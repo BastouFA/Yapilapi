@@ -592,3 +592,128 @@ h3 {
   gap: var(--space-2);
   flex-wrap: wrap;
 }
+
+/* Community FAQ and similar questions */
+.faq {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.faq__item {
+  padding: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.faq__item:first-child {
+  border-top: 0;
+}
+.faq__item summary,
+.similar summary {
+  cursor: pointer;
+  font-weight: 700;
+  list-style-position: outside;
+}
+.faq__item p,
+.similar p {
+  margin: var(--space-2) 0;
+  white-space: pre-wrap;
+  color: var(--ink-muted);
+}
+.similar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--saffron-soft);
+  font-size: 14px;
+  line-height: 20px;
+}
+.similar__post {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+}
+.similar__post:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+/* Sponsored post */
+.yp-sponsored {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.yp-sponsored__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+}
+.yp-sponsored .yp-spacer {
+  flex: 1;
+}
+
+/* Family */
+.family-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.usage {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  height: 88px;
+}
+.usage__day {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.usage__bar {
+  width: 100%;
+  max-width: 28px;
+  border-radius: 8px 8px 4px 4px;
+  background: var(--grad);
+}
+.usage__label {
+  font: 600 11px/14px var(--font-sans);
+  color: var(--ink-muted);
+}
+
+/* Live gifts */
+.live-gift {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-1) 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--saffron-soft);
+  font-size: 14px;
+  line-height: 20px;
+  animation: yp-in var(--duration-base) ease-out both;
+}
+.live-gift__amount {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: var(--grad);
+  color: var(--on-yapi);
+  font: 800 13px/1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}

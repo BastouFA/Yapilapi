@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Avatar, BottomSheet, Button, EmptyState, PostCard, Select, Skeleton, TextField } from '@yapilapi/design-system';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import { Avatar, Badge, BottomSheet, Button, EmptyState, PostCard, Select, Skeleton, TextField } from '@yapilapi/design-system';
+import type { SponsoredAd } from '@yapilapi/api-client';
 import { formatRelativeTime, REPORT_REASONS, type Comment, type Page, type Post } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
@@ -11,7 +12,18 @@ import { useSession } from '@/app/providers';
  * A paginated list of posts with every post interaction wired to the API:
  * like, comment, save, poll vote, feed controls, "why am I seeing this", report, delete.
  */
-export function PostList({ load, empty, reloadKey }: { load: (cursor?: string) => Promise<Page<Post>>; empty?: string; reloadKey?: string }) {
+export function PostList({
+  load,
+  empty,
+  reloadKey,
+  sponsored = false,
+}: {
+  load: (cursor?: string) => Promise<Page<Post>>;
+  empty?: string;
+  reloadKey?: string;
+  /** Allow one labelled sponsored post (only served to adults who opted in to advertising). */
+  sponsored?: boolean;
+}) {
   const { me, toast, t, locale, flags } = useSession();
   const [memoryFor, setMemoryFor] = useState<Post | null>(null);
   const [posts, setPosts] = useState<Post[] | null>(null);
@@ -21,6 +33,19 @@ export function PostList({ load, empty, reloadKey }: { load: (cursor?: string) =
   const [why, setWhy] = useState<{ post: Post; reasons: string[] } | null>(null);
   const [reporting, setReporting] = useState<Post | null>(null);
   const sentinel = useRef<HTMLDivElement>(null);
+  const [ad, setAd] = useState<SponsoredAd | null>(null);
+  const [adWhy, setAdWhy] = useState(false);
+  const adClicked = useRef(false);
+
+  useEffect(() => {
+    setAd(null);
+    adClicked.current = false;
+    if (!sponsored || !flags.ADS) return;
+    api.ads.next().then(
+      (r) => setAd(r.ad),
+      () => {},
+    );
+  }, [sponsored, flags.ADS, reloadKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,6 +151,49 @@ export function PostList({ load, empty, reloadKey }: { load: (cursor?: string) =
     }
   }
 
+  // The sponsored post follows the third post in the list (or the last, in a short list).
+  const renderAd = (slotAd: SponsoredAd) => (
+    <section className="yp-sponsored" aria-label="Sponsored post">
+      <div className="yp-sponsored__bar">
+        <Badge tone="neutral">{slotAd.label}</Badge>
+        <span className="yp-spacer" />
+        <Button size="sm" variant="ghost" onClick={() => setAdWhy(true)}>
+          Why this ad?
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={async () => {
+            setAd(null);
+            await api.ads.hide(slotAd.campaignId).catch(() => {});
+            toast("You won't see this ad again.");
+          }}
+        >
+          Hide
+        </Button>
+      </div>
+      <div
+        onClickCapture={() => {
+          if (adClicked.current) return;
+          adClicked.current = true;
+          void api.ads.click(slotAd.campaignId).catch(() => {});
+        }}
+      >
+        <PostCard
+          post={slotAd.post}
+          locale={locale}
+          linkAs={NextLink}
+          isOwn={false}
+          onLike={like}
+          onSave={save}
+          onVote={vote}
+          onComment={setCommentsFor}
+          onReport={setReporting}
+        />
+      </div>
+    </section>
+  );
+
   if (posts === null)
     return (
       <div className="stack" aria-busy>
@@ -138,23 +206,26 @@ export function PostList({ load, empty, reloadKey }: { load: (cursor?: string) =
 
   return (
     <div className="stack">
-      {posts.map((p) => (
-        <PostCard
-          key={p.id}
-          post={p}
-          locale={locale}
-          linkAs={NextLink}
-          isOwn={p.author.id === me?.id}
-          onLike={like}
-          onSave={save}
-          onVote={vote}
-          onComment={setCommentsFor}
-          onFeedback={feedback}
-          onWhy={async (post) => setWhy({ post, reasons: (await api.posts.why(post.id)).reasons })}
-          onReport={setReporting}
-          onDelete={remove}
-          onAddToMemory={flags.MEMORY ? setMemoryFor : undefined}
-        />
+      {posts.map((p, i) => (
+        <Fragment key={p.id}>
+          <PostCard
+            key={p.id}
+            post={p}
+            locale={locale}
+            linkAs={NextLink}
+            isOwn={p.author.id === me?.id}
+            onLike={like}
+            onSave={save}
+            onVote={vote}
+            onComment={setCommentsFor}
+            onFeedback={feedback}
+            onWhy={async (post) => setWhy({ post, reasons: (await api.posts.why(post.id)).reasons })}
+            onReport={setReporting}
+            onDelete={remove}
+            onAddToMemory={flags.MEMORY ? setMemoryFor : undefined}
+          />
+          {ad && i === Math.min(2, posts.length - 1) ? renderAd(ad) : null}
+        </Fragment>
       ))}
       <div ref={sentinel} />
       {cursor ? (
@@ -189,6 +260,18 @@ export function PostList({ load, empty, reloadKey }: { load: (cursor?: string) =
             {t('post.moreLikeThis')}
           </Button>
         </div>
+      </BottomSheet>
+
+      <BottomSheet open={adWhy && !!ad} onClose={() => setAdWhy(false)} title="Why you're seeing this ad">
+        <ul className="stack-sm" style={{ paddingLeft: 20, margin: 0 }}>
+          {ad?.why.map((r) => (
+            <li key={r}>{r}</li>
+          ))}
+        </ul>
+        <p className="muted">
+          Ads are paid for by the account that posted them. You can turn advertising off in Settings, under Privacy, and no ads are ever shown to people under
+          18.
+        </p>
       </BottomSheet>
 
       <ReportSheet target={reporting ? { type: 'post', id: reporting.id } : null} onClose={() => setReporting(null)} />

@@ -56,6 +56,10 @@ const TEXT: Record<string, (actor: string) => string> = {
   booking_request: (a) => `${a} asked to book`,
   booking_decided: () => 'Your booking was updated',
   tip_received: (a) => `${a} sent you a tip`,
+  family_invite: (a) => `${a} asked to supervise your account`,
+  family_accepted: (a) => `${a} accepted your family link`,
+  family_ended: (a) => `${a} ended your family link`,
+  family_controls_changed: (a) => `${a} changed your family settings`,
   subscription_started: (a) => `${a} subscribed to you`,
 };
 

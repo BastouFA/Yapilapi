@@ -14,9 +14,6 @@ export function SupportCreator({ userId, name, isCreator }: { userId: string; na
   const { toast, locale, flags } = useSession();
   const [data, setData] = useState<Awaited<ReturnType<typeof api.economy.plans>> | null>(null);
   const [tipping, setTipping] = useState(false);
-  const [amount, setAmount] = useState('300');
-  const [currency, setCurrency] = useState('USD');
-  const [message, setMessage] = useState('');
 
   useEffect(() => {
     api.economy.plans(userId).then(setData, () => {});
@@ -59,36 +56,51 @@ export function SupportCreator({ userId, name, isCreator }: { userId: string; na
           Send a tip
         </Button>
       </div>
-      <BottomSheet open={tipping} onClose={() => setTipping(false)} title={`Tip ${name}`}>
-        <form
-          className="stack-sm"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            try {
-              await api.economy.tip(userId, { amountCents: Math.round(Number(amount)), currency, message, idempotencyKey: crypto.randomUUID() });
-              toast('Complete payment to send your tip.');
-              setTipping(false);
-            } catch (err) {
-              toast(errorMessage(err));
-            }
-          }}
-        >
-          <Select label="Amount" value={amount} onChange={(e) => setAmount(e.currentTarget.value)}>
-            {[100, 300, 500, 1000, 2000].map((c) => (
-              <option key={c} value={c}>
-                {formatMoney(c, currency, locale)}
-              </option>
-            ))}
-          </Select>
-          <Select label="Currency" value={currency} onChange={(e) => setCurrency(e.currentTarget.value)}>
-            {['USD', 'EUR', 'GBP', 'NGN', 'XOF'].map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </Select>
-          <TextField label="Message (optional)" value={message} onChange={(e) => setMessage(e.currentTarget.value)} maxLength={200} />
-          <Button type="submit">Continue to payment</Button>
-        </form>
-      </BottomSheet>
+      <TipSheet open={tipping} onClose={() => setTipping(false)} userId={userId} name={name} />
     </Card>
+  );
+}
+
+/** Send a tip. With a liveId it's a gift: once paid, it appears in that live's chat for everyone watching. */
+export function TipSheet({ open, onClose, userId, name, liveId }: { open: boolean; onClose: () => void; userId: string; name: string; liveId?: string }) {
+  const { toast, locale } = useSession();
+  const [amount, setAmount] = useState('300');
+  const [currency, setCurrency] = useState('USD');
+  const [message, setMessage] = useState('');
+  return (
+    <BottomSheet open={open} onClose={onClose} title={liveId ? `Send ${name} a gift` : `Tip ${name}`}>
+      <form
+        className="stack-sm"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          try {
+            await api.economy.tip(userId, { amountCents: Math.round(Number(amount)), currency, message, liveId, idempotencyKey: crypto.randomUUID() });
+            toast(liveId ? 'Complete payment and your gift appears in the chat.' : 'Complete payment to send your tip.');
+            setMessage('');
+            onClose();
+          } catch (err) {
+            toast(errorMessage(err));
+          }
+        }}
+      >
+        <Select label="Amount" value={amount} onChange={(e) => setAmount(e.currentTarget.value)}>
+          {[100, 300, 500, 1000, 2000].map((c) => (
+            <option key={c} value={c}>
+              {formatMoney(c, currency, locale)}
+            </option>
+          ))}
+        </Select>
+        <Select label="Currency" value={currency} onChange={(e) => setCurrency(e.currentTarget.value)}>
+          {['USD', 'EUR', 'GBP', 'NGN', 'XOF'].map((c) => (
+            <option key={c}>{c}</option>
+          ))}
+        </Select>
+        <TextField label="Message (optional)" value={message} onChange={(e) => setMessage(e.currentTarget.value)} maxLength={200} />
+        <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+          A 5% platform fee applies.
+        </p>
+        <Button type="submit">Continue to payment</Button>
+      </form>
+    </BottomSheet>
   );
 }

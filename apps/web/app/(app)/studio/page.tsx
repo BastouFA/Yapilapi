@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button, EmptyState, List, ListItem, Select, Skeleton, Stat, TextField } from '@yapilapi/design-system';
 import { formatMoney, formatRelativeTime } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
+import { Campaigns } from '@/components/Campaigns';
 import { useSession } from '../../providers';
 
 /** Creator Studio: how your content performs over the last 28 days, and what you've earned. */
@@ -81,6 +82,7 @@ export default function Studio() {
         )}
       </section>
       <PlansManager />
+      <Campaigns />
     </div>
   );
 }

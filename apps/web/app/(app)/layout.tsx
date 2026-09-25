@@ -6,6 +6,7 @@ import { NavBar, Skeleton, type NavEntry } from '@yapilapi/design-system';
 import { NextLink } from '@/lib/link';
 import { CallsProvider } from '@/components/Calls';
 import { Sidebar } from '@/components/Sidebar';
+import { UsageHeartbeat } from '@/components/UsageHeartbeat';
 import { useSession } from '../providers';
 
 function currentTab(path: string, username?: string): NavEntry['id'] | undefined {
@@ -58,6 +59,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
         <Sidebar />
+        <UsageHeartbeat />
       </div>
     </CallsProvider>
   );

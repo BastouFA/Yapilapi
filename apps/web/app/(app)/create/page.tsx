@@ -5,6 +5,7 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import { AIPanel, Alert, Button, Checkbox, Segments, Select, TextField } from '@yapilapi/design-system';
 import { VISIBILITIES, type Community, type MessageKey, type Visibility } from '@yapilapi/shared';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
+import { SimilarQuestions } from '@/components/CommunityExtras';
 import { useSession } from '../../providers';
 
 type Uploaded = { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string };
@@ -139,6 +140,9 @@ function Create() {
           aria-invalid={!!fields.body}
         />
         {fields.body ? <span className="yp-field__error">{fields.body}</span> : null}
+        {kind === 'post' && communityId && communities.find((c) => c.id === communityId) ? (
+          <SimilarQuestions slug={communities.find((c) => c.id === communityId)!.slug} text={body} />
+        ) : null}
 
         {media.length ? (
           <div className="thumbs">

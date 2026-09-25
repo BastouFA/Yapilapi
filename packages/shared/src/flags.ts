@@ -9,6 +9,7 @@ export const FEATURE_FLAGS = {
   PLAY: { default: false, description: 'Games and play experiences.' },
   REAL: { default: false, description: 'Authenticity-focused dual capture.' },
   REAL_TOGETHER: { default: false, description: 'Shared multi-perspective experiences.' },
+  ADS: { default: false, description: 'Sponsored posts: paid campaigns shown only to adults who opted in to advertising.' },
 } as const;
 
 export type FeatureFlag = keyof typeof FEATURE_FLAGS;

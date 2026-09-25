@@ -57,7 +57,7 @@ export default function Home() {
         options={(['for_you', 'following', 'friends', 'communities', 'local'] as FeedMode[]).map((m) => ({ id: m, label: t(`feed.${m}`) }))}
       />
 
-      <PostList load={load} reloadKey={mode} />
+      <PostList load={load} reloadKey={mode} sponsored={mode === 'for_you'} />
 
       <BottomSheet open={!!group} onClose={() => setViewing(null)} title={group ? `${group.author.displayName}'s moments` : ''}>
         <div className="stack">

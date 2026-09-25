@@ -7,15 +7,18 @@ import type { LiveChatMessage, LiveSummary } from '@yapilapi/api-client';
 import { api, errorMessage } from '@/lib/api';
 import { useRealtime, useSession } from '../../../providers';
 import { HlsVideo } from '@/components/HlsVideo';
+import { TipSheet } from '@/components/SupportCreator';
+import { formatMoney } from '@yapilapi/shared';
 
 export default function LivePage() {
   const { id } = useParams<{ id: string }>();
-  const { me, toast } = useSession();
+  const { me, toast, locale, flags } = useSession();
   const [live, setLive] = useState<LiveSummary | null>(null);
   const [missing, setMissing] = useState(false);
   const [chat, setChat] = useState<LiveChatMessage[]>([]);
   const [body, setBody] = useState('');
   const [kind, setKind] = useState<'chat' | 'question'>('chat');
+  const [gifting, setGifting] = useState(false);
   const [ingest, setIngest] = useState<{ url: string; streamKey: string } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -122,27 +125,40 @@ export default function LivePage() {
       <section className="stack-sm" aria-label="Live chat">
         <h2 className="section-title">Chat</h2>
         <div className="yp-chat" aria-live="polite" style={{ maxHeight: 360, overflowY: 'auto' }}>
-          {chat.map((m) => (
-            <div key={m.id} className="row" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <ChatBubble mine={m.author.id === me?.id} sender={m.author.displayName} body={m.kind === 'question' ? `Question: ${m.body}` : m.body} />
+          {chat.map((m) =>
+            m.kind === 'gift' ? (
+              <div key={m.id} className="live-gift" role="status">
+                <span className="live-gift__amount">{formatMoney(m.amountCents ?? 0, m.currency ?? 'USD', locale)}</span>
+                <span>
+                  <strong>{m.author.displayName}</strong> sent a gift{m.body ? `: ${m.body}` : ''}
+                </span>
               </div>
-              {canModerate && m.author.id !== me?.id ? (
-                <Menu
-                  label="Moderate"
-                  actions={[
-                    { label: 'Remove message', icon: 'trash', onSelect: () => api.raw.del(`/v1/live/${id}/chat/${m.id}`).catch((e) => toast(errorMessage(e))) },
-                    {
-                      label: `Remove ${m.author.displayName}`,
-                      icon: 'shield',
-                      danger: true,
-                      onSelect: () => api.live.ban(id, m.author.id).then(() => toast('Removed from the live')),
-                    },
-                  ]}
-                />
-              ) : null}
-            </div>
-          ))}
+            ) : (
+              <div key={m.id} className="row" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <ChatBubble mine={m.author.id === me?.id} sender={m.author.displayName} body={m.kind === 'question' ? `Question: ${m.body}` : m.body} />
+                </div>
+                {canModerate && m.author.id !== me?.id ? (
+                  <Menu
+                    label="Moderate"
+                    actions={[
+                      {
+                        label: 'Remove message',
+                        icon: 'trash',
+                        onSelect: () => api.raw.del(`/v1/live/${id}/chat/${m.id}`).catch((e) => toast(errorMessage(e))),
+                      },
+                      {
+                        label: `Remove ${m.author.displayName}`,
+                        icon: 'shield',
+                        danger: true,
+                        onSelect: () => api.live.ban(id, m.author.id).then(() => toast('Removed from the live')),
+                      },
+                    ]}
+                  />
+                ) : null}
+              </div>
+            ),
+          )}
           <div ref={endRef} />
         </div>
         {live.status === 'live' ? (
@@ -184,6 +200,14 @@ export default function LivePage() {
               Send
             </Button>
           </form>
+        ) : null}
+        {live.status === 'live' && !isHost && flags.COMMERCE !== false ? (
+          <>
+            <Button variant="secondary" icon="sparkle" onClick={() => setGifting(true)}>
+              Send a gift
+            </Button>
+            <TipSheet open={gifting} onClose={() => setGifting(false)} userId={live.host.id} name={live.host.displayName} liveId={live.id} />
+          </>
         ) : null}
       </section>
     </div>

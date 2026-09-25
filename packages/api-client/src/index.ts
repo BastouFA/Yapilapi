@@ -163,6 +163,13 @@ export function createClient(opts: ClientOptions) {
       leave: (slug: string) => post(`/v1/communities/${slug}/leave`),
       posts: (slug: string, cursor?: string) => get<Page<Post> & { locked?: boolean }>(`/v1/communities/${slug}/posts${qs({ cursor })}`),
       members: (slug: string) => get<{ items: { user: PublicUser; role: string }[] }>(`/v1/communities/${slug}/members`),
+      faq: (slug: string) => get<{ items: FaqEntry[]; canEdit: boolean }>(`/v1/communities/${slug}/faq`),
+      addFaq: (slug: string, b: { question: string; answer: string }) => post<{ faq: FaqEntry }>(`/v1/communities/${slug}/faq`, b),
+      updateFaq: (slug: string, id: string, b: Partial<{ question: string; answer: string; position: number }>) =>
+        patch<{ faq: FaqEntry }>(`/v1/communities/${slug}/faq/${id}`, b),
+      deleteFaq: (slug: string, id: string) => del(`/v1/communities/${slug}/faq/${id}`),
+      similar: (slug: string, q: string) =>
+        get<{ faq: (FaqEntry & { score: number })[]; posts: { post: Post; score: number }[] }>(`/v1/communities/${slug}/similar${qs({ q })}`),
     },
     events: {
       list: (scope: 'upcoming' | 'going' | 'hosting' | 'now' = 'upcoming') => get<{ items: EventItem[] }>(`/v1/events${qs({ scope })}`),
@@ -243,7 +250,7 @@ export function createClient(opts: ClientOptions) {
         post<{ subscription: { id: string; status: string }; payment: { orderId: string; clientSecret: string } }>(`/v1/creator/plans/${planId}/subscribe`, {
           idempotencyKey,
         }),
-      tip: (userId: string, b: { amountCents: number; currency: string; message?: string; postId?: string; idempotencyKey: string }) =>
+      tip: (userId: string, b: { amountCents: number; currency: string; message?: string; postId?: string; liveId?: string; idempotencyKey: string }) =>
         post<{ payment: { orderId: string } }>(`/v1/users/${userId}/tips`, b),
       subscribers: () => get<{ active: number; cancelled: number }>('/v1/creator/subscribers'),
       mySubscriptions: () =>
@@ -399,6 +406,28 @@ export function createClient(opts: ClientOptions) {
       send: (id: string, body: string, kind: 'chat' | 'question' = 'chat') => post<{ message: LiveChatMessage }>(`/v1/live/${id}/chat`, { body, kind }),
       ban: (id: string, userId: string) => post(`/v1/live/${id}/ban`, { userId }),
     },
+    ads: {
+      next: () => get<{ ad: SponsoredAd | null }>('/v1/ads/next'),
+      click: (campaignId: string) => post(`/v1/ads/${campaignId}/click`),
+      hide: (campaignId: string) => post(`/v1/ads/${campaignId}/hide`),
+      campaigns: () => get<{ items: AdCampaign[] }>('/v1/ads/campaigns'),
+      create: (b: { postId: string; name: string; topics?: string[]; locales?: string[]; cpmCents?: number; startsAt?: string; endsAt?: string }) =>
+        post<{ campaign: AdCampaign }>('/v1/ads/campaigns', b),
+      setStatus: (id: string, status: 'active' | 'paused' | 'ended') => patch<{ campaign: AdCampaign }>(`/v1/ads/campaigns/${id}`, { status }),
+      fund: (id: string, amountCents: number, idempotencyKey: string) =>
+        post<{ payment: { provider: string; clientSecret: string; orderId: string } }>(`/v1/ads/campaigns/${id}/fund`, { amountCents, idempotencyKey }),
+      stats: (id: string) =>
+        get<{ campaign: AdCampaign; days: { day: string; impressions: number; clicks: number; hides: number; reach: number }[] }>(`/v1/ads/campaigns/${id}/stats`),
+    },
+    family: {
+      list: () => get<{ items: FamilyLink[] }>('/v1/family'),
+      invite: (username: string) => post<{ link: { id: string; status: string } }>('/v1/family/invite', { username }),
+      accept: (id: string) => post(`/v1/family/${id}/accept`),
+      end: (id: string) => post(`/v1/family/${id}/end`),
+      setControls: (id: string, b: TeenControls) => put<{ controls: TeenControls }>(`/v1/family/${id}/controls`, b),
+      heartbeat: () =>
+        post<{ minutesToday: number; dailyLimitMinutes: number | null; overLimit: boolean; quietNow: boolean; supervised: boolean }>('/v1/me/usage/heartbeat'),
+    },
     admin: {
       cases: (status = 'open') => get<{ items: Record<string, any>[] }>(`/v1/admin/moderation/cases${qs({ status })}`),
       decide: (id: string, decision: string, note?: string) => post(`/v1/admin/moderation/cases/${id}/decide`, { decision, note }),
@@ -443,9 +472,11 @@ export interface LiveSummary {
 
 export interface LiveChatMessage {
   id: string;
-  kind: 'chat' | 'question' | 'reaction';
+  kind: 'chat' | 'question' | 'reaction' | 'gift';
   body: string;
   answered: boolean;
+  amountCents?: number;
+  currency?: string;
   author: PublicUser;
   createdAt: string;
 }
@@ -468,4 +499,57 @@ export interface TogetherDetail {
   myRole: 'creator' | 'member';
   members: { user: PublicUser; role: string }[];
   contributions: { id: string; caption: string; capturedAt: string; media: { url: string; kind: string; altText: string | null } | null; author: PublicUser }[];
+}
+
+export interface FaqEntry {
+  id: string;
+  question: string;
+  answer: string;
+  position: number;
+  updatedAt: string;
+}
+
+export interface SponsoredAd {
+  campaignId: string;
+  label: 'Sponsored';
+  post: Post;
+  why: string[];
+}
+
+export interface AdCampaign {
+  id: string;
+  name: string;
+  status: 'draft' | 'active' | 'paused' | 'ended' | 'rejected';
+  postId: string;
+  topics: string[];
+  locales: string[];
+  cpmCents: number;
+  currency: string;
+  budgetCents: number;
+  spentCents: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  startsAt: string | null;
+  endsAt: string | null;
+  createdAt: string;
+}
+
+export interface TeenControls {
+  messagesFrom: 'friends' | 'nobody';
+  dailyLimitMinutes: number | null;
+  quietStart: string | null;
+  quietEnd: string | null;
+  timezone: string;
+}
+
+export interface FamilyLink {
+  id: string;
+  role: 'guardian' | 'teen';
+  status: 'pending' | 'active';
+  guardian: PublicUser | null;
+  teen: PublicUser | null;
+  controls: TeenControls | null;
+  usage?: { day: string; minutes: number }[];
+  createdAt: string;
 }

@@ -7,6 +7,7 @@ import { NOTIFICATION_CATEGORIES, PROFILE_MODES, SUPPORTED_LOCALES, formatRelati
 import { startRegistration } from '@simplewebauthn/browser';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { currentSubscription, disableBrowserPush, enableBrowserPush, pushSupported } from '@/lib/push';
+import { FamilyCard } from '@/components/Family';
 import { useSession } from '../../providers';
 
 export default function Settings() {
@@ -210,7 +211,7 @@ function AttentionSettings() {
 const PURPOSES: Record<string, string> = {
   personalization: 'Personalize my feed and suggestions',
   ai_processing: 'Let the assistant remember things I tell it',
-  advertising: 'Use my activity for ads',
+  advertising: 'Show me sponsored posts based on my interests (adults only)',
   analytics: 'Help improve YAPILAPI with usage analytics',
 };
 
@@ -422,6 +423,7 @@ function SecuritySettings() {
       <TwoStepCard />
       <PasskeysCard />
       <BrowserPushCard />
+      <FamilyCard />
       <Card title="Developers" subtitle="Build integrations with API keys and webhooks.">
         <a href="/developers" className="yp-btn yp-btn--secondary yp-btn--sm">
           Open developer settings

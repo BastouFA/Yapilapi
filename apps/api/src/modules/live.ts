@@ -187,7 +187,7 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
     const { id } = parse(idParam, req.params);
     await load(id, u.id);
     const { rows } = await db.query(
-      `SELECT c.id, c.kind, c.body, c.answered, c.created_at, pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode
+      `SELECT c.id, c.kind, c.body, c.answered, c.amount_cents, c.currency, c.created_at, pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode
        FROM live_chat c JOIN profiles pr ON pr.user_id = c.user_id WHERE c.session_id = $1 AND c.deleted_at IS NULL AND ${notBlockedSql('c.user_id', '$2')}
        ORDER BY c.created_at DESC LIMIT 200`,
       [id, u.id],
@@ -195,7 +195,15 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
     return {
       items: rows
         .reverse()
-        .map((r) => ({ id: r.id, kind: r.kind, body: r.body, answered: r.answered, author: publicUserFrom(r, 'a_'), createdAt: r.created_at })),
+        .map((r) => ({
+          id: r.id,
+          kind: r.kind,
+          body: r.body,
+          answered: r.answered,
+          ...(r.kind === 'gift' ? { amountCents: r.amount_cents, currency: r.currency } : {}),
+          author: publicUserFrom(r, 'a_'),
+          createdAt: r.created_at,
+        })),
     };
   });
 

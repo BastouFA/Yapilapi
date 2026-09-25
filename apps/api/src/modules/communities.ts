@@ -285,4 +285,93 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
     await audit(db, { actorId: u.id, action: 'community.update', entityType: 'community', entityId: row.id });
     return { community: toCommunity(await bySlug(slug, u.id)) };
   });
+
+  // ── FAQ ───────────────────────────────────────────────────────────────
+  const faqDto = (r: Record<string, any>) => ({ id: r.id, question: r.question, answer: r.answer, position: r.position, updatedAt: r.updated_at.toISOString() });
+  const faqInput = z.object({ question: z.string().trim().min(5).max(300), answer: z.string().trim().min(1).max(4000), position: z.number().int().min(0).max(999).optional() });
+
+  async function readable(slug: string, viewer: string | null) {
+    const row = await bySlug(slug, viewer);
+    if (row.visibility === 'private' && !row.my_role) throw forbidden('Join this community to see this.');
+    return row;
+  }
+
+  app.get('/v1/communities/:slug/faq', async (req) => {
+    const { slug } = parse(slugParam, req.params);
+    const row = await readable(slug, req.user?.id ?? null);
+    const { rows } = await db.query(`SELECT * FROM community_faqs WHERE community_id = $1 ORDER BY position, created_at`, [row.id]);
+    return { items: rows.map(faqDto), canEdit: atLeast(row.my_role, 'moderator') };
+  });
+
+  app.post('/v1/communities/:slug/faq', { preHandler: requireAuth }, async (req, reply) => {
+    const u = me(req);
+    const { slug } = parse(slugParam, req.params);
+    const input = parse(faqInput, req.body);
+    const row = await bySlug(slug, u.id);
+    if (!atLeast(row.my_role, 'moderator')) throw forbidden();
+    const count = await db.query(`SELECT count(*) AS n FROM community_faqs WHERE community_id = $1`, [row.id]);
+    if (Number(count.rows[0].n) >= 100) throw new AppError(409, 'conflict', 'A community can have up to 100 FAQ entries.');
+    const { rows } = await db.query(
+      `INSERT INTO community_faqs (community_id, question, answer, position, created_by) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [row.id, input.question, input.answer, input.position ?? Number(count.rows[0].n), u.id],
+    );
+    await audit(db, { actorId: u.id, action: 'community.faq.create', entityType: 'community', entityId: row.id });
+    reply.code(201);
+    return { faq: faqDto(rows[0]) };
+  });
+
+  app.patch('/v1/communities/:slug/faq/:id', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { slug, id } = parse(slugParam.extend({ id: z.string().uuid() }), req.params);
+    const input = parse(faqInput.partial(), req.body);
+    const row = await bySlug(slug, u.id);
+    if (!atLeast(row.my_role, 'moderator')) throw forbidden();
+    const { rows } = await db.query(
+      `UPDATE community_faqs SET question = coalesce($3, question), answer = coalesce($4, answer), position = coalesce($5, position)
+       WHERE id = $1 AND community_id = $2 RETURNING *`,
+      [id, row.id, input.question ?? null, input.answer ?? null, input.position ?? null],
+    );
+    if (!rows[0]) throw notFound('FAQ entry');
+    return { faq: faqDto(rows[0]) };
+  });
+
+  app.delete('/v1/communities/:slug/faq/:id', { preHandler: requireAuth }, async (req, reply) => {
+    const u = me(req);
+    const { slug, id } = parse(slugParam.extend({ id: z.string().uuid() }), req.params);
+    const row = await bySlug(slug, u.id);
+    if (!atLeast(row.my_role, 'moderator')) throw forbidden();
+    const r = await db.query(`DELETE FROM community_faqs WHERE id = $1 AND community_id = $2`, [id, row.id]);
+    if (!r.rowCount) throw notFound('FAQ entry');
+    await audit(db, { actorId: u.id, action: 'community.faq.delete', entityType: 'community', entityId: row.id });
+    reply.code(204);
+  });
+
+  /**
+   * "Has this been asked before?" Trigram similarity against the FAQ and
+   * earlier posts in the community, filtered by what the viewer may see.
+   * Called while someone types a question, before they post it.
+   */
+  app.get('/v1/communities/:slug/similar', { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (req) => {
+    const viewer = req.user?.id ?? null;
+    const { slug } = parse(slugParam, req.params);
+    const { q } = parse(z.object({ q: z.string().trim().min(8).max(500) }), req.query);
+    const row = await readable(slug, viewer);
+    const faqs = await db.query(
+      `SELECT *, similarity(question, $2) AS score FROM community_faqs WHERE community_id = $1 AND similarity(question, $2) > 0.25 ORDER BY score DESC LIMIT 3`,
+      [row.id, q],
+    );
+    const posts = await db.query(
+      `SELECT p.id, similarity(p.body, $3) AS score FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
+       WHERE p.community_id = $2 AND p.body % $3 AND ${postVisibleSql('$1')}
+       ORDER BY score DESC, p.created_at DESC LIMIT 3`,
+      [viewer, row.id, q],
+    );
+    const scores = new Map(posts.rows.map((r) => [r.id as string, r.score as number]));
+    const hydrated = await hydratePosts(db, [...scores.keys()], viewer);
+    return {
+      faq: faqs.rows.map((r) => ({ ...faqDto(r), score: Number(Number(r.score).toFixed(2)) })),
+      posts: hydrated.map((p) => ({ post: p, score: Number(Number(scores.get(p.id) ?? 0).toFixed(2)) })),
+    };
+  });
+
 }

@@ -59,7 +59,14 @@ export function Sidebar() {
         <label className="yp-visually-hidden" htmlFor="aside-search">
           Search YAPILAPI
         </label>
-        <input id="aside-search" className="yp-search" type="search" placeholder="Search people, places, events" value={q} onChange={(e) => setQ(e.currentTarget.value)} />
+        <input
+          id="aside-search"
+          className="yp-search"
+          type="search"
+          placeholder="Search people, places, events"
+          value={q}
+          onChange={(e) => setQ(e.currentTarget.value)}
+        />
       </form>
 
       {live.length ? (

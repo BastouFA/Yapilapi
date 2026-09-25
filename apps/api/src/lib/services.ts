@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import { FEATURE_FLAGS, type FeatureFlag } from '@yapilapi/shared';
 import type { RealtimeHub } from './realtime.ts';
 import { pushTextFor, type PushSender } from './push.ts';
+import { activeControls } from './family.ts';
 
 type Q = Pool | PoolClient;
 
@@ -86,7 +87,8 @@ export async function notify(
   if (paused) return;
   await realtime.publish([n.userId], { type: 'notification.created', data: { id: rows[0]!.id, category: n.category, type: n.type } });
   // Push to devices, except when the person is in focus mode. Fire and forget.
-  if (pushSender && !p?.focus_mode) {
+  // A supervised teen's quiet hours hold pushes too; the notification still lands in the inbox.
+  if (pushSender && !p?.focus_mode && !(n.category !== 'security' && (await activeControls(db, n.userId))?.quietNow)) {
     const text = pushTextFor(
       n.type,
       n.actorId ? ((await db.query(`SELECT display_name FROM profiles WHERE user_id = $1`, [n.actorId])).rows[0]?.display_name ?? null) : null,

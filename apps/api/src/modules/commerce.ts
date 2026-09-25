@@ -15,6 +15,40 @@ const idParam = z.object({ id: z.string().uuid() });
 const PLATFORM_FEE_BPS = 500; // 5%
 
 export default async function commerceModule(app: FastifyInstance, ctx: AppContext) {
+  /** A paid tip sent during a live shows up in that live's chat as a gift, for everyone watching. */
+  async function announceLiveGift(c: { query: typeof ctx.db.query }, orderId: string) {
+    const t = (
+      await c.query(
+        `SELECT t.live_id, t.message, t.from_id, o.total_cents, o.currency FROM tips t JOIN orders o ON o.id = t.order_id
+         JOIN live_sessions l ON l.id = t.live_id WHERE t.order_id = $1 AND l.status = 'live'`,
+        [orderId],
+      )
+    ).rows[0];
+    if (!t) return;
+    const { rows } = await c.query(
+      `INSERT INTO live_chat (session_id, user_id, kind, body, amount_cents, currency) VALUES ($1,$2,'gift',$3,$4,$5) RETURNING id, created_at`,
+      [t.live_id, t.from_id, t.message ?? '', t.total_cents, t.currency],
+    );
+    const author = (
+      await c.query(
+        `SELECT user_id AS a_id, username AS a_username, display_name AS a_display_name, avatar_url AS a_avatar_url, mode AS a_mode FROM profiles WHERE user_id = $1`,
+        [t.from_id],
+      )
+    ).rows[0];
+    const audience = (await c.query(`SELECT user_id FROM live_participants WHERE session_id = $1 AND left_at IS NULL`, [t.live_id])).rows.map((r) => r.user_id);
+    const message = {
+      id: rows[0].id,
+      kind: 'gift',
+      body: t.message ?? '',
+      answered: false,
+      amountCents: t.total_cents,
+      currency: t.currency,
+      author: publicUserFrom(author, 'a_'),
+      createdAt: rows[0].created_at,
+    };
+    await ctx.realtime.publish(audience, { type: 'live.chat', data: { liveId: t.live_id, message } });
+  }
+
   const db = ctx.db;
 
   // ── Businesses ────────────────────────────────────────────────────────
@@ -345,7 +379,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
             entityId: p.order_id,
           });
         }
-        if (o.purpose === 'tip')
+        if (o.purpose === 'tip') {
           await notify(c, ctx.realtime, {
             userId: o.payee_id,
             category: 'creators',
@@ -354,6 +388,13 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
             entityType: 'order',
             entityId: p.order_id,
           });
+          await announceLiveGift(c, p.order_id);
+        }
+        if (o.purpose === 'ad_budget')
+          await c.query(
+            `UPDATE ad_campaigns SET budget_millicents = budget_millicents + (o.total_cents::bigint * 1000) FROM orders o WHERE o.id = $1 AND ad_campaigns.id = o.campaign_id`,
+            [p.order_id],
+          );
         const sellers = await c.query<{ seller_id: string }>(
           `SELECT DISTINCT p.seller_id FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = $1`,
           [p.order_id],

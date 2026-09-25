@@ -8,6 +8,7 @@ import type { Community, EventItem, PublicUser } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { PostList } from '@/components/PostList';
+import { CommunityFaq } from '@/components/CommunityExtras';
 import { useSession } from '../../../providers';
 
 export default function CommunityPage() {
@@ -98,7 +99,7 @@ export default function CommunityPage() {
         </div>
         <span className="muted">
           {c.memberCount.toLocaleString()} {t('communities.members')} · {c.visibility === 'private' ? 'Private' : 'Public'}
-          {c.myRole && c.myRole !== 'member' ? ` · You're ${c.myRole === 'admin' ? 'an' : 'a'} ${c.myRole}` : ''}
+          {c.myRole && c.myRole !== 'member' ? ` · You're ${/^[aeiou]/.test(c.myRole) ? 'an' : 'a'} ${c.myRole}` : ''}
         </span>
         {c.description ? <p style={{ margin: 0 }}>{c.description}</p> : null}
         <div className="row">
@@ -168,6 +169,7 @@ export default function CommunityPage() {
         onChange={setTab}
         tabs={[
           { id: 'posts', label: 'Posts' },
+          { id: 'faq', label: 'FAQ' },
           { id: 'events', label: 'Events' },
           { id: 'members', label: 'Members', count: c.memberCount },
         ]}
@@ -177,6 +179,12 @@ export default function CommunityPage() {
           <Alert tone="info">Join this private community to see its posts.</Alert>
         ) : (
           <PostList load={load} reloadKey={slug} empty="No posts yet. Start the first discussion." />
+        )
+      ) : tab === 'faq' ? (
+        c.visibility === 'private' && !isMember ? (
+          <Alert tone="info">Join this private community to see its FAQ.</Alert>
+        ) : (
+          <CommunityFaq slug={slug} />
         )
       ) : tab === 'events' ? (
         events === null ? (

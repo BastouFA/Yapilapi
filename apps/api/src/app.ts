@@ -45,6 +45,8 @@ import oauthModule from './modules/oauth.ts';
 import pushModule from './modules/push.ts';
 import miniAppsModule from './modules/miniapps.ts';
 import economyModule from './modules/economy.ts';
+import adsModule from './modules/ads.ts';
+import familyModule from './modules/family.ts';
 import { createPushSender } from './lib/push.ts';
 import { setPushSender } from './lib/services.ts';
 import { processWebhooks } from './lib/webhooks.ts';
@@ -269,6 +271,8 @@ export async function buildApp(
     pushModule,
     miniAppsModule,
     economyModule,
+    adsModule,
+    familyModule,
   ])
     await mod(app, ctx);
 

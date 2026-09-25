@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
 import { createConversationSchema, pageQuerySchema, sendMessageSchema, type Conversation, type Message } from '@yapilapi/shared';
 import { z } from 'zod';
+import { activeControls } from '../lib/family.ts';
 import { AppError, badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
@@ -38,8 +39,27 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const recipientAge = ageOf(r.rows[0].birth_date);
     const senderAge = ageOf(senderBirth);
     const minorInvolved = (recipientAge !== null && recipientAge < 18) !== (senderAge !== null && senderAge < 18);
-    if (minorInvolved && !(await areFriends(db, senderId, recipientId)))
+    // A guardian the teen accepted through a family link counts like a friend here.
+    const linked = minorInvolved
+      ? (
+          await db.query(
+            `SELECT 1 FROM family_links WHERE status = 'active' AND ((guardian_id = $1 AND teen_id = $2) OR (guardian_id = $2 AND teen_id = $1))`,
+            [senderId, recipientId],
+          )
+        ).rowCount
+      : 0;
+    if (minorInvolved && !linked && !(await areFriends(db, senderId, recipientId)))
       throw new AppError(403, 'minor_protection', 'To keep younger people safe, you can only message them once you are friends.');
+    // Family controls apply both ways: a supervised teen's setting limits who they can message and who can message them. Guardians can always.
+    for (const [teen, other] of [
+      [recipientId, senderId],
+      [senderId, recipientId],
+    ] as const) {
+      const controls = await activeControls(db, teen);
+      if (!controls || controls.guardianIds.includes(other)) continue;
+      if (controls.messagesFrom === 'nobody' || !(await areFriends(db, senderId, recipientId)))
+        throw new AppError(403, 'family_controls', 'Family settings on this account limit who it can message.');
+    }
   }
 
   async function loadConversations(userId: string, ids?: string[]): Promise<Conversation[]> {
