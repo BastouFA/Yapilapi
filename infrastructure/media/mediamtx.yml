@@ -18,3 +18,10 @@ authHTTPExclude: []
 paths:
   '~^live/[0-9a-f-]{36}$':
     source: publisher
+    # Recordings feed the host's saved video and automatic highlight clips.
+    # The API reads them from LIVE_RECORDINGS_DIR (this folder, mounted in docker-compose.yml).
+    record: yes
+    recordPath: /recordings/%path/%Y-%m-%d_%H-%M-%S-%f
+    recordFormat: fmp4
+    recordSegmentDuration: 1h
+    recordDeleteAfter: 7d

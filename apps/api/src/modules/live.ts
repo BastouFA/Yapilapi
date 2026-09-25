@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { hashToken } from '@yapilapi/auth';
 import { tx } from '@yapilapi/database';
 import { z } from 'zod';
+import { enqueue } from '../lib/jobs.ts';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { analyzeText } from '../lib/moderation.ts';
@@ -125,6 +126,32 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
     return { live: dto(await load(id, u.id), u.id) };
   });
 
+  /** The host's recording and automatic highlight clips, once the live has ended. */
+  app.get('/v1/live/:id/clips', { preHandler: gate }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const l = await load(id, u.id);
+    if (l.host_id !== u.id) throw forbidden();
+    const clips = await db.query(
+      `SELECT e.id, e.start_ms, e.end_ms, e.status, e.error, r.id AS media_id, r.url, r.poster_url, r.hls_url, r.status AS media_status
+       FROM media_edits e LEFT JOIN media r ON r.id = e.result_media_id
+       WHERE e.source_media_id = $1 AND e.auto ORDER BY e.start_ms`,
+      [l.recording_media_id],
+    );
+    return {
+      enabled: !!ctx.config.LIVE_RECORDINGS_DIR,
+      recording: { status: l.recording_status ?? null, mediaId: l.recording_media_id ?? null },
+      clips: clips.rows.map((c) => ({
+        id: c.id,
+        startMs: c.start_ms,
+        endMs: c.end_ms,
+        status: c.media_status === 'ready' ? 'ready' : c.status,
+        error: c.error,
+        media: c.media_id ? { id: c.media_id, url: c.url, posterUrl: c.poster_url, hlsUrl: c.hls_url } : null,
+      })),
+    };
+  });
+
   // ── Live shopping: products the host pins while live ─────────────────
   app.get('/v1/live/:id/products', { preHandler: gate }, async (req) => {
     const u = me(req);
@@ -136,7 +163,15 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
       [id],
     );
     return {
-      items: rows.map((r) => ({ id: r.id, kind: r.kind, title: r.title, description: r.description, priceCents: r.price_cents, currency: r.currency, inventory: r.inventory })),
+      items: rows.map((r) => ({
+        id: r.id,
+        kind: r.kind,
+        title: r.title,
+        description: r.description,
+        priceCents: r.price_cents,
+        currency: r.currency,
+        inventory: r.inventory,
+      })),
     };
   });
 
@@ -153,7 +188,10 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
         if (p.seller_id !== u.id) throw forbidden('You can only show products you sell.');
         const count = await db.query(`SELECT count(*) AS n FROM live_products WHERE session_id = $1`, [params.id]);
         if (Number(count.rows[0].n) >= 20) throw new AppError(409, 'conflict', 'Up to 20 products can be shown in a live.');
-        await db.query(`INSERT INTO live_products (session_id, product_id) VALUES ($1,$2) ON CONFLICT (session_id, product_id) DO UPDATE SET pinned_at = now()`, [params.id, productId]);
+        await db.query(
+          `INSERT INTO live_products (session_id, product_id) VALUES ($1,$2) ON CONFLICT (session_id, product_id) DO UPDATE SET pinned_at = now()`,
+          [params.id, productId],
+        );
       } else await db.query(`DELETE FROM live_products WHERE session_id = $1 AND product_id = $2`, [params.id, productId]);
       await ctx.realtime.publish(await audience(params.id), { type: 'live.products', data: { liveId: params.id } });
       return { ok: true };
@@ -222,6 +260,11 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
     ]);
     if (!r.rowCount) throw badRequest('Only the host can end this live.');
     await ctx.realtime.publish(await audience(id), { type: 'live.status', data: { id, status: 'ended' } });
+    // Give the video server a moment to close the last recording segment, then make the recording and highlight clips.
+    if (ctx.config.LIVE_RECORDINGS_DIR) {
+      await db.query(`UPDATE live_sessions SET recording_status = 'pending' WHERE id = $1`, [id]);
+      await enqueue(db, 'live.recording', { sessionId: id }, 15);
+    }
     await db.query(`UPDATE live_participants SET left_at = now() WHERE session_id = $1 AND left_at IS NULL`, [id]);
     return { live: dto(await load(id, u.id), u.id) };
   });
@@ -262,17 +305,15 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
       [id, u.id],
     );
     return {
-      items: rows
-        .reverse()
-        .map((r) => ({
-          id: r.id,
-          kind: r.kind,
-          body: r.body,
-          answered: r.answered,
-          ...(r.kind === 'gift' ? { amountCents: r.amount_cents, currency: r.currency } : {}),
-          author: publicUserFrom(r, 'a_'),
-          createdAt: r.created_at,
-        })),
+      items: rows.reverse().map((r) => ({
+        id: r.id,
+        kind: r.kind,
+        body: r.body,
+        answered: r.answered,
+        ...(r.kind === 'gift' ? { amountCents: r.amount_cents, currency: r.currency } : {}),
+        author: publicUserFrom(r, 'a_'),
+        createdAt: r.created_at,
+      })),
     };
   });
 

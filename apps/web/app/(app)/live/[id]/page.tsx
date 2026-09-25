@@ -10,6 +10,7 @@ import { HlsVideo } from '@/components/HlsVideo';
 import { TipSheet } from '@/components/SupportCreator';
 import { BuyButton } from '@/components/BuyButton';
 import { LiveShop } from '@/components/LiveShop';
+import { LiveClips } from '@/components/LiveClips';
 import { formatMoney } from '@yapilapi/shared';
 
 export default function LivePage() {
@@ -116,6 +117,7 @@ export default function LivePage() {
         </Alert>
       ) : null}
 
+      {isHost && live.status === 'ended' ? <LiveClips liveId={live.id} /> : null}
       <LiveShop liveId={live.id} isHost={isHost} hostId={live.host.id} />
 
       {isHost ? (

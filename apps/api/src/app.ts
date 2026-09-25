@@ -55,6 +55,7 @@ import { processWebhooks } from './lib/webhooks.ts';
 import { processJobs } from './lib/jobs.ts';
 import { mediaJobHandlers } from './lib/media-processing.ts';
 import { studioJobHandlers } from './lib/studio.ts';
+import { liveRecordingJobHandlers } from './lib/live-recording.ts';
 
 export interface BuiltApp {
   app: FastifyInstance;
@@ -292,7 +293,11 @@ export async function buildApp(
   }
   // Background jobs (media processing). Tests drive processJobs directly.
   let jobTimer: NodeJS.Timeout | undefined;
-  const jobHandlers = { ...mediaJobHandlers({ db, storage }), ...studioJobHandlers({ db, storage, transcription: ctx.transcription }) };
+  const jobHandlers = {
+    ...mediaJobHandlers({ db, storage }),
+    ...studioJobHandlers({ db, storage, transcription: ctx.transcription }),
+    ...liveRecordingJobHandlers({ db, storage, recordingsDir: config.LIVE_RECORDINGS_DIR }),
+  };
   if (opts.webhookWorker ?? config.APP_ENV !== 'test') {
     let busy = false;
     jobTimer = setInterval(async () => {

@@ -420,6 +420,12 @@ export function createClient(opts: ClientOptions) {
     live: {
       list: () => get<{ items: LiveSummary[] }>('/v1/live'),
       get: (id: string) => get<{ live: LiveSummary }>(`/v1/live/${id}`),
+      clips: (id: string) =>
+        get<{
+          enabled: boolean;
+          recording: { status: 'pending' | 'ready' | 'none' | 'failed' | null; mediaId: string | null };
+          clips: { id: string; startMs: number; endMs: number; status: string; error: string | null; media: { id: string; url: string; posterUrl: string | null; hlsUrl: string | null } | null }[];
+        }>(`/v1/live/${id}/clips`),
       update: (id: string, b: { title?: string; ticketProductId?: string | null }) => patch<{ live: LiveSummary }>(`/v1/live/${id}`, b),
       products: (id: string) => get<{ items: LiveProduct[] }>(`/v1/live/${id}/products`),
       pin: (id: string, productId: string) => post(`/v1/live/${id}/products`, { productId }),

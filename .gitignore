@@ -16,3 +16,6 @@ coverage/
 
 # Claude Code agent worktrees
 .claude/worktrees/
+
+# Live recordings written by MediaMTX in development
+infrastructure/media/recordings/

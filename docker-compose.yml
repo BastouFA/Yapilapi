@@ -33,7 +33,7 @@ services:
   # Live video: RTMP ingest (OBS etc.) and HLS playback, authorized by the API.
   live:
     image: bluenviron/mediamtx:latest
-    volumes: ['./infrastructure/media/mediamtx.yml:/mediamtx.yml:ro']
+    volumes: ['./infrastructure/media/mediamtx.yml:/mediamtx.yml:ro', './infrastructure/media/recordings:/recordings']
     ports: ['1935:1935', '8888:8888', '8889:8889']
     extra_hosts: ['host.docker.internal:host-gateway']
 
