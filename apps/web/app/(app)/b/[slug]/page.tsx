@@ -7,11 +7,12 @@ import { Badge, EmptyState, List, ListItem, ProductCard, Skeleton } from '@yapil
 import { api } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { BuyButton } from '@/components/BuyButton';
+import { BusinessInsights } from '@/components/BusinessInsights';
 import { useSession } from '../../../providers';
 
 export default function BusinessPage() {
   const { slug } = useParams<{ slug: string }>();
-  const { locale } = useSession();
+  const { locale, me } = useSession();
   const [data, setData] = useState<Awaited<ReturnType<typeof api.businesses.get>> | null>(null);
   const [missing, setMissing] = useState(false);
   useEffect(() => {
@@ -41,6 +42,7 @@ export default function BusinessPage() {
           ) : null}
         </span>
       </div>
+      {me?.id === business.owner.id ? <BusinessInsights businessId={business.id} /> : null}
       {places.length ? (
         <List label="Locations">
           {places.map((p) => (

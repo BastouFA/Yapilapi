@@ -1,15 +1,25 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Badge, Button, Card, List, ListItem, Select, TextField } from '@yapilapi/design-system';
+import { Alert, Badge, Button, Card, List, ListItem, Select, TextField } from '@yapilapi/design-system';
 import type { AdCampaign } from '@yapilapi/api-client';
 import { formatMoney, type Post } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
+const STATUS_LABEL: Record<AdCampaign['status'], string> = {
+  active: 'Running',
+  draft: 'Draft',
+  pending_review: 'In review',
+  paused: 'Paused',
+  ended: 'Ended',
+  rejected: 'Not approved',
+};
+
 const STATUS_TONE: Record<AdCampaign['status'], 'success' | 'neutral' | 'warning' | 'danger'> = {
   active: 'success',
   draft: 'neutral',
+  pending_review: 'warning',
   paused: 'warning',
   ended: 'neutral',
   rejected: 'danger',
@@ -70,7 +80,7 @@ export function Campaigns() {
                 }}
                 primary={
                   <span className="row">
-                    {c.name} <Badge tone={STATUS_TONE[c.status]}>{c.status}</Badge>
+                    {c.name} <Badge tone={STATUS_TONE[c.status]}>{STATUS_LABEL[c.status]}</Badge>
                   </span>
                 }
                 secondary={`${c.impressions.toLocaleString(locale)} impressions · ${c.clicks} clicks · ${c.ctr}% · ${formatMoney(c.spentCents, c.currency, locale)} of ${formatMoney(c.budgetCents, c.currency, locale)}`}
@@ -86,6 +96,16 @@ export function Campaigns() {
         {open && stats ? (
           <div className="family-controls">
             <strong>{stats.campaign.name}</strong>
+            {stats.campaign.status === 'pending_review' ? (
+              <p className="muted" style={{ margin: 0 }}>
+                A moderator checks every new ad, and any ad whose post was edited, before it runs. You&apos;ll get a notification.
+              </p>
+            ) : null}
+            {stats.campaign.status === 'rejected' && stats.campaign.reviewNote ? (
+              <Alert tone="danger" title="Not approved">
+                {stats.campaign.reviewNote}
+              </Alert>
+            ) : null}
             {stats.days.length ? (
               <div className="usage" aria-label="Impressions per day">
                 {stats.days.slice(-14).map((d) => (
@@ -112,11 +132,22 @@ export function Campaigns() {
                   Pause
                 </Button>
               ) : stats.campaign.status === 'draft' || stats.campaign.status === 'paused' ? (
-                <Button size="sm" onClick={() => act(() => api.ads.setStatus(open, 'active'), 'Campaign started')}>
-                  Start
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    act(async () => {
+                      const r = await api.ads.setStatus(open, 'active');
+                      toast(
+                        r.campaign.status === 'pending_review' ? 'Sent for review' : r.campaign.status === 'rejected' ? 'Not approved' : 'Campaign started',
+                      );
+                      setStats(await api.ads.stats(open));
+                    })
+                  }
+                >
+                  {stats.campaign.approvedAt ? 'Resume' : 'Submit for review'}
                 </Button>
               ) : null}
-              {stats.campaign.status !== 'ended' ? (
+              {stats.campaign.status !== 'ended' && stats.campaign.status !== 'rejected' ? (
                 <Button size="sm" variant="ghost" onClick={() => act(() => api.ads.setStatus(open, 'ended'), 'Campaign ended')}>
                   End campaign
                 </Button>

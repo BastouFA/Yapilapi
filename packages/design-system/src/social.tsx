@@ -385,6 +385,13 @@ export function PostCard({
         </div>
       ) : null}
 
+      {post.withheldIn?.length ? (
+        <div className="yp-post__reason" role="note">
+          <Icon name="info" size={14} />
+          Withheld in {post.withheldIn.map((c) => regionName(c, locale)).join(', ')} for legal reasons.
+        </div>
+      ) : null}
+
       {post.reason || post.aiAssisted || post.real ? (
         <div className="yp-post__reason">
           {post.reason ? (
@@ -678,3 +685,11 @@ export function Toast({ message, onDone, ms = 3000 }: { message: string | null; 
 }
 
 export { Button };
+
+function regionName(code: string, locale?: string): string {
+  try {
+    return new Intl.DisplayNames([locale ?? 'en'], { type: 'region' }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}

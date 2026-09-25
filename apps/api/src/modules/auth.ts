@@ -16,7 +16,7 @@ const authLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } };
 
 export async function loadMe(ctx: AppContext, userId: string): Promise<Me> {
   const { rows } = await ctx.db.query(
-    `SELECT u.id, u.email, u.email_verified_at, u.role, u.onboarded_at, pr.username, pr.display_name, pr.avatar_url, pr.mode, pr.locale
+    `SELECT u.id, u.email, u.email_verified_at, u.role, u.onboarded_at, pr.username, pr.display_name, pr.avatar_url, pr.mode, pr.locale, pr.country
      FROM users u JOIN profiles pr ON pr.user_id = u.id WHERE u.id = $1`,
     [userId],
   );
@@ -33,6 +33,7 @@ export async function loadMe(ctx: AppContext, userId: string): Promise<Me> {
     avatarUrl: r.avatar_url,
     mode: r.mode,
     locale: r.locale,
+    country: r.country?.trim() ?? null,
   };
 }
 
@@ -164,7 +165,17 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
     return { ok: true };
   });
 
-  app.get('/v1/auth/me', { preHandler: requireAuth }, async (req) => ({ user: await loadMe(ctx, me(req).id) }));
+  app.get('/v1/auth/me', { preHandler: requireAuth }, async (req) => {
+    // Record the country from a trusted CDN header unless the person chose one themselves.
+    const header = ctx.config.TRUSTED_COUNTRY_HEADER;
+    const cc = header ? String(req.headers[header.toLowerCase()] ?? '').toUpperCase() : '';
+    if (/^[A-Z]{2}$/.test(cc) && cc !== 'XX' && cc !== 'T1')
+      await ctx.db.query(
+        `UPDATE profiles SET country = $2, country_source = 'cdn' WHERE user_id = $1 AND country_source IS DISTINCT FROM 'user' AND country IS DISTINCT FROM $2`,
+        [me(req).id, cc],
+      );
+    return { user: await loadMe(ctx, me(req).id) };
+  });
 
   app.post('/v1/auth/verify-email', { config: authLimit }, async (req) => {
     const { token } = parse(tokenSchema, req.body);

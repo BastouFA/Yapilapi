@@ -183,6 +183,7 @@ export function createClient(opts: ClientOptions) {
       get: (id: string) => get<{ place: Record<string, any>; events: EventItem[]; products: Record<string, any>[] }>(`/v1/places/${id}`),
     },
     businesses: {
+      analytics: (id: string, days = 30) => get<BusinessAnalytics>(`/v1/businesses/${id}/analytics${qs({ days })}`),
       get: (slug: string) => get<{ business: Record<string, any>; places: Record<string, any>[]; products: Record<string, any>[] }>(`/v1/businesses/${slug}`),
     },
     orders: {
@@ -439,6 +440,11 @@ export function createClient(opts: ClientOptions) {
       users: (q = '') => get<{ items: Record<string, any>[] }>(`/v1/admin/users${qs({ q })}`),
       setUserStatus: (id: string, status: 'active' | 'suspended') => put(`/v1/admin/users/${id}/status`, { status }),
       auditLogs: () => get<{ items: Record<string, any>[] }>('/v1/admin/audit-logs'),
+      regionalRules: () => get<{ items: RegionalRule[] }>('/v1/admin/regional-rules'),
+      addRegionalRule: (
+        b: { kind: 'blocked_term'; country: string; term: string; legalBasis: string } | { kind: 'restrict_topic'; country: string; topic: string; legalBasis: string },
+      ) => post<{ rule: RegionalRule }>('/v1/admin/regional-rules', b),
+      deleteRegionalRule: (id: string) => del(`/v1/admin/regional-rules/${id}`),
     },
   };
 }
@@ -522,7 +528,7 @@ export interface SponsoredAd {
 export interface AdCampaign {
   id: string;
   name: string;
-  status: 'draft' | 'active' | 'paused' | 'ended' | 'rejected';
+  status: 'draft' | 'pending_review' | 'active' | 'paused' | 'ended' | 'rejected';
   postId: string;
   topics: string[];
   locales: string[];
@@ -535,6 +541,10 @@ export interface AdCampaign {
   ctr: number;
   startsAt: string | null;
   endsAt: string | null;
+  submittedAt: string | null;
+  approvedAt: string | null;
+  /** Why a campaign was rejected, written by the reviewer. */
+  reviewNote: string | null;
   createdAt: string;
 }
 
@@ -577,4 +587,26 @@ export interface AgentResult {
   model: string;
   contextScopes: string[];
   notice?: string;
+}
+
+export interface RegionalRule {
+  id: string;
+  country: string;
+  kind: 'blocked_term' | 'restrict_topic';
+  term: string | null;
+  topic: string | null;
+  legalBasis: string;
+  withheldPosts: number;
+  createdAt: string;
+}
+
+export interface BusinessAnalytics {
+  days: number;
+  bookingsByStatus: Record<string, { bookings: number; guests: number }>;
+  upcomingBookings: number;
+  reviews: { count: number; average: number | null };
+  topProducts: { title: string; currency: string; units: number; revenue_cents: number }[];
+  views: { day: string; business: number; places: number; visitors: number }[];
+  ratingTrend: { week: string; reviews: number; average: number }[];
+  ads: { impressions: number; clicks: number; spentCents: number };
 }

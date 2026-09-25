@@ -14,6 +14,8 @@ export interface Me extends PublicUser {
   role: 'user' | 'moderator' | 'admin';
   onboarded: boolean;
   locale: string;
+  /** ISO 3166-1 alpha-2, set by the person or from a trusted CDN header. */
+  country: string | null;
 }
 
 export interface Profile extends PublicUser {
@@ -71,6 +73,8 @@ export interface Post {
   createdAt: string;
   /** Why this post is in the viewer's feed (recommendation explanation). */
   reason?: string;
+  /** Only on the author's own posts: countries where regional rules withhold it. */
+  withheldIn?: string[];
 }
 
 export interface Comment {

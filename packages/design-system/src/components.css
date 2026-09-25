@@ -307,8 +307,8 @@ textarea.yp-input {
   color: var(--ink-muted);
 }
 .yp-badge--success {
-  background: var(--yapi-soft);
-  color: var(--yapi);
+  background: var(--success-soft);
+  color: var(--success);
 }
 .yp-badge--warning {
   background: var(--saffron-soft);
@@ -364,15 +364,19 @@ textarea.yp-input {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+/* Info is neutral: coral means brand and action, so it isn't used for notices. */
 .yp-alert--info {
-  background: var(--yapi-soft);
+  background: var(--surface-sunken);
+  border-color: var(--line);
 }
-.yp-alert--info svg,
+.yp-alert--info svg {
+  color: var(--ink-muted);
+}
 .yp-alert--success svg {
-  color: var(--yapi);
+  color: var(--success);
 }
 .yp-alert--success {
-  background: var(--yapi-soft);
+  background: var(--success-soft);
 }
 .yp-alert--warning {
   background: var(--saffron-soft);
@@ -437,6 +441,7 @@ textarea.yp-input {
 
 /* Tabs */
 .yp-tabs__list {
+  scrollbar-width: none;
   display: flex;
   gap: var(--space-1);
   padding: 4px;
@@ -592,4 +597,8 @@ textarea.yp-input {
   .yp-btn__spin {
     animation-duration: 1.6s !important;
   }
+}
+
+.yp-tabs__list::-webkit-scrollbar {
+  display: none;
 }

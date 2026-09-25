@@ -16,7 +16,8 @@
   --saffron: #FFB020;
   --on-saffron: #0E1020;
   --saffron-soft: #FFF3D6;
-  --success: #007F6E;
+  --success: #00735F;
+  --success-soft: #E3F5EF;
   --danger: #C0262D;
   --on-danger: #FFFFFF;
   --danger-soft: #FDECEC;
@@ -63,6 +64,7 @@
     --on-saffron: #0B0C14;
     --saffron-soft: #3A2C0C;
     --success: #3DDBC2;
+    --success-soft: #0E2B27;
     --danger: #FF7B7B;
     --on-danger: #0B0C14;
     --danger-soft: #3D1714;
@@ -90,6 +92,7 @@
   --on-saffron: #0B0C14;
   --saffron-soft: #3A2C0C;
   --success: #3DDBC2;
+  --success-soft: #0E2B27;
   --danger: #FF7B7B;
   --on-danger: #0B0C14;
   --danger-soft: #3D1714;

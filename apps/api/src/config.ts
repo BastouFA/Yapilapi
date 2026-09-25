@@ -35,6 +35,8 @@ const schema = z.object({
   LIVE_HLS_BASE: z.string().default('http://localhost:8888'),
   LIVE_RTMP_URL: z.string().default('rtmp://localhost:1935'),
   LIVE_HOOK_SECRET: z.string().default('dev-live-hook-secret'),
+  /** Header a trusted CDN sets with the visitor's country (e.g. cf-ipcountry). Unset: only the country people choose is used. */
+  TRUSTED_COUNTRY_HEADER: z.string().optional(),
   // TURN (coturn, REST credentials): shared secret and URLs.
   TURN_URLS: z.string().optional().default(''),
   TURN_SECRET: z.string().optional().default(''),

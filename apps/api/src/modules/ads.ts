@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { hydratePosts } from '../lib/posts.ts';
+import { analyzeText } from '../lib/moderation.ts';
 import { audit, isEnabled } from '../lib/services.ts';
 import { ageOf } from '../lib/users.ts';
 import { postVisibleSql } from '../lib/visibility.ts';
@@ -41,6 +42,9 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
     ctr: r.impressions ? Number(((r.clicks / r.impressions) * 100).toFixed(2)) : 0,
     startsAt: r.starts_at,
     endsAt: r.ends_at,
+    submittedAt: r.submitted_at,
+    approvedAt: r.approved_at,
+    reviewNote: r.review_note,
     createdAt: r.created_at,
   });
 
@@ -93,11 +97,47 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
     const { status } = parse(z.object({ status: z.enum(['active', 'paused', 'ended']) }), req.body);
     const c = await mine(id, u.id);
     if (c.status === 'ended' || c.status === 'rejected') throw new AppError(409, 'conflict', 'This campaign has finished.');
+    if (c.status === 'pending_review' && status !== 'ended') throw new AppError(409, 'in_review', 'This campaign is waiting for review.');
     if (status === 'active') {
       await adsOn();
       if (Number(c.budget_millicents) - Number(c.spent_millicents) < c.cpm_cents) throw new AppError(409, 'no_budget', 'Add budget before starting this campaign.');
+      const post = (await db.query(`SELECT body, visibility, moderation_status, deleted_at, updated_at FROM posts WHERE id = $1`, [c.post_id])).rows[0];
+      if (!post || post.deleted_at || post.visibility !== 'public') throw badRequest('The promoted post is no longer public.');
+      // First start, or the post changed since it was approved: a moderator reviews it before it runs.
+      if (!c.approved_at || post.updated_at > c.approved_at) {
+        const risk = analyzeText(post.body).risk;
+        if (risk === 'escalate' || risk === 'restrict' || post.moderation_status !== 'normal') {
+          const { rows } = await db.query(`UPDATE ad_campaigns SET status = 'rejected', review_note = $2 WHERE id = $1 RETURNING *`, [
+            id,
+            "This post can't be promoted because it may break the advertising rules.",
+          ]);
+          await audit(db, { actorId: u.id, action: 'ads.campaign.auto_rejected', entityType: 'ad_campaign', entityId: id, metadata: { risk } });
+          return { campaign: dto(rows[0]) };
+        }
+        const campaign = await tx(db, async (q) => {
+          const mc = await q.query(
+            `INSERT INTO moderation_cases (target_type, target_id, subject_user_id, source, risk, signals) VALUES ('ad_campaign', $1, $2, 'ad_review', $3, $4)
+             ON CONFLICT (target_type, target_id) WHERE status = 'open' DO UPDATE SET created_at = moderation_cases.created_at RETURNING id`,
+            [id, u.id, risk, { postId: c.post_id, name: c.name }],
+          );
+          const { rows } = await q.query(
+            `UPDATE ad_campaigns SET status = 'pending_review', submitted_at = now(), review_note = NULL, review_case_id = $2 WHERE id = $1 RETURNING *`,
+            [id, mc.rows[0].id],
+          );
+          return rows[0];
+        });
+        await audit(db, { actorId: u.id, action: 'ads.campaign.submitted', entityType: 'ad_campaign', entityId: id });
+        return { campaign: dto(campaign) };
+      }
     }
-    const { rows } = await db.query(`UPDATE ad_campaigns SET status = $2 WHERE id = $1 RETURNING *`, [id, status]);
+    const { rows } = await tx(db, async (q) => {
+      // Withdrawing a campaign that is waiting for review closes its review.
+      if (c.status === 'pending_review' && c.review_case_id)
+        await q.query(`UPDATE moderation_cases SET status = 'decided', decision = 'no_action', note = 'Withdrawn by the advertiser', decided_at = now() WHERE id = $1 AND status = 'open'`, [
+          c.review_case_id,
+        ]);
+      return q.query(`UPDATE ad_campaigns SET status = $2 WHERE id = $1 RETURNING *`, [id, status]);
+    });
     await audit(db, { actorId: u.id, action: `ads.campaign.${status}`, entityType: 'ad_campaign', entityId: id });
     return { campaign: dto(rows[0]) };
   });

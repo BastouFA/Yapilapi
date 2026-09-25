@@ -79,7 +79,10 @@ describe('sponsored posts', () => {
     expect((await as(t.app, shop).post('/v1/ads/campaigns', { postId: privatePost.id, name: 'Nope' })).status).toBe(400);
     expect((await as(t.app, optedIn).post('/v1/ads/campaigns', { postId: post.id, name: 'Not mine' })).status).toBe(403);
 
-    const camp = await as(t.app, shop).post('/v1/ads/campaigns', { postId: post.id, name: 'Saturday drop', cpmCents: 1000 });
+    // A topic only this test's viewers follow, so ads from other suites sharing the test database never compete.
+    const topic = `adtest${Math.random().toString(36).slice(2, 8)}`;
+    for (const u of [optedIn, noConsent, teen]) await as(t.app, u).put('/v1/me/interests', { topics: [topic] });
+    const camp = await as(t.app, shop).post('/v1/ads/campaigns', { postId: post.id, name: 'Saturday drop', cpmCents: 1000, topics: [topic] });
     expect(camp.status).toBe(201);
     const id = camp.body.campaign.id;
     // No budget yet: can't start.
@@ -90,7 +93,13 @@ describe('sponsored posts', () => {
     expect((await as(t.app, shop).get('/v1/ads/campaigns')).body.items[0].budgetCents).toBe(0);
     await pay(fund.body.payment.orderId, 500);
     expect((await as(t.app, shop).get('/v1/ads/campaigns')).body.items[0].budgetCents).toBe(500);
-    expect((await as(t.app, shop).patch(`/v1/ads/campaigns/${id}`, { status: 'active' })).status).toBe(200);
+    expect((await as(t.app, shop).patch(`/v1/ads/campaigns/${id}`, { status: 'active' })).body.campaign.status).toBe('pending_review');
+    // A moderator approves it before it runs (see review-regions-business.test.ts for the review flow).
+    const reviewer = await signUp(t.app, { birthDate: ADULT });
+    await t.ctx.db.query(`UPDATE users SET role = 'moderator' WHERE id = $1`, [reviewer.id]);
+    const cases = (await as(t.app, reviewer).get('/v1/admin/moderation/cases')).body.items;
+    const mc = cases.find((c: any) => c.target_id === id);
+    expect((await as(t.app, reviewer).post(`/v1/admin/moderation/cases/${mc.id}/decide`, { decision: 'approve_ad' })).status).toBe(200);
 
     await as(t.app, optedIn).put('/v1/me/consents', { purpose: 'advertising', granted: true });
     await as(t.app, teen).put('/v1/me/consents', { purpose: 'advertising', granted: true });
@@ -103,6 +112,7 @@ describe('sponsored posts', () => {
     expect(served.body.ad.label).toBe('Sponsored');
     expect(served.body.ad.post.id).toBe(post.id);
     expect(served.body.ad.why[0]).toMatch(/advertising/);
+    expect(served.body.ad.why[1]).toMatch(new RegExp(topic));
     expect((await as(t.app, optedIn).post(`/v1/ads/${id}/click`)).status).toBe(200);
     expect((await as(t.app, noConsent).post(`/v1/ads/${id}/click`)).status).toBe(404); // never shown to them
 
@@ -120,6 +130,7 @@ describe('sponsored posts', () => {
     await as(t.app, optedIn).post(`/v1/ads/${id}/hide`);
     const other = await signUp(t.app, { birthDate: ADULT });
     await as(t.app, other).put('/v1/me/consents', { purpose: 'advertising', granted: true });
+    await as(t.app, other).put('/v1/me/interests', { topics: [topic] });
     expect((await as(t.app, other).get('/v1/ads/next')).body.ad.campaignId).toBe(id);
   });
 });

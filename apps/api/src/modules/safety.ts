@@ -1,3 +1,4 @@
+import type { PoolClient } from 'pg';
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
 import { appealSchema, FEATURE_FLAG_KEYS, moderationDecisionSchema, reportSchema } from '@yapilapi/shared';
@@ -76,7 +77,8 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     const { rows } = await db.query(
       `SELECT mc.*, pr.username AS subject_username,
          CASE mc.target_type WHEN 'post' THEN (SELECT body FROM posts WHERE id = mc.target_id)
-                             WHEN 'comment' THEN (SELECT body FROM comments WHERE id = mc.target_id) END AS excerpt
+                             WHEN 'comment' THEN (SELECT body FROM comments WHERE id = mc.target_id)
+                             WHEN 'ad_campaign' THEN (SELECT p.body FROM ad_campaigns a JOIN posts p ON p.id = a.post_id WHERE a.id = mc.target_id) END AS excerpt
        FROM moderation_cases mc LEFT JOIN profiles pr ON pr.user_id = mc.subject_user_id
        WHERE mc.status = $1 ORDER BY CASE mc.risk WHEN 'escalate' THEN 0 WHEN 'restrict' THEN 1 ELSE 2 END, mc.created_at LIMIT 100`,
       [q.status],
@@ -93,7 +95,12 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       const { rows } = await c.query(`SELECT * FROM moderation_cases WHERE id = $1 AND status IN ('open','appealed') FOR UPDATE`, [id]);
       const mc = rows[0];
       if (!mc) throw notFound('Case');
-      await applyDecision(c, mc, input.decision);
+      const isAd = mc.target_type === 'ad_campaign';
+      if (isAd !== (input.decision === 'approve_ad' || input.decision === 'reject_ad'))
+        throw badRequest(isAd ? 'Approve or reject this ad.' : 'That decision is only for ad reviews.');
+      if (input.decision === 'reject_ad' && !input.note?.trim()) throw badRequest('Say why the ad was rejected. The advertiser sees this.');
+      if (isAd) await applyAdDecision(c, mc, input.decision === 'approve_ad', mod.id, input.note ?? null);
+      else await applyDecision(c, mc, input.decision);
       await c.query(`UPDATE moderation_cases SET status = $2, decision = $3, reviewer_id = $4, note = $5, decided_at = now() WHERE id = $1`, [
         id,
         mc.status === 'appealed' ? 'final' : 'decided',
@@ -102,7 +109,7 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
         input.note ?? null,
       ]);
       await c.query(`UPDATE reports SET status = 'closed' WHERE target_type = $1 AND target_id = $2 AND status <> 'closed'`, [mc.target_type, mc.target_id]);
-      if (input.decision !== 'no_action' && mc.subject_user_id) {
+      if (input.decision !== 'no_action' && !isAd && mc.subject_user_id) {
         await c.query(`INSERT INTO enforcements (case_id, user_id, action) VALUES ($1,$2,$3)`, [id, mc.subject_user_id, input.decision]);
         await notify(c, ctx.realtime, {
           userId: mc.subject_user_id,
@@ -123,6 +130,26 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     });
     return { ok: true };
   });
+
+  /** Ad reviews aren't enforcement: approval starts the campaign (paused if its budget ran out meanwhile); rejection tells the advertiser why. */
+  async function applyAdDecision(c: PoolClient, mc: { target_id: string; subject_user_id: string | null }, approve: boolean, reviewer: string, note: string | null) {
+    const { rows } = await c.query(
+      approve
+        ? `UPDATE ad_campaigns SET status = CASE WHEN budget_millicents - spent_millicents >= cpm_cents THEN 'active' ELSE 'paused' END,
+             approved_at = now(), reviewed_by = $2, review_note = NULL WHERE id = $1 AND status = 'pending_review' RETURNING advertiser_id, name`
+        : `UPDATE ad_campaigns SET status = 'rejected', reviewed_by = $2, review_note = $3 WHERE id = $1 AND status = 'pending_review' RETURNING advertiser_id, name`,
+      approve ? [mc.target_id, reviewer] : [mc.target_id, reviewer, note],
+    );
+    if (!rows[0]) throw badRequest('This campaign is no longer waiting for review.');
+    await notify(c, ctx.realtime, {
+      userId: rows[0].advertiser_id,
+      category: 'moderation',
+      type: approve ? 'ad_approved' : 'ad_rejected',
+      entityType: 'ad_campaign',
+      entityId: mc.target_id,
+      data: { name: rows[0].name, note: approve ? null : note },
+    });
+  }
 
   async function applyDecision(
     c: { query: typeof db.query },
@@ -145,6 +172,69 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       await c.query(`UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`, [mc.subject_user_id]);
     }
   }
+
+  // ── Regional rules ────────────────────────────────────────────────────
+  // Content that is legal in most places but not in one country is withheld
+  // for viewers in that country only, never deleted. Every change is audited.
+  const ruleDto = (r: Record<string, any>) => ({
+    id: r.id,
+    country: r.country,
+    kind: r.kind,
+    term: r.term,
+    topic: r.topic,
+    legalBasis: r.legal_basis,
+    withheldPosts: Number(r.withheld ?? 0),
+    createdAt: r.created_at,
+  });
+
+  app.get('/v1/admin/regional-rules', { preHandler: requireRole('admin') }, async () => {
+    const { rows } = await db.query(
+      `SELECT r.*, (SELECT count(*) FROM post_withholdings w WHERE w.rule_id = r.id) AS withheld FROM regional_rules r ORDER BY r.country, r.created_at`,
+    );
+    return { items: rows.map(ruleDto) };
+  });
+
+  app.post('/v1/admin/regional-rules', { preHandler: requireRole('admin') }, async (req, reply) => {
+    const admin = me(req);
+    const input = parse(
+      z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('blocked_term'), country: z.string().regex(/^[A-Za-z]{2}$/), term: z.string().trim().min(2).max(100), legalBasis: z.string().trim().min(3).max(1000) }),
+        z.object({
+          kind: z.literal('restrict_topic'),
+          country: z.string().regex(/^[A-Za-z]{2}$/),
+          topic: z.string().trim().toLowerCase().regex(/^[a-z0-9_-]{1,40}$/),
+          legalBasis: z.string().trim().min(3).max(1000),
+        }),
+      ]),
+      req.body,
+    );
+    const { rows } = await db
+      .query(`INSERT INTO regional_rules (country, kind, term, topic, legal_basis, created_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`, [
+        input.country.toUpperCase(),
+        input.kind,
+        input.kind === 'blocked_term' ? input.term : null,
+        input.kind === 'restrict_topic' ? input.topic : null,
+        input.legalBasis,
+        admin.id,
+      ])
+      .catch((e) => {
+        if (e.code === '23505') throw badRequest('That rule already exists for this country.');
+        throw e;
+      });
+    await audit(db, { actorId: admin.id, action: 'regional_rule.create', entityType: 'regional_rule', entityId: rows[0].id, metadata: input });
+    const withheld = await db.query(`SELECT count(*) AS n FROM post_withholdings WHERE rule_id = $1`, [rows[0].id]);
+    reply.code(201);
+    return { rule: ruleDto({ ...rows[0], withheld: withheld.rows[0].n }) };
+  });
+
+  app.delete('/v1/admin/regional-rules/:id', { preHandler: requireRole('admin') }, async (req, reply) => {
+    const admin = me(req);
+    const { id } = parse(idParam, req.params);
+    const r = await db.query(`DELETE FROM regional_rules WHERE id = $1 RETURNING country, kind, term, topic`, [id]);
+    if (!r.rowCount) throw notFound('Rule');
+    await audit(db, { actorId: admin.id, action: 'regional_rule.delete', entityType: 'regional_rule', entityId: id, metadata: r.rows[0] });
+    reply.code(204);
+  });
 
   // ── Appeals ───────────────────────────────────────────────────────────
   app.post('/v1/appeals', { preHandler: requireAuth }, async (req, reply) => {

@@ -85,6 +85,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       mode: 'mode',
       locale: 'locale',
       isPrivate: 'is_private',
+      country: 'country',
     };
     const sets: string[] = [];
     const vals: unknown[] = [u.id];
@@ -99,6 +100,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       const age = ageOf(u.birthDate);
       if (age !== null && age < 18) throw forbidden('Accounts for people under 18 stay private.');
     }
+    if (input.country !== undefined) sets.push(input.country === null ? `country_source = NULL` : `country_source = 'user'`);
     if (sets.length) await db.query(`UPDATE profiles SET ${sets.join(', ')} WHERE user_id = $1`, vals);
     return { profile: await loadProfile(u.id, u.id) };
   });

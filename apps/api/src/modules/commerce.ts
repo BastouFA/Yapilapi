@@ -6,6 +6,7 @@ import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } fro
 import type { AppContext } from '../lib/context.ts';
 import { audit, isEnabled, notify, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
+import { businessOverview } from '../lib/ai/agents.ts';
 import { publicUserFrom } from '../lib/users.ts';
 import { EVENT_SELECT, toEvent } from './events.ts';
 import { eventVisibleSql } from '../lib/visibility.ts';
@@ -76,6 +77,10 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     );
     const b = rows[0];
     if (!b) throw notFound('Business');
+    if (req.user && req.user.id !== b.o_id)
+      void db
+        .query(`INSERT INTO business_views (business_id, kind, target_id, viewer_id) VALUES ($1,'business',$1,$2) ON CONFLICT DO NOTHING`, [b.id, req.user.id])
+        .catch(() => {});
     const [places, products] = await Promise.all([
       db.query(`SELECT id, name, category, address, city FROM places WHERE business_id = $1 AND deleted_at IS NULL`, [b.id]),
       db.query(
@@ -175,6 +180,15 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     const viewer = req.user?.id ?? null;
     const { id } = parse(idParam, req.params);
     const place = await loadPlace(id);
+    if (viewer)
+      void db
+        .query(
+          `INSERT INTO business_views (business_id, kind, target_id, viewer_id)
+           SELECT pl.business_id, 'place', pl.id, $2 FROM places pl JOIN businesses b ON b.id = pl.business_id WHERE pl.id = $1 AND b.owner_id <> $2
+           ON CONFLICT DO NOTHING`,
+          [id, viewer],
+        )
+        .catch(() => {});
     const events = await db.query(
       `${EVENT_SELECT} WHERE e.place_id = $2 AND e.starts_at >= now() - interval '6 hours' AND ${eventVisibleSql('$1')} ORDER BY e.starts_at LIMIT 10`,
       [viewer, id],
@@ -185,6 +199,41 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       [id],
     );
     return { place, events: events.rows.map(toEvent), products: products.rows.map(productDto) };
+  });
+
+  /** Owner-only insights: visits, bookings, reviews, sales and ads over the last N days. */
+  app.get('/v1/businesses/:id/analytics', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const { days } = parse(z.object({ days: z.coerce.number().int().min(7).max(90).default(30) }), req.query);
+    const own = await db.query(`SELECT owner_id FROM businesses WHERE id = $1 AND deleted_at IS NULL`, [id]);
+    if (!own.rows[0]) throw notFound('Business');
+    if (own.rows[0].owner_id !== u.id) throw forbidden();
+    const [overview, views, ratings, ads] = await Promise.all([
+      businessOverview(db, id, days),
+      db.query(
+        `SELECT day, count(*) FILTER (WHERE kind = 'business')::int AS business, count(*) FILTER (WHERE kind = 'place')::int AS places, count(DISTINCT viewer_id)::int AS visitors
+         FROM business_views WHERE business_id = $1 AND day > current_date - $2::int GROUP BY day ORDER BY day`,
+        [id, days],
+      ),
+      db.query(
+        `SELECT date_trunc('week', r.created_at)::date AS week, count(*)::int AS reviews, round(avg(r.rating)::numeric, 2) AS average
+         FROM place_reviews r JOIN places pl ON pl.id = r.place_id
+         WHERE pl.business_id = $1 AND r.moderation_status IN ('normal','review') AND r.created_at > now() - make_interval(days => $2) GROUP BY 1 ORDER BY 1`,
+        [id, days],
+      ),
+      db.query(
+        `SELECT coalesce(sum(impressions), 0)::int AS impressions, coalesce(sum(clicks), 0)::int AS clicks, coalesce(sum(spent_millicents) / 1000, 0)::int AS spent_cents
+         FROM ad_campaigns WHERE advertiser_id = $1`,
+        [u.id],
+      ),
+    ]);
+    return {
+      ...overview,
+      views: views.rows,
+      ratingTrend: ratings.rows.map((r) => ({ week: r.week, reviews: r.reviews, average: Number(r.average) })),
+      ads: { impressions: ads.rows[0].impressions, clicks: ads.rows[0].clicks, spentCents: ads.rows[0].spent_cents },
+    };
   });
 
   // ── Products ──────────────────────────────────────────────────────────

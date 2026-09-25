@@ -19,6 +19,8 @@ export function postVisibleSql(v: string): string {
     AND au.status = 'active'
     AND (p.moderation_status IN ('normal', 'review') OR p.author_id = ${v})
     AND ${notBlockedSql('p.author_id', v)}
+    AND (p.author_id = ${v} OR NOT EXISTS (
+      SELECT 1 FROM post_withholdings w WHERE w.post_id = p.id AND w.country = (SELECT pv.country FROM profiles pv WHERE pv.user_id = ${v})))
     AND (
       p.author_id = ${v}
       OR (p.visibility = 'public' AND (NOT ap.is_private OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${v} AND f.followee_id = p.author_id)))

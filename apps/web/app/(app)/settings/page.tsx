@@ -44,7 +44,7 @@ export default function Settings() {
 }
 
 function ProfileSettings() {
-  const { me, refresh, toast } = useSession();
+  const { me, refresh, toast, locale } = useSession();
   const [profile, setProfile] = useState<Record<string, any> | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -67,6 +67,7 @@ function ProfileSettings() {
             bio: String(f.get('bio') ?? ''),
             mode: String(f.get('mode')),
             locale: String(f.get('locale')),
+            country: f.get('country') ? String(f.get('country')) : null,
             isPrivate: f.get('isPrivate') === 'on',
             avatarUrl: profile.avatarUrl ?? null,
           });
@@ -119,6 +120,14 @@ function ProfileSettings() {
         {SUPPORTED_LOCALES.map((l) => (
           <option key={l} value={l}>
             {new Intl.DisplayNames([l], { type: 'language' }).of(l)}
+          </option>
+        ))}
+      </Select>
+      <Select label="Country" name="country" defaultValue={me?.country ?? ''} hint="Some content can be unavailable in some countries for legal reasons.">
+        <option value="">Not set</option>
+        {countries(locale).map(([code, name]) => (
+          <option key={code} value={code}>
+            {name}
           </option>
         ))}
       </Select>
@@ -778,4 +787,22 @@ function BrowserPushCard() {
       />
     </Card>
   );
+}
+
+const NOT_COUNTRIES = new Set(['EU', 'EZ', 'UN', 'QO', 'XA', 'XB', 'ZZ', 'XX']);
+/** ISO 3166-1 alpha-2 regions the browser can name, sorted by name in the viewer's language. */
+function countries(locale: string): [string, string][] {
+  const names = new Intl.DisplayNames([locale], { type: 'region', fallback: 'none' });
+  const out: [string, string][] = [];
+  for (let a = 65; a <= 90; a++)
+    for (let b = 65; b <= 90; b++) {
+      const code = String.fromCharCode(a, b);
+      if (NOT_COUNTRIES.has(code)) continue;
+      let name: string | undefined;
+      try {
+        name = names.of(code);
+      } catch {}
+      if (name && name !== code) out.push([code, name]);
+    }
+  return out.sort((x, y) => x[1].localeCompare(y[1], locale));
 }

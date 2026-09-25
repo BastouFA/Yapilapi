@@ -56,6 +56,12 @@ export const updateProfileSchema = z
     mode: z.enum(PROFILE_MODES),
     locale: z.string().min(2).max(10),
     isPrivate: z.boolean(),
+    /** ISO 3166-1 alpha-2; null clears it. Used for regional rules. */
+    country: z
+      .string()
+      .regex(/^[A-Za-z]{2}$/)
+      .transform((c) => c.toUpperCase())
+      .nullable(),
   })
   .partial();
 
@@ -223,7 +229,7 @@ export const reportSchema = z.object({
 });
 
 export const moderationDecisionSchema = z.object({
-  decision: z.enum(['no_action', 'restrict', 'remove', 'suspend_user']),
+  decision: z.enum(['no_action', 'restrict', 'remove', 'suspend_user', 'approve_ad', 'reject_ad']),
   note: z.string().max(2000).optional(),
 });
 
