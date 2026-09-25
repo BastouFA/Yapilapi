@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState, type ComponentType, type ReactNode } from 'react';
-import { formatMoney, formatRelativeTime, t, type CaptionTrackRef, type EventItem, type MediaItem, type MessageKey, type Post } from '@yapilapi/shared';
+import { formatMoney, formatRelativeTime, safeTimeZone, t, type CaptionTrackRef, type EventItem, type MediaItem, type MessageKey, type Post } from '@yapilapi/shared';
 import { Icon, type IconName } from './icons.tsx';
 import { Avatar, Badge, Button, cx } from './primitives.tsx';
 
@@ -568,7 +568,7 @@ export function EventCard({
   locale?: string;
 }) {
   const d = new Date(event.startsAt);
-  const tz = event.timezone || 'UTC';
+  const tz = safeTimeZone(event.timezone);
   const month = new Intl.DateTimeFormat(locale, { month: 'short', timeZone: tz }).format(d);
   const day = new Intl.DateTimeFormat(locale, { day: 'numeric', timeZone: tz }).format(d);
   const time = new Intl.DateTimeFormat(locale, { weekday: 'short', hour: 'numeric', minute: '2-digit', timeZone: tz, timeZoneName: 'short' }).format(d);

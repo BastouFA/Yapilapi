@@ -90,7 +90,12 @@ export function Sidebar() {
 
       {events.length ? (
         <section className="yp-aside-card" aria-labelledby="aside-events">
-          <h2 id="aside-events">Happening soon</h2>
+          <h2 id="aside-events" className="row" style={{ justifyContent: 'space-between' }}>
+            Happening soon
+            <Link href="/events" className="yp-aside-row__meta" style={{ fontFamily: 'var(--font-sans)' }}>
+              See all
+            </Link>
+          </h2>
           {events.map((e) => (
             <Link key={e.id} href={`/events/${e.id}`} className="yp-aside-row">
               <span className="yp-aside-date" aria-hidden>

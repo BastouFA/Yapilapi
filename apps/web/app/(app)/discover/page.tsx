@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { AgentPanel } from '@/components/AgentPanel';
+import { BuyButton } from '@/components/BuyButton';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { Avatar, Button, CommunityCard, EmptyState, EventCard, List, ListItem, PostCard, ProductCard, Skeleton } from '@yapilapi/design-system';
@@ -170,7 +171,7 @@ function Discover() {
                 <h2 className="section-title">{t('discover.products')}</h2>
                 <div className="yp-grid">
                   {products.map((p) => (
-                    <ProductCard key={p.id} product={{ ...p, inventory: null }} locale={locale} />
+                    <ProductCard key={p.id} product={{ ...p, inventory: null }} locale={locale} action={<BuyButton productId={p.id} />} />
                   ))}
                 </div>
               </section>

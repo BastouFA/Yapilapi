@@ -15,6 +15,12 @@ export function UsageHeartbeat() {
   useEffect(() => {
     const beat = async () => {
       if (document.visibilityState !== 'visible') return;
+      // One beat per 50 seconds per tab, even across reloads (the server counts a minute at most once per 50s anyway).
+      try {
+        const last = Number(sessionStorage.getItem('ypl_beat') ?? 0);
+        if (Date.now() - last < 50_000) return;
+        sessionStorage.setItem('ypl_beat', String(Date.now()));
+      } catch {}
       try {
         const r = await api.family.heartbeat();
         let shown = false;

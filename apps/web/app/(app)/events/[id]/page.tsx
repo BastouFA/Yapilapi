@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Avatar, AvatarGroup, Badge, Button, EmptyState, Segments, Skeleton } from '@yapilapi/design-system';
 import type { EventItem, PublicUser } from '@yapilapi/shared';
+import { formatEventWhen, safeTimeZone } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '../../../providers';
 
@@ -29,8 +30,8 @@ export default function EventPage() {
   if (missing) return <EmptyState title="Event not found" body="It may have been cancelled, or it's private." />;
   if (!ev) return <Skeleton height={240} />;
 
-  const tz = ev.timezone || 'UTC';
-  const when = new Intl.DateTimeFormat(locale, { dateStyle: 'full', timeStyle: 'short', timeZone: tz, timeZoneName: 'short' }).format(new Date(ev.startsAt));
+  const tz = safeTimeZone(ev.timezone);
+  const when = formatEventWhen(ev.startsAt, locale, tz);
   const until = ev.endsAt ? new Intl.DateTimeFormat(locale, { timeStyle: 'short', timeZone: tz }).format(new Date(ev.endsAt)) : null;
   const going = attendees.filter((a) => a.status === 'going');
 

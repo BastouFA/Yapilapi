@@ -96,7 +96,7 @@ export async function runAgent(db: Pool, provider: AiProvider, userId: string, k
       if (c.visibility === 'public') out.push(remember({ type: 'community', id: c.id, title: c.name, subtitle: `${c.memberCount} members`, href: `/c/${c.slug}` }));
     for (const u of r.people ?? []) out.push(remember({ type: 'person', id: u.id, title: u.displayName, subtitle: `@${u.username}`, href: `/u/${u.username}` }));
     for (const p of r.products ?? [])
-      out.push(remember({ type: 'product', id: p.id, title: p.title, subtitle: `${(p.priceCents / 100).toFixed(2)} ${p.currency} · ${p.kind}`, href: `/search?q=${encodeURIComponent(p.title)}` }));
+      out.push(remember({ type: 'product', id: p.id, title: p.title, subtitle: `${(p.priceCents / 100).toFixed(2)} ${p.currency} · ${p.kind}`, href: `/discover?q=${encodeURIComponent(p.title)}` }));
     for (const b of r.businesses ?? []) out.push(remember({ type: 'business', id: b.id, title: b.name, subtitle: b.category, href: `/b/${b.slug}` }));
     return { intent: res.intent, results: out };
   }

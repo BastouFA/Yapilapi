@@ -931,3 +931,24 @@ export function formatRelativeTime(date: Date | string, locale = 'en', now = new
 export function formatMoney(cents: number, currency: string, locale = 'en'): string {
   return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(cents / 100);
 }
+
+/** A time zone the runtime accepts, or UTC. Event data can carry any string. */
+export function safeTimeZone(tz: string | null | undefined): string {
+  if (!tz) return 'UTC';
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: tz });
+    return tz;
+  } catch {
+    return 'UTC';
+  }
+}
+
+/** "Sunday, 28 September 2026 at 10:00 WEST": full date and time in the event's own time zone, with its short name. */
+export function formatEventWhen(date: Date | string, locale: string, timeZone: string): string {
+  const tz = safeTimeZone(timeZone);
+  const d = new Date(date);
+  // dateStyle/timeStyle can't be combined with timeZoneName, so the zone name is formatted separately.
+  const main = new Intl.DateTimeFormat(locale, { dateStyle: 'full', timeStyle: 'short', timeZone: tz }).format(d);
+  const zone = new Intl.DateTimeFormat(locale, { timeZone: tz, timeZoneName: 'short' }).formatToParts(d).find((p) => p.type === 'timeZoneName')?.value;
+  return zone ? `${main} ${zone}` : main;
+}

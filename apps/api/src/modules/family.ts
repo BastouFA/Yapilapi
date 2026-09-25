@@ -155,7 +155,7 @@ export default async function familyModule(app: FastifyInstance, ctx: AppContext
    * minutes (in the teen's time zone when supervised) and says whether a
    * daily reminder or quiet hours apply right now.
    */
-  app.post('/v1/me/usage/heartbeat', { preHandler: requireAuth, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req) => {
+  app.post('/v1/me/usage/heartbeat', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {
     const u = me(req);
     const controls = await activeControls(db, u.id);
     const tz = controls?.timezone ?? 'UTC';
