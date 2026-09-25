@@ -406,6 +406,9 @@ export function createClient(opts: ClientOptions) {
       send: (id: string, body: string, kind: 'chat' | 'question' = 'chat') => post<{ message: LiveChatMessage }>(`/v1/live/${id}/chat`, { body, kind }),
       ban: (id: string, userId: string) => post(`/v1/live/${id}/ban`, { userId }),
     },
+    agents: {
+      run: (kind: AgentKind, prompt: string, businessId?: string) => post<AgentResult>(`/v1/ai/agents/${kind}`, { prompt, businessId }),
+    },
     ads: {
       next: () => get<{ ad: SponsoredAd | null }>('/v1/ads/next'),
       click: (campaignId: string) => post(`/v1/ads/${campaignId}/click`),
@@ -552,4 +555,26 @@ export interface FamilyLink {
   controls: TeenControls | null;
   usage?: { day: string; minutes: number }[];
   createdAt: string;
+}
+
+export type AgentKind = 'discover' | 'travel' | 'shopping' | 'business';
+
+export interface AgentEntity {
+  type: 'event' | 'place' | 'community' | 'person' | 'product' | 'business';
+  id: string;
+  title: string;
+  subtitle?: string;
+  startsAt?: string;
+  href: string;
+}
+
+export interface AgentResult {
+  agent: AgentKind;
+  text: string;
+  recommendations: (AgentEntity & { reason: string })[];
+  actions: { kind: 'rsvp' | 'book' | 'buy' | 'follow' | 'join'; target: AgentEntity; label: string }[];
+  provider: string;
+  model: string;
+  contextScopes: string[];
+  notice?: string;
 }

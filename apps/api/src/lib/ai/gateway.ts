@@ -4,6 +4,7 @@ import { forbidden, notFound } from '../errors.ts';
 import { parseSearchIntent } from './intent.ts';
 import { postVisibleSql } from '../visibility.ts';
 import type { AiProvider } from './providers.ts';
+import { runAgent, type AgentKind } from './agents.ts';
 
 export type AiTask = 'caption' | 'summarize_conversation' | 'summarize_community' | 'search_intent' | 'plan_from_message' | 'translate' | 'memory_recap';
 
@@ -42,6 +43,11 @@ export class AiGateway {
 
   get providerName() {
     return this.provider.name;
+  }
+
+  /** Multi-step assistants (Discover, trips, shopping, business). See agents.ts for how their tools stay within the person's permissions. */
+  agent(userId: string, kind: AgentKind, prompt: string, opts: { businessId?: string } = {}) {
+    return runAgent(this.db, this.provider, userId, kind, prompt, opts);
   }
 
   async run(req: AiRequest): Promise<AiResponse> {

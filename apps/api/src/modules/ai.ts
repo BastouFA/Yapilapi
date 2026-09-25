@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { featureDisabled, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { isEnabled } from '../lib/services.ts';
+import { AGENT_KINDS } from '../lib/ai/agents.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 export default async function aiModule(app: FastifyInstance, ctx: AppContext) {
@@ -54,4 +55,10 @@ export default async function aiModule(app: FastifyInstance, ctx: AppContext) {
   });
 
   app.get('/v1/ai/status', async () => ({ provider: ctx.ai.providerName }));
+
+  app.post('/v1/ai/agents/:kind', { preHandler: requireAuth, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req) => {
+    const { kind } = parse(z.object({ kind: z.enum(AGENT_KINDS) }), req.params);
+    const input = parse(z.object({ prompt: z.string().trim().min(2).max(1000), businessId: z.string().uuid().optional() }), req.body);
+    return ctx.ai.agent(me(req).id, kind, input.prompt, { businessId: input.businessId });
+  });
 }

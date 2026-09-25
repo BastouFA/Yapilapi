@@ -167,6 +167,10 @@ export function Sidebar() {
           Privacy & settings
         </Link>{' '}
         ·{' '}
+        <Link href="/assistant" className="muted">
+          Assistant
+        </Link>{' '}
+        ·{' '}
         <Link href="/developers" className="muted">
           Developers
         </Link>{' '}

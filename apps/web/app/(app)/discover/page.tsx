@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { AgentPanel } from '@/components/AgentPanel';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { Avatar, Button, CommunityCard, EmptyState, EventCard, List, ListItem, PostCard, ProductCard, Skeleton } from '@yapilapi/design-system';
@@ -60,6 +61,9 @@ function Discover() {
               Live
             </Link>
           ) : null}
+          <Link href="/assistant" className="yp-btn yp-btn--ghost yp-btn--sm">
+            Assistant
+          </Link>
           <Link href="/communities/new" className="yp-btn yp-btn--secondary yp-btn--sm">
             {t('communities.create')}
           </Link>
@@ -92,6 +96,7 @@ function Discover() {
           Search
         </Button>
       </form>
+      {!q ? <AgentPanel kind="discover" compact /> : null}
 
       {q ? (
         results === null ? (
