@@ -1,4 +1,5 @@
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { registerForPush } from '../lib/push';
 import { useCallback, useState } from 'react';
 import { Text, View } from 'react-native';
 import type { Profile } from '../../../packages/shared/src/types';
@@ -10,6 +11,7 @@ import { Button, Loading, Screen, useColors } from '../lib/ui';
 export default function ProfileScreen() {
   const c = useColors();
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
+  const [note, setNote] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -47,6 +49,22 @@ export default function ProfileScreen() {
           </Text>
         ))}
       </View>
+      <Button label="Capture a Real" variant="secondary" onPress={() => router.push('/real')} />
+      <Button
+        label="Turn on notifications"
+        variant="secondary"
+        onPress={async () => {
+          const r = await registerForPush();
+          setNote(
+            r === 'registered'
+              ? 'Notifications are on.'
+              : r === 'denied'
+                ? 'Notifications are blocked in Settings.'
+                : 'Notifications need a real phone and an EAS project.',
+          );
+        }}
+      />
+      {note ? <Text style={{ color: c.inkMuted }}>{note}</Text> : null}
       <Button
         label="Log out"
         variant="secondary"

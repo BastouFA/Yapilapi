@@ -75,8 +75,10 @@ These are wired behind adapters with working development implementations; produc
 | AI provider key (`ANTHROPIC_API_KEY`) | `apps/api/src/lib/ai/providers.ts` | Deterministic rule-based provider, clearly labelled in the UI |
 | Payment provider | `apps/api/src/lib/payments.ts` | Sandbox provider with signed webhooks |
 | Object storage + CDN | `apps/api/src/lib/storage.ts` | SeaweedFS (S3-compatible) in docker compose, or local disk with `STORAGE_DRIVER=local` |
-| Video transcoding | not built yet | Videos are served as uploaded |
-| TURN server for calls | `apps/api/src/modules/calls.ts` (`TURN_URL`) | STUN only; calls may fail on strict networks |
+| Video transcoding | `apps/api/src/lib/media-processing.ts` | Bundled ffmpeg in the API worker; move to dedicated workers at scale |
+| TURN server for calls | `turn` service (coturn) + `TURN_URLS`, `TURN_SECRET` | Runs in docker compose |
+| Live video | `live` service (MediaMTX) | Runs in docker compose; stream with OBS to `rtmp://localhost:1935/live` |
+| Push notifications | `VAPID_*` (browser), EAS project id (mobile) | Browser push works locally once VAPID keys are set |
 | MFA encryption key (`MFA_ENCRYPTION_KEY`) | `apps/api/src/modules/mfa.ts` | Fixed development key; production refuses to start without one |
 | Live video provider (ingest + playback) | `apps/api/src/modules/live.ts` | Placeholder local URLs; chat, roles and audience work |
 | Production domain, app-store accounts | infrastructure, `apps/mobile/app.json` | localhost |

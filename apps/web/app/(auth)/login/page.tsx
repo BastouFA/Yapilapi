@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { Alert, Button, TextField } from '@yapilapi/design-system';
 import type { Me } from '@yapilapi/shared';
+import { startAuthentication } from '@simplewebauthn/browser';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '../../providers';
 
@@ -68,6 +69,23 @@ function LoginForm() {
       <TextField label={t('auth.password')} name="password" type="password" autoComplete="current-password" required />
       <Button type="submit" block loading={busy}>
         {t('auth.login.submit')}
+      </Button>
+      <Button
+        variant="secondary"
+        block
+        icon="shield"
+        onClick={async () => {
+          setError(null);
+          try {
+            const { options, challengeId } = await api.passkeys.loginOptions();
+            const response = await startAuthentication({ optionsJSON: options });
+            done((await api.passkeys.loginVerify(challengeId, response)).user);
+          } catch (err) {
+            if ((err as Error).name !== 'NotAllowedError') setError(errorMessage(err));
+          }
+        }}
+      >
+        Sign in with a passkey
       </Button>
       <div className="auth__foot row" style={{ justifyContent: 'space-between' }}>
         <Link href="/forgot-password">{t('auth.forgot')}</Link>

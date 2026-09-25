@@ -7,6 +7,7 @@ import { Avatar, Badge, Button, EmptyState, Menu, Skeleton } from '@yapilapi/des
 import type { Profile } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { PostList, ReportSheet } from '@/components/PostList';
+import { SupportCreator } from '@/components/SupportCreator';
 import { useSession } from '../../../providers';
 
 export default function ProfilePage() {
@@ -183,6 +184,7 @@ export default function ProfilePage() {
           </Button>
         ) : null}
       </div>
+      {!rel.isSelf ? <SupportCreator userId={profile.id} name={profile.displayName} isCreator={profile.mode === 'creator'} /> : null}
       <PostList load={load} reloadKey={username} empty={rel.isSelf ? 'Share your first post from Create.' : 'No posts yet.'} />
       <ReportSheet target={reporting ? { type: 'user', id: profile.id } : null} onClose={() => setReporting(false)} />
     </div>

@@ -20,6 +20,7 @@ export default function Layout() {
       <Tabs.Screen name="create" options={{ title: 'Create' }} />
       <Tabs.Screen name="inbox" options={{ title: 'Inbox' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+      <Tabs.Screen name="real" options={{ href: null, title: 'Real' }} />
       <Tabs.Screen name="chat/[id]" options={{ href: null, title: 'Conversation' }} />
     </Tabs>
   );

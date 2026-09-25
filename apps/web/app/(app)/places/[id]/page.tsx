@@ -8,6 +8,7 @@ import type { EventItem } from '@yapilapi/shared';
 import { api } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { BuyButton } from '@/components/BuyButton';
+import { BookTable, ManageBookings, PlaceReviews } from '@/components/PlaceExtras';
 import { ProductCard } from '@yapilapi/design-system';
 import { useSession } from '../../../providers';
 
@@ -79,6 +80,9 @@ export default function PlacePage() {
           </div>
         </section>
       ) : null}
+      {place.business ? <BookTable placeId={place.id} /> : null}
+      <ManageBookings placeId={place.id} />
+      <PlaceReviews placeId={place.id} />
     </div>
   );
 }

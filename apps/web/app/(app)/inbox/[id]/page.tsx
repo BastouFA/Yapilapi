@@ -9,6 +9,7 @@ import { api, errorMessage } from '@/lib/api';
 import { ReportSheet } from '@/components/PostList';
 import { useRealtime, useSession } from '../../../providers';
 import { useCalls } from '@/components/Calls';
+import { MiniAppsSheet } from '@/components/MiniApps';
 
 type Pending = Message & { pending?: boolean };
 
@@ -25,6 +26,7 @@ export default function ChatPage() {
   const [reportId, setReportId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const calls = useCalls();
+  const [appsOpen, setAppsOpen] = useState(false);
 
   useEffect(() => {
     api.conversations.get(id).then(
@@ -141,6 +143,7 @@ export default function ChatPage() {
           label="Conversation options"
           actions={[
             { label: 'Video call', icon: 'eye', onSelect: () => void calls.start(id, 'video') },
+            { label: 'Apps', icon: 'create', onSelect: () => setAppsOpen(true) },
             { label: 'Audio call', icon: 'bell', onSelect: () => void calls.start(id, 'audio') },
             { label: t('inbox.summarize'), icon: 'sparkle', onSelect: () => assist('summarize_conversation') },
             { label: 'Draft a plan from the last message', icon: 'calendar', onSelect: () => assist('plan_from_message') },
@@ -264,6 +267,15 @@ export default function ChatPage() {
         </Button>
       </form>
       <ReportSheet target={reportId ? { type: 'message', id: reportId } : null} onClose={() => setReportId(null)} />
+      <MiniAppsSheet
+        open={appsOpen}
+        onClose={() => setAppsOpen(false)}
+        surface="conversation"
+        surfaceId={id}
+        onSend={async (text) => {
+          await api.conversations.send(id, text, crypto.randomUUID());
+        }}
+      />
     </div>
   );
 }

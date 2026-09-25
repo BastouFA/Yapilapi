@@ -207,6 +207,66 @@ export function createClient(opts: ClientOptions) {
         ),
     },
     flags: () => get<{ flags: Record<string, boolean> }>('/v1/flags'),
+    passkeys: {
+      list: () => get<{ items: { id: string; label: string; created_at: string; last_used_at: string | null; backed_up: boolean }[] }>('/v1/auth/passkeys'),
+      registerOptions: () => post<{ options: any; challengeId: string }>('/v1/auth/passkeys/register/options'),
+      registerVerify: (challengeId: string, response: unknown, label: string) => post('/v1/auth/passkeys/register/verify', { challengeId, response, label }),
+      remove: (id: string) => del(`/v1/auth/passkeys/${id}`),
+      loginOptions: () => post<{ options: any; challengeId: string }>('/v1/auth/passkeys/login/options'),
+      loginVerify: (challengeId: string, response: unknown) => post<{ user: Me; token: string }>('/v1/auth/passkeys/login/verify', { challengeId, response }),
+    },
+    push: {
+      config: () => get<{ webPush: boolean; vapidPublicKey: string | null }>('/v1/push/config'),
+      subscribe: (b: { kind: 'webpush'; endpoint: string; keys: { p256dh: string; auth: string } } | { kind: 'expo'; endpoint: string }) =>
+        post('/v1/push/subscriptions', b),
+      unsubscribe: (endpoint: string) => del('/v1/push/subscriptions', { endpoint }),
+    },
+    miniApps: {
+      directory: (surface: string) =>
+        get<{ items: { id: string; name: string; description: string; permissions: string[] }[] }>(`/v1/mini-apps${qs({ surface })}`),
+      installed: (surface: string, surfaceId: string) =>
+        get<{ items: { id: string; name: string; description: string; entryUrl: string; permissions: string[] }[] }>(
+          `/v1/mini-apps/installed${qs({ surface, surfaceId })}`,
+        ),
+      install: (id: string, surface: string, surfaceId: string) => post(`/v1/mini-apps/${id}/install`, { surface, surfaceId }),
+      context: (id: string, surface: string, surfaceId: string) =>
+        post<{ token: string; permissions: string[] }>(`/v1/mini-apps/${id}/context`, { surface, surfaceId }),
+    },
+    economy: {
+      plans: (userId: string) =>
+        get<{
+          items: { id: string; name: string; description: string; priceCents: number; currency: string }[];
+          mySubscription: { plan_id: string; status: string; current_period_end: string | null } | null;
+        }>(`/v1/users/${userId}/plans`),
+      createPlan: (b: { name: string; description?: string; priceCents: number; currency: string }) => post('/v1/creator/plans', b),
+      subscribe: (planId: string, idempotencyKey: string) =>
+        post<{ subscription: { id: string; status: string }; payment: { orderId: string; clientSecret: string } }>(`/v1/creator/plans/${planId}/subscribe`, {
+          idempotencyKey,
+        }),
+      tip: (userId: string, b: { amountCents: number; currency: string; message?: string; postId?: string; idempotencyKey: string }) =>
+        post<{ payment: { orderId: string } }>(`/v1/users/${userId}/tips`, b),
+      subscribers: () => get<{ active: number; cancelled: number }>('/v1/creator/subscribers'),
+      mySubscriptions: () =>
+        get<{ items: { id: string; status: string; plan: string; priceCents: number; currency: string; creator: PublicUser }[] }>('/v1/me/subscriptions'),
+      cancel: (id: string) => post(`/v1/creator/subscriptions/${id}/cancel`),
+    },
+    reviews: {
+      list: (placeId: string) =>
+        get<{ average: number | null; count: number; items: { id: string; rating: number; body: string; createdAt: string; author: PublicUser }[] }>(
+          `/v1/places/${placeId}/reviews`,
+        ),
+      save: (placeId: string, rating: number, body: string) => put(`/v1/places/${placeId}/reviews`, { rating, body }),
+    },
+    bookings: {
+      create: (placeId: string, b: { partySize: number; startsAt: string; note?: string }) =>
+        post<{ booking: { id: string; status: string } }>(`/v1/places/${placeId}/bookings`, b),
+      mine: () =>
+        get<{ items: { id: string; status: string; party_size: number; starts_at: string; place_id: string; place_name: string }[] }>('/v1/me/bookings'),
+      forPlace: (placeId: string) =>
+        get<{ items: { id: string; status: string; party_size: number; starts_at: string; note: string; guest: string }[] }>(`/v1/places/${placeId}/bookings`),
+      decide: (id: string, confirm: boolean) => post(`/v1/bookings/${id}/decide`, { confirm }),
+      cancel: (id: string) => post(`/v1/bookings/${id}/cancel`),
+    },
     uploads: {
       /** Chunked, resumable upload. Retries each chunk and resumes from what the server already has. */
       resumable: async (file: File, onProgress?: (fraction: number) => void, altText?: string) => {

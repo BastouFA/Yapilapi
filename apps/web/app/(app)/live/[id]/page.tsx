@@ -6,6 +6,7 @@ import { Alert, Badge, Button, ChatBubble, EmptyState, Menu, Segments, Skeleton 
 import type { LiveChatMessage, LiveSummary } from '@yapilapi/api-client';
 import { api, errorMessage } from '@/lib/api';
 import { useRealtime, useSession } from '../../../providers';
+import { HlsVideo } from '@/components/HlsVideo';
 
 export default function LivePage() {
   const { id } = useParams<{ id: string }>();
@@ -86,7 +87,7 @@ export default function LivePage() {
         }}
       >
         {live.status === 'live' && live.playbackUrl ? (
-          <video src={live.playbackUrl} controls autoPlay playsInline muted style={{ width: '100%', height: '100%' }} aria-label="Live video" />
+          <HlsVideo src={live.playbackUrl} live label="Live video" />
         ) : (
           <span>{live.status === 'ended' ? 'This live has ended.' : 'Waiting for the host to go live.'}</span>
         )}

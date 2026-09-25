@@ -4,7 +4,9 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Alert, Button, Card, Dialog, List, ListItem, Select, Switch, Tabs, TextField } from '@yapilapi/design-system';
 import { NOTIFICATION_CATEGORIES, PROFILE_MODES, SUPPORTED_LOCALES, formatRelativeTime } from '@yapilapi/shared';
+import { startRegistration } from '@simplewebauthn/browser';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
+import { currentSubscription, disableBrowserPush, enableBrowserPush, pushSupported } from '@/lib/push';
 import { useSession } from '../../providers';
 
 export default function Settings() {
@@ -418,6 +420,8 @@ function SecuritySettings() {
         </List>
       </Card>
       <TwoStepCard />
+      <PasskeysCard />
+      <BrowserPushCard />
       <Card title="Developers" subtitle="Build integrations with API keys and webhooks.">
         <a href="/developers" className="yp-btn yp-btn--secondary yp-btn--sm">
           Open developer settings
@@ -695,6 +699,81 @@ function ConnectedApps() {
       ) : (
         <p className="muted">No apps are connected.</p>
       )}
+    </Card>
+  );
+}
+
+function PasskeysCard() {
+  const { toast, locale } = useSession();
+  const [items, setItems] = useState<Awaited<ReturnType<typeof api.passkeys.list>>['items']>([]);
+  const load = () => api.passkeys.list().then((r) => setItems(r.items));
+  useEffect(() => {
+    void load();
+  }, []);
+  return (
+    <Card title="Passkeys" subtitle="Sign in with your fingerprint, face or device PIN. Passkeys can't be phished and replace both your password and code.">
+      <div className="stack-sm">
+        {items.length ? (
+          <List>
+            {items.map((p) => (
+              <ListItem
+                key={p.id}
+                primary={p.label}
+                secondary={p.last_used_at ? `Used ${formatRelativeTime(p.last_used_at, locale)}` : 'Not used yet'}
+                end={
+                  <Button size="sm" variant="ghost" onClick={async () => (await api.passkeys.remove(p.id), await load())}>
+                    Remove
+                  </Button>
+                }
+              />
+            ))}
+          </List>
+        ) : null}
+        <Button
+          icon="shield"
+          onClick={async () => {
+            try {
+              const { options, challengeId } = await api.passkeys.registerOptions();
+              const response = await startRegistration({ optionsJSON: options });
+              await api.passkeys.registerVerify(challengeId, response, navigator.platform ? `Passkey on ${navigator.platform}` : 'Passkey');
+              toast('Passkey added');
+              await load();
+            } catch (e) {
+              if ((e as Error).name !== 'NotAllowedError') toast(errorMessage(e));
+            }
+          }}
+        >
+          Add a passkey
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+function BrowserPushCard() {
+  const { toast } = useSession();
+  const [on, setOn] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!pushSupported()) return setOn(null);
+    currentSubscription().then((s) => setOn(!!s));
+  }, []);
+  if (on === null) return null;
+  return (
+    <Card title="Browser notifications" subtitle="Get notified on this device even when YAPILAPI isn't open. Focus mode and paused notifications still apply.">
+      <Switch
+        label="Notifications on this browser"
+        checked={on}
+        onChange={async (v) => {
+          if (!v) {
+            await disableBrowserPush();
+            setOn(false);
+            return;
+          }
+          const r = await enableBrowserPush();
+          if (r === 'enabled') setOn(true);
+          else toast(r === 'denied' ? 'Notifications are blocked in your browser settings.' : "This browser or server doesn't support push notifications.");
+        }}
+      />
     </Card>
   );
 }

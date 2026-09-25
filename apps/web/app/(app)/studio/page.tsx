@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { EmptyState, List, ListItem, Skeleton, Stat } from '@yapilapi/design-system';
+import { Button, EmptyState, List, ListItem, Select, Skeleton, Stat, TextField } from '@yapilapi/design-system';
 import { formatMoney, formatRelativeTime } from '@yapilapi/shared';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 import { useSession } from '../../providers';
 
 /** Creator Studio: how your content performs over the last 28 days, and what you've earned. */
@@ -80,6 +80,62 @@ export default function Studio() {
           <EmptyState title="No posts yet" body="Publish something from Create to see how it does." />
         )}
       </section>
+      <PlansManager />
     </div>
+  );
+}
+
+function PlansManager() {
+  const { me, toast, locale } = useSession();
+  const [plans, setPlans] = useState<{ id: string; name: string; priceCents: number; currency: string }[]>([]);
+  const [subs, setSubs] = useState<{ active: number; cancelled: number } | null>(null);
+  const [name, setName] = useState('');
+  const [price, setPrice] = useState('5');
+  const [currency, setCurrency] = useState('USD');
+  const load = async () => {
+    if (!me) return;
+    setPlans((await api.economy.plans(me.id)).items);
+    setSubs(await api.economy.subscribers());
+  };
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.id]);
+  return (
+    <section className="stack-sm">
+      <h2 className="section-title">Subscriptions</h2>
+      <p className="muted" style={{ margin: 0 }}>
+        {subs ? `${subs.active} active subscriber${subs.active === 1 ? '' : 's'}.` : ''} Fans subscribe from your profile.
+      </p>
+      {plans.map((p) => (
+        <div key={p.id} className="yp-card" style={{ padding: 12 }}>
+          <strong>{p.name}</strong> · {formatMoney(p.priceCents, p.currency, locale)} a month
+        </div>
+      ))}
+      <form
+        className="row"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          try {
+            await api.economy.createPlan({ name, priceCents: Math.round(Number(price) * 100), currency });
+            setName('');
+            await load();
+          } catch (err) {
+            toast(errorMessage(err));
+          }
+        }}
+      >
+        <TextField label="Plan name" value={name} onChange={(e) => setName(e.currentTarget.value)} maxLength={60} />
+        <TextField label="Monthly price" type="number" min={1} step="0.5" value={price} onChange={(e) => setPrice(e.currentTarget.value)} />
+        <Select label="Currency" value={currency} onChange={(e) => setCurrency(e.currentTarget.value)}>
+          {['USD', 'EUR', 'GBP', 'NGN', 'XOF'].map((c) => (
+            <option key={c}>{c}</option>
+          ))}
+        </Select>
+        <Button type="submit" disabled={!name.trim()} style={{ alignSelf: 'flex-end' }}>
+          Add plan
+        </Button>
+      </form>
+    </section>
   );
 }
