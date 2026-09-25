@@ -135,6 +135,29 @@ export function createClient(opts: ClientOptions) {
         return req<{ media: { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string | null } }>('POST', '/v1/media', fd);
       },
     },
+    studio: {
+      /** Your uploaded videos, newest first, for picking one to edit. */
+      videos: () => get<{ items: StudioVideo[] }>('/v1/me/videos'),
+      /** Trim keeps one segment; clips make one new video per segment (up to 20). Times are in seconds. */
+      createEdits: (mediaId: string, b: { kind: 'trim' | 'clip'; segments: { start: number; end: number }[] }) =>
+        post<{ items: MediaEdit[] }>(`/v1/media/${mediaId}/edits`, b),
+      edits: (mediaId: string) => get<{ items: MediaEdit[] }>(`/v1/media/${mediaId}/edits`),
+      /** autoCaptions is only reported to the owner: whether automatic captions are set up on this server. */
+      captions: (mediaId: string) => get<{ items: CaptionTrack[]; autoCaptions?: boolean }>(`/v1/media/${mediaId}/captions`),
+      captionCues: (mediaId: string, lang: string) =>
+        get<{ track: CaptionTrack; cues: CaptionCue[] }>(`/v1/media/${mediaId}/captions/${encodeURIComponent(lang)}`),
+      saveCaptions: (mediaId: string, lang: string, b: { label: string; cues: CaptionCue[] }) =>
+        put<{ track: CaptionTrack }>(`/v1/media/${mediaId}/captions/${encodeURIComponent(lang)}`, b),
+      uploadCaptions: (mediaId: string, lang: string, file: File | Blob, label: string) => {
+        const fd = new FormData();
+        fd.append('label', label);
+        fd.append('file', file, 'captions.vtt');
+        return req<{ track: CaptionTrack }>('PUT', `/v1/media/${mediaId}/captions/${encodeURIComponent(lang)}/file`, fd);
+      },
+      deleteCaptions: (mediaId: string, lang: string) => del<{ ok: true }>(`/v1/media/${mediaId}/captions/${encodeURIComponent(lang)}`),
+      /** Fails with code "not_configured" (501) when the server has no speech-to-text provider. */
+      transcribe: (mediaId: string, b: { lang: string; label: string }) => post<{ track: CaptionTrack }>(`/v1/media/${mediaId}/captions/transcribe`, b),
+    },
     moments: {
       list: () =>
         get<{
@@ -552,4 +575,60 @@ export interface FamilyLink {
   controls: TeenControls | null;
   usage?: { day: string; minutes: number }[];
   createdAt: string;
+}
+
+export interface StudioVideo {
+  id: string;
+  url: string;
+  variants: Record<string, string>;
+  posterUrl: string | null;
+  hlsUrl: string | null;
+  durationMs: number | null;
+  altText: string | null;
+  /** Poster, MP4 and HLS are ready. Only processed videos can be edited. */
+  processed: boolean;
+  /** Set when this video is a trim or clip of another one. */
+  editOf: string | null;
+  createdAt: string;
+}
+
+export interface MediaEdit {
+  id: string;
+  kind: 'trim' | 'clip';
+  /** Seconds into the source video. */
+  start: number;
+  end: number;
+  status: 'queued' | 'rendering' | 'processing' | 'ready' | 'failed';
+  error: string | null;
+  createdAt: string;
+  result: {
+    id: string;
+    url: string;
+    variants: Record<string, string>;
+    posterUrl: string | null;
+    hlsUrl: string | null;
+    durationMs: number | null;
+    ready: boolean;
+  } | null;
+}
+
+export interface CaptionTrack {
+  id: string;
+  lang: string;
+  label: string;
+  source: 'manual' | 'upload' | 'auto';
+  status: 'processing' | 'ready' | 'failed';
+  /** The .vtt file, served with a text/vtt content type. */
+  url: string | null;
+  cueCount: number;
+  /** Why automatic captions failed (owner only). */
+  error: string | null;
+  updatedAt: string;
+}
+
+export interface CaptionCue {
+  /** Seconds. */
+  start: number;
+  end: number;
+  text: string;
 }

@@ -36,6 +36,21 @@ export function postVisibleSql(v: string): string {
   )`;
 }
 
+/**
+ * Media aliased `m`. Media has no audience of its own: the owner always sees it,
+ * and anyone else sees it when it's attached to a post they can see.
+ */
+export function mediaVisibleSql(v: string): string {
+  return `(
+    m.owner_id = ${v}
+    OR EXISTS (SELECT 1 FROM post_media pm
+               JOIN posts p ON p.id = pm.post_id
+               JOIN profiles ap ON ap.user_id = p.author_id
+               JOIN users au ON au.id = p.author_id
+               WHERE pm.media_id = m.id AND ${postVisibleSql(v)})
+  )`;
+}
+
 /** Events aliased `e`. */
 export function eventVisibleSql(v: string): string {
   return `(

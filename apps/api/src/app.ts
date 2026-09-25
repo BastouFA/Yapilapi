@@ -18,6 +18,7 @@ import { anthropicProvider, devProvider } from './lib/ai/providers.ts';
 import { logEmailSender } from './lib/email.ts';
 import { localDiskStorage, s3Storage } from './lib/storage.ts';
 import { devPaymentProvider } from './lib/payments.ts';
+import { transcriberFromConfig } from './lib/transcription.ts';
 import { registerAuth } from './plugins/auth.ts';
 import { MAX_UPLOAD_BYTES } from './modules/media.ts';
 import authModule from './modules/auth.ts';
@@ -47,11 +48,13 @@ import miniAppsModule from './modules/miniapps.ts';
 import economyModule from './modules/economy.ts';
 import adsModule from './modules/ads.ts';
 import familyModule from './modules/family.ts';
+import studioModule from './modules/studio.ts';
 import { createPushSender } from './lib/push.ts';
 import { setPushSender } from './lib/services.ts';
 import { processWebhooks } from './lib/webhooks.ts';
 import { processJobs } from './lib/jobs.ts';
 import { mediaJobHandlers } from './lib/media-processing.ts';
+import { studioJobHandlers } from './lib/studio.ts';
 
 export interface BuiltApp {
   app: FastifyInstance;
@@ -118,6 +121,7 @@ export async function buildApp(
     email: logEmailSender(app.log),
     storage,
     payments: devPaymentProvider(config.PAYMENTS_WEBHOOK_SECRET),
+    transcription: transcriberFromConfig(config),
   };
 
   // Keep the raw body for webhook signature checks.
@@ -273,6 +277,7 @@ export async function buildApp(
     economyModule,
     adsModule,
     familyModule,
+    studioModule,
   ])
     await mod(app, ctx);
 
@@ -287,7 +292,7 @@ export async function buildApp(
   }
   // Background jobs (media processing). Tests drive processJobs directly.
   let jobTimer: NodeJS.Timeout | undefined;
-  const jobHandlers = mediaJobHandlers({ db, storage });
+  const jobHandlers = { ...mediaJobHandlers({ db, storage }), ...studioJobHandlers({ db, storage, transcription: ctx.transcription }) };
   if (opts.webhookWorker ?? config.APP_ENV !== 'test') {
     let busy = false;
     jobTimer = setInterval(async () => {

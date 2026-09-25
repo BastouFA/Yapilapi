@@ -48,6 +48,15 @@ export interface MediaItem {
   hlsUrl?: string | null;
   /** Tiny blurred preview (data URI) shown while loading. */
   placeholder?: string | null;
+  /** WebVTT subtitle tracks for videos. */
+  captions?: CaptionTrackRef[];
+}
+
+export interface CaptionTrackRef {
+  /** BCP 47 language code, e.g. "en" or "pt-BR". */
+  lang: string;
+  label: string;
+  url: string;
 }
 
 export interface Post {
