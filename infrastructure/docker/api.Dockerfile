@@ -4,7 +4,7 @@
 # --workspace @yapilapi/api` below installs it: a separate `npm install tsx` in the runtime stage was tried
 # before and silently produced an empty install (npm's workspace reconciliation pruned it as "not declared by
 # any package.json" the moment --no-save was used), so don't reintroduce that pattern.
-FROM node:22-bookworm-slim AS deps
+FROM node:25-bookworm-slim AS deps
 WORKDIR /repo
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY apps/api/package.json apps/api/
@@ -13,7 +13,7 @@ COPY apps/admin/package.json apps/admin/
 COPY packages packages
 RUN npm ci --omit=dev --workspace @yapilapi/api --include-workspace-root=false
 
-FROM node:22-bookworm-slim
+FROM node:25-bookworm-slim
 ENV NODE_ENV=production
 # ffmpeg powers the media transcoding and slideshow features; the API degrades (503 processing_unavailable) without it.
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
