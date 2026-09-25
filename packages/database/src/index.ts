@@ -8,8 +8,22 @@ pg.types.setTypeParser(20, (v) => Number(v));
 export type Db = pg.Pool;
 export type DbClient = pg.PoolClient | pg.Pool;
 
+/**
+ * Connection pool for request handling. A query never waits forever: a
+ * connection dropped silently (a proxy or container port forward going away)
+ * fails within a minute instead of hanging until the OS gives up on TCP.
+ */
 export function createPool(connectionString: string, max = 10): pg.Pool {
-  return new pg.Pool({ connectionString, max, idleTimeoutMillis: 30_000 });
+  return new pg.Pool({
+    connectionString,
+    max,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
+    statement_timeout: 60_000,
+    query_timeout: 65_000,
+  });
 }
 
 /** Run fn inside a transaction; rolls back on any thrown error. */
