@@ -23,6 +23,7 @@
     "@yapilapi/moderation": "*",
     "@yapilapi/payments": "*",
     "@yapilapi/recommendations": "*",
+    "@yapilapi/search": "*",
     "@yapilapi/security": "*",
     "@yapilapi/shared": "*",
     "blurhash": "^2.0.5",
@@ -32,6 +33,7 @@
     "pino": "^10.3.1",
     "prom-client": "^15.1.0",
     "sharp": "^0.35.4",
+    "tsx": "^4.19.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
