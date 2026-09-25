@@ -8,7 +8,7 @@ type Q = Pool | PoolClient;
 export async function hydratePosts(db: Q, ids: string[], viewer: string | null, reasons?: Map<string, string>): Promise<Post[]> {
   if (!ids.length) return [];
   const { rows } = await db.query(
-    `SELECT p.id, p.kind, p.body, p.visibility, p.link_url, p.topics, p.like_count, p.comment_count, p.created_at, p.ai_provenance,
+    `SELECT p.id, p.kind, p.body, p.visibility, p.link_url, p.topics, p.like_count, p.comment_count, p.created_at, p.ai_provenance, p.metadata->'real' AS real,
             pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode,
             c.id AS c_id, c.slug AS c_slug, c.name AS c_name,
             e.id AS e_id, e.title AS e_title, e.starts_at AS e_starts_at,
@@ -47,6 +47,7 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
         counts: { likes: r.like_count, comments: r.comment_count },
         viewer: { liked: r.liked, saved: r.saved },
         aiAssisted: !!r.ai_provenance?.assisted,
+        real: r.real ?? null,
         createdAt: r.created_at.toISOString(),
         reason: reasons?.get(r.id),
       } satisfies Post,

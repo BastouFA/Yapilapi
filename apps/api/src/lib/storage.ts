@@ -1,6 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
+import type { Readable } from 'node:stream';
+import { CreateBucketCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 export interface StoredObject {
   key: string;
@@ -9,7 +11,69 @@ export interface StoredObject {
 
 /** Object storage abstraction. Local disk in development; S3-compatible + CDN in production. */
 export interface MediaStorage {
+  driver: 'local' | 's3';
   put(data: Buffer, ext: string, mime: string): Promise<StoredObject>;
+  /** Stream an object (S3 driver; local files are served statically). */
+  get?(key: string, range?: string): Promise<{ body: Readable; contentType?: string; contentLength?: number; contentRange?: string; status: number } | null>;
+}
+
+function newKey(ext: string) {
+  const now = new Date();
+  return `${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}/${randomUUID()}.${ext}`;
+}
+
+/**
+ * S3-compatible storage (AWS S3, Cloudflare R2, MinIO, SeaweedFS). The bucket
+ * stays private; the API streams objects at /media/<key>, and a CDN in front of
+ * that path caches them (keys are content-unique, so responses are immutable).
+ */
+export function s3Storage(opts: {
+  endpoint?: string;
+  region: string;
+  bucket: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  forcePathStyle: boolean;
+  publicBase: string;
+}): MediaStorage & { ensureBucket(): Promise<void> } {
+  const s3 = new S3Client({
+    region: opts.region,
+    endpoint: opts.endpoint || undefined,
+    forcePathStyle: opts.forcePathStyle,
+    credentials: { accessKeyId: opts.accessKeyId, secretAccessKey: opts.secretAccessKey },
+  });
+  return {
+    driver: 's3',
+    async ensureBucket() {
+      try {
+        await s3.send(new HeadBucketCommand({ Bucket: opts.bucket }));
+      } catch {
+        await s3.send(new CreateBucketCommand({ Bucket: opts.bucket }));
+      }
+    },
+    async put(data, ext, mime) {
+      const key = newKey(ext);
+      await s3.send(
+        new PutObjectCommand({ Bucket: opts.bucket, Key: key, Body: data, ContentType: mime, CacheControl: 'public, max-age=31536000, immutable' }),
+      );
+      return { key, url: `${opts.publicBase}/media/${key}` };
+    },
+    async get(key, range) {
+      try {
+        const r = await s3.send(new GetObjectCommand({ Bucket: opts.bucket, Key: key, Range: range }));
+        return {
+          body: r.Body as Readable,
+          contentType: r.ContentType,
+          contentLength: r.ContentLength,
+          contentRange: r.ContentRange,
+          status: r.ContentRange ? 206 : 200,
+        };
+      } catch (e) {
+        if ((e as { name?: string }).name === 'NoSuchKey' || (e as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404) return null;
+        throw e;
+      }
+    },
+  };
 }
 
 export const ALLOWED_MIME: Record<string, { ext: string; kind: 'image' | 'video' | 'audio' }> = {
@@ -26,9 +90,9 @@ export const ALLOWED_MIME: Record<string, { ext: string; kind: 'image' | 'video'
 
 export function localDiskStorage(dir: string, publicBase: string): MediaStorage {
   return {
+    driver: 'local',
     async put(data, ext) {
-      const now = new Date();
-      const key = `${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}/${randomUUID()}.${ext}`;
+      const key = newKey(ext);
       const full = path.join(dir, key);
       await mkdir(path.dirname(full), { recursive: true });
       await writeFile(full, data);

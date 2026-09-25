@@ -379,7 +379,7 @@ export function PostCard({
         </div>
       ) : null}
 
-      {post.reason || post.aiAssisted ? (
+      {post.reason || post.aiAssisted || post.real ? (
         <div className="yp-post__reason">
           {post.reason ? (
             <>
@@ -388,6 +388,9 @@ export function PostCard({
             </>
           ) : null}
           {post.aiAssisted ? <Badge tone="neutral">{tt('post.aiAssisted')}</Badge> : null}
+          {post.real ? (
+            <Badge tone="success">Real · captured {new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(post.real.capturedAt))}</Badge>
+          ) : null}
         </div>
       ) : null}
 

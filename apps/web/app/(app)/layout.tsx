@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { NavBar, Skeleton, type NavEntry } from '@yapilapi/design-system';
 import { NextLink } from '@/lib/link';
+import { CallsProvider } from '@/components/Calls';
 import { useSession } from '../providers';
 
 function currentTab(path: string, username?: string): NavEntry['id'] | undefined {
@@ -49,11 +50,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   ];
 
   return (
-    <div className="yp-shell">
-      <NavBar items={items} current={currentTab(path, me.username)} linkAs={NextLink} locale={locale} logoSrc="/mark.svg" />
-      <main className="yp-shell__main" id="main">
-        {children}
-      </main>
-    </div>
+    <CallsProvider>
+      <div className="yp-shell">
+        <NavBar items={items} current={currentTab(path, me.username)} linkAs={NextLink} locale={locale} logoSrc="/mark.svg" />
+        <main className="yp-shell__main" id="main">
+          {children}
+        </main>
+      </div>
+    </CallsProvider>
   );
 }

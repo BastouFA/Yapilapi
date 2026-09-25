@@ -60,7 +60,14 @@ export default function Developers() {
               </Button>
             ))}
           </div>
-          {selected ? <AppDetail key={selected} appId={selected} onDeleted={() => (setSelected(null), void load())} /> : null}
+          {selected ? (
+            <AppDetail
+              key={selected}
+              appId={selected}
+              initialRedirects={apps.find((a) => a.id === selected)?.redirect_uris ?? []}
+              onDeleted={() => (setSelected(null), void load())}
+            />
+          ) : null}
         </>
       ) : apps ? (
         <EmptyState title="No apps yet" body="Create an app to get API keys and webhooks." />
@@ -69,7 +76,7 @@ export default function Developers() {
   );
 }
 
-function AppDetail({ appId, onDeleted }: { appId: string; onDeleted: () => void }) {
+function AppDetail({ appId, initialRedirects, onDeleted }: { appId: string; initialRedirects: string[]; onDeleted: () => void }) {
   const { toast, locale } = useSession();
   const [keys, setKeys] = useState<Awaited<ReturnType<typeof api.developer.keys>>['items']>([]);
   const [hooks, setHooks] = useState<Awaited<ReturnType<typeof api.developer.webhooks>> | null>(null);
@@ -78,6 +85,7 @@ function AppDetail({ appId, onDeleted }: { appId: string; onDeleted: () => void 
   const [write, setWrite] = useState(false);
   const [url, setUrl] = useState('');
   const [events, setEvents] = useState<string[]>(['post.created']);
+  const [redirects, setRedirects] = useState(initialRedirects.join('\n'));
   const load = async () => {
     setKeys((await api.developer.keys(appId)).items);
     setHooks(await api.developer.webhooks(appId));
@@ -99,6 +107,35 @@ function AppDetail({ appId, onDeleted }: { appId: string; onDeleted: () => void 
         </Alert>
       ) : null}
 
+      <Card
+        title="Sign in with YAPILAPI (OAuth)"
+        subtitle="Authorization code flow with PKCE. Client ID is the app ID below. Redirect addresses must match exactly."
+      >
+        <div className="stack-sm">
+          <code style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>client_id = {appId}</code>
+          <TextField label="Redirect addresses (one per line)" multiline value={redirects} onChange={(e) => setRedirects(e.currentTarget.value)} />
+          <Button
+            size="sm"
+            onClick={async () => {
+              try {
+                const r = await api.oauth.setRedirectUris(
+                  appId,
+                  redirects
+                    .split('\n')
+                    .map((x) => x.trim())
+                    .filter(Boolean),
+                );
+                setRedirects(r.redirectUris.join('\n'));
+                toast('Redirect addresses saved');
+              } catch (err) {
+                toast(errorMessage(err));
+              }
+            }}
+          >
+            Save redirect addresses
+          </Button>
+        </div>
+      </Card>
       <Card title="API keys" subtitle="Send as: Authorization: Bearer <key>">
         <div className="stack-sm">
           {keys.length ? (

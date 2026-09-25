@@ -22,6 +22,7 @@ function Create() {
   const [circleId, setCircleId] = useState('');
   const [media, setMedia] = useState<Uploaded[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
   const [poll, setPoll] = useState<string[] | null>(null);
   const [topics, setTopics] = useState('');
   const [expiresIn, setExpiresIn] = useState<'1h' | '24h' | 'permanent'>('24h');
@@ -49,13 +50,15 @@ function Create() {
     setUploading(true);
     try {
       for (const f of Array.from(files).slice(0, 10 - media.length)) {
-        const { media: m } = await api.media.upload(f);
+        // Large files (mostly video) go through resumable, chunked uploads.
+        const { media: m } = f.size > 8 * 1024 * 1024 ? await api.uploads.resumable(f, (p) => setProgress(Math.round(p * 100))) : await api.media.upload(f);
         setMedia((cur) => [...cur, { id: m.id, kind: m.kind, url: m.url, altText: '' }]);
       }
     } catch (e) {
       toast(errorMessage(e));
     } finally {
       setUploading(false);
+      setProgress(null);
       if (fileRef.current) fileRef.current.value = '';
     }
   }
@@ -202,7 +205,7 @@ function Create() {
             onChange={(e) => upload(e.currentTarget.files)}
           />
           <Button size="sm" variant="secondary" icon="image" loading={uploading} onClick={() => fileRef.current?.click()}>
-            Photo or video
+            {progress !== null ? `Uploading ${progress}%` : 'Photo or video'}
           </Button>
           {kind === 'post' && !poll ? (
             <Button size="sm" variant="secondary" icon="poll" onClick={() => setPoll(['', ''])}>

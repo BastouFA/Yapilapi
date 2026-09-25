@@ -11,7 +11,7 @@ import { useSession } from '../../providers';
 type MomentGroup = { author: PublicUser; moments: { id: string; body: string; mediaUrl: string | null; mediaKind: string | null; createdAt: string }[] };
 
 export default function Home() {
-  const { t, locale, unread } = useSession();
+  const { t, locale, unread, flags } = useSession();
   const [mode, setMode] = useState<FeedMode>('for_you');
   const [moments, setMoments] = useState<MomentGroup[]>([]);
   const [viewing, setViewing] = useState<number | null>(null);
@@ -30,6 +30,18 @@ export default function Home() {
     <div className="yp-shell__inner">
       <div className="yp-topbar">
         <h1>{t('nav.home')}</h1>
+        <div className="row">
+          {flags.REAL ? (
+            <Link href="/real" className="yp-btn yp-btn--ghost yp-btn--sm">
+              Real
+            </Link>
+          ) : null}
+          {flags.REAL_TOGETHER ? (
+            <Link href="/together" className="yp-btn yp-btn--ghost yp-btn--sm">
+              Together
+            </Link>
+          ) : null}
+        </div>
         <Link href="/notifications" className="yp-btn yp-btn--ghost" aria-label={`${t('notifications.title')}, ${unread.notifications} unread`}>
           {t('notifications.title')}
           {unread.notifications ? <span className="yp-unread">{unread.notifications}</span> : null}

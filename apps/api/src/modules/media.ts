@@ -24,8 +24,8 @@ export default async function mediaModule(app: FastifyInstance, ctx: AppContext)
     const stored = await ctx.storage.put(buf, allowed.ext, file.mimetype);
     const alt = (file.fields.altText as { value?: string } | undefined)?.value?.slice(0, 500) ?? null;
     const { rows } = await ctx.db.query(
-      `INSERT INTO media (owner_id, kind, url, mime, alt_text, status) VALUES ($1,$2,$3,$4,$5,'ready') RETURNING id, kind, url, alt_text`,
-      [u.id, allowed.kind, stored.url, file.mimetype, alt],
+      `INSERT INTO media (owner_id, kind, url, mime, alt_text, status, storage_key, size_bytes) VALUES ($1,$2,$3,$4,$5,'ready',$6,$7) RETURNING id, kind, url, alt_text`,
+      [u.id, allowed.kind, stored.url, file.mimetype, alt, stored.key, buf.length],
     );
     reply.code(201);
     return { media: { id: rows[0].id, kind: rows[0].kind, url: rows[0].url, altText: rows[0].alt_text } };

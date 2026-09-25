@@ -66,8 +66,32 @@ const KEY_BLOCKED = [
   /^\/v1\/ai\/memories/,
 ];
 
+/** OAuth access tokens (ypo_…) act like API keys granted by the user to an app. */
+async function resolveOAuth(ctx: AppContext, token: string): Promise<AuthUser | null> {
+  const { rows } = await ctx.db.query(
+    `SELECT g.id, g.app_id, g.scopes, g.last_used_at, u.id AS user_id, u.email, u.email_verified_at, u.birth_date
+     FROM oauth_grants g JOIN users u ON u.id = g.user_id JOIN developer_apps a ON a.id = g.app_id
+     WHERE g.access_hash = $1 AND g.revoked_at IS NULL AND g.access_expires_at > now() AND a.deleted_at IS NULL AND u.status = 'active'`,
+    [hashToken(token)],
+  );
+  const r = rows[0];
+  if (!r) return null;
+  if (!r.last_used_at || Date.now() - r.last_used_at.getTime() > 60_000)
+    void ctx.db.query(`UPDATE oauth_grants SET last_used_at = now() WHERE id = $1`, [r.id]).catch(() => {});
+  return {
+    id: r.user_id,
+    sessionId: '',
+    role: 'user',
+    email: r.email,
+    emailVerified: !!r.email_verified_at,
+    birthDate: r.birth_date,
+    apiKey: { id: r.id, appId: r.app_id, scopes: r.scopes },
+  };
+}
+
 export async function resolveSession(ctx: AppContext, token: string | undefined): Promise<AuthUser | null> {
   if (!token) return null;
+  if (token.startsWith('ypo_')) return resolveOAuth(ctx, token);
   if (/^ypl_[0-9a-f]{8}_/.test(token)) return resolveApiKey(ctx, token);
   const { rows } = await ctx.db.query<{
     session_id: string;

@@ -59,6 +59,8 @@ export interface Post {
   counts: { likes: number; comments: number };
   viewer: { liked: boolean; saved: boolean };
   aiAssisted: boolean;
+  /** Set on Real posts: captured in-app moments before posting, unedited. */
+  real?: { capturedAt: string; dual: boolean; locationText: string | null } | null;
   createdAt: string;
   /** Why this post is in the viewer's feed (recommendation explanation). */
   reason?: string;

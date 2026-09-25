@@ -16,7 +16,7 @@ import { RealtimeHub } from './lib/realtime.ts';
 import { AiGateway } from './lib/ai/gateway.ts';
 import { anthropicProvider, devProvider } from './lib/ai/providers.ts';
 import { logEmailSender } from './lib/email.ts';
-import { localDiskStorage } from './lib/storage.ts';
+import { localDiskStorage, s3Storage } from './lib/storage.ts';
 import { devPaymentProvider } from './lib/payments.ts';
 import { registerAuth } from './plugins/auth.ts';
 import { MAX_UPLOAD_BYTES } from './modules/media.ts';
@@ -38,6 +38,10 @@ import creatorModule from './modules/creator.ts';
 import developerModule from './modules/developer.ts';
 import memoryModule from './modules/memory.ts';
 import liveModule from './modules/live.ts';
+import uploadsModule from './modules/uploads.ts';
+import callsModule from './modules/calls.ts';
+import realModule from './modules/real.ts';
+import oauthModule from './modules/oauth.ts';
 import { processWebhooks } from './lib/webhooks.ts';
 
 export interface BuiltApp {
@@ -81,6 +85,21 @@ export async function buildApp(
   if (config.AI_PROVIDER === 'anthropic' && !config.ANTHROPIC_API_KEY)
     app.log.warn('AI_PROVIDER=anthropic but ANTHROPIC_API_KEY is empty; using the dev provider.');
 
+  const storage =
+    config.STORAGE_DRIVER === 's3'
+      ? s3Storage({
+          endpoint: config.S3_ENDPOINT,
+          region: config.S3_REGION,
+          bucket: config.S3_BUCKET,
+          accessKeyId: config.S3_ACCESS_KEY_ID,
+          secretAccessKey: config.S3_SECRET_ACCESS_KEY,
+          forcePathStyle: config.S3_FORCE_PATH_STYLE,
+          publicBase: config.PUBLIC_API_URL,
+        })
+      : localDiskStorage(path.resolve(config.UPLOAD_DIR), config.PUBLIC_API_URL);
+  if ('ensureBucket' in storage)
+    await (storage as { ensureBucket(): Promise<void> }).ensureBucket().catch((e) => app.log.warn({ err: e.message }, 'media bucket not reachable'));
+
   const ctx: AppContext = {
     config,
     db,
@@ -88,7 +107,7 @@ export async function buildApp(
     realtime: new RealtimeHub(redis, sub),
     ai: new AiGateway(db, provider),
     email: logEmailSender(app.log),
-    storage: localDiskStorage(path.resolve(config.UPLOAD_DIR), config.PUBLIC_API_URL),
+    storage,
     payments: devPaymentProvider(config.PAYMENTS_WEBHOOK_SECRET),
   };
 
@@ -103,11 +122,15 @@ export async function buildApp(
     }
   });
 
+  app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_req, body, done) => done(null, body));
+
   await app.register(cors, { origin: config.WEB_ORIGIN.split(','), credentials: true });
   await app.register(cookie);
   await app.register(rateLimit, {
     global: true,
     hook: 'preHandler',
+    // Tests create many users from one address; limits stay on everywhere else.
+    allowList: () => config.APP_ENV === 'test',
     max: config.RATE_LIMIT_MAX,
     timeWindow: '1 minute',
     redis: redis,
@@ -120,7 +143,20 @@ export async function buildApp(
   });
   await app.register(multipart, { limits: { fileSize: MAX_UPLOAD_BYTES } });
   await app.register(websocket);
-  await app.register(fastifyStatic, { root: path.resolve(config.UPLOAD_DIR), prefix: '/media/', decorateReply: false, maxAge: '365d', immutable: true });
+  if (storage.driver === 'local')
+    await app.register(fastifyStatic, { root: path.resolve(config.UPLOAD_DIR), prefix: '/media/', decorateReply: false, maxAge: '365d', immutable: true });
+  else
+    app.get('/media/*', { config: { rateLimit: false } }, async (req, reply) => {
+      const key = (req.params as { '*': string })['*'];
+      if (!/^[\w/.-]+$/.test(key) || key.includes('..')) return reply.code(404).send();
+      const obj = await storage.get!(key, req.headers.range);
+      if (!obj) return reply.code(404).send({ error: { code: 'not_found', message: 'Media not found.' } });
+      reply.code(obj.status).header('cache-control', 'public, max-age=31536000, immutable').header('accept-ranges', 'bytes');
+      if (obj.contentType) reply.type(obj.contentType);
+      if (obj.contentLength !== undefined) reply.header('content-length', obj.contentLength);
+      if (obj.contentRange) reply.header('content-range', obj.contentRange);
+      return reply.send(obj.body);
+    });
 
   // Security headers for every API response.
   app.addHook('onSend', async (req, reply) => {
@@ -219,6 +255,10 @@ export async function buildApp(
     developerModule,
     memoryModule,
     liveModule,
+    uploadsModule,
+    callsModule,
+    realModule,
+    oauthModule,
   ])
     await mod(app, ctx);
 

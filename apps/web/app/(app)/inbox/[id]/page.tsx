@@ -8,6 +8,7 @@ import type { Conversation, Message } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { ReportSheet } from '@/components/PostList';
 import { useRealtime, useSession } from '../../../providers';
+import { useCalls } from '@/components/Calls';
 
 type Pending = Message & { pending?: boolean };
 
@@ -23,6 +24,7 @@ export default function ChatPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [reportId, setReportId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const calls = useCalls();
 
   useEffect(() => {
     api.conversations.get(id).then(
@@ -138,6 +140,8 @@ export default function ChatPage() {
         <Menu
           label="Conversation options"
           actions={[
+            { label: 'Video call', icon: 'eye', onSelect: () => void calls.start(id, 'video') },
+            { label: 'Audio call', icon: 'bell', onSelect: () => void calls.start(id, 'audio') },
             { label: t('inbox.summarize'), icon: 'sparkle', onSelect: () => assist('summarize_conversation') },
             { label: 'Draft a plan from the last message', icon: 'calendar', onSelect: () => assist('plan_from_message') },
             ...(others.length === 1

@@ -23,5 +23,13 @@ services:
       timeout: 3s
       retries: 30
 
+  # S3-compatible object storage for media (any S3 provider works in production).
+  storage:
+    image: chrislusf/seaweedfs:latest
+    command: 'server -s3 -s3.port=8333 -dir=/data -master.volumeSizeLimitMB=1024 -volume.max=0'
+    ports: ['8333:8333']
+    volumes: [media:/data]
+
 volumes:
   pgdata:
+  media:

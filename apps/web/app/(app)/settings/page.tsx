@@ -311,6 +311,7 @@ function PrivacyCenter() {
           </form>
         </div>
       </Card>
+      <ConnectedApps />
       <Card title="Your data">
         <div className="row">
           <Button
@@ -663,6 +664,37 @@ function TwoStepCard() {
           </form>
         ) : null}
       </div>
+    </Card>
+  );
+}
+
+function ConnectedApps() {
+  const { toast } = useSession();
+  const [items, setItems] = useState<Awaited<ReturnType<typeof api.oauth.connectedApps>>['items']>([]);
+  const load = () => api.oauth.connectedApps().then((r) => setItems(r.items));
+  useEffect(() => {
+    void load();
+  }, []);
+  return (
+    <Card title="Connected apps" subtitle="Apps you allowed to use your account with Sign in with YAPILAPI.">
+      {items.length ? (
+        <List>
+          {items.map((a) => (
+            <ListItem
+              key={a.id}
+              primary={a.name}
+              secondary={`Can ${a.scopes.includes('write') ? 'read and post' : 'read'}`}
+              end={
+                <Button size="sm" variant="ghost" onClick={async () => (await api.oauth.disconnect(a.id), toast(`Disconnected ${a.name}`), await load())}>
+                  Disconnect
+                </Button>
+              }
+            />
+          ))}
+        </List>
+      ) : (
+        <p className="muted">No apps are connected.</p>
+      )}
     </Card>
   );
 }

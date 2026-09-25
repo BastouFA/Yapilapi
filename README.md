@@ -4,6 +4,10 @@
 
 This monorepo holds the API, web app, mobile foundation, shared packages, database migrations, infrastructure and docs. See [docs/product/status.md](docs/product/status.md) for exactly what is built, what is architected, and what is still to do.
 
+## Where to keep the project
+
+Keep it outside iCloud-synced folders (Desktop, Documents). iCloud offloads files and makes installs, builds and tests hang. This repository lives in `~/Developer/yapilapi`.
+
 ## Prerequisites
 
 - Node.js 22 or newer
@@ -70,7 +74,9 @@ These are wired behind adapters with working development implementations; produc
 | Email delivery (SMTP or email API) | `apps/api/src/lib/email.ts` | Logs emails, exposes `/dev/outbox` |
 | AI provider key (`ANTHROPIC_API_KEY`) | `apps/api/src/lib/ai/providers.ts` | Deterministic rule-based provider, clearly labelled in the UI |
 | Payment provider | `apps/api/src/lib/payments.ts` | Sandbox provider with signed webhooks |
-| Object storage + CDN + transcoding | `apps/api/src/lib/storage.ts` | Local disk under `./uploads` |
+| Object storage + CDN | `apps/api/src/lib/storage.ts` | SeaweedFS (S3-compatible) in docker compose, or local disk with `STORAGE_DRIVER=local` |
+| Video transcoding | not built yet | Videos are served as uploaded |
+| TURN server for calls | `apps/api/src/modules/calls.ts` (`TURN_URL`) | STUN only; calls may fail on strict networks |
 | MFA encryption key (`MFA_ENCRYPTION_KEY`) | `apps/api/src/modules/mfa.ts` | Fixed development key; production refuses to start without one |
 | Live video provider (ingest + playback) | `apps/api/src/modules/live.ts` | Placeholder local URLs; chat, roles and audience work |
 | Production domain, app-store accounts | infrastructure, `apps/mobile/app.json` | localhost |

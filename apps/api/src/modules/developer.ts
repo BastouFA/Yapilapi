@@ -27,7 +27,7 @@ export default async function developerModule(app: FastifyInstance, ctx: AppCont
 
   app.get('/v1/developer/apps', { preHandler: requireAuth }, async (req) => {
     const { rows } = await db.query(
-      `SELECT a.id, a.name, a.description, a.website, a.created_at,
+      `SELECT a.id, a.name, a.description, a.website, a.redirect_uris, a.created_at,
          (SELECT count(*) FROM api_keys k WHERE k.app_id = a.id AND k.revoked_at IS NULL) AS active_keys,
          (SELECT count(*) FROM webhook_subscriptions s WHERE s.app_id = a.id AND s.active) AS webhooks
        FROM developer_apps a WHERE a.owner_id = $1 AND a.deleted_at IS NULL ORDER BY a.created_at`,

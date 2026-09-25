@@ -25,6 +25,16 @@ const schema = z.object({
   // 32 bytes, base64. Encrypts TOTP secrets at rest. Development falls back to a fixed dev key.
   MFA_ENCRYPTION_KEY: z.string().optional().default(''),
   UPLOAD_DIR: z.string().default('./uploads'),
+  STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
+  S3_ENDPOINT: z.string().optional().default(''),
+  S3_REGION: z.string().default('us-east-1'),
+  S3_BUCKET: z.string().default('yapilapi-media'),
+  S3_ACCESS_KEY_ID: z.string().default('dev'),
+  S3_SECRET_ACCESS_KEY: z.string().default('dev'),
+  S3_FORCE_PATH_STYLE: z
+    .string()
+    .optional()
+    .transform((v) => v !== 'false'),
   PUBLIC_API_URL: z.string().default('http://localhost:4000'),
   RATE_LIMIT_MAX: z.coerce.number().default(300),
 });

@@ -207,6 +207,72 @@ export function createClient(opts: ClientOptions) {
         ),
     },
     flags: () => get<{ flags: Record<string, boolean> }>('/v1/flags'),
+    uploads: {
+      /** Chunked, resumable upload. Retries each chunk and resumes from what the server already has. */
+      resumable: async (file: File, onProgress?: (fraction: number) => void, altText?: string) => {
+        const s = await post<{ uploadId: string; chunkSize: number; totalChunks: number }>('/v1/uploads', {
+          filename: file.name,
+          mime: file.type,
+          size: file.size,
+        });
+        const status = await get<{ missing: number[] }>(`/v1/uploads/${s.uploadId}`);
+        let done = s.totalChunks - status.missing.length;
+        for (const i of status.missing) {
+          const chunk = file.slice(i * s.chunkSize, Math.min(file.size, (i + 1) * s.chunkSize));
+          for (let attempt = 0; ; attempt++) {
+            try {
+              const headers: Record<string, string> = { 'content-type': 'application/octet-stream' };
+              if (opts.token) headers.authorization = `Bearer ${opts.token}`;
+              const res = await f(`${opts.baseUrl}/v1/uploads/${s.uploadId}/chunks/${i}`, { method: 'PUT', body: chunk, headers, credentials: 'include' });
+              if (!res.ok) throw new ApiError(res.status, 'upload_failed', 'A part of the upload failed.');
+              break;
+            } catch (e) {
+              if (attempt >= 4) throw e;
+              await new Promise((r) => setTimeout(r, 500 * 2 ** attempt));
+            }
+          }
+          onProgress?.(++done / s.totalChunks);
+        }
+        return post<{ media: { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string | null } }>(`/v1/uploads/${s.uploadId}/complete`, {
+          altText,
+        });
+      },
+    },
+    calls: {
+      start: (conversationId: string, kind: 'audio' | 'video') =>
+        post<{ call: CallInfo; iceServers: RTCIceServer[] }>(`/v1/conversations/${conversationId}/calls`, { kind }),
+      get: (id: string) => get<{ call: CallInfo; iceServers: RTCIceServer[] }>(`/v1/calls/${id}`),
+      answer: (id: string) => post<{ call: CallInfo; iceServers: RTCIceServer[] }>(`/v1/calls/${id}/answer`),
+      decline: (id: string) => post(`/v1/calls/${id}/decline`),
+      end: (id: string) => post(`/v1/calls/${id}/end`),
+      signal: (id: string, toUserId: string, type: 'offer' | 'answer' | 'candidate', data: unknown) => post(`/v1/calls/${id}/signal`, { toUserId, type, data }),
+    },
+    real: {
+      feed: () => get<{ items: Post[] }>('/v1/real'),
+      create: (b: { mediaIds: string[]; caption?: string; visibility?: string }) => post<{ post: Post }>('/v1/real', b),
+    },
+    together: {
+      list: () => get<{ items: { id: string; title: string; status: string; closesAt: string; contributions: number; members: number }[] }>('/v1/together'),
+      get: (id: string) => get<{ together: TogetherDetail }>(`/v1/together/${id}`),
+      create: (b: { title: string; memberIds: string[]; eventId?: string }) => post<{ together: TogetherDetail }>('/v1/together', b),
+      contribute: (id: string, mediaId: string, caption: string) =>
+        post<{ together: TogetherDetail }>(`/v1/together/${id}/contributions`, { mediaId, caption }),
+      close: (id: string) => post<{ together: TogetherDetail }>(`/v1/together/${id}/close`),
+    },
+    oauth: {
+      consent: (query: string) =>
+        get<{ app: { id: string; name: string; description: string; website: string | null; ownerName: string }; scopes: string[]; redirectUri: string }>(
+          `/v1/oauth/authorize?${query}`,
+        ),
+      decide: (params: Record<string, string>, approve: boolean) => post<{ redirectTo: string }>('/v1/oauth/authorize', { ...params, approve }),
+      connectedApps: () =>
+        get<{ items: { id: string; name: string; website: string | null; scopes: string[]; connected_at: string; last_used_at: string | null }[] }>(
+          '/v1/me/connected-apps',
+        ),
+      disconnect: (appId: string) => del(`/v1/me/connected-apps/${appId}`),
+      setRedirectUris: (appId: string, redirectUris: string[]) =>
+        put<{ redirectUris: string[] }>(`/v1/developer/apps/${appId}/redirect-uris`, { redirectUris }),
+    },
     mfa: {
       status: () =>
         get<{ enabled: boolean; recoveryCodesLeft: number; factors: { id: string; kind: string; label: string; last_used_at: string | null }[] }>(
@@ -219,7 +285,10 @@ export function createClient(opts: ClientOptions) {
       newRecoveryCodes: (code: string) => post<{ recoveryCodes: string[] }>('/v1/auth/mfa/recovery-codes', { code }),
     },
     developer: {
-      apps: () => get<{ items: { id: string; name: string; description: string; active_keys: number; webhooks: number }[] }>('/v1/developer/apps'),
+      apps: () =>
+        get<{ items: { id: string; name: string; description: string; redirect_uris: string[]; active_keys: number; webhooks: number }[] }>(
+          '/v1/developer/apps',
+        ),
       createApp: (b: { name: string; description?: string; website?: string }) => post<{ app: { id: string; name: string } }>('/v1/developer/apps', b),
       deleteApp: (id: string) => del(`/v1/developer/apps/${id}`),
       keys: (appId: string) =>
@@ -319,4 +388,24 @@ export interface LiveChatMessage {
   answered: boolean;
   author: PublicUser;
   createdAt: string;
+}
+
+export interface CallInfo {
+  id: string;
+  conversationId: string;
+  callerId: string;
+  kind: 'audio' | 'video';
+  status: 'ringing' | 'active' | 'ended' | 'missed' | 'declined';
+  participants: string[];
+}
+
+export interface TogetherDetail {
+  id: string;
+  title: string;
+  status: 'open' | 'closed';
+  eventId: string | null;
+  closesAt: string | null;
+  myRole: 'creator' | 'member';
+  members: { user: PublicUser; role: string }[];
+  contributions: { id: string; caption: string; capturedAt: string; media: { url: string; kind: string; altText: string | null } | null; author: PublicUser }[];
 }
