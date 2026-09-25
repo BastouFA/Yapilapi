@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { NavBar, Skeleton, type NavEntry } from '@yapilapi/design-system';
 import { NextLink } from '@/lib/link';
 import { CallsProvider } from '@/components/Calls';
+import { Sidebar } from '@/components/Sidebar';
 import { useSession } from '../providers';
 
 function currentTab(path: string, username?: string): NavEntry['id'] | undefined {
@@ -56,6 +57,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <main className="yp-shell__main" id="main">
           {children}
         </main>
+        <Sidebar />
       </div>
     </CallsProvider>
   );

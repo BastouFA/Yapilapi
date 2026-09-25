@@ -14,6 +14,9 @@ export default function Landing() {
     if (!loading && me) router.replace('/home');
   }, [loading, me, router]);
 
+  // "Your social world. One place." → second sentence gets the brand gradient.
+  const [head, tail] = t('app.tagline').split(/(?<=\.)\s+/);
+
   return (
     <div className="landing">
       <header className="landing__top">
@@ -31,8 +34,13 @@ export default function Landing() {
         </div>
       </header>
       <main className="landing__hero" id="main">
-        <div className="stack">
-          <h1>{t('app.tagline')}</h1>
+        <div className="stack" style={{ gap: 'var(--space-6)' }}>
+          <span className="landing__eyebrow">
+            <b>NEW</b> Live, Real Together and Mini Apps
+          </span>
+          <h1>
+            {head} {tail ? <span className="grad-text">{tail}</span> : null}
+          </h1>
           <p>
             People, communities, events, places and the things you love, in one place you control. No endless scroll by design: you choose what your feed shows,
             and you can always see why.
@@ -42,7 +50,7 @@ export default function Landing() {
               <li key={j}>{j}</li>
             ))}
           </ul>
-          <div className="row">
+          <div className="row" style={{ gap: 'var(--space-3)' }}>
             <Link href="/signup" className="yp-btn yp-btn--primary yp-btn--lg">
               {t('auth.signup.title')}
             </Link>
@@ -51,10 +59,39 @@ export default function Landing() {
             </Link>
           </div>
         </div>
-        <div className="landing__blocks" aria-hidden>
-          {Array.from({ length: 18 }, (_, i) => (
-            <span key={i} style={{ gridColumn: i % 5 === 0 ? 'span 2' : undefined }} />
-          ))}
+        <div className="landing__stage" aria-hidden>
+          <div className="phone phone--a">
+            <div className="phone__row">
+              {Array.from({ length: 4 }, (_, i) => (
+                <span key={i} className="phone__ring">
+                  <i />
+                </span>
+              ))}
+            </div>
+            <div className="phone__card">
+              <div className="phone__line" style={{ width: '55%' }} />
+              <div className="phone__img" />
+              <div className="phone__line" style={{ width: '85%' }} />
+              <div className="phone__line" style={{ width: '60%' }} />
+            </div>
+            <div className="phone__card">
+              <div className="phone__line" style={{ width: '40%' }} />
+              <div className="phone__img phone__img--2" />
+            </div>
+          </div>
+          <div className="phone phone--b">
+            <div className="phone__live" />
+            <div className="phone__bubble">Are you coming tonight?</div>
+            <div className="phone__bubble phone__bubble--me">On my way, saving you a seat</div>
+            <div className="phone__bubble">Bring the playlist</div>
+            <div className="phone__bubble phone__bubble--me">Already on it</div>
+          </div>
+          <div className="float-chip float-chip--1">
+            <span /> You choose your feed
+          </div>
+          <div className="float-chip float-chip--2">
+            <span /> See why every post is here
+          </div>
         </div>
       </main>
       <footer className="landing__foot">© {new Date().getFullYear()} YAPILAPI</footer>

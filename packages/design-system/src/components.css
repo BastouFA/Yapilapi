@@ -12,6 +12,7 @@
 
 /* Button */
 .yp-btn {
+  text-decoration: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -22,12 +23,14 @@
   letter-spacing: 0.01em;
   white-space: nowrap;
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full);
   cursor: pointer;
   transition:
     background-color var(--duration-fast),
     border-color var(--duration-fast),
-    color var(--duration-fast);
+    color var(--duration-fast),
+    transform var(--duration-fast),
+    box-shadow var(--duration-fast);
 }
 .yp-btn:focus-visible {
   outline: none;
@@ -57,16 +60,23 @@
   width: 100%;
 }
 .yp-btn--primary {
-  background: var(--yapi);
+  background: linear-gradient(120deg, var(--yapi) 0%, var(--yapi-strong) 50%, var(--grad-end) 100%);
+  background-size: 180% 100%;
   color: var(--on-yapi);
+  box-shadow: 0 6px 18px -8px color-mix(in oklab, var(--yapi) 70%, transparent);
 }
 .yp-btn--primary:hover:not(:disabled) {
-  background: var(--yapi-strong);
+  background-position: 100% 0;
+  transform: translateY(-1px);
+}
+.yp-btn:active:not(:disabled) {
+  transform: scale(0.97);
 }
 .yp-btn--secondary {
   background: var(--surface);
   color: var(--ink);
-  border-color: var(--line-strong);
+  border-color: var(--line);
+  box-shadow: var(--shadow-sm);
 }
 .yp-btn--secondary:hover:not(:disabled) {
   background: var(--surface-sunken);
@@ -129,8 +139,10 @@
   color: var(--ink);
   background: var(--surface);
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
-  transition: border-color var(--duration-fast);
+  border-radius: var(--radius-md);
+  transition:
+    border-color var(--duration-fast),
+    box-shadow var(--duration-fast);
 }
 textarea.yp-input {
   height: auto;
@@ -379,7 +391,8 @@ textarea.yp-input {
 .yp-card {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   min-width: 0;
 }
 .yp-card--raised {
@@ -426,8 +439,12 @@ textarea.yp-input {
 .yp-tabs__list {
   display: flex;
   gap: var(--space-1);
-  border-bottom: 1px solid var(--line);
+  padding: 4px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-full);
   overflow-x: auto;
+  width: fit-content;
+  max-width: 100%;
 }
 .yp-tabs__tab {
   position: relative;
@@ -439,23 +456,17 @@ textarea.yp-input {
   color: var(--ink-muted);
   cursor: pointer;
   white-space: nowrap;
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  border-radius: var(--radius-full);
+  height: 34px;
+  padding: 0 var(--space-4);
 }
 .yp-tabs__tab:hover {
   color: var(--ink);
 }
 .yp-tabs__tab[aria-selected='true'] {
-  color: var(--yapi);
-}
-.yp-tabs__tab[aria-selected='true']::after {
-  content: '';
-  position: absolute;
-  left: var(--space-3);
-  right: var(--space-3);
-  bottom: -1px;
-  height: 3px;
-  background: var(--yapi);
-  border-radius: 2px 2px 0 0;
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
 }
 .yp-tabs__tab:focus-visible {
   outline: none;
@@ -477,10 +488,10 @@ textarea.yp-input {
   place-items: center;
   flex: none;
   border-radius: var(--radius-full);
-  background: var(--yapi-soft);
+  background: linear-gradient(135deg, var(--yapi-soft), var(--saffron-soft));
   color: var(--yapi);
-  font-family: var(--font-sans);
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 700;
   overflow: hidden;
 }
 .yp-avatar img {
@@ -538,7 +549,7 @@ textarea.yp-input {
   width: 100%;
   max-width: 440px;
   background: var(--surface);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   border: 1px solid var(--line);
 }
