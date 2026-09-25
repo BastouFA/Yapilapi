@@ -88,7 +88,10 @@ describe('static security headers (next.config)', () => {
       scripts: Record<string, string>;
     };
     expect(pkg.scripts['dev']).toContain('-p 3100');
-    expect(pkg.scripts['start']).toContain('-p 3100');
+    // `start` uses `-p ${PORT:-3100}` so hosts like Render can inject their own PORT at runtime,
+    // while still defaulting to 3100 (distinct from the web app) when nothing overrides it.
+    expect(pkg.scripts['start']).toContain('3100');
+    expect(pkg.scripts['start']).toMatch(/-p\s/);
     expect(web.scripts['dev']).not.toContain('3100');
   });
 });

@@ -49,11 +49,28 @@ jobs:
     env:
       TEST_DATABASE_URL: postgres://yapilapi:ci_only_password@127.0.0.1:5432/yapilapi_test_ci
       REDIS_URL: redis://127.0.0.1:6379
+      # tests/ai-evals/run.ts manages its own throwaway database and otherwise defaults to
+      # postgres://yapilapi:yapilapi_dev_password@..., a different password (the local dev / e2e-job
+      # convention) than this job's Postgres service actually uses. Without this, "npm run test:ai-evals"
+      # fails with "password authentication failed for user \"yapilapi\"" once the DB-creation step above
+      # lets the job reach it.
+      AI_EVALS_DATABASE_URL: postgres://yapilapi:ci_only_password@127.0.0.1:5432/yapilapi_test_aievals
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
       - run: npm ci
+      - name: Create and migrate the CI test database
+        # The test harness (apps/api/test/helpers.ts and friends) expects TEST_DATABASE_URL to already point at
+        # an existing, migrated database. The postgres:16 service above only gives us the server - nothing
+        # creates "yapilapi_test_ci" or runs migrations against it, so every test that touches the DB failed with
+        # "database \"yapilapi_test_ci\" does not exist". loadConfig() only requires DATABASE_URL, so pointing it
+        # at the same connection string as TEST_DATABASE_URL is enough for the migration script.
+        env:
+          DATABASE_URL: postgres://yapilapi:ci_only_password@127.0.0.1:5432/yapilapi_test_ci
+        run: |
+          PGPASSWORD=ci_only_password psql -h 127.0.0.1 -U yapilapi -d postgres -c "CREATE DATABASE yapilapi_test_ci;"
+          npm run db:migrate
       - run: npm run test:unit
       - run: npm run test:integration
       - name: AI evaluation suite (deterministic dev provider)
@@ -86,6 +103,13 @@ jobs:
           node-version: '${{ env.NODE_VERSION }}'
           cache: npm
           cache-dependency-path: apps/mobile/package-lock.json
+      # apps/mobile is deliberately not an npm workspace (see docs/architecture/decisions/001-mobile-monorepo.md),
+      # but its Jest config maps @yapilapi/api-client and @yapilapi/design-system straight to their TS source in
+      # packages/*/src, which Babel transpiles using @babel/runtime helpers. That package only resolves from an
+      # ancestor node_modules of packages/*, which only exists once the root workspace is installed - without this
+      # step every mobile test suite that (transitively) imports one of those packages fails with
+      # "Cannot find module '@babel/runtime/helpers/interopRequireDefault'".
+      - run: npm ci
       - run: npm ci --prefix apps/mobile
       - run: npm run mobile:typecheck
       - run: npm run mobile:test

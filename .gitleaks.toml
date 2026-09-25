@@ -1,0 +1,16 @@
+title = "YAPILAPI gitleaks config"
+
+# Extend gitleaks' default ruleset rather than replacing it - we only add allowlist entries below.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known-fake secrets used only as test fixtures, never real credentials"
+regexes = [
+  # Fixed test password shared by the API test harness (apps/api/test/helpers.ts, apps/api/test/auth.test.ts).
+  '''Sturdy-Passphrase-42''',
+  # A syntactically-valid but fake JWT used to test the AI safety redaction filter (packages/ai/src/safety/screen.test.ts).
+  '''eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\.abcdefghijk''',
+  # A fake AWS-access-key-shaped string used to test the same redaction filter (packages/ai/src/safety/screen.test.ts).
+  '''AKIAABCDEFGHIJKLMNOP''',
+]

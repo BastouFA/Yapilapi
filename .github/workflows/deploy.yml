@@ -23,10 +23,17 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
+      owner: ${{ steps.meta.outputs.owner }}
     steps:
       - uses: actions/checkout@v4
       - id: meta
-        run: echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+        # Docker/OCI repository names must be all-lowercase, but github.repository_owner preserves the
+        # GitHub account's actual case (e.g. "BastouFA"), which makes `ghcr.io/<owner>/api:<tag>` an invalid
+        # tag and fails buildx with "invalid tag ...: repository name must be lowercase". Compute a
+        # lowercased owner once here instead of using github.repository_owner directly in each tag below.
+        run: |
+          echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
       - uses: docker/login-action@v3
         with:
           {
@@ -41,7 +48,7 @@ jobs:
           context: .
           file: infrastructure/docker/api.Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/api:${{ steps.meta.outputs.tag }}
+          tags: ghcr.io/${{ steps.meta.outputs.owner }}/api:${{ steps.meta.outputs.tag }}
       - name: web
         uses: docker/build-push-action@v6
         with:
@@ -51,7 +58,7 @@ jobs:
             APP=web
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/web:${{ steps.meta.outputs.tag }}
+          tags: ghcr.io/${{ steps.meta.outputs.owner }}/web:${{ steps.meta.outputs.tag }}
       - name: admin
         uses: docker/build-push-action@v6
         with:
@@ -61,7 +68,7 @@ jobs:
             APP=admin
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/admin:${{ steps.meta.outputs.tag }}
+          tags: ghcr.io/${{ steps.meta.outputs.owner }}/admin:${{ steps.meta.outputs.tag }}
 
   deploy:
     name: Deploy to ${{ github.event.inputs.environment || 'development' }}
@@ -81,6 +88,6 @@ jobs:
           DEPLOY_USER: ${{ vars.DEPLOY_USER }}
           DEPLOY_SSH_KEY_FILE: ${{ runner.temp }}/deploy_key
           TAG: ${{ needs.images.outputs.tag }}
-          REGISTRY: ghcr.io/${{ github.repository_owner }}
+          REGISTRY: ghcr.io/${{ needs.images.outputs.owner }}
           SMOKE_URL: ${{ vars.API_PUBLIC_URL }}
         run: infrastructure/deployment/deploy.sh
