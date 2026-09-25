@@ -1,0 +1,23 @@
+groups:
+  - name: yapilapi
+    rules:
+      - alert: ApiErrorRateHigh
+        expr: sum(rate(ypl_http_errors_total[5m])) / sum(rate(ypl_http_requests_total[5m])) > 0.02
+        for: 5m
+        labels: { severity: page }
+        annotations: { summary: 'More than 2% of API requests are failing with 5xx.' }
+      - alert: ApiDown
+        expr: up{job="yapilapi-api"} == 0
+        for: 1m
+        labels: { severity: page }
+        annotations: { summary: 'The API is not answering scrapes.' }
+      - alert: RealtimeWithoutRedis
+        expr: ypl_realtime_redis == 0
+        for: 10m
+        labels: { severity: ticket }
+        annotations: { summary: 'API running without Redis: realtime only works within one instance.' }
+      - alert: DbPoolSaturated
+        expr: ypl_db_pool_idle == 0 and ypl_db_pool_total >= 10
+        for: 5m
+        labels: { severity: ticket }
+        annotations: { summary: 'Database connection pool has no idle connections.' }

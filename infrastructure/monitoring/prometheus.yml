@@ -1,0 +1,9 @@
+# Scrapes the API's /metrics endpoint (request counts, errors, latency sums, pool usage).
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: yapilapi-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['api:4000']
+rule_files: ['alerts.yml']

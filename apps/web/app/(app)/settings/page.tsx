@@ -25,7 +25,17 @@ export default function Settings() {
           { id: 'safety', label: 'Safety' },
         ]}
       />
-      {tab === 'profile' ? <ProfileSettings /> : tab === 'attention' ? <AttentionSettings /> : tab === 'privacy' ? <PrivacyCenter /> : tab === 'security' ? <SecuritySettings /> : <SafetySettings />}
+      {tab === 'profile' ? (
+        <ProfileSettings />
+      ) : tab === 'attention' ? (
+        <AttentionSettings />
+      ) : tab === 'privacy' ? (
+        <PrivacyCenter />
+      ) : tab === 'security' ? (
+        <SecuritySettings />
+      ) : (
+        <SafetySettings />
+      )}
     </div>
   );
 }
@@ -144,10 +154,18 @@ function AttentionSettings() {
       <Card title="Your feed, your rules" subtitle="YAPILAPI doesn't optimize for time spent. These controls apply immediately.">
         <div className="stack">
           <Switch label="Friends only (For You shows only friends)" checked={!!a.friendsOnly} onChange={(v) => setA('friendsOnly', v)} />
-          <Switch label="Reduced recommendations (only people and communities you chose)" checked={!!a.reducedRecommendations} onChange={(v) => setA('reducedRecommendations', v)} />
+          <Switch
+            label="Reduced recommendations (only people and communities you chose)"
+            checked={!!a.reducedRecommendations}
+            onChange={(v) => setA('reducedRecommendations', v)}
+          />
           <Switch label="Focus mode (hide counts and non-essential badges)" checked={!!a.focusMode} onChange={(v) => setA('focusMode', v)} />
           <Switch label="Quiet mode (no sounds or vibrations)" checked={!!a.quietMode} onChange={(v) => setA('quietMode', v)} />
-          <Select label="Daily time budget" value={String(a.dailyTimeBudgetMinutes ?? '')} onChange={(e) => setA('dailyTimeBudgetMinutes', e.currentTarget.value ? Number(e.currentTarget.value) : null)}>
+          <Select
+            label="Daily time budget"
+            value={String(a.dailyTimeBudgetMinutes ?? '')}
+            onChange={(e) => setA('dailyTimeBudgetMinutes', e.currentTarget.value ? Number(e.currentTarget.value) : null)}
+          >
             <option value="">No limit</option>
             {[15, 30, 45, 60, 90, 120].map((m) => (
               <option key={m} value={m}>
@@ -206,7 +224,10 @@ function PrivacyCenter() {
   const reload = () => api.me.privacy().then(setData);
   useEffect(() => {
     void reload();
-    api.ai.memories().then((r) => setMemories(r.items)).catch(() => {});
+    api.ai
+      .memories()
+      .then((r) => setMemories(r.items))
+      .catch(() => {});
   }, []);
   if (!data) return null;
   const granted = (p: string) => !!data.consents.find((c) => c.purpose === p)?.granted;
@@ -277,7 +298,13 @@ function PrivacyCenter() {
               }
             }}
           >
-            <TextField label="Add something to remember" value={memory} onChange={(e) => setMemory(e.currentTarget.value)} maxLength={1000} style={{ flex: 1 }} />
+            <TextField
+              label="Add something to remember"
+              value={memory}
+              onChange={(e) => setMemory(e.currentTarget.value)}
+              maxLength={1000}
+              style={{ flex: 1 }}
+            />
             <Button type="submit" size="sm" disabled={!memory.trim()}>
               Add
             </Button>
@@ -337,9 +364,17 @@ function PrivacyCenter() {
         }
       >
         <div className="stack-sm">
-          <p style={{ margin: 0 }}>Your posts, messages, connections and assistant memory are removed and you're signed out everywhere. This can't be undone.</p>
+          <p style={{ margin: 0 }}>
+            Your posts, messages, connections and assistant memory are removed and you're signed out everywhere. This can't be undone.
+          </p>
           {err ? <Alert tone="danger">{err}</Alert> : null}
-          <TextField label="Enter your password to confirm" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.currentTarget.value)} />
+          <TextField
+            label="Enter your password to confirm"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.currentTarget.value)}
+          />
         </div>
       </Dialog>
     </div>
@@ -419,7 +454,13 @@ function SafetySettings() {
                 key={c.id}
                 primary={`${c.target_type}: ${c.decision.replace('_', ' ')}`}
                 secondary={c.appeal_status ? `Appeal ${c.appeal_status}` : c.status === 'decided' ? 'You can appeal this decision.' : 'Final'}
-                end={c.status === 'decided' && !c.appeal_status ? <Button size="sm" variant="secondary" onClick={() => setAppealFor(c.id)}>Appeal</Button> : null}
+                end={
+                  c.status === 'decided' && !c.appeal_status ? (
+                    <Button size="sm" variant="secondary" onClick={() => setAppealFor(c.id)}>
+                      Appeal
+                    </Button>
+                  ) : null
+                }
               />
             ))}
           </List>
@@ -475,7 +516,13 @@ function SafetySettings() {
           </Button>
         }
       >
-        <TextField label="Tell us why this decision is wrong" multiline value={statement} onChange={(e) => setStatement(e.currentTarget.value)} maxLength={2000} />
+        <TextField
+          label="Tell us why this decision is wrong"
+          multiline
+          value={statement}
+          onChange={(e) => setStatement(e.currentTarget.value)}
+          maxLength={2000}
+        />
       </Dialog>
     </div>
   );

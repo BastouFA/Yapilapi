@@ -55,7 +55,14 @@ export default async function searchModule(app: FastifyInstance, ctx: AppContext
              ORDER BY ts_rank(p.search, ${tsqEn}) DESC, p.created_at DESC LIMIT $3`,
             [viewer, terms, q.limit],
           )
-          .then(async (r) => void (out.posts = await hydratePosts(db, r.rows.map((x) => x.id), viewer))),
+          .then(
+            async (r) =>
+              void (out.posts = await hydratePosts(
+                db,
+                r.rows.map((x) => x.id),
+                viewer,
+              )),
+          ),
       );
 
     if (wants('communities'))
@@ -67,7 +74,18 @@ export default async function searchModule(app: FastifyInstance, ctx: AppContext
              ORDER BY ts_rank(c.search, websearch_to_tsquery('english', $1)) DESC, c.member_count DESC LIMIT $2`,
             [terms, q.limit, like],
           )
-          .then((r) => void (out.communities = r.rows.map((c) => ({ id: c.id, slug: c.slug, name: c.name, description: c.description, memberCount: c.member_count, topics: c.topics, visibility: c.visibility })))),
+          .then(
+            (r) =>
+              void (out.communities = r.rows.map((c) => ({
+                id: c.id,
+                slug: c.slug,
+                name: c.name,
+                description: c.description,
+                memberCount: c.member_count,
+                topics: c.topics,
+                visibility: c.visibility,
+              }))),
+          ),
       );
 
     if (wants('events')) {

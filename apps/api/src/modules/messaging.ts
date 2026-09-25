@@ -21,7 +21,9 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
   }
 
   async function memberIds(conversationId: string): Promise<string[]> {
-    const { rows } = await db.query<{ user_id: string }>(`SELECT user_id FROM conversation_members WHERE conversation_id = $1 AND left_at IS NULL`, [conversationId]);
+    const { rows } = await db.query<{ user_id: string }>(`SELECT user_id FROM conversation_members WHERE conversation_id = $1 AND left_at IS NULL`, [
+      conversationId,
+    ]);
     return rows.map((r) => r.user_id);
   }
 
@@ -59,7 +61,15 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       title: r.title,
       members: (r.member_ids ?? []).map((id: string) => users.get(id)).filter(Boolean),
       lastMessage: r.lm_id
-        ? { id: r.lm_id, conversationId: r.id, sender: users.get(r.lm_sender)!, body: r.lm_body, replyToId: null, attachments: r.lm_attachments, createdAt: r.lm_created_at.toISOString() }
+        ? {
+            id: r.lm_id,
+            conversationId: r.id,
+            sender: users.get(r.lm_sender)!,
+            body: r.lm_body,
+            replyToId: null,
+            attachments: r.lm_attachments,
+            createdAt: r.lm_created_at.toISOString(),
+          }
         : null,
       unreadCount: r.unread,
       updatedAt: r.last_message_at.toISOString(),
@@ -91,7 +101,10 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
           await c.query(`UPDATE conversation_members SET left_at = NULL WHERE conversation_id = $1 AND user_id = $2`, [existing.rows[0].id, u.id]);
           return existing.rows[0].id;
         }
-        const { rows } = await c.query<{ id: string }>(`INSERT INTO conversations (kind, direct_key, created_by) VALUES ('direct',$1,$2) RETURNING id`, [key, u.id]);
+        const { rows } = await c.query<{ id: string }>(`INSERT INTO conversations (kind, direct_key, created_by) VALUES ('direct',$1,$2) RETURNING id`, [
+          key,
+          u.id,
+        ]);
         await c.query(`INSERT INTO conversation_members (conversation_id, user_id) VALUES ($1,$2),($1,$3)`, [rows[0]!.id, u.id, others[0]]);
         return rows[0]!.id;
       });
@@ -100,7 +113,10 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     }
 
     const id = await tx(db, async (c) => {
-      const { rows } = await c.query<{ id: string }>(`INSERT INTO conversations (kind, title, created_by) VALUES ('group',$1,$2) RETURNING id`, [input.title ?? null, u.id]);
+      const { rows } = await c.query<{ id: string }>(`INSERT INTO conversations (kind, title, created_by) VALUES ('group',$1,$2) RETURNING id`, [
+        input.title ?? null,
+        u.id,
+      ]);
       const cid = rows[0]!.id;
       await c.query(`INSERT INTO conversation_members (conversation_id, user_id, role) VALUES ($1,$2,'admin')`, [cid, u.id]);
       await c.query(`INSERT INTO conversation_members (conversation_id, user_id) SELECT $1, unnest($2::uuid[])`, [cid, others]);
@@ -115,7 +131,10 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const u = me(req);
     const { id } = parse(idParam, req.params);
     const { userIds } = parse(z.object({ userIds: z.array(z.string().uuid()).min(1).max(50) }), req.body);
-    const conv = await db.query(`SELECT c.kind, cm.role FROM conversations c JOIN conversation_members cm ON cm.conversation_id = c.id WHERE c.id = $1 AND cm.user_id = $2 AND cm.left_at IS NULL`, [id, u.id]);
+    const conv = await db.query(
+      `SELECT c.kind, cm.role FROM conversations c JOIN conversation_members cm ON cm.conversation_id = c.id WHERE c.id = $1 AND cm.user_id = $2 AND cm.left_at IS NULL`,
+      [id, u.id],
+    );
     if (!conv.rows[0]) throw notFound('Conversation');
     if (conv.rows[0].kind !== 'group') throw badRequest('You can only add people to group conversations.');
     for (const other of userIds) await assertCanMessage(u.id, u.birthDate, other);
@@ -167,7 +186,10 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     }
     const analysis = analyzeText(input.body);
     if (analysis.risk === 'escalate') {
-      await db.query(`INSERT INTO moderation_cases (target_type, target_id, subject_user_id, source, risk, signals) VALUES ('message', $1, $2, 'automated', 'escalate', $3) ON CONFLICT DO NOTHING`, [id, u.id, { signals: analysis.signals }]);
+      await db.query(
+        `INSERT INTO moderation_cases (target_type, target_id, subject_user_id, source, risk, signals) VALUES ('message', $1, $2, 'automated', 'escalate', $3) ON CONFLICT DO NOTHING`,
+        [id, u.id, { signals: analysis.signals }],
+      );
       throw new AppError(422, 'content_blocked', "This message wasn't sent because it may put someone at risk.");
     }
     const row = await tx(db, async (c) => {
@@ -182,7 +204,16 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       return rows[0];
     });
     const sender = (await usersByIds(db, [u.id])).get(u.id)!;
-    const message: Message = { id: row.id, conversationId: id, sender, body: row.body, replyToId: row.reply_to_id, attachments: row.attachments, createdAt: row.created_at.toISOString(), clientId: row.client_id };
+    const message: Message = {
+      id: row.id,
+      conversationId: id,
+      sender,
+      body: row.body,
+      replyToId: row.reply_to_id,
+      attachments: row.attachments,
+      createdAt: row.created_at.toISOString(),
+      clientId: row.client_id,
+    };
     await ctx.realtime.publish(members, { type: 'message.created', data: message });
     track(db, u.id, 'message_sent', { kind: conv.kind });
     reply.code(201);
@@ -199,9 +230,15 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
   app.delete('/v1/messages/:id', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
-    const r = await db.query(`UPDATE messages SET deleted_at = now(), body = '', attachments = '[]' WHERE id = $1 AND sender_id = $2 AND deleted_at IS NULL RETURNING conversation_id`, [id, u.id]);
+    const r = await db.query(
+      `UPDATE messages SET deleted_at = now(), body = '', attachments = '[]' WHERE id = $1 AND sender_id = $2 AND deleted_at IS NULL RETURNING conversation_id`,
+      [id, u.id],
+    );
     if (!r.rowCount) throw notFound('Message');
-    await ctx.realtime.publish(await memberIds(r.rows[0].conversation_id), { type: 'message.deleted', data: { id, conversationId: r.rows[0].conversation_id } });
+    await ctx.realtime.publish(await memberIds(r.rows[0].conversation_id), {
+      type: 'message.deleted',
+      data: { id, conversationId: r.rows[0].conversation_id },
+    });
     return { ok: true };
   });
 
@@ -222,7 +259,10 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const { id } = parse(idParam, req.params);
     const input = parse(z.object({ title: z.string().trim().min(1).max(120), details: z.record(z.string(), z.unknown()).default({}) }), req.body);
     await assertMember(id, u.id);
-    const { rows } = await db.query(`INSERT INTO plans (conversation_id, created_by, title, details) VALUES ($1,$2,$3,$4) RETURNING id, title, details, status, created_at`, [id, u.id, input.title, input.details]);
+    const { rows } = await db.query(
+      `INSERT INTO plans (conversation_id, created_by, title, details) VALUES ($1,$2,$3,$4) RETURNING id, title, details, status, created_at`,
+      [id, u.id, input.title, input.details],
+    );
     await ctx.realtime.publish(await memberIds(id), { type: 'plan.created', data: rows[0] });
     reply.code(201);
     return { plan: rows[0] };
@@ -250,7 +290,11 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
         if (msg.type === 'ping') socket.send(JSON.stringify({ type: 'pong' }));
         if (msg.type === 'typing' && msg.conversationId) {
           const ids = await memberIds(msg.conversationId);
-          if (ids.includes(user.id)) await ctx.realtime.publish(ids.filter((i) => i !== user.id), { type: 'typing', data: { conversationId: msg.conversationId, userId: user.id } });
+          if (ids.includes(user.id))
+            await ctx.realtime.publish(
+              ids.filter((i) => i !== user.id),
+              { type: 'typing', data: { conversationId: msg.conversationId, userId: user.id } },
+            );
         }
       } catch {
         /* ignore malformed frames */

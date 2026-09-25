@@ -91,12 +91,9 @@ export const createPostSchema = z
   .superRefine((v, ctx) => {
     if (!v.body && v.media.length === 0 && !v.linkUrl && !v.poll)
       ctx.addIssue({ code: 'custom', message: 'A post needs text, media, a link or a poll.', path: ['body'] });
-    if (v.visibility === 'circle' && !v.circleId)
-      ctx.addIssue({ code: 'custom', message: 'Choose a circle.', path: ['circleId'] });
-    if (v.visibility === 'selected' && !v.audience?.length)
-      ctx.addIssue({ code: 'custom', message: 'Choose at least one person.', path: ['audience'] });
-    if (v.kind === 'poll' && !v.poll)
-      ctx.addIssue({ code: 'custom', message: 'Add poll options.', path: ['poll'] });
+    if (v.visibility === 'circle' && !v.circleId) ctx.addIssue({ code: 'custom', message: 'Choose a circle.', path: ['circleId'] });
+    if (v.visibility === 'selected' && !v.audience?.length) ctx.addIssue({ code: 'custom', message: 'Choose at least one person.', path: ['audience'] });
+    if (v.kind === 'poll' && !v.poll) ctx.addIssue({ code: 'custom', message: 'Add poll options.', path: ['poll'] });
   });
 
 export const feedQuerySchema = z.object({
@@ -126,19 +123,27 @@ export const createConversationSchema = z.object({
   memberIds: z.array(uuid).min(1).max(255),
   title: z.string().trim().max(80).optional(),
 });
-export const sendMessageSchema = z.object({
-  body: z.string().trim().max(4000).default(''),
-  replyToId: uuid.optional(),
-  attachments: z
-    .array(z.object({ url: z.string().url(), kind: z.enum(['image', 'video', 'audio', 'file']), name: z.string().max(200).optional() }))
-    .max(10)
-    .default([]),
-  clientId: z.string().max(64).optional(),
-}).refine((v) => v.body.length > 0 || v.attachments.length > 0, { message: 'Write a message or attach a file.', path: ['body'] });
+export const sendMessageSchema = z
+  .object({
+    body: z.string().trim().max(4000).default(''),
+    replyToId: uuid.optional(),
+    attachments: z
+      .array(z.object({ url: z.string().url(), kind: z.enum(['image', 'video', 'audio', 'file']), name: z.string().max(200).optional() }))
+      .max(10)
+      .default([]),
+    clientId: z.string().max(64).optional(),
+  })
+  .refine((v) => v.body.length > 0 || v.attachments.length > 0, { message: 'Write a message or attach a file.', path: ['body'] });
 
 export const createCommunitySchema = z.object({
   name: trimmed(80),
-  slug: z.string().trim().toLowerCase().min(3).max(40).regex(/^[a-z0-9-]+$/, 'Use lowercase letters, numbers and hyphens.'),
+  slug: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(3)
+    .max(40)
+    .regex(/^[a-z0-9-]+$/, 'Use lowercase letters, numbers and hyphens.'),
   description: z.string().trim().max(2000).default(''),
   visibility: z.enum(['public', 'private']).default('public'),
   topics: z.array(z.string().max(40)).max(5).default([]),
@@ -177,7 +182,13 @@ export const createPlaceSchema = z.object({
 
 export const createBusinessSchema = z.object({
   name: trimmed(120),
-  slug: z.string().trim().toLowerCase().min(3).max(40).regex(/^[a-z0-9-]+$/),
+  slug: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(3)
+    .max(40)
+    .regex(/^[a-z0-9-]+$/),
   description: z.string().trim().max(2000).default(''),
   category: z.string().trim().max(60).default('general'),
   website: z.string().url().optional(),
@@ -195,7 +206,10 @@ export const createProductSchema = z.object({
 });
 
 export const createOrderSchema = z.object({
-  items: z.array(z.object({ productId: uuid, quantity: z.number().int().min(1).max(100) })).min(1).max(50),
+  items: z
+    .array(z.object({ productId: uuid, quantity: z.number().int().min(1).max(100) }))
+    .min(1)
+    .max(50),
   idempotencyKey: z.string().min(8).max(100),
 });
 
@@ -218,7 +232,12 @@ export const createMomentSchema = z.object({
   mediaUrl: z.string().url().optional(),
   mediaKind: z.enum(['image', 'video', 'audio']).optional(),
   expiresIn: z.enum(['1h', '24h', 'permanent', 'custom']).default('24h'),
-  customHours: z.number().int().min(1).max(24 * 30).optional(),
+  customHours: z
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 30)
+    .optional(),
   visibility: z.enum(VISIBILITIES).default('friends'),
   locationText: z.string().max(200).optional(),
 });

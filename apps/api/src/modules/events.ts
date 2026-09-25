@@ -67,7 +67,20 @@ export default async function eventsModule(app: FastifyInstance, ctx: AppContext
       const { rows } = await c.query<{ id: string }>(
         `INSERT INTO events (host_id, community_id, place_id, title, description, starts_at, ends_at, timezone, location_text, online, capacity, visibility)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
-        [u.id, input.communityId ?? null, input.placeId ?? null, input.title, input.description, input.startsAt, input.endsAt ?? null, input.timezone, input.locationText ?? null, input.online, input.capacity ?? null, input.visibility],
+        [
+          u.id,
+          input.communityId ?? null,
+          input.placeId ?? null,
+          input.title,
+          input.description,
+          input.startsAt,
+          input.endsAt ?? null,
+          input.timezone,
+          input.locationText ?? null,
+          input.online,
+          input.capacity ?? null,
+          input.visibility,
+        ],
       );
       await c.query(`INSERT INTO event_attendees (event_id, user_id, status) VALUES ($1,$2,'going')`, [rows[0]!.id, u.id]);
       return rows[0]!.id;
@@ -97,7 +110,8 @@ export default async function eventsModule(app: FastifyInstance, ctx: AppContext
     };
     if (q.scope === 'now') where.push(`e.starts_at <= now() + interval '3 hours' AND coalesce(e.ends_at, e.starts_at + interval '3 hours') >= now()`);
     else where.push(`coalesce(e.ends_at, e.starts_at + interval '3 hours') >= now()`);
-    if (q.scope === 'going') where.push(`EXISTS (SELECT 1 FROM event_attendees ea WHERE ea.event_id = e.id AND ea.user_id = $1 AND ea.status IN ('going','interested'))`);
+    if (q.scope === 'going')
+      where.push(`EXISTS (SELECT 1 FROM event_attendees ea WHERE ea.event_id = e.id AND ea.user_id = $1 AND ea.status IN ('going','interested'))`);
     if (q.scope === 'hosting') where.push(`e.host_id = $1`);
     if (q.communityId) add('e.community_id = ?', q.communityId);
     if (q.from) add('e.starts_at >= ?', q.from);
@@ -154,8 +168,12 @@ export default async function eventsModule(app: FastifyInstance, ctx: AppContext
     const { id } = parse(idParam, req.params);
     const r = await db.query(`UPDATE events SET deleted_at = now() WHERE id = $1 AND host_id = $2 AND deleted_at IS NULL RETURNING id`, [id, u.id]);
     if (!r.rowCount) throw notFound('Event');
-    const attendees = await db.query<{ user_id: string }>(`SELECT user_id FROM event_attendees WHERE event_id = $1 AND status IN ('going','interested','waitlist')`, [id]);
-    for (const a of attendees.rows) await notify(db, ctx.realtime, { userId: a.user_id, category: 'events', type: 'event_cancelled', actorId: u.id, entityType: 'event', entityId: id });
+    const attendees = await db.query<{ user_id: string }>(
+      `SELECT user_id FROM event_attendees WHERE event_id = $1 AND status IN ('going','interested','waitlist')`,
+      [id],
+    );
+    for (const a of attendees.rows)
+      await notify(db, ctx.realtime, { userId: a.user_id, category: 'events', type: 'event_cancelled', actorId: u.id, entityType: 'event', entityId: id });
     return { ok: true };
   });
 }

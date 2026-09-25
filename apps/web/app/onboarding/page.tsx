@@ -24,7 +24,10 @@ export default function Onboarding() {
     if (!loading && me?.onboarded) router.replace('/home');
   }, [loading, me, router]);
   useEffect(() => {
-    api.topics().then((r) => setTopics(r.items)).catch(() => {});
+    api
+      .topics()
+      .then((r) => setTopics(r.items))
+      .catch(() => {});
   }, []);
 
   async function saveInterests() {

@@ -75,7 +75,16 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
   app.patch('/v1/me/profile', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const input = parse(updateProfileSchema, req.body);
-    const map: Record<string, string> = { displayName: 'display_name', bio: 'bio', avatarUrl: 'avatar_url', coverUrl: 'cover_url', links: 'links', mode: 'mode', locale: 'locale', isPrivate: 'is_private' };
+    const map: Record<string, string> = {
+      displayName: 'display_name',
+      bio: 'bio',
+      avatarUrl: 'avatar_url',
+      coverUrl: 'cover_url',
+      links: 'links',
+      mode: 'mode',
+      locale: 'locale',
+      isPrivate: 'is_private',
+    };
     const sets: string[] = [];
     const vals: unknown[] = [u.id];
     for (const [k, col] of Object.entries(map)) {
@@ -103,8 +112,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     const { topics } = parse(setInterestsSchema, req.body);
     const slugs = [...new Set(topics.map((t) => t.toLowerCase().trim().replace(/\s+/g, '-')))];
     await tx(db, async (c) => {
-      for (const s of slugs)
-        await c.query(`INSERT INTO topics (slug, name) VALUES ($1, initcap(replace($1, '-', ' '))) ON CONFLICT (slug) DO NOTHING`, [s]);
+      for (const s of slugs) await c.query(`INSERT INTO topics (slug, name) VALUES ($1, initcap(replace($1, '-', ' '))) ON CONFLICT (slug) DO NOTHING`, [s]);
       await c.query(`DELETE FROM user_interests WHERE user_id = $1`, [u.id]);
       await c.query(`INSERT INTO user_interests (user_id, topic_id) SELECT $1, id FROM topics WHERE slug = ANY($2)`, [u.id, slugs]);
     });
@@ -135,7 +143,12 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       items: rows.map((r) => ({
         user: toPublicUser(r as PublicUserRow),
         bio: r.bio,
-        reason: r.mutual > 0 ? `Followed by ${r.mutual} people you follow` : r.shared > 0 ? `${r.shared} shared interest${r.shared > 1 ? 's' : ''}` : 'Popular on YAPILAPI',
+        reason:
+          r.mutual > 0
+            ? `Followed by ${r.mutual} people you follow`
+            : r.shared > 0
+              ? `${r.shared} shared interest${r.shared > 1 ? 's' : ''}`
+              : 'Popular on YAPILAPI',
       })),
     };
   });
@@ -212,13 +225,24 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     if (await isBlockedEitherWay(db, u.id, id)) throw notFound('That profile');
     if (await areFriends(db, u.id, id)) return { status: 'friends' };
     // If they already asked us, accept instead.
-    const reverse = await db.query<{ id: string }>(`SELECT id FROM friend_requests WHERE from_user_id = $1 AND to_user_id = $2 AND status = 'pending'`, [id, u.id]);
+    const reverse = await db.query<{ id: string }>(`SELECT id FROM friend_requests WHERE from_user_id = $1 AND to_user_id = $2 AND status = 'pending'`, [
+      id,
+      u.id,
+    ]);
     if (reverse.rows[0]) return acceptRequest(reverse.rows[0].id, u.id);
-    const r = await db.query<{ id: string }>(
-      `INSERT INTO friend_requests (from_user_id, to_user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING RETURNING id`,
-      [u.id, id],
-    );
-    if (r.rows[0]) await notify(db, ctx.realtime, { userId: id, category: 'friends', type: 'friend_request', actorId: u.id, entityType: 'friend_request', entityId: r.rows[0].id });
+    const r = await db.query<{ id: string }>(`INSERT INTO friend_requests (from_user_id, to_user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING RETURNING id`, [
+      u.id,
+      id,
+    ]);
+    if (r.rows[0])
+      await notify(db, ctx.realtime, {
+        userId: id,
+        category: 'friends',
+        type: 'friend_request',
+        actorId: u.id,
+        entityType: 'friend_request',
+        entityId: r.rows[0].id,
+      });
     return { status: 'sent' };
   });
 
@@ -231,7 +255,14 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       if (!rows[0]) throw notFound('Friend request');
       const [a, b] = [rows[0].from_user_id, userId].sort();
       await c.query(`INSERT INTO friendships (user_a, user_b) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [a, b]);
-      await notify(c, ctx.realtime, { userId: rows[0].from_user_id, category: 'friends', type: 'friend_accepted', actorId: userId, entityType: 'user', entityId: userId });
+      await notify(c, ctx.realtime, {
+        userId: rows[0].from_user_id,
+        category: 'friends',
+        type: 'friend_accepted',
+        actorId: userId,
+        entityType: 'user',
+        entityId: userId,
+      });
       track(db, userId, 'friend_accepted');
       return { status: 'friends' };
     });
@@ -253,7 +284,10 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
 
   app.post('/v1/friend-requests/:id/decline', { preHandler: requireAuth }, async (req) => {
     const { id } = parse(idParam, req.params);
-    const r = await db.query(`UPDATE friend_requests SET status = 'declined', responded_at = now() WHERE id = $1 AND to_user_id = $2 AND status = 'pending'`, [id, me(req).id]);
+    const r = await db.query(`UPDATE friend_requests SET status = 'declined', responded_at = now() WHERE id = $1 AND to_user_id = $2 AND status = 'pending'`, [
+      id,
+      me(req).id,
+    ]);
     if (!r.rowCount) throw notFound('Friend request');
     return { status: 'declined' };
   });
@@ -263,7 +297,10 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     const { id } = parse(idParam, req.params);
     const [a, b] = [u.id, id].sort();
     await db.query(`DELETE FROM friendships WHERE user_a = $1 AND user_b = $2`, [a, b]);
-    await db.query(`UPDATE friend_requests SET status = 'cancelled' WHERE status = 'pending' AND ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1))`, [u.id, id]);
+    await db.query(
+      `UPDATE friend_requests SET status = 'cancelled' WHERE status = 'pending' AND ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1))`,
+      [u.id, id],
+    );
     return { status: 'none' };
   });
 
@@ -278,7 +315,10 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       await c.query(`DELETE FROM follows WHERE (follower_id = $1 AND followee_id = $2) OR (follower_id = $2 AND followee_id = $1)`, [u.id, id]);
       const [a, b] = [u.id, id].sort();
       await c.query(`DELETE FROM friendships WHERE user_a = $1 AND user_b = $2`, [a, b]);
-      await c.query(`UPDATE friend_requests SET status = 'cancelled' WHERE status = 'pending' AND ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1))`, [u.id, id]);
+      await c.query(
+        `UPDATE friend_requests SET status = 'cancelled' WHERE status = 'pending' AND ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1))`,
+        [u.id, id],
+      );
     });
     return { blocked: true };
   });
@@ -290,7 +330,10 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
   });
 
   app.get('/v1/me/blocked', { preHandler: requireAuth }, async (req) => {
-    const { rows } = await db.query<PublicUserRow>(`SELECT ${PUBLIC_USER_COLS} FROM blocks b JOIN profiles pr ON pr.user_id = b.blocked_id WHERE b.blocker_id = $1`, [me(req).id]);
+    const { rows } = await db.query<PublicUserRow>(
+      `SELECT ${PUBLIC_USER_COLS} FROM blocks b JOIN profiles pr ON pr.user_id = b.blocked_id WHERE b.blocker_id = $1`,
+      [me(req).id],
+    );
     return { items: rows.map(toPublicUser) };
   });
 
@@ -325,7 +368,11 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     const input = parse(circleSchema, req.body);
     const count = await db.query(`SELECT count(*) AS n FROM circles WHERE owner_id = $1`, [me(req).id]);
     if (count.rows[0].n >= 50) throw conflict('You can have up to 50 circles.');
-    const { rows } = await db.query(`INSERT INTO circles (owner_id, name, kind) VALUES ($1,$2,$3) RETURNING id, name, kind`, [me(req).id, input.name, input.kind]);
+    const { rows } = await db.query(`INSERT INTO circles (owner_id, name, kind) VALUES ($1,$2,$3) RETURNING id, name, kind`, [
+      me(req).id,
+      input.name,
+      input.kind,
+    ]);
     reply.code(201);
     return { circle: { ...rows[0], memberCount: 0 } };
   });
@@ -338,7 +385,10 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
   app.get('/v1/me/circles/:id/members', { preHandler: requireAuth }, async (req) => {
     const { id } = parse(idParam, req.params);
     await ownCircle(id, me(req).id);
-    const { rows } = await db.query<PublicUserRow>(`SELECT ${PUBLIC_USER_COLS} FROM circle_members cm JOIN profiles pr ON pr.user_id = cm.user_id WHERE cm.circle_id = $1`, [id]);
+    const { rows } = await db.query<PublicUserRow>(
+      `SELECT ${PUBLIC_USER_COLS} FROM circle_members cm JOIN profiles pr ON pr.user_id = cm.user_id WHERE cm.circle_id = $1`,
+      [id],
+    );
     return { items: rows.map(toPublicUser) };
   });
 
@@ -346,10 +396,11 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     const { id } = parse(idParam, req.params);
     const { userIds } = parse(circleMembersSchema, req.body);
     await ownCircle(id, me(req).id);
-    await db.query(
-      `INSERT INTO circle_members (circle_id, user_id) SELECT $1, u.id FROM users u WHERE u.id = ANY($2) AND u.id <> $3 ON CONFLICT DO NOTHING`,
-      [id, userIds, me(req).id],
-    );
+    await db.query(`INSERT INTO circle_members (circle_id, user_id) SELECT $1, u.id FROM users u WHERE u.id = ANY($2) AND u.id <> $3 ON CONFLICT DO NOTHING`, [
+      id,
+      userIds,
+      me(req).id,
+    ]);
     return { ok: true };
   });
 

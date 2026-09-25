@@ -20,15 +20,45 @@ if (process.env.APP_ENV === 'production') {
 export const DEV_PASSWORD = 'dev-password-123';
 
 const TOPICS = [
-  'technology', 'music', 'food', 'travel', 'photography', 'fitness', 'gaming', 'art', 'design', 'books',
-  'film', 'fashion', 'science', 'networking', 'business', 'football', 'basketball', 'cooking', 'nature', 'education',
+  'technology',
+  'music',
+  'food',
+  'travel',
+  'photography',
+  'fitness',
+  'gaming',
+  'art',
+  'design',
+  'books',
+  'film',
+  'fashion',
+  'science',
+  'networking',
+  'business',
+  'football',
+  'basketball',
+  'cooking',
+  'nature',
+  'education',
 ];
 
 const USERS = [
   { username: 'dev_amara', name: 'Amara Obi', mode: 'creator', interests: ['photography', 'travel', 'food'], bio: 'Street photographer. Lagos → Lisbon.' },
-  { username: 'dev_tunde', name: 'Tunde Bello', mode: 'personal', interests: ['technology', 'networking', 'football'], bio: 'Network engineer who explains packets to his cat.' },
+  {
+    username: 'dev_tunde',
+    name: 'Tunde Bello',
+    mode: 'personal',
+    interests: ['technology', 'networking', 'football'],
+    bio: 'Network engineer who explains packets to his cat.',
+  },
   { username: 'dev_lea', name: 'Léa Martin', mode: 'professional', interests: ['design', 'art', 'books'], bio: 'Product designer. Type nerd.' },
-  { username: 'dev_kofi', name: 'Kofi Mensah', mode: 'business', interests: ['food', 'cooking', 'business'], bio: 'Runs Jollof Corner, a small kitchen with big pots.' },
+  {
+    username: 'dev_kofi',
+    name: 'Kofi Mensah',
+    mode: 'business',
+    interests: ['food', 'cooking', 'business'],
+    bio: 'Runs Jollof Corner, a small kitchen with big pots.',
+  },
   { username: 'dev_sara', name: 'Sara Haddad', mode: 'creator', interests: ['fitness', 'music', 'nature'], bio: 'Trail runner, weekend DJ.' },
   { username: 'dev_admin', name: 'Dev Admin', mode: 'personal', interests: ['technology'], bio: 'Local administrator account.', role: 'admin' },
 ] as const;
@@ -49,16 +79,10 @@ async function main() {
   const pw = await hashPassword(DEV_PASSWORD);
   await tx(pool, async (c) => {
     for (const [key, f] of Object.entries(FEATURE_FLAGS))
-      await c.query(
-        `INSERT INTO feature_flags (key, enabled, description) VALUES ($1, $2, $3) ON CONFLICT (key) DO NOTHING`,
-        [key, f.default, f.description],
-      );
+      await c.query(`INSERT INTO feature_flags (key, enabled, description) VALUES ($1, $2, $3) ON CONFLICT (key) DO NOTHING`, [key, f.default, f.description]);
 
     for (const slug of TOPICS)
-      await c.query(`INSERT INTO topics (slug, name) VALUES ($1, $2) ON CONFLICT (slug) DO NOTHING`, [
-        slug,
-        slug[0]!.toUpperCase() + slug.slice(1),
-      ]);
+      await c.query(`INSERT INTO topics (slug, name) VALUES ($1, $2) ON CONFLICT (slug) DO NOTHING`, [slug, slug[0]!.toUpperCase() + slug.slice(1)]);
 
     const ids: Record<string, string> = {};
     for (const u of USERS) {
@@ -74,18 +98,17 @@ async function main() {
       );
       const id = rows[0]!.id;
       ids[u.username] = id;
-      await c.query(
-        `INSERT INTO profiles (user_id, username, display_name, bio, mode) VALUES ($1, $2, $3, $4, $5)`,
-        [id, u.username, u.name, `[Dev data] ${u.bio}`, u.mode],
-      );
-      await c.query(
-        `INSERT INTO user_interests (user_id, topic_id) SELECT $1, id FROM topics WHERE slug = ANY($2) ON CONFLICT DO NOTHING`,
-        [id, u.interests],
-      );
+      await c.query(`INSERT INTO profiles (user_id, username, display_name, bio, mode) VALUES ($1, $2, $3, $4, $5)`, [
+        id,
+        u.username,
+        u.name,
+        `[Dev data] ${u.bio}`,
+        u.mode,
+      ]);
+      await c.query(`INSERT INTO user_interests (user_id, topic_id) SELECT $1, id FROM topics WHERE slug = ANY($2) ON CONFLICT DO NOTHING`, [id, u.interests]);
     }
 
-    const follow = (a: string, b: string) =>
-      c.query(`INSERT INTO follows (follower_id, followee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [ids[a], ids[b]]);
+    const follow = (a: string, b: string) => c.query(`INSERT INTO follows (follower_id, followee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [ids[a], ids[b]]);
     await follow('dev_tunde', 'dev_amara');
     await follow('dev_lea', 'dev_amara');
     await follow('dev_amara', 'dev_lea');
@@ -114,14 +137,18 @@ async function main() {
       );
       const communityId = community.rows[0]?.id;
       if (communityId) {
-        await c.query(
-          `INSERT INTO community_members (community_id, user_id, role) VALUES ($1, $2, 'owner'), ($1, $3, 'member'), ($1, $4, 'moderator')`,
-          [communityId, ids.dev_amara, ids.dev_lea, ids.dev_tunde],
-        );
-        await c.query(
-          `INSERT INTO posts (author_id, kind, body, visibility, community_id, topics) VALUES ($1, 'text', $2, 'public', $3, $4)`,
-          [ids.dev_lea, 'First walk recap: 14 people, 600 photos, one lost lens cap.', communityId, ['photography']],
-        );
+        await c.query(`INSERT INTO community_members (community_id, user_id, role) VALUES ($1, $2, 'owner'), ($1, $3, 'member'), ($1, $4, 'moderator')`, [
+          communityId,
+          ids.dev_amara,
+          ids.dev_lea,
+          ids.dev_tunde,
+        ]);
+        await c.query(`INSERT INTO posts (author_id, kind, body, visibility, community_id, topics) VALUES ($1, 'text', $2, 'public', $3, $4)`, [
+          ids.dev_lea,
+          'First walk recap: 14 people, 600 photos, one lost lens cap.',
+          communityId,
+          ['photography'],
+        ]);
       }
 
       const biz = await c.query<{ id: string }>(

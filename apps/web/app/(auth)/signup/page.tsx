@@ -66,8 +66,23 @@ export default function SignupPage() {
         hint={usernameState === 'ok' ? 'Available.' : 'Letters, numbers, dots and underscores.'}
       />
       <TextField label={t('auth.email')} name="email" type="email" autoComplete="email" required error={fields.email} />
-      <TextField label={t('auth.password')} name="password" type="password" autoComplete="new-password" required minLength={10} hint={t('auth.password.hint')} error={fields.password} />
-      <TextField label="Date of birth" name="birthDate" type="date" hint="Used to keep younger people safe. Never shown on your profile." error={fields.birthDate} />
+      <TextField
+        label={t('auth.password')}
+        name="password"
+        type="password"
+        autoComplete="new-password"
+        required
+        minLength={10}
+        hint={t('auth.password.hint')}
+        error={fields.password}
+      />
+      <TextField
+        label="Date of birth"
+        name="birthDate"
+        type="date"
+        hint="Used to keep younger people safe. Never shown on your profile."
+        error={fields.birthDate}
+      />
       <Button type="submit" block loading={busy}>
         {t('auth.signup.submit')}
       </Button>

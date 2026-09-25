@@ -14,7 +14,19 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   block?: boolean;
 }
 
-export function Button({ variant = 'primary', size = 'md', icon, iconRight, loading, block, className, children, type = 'button', disabled, ...rest }: ButtonProps) {
+export function Button({
+  variant = 'primary',
+  size = 'md',
+  icon,
+  iconRight,
+  loading,
+  block,
+  className,
+  children,
+  type = 'button',
+  disabled,
+  ...rest
+}: ButtonProps) {
   return (
     <button
       type={type}
@@ -45,7 +57,11 @@ export function TextField(props: TextFieldProps) {
       <label className="yp-field__label" htmlFor={id}>
         {label}
       </label>
-      {multiline ? <textarea {...common} {...(rest as TextareaHTMLAttributes<HTMLTextAreaElement>)} /> : <input {...common} {...(rest as InputHTMLAttributes<HTMLInputElement>)} />}
+      {multiline ? (
+        <textarea {...common} {...(rest as TextareaHTMLAttributes<HTMLTextAreaElement>)} />
+      ) : (
+        <input {...common} {...(rest as InputHTMLAttributes<HTMLInputElement>)} />
+      )}
       {error ? (
         <span id={hintId} className="yp-field__error">
           {error}
@@ -59,7 +75,13 @@ export function TextField(props: TextFieldProps) {
   );
 }
 
-export function Select({ label, hint, className, children, ...rest }: { label: string; hint?: string; className?: string; children: ReactNode } & React.SelectHTMLAttributes<HTMLSelectElement>) {
+export function Select({
+  label,
+  hint,
+  className,
+  children,
+  ...rest
+}: { label: string; hint?: string; className?: string; children: ReactNode } & React.SelectHTMLAttributes<HTMLSelectElement>) {
   const id = useId();
   return (
     <div className={cx('yp-field', className)}>
@@ -86,7 +108,21 @@ export function Checkbox({ label, description, className, ...rest }: { label: Re
   );
 }
 
-export function Switch({ label, checked, defaultChecked, onChange, disabled, className }: { label?: string; checked?: boolean; defaultChecked?: boolean; onChange?: (next: boolean) => void; disabled?: boolean; className?: string }) {
+export function Switch({
+  label,
+  checked,
+  defaultChecked,
+  onChange,
+  disabled,
+  className,
+}: {
+  label?: string;
+  checked?: boolean;
+  defaultChecked?: boolean;
+  onChange?: (next: boolean) => void;
+  disabled?: boolean;
+  className?: string;
+}) {
   const controlled = checked !== undefined;
   const [inner, setInner] = useState(!!defaultChecked);
   const on = controlled ? checked : inner;
@@ -109,12 +145,34 @@ export function Switch({ label, checked, defaultChecked, onChange, disabled, cla
   );
 }
 
-export function Badge({ tone = 'neutral', dot, children, className }: { tone?: 'neutral' | 'success' | 'warning' | 'danger' | 'new'; dot?: boolean; children: ReactNode; className?: string }) {
+export function Badge({
+  tone = 'neutral',
+  dot,
+  children,
+  className,
+}: {
+  tone?: 'neutral' | 'success' | 'warning' | 'danger' | 'new';
+  dot?: boolean;
+  children: ReactNode;
+  className?: string;
+}) {
   return <span className={cx('yp-badge', `yp-badge--${tone}`, (dot === false || tone === 'new') && 'yp-badge--plain', className)}>{children}</span>;
 }
 
 const ALERT_ICON: Record<string, IconName> = { info: 'info', success: 'check-circle', warning: 'alert', danger: 'x-circle' };
-export function Alert({ tone = 'info', title, onDismiss, children, className }: { tone?: 'info' | 'success' | 'warning' | 'danger'; title?: string; onDismiss?: () => void; children?: ReactNode; className?: string }) {
+export function Alert({
+  tone = 'info',
+  title,
+  onDismiss,
+  children,
+  className,
+}: {
+  tone?: 'info' | 'success' | 'warning' | 'danger';
+  title?: string;
+  onDismiss?: () => void;
+  children?: ReactNode;
+  className?: string;
+}) {
   return (
     <div className={cx('yp-alert', `yp-alert--${tone}`, className)} role={tone === 'danger' ? 'alert' : 'status'}>
       <Icon name={ALERT_ICON[tone]!} />
@@ -131,7 +189,25 @@ export function Alert({ tone = 'info', title, onDismiss, children, className }: 
   );
 }
 
-export function Card({ title, subtitle, action, footer, raised, onClick, children, className }: { title?: ReactNode; subtitle?: ReactNode; action?: ReactNode; footer?: ReactNode; raised?: boolean; onClick?: () => void; children?: ReactNode; className?: string }) {
+export function Card({
+  title,
+  subtitle,
+  action,
+  footer,
+  raised,
+  onClick,
+  children,
+  className,
+}: {
+  title?: ReactNode;
+  subtitle?: ReactNode;
+  action?: ReactNode;
+  footer?: ReactNode;
+  raised?: boolean;
+  onClick?: () => void;
+  children?: ReactNode;
+  className?: string;
+}) {
   return (
     <section className={cx('yp-card', raised && 'yp-card--raised', onClick && 'yp-card--interactive', className)} onClick={onClick}>
       {title || subtitle || action ? (
@@ -155,7 +231,19 @@ export interface TabItem {
   count?: number;
   content?: ReactNode;
 }
-export function Tabs({ tabs, value, defaultValue, onChange, className }: { tabs: TabItem[]; value?: string; defaultValue?: string; onChange?: (id: string) => void; className?: string }) {
+export function Tabs({
+  tabs,
+  value,
+  defaultValue,
+  onChange,
+  className,
+}: {
+  tabs: TabItem[];
+  value?: string;
+  defaultValue?: string;
+  onChange?: (id: string) => void;
+  className?: string;
+}) {
   const controlled = value !== undefined;
   const [inner, setInner] = useState(defaultValue ?? tabs[0]?.id);
   const cur = controlled ? value : inner;
@@ -213,7 +301,19 @@ function initials(name: string) {
   const parts = name.trim().split(/\s+/);
   return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? (parts.at(-1)?.[0] ?? '') : '')).toUpperCase();
 }
-export function Avatar({ name, src, size = 'md', online, className }: { name: string; src?: string | null; size?: 'sm' | 'md' | 'lg' | 'xl'; online?: boolean; className?: string }) {
+export function Avatar({
+  name,
+  src,
+  size = 'md',
+  online,
+  className,
+}: {
+  name: string;
+  src?: string | null;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  online?: boolean;
+  className?: string;
+}) {
   const style = size === 'xl' ? { width: 88, height: 88, fontSize: 28 } : undefined;
   return (
     <span className={cx('yp-avatar', `yp-avatar--${size === 'xl' ? 'lg' : size}`, className)} style={style} title={name} role="img" aria-label={name}>
@@ -226,7 +326,23 @@ export function AvatarGroup({ children }: { children: ReactNode }) {
   return <span className="yp-avatars">{children}</span>;
 }
 
-export function Dialog({ open, onClose, title, footer, inline, children, className }: { open: boolean; onClose?: () => void; title: string; footer?: ReactNode; inline?: boolean; children?: ReactNode; className?: string }) {
+export function Dialog({
+  open,
+  onClose,
+  title,
+  footer,
+  inline,
+  children,
+  className,
+}: {
+  open: boolean;
+  onClose?: () => void;
+  title: string;
+  footer?: ReactNode;
+  inline?: boolean;
+  children?: ReactNode;
+  className?: string;
+}) {
   const titleId = useId();
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -260,5 +376,11 @@ export function Dialog({ open, onClose, title, footer, inline, children, classNa
       {footer ? <div className="yp-dialog__foot">{footer}</div> : null}
     </div>
   );
-  return inline ? box : <div className="yp-dialog__backdrop" onClick={onClose}>{box}</div>;
+  return inline ? (
+    box
+  ) : (
+    <div className="yp-dialog__backdrop" onClick={onClose}>
+      {box}
+    </div>
+  );
 }

@@ -22,10 +22,17 @@ export default function Inbox() {
   const [requests, setRequests] = useState<{ id: string; from: PublicUser }[]>([]);
   const [newGroup, setNewGroup] = useState(false);
 
-  const load = () => api.conversations.list().then((r) => setItems(r.items), (e) => toast(errorMessage(e)));
+  const load = () =>
+    api.conversations.list().then(
+      (r) => setItems(r.items),
+      (e) => toast(errorMessage(e)),
+    );
   useEffect(() => {
     void load();
-    api.me.friendRequests().then((r) => setRequests(r.items)).catch(() => {});
+    api.me
+      .friendRequests()
+      .then((r) => setRequests(r.items))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useRealtime((e) => {
@@ -138,7 +145,14 @@ function NewGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose: (
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (q.trim().length < 2) return setFound([]);
-    const id = setTimeout(() => api.search(q, 'people').then((r) => setFound((r.results.people ?? []) as PublicUser[])).catch(() => {}), 250);
+    const id = setTimeout(
+      () =>
+        api
+          .search(q, 'people')
+          .then((r) => setFound((r.results.people ?? []) as PublicUser[]))
+          .catch(() => {}),
+      250,
+    );
     return () => clearTimeout(id);
   }, [q]);
   return (
@@ -149,7 +163,13 @@ function NewGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose: (
         {picked.length ? (
           <div className="row">
             {picked.map((p) => (
-              <button key={p.id} type="button" className="yp-chip" onClick={() => setPicked((x) => x.filter((y) => y.id !== p.id))} aria-label={`Remove ${p.displayName}`}>
+              <button
+                key={p.id}
+                type="button"
+                className="yp-chip"
+                onClick={() => setPicked((x) => x.filter((y) => y.id !== p.id))}
+                aria-label={`Remove ${p.displayName}`}
+              >
                 {p.displayName} ×
               </button>
             ))}
@@ -160,7 +180,13 @@ function NewGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose: (
             {found
               .filter((u) => !picked.some((p) => p.id === u.id))
               .map((u) => (
-                <ListItem key={u.id} onClick={() => setPicked((x) => [...x, u])} start={<Avatar name={u.displayName} src={u.avatarUrl} size="sm" />} primary={u.displayName} secondary={`@${u.username}`} />
+                <ListItem
+                  key={u.id}
+                  onClick={() => setPicked((x) => [...x, u])}
+                  start={<Avatar name={u.displayName} src={u.avatarUrl} size="sm" />}
+                  primary={u.displayName}
+                  secondary={`@${u.username}`}
+                />
               ))}
           </List>
         ) : null}

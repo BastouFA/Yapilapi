@@ -55,8 +55,6 @@ export class RealtimeHub {
 
   private deliverLocal(userIds: string[], event: RealtimeEvent) {
     const payload = JSON.stringify(event);
-    for (const id of userIds)
-      for (const s of this.sockets.get(id) ?? [])
-        if (s.readyState === 1) s.send(payload);
+    for (const id of userIds) for (const s of this.sockets.get(id) ?? []) if (s.readyState === 1) s.send(payload);
   }
 }

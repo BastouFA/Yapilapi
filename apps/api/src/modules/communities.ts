@@ -65,7 +65,10 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
       const cid = rows[0]!.id;
       await c.query(`INSERT INTO community_members (community_id, user_id, role) VALUES ($1,$2,'owner')`, [cid, u.id]);
       // Every community gets a shared chat.
-      const conv = await c.query<{ id: string }>(`INSERT INTO conversations (kind, title, community_id, created_by) VALUES ('community',$1,$2,$3) RETURNING id`, [input.name, cid, u.id]);
+      const conv = await c.query<{ id: string }>(
+        `INSERT INTO conversations (kind, title, community_id, created_by) VALUES ('community',$1,$2,$3) RETURNING id`,
+        [input.name, cid, u.id],
+      );
       await c.query(`INSERT INTO conversation_members (conversation_id, user_id, role) VALUES ($1,$2,'admin')`, [conv.rows[0]!.id, u.id]);
       await audit(c, { actorId: u.id, action: 'community.create', entityType: 'community', entityId: cid });
       return cid;
@@ -78,7 +81,14 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
 
   app.get('/v1/communities', async (req) => {
     const viewer = req.user?.id ?? null;
-    const q = parse(z.object({ scope: z.enum(['discover', 'mine']).default('discover'), topic: z.string().max(40).optional(), limit: z.coerce.number().min(1).max(50).default(20) }), req.query);
+    const q = parse(
+      z.object({
+        scope: z.enum(['discover', 'mine']).default('discover'),
+        topic: z.string().max(40).optional(),
+        limit: z.coerce.number().min(1).max(50).default(20),
+      }),
+      req.query,
+    );
     if (q.scope === 'mine') {
       if (!viewer) return { items: [] };
       const { rows } = await db.query(
@@ -119,8 +129,19 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
     });
     if (status === 'active') track(db, u.id, 'community_joined', { communityId: row.id });
     else {
-      const admins = await db.query<{ user_id: string }>(`SELECT user_id FROM community_members WHERE community_id = $1 AND role IN ('owner','admin','moderator') AND status = 'active'`, [row.id]);
-      for (const a of admins.rows) await notify(db, ctx.realtime, { userId: a.user_id, category: 'communities', type: 'join_request', actorId: u.id, entityType: 'community', entityId: row.id });
+      const admins = await db.query<{ user_id: string }>(
+        `SELECT user_id FROM community_members WHERE community_id = $1 AND role IN ('owner','admin','moderator') AND status = 'active'`,
+        [row.id],
+      );
+      for (const a of admins.rows)
+        await notify(db, ctx.realtime, {
+          userId: a.user_id,
+          category: 'communities',
+          type: 'join_request',
+          actorId: u.id,
+          entityType: 'community',
+          entityId: row.id,
+        });
     }
     return { status, role: status === 'active' ? 'member' : null };
   });
@@ -128,7 +149,10 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
   async function joinChat(c: { query: typeof db.query }, communityId: string, userId: string) {
     const conv = await c.query(`SELECT id FROM conversations WHERE community_id = $1 AND kind = 'community'`, [communityId]);
     if (conv.rows[0])
-      await c.query(`INSERT INTO conversation_members (conversation_id, user_id) VALUES ($1,$2) ON CONFLICT (conversation_id, user_id) DO UPDATE SET left_at = NULL`, [conv.rows[0].id, userId]);
+      await c.query(
+        `INSERT INTO conversation_members (conversation_id, user_id) VALUES ($1,$2) ON CONFLICT (conversation_id, user_id) DO UPDATE SET left_at = NULL`,
+        [conv.rows[0].id, userId],
+      );
   }
 
   app.post('/v1/communities/:slug/leave', { preHandler: requireAuth }, async (req) => {
@@ -139,7 +163,10 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
     await tx(db, async (c) => {
       const r = await c.query(`DELETE FROM community_members WHERE community_id = $1 AND user_id = $2 AND status = 'active'`, [row.id, u.id]);
       if (r.rowCount) await c.query(`UPDATE communities SET member_count = greatest(member_count - 1, 0) WHERE id = $1`, [row.id]);
-      await c.query(`UPDATE conversation_members SET left_at = now() WHERE user_id = $2 AND conversation_id IN (SELECT id FROM conversations WHERE community_id = $1)`, [row.id, u.id]);
+      await c.query(
+        `UPDATE conversation_members SET left_at = now() WHERE user_id = $2 AND conversation_id IN (SELECT id FROM conversations WHERE community_id = $1)`,
+        [row.id, u.id],
+      );
     });
     return { status: 'left' };
   });
@@ -166,7 +193,10 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
     const row = await bySlug(slug, u.id);
     if (!atLeast(row.my_role, 'moderator')) throw forbidden();
     await tx(db, async (c) => {
-      const r = await c.query(`UPDATE community_members SET status = 'active', joined_at = now() WHERE community_id = $1 AND user_id = $2 AND status = 'pending'`, [row.id, userId]);
+      const r = await c.query(
+        `UPDATE community_members SET status = 'active', joined_at = now() WHERE community_id = $1 AND user_id = $2 AND status = 'pending'`,
+        [row.id, userId],
+      );
       if (!r.rowCount) throw notFound('Join request');
       await c.query(`UPDATE communities SET member_count = member_count + 1 WHERE id = $1`, [row.id]);
       await joinChat(c, row.id, userId);
@@ -186,7 +216,13 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
     // You can only manage people below you, and only grant roles below your own.
     if (myRank < COMMUNITY_ROLE_RANK.admin || COMMUNITY_ROLE_RANK[target] >= myRank || COMMUNITY_ROLE_RANK[role] >= myRank) throw forbidden();
     await db.query(`UPDATE community_members SET role = $3 WHERE community_id = $1 AND user_id = $2`, [row.id, userId, role]);
-    await audit(db, { actorId: u.id, action: 'community.role_change', entityType: 'community', entityId: row.id, metadata: { userId, from: target, to: role } });
+    await audit(db, {
+      actorId: u.id,
+      action: 'community.role_change',
+      entityType: 'community',
+      entityId: row.id,
+      metadata: { userId, from: target, to: role },
+    });
     return { role };
   });
 
@@ -197,9 +233,15 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
     const target = await roleOf(row.id, userId);
     if (!atLeast(row.my_role, 'moderator') || (target && COMMUNITY_ROLE_RANK[target] >= COMMUNITY_ROLE_RANK[row.my_role as CommunityRole])) throw forbidden();
     await tx(db, async (c) => {
-      const r = await c.query(`UPDATE community_members SET status = 'banned' WHERE community_id = $1 AND user_id = $2 AND status = 'active'`, [row.id, userId]);
+      const r = await c.query(`UPDATE community_members SET status = 'banned' WHERE community_id = $1 AND user_id = $2 AND status = 'active'`, [
+        row.id,
+        userId,
+      ]);
       if (r.rowCount) await c.query(`UPDATE communities SET member_count = greatest(member_count - 1, 0) WHERE id = $1`, [row.id]);
-      await c.query(`UPDATE conversation_members SET left_at = now() WHERE user_id = $2 AND conversation_id IN (SELECT id FROM conversations WHERE community_id = $1)`, [row.id, userId]);
+      await c.query(
+        `UPDATE conversation_members SET left_at = now() WHERE user_id = $2 AND conversation_id IN (SELECT id FROM conversations WHERE community_id = $1)`,
+        [row.id, userId],
+      );
     });
     await audit(db, { actorId: u.id, action: 'community.ban', entityType: 'community', entityId: row.id, metadata: { userId } });
     return { ok: true };
@@ -219,7 +261,14 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
       c ? [viewer, row.id, q.limit + 1, c.t, c.id] : [viewer, row.id, q.limit + 1],
     );
     const page = rows.slice(0, q.limit);
-    return { items: await hydratePosts(db, page.map((r) => r.id), viewer), nextCursor: rows.length > q.limit ? keyCursorOf(page.at(-1)!) : null };
+    return {
+      items: await hydratePosts(
+        db,
+        page.map((r) => r.id),
+        viewer,
+      ),
+      nextCursor: rows.length > q.limit ? keyCursorOf(page.at(-1)!) : null,
+    };
   });
 
   app.patch('/v1/communities/:slug', { preHandler: requireAuth }, async (req) => {

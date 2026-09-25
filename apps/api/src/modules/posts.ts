@@ -1,6 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
-import { commentSchema, createPostSchema, feedbackSchema, feedQuerySchema, pageQuerySchema, reactionSchema, usernameSchema, type Comment } from '@yapilapi/shared';
+import {
+  commentSchema,
+  createPostSchema,
+  feedbackSchema,
+  feedQuerySchema,
+  pageQuerySchema,
+  reactionSchema,
+  usernameSchema,
+  type Comment,
+} from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
@@ -29,9 +38,26 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     const u = me(req);
     const input = parse(createPostSchema, req.body);
     const analysis = analyzeText(`${input.body} ${input.poll?.options.join(' ') ?? ''}`);
-    if (analysis.risk === 'escalate') throw new AppError(422, 'content_blocked', "This post can't be published because it may put someone at risk. If you or someone else is in danger, contact local emergency services.");
+    if (analysis.risk === 'escalate')
+      throw new AppError(
+        422,
+        'content_blocked',
+        "This post can't be published because it may put someone at risk. If you or someone else is in danger, contact local emergency services.",
+      );
 
-    const kind = input.poll ? 'poll' : input.media.length > 1 ? 'carousel' : input.media[0]?.kind === 'video' ? 'video' : input.media[0]?.kind === 'audio' ? 'audio' : input.media[0] ? 'photo' : input.linkUrl ? 'link' : input.kind;
+    const kind = input.poll
+      ? 'poll'
+      : input.media.length > 1
+        ? 'carousel'
+        : input.media[0]?.kind === 'video'
+          ? 'video'
+          : input.media[0]?.kind === 'audio'
+            ? 'audio'
+            : input.media[0]
+              ? 'photo'
+              : input.linkUrl
+                ? 'link'
+                : input.kind;
 
     const postId = await tx(db, async (c) => {
       if (input.communityId) {
@@ -50,9 +76,17 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
         `INSERT INTO posts (author_id, kind, body, visibility, circle_id, community_id, event_id, product_id, link_url, topics, moderation_status, ai_provenance, rights)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
         [
-          u.id, kind, input.body, input.communityId ? 'public' : input.visibility, input.circleId ?? null, input.communityId ?? null,
-          input.eventId ?? null, input.productId ?? null, input.linkUrl ?? null,
-          input.topics.map((t) => t.toLowerCase()), statusForRisk(analysis.risk),
+          u.id,
+          kind,
+          input.body,
+          input.communityId ? 'public' : input.visibility,
+          input.circleId ?? null,
+          input.communityId ?? null,
+          input.eventId ?? null,
+          input.productId ?? null,
+          input.linkUrl ?? null,
+          input.topics.map((t) => t.toLowerCase()),
+          statusForRisk(analysis.risk),
           input.aiAssisted ? { assisted: true, at: new Date().toISOString() } : {},
           { owner: u.id, license: 'all_rights_reserved' },
         ],
@@ -80,7 +114,13 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     track(db, u.id, 'post_created', { kind, visibility: input.visibility, community: !!input.communityId });
     reply.code(201);
     const [post] = await hydratePosts(db, [postId], u.id);
-    return { post, moderation: analysis.risk === 'normal' ? undefined : { status: statusForRisk(analysis.risk), message: 'Your post is published to you only until it has been reviewed.' } };
+    return {
+      post,
+      moderation:
+        analysis.risk === 'normal'
+          ? undefined
+          : { status: statusForRisk(analysis.risk), message: 'Your post is published to you only until it has been reviewed.' },
+    };
   });
 
   app.get('/v1/posts/:id', async (req) => {
@@ -110,7 +150,14 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       c ? [req.user?.id ?? null, username, q.limit + 1, c.t, c.id] : [req.user?.id ?? null, username, q.limit + 1],
     );
     const page = rows.slice(0, q.limit);
-    return { items: await hydratePosts(db, page.map((r) => r.id), req.user?.id ?? null), nextCursor: rows.length > q.limit ? keyCursorOf(page.at(-1)!) : null };
+    return {
+      items: await hydratePosts(
+        db,
+        page.map((r) => r.id),
+        req.user?.id ?? null,
+      ),
+      nextCursor: rows.length > q.limit ? keyCursorOf(page.at(-1)!) : null,
+    };
   });
 
   // ── Feed ──────────────────────────────────────────────────────────────
@@ -146,7 +193,15 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       c ? [u.id, q.limit + 1, c.t, c.id] : [u.id, q.limit + 1],
     );
     const page = rows.slice(0, q.limit);
-    return { mode, items: await hydratePosts(db, page.map((r) => r.id), u.id), nextCursor: rows.length > q.limit ? keyCursorOf(page.at(-1)!) : null };
+    return {
+      mode,
+      items: await hydratePosts(
+        db,
+        page.map((r) => r.id),
+        u.id,
+      ),
+      nextCursor: rows.length > q.limit ? keyCursorOf(page.at(-1)!) : null,
+    };
   });
 
   /**
@@ -223,7 +278,12 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     const more = rows.length > consumed;
     return {
       mode: 'for_you',
-      items: await hydratePosts(db, picked.map((r) => r.id), userId, reasons),
+      items: await hydratePosts(
+        db,
+        picked.map((r) => r.id),
+        userId,
+        reasons,
+      ),
       nextCursor: more ? encodeCursor({ asOf: c.asOf, o: c.o + consumed }) : null,
     };
   }
@@ -234,10 +294,17 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     let authorId = input.authorId ?? null;
     if (input.postId) {
       await assertVisible(input.postId, u.id);
-      if (input.signal === 'mute_creator' && !authorId) authorId = (await db.query(`SELECT author_id FROM posts WHERE id = $1`, [input.postId])).rows[0]?.author_id ?? null;
+      if (input.signal === 'mute_creator' && !authorId)
+        authorId = (await db.query(`SELECT author_id FROM posts WHERE id = $1`, [input.postId])).rows[0]?.author_id ?? null;
     }
     if (input.signal === 'mute_topic' && !input.topic) throw badRequest('Choose a topic to mute.');
-    await db.query(`INSERT INTO feed_feedback (user_id, signal, post_id, author_id, topic) VALUES ($1,$2,$3,$4,$5)`, [u.id, input.signal, input.postId ?? null, authorId, input.topic ?? null]);
+    await db.query(`INSERT INTO feed_feedback (user_id, signal, post_id, author_id, topic) VALUES ($1,$2,$3,$4,$5)`, [
+      u.id,
+      input.signal,
+      input.postId ?? null,
+      authorId,
+      input.topic ?? null,
+    ]);
     return { ok: true };
   });
 
@@ -282,7 +349,15 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     });
     if (inserted) {
       const author = (await db.query(`SELECT author_id FROM posts WHERE id = $1`, [id])).rows[0].author_id;
-      await notify(db, ctx.realtime, { userId: author, category: 'creators', type: 'post_reaction', actorId: u.id, entityType: 'post', entityId: id, data: { kind } });
+      await notify(db, ctx.realtime, {
+        userId: author,
+        category: 'creators',
+        type: 'post_reaction',
+        actorId: u.id,
+        entityType: 'post',
+        entityId: id,
+        data: { kind },
+      });
       track(db, u.id, 'post_reacted');
     }
     const likes = (await db.query(`SELECT like_count FROM posts WHERE id = $1`, [id])).rows[0].like_count;
@@ -315,8 +390,17 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
 
   app.get('/v1/me/saved', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
-    const { rows } = await db.query(`SELECT s.post_id AS id ${POST_FROM} JOIN saves s ON s.post_id = p.id AND s.user_id = $1 WHERE ${VISIBLE} ORDER BY s.created_at DESC LIMIT 100`, [u.id]);
-    return { items: await hydratePosts(db, rows.map((r) => r.id), u.id) };
+    const { rows } = await db.query(
+      `SELECT s.post_id AS id ${POST_FROM} JOIN saves s ON s.post_id = p.id AND s.user_id = $1 WHERE ${VISIBLE} ORDER BY s.created_at DESC LIMIT 100`,
+      [u.id],
+    );
+    return {
+      items: await hydratePosts(
+        db,
+        rows.map((r) => r.id),
+        u.id,
+      ),
+    };
   });
 
   app.post('/v1/posts/:id/vote', { preHandler: requireAuth }, async (req) => {
@@ -326,7 +410,10 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     await assertVisible(id, u.id);
     const opt = await db.query(`SELECT 1 FROM poll_options WHERE id = $1 AND post_id = $2`, [optionId, id]);
     if (!opt.rowCount) throw notFound('Poll option');
-    await db.query(`INSERT INTO poll_votes (post_id, option_id, user_id) VALUES ($1,$2,$3) ON CONFLICT (post_id, user_id) DO UPDATE SET option_id = EXCLUDED.option_id`, [id, optionId, u.id]);
+    await db.query(
+      `INSERT INTO poll_votes (post_id, option_id, user_id) VALUES ($1,$2,$3) ON CONFLICT (post_id, user_id) DO UPDATE SET option_id = EXCLUDED.option_id`,
+      [id, optionId, u.id],
+    );
     const [post] = await hydratePosts(db, [id], u.id);
     return { poll: post!.poll };
   });
@@ -350,7 +437,14 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       c ? [viewer, id, q.limit + 1, c.t, c.id] : [viewer, id, q.limit + 1],
     );
     const page = rows.slice(0, q.limit);
-    const items: Comment[] = page.map((r) => ({ id: r.id, postId: r.post_id, parentId: r.parent_id, body: r.body, author: publicUserFrom(r, 'a_'), createdAt: r.created_at.toISOString() }));
+    const items: Comment[] = page.map((r) => ({
+      id: r.id,
+      postId: r.post_id,
+      parentId: r.parent_id,
+      body: r.body,
+      author: publicUserFrom(r, 'a_'),
+      createdAt: r.created_at.toISOString(),
+    }));
     return { items, nextCursor: rows.length > q.limit ? keyCursorOf(page.at(-1)!) : null };
   });
 
@@ -372,15 +466,40 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       );
       await c.query(`UPDATE posts SET comment_count = comment_count + 1 WHERE id = $1`, [id]);
       if (analysis.risk !== 'normal')
-        await c.query(`INSERT INTO moderation_cases (target_type, target_id, subject_user_id, source, risk, signals) VALUES ('comment',$1,$2,'automated',$3,$4) ON CONFLICT DO NOTHING`, [rows[0].id, u.id, analysis.risk, { signals: analysis.signals }]);
+        await c.query(
+          `INSERT INTO moderation_cases (target_type, target_id, subject_user_id, source, risk, signals) VALUES ('comment',$1,$2,'automated',$3,$4) ON CONFLICT DO NOTHING`,
+          [rows[0].id, u.id, analysis.risk, { signals: analysis.signals }],
+        );
       return rows[0];
     });
     const post = (await db.query(`SELECT author_id FROM posts WHERE id = $1`, [id])).rows[0];
-    await notify(db, ctx.realtime, { userId: post.author_id, category: 'creators', type: 'post_comment', actorId: u.id, entityType: 'post', entityId: id, data: { commentId: comment.id } });
+    await notify(db, ctx.realtime, {
+      userId: post.author_id,
+      category: 'creators',
+      type: 'post_comment',
+      actorId: u.id,
+      entityType: 'post',
+      entityId: id,
+      data: { commentId: comment.id },
+    });
     track(db, u.id, 'comment_created');
-    const author = (await db.query(`SELECT user_id AS a_id, username AS a_username, display_name AS a_display_name, avatar_url AS a_avatar_url, mode AS a_mode FROM profiles WHERE user_id = $1`, [u.id])).rows[0];
+    const author = (
+      await db.query(
+        `SELECT user_id AS a_id, username AS a_username, display_name AS a_display_name, avatar_url AS a_avatar_url, mode AS a_mode FROM profiles WHERE user_id = $1`,
+        [u.id],
+      )
+    ).rows[0];
     reply.code(201);
-    return { comment: { id: comment.id, postId: id, parentId: input.parentId ?? null, body: input.body, author: publicUserFrom(author, 'a_'), createdAt: comment.created_at.toISOString() } satisfies Comment };
+    return {
+      comment: {
+        id: comment.id,
+        postId: id,
+        parentId: input.parentId ?? null,
+        body: input.body,
+        author: publicUserFrom(author, 'a_'),
+        createdAt: comment.created_at.toISOString(),
+      } satisfies Comment,
+    };
   });
 
   app.delete('/v1/comments/:id', { preHandler: requireAuth }, async (req) => {

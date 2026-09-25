@@ -27,9 +27,18 @@ function Discover() {
   }, [q, toast]);
 
   useEffect(() => {
-    api.now().then(setNow).catch(() => {});
-    api.communities.list('discover').then((r) => setCommunities(r.items)).catch(() => {});
-    api.events.list('upcoming').then((r) => setEvents(r.items)).catch(() => {});
+    api
+      .now()
+      .then(setNow)
+      .catch(() => {});
+    api.communities
+      .list('discover')
+      .then((r) => setCommunities(r.items))
+      .catch(() => {});
+    api.events
+      .list('upcoming')
+      .then((r) => setEvents(r.items))
+      .catch(() => {});
   }, []);
 
   const r = results?.results ?? {};
@@ -66,7 +75,14 @@ function Discover() {
         <label htmlFor="q" className="yp-visually-hidden">
           {t('discover.search')}
         </label>
-        <input id="q" className="yp-input" style={{ flex: 1, minWidth: 0 }} placeholder={`${t('discover.search')}. Try "something to do tonight"`} value={input} onChange={(e) => setInput(e.currentTarget.value)} />
+        <input
+          id="q"
+          className="yp-input"
+          style={{ flex: 1, minWidth: 0 }}
+          placeholder={`${t('discover.search')}. Try "something to do tonight"`}
+          value={input}
+          onChange={(e) => setInput(e.currentTarget.value)}
+        />
         <Button type="submit" icon="search">
           Search
         </Button>
@@ -91,7 +107,14 @@ function Discover() {
                 <h2 className="section-title">{t('discover.people')}</h2>
                 <List>
                   {people.map((u) => (
-                    <ListItem key={u.id} href={`/u/${u.username}`} linkAs={NextLink} start={<Avatar name={u.displayName} src={u.avatarUrl} />} primary={u.displayName} secondary={`@${u.username} · ${u.mode}`} />
+                    <ListItem
+                      key={u.id}
+                      href={`/u/${u.username}`}
+                      linkAs={NextLink}
+                      start={<Avatar name={u.displayName} src={u.avatarUrl} />}
+                      primary={u.displayName}
+                      secondary={`@${u.username} · ${u.mode}`}
+                    />
                   ))}
                 </List>
               </section>
@@ -121,7 +144,13 @@ function Discover() {
                 <h2 className="section-title">{t('discover.places')}</h2>
                 <List>
                   {places.map((p) => (
-                    <ListItem key={p.id} href={`/places/${p.id}`} linkAs={NextLink} primary={p.name} secondary={[p.category, p.city].filter(Boolean).join(' · ')} />
+                    <ListItem
+                      key={p.id}
+                      href={`/places/${p.id}`}
+                      linkAs={NextLink}
+                      primary={p.name}
+                      secondary={[p.category, p.city].filter(Boolean).join(' · ')}
+                    />
                   ))}
                 </List>
               </section>

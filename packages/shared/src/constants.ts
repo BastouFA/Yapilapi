@@ -26,31 +26,10 @@ export const COMMUNITY_ROLE_RANK: Record<CommunityRole, number> = {
 
 export const RSVP_STATUSES = ['going', 'interested', 'not_going'] as const;
 
-export const NOTIFICATION_CATEGORIES = [
-  'messages',
-  'friends',
-  'creators',
-  'communities',
-  'events',
-  'commerce',
-  'security',
-  'moderation',
-  'system',
-] as const;
+export const NOTIFICATION_CATEGORIES = ['messages', 'friends', 'creators', 'communities', 'events', 'commerce', 'security', 'moderation', 'system'] as const;
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
 
-export const REPORT_REASONS = [
-  'spam',
-  'harassment',
-  'hate',
-  'violence',
-  'nudity',
-  'self_harm',
-  'impersonation',
-  'fraud',
-  'minor_safety',
-  'other',
-] as const;
+export const REPORT_REASONS = ['spam', 'harassment', 'hate', 'violence', 'nudity', 'self_harm', 'impersonation', 'fraud', 'minor_safety', 'other'] as const;
 
 export const REPORT_TARGETS = ['user', 'post', 'comment', 'message', 'community', 'event', 'product'] as const;
 

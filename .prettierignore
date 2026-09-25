@@ -1,0 +1,8 @@
+node_modules
+.next
+dist
+coverage
+pnpm-lock.yaml
+packages/design-system/src/tokens.css
+packages/database/migrations
+*.md

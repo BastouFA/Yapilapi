@@ -35,10 +35,7 @@ export async function usersByIds(db: Q, ids: string[]): Promise<Map<string, Publ
 }
 
 export async function isBlockedEitherWay(db: Q, a: string, b: string): Promise<boolean> {
-  const r = await db.query(
-    `SELECT 1 FROM blocks WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1)`,
-    [a, b],
-  );
+  const r = await db.query(`SELECT 1 FROM blocks WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1)`, [a, b]);
   return !!r.rowCount;
 }
 

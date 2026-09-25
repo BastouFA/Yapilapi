@@ -40,14 +40,19 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
   async function startSession(req: FastifyRequest, reply: FastifyReply, userId: string) {
     const { token, hash } = newToken();
     const ua = req.headers['user-agent']?.slice(0, 300) ?? null;
-    const device = await ctx.db.query<{ id: string }>(
-      `INSERT INTO devices (user_id, name, platform) VALUES ($1, $2, $3) RETURNING id`,
-      [userId, deviceName(ua), req.headers['x-client-platform'] === 'mobile' ? 'mobile' : 'web'],
-    );
-    await ctx.db.query(
-      `INSERT INTO sessions (user_id, device_id, token_hash, user_agent, ip, expires_at) VALUES ($1,$2,$3,$4,$5,$6)`,
-      [userId, device.rows[0]!.id, hash, ua, req.ip, new Date(Date.now() + ttlMs)],
-    );
+    const device = await ctx.db.query<{ id: string }>(`INSERT INTO devices (user_id, name, platform) VALUES ($1, $2, $3) RETURNING id`, [
+      userId,
+      deviceName(ua),
+      req.headers['x-client-platform'] === 'mobile' ? 'mobile' : 'web',
+    ]);
+    await ctx.db.query(`INSERT INTO sessions (user_id, device_id, token_hash, user_agent, ip, expires_at) VALUES ($1,$2,$3,$4,$5,$6)`, [
+      userId,
+      device.rows[0]!.id,
+      hash,
+      ua,
+      req.ip,
+      new Date(Date.now() + ttlMs),
+    ]);
     reply.setCookie(SESSION_COOKIE, token, {
       httpOnly: true,
       secure: ctx.config.COOKIE_SECURE,
@@ -60,7 +65,10 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
 
   async function sendVerification(userId: string, email: string) {
     const { token, hash } = newToken();
-    await ctx.db.query(`INSERT INTO auth_tokens (user_id, purpose, token_hash, expires_at) VALUES ($1,'verify_email',$2, now() + interval '2 days')`, [userId, hash]);
+    await ctx.db.query(`INSERT INTO auth_tokens (user_id, purpose, token_hash, expires_at) VALUES ($1,'verify_email',$2, now() + interval '2 days')`, [
+      userId,
+      hash,
+    ]);
     await ctx.email.send({
       to: email,
       subject: 'Confirm your email for YAPILAPI',
@@ -72,7 +80,8 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
     const input = parse(registerSchema, req.body);
     if (input.birthDate) {
       const age = ageOf(input.birthDate);
-      if (age === null || age < MIN_AGE) throw badRequest(`You need to be at least ${MIN_AGE} to join.`, { fields: { birthDate: `You need to be at least ${MIN_AGE}.` } });
+      if (age === null || age < MIN_AGE)
+        throw badRequest(`You need to be at least ${MIN_AGE} to join.`, { fields: { birthDate: `You need to be at least ${MIN_AGE}.` } });
     }
     const passwordHash = await hashPassword(input.password);
     const userId = await tx(ctx.db, async (c) => {
@@ -81,7 +90,8 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
         [input.email, input.username],
       );
       const t = taken.rows[0];
-      if (t.email) throw new AppError(409, 'conflict', 'An account with that email already exists. Log in instead.', { fields: { email: 'Already registered.' } });
+      if (t.email)
+        throw new AppError(409, 'conflict', 'An account with that email already exists. Log in instead.', { fields: { email: 'Already registered.' } });
       if (t.username) throw new AppError(409, 'conflict', 'That username is taken. Try another.', { fields: { username: 'Taken.' } });
       const u = await c.query<{ id: string }>(`INSERT INTO users (email, password_hash, birth_date) VALUES ($1,$2,$3) RETURNING id`, [
         input.email,
@@ -159,8 +169,15 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
     const { rows } = await ctx.db.query<{ id: string }>(`SELECT id FROM users WHERE lower(email) = $1 AND status = 'active' AND deleted_at IS NULL`, [email]);
     if (rows[0]) {
       const { token, hash } = newToken();
-      await ctx.db.query(`INSERT INTO auth_tokens (user_id, purpose, token_hash, expires_at) VALUES ($1,'reset_password',$2, now() + interval '1 hour')`, [rows[0].id, hash]);
-      await ctx.email.send({ to: email, subject: 'Reset your YAPILAPI password', text: `Reset your password: ${ctx.config.WEB_ORIGIN}/reset-password?token=${token} (valid for 1 hour)` });
+      await ctx.db.query(`INSERT INTO auth_tokens (user_id, purpose, token_hash, expires_at) VALUES ($1,'reset_password',$2, now() + interval '1 hour')`, [
+        rows[0].id,
+        hash,
+      ]);
+      await ctx.email.send({
+        to: email,
+        subject: 'Reset your YAPILAPI password',
+        text: `Reset your password: ${ctx.config.WEB_ORIGIN}/reset-password?token=${token} (valid for 1 hour)`,
+      });
       await securityEvent(ctx.db, rows[0].id, 'password_reset_requested', req.ip);
     }
     return { ok: true, message: 'If that email has an account, we sent a reset link.' };
@@ -187,7 +204,8 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
     const u = me(req);
     const input = parse(z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(10).max(200) }), req.body);
     const { rows } = await ctx.db.query<{ password_hash: string }>(`SELECT password_hash FROM users WHERE id = $1`, [u.id]);
-    if (!(await verifyPassword(input.currentPassword, rows[0]?.password_hash))) throw badRequest('Your current password is incorrect.', { fields: { currentPassword: 'Incorrect.' } });
+    if (!(await verifyPassword(input.currentPassword, rows[0]?.password_hash)))
+      throw badRequest('Your current password is incorrect.', { fields: { currentPassword: 'Incorrect.' } });
     await ctx.db.query(`UPDATE users SET password_hash = $2 WHERE id = $1`, [u.id, await hashPassword(input.newPassword)]);
     await ctx.db.query(`UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND id <> $2 AND revoked_at IS NULL`, [u.id, u.sessionId]);
     await securityEvent(ctx.db, u.id, 'password_changed', req.ip);
@@ -223,10 +241,9 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
   });
 
   app.get('/v1/auth/security-events', { preHandler: requireAuth }, async (req) => {
-    const { rows } = await ctx.db.query(
-      `SELECT type, host(ip) AS ip, created_at FROM security_events WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
-      [me(req).id],
-    );
+    const { rows } = await ctx.db.query(`SELECT type, host(ip) AS ip, created_at FROM security_events WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`, [
+      me(req).id,
+    ]);
     return { items: rows };
   });
 
@@ -249,7 +266,17 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
 
 function deviceName(ua: string | null): string {
   if (!ua) return 'Unknown device';
-  const os = /iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android' : /Mac OS X/.test(ua) ? 'macOS' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : 'Unknown OS';
+  const os = /iPhone|iPad/.test(ua)
+    ? 'iOS'
+    : /Android/.test(ua)
+      ? 'Android'
+      : /Mac OS X/.test(ua)
+        ? 'macOS'
+        : /Windows/.test(ua)
+          ? 'Windows'
+          : /Linux/.test(ua)
+            ? 'Linux'
+            : 'Unknown OS';
   const browser = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'App';
   return `${browser} on ${os}`;
 }

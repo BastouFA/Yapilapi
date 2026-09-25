@@ -39,7 +39,8 @@ export default async function notificationsModule(app: FastifyInstance, ctx: App
 
   app.post('/v1/notifications/read', { preHandler: requireAuth }, async (req) => {
     const body = (req.body ?? {}) as { ids?: string[] };
-    if (body.ids?.length) await db.query(`UPDATE notifications SET read_at = now() WHERE user_id = $1 AND id = ANY($2::uuid[]) AND read_at IS NULL`, [me(req).id, body.ids]);
+    if (body.ids?.length)
+      await db.query(`UPDATE notifications SET read_at = now() WHERE user_id = $1 AND id = ANY($2::uuid[]) AND read_at IS NULL`, [me(req).id, body.ids]);
     else await db.query(`UPDATE notifications SET read_at = now() WHERE user_id = $1 AND read_at IS NULL`, [me(req).id]);
     return { ok: true };
   });
@@ -63,7 +64,9 @@ export default async function notificationsModule(app: FastifyInstance, ctx: App
   app.put('/v1/me/preferences/notifications', { preHandler: requireAuth }, async (req) => {
     const { categories } = parse(notificationPrefsSchema, req.body);
     // Security notifications can't be turned off.
-    const clean = Object.fromEntries(Object.entries(categories).filter(([k]) => (NOTIFICATION_CATEGORIES as readonly string[]).includes(k) && k !== 'security'));
+    const clean = Object.fromEntries(
+      Object.entries(categories).filter(([k]) => (NOTIFICATION_CATEGORIES as readonly string[]).includes(k) && k !== 'security'),
+    );
     await db.query(
       `INSERT INTO user_preferences (user_id, notification_categories) VALUES ($1,$2)
        ON CONFLICT (user_id) DO UPDATE SET notification_categories = user_preferences.notification_categories || EXCLUDED.notification_categories, updated_at = now()`,
@@ -85,9 +88,15 @@ export default async function notificationsModule(app: FastifyInstance, ctx: App
          updated_at = now()
        WHERE user_id = $1`,
       [
-        me(req).id, a.focusMode ?? null, a.quietMode ?? null, a.friendsOnly ?? null, a.reducedRecommendations ?? null,
-        a.dailyTimeBudgetMinutes !== undefined, a.dailyTimeBudgetMinutes ?? null,
-        a.notificationsPausedUntil !== undefined, a.notificationsPausedUntil ?? null,
+        me(req).id,
+        a.focusMode ?? null,
+        a.quietMode ?? null,
+        a.friendsOnly ?? null,
+        a.reducedRecommendations ?? null,
+        a.dailyTimeBudgetMinutes !== undefined,
+        a.dailyTimeBudgetMinutes ?? null,
+        a.notificationsPausedUntil !== undefined,
+        a.notificationsPausedUntil ?? null,
       ],
     );
     return { ok: true };

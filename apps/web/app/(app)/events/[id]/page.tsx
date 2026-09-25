@@ -16,8 +16,14 @@ export default function EventPage() {
   const [attendees, setAttendees] = useState<{ user: PublicUser; status: string }[]>([]);
 
   useEffect(() => {
-    api.events.get(id).then((r) => setEv(r.event), () => setMissing(true));
-    api.events.attendees(id).then((r) => setAttendees(r.items)).catch(() => {});
+    api.events.get(id).then(
+      (r) => setEv(r.event),
+      () => setMissing(true),
+    );
+    api.events
+      .attendees(id)
+      .then((r) => setAttendees(r.items))
+      .catch(() => {});
   }, [id]);
 
   if (missing) return <EmptyState title="Event not found" body="It may have been cancelled, or it's private." />;
@@ -90,7 +96,13 @@ export default function EventPage() {
                 <Avatar key={a.user.id} name={a.user.displayName} src={a.user.avatarUrl} size="sm" />
               ))}
             </AvatarGroup>
-            <span className="muted">{going.map((a) => a.user.displayName.split(' ')[0]).slice(0, 3).join(', ')}{going.length > 3 ? ` and ${going.length - 3} more` : ''}</span>
+            <span className="muted">
+              {going
+                .map((a) => a.user.displayName.split(' ')[0])
+                .slice(0, 3)
+                .join(', ')}
+              {going.length > 3 ? ` and ${going.length - 3} more` : ''}
+            </span>
           </div>
         </section>
       ) : null}

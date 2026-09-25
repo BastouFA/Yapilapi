@@ -10,7 +10,10 @@ function Verify() {
   const token = useSearchParams().get('token') ?? '';
   const [state, setState] = useState<{ ok?: boolean; error?: string }>({});
   useEffect(() => {
-    api.auth.verifyEmail(token).then(() => setState({ ok: true }), (e) => setState({ error: errorMessage(e) }));
+    api.auth.verifyEmail(token).then(
+      () => setState({ ok: true }),
+      (e) => setState({ error: errorMessage(e) }),
+    );
   }, [token]);
   return (
     <div className="stack">

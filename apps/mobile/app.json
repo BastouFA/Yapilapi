@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "YAPILAPI",
+    "slug": "yapilapi",
+    "scheme": "yapilapi",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": { "bundleIdentifier": "com.yapilapi.app", "supportsTablet": true },
+    "android": { "package": "com.yapilapi.app" },
+    "plugins": ["expo-router", "expo-secure-store"],
+    "extra": { "apiUrl": "http://localhost:4000" }
+  }
+}

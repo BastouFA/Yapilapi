@@ -47,7 +47,15 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
     const groups = new Map<string, { author: ReturnType<typeof publicUserFrom>; moments: unknown[] }>();
     for (const r of rows) {
       const g = groups.get(r.a_id) ?? { author: publicUserFrom(r, 'a_'), moments: [] };
-      g.moments.push({ id: r.id, body: r.body, mediaUrl: r.media_url, mediaKind: r.media_kind, locationText: r.location_text, expiresAt: r.expires_at, createdAt: r.created_at });
+      g.moments.push({
+        id: r.id,
+        body: r.body,
+        mediaUrl: r.media_url,
+        mediaKind: r.media_kind,
+        locationText: r.location_text,
+        expiresAt: r.expires_at,
+        createdAt: r.created_at,
+      });
       groups.set(r.a_id, g);
     }
     return { items: [...groups.values()] };

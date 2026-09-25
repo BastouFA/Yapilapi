@@ -9,10 +9,15 @@ export async function audit(
   db: Q,
   entry: { actorId?: string | null; action: string; entityType?: string; entityId?: string; ip?: string; requestId?: string; metadata?: object },
 ): Promise<void> {
-  await db.query(
-    `INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, ip, request_id, metadata) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-    [entry.actorId ?? null, entry.action, entry.entityType ?? null, entry.entityId ?? null, entry.ip ?? null, entry.requestId ?? null, entry.metadata ?? {}],
-  );
+  await db.query(`INSERT INTO audit_logs (actor_id, action, entity_type, entity_id, ip, request_id, metadata) VALUES ($1,$2,$3,$4,$5,$6,$7)`, [
+    entry.actorId ?? null,
+    entry.action,
+    entry.entityType ?? null,
+    entry.entityId ?? null,
+    entry.ip ?? null,
+    entry.requestId ?? null,
+    entry.metadata ?? {},
+  ]);
 }
 
 export async function securityEvent(db: Q, userId: string | null, type: string, ip?: string, userAgent?: string, metadata: object = {}) {
@@ -30,19 +35,23 @@ export async function securityEvent(db: Q, userId: string | null, type: string, 
  * separately from passive engagement.
  */
 const MEANINGFUL = new Set([
-  'post_created', 'comment_created', 'message_sent', 'follow', 'friend_accepted', 'community_joined',
-  'event_rsvp_going', 'order_paid', 'moment_created',
+  'post_created',
+  'comment_created',
+  'message_sent',
+  'follow',
+  'friend_accepted',
+  'community_joined',
+  'event_rsvp_going',
+  'order_paid',
+  'moment_created',
 ]);
 
 export function track(db: Q, userId: string | null, name: string, properties: object = {}): void {
-  db.query(`INSERT INTO analytics_events (user_id, name, meaningful, properties) VALUES ($1,$2,$3,$4)`, [
-    userId,
-    name,
-    MEANINGFUL.has(name),
-    properties,
-  ]).catch(() => {
-    /* analytics must never break a request */
-  });
+  db.query(`INSERT INTO analytics_events (user_id, name, meaningful, properties) VALUES ($1,$2,$3,$4)`, [userId, name, MEANINGFUL.has(name), properties]).catch(
+    () => {
+      /* analytics must never break a request */
+    },
+  );
 }
 
 /** Create a notification unless the recipient disabled the category or paused notifications. */

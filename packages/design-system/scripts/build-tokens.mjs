@@ -13,12 +13,19 @@ const val = (tok, theme) => (typeof tok.value === 'string' ? tok.value : (tok.va
 const decls = (theme) => themed.map((tok) => `  --${tok.name}: ${val(tok, theme)};`).join('\n');
 
 const flat = ['spacing', 'radius', 'size', 'duration'].flatMap((k) => t[k]?.tokens ?? []);
-const fonts = Object.entries(t.type.families).map(([k, v]) => `  --font-${k}: ${v};`).join('\n');
+const fonts = Object.entries(t.type.families)
+  .map(([k, v]) => `  --font-${k}: ${v};`)
+  .join('\n');
 
 const styles = t.type.groups
   .flatMap((g) =>
     g.styles.map((s) => {
-      const lines = [`  font-family: var(--font-${s.family ?? g.family});`, `  font-size: ${s.fontSize};`, `  line-height: ${s.lineHeight};`, `  font-weight: ${s.fontWeight};`];
+      const lines = [
+        `  font-family: var(--font-${s.family ?? g.family});`,
+        `  font-size: ${s.fontSize};`,
+        `  line-height: ${s.lineHeight};`,
+        `  font-weight: ${s.fontWeight};`,
+      ];
       if (s.letterSpacing) lines.push(`  letter-spacing: ${s.letterSpacing};`);
       return `.type-${s.name} {\n${lines.join('\n')}\n}`;
     }),

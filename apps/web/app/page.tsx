@@ -33,7 +33,10 @@ export default function Landing() {
       <main className="landing__hero" id="main">
         <div className="stack">
           <h1>{t('app.tagline')}</h1>
-          <p>People, communities, events, places and the things you love, in one place you control. No endless scroll by design: you choose what your feed shows, and you can always see why.</p>
+          <p>
+            People, communities, events, places and the things you love, in one place you control. No endless scroll by design: you choose what your feed shows,
+            and you can always see why.
+          </p>
           <ul className="landing__journey" aria-label="What you can do">
             {JOURNEY.map((j) => (
               <li key={j}>{j}</li>

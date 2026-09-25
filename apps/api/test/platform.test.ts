@@ -36,12 +36,25 @@ describe('events, places and commerce', () => {
   it('creates a business, a place and a product, then sells it idempotently', async () => {
     const biz = await as(t.app, host).post('/v1/businesses', { name: 'Test Bakery', slug: `bakery-${Date.now().toString(36)}` });
     expect(biz.status).toBe(201);
-    const place = await as(t.app, host).post('/v1/places', { name: 'Test Bakery', category: 'restaurant', city: 'Lisbon', lat: 38.72, lng: -9.14, businessId: biz.body.business.id });
+    const place = await as(t.app, host).post('/v1/places', {
+      name: 'Test Bakery',
+      category: 'restaurant',
+      city: 'Lisbon',
+      lat: 38.72,
+      lng: -9.14,
+      businessId: biz.body.business.id,
+    });
     expect(place.status).toBe(201);
     const near = await as(t.app, guest).get('/v1/places?lat=38.72&lng=-9.14&radiusKm=2');
     expect(near.body.items.some((p: { id: string }) => p.id === place.body.place.id)).toBe(true);
 
-    const product = await as(t.app, host).post('/v1/products', { title: 'Sourdough loaf', priceCents: 650, currency: 'eur', inventory: 3, businessId: biz.body.business.id });
+    const product = await as(t.app, host).post('/v1/products', {
+      title: 'Sourdough loaf',
+      priceCents: 650,
+      currency: 'eur',
+      inventory: 3,
+      businessId: biz.body.business.id,
+    });
     expect(product.body.product.currency).toBe('EUR');
     const pid = product.body.product.id;
 
@@ -58,12 +71,27 @@ describe('events, places and commerce', () => {
     // Complete payment through a signed webhook; replays are ignored.
     const providerRef = (await t.ctx.db.query(`SELECT provider_ref FROM payments WHERE order_id = $1`, [order.body.order.id])).rows[0].provider_ref;
     const payload = JSON.stringify({ id: `evt_${Date.now()}`, type: 'payment.succeeded', providerRef, amountCents: 1300 });
-    const unsigned = await t.app.inject({ method: 'POST', url: '/v1/payments/webhook/dev', payload, headers: { 'content-type': 'application/json', 'x-signature': 'nope' } });
+    const unsigned = await t.app.inject({
+      method: 'POST',
+      url: '/v1/payments/webhook/dev',
+      payload,
+      headers: { 'content-type': 'application/json', 'x-signature': 'nope' },
+    });
     expect(unsigned.statusCode).toBe(400);
     const sig = signDevWebhook(t.ctx.config.PAYMENTS_WEBHOOK_SECRET, payload);
-    const ok = await t.app.inject({ method: 'POST', url: '/v1/payments/webhook/dev', payload, headers: { 'content-type': 'application/json', 'x-signature': sig } });
+    const ok = await t.app.inject({
+      method: 'POST',
+      url: '/v1/payments/webhook/dev',
+      payload,
+      headers: { 'content-type': 'application/json', 'x-signature': sig },
+    });
     expect(ok.json()).toEqual({ ok: true });
-    const dup = await t.app.inject({ method: 'POST', url: '/v1/payments/webhook/dev', payload, headers: { 'content-type': 'application/json', 'x-signature': sig } });
+    const dup = await t.app.inject({
+      method: 'POST',
+      url: '/v1/payments/webhook/dev',
+      payload,
+      headers: { 'content-type': 'application/json', 'x-signature': sig },
+    });
     expect(dup.json().duplicate).toBe(true);
 
     expect((await as(t.app, guest).get(`/v1/orders/${order.body.order.id}`)).body.order.status).toBe('paid');
@@ -112,7 +140,13 @@ describe('trust, safety and privacy', () => {
     expect(r.body.error.code).toBe('minor_protection');
     const prof = await as(t.app, teen).get(`/v1/users/${teen.username}`);
     expect(prof.body.profile.isPrivate).toBe(true);
-    const tooYoung = await as(t.app, null).post('/v1/auth/register', { email: 'kid@example.test', password: 'long-enough-pass', username: 'kiddo_test', displayName: 'Kid', birthDate: `${new Date().getFullYear() - 10}-01-01` });
+    const tooYoung = await as(t.app, null).post('/v1/auth/register', {
+      email: 'kid@example.test',
+      password: 'long-enough-pass',
+      username: 'kiddo_test',
+      displayName: 'Kid',
+      birthDate: `${new Date().getFullYear() - 10}-01-01`,
+    });
     expect(tooYoung.status).toBe(400);
   });
 
@@ -187,8 +221,7 @@ describe('trust, safety and privacy', () => {
   });
 
   it('requires authentication on protected endpoints', async () => {
-    for (const url of ['/v1/feed', '/v1/conversations', '/v1/notifications', '/v1/me/export'])
-      expect((await as(t.app, null).get(url)).status).toBe(401);
+    for (const url of ['/v1/feed', '/v1/conversations', '/v1/notifications', '/v1/me/export']) expect((await as(t.app, null).get(url)).status).toBe(401);
     expect((await as(t.app, { ...a, token: 'forged-token-value-000000000000' }).get('/v1/auth/me')).status).toBe(401);
   });
 });

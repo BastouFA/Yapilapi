@@ -42,7 +42,11 @@ function Moderation() {
   const { toast, locale, me } = useSession();
   const [status, setStatus] = useState('open');
   const [items, setItems] = useState<Record<string, any>[] | null>(null);
-  const load = () => api.admin.cases(status).then((r) => setItems(r.items), (e) => toast(errorMessage(e)));
+  const load = () =>
+    api.admin.cases(status).then(
+      (r) => setItems(r.items),
+      (e) => toast(errorMessage(e)),
+    );
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps

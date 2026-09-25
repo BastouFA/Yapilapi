@@ -60,7 +60,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     void refresh();
-    api.flags().then((r) => setFlags(r.flags)).catch(() => {});
+    api
+      .flags()
+      .then((r) => setFlags(r.flags))
+      .catch(() => {});
   }, [refresh]);
 
   useEffect(() => {
@@ -77,8 +80,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
     let ws: WebSocket | null = null;
     let attempt = 0;
     const loadCounts = () => {
-      api.notifications.list().then((r) => setUnreadState((u) => ({ ...u, notifications: r.unread }))).catch(() => {});
-      api.conversations.list().then((r) => setUnreadState((u) => ({ ...u, messages: r.items.reduce((s, c) => s + c.unreadCount, 0) }))).catch(() => {});
+      api.notifications
+        .list()
+        .then((r) => setUnreadState((u) => ({ ...u, notifications: r.unread })))
+        .catch(() => {});
+      api.conversations
+        .list()
+        .then((r) => setUnreadState((u) => ({ ...u, messages: r.items.reduce((s, c) => s + c.unreadCount, 0) })))
+        .catch(() => {});
     };
     loadCounts();
     const connect = () => {

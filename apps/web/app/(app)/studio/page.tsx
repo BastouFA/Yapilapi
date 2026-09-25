@@ -13,7 +13,10 @@ export default function Studio() {
   const [earnings, setEarnings] = useState<{ currency: string; grossCents: number; feeCents: number; availableCents: number }[]>([]);
   useEffect(() => {
     api.creator.analytics().then(setData);
-    api.raw.get<{ balances: typeof earnings }>('/v1/me/earnings').then((r) => setEarnings(r.balances)).catch(() => {});
+    api.raw
+      .get<{ balances: typeof earnings }>('/v1/me/earnings')
+      .then((r) => setEarnings(r.balances))
+      .catch(() => {});
   }, []);
   if (!data) return <Skeleton height={240} />;
   const growth = data.followerGrowth.map((d) => Number(d.new_followers));
@@ -50,7 +53,12 @@ export default function Studio() {
           <h2 className="section-title">Earnings</h2>
           <div className="stats">
             {earnings.map((e) => (
-              <Stat key={e.currency} label={`Available (${e.currency})`} value={formatMoney(e.availableCents, e.currency, locale)} delta={`${formatMoney(e.grossCents, e.currency, locale)} gross, ${formatMoney(e.feeCents, e.currency, locale)} fees`} />
+              <Stat
+                key={e.currency}
+                label={`Available (${e.currency})`}
+                value={formatMoney(e.availableCents, e.currency, locale)}
+                delta={`${formatMoney(e.grossCents, e.currency, locale)} gross, ${formatMoney(e.feeCents, e.currency, locale)} fees`}
+              />
             ))}
           </div>
         </section>
@@ -60,7 +68,12 @@ export default function Studio() {
         {data.topPosts.length ? (
           <List>
             {data.topPosts.map((p) => (
-              <ListItem key={p.id} primary={p.excerpt || `(${p.kind})`} secondary={formatRelativeTime(p.created_at, locale)} end={`${p.like_count} likes · ${p.comment_count} comments`} />
+              <ListItem
+                key={p.id}
+                primary={p.excerpt || `(${p.kind})`}
+                secondary={formatRelativeTime(p.created_at, locale)}
+                end={`${p.like_count} likes · ${p.comment_count} comments`}
+              />
             ))}
           </List>
         ) : (

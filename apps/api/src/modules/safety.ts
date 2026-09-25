@@ -41,7 +41,10 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     if (subject === u.id) throw badRequest("You can't report your own content.");
     // A reported message must be one the reporter could actually see.
     if (input.targetType === 'message') {
-      const ok = await db.query(`SELECT 1 FROM messages m JOIN conversation_members cm ON cm.conversation_id = m.conversation_id WHERE m.id = $1 AND cm.user_id = $2`, [input.targetId, u.id]);
+      const ok = await db.query(
+        `SELECT 1 FROM messages m JOIN conversation_members cm ON cm.conversation_id = m.conversation_id WHERE m.id = $1 AND cm.user_id = $2`,
+        [input.targetId, u.id],
+      );
       if (!ok.rowCount) throw notFound('The item you reported');
     }
     const report = await tx(db, async (c) => {
@@ -59,7 +62,8 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
         [input.targetType, input.targetId, subject, risk, { reports: 1, reasons: [input.reason] }],
       );
       // Content reported for minor safety is hidden immediately pending review.
-      if (input.reason === 'minor_safety' && input.targetType === 'post') await c.query(`UPDATE posts SET moderation_status = 'restricted' WHERE id = $1`, [input.targetId]);
+      if (input.reason === 'minor_safety' && input.targetType === 'post')
+        await c.query(`UPDATE posts SET moderation_status = 'restricted' WHERE id = $1`, [input.targetId]);
       return r.rows[0];
     });
     reply.code(201);
@@ -91,19 +95,40 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       if (!mc) throw notFound('Case');
       await applyDecision(c, mc, input.decision);
       await c.query(`UPDATE moderation_cases SET status = $2, decision = $3, reviewer_id = $4, note = $5, decided_at = now() WHERE id = $1`, [
-        id, mc.status === 'appealed' ? 'final' : 'decided', input.decision, mod.id, input.note ?? null,
+        id,
+        mc.status === 'appealed' ? 'final' : 'decided',
+        input.decision,
+        mod.id,
+        input.note ?? null,
       ]);
       await c.query(`UPDATE reports SET status = 'closed' WHERE target_type = $1 AND target_id = $2 AND status <> 'closed'`, [mc.target_type, mc.target_id]);
       if (input.decision !== 'no_action' && mc.subject_user_id) {
         await c.query(`INSERT INTO enforcements (case_id, user_id, action) VALUES ($1,$2,$3)`, [id, mc.subject_user_id, input.decision]);
-        await notify(c, ctx.realtime, { userId: mc.subject_user_id, category: 'moderation', type: 'enforcement', entityType: 'moderation_case', entityId: id, data: { decision: input.decision, canAppeal: mc.status !== 'appealed' } });
+        await notify(c, ctx.realtime, {
+          userId: mc.subject_user_id,
+          category: 'moderation',
+          type: 'enforcement',
+          entityType: 'moderation_case',
+          entityId: id,
+          data: { decision: input.decision, canAppeal: mc.status !== 'appealed' },
+        });
       }
-      await audit(c, { actorId: mod.id, action: `moderation.${input.decision}`, entityType: mc.target_type, entityId: mc.target_id, metadata: { caseId: id, note: input.note } });
+      await audit(c, {
+        actorId: mod.id,
+        action: `moderation.${input.decision}`,
+        entityType: mc.target_type,
+        entityId: mc.target_id,
+        metadata: { caseId: id, note: input.note },
+      });
     });
     return { ok: true };
   });
 
-  async function applyDecision(c: { query: typeof db.query }, mc: { target_type: string; target_id: string; subject_user_id: string | null }, decision: string) {
+  async function applyDecision(
+    c: { query: typeof db.query },
+    mc: { target_type: string; target_id: string; subject_user_id: string | null },
+    decision: string,
+  ) {
     const table: Record<string, string> = { post: 'posts', comment: 'comments' };
     const t = table[mc.target_type];
     if (decision === 'no_action' && t) await c.query(`UPDATE ${t} SET moderation_status = 'normal' WHERE id = $1`, [mc.target_id]);
@@ -180,7 +205,9 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
   });
 
   app.get('/v1/admin/audit-logs', { preHandler: requireRole('admin') }, async () => {
-    const { rows } = await db.query(`SELECT id, actor_id, action, entity_type, entity_id, host(ip) AS ip, request_id, metadata, created_at FROM audit_logs ORDER BY id DESC LIMIT 200`);
+    const { rows } = await db.query(
+      `SELECT id, actor_id, action, entity_type, entity_id, host(ip) AS ip, request_id, metadata, created_at FROM audit_logs ORDER BY id DESC LIMIT 200`,
+    );
     return { items: rows };
   });
 
@@ -194,12 +221,16 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
          (SELECT count(*) FROM moderation_cases WHERE status = 'open') AS open_cases,
          (SELECT count(*) FROM orders WHERE status = 'paid' AND created_at > now() - interval '7 days') AS paid_orders_7d`,
     );
-    const byAction = await db.query(`SELECT name, count(*) AS n FROM analytics_events WHERE meaningful AND created_at > now() - interval '7 days' GROUP BY name ORDER BY n DESC`);
+    const byAction = await db.query(
+      `SELECT name, count(*) AS n FROM analytics_events WHERE meaningful AND created_at > now() - interval '7 days' GROUP BY name ORDER BY n DESC`,
+    );
     return { northStar: 'meaningful social actions', summary: rows[0], meaningfulByAction: byAction.rows };
   });
 
   app.get('/v1/admin/ai/calls', { preHandler: requireRole('admin') }, async () => {
-    const { rows } = await db.query(`SELECT task, provider, model, status, count(*) AS n, avg(latency_ms)::int AS avg_ms FROM ai_tool_calls WHERE created_at > now() - interval '7 days' GROUP BY 1,2,3,4 ORDER BY n DESC`);
+    const { rows } = await db.query(
+      `SELECT task, provider, model, status, count(*) AS n, avg(latency_ms)::int AS avg_ms FROM ai_tool_calls WHERE created_at > now() - interval '7 days' GROUP BY 1,2,3,4 ORDER BY n DESC`,
+    );
     return { items: rows };
   });
 
@@ -209,7 +240,10 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
   app.put('/v1/admin/flags/:key', { preHandler: requireRole('admin') }, async (req) => {
     const { key } = parse(z.object({ key: z.enum(FEATURE_FLAG_KEYS as [string, ...string[]]) }), req.params);
     const { enabled } = parse(z.object({ enabled: z.boolean() }), req.body);
-    await db.query(`INSERT INTO feature_flags (key, enabled) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = now()`, [key, enabled]);
+    await db.query(`INSERT INTO feature_flags (key, enabled) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = now()`, [
+      key,
+      enabled,
+    ]);
     await audit(db, { actorId: me(req).id, action: 'flag.set', entityType: 'feature_flag', entityId: key, metadata: { enabled } });
     return { flags: await getFlags(db) };
   });

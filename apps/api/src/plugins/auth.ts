@@ -73,10 +73,12 @@ export async function requireAuth(req: FastifyRequest, _reply: FastifyReply) {
 
 /** preHandler factory: the user must hold one of the given platform roles (RBAC). */
 export function requireRole(...roles: UserRole[]) {
-  return async (req: FastifyRequest, _reply: FastifyReply) => {
+  const handler = async (req: FastifyRequest, _reply: FastifyReply) => {
     if (!req.user) throw unauthorized();
     if (!roles.includes(req.user.role)) throw forbidden();
   };
+  // Lets tooling (docs generator) see which roles a route requires.
+  return Object.assign(handler, { roles });
 }
 
 /** Narrow req.user after requireAuth. */

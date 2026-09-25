@@ -17,7 +17,10 @@ export default function Home() {
   const [viewing, setViewing] = useState<number | null>(null);
 
   useEffect(() => {
-    api.moments.list().then((r) => setMoments(r.items as MomentGroup[])).catch(() => {});
+    api.moments
+      .list()
+      .then((r) => setMoments(r.items as MomentGroup[]))
+      .catch(() => {});
   }, []);
 
   const load = useCallback((cursor?: string) => api.feed(mode, cursor), [mode]);

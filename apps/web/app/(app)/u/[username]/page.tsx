@@ -17,7 +17,14 @@ export default function ProfilePage() {
   const [missing, setMissing] = useState(false);
   const [reporting, setReporting] = useState(false);
 
-  const reload = useCallback(() => api.users.get(username).then((r) => setProfile(r.profile), () => setMissing(true)), [username]);
+  const reload = useCallback(
+    () =>
+      api.users.get(username).then(
+        (r) => setProfile(r.profile),
+        () => setMissing(true),
+      ),
+    [username],
+  );
   useEffect(() => {
     void reload();
   }, [reload]);
@@ -52,7 +59,8 @@ export default function ProfilePage() {
           <div className="stack-sm" style={{ gap: 2 }}>
             <h1 className="profile__name">{profile.displayName}</h1>
             <span className="muted">
-              @{profile.username} {profile.mode !== 'personal' ? <Badge tone="neutral">{profile.mode}</Badge> : null} {profile.isPrivate ? <Badge tone="neutral">Private</Badge> : null}
+              @{profile.username} {profile.mode !== 'personal' ? <Badge tone="neutral">{profile.mode}</Badge> : null}{' '}
+              {profile.isPrivate ? <Badge tone="neutral">Private</Badge> : null}
             </span>
           </div>
           {rel.isSelf ? (
@@ -98,9 +106,25 @@ export default function ProfilePage() {
                     ? { label: 'Remove friend', icon: 'users', onSelect: act(() => api.users.unfriend(profile.id), 'Removed from friends') }
                     : rel.friendRequest === 'sent'
                       ? { label: t('profile.requestSent'), icon: 'check', onSelect: () => {} }
-                      : { label: rel.friendRequest === 'received' ? t('profile.acceptFriend') : t('profile.addFriend'), icon: 'users', onSelect: act(() => api.users.friendRequest(profile.id)) },
-                  { label: rel.muted ? 'Unmute' : 'Mute', icon: 'bell', onSelect: act(() => (rel.muted ? api.raw.del(`/v1/users/${profile.id}/mute`) : api.users.mute(profile.id)), rel.muted ? 'Unmuted' : 'Muted') },
-                  { label: rel.blocked ? t('profile.unblock') : t('profile.block'), icon: 'shield', danger: !rel.blocked, onSelect: act(() => (rel.blocked ? api.users.unblock(profile.id) : api.users.block(profile.id)), rel.blocked ? 'Unblocked' : 'Blocked') },
+                      : {
+                          label: rel.friendRequest === 'received' ? t('profile.acceptFriend') : t('profile.addFriend'),
+                          icon: 'users',
+                          onSelect: act(() => api.users.friendRequest(profile.id)),
+                        },
+                  {
+                    label: rel.muted ? 'Unmute' : 'Mute',
+                    icon: 'bell',
+                    onSelect: act(
+                      () => (rel.muted ? api.raw.del(`/v1/users/${profile.id}/mute`) : api.users.mute(profile.id)),
+                      rel.muted ? 'Unmuted' : 'Muted',
+                    ),
+                  },
+                  {
+                    label: rel.blocked ? t('profile.unblock') : t('profile.block'),
+                    icon: 'shield',
+                    danger: !rel.blocked,
+                    onSelect: act(() => (rel.blocked ? api.users.unblock(profile.id) : api.users.block(profile.id)), rel.blocked ? 'Unblocked' : 'Blocked'),
+                  },
                   { label: 'Report', icon: 'flag', danger: true, onSelect: () => setReporting(true) },
                 ]}
               />

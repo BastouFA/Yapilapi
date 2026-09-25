@@ -38,8 +38,16 @@ export default function CommunityPage() {
   }, [reload]);
   useEffect(() => {
     if (!c) return;
-    if (tab === 'members' && !members) api.communities.members(slug).then((r) => setMembers(r.items), (e) => (setMembers([]), toast(errorMessage(e))));
-    if (tab === 'events' && !events) api.raw.get<{ items: EventItem[] }>(`/v1/events?communityId=${c.id}`).then((r) => setEvents(r.items), () => setEvents([]));
+    if (tab === 'members' && !members)
+      api.communities.members(slug).then(
+        (r) => setMembers(r.items),
+        (e) => (setMembers([]), toast(errorMessage(e))),
+      );
+    if (tab === 'events' && !events)
+      api.raw.get<{ items: EventItem[] }>(`/v1/events?communityId=${c.id}`).then(
+        (r) => setEvents(r.items),
+        () => setEvents([]),
+      );
   }, [tab, c, slug, members, events, toast]);
   const load = useCallback((cursor?: string) => api.communities.posts(slug, cursor), [slug]);
 
@@ -142,7 +150,15 @@ export default function CommunityPage() {
       </div>
 
       {summary ? (
-        <AIPanel title="What's been happening" notice={`${summary.notice ?? ''} Summaries report what members said; they never make decisions for the community.`.trim()} actions={<Button size="sm" variant="ghost" onClick={() => setSummary(null)}>Close</Button>}>
+        <AIPanel
+          title="What's been happening"
+          notice={`${summary.notice ?? ''} Summaries report what members said; they never make decisions for the community.`.trim()}
+          actions={
+            <Button size="sm" variant="ghost" onClick={() => setSummary(null)}>
+              Close
+            </Button>
+          }
+        >
           {summary.text}
         </AIPanel>
       ) : null}
@@ -157,15 +173,36 @@ export default function CommunityPage() {
         ]}
       />
       {tab === 'posts' ? (
-        c.visibility === 'private' && !isMember ? <Alert tone="info">Join this private community to see its posts.</Alert> : <PostList load={load} reloadKey={slug} empty="No posts yet. Start the first discussion." />
+        c.visibility === 'private' && !isMember ? (
+          <Alert tone="info">Join this private community to see its posts.</Alert>
+        ) : (
+          <PostList load={load} reloadKey={slug} empty="No posts yet. Start the first discussion." />
+        )
       ) : tab === 'events' ? (
-        events === null ? <Skeleton height={80} /> : events.length ? <div className="yp-grid">{events.map((e) => <EventCard key={e.id} event={e} linkAs={NextLink} locale={locale} />)}</div> : <p className="muted">No upcoming events.</p>
+        events === null ? (
+          <Skeleton height={80} />
+        ) : events.length ? (
+          <div className="yp-grid">
+            {events.map((e) => (
+              <EventCard key={e.id} event={e} linkAs={NextLink} locale={locale} />
+            ))}
+          </div>
+        ) : (
+          <p className="muted">No upcoming events.</p>
+        )
       ) : members === null ? (
         <Skeleton height={120} />
       ) : (
         <List>
           {members.map((m) => (
-            <ListItem key={m.user.id} href={`/u/${m.user.username}`} linkAs={NextLink} start={<Avatar name={m.user.displayName} src={m.user.avatarUrl} size="sm" />} primary={m.user.displayName} end={m.role !== 'member' ? <Badge tone="neutral">{m.role}</Badge> : null} />
+            <ListItem
+              key={m.user.id}
+              href={`/u/${m.user.username}`}
+              linkAs={NextLink}
+              start={<Avatar name={m.user.displayName} src={m.user.avatarUrl} size="sm" />}
+              primary={m.user.displayName}
+              end={m.role !== 'member' ? <Badge tone="neutral">{m.role}</Badge> : null}
+            />
           ))}
         </List>
       )}

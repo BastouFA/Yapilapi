@@ -20,7 +20,21 @@ export interface NavEntry {
 const NAV_ICON: Record<NavEntry['id'], IconName> = { home: 'home', discover: 'compass', create: 'create', inbox: 'inbox', profile: 'user' };
 
 /** Primary navigation: Home | Discover | Create | Inbox | Profile. Bottom bar on phones, side rail on desktop. */
-export function NavBar({ items, current, linkAs: L = A, locale = 'en', brandHref = '/home', logoSrc }: { items: NavEntry[]; current?: NavEntry['id']; linkAs?: LinkLike; locale?: string; brandHref?: string; logoSrc?: string }) {
+export function NavBar({
+  items,
+  current,
+  linkAs: L = A,
+  locale = 'en',
+  brandHref = '/home',
+  logoSrc,
+}: {
+  items: NavEntry[];
+  current?: NavEntry['id'];
+  linkAs?: LinkLike;
+  locale?: string;
+  brandHref?: string;
+  logoSrc?: string;
+}) {
   return (
     <nav className="yp-nav" aria-label="Primary">
       <L href={brandHref} className="yp-nav__brand" aria-label="YAPILAPI home">
@@ -28,7 +42,12 @@ export function NavBar({ items, current, linkAs: L = A, locale = 'en', brandHref
         YAPILAPI
       </L>
       {items.map((it) => (
-        <L key={it.id} href={it.href} className={cx('yp-nav__item', it.id === 'create' && 'yp-nav__item--create')} aria-current={it.id === current ? 'page' : undefined}>
+        <L
+          key={it.id}
+          href={it.href}
+          className={cx('yp-nav__item', it.id === 'create' && 'yp-nav__item--create')}
+          aria-current={it.id === current ? 'page' : undefined}
+        >
           <span className="yp-nav__icon">
             <Icon name={NAV_ICON[it.id]} size={24} />
           </span>
@@ -40,7 +59,17 @@ export function NavBar({ items, current, linkAs: L = A, locale = 'en', brandHref
   );
 }
 
-export function Segments<T extends string>({ options, value, onChange, label }: { options: { id: T; label: string }[]; value: T; onChange: (v: T) => void; label: string }) {
+export function Segments<T extends string>({
+  options,
+  value,
+  onChange,
+  label,
+}: {
+  options: { id: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+  label: string;
+}) {
   return (
     <div className="yp-segments" role="group" aria-label={label}>
       {options.map((o) => (
@@ -61,8 +90,20 @@ export function MediaGrid({ media }: { media: MediaItem[] }) {
     <>
       <div className={cx('yp-media', `yp-media--${Math.min(shown.length, 4)}`)}>
         {shown.map((m, i) => (
-          <button key={m.id} type="button" className="yp-media__item" onClick={() => setOpen(i)} aria-label={m.altText ? `Open: ${m.altText}` : `Open media ${i + 1} of ${media.length}`}>
-            {m.kind === 'video' ? <video src={m.url} muted playsInline preload="metadata" /> : m.kind === 'audio' ? <span className="yp-media__more">♪</span> : <img src={m.url} alt={m.altText ?? ''} loading="lazy" decoding="async" />}
+          <button
+            key={m.id}
+            type="button"
+            className="yp-media__item"
+            onClick={() => setOpen(i)}
+            aria-label={m.altText ? `Open: ${m.altText}` : `Open media ${i + 1} of ${media.length}`}
+          >
+            {m.kind === 'video' ? (
+              <video src={m.url} muted playsInline preload="metadata" />
+            ) : m.kind === 'audio' ? (
+              <span className="yp-media__more">♪</span>
+            ) : (
+              <img src={m.url} alt={m.altText ?? ''} loading="lazy" decoding="async" />
+            )}
             {i === 3 && media.length > 4 ? <span className="yp-media__more">+{media.length - 4}</span> : null}
           </button>
         ))}
@@ -104,7 +145,13 @@ export function MediaViewer({ media, index, onClose }: { media: MediaItem[]; ind
         </button>
       </div>
       <div className="yp-viewer__stage">
-        {m.kind === 'video' ? <video src={m.url} controls autoPlay playsInline /> : m.kind === 'audio' ? <audio src={m.url} controls /> : <img src={m.url} alt={m.altText ?? ''} />}
+        {m.kind === 'video' ? (
+          <video src={m.url} controls autoPlay playsInline />
+        ) : m.kind === 'audio' ? (
+          <audio src={m.url} controls />
+        ) : (
+          <img src={m.url} alt={m.altText ?? ''} />
+        )}
       </div>
       {media.length > 1 ? (
         <>
@@ -148,7 +195,15 @@ export function Menu({ label, actions, icon = 'more' }: { label: string; actions
   }, [open]);
   return (
     <div className="yp-menu" ref={wrap}>
-      <button type="button" className="yp-action" aria-label={label} aria-haspopup="menu" aria-expanded={open} aria-controls={listId} onClick={() => setOpen((o) => !o)}>
+      <button
+        type="button"
+        className="yp-action"
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={listId}
+        onClick={() => setOpen((o) => !o)}
+      >
         <Icon name={icon} />
       </button>
       {open ? (
@@ -218,7 +273,20 @@ export interface PostCardProps {
 
 const VIS_ICON: Record<string, IconName> = { public: 'globe', followers: 'users', friends: 'users', circle: 'users', selected: 'user', private: 'lock' };
 
-export function PostCard({ post, locale = 'en', linkAs: L = A, isOwn, onLike, onComment, onSave, onVote, onFeedback, onWhy, onReport, onDelete }: PostCardProps) {
+export function PostCard({
+  post,
+  locale = 'en',
+  linkAs: L = A,
+  isOwn,
+  onLike,
+  onComment,
+  onSave,
+  onVote,
+  onFeedback,
+  onWhy,
+  onReport,
+  onDelete,
+}: PostCardProps) {
   const tt = (k: MessageKey) => t(k, locale);
   const menu: MenuAction[] = [];
   if (onWhy) menu.push({ label: tt('post.why'), icon: 'info', onSelect: () => onWhy(post) });
@@ -321,7 +389,13 @@ export function PostCard({ post, locale = 'en', linkAs: L = A, isOwn, onLike, on
       ) : null}
 
       <div className="yp-post__actions">
-        <button type="button" className="yp-action" aria-pressed={post.viewer.liked} onClick={() => onLike?.(post)} aria-label={`${post.viewer.liked ? tt('post.unlike') : tt('post.like')}, ${post.counts.likes}`}>
+        <button
+          type="button"
+          className="yp-action"
+          aria-pressed={post.viewer.liked}
+          onClick={() => onLike?.(post)}
+          aria-label={`${post.viewer.liked ? tt('post.unlike') : tt('post.like')}, ${post.counts.likes}`}
+        >
           <Icon name="heart" filled={post.viewer.liked} />
           {post.counts.likes || ''}
         </button>
@@ -355,7 +429,23 @@ export function List({ children, label }: { children: ReactNode; label?: string 
   );
 }
 
-export function ListItem({ href, onClick, start, primary, secondary, end, linkAs: L = A }: { href?: string; onClick?: () => void; start?: ReactNode; primary: ReactNode; secondary?: ReactNode; end?: ReactNode; linkAs?: LinkLike }) {
+export function ListItem({
+  href,
+  onClick,
+  start,
+  primary,
+  secondary,
+  end,
+  linkAs: L = A,
+}: {
+  href?: string;
+  onClick?: () => void;
+  start?: ReactNode;
+  primary: ReactNode;
+  secondary?: ReactNode;
+  end?: ReactNode;
+  linkAs?: LinkLike;
+}) {
   const inner = (
     <>
       {start}
@@ -393,7 +483,17 @@ export function ChatBubble({ mine, sender, body, time, pending }: { mine: boolea
   );
 }
 
-export function CommunityCard({ community, href, linkAs: L = A, action }: { community: { name: string; description: string; memberCount: number; visibility?: string; topics?: string[] }; href: string; linkAs?: LinkLike; action?: ReactNode }) {
+export function CommunityCard({
+  community,
+  href,
+  linkAs: L = A,
+  action,
+}: {
+  community: { name: string; description: string; memberCount: number; visibility?: string; topics?: string[] };
+  href: string;
+  linkAs?: LinkLike;
+  action?: ReactNode;
+}) {
   return (
     <div className="yp-ccard">
       <L href={href} className="yp-ccard__mark" aria-label={community.name}>
@@ -411,7 +511,15 @@ export function CommunityCard({ community, href, linkAs: L = A, action }: { comm
   );
 }
 
-export function EventCard({ event, linkAs: L = A, locale = 'en' }: { event: Pick<EventItem, 'id' | 'title' | 'startsAt' | 'timezone' | 'locationText' | 'place' | 'online' | 'counts'>; linkAs?: LinkLike; locale?: string }) {
+export function EventCard({
+  event,
+  linkAs: L = A,
+  locale = 'en',
+}: {
+  event: Pick<EventItem, 'id' | 'title' | 'startsAt' | 'timezone' | 'locationText' | 'place' | 'online' | 'counts'>;
+  linkAs?: LinkLike;
+  locale?: string;
+}) {
   const d = new Date(event.startsAt);
   const tz = event.timezone || 'UTC';
   const month = new Intl.DateTimeFormat(locale, { month: 'short', timeZone: tz }).format(d);
@@ -434,7 +542,15 @@ export function EventCard({ event, linkAs: L = A, locale = 'en' }: { event: Pick
   );
 }
 
-export function ProductCard({ product, locale = 'en', action }: { product: { kind: string; title: string; priceCents: number; currency: string; inventory: number | null; description?: string }; locale?: string; action?: ReactNode }) {
+export function ProductCard({
+  product,
+  locale = 'en',
+  action,
+}: {
+  product: { kind: string; title: string; priceCents: number; currency: string; inventory: number | null; description?: string };
+  locale?: string;
+  action?: ReactNode;
+}) {
   return (
     <div className="yp-pcard">
       <span className="yp-pcard__kind">{product.kind}</span>
@@ -457,7 +573,15 @@ export function Stat({ label, value, delta }: { label: string; value: ReactNode;
   );
 }
 
-export function MomentsStrip({ groups, onOpen, onCreate }: { groups: { author: { id: string; displayName: string; avatarUrl: string | null }; moments: unknown[] }[]; onOpen: (index: number) => void; onCreate?: () => void }) {
+export function MomentsStrip({
+  groups,
+  onOpen,
+  onCreate,
+}: {
+  groups: { author: { id: string; displayName: string; avatarUrl: string | null }; moments: unknown[] }[];
+  onOpen: (index: number) => void;
+  onCreate?: () => void;
+}) {
   return (
     <div className="yp-moments" role="list" aria-label="Moments">
       {onCreate ? (
@@ -469,7 +593,14 @@ export function MomentsStrip({ groups, onOpen, onCreate }: { groups: { author: {
         </button>
       ) : null}
       {groups.map((g, i) => (
-        <button key={g.author.id} type="button" className="yp-moment" onClick={() => onOpen(i)} role="listitem" aria-label={`${g.author.displayName}, ${g.moments.length} moments`}>
+        <button
+          key={g.author.id}
+          type="button"
+          className="yp-moment"
+          onClick={() => onOpen(i)}
+          role="listitem"
+          aria-label={`${g.author.displayName}, ${g.moments.length} moments`}
+        >
           <span className="yp-moment__ring">
             <Avatar name={g.author.displayName} src={g.author.avatarUrl} size="lg" />
           </span>
@@ -481,7 +612,19 @@ export function MomentsStrip({ groups, onOpen, onCreate }: { groups: { author: {
 }
 
 /** Shows AI output with its source, so people always know what the assistant produced. */
-export function AIPanel({ title, children, notice, actions, loading }: { title: string; children?: ReactNode; notice?: string; actions?: ReactNode; loading?: boolean }) {
+export function AIPanel({
+  title,
+  children,
+  notice,
+  actions,
+  loading,
+}: {
+  title: string;
+  children?: ReactNode;
+  notice?: string;
+  actions?: ReactNode;
+  loading?: boolean;
+}) {
   return (
     <section className="yp-ai" aria-live="polite" aria-busy={loading || undefined}>
       <div className="yp-ai__head">

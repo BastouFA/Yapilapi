@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type RouteOptions } from 'fastify';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
@@ -42,7 +42,7 @@ export interface BuiltApp {
   close: () => Promise<void>;
 }
 
-export async function buildApp(config: Config, opts: { logger?: boolean } = {}): Promise<BuiltApp> {
+export async function buildApp(config: Config, opts: { logger?: boolean; onRoute?: (route: RouteOptions) => void } = {}): Promise<BuiltApp> {
   const app = Fastify({
     logger:
       opts.logger === false
@@ -56,6 +56,7 @@ export async function buildApp(config: Config, opts: { logger?: boolean } = {}):
     trustProxy: true,
     bodyLimit: 1_000_000,
   });
+  if (opts.onRoute) app.addHook('onRoute', opts.onRoute);
 
   const db = createPool(config.DATABASE_URL);
   let redis: Redis | undefined;
@@ -68,8 +69,10 @@ export async function buildApp(config: Config, opts: { logger?: boolean } = {}):
     sub.on('error', (e) => app.log.warn({ err: e.message }, 'redis subscriber error'));
   }
 
-  const provider = config.AI_PROVIDER === 'anthropic' && config.ANTHROPIC_API_KEY ? anthropicProvider(config.ANTHROPIC_API_KEY, config.AI_MODEL) : devProvider();
-  if (config.AI_PROVIDER === 'anthropic' && !config.ANTHROPIC_API_KEY) app.log.warn('AI_PROVIDER=anthropic but ANTHROPIC_API_KEY is empty; using the dev provider.');
+  const provider =
+    config.AI_PROVIDER === 'anthropic' && config.ANTHROPIC_API_KEY ? anthropicProvider(config.ANTHROPIC_API_KEY, config.AI_MODEL) : devProvider();
+  if (config.AI_PROVIDER === 'anthropic' && !config.ANTHROPIC_API_KEY)
+    app.log.warn('AI_PROVIDER=anthropic but ANTHROPIC_API_KEY is empty; using the dev provider.');
 
   const ctx: AppContext = {
     config,
@@ -103,7 +106,10 @@ export async function buildApp(config: Config, opts: { logger?: boolean } = {}):
     redis: redis,
     skipOnError: true,
     keyGenerator: (req) => req.user?.id ?? req.ip,
-    errorResponseBuilder: (_req, c) => ({ statusCode: 429, error: { code: 'rate_limited', message: `Too many requests. Try again in ${Math.ceil(c.ttl / 1000)} seconds.` } }),
+    errorResponseBuilder: (_req, c) => ({
+      statusCode: 429,
+      error: { code: 'rate_limited', message: `Too many requests. Try again in ${Math.ceil(c.ttl / 1000)} seconds.` },
+    }),
   });
   await app.register(multipart, { limits: { fileSize: MAX_UPLOAD_BYTES } });
   await app.register(websocket);
@@ -132,16 +138,21 @@ export async function buildApp(config: Config, opts: { logger?: boolean } = {}):
   });
 
   app.setErrorHandler((err, req, reply) => {
-    if (err instanceof AppError) return reply.code(err.status).send({ error: { code: err.code, message: err.message, details: err.details, requestId: req.id } });
+    if (err instanceof AppError)
+      return reply.code(err.status).send({ error: { code: err.code, message: err.message, details: err.details, requestId: req.id } });
     const e = err as { statusCode?: number; code?: string; message: string };
     if (e.statusCode === 429) return reply.code(429).send(err);
-    if (e.code === 'FST_REQ_FILE_TOO_LARGE') return reply.code(413).send({ error: { code: 'too_large', message: 'Files can be up to 50 MB.', requestId: req.id } });
-    if (e.statusCode && e.statusCode < 500) return reply.code(e.statusCode).send({ error: { code: e.code ?? 'bad_request', message: e.message, requestId: req.id } });
+    if (e.code === 'FST_REQ_FILE_TOO_LARGE')
+      return reply.code(413).send({ error: { code: 'too_large', message: 'Files can be up to 50 MB.', requestId: req.id } });
+    if (e.statusCode && e.statusCode < 500)
+      return reply.code(e.statusCode).send({ error: { code: e.code ?? 'bad_request', message: e.message, requestId: req.id } });
     req.log.error({ err }, 'unhandled error');
     return reply.code(500).send({ error: { code: 'internal', message: 'Something went wrong on our side. Try again.', requestId: req.id } });
   });
 
-  app.setNotFoundHandler((req, reply) => reply.code(404).send({ error: { code: 'not_found', message: `No route for ${req.method} ${req.url}.`, requestId: req.id } }));
+  app.setNotFoundHandler((req, reply) =>
+    reply.code(404).send({ error: { code: 'not_found', message: `No route for ${req.method} ${req.url}.`, requestId: req.id } }),
+  );
 
   // ── Health ────────────────────────────────────────────────────────────
   app.get('/health/live', { config: { rateLimit: false } }, async () => ({ status: 'ok' }));
@@ -153,7 +164,11 @@ export async function buildApp(config: Config, opts: { logger?: boolean } = {}):
     } catch {
       checks.database = 'down';
     }
-    if (redis) checks.redis = await redis.ping().then(() => 'ok').catch(() => 'degraded');
+    if (redis)
+      checks.redis = await redis
+        .ping()
+        .then(() => 'ok')
+        .catch(() => 'degraded');
     checks.ai = ctx.ai.providerName;
     const ready = checks.database === 'ok';
     reply.code(ready ? 200 : 503);
@@ -165,19 +180,35 @@ export async function buildApp(config: Config, opts: { logger?: boolean } = {}):
     for (const [k, m] of metrics) {
       const [method, route] = k.split(' ');
       const labels = `method="${method}",route="${route}"`;
-      lines.push(`ypl_http_requests_total{${labels}} ${m.count}`, `ypl_http_errors_total{${labels}} ${m.errors}`, `ypl_http_request_ms_sum{${labels}} ${m.totalMs.toFixed(1)}`);
+      lines.push(
+        `ypl_http_requests_total{${labels}} ${m.count}`,
+        `ypl_http_errors_total{${labels}} ${m.errors}`,
+        `ypl_http_request_ms_sum{${labels}} ${m.totalMs.toFixed(1)}`,
+      );
     }
     lines.push(`ypl_realtime_redis ${redis ? 1 : 0}`, `ypl_db_pool_total ${db.totalCount}`, `ypl_db_pool_idle ${db.idleCount}`);
     return lines.join('\n') + '\n';
   });
 
   // Dev-only outbox so the web app and tests can read verification/reset emails.
-  if (config.APP_ENV === 'development' || config.APP_ENV === 'test')
-    app.get('/dev/outbox', async () => ({ items: ctx.email.outbox ?? [] }));
+  if (config.APP_ENV === 'development' || config.APP_ENV === 'test') app.get('/dev/outbox', async () => ({ items: ctx.email.outbox ?? [] }));
 
   for (const mod of [
-    authModule, profilesModule, postsModule, messagingModule, communitiesModule, eventsModule, commerceModule, searchModule,
-    notificationsModule, safetyModule, privacyModule, aiModule, momentsModule, mediaModule, creatorModule,
+    authModule,
+    profilesModule,
+    postsModule,
+    messagingModule,
+    communitiesModule,
+    eventsModule,
+    commerceModule,
+    searchModule,
+    notificationsModule,
+    safetyModule,
+    privacyModule,
+    aiModule,
+    momentsModule,
+    mediaModule,
+    creatorModule,
   ])
     await mod(app, ctx);
 

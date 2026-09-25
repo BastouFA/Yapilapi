@@ -15,7 +15,14 @@ export default function NewCommunity() {
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  const autoSlug = (v: string) => v.toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/[\s_]+/g, '-').slice(0, 40);
+  const autoSlug = (v: string) =>
+    v
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[^\w\s-]/g, '')
+      .trim()
+      .replace(/[\s_]+/g, '-')
+      .slice(0, 40);
 
   return (
     <form
@@ -32,8 +39,15 @@ export default function NewCommunity() {
             slug,
             description: String(f.get('description') ?? ''),
             visibility: String(f.get('visibility')),
-            topics: String(f.get('topics') ?? '').split(/[,\s#]+/).filter(Boolean).slice(0, 5),
-            rules: String(f.get('rules') ?? '').split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 20),
+            topics: String(f.get('topics') ?? '')
+              .split(/[,\s#]+/)
+              .filter(Boolean)
+              .slice(0, 5),
+            rules: String(f.get('rules') ?? '')
+              .split('\n')
+              .map((s) => s.trim())
+              .filter(Boolean)
+              .slice(0, 20),
           });
           toast(`${community.name} is ready`);
           router.push(`/c/${community.slug}`);

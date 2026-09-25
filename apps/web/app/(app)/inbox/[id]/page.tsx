@@ -25,13 +25,19 @@ export default function ChatPage() {
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    api.conversations.get(id).then((r) => setConv(r.conversation), (e) => toast(errorMessage(e)));
-    api.conversations.messages(id).then((r) => {
-      setMessages(r.items);
-      setCursor(r.nextCursor);
-      void api.conversations.read(id);
-      setUnread({ messages: Math.max(0, unread.messages - (conv?.unreadCount ?? 0)) });
-    }, (e) => toast(errorMessage(e)));
+    api.conversations.get(id).then(
+      (r) => setConv(r.conversation),
+      (e) => toast(errorMessage(e)),
+    );
+    api.conversations.messages(id).then(
+      (r) => {
+        setMessages(r.items);
+        setCursor(r.nextCursor);
+        void api.conversations.read(id);
+        setUnread({ messages: Math.max(0, unread.messages - (conv?.unreadCount ?? 0)) });
+      },
+      (e) => toast(errorMessage(e)),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -61,7 +67,17 @@ export default function ChatPage() {
     const text = body.trim();
     if (!text || !me) return;
     const clientId = crypto.randomUUID();
-    const optimistic: Pending = { id: clientId, conversationId: id, sender: { id: me.id, username: me.username, displayName: me.displayName, avatarUrl: me.avatarUrl, mode: me.mode }, body: text, replyToId: null, attachments: [], createdAt: new Date().toISOString(), clientId, pending: true };
+    const optimistic: Pending = {
+      id: clientId,
+      conversationId: id,
+      sender: { id: me.id, username: me.username, displayName: me.displayName, avatarUrl: me.avatarUrl, mode: me.mode },
+      body: text,
+      replyToId: null,
+      attachments: [],
+      createdAt: new Date().toISOString(),
+      clientId,
+      pending: true,
+    };
     setMessages((cur) => [...(cur ?? []), optimistic]);
     setBody('');
     try {
@@ -84,7 +100,16 @@ export default function ChatPage() {
         const last = [...(messages ?? [])].reverse().find((m) => m.body)?.body ?? '';
         const r = await api.ai.assist({ task, input: last });
         const plan = r.output as Record<string, unknown>;
-        setAi({ title: 'Plan draft', text: Object.entries(plan).filter(([, v]) => v && (!Array.isArray(v) || v.length)).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('\n') || 'Not enough detail to draft a plan yet.', notice: r.notice, plan });
+        setAi({
+          title: 'Plan draft',
+          text:
+            Object.entries(plan)
+              .filter(([, v]) => v && (!Array.isArray(v) || v.length))
+              .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+              .join('\n') || 'Not enough detail to draft a plan yet.',
+          notice: r.notice,
+          plan,
+        });
       }
     } catch (e) {
       toast(errorMessage(e));
@@ -104,14 +129,18 @@ export default function ChatPage() {
           <Link href="/inbox" className="yp-action" aria-label="Back to inbox">
             <Icon name="arrow-left" />
           </Link>
-          <h1 style={{ fontSize: 20, lineHeight: '26px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title || <Skeleton width={160} />}</h1>
+          <h1 style={{ fontSize: 20, lineHeight: '26px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {title || <Skeleton width={160} />}
+          </h1>
         </div>
         <Menu
           label="Conversation options"
           actions={[
             { label: t('inbox.summarize'), icon: 'sparkle', onSelect: () => assist('summarize_conversation') },
             { label: 'Draft a plan from the last message', icon: 'calendar', onSelect: () => assist('plan_from_message') },
-            ...(others.length === 1 ? [{ label: `View ${others[0]!.displayName}'s profile`, icon: 'user' as const, onSelect: () => (location.href = `/u/${others[0]!.username}`) }] : []),
+            ...(others.length === 1
+              ? [{ label: `View ${others[0]!.displayName}'s profile`, icon: 'user' as const, onSelect: () => (location.href = `/u/${others[0]!.username}`) }]
+              : []),
           ]}
         />
       </div>
@@ -191,7 +220,11 @@ export default function ChatPage() {
               </div>
             );
           })}
-          {typing ? <span className="muted" style={{ fontSize: 12 }}>{typing} is typing…</span> : null}
+          {typing ? (
+            <span className="muted" style={{ fontSize: 12 }}>
+              {typing} is typing…
+            </span>
+          ) : null}
           <div ref={endRef} />
         </div>
       )}

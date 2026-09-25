@@ -34,7 +34,11 @@ function hrefFor(n: NotificationItem): string | undefined {
 export default function Notifications() {
   const { t, locale, toast, setUnread } = useSession();
   const [items, setItems] = useState<NotificationItem[] | null>(null);
-  const load = () => api.notifications.list().then((r) => setItems(r.items), (e) => toast(errorMessage(e)));
+  const load = () =>
+    api.notifications.list().then(
+      (r) => setItems(r.items),
+      (e) => toast(errorMessage(e)),
+    );
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps

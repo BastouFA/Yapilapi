@@ -99,8 +99,17 @@ export function PostList({ load, empty, reloadKey }: { load: (cursor?: string) =
   async function feedback(p: Post, signal: 'more_like_this' | 'less_like_this' | 'not_interested' | 'mute_creator') {
     try {
       await api.feedback({ signal, postId: p.id });
-      if (signal === 'not_interested' || signal === 'mute_creator') setPosts((cur) => cur?.filter((x) => (signal === 'mute_creator' ? x.author.id !== p.author.id : x.id !== p.id)) ?? cur);
-      toast(signal === 'more_like_this' ? "We'll show more like this." : signal === 'less_like_this' ? "We'll show less like this." : signal === 'mute_creator' ? `Muted ${p.author.displayName}.` : 'Hidden.');
+      if (signal === 'not_interested' || signal === 'mute_creator')
+        setPosts((cur) => cur?.filter((x) => (signal === 'mute_creator' ? x.author.id !== p.author.id : x.id !== p.id)) ?? cur);
+      toast(
+        signal === 'more_like_this'
+          ? "We'll show more like this."
+          : signal === 'less_like_this'
+            ? "We'll show less like this."
+            : signal === 'mute_creator'
+              ? `Muted ${p.author.displayName}.`
+              : 'Hidden.',
+      );
     } catch (e) {
       toast(errorMessage(e));
     }
@@ -191,7 +200,10 @@ function CommentsSheet({ post, onClose, onAdded }: { post: Post; onClose: () => 
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    api.posts.comments(post.id).then((r) => setItems(r.items), (e) => toast(errorMessage(e)));
+    api.posts.comments(post.id).then(
+      (r) => setItems(r.items),
+      (e) => toast(errorMessage(e)),
+    );
   }, [post.id, toast]);
   return (
     <BottomSheet open onClose={onClose} title={t('post.comments')}>
@@ -284,7 +296,13 @@ export function ReportSheet({ target, onClose }: { target: { type: string; id: s
             </option>
           ))}
         </Select>
-        <TextField label="Anything else we should know? (optional)" multiline value={details} onChange={(e) => setDetails(e.currentTarget.value)} maxLength={2000} />
+        <TextField
+          label="Anything else we should know? (optional)"
+          multiline
+          value={details}
+          onChange={(e) => setDetails(e.currentTarget.value)}
+          maxLength={2000}
+        />
         <Button type="submit" variant="danger" loading={busy}>
           Send report
         </Button>

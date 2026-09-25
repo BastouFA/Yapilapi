@@ -1,0 +1,29 @@
+# Single-host deployment for staging. Production runs the same images on a
+# container platform with managed Postgres/Redis (see docs/architecture/deployment.md).
+# Secrets come from the environment or a secrets manager, never from this file.
+services:
+  api:
+    build: { context: ../.., dockerfile: infrastructure/docker/api.Dockerfile }
+    environment:
+      APP_ENV: staging
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:?set REDIS_URL}
+      WEB_ORIGIN: ${WEB_ORIGIN:?set WEB_ORIGIN}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:?set PUBLIC_API_URL}
+      COOKIE_SECURE: 'true'
+      PAYMENTS_WEBHOOK_SECRET: ${PAYMENTS_WEBHOOK_SECRET:?set PAYMENTS_WEBHOOK_SECRET}
+      AI_PROVIDER: ${AI_PROVIDER:-dev}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      UPLOAD_DIR: /data/uploads
+    volumes: [uploads:/data/uploads]
+    restart: unless-stopped
+  web:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/web.Dockerfile
+      args: { API_INTERNAL_URL: 'http://api:4000' }
+    depends_on: [api]
+    ports: ['3000:3000']
+    restart: unless-stopped
+volumes:
+  uploads:

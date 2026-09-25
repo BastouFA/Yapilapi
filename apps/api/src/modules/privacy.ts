@@ -51,7 +51,9 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       interests: await q(`SELECT t.slug FROM user_interests ui JOIN topics t ON t.id = ui.topic_id WHERE ui.user_id = $1`),
       following: await q(`SELECT followee_id, created_at FROM follows WHERE follower_id = $1`),
       followers: await q(`SELECT follower_id, created_at FROM follows WHERE followee_id = $1`),
-      circles: await q(`SELECT c.name, c.kind, array_agg(cm.user_id) AS members FROM circles c LEFT JOIN circle_members cm ON cm.circle_id = c.id WHERE c.owner_id = $1 GROUP BY c.id`),
+      circles: await q(
+        `SELECT c.name, c.kind, array_agg(cm.user_id) AS members FROM circles c LEFT JOIN circle_members cm ON cm.circle_id = c.id WHERE c.owner_id = $1 GROUP BY c.id`,
+      ),
       posts: await q(`SELECT id, kind, body, visibility, topics, created_at, deleted_at FROM posts WHERE author_id = $1`),
       comments: await q(`SELECT id, post_id, body, created_at FROM comments WHERE author_id = $1`),
       reactions: await q(`SELECT post_id, kind, created_at FROM reactions WHERE user_id = $1`),
@@ -79,7 +81,10 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
     const { rows } = await db.query(`SELECT password_hash FROM users WHERE id = $1`, [u.id]);
     if (!(await verifyPassword(password, rows[0]?.password_hash))) throw badRequest('Your password is incorrect.', { fields: { password: 'Incorrect.' } });
     await tx(db, async (c) => {
-      await c.query(`UPDATE users SET status = 'deleted', deleted_at = now(), email = 'deleted+' || id || '@deleted.invalid', password_hash = NULL, birth_date = NULL WHERE id = $1`, [u.id]);
+      await c.query(
+        `UPDATE users SET status = 'deleted', deleted_at = now(), email = 'deleted+' || id || '@deleted.invalid', password_hash = NULL, birth_date = NULL WHERE id = $1`,
+        [u.id],
+      );
       await c.query(
         `UPDATE profiles SET username = 'deleted_' || substr(replace(user_id::text, '-', ''), 1, 12), display_name = 'Deleted account', bio = '', avatar_url = NULL, cover_url = NULL, links = '[]', is_private = true WHERE user_id = $1`,
         [u.id],

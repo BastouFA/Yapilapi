@@ -1,5 +1,7 @@
 packages:
-  - "apps/*"
-  - "packages/*"
+  - 'apps/*'
+  # The Expo app installs on its own (see apps/mobile/README.md) to keep web/API installs light.
+  - '!apps/mobile'
+  - 'packages/*'
 allowBuilds:
   esbuild: true

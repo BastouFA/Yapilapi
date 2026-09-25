@@ -43,10 +43,22 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     if (!b) throw notFound('Business');
     const [places, products] = await Promise.all([
       db.query(`SELECT id, name, category, address, city FROM places WHERE business_id = $1 AND deleted_at IS NULL`, [b.id]),
-      db.query(`SELECT id, kind, title, description, price_cents, currency, inventory FROM products WHERE business_id = $1 AND deleted_at IS NULL AND status = 'active' ORDER BY created_at DESC`, [b.id]),
+      db.query(
+        `SELECT id, kind, title, description, price_cents, currency, inventory FROM products WHERE business_id = $1 AND deleted_at IS NULL AND status = 'active' ORDER BY created_at DESC`,
+        [b.id],
+      ),
     ]);
     return {
-      business: { id: b.id, slug: b.slug, name: b.name, description: b.description, category: b.category, website: b.website, verified: !!b.verified_at, owner: publicUserFrom(b, 'o_') },
+      business: {
+        id: b.id,
+        slug: b.slug,
+        name: b.name,
+        description: b.description,
+        category: b.category,
+        website: b.website,
+        verified: !!b.verified_at,
+        owner: publicUserFrom(b, 'o_'),
+      },
       places: places.rows,
       products: products.rows.map(productDto),
     };
@@ -62,7 +74,18 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     }
     const { rows } = await db.query(
       `INSERT INTO places (name, category, description, address, city, country, lat, lng, business_id, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
-      [input.name, input.category, input.description, input.address ?? null, input.city ?? null, input.country?.toUpperCase() ?? null, input.lat ?? null, input.lng ?? null, input.businessId ?? null, u.id],
+      [
+        input.name,
+        input.category,
+        input.description,
+        input.address ?? null,
+        input.city ?? null,
+        input.country?.toUpperCase() ?? null,
+        input.lat ?? null,
+        input.lng ?? null,
+        input.businessId ?? null,
+        u.id,
+      ],
     );
     reply.code(201);
     return { place: await loadPlace(rows[0].id) };
@@ -117,7 +140,10 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     const viewer = req.user?.id ?? null;
     const { id } = parse(idParam, req.params);
     const place = await loadPlace(id);
-    const events = await db.query(`${EVENT_SELECT} WHERE e.place_id = $2 AND e.starts_at >= now() - interval '6 hours' AND ${eventVisibleSql('$1')} ORDER BY e.starts_at LIMIT 10`, [viewer, id]);
+    const events = await db.query(
+      `${EVENT_SELECT} WHERE e.place_id = $2 AND e.starts_at >= now() - interval '6 hours' AND ${eventVisibleSql('$1')} ORDER BY e.starts_at LIMIT 10`,
+      [viewer, id],
+    );
     const products = await db.query(
       `SELECT pd.id, pd.kind, pd.title, pd.description, pd.price_cents, pd.currency, pd.inventory FROM products pd JOIN places pl ON pl.business_id = pd.business_id
        WHERE pl.id = $1 AND pd.deleted_at IS NULL AND pd.status = 'active' LIMIT 20`,
@@ -142,7 +168,17 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     const { rows } = await db.query(
       `INSERT INTO products (seller_id, business_id, event_id, kind, title, description, price_cents, currency, inventory) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING id, kind, title, description, price_cents, currency, inventory`,
-      [u.id, input.businessId ?? null, input.eventId ?? null, input.kind, input.title, input.description, input.priceCents, input.currency, input.inventory ?? null],
+      [
+        u.id,
+        input.businessId ?? null,
+        input.eventId ?? null,
+        input.kind,
+        input.title,
+        input.description,
+        input.priceCents,
+        input.currency,
+        input.inventory ?? null,
+      ],
     );
     reply.code(201);
     return { product: productDto(rows[0]) };
@@ -170,7 +206,10 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
 
     const order = await tx(db, async (c) => {
       const ids = input.items.map((i) => i.productId);
-      const { rows: products } = await c.query(`SELECT id, seller_id, price_cents, currency, inventory FROM products WHERE id = ANY($1) AND deleted_at IS NULL AND status = 'active' FOR UPDATE`, [ids]);
+      const { rows: products } = await c.query(
+        `SELECT id, seller_id, price_cents, currency, inventory FROM products WHERE id = ANY($1) AND deleted_at IS NULL AND status = 'active' FOR UPDATE`,
+        [ids],
+      );
       if (products.length !== new Set(ids).size) throw notFound('One of those products');
       const currencies = new Set(products.map((p) => p.currency));
       if (currencies.size > 1) throw badRequest('All items in one order must use the same currency.');
@@ -189,10 +228,22 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       const orderId = rows[0]!.id;
       for (const item of input.items) {
         const p = products.find((x) => x.id === item.productId)!;
-        await c.query(`INSERT INTO order_items (order_id, product_id, quantity, unit_cents) VALUES ($1,$2,$3,$4)`, [orderId, p.id, item.quantity, p.price_cents]);
+        await c.query(`INSERT INTO order_items (order_id, product_id, quantity, unit_cents) VALUES ($1,$2,$3,$4)`, [
+          orderId,
+          p.id,
+          item.quantity,
+          p.price_cents,
+        ]);
       }
       const intent = await ctx.payments.createIntent({ amountCents: total, currency: [...currencies][0], orderId, idempotencyKey: input.idempotencyKey });
-      await c.query(`INSERT INTO payments (order_id, provider, provider_ref, status, amount_cents, currency) VALUES ($1,$2,$3,$4,$5,$6)`, [orderId, ctx.payments.name, intent.providerRef, intent.status, total, [...currencies][0]]);
+      await c.query(`INSERT INTO payments (order_id, provider, provider_ref, status, amount_cents, currency) VALUES ($1,$2,$3,$4,$5,$6)`, [
+        orderId,
+        ctx.payments.name,
+        intent.providerRef,
+        intent.status,
+        total,
+        [...currencies][0],
+      ]);
       await audit(c, { actorId: u.id, action: 'order.create', entityType: 'order', entityId: orderId, metadata: { total } });
       return { orderId, clientSecret: intent.clientSecret };
     });
@@ -210,7 +261,15 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     );
     if (!rows[0]) throw notFound('Order');
     const r = rows[0];
-    return { id: r.id, status: r.status, totalCents: r.total_cents, platformFeeCents: r.platform_fee_cents, currency: r.currency, items: r.items, createdAt: r.created_at };
+    return {
+      id: r.id,
+      status: r.status,
+      totalCents: r.total_cents,
+      platformFeeCents: r.platform_fee_cents,
+      currency: r.currency,
+      items: r.items,
+      createdAt: r.created_at,
+    };
   }
 
   app.get('/v1/orders', { preHandler: requireAuth }, async (req) => {
@@ -238,16 +297,29 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       reply.code(400);
       return { error: { code: 'bad_signature', message: 'Webhook signature is invalid.' } };
     }
-    const fresh = await db.query(`INSERT INTO payment_webhook_events (id, provider, type, payload) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`, [event.id, provider, event.type, event]);
+    const fresh = await db.query(`INSERT INTO payment_webhook_events (id, provider, type, payload) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`, [
+      event.id,
+      provider,
+      event.type,
+      event,
+    ]);
     if (!fresh.rowCount) return { ok: true, duplicate: true };
     await tx(db, async (c) => {
-      const pay = await c.query(`SELECT id, order_id, amount_cents, status FROM payments WHERE provider = $1 AND provider_ref = $2 FOR UPDATE`, [provider, event.providerRef]);
+      const pay = await c.query(`SELECT id, order_id, amount_cents, status FROM payments WHERE provider = $1 AND provider_ref = $2 FOR UPDATE`, [
+        provider,
+        event.providerRef,
+      ]);
       const p = pay.rows[0];
       if (!p) return;
       if (event.type === 'payment.succeeded' && p.status !== 'succeeded') {
         // Reconciliation: the amount the provider captured must match what we charged.
         if (event.amountCents !== undefined && event.amountCents !== p.amount_cents) {
-          await audit(c, { action: 'payment.amount_mismatch', entityType: 'payment', entityId: p.id, metadata: { expected: p.amount_cents, got: event.amountCents } });
+          await audit(c, {
+            action: 'payment.amount_mismatch',
+            entityType: 'payment',
+            entityId: p.id,
+            metadata: { expected: p.amount_cents, got: event.amountCents },
+          });
           return;
         }
         await c.query(`UPDATE payments SET status = 'succeeded', updated_at = now() WHERE id = $1`, [p.id]);
@@ -258,8 +330,19 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
         );
         const o = (await c.query(`SELECT buyer_id FROM orders WHERE id = $1`, [p.order_id])).rows[0];
         track(db, o.buyer_id, 'order_paid');
-        const sellers = await c.query<{ seller_id: string }>(`SELECT DISTINCT p.seller_id FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = $1`, [p.order_id]);
-        for (const s of sellers.rows) await notify(c, ctx.realtime, { userId: s.seller_id, category: 'commerce', type: 'order_paid', actorId: o.buyer_id, entityType: 'order', entityId: p.order_id });
+        const sellers = await c.query<{ seller_id: string }>(
+          `SELECT DISTINCT p.seller_id FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = $1`,
+          [p.order_id],
+        );
+        for (const s of sellers.rows)
+          await notify(c, ctx.realtime, {
+            userId: s.seller_id,
+            category: 'commerce',
+            type: 'order_paid',
+            actorId: o.buyer_id,
+            entityType: 'order',
+            entityId: p.order_id,
+          });
       } else if (event.type === 'payment.failed') {
         await c.query(`UPDATE payments SET status = 'failed', updated_at = now() WHERE id = $1`, [p.id]);
         await c.query(`UPDATE orders SET status = 'failed', updated_at = now() WHERE id = $1 AND status = 'pending'`, [p.order_id]);
@@ -285,7 +368,13 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       if (!r || (!r.is_seller && u.role !== 'admin')) throw notFound('Order');
       if (r.status !== 'paid') throw badRequest('Only paid orders can be refunded.');
       const result = await ctx.payments.refund({ providerRef: r.provider_ref, amountCents: r.amount_cents });
-      await c.query(`INSERT INTO refunds (payment_id, amount_cents, reason, status, requested_by) VALUES ($1,$2,$3,$4,$5)`, [r.payment_id, r.amount_cents, reason ?? null, result.status, u.id]);
+      await c.query(`INSERT INTO refunds (payment_id, amount_cents, reason, status, requested_by) VALUES ($1,$2,$3,$4,$5)`, [
+        r.payment_id,
+        r.amount_cents,
+        reason ?? null,
+        result.status,
+        u.id,
+      ]);
       if (result.status === 'succeeded') {
         await c.query(`UPDATE orders SET status = 'refunded', updated_at = now() WHERE id = $1`, [id]);
         await c.query(`UPDATE payments SET status = 'refunded', updated_at = now() WHERE id = $1`, [r.payment_id]);
@@ -305,7 +394,9 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
        WHERE p.seller_id = $1 AND o.status = 'paid' GROUP BY o.currency`,
       [u.id],
     );
-    const payouts = await db.query(`SELECT currency, sum(amount_cents) AS paid FROM payouts WHERE user_id = $1 AND status <> 'failed' GROUP BY currency`, [u.id]);
+    const payouts = await db.query(`SELECT currency, sum(amount_cents) AS paid FROM payouts WHERE user_id = $1 AND status <> 'failed' GROUP BY currency`, [
+      u.id,
+    ]);
     return {
       balances: rows.map((r) => {
         const net = Number(r.gross) - Number(r.fees);
@@ -319,7 +410,11 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     const u = me(req);
     const input = parse(z.object({ amountCents: z.number().int().positive(), currency: z.string().length(3).toUpperCase() }), req.body);
     if (!u.emailVerified) throw forbidden('Verify your email before requesting a payout.');
-    const { rows } = await db.query(`INSERT INTO payouts (user_id, amount_cents, currency) VALUES ($1,$2,$3) RETURNING id, status`, [u.id, input.amountCents, input.currency]);
+    const { rows } = await db.query(`INSERT INTO payouts (user_id, amount_cents, currency) VALUES ($1,$2,$3) RETURNING id, status`, [
+      u.id,
+      input.amountCents,
+      input.currency,
+    ]);
     await audit(db, { actorId: u.id, action: 'payout.request', entityType: 'payout', entityId: rows[0].id, metadata: input });
     reply.code(201);
     return { payout: rows[0], message: 'Payout requested. It will be paid after verification.' };

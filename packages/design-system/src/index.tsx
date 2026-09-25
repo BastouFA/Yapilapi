@@ -5,7 +5,23 @@
  *   import '@yapilapi/design-system/social.css';
  */
 export { Icon, ICON_NAMES, type IconName } from './icons.tsx';
-export { Alert, Avatar, AvatarGroup, Badge, Button, Card, Checkbox, cx, Dialog, Select, Switch, Tabs, TextField, type ButtonProps, type TabItem } from './primitives.tsx';
+export {
+  Alert,
+  Avatar,
+  AvatarGroup,
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  cx,
+  Dialog,
+  Select,
+  Switch,
+  Tabs,
+  TextField,
+  type ButtonProps,
+  type TabItem,
+} from './primitives.tsx';
 export {
   AIPanel,
   BottomSheet,

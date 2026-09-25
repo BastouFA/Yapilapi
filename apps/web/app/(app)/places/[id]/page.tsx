@@ -34,7 +34,12 @@ export default function PlacePage() {
         {place.business ? <Link href={`/b/${place.business.slug}`}>{place.business.name}</Link> : null}
         {place.description ? <p style={{ margin: 0 }}>{place.description}</p> : null}
         {place.lat && place.lng ? (
-          <a href={`https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lng}#map=17/${place.lat}/${place.lng}`} target="_blank" rel="noopener noreferrer" className="yp-chip">
+          <a
+            href={`https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lng}#map=17/${place.lat}/${place.lng}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="yp-chip"
+          >
             Open in map
           </a>
         ) : null}

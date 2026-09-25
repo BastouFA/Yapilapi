@@ -34,8 +34,14 @@ function Create() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    api.communities.list('mine').then((r) => setCommunities(r.items)).catch(() => {});
-    api.me.circles().then((r) => setCircles(r.items)).catch(() => {});
+    api.communities
+      .list('mine')
+      .then((r) => setCommunities(r.items))
+      .catch(() => {});
+    api.me
+      .circles()
+      .then((r) => setCircles(r.items))
+      .catch(() => {});
   }, []);
 
   async function upload(files: FileList | null) {
@@ -85,7 +91,10 @@ function Create() {
         circleId: visibility === 'circle' ? circleId || undefined : undefined,
         media: media.map((m) => ({ url: new URL(m.url, location.origin).toString(), kind: m.kind, altText: m.altText || undefined })),
         poll: poll ? { options: poll.filter((o) => o.trim()) } : undefined,
-        topics: topics.split(/[,\s#]+/).filter(Boolean).slice(0, 5),
+        topics: topics
+          .split(/[,\s#]+/)
+          .filter(Boolean)
+          .slice(0, 5),
         aiAssisted: aiUsed,
       });
       toast(r.moderation ? r.moderation.message : t('create.published'));
@@ -103,14 +112,29 @@ function Create() {
       <div className="yp-topbar">
         <h1>{t('create.title')}</h1>
       </div>
-      <Segments label="What to create" value={kind} onChange={setKind} options={[{ id: 'post', label: 'Post' }, { id: 'moment', label: 'Moment' }]} />
+      <Segments
+        label="What to create"
+        value={kind}
+        onChange={setKind}
+        options={[
+          { id: 'post', label: 'Post' },
+          { id: 'moment', label: 'Moment' },
+        ]}
+      />
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
       <div className="composer-box">
         <label htmlFor="body" className="yp-visually-hidden">
           {t('create.placeholder')}
         </label>
-        <textarea id="body" placeholder={t('create.placeholder')} value={body} onChange={(e) => setBody(e.currentTarget.value)} maxLength={kind === 'moment' ? 500 : 5000} aria-invalid={!!fields.body} />
+        <textarea
+          id="body"
+          placeholder={t('create.placeholder')}
+          value={body}
+          onChange={(e) => setBody(e.currentTarget.value)}
+          maxLength={kind === 'moment' ? 500 : 5000}
+          aria-invalid={!!fields.body}
+        />
         {fields.body ? <span className="yp-field__error">{fields.body}</span> : null}
 
         {media.length ? (
@@ -169,7 +193,14 @@ function Create() {
         ) : null}
 
         <div className="row">
-          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm" multiple={kind === 'post'} hidden onChange={(e) => upload(e.currentTarget.files)} />
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
+            multiple={kind === 'post'}
+            hidden
+            onChange={(e) => upload(e.currentTarget.files)}
+          />
           <Button size="sm" variant="secondary" icon="image" loading={uploading} onClick={() => fileRef.current?.click()}>
             Photo or video
           </Button>
@@ -246,7 +277,9 @@ function Create() {
             ))}
           </Select>
         ) : null}
-        {kind === 'post' ? <TextField label="Topics (optional)" hint="Up to 5, separated by commas." value={topics} onChange={(e) => setTopics(e.currentTarget.value)} /> : null}
+        {kind === 'post' ? (
+          <TextField label="Topics (optional)" hint="Up to 5, separated by commas." value={topics} onChange={(e) => setTopics(e.currentTarget.value)} />
+        ) : null}
         {aiUsed ? <Checkbox label="Label this post as made with AI assistance" checked readOnly disabled /> : null}
       </div>
 

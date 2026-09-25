@@ -39,7 +39,12 @@ describe('core vertical slice', () => {
   });
 
   it('rejects duplicate emails and weak passwords', async () => {
-    const dup = await as(t.app, null).post('/v1/auth/register', { email: ada.email, password: 'another-long-password', username: 'someone_new', displayName: 'X' });
+    const dup = await as(t.app, null).post('/v1/auth/register', {
+      email: ada.email,
+      password: 'another-long-password',
+      username: 'someone_new',
+      displayName: 'X',
+    });
     expect(dup.status).toBe(409);
     const weak = await as(t.app, null).post('/v1/auth/register', { email: 'weak@example.test', password: 'short', username: 'weakling', displayName: 'W' });
     expect(weak.status).toBe(400);

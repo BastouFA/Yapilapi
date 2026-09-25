@@ -1,17 +1,4 @@
-import type {
-  Comment,
-  Community,
-  Conversation,
-  EventItem,
-  FeedMode,
-  Me,
-  Message,
-  NotificationItem,
-  Page,
-  Post,
-  Profile,
-  PublicUser,
-} from '@yapilapi/shared';
+import type { Comment, Community, Conversation, EventItem, FeedMode, Me, Message, NotificationItem, Page, Post, Profile, PublicUser } from '@yapilapi/shared';
 
 export class ApiError extends Error {
   constructor(
@@ -66,7 +53,11 @@ export function createClient(opts: ClientOptions) {
   const patch = <T>(p: string, b: unknown = {}) => req<T>('PATCH', p, b);
   const del = <T>(p: string, b?: unknown) => req<T>('DELETE', p, b);
   const qs = (o: Record<string, unknown>) => {
-    const s = new URLSearchParams(Object.entries(o).filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => [k, String(v)])).toString();
+    const s = new URLSearchParams(
+      Object.entries(o)
+        .filter(([, v]) => v !== undefined && v !== null && v !== '')
+        .map(([k, v]) => [k, String(v)]),
+    ).toString();
     return s ? `?${s}` : '';
   };
 
@@ -74,7 +65,8 @@ export function createClient(opts: ClientOptions) {
     raw: { get, post, put, patch, del },
     auth: {
       me: () => get<{ user: Me }>('/v1/auth/me'),
-      register: (b: { email: string; password: string; username: string; displayName: string; birthDate?: string }) => post<{ user: Me; token: string }>('/v1/auth/register', b),
+      register: (b: { email: string; password: string; username: string; displayName: string; birthDate?: string }) =>
+        post<{ user: Me; token: string }>('/v1/auth/register', b),
       login: (b: { email: string; password: string }) => post<{ user: Me; token: string }>('/v1/auth/login', b),
       logout: () => post<{ ok: true }>('/v1/auth/logout'),
       verifyEmail: (token: string) => post('/v1/auth/verify-email', { token }),
@@ -115,7 +107,8 @@ export function createClient(opts: ClientOptions) {
       deleteAccount: (password: string) => del('/v1/me', { password }),
       saved: () => get<{ items: Post[] }>('/v1/me/saved'),
       circles: () => get<{ items: { id: string; name: string; kind: string; memberCount: number }[] }>('/v1/me/circles'),
-      moderation: () => get<{ items: { id: string; target_type: string; decision: string; status: string; appeal_status: string | null }[] }>('/v1/me/moderation'),
+      moderation: () =>
+        get<{ items: { id: string; target_type: string; decision: string; status: string; appeal_status: string | null }[] }>('/v1/me/moderation'),
     },
     topics: () => get<{ items: { slug: string; name: string }[] }>('/v1/topics'),
     feed: (mode: FeedMode, cursor?: string) => get<Page<Post> & { mode: FeedMode }>(`/v1/feed${qs({ mode, cursor })}`),
@@ -142,7 +135,13 @@ export function createClient(opts: ClientOptions) {
       },
     },
     moments: {
-      list: () => get<{ items: { author: PublicUser; moments: { id: string; body: string; mediaUrl: string | null; mediaKind: string | null; expiresAt: string | null; createdAt: string }[] }[] }>('/v1/moments'),
+      list: () =>
+        get<{
+          items: {
+            author: PublicUser;
+            moments: { id: string; body: string; mediaUrl: string | null; mediaKind: string | null; expiresAt: string | null; createdAt: string }[];
+          }[];
+        }>('/v1/moments'),
       create: (b: Record<string, unknown>) => post('/v1/moments', b),
     },
     conversations: {
@@ -175,13 +174,19 @@ export function createClient(opts: ClientOptions) {
       list: (params: Record<string, unknown> = {}) => get<{ items: Record<string, any>[] }>(`/v1/places${qs(params)}`),
       get: (id: string) => get<{ place: Record<string, any>; events: EventItem[]; products: Record<string, any>[] }>(`/v1/places/${id}`),
     },
-    businesses: { get: (slug: string) => get<{ business: Record<string, any>; places: Record<string, any>[]; products: Record<string, any>[] }>(`/v1/businesses/${slug}`) },
+    businesses: {
+      get: (slug: string) => get<{ business: Record<string, any>; places: Record<string, any>[]; products: Record<string, any>[] }>(`/v1/businesses/${slug}`),
+    },
     orders: {
-      create: (items: { productId: string; quantity: number }[], idempotencyKey: string) => post<{ order: Record<string, any>; payment?: { provider: string; clientSecret: string } }>('/v1/orders', { items, idempotencyKey }),
+      create: (items: { productId: string; quantity: number }[], idempotencyKey: string) =>
+        post<{ order: Record<string, any>; payment?: { provider: string; clientSecret: string } }>('/v1/orders', { items, idempotencyKey }),
       list: () => get<{ items: Record<string, any>[] }>('/v1/orders'),
     },
     search: (q: string, type = 'all') => get<{ query: string; intent: Record<string, any>; results: Record<string, any> }>(`/v1/search${qs({ q, type })}`),
-    now: () => get<{ events: EventItem[]; trendingTopics: { topic: string; posts: number }[]; activeCommunities: { slug: string; name: string; posts: number }[] }>('/v1/now'),
+    now: () =>
+      get<{ events: EventItem[]; trendingTopics: { topic: string; posts: number }[]; activeCommunities: { slug: string; name: string; posts: number }[] }>(
+        '/v1/now',
+      ),
     notifications: {
       list: (cursor?: string) => get<Page<NotificationItem> & { unread: number }>(`/v1/notifications${qs({ cursor })}`),
       markRead: (ids?: string[]) => post('/v1/notifications/read', ids ? { ids } : {}),
@@ -194,7 +199,12 @@ export function createClient(opts: ClientOptions) {
       addMemory: (content: string) => post('/v1/ai/memories', { content }),
       deleteMemory: (id: string) => del(`/v1/ai/memories/${id}`),
     },
-    creator: { analytics: () => get<{ totals: Record<string, number>; topPosts: Record<string, any>[]; followerGrowth: { day: string; new_followers: number }[] }>('/v1/creator/analytics') },
+    creator: {
+      analytics: () =>
+        get<{ totals: Record<string, number>; topPosts: Record<string, any>[]; followerGrowth: { day: string; new_followers: number }[] }>(
+          '/v1/creator/analytics',
+        ),
+    },
     flags: () => get<{ flags: Record<string, boolean> }>('/v1/flags'),
     admin: {
       cases: (status = 'open') => get<{ items: Record<string, any>[] }>(`/v1/admin/moderation/cases${qs({ status })}`),
