@@ -11,7 +11,7 @@ import { useSession } from '../../../providers';
 
 export default function ProfilePage() {
   const { username } = useParams<{ username: string }>();
-  const { me, t, toast, setMe } = useSession();
+  const { me, t, toast, setMe, flags } = useSession();
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [missing, setMissing] = useState(false);
@@ -71,6 +71,11 @@ export default function ProfilePage() {
               <Link href="/studio" className="yp-btn yp-btn--ghost yp-btn--sm">
                 Studio
               </Link>
+              {flags.MEMORY ? (
+                <Link href="/memories" className="yp-btn yp-btn--ghost yp-btn--sm">
+                  Memories
+                </Link>
+              ) : null}
             </div>
           ) : (
             <div className="row">

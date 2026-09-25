@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { Alert, Button, TextField } from '@yapilapi/design-system';
+import type { Me } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '../../providers';
 
@@ -13,6 +14,12 @@ function LoginForm() {
   const next = useSearchParams().get('next');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [challenge, setChallenge] = useState<string | null>(null);
+
+  function done(user: Me) {
+    setMe(user);
+    router.replace(!user.onboarded ? '/onboarding' : next?.startsWith('/') ? next : '/home');
+  }
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -20,15 +27,38 @@ function LoginForm() {
     setBusy(true);
     setError(null);
     try {
-      const { user } = await api.auth.login({ email: String(f.get('email')), password: String(f.get('password')) });
-      setMe(user);
-      router.replace(!user.onboarded ? '/onboarding' : next?.startsWith('/') ? next : '/home');
+      if (challenge) {
+        done((await api.mfa.verify(challenge, String(f.get('code')).trim())).user);
+        return;
+      }
+      const r = await api.auth.login({ email: String(f.get('email')), password: String(f.get('password')) });
+      if (r.mfaRequired && r.challengeToken) setChallenge(r.challengeToken);
+      else if (r.user) done(r.user);
     } catch (err) {
       setError(errorMessage(err));
+      if (challenge && /expired|Sign in again/.test(errorMessage(err))) setChallenge(null);
     } finally {
       setBusy(false);
     }
   }
+
+  if (challenge)
+    return (
+      <form className="stack" onSubmit={submit} noValidate>
+        <h1>Two-step verification</h1>
+        <p className="muted" style={{ margin: 0 }}>
+          Enter the 6-digit code from your authenticator app, or one of your recovery codes.
+        </p>
+        {error ? <Alert tone="danger">{error}</Alert> : null}
+        <TextField label="Code" name="code" autoComplete="one-time-code" inputMode="text" autoFocus required maxLength={12} />
+        <Button type="submit" block loading={busy}>
+          Verify
+        </Button>
+        <Button variant="ghost" onClick={() => (setChallenge(null), setError(null))}>
+          Use a different account
+        </Button>
+      </form>
+    );
 
   return (
     <form className="stack" onSubmit={submit} noValidate>

@@ -268,6 +268,7 @@ export interface PostCardProps {
   onFeedback?: (post: Post, signal: 'more_like_this' | 'less_like_this' | 'not_interested' | 'mute_creator') => void;
   onWhy?: (post: Post) => void;
   onReport?: (post: Post) => void;
+  onAddToMemory?: (post: Post) => void;
   onDelete?: (post: Post) => void;
 }
 
@@ -286,10 +287,12 @@ export function PostCard({
   onWhy,
   onReport,
   onDelete,
+  onAddToMemory,
 }: PostCardProps) {
   const tt = (k: MessageKey) => t(k, locale);
   const menu: MenuAction[] = [];
   if (onWhy) menu.push({ label: tt('post.why'), icon: 'info', onSelect: () => onWhy(post) });
+  if (onAddToMemory) menu.push({ label: 'Add to a memory', icon: 'bookmark', onSelect: () => onAddToMemory(post) });
   if (onFeedback && !isOwn) {
     menu.push({ label: tt('post.moreLikeThis'), icon: 'plus', onSelect: () => onFeedback(post, 'more_like_this') });
     menu.push({ label: tt('post.lessLikeThis'), icon: 'eye', onSelect: () => onFeedback(post, 'less_like_this') });

@@ -10,7 +10,7 @@ import { NextLink } from '@/lib/link';
 import { useSession } from '../../providers';
 
 function Discover() {
-  const { t, locale, toast } = useSession();
+  const { t, locale, toast, flags } = useSession();
   const router = useRouter();
   const q = useSearchParams().get('q') ?? '';
   const [input, setInput] = useState(q);
@@ -55,6 +55,11 @@ function Discover() {
       <div className="yp-topbar">
         <h1>{t('discover.title')}</h1>
         <div className="row">
+          {flags.LIVE ? (
+            <Link href="/live" className="yp-btn yp-btn--ghost yp-btn--sm">
+              Live
+            </Link>
+          ) : null}
           <Link href="/communities/new" className="yp-btn yp-btn--secondary yp-btn--sm">
             {t('communities.create')}
           </Link>

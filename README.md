@@ -71,5 +71,6 @@ These are wired behind adapters with working development implementations; produc
 | AI provider key (`ANTHROPIC_API_KEY`) | `apps/api/src/lib/ai/providers.ts` | Deterministic rule-based provider, clearly labelled in the UI |
 | Payment provider | `apps/api/src/lib/payments.ts` | Sandbox provider with signed webhooks |
 | Object storage + CDN + transcoding | `apps/api/src/lib/storage.ts` | Local disk under `./uploads` |
-| MFA encryption key, WebAuthn relying party | `apps/api/src/modules/auth.ts` | Enrolment is off; factors table exists |
+| MFA encryption key (`MFA_ENCRYPTION_KEY`) | `apps/api/src/modules/mfa.ts` | Fixed development key; production refuses to start without one |
+| Live video provider (ingest + playback) | `apps/api/src/modules/live.ts` | Placeholder local URLs; chat, roles and audience work |
 | Production domain, app-store accounts | infrastructure, `apps/mobile/app.json` | localhost |

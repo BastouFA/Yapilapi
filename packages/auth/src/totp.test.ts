@@ -38,7 +38,7 @@ describe('encryption and recovery codes', () => {
     const key = randomBytes(32);
     const blob = encrypt(key, Buffer.from('secret'));
     expect(decrypt(key, blob).toString()).toBe('secret');
-    blob[blob.length - 1] ^= 1;
+    blob[blob.length - 1]! ^= 1;
     expect(() => decrypt(key, blob)).toThrow();
   });
 

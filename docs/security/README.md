@@ -5,6 +5,9 @@
 | Area | Control | Where |
 | --- | --- | --- |
 | Passwords | scrypt (N=2^15, r=8, p=1), per-password salt, constant-time compare, equal timing for unknown accounts | `packages/auth` |
+| Two-step verification | TOTP (RFC 6238, ±30 s), secrets encrypted with AES-256-GCM, 10 hashed single-use recovery codes, 5-minute login challenges locked after 5 wrong codes, disabling requires password + code | `apps/api/src/modules/mfa.ts`, `packages/auth/src/totp.ts` |
+| API keys | Hashed, scoped read/write, revocable, never carry admin roles, blocked from auth, keys, exports, payouts, consents and AI memory | `apps/api/src/plugins/auth.ts` |
+| Webhooks | HMAC-SHA256 signed with timestamp, https only in production, private/loopback addresses rejected at creation and at delivery, no redirects followed | `apps/api/src/lib/webhooks.ts` |
 | Sessions | 256-bit random tokens, only SHA-256 hashes stored, httpOnly + SameSite=Lax cookies (Secure in production), expiry, per-device listing and revocation, revoke-all on password reset and suspension | `apps/api/src/modules/auth.ts` |
 | Authorization | Every protected route uses `requireAuth` / `requireRole`; visibility enforced in shared SQL predicates; hidden content returns 404, not 403 | `plugins/auth.ts`, `lib/visibility.ts` |
 | Input | zod validation on every body, query and path parameter; parameterized SQL only | `packages/shared/src/schemas.ts` |
@@ -21,7 +24,7 @@
 
 ## Not yet in place
 
-- MFA (TOTP) and passkeys: schema exists; enrolment needs `MFA_ENCRYPTION_KEY` and a WebAuthn relying-party id.
+- Passkeys (WebAuthn): not started; TOTP two-step verification is in place.
 - Encryption at rest is delegated to the managed database and object store (enable it there).
 - Malware scanning of uploads and image/video content classification.
 - Content Security Policy on the web app (needs the final CDN and font origins).

@@ -12,7 +12,8 @@ import { useSession } from '@/app/providers';
  * like, comment, save, poll vote, feed controls, "why am I seeing this", report, delete.
  */
 export function PostList({ load, empty, reloadKey }: { load: (cursor?: string) => Promise<Page<Post>>; empty?: string; reloadKey?: string }) {
-  const { me, toast, t, locale } = useSession();
+  const { me, toast, t, locale, flags } = useSession();
+  const [memoryFor, setMemoryFor] = useState<Post | null>(null);
   const [posts, setPosts] = useState<Post[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -152,6 +153,7 @@ export function PostList({ load, empty, reloadKey }: { load: (cursor?: string) =
           onWhy={async (post) => setWhy({ post, reasons: (await api.posts.why(post.id)).reasons })}
           onReport={setReporting}
           onDelete={remove}
+          onAddToMemory={flags.MEMORY ? setMemoryFor : undefined}
         />
       ))}
       <div ref={sentinel} />
@@ -190,6 +192,7 @@ export function PostList({ load, empty, reloadKey }: { load: (cursor?: string) =
       </BottomSheet>
 
       <ReportSheet target={reporting ? { type: 'post', id: reporting.id } : null} onClose={() => setReporting(null)} />
+      {memoryFor ? <AddToMemorySheet post={memoryFor} onClose={() => setMemoryFor(null)} /> : null}
     </div>
   );
 }
@@ -307,6 +310,55 @@ export function ReportSheet({ target, onClose }: { target: { type: string; id: s
           Send report
         </Button>
       </form>
+    </BottomSheet>
+  );
+}
+
+function AddToMemorySheet({ post, onClose }: { post: Post; onClose: () => void }) {
+  const { toast } = useSession();
+  const [memories, setMemories] = useState<{ id: string; title: string; mine: boolean }[] | null>(null);
+  const [title, setTitle] = useState('');
+  useEffect(() => {
+    api.memories.list().then(
+      (r) => setMemories(r.items.filter((m) => m.mine)),
+      (e) => toast(errorMessage(e)),
+    );
+  }, [toast]);
+  const add = async (memoryId: string, name: string) => {
+    try {
+      await api.memories.addItem(memoryId, 'post', post.id);
+      toast(`Added to ${name}`);
+      onClose();
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  };
+  return (
+    <BottomSheet open onClose={onClose} title="Add to a memory">
+      <div className="stack-sm">
+        {memories === null ? (
+          <Skeleton height={60} />
+        ) : (
+          memories.map((m) => (
+            <Button key={m.id} variant="secondary" block onClick={() => add(m.id, m.title)}>
+              {m.title}
+            </Button>
+          ))
+        )}
+        <form
+          className="stack-sm"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const { memory } = await api.memories.create({ title });
+            await add(memory.id, memory.title);
+          }}
+        >
+          <TextField label="Or start a new memory" value={title} onChange={(e) => setTitle(e.currentTarget.value)} maxLength={120} />
+          <Button type="submit" disabled={!title.trim()}>
+            Create and add
+          </Button>
+        </form>
+      </div>
     </BottomSheet>
   );
 }

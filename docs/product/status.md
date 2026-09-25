@@ -1,6 +1,6 @@
 # Build status against the master directive
 
-Last updated 2026-09-25. Legend: **Built** = UI + API + database + validation + authorization + tests. **API** = working, tested endpoints without a dedicated UI yet. **Schema** = tables and design exist, no endpoints. **Not started** = nothing yet.
+Last updated 2026-09-25 (second pass). Legend: **Built** = UI + API + database + validation + authorization + tests. **API** = working, tested endpoints without a dedicated UI yet. **Schema** = tables and design exist, no endpoints. **Not started** = nothing yet.
 
 ## The first integrated flow (directive §60)
 
@@ -10,7 +10,7 @@ Sign up → profile → interests → follow → Home → Discover → create po
 
 | # | Domain | Status | Notes |
 | --- | --- | --- | --- |
-| 1 | Identity | Built | Register, login, logout, email verification, password reset/change, sessions and devices, security events, account deletion, data export. MFA and passkeys: schema only (need keys). |
+| 1 | Identity | Built | Register, login, logout, email verification, password reset/change, sessions and devices, security events, account deletion, data export, **two-step verification (TOTP + recovery codes)**. Passkeys: not started. |
 | 2 | Profiles | Built | Avatar, bio, links, interests, counts, personal/creator/professional/business modes, private accounts. Cover upload UI not yet. |
 | 3 | Social graph | Built | Follow, friends with requests, block, mute. Restrict and circles: API; circles management UI not yet. |
 | 4 | Content | Built | Text, photo, video, carousel, audio, poll, link, community, event- and product-linked posts; visibility public/followers/friends/circle/selected/private; moderation status, rights and AI provenance fields. |
@@ -23,10 +23,10 @@ Sign up → profile → interests → follow → Home → Discover → create po
 | 11 | Communities | Built | Create, discover, join (public/private with approval), roles owner→guest with rank rules, bans, feed, chat, events, AI catch-up. Voice rooms, resources: not started. |
 | 12 | Moments | Built | 1h/24h/permanent, visibility, viewer strip. Music and dual capture: not started. |
 | 13–14 | Real, Real Together | Not started | Behind `REAL` / `REAL_TOGETHER` flags. |
-| 15 | Memory | Not started | Behind `MEMORY` flag. AI memory (user-controlled) is built. |
+| 15 | Memory | Built (behind `MEMORY`) | Private collections, memories from attended events, On this day, add posts from any post menu, share with friends, AI recap limited to what the owner can see. Auto-generated videos: not started. |
 | 16 | Creator Studio | Built (foundation) | 28-day analytics, follower growth, top posts, earnings. Editing, captions, clips: not started. |
 | 17 | Creator economy | API | Earnings, payouts with admin verification. Subscriptions, tips, gifts: schema only. |
-| 18 | Live | Not started | Behind `LIVE` flag. |
+| 18 | Live | Built (behind `LIVE`), needs video provider | Sessions, stream keys, go live/end, audience count, chat and Q&A, co-host/moderator roles, bans, follower notifications. Video ingest/playback: provider adapter with local placeholder URLs. Gifts, tickets, clips: not started. |
 | 19 | Events | Built | Create, discover, RSVP with capacity and waitlist, attendees, host notifications, community events, time zones. Ticketing via products (kind `ticket`). |
 | 20 | Places | Built | Place profiles with hours, location, events, products; nearby search. Reviews, booking calendar: not started. |
 | 21 | Business | Built (foundation) | Business profiles, places, products. Business analytics/AI assistant: not started. |
@@ -37,22 +37,22 @@ Sign up → profile → interests → follow → Home → Discover → create po
 | 27 | Trust & safety | Built | Automated analysis, reports, cases, moderator console, decisions, enforcement, appeals, audit trail. |
 | 28 | Minor safety | Built (core) | Minimum age 13, minors private by default, adults can't DM minors unless friends, minor-safety reports hide content immediately. Parental controls: not started. |
 | 29 | Privacy | Built | Privacy center: data summary, consents, export, deletion, AI memory. |
-| 30 | Security | Built (core) | scrypt, hashed session tokens, httpOnly cookies, rate limits, RBAC, audit logs, security headers, CSRF-safe SameSite cookies. MFA/passkeys pending keys. |
+| 30 | Security | Built (core) | scrypt, hashed session tokens, httpOnly cookies, rate limits, RBAC, audit logs, security headers, CSRF-safe SameSite cookies, TOTP two-step verification with encrypted secrets. Passkeys: not started. |
 | 31 | Analytics | Built | Event instrumentation, meaningful-action North Star, admin overview. |
 | 32 | Administration | Built | /admin: moderation queue, overview, feature flags, audit log; user status/role API. |
-| 33 | Developer platform | Not started | Typed API client exists; OAuth apps, API keys, webhooks: not started. |
+| 33 | Developer platform | Built (API keys, webhooks) | Developer apps, scoped read/write API keys (hashed, revocable, blocked from sensitive routes), signed webhooks with SSRF protection, retries and delivery logs, developer console at /developers. OAuth for third-party sign-in: not started. |
 | 34 | Mini apps | Not started | Behind `MINI_APPS` flag. |
 | 35 | Internationalization | Built (core) | All UI strings through `t()`, English/French/Arabic catalogs, RTL switching, Intl dates/money. Many strings still need translation. |
 | 36 | Accessibility | Built (core) | Keyboard focus rings, ARIA roles, alt text on upload, reduced motion, contrast-checked tokens. Formal audit not done. |
 | — | Low bandwidth | Partial | Cursor pagination, lazy images, reduced motion. Compression, resumable uploads: not started. |
-| — | Mobile | Foundation | Expo app with tabs, sign-in and feed; not installed or run yet. |
+| — | Mobile | Built (core tabs) | Expo app: Home feed, Discover search, Create post, Inbox + chat, Profile. Type-checks and the iOS bundle builds; not yet run on a device (no Xcode on this machine). |
 | — | Design system | Built | Tokens, light/dark themes, 11 primitives, 20 social components; published reference artifact. |
 | — | CI/CD, observability | Built | CI workflow, Dockerfiles, health/readiness, Prometheus metrics and alerts, structured logs with request ids. Tracing: not started. |
 
 ## Next priorities
 
-1. Mobile: install, finish the four remaining tabs, test on devices.
+1. Run the mobile app on devices; add realtime, media upload and push notifications to it.
 2. Media pipeline: object storage adapter, transcoding, resumable uploads.
-3. MFA (TOTP) and passkeys once keys are provisioned.
-4. Live, Real and Memory behind their flags.
-5. Developer platform: OAuth apps and API keys.
+3. Live video provider integration, then gifts and tickets.
+4. OAuth for third-party apps; passkeys.
+5. Calls, Real, Real Together, Mini Apps.

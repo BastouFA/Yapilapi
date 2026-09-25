@@ -416,8 +416,11 @@ function SecuritySettings() {
           ))}
         </List>
       </Card>
-      <Card title="Two-step verification and passkeys" subtitle="Your account is protected by a strong password hash, session controls and sign-in alerts.">
-        <Alert tone="info">Two-step verification needs server keys that aren't configured in this environment yet.</Alert>
+      <TwoStepCard />
+      <Card title="Developers" subtitle="Build integrations with API keys and webhooks.">
+        <a href="/developers" className="yp-btn yp-btn--secondary yp-btn--sm">
+          Open developer settings
+        </a>
       </Card>
       <Button
         variant="secondary"
@@ -525,5 +528,141 @@ function SafetySettings() {
         />
       </Dialog>
     </div>
+  );
+}
+
+function TwoStepCard() {
+  const { toast } = useSession();
+  const [status, setStatus] = useState<{ enabled: boolean; recoveryCodesLeft: number } | null>(null);
+  const [setup, setSetup] = useState<{ secret: string; otpauthUri: string } | null>(null);
+  const [codes, setCodes] = useState<string[] | null>(null);
+  const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [disabling, setDisabling] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const load = () => api.mfa.status().then(setStatus);
+  useEffect(() => {
+    void load();
+  }, []);
+  if (!status) return null;
+
+  return (
+    <Card
+      title="Two-step verification"
+      subtitle={
+        status.enabled ? `On. ${status.recoveryCodesLeft} recovery codes left.` : 'Protect your account with a code from an authenticator app when you sign in.'
+      }
+    >
+      <div className="stack-sm">
+        {err ? <Alert tone="danger">{err}</Alert> : null}
+        {codes ? (
+          <Alert tone="warning" title="Save your recovery codes">
+            Each code works once if you lose your phone. They won't be shown again.
+            <pre style={{ fontFamily: 'var(--font-mono)', fontSize: 14, lineHeight: '22px', margin: '8px 0 0', whiteSpace: 'pre-wrap' }}>
+              {codes.join('\n')}
+            </pre>
+            <Button size="sm" variant="secondary" onClick={() => navigator.clipboard?.writeText(codes.join('\n')).then(() => toast('Codes copied'))}>
+              Copy codes
+            </Button>
+          </Alert>
+        ) : null}
+        {!status.enabled && !setup ? (
+          <Button
+            icon="shield"
+            onClick={async () => {
+              setErr(null);
+              try {
+                setSetup(await api.mfa.setup());
+              } catch (e) {
+                setErr(errorMessage(e));
+              }
+            }}
+          >
+            Turn on two-step verification
+          </Button>
+        ) : null}
+        {setup ? (
+          <form
+            className="stack-sm"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setErr(null);
+              try {
+                setCodes((await api.mfa.confirm(code)).recoveryCodes);
+                setSetup(null);
+                setCode('');
+                await load();
+              } catch (e2) {
+                setErr(errorMessage(e2));
+              }
+            }}
+          >
+            <p style={{ margin: 0 }}>In your authenticator app, add an account with this key, or open the setup link on this device:</p>
+            <code style={{ fontFamily: 'var(--font-mono)', fontSize: 15, letterSpacing: '.08em', wordBreak: 'break-all' }}>
+              {setup.secret.match(/.{1,4}/g)?.join(' ')}
+            </code>
+            <a href={setup.otpauthUri}>Open in authenticator app</a>
+            <TextField
+              label="6-digit code from the app"
+              value={code}
+              onChange={(e) => setCode(e.currentTarget.value)}
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              maxLength={6}
+            />
+            <div className="row">
+              <Button type="submit" disabled={code.length !== 6}>
+                Verify and turn on
+              </Button>
+              <Button variant="ghost" onClick={() => setSetup(null)}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : null}
+        {status.enabled && !disabling ? (
+          <Button variant="secondary" onClick={() => setDisabling(true)}>
+            Turn off
+          </Button>
+        ) : null}
+        {disabling ? (
+          <form
+            className="stack-sm"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setErr(null);
+              try {
+                await api.mfa.disable(password, code);
+                setDisabling(false);
+                setPassword('');
+                setCode('');
+                setCodes(null);
+                toast('Two-step verification is off');
+                await load();
+              } catch (e2) {
+                setErr(errorMessage(e2));
+              }
+            }}
+          >
+            <TextField label="Password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.currentTarget.value)} />
+            <TextField
+              label="Code or recovery code"
+              value={code}
+              onChange={(e) => setCode(e.currentTarget.value)}
+              autoComplete="one-time-code"
+              maxLength={12}
+            />
+            <div className="row">
+              <Button type="submit" variant="danger" disabled={!password || code.length < 6}>
+                Turn off two-step verification
+              </Button>
+              <Button variant="ghost" onClick={() => setDisabling(false)}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : null}
+      </div>
+    </Card>
   );
 }

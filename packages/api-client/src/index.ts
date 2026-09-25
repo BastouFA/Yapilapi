@@ -67,7 +67,8 @@ export function createClient(opts: ClientOptions) {
       me: () => get<{ user: Me }>('/v1/auth/me'),
       register: (b: { email: string; password: string; username: string; displayName: string; birthDate?: string }) =>
         post<{ user: Me; token: string }>('/v1/auth/register', b),
-      login: (b: { email: string; password: string }) => post<{ user: Me; token: string }>('/v1/auth/login', b),
+      login: (b: { email: string; password: string }) =>
+        post<{ user?: Me; token?: string; mfaRequired?: boolean; challengeToken?: string }>('/v1/auth/login', b),
       logout: () => post<{ ok: true }>('/v1/auth/logout'),
       verifyEmail: (token: string) => post('/v1/auth/verify-email', { token }),
       resendVerification: () => post('/v1/auth/verify-email/resend'),
@@ -206,6 +207,69 @@ export function createClient(opts: ClientOptions) {
         ),
     },
     flags: () => get<{ flags: Record<string, boolean> }>('/v1/flags'),
+    mfa: {
+      status: () =>
+        get<{ enabled: boolean; recoveryCodesLeft: number; factors: { id: string; kind: string; label: string; last_used_at: string | null }[] }>(
+          '/v1/auth/mfa',
+        ),
+      setup: () => post<{ secret: string; otpauthUri: string }>('/v1/auth/mfa/totp/setup'),
+      confirm: (code: string) => post<{ enabled: true; recoveryCodes: string[] }>('/v1/auth/mfa/totp/confirm', { code }),
+      verify: (challengeToken: string, code: string) => post<{ user: Me; token: string }>('/v1/auth/mfa/verify', { challengeToken, code }),
+      disable: (password: string, code: string) => post('/v1/auth/mfa/disable', { password, code }),
+      newRecoveryCodes: (code: string) => post<{ recoveryCodes: string[] }>('/v1/auth/mfa/recovery-codes', { code }),
+    },
+    developer: {
+      apps: () => get<{ items: { id: string; name: string; description: string; active_keys: number; webhooks: number }[] }>('/v1/developer/apps'),
+      createApp: (b: { name: string; description?: string; website?: string }) => post<{ app: { id: string; name: string } }>('/v1/developer/apps', b),
+      deleteApp: (id: string) => del(`/v1/developer/apps/${id}`),
+      keys: (appId: string) =>
+        get<{
+          items: { id: string; name: string; prefix: string; scopes: string[]; last_used_at: string | null; revoked_at: string | null; created_at: string }[];
+        }>(`/v1/developer/apps/${appId}/keys`),
+      createKey: (appId: string, b: { name: string; scopes: string[] }) => post<{ secret: string; message: string }>(`/v1/developer/apps/${appId}/keys`, b),
+      revokeKey: (appId: string, keyId: string) => del(`/v1/developer/apps/${appId}/keys/${keyId}`),
+      webhooks: (appId: string) =>
+        get<{
+          items: { id: string; url: string; events: string[]; active: boolean }[];
+          deliveries: { id: string; event: string; status: string; attempts: number; response_code: number | null; created_at: string }[];
+          events: string[];
+        }>(`/v1/developer/apps/${appId}/webhooks`),
+      createWebhook: (appId: string, url: string, events: string[]) => post<{ secret: string }>(`/v1/developer/apps/${appId}/webhooks`, { url, events }),
+      deleteWebhook: (appId: string, id: string) => del(`/v1/developer/apps/${appId}/webhooks/${id}`),
+      ping: (appId: string, id: string) => post(`/v1/developer/apps/${appId}/webhooks/${id}/ping`),
+    },
+    memories: {
+      list: () => get<{ items: MemorySummary[] }>('/v1/memories'),
+      get: (id: string) =>
+        get<{
+          memory: MemorySummary;
+          posts: Post[];
+          events: EventItem[];
+          moments: { id: string; body: string; media_url: string | null; media_kind: string | null }[];
+          hiddenItems: number;
+        }>(`/v1/memories/${id}`),
+      create: (b: { title: string; kind?: string; description?: string }) => post<{ memory: MemorySummary }>('/v1/memories', b),
+      remove: (id: string) => del(`/v1/memories/${id}`),
+      suggestions: () => get<{ events: EventItem[]; onThisDay: Post[] }>('/v1/memories/suggestions'),
+      fromEvent: (eventId: string) => post<{ memoryId: string }>(`/v1/memories/from-event/${eventId}`),
+      addItem: (id: string, itemType: 'post' | 'moment' | 'event', itemId: string) => post(`/v1/memories/${id}/items`, { itemType, itemId }),
+      removeItem: (id: string, itemType: string, itemId: string) => del(`/v1/memories/${id}/items/${itemType}/${itemId}`),
+      share: (id: string, userIds: string[]) => put<{ visibility: string }>(`/v1/memories/${id}/shares`, { userIds }),
+      recap: (id: string) => post<{ recap: string; notice?: string }>(`/v1/memories/${id}/recap`),
+    },
+    live: {
+      list: () => get<{ items: LiveSummary[] }>('/v1/live'),
+      get: (id: string) => get<{ live: LiveSummary }>(`/v1/live/${id}`),
+      create: (b: { title: string; visibility?: string }) =>
+        post<{ live: LiveSummary; ingest: { url: string; streamKey: string }; message: string }>('/v1/live', b),
+      start: (id: string) => post<{ live: LiveSummary }>(`/v1/live/${id}/start`),
+      end: (id: string) => post<{ live: LiveSummary }>(`/v1/live/${id}/end`),
+      join: (id: string) => post<{ live: LiveSummary }>(`/v1/live/${id}/join`),
+      leave: (id: string) => post(`/v1/live/${id}/leave`),
+      chat: (id: string) => get<{ items: LiveChatMessage[] }>(`/v1/live/${id}/chat`),
+      send: (id: string, body: string, kind: 'chat' | 'question' = 'chat') => post<{ message: LiveChatMessage }>(`/v1/live/${id}/chat`, { body, kind }),
+      ban: (id: string, userId: string) => post(`/v1/live/${id}/ban`, { userId }),
+    },
     admin: {
       cases: (status = 'open') => get<{ items: Record<string, any>[] }>(`/v1/admin/moderation/cases${qs({ status })}`),
       decide: (id: string, decision: string, note?: string) => post(`/v1/admin/moderation/cases/${id}/decide`, { decision, note }),
@@ -219,3 +283,40 @@ export function createClient(opts: ClientOptions) {
 }
 
 export type YapilapiClient = ReturnType<typeof createClient>;
+
+export interface MemorySummary {
+  id: string;
+  title: string;
+  kind: string;
+  description: string;
+  recap: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  visibility: 'private' | 'friends' | 'selected';
+  mine: boolean;
+  itemCount: number;
+  createdAt: string;
+}
+
+export interface LiveSummary {
+  id: string;
+  title: string;
+  status: 'scheduled' | 'live' | 'ended';
+  visibility: string;
+  host: PublicUser;
+  viewers: number;
+  peakViewers: number;
+  startedAt: string | null;
+  endedAt: string | null;
+  myRole: 'host' | 'cohost' | 'moderator' | 'viewer' | null;
+  playbackUrl: string | null;
+}
+
+export interface LiveChatMessage {
+  id: string;
+  kind: 'chat' | 'question' | 'reaction';
+  body: string;
+  answered: boolean;
+  author: PublicUser;
+  createdAt: string;
+}
