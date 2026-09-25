@@ -12,12 +12,18 @@ export function notBlockedSql(otherUserCol: string, v: string): string {
                                           OR (b.blocker_id = ${otherUserCol} AND b.blocked_id = ${v}))`;
 }
 
-/** Posts aliased `p`, author's profile aliased `ap`, author user aliased `au`. */
+/**
+ * Posts aliased `p`, author's profile aliased `ap`, author user aliased `au`.
+ * Posts waiting for a moderator (flagged as possibly sensitive) stay hidden from people under 18 until cleared,
+ * and posts withheld by a regional rule are hidden from viewers in that country.
+ */
 export function postVisibleSql(v: string): string {
   return `(
     p.deleted_at IS NULL
     AND au.status = 'active'
     AND (p.moderation_status IN ('normal', 'review') OR p.author_id = ${v})
+    AND (p.moderation_status <> 'review' OR p.author_id = ${v}
+         OR coalesce((SELECT uv.birth_date FROM users uv WHERE uv.id = ${v}) <= current_date - interval '18 years', true))
     AND ${notBlockedSql('p.author_id', v)}
     AND (p.author_id = ${v} OR NOT EXISTS (
       SELECT 1 FROM post_withholdings w WHERE w.post_id = p.id AND w.country = (SELECT pv.country FROM profiles pv WHERE pv.user_id = ${v})))

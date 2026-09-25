@@ -201,3 +201,18 @@ describe('live gifts', () => {
     expect(gifts[0].author.id).toBe(fan.id);
   });
 });
+
+describe('sensitive content and minors', () => {
+  it('hides posts waiting for review from under-18 viewers only', async () => {
+    const author = await signUp(t.app, { birthDate: ADULT });
+    const adult = await signUp(t.app, { birthDate: ADULT });
+    const teen = await signUp(t.app, { birthDate: TEEN });
+    const post = (await as(t.app, author).post('/v1/posts', { body: 'A post a moderator needs to look at' })).body.post;
+    await t.ctx.db.query(`UPDATE posts SET moderation_status = 'review' WHERE id = $1`, [post.id]);
+    expect((await as(t.app, adult).get(`/v1/posts/${post.id}`)).status).toBe(200);
+    expect((await as(t.app, teen).get(`/v1/posts/${post.id}`)).status).toBe(404);
+    expect((await as(t.app, author).get(`/v1/posts/${post.id}`)).status).toBe(200);
+    await t.ctx.db.query(`UPDATE posts SET moderation_status = 'normal' WHERE id = $1`, [post.id]);
+    expect((await as(t.app, teen).get(`/v1/posts/${post.id}`)).status).toBe(200);
+  });
+});
