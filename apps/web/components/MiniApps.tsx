@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { BottomSheet, Button, Dialog, List, ListItem } from '@yapilapi/design-system';
+import { BottomSheet, Button, Dialog, List, ListItem, useModalFocus } from '@yapilapi/design-system';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
@@ -110,7 +110,9 @@ function MiniAppFrame({
   onSend?: (text: string) => Promise<void>;
 }) {
   const frame = useRef<HTMLIFrameElement>(null);
+  const overlay = useRef<HTMLDivElement>(null);
   const [pending, setPending] = useState<string | null>(null);
+  useModalFocus(overlay, true, onClose);
   const origin = new URL(app.entryUrl).origin;
 
   useEffect(() => {
@@ -129,7 +131,15 @@ function MiniAppFrame({
   }, [app, origin, surface, surfaceId, onSend]);
 
   return (
-    <div className="call" role="dialog" aria-modal aria-label={app.name} style={{ background: 'var(--ground)', color: 'var(--ink)' }}>
+    <div
+      className="call"
+      role="dialog"
+      aria-modal
+      aria-label={app.name}
+      ref={overlay}
+      tabIndex={-1}
+      style={{ background: 'var(--ground)', color: 'var(--ink)' }}
+    >
       <iframe
         ref={frame}
         src={app.entryUrl}

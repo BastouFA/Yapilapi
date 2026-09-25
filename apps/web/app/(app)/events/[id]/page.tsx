@@ -30,7 +30,17 @@ export default function EventPage() {
   if (!ev) return <Skeleton height={240} />;
 
   const tz = ev.timezone || 'UTC';
-  const when = new Intl.DateTimeFormat(locale, { dateStyle: 'full', timeStyle: 'short', timeZone: tz, timeZoneName: 'short' }).format(new Date(ev.startsAt));
+  // dateStyle/timeStyle can't be combined with timeZoneName (it throws), so spell the parts out.
+  const when = new Intl.DateTimeFormat(locale, {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: tz,
+    timeZoneName: 'short',
+  }).format(new Date(ev.startsAt));
   const until = ev.endsAt ? new Intl.DateTimeFormat(locale, { timeStyle: 'short', timeZone: tz }).format(new Date(ev.endsAt)) : null;
   const going = attendees.filter((a) => a.status === 'going');
 

@@ -51,6 +51,7 @@ export function Sidebar() {
     <aside className="yp-shell__aside" aria-label="Around you">
       <form
         role="search"
+        aria-label="Quick search"
         onSubmit={(e) => {
           e.preventDefault();
           if (q.trim()) router.push(`/discover?q=${encodeURIComponent(q.trim())}`);

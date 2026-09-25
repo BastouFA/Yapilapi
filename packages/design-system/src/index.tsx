@@ -19,6 +19,7 @@ export {
   Switch,
   Tabs,
   TextField,
+  useModalFocus,
   type ButtonProps,
   type TabItem,
 } from './primitives.tsx';

@@ -1,8 +1,72 @@
-import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type RefObject,
+  type TextareaHTMLAttributes,
+} from 'react';
 import { Icon, type IconName } from './icons.tsx';
 
 export function cx(...parts: (string | false | null | undefined)[]) {
   return parts.filter(Boolean).join(' ');
+}
+
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), iframe, audio[controls], video[controls], [contenteditable]:not([contenteditable="false"]), [tabindex]:not([tabindex="-1"])';
+
+/** Open modals, innermost last: only the top one handles Tab and Escape. */
+const modalStack: HTMLElement[] = [];
+
+/**
+ * Modal focus handling for dialogs, sheets and overlays: moves focus into the
+ * container (give it tabIndex={-1}), keeps Tab and Shift+Tab inside it, closes
+ * on Escape and returns focus to whatever had it before when it closes.
+ */
+export function useModalFocus(ref: RefObject<HTMLElement | null>, active: boolean, onEscape?: () => void) {
+  const escape = useRef(onEscape);
+  escape.current = onEscape;
+  useEffect(() => {
+    const node = ref.current;
+    if (!active || !node) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    modalStack.push(node);
+    if (!node.contains(document.activeElement)) node.focus({ preventScroll: true });
+    const onKey = (e: KeyboardEvent) => {
+      if (modalStack.at(-1) !== node) return;
+      if (e.key === 'Escape' && escape.current) {
+        e.preventDefault();
+        escape.current();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const items = [...node.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0);
+      if (!items.length) {
+        e.preventDefault();
+        node.focus();
+        return;
+      }
+      const first = items[0]!;
+      const last = items.at(-1)!;
+      const cur = document.activeElement;
+      if (e.shiftKey && (cur === first || cur === node || !node.contains(cur))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (cur === last || !node.contains(cur))) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      modalStack.splice(modalStack.indexOf(node), 1);
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
+    };
+  }, [active, ref]);
 }
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -231,23 +295,33 @@ export interface TabItem {
   count?: number;
   content?: ReactNode;
 }
+/**
+ * Tabs. Pass `content` per tab to have the panel rendered here, or render the
+ * panel yourself: give it role="tabpanel", id={panelId} and
+ * aria-labelledby={`${id}-${selectedTabId}`}, and pass `id` and `panelId`.
+ */
 export function Tabs({
   tabs,
   value,
   defaultValue,
   onChange,
   className,
+  id,
+  panelId,
 }: {
   tabs: TabItem[];
   value?: string;
   defaultValue?: string;
   onChange?: (id: string) => void;
   className?: string;
+  id?: string;
+  panelId?: string;
 }) {
   const controlled = value !== undefined;
   const [inner, setInner] = useState(defaultValue ?? tabs[0]?.id);
   const cur = controlled ? value : inner;
-  const base = useId();
+  const auto = useId();
+  const base = id ? `${id}-` : auto;
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
   const select = (id: string) => {
     if (!controlled) setInner(id);
@@ -261,8 +335,9 @@ export function Tabs({
         role="tablist"
         onKeyDown={(e) => {
           const i = tabs.findIndex((t) => t.id === cur);
-          const n = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : null;
-          if (n === null) return;
+          const n = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+          if (n === undefined) return;
+          e.preventDefault();
           const next = tabs[(n + tabs.length) % tabs.length]!;
           select(next.id);
           refs.current[next.id]?.focus();
@@ -278,7 +353,8 @@ export function Tabs({
             role="tab"
             id={`${base}${t.id}`}
             aria-selected={t.id === cur}
-            aria-controls={`${base}${t.id}-panel`}
+            // Only the selected tab's panel is rendered, so only it can be referenced.
+            aria-controls={t.id !== cur ? undefined : t.content !== undefined ? `${base}${t.id}-panel` : panelId}
             tabIndex={t.id === cur ? 0 : -1}
             className="yp-tabs__tab"
             onClick={() => select(t.id)}
@@ -345,17 +421,7 @@ export function Dialog({
 }) {
   const titleId = useId();
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open || inline) return;
-    const prev = document.activeElement as HTMLElement | null;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose?.();
-    document.addEventListener('keydown', onKey);
-    ref.current?.focus();
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      prev?.focus?.();
-    };
-  }, [open, inline, onClose]);
+  useModalFocus(ref, open && !inline, onClose);
   if (!open) return null;
   const box = (
     <div

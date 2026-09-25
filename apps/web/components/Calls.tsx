@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Button, Icon } from '@yapilapi/design-system';
+import { Button, Icon, useModalFocus } from '@yapilapi/design-system';
 import type { CallInfo } from '@yapilapi/api-client';
 import { api, errorMessage } from '@/lib/api';
 import { useRealtime, useSession } from '@/app/providers';
@@ -30,7 +30,10 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
   const ice = useRef<RTCIceServer[]>([]);
   const localVideo = useRef<HTMLVideoElement>(null);
   const callRef = useRef<CallInfo | null>(null);
+  const overlay = useRef<HTMLDivElement>(null);
   callRef.current = call;
+  // Keep keyboard focus in the call UI while it's up. No Escape: that shouldn't hang up.
+  useModalFocus(overlay, phase !== 'idle' && !!call);
 
   const cleanup = useCallback(() => {
     peers.current.forEach((p) => p.close());
@@ -157,7 +160,7 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
     <Ctx.Provider value={{ start }}>
       {children}
       {phase !== 'idle' && call ? (
-        <div className="call" role="dialog" aria-modal aria-label={phase === 'incoming' ? 'Incoming call' : 'Call'}>
+        <div className="call" role="dialog" aria-modal aria-label={phase === 'incoming' ? 'Incoming call' : 'Call'} ref={overlay} tabIndex={-1}>
           {phase === 'incoming' ? (
             <div className="call__ring">
               <Icon name={call.kind === 'video' ? 'eye' : 'bell'} size={40} />

@@ -71,6 +71,7 @@ function Discover() {
 
       <form
         role="search"
+        aria-label="Discover"
         className="row"
         onSubmit={(e) => {
           e.preventDefault();
