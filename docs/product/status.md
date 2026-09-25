@@ -1,6 +1,6 @@
 # Build status against the master directive
 
-Last updated 2026-09-25 (third pass). Legend: **Built** = UI + API + database + validation + authorization + tests. **API** = working, tested endpoints without a dedicated UI yet. **Schema** = tables and design exist, no endpoints. **Not started** = nothing yet.
+Last updated 2026-09-25 (fourth pass). Legend: **Built** = UI + API + database + validation + authorization + tests. **API** = working, tested endpoints without a dedicated UI yet. **Schema** = tables and design exist, no endpoints. **Not started** = nothing yet.
 
 ## The first integrated flow (directive §60)
 
@@ -24,17 +24,17 @@ Sign up → profile → interests → follow → Home → Discover → create po
 | 12 | Moments | Built | 1h/24h/permanent, visibility, viewer strip. Music and dual capture: not started. |
 | 13–14 | Real, Real Together | Built (behind `REAL` / `REAL_TOGETHER`) | Real: in-app camera capture only (media must be minutes old and unused), front + back, time-labelled, three a day, friends/followers feed. Real Together: shared members-only moments where friends or people at the same event add their own photos. |
 | 15 | Memory | Built (behind `MEMORY`) | Private collections, memories from attended events, On this day, add posts from any post menu, share with friends, AI recap limited to what the owner can see. Auto-generated videos: not started. |
-| 16 | Creator Studio | Built (foundation) | 28-day analytics, follower growth, top posts, earnings. Editing, captions, clips: not started. |
+| 16 | Creator Studio | Built | 28-day analytics, follower growth, top posts, earnings, campaigns; **video trim and clips** (ffmpeg jobs into new processed videos); **captions** (editor, .vtt upload with strict parsing, per-language tracks on every player). Automatic captions need a speech-to-text provider (`TRANSCRIBE_PROVIDER`); without one the option says so. |
 | 17 | Creator economy | Built | Monthly subscription plans, tips on profiles/posts/lives, payment through the provider with activation on the signed webhook, 5% platform fee, earnings, payouts with verification. **Sponsored posts** (behind `ADS`): advertisers promote their own public post, fund the budget through the payment provider, pay per impression at their CPM with a daily frequency cap; served only to adults who opted in to advertising, never to supervised or under-18 accounts, always labelled with a why-sheet and hide. Campaign stats (impressions, clicks, reach, CTR) in Studio. Subscriber-only posts, brand deals: not started. |
 | 18 | Live | Built (behind `LIVE`) | MediaMTX: streaming software publishes RTMP with a per-session key checked by the API; viewers watch low-latency HLS with signed, per-viewer tokens (hls.js in browsers). Chat, Q&A, roles, bans, **gifts** (a paid tip during a live appears in the chat for everyone once the payment is confirmed). Ticketed lives, auto-clips: not started. |
 | 19 | Events | Built | Create, discover, RSVP with capacity and waitlist, attendees, host notifications, community events, time zones. Ticketing via products (kind `ticket`). |
 | 20 | Places | Built | Place profiles, hours, map link, events, products, nearby search, **reviews and ratings**, **booking requests** with capacity per time slot and owner confirm/decline. |
-| 21 | Business | Built (foundation) | Business profiles, places, products. Business analytics/AI assistant: not started. |
+| 21 | Business | Built | Business profiles, places, products; **Insights** for owners (visitors, bookings, rating trend, sales, ads) and the **business assistant**. |
 | 22 | Commerce | Built | Products, services, tickets, bookings, digital; idempotent orders; stock. Cart and checkout UI minimal (Buy button). |
 | 23 | Payments | API | Provider abstraction, signed webhooks, replay protection, amount reconciliation, refunds, platform fees, payouts. Real provider: needs account. |
-| 24–25 | AI, recommendations | Built | Gateway → permission → context → router → safety → audit log; caption, summaries, search intent, plans, translation; Claude adapter + offline dev provider; evaluation suite. Agents: not started. |
+| 24–25 | AI, recommendations | Built | Gateway → permission → context → router → safety → audit log; caption, summaries, search intent, plans, translation; Claude adapter + offline dev provider; evaluation suite. **Assistants** (`/assistant` and on Discover): Discover, Trips, Shopping and Business run a model with tools that act as the person, only recommend items a tool returned, and propose actions the person confirms. |
 | 26 | Notifications | Built | In-app + realtime, categories, pause, focus mode, **browser push (VAPID)** and **mobile push (Expo)**, dead-token cleanup. |
-| 27 | Trust & safety | Built | Automated analysis, reports, cases, moderator console, decisions, enforcement, appeals, audit trail. |
+| 27 | Trust & safety | Built | Automated analysis, reports, cases, moderator console, decisions, enforcement, appeals, audit trail, **ad review** before campaigns run, **regional rules** (per-country withholding with a recorded legal basis; authors see where a post is withheld). |
 | 28 | Minor safety | Built | Minimum age 13, minors private by default, adults can't DM minors unless friends, minor-safety reports hide content immediately. **Family links**: an adult guardian invites a teen, the teen accepts; the guardian sets who can message the teen, a daily reminder and quiet hours (pushes held), and sees daily minutes only. Either side can end it; the teen is told about every change. |
 | 29 | Privacy | Built | Privacy center: data summary, consents, export, deletion, AI memory. |
 | 30 | Security | Built | scrypt, hashed session tokens, httpOnly cookies, rate limits, RBAC, audit logs, security headers, SameSite cookies, TOTP and passkeys, scoped API keys and OAuth, SSRF-safe webhooks, EXIF stripping. |
@@ -45,16 +45,12 @@ Sign up → profile → interests → follow → Home → Discover → create po
 | 35 | Internationalization | Built (core) | All UI strings through `t()`, complete catalogs for English, French, Arabic, Spanish, Portuguese (Brazil), Swahili, Yorùbá and Hausa, RTL switching, Intl dates/money. Yorùbá and Hausa need a native-speaker review. |
 | 36 | Accessibility | Built (core) | Keyboard focus rings, ARIA roles, alt text on upload, reduced motion, contrast-checked tokens. Formal audit not done. |
 | — | Low bandwidth | Partial | Cursor pagination, lazy images, reduced motion, resumable uploads with retry. Image compression/variants: not started. |
-| — | Mobile | Built (core) | Expo app: Home, Discover, Create, Inbox + chat, Profile, Real capture (expo-camera), push registration. Type-checks and the iOS bundle builds; not yet run on a device. Calls on mobile need a development build with WebRTC. |
+| — | Mobile | Built (core) | Expo app: Home, Discover, Create, Inbox + chat, Profile, Real capture (expo-camera), push registration. Type-checks and iOS/Android bundles build; not yet run on a device. **Calls** (react-native-webrtc, same signaling as web) in a development build; post, community with FAQ, settings with family supervision; the new look. |
 | — | Design system | Built | Coral and sun palette, light/dark themes with contrast-checked tokens, soft radii, layered shadows; 11 primitives, 20 social components; three-column desktop layout with a live/events/people/trending sidebar; published reference artifact. |
 | — | CI/CD, observability | Built | CI workflow, Dockerfiles, health/readiness, Prometheus metrics and alerts, structured logs with request ids. Tracing: not started. |
 
 ## Not built yet
 
-- Creator Studio editing tools (trim, captions/subtitles, clips, AI highlight detection).
 - Ticketed lives, live shopping, auto-translation, auto-clips.
-- AI Discover, AI agents (travel, shopping, business).
-- Business analytics beyond campaigns, and the business AI assistant; ad review by moderators before a campaign starts.
-- Regional moderation rules; filtering sensitive content for supervised teens.
-- Load/performance tests, a formal accessibility audit, distributed tracing (OpenTelemetry).
-- Calls on mobile (needs an Expo development build with react-native-webrtc); running the mobile app on devices.
+- Filtering sensitive content for supervised teens.
+- Anything that needs a real device or account to prove: mobile calls and pushes on phones, a real payment provider, a real speech-to-text provider, the Claude assistants against the live API (they run on the offline provider in development).
