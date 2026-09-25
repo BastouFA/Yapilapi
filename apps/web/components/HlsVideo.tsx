@@ -1,9 +1,26 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { CaptionTracks, videoCrossOrigin } from '@yapilapi/design-system';
+import type { CaptionTrackRef } from '@yapilapi/shared';
 
-/** Plays an HLS stream: natively on Safari/iOS, through hls.js elsewhere. Retries while a live stream starts. */
-export function HlsVideo({ src, poster, live, label }: { src: string; poster?: string; live?: boolean; label: string }) {
+/**
+ * Plays an HLS stream: natively on Safari/iOS, through hls.js elsewhere. Retries while a live stream starts.
+ * Caption tracks (WebVTT) render as subtitles in the player's captions menu.
+ */
+export function HlsVideo({
+  src,
+  poster,
+  live,
+  label,
+  captions,
+}: {
+  src: string;
+  poster?: string;
+  live?: boolean;
+  label: string;
+  captions?: CaptionTrackRef[];
+}) {
   const ref = useRef<HTMLVideoElement>(null);
   const [waiting, setWaiting] = useState(false);
 
@@ -35,7 +52,19 @@ export function HlsVideo({ src, poster, live, label }: { src: string; poster?: s
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <video ref={ref} poster={poster} controls autoPlay playsInline muted={live} style={{ width: '100%', height: '100%' }} aria-label={label} />
+      <video
+        ref={ref}
+        poster={poster}
+        crossOrigin={videoCrossOrigin(captions)}
+        controls
+        autoPlay
+        playsInline
+        muted={live}
+        style={{ width: '100%', height: '100%' }}
+        aria-label={label}
+      >
+        <CaptionTracks captions={captions} />
+      </video>
       {waiting ? (
         <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: '#c7d2cd', pointerEvents: 'none' }}>
           Waiting for the stream to start…

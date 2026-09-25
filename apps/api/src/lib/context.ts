@@ -6,6 +6,7 @@ import type { AiGateway } from './ai/gateway.ts';
 import type { EmailSender } from './email.ts';
 import type { MediaStorage } from './storage.ts';
 import type { PaymentProvider } from './payments.ts';
+import type { TranscriptionProvider } from './transcription.ts';
 
 /** Everything a module needs, created once in buildApp. */
 export interface AppContext {
@@ -17,4 +18,6 @@ export interface AppContext {
   email: EmailSender;
   storage: MediaStorage;
   payments: PaymentProvider;
+  /** Speech-to-text for automatic captions; null when not configured. */
+  transcription: TranscriptionProvider | null;
 }

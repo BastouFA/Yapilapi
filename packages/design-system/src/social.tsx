@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState, type ComponentType, type ReactNode } from 'react';
-import { formatMoney, formatRelativeTime, t, type EventItem, type MediaItem, type MessageKey, type Post } from '@yapilapi/shared';
+import { formatMoney, formatRelativeTime, t, type CaptionTrackRef, type EventItem, type MediaItem, type MessageKey, type Post } from '@yapilapi/shared';
 import { Icon, type IconName } from './icons.tsx';
 import { Avatar, Badge, Button, cx } from './primitives.tsx';
 
@@ -119,6 +119,24 @@ export function MediaGrid({ media }: { media: MediaItem[] }) {
   );
 }
 
+/**
+ * Subtitle tracks for a <video>. Caption files live on the media origin, so a
+ * video that has tracks must set crossOrigin="anonymous" (see videoCrossOrigin);
+ * the media route answers with CORS headers for the web app.
+ */
+export function CaptionTracks({ captions }: { captions?: CaptionTrackRef[] | null }) {
+  return (
+    <>
+      {(captions ?? []).map((c) => (
+        <track key={c.lang} kind="subtitles" src={c.url} srcLang={c.lang} label={c.label} />
+      ))}
+    </>
+  );
+}
+
+/** crossOrigin for a <video>: only needed (and only set) when it has caption tracks. */
+export const videoCrossOrigin = (captions?: CaptionTrackRef[] | null) => (captions?.length ? ('anonymous' as const) : undefined);
+
 /** Full-screen media viewer: arrow keys to move, Escape to close, alt text shown. */
 export function MediaViewer({ media, index, onClose }: { media: MediaItem[]; index: number; onClose: () => void }) {
   const [i, setI] = useState(index);
@@ -152,7 +170,17 @@ export function MediaViewer({ media, index, onClose }: { media: MediaItem[]; ind
       </div>
       <div className="yp-viewer__stage">
         {m.kind === 'video' ? (
-          <video src={m.variants?.mp4 ?? m.url} poster={m.posterUrl ?? undefined} controls autoPlay playsInline />
+          <video
+            key={m.id}
+            src={m.variants?.mp4 ?? m.url}
+            poster={m.posterUrl ?? undefined}
+            crossOrigin={videoCrossOrigin(m.captions)}
+            controls
+            autoPlay
+            playsInline
+          >
+            <CaptionTracks captions={m.captions} />
+          </video>
         ) : m.kind === 'audio' ? (
           <audio src={m.url} controls />
         ) : (

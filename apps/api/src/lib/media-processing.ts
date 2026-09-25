@@ -15,7 +15,7 @@ export interface ProcessDeps {
   storage: MediaStorage;
 }
 
-function run(args: string[], cwd?: string): Promise<void> {
+export function run(args: string[], cwd?: string): Promise<void> {
   return new Promise((resolve, reject) => {
     if (!ffmpegPath) return reject(new Error('ffmpeg is not available'));
     const p = spawn(ffmpegPath as unknown as string, ['-hide_banner', '-loglevel', 'error', ...args], { cwd });
@@ -23,6 +23,35 @@ function run(args: string[], cwd?: string): Promise<void> {
     p.stderr.on('data', (d) => (err += d));
     p.on('error', reject);
     p.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`ffmpeg exited ${code}: ${err.slice(-300)}`))));
+  });
+}
+
+export interface VideoInfo {
+  durationMs: number | null;
+  width: number | null;
+  height: number | null;
+  hasAudio: boolean;
+}
+
+/** Read duration, frame size and whether there is an audio stream (ffmpeg-static ships without ffprobe). */
+export function probe(file: string): Promise<VideoInfo> {
+  return new Promise((resolve, reject) => {
+    if (!ffmpegPath) return reject(new Error('ffmpeg is not available'));
+    // With no output file ffmpeg prints the stream info and exits non-zero; that is expected.
+    const p = spawn(ffmpegPath as unknown as string, ['-hide_banner', '-i', file]);
+    let err = '';
+    p.stderr.on('data', (d) => (err += d));
+    p.on('error', reject);
+    p.on('close', () => {
+      const d = /Duration: (\d+):(\d{2}):(\d{2}(?:\.\d+)?)/.exec(err);
+      const size = /Stream #[^\n]*Video:[^\n]*?, (\d{2,5})x(\d{2,5})/.exec(err);
+      resolve({
+        durationMs: d ? Math.round((Number(d[1]) * 3600 + Number(d[2]) * 60 + Number(d[3])) * 1000) : null,
+        width: size ? Number(size[1]) : null,
+        height: size ? Number(size[2]) : null,
+        hasAudio: /Stream #[^\n]*Audio:/.test(err),
+      });
+    });
   });
 }
 
@@ -56,6 +85,7 @@ async function processVideo(deps: ProcessDeps, id: string, key: string) {
     const input = path.join(dir, 'input');
     await writeFile(input, await deps.storage.read(key));
     const base = key.replace(/\.[^.]+$/, '');
+    const info = await probe(input);
     // Poster frame.
     await run(['-ss', '1', '-i', input, '-frames:v', '1', '-vf', 'scale=1280:-2', '-q:v', '3', path.join(dir, 'poster.jpg')]).catch(() =>
       run(['-i', input, '-frames:v', '1', '-vf', 'scale=1280:-2', '-q:v', '3', path.join(dir, 'poster.jpg')]),
@@ -179,12 +209,11 @@ async function processVideo(deps: ProcessDeps, id: string, key: string) {
       );
       if (f === 'index.m3u8') hls = stored.url;
     }
-    await deps.db.query(`UPDATE media SET poster_url = $2, hls_url = $3, variants = jsonb_build_object('mp4', $4::text), status = 'ready' WHERE id = $1`, [
-      id,
-      poster.url,
-      hls,
-      mp4.url,
-    ]);
+    await deps.db.query(
+      `UPDATE media SET poster_url = $2, hls_url = $3, variants = jsonb_build_object('mp4', $4::text), status = 'ready',
+                        duration_ms = coalesce($5, duration_ms), width = coalesce(width, $6), height = coalesce(height, $7) WHERE id = $1`,
+      [id, poster.url, hls, mp4.url, info.durationMs, info.width, info.height],
+    );
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

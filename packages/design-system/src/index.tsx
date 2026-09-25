@@ -25,6 +25,7 @@ export {
 export {
   AIPanel,
   BottomSheet,
+  CaptionTracks,
   ChatBubble,
   CommunityCard,
   EmptyState,
@@ -42,6 +43,7 @@ export {
   Skeleton,
   Stat,
   Toast,
+  videoCrossOrigin,
   type LinkLike,
   type MenuAction,
   type NavEntry,

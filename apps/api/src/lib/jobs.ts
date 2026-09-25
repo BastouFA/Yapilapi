@@ -5,8 +5,14 @@ export type JobHandler = (payload: any) => Promise<void>;
 
 const MAX_ATTEMPTS = 5;
 
-export async function enqueue(db: Q, kind: string, payload: object, delaySeconds = 0): Promise<void> {
-  await db.query(`INSERT INTO jobs (kind, payload, run_at) VALUES ($1, $2, now() + make_interval(secs => $3))`, [kind, payload, delaySeconds]);
+/** Queue a job and return its id. */
+export async function enqueue(db: Q, kind: string, payload: object, delaySeconds = 0): Promise<string> {
+  const { rows } = await db.query(`INSERT INTO jobs (kind, payload, run_at) VALUES ($1, $2, now() + make_interval(secs => $3)) RETURNING id`, [
+    kind,
+    payload,
+    delaySeconds,
+  ]);
+  return String(rows[0].id);
 }
 
 /**

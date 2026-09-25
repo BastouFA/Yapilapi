@@ -52,6 +52,11 @@ const schema = z.object({
     .optional()
     .transform((v) => v !== 'false'),
   PUBLIC_API_URL: z.string().default('http://localhost:4000'),
+  // Automatic captions (speech-to-text). Off unless a provider is configured.
+  TRANSCRIBE_PROVIDER: z.enum(['none', 'openai-compatible']).default('none'),
+  TRANSCRIBE_API_URL: z.string().optional().default(''),
+  TRANSCRIBE_API_KEY: z.string().optional().default(''),
+  TRANSCRIBE_MODEL: z.string().default('whisper-1'),
   RATE_LIMIT_MAX: z.coerce.number().default(300),
 });
 

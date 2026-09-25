@@ -5,6 +5,7 @@ import { Button, EmptyState, List, ListItem, Select, Skeleton, Stat, TextField }
 import { formatMoney, formatRelativeTime } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { Campaigns } from '@/components/Campaigns';
+import { VideoEditor } from '@/components/VideoEditor';
 import { useSession } from '../../providers';
 
 /** Creator Studio: how your content performs over the last 28 days, and what you've earned. */
@@ -81,6 +82,7 @@ export default function Studio() {
           <EmptyState title="No posts yet" body="Publish something from Create to see how it does." />
         )}
       </section>
+      <VideoEditor />
       <PlansManager />
       <Campaigns />
     </div>
