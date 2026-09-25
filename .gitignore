@@ -13,3 +13,6 @@ coverage/
 *.tsbuildinfo
 # Expo local state (device history, dev server settings)
 .expo/
+
+# Claude Code agent worktrees
+.claude/worktrees/
