@@ -1,0 +1,26 @@
+{
+  "name": "@yapilapi/database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "migrate": "tsx --env-file-if-exists=../../.env src/migrate-cli.ts",
+    "seed": "tsx --env-file-if-exists=../../.env src/seed.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "pg": "8.23.0",
+    "@yapilapi/auth": "workspace:*",
+    "@yapilapi/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.0",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}

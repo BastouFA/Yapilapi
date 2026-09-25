@@ -1,0 +1,194 @@
+import Fastify, { type FastifyInstance } from 'fastify';
+import cookie from '@fastify/cookie';
+import cors from '@fastify/cors';
+import multipart from '@fastify/multipart';
+import rateLimit from '@fastify/rate-limit';
+import fastifyStatic from '@fastify/static';
+import websocket from '@fastify/websocket';
+import { Redis } from 'ioredis';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { createPool } from '@yapilapi/database';
+import type { Config } from './config.ts';
+import type { AppContext } from './lib/context.ts';
+import { AppError } from './lib/errors.ts';
+import { RealtimeHub } from './lib/realtime.ts';
+import { AiGateway } from './lib/ai/gateway.ts';
+import { anthropicProvider, devProvider } from './lib/ai/providers.ts';
+import { logEmailSender } from './lib/email.ts';
+import { localDiskStorage } from './lib/storage.ts';
+import { devPaymentProvider } from './lib/payments.ts';
+import { registerAuth } from './plugins/auth.ts';
+import { MAX_UPLOAD_BYTES } from './modules/media.ts';
+import authModule from './modules/auth.ts';
+import profilesModule from './modules/profiles.ts';
+import postsModule from './modules/posts.ts';
+import messagingModule from './modules/messaging.ts';
+import communitiesModule from './modules/communities.ts';
+import eventsModule from './modules/events.ts';
+import commerceModule from './modules/commerce.ts';
+import searchModule from './modules/search.ts';
+import notificationsModule from './modules/notifications.ts';
+import safetyModule from './modules/safety.ts';
+import privacyModule from './modules/privacy.ts';
+import aiModule from './modules/ai.ts';
+import momentsModule from './modules/moments.ts';
+import mediaModule from './modules/media.ts';
+import creatorModule from './modules/creator.ts';
+
+export interface BuiltApp {
+  app: FastifyInstance;
+  ctx: AppContext;
+  close: () => Promise<void>;
+}
+
+export async function buildApp(config: Config, opts: { logger?: boolean } = {}): Promise<BuiltApp> {
+  const app = Fastify({
+    logger:
+      opts.logger === false
+        ? false
+        : {
+            level: config.APP_ENV === 'production' ? 'info' : 'debug',
+            // Never log credentials or session tokens.
+            redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]', '*.password', '*.token'],
+          },
+    genReqId: (req) => (req.headers['x-request-id'] as string) || randomUUID(),
+    trustProxy: true,
+    bodyLimit: 1_000_000,
+  });
+
+  const db = createPool(config.DATABASE_URL);
+  let redis: Redis | undefined;
+  let sub: Redis | undefined;
+  if (config.REDIS_URL) {
+    redis = new Redis(config.REDIS_URL, { maxRetriesPerRequest: 2, lazyConnect: false });
+    sub = redis.duplicate();
+    // Degrade gracefully: Redis outages must not take the API down.
+    redis.on('error', (e) => app.log.warn({ err: e.message }, 'redis error'));
+    sub.on('error', (e) => app.log.warn({ err: e.message }, 'redis subscriber error'));
+  }
+
+  const provider = config.AI_PROVIDER === 'anthropic' && config.ANTHROPIC_API_KEY ? anthropicProvider(config.ANTHROPIC_API_KEY, config.AI_MODEL) : devProvider();
+  if (config.AI_PROVIDER === 'anthropic' && !config.ANTHROPIC_API_KEY) app.log.warn('AI_PROVIDER=anthropic but ANTHROPIC_API_KEY is empty; using the dev provider.');
+
+  const ctx: AppContext = {
+    config,
+    db,
+    redis,
+    realtime: new RealtimeHub(redis, sub),
+    ai: new AiGateway(db, provider),
+    email: logEmailSender(app.log),
+    storage: localDiskStorage(path.resolve(config.UPLOAD_DIR), config.PUBLIC_API_URL),
+    payments: devPaymentProvider(config.PAYMENTS_WEBHOOK_SECRET),
+  };
+
+  // Keep the raw body for webhook signature checks.
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+    (req as unknown as { rawBody: string }).rawBody = body as string;
+    if (!body) return done(null, {});
+    try {
+      done(null, JSON.parse(body as string));
+    } catch {
+      done(new AppError(400, 'invalid_json', 'The request body is not valid JSON.'), undefined);
+    }
+  });
+
+  await app.register(cors, { origin: config.WEB_ORIGIN.split(','), credentials: true });
+  await app.register(cookie);
+  await app.register(rateLimit, {
+    global: true,
+    hook: 'preHandler',
+    max: config.RATE_LIMIT_MAX,
+    timeWindow: '1 minute',
+    redis: redis,
+    skipOnError: true,
+    keyGenerator: (req) => req.user?.id ?? req.ip,
+    errorResponseBuilder: (_req, c) => ({ statusCode: 429, error: { code: 'rate_limited', message: `Too many requests. Try again in ${Math.ceil(c.ttl / 1000)} seconds.` } }),
+  });
+  await app.register(multipart, { limits: { fileSize: MAX_UPLOAD_BYTES } });
+  await app.register(websocket);
+  await app.register(fastifyStatic, { root: path.resolve(config.UPLOAD_DIR), prefix: '/media/', decorateReply: false, maxAge: '365d', immutable: true });
+
+  // Security headers for every API response.
+  app.addHook('onSend', async (req, reply) => {
+    reply.header('x-request-id', req.id);
+    reply.header('x-content-type-options', 'nosniff');
+    reply.header('referrer-policy', 'no-referrer');
+    reply.header('x-frame-options', 'DENY');
+    if (config.COOKIE_SECURE) reply.header('strict-transport-security', 'max-age=63072000; includeSubDomains');
+  });
+
+  registerAuth(app, ctx);
+
+  // Metrics: request counts and latency by route, exposed in Prometheus text format.
+  const metrics = new Map<string, { count: number; errors: number; totalMs: number }>();
+  app.addHook('onResponse', async (req, reply) => {
+    const key = `${req.method} ${req.routeOptions.url ?? 'unknown'}`;
+    const m = metrics.get(key) ?? { count: 0, errors: 0, totalMs: 0 };
+    m.count++;
+    if (reply.statusCode >= 500) m.errors++;
+    m.totalMs += reply.elapsedTime;
+    metrics.set(key, m);
+  });
+
+  app.setErrorHandler((err, req, reply) => {
+    if (err instanceof AppError) return reply.code(err.status).send({ error: { code: err.code, message: err.message, details: err.details, requestId: req.id } });
+    const e = err as { statusCode?: number; code?: string; message: string };
+    if (e.statusCode === 429) return reply.code(429).send(err);
+    if (e.code === 'FST_REQ_FILE_TOO_LARGE') return reply.code(413).send({ error: { code: 'too_large', message: 'Files can be up to 50 MB.', requestId: req.id } });
+    if (e.statusCode && e.statusCode < 500) return reply.code(e.statusCode).send({ error: { code: e.code ?? 'bad_request', message: e.message, requestId: req.id } });
+    req.log.error({ err }, 'unhandled error');
+    return reply.code(500).send({ error: { code: 'internal', message: 'Something went wrong on our side. Try again.', requestId: req.id } });
+  });
+
+  app.setNotFoundHandler((req, reply) => reply.code(404).send({ error: { code: 'not_found', message: `No route for ${req.method} ${req.url}.`, requestId: req.id } }));
+
+  // ── Health ────────────────────────────────────────────────────────────
+  app.get('/health/live', { config: { rateLimit: false } }, async () => ({ status: 'ok' }));
+  app.get('/health/ready', { config: { rateLimit: false } }, async (_req, reply) => {
+    const checks: Record<string, string> = {};
+    try {
+      await db.query('SELECT 1');
+      checks.database = 'ok';
+    } catch {
+      checks.database = 'down';
+    }
+    if (redis) checks.redis = await redis.ping().then(() => 'ok').catch(() => 'degraded');
+    checks.ai = ctx.ai.providerName;
+    const ready = checks.database === 'ok';
+    reply.code(ready ? 200 : 503);
+    return { status: ready ? 'ready' : 'not_ready', checks };
+  });
+  app.get('/metrics', { config: { rateLimit: false } }, async (_req, reply) => {
+    reply.type('text/plain; version=0.0.4');
+    const lines = ['# TYPE ypl_http_requests_total counter', '# TYPE ypl_http_errors_total counter', '# TYPE ypl_http_request_ms_sum counter'];
+    for (const [k, m] of metrics) {
+      const [method, route] = k.split(' ');
+      const labels = `method="${method}",route="${route}"`;
+      lines.push(`ypl_http_requests_total{${labels}} ${m.count}`, `ypl_http_errors_total{${labels}} ${m.errors}`, `ypl_http_request_ms_sum{${labels}} ${m.totalMs.toFixed(1)}`);
+    }
+    lines.push(`ypl_realtime_redis ${redis ? 1 : 0}`, `ypl_db_pool_total ${db.totalCount}`, `ypl_db_pool_idle ${db.idleCount}`);
+    return lines.join('\n') + '\n';
+  });
+
+  // Dev-only outbox so the web app and tests can read verification/reset emails.
+  if (config.APP_ENV === 'development' || config.APP_ENV === 'test')
+    app.get('/dev/outbox', async () => ({ items: ctx.email.outbox ?? [] }));
+
+  for (const mod of [
+    authModule, profilesModule, postsModule, messagingModule, communitiesModule, eventsModule, commerceModule, searchModule,
+    notificationsModule, safetyModule, privacyModule, aiModule, momentsModule, mediaModule, creatorModule,
+  ])
+    await mod(app, ctx);
+
+  return {
+    app,
+    ctx,
+    close: async () => {
+      await app.close();
+      await db.end();
+      sub?.disconnect();
+      redis?.disconnect();
+    },
+  };
+}

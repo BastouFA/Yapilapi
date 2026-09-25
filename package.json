@@ -1,0 +1,29 @@
+{
+  "name": "yapilapi",
+  "private": true,
+  "version": "0.1.0",
+  "description": "YAPILAPI — Your social world. One place.",
+  "packageManager": "pnpm@12.6.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "infra:up": "docker compose up -d --wait",
+    "infra:down": "docker compose down",
+    "db:migrate": "pnpm --filter @yapilapi/database migrate",
+    "db:seed": "pnpm --filter @yapilapi/database seed",
+    "dev": "pnpm --parallel --filter @yapilapi/api --filter @yapilapi/web dev",
+    "dev:api": "pnpm --filter @yapilapi/api dev",
+    "dev:web": "pnpm --filter @yapilapi/web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "prettier": "^3.6.0",
+    "typescript": "5.9.3"
+  }
+}
