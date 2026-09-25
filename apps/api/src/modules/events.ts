@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { notify, track } from '../lib/services.ts';
+import { emitWebhook } from '../lib/webhooks.ts';
 import { PUBLIC_USER_COLS, publicUserFrom, toPublicUser, type PublicUserRow } from '../lib/users.ts';
 import { eventVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
@@ -147,6 +148,7 @@ export default async function eventsModule(app: FastifyInstance, ctx: AppContext
     if (stored === 'going') {
       await notify(db, ctx.realtime, { userId: ev.h_id, category: 'events', type: 'event_rsvp', actorId: u.id, entityType: 'event', entityId: id });
       track(db, u.id, 'event_rsvp_going');
+      void emitWebhook(db, ev.h_id, 'event.rsvp', { eventId: id, status: stored });
     }
     return { status: stored, event: toEvent(await load(id, u.id)) };
   });

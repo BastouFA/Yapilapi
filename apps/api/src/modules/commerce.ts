@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { audit, isEnabled, notify, track } from '../lib/services.ts';
+import { emitWebhook } from '../lib/webhooks.ts';
 import { publicUserFrom } from '../lib/users.ts';
 import { EVENT_SELECT, toEvent } from './events.ts';
 import { eventVisibleSql } from '../lib/visibility.ts';
@@ -334,6 +335,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
           `SELECT DISTINCT p.seller_id FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = $1`,
           [p.order_id],
         );
+        for (const s of sellers.rows) await emitWebhook(c, s.seller_id, 'order.paid', { orderId: p.order_id });
         for (const s of sellers.rows)
           await notify(c, ctx.realtime, {
             userId: s.seller_id,

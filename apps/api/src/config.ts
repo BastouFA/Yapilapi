@@ -22,6 +22,8 @@ const schema = z.object({
   ANTHROPIC_API_KEY: z.string().optional().default(''),
   PAYMENTS_PROVIDER: z.enum(['dev']).default('dev'),
   PAYMENTS_WEBHOOK_SECRET: z.string().default('dev-webhook-secret-change-me'),
+  // 32 bytes, base64. Encrypts TOTP secrets at rest. Development falls back to a fixed dev key.
+  MFA_ENCRYPTION_KEY: z.string().optional().default(''),
   UPLOAD_DIR: z.string().default('./uploads'),
   PUBLIC_API_URL: z.string().default('http://localhost:4000'),
   RATE_LIMIT_MAX: z.coerce.number().default(300),
@@ -38,6 +40,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const cfg = parsed.data;
   if (cfg.APP_ENV === 'production') {
     if (cfg.PAYMENTS_WEBHOOK_SECRET.startsWith('dev-')) throw new Error('Set PAYMENTS_WEBHOOK_SECRET for production.');
+    if (Buffer.from(cfg.MFA_ENCRYPTION_KEY, 'base64').length !== 32) throw new Error('Set MFA_ENCRYPTION_KEY (32 bytes, base64) for production.');
     if (!cfg.COOKIE_SECURE) throw new Error('COOKIE_SECURE must be true in production.');
   }
   return cfg;

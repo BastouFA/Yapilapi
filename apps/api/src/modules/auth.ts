@@ -8,6 +8,7 @@ import type { AppContext } from '../lib/context.ts';
 import { audit, securityEvent, track } from '../lib/services.ts';
 import { ageOf } from '../lib/users.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
+import { registerMfa } from './mfa.ts';
 
 const MIN_AGE = 13;
 const authLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } };
@@ -131,9 +132,23 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
       throw unauthorized('That email and password don’t match. Try again or reset your password.');
     }
     if (u.status !== 'active') throw new AppError(403, 'account_suspended', 'This account is suspended. You can appeal from the email we sent you.');
+    // Second factor: the password alone only earns a short-lived challenge.
+    const mfa = await ctx.db.query(`SELECT 1 FROM mfa_factors WHERE user_id = $1 AND kind = 'totp' AND confirmed_at IS NOT NULL`, [u.id]);
+    if (mfa.rowCount) {
+      const { token: challengeToken, hash } = newToken();
+      await ctx.db.query(`INSERT INTO mfa_challenges (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '5 minutes')`, [u.id, hash]);
+      await securityEvent(ctx.db, u.id, 'login_password_ok_mfa_pending', req.ip, req.headers['user-agent']);
+      return { mfaRequired: true, challengeToken };
+    }
     const token = await startSession(req, reply, u.id);
     await securityEvent(ctx.db, u.id, 'login', req.ip, req.headers['user-agent']);
     return { user: await loadMe(ctx, u.id), token };
+  });
+
+  registerMfa(app, ctx, async (req, reply, userId) => {
+    const token = await startSession(req, reply, userId);
+    await securityEvent(ctx.db, userId, 'login', req.ip, req.headers['user-agent'], { mfa: true });
+    return { user: await loadMe(ctx, userId), token };
   });
 
   app.post('/v1/auth/logout', async (req, reply) => {
@@ -245,13 +260,6 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
       me(req).id,
     ]);
     return { items: rows };
-  });
-
-  // MFA / passkeys: factors are listed here; enrolment flows are gated until a
-  // TOTP secret-encryption key and WebAuthn relying-party config are provisioned.
-  app.get('/v1/auth/mfa', { preHandler: requireAuth }, async (req) => {
-    const { rows } = await ctx.db.query(`SELECT id, kind, label, created_at, last_used_at FROM mfa_factors WHERE user_id = $1`, [me(req).id]);
-    return { items: rows, enrollmentAvailable: false, reason: 'MFA enrolment needs MFA_ENCRYPTION_KEY and WEBAUTHN_RP_ID to be configured.' };
   });
 
   app.post('/v1/auth/check-username', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {

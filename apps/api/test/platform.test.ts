@@ -121,6 +121,7 @@ describe('trust, safety and privacy', () => {
     b = await signUp(t.app);
     admin = await signUp(t.app);
     await t.ctx.db.query(`UPDATE users SET role = 'admin' WHERE id = $1`, [admin.id]);
+    await t.ctx.db.query(`DELETE FROM feature_flags`);
   });
   afterAll(() => t.close());
 

@@ -17,6 +17,7 @@ import { decodeCursor, encodeCursor, keyCursorOf, type KeyCursor } from '../lib/
 import { analyzeText, statusForRisk } from '../lib/moderation.ts';
 import { hydratePosts } from '../lib/posts.ts';
 import { notify, track } from '../lib/services.ts';
+import { emitWebhook } from '../lib/webhooks.ts';
 import { publicUserFrom } from '../lib/users.ts';
 import { notBlockedSql, postVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
@@ -112,6 +113,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       return id;
     });
     track(db, u.id, 'post_created', { kind, visibility: input.visibility, community: !!input.communityId });
+    void emitWebhook(db, u.id, 'post.created', { postId, kind, visibility: input.visibility });
     reply.code(201);
     const [post] = await hydratePosts(db, [postId], u.id);
     return {

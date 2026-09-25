@@ -11,6 +11,8 @@ export interface AuthUser {
   email: string;
   emailVerified: boolean;
   birthDate: Date | null;
+  /** Set when the request authenticated with a developer API key instead of a session. */
+  apiKey?: { id: string; appId: string; scopes: string[] };
 }
 
 declare module 'fastify' {
@@ -28,8 +30,45 @@ export function sessionTokenOf(req: FastifyRequest): string | undefined {
   return undefined;
 }
 
+/** Developer API keys look like ypl_<8 hex>_<secret>. */
+async function resolveApiKey(ctx: AppContext, key: string): Promise<AuthUser | null> {
+  const { rows } = await ctx.db.query(
+    `SELECT k.id, k.app_id, k.scopes, k.last_used_at, u.id AS user_id, u.email, u.email_verified_at, u.birth_date
+     FROM api_keys k JOIN users u ON u.id = k.owner_id JOIN developer_apps a ON a.id = k.app_id
+     WHERE k.key_hash = $1 AND k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.expires_at > now())
+       AND a.deleted_at IS NULL AND u.status = 'active'`,
+    [hashToken(key)],
+  );
+  const r = rows[0];
+  if (!r) return null;
+  if (!r.last_used_at || Date.now() - r.last_used_at.getTime() > 60_000)
+    void ctx.db.query(`UPDATE api_keys SET last_used_at = now() WHERE id = $1`, [r.id]).catch(() => {});
+  // Keys never carry platform roles, whatever their owner's role is.
+  return {
+    id: r.user_id,
+    sessionId: '',
+    role: 'user',
+    email: r.email,
+    emailVerified: !!r.email_verified_at,
+    birthDate: r.birth_date,
+    apiKey: { id: r.id, appId: r.app_id, scopes: r.scopes },
+  };
+}
+
+/** Routes an API key can never reach: account security, keys themselves, data export, deletion, money out, admin. */
+const KEY_BLOCKED = [
+  /^\/v1\/auth\//,
+  /^\/v1\/developer\//,
+  /^\/v1\/admin\//,
+  /^\/v1\/me\/export$/,
+  /^\/v1\/me\/payouts/,
+  /^\/v1\/me\/consents$/,
+  /^\/v1\/ai\/memories/,
+];
+
 export async function resolveSession(ctx: AppContext, token: string | undefined): Promise<AuthUser | null> {
   if (!token) return null;
+  if (/^ypl_[0-9a-f]{8}_/.test(token)) return resolveApiKey(ctx, token);
   const { rows } = await ctx.db.query<{
     session_id: string;
     user_id: string;
@@ -63,6 +102,13 @@ export function registerAuth(app: FastifyInstance, ctx: AppContext) {
   app.decorateRequest('user', null);
   app.addHook('onRequest', async (req) => {
     req.user = await resolveSession(ctx, sessionTokenOf(req));
+    const key = req.user?.apiKey;
+    if (!key) return;
+    const path = req.url.split('?')[0]!;
+    if (KEY_BLOCKED.some((r) => r.test(path)) || (req.method === 'DELETE' && path === '/v1/me'))
+      throw forbidden('API keys cannot use this endpoint. Sign in to the app instead.');
+    const needs = req.method === 'GET' || req.method === 'HEAD' ? 'read' : 'write';
+    if (!key.scopes.includes(needs)) throw forbidden(`This API key needs the "${needs}" scope.`);
   });
 }
 

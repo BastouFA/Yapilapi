@@ -35,6 +35,10 @@ import aiModule from './modules/ai.ts';
 import momentsModule from './modules/moments.ts';
 import mediaModule from './modules/media.ts';
 import creatorModule from './modules/creator.ts';
+import developerModule from './modules/developer.ts';
+import memoryModule from './modules/memory.ts';
+import liveModule from './modules/live.ts';
+import { processWebhooks } from './lib/webhooks.ts';
 
 export interface BuiltApp {
   app: FastifyInstance;
@@ -42,7 +46,10 @@ export interface BuiltApp {
   close: () => Promise<void>;
 }
 
-export async function buildApp(config: Config, opts: { logger?: boolean; onRoute?: (route: RouteOptions) => void } = {}): Promise<BuiltApp> {
+export async function buildApp(
+  config: Config,
+  opts: { logger?: boolean; onRoute?: (route: RouteOptions) => void; webhookWorker?: boolean } = {},
+): Promise<BuiltApp> {
   const app = Fastify({
     logger:
       opts.logger === false
@@ -209,13 +216,25 @@ export async function buildApp(config: Config, opts: { logger?: boolean; onRoute
     momentsModule,
     mediaModule,
     creatorModule,
+    developerModule,
+    memoryModule,
+    liveModule,
   ])
     await mod(app, ctx);
+
+  // Webhook delivery worker. Tests drive processWebhooks directly instead.
+  let webhookTimer: NodeJS.Timeout | undefined;
+  if (opts.webhookWorker ?? config.APP_ENV !== 'test') {
+    const allowLocal = config.APP_ENV === 'development';
+    webhookTimer = setInterval(() => void processWebhooks(db, { allowLocal }).catch((e) => app.log.warn({ err: e.message }, 'webhook worker')), 5_000);
+    webhookTimer.unref();
+  }
 
   return {
     app,
     ctx,
     close: async () => {
+      clearInterval(webhookTimer);
       await app.close();
       await db.end();
       sub?.disconnect();

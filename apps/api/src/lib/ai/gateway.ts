@@ -2,9 +2,10 @@ import type { Pool } from 'pg';
 import { analyzeText } from '../moderation.ts';
 import { forbidden, notFound } from '../errors.ts';
 import { parseSearchIntent } from './intent.ts';
+import { postVisibleSql } from '../visibility.ts';
 import type { AiProvider } from './providers.ts';
 
-export type AiTask = 'caption' | 'summarize_conversation' | 'summarize_community' | 'search_intent' | 'plan_from_message' | 'translate';
+export type AiTask = 'caption' | 'summarize_conversation' | 'summarize_community' | 'search_intent' | 'plan_from_message' | 'translate' | 'memory_recap';
 
 export interface AiRequest {
   userId: string;
@@ -12,6 +13,7 @@ export interface AiRequest {
   input: string;
   conversationId?: string;
   communityId?: string;
+  memoryId?: string;
   targetLanguage?: string;
 }
 
@@ -125,6 +127,20 @@ export class AiGateway {
       );
       return { text: rows.map((r) => `${r.name}: ${r.body}`).join('\n'), scopes: [`community:${req.communityId}`] };
     }
+    if (req.task === 'memory_recap') {
+      if (!req.memoryId) throw notFound('Memory');
+      const own = await this.db.query(`SELECT 1 FROM memories WHERE id = $1 AND owner_id = $2`, [req.memoryId, req.userId]);
+      if (!own.rowCount) throw notFound('Memory');
+      // Only posts the owner can see right now, even if they were added earlier.
+      const { rows } = await this.db.query<{ name: string; body: string }>(
+        `SELECT pr.display_name AS name, p.body FROM memory_items i
+         JOIN posts p ON p.id = i.item_id AND i.item_type = 'post'
+         JOIN profiles pr ON pr.user_id = p.author_id JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
+         WHERE i.memory_id = $2 AND ${postVisibleSql('$1')} ORDER BY p.created_at LIMIT 100`,
+        [req.userId, req.memoryId],
+      );
+      return { text: rows.map((r) => `${r.name}: ${r.body}`).join('\n'), scopes: [`memory:${req.memoryId}`] };
+    }
     // caption, search_intent, plan_from_message and translate only use the text the user supplied.
     return { text: req.input, scopes: ['input'] };
   }
@@ -157,6 +173,11 @@ export class AiGateway {
       translate: {
         system: `Translate the text into ${req.targetLanguage ?? 'English'}. Reply with the translation only.`,
         prompt: context,
+      },
+      memory_recap: {
+        system:
+          'Write a warm, factual recap (2-4 sentences) of a personal memory from these posts. Mention only people and details that appear in the posts. No hashtags.',
+        prompt: context || '(no posts)',
       },
     };
     const p = prompts[req.task];
@@ -195,6 +216,12 @@ function devTask(req: AiRequest, context: string): unknown {
     case 'caption': {
       const first = context.split(/(?<=[.!?])\s/)[0]?.trim() ?? '';
       return first.length > 140 ? `${first.slice(0, 137)}…` : first;
+    }
+    case 'memory_recap': {
+      const lines = context.split('\n').filter(Boolean);
+      if (!lines.length) return '';
+      const people = [...new Set(lines.map((l) => l.split(':')[0]))];
+      return `${req.input}: ${lines.length} moment${lines.length > 1 ? 's' : ''} shared by ${people.join(', ')}. ${lines[0]!.split(': ').slice(1).join(': ')}`;
     }
     case 'summarize_conversation':
     case 'summarize_community': {
