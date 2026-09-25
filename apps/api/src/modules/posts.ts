@@ -225,7 +225,12 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
    * Not optimized for time spent: no autoplay loops, a clear end of feed.
    */
   async function rankedFeed(userId: string, cursor: string | undefined, limit: number, personal: string, reduced: boolean) {
-    const c = decodeCursor<{ asOf: string; o: number }>(cursor) ?? { asOf: new Date().toISOString(), o: 0 };
+    // The window starts at the database's clock, not this process's: a post written a moment ago must be inside it
+    // even when the two clocks drift (common with containers after the host sleeps).
+    const c = decodeCursor<{ asOf: string; o: number }>(cursor) ?? {
+      asOf: ((await db.query<{ t: Date }>(`SELECT now() AS t`)).rows[0]!.t as Date).toISOString(),
+      o: 0,
+    };
     const connectionOnly = reduced
       ? `AND (p.author_id = $1 OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = p.author_id)
               OR EXISTS (SELECT 1 FROM community_members cm WHERE cm.community_id = p.community_id AND cm.user_id = $1))`
