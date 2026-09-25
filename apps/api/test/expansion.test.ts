@@ -212,7 +212,7 @@ describe('live', () => {
   it('runs a live session with chat, Q&A, moderation and ending', async () => {
     const created = await as(t.app, host).post('/v1/live', { title: 'Friday Q&A' });
     expect(created.status).toBe(201);
-    expect(created.body.ingest.streamKey).toMatch(/^sk_/);
+    expect(created.body.ingest.streamKey).toMatch(/^[0-9a-f-]{36}\?key=sk_/);
     const id = created.body.live.id;
     expect((await as(t.app, fan).post(`/v1/live/${id}/join`)).status).toBe(400);
     expect((await as(t.app, fan).post(`/v1/live/${id}/start`)).status).toBe(400);

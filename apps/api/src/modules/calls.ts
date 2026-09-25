@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
 import { z } from 'zod';
@@ -18,10 +19,20 @@ const RING_SECONDS = 45;
 export default async function callsModule(app: FastifyInstance, ctx: AppContext) {
   const db = ctx.db;
 
-  function iceServers() {
+  /**
+   * STUN plus time-limited TURN credentials (TURN REST API: username = expiry:userId,
+   * credential = base64(HMAC-SHA1(secret, username))), valid for 12 hours.
+   */
+  function iceServers(userId?: string) {
     const servers: { urls: string | string[]; username?: string; credential?: string }[] = [{ urls: 'stun:stun.l.google.com:19302' }];
-    const turn = process.env.TURN_URL;
-    if (turn) servers.push({ urls: turn, username: process.env.TURN_USERNAME, credential: process.env.TURN_CREDENTIAL });
+    const urls = ctx.config.TURN_URLS.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (urls.length && ctx.config.TURN_SECRET && userId) {
+      const username = `${Math.floor(Date.now() / 1000) + 12 * 3600}:${userId}`;
+      const credential = createHmac('sha1', ctx.config.TURN_SECRET).update(username).digest('base64');
+      servers.push({ urls, username, credential });
+    }
     return servers;
   }
 
@@ -55,7 +66,7 @@ export default async function callsModule(app: FastifyInstance, ctx: AppContext)
     };
   }
 
-  app.get('/v1/calls/ice-servers', { preHandler: requireAuth }, async () => ({ iceServers: iceServers() }));
+  app.get('/v1/calls/ice-servers', { preHandler: requireAuth }, async (req) => ({ iceServers: iceServers(me(req).id) }));
 
   app.post('/v1/conversations/:id/calls', { preHandler: requireAuth, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req, reply) => {
     const u = me(req);
@@ -98,12 +109,12 @@ export default async function callsModule(app: FastifyInstance, ctx: AppContext)
       });
     track(db, u.id, 'call_started', { kind, size: members.length });
     reply.code(201);
-    return { call, iceServers: iceServers() };
+    return { call, iceServers: iceServers(me(req).id) };
   });
 
   app.get('/v1/calls/:id', { preHandler: requireAuth }, async (req) => {
     const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
-    return { call: dto(await loadCall(id, me(req).id)), iceServers: iceServers() };
+    return { call: dto(await loadCall(id, me(req).id)), iceServers: iceServers(me(req).id) };
   });
 
   app.post('/v1/calls/:id/answer', { preHandler: requireAuth }, async (req) => {
@@ -115,7 +126,7 @@ export default async function callsModule(app: FastifyInstance, ctx: AppContext)
     await db.query(`UPDATE call_participants SET joined_at = now(), left_at = NULL WHERE call_id = $1 AND user_id = $2`, [id, u.id]);
     const call = dto(await loadCall(id, u.id));
     await ctx.realtime.publish(call.participants, { type: 'call.answered', data: { callId: id, userId: u.id } });
-    return { call, iceServers: iceServers() };
+    return { call, iceServers: iceServers(me(req).id) };
   });
 
   app.post('/v1/calls/:id/decline', { preHandler: requireAuth }, async (req) => {

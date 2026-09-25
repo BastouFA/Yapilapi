@@ -94,11 +94,23 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       );
       const id = rows[0]!.id;
       for (const [i, m] of input.media.entries()) {
-        const media = await c.query<{ id: string }>(
-          `INSERT INTO media (owner_id, kind, url, alt_text, width, height) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-          [u.id, m.kind, m.url, m.altText ?? null, m.width ?? null, m.height ?? null],
-        );
-        await c.query(`INSERT INTO post_media (post_id, media_id, position) VALUES ($1,$2,$3)`, [id, media.rows[0]!.id, i]);
+        let mediaId = m.id;
+        if (mediaId) {
+          // Reuse the uploaded item (only your own), updating its alt text.
+          const own = await c.query(`UPDATE media SET alt_text = coalesce($3, alt_text) WHERE id = $1 AND owner_id = $2 RETURNING id`, [
+            mediaId,
+            u.id,
+            m.altText ?? null,
+          ]);
+          if (!own.rowCount) throw notFound('One of the photos or videos');
+        } else {
+          const media = await c.query<{ id: string }>(
+            `INSERT INTO media (owner_id, kind, url, alt_text, width, height) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+            [u.id, m.kind, m.url, m.altText ?? null, m.width ?? null, m.height ?? null],
+          );
+          mediaId = media.rows[0]!.id;
+        }
+        await c.query(`INSERT INTO post_media (post_id, media_id, position) VALUES ($1,$2,$3)`, [id, mediaId, i]);
       }
       if (input.poll)
         for (const [i, label] of input.poll.options.entries())

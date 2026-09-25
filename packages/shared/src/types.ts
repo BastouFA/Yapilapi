@@ -41,6 +41,13 @@ export interface MediaItem {
   altText: string | null;
   width: number | null;
   height: number | null;
+  /** Processed sizes (thumb/medium/large webp for images; mp4 for video). Empty until processing finishes. */
+  variants?: Record<string, string>;
+  posterUrl?: string | null;
+  /** Adaptive HLS stream for videos. */
+  hlsUrl?: string | null;
+  /** Tiny blurred preview (data URI) shown while loading. */
+  placeholder?: string | null;
 }
 
 export interface Post {

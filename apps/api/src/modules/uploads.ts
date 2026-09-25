@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { AppError, badRequest, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { ALLOWED_MIME, sniffMatches } from '../lib/storage.ts';
+import { enqueue } from '../lib/jobs.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 export const CHUNK_SIZE = 5 * 1024 * 1024;
@@ -99,6 +100,7 @@ export default async function uploadsModule(app: FastifyInstance, ctx: AppContex
       [u.id, kind.kind, stored.url, s.mime, alt, stored.key, data.length],
     );
     await db.query(`UPDATE upload_sessions SET status = 'completed', media_id = $2 WHERE id = $1`, [id, rows[0].id]);
+    await enqueue(db, 'media.process', { mediaId: rows[0].id });
     await rm(dir, { recursive: true, force: true });
     reply.code(201);
     return { media: rows[0] };

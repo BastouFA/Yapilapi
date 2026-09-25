@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { FEATURE_FLAGS, type FeatureFlag } from '@yapilapi/shared';
 import type { RealtimeHub } from './realtime.ts';
+import { pushTextFor, type PushSender } from './push.ts';
 
 type Q = Pool | PoolClient;
 
@@ -61,8 +62,8 @@ export async function notify(
   n: { userId: string; category: string; type: string; actorId?: string; entityType?: string; entityId?: string; data?: object },
 ): Promise<void> {
   if (n.actorId && n.actorId === n.userId) return;
-  const prefs = await db.query<{ notification_categories: Record<string, boolean>; notifications_paused_until: Date | null }>(
-    `SELECT notification_categories, notifications_paused_until FROM user_preferences WHERE user_id = $1`,
+  const prefs = await db.query<{ notification_categories: Record<string, boolean>; notifications_paused_until: Date | null; focus_mode: boolean }>(
+    `SELECT notification_categories, notifications_paused_until, focus_mode FROM user_preferences WHERE user_id = $1`,
     [n.userId],
   );
   const p = prefs.rows[0];
@@ -82,7 +83,22 @@ export async function notify(
   );
   // Security notifications always go out; others respect a pause.
   const paused = p?.notifications_paused_until && p.notifications_paused_until > new Date() && n.category !== 'security';
-  if (!paused) await realtime.publish([n.userId], { type: 'notification.created', data: { id: rows[0]!.id, category: n.category, type: n.type } });
+  if (paused) return;
+  await realtime.publish([n.userId], { type: 'notification.created', data: { id: rows[0]!.id, category: n.category, type: n.type } });
+  // Push to devices, except when the person is in focus mode. Fire and forget.
+  if (pushSender && !p?.focus_mode) {
+    const text = pushTextFor(
+      n.type,
+      n.actorId ? ((await db.query(`SELECT display_name FROM profiles WHERE user_id = $1`, [n.actorId])).rows[0]?.display_name ?? null) : null,
+    );
+    if (text) void pushSender(n.userId, { title: 'YAPILAPI', body: text, tag: n.type, url: '/notifications' }).catch(() => {});
+  }
+}
+
+let pushSender: PushSender | null = null;
+/** Called once at startup with the configured push sender. */
+export function setPushSender(sender: PushSender | null) {
+  pushSender = sender;
 }
 
 export async function getFlags(db: Q): Promise<Record<FeatureFlag, boolean>> {

@@ -98,11 +98,17 @@ export function MediaGrid({ media }: { media: MediaItem[] }) {
             aria-label={m.altText ? `Open: ${m.altText}` : `Open media ${i + 1} of ${media.length}`}
           >
             {m.kind === 'video' ? (
-              <video src={m.url} muted playsInline preload="metadata" />
+              <video src={m.variants?.mp4 ?? m.url} poster={m.posterUrl ?? undefined} muted playsInline preload="metadata" />
             ) : m.kind === 'audio' ? (
               <span className="yp-media__more">♪</span>
             ) : (
-              <img src={m.url} alt={m.altText ?? ''} loading="lazy" decoding="async" />
+              <img
+                src={(shown.length > 1 ? m.variants?.medium : (m.variants?.large ?? m.variants?.medium)) ?? m.url}
+                alt={m.altText ?? ''}
+                loading="lazy"
+                decoding="async"
+                style={m.placeholder ? { backgroundImage: `url(${m.placeholder})`, backgroundSize: 'cover' } : undefined}
+              />
             )}
             {i === 3 && media.length > 4 ? <span className="yp-media__more">+{media.length - 4}</span> : null}
           </button>
@@ -146,11 +152,11 @@ export function MediaViewer({ media, index, onClose }: { media: MediaItem[]; ind
       </div>
       <div className="yp-viewer__stage">
         {m.kind === 'video' ? (
-          <video src={m.url} controls autoPlay playsInline />
+          <video src={m.variants?.mp4 ?? m.url} poster={m.posterUrl ?? undefined} controls autoPlay playsInline />
         ) : m.kind === 'audio' ? (
           <audio src={m.url} controls />
         ) : (
-          <img src={m.url} alt={m.altText ?? ''} />
+          <img src={m.variants?.large ?? m.url} alt={m.altText ?? ''} />
         )}
       </div>
       {media.length > 1 ? (

@@ -329,8 +329,31 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
           `UPDATE products pd SET inventory = pd.inventory - oi.quantity FROM order_items oi WHERE oi.order_id = $1 AND oi.product_id = pd.id AND pd.inventory IS NOT NULL`,
           [p.order_id],
         );
-        const o = (await c.query(`SELECT buyer_id FROM orders WHERE id = $1`, [p.order_id])).rows[0];
-        track(db, o.buyer_id, 'order_paid');
+        const o = (await c.query(`SELECT buyer_id, purpose, payee_id FROM orders WHERE id = $1`, [p.order_id])).rows[0];
+        track(db, o.buyer_id, 'order_paid', { purpose: o.purpose });
+        if (o.purpose === 'subscription') {
+          await c.query(
+            `UPDATE creator_subscriptions SET status = 'active', current_period_end = now() + interval '30 days' WHERE order_id = $1 AND status = 'pending'`,
+            [p.order_id],
+          );
+          await notify(c, ctx.realtime, {
+            userId: o.payee_id,
+            category: 'creators',
+            type: 'subscription_started',
+            actorId: o.buyer_id,
+            entityType: 'order',
+            entityId: p.order_id,
+          });
+        }
+        if (o.purpose === 'tip')
+          await notify(c, ctx.realtime, {
+            userId: o.payee_id,
+            category: 'creators',
+            type: 'tip_received',
+            actorId: o.buyer_id,
+            entityType: 'order',
+            entityId: p.order_id,
+          });
         const sellers = await c.query<{ seller_id: string }>(
           `SELECT DISTINCT p.seller_id FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = $1`,
           [p.order_id],
@@ -390,10 +413,13 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
   app.get('/v1/me/earnings', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const { rows } = await db.query(
-      `SELECT o.currency, sum(oi.quantity * oi.unit_cents) AS gross,
-              sum(round(oi.quantity * oi.unit_cents * ${PLATFORM_FEE_BPS} / 10000.0)) AS fees
-       FROM order_items oi JOIN orders o ON o.id = oi.order_id JOIN products p ON p.id = oi.product_id
-       WHERE p.seller_id = $1 AND o.status = 'paid' GROUP BY o.currency`,
+      `SELECT currency, sum(gross) AS gross, sum(fees) AS fees FROM (
+         SELECT o.currency, oi.quantity * oi.unit_cents AS gross, round(oi.quantity * oi.unit_cents * ${PLATFORM_FEE_BPS} / 10000.0) AS fees
+         FROM order_items oi JOIN orders o ON o.id = oi.order_id JOIN products p ON p.id = oi.product_id
+         WHERE p.seller_id = $1 AND o.status = 'paid'
+         UNION ALL
+         SELECT o.currency, o.total_cents, o.platform_fee_cents FROM orders o WHERE o.payee_id = $1 AND o.status = 'paid' AND o.purpose IN ('subscription', 'tip')
+       ) x GROUP BY currency`,
       [u.id],
     );
     const payouts = await db.query(`SELECT currency, sum(amount_cents) AS paid FROM payouts WHERE user_id = $1 AND status <> 'failed' GROUP BY currency`, [

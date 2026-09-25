@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { hashToken } from '@yapilapi/auth';
 import { tx } from '@yapilapi/database';
@@ -19,16 +19,37 @@ const idParam = z.object({ id: z.string().uuid() });
  */
 export interface LiveVideoProvider {
   ingest(sessionId: string, streamKey: string): { url: string; streamKey: string };
-  playback(sessionId: string): string;
+  playback(sessionId: string, token: string): string;
 }
-export const devLiveVideo: LiveVideoProvider = {
-  ingest: (_id, streamKey) => ({ url: 'rtmp://localhost:1935/live', streamKey }),
-  playback: (id) => `http://localhost:8080/hls/${id}.m3u8`,
-};
+
+/**
+ * MediaMTX: streaming software publishes RTMP to <server>/live with stream key
+ * "<sessionId>?key=<secret>"; viewers get HLS at /live/<sessionId>/index.m3u8
+ * with a short-lived signed token. MediaMTX asks /v1/live/hooks/auth for both.
+ */
+export function mediamtxVideo(rtmpBase: string, hlsBase: string): LiveVideoProvider {
+  return {
+    ingest: (id, streamKey) => ({ url: `${rtmpBase}/live`, streamKey: `${id}?key=${streamKey}` }),
+    playback: (id, token) => `${hlsBase}/live/${id}/index.m3u8?token=${encodeURIComponent(token)}`,
+  };
+}
 
 /** Live sessions: host, co-hosts, audience, chat, Q&A, moderation. Behind the LIVE flag. */
-export default async function liveModule(app: FastifyInstance, ctx: AppContext, video: LiveVideoProvider = devLiveVideo) {
+export default async function liveModule(app: FastifyInstance, ctx: AppContext, videoOverride?: LiveVideoProvider) {
   const db = ctx.db;
+  const video = videoOverride ?? mediamtxVideo(ctx.config.LIVE_RTMP_URL, ctx.config.LIVE_HLS_BASE);
+  // Viewer tokens: HMAC(sessionId.userId.expiry), valid for 6 hours.
+  const signView = (sessionId: string, userId: string) => {
+    const exp = Math.floor(Date.now() / 1000) + 6 * 3600;
+    const mac = createHmac('sha256', ctx.config.LIVE_HOOK_SECRET).update(`${sessionId}.${userId}.${exp}`).digest('base64url');
+    return `${userId}.${exp}.${mac}`;
+  };
+  const checkView = (sessionId: string, token: string) => {
+    const [userId, exp, mac] = token.split('.');
+    if (!userId || !exp || !mac || Number(exp) < Date.now() / 1000) return false;
+    const expected = createHmac('sha256', ctx.config.LIVE_HOOK_SECRET).update(`${sessionId}.${userId}.${exp}`).digest('base64url');
+    return expected.length === mac.length && timingSafeEqual(Buffer.from(expected), Buffer.from(mac));
+  };
   const gate = async (req: FastifyRequest) => {
     await requireAuth(req, undefined as never);
     if (!(await isEnabled(db, 'LIVE'))) throw featureDisabled('Live');
@@ -45,7 +66,7 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
       (SELECT banned FROM live_participants p WHERE p.session_id = l.id AND p.user_id = $1) AS banned
     FROM live_sessions l JOIN profiles pr ON pr.user_id = l.host_id`;
 
-  function dto(r: Record<string, any>) {
+  function dto(r: Record<string, any>, viewerId: string) {
     return {
       id: r.id,
       title: r.title,
@@ -58,7 +79,7 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
       startedAt: r.started_at,
       endedAt: r.ended_at,
       myRole: r.my_role,
-      playbackUrl: r.status === 'live' ? video.playback(r.id) : null,
+      playbackUrl: r.status === 'live' && !r.banned ? video.playback(r.id, signView(r.id, viewerId)) : null,
     };
   }
 
@@ -77,7 +98,7 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
       `${SELECT} WHERE ${VISIBLE} AND l.status IN ('live','scheduled') ORDER BY l.status = 'live' DESC, coalesce(l.started_at, l.scheduled_for) DESC LIMIT 50`,
       [me(req).id],
     );
-    return { items: rows.map(dto) };
+    return { items: rows.map((r) => dto(r, me(req).id)) };
   });
 
   app.post('/v1/live', { preHandler: gate, config: { rateLimit: { max: 10, timeWindow: '1 hour' } } }, async (req, reply) => {
@@ -100,12 +121,12 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
       return rows[0].id as string;
     });
     reply.code(201);
-    return { live: dto(await load(id, u.id)), ingest: video.ingest(id, streamKey), message: 'Keep the stream key private. It is shown once.' };
+    return { live: dto(await load(id, u.id), u.id), ingest: video.ingest(id, streamKey), message: 'Keep the stream key private. It is shown once.' };
   });
 
   app.get('/v1/live/:id', { preHandler: gate }, async (req) => {
     const { id } = parse(idParam, req.params);
-    return { live: dto(await load(id, me(req).id)) };
+    return { live: dto(await load(id, me(req).id), me(req).id) };
   });
 
   app.post('/v1/live/:id/start', { preHandler: gate }, async (req) => {
@@ -121,7 +142,7 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
     for (const f of followers.rows)
       await notify(db, ctx.realtime, { userId: f.follower_id, category: 'creators', type: 'live_started', actorId: u.id, entityType: 'live', entityId: id });
     track(db, u.id, 'live_started');
-    return { live: dto(await load(id, u.id)) };
+    return { live: dto(await load(id, u.id), u.id) };
   });
 
   app.post('/v1/live/:id/end', { preHandler: gate }, async (req) => {
@@ -134,7 +155,7 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
     if (!r.rowCount) throw badRequest('Only the host can end this live.');
     await ctx.realtime.publish(await audience(id), { type: 'live.status', data: { id, status: 'ended' } });
     await db.query(`UPDATE live_participants SET left_at = now() WHERE session_id = $1 AND left_at IS NULL`, [id]);
-    return { live: dto(await load(id, u.id)) };
+    return { live: dto(await load(id, u.id), u.id) };
   });
 
   app.post('/v1/live/:id/join', { preHandler: gate }, async (req) => {
@@ -152,7 +173,7 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
     );
     await db.query(`UPDATE live_sessions SET peak_viewers = greatest(peak_viewers, $2) WHERE id = $1`, [id, viewers]);
     await ctx.realtime.publish(await audience(id), { type: 'live.viewers', data: { id, viewers } });
-    return { live: dto(await load(id, u.id)) };
+    return { live: dto(await load(id, u.id), u.id) };
   });
 
   app.post('/v1/live/:id/leave', { preHandler: gate }, async (req) => {
@@ -246,5 +267,33 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
     );
     await ctx.realtime.publish([userId], { type: 'live.status', data: { id, status: 'removed' } });
     return { ok: true };
+  });
+
+  /**
+   * MediaMTX auth hook. Publish: the stream key must match the session and its host,
+   * and the session must not have ended. Read: a valid signed viewer token.
+   */
+  app.post('/v1/live/hooks/auth', { config: { rateLimit: false } }, async (req, reply) => {
+    const secret = (req.query as { secret?: string }).secret ?? '';
+    const want = Buffer.from(ctx.config.LIVE_HOOK_SECRET);
+    if (secret.length !== want.length || !timingSafeEqual(Buffer.from(secret), want)) return reply.code(401).send();
+    const b = (req.body ?? {}) as { action?: string; path?: string; query?: string };
+    const m = /^live\/([0-9a-f-]{36})$/.exec(b.path ?? '');
+    if (!m) return reply.code(401).send();
+    const sessionId = m[1]!;
+    const params = new URLSearchParams(b.query ?? '');
+    const { rows } = await db.query(`SELECT status, stream_key_hash FROM live_sessions WHERE id = $1`, [sessionId]);
+    const l = rows[0];
+    if (!l) return reply.code(401).send();
+    if (b.action === 'publish') {
+      const key = params.get('key') ?? '';
+      if (l.status === 'ended' || !l.stream_key_hash || hashToken(key) !== l.stream_key_hash) return reply.code(401).send();
+      return reply.code(200).send();
+    }
+    if (b.action === 'read' || b.action === 'playback') {
+      if (l.status !== 'live' || !checkView(sessionId, params.get('token') ?? '')) return reply.code(401).send();
+      return reply.code(200).send();
+    }
+    return reply.code(401).send();
   });
 }

@@ -30,6 +30,20 @@ services:
     ports: ['8333:8333']
     volumes: [media:/data]
 
+  # Live video: RTMP ingest (OBS etc.) and HLS playback, authorized by the API.
+  live:
+    image: bluenviron/mediamtx:latest
+    volumes: ['./infrastructure/media/mediamtx.yml:/mediamtx.yml:ro']
+    ports: ['1935:1935', '8888:8888', '8889:8889']
+    extra_hosts: ['host.docker.internal:host-gateway']
+
+  # TURN relay for calls on networks that block peer-to-peer traffic.
+  turn:
+    image: coturn/coturn:latest
+    command: ['-c', '/etc/coturn/turnserver.conf']
+    volumes: ['./infrastructure/media/turnserver.conf:/etc/coturn/turnserver.conf:ro']
+    ports: ['3478:3478/udp', '3478:3478/tcp', '51160-51200:51160-51200/udp']
+
 volumes:
   pgdata:
   media:

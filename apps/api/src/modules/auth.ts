@@ -9,6 +9,7 @@ import { audit, securityEvent, track } from '../lib/services.ts';
 import { ageOf } from '../lib/users.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 import { registerMfa } from './mfa.ts';
+import { registerPasskeys } from './passkeys.ts';
 
 const MIN_AGE = 13;
 const authLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } };
@@ -148,6 +149,12 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
   registerMfa(app, ctx, async (req, reply, userId) => {
     const token = await startSession(req, reply, userId);
     await securityEvent(ctx.db, userId, 'login', req.ip, req.headers['user-agent'], { mfa: true });
+    return { user: await loadMe(ctx, userId), token };
+  });
+
+  registerPasskeys(app, ctx, async (req, reply, userId) => {
+    const token = await startSession(req, reply, userId);
+    await securityEvent(ctx.db, userId, 'login', req.ip, req.headers['user-agent'], { passkey: true });
     return { user: await loadMe(ctx, userId), token };
   });
 

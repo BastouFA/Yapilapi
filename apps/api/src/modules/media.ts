@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { AppError, badRequest } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { ALLOWED_MIME, sniffMatches } from '../lib/storage.ts';
+import { enqueue } from '../lib/jobs.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
@@ -27,6 +28,7 @@ export default async function mediaModule(app: FastifyInstance, ctx: AppContext)
       `INSERT INTO media (owner_id, kind, url, mime, alt_text, status, storage_key, size_bytes) VALUES ($1,$2,$3,$4,$5,'ready',$6,$7) RETURNING id, kind, url, alt_text`,
       [u.id, allowed.kind, stored.url, file.mimetype, alt, stored.key, buf.length],
     );
+    await enqueue(ctx.db, 'media.process', { mediaId: rows[0].id });
     reply.code(201);
     return { media: { id: rows[0].id, kind: rows[0].kind, url: rows[0].url, altText: rows[0].alt_text } };
   });

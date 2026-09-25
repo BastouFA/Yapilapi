@@ -24,6 +24,20 @@ const schema = z.object({
   PAYMENTS_WEBHOOK_SECRET: z.string().default('dev-webhook-secret-change-me'),
   // 32 bytes, base64. Encrypts TOTP secrets at rest. Development falls back to a fixed dev key.
   MFA_ENCRYPTION_KEY: z.string().optional().default(''),
+  // Passkeys: the site's domain and origin. Default to WEB_ORIGIN.
+  WEBAUTHN_RP_ID: z.string().optional().default(''),
+  WEBAUTHN_ORIGIN: z.string().optional().default(''),
+  // Web push (VAPID). Generate with: npx web-push generate-vapid-keys
+  VAPID_PUBLIC_KEY: z.string().optional().default(''),
+  VAPID_PRIVATE_KEY: z.string().optional().default(''),
+  VAPID_SUBJECT: z.string().default('mailto:support@yapilapi.local'),
+  // Live video (MediaMTX): where viewers load HLS, and the secret MediaMTX sends to our auth hook.
+  LIVE_HLS_BASE: z.string().default('http://localhost:8888'),
+  LIVE_RTMP_URL: z.string().default('rtmp://localhost:1935'),
+  LIVE_HOOK_SECRET: z.string().default('dev-live-hook-secret'),
+  // TURN (coturn, REST credentials): shared secret and URLs.
+  TURN_URLS: z.string().optional().default(''),
+  TURN_SECRET: z.string().optional().default(''),
   UPLOAD_DIR: z.string().default('./uploads'),
   STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
   S3_ENDPOINT: z.string().optional().default(''),

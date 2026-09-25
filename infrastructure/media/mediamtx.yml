@@ -1,0 +1,20 @@
+# MediaMTX: RTMP ingest from streaming software, HLS/WebRTC playback.
+# Every publish/read is authorized by the YAPILAPI API (live module).
+logLevel: info
+rtmp: yes
+rtmpAddress: :1935
+hls: yes
+hlsAddress: :8888
+hlsAllowOrigin: '*'
+hlsVariant: lowLatency
+hlsSegmentDuration: 1s
+webrtc: yes
+webrtcAddress: :8889
+rtsp: no
+srt: no
+authMethod: http
+authHTTPAddress: http://host.docker.internal:4000/v1/live/hooks/auth?secret=dev-live-hook-secret
+authHTTPExclude: []
+paths:
+  '~^live/[0-9a-f-]{36}$':
+    source: publisher

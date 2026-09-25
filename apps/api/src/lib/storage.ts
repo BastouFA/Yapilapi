@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
@@ -13,6 +13,9 @@ export interface StoredObject {
 export interface MediaStorage {
   driver: 'local' | 's3';
   put(data: Buffer, ext: string, mime: string): Promise<StoredObject>;
+  /** Store at an exact key (derived files such as variants and HLS segments). */
+  putKey(key: string, data: Buffer, mime: string): Promise<StoredObject>;
+  read(key: string): Promise<Buffer>;
   /** Stream an object (S3 driver; local files are served statically). */
   get?(key: string, range?: string): Promise<{ body: Readable; contentType?: string; contentLength?: number; contentRange?: string; status: number } | null>;
 }
@@ -52,11 +55,17 @@ export function s3Storage(opts: {
       }
     },
     async put(data, ext, mime) {
-      const key = newKey(ext);
+      return this.putKey(newKey(ext), data, mime);
+    },
+    async putKey(key, data, mime) {
       await s3.send(
         new PutObjectCommand({ Bucket: opts.bucket, Key: key, Body: data, ContentType: mime, CacheControl: 'public, max-age=31536000, immutable' }),
       );
       return { key, url: `${opts.publicBase}/media/${key}` };
+    },
+    async read(key) {
+      const r = await s3.send(new GetObjectCommand({ Bucket: opts.bucket, Key: key }));
+      return Buffer.from(await r.Body!.transformToByteArray());
     },
     async get(key, range) {
       try {
@@ -91,12 +100,17 @@ export const ALLOWED_MIME: Record<string, { ext: string; kind: 'image' | 'video'
 export function localDiskStorage(dir: string, publicBase: string): MediaStorage {
   return {
     driver: 'local',
-    async put(data, ext) {
-      const key = newKey(ext);
+    async put(data, ext, mime) {
+      return this.putKey(newKey(ext), data, mime);
+    },
+    async putKey(key, data) {
       const full = path.join(dir, key);
       await mkdir(path.dirname(full), { recursive: true });
       await writeFile(full, data);
       return { key, url: `${publicBase}/media/${key}` };
+    },
+    async read(key) {
+      return readFile(path.join(dir, key));
     },
   };
 }

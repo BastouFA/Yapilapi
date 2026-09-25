@@ -42,7 +42,14 @@ import uploadsModule from './modules/uploads.ts';
 import callsModule from './modules/calls.ts';
 import realModule from './modules/real.ts';
 import oauthModule from './modules/oauth.ts';
+import pushModule from './modules/push.ts';
+import miniAppsModule from './modules/miniapps.ts';
+import economyModule from './modules/economy.ts';
+import { createPushSender } from './lib/push.ts';
+import { setPushSender } from './lib/services.ts';
 import { processWebhooks } from './lib/webhooks.ts';
+import { processJobs } from './lib/jobs.ts';
+import { mediaJobHandlers } from './lib/media-processing.ts';
 
 export interface BuiltApp {
   app: FastifyInstance;
@@ -259,8 +266,13 @@ export async function buildApp(
     callsModule,
     realModule,
     oauthModule,
+    pushModule,
+    miniAppsModule,
+    economyModule,
   ])
     await mod(app, ctx);
+
+  setPushSender(config.APP_ENV === 'test' ? null : createPushSender(db, config));
 
   // Webhook delivery worker. Tests drive processWebhooks directly instead.
   let webhookTimer: NodeJS.Timeout | undefined;
@@ -269,12 +281,26 @@ export async function buildApp(
     webhookTimer = setInterval(() => void processWebhooks(db, { allowLocal }).catch((e) => app.log.warn({ err: e.message }, 'webhook worker')), 5_000);
     webhookTimer.unref();
   }
+  // Background jobs (media processing). Tests drive processJobs directly.
+  let jobTimer: NodeJS.Timeout | undefined;
+  const jobHandlers = mediaJobHandlers({ db, storage });
+  if (opts.webhookWorker ?? config.APP_ENV !== 'test') {
+    let busy = false;
+    jobTimer = setInterval(async () => {
+      if (busy) return;
+      busy = true;
+      await processJobs(db, jobHandlers).catch((e) => app.log.warn({ err: e.message }, 'job worker'));
+      busy = false;
+    }, 2_000);
+    jobTimer.unref();
+  }
 
   return {
     app,
     ctx,
     close: async () => {
       clearInterval(webhookTimer);
+      clearInterval(jobTimer);
       await app.close();
       await db.end();
       sub?.disconnect();

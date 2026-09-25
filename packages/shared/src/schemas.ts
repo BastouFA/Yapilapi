@@ -75,6 +75,8 @@ export const createPostSchema = z
     media: z
       .array(
         z.object({
+          /** An item uploaded through /v1/media or /v1/uploads (preferred: keeps processed sizes). */
+          id: uuid.optional(),
           url: z.string().url().max(1000),
           kind: z.enum(['image', 'video', 'audio']),
           altText: z.string().max(500).optional(),

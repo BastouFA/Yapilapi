@@ -92,7 +92,7 @@ function Create() {
         visibility,
         communityId: communityId || undefined,
         circleId: visibility === 'circle' ? circleId || undefined : undefined,
-        media: media.map((m) => ({ url: new URL(m.url, location.origin).toString(), kind: m.kind, altText: m.altText || undefined })),
+        media: media.map((m) => ({ id: m.id, url: new URL(m.url, location.origin).toString(), kind: m.kind, altText: m.altText || undefined })),
         poll: poll ? { options: poll.filter((o) => o.trim()) } : undefined,
         topics: topics
           .split(/[,\s#]+/)
