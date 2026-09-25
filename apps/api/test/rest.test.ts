@@ -164,11 +164,15 @@ describe('push notifications', () => {
     const sent: unknown[] = [];
     const fakeFetch = (async (_url: string, init: RequestInit) => {
       sent.push(JSON.parse(String(init.body)));
-      return new Response(JSON.stringify({ data: sent.length > 1 ? { status: 'error', details: { error: 'DeviceNotRegistered' } } : { status: 'ok' } }));
+      return new Response(JSON.stringify({ data: sent.length > 2 ? { status: 'error', details: { error: 'DeviceNotRegistered' } } : { status: 'ok' } }));
     }) as typeof fetch;
     const push = createPushSender(t.ctx.db, t.ctx.config, fakeFetch);
     await push(u.id, { title: 'YAPILAPI', body: 'Ada liked your post' });
     expect(sent[0]).toMatchObject({ to: token, body: 'Ada liked your post' });
+    expect(sent[0]).not.toHaveProperty('categoryId');
+    // Incoming calls carry the call id and ring through the app's call category.
+    await push(u.id, { title: 'YAPILAPI', body: 'Ada is calling you', tag: 'call_incoming', data: { type: 'call_incoming', entityId: 'c1' } });
+    expect(sent[1]).toMatchObject({ categoryId: 'call_incoming', channelId: 'calls', priority: 'high', data: { type: 'call_incoming', entityId: 'c1' } });
     await push(u.id, { title: 'YAPILAPI', body: 'again' });
     expect((await t.ctx.db.query(`SELECT 1 FROM push_subscriptions WHERE user_id = $1`, [u.id])).rowCount).toBe(0);
   });

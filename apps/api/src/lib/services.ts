@@ -93,7 +93,10 @@ export async function notify(
       n.type,
       n.actorId ? ((await db.query(`SELECT display_name FROM profiles WHERE user_id = $1`, [n.actorId])).rows[0]?.display_name ?? null) : null,
     );
-    if (text) void pushSender(n.userId, { title: 'YAPILAPI', body: text, tag: n.type, url: '/notifications' }).catch(() => {});
+    const data: Record<string, string> = { type: n.type };
+    if (n.entityType) data.entityType = n.entityType;
+    if (n.entityId) data.entityId = n.entityId;
+    if (text) void pushSender(n.userId, { title: 'YAPILAPI', body: text, tag: n.type, url: '/notifications', data }).catch(() => {});
   }
 }
 

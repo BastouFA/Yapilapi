@@ -27,6 +27,8 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
   const [cameraOff, setCameraOff] = useState(false);
   const local = useRef<MediaStream | null>(null);
   const peers = useRef(new Map<string, RTCPeerConnection>());
+  // ICE candidates can arrive before the offer or answer they belong to; hold them until then.
+  const pending = useRef(new Map<string, RTCIceCandidateInit[]>());
   const ice = useRef<RTCIceServer[]>([]);
   const localVideo = useRef<HTMLVideoElement>(null);
   const callRef = useRef<CallInfo | null>(null);
@@ -35,6 +37,7 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
   const cleanup = useCallback(() => {
     peers.current.forEach((p) => p.close());
     peers.current.clear();
+    pending.current.clear();
     local.current?.getTracks().forEach((t) => t.stop());
     local.current = null;
     setRemotes({});
@@ -85,9 +88,11 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
   async function answer() {
     if (!call) return;
     try {
+      // Camera and microphone first, so the caller's offer (sent as soon as we answer) finds them ready.
+      await getMedia(call.kind);
+      ice.current = (await api.calls.get(call.id)).iceServers;
       const r = await api.calls.answer(call.id);
       ice.current = r.iceServers;
-      await getMedia(call.kind);
       setPhase('active');
     } catch (e) {
       toast(e instanceof DOMException ? 'Allow camera and microphone access to answer.' : errorMessage(e));
@@ -119,13 +124,23 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
     }
     if (e.type === 'call.signal') {
       const pc = peerFor(cur.id, e.data.from);
+      const flush = async () => {
+        for (const c of pending.current.get(e.data.from) ?? []) await pc.addIceCandidate(c).catch(() => {});
+        pending.current.delete(e.data.from);
+      };
       if (e.data.type === 'offer') {
         await pc.setRemoteDescription(e.data.data);
+        await flush();
         const ans = await pc.createAnswer();
         await pc.setLocalDescription(ans);
         await api.calls.signal(cur.id, e.data.from, 'answer', ans);
-      } else if (e.data.type === 'answer') await pc.setRemoteDescription(e.data.data);
-      else if (e.data.type === 'candidate') await pc.addIceCandidate(e.data.data).catch(() => {});
+      } else if (e.data.type === 'answer') {
+        await pc.setRemoteDescription(e.data.data);
+        await flush();
+      } else if (e.data.type === 'candidate') {
+        if (pc.remoteDescription) await pc.addIceCandidate(e.data.data).catch(() => {});
+        else pending.current.set(e.data.from, [...(pending.current.get(e.data.from) ?? []), e.data.data]);
+      }
     }
     if (e.type === 'call.declined' || e.type === 'call.left') {
       peers.current.get(e.data.userId)?.close();

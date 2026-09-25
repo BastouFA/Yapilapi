@@ -1,73 +1,165 @@
-import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, Text, View } from 'react-native';
-import type { Message } from '../../../../packages/shared/src/types';
-import { client } from '../../lib/api';
-import { radius, space } from '../../lib/theme';
-import { Button, Field, useColors } from '../../lib/ui';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { Conversation, Message } from '../../../../packages/shared/src/types';
+import { useCalls } from '../../lib/calls';
+import { client, errorMessage } from '../../lib/api';
+import { conversationTitle } from '../../lib/post';
+import { useRealtime, useSession } from '../../lib/session';
+import { elevation, gradient, radius, space } from '../../lib/theme';
+import { Icon, Notice, useColors } from '../../lib/ui';
 
-/** A conversation. Polls every few seconds; the web app uses the realtime socket. */
+/** A conversation, updated live over the realtime socket, with audio and video call buttons. */
 export default function Chat() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const c = useColors();
-  const [me, setMe] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+  const { me } = useSession();
+  const calls = useCalls();
+  const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [body, setBody] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const list = useRef<FlatList<Message>>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const api = await client();
+      const [conv, page] = await Promise.all([api.conversations.get(id), api.conversations.messages(id)]);
+      setConversation(conv.conversation);
+      setMessages(page.items); // oldest first, the latest page
+      void api.conversations.read(id).catch(() => {});
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  }, [id]);
 
   useEffect(() => {
-    let stop = false;
-    const load = async () => {
-      const api = await client();
-      if (!me) setMe((await api.auth.me()).user.id);
-      const page = await api.conversations.messages(id);
-      if (!stop) setMessages(page.items);
-      await api.conversations.read(id);
-    };
     void load();
-    const t = setInterval(load, 4000);
-    return () => {
-      stop = true;
-      clearInterval(t);
-    };
-  }, [id, me]);
+  }, [load]);
+
+  useRealtime((e) => {
+    if (e.type === 'message.created' && e.data?.conversationId === id) {
+      const m = e.data as Message;
+      setMessages((cur) => (cur.some((x) => x.id === m.id || (m.clientId && x.clientId === m.clientId)) ? cur : [...cur, m]));
+      void client().then((api) => api.conversations.read(id).catch(() => {}));
+    }
+    if (e.type === 'message.deleted' && e.data?.conversationId === id) void load();
+    if (e.type === 'app.foreground') void load();
+  });
+
+  const canCall = !!conversation && conversation.kind !== 'community' && conversation.members.length <= 8 && conversation.members.length > 1;
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: conversation ? conversationTitle(conversation, me?.id) : 'Conversation',
+      headerRight: canCall
+        ? () => (
+            <View style={{ flexDirection: 'row', gap: space[4] }}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Start audio call" hitSlop={10} onPress={() => void calls.start(id, 'audio')}>
+                <Icon name="call-outline" size={22} color={c.yapi} />
+              </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="Start video call" hitSlop={10} onPress={() => void calls.start(id, 'video')}>
+                <Icon name="videocam-outline" size={24} color={c.yapi} />
+              </Pressable>
+            </View>
+          )
+        : undefined,
+    });
+  }, [navigation, conversation, me?.id, canCall, calls, id, c.yapi]);
+
+  async function send() {
+    const text = body.trim();
+    if (!text) return;
+    setBody('');
+    const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      const { message } = await (await client()).conversations.send(id, text, clientId);
+      setMessages((cur) => (cur.some((x) => x.id === message.id) ? cur : [...cur, message]));
+    } catch (e) {
+      setBody(text);
+      setError(errorMessage(e));
+    }
+  }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.ground }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: c.ground }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={insets.top + 44}
+    >
+      {error ? (
+        <View style={{ padding: space[3] }}>
+          <Notice tone="danger">{error}</Notice>
+        </View>
+      ) : null}
       <FlatList
+        ref={list}
         data={messages}
         keyExtractor={(m) => m.id}
         contentContainerStyle={{ padding: space[4], gap: space[2] }}
+        onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
         renderItem={({ item }) => {
-          const mine = item.sender.id === me;
-          return (
-            <View
-              style={{
-                alignSelf: mine ? 'flex-end' : 'flex-start',
-                maxWidth: '80%',
-                padding: space[3],
-                borderRadius: radius.md,
-                backgroundColor: mine ? c.yapi : c.surface,
-              }}
-            >
-              {!mine ? <Text style={{ color: c.yapi, fontSize: 12, fontWeight: '600' }}>{item.sender.displayName}</Text> : null}
-              <Text style={{ color: mine ? c.onYapi : c.ink, fontSize: 15 }}>{item.body}</Text>
+          const mine = item.sender.id === me?.id;
+          const text = item.body || (item.attachments.length ? 'Attachment' : 'Message deleted');
+          return mine ? (
+            <LinearGradient {...gradient(c)} style={[bubble, { alignSelf: 'flex-end', borderBottomRightRadius: 6 }]}>
+              <Text style={{ color: c.onYapi, fontSize: 15, lineHeight: 21 }}>{text}</Text>
+            </LinearGradient>
+          ) : (
+            <View style={[bubble, { alignSelf: 'flex-start', backgroundColor: c.surface, borderBottomLeftRadius: 6 }, elevation(c)]}>
+              {conversation && conversation.members.length > 2 ? (
+                <Text style={{ color: c.yapi, fontSize: 12, fontWeight: '700' }}>{item.sender.displayName}</Text>
+              ) : null}
+              <Text style={{ color: c.ink, fontSize: 15, lineHeight: 21 }}>{text}</Text>
             </View>
           );
         }}
       />
-      <View style={{ padding: space[3], gap: space[2] }}>
-        <Field label="Message" value={body} onChangeText={setBody} maxLength={4000} />
-        <Button
-          label="Send"
-          disabled={!body.trim()}
-          onPress={async () => {
-            const text = body.trim();
-            setBody('');
-            const { message } = await (await client()).conversations.send(id, text, `${Date.now()}`);
-            setMessages((cur) => [...cur, message]);
-          }}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'flex-end',
+          gap: space[2],
+          paddingHorizontal: space[3],
+          paddingTop: space[2],
+          paddingBottom: Math.max(insets.bottom, space[3]),
+        }}
+      >
+        <TextInput
+          accessibilityLabel="Message"
+          placeholder="Message"
+          placeholderTextColor={c.inkMuted}
+          value={body}
+          onChangeText={setBody}
+          maxLength={4000}
+          multiline
+          style={[
+            {
+              flex: 1,
+              minHeight: 44,
+              maxHeight: 120,
+              borderRadius: radius.lg,
+              paddingHorizontal: space[4],
+              paddingTop: 12,
+              paddingBottom: 12,
+              fontSize: 15,
+              color: c.ink,
+              backgroundColor: c.surface,
+            },
+            elevation(c),
+          ]}
         />
+        <Pressable accessibilityRole="button" accessibilityLabel="Send" disabled={!body.trim()} onPress={send} style={{ opacity: body.trim() ? 1 : 0.45 }}>
+          <LinearGradient {...gradient(c)} style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="arrow-up" size={22} color={c.onYapi} />
+          </LinearGradient>
+        </Pressable>
       </View>
     </KeyboardAvoidingView>
   );
 }
+
+const bubble = { maxWidth: '80%', paddingHorizontal: space[3] + 2, paddingVertical: space[2] + 2, borderRadius: radius.lg } as const;

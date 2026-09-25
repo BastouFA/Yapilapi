@@ -11,3 +11,5 @@ coverage/
 # stray folder created by an accidental "Save As"
 /\#*
 *.tsbuildinfo
+# Expo local state (device history, dev server settings)
+.expo/
