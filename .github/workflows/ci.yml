@@ -134,6 +134,6 @@ jobs:
       # Production dependencies must have no high/critical advisories. Dev-only advisories are reported, not blocking.
       - run: npm audit --omit=dev --audit-level=high
       - run: npm audit --audit-level=high || echo "::warning::dev-dependency advisories present"
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
