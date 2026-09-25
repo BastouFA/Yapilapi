@@ -420,7 +420,11 @@ export function createClient(opts: ClientOptions) {
     live: {
       list: () => get<{ items: LiveSummary[] }>('/v1/live'),
       get: (id: string) => get<{ live: LiveSummary }>(`/v1/live/${id}`),
-      create: (b: { title: string; visibility?: string }) =>
+      update: (id: string, b: { title?: string; ticketProductId?: string | null }) => patch<{ live: LiveSummary }>(`/v1/live/${id}`, b),
+      products: (id: string) => get<{ items: LiveProduct[] }>(`/v1/live/${id}/products`),
+      pin: (id: string, productId: string) => post(`/v1/live/${id}/products`, { productId }),
+      unpin: (id: string, productId: string) => del(`/v1/live/${id}/products/${productId}`),
+      create: (b: { title: string; visibility?: string; ticketProductId?: string }) =>
         post<{ live: LiveSummary; ingest: { url: string; streamKey: string }; message: string }>('/v1/live', b),
       start: (id: string) => post<{ live: LiveSummary }>(`/v1/live/${id}/start`),
       end: (id: string) => post<{ live: LiveSummary }>(`/v1/live/${id}/end`),
@@ -499,7 +503,19 @@ export interface LiveSummary {
   startedAt: string | null;
   endedAt: string | null;
   myRole: 'host' | 'cohost' | 'moderator' | 'viewer' | null;
+  /** Ticketed lives: playbackUrl stays null until the viewer holds a paid ticket. */
+  ticket: { productId: string; title: string; priceCents: number; currency: string; hasTicket: boolean } | null;
   playbackUrl: string | null;
+}
+
+export interface LiveProduct {
+  id: string;
+  kind: string;
+  title: string;
+  description: string;
+  priceCents: number;
+  currency: string;
+  inventory: number | null;
 }
 
 export interface LiveChatMessage {

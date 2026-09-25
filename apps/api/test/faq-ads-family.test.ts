@@ -216,3 +216,44 @@ describe('sensitive content and minors', () => {
     expect((await as(t.app, teen).get(`/v1/posts/${post.id}`)).status).toBe(200);
   });
 });
+
+describe('ticketed lives and live shopping', () => {
+  it('only gives playback to ticket holders and lets the host pin products', async () => {
+    await t.ctx.db.query(`INSERT INTO feature_flags (key, enabled) VALUES ('LIVE', true) ON CONFLICT (key) DO UPDATE SET enabled = true`);
+    const host = await signUp(t.app, { birthDate: ADULT });
+    const fan = await signUp(t.app, { birthDate: ADULT });
+    const other = await signUp(t.app, { birthDate: ADULT });
+    const ticket = (await as(t.app, host).post('/v1/products', { kind: 'ticket', title: 'Concert pass', priceCents: 800 })).body.product;
+    const mug = (await as(t.app, host).post('/v1/products', { title: 'Tour mug', priceCents: 1500 })).body.product;
+    const notTicket = (await as(t.app, other).post('/v1/products', { kind: 'ticket', title: 'Not yours', priceCents: 100 })).body.product;
+
+    expect((await as(t.app, host).post('/v1/live', { title: 'Nope', ticketProductId: notTicket.id })).status).toBe(403);
+    expect((await as(t.app, host).post('/v1/live', { title: 'Nope', ticketProductId: mug.id })).status).toBe(400);
+    const live = (await as(t.app, host).post('/v1/live', { title: 'Paid concert', ticketProductId: ticket.id })).body.live;
+    expect(live.ticket).toMatchObject({ productId: ticket.id, priceCents: 800, hasTicket: true });
+    await as(t.app, host).post(`/v1/live/${live.id}/start`);
+
+    const before = (await as(t.app, fan).get(`/v1/live/${live.id}`)).body.live;
+    expect(before.ticket.hasTicket).toBe(false);
+    expect(before.playbackUrl).toBeNull();
+    const refused = await as(t.app, fan).post(`/v1/live/${live.id}/join`);
+    expect(refused.status).toBe(402);
+    expect(refused.body.error.code).toBe('ticket_required');
+
+    const order = await as(t.app, fan).post('/v1/orders', { items: [{ productId: ticket.id, quantity: 1 }], idempotencyKey: key() });
+    await pay(order.body.order.id, 800);
+    const joined = await as(t.app, fan).post(`/v1/live/${live.id}/join`);
+    expect(joined.status).toBe(200);
+    expect(joined.body.live.playbackUrl).toMatch(/token=/);
+
+    // Live shopping
+    expect((await as(t.app, fan).post(`/v1/live/${live.id}/products`, { productId: mug.id })).status).toBe(403);
+    expect((await as(t.app, host).post(`/v1/live/${live.id}/products`, { productId: notTicket.id })).status).toBe(403);
+    expect((await as(t.app, host).post(`/v1/live/${live.id}/products`, { productId: mug.id })).status).toBe(200);
+    expect((await as(t.app, host).post(`/v1/live/${live.id}/products`, { productId: mug.id })).status).toBe(200); // re-pin is fine
+    expect((await as(t.app, fan).get(`/v1/live/${live.id}/products`)).body.items.map((p: any) => p.title)).toEqual(['Tour mug']);
+    await as(t.app, host).del(`/v1/live/${live.id}/products/${mug.id}`);
+    expect((await as(t.app, fan).get(`/v1/live/${live.id}/products`)).body.items).toEqual([]);
+    expect((await as(t.app, host).patch(`/v1/live/${live.id}`, { ticketProductId: null })).status).toBe(400); // already started
+  });
+});

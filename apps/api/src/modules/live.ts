@@ -63,8 +63,13 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
   const SELECT = `SELECT l.*, pr.user_id AS h_id, pr.username AS h_username, pr.display_name AS h_display_name, pr.avatar_url AS h_avatar_url, pr.mode AS h_mode,
       (SELECT count(*) FROM live_participants p WHERE p.session_id = l.id AND p.left_at IS NULL AND p.role = 'viewer') AS viewers,
       (SELECT role FROM live_participants p WHERE p.session_id = l.id AND p.user_id = $1) AS my_role,
-      (SELECT banned FROM live_participants p WHERE p.session_id = l.id AND p.user_id = $1) AS banned
-    FROM live_sessions l JOIN profiles pr ON pr.user_id = l.host_id`;
+      (SELECT banned FROM live_participants p WHERE p.session_id = l.id AND p.user_id = $1) AS banned,
+      tp.price_cents AS ticket_price_cents, tp.currency AS ticket_currency, tp.title AS ticket_title,
+      (l.ticket_product_id IS NULL OR l.host_id = $1
+        OR EXISTS (SELECT 1 FROM live_participants p WHERE p.session_id = l.id AND p.user_id = $1 AND p.role IN ('cohost','moderator'))
+        OR EXISTS (SELECT 1 FROM orders o JOIN order_items oi ON oi.order_id = o.id WHERE o.buyer_id = $1 AND o.status = 'paid' AND oi.product_id = l.ticket_product_id)
+      ) AS has_access
+    FROM live_sessions l JOIN profiles pr ON pr.user_id = l.host_id LEFT JOIN products tp ON tp.id = l.ticket_product_id`;
 
   function dto(r: Record<string, any>, viewerId: string) {
     return {
@@ -79,7 +84,11 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
       startedAt: r.started_at,
       endedAt: r.ended_at,
       myRole: r.my_role,
-      playbackUrl: r.status === 'live' && !r.banned ? video.playback(r.id, signView(r.id, viewerId)) : null,
+      ticket: r.ticket_product_id
+        ? { productId: r.ticket_product_id, title: r.ticket_title, priceCents: r.ticket_price_cents, currency: r.ticket_currency, hasTicket: !!r.has_access }
+        : null,
+      // Ticketed lives only hand out a signed playback link to ticket holders; the video server checks that token.
+      playbackUrl: r.status === 'live' && !r.banned && r.has_access ? video.playback(r.id, signView(r.id, viewerId)) : null,
     };
   }
 
@@ -92,6 +101,63 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
     return (await db.query(`SELECT user_id FROM live_participants WHERE session_id = $1 AND left_at IS NULL`, [id])).rows.map((r) => r.user_id);
   }
   const canModerate = (role: string | null) => role === 'host' || role === 'cohost' || role === 'moderator';
+
+  /** A live's ticket must be the host's own active ticket product. */
+  async function assertTicket(productId: string, hostId: string) {
+    const p = (await db.query(`SELECT seller_id, kind, status, deleted_at FROM products WHERE id = $1`, [productId])).rows[0];
+    if (!p || p.deleted_at || p.status !== 'active') throw notFound('Ticket');
+    if (p.seller_id !== hostId) throw forbidden('Use a ticket you sell.');
+    if (p.kind !== 'ticket') throw badRequest('Choose a product of the ticket kind.');
+  }
+
+  app.patch('/v1/live/:id', { preHandler: gate }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const input = parse(z.object({ title: z.string().trim().min(1).max(120).optional(), ticketProductId: z.string().uuid().nullable().optional() }), req.body);
+    const l = await load(id, u.id);
+    if (l.host_id !== u.id) throw forbidden();
+    if (input.ticketProductId !== undefined && l.status !== 'scheduled') throw badRequest('Tickets can only be changed before the live starts.');
+    if (input.ticketProductId) await assertTicket(input.ticketProductId, u.id);
+    await db.query(
+      `UPDATE live_sessions SET title = coalesce($2, title), ticket_product_id = CASE WHEN $3 THEN $4::uuid ELSE ticket_product_id END WHERE id = $1`,
+      [id, input.title ?? null, input.ticketProductId !== undefined, input.ticketProductId ?? null],
+    );
+    return { live: dto(await load(id, u.id), u.id) };
+  });
+
+  // ── Live shopping: products the host pins while live ─────────────────
+  app.get('/v1/live/:id/products', { preHandler: gate }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    await load(id, u.id);
+    const { rows } = await db.query(
+      `SELECT pd.id, pd.kind, pd.title, pd.description, pd.price_cents, pd.currency, pd.inventory FROM live_products lp JOIN products pd ON pd.id = lp.product_id
+       WHERE lp.session_id = $1 AND pd.deleted_at IS NULL AND pd.status = 'active' ORDER BY lp.pinned_at DESC`,
+      [id],
+    );
+    return {
+      items: rows.map((r) => ({ id: r.id, kind: r.kind, title: r.title, description: r.description, priceCents: r.price_cents, currency: r.currency, inventory: r.inventory })),
+    };
+  });
+
+  for (const pin of [true, false])
+    app[pin ? 'post' : 'delete'](`/v1/live/:id/products${pin ? '' : '/:productId'}`, { preHandler: gate }, async (req) => {
+      const u = me(req);
+      const params = parse(z.object({ id: z.string().uuid(), productId: z.string().uuid().optional() }), req.params);
+      const productId = pin ? parse(z.object({ productId: z.string().uuid() }), req.body).productId : params.productId!;
+      const l = await load(params.id, u.id);
+      if (l.host_id !== u.id) throw forbidden();
+      if (pin) {
+        const p = (await db.query(`SELECT seller_id, status, deleted_at FROM products WHERE id = $1`, [productId])).rows[0];
+        if (!p || p.deleted_at || p.status !== 'active') throw notFound('Product');
+        if (p.seller_id !== u.id) throw forbidden('You can only show products you sell.');
+        const count = await db.query(`SELECT count(*) AS n FROM live_products WHERE session_id = $1`, [params.id]);
+        if (Number(count.rows[0].n) >= 20) throw new AppError(409, 'conflict', 'Up to 20 products can be shown in a live.');
+        await db.query(`INSERT INTO live_products (session_id, product_id) VALUES ($1,$2) ON CONFLICT (session_id, product_id) DO UPDATE SET pinned_at = now()`, [params.id, productId]);
+      } else await db.query(`DELETE FROM live_products WHERE session_id = $1 AND product_id = $2`, [params.id, productId]);
+      await ctx.realtime.publish(await audience(params.id), { type: 'live.products', data: { liveId: params.id } });
+      return { ok: true };
+    });
 
   app.get('/v1/live', { preHandler: gate }, async (req) => {
     const { rows } = await db.query(
@@ -108,14 +174,16 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
         title: z.string().trim().min(1).max(120),
         visibility: z.enum(['public', 'followers', 'friends']).default('public'),
         scheduledFor: z.string().datetime({ offset: true }).optional(),
+        ticketProductId: z.string().uuid().optional(),
       }),
       req.body,
     );
+    if (input.ticketProductId) await assertTicket(input.ticketProductId, u.id);
     const streamKey = `sk_${randomBytes(20).toString('base64url')}`;
     const id = await tx(db, async (c) => {
       const { rows } = await c.query(
-        `INSERT INTO live_sessions (host_id, title, visibility, scheduled_for, stream_key_hash) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-        [u.id, input.title, input.visibility, input.scheduledFor ?? null, hashToken(streamKey)],
+        `INSERT INTO live_sessions (host_id, title, visibility, scheduled_for, stream_key_hash, ticket_product_id) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+        [u.id, input.title, input.visibility, input.scheduledFor ?? null, hashToken(streamKey), input.ticketProductId ?? null],
       );
       await c.query(`INSERT INTO live_participants (session_id, user_id, role) VALUES ($1,$2,'host')`, [rows[0].id, u.id]);
       return rows[0].id as string;
@@ -164,6 +232,7 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
     const l = await load(id, u.id);
     if (l.banned) throw forbidden("You can't join this live.");
     if (l.status !== 'live') throw badRequest("This live hasn't started or has ended.");
+    if (!l.has_access) throw new AppError(402, 'ticket_required', 'This live needs a ticket.');
     await db.query(
       `INSERT INTO live_participants (session_id, user_id) VALUES ($1,$2) ON CONFLICT (session_id, user_id) DO UPDATE SET left_at = NULL, joined_at = now()`,
       [id, u.id],

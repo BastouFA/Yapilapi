@@ -4,16 +4,26 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Avatar, Badge, Button, EmptyState, Select, Skeleton, TextField } from '@yapilapi/design-system';
-import type { LiveSummary } from '@yapilapi/api-client';
+import type { LiveProduct, LiveSummary } from '@yapilapi/api-client';
+import { formatMoney } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '../../providers';
 
 export default function LiveList() {
-  const { flags, toast } = useSession();
+  const { flags, toast, me, locale } = useSession();
   const router = useRouter();
   const [items, setItems] = useState<LiveSummary[] | null>(null);
   const [title, setTitle] = useState('');
   const [visibility, setVisibility] = useState('public');
+  const [ticketId, setTicketId] = useState('');
+  const [tickets, setTickets] = useState<LiveProduct[]>([]);
+  useEffect(() => {
+    if (!me || flags.LIVE === false) return;
+    api.raw.get<{ items: LiveProduct[] }>(`/v1/products?sellerId=${me.id}&limit=50`).then(
+      (r) => setTickets(r.items.filter((p) => p.kind === 'ticket')),
+      () => {},
+    );
+  }, [me, flags.LIVE]);
 
   useEffect(() => {
     if (flags.LIVE === false) return;
@@ -36,7 +46,7 @@ export default function LiveList() {
         onSubmit={async (e) => {
           e.preventDefault();
           try {
-            const r = await api.live.create({ title, visibility });
+            const r = await api.live.create({ title, visibility, ticketProductId: ticketId || undefined });
             sessionStorage.setItem(`ypl-ingest-${r.live.id}`, JSON.stringify(r.ingest));
             router.push(`/live/${r.live.id}`);
           } catch (err) {
@@ -50,6 +60,16 @@ export default function LiveList() {
           <option value="followers">Followers</option>
           <option value="friends">Friends</option>
         </Select>
+        {tickets.length ? (
+          <Select label="Ticket" value={ticketId} onChange={(e) => setTicketId(e.currentTarget.value)} hint="Only people who bought this ticket can watch.">
+            <option value="">Free to watch</option>
+            {tickets.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.title} · {formatMoney(p.priceCents, p.currency, locale)}
+              </option>
+            ))}
+          </Select>
+        ) : null}
         <Button type="submit" disabled={!title.trim()}>
           Set up live
         </Button>

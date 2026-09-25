@@ -8,6 +8,8 @@ import { api, errorMessage } from '@/lib/api';
 import { useRealtime, useSession } from '../../../providers';
 import { HlsVideo } from '@/components/HlsVideo';
 import { TipSheet } from '@/components/SupportCreator';
+import { BuyButton } from '@/components/BuyButton';
+import { LiveShop } from '@/components/LiveShop';
 import { formatMoney } from '@yapilapi/shared';
 
 export default function LivePage() {
@@ -19,6 +21,17 @@ export default function LivePage() {
   const [body, setBody] = useState('');
   const [kind, setKind] = useState<'chat' | 'question'>('chat');
   const [gifting, setGifting] = useState(false);
+  const [translated, setTranslated] = useState<Record<string, string>>({});
+  async function translate(id: string, text: string) {
+    try {
+      const r = await api.ai.assist({ task: 'translate', input: text, targetLanguage: locale });
+      const out = (r.output as { translated?: string | null } | null)?.translated;
+      if (out) setTranslated((t) => ({ ...t, [id]: out }));
+      else toast(r.notice ?? (r.output as { notice?: string } | null)?.notice ?? "This message couldn't be translated.");
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  }
   const [ingest, setIngest] = useState<{ url: string; streamKey: string } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -96,6 +109,15 @@ export default function LivePage() {
         )}
       </div>
 
+      {live.ticket && !live.ticket.hasTicket ? (
+        <Alert tone="warning" title={`${live.ticket.title}: ${formatMoney(live.ticket.priceCents, live.ticket.currency, locale)}`}>
+          <p style={{ margin: '0 0 8px' }}>This live needs a ticket. Once your payment is confirmed, the video starts here.</p>
+          <BuyButton productId={live.ticket.productId} />
+        </Alert>
+      ) : null}
+
+      <LiveShop liveId={live.id} isHost={isHost} hostId={live.host.id} />
+
       {isHost ? (
         <div className="stack-sm">
           {ingest && live.status !== 'ended' ? (
@@ -136,7 +158,16 @@ export default function LivePage() {
             ) : (
               <div key={m.id} className="row" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <ChatBubble mine={m.author.id === me?.id} sender={m.author.displayName} body={m.kind === 'question' ? `Question: ${m.body}` : m.body} />
+                  <ChatBubble
+                    mine={m.author.id === me?.id}
+                    sender={m.author.displayName}
+                    body={`${m.kind === 'question' ? 'Question: ' : ''}${translated[m.id] ?? m.body}`}
+                  />
+                  {flags.AI_TRANSLATION && m.author.id !== me?.id && !translated[m.id] ? (
+                    <button type="button" className="live-translate" onClick={() => translate(m.id, m.body)}>
+                      Translate
+                    </button>
+                  ) : null}
                 </div>
                 {canModerate && m.author.id !== me?.id ? (
                   <Menu
