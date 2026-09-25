@@ -42,7 +42,9 @@ export default function LivePage() {
     return () => void api.live.leave(id).catch(() => {});
   }, [id]);
 
-  useEffect(() => endRef.current?.scrollIntoView({ block: 'end' }), [chat.length]);
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: 'end' });
+  }, [chat.length]);
 
   useRealtime((e) => {
     if (e.type === 'live.chat' && e.data.liveId === id) setChat((c) => (c.some((m) => m.id === e.data.message.id) ? c : [...c, e.data.message]));

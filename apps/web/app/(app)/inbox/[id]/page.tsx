@@ -41,7 +41,9 @@ export default function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  useEffect(() => endRef.current?.scrollIntoView({ block: 'end' }), [messages?.length]);
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: 'end' });
+  }, [messages?.length]);
 
   useRealtime((e) => {
     if (e.type === 'message.created' && e.data.conversationId === id) {
