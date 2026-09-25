@@ -191,3 +191,20 @@ describe('core vertical slice', () => {
     expect(nl.body.results.communities.length).toBeGreaterThan(0);
   });
 });
+
+describe('feed explanations', () => {
+  it('only says "a community you are in" for communities the viewer joined', async () => {
+    const t = await testApp();
+    const owner = await signUp(t.app);
+    const viewer = await signUp(t.app);
+    const slug = `why-${Date.now().toString(36)}`;
+    const c = (await as(t.app, owner).post('/v1/communities', { name: 'Why Club', slug })).body.community;
+    const post = (await as(t.app, owner).post('/v1/posts', { body: 'Club news', communityId: c.id })).body.post;
+    const before = (await as(t.app, viewer).get('/v1/feed?mode=for_you')).body.items.find((p: { id: string }) => p.id === post.id);
+    expect(before?.reason ?? '').not.toMatch(/community you're in/);
+    await as(t.app, viewer).post(`/v1/communities/${slug}/join`);
+    const after = (await as(t.app, viewer).get('/v1/feed?mode=for_you')).body.items.find((p: { id: string }) => p.id === post.id);
+    expect(after.reason).toMatch(/community you're in/);
+    await t.close();
+  });
+});

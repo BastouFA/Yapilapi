@@ -165,7 +165,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       `WITH my_topics AS (SELECT t.slug FROM user_interests ui JOIN topics t ON t.id = ui.topic_id WHERE ui.user_id = $1),
             less AS (SELECT DISTINCT unnest(p2.topics) AS topic FROM feed_feedback ff JOIN posts p2 ON p2.id = ff.post_id WHERE ff.user_id = $1 AND ff.signal = 'less_like_this'),
             more AS (SELECT DISTINCT unnest(p2.topics) AS topic FROM feed_feedback ff JOIN posts p2 ON p2.id = ff.post_id WHERE ff.user_id = $1 AND ff.signal = 'more_like_this')
-       SELECT p.id, p.author_id, ap.display_name, cm_c.name AS community_name,
+       SELECT p.id, p.author_id, ap.display_name, cm_c.name AS community_name, (cm_self.user_id IS NOT NULL) AS member,
               EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = p.author_id) AS followed,
               EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = p.author_id) OR (fr.user_b = $1 AND fr.user_a = p.author_id)) AS friend,
               (SELECT t FROM unnest(p.topics) t WHERE t IN (SELECT slug FROM my_topics) LIMIT 1) AS matched_topic,
@@ -212,11 +212,13 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
             ? `You're friends with ${r.display_name}`
             : r.followed
               ? `You follow ${r.display_name}`
-              : r.community_name
+              : r.community_name && r.member
                 ? `From ${r.community_name}, a community you're in`
                 : r.matched_topic
                   ? `You're interested in ${r.matched_topic}`
-                  : 'Popular with people on YAPILAPI right now',
+                  : r.community_name
+                    ? `Popular in ${r.community_name}`
+                    : 'Popular with people on YAPILAPI right now',
       );
     const more = rows.length > consumed;
     return {

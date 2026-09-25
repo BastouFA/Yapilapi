@@ -1,0 +1,30 @@
+{
+  "name": "@yapilapi/design-system",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.tsx",
+  "types": "./src/index.tsx",
+  "exports": {
+    ".": "./src/index.tsx",
+    "./tokens.css": "./src/tokens.css",
+    "./components.css": "./src/components.css",
+    "./tokens.json": "./tokens.json",
+    "./social.css": "./src/social.css"
+  },
+  "scripts": {
+    "build:tokens": "node scripts/build-tokens.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "react": "19.3.0",
+    "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "@yapilapi/shared": "workspace:*"
+  }
+}
