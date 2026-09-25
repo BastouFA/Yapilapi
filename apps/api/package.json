@@ -9,7 +9,9 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "docs:routes": "tsx --env-file-if-exists=../../.env scripts/gen-routes.ts"
+    "docs:routes": "tsx --env-file-if-exists=../../.env scripts/gen-routes.ts",
+    "load": "tsx load/run.ts",
+    "load:explain": "tsx load/explain.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.128.0",
@@ -18,9 +20,20 @@
     "@fastify/cookie": "11.1.2",
     "@fastify/cors": "11.3.0",
     "@fastify/multipart": "10.1.2",
+    "@fastify/otel": "0.21.0",
     "@fastify/rate-limit": "11.2.0",
     "@fastify/static": "10.1.4",
     "@fastify/websocket": "11.3.1",
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/exporter-trace-otlp-http": "0.222.0",
+    "@opentelemetry/instrumentation": "0.222.0",
+    "@opentelemetry/instrumentation-http": "0.222.0",
+    "@opentelemetry/instrumentation-ioredis": "0.70.0",
+    "@opentelemetry/instrumentation-pg": "0.74.0",
+    "@opentelemetry/instrumentation-undici": "0.32.0",
+    "@opentelemetry/resources": "2.11.0",
+    "@opentelemetry/sdk-trace-node": "2.11.0",
+    "@opentelemetry/semantic-conventions": "1.43.0",
     "@simplewebauthn/server": "14.0.3",
     "@yapilapi/auth": "workspace:*",
     "@yapilapi/database": "workspace:*",
@@ -34,9 +47,11 @@
     "zod": "3.25.76"
   },
   "devDependencies": {
+    "@types/autocannon": "7.12.7",
     "@types/pg": "^8.15.0",
     "@types/web-push": "^3.6.4",
     "@types/ws": "^8.18.0",
+    "autocannon": "8.0.0",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
     "vitest": "3.2.7",

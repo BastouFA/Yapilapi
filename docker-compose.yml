@@ -44,6 +44,14 @@ services:
     volumes: ['./infrastructure/media/turnserver.conf:/etc/coturn/turnserver.conf:ro']
     ports: ['3478:3478/udp', '3478:3478/tcp', '51160-51200:51160-51200/udp']
 
+  # Distributed tracing (opt-in): `docker compose --profile tracing up -d jaeger`,
+  # then run the API with OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318.
+  # Jaeger receives OTLP directly; the UI is on http://localhost:16686.
+  jaeger:
+    profiles: ['tracing']
+    image: jaegertracing/jaeger:2.21.0
+    ports: ['4318:4318', '16686:16686']
+
 volumes:
   pgdata:
   media:

@@ -9,7 +9,10 @@ export type Db = pg.Pool;
 export type DbClient = pg.PoolClient | pg.Pool;
 
 export function createPool(connectionString: string, max = 10): pg.Pool {
-  return new pg.Pool({ connectionString, max, idleTimeoutMillis: 30_000 });
+  // JIT off: our queries are short OLTP reads and writes. On larger tables the planner's
+  // cost estimate for the ranked feed crosses jit_above_cost and Postgres spent over a
+  // second compiling a query that runs in a fraction of that (docs/architecture/performance.md).
+  return new pg.Pool({ connectionString, max, idleTimeoutMillis: 30_000, options: '-c jit=off' });
 }
 
 /** Run fn inside a transaction; rolls back on any thrown error. */

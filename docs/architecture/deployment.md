@@ -11,3 +11,4 @@ Environments: **development** (local Docker), **staging** (single host, `infrast
 - Replace local-disk media storage with an S3-compatible bucket and CDN (implement `MediaStorage.put`).
 - Migrations run on start (`MIGRATE_ON_START=true`, advisory-locked) or as a release step.
 - Scrape `/metrics` with Prometheus (`infrastructure/monitoring/`), route alerts to on-call; point liveness at `/health/live` and readiness at `/health/ready`.
+- Tracing: set `OTEL_EXPORTER_OTLP_ENDPOINT` to an OpenTelemetry Collector and `OTEL_TRACES_SAMPLER=parentbased_traceidratio` with a ratio (see [observability](observability.md)).

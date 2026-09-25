@@ -18,6 +18,7 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
+    "load": "pnpm --filter @yapilapi/api load",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

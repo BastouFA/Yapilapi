@@ -31,6 +31,7 @@ flowchart LR
 2. `preHandler`: rate limit (per user, else per IP; Redis-backed), then route-level `requireAuth` / `requireRole`.
 3. Handler: `parse(schema, input)` with shared zod schemas, business rules, database work in transactions.
 4. `onSend`: security headers and `x-request-id`. `onResponse`: metrics.
+   With `OTEL_EXPORTER_OTLP_ENDPOINT` set, every step above is also a span in one trace (see [observability](observability.md)).
 5. Errors map to `{ error: { code, message, details, requestId } }`.
 
 ## Data
@@ -49,4 +50,8 @@ The API keeps WebSocket connections per user. With Redis configured, events are 
 
 `feature_flags` rows override defaults in `packages/shared/src/flags.ts`. Admins toggle them at `/admin`; every change is audited. Initial flags: LIVE, COMMERCE, AI_TRANSLATION, MEMORY, NOW, MINI_APPS, PLAY, REAL, REAL_TOGETHER.
 
-See also: [decisions](decisions/), [deployment](deployment.md), [disaster recovery](disaster-recovery.md), [API](../api/README.md), [security](../security/README.md).
+## Observability
+
+Structured JSON logs with request ids, Prometheus metrics at `/metrics`, and opt-in OpenTelemetry tracing (HTTP, Fastify, Postgres, Redis, outgoing fetch) with trace ids in the logs. Details, variables and a local Jaeger setup: [observability](observability.md). Load-test results and latency targets: [performance](performance.md).
+
+See also: [decisions](decisions/), [deployment](deployment.md), [observability](observability.md), [performance](performance.md), [disaster recovery](disaster-recovery.md), [API](../api/README.md), [security](../security/README.md).

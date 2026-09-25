@@ -52,6 +52,7 @@ import { setPushSender } from './lib/services.ts';
 import { processWebhooks } from './lib/webhooks.ts';
 import { processJobs } from './lib/jobs.ts';
 import { mediaJobHandlers } from './lib/media-processing.ts';
+import { fastifyTracingPlugin, traceLogMixin } from './lib/tracing.ts';
 
 export interface BuiltApp {
   app: FastifyInstance;
@@ -71,12 +72,17 @@ export async function buildApp(
             level: config.APP_ENV === 'production' ? 'info' : 'debug',
             // Never log credentials or session tokens.
             redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]', '*.password', '*.token'],
+            // With tracing on, log lines carry trace_id/span_id next to reqId.
+            mixin: traceLogMixin(),
           },
     genReqId: (req) => (req.headers['x-request-id'] as string) || randomUUID(),
     trustProxy: true,
     bodyLimit: 1_000_000,
   });
   if (opts.onRoute) app.addHook('onRoute', opts.onRoute);
+  // Route, hook and handler spans. Registered first so it sees every route.
+  const tracing = fastifyTracingPlugin();
+  if (tracing) await app.register(tracing);
 
   const db = createPool(config.DATABASE_URL);
   let redis: Redis | undefined;
