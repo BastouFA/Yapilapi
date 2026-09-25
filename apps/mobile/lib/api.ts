@@ -3,13 +3,22 @@ import * as SecureStore from 'expo-secure-store';
 import { createClient } from '../../../packages/api-client/src/index';
 
 const TOKEN_KEY = 'ypl_session';
-const baseUrl = (Constants.expoConfig?.extra?.apiUrl as string | undefined) ?? 'http://localhost:4000';
+export const baseUrl = (Constants.expoConfig?.extra?.apiUrl as string | undefined) ?? 'http://localhost:4000';
+
+export const getToken = async () => (await SecureStore.getItemAsync(TOKEN_KEY)) ?? undefined;
 
 /** Mobile uses a Bearer session token kept in the OS keychain (never AsyncStorage). */
 export async function client() {
-  const token = (await SecureStore.getItemAsync(TOKEN_KEY)) ?? undefined;
-  return createClient({ baseUrl, token });
+  return createClient({ baseUrl, token: await getToken() });
 }
+
+/** The realtime socket URL (same endpoint as the web app). The token goes in a header, not the URL. */
+export const realtimeUrl = () => `${baseUrl.replace(/^http/, 'ws')}/v1/realtime`;
+
+/** Media URLs from the API may be relative to the API origin. */
+export const mediaUrl = (url: string) => (/^https?:\/\//.test(url) ? url : `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`);
+
+export const errorMessage = (e: unknown) => (e instanceof Error && e.message ? e.message : 'Something went wrong. Try again.');
 
 export async function signIn(email: string, password: string) {
   const res = await fetch(`${baseUrl}/v1/auth/login`, {
@@ -19,6 +28,7 @@ export async function signIn(email: string, password: string) {
   });
   const json = await res.json();
   if (!res.ok) throw new Error(json?.error?.message ?? 'Sign-in failed');
+  if (!json.token) throw new Error('This account uses two-step verification, which the app does not support yet. Log in on the web for now.');
   await SecureStore.setItemAsync(TOKEN_KEY, json.token);
   return json.user;
 }

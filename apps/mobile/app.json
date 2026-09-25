@@ -8,10 +8,23 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.yapilapi.app",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "YAPILAPI uses the camera for video calls and to capture Reals.",
+        "NSMicrophoneUsageDescription": "YAPILAPI uses the microphone for audio and video calls.",
+        "UIBackgroundModes": ["audio"]
+      }
     },
     "android": {
-      "package": "com.yapilapi.app"
+      "package": "com.yapilapi.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.WAKE_LOCK"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -19,11 +32,22 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "YAPILAPI uses the camera to capture Reals."
+          "cameraPermission": "YAPILAPI uses the camera for video calls and to capture Reals.",
+          "microphonePermission": "YAPILAPI uses the microphone for audio and video calls.",
+          "recordAudioAndroid": true
         }
       ],
       "expo-notifications",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "YAPILAPI uses the camera for video calls and to capture Reals.",
+          "microphonePermission": "YAPILAPI uses the microphone for audio and video calls."
+        }
+      ],
+      "expo-dev-client",
+      "expo-font"
     ],
     "extra": {
       "apiUrl": "http://localhost:4000",

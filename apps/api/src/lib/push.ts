@@ -7,6 +7,8 @@ export interface PushMessage {
   body: string;
   url?: string;
   tag?: string;
+  /** Small string map for the app to act on (for example the call id on call_incoming). */
+  data?: Record<string, string>;
 }
 
 export type PushSender = (userId: string, msg: PushMessage) => Promise<void>;
@@ -28,7 +30,15 @@ export function createPushSender(db: Pool, config: Config, fetchImpl: typeof fet
           const res = await fetchImpl('https://exp.host/--/api/v2/push/send', {
             method: 'POST',
             headers: { 'content-type': 'application/json', accept: 'application/json' },
-            body: JSON.stringify({ to: s.endpoint, title: msg.title, body: msg.body, data: { url: msg.url } }),
+            body: JSON.stringify({
+              to: s.endpoint,
+              title: msg.title,
+              body: msg.body,
+              data: { url: msg.url, ...msg.data },
+              // Incoming calls ring: high priority, a sound, the "calls" Android channel and
+              // the call_incoming category (Answer / Decline actions) registered by the app.
+              ...(msg.tag === 'call_incoming' ? { priority: 'high', sound: 'default', channelId: 'calls', categoryId: 'call_incoming', ttl: 45 } : {}),
+            }),
           });
           const out = (await res.json().catch(() => ({}))) as { data?: { status?: string; details?: { error?: string } } };
           if (out.data?.details?.error === 'DeviceNotRegistered') throw Object.assign(new Error('gone'), { statusCode: 410 });
