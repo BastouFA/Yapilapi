@@ -1,0 +1,11 @@
+node_modules
+dist
+.next
+coverage
+package-lock.json
+apps/mobile/.expo
+docs/api/openapi.json
+apps/mobile/src/theme/tokens.generated.ts
+apps/web/test-results
+apps/web/e2e/report
+apps/*/test-results

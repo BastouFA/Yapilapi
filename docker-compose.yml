@@ -1,0 +1,47 @@
+# Local infrastructure. `docker compose up -d` starts Postgres + Redis.
+# Optional profiles: `--profile search` (OpenSearch), `--profile media` (MinIO), `--profile mail` (Mailpit)
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: yapilapi
+      POSTGRES_PASSWORD: yapilapi_dev_password
+      POSTGRES_DB: yapilapi_dev
+    ports: ['5432:5432']
+    volumes: ['pgdata:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U yapilapi -d yapilapi_dev']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  redis:
+    image: redis:7
+    ports: ['6379:6379']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  opensearch:
+    profiles: ['search']
+    image: opensearchproject/opensearch:2
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: 'true'
+    ports: ['9200:9200']
+  minio:
+    profiles: ['media']
+    image: minio/minio
+    command: server /data --console-address ':9001'
+    environment:
+      MINIO_ROOT_USER: yapilapi
+      MINIO_ROOT_PASSWORD: yapilapi_dev_password
+    ports: ['9000:9000', '9001:9001']
+    volumes: ['miniodata:/data']
+  mailpit:
+    profiles: ['mail']
+    image: axllent/mailpit
+    ports: ['1025:1025', '8025:8025']
+volumes:
+  pgdata:
+  miniodata:

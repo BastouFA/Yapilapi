@@ -1,0 +1,211 @@
+# Render Blueprint for YAPILAPI: https://render.com/docs/blueprint-spec
+#
+# `render blueprints validate` this file, then open:
+#   https://dashboard.render.com/blueprint/new?repo=<your-pushed-repo-url>
+#
+# What this provisions: the API (Fastify, Docker), the web app and admin console (Next.js, Docker), one
+# long-lived maintenance worker (scripts/scheduler.ts — see docs/operations/resilience-and-disaster-recovery.md),
+# a managed Postgres database, and a managed Key Value (Redis-compatible) instance.
+#
+# Every plan below is "free" per Render's own guidance to default there unless told otherwise. Free Postgres is
+# deleted after 30 days of the *database's* age (not activity) unless upgraded first — mark your calendar or
+# upgrade the `yapilapi-db` plan before then. Free web services spin down after 15 minutes idle and cold-start on
+# the next request. A free plan may not be offered for the background worker or Key Value service on your
+# account; if the Dashboard flags either as unavailable at the free tier when you click Apply, bump that one
+# service's `plan` to `starter` there (or in this file) and continue — it doesn't block the rest.
+#
+# Secrets marked `sync: false` are NOT filled in here on purpose (Blueprints are meant to be committed to git);
+# you fill them in the Render Dashboard the first time you apply this Blueprint. The most important ones, all in
+# the shared `yapilapi-secrets` group below so you only enter each one once even though both the API and the
+# scheduler worker need it:
+#
+#   - STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET   Required: PAYMENT_PROVIDER=dev (fake, always-succeeds payments)
+#                                                  is refused outside development, by design. Stripe's test-mode
+#                                                  keys work fine here and cost nothing to obtain.
+#   - SMTP_URL / EMAIL_FROM                       Required: EMAIL_ADAPTER=console (logs instead of sending) is
+#                                                  refused outside development too, so account verification and
+#                                                  password reset emails need a real SMTP relay.
+#   - S3_ENDPOINT / S3_REGION / S3_BUCKET /        Required for media uploads to persist: this Blueprint has no
+#     S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY       persistent disk, so local storage would silently lose every
+#                                                  uploaded file on the next deploy or restart.
+#
+# Everything else (ANTHROPIC_API_KEY, OPENAI_API_KEY, EXPO_ACCESS_TOKEN, OPENSEARCH_URL, METRICS_TOKEN, ...) is
+# optional and the app degrades honestly without it (see README.md "Status and honest gaps").
+#
+# NEXT_PUBLIC_API_URL / CORS_ALLOWED_ORIGINS / *_PUBLIC_URL below assume Render gives these services the
+# hostnames their `name` implies (https://<name>.onrender.com). If any name is already taken by someone else on
+# Render, that one service gets a different hostname — update the values below (or in the Dashboard) to match
+# before relying on cross-origin requests or email links.
+
+envVarGroups:
+  - name: yapilapi-secrets
+    envVars:
+      - key: DATA_ENCRYPTION_KEY
+        generateValue: true # base64 256-bit value Render generates once — exactly the 32 bytes this key requires
+      - key: WEBHOOK_SIGNING_SECRET
+        generateValue: true
+      - key: IP_HASH_SALT
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: 'true'
+      - key: EMAIL_ADAPTER
+        value: smtp
+      - key: SMTP_URL
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: MEDIA_ADAPTER
+        value: s3
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_REGION
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: PAYMENT_PROVIDER
+        value: stripe
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: AI_ENABLED
+        value: 'false' # the only real (non-canned) providers need ANTHROPIC_API_KEY/OPENAI_API_KEY you don't have
+        # yet; leaving this off is honest, whereas AI_ENABLED=true with no key silently only ever returns the
+        # deterministic "dev" provider's canned text to real users. Flip to 'true', set AI_DEFAULT_PROVIDER to
+        # 'anthropic' or 'openai', and add the matching *_API_KEY once you have a real key.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: EXPO_ACCESS_TOKEN
+        sync: false # only needed if you switch PUSH_ADAPTER to 'expo' once the mobile app ships to app stores
+      - key: OPENSEARCH_URL
+        sync: false # only needed if you switch SEARCH_BACKEND to 'opensearch'; postgres search works without it
+
+databases:
+  - name: yapilapi-db
+    databaseName: yapilapi
+    user: yapilapi
+    plan: free
+    postgresMajorVersion: '16'
+    region: oregon
+
+services:
+  - type: keyvalue
+    name: yapilapi-cache
+    plan: free
+    region: oregon
+    # Rate limiting, WS pub/sub fan-out and single-use realtime tickets are all designed to tolerate Redis data
+    # loss (see docs/operations/resilience-and-disaster-recovery.md): rate limiting fails open, pub/sub degrades
+    # to single-instance delivery. So evicting under memory pressure (allkeys-lru) is safer than noeviction, which
+    # would instead start refusing writes.
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: [] # internal (private network) only
+
+  - type: web
+    name: yapilapi-api
+    runtime: docker
+    dockerfilePath: infrastructure/docker/api.Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    branch: master
+    healthCheckPath: /health/live # liveness only: checks no dependency, so a DB/Redis blip never causes a restart loop
+    preDeployCommand: npm run db:migrate
+    envVars:
+      - fromGroup: yapilapi-secrets
+      - key: NODE_ENV
+        value: production
+      - key: APP_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: API_PORT
+        value: 10000
+      - key: API_PUBLIC_URL
+        value: https://yapilapi-api.onrender.com
+      - key: WEB_PUBLIC_URL
+        value: https://yapilapi-web.onrender.com
+      - key: ADMIN_PUBLIC_URL
+        value: https://yapilapi-admin.onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://yapilapi-web.onrender.com,https://yapilapi-admin.onrender.com
+      - key: TRUST_PROXY
+        value: 'true' # Render terminates TLS at its edge and forwards via its proxy; trust its X-Forwarded-* headers
+      - key: LOG_LEVEL
+        value: info
+      - key: DATABASE_URL
+        fromDatabase:
+          name: yapilapi-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: yapilapi-cache
+          type: keyvalue
+          property: connectionString
+      - key: METRICS_TOKEN
+        generateValue: true # copy this from the Dashboard into your Prometheus scrape config
+
+  - type: web
+    name: yapilapi-web
+    runtime: docker
+    dockerfilePath: infrastructure/docker/web.Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    branch: master
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: NEXT_PUBLIC_API_URL
+        value: https://yapilapi-api.onrender.com
+
+  - type: web
+    name: yapilapi-admin
+    runtime: docker
+    dockerfilePath: infrastructure/docker/admin.Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    branch: master
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: NEXT_PUBLIC_API_URL
+        value: https://yapilapi-api.onrender.com
+
+  - type: worker
+    name: yapilapi-scheduler
+    runtime: docker
+    dockerfilePath: infrastructure/docker/api.Dockerfile # same image as the API; only the start command differs
+    dockerContext: .
+    dockerCommand: node --import tsx scripts/scheduler.ts
+    plan: free
+    region: oregon
+    branch: master
+    maxShutdownDelaySeconds: 60 # give the in-flight job (if any) time to finish; see scripts/scheduler.ts
+    envVars:
+      - fromGroup: yapilapi-secrets
+      - key: NODE_ENV
+        value: production
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: DATABASE_URL
+        fromDatabase:
+          name: yapilapi-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: yapilapi-cache
+          type: keyvalue
+          property: connectionString

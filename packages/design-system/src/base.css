@@ -1,0 +1,143 @@
+/* Base element styles shared by every YAPILAPI surface. Logical properties only (RTL-safe). */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  background: var(--yl-color-bg);
+  scroll-padding-block-start: calc(var(--yl-header-h) + var(--yl-space-4));
+}
+
+body {
+  margin: 0;
+  min-block-size: 100dvh;
+  background: var(--yl-color-bg);
+  color: var(--yl-color-text);
+  font-family: var(--yl-font-sans);
+  font-size: var(--yl-text-md);
+  font-weight: var(--yl-weight-regular);
+  line-height: var(--yl-leading-normal);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-wrap: break-word;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-family: var(--yl-font-display);
+  line-height: var(--yl-leading-tight);
+  letter-spacing: var(--yl-tracking-tight);
+  font-weight: var(--yl-weight-bold);
+}
+p {
+  margin: 0;
+}
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+img,
+svg,
+video {
+  display: block;
+  max-inline-size: 100%;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+a {
+  color: var(--yl-color-primary-text);
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 0.08em;
+}
+a:hover {
+  color: var(--yl-color-primary-hover);
+}
+:target {
+  scroll-margin-block-start: var(--yl-header-h);
+}
+::selection {
+  background: var(--yl-color-accent);
+  color: var(--yl-color-on-accent);
+}
+[hidden] {
+  display: none !important;
+}
+
+/* Focus: a two-tone ring is visible on any background. Never removed, only restyled. */
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: var(--yl-focus-width) solid var(--yl-color-focus);
+  outline-offset: var(--yl-focus-offset);
+  box-shadow: 0 0 0 calc(var(--yl-focus-offset) + 1px) var(--yl-color-focus-halo);
+}
+[tabindex='-1']:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.yl-sr-only {
+  position: absolute !important;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Motion off: reduced-motion users and low-bandwidth mode never see transitions or animations. */
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) *,
+  :root:not([data-motion='full']) *::before,
+  :root:not([data-motion='full']) *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+:root[data-motion='reduce'] *,
+:root[data-motion='reduce'] *::before,
+:root[data-motion='reduce'] *::after,
+:root[data-bandwidth='low'] *,
+:root[data-bandwidth='low'] *::before,
+:root[data-bandwidth='low'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Low-bandwidth: no backdrop blur, no gradients, decorative media hidden. */
+:root[data-bandwidth='low'] [data-lowbw='hide'] {
+  display: none !important;
+}
+:root[data-bandwidth='low'] * {
+  backdrop-filter: none !important;
+}
+
+/* Windows high-contrast / forced colors: keep focus and boundaries visible. */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 3px solid Highlight;
+    box-shadow: none;
+  }
+}

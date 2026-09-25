@@ -1,0 +1,331 @@
+/*
+ * YAPILAPI design tokens.
+ *
+ * Brand feel: warm, playful, trustworthy. "Ember" (baked-clay orange) is the primary voice, "Lagoon" (deep teal)
+ * is the calm counterweight and "Saffron" is the spark. Surfaces are sun-warmed sand in light mode and cocoa in
+ * dark mode. Nothing here borrows an existing social network's palette.
+ *
+ * Contrast contract (verified by src/tokens.test.ts): every text/background pair listed in CONTRAST_PAIRS meets
+ * WCAG 2.2 AA (4.5:1 text, 3:1 UI boundaries). High-contrast mode raises the bar to AAA (7:1).
+ *
+ * Theme selection:
+ *   :root                                   light (default)
+ *   :root[data-theme="dark"]                dark, explicit
+ *   :root:not([data-theme="light"]) + prefers-color-scheme: dark   dark, "system"
+ * The two dark blocks are kept identical; a test enforces it.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* ---- Brand ramps (raw, prefer the roles below) ---- */
+  --yl-ember-50: #fbe6dc;
+  --yl-ember-500: #b33d1b;
+  --yl-ember-600: #9a3214;
+  --yl-ember-700: #7f2810;
+  --yl-lagoon-500: #0b6b6e;
+  --yl-saffron-500: #f0a81b;
+
+  /* ---- Color roles: surfaces ---- */
+  --yl-color-bg: #fbf7f0;
+  --yl-color-surface: #ffffff;
+  --yl-color-surface-subtle: #f5eee3;
+  --yl-color-surface-sunken: #efe6d8;
+  --yl-color-overlay: rgb(36 28 21 / 0.55);
+
+  /* ---- Color roles: text ---- */
+  --yl-color-text: #241c15;
+  --yl-color-text-muted: #5a4e42;
+  --yl-color-text-subtle: #6b5e50;
+  --yl-color-text-inverse: #ffffff;
+
+  /* ---- Color roles: lines ---- */
+  --yl-color-border: #e4d9c8; /* decorative dividers only */
+  --yl-color-border-strong: #857866; /* form-control and interactive boundaries (>= 3:1) */
+
+  /* ---- Color roles: brand ---- */
+  --yl-color-primary: #b33d1b;
+  --yl-color-primary-hover: #9a3214;
+  --yl-color-primary-active: #7f2810;
+  --yl-color-on-primary: #ffffff;
+  --yl-color-primary-text: #b33d1b; /* primary used as text/link on bg/surface */
+  --yl-color-primary-soft: #fbe6dc;
+  --yl-color-on-primary-soft: #8a2c10;
+
+  --yl-color-secondary: #0b6b6e;
+  --yl-color-secondary-hover: #095557;
+  --yl-color-on-secondary: #ffffff;
+  --yl-color-secondary-soft: #ddf0ee;
+  --yl-color-on-secondary-soft: #084f51;
+
+  --yl-color-accent: #f0a81b;
+  --yl-color-on-accent: #2b1d05;
+
+  /* ---- Color roles: status ---- */
+  --yl-color-success: #1e7a45;
+  --yl-color-success-soft: #dff3e6;
+  --yl-color-warning: #8a5a00;
+  --yl-color-warning-soft: #fff1cc;
+  --yl-color-danger: #b3261e;
+  --yl-color-danger-soft: #fde5e2;
+  --yl-color-info: #2a5da0;
+  --yl-color-info-soft: #e0ebf9;
+
+  /* ---- Focus ---- */
+  --yl-color-focus: #0b6b6e;
+  --yl-color-focus-halo: #ffffff;
+  --yl-focus-width: 3px;
+  --yl-focus-offset: 2px;
+
+  /* ---- Elevation (warm-tinted shadows) ---- */
+  --yl-shadow-1: 0 1px 2px rgb(74 46 20 / 0.08), 0 1px 1px rgb(74 46 20 / 0.06);
+  --yl-shadow-2: 0 4px 12px rgb(74 46 20 / 0.1), 0 1px 3px rgb(74 46 20 / 0.08);
+  --yl-shadow-3: 0 10px 28px rgb(74 46 20 / 0.14), 0 2px 6px rgb(74 46 20 / 0.08);
+  --yl-shadow-4: 0 22px 56px rgb(74 46 20 / 0.22), 0 4px 12px rgb(74 46 20 / 0.1);
+
+  /* ---- Spacing (4px base) ---- */
+  --yl-space-0: 0;
+  --yl-space-1: 0.25rem;
+  --yl-space-2: 0.5rem;
+  --yl-space-3: 0.75rem;
+  --yl-space-4: 1rem;
+  --yl-space-5: 1.25rem;
+  --yl-space-6: 1.5rem;
+  --yl-space-8: 2rem;
+  --yl-space-10: 2.5rem;
+  --yl-space-12: 3rem;
+  --yl-space-16: 4rem;
+
+  /* ---- Radii: "pebble" shapes, generous and soft ---- */
+  --yl-radius-xs: 0.375rem;
+  --yl-radius-sm: 0.625rem;
+  --yl-radius-md: 0.875rem;
+  --yl-radius-lg: 1.25rem;
+  --yl-radius-xl: 1.75rem;
+  --yl-radius-pill: 999px;
+  --yl-radius-pebble: 38%; /* avatars are pebbles, not circles */
+
+  /* ---- Typography ---- */
+  --yl-font-sans:
+    ui-rounded, 'SF Pro Rounded', 'Nunito', 'Segoe UI Variable Text', 'Segoe UI', 'Noto Sans',
+    'Noto Sans Arabic', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --yl-font-display:
+    ui-rounded, 'SF Pro Rounded', 'Nunito', 'Segoe UI Variable Display', 'Segoe UI', 'Noto Sans',
+    'Noto Sans Arabic', system-ui, -apple-system, sans-serif;
+  --yl-font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+
+  --yl-text-xs: 0.75rem;
+  --yl-text-sm: 0.875rem;
+  --yl-text-md: 1rem;
+  --yl-text-lg: 1.125rem;
+  --yl-text-xl: 1.25rem;
+  --yl-text-2xl: 1.5rem;
+  --yl-text-3xl: clamp(1.625rem, 1.3rem + 1.4vw, 2rem);
+  --yl-text-4xl: clamp(2rem, 1.5rem + 2.4vw, 3rem);
+
+  --yl-leading-tight: 1.2;
+  --yl-leading-snug: 1.35;
+  --yl-leading-normal: 1.55;
+  --yl-weight-regular: 450;
+  --yl-weight-medium: 550;
+  --yl-weight-bold: 700;
+  --yl-weight-black: 800;
+  --yl-tracking-tight: -0.015em;
+
+  /* ---- Motion ---- */
+  --yl-motion-scale: 1;
+  --yl-dur-1: 90ms;
+  --yl-dur-2: 160ms;
+  --yl-dur-3: 260ms;
+  --yl-dur-4: 420ms;
+  --yl-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --yl-ease-emphasized: cubic-bezier(0.3, 0, 0, 1.15);
+  --yl-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* ---- Layering ---- */
+  --yl-z-sticky: 20;
+  --yl-z-nav: 30;
+  --yl-z-popover: 60;
+  --yl-z-dialog: 70;
+  --yl-z-toast: 80;
+  --yl-z-skip: 100;
+
+  /* ---- Layout ---- */
+  --yl-sidebar-w: 17rem;
+  --yl-content-w: 40rem;
+  --yl-tabbar-h: 4rem;
+  --yl-header-h: 3.5rem;
+  --yl-target-min: 2.75rem; /* 44px minimum touch target */
+}
+
+/* ------------------------------------------------------------------ dark: explicit */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --yl-ember-50: #3c1f14;
+  --yl-color-bg: #16110d;
+  --yl-color-surface: #211a15;
+  --yl-color-surface-subtle: #2b221c;
+  --yl-color-surface-sunken: #100c09;
+  --yl-color-overlay: rgb(8 5 3 / 0.7);
+  --yl-color-text: #f5ede2;
+  --yl-color-text-muted: #cdbfad;
+  --yl-color-text-subtle: #ac9d8a;
+  --yl-color-text-inverse: #16110d;
+  --yl-color-border: #3b3028;
+  --yl-color-border-strong: #9a8b79;
+  --yl-color-primary: #f27a50;
+  --yl-color-primary-hover: #ff9068;
+  --yl-color-primary-active: #ffa683;
+  --yl-color-on-primary: #2a0e04;
+  --yl-color-primary-text: #ff9b78;
+  --yl-color-primary-soft: #3c1f14;
+  --yl-color-on-primary-soft: #ffb79c;
+  --yl-color-secondary: #4fc1be;
+  --yl-color-secondary-hover: #72d3d0;
+  --yl-color-on-secondary: #062a2b;
+  --yl-color-secondary-soft: #12312f;
+  --yl-color-on-secondary-soft: #8fe0dd;
+  --yl-color-accent: #f5b83d;
+  --yl-color-on-accent: #2b1d05;
+  --yl-color-success: #5cc98a;
+  --yl-color-success-soft: #14301f;
+  --yl-color-warning: #f0b44c;
+  --yl-color-warning-soft: #362806;
+  --yl-color-danger: #ff8a80;
+  --yl-color-danger-soft: #3e1714;
+  --yl-color-info: #8db6f0;
+  --yl-color-info-soft: #16263d;
+  --yl-color-focus: #72d3d0;
+  --yl-color-focus-halo: #16110d;
+  --yl-shadow-1: 0 1px 2px rgb(0 0 0 / 0.5);
+  --yl-shadow-2: 0 4px 12px rgb(0 0 0 / 0.5);
+  --yl-shadow-3: 0 10px 28px rgb(0 0 0 / 0.55);
+  --yl-shadow-4: 0 22px 56px rgb(0 0 0 / 0.65);
+}
+
+/* ------------------------------------------------------------------ dark: "system" preference */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --yl-ember-50: #3c1f14;
+    --yl-color-bg: #16110d;
+    --yl-color-surface: #211a15;
+    --yl-color-surface-subtle: #2b221c;
+    --yl-color-surface-sunken: #100c09;
+    --yl-color-overlay: rgb(8 5 3 / 0.7);
+    --yl-color-text: #f5ede2;
+    --yl-color-text-muted: #cdbfad;
+    --yl-color-text-subtle: #ac9d8a;
+    --yl-color-text-inverse: #16110d;
+    --yl-color-border: #3b3028;
+    --yl-color-border-strong: #9a8b79;
+    --yl-color-primary: #f27a50;
+    --yl-color-primary-hover: #ff9068;
+    --yl-color-primary-active: #ffa683;
+    --yl-color-on-primary: #2a0e04;
+    --yl-color-primary-text: #ff9b78;
+    --yl-color-primary-soft: #3c1f14;
+    --yl-color-on-primary-soft: #ffb79c;
+    --yl-color-secondary: #4fc1be;
+    --yl-color-secondary-hover: #72d3d0;
+    --yl-color-on-secondary: #062a2b;
+    --yl-color-secondary-soft: #12312f;
+    --yl-color-on-secondary-soft: #8fe0dd;
+    --yl-color-accent: #f5b83d;
+    --yl-color-on-accent: #2b1d05;
+    --yl-color-success: #5cc98a;
+    --yl-color-success-soft: #14301f;
+    --yl-color-warning: #f0b44c;
+    --yl-color-warning-soft: #362806;
+    --yl-color-danger: #ff8a80;
+    --yl-color-danger-soft: #3e1714;
+    --yl-color-info: #8db6f0;
+    --yl-color-info-soft: #16263d;
+    --yl-color-focus: #72d3d0;
+    --yl-color-focus-halo: #16110d;
+    --yl-shadow-1: 0 1px 2px rgb(0 0 0 / 0.5);
+    --yl-shadow-2: 0 4px 12px rgb(0 0 0 / 0.5);
+    --yl-shadow-3: 0 10px 28px rgb(0 0 0 / 0.55);
+    --yl-shadow-4: 0 22px 56px rgb(0 0 0 / 0.65);
+  }
+}
+
+/* ------------------------------------------------------------------ high contrast (AAA text, stronger lines) */
+:root[data-contrast='more'] {
+  --yl-color-text: #000000;
+  --yl-color-text-muted: #1f1812;
+  --yl-color-text-subtle: #33291f;
+  --yl-color-border: #5a4e42;
+  --yl-color-border-strong: #241c15;
+  --yl-color-primary: #8a2c10;
+  --yl-color-primary-hover: #6f220b;
+  --yl-color-primary-active: #571a08;
+  --yl-color-primary-text: #8a2c10;
+  --yl-color-secondary: #084f51;
+  --yl-color-focus: #000000;
+  --yl-focus-width: 4px;
+}
+:root[data-theme='dark'][data-contrast='more'] {
+  --yl-color-text: #ffffff;
+  --yl-color-text-muted: #f3e9dc;
+  --yl-color-text-subtle: #e2d4c2;
+  --yl-color-border: #cdbfad;
+  --yl-color-border-strong: #f5ede2;
+  --yl-color-primary: #ffa683;
+  --yl-color-primary-hover: #ffbca0;
+  --yl-color-primary-text: #ffb79c;
+  --yl-color-secondary: #8fe0dd;
+  --yl-color-focus: #ffffff;
+}
+@media (prefers-contrast: more) {
+  :root:not([data-contrast='normal']) {
+    --yl-color-border: #5a4e42;
+    --yl-color-border-strong: #241c15;
+    --yl-color-text-muted: #1f1812;
+    --yl-color-text-subtle: #33291f;
+    --yl-focus-width: 4px;
+  }
+}
+
+/* ------------------------------------------------------------------ motion */
+:root[data-motion='reduce'] {
+  --yl-motion-scale: 0;
+  --yl-dur-1: 0.01ms;
+  --yl-dur-2: 0.01ms;
+  --yl-dur-3: 0.01ms;
+  --yl-dur-4: 0.01ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) {
+    --yl-motion-scale: 0;
+    --yl-dur-1: 0.01ms;
+    --yl-dur-2: 0.01ms;
+    --yl-dur-3: 0.01ms;
+    --yl-dur-4: 0.01ms;
+  }
+}
+
+/* ------------------------------------------------------------------ low-bandwidth mode
+ * data-bandwidth="low" is set by applyDocumentPreferences() when the user opts in, or when the browser reports
+ * Save-Data / a 2G connection and the preference is "auto". It removes decorative weight: shadows, blur,
+ * gradients and motion. Components additionally consult useLowBandwidth() to skip media and prefetching.
+ */
+:root[data-bandwidth='low'] {
+  --yl-motion-scale: 0;
+  --yl-dur-1: 0.01ms;
+  --yl-dur-2: 0.01ms;
+  --yl-dur-3: 0.01ms;
+  --yl-dur-4: 0.01ms;
+  --yl-shadow-1: none;
+  --yl-shadow-2: none;
+  --yl-shadow-3: 0 0 0 1px var(--yl-color-border-strong);
+  --yl-shadow-4: 0 0 0 2px var(--yl-color-border-strong);
+}
+
+/* ------------------------------------------------------------------ text direction helpers */
+:root[dir='rtl'] {
+  --yl-dir-sign: -1; /* for the rare transform that cannot be expressed logically */
+}
+:root[dir='ltr'] {
+  --yl-dir-sign: 1;
+}

@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "YAPILAPI",
+    "slug": "yapilapi",
+    "version": "0.1.0",
+    "scheme": "yapilapi",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "app.yapilapi.mobile",
+      "supportsTablet": true,
+      "associatedDomains": ["applinks:yapilapi.example"],
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "YAPILAPI reads the photos and videos you choose to attach to a post, message or profile.",
+        "NSCameraUsageDescription": "YAPILAPI uses the camera only when you choose to take a photo or video to share.",
+        "NSLocationWhenInUseUsageDescription": "YAPILAPI uses your approximate location only when you open the Local feed, to show posts near you."
+      }
+    },
+    "android": {
+      "package": "app.yapilapi.mobile",
+      "permissions": ["POST_NOTIFICATIONS"],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "https", "host": "yapilapi.example", "pathPrefix": "/post" },
+            { "scheme": "https", "host": "yapilapi.example", "pathPrefix": "/u" },
+            { "scheme": "https", "host": "yapilapi.example", "pathPrefix": "/communities" },
+            { "scheme": "https", "host": "yapilapi.example", "pathPrefix": "/inbox" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "web": { "bundler": "metro", "output": "single" },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-localization",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "YAPILAPI reads the photos and videos you choose to attach.",
+          "cameraPermission": "YAPILAPI uses the camera only when you choose to take a photo or video."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "YAPILAPI uses your approximate location only when you open the Local feed."
+        }
+      ],
+      ["expo-notifications", { "defaultChannel": "default" }]
+    ],
+    "experiments": { "tsconfigPaths": true },
+    "extra": { "router": {} }
+  }
+}

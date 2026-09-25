@@ -1,0 +1,13 @@
+{
+  "id": "chatcmpl-Fixture",
+  "object": "chat.completion",
+  "model": "gpt-4o-mini-2024-07-18",
+  "choices": [
+    {
+      "index": 0,
+      "message": { "role": "assistant", "content": "Here is a short summary." },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": { "prompt_tokens": 120, "completion_tokens": 9, "total_tokens": 129 }
+}

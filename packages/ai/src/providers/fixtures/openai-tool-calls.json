@@ -1,0 +1,23 @@
+{
+  "id": "chatcmpl-Tool",
+  "object": "chat.completion",
+  "model": "gpt-4o-mini-2024-07-18",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_abc",
+            "type": "function",
+            "function": { "name": "find_events", "arguments": "{\"when\":\"this weekend\"}" }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": { "prompt_tokens": 200, "completion_tokens": 21, "total_tokens": 221 }
+}

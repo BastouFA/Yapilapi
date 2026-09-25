@@ -1,0 +1,34 @@
+# Reference single-host deployment (staging or a small production). Bigger installs should map the same
+# three services onto their orchestrator; nothing here is required by the code.
+# Secrets come from the environment / an env file that is NOT in the repo:  docker compose --env-file /etc/yapilapi/env up -d
+services:
+  api:
+    image: ${REGISTRY:-ghcr.io/yapilapi}/api:${TAG:-latest}
+    env_file: [/etc/yapilapi/api.env]
+    depends_on: [redis]
+    restart: unless-stopped
+    volumes: ['media:/repo/storage']
+    expose: ['4000']
+  web:
+    image: ${REGISTRY:-ghcr.io/yapilapi}/web:${TAG:-latest}
+    restart: unless-stopped
+    expose: ['3000']
+  admin:
+    image: ${REGISTRY:-ghcr.io/yapilapi}/admin:${TAG:-latest}
+    restart: unless-stopped
+    expose: ['3100']
+  redis:
+    image: redis:7
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes: ['redis:/data']
+    restart: unless-stopped
+  migrate:
+    image: ${REGISTRY:-ghcr.io/yapilapi}/api:${TAG:-latest}
+    env_file: [/etc/yapilapi/api.env]
+    command: ['node', '--import', 'tsx', 'scripts/db-migrate.ts']
+    profiles: ['ops']
+  # PostgreSQL is deliberately NOT here: use a managed service (backups, PITR, failover) or your own cluster.
+  # TLS termination / reverse proxy (Caddy, nginx, a cloud LB) sits in front of web:3000, admin:3100, api:4000.
+volumes:
+  media:
+  redis:

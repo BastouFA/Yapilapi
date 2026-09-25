@@ -1,0 +1,17 @@
+node_modules
+dist
+.next
+.expo
+.turbo
+coverage
+*.log
+.env
+.env.local
+.env.*.local
+!.env.example
+.DS_Store
+storage/
+dump.rdb
+.vitest-cache
+*.tsbuildinfo
+tests/ai-evals/out

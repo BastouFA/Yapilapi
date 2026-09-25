@@ -1,0 +1,133 @@
+/** English copy for Creator Studio (video/audio editing recipes, captions, renders, suggestions, publishing). */
+export const enStudio = {
+  'nav.studio': 'Studio',
+  'studio.title': 'Studio',
+  'studio.lead':
+    'Edit your videos and audio non-destructively: your original file is never changed, only a recipe describing the edit.',
+
+  'studio.unavailable.render': 'Rendering is not available on this server right now.',
+  'studio.unavailable.speech': 'Automatic transcription is not configured on this server.',
+  'studio.unavailable.ai': 'AI suggestions are not enabled on this server.',
+
+  'studio.projects.empty': 'You have not created any studio projects yet.',
+  'studio.projects.limit': 'You can have at most {limit} projects at a time.',
+  'studio.projects.new': 'New project',
+  'studio.projects.uploadFile': 'Video or audio file',
+  'studio.projects.title': 'Title',
+  'studio.projects.description': 'Description',
+  'studio.projects.create': 'Create project',
+  'studio.projects.created': 'Project created.',
+  'studio.projects.uploading': 'Uploading…',
+  'studio.projects.sourceNotReady':
+    'Your file is still processing. Wait a moment, then try creating the project again.',
+  'studio.projects.retry': 'Try again',
+  'studio.projects.delete': 'Delete project',
+  'studio.projects.deleteConfirm.title': 'Delete this project?',
+  'studio.projects.deleteConfirm.body':
+    'The recipe is deleted. Your original media and any post you already published are kept.',
+  'studio.projects.deleted': 'Project deleted.',
+  'studio.projects.notFound': 'Project not found.',
+  'studio.projects.status.draft': 'Draft',
+  'studio.projects.status.published': 'Published',
+  'studio.projects.rendered': 'Rendered',
+  'studio.projects.notRendered': 'Not rendered yet',
+  'studio.projects.renameSave': 'Save',
+  'studio.projects.renamed': 'Project updated.',
+
+  'studio.tab.edit': 'Edit',
+  'studio.tab.captions': 'Captions',
+  'studio.tab.suggestions': 'Suggestions',
+  'studio.tab.render': 'Render',
+  'studio.tab.publish': 'Publish',
+
+  // ---- EDL editor
+  'studio.edl.title': 'Edit recipe (EDL)',
+  'studio.edl.help':
+    'A recipe describing which parts of the source are kept, an optional aspect crop, thumbnail moment and caption track. Edit as JSON.',
+  'studio.edl.validate': 'Validate',
+  'studio.edl.valid': 'Recipe is valid.',
+  'studio.edl.save': 'Save recipe',
+  'studio.edl.saved': 'Recipe saved.',
+  'studio.edl.invalidJson': 'That is not valid JSON.',
+  'studio.edl.issue': '{path}: {message}',
+  'studio.edl.conflict':
+    'This project changed elsewhere since you loaded it. Reload before saving again.',
+
+  // ---- captions
+  'studio.captions.empty': 'No caption tracks yet.',
+  'studio.captions.lang': 'Language tag (e.g. en, pt-BR)',
+  'studio.captions.format': 'Format',
+  'studio.captions.format.vtt': 'WebVTT',
+  'studio.captions.format.srt': 'SRT',
+  'studio.captions.text': 'Paste WebVTT or SRT text',
+  'studio.captions.save': 'Save track',
+  'studio.captions.saved': 'Caption track saved.',
+  'studio.captions.delete': 'Delete',
+  'studio.captions.deleted': 'Caption track deleted.',
+  'studio.captions.cueCount': '{count} cues',
+  'studio.captions.transcribe': 'Auto-transcribe',
+  'studio.captions.transcribeLanguage': 'Language (optional)',
+  'studio.captions.transcribed': 'Transcription complete: review it like any caption track.',
+  'studio.captions.validate': 'Validate',
+  'studio.captions.valid': '{count} cues look good.',
+
+  // ---- suggestions (proposals only, never applied automatically)
+  'studio.suggestions.lead':
+    'Suggestions are proposals only. Nothing changes and nothing publishes until you accept it.',
+  'studio.suggestions.generate': 'Get suggestions',
+  'studio.suggestions.empty': 'No suggestions yet.',
+  'studio.suggestions.skipped': 'Skipped: {kind} — {reason}',
+  'studio.suggestions.kind.title': 'Title',
+  'studio.suggestions.kind.description': 'Description',
+  'studio.suggestions.kind.thumbnail': 'Thumbnail moment',
+  'studio.suggestions.kind.silence_cuts': 'Silence cuts',
+  'studio.suggestions.kind.highlights': 'Highlight clips',
+  'studio.suggestions.kind.captions_review': 'Caption review',
+  'studio.suggestions.accept': 'Accept',
+  'studio.suggestions.accepted': 'Suggestion applied to your draft.',
+  'studio.suggestions.dismiss': 'Dismiss',
+  'studio.suggestions.dismissed': 'Suggestion dismissed.',
+  'studio.suggestions.status.suggested': 'Proposed',
+  'studio.suggestions.status.accepted': 'Accepted',
+  'studio.suggestions.status.dismissed': 'Dismissed',
+
+  // ---- render
+  'studio.render.title': 'Render',
+  'studio.render.help':
+    'Rendering applies your recipe with ffmpeg and produces a new media file. Your original is never modified.',
+  'studio.render.start': 'Render now',
+  'studio.render.started': 'Render started.',
+  'studio.render.reused': 'This recipe was already rendered; reusing the existing output.',
+  'studio.render.history': 'Render history',
+  'studio.render.empty': 'No renders yet.',
+  'studio.render.status.queued': 'Queued',
+  'studio.render.status.running': 'Running',
+  'studio.render.status.done': 'Done',
+  'studio.render.status.failed': 'Failed',
+
+  // ---- publish (explicit confirm required)
+  'studio.publish.title': 'Publish',
+  'studio.publish.help':
+    'Publishing creates a real post from this project. Nothing is posted until you confirm.',
+  'studio.publish.needsRender': 'Render your latest edit before publishing.',
+  'studio.publish.body': 'Caption for the post',
+  'studio.publish.mode': 'When',
+  'studio.publish.mode.now': 'Publish now',
+  'studio.publish.mode.scheduled': 'Schedule',
+  'studio.publish.publishAt': 'Publish at',
+  'studio.publish.confirm': 'Publish',
+  'studio.publish.confirmDialog.title': 'Publish this project?',
+  'studio.publish.confirmDialog.body':
+    'This creates a real, visible post from your edited video or audio. This is a distinct, explicit action — nothing is ever published automatically.',
+  'studio.publish.published': 'Published.',
+  'studio.publish.scheduled': 'Scheduled. It publishes automatically unless you cancel it first.',
+  'studio.publish.current': 'Current publication',
+  'studio.publish.none': 'Not published yet.',
+  'studio.publish.cancel': 'Cancel scheduled publication',
+  'studio.publish.cancelled': 'Scheduled publication cancelled.',
+  'studio.publish.status.confirmed': 'Scheduled',
+  'studio.publish.status.published': 'Published',
+  'studio.publish.status.cancelled': 'Cancelled',
+  'studio.publish.status.stale': 'Stale (the project changed since scheduling)',
+  'studio.publish.status.failed': 'Failed',
+} as const;

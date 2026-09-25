@@ -1,0 +1,38 @@
+# Alert rules built only from metrics the API actually exports (see apps/api/src/lib/metrics.ts).
+groups:
+  - name: yapilapi-api
+    rules:
+      - alert: ApiHighErrorRate
+        expr: sum(rate(yapilapi_http_requests_total{status=~"5.."}[5m])) / sum(rate(yapilapi_http_requests_total[5m])) > 0.02
+        for: 10m
+        labels: { severity: page }
+        annotations: { summary: 'More than 2% of API requests are failing with 5xx' }
+      - alert: ApiSlowP95
+        expr: histogram_quantile(0.95, sum by (le) (rate(yapilapi_http_request_duration_seconds_bucket[5m]))) > 1
+        for: 15m
+        labels: { severity: ticket }
+        annotations: { summary: 'API p95 latency above 1s' }
+      - alert: ApiNotReady
+        expr: probe_success{job="yapilapi-readiness"} == 0
+        for: 3m
+        labels: { severity: page }
+        annotations: { summary: '/health/ready is failing (database unreachable?)' }
+      - alert: NodeEventLoopLag
+        expr: yapilapi_nodejs_eventloop_lag_p99_seconds > 0.5
+        for: 10m
+        labels: { severity: ticket }
+        annotations: { summary: 'Event loop lag p99 above 500ms' }
+      - alert: SignupsStopped
+        expr: sum(increase(yapilapi_domain_events_total{name="signup"}[6h])) == 0
+        for: 6h
+        labels: { severity: ticket }
+        annotations: { summary: 'No signups for 6 hours (check registration flow)' }
+      - alert: PaymentWebhooksRejected
+        expr: sum(increase(yapilapi_domain_events_total{name="payment_webhook_rejected"}[15m])) > 5
+        labels: { severity: page }
+        annotations:
+          { summary: 'Payment webhooks are being rejected (bad signature or secret rotation?)' }
+      - alert: PaymentsBlockedSpike
+        expr: sum(increase(yapilapi_domain_events_total{name="payment_blocked"}[15m])) > 20
+        labels: { severity: ticket }
+        annotations: { summary: 'Unusual number of payments blocked by fraud rules' }
