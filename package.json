@@ -61,7 +61,7 @@
     "tsx": "^4.19.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.0.0",
-    "vitest": "^3.2.0"
+    "vitest": "^5.0.1"
   },
   "overrides": {
     "postcss": "^8.5.28"
