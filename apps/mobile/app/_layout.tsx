@@ -32,6 +32,8 @@ function Screens() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false, title: t('nav.home') }} />
         <Stack.Screen name="chat/[id]" options={{ title: t('m.title.conversation') }} />
         <Stack.Screen name="p/[id]" options={{ title: t('m.title.post') }} />
+        <Stack.Screen name="u/[username]" options={{ title: t('m.title.profile') }} />
+        <Stack.Screen name="t/[tag]" options={{ title: t('m.title.tag') }} />
         <Stack.Screen name="c/[slug]" options={{ title: t('m.title.community') }} />
         <Stack.Screen name="settings" options={{ title: t('m.title.settings') }} />
         <Stack.Screen name="real" options={{ title: t('m.title.real') }} />

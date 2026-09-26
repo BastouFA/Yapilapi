@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import { Image, Pressable, Text, View, type StyleProp, type TextStyle } from 'react-native';
+import { splitRichText } from '../../../packages/shared/src/hashtags';
 import type { Conversation, Post } from '../../../packages/shared/src/types';
 import { client, mediaUrl } from './api';
 import { useT, type Translate } from './i18n';
@@ -14,6 +15,30 @@ export const conversationTitle = (c: Conversation, meId: string | undefined, t: 
     .map((m) => m.displayName)
     .join(', ') ||
     t('m.chat.justYou'));
+
+/** Text with #tags and @mentions that open the tag or the person's profile. */
+export function RichText({ text, style, numberOfLines }: { text: string; style?: StyleProp<TextStyle>; numberOfLines?: number }) {
+  const c = useColors();
+  return (
+    <Text style={[style, userText]} numberOfLines={numberOfLines}>
+      {splitRichText(text).map((part, i) =>
+        'tag' in part || 'mention' in part ? (
+          <Text
+            key={i}
+            accessibilityRole="link"
+            suppressHighlighting={false}
+            onPress={() => router.push('tag' in part ? `/t/${encodeURIComponent(part.tag)}` : `/u/${part.mention}`)}
+            style={{ color: c.yapi, fontWeight: '600' }}
+          >
+            {part.text}
+          </Text>
+        ) : (
+          part.text
+        ),
+      )}
+    </Text>
+  );
+}
 
 /** A post as a rounded card. Tapping it opens the post; like and save update in place. */
 export function PostCard({ post, open = true }: { post: Post; open?: boolean }) {
@@ -31,7 +56,18 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
       label={open ? t('m.post.by', { name: post.author.displayName }) : undefined}
       style={{ gap: space[3] }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
+      {post.pinned ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Icon name="bookmark" size={12} color={c.inkMuted} />
+          <Text style={{ color: c.inkMuted, fontSize: 12, fontWeight: '600' }}>{t('m.post.pinned')}</Text>
+        </View>
+      ) : null}
+      <Pressable
+        accessibilityRole="link"
+        accessibilityLabel={t('m.title.profile') + ': ' + post.author.displayName}
+        onPress={() => router.push(`/u/${post.author.username}`)}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}
+      >
         <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={40} />
         <View style={{ flex: 1 }}>
           <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 15 }, userText]} numberOfLines={1}>
@@ -42,7 +78,7 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
             {post.reason ? ` · ${post.reason}` : ''}
           </Text>
         </View>
-      </View>
+      </Pressable>
 
       {post.community ? (
         <Pressable
@@ -54,7 +90,7 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
         </Pressable>
       ) : null}
 
-      {post.body ? <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 22 }, userText]}>{post.body}</Text> : null}
+      {post.body ? <RichText text={post.body} style={{ color: c.ink, fontSize: 15, lineHeight: 22 }} /> : null}
 
       {imageUri ? (
         <Image
