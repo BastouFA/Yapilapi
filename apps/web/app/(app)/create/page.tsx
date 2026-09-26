@@ -498,11 +498,7 @@ function Create() {
         ) : null}
 
         {kind === 'story' ? (
-          <StoryStickerEditor
-            stickers={stickers}
-            onChange={setStickers}
-            preview={{ mediaUrl: media[0]?.url, mediaKind: media[0]?.kind, body }}
-          />
+          <StoryStickerEditor stickers={stickers} onChange={setStickers} preview={{ mediaUrl: media[0]?.url, mediaKind: media[0]?.kind, body }} />
         ) : null}
 
         {kind === 'reel' && !remixOf ? (

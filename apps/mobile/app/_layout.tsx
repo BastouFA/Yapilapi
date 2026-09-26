@@ -5,10 +5,12 @@ import { LocaleProvider, useT } from '../lib/i18n';
 import { SessionProvider, useSession } from '../lib/session';
 import { useColors } from '../lib/ui';
 import { useUsageHeartbeat } from '../lib/usage';
+import { useStoryPushLinks } from '../lib/stories';
 
 function Heartbeat() {
   const { me } = useSession();
   useUsageHeartbeat(!!me);
+  useStoryPushLinks();
   return null;
 }
 
@@ -34,6 +36,7 @@ function Screens() {
         <Stack.Screen name="p/[id]" options={{ title: t('m.title.post') }} />
         <Stack.Screen name="u/[username]" options={{ title: t('m.title.profile') }} />
         <Stack.Screen name="t/[tag]" options={{ title: t('m.title.tag') }} />
+        <Stack.Screen name="s/[id]" options={{ title: t('m.stories.label') }} />
         <Stack.Screen name="sounds/[id]" options={{ title: t('m.sound.title') }} />
         <Stack.Screen name="close-friends" options={{ title: t('m.closeFriends.title') }} />
         <Stack.Screen name="invite" options={{ title: t('invite.title') }} />

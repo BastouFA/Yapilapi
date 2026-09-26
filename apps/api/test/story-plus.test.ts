@@ -211,9 +211,9 @@ describe('interactive stickers', () => {
     const outsider = await adult();
     await follow(a, author);
     await follow(b, author);
-    expect(
-      (await as(t.app, author).post('/v1/moments', { body: 'x', stickers: [{ type: 'poll', ...at, options: ['One', 'Two', 'Three'] }] })).status,
-    ).toBe(400);
+    expect((await as(t.app, author).post('/v1/moments', { body: 'x', stickers: [{ type: 'poll', ...at, options: ['One', 'Two', 'Three'] }] })).status).toBe(
+      400,
+    );
     expect(
       (
         await as(t.app, author).post('/v1/moments', {
@@ -225,7 +225,11 @@ describe('interactive stickers', () => {
         })
       ).status,
     ).toBe(400);
-    const s = await story(author, { body: 'Lunch?', visibility: 'followers', stickers: [{ type: 'poll', ...at, question: 'Where?', options: ['Rice', 'Soup'] }] });
+    const s = await story(author, {
+      body: 'Lunch?',
+      visibility: 'followers',
+      stickers: [{ type: 'poll', ...at, question: 'Where?', options: ['Rice', 'Soup'] }],
+    });
     const poll = (await open(a, s.id)).stickers[0];
     expect(poll).toMatchObject({ type: 'poll', question: 'Where?', options: ['Rice', 'Soup'], voted: null });
     expect(poll.results).toBeUndefined();
@@ -299,8 +303,12 @@ describe('interactive stickers', () => {
     const fan = await adult();
     await follow(fan, author);
     expect(
-      (await as(t.app, author).post('/v1/moments', { body: 'x', stickers: [{ type: 'countdown', ...at, title: 'Launch', endsAt: new Date(Date.now() - 60_000).toISOString() }] }))
-        .status,
+      (
+        await as(t.app, author).post('/v1/moments', {
+          body: 'x',
+          stickers: [{ type: 'countdown', ...at, title: 'Launch', endsAt: new Date(Date.now() - 60_000).toISOString() }],
+        })
+      ).status,
     ).toBe(400);
     const endsAt = new Date(Date.now() + 3_600_000).toISOString();
     const s = await story(author, { body: 'Soon', visibility: 'followers', stickers: [{ type: 'countdown', ...at, title: 'Launch', endsAt }] });
@@ -347,7 +355,8 @@ describe('interactive stickers', () => {
     const fan = await adult();
     await follow(fan, author);
     expect(
-      (await as(t.app, author).post('/v1/moments', { body: 'x', stickers: [{ type: 'place', ...at, placeId: '00000000-0000-4000-8000-000000000000' }] })).status,
+      (await as(t.app, author).post('/v1/moments', { body: 'x', stickers: [{ type: 'place', ...at, placeId: '00000000-0000-4000-8000-000000000000' }] }))
+        .status,
     ).toBe(404);
     const place = (
       await t.ctx.db.query(`INSERT INTO places (name, category, city, created_by) VALUES ('Mama Put', 'restaurant', 'Lagos', $1) RETURNING id`, [author.id])

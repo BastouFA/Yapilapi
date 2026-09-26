@@ -262,27 +262,31 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
   const ONCE = `ON CONFLICT (moment_id, sticker_id, user_id) WHERE kind IN ('poll','slider','reminder') DO NOTHING`;
 
   /** Vote in a poll, once. The results come back with your vote. */
-  app.post('/v1/moments/:id/stickers/:stickerId/vote', { preHandler: requireAuth, config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (req) => {
-    const u = me(req);
-    const { id, stickerId } = parse(stickerParam, req.params);
-    const { option } = parse(z.object({ option: z.union([z.literal(0), z.literal(1)]) }), req.body);
-    const { story } = await stickerOn(id, stickerId, u.id, 'poll');
-    if (story.author_id === u.id) throw new AppError(400, 'validation_failed', "You can't vote in your own poll.");
-    const r = await db.query(`INSERT INTO story_responses (moment_id, sticker_id, user_id, kind, choice) VALUES ($1,$2,$3,'poll',$4) ${ONCE}`, [
-      id,
-      stickerId,
-      u.id,
-      option,
-    ]);
-    if (!r.rowCount) throw conflict('You already voted in this poll.');
-    const { rows } = await db.query(
-      `SELECT choice, count(*)::int AS n FROM story_responses WHERE moment_id = $1 AND sticker_id = $2 AND kind = 'poll' GROUP BY 1`,
-      [id, stickerId],
-    );
-    const counts: [number, number] = [0, 0];
-    for (const x of rows) counts[x.choice as 0 | 1] = x.n;
-    return { voted: option, results: pollPercents(counts), votes: counts[0] + counts[1] };
-  });
+  app.post(
+    '/v1/moments/:id/stickers/:stickerId/vote',
+    { preHandler: requireAuth, config: { rateLimit: { max: 120, timeWindow: '1 minute' } } },
+    async (req) => {
+      const u = me(req);
+      const { id, stickerId } = parse(stickerParam, req.params);
+      const { option } = parse(z.object({ option: z.union([z.literal(0), z.literal(1)]) }), req.body);
+      const { story } = await stickerOn(id, stickerId, u.id, 'poll');
+      if (story.author_id === u.id) throw new AppError(400, 'validation_failed', "You can't vote in your own poll.");
+      const r = await db.query(`INSERT INTO story_responses (moment_id, sticker_id, user_id, kind, choice) VALUES ($1,$2,$3,'poll',$4) ${ONCE}`, [
+        id,
+        stickerId,
+        u.id,
+        option,
+      ]);
+      if (!r.rowCount) throw conflict('You already voted in this poll.');
+      const { rows } = await db.query(
+        `SELECT choice, count(*)::int AS n FROM story_responses WHERE moment_id = $1 AND sticker_id = $2 AND kind = 'poll' GROUP BY 1`,
+        [id, stickerId],
+      );
+      const counts: [number, number] = [0, 0];
+      for (const x of rows) counts[x.choice as 0 | 1] = x.n;
+      return { voted: option, results: pollPercents(counts), votes: counts[0] + counts[1] };
+    },
+  );
 
   /** Answer a question sticker (up to 10 answers each). Only the author sees answers. */
   app.post(
@@ -307,21 +311,25 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
   );
 
   /** Answer an emoji slider (0 to 1), once. The author sees the average. */
-  app.post('/v1/moments/:id/stickers/:stickerId/slide', { preHandler: requireAuth, config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (req) => {
-    const u = me(req);
-    const { id, stickerId } = parse(stickerParam, req.params);
-    const { value } = parse(z.object({ value: z.number().min(0).max(1) }), req.body);
-    const { story } = await stickerOn(id, stickerId, u.id, 'slider');
-    if (story.author_id === u.id) throw new AppError(400, 'validation_failed', "You can't answer your own slider.");
-    const r = await db.query(`INSERT INTO story_responses (moment_id, sticker_id, user_id, kind, value) VALUES ($1,$2,$3,'slider',$4) ${ONCE}`, [
-      id,
-      stickerId,
-      u.id,
-      value,
-    ]);
-    if (!r.rowCount) throw conflict('You already answered this slider.');
-    return { mine: value };
-  });
+  app.post(
+    '/v1/moments/:id/stickers/:stickerId/slide',
+    { preHandler: requireAuth, config: { rateLimit: { max: 120, timeWindow: '1 minute' } } },
+    async (req) => {
+      const u = me(req);
+      const { id, stickerId } = parse(stickerParam, req.params);
+      const { value } = parse(z.object({ value: z.number().min(0).max(1) }), req.body);
+      const { story } = await stickerOn(id, stickerId, u.id, 'slider');
+      if (story.author_id === u.id) throw new AppError(400, 'validation_failed', "You can't answer your own slider.");
+      const r = await db.query(`INSERT INTO story_responses (moment_id, sticker_id, user_id, kind, value) VALUES ($1,$2,$3,'slider',$4) ${ONCE}`, [
+        id,
+        stickerId,
+        u.id,
+        value,
+      ]);
+      if (!r.rowCount) throw conflict('You already answered this slider.');
+      return { mine: value };
+    },
+  );
 
   /** "Remind me": a notification when the countdown ends. */
   app.put(

@@ -386,7 +386,7 @@ export default function Camera() {
   const clipMode = mode !== 'reel';
   const shutterLabel = recording ? t('m.camera.stopRecording') : clipMode ? t('m.camera.takePhoto') : t('m.camera.startRecording');
   const torch = back && shownFlash === 'on' && (mode === 'reel' || !!recording);
-  const writeLabel = mode === 'post' ? t('m.create.textOnly') : mode === 'story' ? t('m.camera.writeStory') : null;
+  const writeLabel = mode === 'post' ? t('m.create.textOnly') : mode === 'story' ? t('m.camera.storyStickers') : null;
 
   return (
     <View style={s.root}>

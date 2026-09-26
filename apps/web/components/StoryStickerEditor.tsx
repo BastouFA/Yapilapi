@@ -235,7 +235,9 @@ function StickerForm({ kind, onAdd, onCancel }: { kind: Kind; onAdd: (s: NewStic
         }
       }}
     >
-      {kind === 'mention' ? <TextField label="Username" value={a} maxLength={31} placeholder="@username" onChange={(e) => setA(e.currentTarget.value)} /> : null}
+      {kind === 'mention' ? (
+        <TextField label="Username" value={a} maxLength={31} placeholder="@username" onChange={(e) => setA(e.currentTarget.value)} />
+      ) : null}
       {kind === 'hashtag' ? <TextField label="Hashtag" value={a} maxLength={41} placeholder="#tag" onChange={(e) => setA(e.currentTarget.value)} /> : null}
       {kind === 'poll' ? (
         <>

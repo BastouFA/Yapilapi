@@ -121,8 +121,9 @@ export async function prepareStory(
   const byName = new Map(people.map((p) => [p.username, p.user_id]));
 
   if (list.some((s) => s.type === 'link')) {
-    const u = (await db.query(`SELECT created_at <= now() - make_interval(days => $2) AS old_enough FROM users WHERE id = $1`, [authorId, LINK_STICKER_MIN_DAYS]))
-      .rows[0];
+    const u = (
+      await db.query(`SELECT created_at <= now() - make_interval(days => $2) AS old_enough FROM users WHERE id = $1`, [authorId, LINK_STICKER_MIN_DAYS])
+    ).rows[0];
     if (!u?.old_enough)
       throw new AppError(403, 'link_sticker_not_allowed', `Link stickers are available once your account is ${LINK_STICKER_MIN_DAYS} days old.`);
   }
@@ -253,7 +254,9 @@ export async function hydrateStories(db: Q, rows: Record<string, any>[], viewer:
   const [users, places, mine, totals, cards] = await Promise.all([
     usersByIds(db, userIds),
     placeIds.length
-      ? db.query<{ id: string; name: string; city: string | null }>(`SELECT id, name, city FROM places WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL`, [placeIds])
+      ? db.query<{ id: string; name: string; city: string | null }>(`SELECT id, name, city FROM places WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL`, [
+          placeIds,
+        ])
       : null,
     interactive && viewer
       ? db.query(

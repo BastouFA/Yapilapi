@@ -18,6 +18,7 @@ import { useCalls } from '../../lib/calls';
 import { client, errorMessage, mediaUrl } from '../../lib/api';
 import { clock, pickOne, uploadFile, uploadPicked, VOICE_MIME } from '../../lib/media';
 import { useT } from '../../lib/i18n';
+import { StoryCardView } from '../../lib/story-stickers';
 import { conversationTitle } from '../../lib/post';
 import { isVerificationError, SensitiveCover, UnavailableMedia, VerifyPrompt } from '../../lib/safety';
 import { useRealtime, useSession } from '../../lib/session';
@@ -236,8 +237,13 @@ export default function Chat() {
         onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
         renderItem={({ item }) => {
           const mine = item.sender.id === me?.id;
-          const text = item.body || (item.attachments.length ? '' : t('m.message.deleted'));
-          const media = <Attachments items={item.attachments} tint={mine ? c.onYapi : c.ink} />;
+          const text = item.body || (item.attachments.length || item.story ? '' : t('m.message.deleted'));
+          const media = (
+            <>
+              {item.story ? <StoryCardView card={item.story} dark={mine} /> : null}
+              <Attachments items={item.attachments} tint={mine ? c.onYapi : c.ink} />
+            </>
+          );
           // Your messages sit at the end edge (the right in English, the left in Arabic), with the
           // tail corner on that side.
           return mine ? (

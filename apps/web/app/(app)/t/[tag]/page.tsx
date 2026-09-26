@@ -117,9 +117,7 @@ export default function TagPage() {
           <MomentsStrip groups={stories} onOpen={setViewing} />
         </section>
       ) : null}
-      {viewing !== null && stories[viewing] ? (
-        <StoryViewer groups={stories} start={viewing} onClose={() => setViewing(null)} onChange={setStories} />
-      ) : null}
+      {viewing !== null && stories[viewing] ? <StoryViewer groups={stories} start={viewing} onClose={() => setViewing(null)} onChange={setStories} /> : null}
 
       <Segments
         label="Sort posts"

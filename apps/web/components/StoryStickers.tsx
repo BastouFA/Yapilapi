@@ -54,8 +54,7 @@ export function StickerLayer({
   onBusy: (busy: boolean) => void;
   toast: (message: string) => void;
 }) {
-  const update = (id: string, patch: Partial<StorySticker>) =>
-    onChange(story.stickers.map((s) => (s.id === id ? ({ ...s, ...patch } as StorySticker) : s)));
+  const update = (id: string, patch: Partial<StorySticker>) => onChange(story.stickers.map((s) => (s.id === id ? ({ ...s, ...patch } as StorySticker) : s)));
   return (
     <div className="story-stickers">
       {story.stickers.map((s) => (

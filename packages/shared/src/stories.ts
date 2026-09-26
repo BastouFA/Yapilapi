@@ -16,7 +16,10 @@ const short = (max: number) => z.string().trim().min(1).max(max);
 
 /** Stickers as the author sends them. The server gives each an id and fills in names, domains and places. */
 export const storyStickerInputSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('mention'), ...placement, username: z
+  z.object({
+    type: z.literal('mention'),
+    ...placement,
+    username: z
       .string()
       .trim()
       .transform((s) => s.replace(/^@/, ''))
@@ -85,7 +88,14 @@ export type StorySticker = Placed &
         votes?: number;
       }
     | { type: 'question'; prompt: string; /** How many answers you've sent. */ answered: number }
-    | { type: 'slider'; prompt: string; emoji: string; /** Your answer (0–1), or null. */ mine: number | null; /** The author only. */ average?: number | null; count?: number }
+    | {
+        type: 'slider';
+        prompt: string;
+        emoji: string;
+        /** Your answer (0–1), or null. */ mine: number | null;
+        /** The author only. */ average?: number | null;
+        count?: number;
+      }
     | { type: 'countdown'; title: string; endsAt: string; /** You asked to be reminded. */ reminding: boolean }
     | { type: 'link'; url: string; domain: string; label: string }
     | { type: 'place'; placeId: string; name: string; city: string | null }
