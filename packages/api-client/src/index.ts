@@ -236,6 +236,14 @@ export function createClient(opts: ClientOptions) {
       list: () => get<{ items: Record<string, any>[] }>('/v1/orders'),
       get: (id: string) => get<{ order: Record<string, any> }>(`/v1/orders/${id}`),
     },
+    trending: (limit = 10) => get<{ items: TrendingTag[] }>(`/v1/trending${qs({ limit })}`),
+    tags: {
+      get: (tag: string) => get<TagSummary>(`/v1/tags/${encodeURIComponent(tag)}`),
+      posts: (tag: string, sort: 'recent' | 'top' = 'recent', cursor?: string) =>
+        get<Page<Post>>(`/v1/tags/${encodeURIComponent(tag)}/posts${qs({ sort, cursor })}`),
+      follow: (tag: string) => put<{ following: boolean }>(`/v1/tags/${encodeURIComponent(tag)}/follow`),
+      unfollow: (tag: string) => del<{ following: boolean }>(`/v1/tags/${encodeURIComponent(tag)}/follow`),
+    },
     search: (q: string, type = 'all') => get<{ query: string; intent: Record<string, any>; results: Record<string, any> }>(`/v1/search${qs({ q, type })}`),
     now: () =>
       get<{ events: EventItem[]; trendingTopics: { topic: string; posts: number }[]; activeCommunities: { slug: string; name: string; posts: number }[] }>(
@@ -779,4 +787,22 @@ export interface StoryGroup {
   mine: boolean;
   allSeen: boolean;
   moments: Story[];
+}
+
+export interface TrendingTag {
+  tag: string;
+  /** Public posts with the tag in the last 7 days. */
+  posts: number;
+  people: number;
+  /** More posts today than yesterday. */
+  rising: boolean;
+}
+
+export interface TagSummary {
+  tag: string;
+  posts: number;
+  people: number;
+  postsThisWeek: number;
+  related: string[];
+  following: boolean;
 }

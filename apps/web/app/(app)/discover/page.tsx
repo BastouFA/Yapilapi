@@ -9,6 +9,8 @@ import { Avatar, Button, CommunityCard, EmptyState, EventCard, List, ListItem, P
 import type { Community, EventItem, Post, PublicUser } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
+import { TrendingTags } from '@/components/TrendingTags';
+import { normalizeTag } from '@yapilapi/shared';
 import { useSession } from '../../providers';
 
 function Discover() {
@@ -80,7 +82,10 @@ function Discover() {
         className="row"
         onSubmit={(e) => {
           e.preventDefault();
-          router.push(input.trim() ? `/discover?q=${encodeURIComponent(input.trim())}` : '/discover');
+          const v = input.trim();
+          // A single #tag goes straight to its page.
+          if (/^#[\p{L}\p{M}\p{N}_]{2,40}$/u.test(v)) return router.push(`/t/${encodeURIComponent(normalizeTag(v))}`);
+          router.push(v ? `/discover?q=${encodeURIComponent(v)}` : '/discover');
         }}
       >
         <label htmlFor="q" className="yp-visually-hidden">
@@ -190,10 +195,14 @@ function Discover() {
       ) : (
         <div className="stack">
           <section className="stack-sm">
+            <h2 className="section-title">Trending</h2>
+            <TrendingTags />
+          </section>
+          <section className="stack-sm">
             <h2 className="section-title">{t('discover.now')}</h2>
             {now === null ? (
               <Skeleton height={80} />
-            ) : now.events.length || now.trendingTopics.length ? (
+            ) : now.events.length ? (
               <>
                 {now.events.length ? (
                   <div className="yp-grid">
@@ -202,13 +211,6 @@ function Discover() {
                     ))}
                   </div>
                 ) : null}
-                <div className="row">
-                  {now.trendingTopics.map((tp) => (
-                    <Link key={tp.topic} href={`/discover?q=${encodeURIComponent(tp.topic)}`} className="yp-chip">
-                      #{tp.topic} · {tp.posts}
-                    </Link>
-                  ))}
-                </div>
               </>
             ) : (
               <p className="muted">It's quiet right now. Check upcoming events below.</p>

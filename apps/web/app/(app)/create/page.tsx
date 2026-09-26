@@ -36,7 +36,7 @@ function Create() {
   const params = useSearchParams();
   const initialMode = params.get('mode') === 'reel' ? 'reel' : params.get('mode') === 'story' || params.get('moment') ? 'story' : 'post';
   const [kind, setKind] = useState<'post' | 'reel' | 'story'>(initialMode);
-  const [body, setBody] = useState('');
+  const [body, setBody] = useState(() => (params.get('text') ?? '').slice(0, 5000));
   const [visibility, setVisibility] = useState<Visibility>(initialMode === 'story' ? 'friends' : 'public');
   const [communityId, setCommunityId] = useState(params.get('community') ?? '');
   const [communities, setCommunities] = useState<Community[]>([]);

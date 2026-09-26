@@ -1564,3 +1564,126 @@ h3 {
 .follow-list__name:hover {
   text-decoration: underline;
 }
+
+/* Trending tags */
+.trending {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.trending__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease;
+}
+.trending__item:hover {
+  border-color: var(--yapi);
+  transform: translateY(-1px);
+}
+.trending__item:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.trending__rank {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--yapi), var(--grad-end));
+  color: var(--on-yapi);
+  font-weight: 800;
+}
+.trending__text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.trending__tag {
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trending__meta {
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+.trending__rising {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--saffron-soft);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+@media (prefers-reduced-motion: reduce) {
+  .trending__item {
+    transition: none;
+  }
+  .trending__item:hover {
+    transform: none;
+  }
+}
+
+/* Tag page */
+.tag-hero {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border-radius: 20px;
+  background: linear-gradient(135deg, var(--yapi), var(--grad-end));
+  color: var(--on-yapi);
+}
+.tag-hero h1 {
+  margin: 0;
+  font-size: clamp(28px, 6vw, 40px);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.tag-hero__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  font-size: 14px;
+}
+.tag-hero__stats strong {
+  font-size: 18px;
+}
+.tag-hero .yp-btn--secondary {
+  justify-self: start;
+}
+.tag-hero .yp-btn--primary {
+  background: #0b0c14;
+  color: #ffffff;
+  box-shadow: none;
+}
+.tag-hero .yp-btn--secondary {
+  border-color: transparent;
+  background: rgb(255 255 255 / 0.9);
+  color: #0b0c14;
+}
+.tag-hero .yp-btn--secondary:hover {
+  background: #ffffff;
+  color: #0b0c14;
+}
+.tag-hero .yp-btn--primary:hover {
+  background: #1d2033;
+  color: #ffffff;
+}

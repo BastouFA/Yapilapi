@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useId, useRef, useState, type ComponentType, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import {
+  extractHashtags,
   formatMoney,
   formatRelativeTime,
   safeTimeZone,
+  splitHashtags,
   t,
   type CaptionTrackRef,
   type EventItem,
@@ -331,6 +333,23 @@ export function BottomSheet({ open, onClose, title, children }: { open: boolean;
 }
 
 // ── Post ────────────────────────────────────────────────────────────────
+/** Text with each #tag linked to its tag page. */
+export function TaggedText({ text, linkAs: L = A }: { text: string; linkAs?: LinkLike }) {
+  return (
+    <>
+      {splitHashtags(text).map((part, i) =>
+        'tag' in part ? (
+          <L key={i} href={`/t/${encodeURIComponent(part.tag)}`} className="yp-hashtag">
+            {part.text}
+          </L>
+        ) : (
+          part.text
+        ),
+      )}
+    </>
+  );
+}
+
 export interface PostCardProps {
   post: Post;
   locale?: string;
@@ -377,6 +396,9 @@ export function PostCard({
   if (onReport && !isOwn) menu.push({ label: tt('post.report'), icon: 'flag', danger: true, onSelect: () => onReport(post) });
   if (onDelete && isOwn) menu.push({ label: tt('post.delete'), icon: 'trash', danger: true, onSelect: () => onDelete(post) });
   const totalVotes = post.poll?.options.reduce((s, o) => s + o.votes, 0) ?? 0;
+  // Tags already linked in the text don't need a chip too.
+  const inText = extractHashtags(post.body, 50);
+  const chipTopics = post.topics.filter((tp) => !inText.includes(tp));
 
   return (
     <article className="yp-post" aria-labelledby={`post-${post.id}-author`}>
@@ -407,7 +429,7 @@ export function PostCard({
 
       {post.body ? (
         <div className="yp-post__body" dir="auto">
-          {post.body}
+          <TaggedText text={post.body} linkAs={L} />
         </div>
       ) : null}
 
@@ -433,7 +455,7 @@ export function PostCard({
         </div>
       ) : null}
 
-      {post.format === 'reel' || post.linkUrl || post.event || post.product || post.topics.length ? (
+      {post.format === 'reel' || post.linkUrl || post.event || post.product || chipTopics.length ? (
         <div className="yp-post__chips">
           {post.format === 'reel' ? (
             <L href={`/reels?start=${post.id}`} className="yp-chip">
@@ -459,8 +481,8 @@ export function PostCard({
               {post.product.title} · {formatMoney(post.product.priceCents, post.product.currency, locale)}
             </span>
           ) : null}
-          {post.topics.map((tp) => (
-            <L key={tp} href={`/discover?q=${encodeURIComponent(tp)}`} className="yp-chip">
+          {chipTopics.map((tp) => (
+            <L key={tp} href={`/t/${encodeURIComponent(tp)}`} className="yp-chip">
               <bdi>#{tp}</bdi>
             </L>
           ))}

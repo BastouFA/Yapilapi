@@ -16,6 +16,7 @@ import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, encodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
 import { analyzeText, statusForRisk } from '../lib/moderation.ts';
 import { hydratePosts } from '../lib/posts.ts';
+import { topicsFor } from './tags.ts';
 import { notify, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
 import { publicUserFrom } from '../lib/users.ts';
@@ -134,7 +135,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
           input.eventId ?? null,
           input.productId ?? null,
           input.linkUrl ?? null,
-          input.topics.map((t) => t.toLowerCase()),
+          topicsFor(input.topics, input.body),
           statusForRisk(analysis.risk),
           input.aiAssisted ? { assisted: true, at: new Date().toISOString() } : {},
           { owner: u.id, license: 'all_rights_reserved' },

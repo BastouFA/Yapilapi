@@ -1457,3 +1457,12 @@ a.yp-ecard:hover {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+
+.yp-hashtag {
+  color: var(--yapi);
+  font-weight: 600;
+  text-decoration: none;
+}
+.yp-hashtag:hover {
+  text-decoration: underline;
+}

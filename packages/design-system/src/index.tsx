@@ -43,6 +43,7 @@ export {
   Segments,
   Skeleton,
   Stat,
+  TaggedText,
   Toast,
   videoCrossOrigin,
   type LinkLike,
