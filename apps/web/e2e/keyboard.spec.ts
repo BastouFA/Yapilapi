@@ -54,7 +54,8 @@ test('skip link and primary navigation', async ({ page, isMobile }) => {
   await page.goto('/home');
   await page.waitForLoadState('networkidle');
   // On phones the wordmark is hidden and the bar sits at the bottom, but it still comes first in tab order.
-  const expected = ['Skip to content', ...(isMobile ? [] : ['YAPILAPI']), 'Home', 'Discover', 'Create', 'Inbox', 'Profile'];
+  // Search sits under the wordmark on wide screens; phones have it in the page header instead.
+  const expected = ['Skip to content', ...(isMobile ? [] : ['YAPILAPI', 'Search']), 'Home', 'Discover', 'Create', 'Inbox', 'Profile'];
   const order: string[] = [];
   for (const _ of expected) {
     await page.keyboard.press('Tab');

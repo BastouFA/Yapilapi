@@ -179,7 +179,7 @@ function SearchPage() {
           ) : null}
           <section className="stack-sm" aria-labelledby="trend-title">
             <h2 id="trend-title" className="section-title">
-              Trending
+              Trending tags
             </h2>
             <TrendingTags limit={10} />
           </section>

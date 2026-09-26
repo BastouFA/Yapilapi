@@ -118,6 +118,11 @@ jobs:
 
   security:
     runs-on: ubuntu-latest
+    # CodeQL uploads its findings to the repository's code scanning alerts.
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
     steps:
       - uses: actions/checkout@v4
         with:
