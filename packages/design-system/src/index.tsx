@@ -26,8 +26,12 @@ export {
 } from './primitives.tsx';
 export {
   AIPanel,
+  AuthorNames,
   BottomSheet,
   CaptionTracks,
+  joinNames,
+  tagBubbleClass,
+  type MediaTagOptions,
   SensitiveCover,
   ChatBubble,
   CommunityCard,

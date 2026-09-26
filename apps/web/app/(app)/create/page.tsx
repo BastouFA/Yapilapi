@@ -5,14 +5,16 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AutocompleteText } from '@/components/Autocomplete';
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { AIPanel, Alert, Button, Checkbox, Segments, Select, TextField } from '@yapilapi/design-system';
+import { AIPanel, Alert, BottomSheet, Button, Checkbox, Segments, Select, TextField } from '@yapilapi/design-system';
 import {
+  MAX_COLLABORATORS,
   POST_VISIBILITIES,
   STORY_VISIBILITIES,
   VISIBILITIES,
   type Community,
   type MessageKey,
   type Post,
+  type PublicUser,
   type Sound,
   type StoryVisibility,
   type Visibility,
@@ -28,9 +30,11 @@ import { PhotoEditor } from '@/components/editor/PhotoEditor';
 import { VideoEditor } from '@/components/editor/VideoEditor';
 import { onPendingMedia, takePendingMedia } from '@/lib/pending-media';
 import { SoundPicker, SoundPlayButton } from '@/components/SoundPicker';
+import { PeoplePicker } from '@/components/PeoplePicker';
+import { PhotoTagger, type DraftTag } from '@/components/PhotoTags';
 import { useSession } from '../../providers';
 
-type Uploaded = { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string };
+type Uploaded = { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string; tags: DraftTag[] };
 
 /** Reels: 3 minutes, or 10 minutes with YAPILAPI Plus (the API enforces the same limits). */
 const REEL_MAX_SECONDS = 180;
@@ -83,6 +87,11 @@ function Create() {
   // Posting for subscribers needs a subscription plan (set up in Studio).
   const [hasPlans, setHasPlans] = useState(false);
   const [media, setMedia] = useState<Uploaded[]>([]);
+  // The photo whose tags are open for editing.
+  const [taggingId, setTaggingId] = useState<string | null>(null);
+  const tagging = media.find((m) => m.id === taggingId && m.kind === 'image') ?? null;
+  // People invited to co-author (people you follow who follow you back).
+  const [collaborators, setCollaborators] = useState<PublicUser[]>([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [poll, setPoll] = useState<string[] | null>(null);
@@ -176,7 +185,7 @@ function Create() {
   }
 
   /** Upload one file (and, for an edited video, apply the edits on the server), after any upload already running. */
-  function enqueueUpload(f: File, edits: EditorParamsInput | null) {
+  function enqueueUpload(f: File, edits: EditorParamsInput | null, tags: DraftTag[] = []) {
     pendingUploads.current++;
     setUploading(true);
     uploads.current = uploads.current.then(async () => {
@@ -196,8 +205,8 @@ function Create() {
           setEditing(true);
           const { media: started } = await api.media.edit(m.id, edits);
           const done = await api.media.waitUntilReady(started.id);
-          setMedia((cur) => [...cur, { id: done.id, kind: 'video', url: done.variants.mp4 ?? done.url, altText: '' }]);
-        } else setMedia((cur) => [...cur, { id: m.id, kind: m.kind, url: m.url, altText: '' }]);
+          setMedia((cur) => [...cur, { id: done.id, kind: 'video', url: done.variants.mp4 ?? done.url, altText: '', tags: [] }]);
+        } else setMedia((cur) => [...cur, { id: m.id, kind: m.kind, url: m.url, altText: '', tags: m.kind === 'image' ? tags : [] }]);
       } catch (e) {
         toast(errorMessage(e));
       } finally {
@@ -243,6 +252,7 @@ function Create() {
           allowRemix,
           ...(remixOf && original ? { remixOf, remixMode } : sound ? { soundId: sound.id } : soundTitle.trim() ? { soundTitle: soundTitle.trim() } : {}),
           media: [{ id: v.id, url: new URL(v.url, location.origin).toString(), kind: 'video', altText: v.altText || undefined }],
+          collaborators: collaborators.map((u) => u.id),
           topics: topics
             .split(/[,\s#]+/)
             .filter(Boolean)
@@ -258,7 +268,14 @@ function Create() {
         visibility,
         communityId: communityId || undefined,
         circleId: visibility === 'circle' ? circleId || undefined : undefined,
-        media: media.map((m) => ({ id: m.id, url: new URL(m.url, location.origin).toString(), kind: m.kind, altText: m.altText || undefined })),
+        media: media.map((m) => ({
+          id: m.id,
+          url: new URL(m.url, location.origin).toString(),
+          kind: m.kind,
+          altText: m.altText || undefined,
+          tags: m.kind === 'image' && m.tags.length ? m.tags.map((t) => ({ userId: t.user.id, x: t.x, y: t.y })) : undefined,
+        })),
+        collaborators: collaborators.map((u) => u.id),
         poll: poll ? { options: poll.filter((o) => o.trim()) } : undefined,
         topics: topics
           .split(/[,\s#]+/)
@@ -395,6 +412,16 @@ function Create() {
                       setMedia((cur) => cur.map((x) => (x.id === m.id ? { ...x, altText: v } : x)));
                     }}
                   />
+                  {m.kind === 'image' && kind !== 'story' ? (
+                    <button
+                      type="button"
+                      className="thumb-tag"
+                      onClick={() => setTaggingId(m.id)}
+                      aria-label={m.tags.length ? `Edit people tagged in image ${i + 1}, ${m.tags.length} tagged` : `Tag people in image ${i + 1}`}
+                    >
+                      {m.tags.length ? `Tagged (${m.tags.length})` : 'Tag people'}
+                    </button>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -484,6 +511,18 @@ function Create() {
           >
             {ai.text || 'No suggestion this time.'}
           </AIPanel>
+        ) : null}
+
+        {kind !== 'story' ? (
+          <PeoplePicker
+            label="Invite co-authors (optional)"
+            hint="They can accept or decline. Once they accept, it shows on their profile too."
+            scope="mutuals"
+            max={MAX_COLLABORATORS}
+            canPick={() => true}
+            picked={collaborators}
+            onChange={setCollaborators}
+          />
         ) : null}
 
         {kind === 'reel' && !remixOf ? (
@@ -633,14 +672,27 @@ function Create() {
             key={`${queue[0].name}-${queue[0].lastModified}-${queued - queue.length}`}
             file={queue[0]}
             title={queued > 1 ? `Edit photo ${queued - queue.length + 1} of ${queued}` : 'Edit photo'}
-            onDone={(edited) => {
-              enqueueUpload(edited, null);
+            onDone={(edited, tags) => {
+              enqueueUpload(edited, null, tags);
               nextInQueue();
             }}
             onCancel={nextInQueue}
           />
         )
       ) : null}
+      <BottomSheet open={!!tagging} onClose={() => setTaggingId(null)} title="Tag people">
+        {tagging ? (
+          <div className="stack">
+            <PhotoTagger
+              src={tagging.url}
+              alt={tagging.altText}
+              tags={tagging.tags}
+              onChange={(tags) => setMedia((cur) => cur.map((x) => (x.id === tagging.id ? { ...x, tags } : x)))}
+            />
+            <Button onClick={() => setTaggingId(null)}>Done</Button>
+          </div>
+        ) : null}
+      </BottomSheet>
     </>
   );
 }

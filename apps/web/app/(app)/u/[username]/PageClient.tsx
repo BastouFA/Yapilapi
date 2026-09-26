@@ -27,7 +27,9 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
   const [missing, setMissing] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [list, setList] = useState<'followers' | 'following' | null>(null);
-  const [tab, setTab] = useState<'posts' | 'reposts' | 'shop'>('posts');
+  const [tab, setTab] = useState<'posts' | 'reposts' | 'tagged' | 'shop'>('posts');
+  // Tagged posts of a private profile you don't follow stay hidden.
+  const [taggedHidden, setTaggedHidden] = useState(false);
   // Bumped when you subscribe, so posts for subscribers reload unlocked.
   const [version, setVersion] = useState(0);
   // Links from a locked post (?subscribe=1) and to the shop (?shop=1).
@@ -59,6 +61,14 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
   }, [reload, signedOut, isPublic]);
   const load = useCallback((cursor?: string) => api.users.posts(username, cursor), [username]);
   const loadReposts = useCallback((cursor?: string) => api.users.reposts(profile?.id ?? '', cursor), [profile?.id]);
+  const loadTagged = useCallback(
+    (cursor?: string) =>
+      api.users.tagged(username, cursor).then((r) => {
+        setTaggedHidden(!!r.hidden);
+        return r;
+      }),
+    [username],
+  );
 
   if (signedOut && !isPublic) return <NeedsAccount title="Sign in to see this profile" body="Some profiles are only visible to people with an account." />;
   if (missing) return <EmptyState title="This profile isn't available" body="It may have been removed, or you may not be able to see it." />;
@@ -256,11 +266,25 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
         options={[
           { id: 'posts', label: 'Posts' },
           { id: 'reposts', label: 'Reposts' },
+          { id: 'tagged', label: 'Tagged' },
           { id: 'shop', label: 'Shop' },
         ]}
       />
       {tab === 'posts' ? (
         <PostList load={load} reloadKey={`${username}-${version}`} empty={rel.isSelf ? 'Share your first post from Create.' : 'No posts yet.'} />
+      ) : tab === 'tagged' ? (
+        <PostList
+          load={loadTagged}
+          reloadKey={`${username}-tagged`}
+          emptyTitle={taggedHidden ? 'This account is private' : 'No tagged posts yet'}
+          empty={
+            taggedHidden
+              ? `Follow ${profile.displayName} to see photos they're tagged in.`
+              : rel.isSelf
+                ? 'Photos people tag you in show up here.'
+                : `Photos ${profile.displayName} is tagged in show up here.`
+          }
+        />
       ) : tab === 'shop' ? (
         <Shop userId={profile.id} name={profile.displayName} isSelf={rel.isSelf} />
       ) : (

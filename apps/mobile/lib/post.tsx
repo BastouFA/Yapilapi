@@ -1,13 +1,13 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Image, Platform, Pressable, Share, Text, View, type StyleProp, type TextStyle } from 'react-native';
+import { Fragment, useState } from 'react';
+import { Alert, Image, Platform, Pressable, Share, Text, View, type StyleProp, type TextStyle } from 'react-native';
 import { splitRichText } from '../../../packages/shared/src/hashtags';
-import type { Conversation, Post } from '../../../packages/shared/src/types';
-import { client, mediaUrl, webUrl } from './api';
+import type { Conversation, PhotoTag, Post, PublicUser } from '../../../packages/shared/src/types';
+import { client, errorMessage, mediaUrl, webUrl } from './api';
 import { useSession } from './session';
 import { useT, type Translate } from './i18n';
 import { radius, space } from './theme';
-import { Avatar, Card, Icon, PlusBadge, useColors, userText } from './ui';
+import { Avatar, Button, Card, Icon, Notice, PlusBadge, useColors, userText } from './ui';
 import { LockedPanel } from './money';
 import { SensitiveCover } from './safety';
 
@@ -20,7 +20,18 @@ export const conversationTitle = (c: Conversation, meId: string | undefined, t: 
     t('m.chat.justYou'));
 
 /** Text with #tags and @mentions that open the tag or the person's profile. */
-export function RichText({ text, style, numberOfLines }: { text: string; style?: StyleProp<TextStyle>; numberOfLines?: number }) {
+export function RichText({
+  text,
+  style,
+  numberOfLines,
+  linkStyle,
+}: {
+  text: string;
+  style?: StyleProp<TextStyle>;
+  numberOfLines?: number;
+  /** Overrides the link look (Reels show white links over the video). */
+  linkStyle?: StyleProp<TextStyle>;
+}) {
   const c = useColors();
   return (
     <Text style={[style, userText]} numberOfLines={numberOfLines}>
@@ -31,7 +42,7 @@ export function RichText({ text, style, numberOfLines }: { text: string; style?:
             accessibilityRole="link"
             suppressHighlighting={false}
             onPress={() => router.push('tag' in part ? `/t/${encodeURIComponent(part.tag)}` : `/u/${part.mention}`)}
-            style={{ color: c.yapi, fontWeight: '600' }}
+            style={[{ color: c.yapi, fontWeight: '600' }, linkStyle]}
           >
             {part.text}
           </Text>
@@ -40,6 +51,109 @@ export function RichText({ text, style, numberOfLines }: { text: string; style?:
         ),
       )}
     </Text>
+  );
+}
+
+/** "Ada", "Ada and Bola", "Ada, Bola and Chi" in the app's language. */
+export const joinNames = (names: string[], t: Translate) =>
+  names.map((n, i) => (i === 0 ? '' : i === names.length - 1 ? t('m.collab.joinLast') : t('m.collab.joinSep')) + n).join('');
+
+/**
+ * A post's authors: "Ada" or, with co-authors, "Ada and Bola" where each name opens that
+ * person's profile.
+ */
+export function AuthorNames({
+  author,
+  collaborators = [],
+  style,
+  numberOfLines,
+}: {
+  author: PublicUser;
+  collaborators?: PublicUser[];
+  style?: StyleProp<TextStyle>;
+  numberOfLines?: number;
+}) {
+  const { t } = useT();
+  const people = [author, ...collaborators.filter((u) => u.id !== author.id)];
+  return (
+    <Text style={[style, userText]} numberOfLines={numberOfLines}>
+      {people.length === 1
+        ? author.displayName
+        : people.map((u, i) => (
+            <Fragment key={u.id}>
+              {i === 0 ? '' : i === people.length - 1 ? t('m.collab.joinLast') : t('m.collab.joinSep')}
+              <Text
+                accessibilityRole="link"
+                accessibilityLabel={t('m.title.profile') + ': ' + u.displayName}
+                suppressHighlighting={false}
+                onPress={() => router.push(`/u/${u.username}`)}
+              >
+                {u.displayName}
+              </Text>
+            </Fragment>
+          ))}
+    </Text>
+  );
+}
+
+/** Name bubbles over a photo at the spots people were tagged; each opens the profile, and you can remove your own tag. */
+function TagBubbles({
+  tags,
+  width,
+  height,
+  meId,
+  onRemove,
+}: {
+  tags: PhotoTag[];
+  width: number;
+  height: number;
+  meId?: string;
+  onRemove: (tag: PhotoTag) => void;
+}) {
+  const { t } = useT();
+  const BOX = 200;
+  return (
+    <>
+      {tags.map((tag) => {
+        // Keep short names inside the photo when the spot is near an edge.
+        const cx = Math.min(Math.max(tag.x * width, 56), Math.max(56, width - 56));
+        const top = Math.min(Math.max(tag.y * height - 14, 4), Math.max(4, height - 36));
+        const mine = tag.user.id === meId;
+        return (
+          <View key={tag.id} pointerEvents="box-none" style={{ position: 'absolute', left: cx - BOX / 2, top, width: BOX, alignItems: 'center' }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                maxWidth: BOX,
+                backgroundColor: 'rgba(0,0,0,0.78)',
+                borderRadius: 999,
+                paddingHorizontal: 10,
+                minHeight: 28,
+              }}
+            >
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel={t('m.title.profile') + ': ' + tag.user.displayName}
+                hitSlop={6}
+                onPress={() => router.push(`/u/${tag.user.username}`)}
+                style={{ flexShrink: 1 }}
+              >
+                <Text style={[{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }, userText]} numberOfLines={1}>
+                  {tag.user.displayName}
+                </Text>
+              </Pressable>
+              {mine ? (
+                <Pressable accessibilityRole="button" accessibilityLabel={t('m.tags.removeMine')} hitSlop={8} onPress={() => onRemove(tag)}>
+                  <Icon name="close" size={14} color="#FFFFFF" />
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+        );
+      })}
+    </>
   );
 }
 
@@ -59,6 +173,69 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
   const image = post.media.find((m) => m.kind === 'image');
   const covered = !!image?.sensitive && !revealed;
   const imageUri = image ? (image.variants?.medium ?? image.url) : null;
+  const isAuthor = !!me && post.author.id === me.id;
+  // Co-authoring: your invite to this post (if any), who accepted, and (on your own posts) who hasn't answered yet.
+  const [collab, setCollab] = useState(post.viewer.collab);
+  const [coauthors, setCoauthors] = useState<PublicUser[]>(post.collaborators ?? []);
+  const pending = isAuthor ? (post.pendingCollaborators ?? []) : [];
+  const [collabBusy, setCollabBusy] = useState(false);
+  const [collabError, setCollabError] = useState<string | null>(null);
+  // Photo tags: tap the photo to show or hide the names.
+  const [tags, setTags] = useState<PhotoTag[]>(image?.tags ?? []);
+  const [showTags, setShowTags] = useState(false);
+  const [photoSize, setPhotoSize] = useState<{ width: number; height: number } | null>(null);
+  const myTag = me ? tags.find((x) => x.user.id === me.id) : undefined;
+
+  async function answerInvite(accept: boolean) {
+    setCollabBusy(true);
+    setCollabError(null);
+    try {
+      const api = await client();
+      if (accept) {
+        const r = await api.posts.acceptCollab(post.id);
+        setCoauthors(r.post.collaborators ?? []);
+        setCollab('accepted');
+      } else {
+        await api.posts.declineCollab(post.id);
+        setCollab(undefined);
+      }
+    } catch (e) {
+      setCollabError(errorMessage(e));
+    } finally {
+      setCollabBusy(false);
+    }
+  }
+
+  async function leave() {
+    setCollabError(null);
+    try {
+      await (await client()).posts.leaveCollab(post.id);
+      setCollab(undefined);
+      setCoauthors((cur) => cur.filter((u) => u.id !== me?.id));
+    } catch (e) {
+      setCollabError(errorMessage(e));
+    }
+  }
+
+  async function removeTag(tag: PhotoTag) {
+    const before = tags;
+    setTags((cur) => cur.filter((x) => x.id !== tag.id));
+    try {
+      await (await client()).posts.removeTag(post.id, tag.id);
+    } catch (e) {
+      setTags(before);
+      setCollabError(errorMessage(e));
+    }
+  }
+
+  /** More: leave as co-author, remove your photo tag. */
+  function more() {
+    const options: { text: string; style?: 'destructive' | 'cancel'; onPress?: () => void }[] = [];
+    if (collab === 'accepted') options.push({ text: t('m.collab.leave'), style: 'destructive', onPress: () => void leave() });
+    if (myTag) options.push({ text: t('m.tags.removeMine'), onPress: () => void removeTag(myTag) });
+    options.push({ text: t('common.cancel'), style: 'cancel' });
+    Alert.alert(t('m.post.more'), collab === 'accepted' ? t('m.collab.leaveBody', { name: post.author.displayName }) : undefined, options);
+  }
 
   return (
     <Card
@@ -72,26 +249,72 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
           <Text style={{ color: c.inkMuted, fontSize: 12, fontWeight: '600' }}>{t('m.post.pinned')}</Text>
         </View>
       ) : null}
-      <Pressable
-        accessibilityRole="link"
-        accessibilityLabel={t('m.title.profile') + ': ' + post.author.displayName}
-        onPress={() => router.push(`/u/${post.author.username}`)}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}
-      >
-        <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={40} />
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 15, flexShrink: 1 }, userText]} numberOfLines={1}>
-              {post.author.displayName}
+      {coauthors.length ? (
+        // With co-authors each name is its own link, so the row isn't one big link.
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel={t('m.title.profile') + ': ' + post.author.displayName}
+            onPress={() => router.push(`/u/${post.author.username}`)}
+          >
+            <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={40} />
+          </Pressable>
+          <View style={{ flex: 1 }}>
+            <AuthorNames author={post.author} collaborators={coauthors} numberOfLines={2} style={{ color: c.ink, fontWeight: '700', fontSize: 15 }} />
+            <Text style={[{ color: c.inkMuted, fontSize: 12 }, userText]} numberOfLines={1}>
+              {timeAgo(post.createdAt)}
+              {post.reason ? ` · ${post.reason}` : ''}
             </Text>
-            {post.author.plus ? <PlusBadge /> : null}
           </View>
-          <Text style={[{ color: c.inkMuted, fontSize: 12 }, userText]} numberOfLines={1}>
-            @{post.author.username} · {timeAgo(post.createdAt)}
-            {post.reason ? ` · ${post.reason}` : ''}
+        </View>
+      ) : (
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={t('m.title.profile') + ': ' + post.author.displayName}
+          onPress={() => router.push(`/u/${post.author.username}`)}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}
+        >
+          <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={40} />
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 15, flexShrink: 1 }, userText]} numberOfLines={1}>
+                {post.author.displayName}
+              </Text>
+              {post.author.plus ? <PlusBadge /> : null}
+            </View>
+            <Text style={[{ color: c.inkMuted, fontSize: 12 }, userText]} numberOfLines={1}>
+              @{post.author.username} · {timeAgo(post.createdAt)}
+              {post.reason ? ` · ${post.reason}` : ''}
+            </Text>
+          </View>
+        </Pressable>
+      )}
+
+      {pending.length ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Icon name="people-outline" size={14} color={c.inkMuted} />
+          <Text style={[{ color: c.inkMuted, fontSize: 13, flexShrink: 1 }, userText]}>
+            {t('m.collab.waiting', {
+              names: joinNames(
+                pending.map((u) => u.displayName),
+                t,
+              ),
+            })}
           </Text>
         </View>
-      </Pressable>
+      ) : null}
+
+      {collab === 'pending' ? (
+        <View style={{ backgroundColor: c.yapiSoft, borderRadius: radius.md, padding: space[3], gap: space[2] }}>
+          <Text style={[{ color: c.ink, fontWeight: '700', lineHeight: 20 }, userText]}>{t('m.collab.invited', { name: post.author.displayName })}</Text>
+          <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('m.collab.invitedHint')}</Text>
+          <View style={{ flexDirection: 'row', gap: space[2] }}>
+            <Button label={t('m.collab.accept')} size="sm" disabled={collabBusy} onPress={() => void answerInvite(true)} />
+            <Button label={t('m.collab.decline')} size="sm" variant="secondary" disabled={collabBusy} onPress={() => void answerInvite(false)} />
+          </View>
+        </View>
+      ) : null}
+      {collabError ? <Notice tone="danger">{collabError}</Notice> : null}
 
       {post.community ? (
         <Pressable
@@ -132,19 +355,51 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
       ) : null}
 
       {imageUri ? (
-        <View style={{ borderRadius: radius.md, overflow: 'hidden' }}>
-          <Image
-            source={{ uri: mediaUrl(imageUri) }}
-            accessibilityLabel={covered ? undefined : (image?.altText ?? t('m.post.photo'))}
+        <View
+          style={{ borderRadius: radius.md, overflow: 'hidden' }}
+          onLayout={(e) => setPhotoSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+        >
+          <Pressable
+            // A photo with people tagged: a tap shows or hides their names (instead of opening the post).
+            disabled={!tags.length || covered}
+            accessibilityRole={tags.length && !covered ? 'button' : 'image'}
+            accessibilityLabel={covered ? undefined : `${image?.altText ?? t('m.post.photo')}${tags.length ? `. ${tp('m.tags.count', tags.length)}` : ''}`}
+            accessibilityHint={tags.length && !covered ? (showTags ? t('m.tags.hide') : t('m.tags.show')) : undefined}
             accessibilityElementsHidden={covered}
-            blurRadius={covered ? 40 : 0}
-            style={{
-              width: '100%',
-              aspectRatio: image?.width && image?.height ? Math.max(0.75, Math.min(1.9, image.width / image.height)) : 4 / 3,
-              backgroundColor: c.surfaceSunken,
-            }}
-            resizeMode="cover"
-          />
+            onPress={() => setShowTags((v) => !v)}
+          >
+            <Image
+              source={{ uri: mediaUrl(imageUri) }}
+              blurRadius={covered ? 40 : 0}
+              style={{
+                width: '100%',
+                aspectRatio: image?.width && image?.height ? Math.max(0.75, Math.min(1.9, image.width / image.height)) : 4 / 3,
+                backgroundColor: c.surfaceSunken,
+              }}
+              resizeMode="cover"
+            />
+          </Pressable>
+          {tags.length && !covered ? (
+            <View
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                bottom: space[2],
+                start: space[2],
+                width: 28,
+                height: 28,
+                borderRadius: 14,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(0,0,0,0.6)',
+              }}
+            >
+              <Icon name="person" size={15} color="#FFFFFF" />
+            </View>
+          ) : null}
+          {showTags && photoSize && !covered ? (
+            <TagBubbles tags={tags} width={photoSize.width} height={photoSize.height} meId={me?.id} onRemove={(tag) => void removeTag(tag)} />
+          ) : null}
           {covered ? <SensitiveCover onReveal={() => setRevealed(true)} /> : null}
         </View>
       ) : null}
@@ -234,6 +489,11 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
           </Pressable>
         ) : null}
         <View style={{ flex: 1 }} />
+        {collab === 'accepted' || myTag ? (
+          <Pressable accessibilityRole="button" accessibilityLabel={t('m.post.more')} hitSlop={8} onPress={more}>
+            <Icon name="ellipsis-horizontal" size={20} color={c.inkMuted} />
+          </Pressable>
+        ) : null}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={saved ? t('m.post.unsave') : t('post.save')}

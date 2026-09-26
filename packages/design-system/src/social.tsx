@@ -10,7 +10,9 @@ import {
   type EventItem,
   type MediaItem,
   type MessageKey,
+  type PhotoTag,
   type Post,
+  type PublicUser,
 } from '@yapilapi/shared';
 import { Icon, type IconName } from './icons.tsx';
 import { Avatar, Badge, Button, cx, PlusBadge, useModalFocus } from './primitives.tsx';
@@ -135,10 +137,21 @@ export function SensitiveCover({ onReveal, compact }: { onReveal: () => void; co
   );
 }
 
-export function MediaGrid({ media }: { media: MediaItem[] }) {
+export interface MediaTagOptions {
+  linkAs?: LinkLike;
+  /** The signed-in person: they can remove a tag of themselves. */
+  viewerId?: string;
+  /** The post's original author can remove any tag. */
+  canRemoveAny?: boolean;
+  onRemoveTag?: (mediaId: string, tag: PhotoTag) => void;
+}
+
+export function MediaGrid({ media, tagOptions }: { media: MediaItem[]; tagOptions?: MediaTagOptions }) {
   const [open, setOpen] = useState<number | null>(null);
   // One choice per post: viewing one sensitive item shows the others too.
   const [revealed, setRevealed] = useState(false);
+  // Tapping a photo with people tagged in it shows or hides their names on every photo of the post.
+  const [showTags, setShowTags] = useState(false);
   if (!media.length) return null;
   const shown = media.slice(0, 4);
   const hidden = (m: MediaItem) => !!m.sensitive && !revealed;
@@ -155,6 +168,18 @@ export function MediaGrid({ media }: { media: MediaItem[] }) {
               ) : null}
               <SensitiveCover onReveal={() => setRevealed(true)} />
             </div>
+          ) : m.kind === 'image' && m.tags?.length ? (
+            <TaggedPhoto
+              key={m.id}
+              media={m}
+              src={(shown.length > 1 ? m.variants?.medium : (m.variants?.large ?? m.variants?.medium)) ?? m.url}
+              label={m.altText ? m.altText : `Photo ${i + 1} of ${media.length}`}
+              showTags={showTags}
+              onToggle={() => setShowTags((v) => !v)}
+              onOpen={() => setOpen(i)}
+              more={i === 3 && media.length > 4 ? media.length - 4 : 0}
+              options={tagOptions}
+            />
           ) : (
             <button
               key={m.id}
@@ -185,6 +210,117 @@ export function MediaGrid({ media }: { media: MediaItem[] }) {
         <MediaViewer media={viewable} index={Math.max(0, viewable.indexOf(media[open]!))} onClose={() => setOpen(null)} />
       ) : null}
     </>
+  );
+}
+
+/** Where an image's picture sits inside its element, allowing for object-fit cover or contain. */
+function pictureBox(img: HTMLImageElement) {
+  const bw = img.clientWidth;
+  const bh = img.clientHeight;
+  const nw = img.naturalWidth;
+  const nh = img.naturalHeight;
+  if (!bw || !bh || !nw || !nh) return null;
+  const fit = getComputedStyle(img).objectFit;
+  if (fit !== 'cover' && fit !== 'contain') return { left: 0, top: 0, width: bw, height: bh, bw, bh };
+  const k = fit === 'cover' ? Math.max(bw / nw, bh / nh) : Math.min(bw / nw, bh / nh);
+  return { left: (bw - nw * k) / 2, top: (bh - nh * k) / 2, width: nw * k, height: nh * k, bw, bh };
+}
+
+/** Which way a name bubble opens from its spot, so it stays on the photo near the edges. */
+export function tagBubbleClass(x: number, y: number) {
+  return cx('yp-phototag', x < 0.2 && 'yp-phototag--start', x > 0.8 && 'yp-phototag--end', y > 0.8 && 'yp-phototag--above');
+}
+
+/** A photo with people tagged in it: tap to show or hide their names, each linking to their profile. */
+function TaggedPhoto({
+  media: m,
+  src,
+  label,
+  showTags,
+  onToggle,
+  onOpen,
+  more,
+  options = {},
+}: {
+  media: MediaItem;
+  src: string;
+  label: string;
+  showTags: boolean;
+  onToggle: () => void;
+  onOpen: () => void;
+  more: number;
+  options?: MediaTagOptions;
+}) {
+  const { linkAs: L = A, viewerId, canRemoveAny, onRemoveTag } = options;
+  const img = useRef<HTMLImageElement>(null);
+  const [box, setBox] = useState<ReturnType<typeof pictureBox>>(null);
+  const tags = m.tags ?? [];
+  useEffect(() => {
+    const el = img.current;
+    if (!el) return;
+    const measure = () => setBox(pictureBox(el));
+    measure();
+    el.addEventListener('load', measure);
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    ro?.observe(el);
+    return () => {
+      el.removeEventListener('load', measure);
+      ro?.disconnect();
+    };
+  }, [src]);
+  const place = (t: PhotoTag) => {
+    if (!box) return { left: `${t.x * 100}%`, top: `${t.y * 100}%` };
+    const within = (v: number, max: number) => Math.min(max, Math.max(0, v));
+    return { left: within(box.left + t.x * box.width, box.bw), top: within(box.top + t.y * box.height, box.bh) };
+  };
+  const count = tags.length === 1 ? '1 person tagged' : `${tags.length} people tagged`;
+  return (
+    <div className="yp-media__item yp-media__item--tagged">
+      <button type="button" className="yp-media__hit" aria-pressed={showTags} onClick={onToggle} aria-label={`Show people tagged in ${label}, ${count}`}>
+        <img
+          ref={img}
+          src={src}
+          alt={m.altText ?? ''}
+          loading="lazy"
+          decoding="async"
+          style={m.placeholder ? { backgroundImage: `url(${m.placeholder})`, backgroundSize: 'cover' } : undefined}
+        />
+        {more ? <span className="yp-media__more">+{more}</span> : null}
+      </button>
+      <span className="yp-media__people" aria-hidden>
+        <Icon name="user" size={14} />
+      </span>
+      <button type="button" className="yp-media__open" onClick={onOpen} aria-label={`Open ${label} full screen`}>
+        <Icon name="image" size={16} />
+      </button>
+      {showTags ? (
+        <ul className="yp-phototags" aria-label={`People tagged in ${label}`}>
+          {tags.map((t) => {
+            const self = !!viewerId && t.user.id === viewerId;
+            const removable = !!onRemoveTag && (self || !!canRemoveAny);
+            return (
+              <li key={t.id} className={tagBubbleClass(t.x, t.y)} style={place(t)}>
+                <span className="yp-phototag__bubble">
+                  <L href={`/u/${t.user.username}`} className="yp-phototag__name" aria-label={`${t.user.displayName}, @${t.user.username}`}>
+                    <bdi>{t.user.displayName}</bdi>
+                  </L>
+                  {removable ? (
+                    <button
+                      type="button"
+                      className="yp-phototag__remove"
+                      onClick={() => onRemoveTag!(m.id, t)}
+                      aria-label={self ? 'Remove me from this photo' : `Remove tag for ${t.user.displayName}`}
+                    >
+                      {self ? 'Remove me' : <Icon name="x" size={12} />}
+                    </button>
+                  ) : null}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 
@@ -426,6 +562,41 @@ export interface PostCardProps {
   onPin?: (post: Post) => void;
   /** Boost one of your own public posts (opens the boost sheet). */
   onBoost?: (post: Post) => void;
+  /** The signed-in person's id: a tagged person can remove their own tag. */
+  viewerId?: string;
+  /** Answer an invite to co-author the post (shown when post.viewer.collab is 'pending'). */
+  onAcceptCollab?: (post: Post) => void;
+  onDeclineCollab?: (post: Post) => void;
+  /** Stop being a co-author (post.viewer.collab is 'accepted'); the post comes off your profile. */
+  onLeaveCollab?: (post: Post) => void;
+  /** Remove a photo tag: the original author can remove any, the person tagged their own. */
+  onRemoveTag?: (post: Post, mediaId: string, tag: PhotoTag) => void;
+  /** Original author: invite co-authors or take them off (own posts only). */
+  onManageCollaborators?: (post: Post) => void;
+}
+
+type Person = Pick<PublicUser, 'id' | 'username' | 'displayName'>;
+
+/** "Ada", "Ada and Bola" or "Ada, Bola and Chi" as plain text. */
+export function joinNames(people: Person[]): string {
+  const names = people.map((p) => p.displayName);
+  return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+}
+
+/** "Ada and Bola" (or "Ada, Bola and Chi"), each name linking to that profile. */
+export function AuthorNames({ people, linkAs: L = A, linkClassName }: { people: Person[]; linkAs?: LinkLike; linkClassName?: string }) {
+  return (
+    <>
+      {people.map((p, i) => (
+        <span key={p.id}>
+          {i === 0 ? '' : i === people.length - 1 ? ' and ' : ', '}
+          <L href={`/u/${p.username}`} className={linkClassName}>
+            <bdi>{p.displayName}</bdi>
+          </L>
+        </span>
+      ))}
+    </>
+  );
 }
 
 const VIS_ICON: Record<string, IconName> = {
@@ -456,20 +627,38 @@ export function PostCard({
   onAddToMemory,
   onPin,
   onBoost,
+  viewerId,
+  onAcceptCollab,
+  onDeclineCollab,
+  onLeaveCollab,
+  onRemoveTag,
+  onManageCollaborators,
 }: PostCardProps) {
   const tt = (k: MessageKey) => t(k, locale);
+  const coauthors = post.collaborators ?? [];
+  const pendingCoauthors = isOwn ? (post.pendingCollaborators ?? []) : [];
+  // A co-author shares the post but only the original author can change or delete it.
+  const coauthor = post.viewer.collab === 'accepted';
+  const invited = post.viewer.collab === 'pending';
   const menu: MenuAction[] = [];
   if (onWhy) menu.push({ label: tt('post.why'), icon: 'info', onSelect: () => onWhy(post) });
   if (onAddToMemory) menu.push({ label: 'Add to a memory', icon: 'bookmark', onSelect: () => onAddToMemory(post) });
-  if (onFeedback && !isOwn) {
+  if (onLeaveCollab && coauthor && !isOwn) menu.push({ label: 'Leave as co-author', icon: 'logout', onSelect: () => onLeaveCollab(post) });
+  if (onFeedback && !isOwn && !coauthor) {
     menu.push({ label: tt('post.moreLikeThis'), icon: 'plus', onSelect: () => onFeedback(post, 'more_like_this') });
     menu.push({ label: tt('post.lessLikeThis'), icon: 'eye', onSelect: () => onFeedback(post, 'less_like_this') });
     menu.push({ label: tt('post.notInterested'), icon: 'x', onSelect: () => onFeedback(post, 'not_interested') });
     menu.push({ label: tt('post.muteCreator'), icon: 'bell', onSelect: () => onFeedback(post, 'mute_creator') });
   }
-  if (onReport && !isOwn) menu.push({ label: tt('post.report'), icon: 'flag', danger: true, onSelect: () => onReport(post) });
+  if (onReport && !isOwn && !coauthor) menu.push({ label: tt('post.report'), icon: 'flag', danger: true, onSelect: () => onReport(post) });
   if (onPin && isOwn && !post.community)
     menu.push({ label: post.pinned ? 'Unpin from profile' : 'Pin to profile', icon: 'bookmark', onSelect: () => onPin(post) });
+  if (onManageCollaborators && isOwn && !post.community)
+    menu.push({
+      label: coauthors.length || pendingCoauthors.length ? 'Co-authors' : 'Invite co-authors',
+      icon: 'users',
+      onSelect: () => onManageCollaborators(post),
+    });
   if (onBoost && isOwn && post.visibility === 'public' && !post.community)
     menu.push({ label: tt('post.boost'), icon: 'sparkle', onSelect: () => onBoost(post) });
   if (onDelete && isOwn) menu.push({ label: tt('post.delete'), icon: 'trash', danger: true, onSelect: () => onDelete(post) });
@@ -492,10 +681,18 @@ export function PostCard({
         </L>
         <div className="yp-post__who">
           <span className="yp-post__nameline">
-            <L href={`/u/${post.author.username}`} className="yp-post__name">
-              <bdi id={`post-${post.id}-author`}>{post.author.displayName}</bdi>
-            </L>
-            {post.author.plus ? <PlusBadge label={t('plus.badge.label', locale)} /> : null}
+            {coauthors.length ? (
+              <span className="yp-post__names" id={`post-${post.id}-author`}>
+                <AuthorNames people={[post.author, ...coauthors]} linkAs={L} linkClassName="yp-post__name" />
+              </span>
+            ) : (
+              <>
+                <L href={`/u/${post.author.username}`} className="yp-post__name">
+                  <bdi id={`post-${post.id}-author`}>{post.author.displayName}</bdi>
+                </L>
+                {post.author.plus ? <PlusBadge label={t('plus.badge.label', locale)} /> : null}
+              </>
+            )}
           </span>
           <span className="yp-post__meta">
             <bdi>@{post.author.username}</bdi> ·{' '}
@@ -513,6 +710,28 @@ export function PostCard({
         </div>
         {menu.length ? <Menu label="Post options" actions={menu} /> : null}
       </header>
+
+      {invited && onAcceptCollab && onDeclineCollab ? (
+        <div className="yp-post__invite" role="group" aria-label="Invite to co-author">
+          <span>
+            <bdi>{post.author.displayName}</bdi> invited you to co-author this post
+          </span>
+          <span className="yp-post__invite-actions">
+            <Button size="sm" onClick={() => onAcceptCollab(post)}>
+              Accept
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => onDeclineCollab(post)}>
+              Decline
+            </Button>
+          </span>
+        </div>
+      ) : null}
+      {pendingCoauthors.length ? (
+        <p className="yp-post__reason yp-post__pending">
+          <Icon name="users" size={14} />
+          <span>Waiting for {joinNames(pendingCoauthors)} to accept</span>
+        </p>
+      ) : null}
 
       {post.body ? (
         <div className="yp-post__body" dir="auto">
@@ -563,7 +782,15 @@ export function PostCard({
 
       {post.media.length ? (
         <div className="yp-post__media">
-          <MediaGrid media={post.media} />
+          <MediaGrid
+            media={post.media}
+            tagOptions={{
+              linkAs: L,
+              viewerId,
+              canRemoveAny: isOwn,
+              onRemoveTag: onRemoveTag ? (mediaId, tag) => onRemoveTag(post, mediaId, tag) : undefined,
+            }}
+          />
         </div>
       ) : null}
 
@@ -654,7 +881,7 @@ export function PostCard({
           <Icon name="message" />
           {post.counts.comments || ''}
         </button>
-        {onRepost && !isOwn && post.visibility === 'public' ? (
+        {onRepost && !isOwn && !coauthor && post.visibility === 'public' ? (
           <button
             type="button"
             className={cx('yp-action', post.viewer.reposted && 'yp-action--reposted')}

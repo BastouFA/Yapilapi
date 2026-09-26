@@ -13,6 +13,7 @@ import { useT } from '../lib/i18n';
 import { radius, space } from '../lib/theme';
 import { Avatar, Button, EmptyState, Icon, Loading, Notice, useColors, userText, type IconName } from '../lib/ui';
 import { LockedPanel } from '../lib/money';
+import { AuthorNames, RichText } from '../lib/post';
 import { SensitiveCover } from '../lib/safety';
 
 const WHITE = '#FFFFFF';
@@ -383,16 +384,26 @@ function Reel({
       </Pressable>
 
       <View style={[s.info, { bottom: insets.bottom + space[6] }]} pointerEvents="box-none">
-        <Pressable
-          accessibilityRole="link"
-          onPress={() => router.push(`/p/${post.id}`)}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], alignSelf: 'flex-start' }}
-        >
-          <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={36} />
-          <Text style={[s.author, userText]} numberOfLines={1}>
-            {post.author.displayName}
-          </Text>
-        </Pressable>
+        {post.collaborators?.length ? (
+          // Co-authored: each name opens that person's profile.
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], alignSelf: 'flex-start' }}>
+            <Pressable accessibilityRole="link" accessibilityLabel={t('m.title.post')} onPress={() => router.push(`/p/${post.id}`)}>
+              <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={36} />
+            </Pressable>
+            <AuthorNames author={post.author} collaborators={post.collaborators} numberOfLines={2} style={s.author} />
+          </View>
+        ) : (
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => router.push(`/p/${post.id}`)}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], alignSelf: 'flex-start' }}
+          >
+            <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={36} />
+            <Text style={[s.author, userText]} numberOfLines={1}>
+              {post.author.displayName}
+            </Text>
+          </Pressable>
+        )}
         {post.remixOf ? (
           post.remixOf.post ? (
             <Pressable
@@ -415,11 +426,7 @@ function Reel({
             </View>
           )
         ) : null}
-        {post.body ? (
-          <Text style={[s.caption, userText]} numberOfLines={3}>
-            {post.body}
-          </Text>
-        ) : null}
+        {post.body ? <RichText text={post.body} style={s.caption} linkStyle={s.captionLink} numberOfLines={3} /> : null}
         {post.sound ? (
           <Pressable accessibilityRole="link" hitSlop={6} onPress={() => router.push(`/sounds/${post.sound!.id}`)} style={s.chip}>
             <Icon name="musical-notes" size={14} color={WHITE} />
@@ -523,6 +530,7 @@ const s = StyleSheet.create({
   info: { position: 'absolute', start: space[4], end: 84, gap: space[2] },
   author: { color: WHITE, fontWeight: '800', fontSize: 15, flexShrink: 1, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 4 },
   caption: { color: WHITE, fontSize: 14, lineHeight: 20, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 4 },
+  captionLink: { color: WHITE, fontWeight: '800', textDecorationLine: 'underline' },
   actions: { position: 'absolute', end: space[3], alignItems: 'center', gap: space[4] },
   actionIcon: { width: 48, height: 48, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: SCRIM },
   count: { color: WHITE, fontSize: 12, fontWeight: '700' },

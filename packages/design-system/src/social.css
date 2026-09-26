@@ -1636,3 +1636,172 @@ a.yp-post__reel-link:hover {
 .yp-post__boost {
   color: var(--yapi);
 }
+
+/* ── Co-authors ───────────────────────────────────────────────────────── */
+.yp-post__names {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 700 15px/24px var(--font-sans);
+  color: var(--ink);
+}
+.yp-post__invite {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: var(--space-3) var(--space-4) 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  font: 500 14px/20px var(--font-sans);
+}
+.yp-post__invite-actions {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+p.yp-post__pending {
+  margin: 0;
+}
+
+/* ── Photo tags: tap the photo to show names ──────────────────────────── */
+.yp-media__item--tagged {
+  cursor: default;
+}
+.yp-media__hit {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.yp-media__hit:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
+}
+.yp-media__people,
+.yp-media__open {
+  position: absolute;
+  bottom: 8px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: rgba(14, 16, 32, 0.72);
+  color: #fff;
+}
+.yp-media__people {
+  left: 8px;
+  pointer-events: none;
+}
+.yp-media__open {
+  right: 8px;
+  border: 0;
+  cursor: zoom-in;
+}
+.yp-media__open:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.yp-phototags {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+/* A spot on the photo; its name bubble hangs below it (or above, near the bottom edge). */
+.yp-phototag {
+  position: absolute;
+  z-index: 1;
+  width: 0;
+  height: 0;
+}
+.yp-phototag__bubble {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px 3px 10px;
+  border-radius: var(--radius-full);
+  background: rgba(14, 16, 32, 0.88);
+  color: #fff;
+  font: 600 13px/18px var(--font-sans);
+  white-space: nowrap;
+  pointer-events: auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.yp-phototag__bubble::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  margin-left: -5px;
+  border: 5px solid transparent;
+  border-top: 0;
+  border-bottom-color: rgba(14, 16, 32, 0.88);
+}
+.yp-phototag--start .yp-phototag__bubble {
+  transform: translateX(-12px);
+}
+.yp-phototag--start .yp-phototag__bubble::before {
+  left: 12px;
+}
+.yp-phototag--end .yp-phototag__bubble {
+  transform: translateX(calc(-100% + 12px));
+}
+.yp-phototag--end .yp-phototag__bubble::before {
+  left: auto;
+  right: 7px;
+  margin-left: 0;
+}
+.yp-phototag--above .yp-phototag__bubble {
+  top: auto;
+  bottom: 8px;
+}
+.yp-phototag--above .yp-phototag__bubble::before {
+  top: auto;
+  bottom: -5px;
+  border-bottom: 0;
+  border-top: 5px solid rgba(14, 16, 32, 0.88);
+}
+.yp-phototag__name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 3px 0;
+  color: inherit;
+  text-decoration: none;
+}
+.yp-phototag__name:hover {
+  text-decoration: underline;
+}
+.yp-phototag__remove {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font: 600 12px/1 var(--font-sans);
+  cursor: pointer;
+}
+.yp-phototag__name:focus-visible,
+.yp-phototag__remove:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}

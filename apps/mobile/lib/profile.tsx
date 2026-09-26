@@ -26,7 +26,9 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
   const [error, setError] = useState<string | null>(null);
   const [needsVerify, setNeedsVerify] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [tab, setTab] = useState<'posts' | 'shop'>('posts');
+  const [tab, setTab] = useState<'posts' | 'tagged' | 'shop'>('posts');
+  // Photos this person is tagged in, loaded the first time the tab opens.
+  const [tagged, setTagged] = useState<{ items: Post[]; cursor: string | null; hidden: boolean } | null>(null);
 
   const load = useCallback(async () => {
     const api = await client();
@@ -49,7 +51,28 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
 
   useEffect(() => {
     void load();
+    setTagged(null);
   }, [load]);
+
+  const loadTagged = useCallback(
+    async (next?: string) => {
+      try {
+        const page = await (await client()).users.tagged(username, next);
+        setTagged((cur) => ({
+          items: next && cur ? [...cur.items, ...page.items.filter((x) => !cur.items.some((y) => y.id === x.id))] : page.items,
+          cursor: page.nextCursor,
+          hidden: !!page.hidden,
+        }));
+      } catch {
+        setTagged((cur) => cur ?? { items: [], cursor: null, hidden: false });
+      }
+    },
+    [username],
+  );
+
+  useEffect(() => {
+    if (tab === 'tagged' && !tagged) void loadTagged();
+  }, [tab, tagged, loadTagged]);
 
   const more = async () => {
     if (!cursor) return;
@@ -142,6 +165,7 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
         onChange={setTab}
         options={[
           { id: 'posts', label: t('profile.posts') },
+          { id: 'tagged', label: t('m.tagged.tab') },
           { id: 'shop', label: t('m.shop.tab') },
         ]}
       />
@@ -153,11 +177,11 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
     <FlatList
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: bottom + space[4] }}
-      data={tab === 'posts' ? posts : []}
+      data={tab === 'posts' ? posts : tab === 'tagged' ? (tagged?.items ?? []) : []}
       keyExtractor={(p) => p.id}
       ListHeaderComponent={header}
       renderItem={({ item }) => <PostCard post={item} />}
-      onEndReached={() => void (tab === 'posts' && more())}
+      onEndReached={() => void (tab === 'posts' ? more() : tab === 'tagged' && tagged?.cursor ? loadTagged(tagged.cursor) : undefined)}
       onEndReachedThreshold={0.5}
       refreshControl={
         <RefreshControl
@@ -165,6 +189,7 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
           onRefresh={async () => {
             setRefreshing(true);
             await load();
+            if (tab === 'tagged') await loadTagged();
             setRefreshing(false);
           }}
         />
@@ -172,6 +197,14 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
       ListEmptyComponent={
         tab === 'shop' ? (
           <ShopList userId={profile.id} username={profile.username} isSelf={rel.isSelf} />
+        ) : tab === 'tagged' ? (
+          !tagged ? (
+            <Loading />
+          ) : tagged.hidden ? (
+            <EmptyState title={t('m.profile.private')} />
+          ) : (
+            <EmptyState title={t('m.tagged.empty')} body={rel.isSelf ? t('m.tagged.emptySelf') : undefined} />
+          )
         ) : (
           <EmptyState title={locked ? t('m.profile.private') : t('m.profile.noPosts')} />
         )

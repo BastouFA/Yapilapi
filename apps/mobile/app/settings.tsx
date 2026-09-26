@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { router } from 'expo-router';
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import type { FamilyLink, SharingSettings, TeenControls } from '../../../packages/api-client/src/index';
+import type { TagPermission } from '../../../packages/shared/src/types';
 import { client, errorMessage } from '../lib/api';
 import { useT, type Translator } from '../lib/i18n';
 import { useSession } from '../lib/session';
@@ -35,6 +36,7 @@ export default function Settings() {
         onPress={() => router.push('/close-friends')}
       />
       <Sharing />
+      <Tagging />
       <VerificationCard />
       <Family />
       <Advertising />
@@ -86,6 +88,64 @@ function Sharing() {
             onValueChange={(v) => void set('allowDownload', v)}
           />
         </>
+      ) : !error ? (
+        <Loading />
+      ) : null}
+    </Card>
+  );
+}
+
+/** Who can tag you in photos: everyone, people you follow, or no one. */
+function Tagging() {
+  const c = useColors();
+  const { t } = useT();
+  const [allowFrom, setAllowFrom] = useState<TagPermission | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    client()
+      .then((api) => api.me.tagging())
+      .then((r) => setAllowFrom(r.allowFrom))
+      .catch((e) => setError(errorMessage(e)));
+  }, []);
+  const set = async (v: TagPermission) => {
+    const before = allowFrom;
+    setAllowFrom(v);
+    setError(null);
+    try {
+      setAllowFrom((await (await client()).me.setTagging(v)).allowFrom);
+    } catch (e) {
+      setAllowFrom(before);
+      setError(errorMessage(e));
+    }
+  };
+  return (
+    <Card style={{ gap: space[3] }}>
+      <Title sub={t('m.tagging.body')}>{t('m.tagging.title')}</Title>
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {allowFrom ? (
+        <View accessibilityRole="radiogroup" accessibilityLabel={t('m.tagging.title')} style={{ gap: space[1] }}>
+          {(
+            [
+              ['everyone', 'm.tagging.everyone'],
+              ['following', 'm.tagging.following'],
+              ['nobody', 'm.tagging.nobody'],
+            ] as const
+          ).map(([id, label]) => {
+            const on = allowFrom === id;
+            return (
+              <Pressable
+                key={id}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: on }}
+                onPress={() => !on && void set(id)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44 }}
+              >
+                <Icon name={on ? 'radio-button-on' : 'radio-button-off'} size={22} color={on ? c.yapi : c.inkMuted} />
+                <Text style={{ color: c.ink, fontSize: 15, fontWeight: on ? '700' : '500' }}>{t(label)}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
       ) : !error ? (
         <Loading />
       ) : null}

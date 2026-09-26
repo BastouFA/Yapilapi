@@ -34,6 +34,9 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
   booking_decided: () => 'Your booking was updated',
   call_incoming: () => 'called you',
   together_invite: () => 'invited you to a Together',
+  collab_invite: () => 'invited you to co-author a post',
+  collab_accepted: () => 'accepted your invite to co-author your post',
+  photo_tag: () => 'tagged you in a photo',
   family_invite: () => 'asked to supervise your account. You can accept or decline in Settings.',
   family_accepted: () => 'accepted your family link',
   family_ended: () => 'ended your family link',
@@ -108,6 +111,20 @@ export default function Notifications() {
   const { t, locale, toast, setUnread } = useSession();
   const [items, setItems] = useState<NotificationItem[] | null>(null);
   const [followed, setFollowed] = useState<Set<string>>(new Set());
+  // Co-author invites answered here, by post id.
+  const [answered, setAnswered] = useState<Record<string, 'accepted' | 'declined'>>({});
+  const [answering, setAnswering] = useState<string | null>(null);
+  const answer = async (postId: string, accept: boolean) => {
+    setAnswering(postId);
+    try {
+      await (accept ? api.posts.acceptCollab(postId) : api.posts.declineCollab(postId));
+      setAnswered((a) => ({ ...a, [postId]: accept ? 'accepted' : 'declined' }));
+    } catch (e) {
+      toast(errorMessage(e));
+    } finally {
+      setAnswering(null);
+    }
+  };
   const load = () =>
     api.notifications.list().then(
       (r) => setItems(r.items),
@@ -169,6 +186,38 @@ export default function Notifications() {
                       {unread ? <span className="yp-unread" aria-label="Unread" style={{ minWidth: 8, height: 8, padding: 0 }} /> : null}
                     </>
                   );
+                  if (n.type === 'collab_invite' && n.entityId) {
+                    const postId = n.entityId;
+                    const outcome = answered[postId];
+                    return (
+                      <ListItem
+                        key={g.key}
+                        start={start}
+                        primary={
+                          <Link href={`/p/${postId}`} className="notif__link">
+                            {text}
+                          </Link>
+                        }
+                        secondary={formatRelativeTime(n.createdAt, locale)}
+                        end={
+                          outcome ? (
+                            <span className="muted" role="status">
+                              {outcome === 'accepted' ? "You're a co-author now" : 'Declined'}
+                            </span>
+                          ) : (
+                            <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
+                              <Button size="sm" loading={answering === postId} disabled={!!answering} onClick={() => answer(postId, true)}>
+                                Accept
+                              </Button>
+                              <Button size="sm" variant="ghost" disabled={!!answering} onClick={() => answer(postId, false)}>
+                                Decline
+                              </Button>
+                            </span>
+                          )
+                        }
+                      />
+                    );
+                  }
                   return followBack ? (
                     <ListItem
                       key={g.key}

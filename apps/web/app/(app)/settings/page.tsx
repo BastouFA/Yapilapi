@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Alert, Button, Card, Dialog, List, ListItem, Select, Switch, Tabs, TextField } from '@yapilapi/design-system';
-import { NOTIFICATION_CATEGORIES, PROFILE_MODES, SUPPORTED_LOCALES, formatRelativeTime } from '@yapilapi/shared';
+import { NOTIFICATION_CATEGORIES, PROFILE_MODES, SUPPORTED_LOCALES, formatRelativeTime, type TagPermission } from '@yapilapi/shared';
 import { startRegistration } from '@simplewebauthn/browser';
 import type { SharingSettings as SharingSettingsState } from '@yapilapi/api-client';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
@@ -313,6 +313,49 @@ function SharingSettings() {
   );
 }
 
+const TAG_CHOICES: { id: TagPermission; label: string }[] = [
+  { id: 'everyone', label: 'Everyone' },
+  { id: 'following', label: 'People you follow' },
+  { id: 'nobody', label: 'No one' },
+];
+
+/** Who may tag you in photos. */
+function TaggingSettings() {
+  const { toast } = useSession();
+  const [allowFrom, setAllowFrom] = useState<TagPermission | null>(null);
+  useEffect(() => {
+    api.me.tagging().then(
+      (r) => setAllowFrom(r.allowFrom),
+      () => {},
+    );
+  }, []);
+  if (!allowFrom) return null;
+  const set = async (v: TagPermission) => {
+    const before = allowFrom;
+    setAllowFrom(v);
+    try {
+      setAllowFrom((await api.me.setTagging(v)).allowFrom);
+    } catch (e) {
+      setAllowFrom(before);
+      toast(errorMessage(e));
+    }
+  };
+  return (
+    <Card title="Photo tags">
+      <fieldset className="stack-sm" style={{ border: 0, margin: 0, padding: 0 }}>
+        <legend className="yp-field__label">Who can tag you in photos</legend>
+        {TAG_CHOICES.map((c) => (
+          <label key={c.id} className="row" style={{ gap: 8 }}>
+            <input type="radio" name="tag-permission" value={c.id} checked={allowFrom === c.id} onChange={() => set(c.id)} />
+            {c.label}
+          </label>
+        ))}
+        <p className="muted setting-hint">Tags you&apos;re in show on your profile under Tagged. You can remove yourself from any photo.</p>
+      </fieldset>
+    </Card>
+  );
+}
+
 function PrivacyCenter() {
   const { toast, setMe } = useSession();
   const router = useRouter();
@@ -337,6 +380,7 @@ function PrivacyCenter() {
     <div className="stack">
       <CloseFriendsCard />
       <SharingSettings />
+      <TaggingSettings />
       <Card title="What we hold about you">
         <div className="stats">
           {Object.entries(data.dataSummary).map(([k, v]) => (

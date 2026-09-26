@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRef, type ComponentProps, type ReactNode } from 'react';
+import { useRef, type ComponentProps, type ReactNode, type Ref } from 'react';
 import {
   ActivityIndicator,
   I18nManager,
@@ -121,7 +121,7 @@ export function Button({
   );
 }
 
-export function Field(props: TextInputProps & { label: string; hideLabel?: boolean }) {
+export function Field(props: TextInputProps & { label: string; hideLabel?: boolean; ref?: Ref<TextInput> }) {
   const c = useColors();
   return (
     <View style={{ gap: space[1] }}>

@@ -5,7 +5,9 @@ import { useEffect, useState } from 'react';
 import { Alert, Image, Linking, ScrollView, Text, View } from 'react-native';
 import type { EditorParamsInput } from '../../../../packages/shared/src/filters';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
-import type { Sound } from '../../../../packages/shared/src/types';
+import type { PublicUser, Sound } from '../../../../packages/shared/src/types';
+import { useAutocomplete } from '../../lib/autocomplete';
+import { CoauthorPicker, PhotoTagger, type DraftTag } from '../../lib/collab';
 import { client, errorMessage, mediaUrl } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import {
@@ -74,6 +76,12 @@ export default function Create() {
   const [busy, setBusy] = useState(false);
   const [sound, setSound] = useState<Sound | null>(null);
   const [closeFriends, setCloseFriends] = useState(false);
+  // Posts and reels: people invited to co-author (up to 3), and people tagged in the photo.
+  const [coauthors, setCoauthors] = useState<PublicUser[]>([]);
+  const [photoTags, setPhotoTags] = useState<DraftTag[]>([]);
+  const ac = useAutocomplete(body, setBody);
+  // Tags belong to the photo they were placed on.
+  useEffect(() => setPhotoTags([]), [media?.id]);
   // Posting for subscribers needs a subscription plan (set up in Studio on the web).
   const [hasPlans, setHasPlans] = useState(false);
   const [editing, setEditing] = useState<Picked | null>(null);
@@ -241,8 +249,10 @@ export default function Create() {
           visibility,
           media: [{ id: v.id, url: mediaUrl(v.url), kind: 'video' }],
           ...(sound ? { soundId: sound.id } : {}),
+          ...(coauthors.length ? { collaborators: coauthors.map((u) => u.id) } : {}),
         });
         setBody('');
+        setCoauthors([]);
         setMedia(null);
         setSound(null);
         if (r.moderation) Alert.alert(r.moderation.message);
@@ -252,9 +262,22 @@ export default function Create() {
       const r = await api.posts.create({
         body,
         visibility,
-        ...(media ? { media: [{ id: media.id, url: mediaUrl(media.url), kind: media.kind }] } : {}),
+        ...(media
+          ? {
+              media: [
+                {
+                  id: media.id,
+                  url: mediaUrl(media.url),
+                  kind: media.kind,
+                  ...(media.kind === 'image' && photoTags.length ? { tags: photoTags.map((x) => ({ userId: x.user.id, x: x.x, y: x.y })) } : {}),
+                },
+              ],
+            }
+          : {}),
+        ...(coauthors.length ? { collaborators: coauthors.map((u) => u.id) } : {}),
       });
       setBody('');
+      setCoauthors([]);
       setMedia(null);
       if (r.moderation) setNote(r.moderation.message);
       // Home shows the new post at the top, whatever the feed's ranking.
@@ -289,12 +312,12 @@ export default function Create() {
       <Card style={{ gap: space[3] }}>
         <Field
           label={kind === 'reel' ? t('m.create.reel.caption') : kind === 'story' ? t('m.create.story.body') : t('create.placeholder')}
-          value={body}
-          onChangeText={setBody}
+          {...ac.inputProps}
           multiline
           maxLength={kind === 'story' ? 500 : kind === 'reel' ? 2200 : 5000}
           style={{ minHeight: kind === 'post' ? 140 : 96, textAlignVertical: 'top', paddingTop: 12 }}
         />
+        {ac.list}
 
         <View style={{ gap: space[2] }}>
           {media ? <Preview media={media} onRemove={() => setMedia(null)} /> : null}
@@ -332,6 +355,9 @@ export default function Create() {
             </Notice>
           ) : null}
         </View>
+
+        {kind === 'post' && media?.kind === 'image' ? <PhotoTagger uri={media.local} value={photoTags} onChange={setPhotoTags} /> : null}
+        {kind !== 'story' ? <CoauthorPicker value={coauthors} onChange={setCoauthors} /> : null}
 
         {kind === 'reel' && sound ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>

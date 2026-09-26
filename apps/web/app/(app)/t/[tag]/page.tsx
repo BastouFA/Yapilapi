@@ -46,6 +46,11 @@ export default function TagPage() {
             <span>
               <strong>{n.format(info.people)}</strong> {info.people === 1 ? 'person' : 'people'}
             </span>
+            {info.comments > 0 ? (
+              <span>
+                <strong>{n.format(info.comments)}</strong> {info.comments === 1 ? 'comment' : 'comments'}
+              </span>
+            ) : null}
             <span>
               <strong>{n.format(info.postsThisWeek)}</strong> this week
             </span>

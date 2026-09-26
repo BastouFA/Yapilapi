@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
-import { Avatar, Badge, BottomSheet, Button, EmptyState, PostCard, Select, Skeleton, TaggedText, TextField } from '@yapilapi/design-system';
+import { Avatar, Badge, BottomSheet, Button, EmptyState, List, ListItem, PostCard, Select, Skeleton, TaggedText, TextField } from '@yapilapi/design-system';
 import type { SponsoredAd } from '@yapilapi/api-client';
-import { formatRelativeTime, REPORT_REASONS, type Comment, type Page, type Post } from '@yapilapi/shared';
+import { formatRelativeTime, MAX_COLLABORATORS, REPORT_REASONS, type Comment, type Page, type PhotoTag, type Post, type PublicUser } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { AutocompleteText } from '@/components/Autocomplete';
+import { PeoplePicker } from '@/components/PeoplePicker';
 import { useSession } from '@/app/providers';
 import { signInHref, useSignIn } from './SignedOut';
 import { BoostSheet } from './Boost';
@@ -19,12 +20,14 @@ import { BoostSheet } from './Boost';
 export function PostList({
   load,
   empty,
+  emptyTitle = 'Nothing here yet',
   reloadKey,
   sponsored = false,
   showEnd = true,
 }: {
   load: (cursor?: string) => Promise<Page<Post>>;
   empty?: string;
+  emptyTitle?: string;
   reloadKey?: string;
   /** Allow one labelled sponsored post (only served to adults who opted in to advertising). */
   sponsored?: boolean;
@@ -40,6 +43,7 @@ export function PostList({
   const [why, setWhy] = useState<{ post: Post; reasons: string[] } | null>(null);
   const [reporting, setReporting] = useState<Post | null>(null);
   const [boosting, setBoosting] = useState<Post | null>(null);
+  const [coauthorsFor, setCoauthorsFor] = useState<string | null>(null);
   const sentinel = useRef<HTMLDivElement>(null);
   const [ad, setAd] = useState<SponsoredAd | null>(null);
   const [adWhy, setAdWhy] = useState(false);
@@ -196,6 +200,53 @@ export function PostList({
     }
   }
 
+  async function acceptCollab(p: Post) {
+    try {
+      const r = await api.posts.acceptCollab(p.id);
+      patch(p.id, () => r.post);
+      toast("You're a co-author now. It shows on your profile too.");
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  }
+
+  async function declineCollab(p: Post) {
+    try {
+      await api.posts.declineCollab(p.id);
+      patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, collab: undefined } }));
+      toast('Declined');
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  }
+
+  async function leaveCollab(p: Post) {
+    try {
+      await api.posts.leaveCollab(p.id);
+      patch(p.id, (x) => ({
+        ...x,
+        collaborators: x.collaborators?.filter((c) => c.id !== me?.id),
+        viewer: { ...x.viewer, collab: undefined },
+      }));
+      toast("You're no longer a co-author. It's off your profile.");
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  }
+
+  async function removeTag(p: Post, mediaId: string, tag: PhotoTag) {
+    try {
+      await api.posts.removeTag(p.id, tag.id);
+      patch(p.id, (x) => ({
+        ...x,
+        media: x.media.map((m) => (m.id === mediaId ? { ...m, tags: m.tags?.filter((t) => t.id !== tag.id) } : m)),
+      }));
+      toast(tag.user.id === me?.id ? 'You were removed from the photo' : 'Tag removed');
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  }
+
   async function remove(p: Post) {
     try {
       await api.posts.remove(p.id);
@@ -258,7 +309,7 @@ export function PostList({
         ))}
       </div>
     );
-  if (!posts.length) return <EmptyState title="Nothing here yet" body={empty ?? t('feed.empty')} />;
+  if (!posts.length) return <EmptyState title={emptyTitle} body={empty ?? t('feed.empty')} />;
 
   return (
     <div className="stack">
@@ -283,6 +334,12 @@ export function PostList({
             onPin={me ? pin : undefined}
             onBoost={me && flags.ADS && flags.COMMERCE !== false ? setBoosting : undefined}
             onAddToMemory={me && flags.MEMORY ? setMemoryFor : undefined}
+            viewerId={me?.id}
+            onAcceptCollab={me ? acceptCollab : undefined}
+            onDeclineCollab={me ? declineCollab : undefined}
+            onLeaveCollab={me ? leaveCollab : undefined}
+            onRemoveTag={me ? removeTag : undefined}
+            onManageCollaborators={me ? (post) => setCoauthorsFor(post.id) : undefined}
           />
           {ad && i === Math.min(2, posts.length - 1) ? renderAd(ad) : null}
         </Fragment>
@@ -349,7 +406,114 @@ export function PostList({
         }}
       />
       {memoryFor ? <AddToMemorySheet post={memoryFor} onClose={() => setMemoryFor(null)} /> : null}
+      {coauthorsFor && posts.some((x) => x.id === coauthorsFor) ? (
+        <CoauthorsSheet
+          post={posts.find((x) => x.id === coauthorsFor)!}
+          onClose={() => setCoauthorsFor(null)}
+          onChanged={(post) => patch(post.id, () => post)}
+        />
+      ) : null}
     </div>
+  );
+}
+
+/** The original author invites co-authors to a post, cancels invites, or takes a co-author off. */
+function CoauthorsSheet({ post, onClose, onChanged }: { post: Post; onClose: () => void; onChanged: (p: Post) => void }) {
+  const { toast } = useSession();
+  const [picked, setPicked] = useState<PublicUser[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const people = [
+    ...(post.collaborators ?? []).map((user) => ({ user, pending: false })),
+    ...(post.pendingCollaborators ?? []).map((user) => ({ user, pending: true })),
+  ];
+  const room = MAX_COLLABORATORS - people.length;
+  const run = async (key: string, fn: () => Promise<{ post: Post }>, done: string) => {
+    setBusy(key);
+    try {
+      onChanged((await fn()).post);
+      toast(done);
+    } catch (e) {
+      toast(errorMessage(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <BottomSheet open onClose={onClose} title="Co-authors">
+      <div className="stack">
+        {people.length ? (
+          <List label="Co-authors">
+            {people.map(({ user, pending }) => (
+              <ListItem
+                key={user.id}
+                start={<Avatar name={user.displayName} src={user.avatarUrl} size="sm" />}
+                primary={user.displayName}
+                secondary={pending ? 'Invited, not answered yet' : 'Co-author'}
+                end={
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    loading={busy === user.id}
+                    disabled={!!busy}
+                    onClick={() =>
+                      run(
+                        user.id,
+                        () => api.posts.removeCollaborator(post.id, user.id),
+                        pending ? 'Invite cancelled' : `${user.displayName} is no longer a co-author`,
+                      )
+                    }
+                  >
+                    {pending ? 'Cancel invite' : 'Remove'}
+                  </Button>
+                }
+              />
+            ))}
+          </List>
+        ) : (
+          <p className="muted" style={{ margin: 0 }}>
+            No co-authors yet.
+          </p>
+        )}
+        {room > 0 ? (
+          <>
+            <PeoplePicker
+              label="Invite co-authors"
+              hint="They can accept or decline. Once they accept, it shows on their profile too."
+              scope="mutuals"
+              max={room}
+              canPick={() => true}
+              exclude={people.map((p) => p.user.id)}
+              picked={picked}
+              onChange={setPicked}
+            />
+            <Button
+              disabled={!picked.length || !!busy}
+              loading={busy === 'invite'}
+              onClick={() =>
+                run(
+                  'invite',
+                  async () => {
+                    const r = await api.posts.inviteCollaborators(
+                      post.id,
+                      picked.map((u) => u.id),
+                    );
+                    setPicked([]);
+                    return r;
+                  },
+                  picked.length === 1 ? 'Invite sent' : 'Invites sent',
+                )
+              }
+            >
+              Send {picked.length === 1 ? 'invite' : 'invites'}
+            </Button>
+          </>
+        ) : (
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+            A post can have up to {MAX_COLLABORATORS} co-authors.
+          </p>
+        )}
+      </div>
+    </BottomSheet>
   );
 }
 

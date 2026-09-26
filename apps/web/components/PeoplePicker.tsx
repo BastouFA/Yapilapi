@@ -5,39 +5,65 @@ import { Avatar } from '@yapilapi/design-system';
 import type { PublicUser } from '@yapilapi/shared';
 import { api } from '@/lib/api';
 
-type Suggestion = { user: PublicUser; relation: 'friend' | 'following' | null; canMessage: boolean };
+export type PersonSuggestion = { user: PublicUser; relation: 'friend' | 'following' | null; canMessage: boolean; canTag: boolean };
 
 /**
  * Pick people with suggestions as you type. Before typing it offers your
  * friends, people you follow and recent chats; each letter narrows it down.
  * Keyboard: arrows move, Enter adds, Backspace on an empty field removes the
- * last person. People you can't message yet are shown but can't be added.
+ * last person. By default people you can't message yet are shown but can't be
+ * added; `canPick` and `unavailable` change that for other uses.
  */
-export function PeoplePicker({ picked, onChange, label = 'Add people' }: { picked: PublicUser[]; onChange: (p: PublicUser[]) => void; label?: string }) {
+export function PeoplePicker({
+  picked,
+  onChange,
+  label = 'Add people',
+  hint,
+  scope,
+  max,
+  canPick = (s) => s.canMessage,
+  unavailable = 'You can message them once you are friends',
+  exclude,
+}: {
+  /** People not to suggest (already added elsewhere). */
+  exclude?: string[];
+  picked: PublicUser[];
+  onChange: (p: PublicUser[]) => void;
+  label?: string;
+  hint?: string;
+  /** Which people to suggest (see api.people.suggest). */
+  scope?: 'all' | 'followers' | 'mutuals';
+  /** At most this many people. */
+  max?: number;
+  canPick?: (s: PersonSuggestion) => boolean;
+  /** Shown after a person who can't be picked. */
+  unavailable?: string;
+}) {
   const id = useId();
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState<Suggestion[]>([]);
+  const [items, setItems] = useState<PersonSuggestion[]>([]);
   const [active, setActive] = useState(0);
   const req = useRef(0);
+  const full = max !== undefined && picked.length >= max;
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || full) return;
     const n = ++req.current;
     const timer = setTimeout(
       () =>
-        api.people.suggest(q.trim(), 8).then(
+        api.people.suggest(q.trim(), 8, scope).then(
           (r) => n === req.current && (setItems(r.items), setActive(0)),
           () => {},
         ),
       q ? 150 : 0,
     );
     return () => clearTimeout(timer);
-  }, [q, open]);
+  }, [q, open, scope, full]);
 
-  const shown = items.filter((s) => !picked.some((p) => p.id === s.user.id));
-  const add = (s: Suggestion | undefined) => {
-    if (!s || !s.canMessage) return;
+  const shown = full ? [] : items.filter((s) => !picked.some((p) => p.id === s.user.id) && !exclude?.includes(s.user.id));
+  const add = (s: PersonSuggestion | undefined) => {
+    if (!s || !canPick(s) || full) return;
     onChange([...picked, s.user]);
     setQ('');
   };
@@ -69,9 +95,11 @@ export function PeoplePicker({ picked, onChange, label = 'Add people' }: { picke
           aria-controls={`${id}-list`}
           aria-autocomplete="list"
           aria-activedescendant={open && shown[active] ? `${id}-opt-${active}` : undefined}
+          aria-describedby={hint || full ? `${id}-hint` : undefined}
           autoComplete="off"
           value={q}
-          placeholder={picked.length ? '' : 'Type a name or username'}
+          readOnly={full}
+          placeholder={full ? '' : picked.length ? '' : 'Type a name or username'}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           onChange={(e) => {
@@ -99,6 +127,12 @@ export function PeoplePicker({ picked, onChange, label = 'Add people' }: { picke
           }}
         />
       </div>
+      {hint || full ? (
+        <span id={`${id}-hint`} className="yp-field__hint">
+          {full ? `That's the most you can add (${max}). ` : ''}
+          {hint}
+        </span>
+      ) : null}
       {open && shown.length ? (
         <ul id={`${id}-list`} role="listbox" className="picker__list" aria-label="Suggestions">
           {shown.map((s, i) => (
@@ -107,7 +141,7 @@ export function PeoplePicker({ picked, onChange, label = 'Add people' }: { picke
               id={`${id}-opt-${i}`}
               role="option"
               aria-selected={i === active}
-              aria-disabled={!s.canMessage}
+              aria-disabled={!canPick(s)}
               className="picker__option"
               onMouseEnter={() => setActive(i)}
               onMouseDown={(e) => {
@@ -121,13 +155,13 @@ export function PeoplePicker({ picked, onChange, label = 'Add people' }: { picke
                 <span className="picker__meta">
                   <bdi>@{s.user.username}</bdi>
                   {s.relation === 'friend' ? ' · Friend' : s.relation === 'following' ? ' · You follow' : ''}
-                  {!s.canMessage ? ' · You can message them once you are friends' : ''}
+                  {!canPick(s) ? ` · ${unavailable}` : ''}
                 </span>
               </span>
             </li>
           ))}
         </ul>
-      ) : open && q.trim() ? (
+      ) : open && q.trim() && !full ? (
         <p className="muted" role="status" style={{ margin: 0, fontSize: 13 }}>
           Nobody matches &ldquo;{q.trim()}&rdquo;.
         </p>

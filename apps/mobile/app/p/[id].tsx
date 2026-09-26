@@ -5,7 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Comment, Post } from '../../../../packages/shared/src/types';
 import { client, errorMessage } from '../../lib/api';
 import { useT } from '../../lib/i18n';
-import { PostCard } from '../../lib/post';
+import { useAutocomplete } from '../../lib/autocomplete';
+import { PostCard, RichText } from '../../lib/post';
 import { useSession } from '../../lib/session';
 import { elevation, radius, space } from '../../lib/theme';
 import { Avatar, Button, EmptyState, Loading, Notice, useColors, userText } from '../../lib/ui';
@@ -24,6 +25,7 @@ export default function PostScreen() {
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const ac = useAutocomplete(body, setBody);
 
   const loadComments = useCallback(
     async (next?: string) => {
@@ -87,7 +89,7 @@ export default function PostScreen() {
                   {item.author.displayName} <Text style={{ color: c.inkMuted, fontWeight: '400' }}>· {timeAgo(item.createdAt)}</Text>
                 </Text>
                 {parent ? <Text style={{ color: c.inkMuted, fontSize: 12 }}>{t('m.comment.replyingTo', { name: parent.author.displayName })}</Text> : null}
-                <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 21 }, userText]}>{item.body}</Text>
+                <RichText text={item.body} style={{ color: c.ink, fontSize: 15, lineHeight: 21 }} />
                 {me ? (
                   <Pressable accessibilityRole="button" onPress={() => setReplyTo(item)} hitSlop={6} style={{ alignSelf: 'flex-start', marginTop: 2 }}>
                     <Text style={{ color: c.yapi, fontWeight: '700', fontSize: 12 }}>{t('m.comment.reply')}</Text>
@@ -120,13 +122,13 @@ export default function PostScreen() {
               </Pressable>
             </View>
           ) : null}
+          {ac.list}
           <View style={{ flexDirection: 'row', gap: space[2], alignItems: 'flex-end' }}>
             <TextInput
+              {...ac.inputProps}
               accessibilityLabel={t('comment.placeholder')}
               placeholder={t('comment.placeholder')}
               placeholderTextColor={c.inkMuted}
-              value={body}
-              onChangeText={setBody}
               multiline
               maxLength={2000}
               style={[

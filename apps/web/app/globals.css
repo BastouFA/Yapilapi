@@ -3154,3 +3154,92 @@ span.cam__icon {
 .create-kinds {
   display: contents;
 }
+
+/* Co-authors on a reel */
+.reel__authors {
+  min-width: 0;
+  font: 800 16px/20px var(--font-display);
+}
+.reel__authors .reel__author {
+  display: inline;
+}
+
+/* Tagging people in a photo (Create and the photo editor) */
+.thumb-tag {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--ink);
+  font: 600 12px/1 var(--font-sans);
+  cursor: pointer;
+}
+.thumb-tag:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ptag__photo {
+  position: relative;
+  align-self: center;
+  width: fit-content;
+  max-width: 100%;
+  touch-action: none;
+}
+.ptag__photo img {
+  display: block;
+  max-width: 100%;
+  max-height: 55vh;
+  border-radius: var(--radius-md);
+  user-select: none;
+}
+.ptag-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+.ptag-layer__surface {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: crosshair;
+}
+.ptag-layer__surface:disabled {
+  cursor: default;
+}
+.ptag-layer__surface:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
+}
+.ptag-layer__spot {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border: 2px solid #fff;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--yapi) 70%, transparent);
+  box-shadow: 0 0 0 2px rgba(14, 16, 32, 0.5);
+  pointer-events: none;
+}
+.ptag-layer__name {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: grab;
+  touch-action: none;
+}
+.ptag-layer__name:active {
+  cursor: grabbing;
+}
+.ptag-search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}

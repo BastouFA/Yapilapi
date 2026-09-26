@@ -1,6 +1,15 @@
 'use client';
 
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react';
 import { Alert, Button, Segments, Tabs } from '@yapilapi/design-system';
 import {
   applyColorMatrix,
@@ -28,6 +37,7 @@ import {
   useHistory,
   VignetteOverlay,
 } from './parts';
+import { TagHint, TagLayer, TagPersonSearch, useTagEditing, type DraftTag } from '../PhotoTags';
 
 type Turn = 0 | 90 | 180 | 270;
 type Crop = { x: number; y: number; w: number; h: number };
@@ -133,7 +143,18 @@ async function renderPhoto(img: HTMLImageElement, s: PhotoState, name: string): 
  * Photo editor: crop (free or a fixed shape), turn and flip, a look, adjustments and text.
  * Everything renders in the browser at full size, so the uploaded file is already edited.
  */
-export function PhotoEditor({ file, title = 'Edit photo', onDone, onCancel }: { file: File; title?: string; onDone: (f: File) => void; onCancel: () => void }) {
+export function PhotoEditor({
+  file,
+  title = 'Edit photo',
+  onDone,
+  onCancel,
+}: {
+  file: File;
+  title?: string;
+  /** The edited photo, and anyone tagged in it (spots on the finished, cropped photo). */
+  onDone: (f: File, tags: DraftTag[]) => void;
+  onCancel: () => void;
+}) {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [failed, setFailed] = useState(false);
   const [tab, setTab] = useState('crop');
@@ -142,6 +163,9 @@ export function PhotoEditor({ file, title = 'Edit photo', onDone, onCancel }: { 
   const h = useHistory<PhotoState>(INITIAL);
   const s = h.value;
   const sharpenId = `yp-sharpen-${useId().replace(/:/g, '')}`;
+  // Tags sit on the finished photo as fractions of its size, so a later crop keeps each spot.
+  const [tags, setTags] = useState<DraftTag[]>([]);
+  const tagging = useTagEditing(tags, setTags);
 
   useEffect(() => {
     // Results from a load that was cancelled (the file changed, or React mounted twice) are ignored.
@@ -203,11 +227,11 @@ export function PhotoEditor({ file, title = 'Edit photo', onDone, onCancel }: { 
 
   async function done() {
     if (!img) return;
-    if (!h.changed) return onDone(file);
+    if (!h.changed) return onDone(file, tags);
     setBusy(true);
     setError(null);
     try {
-      onDone(await renderPhoto(img, s, file.name));
+      onDone(await renderPhoto(img, s, file.name), tags);
     } catch {
       setError("We couldn't save your edits. Try again, or cancel to use the photo as it is.");
       setBusy(false);
@@ -261,6 +285,11 @@ export function PhotoEditor({ file, title = 'Edit photo', onDone, onCancel }: { 
             ),
           },
           { id: 'text', label: 'Text', content: <TextPanel text={s.text} onChange={(text, group) => h.set((cur) => ({ ...cur, text }), group ?? null)} /> },
+          {
+            id: 'tag',
+            label: 'Tag people',
+            content: tagging.pending ? <TagPersonSearch {...tagging.searchProps} /> : <TagHint count={tags.length} />,
+          },
         ]}
       />
     </>
@@ -300,6 +329,7 @@ export function PhotoEditor({ file, title = 'Edit photo', onDone, onCancel }: { 
                 state={s}
                 filterCss={previewFilter(s.filter, s.adjustments, sharpenId)}
                 onMoveText={(x, y) => h.set((cur) => (cur.text ? { ...cur, text: { ...cur.text, x, y } } : cur), 'text-move')}
+                overlay={tab === 'tag' ? <TagLayer {...tagging.layerProps} /> : null}
               />
             )}
           </>
@@ -331,11 +361,14 @@ function PhotoPreview({
   state: s,
   filterCss,
   onMoveText,
+  overlay,
 }: {
   img: HTMLImageElement;
   state: PhotoState;
   filterCss: string;
   onMoveText: (x: number, y: number) => void;
+  /** Drawn over the picture, the same size (the photo tags). */
+  overlay?: ReactNode;
 }) {
   const { W, H } = turnedSize(img, s.rotate);
   const fit = useFit(s.crop.w * W, s.crop.h * H);
@@ -355,6 +388,7 @@ function PhotoPreview({
         <canvas ref={canvas} role="img" aria-label="Preview of your edited photo" style={{ width: '100%', height: '100%', filter: filterCss }} />
         <VignetteOverlay filter={s.filter} adjustments={s.adjustments} />
         {s.text?.value.trim() ? <TextOnStage text={s.text} width={fit.width} onMove={onMoveText} /> : null}
+        {overlay}
       </div>
     </div>
   );

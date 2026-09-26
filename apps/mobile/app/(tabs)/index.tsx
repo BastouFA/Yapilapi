@@ -46,16 +46,21 @@ function Feed() {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('m.title.reels')}
-          hitSlop={10}
-          onPress={() => router.push('/reels')}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginEnd: space[4] }}
-        >
-          <Icon name="film-outline" size={22} color={c.yapi} />
-          <Text style={{ color: c.yapi, fontWeight: '700', fontSize: 15 }}>{t('m.title.reels')}</Text>
-        </Pressable>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[4], marginEnd: space[4] }}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('notifications.title')} hitSlop={10} onPress={() => router.push('/notifications')}>
+            <Icon name="notifications-outline" size={22} color={c.yapi} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('m.title.reels')}
+            hitSlop={10}
+            onPress={() => router.push('/reels')}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+          >
+            <Icon name="film-outline" size={22} color={c.yapi} />
+            <Text style={{ color: c.yapi, fontWeight: '700', fontSize: 15 }}>{t('m.title.reels')}</Text>
+          </Pressable>
+        </View>
       ),
     });
   }, [navigation, c.yapi, t]);

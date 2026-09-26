@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Avatar, EmptyState, Icon, Menu, SensitiveCover, Skeleton, TaggedText } from '@yapilapi/design-system';
+import { AuthorNames, Avatar, EmptyState, Icon, Menu, SensitiveCover, Skeleton, TaggedText } from '@yapilapi/design-system';
 import type { Post } from '@yapilapi/shared';
 import { NextLink } from '@/lib/link';
 import { api, errorMessage } from '@/lib/api';
@@ -103,6 +103,16 @@ function Reels() {
       toast(`Following ${name}`);
     } catch (e) {
       setAuthors((a) => ({ ...a, [authorId]: { followers: Math.max(0, (a[authorId]?.followers ?? 1) - 1), following: false } }));
+      toast(errorMessage(e));
+    }
+  }
+
+  async function leaveCollab(p: Post) {
+    try {
+      await api.posts.leaveCollab(p.id);
+      patch(p.id, (x) => ({ ...x, collaborators: x.collaborators?.filter((c) => c.id !== me?.id), viewer: { ...x.viewer, collab: undefined } }));
+      toast("You're no longer a co-author. It's off your profile.");
+    } catch (e) {
       toast(errorMessage(e));
     }
   }
@@ -216,9 +226,15 @@ function Reels() {
             />
             <div className="reel__info">
               <div className="reel__byline">
-                <Link href={`/u/${p.author.username}`} className="reel__author">
-                  <bdi>{p.author.displayName}</bdi>
-                </Link>
+                {p.collaborators?.length ? (
+                  <span className="reel__authors">
+                    <AuthorNames people={[p.author, ...p.collaborators]} linkAs={NextLink} linkClassName="reel__author" />
+                  </span>
+                ) : (
+                  <Link href={`/u/${p.author.username}`} className="reel__author">
+                    <bdi>{p.author.displayName}</bdi>
+                  </Link>
+                )}
                 {!mine && a && !a.following ? (
                   <button type="button" className="reel__follow" onClick={() => follow(p.author.id, p.author.displayName)}>
                     Follow
@@ -343,7 +359,12 @@ function Reels() {
                         ]
                       : []),
                     ...(p.downloadable ? [{ label: t('share.video.download'), icon: 'download' as const, onSelect: () => void downloadToShare(p) }] : []),
-                    ...(mine ? [] : [{ label: 'Report', icon: 'flag' as const, danger: true, onSelect: () => setReporting(p) }]),
+                    ...(p.viewer.collab === 'accepted' && !mine
+                      ? [{ label: 'Leave as co-author', icon: 'logout' as const, onSelect: () => void leaveCollab(p) }]
+                      : []),
+                    ...(mine || p.viewer.collab === 'accepted'
+                      ? []
+                      : [{ label: 'Report', icon: 'flag' as const, danger: true, onSelect: () => setReporting(p) }]),
                   ]}
                 />
               </div>
