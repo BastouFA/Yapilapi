@@ -5,7 +5,17 @@ import { Alert, Image, Linking, ScrollView, Text, View } from 'react-native';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
 import { client, errorMessage, mediaUrl } from '../../lib/api';
 import { useT } from '../../lib/i18n';
-import { clock, MAX_UPLOAD_BYTES, pickOne, REEL_MAX_SECONDS, uploadPicked, type Picked, type Uploaded } from '../../lib/media';
+import {
+  clock,
+  pickOne,
+  PLUS_RESUMABLE_MAX_BYTES,
+  PLUS_REEL_MAX_SECONDS,
+  REEL_MAX_SECONDS,
+  RESUMABLE_MAX_BYTES,
+  uploadPicked,
+  type Picked,
+  type Uploaded,
+} from '../../lib/media';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
 import { Button, Card, Field, Icon, Notice, Screen, Segmented, useColors, useTabBarSpace } from '../../lib/ui';
@@ -82,10 +92,12 @@ export default function Create() {
 
   async function choose() {
     setError(null);
-    const asset = await pickOne(kind === 'reel' ? ['videos'] : ['images', 'videos']).catch((e: unknown) => {
-      setError(errorMessage(e));
-      return null;
-    });
+    const asset = await pickOne(kind === 'reel' ? ['videos'] : ['images', 'videos'], me?.plus ? PLUS_REEL_MAX_SECONDS : REEL_MAX_SECONDS).catch(
+      (e: unknown) => {
+        setError(errorMessage(e));
+        return null;
+      },
+    );
     if (asset === 'denied') return setDenied(true);
     setDenied(false);
     if (!asset) return;
@@ -107,8 +119,10 @@ export default function Create() {
     if (kind === 'reel' && !video) return t('m.create.notVideo');
     // Check the length before uploading a long file for nothing.
     const seconds = asset.duration ? asset.duration / 1000 : 0;
-    if (kind === 'reel' && seconds > REEL_MAX_SECONDS) return t('m.create.reelTooLong', { length: clock(seconds) });
-    if (asset.fileSize && asset.fileSize > MAX_UPLOAD_BYTES) return t('m.create.tooLarge');
+    const maxSeconds = me?.plus ? PLUS_REEL_MAX_SECONDS : REEL_MAX_SECONDS;
+    if (kind === 'reel' && seconds > maxSeconds) return t('m.create.reelTooLongMinutes', { minutes: maxSeconds / 60, length: clock(seconds) });
+    const maxBytes = me?.plus ? PLUS_RESUMABLE_MAX_BYTES : RESUMABLE_MAX_BYTES;
+    if (asset.fileSize && asset.fileSize > maxBytes) return t('m.create.tooLargeSize', { size: Math.round(maxBytes / 1024 / 1024) });
     return null;
   }
 
