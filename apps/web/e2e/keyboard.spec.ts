@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { STATE } from './global-setup';
+import { readFileSync } from 'node:fs';
+import { DATA, STATE, type SeedData } from './global-setup';
 
 /**
  * Keyboard-only use of the shell and the overlay components: the skip link and
@@ -127,4 +128,23 @@ test('dialog (delete account) and tabs', async ({ page }) => {
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   await expect(opener).toBeFocused();
+});
+
+test('checkout sheet', async ({ page }) => {
+  const { businessSlug } = JSON.parse(readFileSync(DATA, 'utf8')) as SeedData;
+  await page.goto(`/b/${businessSlug}`);
+  await page.waitForLoadState('networkidle');
+  const buy = page.getByRole('button', { name: 'Buy', exact: true }).first();
+  await buy.click();
+  const sheet = page.getByRole('dialog', { name: 'Checkout' });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByRole('button', { name: 'Pay (test)' })).toBeVisible();
+  expect(await focusInside(page, '[role="dialog"]'), `focus should move into checkout: ${await focused(page)}`).toBe(true);
+  await tabStaysInside(page, '[role="dialog"]', 6);
+  await auditOpen(page, '[role="dialog"]');
+  await sheet.getByRole('button', { name: 'Pay (test)' }).click();
+  await expect(sheet.getByText('Paid')).toBeVisible({ timeout: 15_000 });
+  await auditOpen(page, '[role="dialog"]');
+  await page.keyboard.press('Escape');
+  await expect(sheet).toBeHidden();
 });

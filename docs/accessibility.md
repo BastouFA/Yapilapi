@@ -40,6 +40,7 @@ in four projects: **desktop** (1440×900) and **mobile** (Pixel 7, 412×915, tou
 - The first Tab reaches a visible "Skip to content" link; following it puts the next Tab inside `main`. The primary navigation is reached next, in visual order, with `aria-current="page"` on the current destination.
 - Post options **menu**: Enter opens it on the first item, arrows/Home/End move with wrap-around, ArrowUp opens on the last item, Escape closes it and returns focus to the button, Tab closes it.
 - Comments **bottom sheet**: focus moves into it, Tab and Shift+Tab stay inside, Escape closes it and focus returns to the Comments button. The open sheet is audited with axe.
+- **Checkout** sheet: opens from a Buy button, focus moves in and stays in, the open sheet and the paid state are audited with axe, Escape closes it.
 - Delete-account **dialog** and settings **tabs**: arrows and Home/End move between tabs, the dialog traps focus, closes on Escape and returns focus to its button. The open dialog is audited with axe.
 
 ## Results (2026-09-26)

@@ -14,6 +14,7 @@ export interface SeedData {
   placeId: string;
   conversationId: string;
   postId: string;
+  businessSlug: string;
 }
 
 /**
@@ -78,6 +79,11 @@ export default async function globalSetup(config: FullConfig) {
     }),
   );
 
+  // A shop run by the friend, so the main user can open checkout.
+  const businessSlug = `a11y-shop-${run}`.slice(0, 40);
+  const business = await must(friend.ctx.post('/api/v1/businesses', { data: { name: 'Corner Pantry', slug: businessSlug } }));
+  await must(friend.ctx.post('/api/v1/products', { data: { title: 'Sourdough loaf', priceCents: 650, businessId: business.business.id } }));
+
   await must(friend.ctx.post(`/api/v1/users/${main.id}/follow`, { data: {} }));
   await must(friend.ctx.post(`/api/v1/communities/${communitySlug}/join`, { data: {} }));
   const convo = await must(friend.ctx.post('/api/v1/conversations', { data: { memberIds: [main.id] } }));
@@ -87,7 +93,15 @@ export default async function globalSetup(config: FullConfig) {
 
   await mkdir(AUTH_DIR, { recursive: true });
   await main.ctx.storageState({ path: STATE });
-  const data: SeedData = { username: main.username, communitySlug, eventId: event.event.id, placeId: place.place.id, conversationId, postId: post.post.id };
+  const data: SeedData = {
+    username: main.username,
+    communitySlug,
+    eventId: event.event.id,
+    placeId: place.place.id,
+    conversationId,
+    postId: post.post.id,
+    businessSlug,
+  };
   await writeFile(DATA, JSON.stringify(data, null, 2));
   await main.ctx.dispose();
   await friend.ctx.dispose();
