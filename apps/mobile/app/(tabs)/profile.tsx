@@ -28,6 +28,7 @@ export default function ProfileScreen() {
       bottom={bottom}
       actions={
         <View style={{ gap: space[3] }}>
+          <Button label={t('invite.title')} icon="gift-outline" onPress={() => router.push('/invite')} />
           <Button label={t('m.real.capture')} icon="camera-outline" variant="secondary" onPress={() => router.push('/real')} />
           <Button label={t('m.title.settings')} icon="settings-outline" variant="secondary" onPress={() => router.push('/settings')} />
           <Button

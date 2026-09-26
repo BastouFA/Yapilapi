@@ -292,3 +292,18 @@ const s = StyleSheet.create({
   segmented: { flexDirection: 'row', borderRadius: radius.full, padding: 4, gap: 4 },
   segment: { flex: 1, height: 36, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[2] },
 });
+
+/** The small Plus mark next to a member's name. */
+export function PlusBadge() {
+  const c = useColors();
+  const { t } = useT();
+  return (
+    <View
+      accessible
+      accessibilityLabel={t('plus.badge.label')}
+      style={{ backgroundColor: c.saffronSoft, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1, alignSelf: 'center' }}
+    >
+      <Text style={{ color: c.ink, fontSize: 10, fontWeight: '800' }}>{t('plus.short')}</Text>
+    </View>
+  );
+}

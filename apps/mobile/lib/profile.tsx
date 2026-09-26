@@ -6,7 +6,7 @@ import { client, errorMessage } from './api';
 import { useT } from './i18n';
 import { PostCard, RichText } from './post';
 import { space } from './theme';
-import { Avatar, Button, Card, EmptyState, Loading, Notice, useColors, userText } from './ui';
+import { Avatar, Button, Card, EmptyState, Loading, Notice, PlusBadge, useColors, userText } from './ui';
 
 /**
  * A profile: name, bio, counts, Follow and Message for other people, and
@@ -67,7 +67,10 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
     <View style={{ gap: space[3], marginBottom: space[3] }}>
       <Card style={{ alignItems: 'center', gap: space[2], paddingVertical: space[6] }}>
         <Avatar name={profile.displayName} url={profile.avatarUrl} size={84} />
-        <Text style={[{ color: c.ink, fontSize: 24, fontWeight: '800', letterSpacing: -0.4 }, userText]}>{profile.displayName}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+          <Text style={[{ color: c.ink, fontSize: 24, fontWeight: '800', letterSpacing: -0.4 }, userText]}>{profile.displayName}</Text>
+          {profile.plus ? <PlusBadge /> : null}
+        </View>
         <Text style={[{ color: c.inkMuted }, userText]}>
           @{profile.username}
           {rel.followedBy && !rel.isSelf ? ` · ${t('m.profile.followsYou')}` : ''}

@@ -6,7 +6,7 @@ import type { Conversation, Post } from '../../../packages/shared/src/types';
 import { client, mediaUrl } from './api';
 import { useT, type Translate } from './i18n';
 import { radius, space } from './theme';
-import { Avatar, Card, Icon, useColors, userText } from './ui';
+import { Avatar, Card, Icon, PlusBadge, useColors, userText } from './ui';
 
 export const conversationTitle = (c: Conversation, meId: string | undefined, t: Translate) =>
   c.title ??
@@ -70,9 +70,12 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
       >
         <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={40} />
         <View style={{ flex: 1 }}>
-          <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 15 }, userText]} numberOfLines={1}>
-            {post.author.displayName}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 15, flexShrink: 1 }, userText]} numberOfLines={1}>
+              {post.author.displayName}
+            </Text>
+            {post.author.plus ? <PlusBadge /> : null}
+          </View>
           <Text style={[{ color: c.inkMuted, fontSize: 12 }, userText]} numberOfLines={1}>
             @{post.author.username} · {timeAgo(post.createdAt)}
             {post.reason ? ` · ${post.reason}` : ''}
