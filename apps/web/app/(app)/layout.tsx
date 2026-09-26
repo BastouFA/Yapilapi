@@ -7,6 +7,7 @@ import { NextLink } from '@/lib/link';
 import { CallsProvider } from '@/components/Calls';
 import { CheckoutProvider } from '@/components/Checkout';
 import { Sidebar } from '@/components/Sidebar';
+import { isPublicPath, SignedOutShell } from '@/components/SignedOut';
 import { UsageHeartbeat } from '@/components/UsageHeartbeat';
 import { useSession } from '../providers';
 
@@ -25,11 +26,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const path = usePathname();
 
+  // Shared links (posts, reels, profiles, events, communities) stay open without an account.
+  const openWithoutAccount = isPublicPath(path);
+
   useEffect(() => {
     if (loading) return;
-    if (!me) router.replace(`/login?next=${encodeURIComponent(path)}`);
-    else if (!me.onboarded && !path.startsWith('/onboarding')) router.replace('/onboarding');
-  }, [loading, me, path, router]);
+    if (!me) {
+      if (!openWithoutAccount) router.replace(`/login?next=${encodeURIComponent(path)}`);
+    } else if (!me.onboarded && !path.startsWith('/onboarding')) router.replace('/onboarding');
+  }, [loading, me, path, router, openWithoutAccount]);
+
+  if (!loading && !me && openWithoutAccount) return <SignedOutShell>{children}</SignedOutShell>;
 
   if (loading || !me)
     return (

@@ -53,6 +53,7 @@ import studioModule from './modules/studio.ts';
 import tagsModule from './modules/tags.ts';
 import plusModule from './modules/plus.ts';
 import invitesModule from './modules/invites.ts';
+import publicModule from './modules/public.ts';
 import { createPushSender } from './lib/push.ts';
 import { setPushSender } from './lib/services.ts';
 import { processWebhooks } from './lib/webhooks.ts';
@@ -304,6 +305,7 @@ export async function buildApp(
     studioModule,
     plusModule,
     invitesModule,
+    publicModule,
   ])
     await mod(app, ctx);
 
