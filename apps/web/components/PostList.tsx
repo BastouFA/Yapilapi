@@ -142,6 +142,17 @@ export function PostList({
     }
   }
 
+  async function pin(p: Post) {
+    try {
+      await api.posts.pin(p.pinned ? null : p.id);
+      // Only one post is pinned at a time; the list order changes on the next load.
+      setPosts((cur) => cur?.map((x) => ({ ...x, pinned: x.id === p.id ? !p.pinned : false })) ?? cur);
+      toast(p.pinned ? 'Unpinned from your profile' : 'Pinned to the top of your profile');
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  }
+
   async function remove(p: Post) {
     try {
       await api.posts.remove(p.id);
@@ -223,6 +234,7 @@ export function PostList({
             onWhy={async (post) => setWhy({ post, reasons: (await api.posts.why(post.id)).reasons })}
             onReport={setReporting}
             onDelete={remove}
+            onPin={pin}
             onAddToMemory={flags.MEMORY ? setMemoryFor : undefined}
           />
           {ad && i === Math.min(2, posts.length - 1) ? renderAd(ad) : null}

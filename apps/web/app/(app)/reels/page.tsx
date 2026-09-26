@@ -163,6 +163,13 @@ export default function Reels() {
               onVisible={() => {
                 if (i >= items.length - 2 && cursor) void more(cursor);
               }}
+              onWatched={() => {
+                if (mine) return;
+                void api.posts.view(p.id).then(
+                  (r) => setItems((cur) => cur?.map((x) => (x.id === p.id ? { ...x, counts: { ...x.counts, views: r.views } } : x)) ?? cur),
+                  () => {},
+                );
+              }}
             />
             <div className="reel__info">
               <div className="reel__byline">
@@ -175,17 +182,20 @@ export default function Reels() {
                   </button>
                 ) : null}
               </div>
-              {a ? (
-                <span className="reel__stats">
-                  {compact.format(a.followers)} {a.followers === 1 ? 'follower' : 'followers'}
-                  {a.following && !mine ? ' · Following' : ''}
-                </span>
-              ) : null}
+              <span className="reel__stats">
+                {[
+                  p.counts.views ? `${compact.format(p.counts.views)} ${p.counts.views === 1 ? 'view' : 'views'}` : null,
+                  a ? `${compact.format(a.followers)} ${a.followers === 1 ? 'follower' : 'followers'}` : null,
+                  a?.following && !mine ? 'Following' : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
               {p.body ? <Caption text={p.body} /> : null}
               {p.topics.length ? (
                 <div className="reel__tags">
                   {p.topics.map((t) => (
-                    <Link key={t} href={`/discover?q=${encodeURIComponent(t)}`}>
+                    <Link key={t} href={`/t/${encodeURIComponent(t)}`}>
                       <bdi>#{t}</bdi>
                     </Link>
                   ))}
@@ -322,7 +332,21 @@ function Caption({ text }: { text: string }) {
   );
 }
 
-function ReelVideo({ post, muted, onDoubleTap, onVisible }: { post: Post; muted: boolean; onDoubleTap: () => void; onVisible: () => void }) {
+function ReelVideo({
+  post,
+  muted,
+  onDoubleTap,
+  onVisible,
+  onWatched,
+}: {
+  post: Post;
+  muted: boolean;
+  onDoubleTap: () => void;
+  onVisible: () => void;
+  /** Played for 2 seconds (or half of a shorter reel): counts as a view. */
+  onWatched: () => void;
+}) {
+  const watched = useRef(false);
   const box = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
@@ -385,6 +409,10 @@ function ReelVideo({ post, muted, onDoubleTap, onVisible }: { post: Post; muted:
           onTimeUpdate={(e) => {
             const v = e.currentTarget;
             if (v.duration) setProgress(v.currentTime / v.duration);
+            if (!watched.current && v.duration && v.currentTime >= Math.min(2, v.duration / 2)) {
+              watched.current = true;
+              onWatched();
+            }
           }}
           onClick={() => {
             // One tap pauses; a quick second tap likes instead.

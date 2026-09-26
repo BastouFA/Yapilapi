@@ -122,6 +122,8 @@ export function createClient(opts: ClientOptions) {
       like: (id: string) => put<{ liked: boolean; likes: number }>(`/v1/posts/${id}/reaction`, { kind: 'like' }),
       unlike: (id: string) => del<{ liked: boolean; likes: number }>(`/v1/posts/${id}/reaction`),
       save: (id: string) => put(`/v1/posts/${id}/save`),
+      view: (id: string) => post<{ views: number }>(`/v1/posts/${id}/view`),
+      pin: (postId: string | null) => put<{ pinnedPostId: string | null }>('/v1/me/pinned-post', { postId }),
       repost: (id: string) => put<{ reposted: boolean; reposts: number }>(`/v1/posts/${id}/repost`),
       unrepost: (id: string) => del<{ reposted: boolean; reposts: number }>(`/v1/posts/${id}/repost`),
       unsave: (id: string) => del(`/v1/posts/${id}/save`),

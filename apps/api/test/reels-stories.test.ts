@@ -156,3 +156,43 @@ describe('follower lists', () => {
     expect((await as(t.app, owner).get(`/v1/users/${owner.id}/following`)).status).toBe(200);
   });
 });
+
+describe('views and pinned posts', () => {
+  it('counts each viewer once and never the author', async () => {
+    const creator = await signUp(t.app, { birthDate: '1990-01-01' });
+    const fan = await signUp(t.app, { birthDate: '1990-01-01' });
+    const v = await video(creator);
+    const reel = (await as(t.app, creator).post('/v1/posts', { format: 'reel', media: [{ id: v.id, url: v.url, kind: 'video' }] })).body.post;
+    expect((await as(t.app, fan).post(`/v1/posts/${reel.id}/view`)).body).toEqual({ views: 1 });
+    expect((await as(t.app, fan).post(`/v1/posts/${reel.id}/view`)).body).toEqual({ views: 1 });
+    expect((await as(t.app, creator).post(`/v1/posts/${reel.id}/view`)).body).toEqual({ views: 1 });
+    expect((await as(t.app, fan).get(`/v1/posts/${reel.id}`)).body.post.counts.views).toBe(1);
+    const hidden = (await as(t.app, creator).post('/v1/posts', { body: 'Just me', visibility: 'private' })).body.post;
+    expect((await as(t.app, fan).post(`/v1/posts/${hidden.id}/view`)).status).toBe(404);
+  });
+
+  it('shows your pinned post first on your profile, once', async () => {
+    const author = await signUp(t.app, { birthDate: '1990-01-01' });
+    const other = await signUp(t.app, { birthDate: '1990-01-01' });
+    const first = (await as(t.app, author).post('/v1/posts', { body: 'First' })).body.post;
+    const second = (await as(t.app, author).post('/v1/posts', { body: 'Second' })).body.post;
+    const third = (await as(t.app, author).post('/v1/posts', { body: 'Third' })).body.post;
+    const theirs = (await as(t.app, other).post('/v1/posts', { body: 'Not yours' })).body.post;
+    expect((await as(t.app, author).put('/v1/me/pinned-post', { postId: theirs.id })).status).toBe(404);
+    await as(t.app, author).put('/v1/me/pinned-post', { postId: first.id });
+
+    const p1 = (await as(t.app, other).get(`/v1/users/${author.username}/posts?limit=2`)).body;
+    expect(p1.items.map((p: any) => [p.id, !!p.pinned])).toEqual([
+      [first.id, true],
+      [third.id, false],
+      [second.id, false],
+    ]);
+    expect(p1.nextCursor).toBeNull();
+    const p2 = (await as(t.app, other).get(`/v1/users/${author.username}/posts?limit=1`)).body;
+    const rest = (await as(t.app, other).get(`/v1/users/${author.username}/posts?limit=1&cursor=${p2.nextCursor}`)).body;
+    expect(rest.items.map((p: any) => p.id)).toEqual([second.id]); // the pinned post doesn't repeat
+
+    await as(t.app, author).put('/v1/me/pinned-post', { postId: null });
+    expect((await as(t.app, other).get(`/v1/users/${author.username}/posts`)).body.items.map((p: any) => p.id)).toEqual([third.id, second.id, first.id]);
+  });
+});

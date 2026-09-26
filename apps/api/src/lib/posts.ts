@@ -8,7 +8,7 @@ type Q = Pool | PoolClient;
 export async function hydratePosts(db: Q, ids: string[], viewer: string | null, reasons?: Map<string, string>): Promise<Post[]> {
   if (!ids.length) return [];
   const { rows } = await db.query(
-    `SELECT p.id, p.kind, p.format, p.body, p.visibility, p.link_url, p.topics, p.like_count, p.comment_count, p.created_at, p.ai_provenance, p.metadata->'real' AS real,
+    `SELECT p.id, p.kind, p.format, p.body, p.visibility, p.link_url, p.topics, p.like_count, p.comment_count, p.view_count, p.created_at, p.ai_provenance, p.metadata->'real' AS real,
             pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode,
             c.id AS c_id, c.slug AS c_slug, c.name AS c_name,
             e.id AS e_id, e.title AS e_title, e.starts_at AS e_starts_at,
@@ -48,7 +48,7 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
         community: r.c_id ? { id: r.c_id, slug: r.c_slug, name: r.c_name } : null,
         event: r.e_id ? { id: r.e_id, title: r.e_title, startsAt: r.e_starts_at.toISOString() } : null,
         product: r.pd_id ? { id: r.pd_id, title: r.pd_title, priceCents: r.pd_price, currency: r.pd_currency } : null,
-        counts: { likes: r.like_count, comments: r.comment_count, reposts: r.repost_count ?? 0 },
+        counts: { likes: r.like_count, comments: r.comment_count, reposts: r.repost_count ?? 0, views: r.view_count ?? 0 },
         viewer: { liked: r.liked, saved: r.saved, reposted: r.reposted },
         aiAssisted: !!r.ai_provenance?.assisted,
         real: r.real ?? null,

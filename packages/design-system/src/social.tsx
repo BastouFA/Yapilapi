@@ -368,6 +368,8 @@ export interface PostCardProps {
   onReport?: (post: Post) => void;
   onAddToMemory?: (post: Post) => void;
   onDelete?: (post: Post) => void;
+  /** Pin to or unpin from the top of your profile (own posts only). */
+  onPin?: (post: Post) => void;
 }
 
 const VIS_ICON: Record<string, IconName> = { public: 'globe', followers: 'users', friends: 'users', circle: 'users', selected: 'user', private: 'lock' };
@@ -386,6 +388,7 @@ export function PostCard({
   onReport,
   onDelete,
   onAddToMemory,
+  onPin,
 }: PostCardProps) {
   const tt = (k: MessageKey) => t(k, locale);
   const menu: MenuAction[] = [];
@@ -398,6 +401,8 @@ export function PostCard({
     menu.push({ label: tt('post.muteCreator'), icon: 'bell', onSelect: () => onFeedback(post, 'mute_creator') });
   }
   if (onReport && !isOwn) menu.push({ label: tt('post.report'), icon: 'flag', danger: true, onSelect: () => onReport(post) });
+  if (onPin && isOwn && !post.community)
+    menu.push({ label: post.pinned ? 'Unpin from profile' : 'Pin to profile', icon: 'bookmark', onSelect: () => onPin(post) });
   if (onDelete && isOwn) menu.push({ label: tt('post.delete'), icon: 'trash', danger: true, onSelect: () => onDelete(post) });
   const totalVotes = post.poll?.options.reduce((s, o) => s + o.votes, 0) ?? 0;
   // Tags already linked in the text don't need a chip too.
@@ -406,6 +411,12 @@ export function PostCard({
 
   return (
     <article className="yp-post" aria-labelledby={`post-${post.id}-author`}>
+      {post.pinned ? (
+        <p className="yp-post__pinned">
+          <Icon name="bookmark" size={12} filled />
+          Pinned
+        </p>
+      ) : null}
       <header className="yp-post__head">
         <L href={`/u/${post.author.username}`} aria-label={post.author.displayName}>
           <Avatar name={post.author.displayName} src={post.author.avatarUrl} />

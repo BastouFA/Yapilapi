@@ -1466,3 +1466,17 @@ a.yp-ecard:hover {
 .yp-hashtag:hover {
   text-decoration: underline;
 }
+
+.yp-post__pinned {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: var(--space-3) var(--space-4) 0;
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.yp-post__pinned + .yp-post__head {
+  padding-top: var(--space-2);
+}

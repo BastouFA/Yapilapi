@@ -209,26 +209,53 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     return { ok: true };
   });
 
+  /** A person's posts, newest first, with their pinned post (if you can see it) at the top of the first page. */
   app.get('/v1/users/:username/posts', async (req) => {
     const { username } = parse(z.object({ username: usernameSchema }), req.params);
     const q = parse(pageQuerySchema, req.query);
     const c = decodeCursor<KeyCursor>(q.cursor);
+    const viewer = req.user?.id ?? null;
+    const pinned = c
+      ? null
+      : (await db.query(`SELECT p.id ${POST_FROM} WHERE lower(ap.username) = lower($2) AND p.id = ap.pinned_post_id AND ${VISIBLE}`, [viewer, username]))
+          .rows[0]?.id;
     const { rows } = await db.query(
       `SELECT p.id, p.created_at ${POST_FROM}
-       WHERE lower(ap.username) = lower($2) AND p.community_id IS NULL AND ${VISIBLE}
+       WHERE lower(ap.username) = lower($2) AND p.community_id IS NULL AND ${VISIBLE} AND p.id IS DISTINCT FROM ap.pinned_post_id
          ${c ? 'AND (p.created_at, p.id) < ($4::timestamptz, $5::uuid)' : ''}
        ORDER BY p.created_at DESC, p.id DESC LIMIT $3`,
       c ? [req.user?.id ?? null, username, q.limit + 1, c.t, c.id] : [req.user?.id ?? null, username, q.limit + 1],
     );
     const page = rows.slice(0, q.limit);
-    return {
-      items: await hydratePosts(
-        db,
-        page.map((r) => r.id),
-        req.user?.id ?? null,
-      ),
-      nextCursor: rows.length > q.limit ? keyCursorOf(page.at(-1)!) : null,
-    };
+    const items = await hydratePosts(db, pinned ? [pinned, ...page.map((r) => r.id)] : page.map((r) => r.id), viewer);
+    const top = items[0];
+    if (pinned && top && top.id === pinned) top.pinned = true;
+    return { items, nextCursor: rows.length > q.limit ? keyCursorOf(page.at(-1)!) : null };
+  });
+
+  /** Pin one of your own posts to the top of your profile, or unpin with null. */
+  app.put('/v1/me/pinned-post', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { postId } = parse(z.object({ postId: z.string().uuid().nullable() }), req.body);
+    if (postId) {
+      const own = await db.query(`SELECT 1 FROM posts WHERE id = $1 AND author_id = $2 AND deleted_at IS NULL AND community_id IS NULL`, [postId, u.id]);
+      if (!own.rowCount) throw notFound('That post');
+    }
+    await db.query(`UPDATE profiles SET pinned_post_id = $2 WHERE user_id = $1`, [u.id, postId]);
+    return { pinnedPostId: postId };
+  });
+
+  /** Someone watched a reel or opened a post: counted once per person, never for the author. */
+  app.post('/v1/posts/:id/view', { preHandler: requireAuth, config: { rateLimit: { max: 600, timeWindow: '1 minute' } } }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    await assertVisible(id, u.id);
+    const r = await db.query(
+      `WITH ins AS (INSERT INTO post_views (post_id, viewer_id) SELECT $1, $2 FROM posts WHERE id = $1 AND author_id <> $2 ON CONFLICT DO NOTHING RETURNING 1)
+       UPDATE posts SET view_count = view_count + (SELECT count(*) FROM ins) WHERE id = $1 RETURNING view_count`,
+      [id, u.id],
+    );
+    return { views: r.rows[0]?.view_count ?? 0 };
   });
 
   // ── Feed ──────────────────────────────────────────────────────────────
