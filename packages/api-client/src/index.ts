@@ -210,6 +210,11 @@ export function createClient(opts: ClientOptions) {
       analytics: (id: string, days = 30) => get<BusinessAnalytics>(`/v1/businesses/${id}/analytics${qs({ days })}`),
       get: (slug: string) => get<{ business: Record<string, any>; places: Record<string, any>[]; products: Record<string, any>[] }>(`/v1/businesses/${slug}`),
     },
+    people: {
+      /** People to add to a conversation: connections first, prefix matches as you type. */
+      suggest: (q = '', limit = 8) =>
+        get<{ items: { user: PublicUser; relation: 'friend' | 'following' | null; canMessage: boolean }[] }>(`/v1/people/suggest${qs({ q, limit })}`),
+    },
     payments: {
       config: () => get<{ provider: string; publishableKey?: string }>('/v1/payments/config'),
       /** Development provider only: finish a test payment. */

@@ -16,6 +16,56 @@ const idParam = z.object({ id: z.string().uuid() });
 export default async function profilesModule(app: FastifyInstance, ctx: AppContext) {
   const db = ctx.db;
 
+  /**
+   * People to add to a conversation, as you type. With no query: friends, people
+   * you follow and recent chat partners. With a query: name or username prefix
+   * matches, friends first, then people you follow, then everyone else. Blocked
+   * people never appear; `canMessage` is false where minor protection or family
+   * settings would refuse the conversation, so the app can say so up front.
+   */
+  app.get('/v1/people/suggest', { preHandler: requireAuth, config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (req) => {
+    const u = me(req);
+    const { q, limit } = parse(z.object({ q: z.string().trim().max(60).default(''), limit: z.coerce.number().int().min(1).max(20).default(8) }), req.query);
+    // Literal match: %, _ and backslash are escaped rather than dropped (usernames often contain _).
+    const term = q.replace(/^@/, '').replace(/[\\%_]/g, (c) => `\\${c}`);
+    const { rows } = await ctx.db.query(
+      `WITH me AS (SELECT birth_date FROM users WHERE id = $1),
+       rel AS (
+         SELECT pr.user_id,
+                EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = pr.user_id) OR (fr.user_b = $1 AND fr.user_a = pr.user_id)) AS friend,
+                EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = pr.user_id) AS following,
+                (SELECT max(m.created_at) FROM messages m JOIN conversation_members a ON a.conversation_id = m.conversation_id AND a.user_id = $1
+                   JOIN conversation_members b ON b.conversation_id = m.conversation_id AND b.user_id = pr.user_id) AS last_chat
+         FROM profiles pr JOIN users u2 ON u2.id = pr.user_id
+         WHERE pr.user_id <> $1 AND u2.status = 'active' AND u2.deleted_at IS NULL AND ${notBlockedSql('pr.user_id', '$1')}
+           AND (
+             ($2 = '' AND (EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = pr.user_id) OR (fr.user_b = $1 AND fr.user_a = pr.user_id))
+                           OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = pr.user_id)
+                           OR EXISTS (SELECT 1 FROM conversation_members a JOIN conversation_members b ON b.conversation_id = a.conversation_id
+                                      WHERE a.user_id = $1 AND b.user_id = pr.user_id)))
+             OR ($2 <> '' AND (pr.username ILIKE $2 || '%' OR pr.display_name ILIKE $2 || '%' OR pr.display_name ILIKE '% ' || $2 || '%'))
+           )
+       )
+       SELECT ${PUBLIC_USER_COLS}, rel.friend, rel.following,
+              -- Minor protection: an adult and a minor can only message once they're friends.
+              (rel.friend OR NOT (
+                 (coalesce(u2.birth_date > current_date - interval '18 years', false)) <>
+                 (coalesce((SELECT birth_date FROM me) > current_date - interval '18 years', false)))) AS can_message
+       FROM rel JOIN profiles pr ON pr.user_id = rel.user_id JOIN users u2 ON u2.id = rel.user_id
+       ORDER BY rel.friend DESC, rel.following DESC, rel.last_chat DESC NULLS LAST,
+                (pr.username ILIKE $2 || '%') DESC, pr.display_name
+       LIMIT $3`,
+      [u.id, term, limit],
+    );
+    return {
+      items: rows.map((r) => ({
+        user: toPublicUser(r as PublicUserRow),
+        relation: r.friend ? 'friend' : r.following ? 'following' : null,
+        canMessage: !!r.can_message,
+      })),
+    };
+  });
+
   async function userIdByUsername(username: string, viewer: string | null): Promise<string> {
     const { rows } = await db.query<{ user_id: string }>(
       `SELECT pr.user_id FROM profiles pr JOIN users u ON u.id = pr.user_id

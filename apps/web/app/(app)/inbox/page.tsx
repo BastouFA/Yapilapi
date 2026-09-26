@@ -7,6 +7,7 @@ import { Avatar, AvatarGroup, BottomSheet, Button, EmptyState, List, ListItem, S
 import { formatRelativeTime, type Conversation, type PublicUser } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
+import { PeoplePicker } from '@/components/PeoplePicker';
 import { useRealtime, useSession } from '../../providers';
 
 function conversationTitle(c: Conversation, meId: string): string {
@@ -139,57 +140,13 @@ export default function Inbox() {
 function NewGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (id: string) => void }) {
   const { toast } = useSession();
   const [title, setTitle] = useState('');
-  const [q, setQ] = useState('');
-  const [found, setFound] = useState<PublicUser[]>([]);
   const [picked, setPicked] = useState<PublicUser[]>([]);
   const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    if (q.trim().length < 2) return setFound([]);
-    const id = setTimeout(
-      () =>
-        api
-          .search(q, 'people')
-          .then((r) => setFound((r.results.people ?? []) as PublicUser[]))
-          .catch(() => {}),
-      250,
-    );
-    return () => clearTimeout(id);
-  }, [q]);
   return (
     <BottomSheet open={open} onClose={onClose} title="New group">
       <div className="stack">
         <TextField label="Group name" value={title} onChange={(e) => setTitle(e.currentTarget.value)} maxLength={80} />
-        <TextField label="Add people" value={q} onChange={(e) => setQ(e.currentTarget.value)} placeholder="Search by name or username" />
-        {picked.length ? (
-          <div className="row">
-            {picked.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                className="yp-chip"
-                onClick={() => setPicked((x) => x.filter((y) => y.id !== p.id))}
-                aria-label={`Remove ${p.displayName}`}
-              >
-                {p.displayName} ×
-              </button>
-            ))}
-          </div>
-        ) : null}
-        {found.length ? (
-          <List>
-            {found
-              .filter((u) => !picked.some((p) => p.id === u.id))
-              .map((u) => (
-                <ListItem
-                  key={u.id}
-                  onClick={() => setPicked((x) => [...x, u])}
-                  start={<Avatar name={u.displayName} src={u.avatarUrl} size="sm" />}
-                  primary={u.displayName}
-                  secondary={`@${u.username}`}
-                />
-              ))}
-          </List>
-        ) : null}
+        <PeoplePicker picked={picked} onChange={setPicked} />
         <Button
           disabled={!picked.length}
           loading={busy}
