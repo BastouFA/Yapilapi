@@ -5,11 +5,12 @@ import { AgentPanel } from '@/components/AgentPanel';
 import { BuyButton } from '@/components/BuyButton';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
-import { Avatar, Button, CommunityCard, EmptyState, EventCard, List, ListItem, PostCard, ProductCard, Skeleton } from '@yapilapi/design-system';
+import { Avatar, Button, CommunityCard, EmptyState, EventCard, List, ListItem, ProductCard, Skeleton } from '@yapilapi/design-system';
 import type { Community, EventItem, Post, PublicUser } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { TrendingTags } from '@/components/TrendingTags';
+import { PostList } from '@/components/PostList';
 import { normalizeTag } from '@yapilapi/shared';
 import { useSession } from '../../providers';
 
@@ -185,9 +186,11 @@ function Discover() {
             {posts.length ? (
               <section className="stack-sm">
                 <h2 className="section-title">{t('discover.posts')}</h2>
-                {posts.map((p) => (
-                  <PostCard key={p.id} post={p} locale={locale} linkAs={NextLink} />
-                ))}
+                <PostList
+                  load={() => Promise.resolve({ items: posts, nextCursor: null })}
+                  reloadKey={`${q}-${posts.map((p) => p.id).join()}`}
+                  showEnd={false}
+                />
               </section>
             ) : null}
           </div>

@@ -373,6 +373,8 @@ export interface PostCardProps {
   onSave?: (post: Post) => void;
   /** Share someone else's public post with your followers. */
   onRepost?: (post: Post) => void;
+  /** Share a link to the post (the system share sheet, or copy the link). */
+  onShare?: (post: Post) => void;
   onVote?: (post: Post, optionId: string) => void;
   onFeedback?: (post: Post, signal: 'more_like_this' | 'less_like_this' | 'not_interested' | 'mute_creator') => void;
   onWhy?: (post: Post) => void;
@@ -394,6 +396,7 @@ export function PostCard({
   onComment,
   onSave,
   onRepost,
+  onShare,
   onVote,
   onFeedback,
   onWhy,
@@ -572,6 +575,11 @@ export function PostCard({
             <Icon name="repost" />
             {post.counts.reposts}
           </span>
+        ) : null}
+        {onShare && post.visibility !== 'private' ? (
+          <button type="button" className="yp-action" onClick={() => onShare(post)} aria-label="Share">
+            <Icon name="send" />
+          </button>
         ) : null}
         <span className="yp-spacer" />
         <button type="button" className="yp-action" aria-pressed={post.viewer.saved} onClick={() => onSave?.(post)} aria-label={tt('post.save')}>

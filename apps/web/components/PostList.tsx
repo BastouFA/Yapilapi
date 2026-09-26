@@ -20,12 +20,15 @@ export function PostList({
   empty,
   reloadKey,
   sponsored = false,
+  showEnd = true,
 }: {
   load: (cursor?: string) => Promise<Page<Post>>;
   empty?: string;
   reloadKey?: string;
   /** Allow one labelled sponsored post (only served to adults who opted in to advertising). */
   sponsored?: boolean;
+  /** Show "You're all caught up" at the end (off for short embedded lists such as search results). */
+  showEnd?: boolean;
 }) {
   const { me, toast, t, locale, flags } = useSession();
   const [memoryFor, setMemoryFor] = useState<Post | null>(null);
@@ -119,6 +122,23 @@ export function PostList({
     } catch (e) {
       patch(p.id, () => p);
       toast(errorMessage(e));
+    }
+  }
+
+  /** The system share sheet where there is one (phones), otherwise copy the link. */
+  async function share(p: Post) {
+    const url = `${location.origin}${p.format === 'reel' ? `/reels?start=${p.id}` : `/p/${p.id}`}`;
+    const title = `${p.author.displayName} on YAPILAPI`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text: p.body ? p.body.slice(0, 120) : title, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      toast('Link copied');
+    } catch (e) {
+      // Closing the share sheet isn't an error.
+      if ((e as Error).name !== 'AbortError') toast("Couldn't share. Copy the address from your browser instead.");
     }
   }
 
@@ -219,6 +239,7 @@ export function PostList({
           isOwn={false}
           onLike={like}
           onSave={save}
+          onShare={share}
           onVote={vote}
           onComment={setCommentsFor}
           onReport={setReporting}
@@ -250,6 +271,7 @@ export function PostList({
             onLike={guard(like)}
             onSave={guard(save)}
             onRepost={guard(repost)}
+            onShare={share}
             onVote={guard(vote)}
             onComment={setCommentsFor}
             onFeedback={me ? feedback : undefined}
@@ -267,11 +289,11 @@ export function PostList({
         <Button variant="secondary" loading={loadingMore} onClick={more}>
           {t('feed.loadMore')}
         </Button>
-      ) : (
+      ) : showEnd ? (
         <p className="muted" style={{ textAlign: 'center' }}>
           {t('feed.end')}
         </p>
-      )}
+      ) : null}
 
       {commentsFor ? (
         <CommentsSheet

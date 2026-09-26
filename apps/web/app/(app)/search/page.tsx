@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { Avatar, Button, CommunityCard, EmptyState, EventCard, Icon, List, ListItem, PostCard, Segments, Skeleton } from '@yapilapi/design-system';
+import { Avatar, Button, CommunityCard, EmptyState, EventCard, Icon, List, ListItem, Segments, Skeleton } from '@yapilapi/design-system';
 import type { Community, EventItem, Post, PublicUser } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { TrendingTags } from '@/components/TrendingTags';
+import { PostList } from '@/components/PostList';
 import { useSession } from '../../providers';
 
 type Tab = 'all' | 'people' | 'topics' | 'posts' | 'communities' | 'events';
@@ -252,9 +253,11 @@ function SearchPage() {
               <h2 id="res-posts" className="section-title">
                 {t('discover.posts')}
               </h2>
-              {posts.map((p) => (
-                <PostCard key={p.id} post={p} locale={locale} linkAs={NextLink} />
-              ))}
+              <PostList
+                load={() => Promise.resolve({ items: posts, nextCursor: null })}
+                reloadKey={`${q}-${tab}-${posts.map((p) => p.id).join()}`}
+                showEnd={false}
+              />
             </section>
           ) : null}
         </div>

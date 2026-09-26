@@ -1,9 +1,9 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Image, Pressable, Text, View, type StyleProp, type TextStyle } from 'react-native';
+import { Image, Platform, Pressable, Share, Text, View, type StyleProp, type TextStyle } from 'react-native';
 import { splitRichText } from '../../../packages/shared/src/hashtags';
 import type { Conversation, Post } from '../../../packages/shared/src/types';
-import { client, mediaUrl } from './api';
+import { client, mediaUrl, webUrl } from './api';
 import { useSession } from './session';
 import { useT, type Translate } from './i18n';
 import { radius, space } from './theme';
@@ -177,6 +177,25 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
           >
             <Icon name="repeat" size={20} color={reposted ? c.success : c.inkMuted} />
             <Text style={{ color: reposted ? c.success : c.inkMuted, fontSize: 13, fontWeight: '600' }}>{number(reposts)}</Text>
+          </Pressable>
+        ) : null}
+        {post.visibility !== 'private' ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('m.common.share')}
+            hitSlop={8}
+            onPress={async () => {
+              const url = `${webUrl}${post.format === 'reel' ? `/reels?start=${post.id}` : `/p/${post.id}`}`;
+              const title = t('m.reels.shareTitle', { name: post.author.displayName });
+              try {
+                // iOS shares the link as a link; Android only takes a message.
+                await Share.share(Platform.OS === 'ios' ? { url, message: title } : { message: `${title}\n${url}`, title });
+              } catch {
+                // The person closed the share sheet.
+              }
+            }}
+          >
+            <Icon name="paper-plane-outline" size={19} color={c.inkMuted} />
           </Pressable>
         ) : null}
         <View style={{ flex: 1 }} />
