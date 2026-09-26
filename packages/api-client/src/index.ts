@@ -65,7 +65,7 @@ export function createClient(opts: ClientOptions) {
     raw: { get, post, put, patch, del },
     auth: {
       me: () => get<{ user: Me }>('/v1/auth/me'),
-      register: (b: { email: string; password: string; username: string; displayName: string; birthDate?: string; locale?: string }) =>
+      register: (b: { email: string; password: string; username: string; displayName: string; birthDate?: string; locale?: string; inviteCode?: string }) =>
         post<{ user: Me; token: string }>('/v1/auth/register', b),
       login: (b: { email: string; password: string }) =>
         post<{ user?: Me; token?: string; mfaRequired?: boolean; challengeToken?: string }>('/v1/auth/login', b),
@@ -482,6 +482,23 @@ export function createClient(opts: ClientOptions) {
     agents: {
       run: (kind: AgentKind, prompt: string, businessId?: string) => post<AgentResult>(`/v1/ai/agents/${kind}`, { prompt, businessId }),
     },
+    plus: {
+      get: () => get<PlusInfo>('/v1/plus'),
+      /** Start paying for 30 days of Plus; open checkout with the returned payment. */
+      checkout: (idempotencyKey: string) =>
+        post<{ priceCents: number; currency: string; days: number; payment: { provider: string; orderId: string; clientSecret: string } }>(
+          '/v1/plus/checkout',
+          {
+            idempotencyKey,
+          },
+        ),
+    },
+    invites: {
+      mine: () => get<InvitesInfo>('/v1/invites'),
+      /** Who a code belongs to (public). */
+      preview: (code: string) => get<{ code: string; inviter: PublicUser }>(`/v1/invites/${encodeURIComponent(code)}`),
+      accept: (code: string) => post<{ inviter: PublicUser }>('/v1/invites/accept', { code }),
+    },
     ads: {
       next: () => get<{ ad: SponsoredAd | null }>('/v1/ads/next'),
       click: (campaignId: string) => post(`/v1/ads/${campaignId}/click`),
@@ -807,4 +824,34 @@ export interface TagSummary {
   postsThisWeek: number;
   related: string[];
   following: boolean;
+}
+
+export interface PlusInfo {
+  priceCents: number;
+  currency: string;
+  days: number;
+  autoRenews: false;
+  benefits: (
+    | { id: 'no_ads' }
+    | { id: 'long_reels'; minutes: number; standardMinutes: number }
+    | { id: 'big_uploads'; megabytes: number; standardMegabytes: number }
+    | { id: 'badge' }
+  )[];
+  /** Null when signed out. `until` is only set while Plus is active. */
+  status: { active: boolean; until: string | null; canExtend: boolean } | null;
+  history: { source: 'purchase' | 'referral'; days: number; startsAt: string; endsAt: string; createdAt: string }[];
+}
+
+export interface InvitesInfo {
+  code: string;
+  link: string;
+  joined: number;
+  confirmed: number;
+  reward: { perPeople: number; days: number; max: number; earned: number };
+  /** Confirmed people still needed for the next free month; null once the limit is reached. */
+  toNextReward: number | null;
+  /** True for a new account that joined without a code: it can still enter one (POST /v1/invites/accept). */
+  canEnterCode: boolean;
+  enterCodeDays: number;
+  people: { user: PublicUser; joinedAt: string; confirmed: boolean }[];
 }

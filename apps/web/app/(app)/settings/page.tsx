@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Alert, Button, Card, Dialog, List, ListItem, Select, Switch, Tabs, TextField } from '@yapilapi/design-system';
@@ -32,7 +33,10 @@ export default function Settings() {
       />
       <div role="tabpanel" id="settings-panel" aria-labelledby={`settings-tabs-${tab}`}>
         {tab === 'profile' ? (
-          <ProfileSettings />
+          <div className="stack">
+            <PlusAndInvites />
+            <ProfileSettings />
+          </div>
         ) : tab === 'attention' ? (
           <AttentionSettings />
         ) : tab === 'privacy' ? (
@@ -43,6 +47,26 @@ export default function Settings() {
           <SafetySettings />
         )}
       </div>
+    </div>
+  );
+}
+
+/** YAPILAPI Plus status and the invite link, each with its own page. */
+function PlusAndInvites() {
+  const { me, t, locale } = useSession();
+  const until = me?.plusUntil ? new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(new Date(me.plusUntil)) : null;
+  return (
+    <div className="settings-duo">
+      <Card title={t('plus.title')} subtitle={until ? t('plus.status.active', { date: until }) : t('plus.status.none')}>
+        <Link href="/plus" className="yp-btn yp-btn--secondary yp-btn--sm">
+          {t('plus.open')}
+        </Link>
+      </Card>
+      <Card title={t('invite.title')} subtitle={t('plus.inviteHint')}>
+        <Link href="/invite" className="yp-btn yp-btn--secondary yp-btn--sm">
+          {t('invite.title')}
+        </Link>
+      </Card>
     </div>
   );
 }

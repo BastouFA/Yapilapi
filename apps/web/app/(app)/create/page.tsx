@@ -11,7 +11,9 @@ import { useSession } from '../../providers';
 
 type Uploaded = { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string };
 
+/** Reels: 3 minutes, or 10 minutes with YAPILAPI Plus (the API enforces the same limits). */
 const REEL_MAX_SECONDS = 180;
+const PLUS_REEL_MAX_SECONDS = 600;
 
 /** A video file's length, read in the browser before uploading. */
 function videoSeconds(file: File): Promise<number> {
@@ -32,7 +34,8 @@ function videoSeconds(file: File): Promise<number> {
 }
 
 function Create() {
-  const { t, toast } = useSession();
+  const { t, toast, me } = useSession();
+  const reelMax = me?.plus ? PLUS_REEL_MAX_SECONDS : REEL_MAX_SECONDS;
   const router = useRouter();
   const params = useSearchParams();
   const initialMode = params.get('mode') === 'reel' ? 'reel' : params.get('mode') === 'story' || params.get('moment') ? 'story' : 'post';
@@ -75,7 +78,10 @@ function Create() {
       if (!f.type.startsWith('video/')) return toast('A reel is a video.');
       // Check the length before uploading a long file for nothing.
       const seconds = await videoSeconds(f);
-      if (seconds > REEL_MAX_SECONDS) return toast(`Reels can be up to 3 minutes. This one is ${Math.round(seconds / 60)} minutes; trim it in Studio first.`);
+      if (seconds > reelMax)
+        return toast(
+          `Reels can be up to ${reelMax / 60} minutes${me?.plus ? '' : ', or 10 minutes with YAPILAPI Plus'}. This one is ${Math.round(seconds / 60)} minutes; trim it in Studio first.`,
+        );
     }
     setUploading(true);
     try {
@@ -185,7 +191,7 @@ function Create() {
         {kind === 'post'
           ? 'Text, photos, videos, a link or a poll, on your profile or in a community.'
           : kind === 'reel'
-            ? 'One vertical video up to 3 minutes, shown full screen in Reels and on your profile.'
+            ? `One vertical video up to ${reelMax / 60} minutes, shown full screen in Reels and on your profile.`
             : 'A photo, video or a few words for your people. It disappears when you choose.'}
       </p>
       {error ? <Alert tone="danger">{error}</Alert> : null}

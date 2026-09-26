@@ -391,6 +391,11 @@ a.yp-aside-row:hover {
   display: flex;
   flex-direction: column;
 }
+.yp-post__nameline {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
 .yp-post__name {
   /* 24px line keeps the author link a comfortable target (WCAG 2.5.8). */
   font: 700 15px/24px var(--font-sans);

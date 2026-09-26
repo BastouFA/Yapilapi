@@ -13,7 +13,7 @@ import {
   type Post,
 } from '@yapilapi/shared';
 import { Icon, type IconName } from './icons.tsx';
-import { Avatar, Badge, Button, cx, useModalFocus } from './primitives.tsx';
+import { Avatar, Badge, Button, cx, PlusBadge, useModalFocus } from './primitives.tsx';
 
 /** A link component (e.g. next/link). Defaults to a plain anchor. */
 export type LinkLike = ComponentType<{ href: string; className?: string; children?: ReactNode; 'aria-current'?: 'page' | undefined; 'aria-label'?: string }>;
@@ -422,9 +422,12 @@ export function PostCard({
           <Avatar name={post.author.displayName} src={post.author.avatarUrl} />
         </L>
         <div className="yp-post__who">
-          <L href={`/u/${post.author.username}`} className="yp-post__name">
-            <bdi id={`post-${post.id}-author`}>{post.author.displayName}</bdi>
-          </L>
+          <span className="yp-post__nameline">
+            <L href={`/u/${post.author.username}`} className="yp-post__name">
+              <bdi id={`post-${post.id}-author`}>{post.author.displayName}</bdi>
+            </L>
+            {post.author.plus ? <PlusBadge label={t('plus.badge.label', locale)} /> : null}
+          </span>
           <span className="yp-post__meta">
             <bdi>@{post.author.username}</bdi> ·{' '}
             <bdi>

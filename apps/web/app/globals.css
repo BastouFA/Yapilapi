@@ -1826,4 +1826,9 @@ h3 {
 .suggested__hide:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
+/* Two cards side by side on wide screens, stacked on phones. */
+.settings-duo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: var(--space-3);
 }

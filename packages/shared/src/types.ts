@@ -6,6 +6,8 @@ export interface PublicUser {
   displayName: string;
   avatarUrl: string | null;
   mode: ProfileMode;
+  /** A YAPILAPI Plus member right now. Present (true) only for members. */
+  plus?: boolean;
 }
 
 export interface Me extends PublicUser {
@@ -16,6 +18,8 @@ export interface Me extends PublicUser {
   locale: string;
   /** ISO 3166-1 alpha-2, set by the person or from a trusted CDN header. */
   country: string | null;
+  /** When YAPILAPI Plus ends (it never renews on its own), or null without Plus. */
+  plusUntil: string | null;
 }
 
 export interface Profile extends PublicUser {

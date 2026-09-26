@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { Avatar, Badge, Button, EmptyState, Menu, Segments, Skeleton } from '@yapilapi/design-system';
+import { Avatar, Badge, Button, EmptyState, Menu, PlusBadge, Segments, Skeleton } from '@yapilapi/design-system';
 import { FollowList } from '@/components/FollowList';
 import type { Profile } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
@@ -63,7 +63,10 @@ export default function ProfilePage() {
         <Avatar name={profile.displayName} src={profile.avatarUrl} size="xl" />
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <div className="stack-sm" style={{ gap: 2 }}>
-            <h1 className="profile__name">{profile.displayName}</h1>
+            <h1 className="profile__name">
+              {profile.displayName}
+              {profile.plus ? <PlusBadge label={t('plus.badge.label')} /> : null}
+            </h1>
             <span className="muted">
               @{profile.username} {profile.mode !== 'personal' ? <Badge tone="neutral">{profile.mode}</Badge> : null}{' '}
               {profile.isPrivate ? <Badge tone="neutral">Private</Badge> : null}
@@ -82,6 +85,12 @@ export default function ProfilePage() {
                   Memories
                 </Link>
               ) : null}
+              <Link href="/invite" className="yp-btn yp-btn--ghost yp-btn--sm">
+                {t('invite.title')}
+              </Link>
+              <Link href="/plus" className="yp-btn yp-btn--ghost yp-btn--sm">
+                {t('plus.short')}
+              </Link>
             </div>
           ) : (
             <div className="row">

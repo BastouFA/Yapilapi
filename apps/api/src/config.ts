@@ -26,6 +26,9 @@ const schema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().default(''),
   STRIPE_PUBLISHABLE_KEY: z.string().default(''),
   PAYMENTS_WEBHOOK_SECRET: z.string().default('dev-webhook-secret-change-me'),
+  /** YAPILAPI Plus: the price of one month (30 days), in hundredths of PLUS_CURRENCY. */
+  PLUS_PRICE_CENTS: z.coerce.number().int().min(50).max(100_000).default(499),
+  PLUS_CURRENCY: z.string().length(3).toUpperCase().default('USD'),
   // 32 bytes, base64. Encrypts TOTP secrets at rest. Development falls back to a fixed dev key.
   MFA_ENCRYPTION_KEY: z.string().optional().default(''),
   // Passkeys: the site's domain and origin. Default to WEB_ORIGIN.

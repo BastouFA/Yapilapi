@@ -76,6 +76,8 @@ const TEXT: Record<string, (actor: string) => string> = {
   family_ended: (a) => `${a} ended your family link`,
   family_controls_changed: (a) => `${a} changed your family settings`,
   subscription_started: (a) => `${a} subscribed to you`,
+  invite_joined: (a) => `${a} joined YAPILAPI with your invite`,
+  plus_referral_reward: () => 'You have 30 more days of YAPILAPI Plus, thanks to friends you invited',
 };
 
 /** Human text for a notification type, or null for types that shouldn't push. */

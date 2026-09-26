@@ -10,6 +10,7 @@ import { audit, isEnabled } from '../lib/services.ts';
 import { ageOf } from '../lib/users.ts';
 import { postVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
+import { isPlus } from '../lib/plus.ts';
 
 const FREQUENCY_CAP_PER_DAY = 3;
 
@@ -238,6 +239,8 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
   app.get('/v1/ads/next', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req) => {
     const u = me(req);
     if (!(await isEnabled(db, 'ADS'))) return { ad: null };
+    // YAPILAPI Plus members never see sponsored posts.
+    if (await isPlus(db, u.id)) return { ad: null };
     if (!(await eligible(u.id, u.birthDate ?? null))) return { ad: null };
     const { rows } = await db.query(
       `WITH me AS (

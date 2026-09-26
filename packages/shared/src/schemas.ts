@@ -37,6 +37,8 @@ export const registerSchema = z.object({
     .optional(),
   /** The browser's or phone's language, so a new account starts in it (unsupported ones fall back to English). */
   locale: z.string().max(35).optional(),
+  /** A friend's invite code, from a /join/<code> link. */
+  inviteCode: z.string().trim().max(32).optional(),
 });
 
 export const loginSchema = z.object({

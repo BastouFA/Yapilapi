@@ -15,6 +15,7 @@ export {
   Checkbox,
   cx,
   Dialog,
+  PlusBadge,
   Select,
   Switch,
   Tabs,

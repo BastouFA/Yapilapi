@@ -18,15 +18,15 @@ import { analyzeText, statusForRisk } from '../lib/moderation.ts';
 import { hydratePosts } from '../lib/posts.ts';
 import { notifyMentions } from '../lib/mentions.ts';
 import { topicsFor } from './tags.ts';
+import { isPlus, PLUS_REEL_MAX_MS, REEL_MAX_MS } from '../lib/plus.ts';
 import { notify, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
-import { publicUserFrom } from '../lib/users.ts';
+import { plusCol, publicUserFrom } from '../lib/users.ts';
 import { notBlockedSql, postVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 const VISIBLE = postVisibleSql('$1');
-const REEL_MAX_MS = 180_000;
 /** For You scores posts from your connections plus this many of the newest other posts. */
 const RECENT_CANDIDATES = 1000;
 const POST_FROM = `FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id`;
@@ -165,7 +165,12 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
         if (input.format === 'reel') {
           // Reels are short. Uploads still processing have no length yet; those are checked by the player, not refused here.
           const len = (await c.query(`SELECT duration_ms FROM media WHERE id = $1`, [mediaId])).rows[0]?.duration_ms;
-          if (len && len > REEL_MAX_MS) throw new AppError(400, 'validation_failed', 'Reels can be up to 3 minutes. Trim it in Studio first.');
+          if (len && len > REEL_MAX_MS) {
+            // Plus members can post reels up to 10 minutes.
+            const plus = await isPlus(c, u.id);
+            if (!plus) throw new AppError(400, 'validation_failed', 'Reels can be up to 3 minutes, or 10 minutes with YAPILAPI Plus. Trim it in Studio first.');
+            if (len > PLUS_REEL_MAX_MS) throw new AppError(400, 'validation_failed', 'Reels can be up to 10 minutes. Trim it in Studio first.');
+          }
         }
       }
       if (input.poll)
@@ -648,7 +653,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     const c = decodeCursor<KeyCursor>(q.cursor);
     const { rows } = await db.query(
       `SELECT cm.id, cm.post_id, cm.parent_id, cm.body, cm.created_at,
-              pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode
+              pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode, ${plusCol('a_')}
        FROM comments cm JOIN profiles pr ON pr.user_id = cm.author_id
        WHERE cm.post_id = $2 AND cm.deleted_at IS NULL AND (cm.moderation_status IN ('normal','review') OR cm.author_id = $1)
          AND ${notBlockedSql('cm.author_id', '$1')}

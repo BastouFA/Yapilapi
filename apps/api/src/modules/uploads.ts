@@ -6,10 +6,10 @@ import { AppError, badRequest, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { ALLOWED_MIME, sniffMatches } from '../lib/storage.ts';
 import { enqueue } from '../lib/jobs.ts';
+import { isPlus, MAX_RESUMABLE_BYTES, PLUS_MAX_RESUMABLE_BYTES } from '../lib/plus.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 export const CHUNK_SIZE = 5 * 1024 * 1024;
-export const MAX_RESUMABLE_BYTES = 200 * 1024 * 1024;
 
 /**
  * Resumable uploads for large or flaky-network files (low-bandwidth support):
@@ -17,7 +17,7 @@ export const MAX_RESUMABLE_BYTES = 200 * 1024 * 1024;
  *   PUT  /v1/uploads/:id/chunks/:index → one chunk (raw bytes), idempotent
  *   GET  /v1/uploads/:id               → which chunks arrived, so clients resume
  *   POST /v1/uploads/:id/complete      → verify, store, create the media item
- * Sessions expire after 24 hours.
+ * Sessions expire after 24 hours. Files can be up to 200 MB, or 500 MB with Plus.
  */
 export default async function uploadsModule(app: FastifyInstance, ctx: AppContext) {
   const db = ctx.db;
@@ -40,7 +40,11 @@ export default async function uploadsModule(app: FastifyInstance, ctx: AppContex
     const u = me(req);
     const input = parse(z.object({ filename: z.string().trim().min(1).max(200), mime: z.string().max(100), size: z.number().int().positive() }), req.body);
     if (!ALLOWED_MIME[input.mime]) throw new AppError(415, 'unsupported_media', 'Upload a JPEG, PNG, WebP, GIF, MP4, WebM, MP3 or M4A file.');
-    if (input.size > MAX_RESUMABLE_BYTES) throw new AppError(413, 'too_large', 'Files can be up to 200 MB.');
+    if (input.size > MAX_RESUMABLE_BYTES) {
+      // Plus members can upload bigger files.
+      if (!(await isPlus(db, u.id))) throw new AppError(413, 'too_large', 'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.');
+      if (input.size > PLUS_MAX_RESUMABLE_BYTES) throw new AppError(413, 'too_large', 'Files can be up to 500 MB.');
+    }
     const total = Math.ceil(input.size / CHUNK_SIZE);
     const { rows } = await db.query(
       `INSERT INTO upload_sessions (user_id, filename, mime, size, chunk_size, total_chunks) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, chunk_size, total_chunks, expires_at`,

@@ -3,7 +3,10 @@ import type { PublicUser } from '@yapilapi/shared';
 
 type Q = Pool | PoolClient;
 
-export const PUBLIC_USER_COLS = `pr.user_id AS id, pr.username, pr.display_name, pr.avatar_url, pr.mode`;
+/** `plus` reads a column already on profiles, so the Plus badge costs no join. */
+export const PUBLIC_USER_COLS = `pr.user_id AS id, pr.username, pr.display_name, pr.avatar_url, pr.mode, (pr.plus_until > now()) AS plus`;
+/** The same Plus flag for queries that select prefixed profile columns: `${plusCol('a_')}` gives `a_plus`. */
+export const plusCol = (prefix: string, alias = 'pr') => `(${alias}.plus_until > now()) AS ${prefix}plus`;
 
 export interface PublicUserRow {
   id: string;
@@ -11,10 +14,11 @@ export interface PublicUserRow {
   display_name: string;
   avatar_url: string | null;
   mode: PublicUser['mode'];
+  plus?: boolean | null;
 }
 
 export function toPublicUser(r: PublicUserRow): PublicUser {
-  return { id: r.id, username: r.username, displayName: r.display_name, avatarUrl: r.avatar_url, mode: r.mode };
+  return { id: r.id, username: r.username, displayName: r.display_name, avatarUrl: r.avatar_url, mode: r.mode, ...(r.plus ? { plus: true } : {}) };
 }
 
 /** Build a PublicUser from prefixed columns (e.g. author_username) on a joined row. */
@@ -25,6 +29,7 @@ export function publicUserFrom(row: Record<string, unknown>, prefix: string): Pu
     displayName: row[`${prefix}display_name`] as string,
     avatarUrl: (row[`${prefix}avatar_url`] as string | null) ?? null,
     mode: row[`${prefix}mode`] as PublicUser['mode'],
+    ...(row[`${prefix}plus`] ? { plus: true } : {}),
   };
 }
 
