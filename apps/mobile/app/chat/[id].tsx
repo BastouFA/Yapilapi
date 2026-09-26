@@ -1,11 +1,12 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { FlatList, Image, KeyboardAvoidingView, Linking, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Conversation, Message } from '../../../../packages/shared/src/types';
 import { useCalls } from '../../lib/calls';
-import { client, errorMessage } from '../../lib/api';
+import { client, errorMessage, mediaUrl } from '../../lib/api';
+import { clock, pickOne, uploadPicked } from '../../lib/media';
 import { useT } from '../../lib/i18n';
 import { conversationTitle } from '../../lib/post';
 import { useRealtime, useSession } from '../../lib/session';
@@ -72,6 +73,29 @@ export default function Chat() {
     });
   }, [navigation, conversation, me?.id, canCall, calls, id, c.yapi, t]);
 
+  const [sending, setSending] = useState(false);
+
+  /** Pick a photo or video, upload it and send it as its own message. */
+  async function sendMedia() {
+    const asset = await pickOne(['images', 'videos']).catch(() => null);
+    if (!asset || asset === 'denied') {
+      if (asset === 'denied') setError(t('m.create.photosPermission'));
+      return;
+    }
+    setSending(true);
+    setError(null);
+    try {
+      const media = await uploadPicked(asset);
+      const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const { message } = await (await client()).conversations.send(id, '', clientId, [{ mediaId: media.id }]);
+      setMessages((cur) => (cur.some((x) => x.id === message.id) ? cur : [...cur, message]));
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setSending(false);
+    }
+  }
+
   async function send() {
     const text = body.trim();
     if (!text) return;
@@ -105,19 +129,22 @@ export default function Chat() {
         onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
         renderItem={({ item }) => {
           const mine = item.sender.id === me?.id;
-          const text = item.body || (item.attachments.length ? t('m.message.attachment') : t('m.message.deleted'));
+          const text = item.body || (item.attachments.length ? '' : t('m.message.deleted'));
+          const media = <Attachments items={item.attachments} tint={mine ? c.onYapi : c.ink} />;
           // Your messages sit at the end edge (the right in English, the left in Arabic), with the
           // tail corner on that side.
           return mine ? (
             <LinearGradient {...gradient(c)} style={[bubble, { alignSelf: 'flex-end', borderBottomEndRadius: 6 }]}>
-              <Text style={[{ color: c.onYapi, fontSize: 15, lineHeight: 21 }, userText]}>{text}</Text>
+              {media}
+              {text ? <Text style={[{ color: c.onYapi, fontSize: 15, lineHeight: 21 }, userText]}>{text}</Text> : null}
             </LinearGradient>
           ) : (
             <View style={[bubble, { alignSelf: 'flex-start', backgroundColor: c.surface, borderBottomStartRadius: 6 }, elevation(c)]}>
               {conversation && conversation.members.length > 2 ? (
                 <Text style={[{ color: c.yapi, fontSize: 12, fontWeight: '700' }, userText]}>{item.sender.displayName}</Text>
               ) : null}
-              <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 21 }, userText]}>{text}</Text>
+              {media}
+              {text ? <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 21 }, userText]}>{text}</Text> : null}
             </View>
           );
         }}
@@ -132,6 +159,15 @@ export default function Chat() {
           paddingBottom: Math.max(insets.bottom, space[3]),
         }}
       >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('m.chat.sendPhoto')}
+          disabled={sending}
+          onPress={() => void sendMedia()}
+          style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', opacity: sending ? 0.45 : 1 }}
+        >
+          <Icon name="image-outline" size={24} color={c.inkMuted} />
+        </Pressable>
         <TextInput
           accessibilityLabel={t('inbox.placeholder')}
           placeholder={t('inbox.placeholder')}
@@ -175,3 +211,38 @@ export default function Chat() {
 }
 
 const bubble = { maxWidth: '80%', paddingHorizontal: space[3] + 2, paddingVertical: space[2] + 2, borderRadius: radius.lg } as const;
+
+/** Photos inline; videos and voice messages open in the player. */
+function Attachments({ items, tint }: { items: Message['attachments']; tint: string }) {
+  const { t } = useT();
+  if (!items.length) return null;
+  return (
+    <View style={{ gap: space[1] }}>
+      {items.map((a, i) =>
+        a.kind === 'image' ? (
+          <Pressable
+            key={i}
+            accessibilityRole="imagebutton"
+            accessibilityLabel={a.name || t('m.post.photo')}
+            onPress={() => void Linking.openURL(mediaUrl(a.url))}
+          >
+            <Image source={{ uri: mediaUrl(a.url) }} style={{ width: 220, height: 160, borderRadius: radius.md }} resizeMode="cover" />
+          </Pressable>
+        ) : (
+          <Pressable
+            key={i}
+            accessibilityRole="button"
+            onPress={() => void Linking.openURL(mediaUrl(a.url))}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], paddingVertical: space[1] }}
+          >
+            <Icon name={a.kind === 'audio' ? 'mic-outline' : 'play-circle-outline'} size={22} color={tint} />
+            <Text style={{ color: tint, fontSize: 15, fontWeight: '600' }}>
+              {a.kind === 'audio' ? t('m.chat.voiceMessage') : t('m.chat.video')}
+              {a.durationMs ? ` · ${clock(a.durationMs / 1000)}` : ''}
+            </Text>
+          </Pressable>
+        ),
+      )}
+    </View>
+  );
+}
