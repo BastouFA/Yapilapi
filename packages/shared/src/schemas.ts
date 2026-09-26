@@ -35,6 +35,8 @@ export const registerSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
+  /** The browser's or phone's language, so a new account starts in it (unsupported ones fall back to English). */
+  locale: z.string().max(35).optional(),
 });
 
 export const loginSchema = z.object({

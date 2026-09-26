@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { hashPassword, hashToken, newToken, SESSION_COOKIE, verifyPassword } from '@yapilapi/auth';
 import { tx } from '@yapilapi/database';
-import { forgotPasswordSchema, loginSchema, registerSchema, resetPasswordSchema, tokenSchema, type Me } from '@yapilapi/shared';
+import { forgotPasswordSchema, loginSchema, registerSchema, resetPasswordSchema, tokenSchema, type Me, SUPPORTED_LOCALES } from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, badRequest, conflict, notFound, parse, unauthorized } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
@@ -102,7 +102,10 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
         input.birthDate ?? null,
       ]);
       const id = u.rows[0]!.id;
-      await c.query(`INSERT INTO profiles (user_id, username, display_name) VALUES ($1,$2,$3)`, [id, input.username, input.displayName]);
+      // Start in the person's own language when we support it.
+      const base = input.locale?.split(/[-_]/)[0]?.toLowerCase() ?? 'en';
+      const locale = SUPPORTED_LOCALES.includes(base) ? base : 'en';
+      await c.query(`INSERT INTO profiles (user_id, username, display_name, locale) VALUES ($1,$2,$3,$4)`, [id, input.username, input.displayName, locale]);
       await c.query(`INSERT INTO user_preferences (user_id) VALUES ($1)`, [id]);
       // Minors get protective defaults: private account, no personalization for ads.
       const age = ageOf(input.birthDate ?? null);

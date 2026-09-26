@@ -37,6 +37,7 @@ export default function SignupPage() {
         username: String(f.get('username')),
         displayName: String(f.get('displayName')),
         birthDate: String(f.get('birthDate') || '') || undefined,
+        locale: navigator.language,
       });
       setMe(user);
       router.replace('/onboarding');

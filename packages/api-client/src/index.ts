@@ -65,7 +65,7 @@ export function createClient(opts: ClientOptions) {
     raw: { get, post, put, patch, del },
     auth: {
       me: () => get<{ user: Me }>('/v1/auth/me'),
-      register: (b: { email: string; password: string; username: string; displayName: string; birthDate?: string }) =>
+      register: (b: { email: string; password: string; username: string; displayName: string; birthDate?: string; locale?: string }) =>
         post<{ user: Me; token: string }>('/v1/auth/register', b),
       login: (b: { email: string; password: string }) =>
         post<{ user?: Me; token?: string; mfaRequired?: boolean; challengeToken?: string }>('/v1/auth/login', b),

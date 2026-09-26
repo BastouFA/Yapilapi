@@ -43,3 +43,12 @@ describe('people suggestions for new conversations', () => {
     expect((await as(t.app, me).get(`/v1/people/suggest?q=@${stranger.username.slice(0, 8)}`)).body.items.map((x: any) => x.user.id)).toContain(stranger.id);
   });
 });
+
+describe('new accounts start in their own language', () => {
+  it('stores a supported browser language and falls back to English', async () => {
+    const fr = await signUp(t.app, { locale: 'fr-CA' });
+    const xx = await signUp(t.app, { locale: 'tlh' });
+    expect((await as(t.app, fr).get('/v1/auth/me')).body.user.locale).toBe('fr');
+    expect((await as(t.app, xx).get('/v1/auth/me')).body.user.locale).toBe('en');
+  });
+});
