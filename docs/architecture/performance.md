@@ -108,3 +108,15 @@ No new index was needed: every remaining hot query already uses an index (`notif
 - `GET /v1/ads/next` returns an ad until each user reaches the frequency cap (3 per campaign per day); later requests in a run measure the "no eligible ad" path, which runs the same candidate query.
 - People search orders by follower count with a correlated `count(*)` per matching profile; fine at this size, worth a denormalized `follower_count` once profiles reach the hundreds of thousands.
 - Numbers come from one laptop with Postgres in Docker Desktop; re-baseline on production-like hardware before treating them as capacity figures.
+
+### 2026-09-26: reels, stories, people suggestions
+
+The seed now also creates a story per user and reels for a fifth of the users, and approves the ad campaigns (campaigns go to moderator review when started, so earlier runs after ad review landed served no ads). p95 at 16 connections, zero errors:
+
+| Scenario | Route | p95 ms | Target |
+| --- | --- | ---: | ---: |
+| home feed | `GET /v1/feed` | 61.7 | 250 |
+| reels feed | `GET /v1/reels` | 13.4 | 250 |
+| stories | `GET /v1/moments` | 11.0 | 150 |
+| people suggest | `GET /v1/people/suggest` | 21.3 | 100 |
+| ads next (now serving ads) | `GET /v1/ads/next` | 17.0 | 100 |

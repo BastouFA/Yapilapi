@@ -35,6 +35,28 @@ export function scenarios(d: Dataset): Scenario[] {
       next: () => ({ method: 'GET', path: '/v1/feed', token: user().token }),
     },
     {
+      name: 'reels feed',
+      route: 'GET /v1/reels',
+      sloP95Ms: 250,
+      next: () => ({ method: 'GET', path: '/v1/reels', token: user().token }),
+    },
+    {
+      name: 'stories',
+      route: 'GET /v1/moments',
+      sloP95Ms: 150,
+      next: () => ({ method: 'GET', path: '/v1/moments', token: user().token }),
+    },
+    {
+      name: 'people suggest',
+      route: 'GET /v1/people/suggest',
+      sloP95Ms: 100,
+      next: () => ({
+        method: 'GET',
+        path: `/v1/people/suggest?q=${encodeURIComponent(d.searchTerms[Math.floor(Math.random() * d.searchTerms.length)]!.slice(0, 2))}`,
+        token: user().token,
+      }),
+    },
+    {
       name: 'home feed (following)',
       route: 'GET /v1/feed?mode=following',
       sloP95Ms: 150,

@@ -215,7 +215,30 @@ export async function seed(o: SeedOptions, log: (msg: string) => void = console.
     await call('POST', '/v1/payments/webhook/dev', null, payload, { 'x-signature': signDevWebhook(o.webhookSecret, payload) });
     await call('PATCH', `/v1/ads/campaigns/${camp.campaign.id}`, u.token, { status: 'active' });
   });
-  step(`${o.advertisers} funded ad campaigns`);
+  // Starting a campaign sends it to review; approve them the way a moderator would, so ads are actually served.
+  await o.db.query(`UPDATE ad_campaigns SET status = 'active', approved_at = now() WHERE status = 'pending_review'`);
+  await o.db.query(
+    `UPDATE moderation_cases SET status = 'decided', decision = 'approve_ad', decided_at = now() WHERE target_type = 'ad_campaign' AND status = 'open'`,
+  );
+  step(`${o.advertisers} funded, approved ad campaigns`);
+
+  // 8. Stories from everyone and reels from a fifth of the users (video rows stand in for processed uploads).
+  await pool(users, o.concurrency, async (u) => {
+    await call('POST', '/v1/moments', u.token, { body: `Today: ${r.sample(WORDS, 3).join(' ')}`, visibility: 'followers' });
+  });
+  await pool(users.slice(0, Math.max(1, Math.floor(users.length / 5))), o.concurrency, async (u) => {
+    const m = await o.db.query(
+      `INSERT INTO media (owner_id, kind, url, mime, status, duration_ms) VALUES ($1,'video','http://localhost/media/load.mp4','video/mp4','ready',15000) RETURNING id, url`,
+      [u.id],
+    );
+    await call('POST', '/v1/posts', u.token, {
+      format: 'reel',
+      body: `Reel: ${r.sample(WORDS, 3).join(' ')}`,
+      topics: r.sample(TOPICS, 2),
+      media: [{ id: m.rows[0].id, url: m.rows[0].url, kind: 'video' }],
+    });
+  });
+  step(`stories and reels`);
 
   // Keep planner statistics current, as autovacuum would on a live database.
   await o.db.query('ANALYZE');
