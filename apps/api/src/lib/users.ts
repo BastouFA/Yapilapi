@@ -58,3 +58,16 @@ export function ageOf(birthDate: Date | string | null, now = new Date()): number
   if (m < 0 || (m === 0 && now.getUTCDate() < b.getUTCDate())) age--;
   return age;
 }
+
+/**
+ * Whether a viewer is known to be 18 or older. Unknown ages (no birth date, or
+ * not signed in) count as not adult, like the rule for posts waiting for review.
+ */
+export async function isAdultViewer(db: Q, viewer: string | null | undefined): Promise<boolean> {
+  if (!viewer) return false;
+  const { rows } = await db.query<{ adult: boolean }>(
+    `SELECT coalesce(birth_date <= current_date - interval '18 years', false) AS adult FROM users WHERE id = $1`,
+    [viewer],
+  );
+  return !!rows[0]?.adult;
+}

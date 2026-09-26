@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Alert, Button, Card, EmptyState, Select, Stat, Switch, Tabs, TextField } from '@yapilapi/design-system';
-import type { RegionalRule } from '@yapilapi/api-client';
+import { Alert, Badge, Button, Card, EmptyState, SensitiveCover, Select, Stat, Switch, Tabs, TextField } from '@yapilapi/design-system';
+import type { RegionalRule, RiskAccount } from '@yapilapi/api-client';
 import { FEATURE_FLAGS, formatRelativeTime } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '../../providers';
@@ -27,6 +27,7 @@ export default function Admin() {
         onChange={setTab}
         tabs={[
           { id: 'moderation', label: 'Moderation' },
+          { id: 'accounts', label: 'Account signals' },
           ...(me?.role === 'admin'
             ? [
                 { id: 'overview', label: 'Overview' },
@@ -40,6 +41,8 @@ export default function Admin() {
       <div role="tabpanel" id="admin-panel" aria-labelledby={`admin-tabs-${tab}`}>
         {tab === 'moderation' ? (
           <Moderation />
+        ) : tab === 'accounts' ? (
+          <AccountSignals />
         ) : tab === 'overview' ? (
           <Overview />
         ) : tab === 'flags' ? (
@@ -117,12 +120,137 @@ function Moderation() {
             }
           >
             {c.risk === 'escalate' ? <Alert tone="danger">Escalated: review first.</Alert> : null}
-            <p style={{ whiteSpace: 'pre-wrap' }}>{c.excerpt ?? '(no text preview)'}</p>
+            {c.media ? <CaseMedia media={c.media} /> : <p style={{ whiteSpace: 'pre-wrap' }}>{c.excerpt ?? '(no text preview)'}</p>}
             <code style={{ fontSize: 12 }}>{JSON.stringify(c.signals)}</code>
           </Card>
         ))
       ) : (
         <EmptyState title="Queue is clear" />
+      )}
+    </div>
+  );
+}
+
+/** Media an automated check flagged, blurred until the moderator chooses to look. */
+function CaseMedia({ media }: { media: { kind: string; url: string; moderation: string } }) {
+  const [shown, setShown] = useState(false);
+  return (
+    <div className="stack-sm">
+      <p className="muted" style={{ margin: 0 }}>
+        Automated check: {media.moderation}. No action puts the {media.kind} back up; Restrict keeps it up but blurred; Remove keeps it down.
+      </p>
+      <div className="case-media">
+        {media.kind === 'video' && !/\.(jpe?g|png|webp)$/i.test(media.url) ? (
+          <video src={media.url} controls={shown} muted className={shown ? undefined : 'yp-blurred'} />
+        ) : (
+          <img src={media.url} alt="" className={shown ? undefined : 'yp-blurred'} />
+        )}
+        {shown ? null : <SensitiveCover onReveal={() => setShown(true)} />}
+      </div>
+    </div>
+  );
+}
+
+const SIGNAL_TEXT: Record<string, string> = {
+  disposable_email: 'Signed up with a throwaway email address',
+  signup_ip_velocity: 'Many sign-ups from the same address',
+  signup_subnet_velocity: 'Many sign-ups from the same network',
+  post_velocity: 'Hit the new-account posting pace',
+  message_velocity: 'Hit the new-account messaging pace',
+  duplicate_text: 'Posted or sent the same text many times',
+  link_spam: 'Many links from a new account',
+  auto_restricted: 'Limited automatically after repeated flags',
+  held_while_limited: 'Posted while limited (visible only to them)',
+};
+
+/**
+ * Spam and bot signals by account. Clearing lifts any limit and releases held
+ * posts and messages; confirming keeps the limit and removes the flagged items.
+ */
+function AccountSignals() {
+  const { toast, locale } = useSession();
+  const [status, setStatus] = useState<'open' | 'reviewed'>('open');
+  const [items, setItems] = useState<RiskAccount[] | null>(null);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const load = () =>
+    api.admin.riskAccounts(status).then(
+      (r) => setItems(r.items),
+      (e) => toast(errorMessage(e)),
+    );
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+  const review = async (id: string, action: 'clear' | 'confirm') => {
+    try {
+      await api.admin.reviewRisk(id, action, notes[id]?.trim() || undefined);
+      toast(action === 'clear' ? 'Signals cleared' : 'Signals confirmed');
+      await load();
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  };
+  return (
+    <div className="stack">
+      <div className="row">
+        {(['open', 'reviewed'] as const).map((s) => (
+          <Button key={s} size="sm" variant={s === status ? 'primary' : 'secondary'} onClick={() => setStatus(s)}>
+            {s === 'open' ? 'Waiting for review' : 'Reviewed (30 days)'}
+          </Button>
+        ))}
+      </div>
+      {items === null ? null : items.length ? (
+        items.map((a) => (
+          <Card
+            key={a.user.id}
+            title={
+              <>
+                {a.user.displayName} <span className="muted">@{a.user.username}</span> {a.restrictedAt ? <Badge tone="warning">Limited</Badge> : null}
+              </>
+            }
+            subtitle={`Joined ${formatRelativeTime(a.user.createdAt, locale)} · email ${a.user.emailVerified ? 'confirmed' : 'not confirmed'} · phone ${
+              a.user.phoneVerified ? 'confirmed' : 'not confirmed'
+            } · risk score ${a.score}`}
+            footer={
+              status === 'open' ? (
+                <>
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <TextField
+                      label="Note (optional)"
+                      value={notes[a.user.id] ?? ''}
+                      onChange={(e) => setNotes({ ...notes, [a.user.id]: e.currentTarget.value })}
+                      maxLength={2000}
+                    />
+                  </div>
+                  <Button size="sm" variant="secondary" onClick={() => review(a.user.id, 'clear')}>
+                    {a.restrictedAt ? 'Clear and lift limit' : 'Clear'}
+                  </Button>
+                  <Button size="sm" variant="danger" onClick={() => review(a.user.id, 'confirm')}>
+                    Confirm
+                  </Button>
+                </>
+              ) : null
+            }
+          >
+            <ul className="risk-signals">
+              {a.signals.map((s) => (
+                <li key={s.id} data-status={s.status}>
+                  <span>
+                    <strong>{SIGNAL_TEXT[s.kind] ?? s.kind.replace(/_/g, ' ')}</strong>{' '}
+                    <span className="muted">
+                      · {s.status} · {formatRelativeTime(s.createdAt, locale)}
+                      {s.weight ? ` · weight ${s.weight}` : ''}
+                    </span>
+                  </span>
+                  {s.excerpt ? <span style={{ whiteSpace: 'pre-wrap' }}>“{s.excerpt}”</span> : null}
+                  {Object.keys(s.detail ?? {}).length ? <code style={{ fontSize: 12 }}>{JSON.stringify(s.detail)}</code> : null}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ))
+      ) : (
+        <EmptyState title={status === 'open' ? 'Nothing waiting' : 'No recent reviews'} />
       )}
     </div>
   );

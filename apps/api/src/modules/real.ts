@@ -5,7 +5,9 @@ import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } fro
 import type { AppContext } from '../lib/context.ts';
 import { hydratePosts } from '../lib/posts.ts';
 import { isEnabled, notify, track } from '../lib/services.ts';
-import { areFriends, publicUserFrom } from '../lib/users.ts';
+import { areFriends, isAdultViewer, publicUserFrom } from '../lib/users.ts';
+import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
+import { requireVerified } from '../lib/verification.ts';
 import { eventVisibleSql, postVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
@@ -15,11 +17,12 @@ const REALS_PER_DAY = 3;
 /** Media must be captured in-app moments ago and never used before: that is what makes a Real real. */
 async function freshMedia(c: { query: AppContext['db']['query'] }, userId: string, ids: string[]) {
   const { rows } = await c.query(
-    `SELECT id, kind, url FROM media WHERE id = ANY($1) AND owner_id = $2 AND used_at IS NULL AND created_at > now() - make_interval(mins => $3)`,
+    `SELECT id, kind, url, moderation FROM media WHERE id = ANY($1) AND owner_id = $2 AND used_at IS NULL AND created_at > now() - make_interval(mins => $3)`,
     [ids, userId, FRESH_MINUTES],
   );
   if (rows.length !== new Set(ids).size)
     throw new AppError(422, 'not_fresh', `Capture your photo now: Real uses media taken in the last ${FRESH_MINUTES} minutes that hasn't been shared before.`);
+  if (rows.some((r) => r.moderation === 'blocked')) throw new AppError(422, 'media_blocked', MEDIA_BLOCKED_MESSAGE);
   await c.query(`UPDATE media SET used_at = now() WHERE id = ANY($1)`, [ids]);
   return rows;
 }
@@ -53,6 +56,7 @@ export default async function realModule(app: FastifyInstance, ctx: AppContext) 
       [u.id],
     );
     if (Number(today.rows[0].n) >= REALS_PER_DAY) throw new AppError(429, 'real_limit', `You can share ${REALS_PER_DAY} Reals a day.`);
+    if (input.visibility === 'public') await requireVerified(db, ctx.config, u.id, 'post');
     const postId = await tx(db, async (c) => {
       const media = await freshMedia(c, u.id, input.mediaIds);
       if (media.some((m) => m.kind !== 'image')) throw badRequest('Real is for photos.');
@@ -172,11 +176,12 @@ export default async function realModule(app: FastifyInstance, ctx: AppContext) 
       [id],
     );
     const contributions = await db.query(
-      `SELECT c.id, c.caption, c.captured_at, md.url, md.kind, md.alt_text,
+      `SELECT c.id, c.caption, c.captured_at, md.url, md.kind, md.alt_text, md.moderation,
               pr.user_id AS u_id, pr.username AS u_username, pr.display_name AS u_display_name, pr.avatar_url AS u_avatar_url, pr.mode AS u_mode
        FROM together_contributions c JOIN profiles pr ON pr.user_id = c.user_id LEFT JOIN media md ON md.id = c.media_id
-       WHERE c.together_id = $1 AND c.deleted_at IS NULL ORDER BY c.captured_at, c.created_at`,
-      [id],
+       WHERE c.together_id = $1 AND c.deleted_at IS NULL AND md.moderation IS DISTINCT FROM 'blocked'
+         AND (md.moderation IS DISTINCT FROM 'sensitive' OR $2) ORDER BY c.captured_at, c.created_at`,
+      [id, await isAdultViewer(db, userId)],
     );
     return {
       id: t.id,
@@ -190,7 +195,7 @@ export default async function realModule(app: FastifyInstance, ctx: AppContext) 
         id: c.id,
         caption: c.caption,
         capturedAt: c.captured_at,
-        media: c.url ? { url: c.url, kind: c.kind, altText: c.alt_text } : null,
+        media: c.url ? { url: c.url, kind: c.kind, altText: c.alt_text, ...(c.moderation === 'sensitive' ? { sensitive: true } : {}) } : null,
         author: publicUserFrom(c, 'u_'),
       })),
     };

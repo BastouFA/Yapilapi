@@ -1983,3 +1983,78 @@ video.chat-att__media {
     animation: none;
   }
 }
+
+/* Launch safety: honeypot, verification, held messages, sensitive chat media */
+.hp-field {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.verify-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.verify-row > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.chat-held {
+  align-self: flex-end;
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+.chat-att__sensitive {
+  position: relative;
+  min-width: 200px;
+  min-height: 160px;
+  background: #000;
+}
+.chat-att__sensitive img {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+}
+.chat-att__removed {
+  margin: 0;
+  font-size: 14px;
+  font-style: italic;
+  opacity: 0.8;
+}
+.risk-signals {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.risk-signals li {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface-sunken);
+  font-size: 14px;
+}
+.risk-signals li[data-status='open'] {
+  border-inline-start: 3px solid var(--saffron);
+}
+.case-media {
+  position: relative;
+  max-width: 320px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+}
+.case-media img {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+}

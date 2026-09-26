@@ -78,6 +78,10 @@ const TEXT: Record<string, (actor: string) => string> = {
   subscription_started: (a) => `${a} subscribed to you`,
   invite_joined: (a) => `${a} joined YAPILAPI with your invite`,
   plus_referral_reward: () => 'You have 30 more days of YAPILAPI Plus, thanks to friends you invited',
+  media_blocked: () => "A photo or video you shared wasn't posted. Our team will check it",
+  media_restored: () => 'Your photo or video is back up after review',
+  account_limited: () => 'Your account is limited while our team reviews some recent activity',
+  account_review: () => 'Our team finished reviewing your account',
 };
 
 /** Human text for a notification type, or null for types that shouldn't push. */

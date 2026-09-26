@@ -46,7 +46,9 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
     const q = (sql: string) => db.query(sql, [u.id]).then((r) => r.rows);
     const data = {
       exportedAt: new Date().toISOString(),
-      account: (await q(`SELECT id, email, email_verified_at, role, status, birth_date, created_at FROM users WHERE id = $1`))[0],
+      account: (
+        await q(`SELECT id, email, email_verified_at, phone_e164, phone_verified_at, role, status, birth_date, created_at FROM users WHERE id = $1`)
+      )[0],
       profile: (await q(`SELECT username, display_name, bio, avatar_url, cover_url, links, mode, locale, is_private FROM profiles WHERE user_id = $1`))[0],
       interests: await q(`SELECT t.slug FROM user_interests ui JOIN topics t ON t.id = ui.topic_id WHERE ui.user_id = $1`),
       following: await q(`SELECT followee_id, created_at FROM follows WHERE follower_id = $1`),
@@ -82,7 +84,8 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
     if (!(await verifyPassword(password, rows[0]?.password_hash))) throw badRequest('Your password is incorrect.', { fields: { password: 'Incorrect.' } });
     await tx(db, async (c) => {
       await c.query(
-        `UPDATE users SET status = 'deleted', deleted_at = now(), email = 'deleted+' || id || '@deleted.invalid', password_hash = NULL, birth_date = NULL WHERE id = $1`,
+        `UPDATE users SET status = 'deleted', deleted_at = now(), email = 'deleted+' || id || '@deleted.invalid', password_hash = NULL, birth_date = NULL,
+           phone_e164 = NULL, phone_verified_at = NULL WHERE id = $1`,
         [u.id],
       );
       await c.query(

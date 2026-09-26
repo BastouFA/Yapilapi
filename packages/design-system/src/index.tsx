@@ -28,6 +28,7 @@ export {
   AIPanel,
   BottomSheet,
   CaptionTracks,
+  SensitiveCover,
   ChatBubble,
   CommunityCard,
   EmptyState,

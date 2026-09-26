@@ -19,6 +19,7 @@ import {
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
 import { Button, Card, Field, Icon, Notice, Screen, Segmented, useColors, useTabBarSpace } from '../../lib/ui';
+import { isVerificationError, VerifyPrompt } from '../../lib/safety';
 
 const VISIBILITY = [
   { id: 'public', label: 'visibility.public' },
@@ -61,6 +62,7 @@ export default function Create() {
   const [denied, setDenied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [needsVerify, setNeedsVerify] = useState(false);
   const [busy, setBusy] = useState(false);
   const uploading = progress !== null;
 
@@ -130,6 +132,7 @@ export default function Create() {
     setBusy(true);
     setError(null);
     setNote(null);
+    setNeedsVerify(false);
     try {
       const api = await client();
       if (kind === 'story') {
@@ -154,7 +157,8 @@ export default function Create() {
       if (r.moderation) setNote(r.moderation.message);
       else router.navigate('/');
     } catch (e) {
-      setError(errorMessage(e));
+      if (isVerificationError(e)) setNeedsVerify(true);
+      else setError(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -238,6 +242,7 @@ export default function Create() {
           onChange={setVisibility}
         />
         {error ? <Notice tone="danger">{error}</Notice> : null}
+        {needsVerify || (me?.needsVerification && kind !== 'story' && visibility === 'public') ? <VerifyPrompt action="post" /> : null}
         {note ? <Notice>{note}</Notice> : null}
         <Button
           label={

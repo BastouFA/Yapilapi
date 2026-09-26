@@ -8,7 +8,10 @@ import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { track } from '../lib/services.ts';
-import { ageOf, areFriends, isBlockedEitherWay, publicUserFrom, usersByIds } from '../lib/users.ts';
+import { ageOf, areFriends, isAdultViewer, isBlockedEitherWay, publicUserFrom, usersByIds } from '../lib/users.ts';
+import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
+import { assertMessagePace, assessMessage, flagContent, isRestricted, restrictedError } from '../lib/spam.ts';
+import { requireVerified } from '../lib/verification.ts';
 import { me, requireAuth, resolveSession, sessionTokenOf } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -60,22 +63,58 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       if (controls.messagesFrom === 'nobody' || !(await areFriends(db, senderId, recipientId)))
         throw new AppError(403, 'family_controls', 'Family settings on this account limit who it can message.');
     }
+    // Messaging people who aren't friends needs a confirmed email or phone, and isn't open to limited accounts.
+    if (!(await areFriends(db, senderId, recipientId))) {
+      await requireVerified(db, ctx.config, senderId, 'message');
+      if (await isRestricted(db, senderId)) throw restrictedError('message');
+    }
+  }
+
+  type Attachment = Message['attachments'][number];
+  /**
+   * Attachments follow the media's current moderation verdict when they're read:
+   * blocked media is replaced by an empty placeholder for everyone, sensitive
+   * media is marked (shown blurred) for adults and replaced for everyone else.
+   */
+  async function withVerdicts<T extends { attachments: Attachment[] | null }>(items: T[], adult: boolean): Promise<T[]> {
+    const ids = [...new Set(items.flatMap((m) => (m.attachments ?? []).map((a) => a.mediaId).filter((x): x is string => !!x)))];
+    if (!ids.length) return items;
+    const { rows } = await db.query<{ id: string; moderation: string }>(`SELECT id, moderation FROM media WHERE id = ANY($1::uuid[])`, [ids]);
+    const verdict = new Map(rows.map((r) => [r.id, r.moderation]));
+    const hide = (a: Attachment): Attachment => ({ kind: a.kind, mediaId: a.mediaId, url: '', removed: true });
+    return items.map((m) => ({
+      ...m,
+      attachments: (m.attachments ?? []).map((a) => {
+        const v = a.mediaId ? verdict.get(a.mediaId) : undefined;
+        if (v === 'blocked') return hide(a);
+        if (v === 'sensitive') return adult ? { ...a, sensitive: true } : hide(a);
+        return a;
+      }),
+    }));
   }
 
   async function loadConversations(userId: string, ids?: string[]): Promise<Conversation[]> {
     const { rows } = await db.query(
       `SELECT c.id, c.kind, c.title, c.last_message_at, cm.last_read_at,
-         (SELECT count(*) FROM messages m WHERE m.conversation_id = c.id AND m.created_at > cm.last_read_at AND m.sender_id <> $1 AND m.deleted_at IS NULL) AS unread,
+         (SELECT count(*) FROM messages m WHERE m.conversation_id = c.id AND m.created_at > cm.last_read_at AND m.sender_id <> $1 AND m.deleted_at IS NULL
+            AND m.moderation_status = 'normal') AS unread,
          (SELECT array_agg(user_id) FROM conversation_members WHERE conversation_id = c.id AND left_at IS NULL) AS member_ids,
          lm.id AS lm_id, lm.body AS lm_body, lm.created_at AS lm_created_at, lm.sender_id AS lm_sender, lm.attachments AS lm_attachments
        FROM conversation_members cm JOIN conversations c ON c.id = cm.conversation_id
-       LEFT JOIN LATERAL (SELECT id, body, created_at, sender_id, attachments FROM messages WHERE conversation_id = c.id AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1) lm ON true
+       LEFT JOIN LATERAL (SELECT id, body, created_at, sender_id, attachments FROM messages
+                          WHERE conversation_id = c.id AND deleted_at IS NULL AND (moderation_status = 'normal' OR (moderation_status = 'review' AND sender_id = $1))
+                          ORDER BY created_at DESC LIMIT 1) lm ON true
        WHERE cm.user_id = $1 AND cm.left_at IS NULL ${ids ? 'AND c.id = ANY($2)' : ''}
        ORDER BY c.last_message_at DESC LIMIT 100`,
       ids ? [userId, ids] : [userId],
     );
     const users = await usersByIds(db, [...new Set(rows.flatMap((r) => r.member_ids ?? []))]);
-    return rows.map((r) => ({
+    const adult = await isAdultViewer(db, userId);
+    const withLast = await withVerdicts(
+      rows.map((r) => ({ ...r, attachments: r.lm_attachments as Attachment[] | null })),
+      adult,
+    );
+    return withLast.map((r) => ({
       id: r.id,
       kind: r.kind,
       title: r.title,
@@ -87,7 +126,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
             sender: users.get(r.lm_sender)!,
             body: r.lm_body,
             replyToId: null,
-            attachments: r.lm_attachments,
+            attachments: r.attachments ?? [],
             createdAt: r.lm_created_at.toISOString(),
           }
         : null,
@@ -179,17 +218,18 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     await assertMember(id, u.id);
     const c = decodeCursor<KeyCursor>(q.cursor);
     const { rows } = await db.query(
-      `SELECT m.id, m.conversation_id, m.body, m.reply_to_id, m.attachments, m.created_at, m.client_id,
+      `SELECT m.id, m.conversation_id, m.body, m.reply_to_id, m.attachments, m.created_at, m.client_id, m.moderation_status,
               pr.user_id AS s_id, pr.username AS s_username, pr.display_name AS s_display_name, pr.avatar_url AS s_avatar_url, pr.mode AS s_mode
        FROM messages m JOIN profiles pr ON pr.user_id = m.sender_id
        WHERE m.conversation_id = $1 AND m.deleted_at IS NULL
+         AND (m.moderation_status = 'normal' OR (m.moderation_status = 'review' AND m.sender_id = $2))
          AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $2 AND b.blocked_id = m.sender_id)
          ${c ? 'AND (m.created_at, m.id) < ($4::timestamptz, $5::uuid)' : ''}
        ORDER BY m.created_at DESC, m.id DESC LIMIT $3`,
       c ? [id, u.id, q.limit + 1, c.t, c.id] : [id, u.id, q.limit + 1],
     );
     const page = rows.slice(0, q.limit);
-    const items: Message[] = page.map(toMessage).reverse();
+    const items: Message[] = (await withVerdicts(page.map(toMessage), await isAdultViewer(db, u.id))).reverse();
     return { items, nextCursor: rows.length > q.limit ? keyCursorOf(page.at(-1)!) : null };
   });
 
@@ -200,10 +240,15 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     await assertMember(id, u.id);
     const members = await memberIds(id);
     const conv = (await db.query(`SELECT kind FROM conversations WHERE id = $1`, [id])).rows[0];
+    let toStranger = false;
     if (conv.kind === 'direct') {
       const other = members.find((m) => m !== u.id);
-      if (other) await assertCanMessage(u.id, u.birthDate, other);
+      if (other) {
+        await assertCanMessage(u.id, u.birthDate, other);
+        toStranger = !(await areFriends(db, u.id, other));
+      }
     }
+    await assertMessagePace(db, ctx.config, u.id);
     const analysis = analyzeText(input.body);
     if (analysis.risk === 'escalate') {
       await db.query(
@@ -217,10 +262,11 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     if (input.attachments.length) {
       const ids = input.attachments.map((a) => a.mediaId);
       const { rows: media } = await db.query(
-        `SELECT id, kind, url, variants, poster_url, duration_ms FROM media WHERE id = ANY($1::uuid[]) AND owner_id = $2 AND status <> 'failed'`,
+        `SELECT id, kind, url, variants, poster_url, duration_ms, moderation FROM media WHERE id = ANY($1::uuid[]) AND owner_id = $2 AND status <> 'failed'`,
         [ids, u.id],
       );
       if (media.length !== new Set(ids).size) throw notFound('That photo, video or voice message');
+      if (media.some((m) => m.moderation === 'blocked')) throw new AppError(422, 'media_blocked', MEDIA_BLOCKED_MESSAGE);
       const byId = new Map(media.map((m) => [m.id as string, m]));
       attachments = input.attachments.map((a) => {
         const m = byId.get(a.mediaId)!;
@@ -234,15 +280,26 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
         };
       });
     }
+    // Messages to people who aren't friends are checked for spam; flagged ones wait for a moderator before delivery.
+    const spam = toStranger ? await assessMessage(db, ctx.config, u.id, id, input.body) : null;
+    const held = !!spam?.flags.length;
     const row = await tx(db, async (c) => {
       const { rows } = await c.query(
-        `INSERT INTO messages (conversation_id, sender_id, body, reply_to_id, attachments, client_id) VALUES ($1,$2,$3,$4,$5,$6)
+        `INSERT INTO messages (conversation_id, sender_id, body, reply_to_id, attachments, client_id, moderation_status) VALUES ($1,$2,$3,$4,$5,$6,$7)
          ON CONFLICT (sender_id, client_id) WHERE client_id IS NOT NULL DO UPDATE SET client_id = EXCLUDED.client_id
-         RETURNING id, conversation_id, body, reply_to_id, attachments, created_at, client_id`,
-        [id, u.id, input.body, input.replyToId ?? null, JSON.stringify(attachments), input.clientId ?? null],
+         RETURNING id, conversation_id, body, reply_to_id, attachments, created_at, client_id, moderation_status`,
+        [id, u.id, input.body, input.replyToId ?? null, JSON.stringify(attachments), input.clientId ?? null, held ? 'review' : 'normal'],
       );
-      await c.query(`UPDATE conversations SET last_message_at = now() WHERE id = $1`, [id]);
+      if (!held) await c.query(`UPDATE conversations SET last_message_at = now() WHERE id = $1`, [id]);
       await c.query(`UPDATE conversation_members SET last_read_at = now() WHERE conversation_id = $1 AND user_id = $2`, [id, u.id]);
+      if (held && spam) {
+        await c.query(
+          `INSERT INTO moderation_cases (target_type, target_id, subject_user_id, source, risk, signals) VALUES ('message', $1, $2, 'automated', 'review', $3)
+           ON CONFLICT DO NOTHING`,
+          [rows[0].id, u.id, { signals: spam.flags.map((f) => f.kind), spam: spam.flags }],
+        );
+        await flagContent(c, ctx.realtime, u.id, { type: 'message', id: rows[0].id }, spam.flags);
+      }
       return rows[0];
     });
     const sender = (await usersByIds(db, [u.id])).get(u.id)!;
@@ -255,11 +312,37 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       attachments: row.attachments,
       createdAt: row.created_at.toISOString(),
       clientId: row.client_id,
+      ...(row.moderation_status === 'review' ? { moderation: 'review' as const } : {}),
     };
-    await ctx.realtime.publish(members, { type: 'message.created', data: message });
+    if (row.moderation_status === 'review') {
+      // Held: only the sender sees it until a moderator lets it through.
+      await ctx.realtime.publish([u.id], { type: 'message.created', data: message });
+      reply.code(201);
+      return {
+        message,
+        notice:
+          'We’re holding this message for a quick check before it’s delivered. This sometimes happens with messages to people you aren’t friends with yet.',
+      };
+    }
+    // Sensitive attachments are marked for adults and replaced for everyone else.
+    const adults = new Set(
+      (
+        await db.query<{ id: string }>(`SELECT id FROM users WHERE id = ANY($1::uuid[]) AND birth_date <= current_date - interval '18 years'`, [members])
+      ).rows.map((r) => r.id),
+    );
+    const [forAdults] = await withVerdicts([message], true);
+    const [forOthers] = await withVerdicts([message], false);
+    await ctx.realtime.publish(
+      members.filter((m) => adults.has(m)),
+      { type: 'message.created', data: forAdults },
+    );
+    await ctx.realtime.publish(
+      members.filter((m) => !adults.has(m)),
+      { type: 'message.created', data: forOthers },
+    );
     track(db, u.id, 'message_sent', { kind: conv.kind });
     reply.code(201);
-    return { message };
+    return { message: adults.has(u.id) ? forAdults : forOthers };
   });
 
   app.post('/v1/conversations/:id/read', { preHandler: requireAuth }, async (req) => {
@@ -356,5 +439,6 @@ function toMessage(r: Record<string, any>): Message {
     attachments: r.attachments,
     createdAt: r.created_at.toISOString(),
     clientId: r.client_id,
+    ...(r.moderation_status === 'review' ? { moderation: 'review' as const } : {}),
   };
 }

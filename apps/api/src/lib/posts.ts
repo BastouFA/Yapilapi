@@ -1,12 +1,14 @@
 import type { Pool, PoolClient } from 'pg';
-import type { Post } from '@yapilapi/shared';
-import { plusCol, publicUserFrom } from './users.ts';
+import type { MediaItem, Post } from '@yapilapi/shared';
+import { isAdultViewer, plusCol, publicUserFrom } from './users.ts';
 
 type Q = Pool | PoolClient;
 
 /** Load full Post DTOs for ids (already authorized by the caller), preserving order. */
 export async function hydratePosts(db: Q, ids: string[], viewer: string | null, reasons?: Map<string, string>): Promise<Post[]> {
   if (!ids.length) return [];
+  // Media the automated check marked sensitive is never sent to people under 18 (or whose age we don't know); blocked media to nobody.
+  const adult = await isAdultViewer(db, viewer);
   const { rows } = await db.query(
     `SELECT p.id, p.kind, p.format, p.body, p.visibility, p.link_url, p.topics, p.like_count, p.comment_count, p.view_count, p.created_at, p.ai_provenance, p.metadata->'real' AS real,
             pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode, ${plusCol('a_')},
@@ -16,10 +18,11 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
             EXISTS (SELECT 1 FROM reactions r WHERE r.post_id = p.id AND r.user_id = $2) AS liked,
             EXISTS (SELECT 1 FROM saves s WHERE s.post_id = p.id AND s.user_id = $2) AS saved,
             EXISTS (SELECT 1 FROM post_reposts rp WHERE rp.post_id = p.id AND rp.user_id = $2) AS reposted, p.repost_count,
-            (SELECT coalesce(json_agg(json_build_object('id', m.id, 'kind', m.kind, 'url', m.url, 'altText', m.alt_text, 'width', m.width, 'height', m.height, 'variants', m.variants, 'posterUrl', m.poster_url, 'hlsUrl', m.hls_url, 'placeholder', m.blurhash,
+            (SELECT coalesce(json_agg(json_build_object('id', m.id, 'kind', m.kind, 'url', m.url, 'altText', m.alt_text, 'width', m.width, 'height', m.height, 'variants', m.variants, 'posterUrl', m.poster_url, 'hlsUrl', m.hls_url, 'placeholder', m.blurhash, 'sensitive', m.moderation = 'sensitive',
                                                    'captions', (SELECT coalesce(json_agg(json_build_object('lang', ct.lang, 'label', ct.label, 'url', ct.url) ORDER BY ct.lang), '[]')
                                                                 FROM caption_tracks ct WHERE ct.media_id = m.id AND ct.status = 'ready')) ORDER BY pm.position), '[]')
-               FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id) AS media,
+               FROM post_media pm JOIN media m ON m.id = pm.media_id
+               WHERE pm.post_id = p.id AND m.moderation <> 'blocked' AND (m.moderation <> 'sensitive' OR $3)) AS media,
             (SELECT json_agg(json_build_object('id', o.id, 'label', o.label, 'votes', (SELECT count(*) FROM poll_votes v WHERE v.option_id = o.id)) ORDER BY o.position)
                FROM poll_options o WHERE o.post_id = p.id) AS poll_options,
             (SELECT option_id FROM poll_votes v WHERE v.post_id = p.id AND v.user_id = $2) AS my_vote,
@@ -30,7 +33,7 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
      LEFT JOIN events e ON e.id = p.event_id AND e.deleted_at IS NULL
      LEFT JOIN products pd ON pd.id = p.product_id AND pd.deleted_at IS NULL
      WHERE p.id = ANY($1)`,
-    [ids, viewer],
+    [ids, viewer, adult],
   );
   const byId = new Map<string, Post>(
     rows.map((r) => [
@@ -41,7 +44,7 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
         body: r.body,
         visibility: r.visibility,
         author: publicUserFrom(r, 'a_'),
-        media: r.media,
+        media: (r.media as (MediaItem & { sensitive: boolean })[]).map(({ sensitive, ...m }) => (sensitive ? { ...m, sensitive: true } : m)),
         linkUrl: r.link_url,
         poll: r.poll_options ? { options: r.poll_options, myVote: r.my_vote } : null,
         topics: r.topics,

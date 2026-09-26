@@ -101,39 +101,80 @@ export function Segments<T extends string>({
 }
 
 // ── Media ───────────────────────────────────────────────────────────────
+/**
+ * Covers media that automated checks marked sensitive. Place it inside a
+ * positioned box over the (blurred) media; only the button takes clicks, so
+ * controls around it keep working.
+ */
+export function SensitiveCover({ onReveal, compact }: { onReveal: () => void; compact?: boolean }) {
+  return (
+    <div className={cx('yp-sensitive', compact && 'yp-sensitive--compact')}>
+      <Icon name="eye" size={compact ? 18 : 24} />
+      <span>Sensitive content.</span>
+      <button
+        type="button"
+        className="yp-sensitive__view"
+        aria-label="View sensitive content"
+        onClick={(e) => {
+          e.stopPropagation();
+          onReveal();
+        }}
+      >
+        View
+      </button>
+    </div>
+  );
+}
+
 export function MediaGrid({ media }: { media: MediaItem[] }) {
   const [open, setOpen] = useState<number | null>(null);
+  // One choice per post: viewing one sensitive item shows the others too.
+  const [revealed, setRevealed] = useState(false);
   if (!media.length) return null;
   const shown = media.slice(0, 4);
+  const hidden = (m: MediaItem) => !!m.sensitive && !revealed;
+  // The full-screen viewer only steps through what isn't covered.
+  const viewable = media.filter((m) => !hidden(m));
   return (
     <>
       <div className={cx('yp-media', `yp-media--${Math.min(shown.length, 4)}`)}>
-        {shown.map((m, i) => (
-          <button
-            key={m.id}
-            type="button"
-            className="yp-media__item"
-            onClick={() => setOpen(i)}
-            aria-label={m.altText ? `Open: ${m.altText}` : `Open media ${i + 1} of ${media.length}`}
-          >
-            {m.kind === 'video' ? (
-              <video src={m.variants?.mp4 ?? m.url} poster={m.posterUrl ?? undefined} muted playsInline preload="metadata" />
-            ) : m.kind === 'audio' ? (
-              <span className="yp-media__more">♪</span>
-            ) : (
-              <img
-                src={(shown.length > 1 ? m.variants?.medium : (m.variants?.large ?? m.variants?.medium)) ?? m.url}
-                alt={m.altText ?? ''}
-                loading="lazy"
-                decoding="async"
-                style={m.placeholder ? { backgroundImage: `url(${m.placeholder})`, backgroundSize: 'cover' } : undefined}
-              />
-            )}
-            {i === 3 && media.length > 4 ? <span className="yp-media__more">+{media.length - 4}</span> : null}
-          </button>
-        ))}
+        {shown.map((m, i) =>
+          hidden(m) ? (
+            <div key={m.id} className="yp-media__item yp-media__item--sensitive">
+              {m.placeholder || m.posterUrl || m.variants?.thumb ? (
+                <img src={m.placeholder ?? m.posterUrl ?? m.variants?.thumb} alt="" aria-hidden className="yp-blurred" />
+              ) : null}
+              <SensitiveCover onReveal={() => setRevealed(true)} />
+            </div>
+          ) : (
+            <button
+              key={m.id}
+              type="button"
+              className="yp-media__item"
+              onClick={() => setOpen(i)}
+              aria-label={m.altText ? `Open: ${m.altText}` : `Open media ${i + 1} of ${media.length}`}
+            >
+              {m.kind === 'video' ? (
+                <video src={m.variants?.mp4 ?? m.url} poster={m.posterUrl ?? undefined} muted playsInline preload="metadata" />
+              ) : m.kind === 'audio' ? (
+                <span className="yp-media__more">♪</span>
+              ) : (
+                <img
+                  src={(shown.length > 1 ? m.variants?.medium : (m.variants?.large ?? m.variants?.medium)) ?? m.url}
+                  alt={m.altText ?? ''}
+                  loading="lazy"
+                  decoding="async"
+                  style={m.placeholder ? { backgroundImage: `url(${m.placeholder})`, backgroundSize: 'cover' } : undefined}
+                />
+              )}
+              {i === 3 && media.length > 4 ? <span className="yp-media__more">+{media.length - 4}</span> : null}
+            </button>
+          ),
+        )}
       </div>
-      {open !== null ? <MediaViewer media={media} index={open} onClose={() => setOpen(null)} /> : null}
+      {open !== null && viewable.length ? (
+        <MediaViewer media={viewable} index={Math.max(0, viewable.indexOf(media[open]!))} onClose={() => setOpen(null)} />
+      ) : null}
     </>
   );
 }

@@ -28,6 +28,7 @@ import { client, errorMessage, mediaUrl } from './api';
 import { useT } from './i18n';
 import { gradient, radius, space } from './theme';
 import { Avatar, Icon, useColors, userText } from './ui';
+import { SensitiveCover } from './safety';
 
 const PHOTO_MS = 5000;
 const WHITE = '#FFFFFF';
@@ -151,7 +152,10 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
   const [viewers, setViewers] = useState<{ user: PublicUser; liked: boolean }[] | null>(null);
   const group = groups[g];
   const story = group?.moments[i];
-  const stopped = held || paused || typing || viewers !== null;
+  // Sensitive stories wait, blurred and paused, until the viewer chooses to see them.
+  const [revealed, setRevealed] = useState<string[]>([]);
+  const covered = !!story?.sensitive && !revealed.includes(story.id);
+  const stopped = held || paused || typing || viewers !== null || covered;
 
   const next = useCallback(() => {
     if (!group) return onClose();
@@ -305,7 +309,20 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
           }}
           {...pan.panHandlers}
         >
-          {story.mediaKind === 'video' && uri ? (
+          {covered && uri ? (
+            <>
+              {story.mediaKind === 'image' || story.posterUrl ? (
+                <Image
+                  key={story.id}
+                  source={{ uri: story.mediaKind === 'image' ? uri : mediaUrl(story.posterUrl!) }}
+                  blurRadius={50}
+                  style={StyleSheet.absoluteFill}
+                  resizeMode="cover"
+                />
+              ) : null}
+              <SensitiveCover onReveal={() => setRevealed((r) => [...r, story.id])} />
+            </>
+          ) : story.mediaKind === 'video' && uri ? (
             <StoryVideo key={story.id} uri={uri} paused={stopped} onProgress={setProgress} onEnd={next} />
           ) : story.mediaKind === 'image' && uri ? (
             <Image

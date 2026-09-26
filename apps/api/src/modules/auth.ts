@@ -8,6 +8,7 @@ import type { AppContext } from '../lib/context.ts';
 import { audit, securityEvent, track } from '../lib/services.ts';
 import { ageOf } from '../lib/users.ts';
 import { announceReferral, applyReferral, inviterByCode, qualifyReferral } from '../lib/invites.ts';
+import { recordSignals, scoreSignup } from '../lib/spam.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 import { registerMfa } from './mfa.ts';
 import { registerPasskeys } from './passkeys.ts';
@@ -17,7 +18,7 @@ const authLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } };
 
 export async function loadMe(ctx: AppContext, userId: string): Promise<Me> {
   const { rows } = await ctx.db.query(
-    `SELECT u.id, u.email, u.email_verified_at, u.role, u.onboarded_at, pr.username, pr.display_name, pr.avatar_url, pr.mode, pr.locale, pr.country, pr.plus_until
+    `SELECT u.id, u.email, u.email_verified_at, u.phone_e164, u.phone_verified_at, u.restricted_at, u.role, u.onboarded_at, pr.username, pr.display_name, pr.avatar_url, pr.mode, pr.locale, pr.country, pr.plus_until
      FROM users u JOIN profiles pr ON pr.user_id = u.id WHERE u.id = $1`,
     [userId],
   );
@@ -27,6 +28,10 @@ export async function loadMe(ctx: AppContext, userId: string): Promise<Me> {
     id: r.id,
     email: r.email,
     emailVerified: !!r.email_verified_at,
+    phone: r.phone_e164 ?? null,
+    phoneVerified: !!r.phone_verified_at,
+    needsVerification: ctx.config.REQUIRE_VERIFICATION && !r.email_verified_at && !r.phone_verified_at,
+    ...(r.restricted_at ? { limited: true } : {}),
     role: r.role,
     onboarded: !!r.onboarded_at,
     username: r.username,
@@ -84,12 +89,19 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
 
   app.post('/v1/auth/register', { config: authLimit }, async (req, reply) => {
     const input = parse(registerSchema, req.body);
+    // The web form has a field people never see or fill in; bots that fill every field get a plain refusal.
+    if (input.website) {
+      await securityEvent(ctx.db, null, 'signup_blocked', req.ip, req.headers['user-agent'], { reason: 'honeypot' });
+      throw new AppError(400, 'signup_blocked', 'We couldn’t create your account. Try again, or contact support if this keeps happening.');
+    }
     if (input.birthDate) {
       const age = ageOf(input.birthDate);
       if (age === null || age < MIN_AGE)
         throw badRequest(`You need to be at least ${MIN_AGE} to join.`, { fields: { birthDate: `You need to be at least ${MIN_AGE}.` } });
     }
     const passwordHash = await hashPassword(input.password);
+    // Risk signals (throwaway email, many sign-ups from one network) never block a sign-up; moderators see them.
+    const risk = await scoreSignup(ctx.db, ctx.config, { email: input.email, ip: req.ip });
     let inviterId: string | null = null;
     const userId = await tx(ctx.db, async (c) => {
       const taken = await c.query(
@@ -123,6 +135,7 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
         [id],
       );
       await securityEvent(c, id, 'account_created', req.ip, req.headers['user-agent']);
+      await recordSignals(c, id, risk);
       if (inviter) {
         await applyReferral(c, { id, email: input.email, birthDate: input.birthDate ?? null, createdAt: u.rows[0]!.created_at }, inviter);
         inviterId = inviter.id;

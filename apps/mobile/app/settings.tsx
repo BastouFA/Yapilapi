@@ -6,8 +6,9 @@ import { useT, type Translator } from '../lib/i18n';
 import { useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
 import { Avatar, Button, Card, Field, Loading, Notice, Segmented, SwitchRow, Title, useColors, userText } from '../lib/ui';
+import { VerificationCard } from '../lib/safety';
 
-/** Settings: family supervision and advertising consent (same endpoints as the web settings page). */
+/** Settings: email and phone confirmation, family supervision and advertising consent (same endpoints as the web settings page). */
 export default function Settings() {
   const c = useColors();
   const { t } = useT();
@@ -25,6 +26,7 @@ export default function Settings() {
       contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
       keyboardShouldPersistTaps="handled"
     >
+      <VerificationCard />
       <Family />
       <Advertising />
     </ScrollView>

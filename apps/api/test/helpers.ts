@@ -3,7 +3,8 @@ import type { FastifyInstance } from 'fastify';
 import { buildApp, type BuiltApp } from '../src/app.ts';
 import { loadConfig } from '../src/config.ts';
 
-export async function testApp(): Promise<BuiltApp> {
+/** A test app; `env` overrides settings (e.g. SPAM_CHECKS or REQUIRE_VERIFICATION) for one test file. */
+export async function testApp(env: Record<string, string> = {}): Promise<BuiltApp> {
   const config = loadConfig({
     ...process.env,
     APP_ENV: 'test',
@@ -12,6 +13,7 @@ export async function testApp(): Promise<BuiltApp> {
     AI_PROVIDER: 'dev',
     UPLOAD_DIR: `/tmp/ypl-test-uploads`,
     RATE_LIMIT_MAX: '10000',
+    ...env,
   });
   return buildApp(config, { logger: false });
 }

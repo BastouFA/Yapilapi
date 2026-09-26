@@ -9,6 +9,7 @@ import { client, errorMessage, mediaUrl } from '../../lib/api';
 import { clock, pickOne, uploadPicked } from '../../lib/media';
 import { useT } from '../../lib/i18n';
 import { conversationTitle } from '../../lib/post';
+import { isVerificationError, SensitiveCover, UnavailableMedia, VerifyPrompt } from '../../lib/safety';
 import { useRealtime, useSession } from '../../lib/session';
 import { elevation, gradient, radius, space } from '../../lib/theme';
 import { Icon, Notice, useColors, userText } from '../../lib/ui';
@@ -26,7 +27,12 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [needsVerify, setNeedsVerify] = useState(false);
   const list = useRef<FlatList<Message>>(null);
+  const fail = (e: unknown) => {
+    if (isVerificationError(e)) setNeedsVerify(true);
+    else setError(errorMessage(e));
+  };
 
   const load = useCallback(async () => {
     try {
@@ -50,7 +56,7 @@ export default function Chat() {
       setMessages((cur) => (cur.some((x) => x.id === m.id || (m.clientId && x.clientId === m.clientId)) ? cur : [...cur, m]));
       void client().then((api) => api.conversations.read(id).catch(() => {}));
     }
-    if (e.type === 'message.deleted' && e.data?.conversationId === id) void load();
+    if ((e.type === 'message.deleted' || e.type === 'message.released') && e.data?.conversationId === id) void load();
     if (e.type === 'app.foreground') void load();
   });
 
@@ -90,7 +96,7 @@ export default function Chat() {
       const { message } = await (await client()).conversations.send(id, '', clientId, [{ mediaId: media.id }]);
       setMessages((cur) => (cur.some((x) => x.id === message.id) ? cur : [...cur, message]));
     } catch (e) {
-      setError(errorMessage(e));
+      fail(e);
     } finally {
       setSending(false);
     }
@@ -106,7 +112,7 @@ export default function Chat() {
       setMessages((cur) => (cur.some((x) => x.id === message.id) ? cur : [...cur, message]));
     } catch (e) {
       setBody(text);
-      setError(errorMessage(e));
+      fail(e);
     }
   }
 
@@ -119,6 +125,11 @@ export default function Chat() {
       {error ? (
         <View style={{ padding: space[3] }}>
           <Notice tone="danger">{error}</Notice>
+        </View>
+      ) : null}
+      {needsVerify ? (
+        <View style={{ padding: space[3] }}>
+          <VerifyPrompt action="message" />
         </View>
       ) : null}
       <FlatList
@@ -134,10 +145,13 @@ export default function Chat() {
           // Your messages sit at the end edge (the right in English, the left in Arabic), with the
           // tail corner on that side.
           return mine ? (
-            <LinearGradient {...gradient(c)} style={[bubble, { alignSelf: 'flex-end', borderBottomEndRadius: 6 }]}>
-              {media}
-              {text ? <Text style={[{ color: c.onYapi, fontSize: 15, lineHeight: 21 }, userText]}>{text}</Text> : null}
-            </LinearGradient>
+            <View style={{ alignSelf: 'flex-end', maxWidth: '80%', gap: 2 }}>
+              <LinearGradient {...gradient(c)} style={[bubble, { maxWidth: '100%', alignSelf: 'flex-end', borderBottomEndRadius: 6 }]}>
+                {media}
+                {text ? <Text style={[{ color: c.onYapi, fontSize: 15, lineHeight: 21 }, userText]}>{text}</Text> : null}
+              </LinearGradient>
+              {item.moderation === 'review' ? <Text style={{ color: c.inkMuted, fontSize: 12, alignSelf: 'flex-end' }}>{t('m.chat.held')}</Text> : null}
+            </View>
           ) : (
             <View style={[bubble, { alignSelf: 'flex-start', backgroundColor: c.surface, borderBottomStartRadius: 6 }, elevation(c)]}>
               {conversation && conversation.members.length > 2 ? (
@@ -215,11 +229,28 @@ const bubble = { maxWidth: '80%', paddingHorizontal: space[3] + 2, paddingVertic
 /** Photos inline; videos and voice messages open in the player. */
 function Attachments({ items, tint }: { items: Message['attachments']; tint: string }) {
   const { t } = useT();
+  const [revealed, setRevealed] = useState<number[]>([]);
   if (!items.length) return null;
   return (
     <View style={{ gap: space[1] }}>
       {items.map((a, i) =>
-        a.kind === 'image' ? (
+        a.removed ? (
+          <UnavailableMedia key={i} tint={tint} />
+        ) : a.sensitive && !revealed.includes(i) ? (
+          <View key={i} style={{ width: 220, height: 160, borderRadius: radius.md, overflow: 'hidden', backgroundColor: '#000' }}>
+            {a.kind === 'image' || a.posterUrl ? (
+              <Image
+                source={{ uri: mediaUrl(a.kind === 'image' ? a.url : a.posterUrl!) }}
+                blurRadius={40}
+                style={{ width: 220, height: 160 }}
+                resizeMode="cover"
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+              />
+            ) : null}
+            <SensitiveCover compact onReveal={() => setRevealed((r) => [...r, i])} />
+          </View>
+        ) : a.kind === 'image' ? (
           <Pressable
             key={i}
             accessibilityRole="imagebutton"

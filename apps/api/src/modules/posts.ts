@@ -21,8 +21,11 @@ import { topicsFor } from './tags.ts';
 import { isPlus, PLUS_REEL_MAX_MS, REEL_MAX_MS } from '../lib/plus.ts';
 import { notify, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
-import { plusCol, publicUserFrom } from '../lib/users.ts';
+import { isAdultViewer, plusCol, publicUserFrom } from '../lib/users.ts';
 import { notBlockedSql, postVisibleSql } from '../lib/visibility.ts';
+import { assertPostPace, assessPost, flagContent, recordSignals } from '../lib/spam.ts';
+import { requireVerified } from '../lib/verification.ts';
+import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -55,6 +58,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     const { rows } = await db.query(
       `SELECT p.id ${POST_FROM}
        WHERE p.format = 'reel' AND ${VISIBLE} AND p.moderation_status = 'normal' AND p.created_at <= $2::timestamptz
+         AND ($5 OR NOT EXISTS (SELECT 1 FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id AND m.moderation = 'sensitive'))
        ORDER BY (
            CASE WHEN EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = p.author_id) OR (fr.user_b = $1 AND fr.user_a = p.author_id)) THEN 3 ELSE 0 END
          + CASE WHEN EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = p.author_id) THEN 2 ELSE 0 END
@@ -63,7 +67,8 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
          + 4.0 * exp(-extract(epoch FROM ($2::timestamptz - p.created_at)) / 86400.0)
        ) DESC, p.created_at DESC, p.id DESC
        LIMIT $3 OFFSET $4`,
-      [u.id, c.asOf, q.limit + 1, c.o],
+      // A reel is its video: people under 18 don't get reels whose video is marked sensitive.
+      [u.id, c.asOf, q.limit + 1, c.o, await isAdultViewer(db, u.id)],
     );
     const page = rows.slice(0, q.limit);
     const items = await hydratePosts(
@@ -95,6 +100,20 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
         'content_blocked',
         "This post can't be published because it may put someone at risk. If you or someone else is in danger, contact local emergency services.",
       );
+    // Reaching everyone needs a confirmed email or phone (when REQUIRE_VERIFICATION is on).
+    const reachesEveryone = input.visibility === 'public' || !!input.communityId;
+    if (reachesEveryone) await requireVerified(db, ctx.config, u.id, 'post');
+    await assertPostPace(db, ctx.config, u.id);
+    const spam = await assessPost(db, ctx.config, u.id, input.body);
+    const heldForAccount = spam.risky && reachesEveryone;
+    const status = spam.restricted
+      ? 'restricted'
+      : analysis.risk !== 'normal'
+        ? statusForRisk(analysis.risk)
+        : spam.flags.length || heldForAccount
+          ? 'review'
+          : 'normal';
+    let limitedNow = false;
 
     const kind = input.poll
       ? 'poll'
@@ -137,7 +156,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
           input.productId ?? null,
           input.linkUrl ?? null,
           topicsFor(input.topics, input.body),
-          statusForRisk(analysis.risk),
+          status,
           input.aiAssisted ? { assisted: true, at: new Date().toISOString() } : {},
           { owner: u.id, license: 'all_rights_reserved' },
           input.format,
@@ -148,12 +167,13 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
         let mediaId = m.id;
         if (mediaId) {
           // Reuse the uploaded item (only your own), updating its alt text.
-          const own = await c.query(`UPDATE media SET alt_text = coalesce($3, alt_text) WHERE id = $1 AND owner_id = $2 RETURNING id`, [
+          const own = await c.query(`UPDATE media SET alt_text = coalesce($3, alt_text) WHERE id = $1 AND owner_id = $2 RETURNING id, moderation`, [
             mediaId,
             u.id,
             m.altText ?? null,
           ]);
           if (!own.rowCount) throw notFound('One of the photos or videos');
+          if (own.rows[0].moderation === 'blocked') throw new AppError(422, 'media_blocked', MEDIA_BLOCKED_MESSAGE);
         } else {
           const media = await c.query<{ id: string }>(
             `INSERT INTO media (owner_id, kind, url, alt_text, width, height) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
@@ -178,24 +198,41 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
           await c.query(`INSERT INTO poll_options (post_id, label, position) VALUES ($1,$2,$3)`, [id, label, i]);
       if (input.visibility === 'selected' && input.audience)
         await c.query(`INSERT INTO post_audience (post_id, user_id) SELECT $1, unnest($2::uuid[]) ON CONFLICT DO NOTHING`, [id, input.audience]);
-      if (analysis.risk !== 'normal')
+      // Flagged posts go to a moderator with the signals that flagged them.
+      if (analysis.risk !== 'normal' || spam.flags.length || heldForAccount)
         await c.query(
           `INSERT INTO moderation_cases (target_type, target_id, subject_user_id, source, risk, signals) VALUES ('post', $1, $2, 'automated', $3, $4)`,
-          [id, u.id, analysis.risk, { signals: analysis.signals }],
+          [
+            id,
+            u.id,
+            analysis.risk !== 'normal' ? analysis.risk : 'review',
+            {
+              signals: [...analysis.signals, ...spam.flags.map((f) => f.kind), ...(heldForAccount ? ['risky_account'] : [])],
+              ...(spam.flags.length ? { spam: spam.flags } : {}),
+            },
+          ],
         );
+      limitedNow = await flagContent(c, ctx.realtime, u.id, { type: 'post', id }, spam.flags);
+      // Posts from a limited account wait with the account's review; clearing it publishes them.
+      if (spam.restricted) await recordSignals(c, u.id, [{ kind: 'held_while_limited', weight: 0 }], { type: 'post', id });
       return id;
     });
     track(db, u.id, 'post_created', { kind, visibility: input.visibility, community: !!input.communityId });
     await emitWebhook(db, u.id, 'post.created', { postId, kind, visibility: input.visibility });
-    if (analysis.risk === 'normal') await notifyMentions(db, ctx.realtime, { text: input.body, actorId: u.id, postId });
+    if (status === 'normal') await notifyMentions(db, ctx.realtime, { text: input.body, actorId: u.id, postId });
     reply.code(201);
     const [post] = await hydratePosts(db, [postId], u.id);
     return {
       post,
       moderation:
-        analysis.risk === 'normal'
+        status === 'normal'
           ? undefined
-          : { status: statusForRisk(analysis.risk), message: 'Your post is published to you only until it has been reviewed.' },
+          : spam.restricted || limitedNow
+            ? {
+                status,
+                message: 'Your account is limited while our team reviews some recent activity, so new posts are visible only to you for now.',
+              }
+            : { status, message: 'Your post is published to you only until it has been reviewed.' },
     };
   });
 

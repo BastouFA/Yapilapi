@@ -9,10 +9,13 @@ import { startRegistration } from '@simplewebauthn/browser';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { currentSubscription, disableBrowserPush, enableBrowserPush, pushSupported } from '@/lib/push';
 import { FamilyCard } from '@/components/Family';
+import { VerificationCard } from '@/components/Verification';
 import { useSession } from '../../providers';
 
 export default function Settings() {
-  const [tab, setTab] = useState(() => (typeof location !== 'undefined' && location.hash === '#moderation' ? 'safety' : 'profile'));
+  const [tab, setTab] = useState(() =>
+    typeof location === 'undefined' ? 'profile' : location.hash === '#moderation' ? 'safety' : location.hash === '#verification' ? 'security' : 'profile',
+  );
   return (
     <div className="yp-shell__inner">
       <div className="yp-topbar">
@@ -435,6 +438,7 @@ function SecuritySettings() {
   }, []);
   return (
     <div className="stack">
+      <VerificationCard />
       <Card title="Where you're signed in">
         <List>
           {sessions.map((s) => (

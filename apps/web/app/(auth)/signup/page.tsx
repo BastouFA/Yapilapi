@@ -49,6 +49,7 @@ function SignupForm() {
         birthDate: String(f.get('birthDate') || '') || undefined,
         locale: navigator.language,
         inviteCode: String(f.get('inviteCode') ?? '').trim() || undefined,
+        website: String(f.get('website') ?? '') || undefined,
       });
       setMe(user);
       router.replace('/onboarding');
@@ -106,6 +107,11 @@ function SignupForm() {
         maxLength={32}
         error={fields.inviteCode}
       />
+      {/* Left empty by people (it's hidden from view and from screen readers); forms that fill it in are refused. */}
+      <div className="hp-field" aria-hidden="true">
+        <label htmlFor="signup-website">Website</label>
+        <input id="signup-website" name="website" type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
+      </div>
       <Button type="submit" block loading={busy}>
         {t('auth.signup.submit')}
       </Button>

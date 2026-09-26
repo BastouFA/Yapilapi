@@ -82,8 +82,17 @@ export function createClient(opts: ClientOptions) {
     raw: { get, post, put, patch, del },
     auth: {
       me: () => get<{ user: Me }>('/v1/auth/me'),
-      register: (b: { email: string; password: string; username: string; displayName: string; birthDate?: string; locale?: string; inviteCode?: string }) =>
-        post<{ user: Me; token: string }>('/v1/auth/register', b),
+      /** `website` is the web form's hidden honeypot field: people leave it empty. */
+      register: (b: {
+        email: string;
+        password: string;
+        username: string;
+        displayName: string;
+        birthDate?: string;
+        locale?: string;
+        inviteCode?: string;
+        website?: string;
+      }) => post<{ user: Me; token: string }>('/v1/auth/register', b),
       login: (b: { email: string; password: string }) =>
         post<{ user?: Me; token?: string; mfaRequired?: boolean; challengeToken?: string }>('/v1/auth/login', b),
       logout: () => post<{ ok: true }>('/v1/auth/logout'),
@@ -128,6 +137,14 @@ export function createClient(opts: ClientOptions) {
       circles: () => get<{ items: { id: string; name: string; kind: string; memberCount: number }[] }>('/v1/me/circles'),
       moderation: () =>
         get<{ items: { id: string; target_type: string; decision: string; status: string; appeal_status: string | null }[] }>('/v1/me/moderation'),
+    },
+    /** Confirming a phone number (an alternative to confirming the email address). */
+    verification: {
+      status: () => get<VerificationStatus>('/v1/me/verification'),
+      setPhone: (phone: string) => put<VerificationStatus>('/v1/me/phone', { phone }),
+      removePhone: () => del<VerificationStatus>('/v1/me/phone'),
+      sendCode: () => post<{ sent: boolean; alreadyVerified?: boolean; expiresInSeconds?: number; resendAfterSeconds?: number }>('/v1/me/phone/code'),
+      verifyPhone: (code: string) => post<VerificationStatus>('/v1/me/phone/verify', { code }),
     },
     topics: () => get<{ items: { slug: string; name: string }[] }>('/v1/topics'),
     feed: (mode: FeedMode, cursor?: string) => get<Page<Post> & { mode: FeedMode }>(`/v1/feed${qs({ mode, cursor })}`),
@@ -203,7 +220,7 @@ export function createClient(opts: ClientOptions) {
       create: (memberIds: string[], title?: string) => post<{ conversation: Conversation }>('/v1/conversations', { memberIds, title }),
       messages: (id: string, cursor?: string) => get<Page<Message>>(`/v1/conversations/${id}/messages${qs({ cursor })}`),
       send: (id: string, body: string, clientId?: string, attachments: { mediaId: string; name?: string }[] = []) =>
-        post<{ message: Message }>(`/v1/conversations/${id}/messages`, { body, clientId, attachments }),
+        post<{ message: Message; notice?: string }>(`/v1/conversations/${id}/messages`, { body, clientId, attachments }),
       read: (id: string) => post(`/v1/conversations/${id}/read`),
       createPlan: (id: string, title: string, details: Record<string, unknown>) => post(`/v1/conversations/${id}/plans`, { title, details }),
       plans: (id: string) => get<{ items: { id: string; title: string; details: Record<string, unknown>; status: string }[] }>(`/v1/conversations/${id}/plans`),
@@ -571,6 +588,9 @@ export function createClient(opts: ClientOptions) {
           | { kind: 'restrict_topic'; country: string; topic: string; legalBasis: string },
       ) => post<{ rule: RegionalRule }>('/v1/admin/regional-rules', b),
       deleteRegionalRule: (id: string) => del(`/v1/admin/regional-rules/${id}`),
+      riskAccounts: (status: 'open' | 'reviewed' = 'open') => get<{ items: RiskAccount[] }>(`/v1/admin/risk/accounts${qs({ status })}`),
+      reviewRisk: (userId: string, action: 'clear' | 'confirm', note?: string) =>
+        post<{ restricted: boolean; signals: number }>(`/v1/admin/risk/accounts/${userId}/review`, { action, note }),
     },
   };
 }
@@ -645,7 +665,53 @@ export interface TogetherDetail {
   closesAt: string | null;
   myRole: 'creator' | 'member';
   members: { user: PublicUser; role: string }[];
-  contributions: { id: string; caption: string; capturedAt: string; media: { url: string; kind: string; altText: string | null } | null; author: PublicUser }[];
+  contributions: {
+    id: string;
+    caption: string;
+    capturedAt: string;
+    media: { url: string; kind: string; altText: string | null; sensitive?: boolean } | null;
+    author: PublicUser;
+  }[];
+}
+
+export interface VerificationStatus {
+  email: { address: string; verified: boolean };
+  /** E.164. */
+  phone: { number: string; verified: boolean } | null;
+  /** A confirmed email or phone number. */
+  verified: boolean;
+  /** Whether confirming is needed to post publicly, message people who aren't friends and go live. */
+  required: boolean;
+}
+
+export interface RiskSignal {
+  id: string;
+  kind: string;
+  weight: number;
+  detail: Record<string, unknown>;
+  status: 'open' | 'cleared' | 'confirmed';
+  createdAt: string;
+  targetType: 'post' | 'message' | null;
+  targetId: string | null;
+  excerpt: string | null;
+}
+
+export interface RiskAccount {
+  user: {
+    id: string;
+    username: string;
+    displayName: string;
+    email: string;
+    status: string;
+    createdAt: string;
+    emailVerified: boolean;
+    phoneVerified: boolean;
+  };
+  /** Set while the account is limited. */
+  restrictedAt: string | null;
+  /** Sum of the weights of its open signals. */
+  score: number;
+  signals: RiskSignal[];
 }
 
 export interface FaqEntry {
@@ -824,6 +890,8 @@ export interface Story {
   liked: boolean;
   /** Only on your own stories. */
   views?: number;
+  /** Its photo or video is marked sensitive: show it blurred until the viewer chooses to see it. */
+  sensitive?: boolean;
 }
 
 export interface StoryGroup {

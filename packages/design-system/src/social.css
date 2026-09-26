@@ -622,6 +622,58 @@ button.yp-chip:focus-visible {
   box-shadow: inset var(--focus-ring);
 }
 
+/* Sensitive media: blurred for everyone until they choose to view it. */
+.yp-blurred {
+  filter: blur(28px) saturate(0.8);
+  transform: scale(1.15);
+}
+.yp-media__item--sensitive {
+  cursor: default;
+  min-height: 240px;
+}
+.yp-media__item--sensitive img {
+  position: absolute;
+  inset: 0;
+}
+.yp-sensitive {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  background: color-mix(in oklab, #07080e 55%, transparent);
+  color: #fff;
+  font: 600 15px/1.3 var(--font-sans);
+  text-align: center;
+  pointer-events: none;
+}
+.yp-sensitive--compact {
+  gap: 4px;
+  font-size: 13px;
+}
+.yp-sensitive__view {
+  pointer-events: auto;
+  min-height: 36px;
+  padding: 6px 18px;
+  border: 1px solid rgb(255 255 255 / 0.7);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.12);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.yp-sensitive__view:hover {
+  background: rgb(255 255 255 / 0.22);
+}
+.yp-sensitive__view:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .yp-viewer {
   position: fixed;
   inset: 0;

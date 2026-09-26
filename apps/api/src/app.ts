@@ -20,6 +20,8 @@ import { logEmailSender } from './lib/email.ts';
 import { localDiskStorage, s3Storage } from './lib/storage.ts';
 import { devPaymentProvider, stripePaymentProvider } from './lib/payments.ts';
 import { transcriberFromConfig } from './lib/transcription.ts';
+import { devSmsProvider, twilioSmsProvider } from './lib/sms.ts';
+import { mediaModeratorFromConfig } from './lib/media-moderation.ts';
 import { registerAuth } from './plugins/auth.ts';
 import { MAX_UPLOAD_BYTES } from './modules/media.ts';
 import authModule from './modules/auth.ts';
@@ -53,6 +55,7 @@ import studioModule from './modules/studio.ts';
 import tagsModule from './modules/tags.ts';
 import plusModule from './modules/plus.ts';
 import invitesModule from './modules/invites.ts';
+import phoneModule from './modules/phone.ts';
 import publicModule from './modules/public.ts';
 import { createPushSender } from './lib/push.ts';
 import { setPushSender } from './lib/services.ts';
@@ -146,7 +149,16 @@ export async function buildApp(
           })
         : devPaymentProvider(config.PAYMENTS_WEBHOOK_SECRET),
     transcription: transcriberFromConfig(config),
+    sms:
+      config.SMS_PROVIDER === 'twilio'
+        ? twilioSmsProvider({ accountSid: config.TWILIO_ACCOUNT_SID, authToken: config.TWILIO_AUTH_TOKEN, serviceSid: config.TWILIO_VERIFY_SERVICE_SID })
+        : devSmsProvider((msg) => app.log.info(msg)),
+    mediaModerator: mediaModeratorFromConfig(config),
   };
+  if (config.APP_ENV === 'production' && config.SMS_PROVIDER === 'dev')
+    app.log.warn('SMS_PROVIDER=dev in production: phone codes are only written to the log. Configure Twilio Verify.');
+  if (config.APP_ENV === 'production' && ctx.mediaModerator.name === 'none')
+    app.log.warn('MEDIA_MODERATION_PROVIDER is none: photos and videos are not checked automatically.');
 
   // Keep the raw body for webhook signature checks.
   app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
@@ -271,7 +283,11 @@ export async function buildApp(
   });
 
   // Dev-only outbox so the web app and tests can read verification/reset emails.
-  if (config.APP_ENV === 'development' || config.APP_ENV === 'test') app.get('/dev/outbox', async () => ({ items: ctx.email.outbox ?? [] }));
+  if (config.APP_ENV === 'development' || config.APP_ENV === 'test') {
+    app.get('/dev/outbox', async () => ({ items: ctx.email.outbox ?? [] }));
+    // Phone codes from the dev SMS provider, for the web app and tests.
+    app.get('/dev/sms-outbox', async () => ({ items: 'outbox' in ctx.sms ? ctx.sms.outbox : [] }));
+  }
 
   for (const mod of [
     authModule,
@@ -306,6 +322,7 @@ export async function buildApp(
     plusModule,
     invitesModule,
     publicModule,
+    phoneModule,
   ])
     await mod(app, ctx);
 
@@ -321,7 +338,7 @@ export async function buildApp(
   // Background jobs (media processing). Tests drive processJobs directly.
   let jobTimer: NodeJS.Timeout | undefined;
   const jobHandlers = {
-    ...mediaJobHandlers({ db, storage }),
+    ...mediaJobHandlers({ db, storage, moderator: ctx.mediaModerator, realtime: ctx.realtime }),
     ...studioJobHandlers({ db, storage, transcription: ctx.transcription }),
     ...liveRecordingJobHandlers({ db, storage, recordingsDir: config.LIVE_RECORDINGS_DIR }),
   };

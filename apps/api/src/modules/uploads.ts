@@ -104,7 +104,7 @@ export default async function uploadsModule(app: FastifyInstance, ctx: AppContex
       [u.id, kind.kind, stored.url, s.mime, alt, stored.key, data.length],
     );
     await db.query(`UPDATE upload_sessions SET status = 'completed', media_id = $2 WHERE id = $1`, [id, rows[0].id]);
-    await enqueue(db, 'media.process', { mediaId: rows[0].id });
+    await enqueue(db, 'media.process', { mediaId: rows[0].id, filename: s.filename });
     await rm(dir, { recursive: true, force: true });
     reply.code(201);
     return { media: rows[0] };

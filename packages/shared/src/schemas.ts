@@ -39,6 +39,8 @@ export const registerSchema = z.object({
   locale: z.string().max(35).optional(),
   /** A friend's invite code, from a /join/<code> link. */
   inviteCode: z.string().trim().max(32).optional(),
+  /** Honeypot: a field hidden from people on the web sign-up form. Anything in it means a bot filled the form. */
+  website: z.string().max(500).optional(),
 });
 
 export const loginSchema = z.object({
