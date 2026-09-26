@@ -9,8 +9,10 @@ import { analyzeText } from '../lib/moderation.ts';
 import { audit, isEnabled } from '../lib/services.ts';
 import { ageOf } from '../lib/users.ts';
 import { postVisibleSql } from '../lib/visibility.ts';
+import { REQUEST_COUNTRY } from '../lib/request-context.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 import { isPlus } from '../lib/plus.ts';
+import { startPayment } from '../lib/checkout.ts';
 
 const FREQUENCY_CAP_PER_DAY = 3;
 
@@ -35,6 +37,8 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
     postId: r.post_id,
     topics: r.topics,
     locales: r.locales,
+    countries: r.countries ?? [],
+    boostDays: r.boost_days ?? null,
     cpmCents: r.cpm_cents,
     currency: r.currency,
     budgetCents: Math.floor(Number(r.budget_millicents) / 1000),
@@ -64,6 +68,16 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
     name: z.string().trim().min(1).max(80),
     topics: z.array(z.string().trim().toLowerCase().min(1).max(40)).max(10).default([]),
     locales: z.array(z.string().min(2).max(10)).max(10).default([]),
+    /** Only people in these countries (ISO 3166-1 alpha-2). Empty: everywhere. */
+    countries: z
+      .array(
+        z
+          .string()
+          .regex(/^[A-Za-z]{2}$/)
+          .transform((c) => c.toUpperCase()),
+      )
+      .max(20)
+      .default([]),
     cpmCents: z.number().int().min(100).max(10_000).default(500),
     currency: z.string().length(3).toUpperCase().default('USD'),
     startsAt: z.coerce.date().optional(),
@@ -87,8 +101,8 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
       if (!own.rowCount) throw forbidden('You can only run ads for your own business.');
     }
     const { rows } = await db.query(
-      `INSERT INTO ad_campaigns (advertiser_id, post_id, name, topics, locales, cpm_cents, currency, starts_at, ends_at, business_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      `INSERT INTO ad_campaigns (advertiser_id, post_id, name, topics, locales, cpm_cents, currency, starts_at, ends_at, business_id, countries)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
       [
         u.id,
         input.postId,
@@ -100,6 +114,7 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
         input.startsAt ?? null,
         input.endsAt ?? null,
         input.businessId ?? null,
+        input.countries,
       ],
     );
     await audit(db, { actorId: u.id, action: 'ads.campaign.create', entityType: 'ad_campaign', entityId: rows[0].id });
@@ -135,7 +150,7 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
               id,
               "This post can't be promoted because it may break the advertising rules.",
             ]);
-            await refundUnspentBudget(q, ctx.payments, id, null);
+            await refundUnspentBudget(q, ctx.paymentProviders, id, null);
             return (await q.query(`SELECT * FROM ad_campaigns WHERE id = $1`, [id])).rows[0] ?? rows[0];
           });
           await audit(db, { actorId: u.id, action: 'ads.campaign.auto_rejected', entityType: 'ad_campaign', entityId: id, metadata: { risk } });
@@ -166,7 +181,7 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
         );
       await q.query(`UPDATE ad_campaigns SET status = $2 WHERE id = $1`, [id, status]);
       // An ended campaign can't restart, so its unspent budget is refunded.
-      if (status === 'ended') await refundUnspentBudget(q, ctx.payments, id, u.id);
+      if (status === 'ended') await refundUnspentBudget(q, ctx.paymentProviders, id, u.id);
       return q.query(`SELECT * FROM ad_campaigns WHERE id = $1`, [id]);
     });
     await audit(db, { actorId: u.id, action: `ads.campaign.${status}`, entityType: 'ad_campaign', entityId: id });
@@ -189,16 +204,14 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
         [u.id, input.amountCents, c.currency, input.idempotencyKey, id],
       );
       const orderId = rows[0].id as string;
-      const intent = await ctx.payments.createIntent({ amountCents: input.amountCents, currency: c.currency, orderId, idempotencyKey: input.idempotencyKey });
-      await q.query(`INSERT INTO payments (order_id, provider, provider_ref, status, amount_cents, currency) VALUES ($1,$2,$3,$4,$5,$6)`, [
+      const pay = await startPayment(q, ctx.paymentProviders, {
         orderId,
-        ctx.payments.name,
-        intent.providerRef,
-        intent.status,
-        input.amountCents,
-        c.currency,
-      ]);
-      return { payment: { provider: ctx.payments.name, clientSecret: intent.clientSecret, orderId } };
+        buyerId: u.id,
+        amountCents: input.amountCents,
+        currency: c.currency,
+        idempotencyKey: input.idempotencyKey,
+      });
+      return { payment: { ...pay, orderId } };
     });
     reply.code(201);
     return result;
@@ -245,9 +258,11 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
     const { rows } = await db.query(
       `WITH me AS (
          SELECT (SELECT locale FROM profiles WHERE user_id = $1) AS locale,
+                -- Where the viewer is: the country they chose, else the one the CDN reported for them or for this request.
+                coalesce((SELECT coalesce(country, cdn_country) FROM profiles WHERE user_id = $1), ${REQUEST_COUNTRY}) AS country,
                 coalesce((SELECT array_agg(t.slug) FROM user_interests ui JOIN topics t ON t.id = ui.topic_id WHERE ui.user_id = $1), '{}') AS interests
        )
-       SELECT c.id, c.post_id, c.cpm_cents, c.topics, c.locales, (c.topics && me.interests) AS topic_match
+       SELECT c.id, c.post_id, c.cpm_cents, c.topics, c.locales, c.countries, (c.topics && me.interests) AS topic_match
        FROM ad_campaigns c CROSS JOIN me
        JOIN posts p ON p.id = c.post_id JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
        WHERE c.status = 'active' AND c.advertiser_id <> $1
@@ -255,6 +270,7 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
          AND c.budget_millicents - c.spent_millicents >= c.cpm_cents
          AND (cardinality(c.locales) = 0 OR split_part(me.locale, '-', 1) = ANY(c.locales))
          AND (cardinality(c.topics) = 0 OR c.topics && me.interests)
+         AND (cardinality(c.countries) = 0 OR me.country = ANY(c.countries))
          AND p.visibility = 'public' AND p.moderation_status = 'normal' AND ${postVisibleSql('$1')}
          AND NOT EXISTS (SELECT 1 FROM ad_events e WHERE e.campaign_id = c.id AND e.user_id = $1 AND e.kind = 'hide')
          AND (SELECT count(*) FROM ad_events e WHERE e.campaign_id = c.id AND e.user_id = $1 AND e.kind = 'impression' AND e.created_at > now() - interval '1 day') < ${FREQUENCY_CAP_PER_DAY}
@@ -274,6 +290,7 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
       const why = ['You turned on advertising in your privacy settings.'];
       if (cand.topic_match) why.push(`It's about ${cand.topics.slice(0, 2).join(' and ')}, which you follow.`);
       if (cand.locales.length) why.push('It matches your language.');
+      if (cand.countries.length) why.push("It's shown to people in your country.");
       return { ad: { campaignId: cand.id, label: 'Sponsored', post, why } };
     }
     return { ad: null };

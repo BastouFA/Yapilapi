@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { Button, EmptyState, List, ListItem, Select, Skeleton, Stat, TextField } from '@yapilapi/design-system';
-import { formatMoney, formatRelativeTime } from '@yapilapi/shared';
+import { CURRENCIES, currencyForCountry, formatMoney, formatRelativeTime } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { Campaigns } from '@/components/Campaigns';
 import { VideoEditor } from '@/components/VideoEditor';
+import { BoostsPanel, SalesPanel, ShopManager } from '@/components/StudioMoney';
 import { useSession } from '../../providers';
 
 /** Creator Studio: how your content performs over the last 28 days, and what you've earned. */
@@ -82,6 +83,9 @@ export default function Studio() {
           <EmptyState title="No posts yet" body="Publish something from Create to see how it does." />
         )}
       </section>
+      <SalesPanel />
+      <ShopManager />
+      <BoostsPanel />
       <VideoEditor />
       <PlansManager />
       <Campaigns />
@@ -95,7 +99,7 @@ function PlansManager() {
   const [subs, setSubs] = useState<{ active: number; cancelled: number } | null>(null);
   const [name, setName] = useState('');
   const [price, setPrice] = useState('5');
-  const [currency, setCurrency] = useState('USD');
+  const [currency, setCurrency] = useState<string>(() => currencyForCountry(me?.country));
   const load = async () => {
     if (!me) return;
     setPlans((await api.economy.plans(me.id)).items);
@@ -109,7 +113,8 @@ function PlansManager() {
     <section className="stack-sm">
       <h2 className="section-title">Subscriptions</h2>
       <p className="muted" style={{ margin: 0 }}>
-        {subs ? `${subs.active} active subscriber${subs.active === 1 ? '' : 's'}.` : ''} Fans subscribe from your profile.
+        {subs ? `${subs.active} active subscriber${subs.active === 1 ? '' : 's'}.` : ''} Fans subscribe from your profile. With a plan, you can choose
+        Subscribers when you post: everyone else sees a locked preview.
       </p>
       {plans.map((p) => (
         <div key={p.id} className="yp-card" style={{ padding: 12 }}>
@@ -132,7 +137,7 @@ function PlansManager() {
         <TextField label="Plan name" value={name} onChange={(e) => setName(e.currentTarget.value)} maxLength={60} />
         <TextField label="Monthly price" type="number" min={1} step="0.5" value={price} onChange={(e) => setPrice(e.currentTarget.value)} />
         <Select label="Currency" value={currency} onChange={(e) => setCurrency(e.currentTarget.value)}>
-          {['USD', 'EUR', 'GBP', 'NGN', 'XOF'].map((c) => (
+          {CURRENCIES.map((c) => (
             <option key={c}>{c}</option>
           ))}
         </Select>

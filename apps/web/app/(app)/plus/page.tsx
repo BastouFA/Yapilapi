@@ -52,6 +52,7 @@ export default function PlusPage() {
       checkout({
         orderId: r.payment.orderId,
         clientSecret: r.payment.clientSecret,
+        provider: r.payment.provider,
         label: t('plus.checkoutLabel', { price }),
         onPaid: async () => {
           toast(t('plus.paid'));

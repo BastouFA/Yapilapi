@@ -18,7 +18,7 @@ import { AiGateway } from './lib/ai/gateway.ts';
 import { anthropicProvider, devProvider } from './lib/ai/providers.ts';
 import { logEmailSender } from './lib/email.ts';
 import { localDiskStorage, s3Storage } from './lib/storage.ts';
-import { devPaymentProvider, stripePaymentProvider } from './lib/payments.ts';
+import { devPaymentProvider, paymentRegistry, paystackPaymentProvider, stripePaymentProvider } from './lib/payments.ts';
 import { transcriberFromConfig } from './lib/transcription.ts';
 import { registerAuth } from './plugins/auth.ts';
 import { MAX_UPLOAD_BYTES } from './modules/media.ts';
@@ -54,6 +54,7 @@ import tagsModule from './modules/tags.ts';
 import plusModule from './modules/plus.ts';
 import invitesModule from './modules/invites.ts';
 import publicModule from './modules/public.ts';
+import moneyModule from './modules/money.ts';
 import { createPushSender } from './lib/push.ts';
 import { setPushSender } from './lib/services.ts';
 import { processWebhooks } from './lib/webhooks.ts';
@@ -62,6 +63,7 @@ import { mediaJobHandlers } from './lib/media-processing.ts';
 import { studioJobHandlers } from './lib/studio.ts';
 import { liveRecordingJobHandlers } from './lib/live-recording.ts';
 import { fastifyTracingPlugin, traceLogMixin } from './lib/tracing.ts';
+import { endExpiredCampaigns } from './lib/boosts.ts';
 
 export interface BuiltApp {
   app: FastifyInstance;
@@ -71,7 +73,13 @@ export interface BuiltApp {
 
 export async function buildApp(
   config: Config,
-  opts: { logger?: boolean; onRoute?: (route: RouteOptions) => void; webhookWorker?: boolean } = {},
+  opts: {
+    logger?: boolean;
+    onRoute?: (route: RouteOptions) => void;
+    webhookWorker?: boolean;
+    /** Used for calls to Paystack (tests pass a fake so nothing leaves the machine). */
+    paystackFetch?: typeof fetch;
+  } = {},
 ): Promise<BuiltApp> {
   const app = Fastify({
     logger:
@@ -129,6 +137,24 @@ export async function buildApp(
   if ('ensureBucket' in storage)
     await (storage as { ensureBucket(): Promise<void> }).ensureBucket().catch((e) => app.log.warn({ err: e.message }, 'media bucket not reachable'));
 
+  const defaultPayments =
+    config.PAYMENTS_PROVIDER === 'stripe'
+      ? stripePaymentProvider({
+          secretKey: config.STRIPE_SECRET_KEY,
+          webhookSecret: config.STRIPE_WEBHOOK_SECRET,
+          publishableKey: config.STRIPE_PUBLISHABLE_KEY,
+        })
+      : devPaymentProvider(config.PAYMENTS_WEBHOOK_SECRET);
+  // Paystack takes its own currencies (NGN, GHS, KES, ZAR) when its keys are set; everything else stays with the default.
+  const paystack = config.PAYSTACK_SECRET_KEY
+    ? paystackPaymentProvider({
+        secretKey: config.PAYSTACK_SECRET_KEY,
+        publicKey: config.PAYSTACK_PUBLIC_KEY,
+        callbackUrl: `${config.WEB_ORIGIN.split(',')[0]!.replace(/\/+$/, '')}/checkout/done`,
+        fetch: opts.paystackFetch,
+      })
+    : null;
+
   const ctx: AppContext = {
     config,
     db,
@@ -137,14 +163,8 @@ export async function buildApp(
     ai: new AiGateway(db, provider),
     email: logEmailSender(app.log),
     storage,
-    payments:
-      config.PAYMENTS_PROVIDER === 'stripe'
-        ? stripePaymentProvider({
-            secretKey: config.STRIPE_SECRET_KEY,
-            webhookSecret: config.STRIPE_WEBHOOK_SECRET,
-            publishableKey: config.STRIPE_PUBLISHABLE_KEY,
-          })
-        : devPaymentProvider(config.PAYMENTS_WEBHOOK_SECRET),
+    payments: defaultPayments,
+    paymentProviders: paymentRegistry(defaultPayments, paystack ? [paystack] : []),
     transcription: transcriberFromConfig(config),
   };
 
@@ -185,7 +205,8 @@ export async function buildApp(
   else
     app.get('/media/*', { config: { rateLimit: false } }, async (req, reply) => {
       const key = (req.params as { '*': string })['*'];
-      if (!/^[\w/.-]+$/.test(key) || key.includes('..')) return reply.code(404).send();
+      // private/ holds digital products: only buyers get them, through /v1/downloads.
+      if (!/^[\w/.-]+$/.test(key) || key.includes('..') || key.startsWith('private/')) return reply.code(404).send();
       const obj = await storage.get!(key, req.headers.range);
       if (!obj) return reply.code(404).send({ error: { code: 'not_found', message: 'Media not found.' } });
       reply.code(obj.status).header('cache-control', 'public, max-age=31536000, immutable').header('accept-ranges', 'bytes');
@@ -306,6 +327,7 @@ export async function buildApp(
     plusModule,
     invitesModule,
     publicModule,
+    moneyModule,
   ])
     await mod(app, ctx);
 
@@ -331,6 +353,8 @@ export async function buildApp(
       if (busy) return;
       busy = true;
       await processJobs(db, jobHandlers).catch((e) => app.log.warn({ err: e.message }, 'job worker'));
+      // Campaigns and boosts past their end date stop, and their unspent budget is refunded.
+      await endExpiredCampaigns(db, ctx.paymentProviders).catch((e) => app.log.warn({ err: e.message }, 'ad expiry'));
       busy = false;
     }, 2_000);
     jobTimer.unref();

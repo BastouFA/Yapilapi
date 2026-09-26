@@ -37,8 +37,10 @@ export default function PostScreen() {
   useEffect(() => {
     void (async () => {
       try {
-        setPost((await (await client()).posts.get(id)).post);
-        await loadComments();
+        const p = (await (await client()).posts.get(id)).post;
+        setPost(p);
+        // Comments on a post for subscribers are for subscribers too.
+        if (!p.locked) await loadComments();
       } catch {
         setPost(null);
       }

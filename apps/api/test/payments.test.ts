@@ -45,6 +45,7 @@ describe('Stripe provider', () => {
       type: 'payment.succeeded',
       providerRef: 'pi_1',
       amountCents: 2500,
+      currency: 'USD',
     });
     expect(() => provider.verifyWebhook(body, { 'stripe-signature': 't=1,v1=bad' })).toThrow();
     expect(provider.publicConfig()).toEqual({ provider: 'stripe', publishableKey: 'pk_test_x' });

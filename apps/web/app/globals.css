@@ -1983,3 +1983,74 @@ video.chat-att__media {
     animation: none;
   }
 }
+
+/* Shop tab on profiles, and the shop in Studio */
+.shop__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+.shop__main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.shop__desc {
+  margin: 0;
+  font-size: 14px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.shop__price {
+  font-weight: 600;
+}
+.shop__actions {
+  flex-shrink: 0;
+}
+@media (max-width: 520px) {
+  .shop__item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Where "Subscribe to see this" lands on a profile */
+.profile__subscribe {
+  scroll-margin-top: 80px;
+}
+.profile__subscribe--focus > * {
+  box-shadow: 0 0 0 2px var(--yapi);
+  border-radius: var(--radius-lg);
+}
+
+/* A reel for subscribers, seen by someone who isn't one */
+.reel__locked {
+  background-color: #10121e;
+  background-size: cover;
+  background-position: center;
+}
+.reel__locked::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  backdrop-filter: blur(24px);
+  background: #00000080;
+}
+.reel__locked-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 320px;
+  padding: var(--space-4);
+  text-align: center;
+  color: #fff;
+}
+.reel__locked-inner span {
+  color: #c9cde0;
+}

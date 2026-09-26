@@ -29,6 +29,7 @@ export function BuyButton({ productId, onPaid }: { productId: string; onPaid?: (
             checkout({
               orderId: r.order.id,
               clientSecret: r.payment.clientSecret,
+              provider: r.payment.provider,
               label: `${(r.order.items as { title: string }[] | null)?.[0]?.title ?? 'Your order'}, ${formatMoney(r.order.totalCents, r.order.currency)}`,
               onPaid,
             });

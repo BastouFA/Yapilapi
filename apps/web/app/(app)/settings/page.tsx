@@ -9,6 +9,7 @@ import { startRegistration } from '@simplewebauthn/browser';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { currentSubscription, disableBrowserPush, enableBrowserPush, pushSupported } from '@/lib/push';
 import { FamilyCard } from '@/components/Family';
+import { PurchasesCard } from '@/components/Shop';
 import { useSession } from '../../providers';
 
 export default function Settings() {
@@ -35,6 +36,7 @@ export default function Settings() {
         {tab === 'profile' ? (
           <div className="stack">
             <PlusAndInvites />
+            <PurchasesCard />
             <ProfileSettings />
           </div>
         ) : tab === 'attention' ? (

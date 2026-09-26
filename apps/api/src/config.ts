@@ -26,6 +26,11 @@ const schema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().default(''),
   STRIPE_PUBLISHABLE_KEY: z.string().default(''),
   PAYMENTS_WEBHOOK_SECRET: z.string().default('dev-webhook-secret-change-me'),
+  /** Paystack (optional): takes NGN, GHS, KES and ZAR payments (cards and mobile money). Other currencies stay with PAYMENTS_PROVIDER. */
+  PAYSTACK_SECRET_KEY: z.string().default(''),
+  PAYSTACK_PUBLIC_KEY: z.string().default(''),
+  /** Where digital products are stored on disk with the local storage driver. Never served as public media. */
+  PRIVATE_UPLOAD_DIR: z.string().default('./uploads-private'),
   /** YAPILAPI Plus: the price of one month (30 days), in hundredths of PLUS_CURRENCY. */
   PLUS_PRICE_CENTS: z.coerce.number().int().min(50).max(100_000).default(499),
   PLUS_CURRENCY: z.string().length(3).toUpperCase().default('USD'),
@@ -82,6 +87,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const cfg = parsed.data;
   if (cfg.PAYMENTS_PROVIDER === 'stripe' && (!cfg.STRIPE_SECRET_KEY || !cfg.STRIPE_WEBHOOK_SECRET || !cfg.STRIPE_PUBLISHABLE_KEY))
     throw new Error('PAYMENTS_PROVIDER=stripe needs STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and STRIPE_PUBLISHABLE_KEY.');
+  if (!!cfg.PAYSTACK_SECRET_KEY !== !!cfg.PAYSTACK_PUBLIC_KEY) throw new Error('Paystack needs both PAYSTACK_SECRET_KEY and PAYSTACK_PUBLIC_KEY.');
   if (cfg.APP_ENV === 'production') {
     if (cfg.PAYMENTS_PROVIDER === 'dev') throw new Error('The development payment provider moves no money. Set PAYMENTS_PROVIDER for production.');
     if (Buffer.from(cfg.MFA_ENCRYPTION_KEY, 'base64').length !== 32) throw new Error('Set MFA_ENCRYPTION_KEY (32 bytes, base64) for production.');

@@ -370,9 +370,19 @@ export interface PostCardProps {
   onDelete?: (post: Post) => void;
   /** Pin to or unpin from the top of your profile (own posts only). */
   onPin?: (post: Post) => void;
+  /** Boost one of your own public posts (opens the boost sheet). */
+  onBoost?: (post: Post) => void;
 }
 
-const VIS_ICON: Record<string, IconName> = { public: 'globe', followers: 'users', friends: 'users', circle: 'users', selected: 'user', private: 'lock' };
+const VIS_ICON: Record<string, IconName> = {
+  public: 'globe',
+  followers: 'users',
+  friends: 'users',
+  circle: 'users',
+  selected: 'user',
+  private: 'lock',
+  subscribers: 'star',
+};
 
 export function PostCard({
   post,
@@ -389,6 +399,7 @@ export function PostCard({
   onDelete,
   onAddToMemory,
   onPin,
+  onBoost,
 }: PostCardProps) {
   const tt = (k: MessageKey) => t(k, locale);
   const menu: MenuAction[] = [];
@@ -403,6 +414,8 @@ export function PostCard({
   if (onReport && !isOwn) menu.push({ label: tt('post.report'), icon: 'flag', danger: true, onSelect: () => onReport(post) });
   if (onPin && isOwn && !post.community)
     menu.push({ label: post.pinned ? 'Unpin from profile' : 'Pin to profile', icon: 'bookmark', onSelect: () => onPin(post) });
+  if (onBoost && isOwn && post.visibility === 'public' && !post.community)
+    menu.push({ label: tt('post.boost'), icon: 'sparkle', onSelect: () => onBoost(post) });
   if (onDelete && isOwn) menu.push({ label: tt('post.delete'), icon: 'trash', danger: true, onSelect: () => onDelete(post) });
   const totalVotes = post.poll?.options.reduce((s, o) => s + o.votes, 0) ?? 0;
   // Tags already linked in the text don't need a chip too.
@@ -450,6 +463,8 @@ export function PostCard({
           <TaggedText text={post.body} linkAs={L} />
         </div>
       ) : null}
+
+      {post.locked ? <LockedPanel post={post} locale={locale} linkAs={L} /> : null}
 
       {post.poll ? (
         <div className="yp-poll" role="group" aria-label="Poll">
@@ -514,6 +529,22 @@ export function PostCard({
         </div>
       ) : null}
 
+      {post.boost ? (
+        <div className="yp-post__reason yp-post__boost" role="note">
+          <Icon name="sparkle" size={14} />
+          <span>{tt(`post.boost.status.${post.boost.status}` as MessageKey)}</span>
+          {post.boost.impressions || post.boost.spentCents ? (
+            <span>
+              {t('post.boost.results', locale, {
+                impressions: new Intl.NumberFormat(locale).format(post.boost.impressions),
+                clicks: new Intl.NumberFormat(locale).format(post.boost.clicks),
+                spent: formatMoney(post.boost.spentCents, post.boost.currency, locale),
+              })}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       {post.reason || post.aiAssisted || post.real ? (
         <div className="yp-post__reason">
           {post.reason ? (
@@ -550,6 +581,28 @@ export function PostCard({
         </button>
       </div>
     </article>
+  );
+}
+
+/**
+ * A subscriber-only post the viewer can't open: a blurred preview (a tiny
+ * image the server sends instead of the media), who it's from, and a link to
+ * subscribe on the author's profile.
+ */
+function LockedPanel({ post, locale, linkAs: L }: { post: Post; locale: string; linkAs: LinkLike }) {
+  const placeholder = post.locked?.placeholder;
+  const bg = placeholder && /^data:image\/[a-z+]+;base64,[A-Za-z0-9+/=]+$/.test(placeholder) ? { backgroundImage: `url(${placeholder})` } : undefined;
+  return (
+    <div className={`yp-post__locked${bg ? ' yp-post__locked--media' : ''}`} style={bg}>
+      <div className="yp-post__locked-inner">
+        <Icon name="lock" size={22} />
+        <strong>{t('post.locked.title', locale)}</strong>
+        <span>{t('post.locked.body', locale, { name: post.author.displayName })}</span>
+        <L href={`/u/${post.author.username}?subscribe=1`} className="yp-btn yp-btn--primary yp-btn--sm">
+          {t('post.locked.cta', locale)}
+        </L>
+      </div>
+    </div>
   );
 }
 

@@ -17,5 +17,8 @@ coverage/
 # Claude Code agent worktrees
 .claude/worktrees/
 
+# Digital products stored on disk in development
+uploads-private/
+
 # Live recordings written by MediaMTX in development
 infrastructure/media/recordings/

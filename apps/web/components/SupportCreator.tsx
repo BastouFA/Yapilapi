@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { BottomSheet, Button, Card, Select, TextField } from '@yapilapi/design-system';
-import { formatMoney } from '@yapilapi/shared';
+import { CURRENCIES, formatMoney } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 import { useCheckout } from './Checkout';
@@ -11,7 +11,18 @@ import { useCheckout } from './Checkout';
  * Subscribe to or tip a creator. Payment is completed with the payment provider;
  * the subscription turns on when the provider confirms the charge.
  */
-export function SupportCreator({ userId, name, isCreator }: { userId: string; name: string; isCreator: boolean }) {
+export function SupportCreator({
+  userId,
+  name,
+  isCreator,
+  onSubscribed,
+}: {
+  userId: string;
+  name: string;
+  isCreator: boolean;
+  /** Called once a subscription is paid (e.g. to reload posts for subscribers). */
+  onSubscribed?: () => void;
+}) {
   const { toast, locale, flags } = useSession();
   const checkout = useCheckout();
   const [data, setData] = useState<Awaited<ReturnType<typeof api.economy.plans>> | null>(null);
@@ -45,8 +56,12 @@ export function SupportCreator({ userId, name, isCreator }: { userId: string; na
                     checkout({
                       orderId: r.payment.orderId,
                       clientSecret: r.payment.clientSecret,
+                      provider: r.payment.provider,
                       label: `${p.name} for ${name}, ${formatMoney(p.priceCents, p.currency, locale)} a month`,
-                      onPaid: async () => setData(await api.economy.plans(userId)),
+                      onPaid: async () => {
+                        setData(await api.economy.plans(userId));
+                        onSubscribed?.();
+                      },
                     });
                     setData(await api.economy.plans(userId));
                   } catch (e) {
@@ -94,6 +109,7 @@ export function TipSheet({ open, onClose, userId, name, liveId }: { open: boolea
             checkout({
               orderId: r.payment.orderId,
               clientSecret: r.payment.clientSecret,
+              provider: r.payment.provider,
               label: `${liveId ? 'Gift' : 'Tip'} for ${name}, ${formatMoney(Math.round(Number(amount)), currency, locale)}`,
               onPaid: () => toast(liveId ? 'Your gift is in the chat.' : 'Tip sent. Thank you.'),
             });
@@ -110,7 +126,7 @@ export function TipSheet({ open, onClose, userId, name, liveId }: { open: boolea
           ))}
         </Select>
         <Select label="Currency" value={currency} onChange={(e) => setCurrency(e.currentTarget.value)}>
-          {['USD', 'EUR', 'GBP', 'NGN', 'XOF'].map((c) => (
+          {CURRENCIES.map((c) => (
             <option key={c}>{c}</option>
           ))}
         </Select>

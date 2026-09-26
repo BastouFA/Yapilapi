@@ -93,6 +93,23 @@ export interface Post {
   reason?: string;
   /** Only on the author's own posts: countries where regional rules withhold it. */
   withheldIn?: string[];
+  /**
+   * Set when the post is for subscribers and the viewer isn't one. The text,
+   * media, poll, link, topics and attachments are withheld (empty); only a
+   * blurred preview and how many photos or videos it has are sent.
+   */
+  locked?: { placeholder: string | null; mediaCount: number };
+  /** Only on the author's own posts: the latest boost and its results so far. */
+  boost?: {
+    campaignId: string;
+    status: 'draft' | 'pending_review' | 'active' | 'paused' | 'ended' | 'rejected';
+    impressions: number;
+    clicks: number;
+    spentCents: number;
+    budgetCents: number;
+    currency: string;
+    endsAt: string | null;
+  };
 }
 
 export interface Comment {
@@ -219,6 +236,8 @@ export interface PublicPostPreview {
   counts: { likes: number; comments: number; reposts: number };
   community: { slug: string; name: string } | null;
   createdAt: string;
+  /** For subscribers only: the preview has no text, image or video. */
+  locked?: boolean;
 }
 
 export interface PublicProfilePreview {

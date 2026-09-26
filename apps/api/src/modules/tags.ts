@@ -5,10 +5,11 @@ import { AppError, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, encodeCursor } from '../lib/cursor.ts';
 import { hydratePosts } from '../lib/posts.ts';
-import { postVisibleSql } from '../lib/visibility.ts';
+import { postUnlockedSql, postVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
-const VISIBLE = postVisibleSql('$1');
+/** Tag pages list posts you can see and open: a subscriber-only post's tags are part of what it says. */
+const VISIBLE = `${postVisibleSql('$1')} AND ${postUnlockedSql('$1')}`;
 const FROM = `FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id`;
 /** Public, unflagged posts only: what trending counts. */
 const PUBLIC_POST = `p.visibility = 'public' AND p.deleted_at IS NULL AND p.moderation_status = 'normal' AND au.status = 'active' AND NOT ap.is_private`;

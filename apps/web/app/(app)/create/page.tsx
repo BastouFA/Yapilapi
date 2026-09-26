@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { AutocompleteText } from '@/components/Autocomplete';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { AIPanel, Alert, Button, Checkbox, Segments, Select, TextField } from '@yapilapi/design-system';
-import { VISIBILITIES, type Community, type MessageKey, type Visibility } from '@yapilapi/shared';
+import { POST_VISIBILITIES, VISIBILITIES, type Community, type MessageKey, type Visibility } from '@yapilapi/shared';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { SimilarQuestions } from '@/components/CommunityExtras';
 import { useSession } from '../../providers';
@@ -46,6 +46,8 @@ function Create() {
   const [communities, setCommunities] = useState<Community[]>([]);
   const [circles, setCircles] = useState<{ id: string; name: string }[]>([]);
   const [circleId, setCircleId] = useState('');
+  // Posting for subscribers needs a subscription plan (set up in Studio).
+  const [hasPlans, setHasPlans] = useState(false);
   const [media, setMedia] = useState<Uploaded[]>([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
@@ -69,7 +71,12 @@ function Create() {
       .circles()
       .then((r) => setCircles(r.items))
       .catch(() => {});
-  }, []);
+    if (me)
+      api.economy
+        .plans(me.id)
+        .then((r) => setHasPlans(r.items.length > 0))
+        .catch(() => {});
+  }, [me]);
 
   async function upload(files: FileList | null) {
     if (!files?.length) return;
@@ -179,7 +186,7 @@ function Create() {
             setPoll(null);
             setMedia((m) => m.filter((x) => k !== 'reel' || x.kind === 'video').slice(0, 1));
           }
-          if (k === 'story' && visibility === 'selected') setVisibility('friends');
+          if (k === 'story' && (visibility === 'selected' || visibility === 'subscribers')) setVisibility('friends');
         }}
         options={[
           { id: 'post', label: 'Post' },
@@ -336,12 +343,19 @@ function Create() {
         )}
         {!communityId ? (
           <Select label={t('create.visibility')} value={visibility} onChange={(e) => setVisibility(e.currentTarget.value as Visibility)}>
-            {VISIBILITIES.filter((v) => kind !== 'story' || v !== 'selected').map((v) => (
-              <option key={v} value={v} disabled={v === 'circle' && !circles.length}>
-                {t(`visibility.${v}` as MessageKey)}
-              </option>
-            ))}
+            {(kind === 'story' ? VISIBILITIES : POST_VISIBILITIES)
+              .filter((v) => (kind !== 'story' || v !== 'selected') && (v !== 'subscribers' || hasPlans))
+              .map((v) => (
+                <option key={v} value={v} disabled={v === 'circle' && !circles.length}>
+                  {t(`visibility.${v}` as MessageKey)}
+                </option>
+              ))}
           </Select>
+        ) : null}
+        {visibility === 'subscribers' && !communityId && kind !== 'story' ? (
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+            Only people with a paid subscription see this. Everyone else sees a locked preview with a link to subscribe.
+          </p>
         ) : null}
         {visibility === 'circle' && !communityId ? (
           <Select label="Circle" value={circleId} onChange={(e) => setCircleId(e.currentTarget.value)}>

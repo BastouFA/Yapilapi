@@ -1,12 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
 import { z } from 'zod';
+import { CURRENCIES, CURRENCY_SCALE } from '@yapilapi/shared';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { audit, isEnabled, notify } from '../lib/services.ts';
 import { isBlockedEitherWay, publicUserFrom } from '../lib/users.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
+import { refundOrder, startPayment } from '../lib/checkout.ts';
 
 const PLATFORM_FEE_BPS = 500;
 
@@ -36,16 +38,8 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
       [buyerId, amountCents, fee, currency, idempotencyKey, purpose, payeeId],
     );
     const orderId = rows[0].id as string;
-    const intent = await ctx.payments.createIntent({ amountCents, currency, orderId, idempotencyKey });
-    await c.query(`INSERT INTO payments (order_id, provider, provider_ref, status, amount_cents, currency) VALUES ($1,$2,$3,$4,$5,$6)`, [
-      orderId,
-      ctx.payments.name,
-      intent.providerRef,
-      intent.status,
-      amountCents,
-      currency,
-    ]);
-    return { orderId, clientSecret: intent.clientSecret };
+    const pay = await startPayment(c, ctx.paymentProviders, { orderId, buyerId, amountCents, currency, idempotencyKey });
+    return { orderId, ...pay };
   }
 
   // ── Subscriptions ─────────────────────────────────────────────────────
@@ -56,11 +50,12 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
       z.object({
         name: z.string().trim().min(1).max(60),
         description: z.string().trim().max(500).default(''),
-        priceCents: z.number().int().min(100).max(100_000),
-        currency: z.string().length(3).toUpperCase().default('USD'),
+        priceCents: z.number().int().min(100).max(100_000_000),
+        currency: z.string().length(3).toUpperCase().pipe(z.enum(CURRENCIES)).default('USD'),
       }),
       req.body,
     );
+    if (input.priceCents > 100_000 * CURRENCY_SCALE[input.currency]) throw badRequest('That price is higher than plans can be.');
     const count = await db.query(`SELECT count(*) AS n FROM creator_plans WHERE creator_id = $1 AND active`, [u.id]);
     if (Number(count.rows[0].n) >= 5) throw new AppError(409, 'conflict', 'You can have up to 5 plans.');
     const { rows } = await db.query(`INSERT INTO creator_plans (creator_id, name, description, price_cents, currency) VALUES ($1,$2,$3,$4,$5) RETURNING *`, [
@@ -110,7 +105,7 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
         `INSERT INTO creator_subscriptions (plan_id, subscriber_id, creator_id, order_id) VALUES ($1,$2,$3,$4) RETURNING id, status`,
         [id, u.id, plan.creator_id, pay.orderId],
       );
-      return { subscription: rows[0], payment: { provider: ctx.payments.name, clientSecret: pay.clientSecret, orderId: pay.orderId } };
+      return { subscription: rows[0], payment: { provider: pay.provider, clientSecret: pay.clientSecret, orderId: pay.orderId } };
     });
     reply.code(201);
     return result;
@@ -163,8 +158,8 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
     const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
     const input = parse(
       z.object({
-        amountCents: z.number().int().min(100).max(50_000),
-        currency: z.string().length(3).toUpperCase().default('USD'),
+        amountCents: z.number().int().min(100).max(50_000_000),
+        currency: z.string().length(3).toUpperCase().pipe(z.enum(CURRENCIES)).default('USD'),
         message: z.string().trim().max(200).default(''),
         postId: z.string().uuid().optional(),
         liveId: z.string().uuid().optional(),
@@ -173,6 +168,7 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
       req.body,
     );
     if (id === u.id) throw badRequest("You can't tip yourself.");
+    if (input.amountCents > 50_000 * CURRENCY_SCALE[input.currency]) throw badRequest('That tip is higher than tips can be.');
     if (await isBlockedEitherWay(db, u.id, id)) throw forbidden();
     if (input.message && analyzeText(input.message).risk !== 'normal') throw new AppError(422, 'content_blocked', "That message can't be sent.");
     const result = await tx(db, async (c) => {
@@ -185,7 +181,7 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
         input.message,
         pay.orderId,
       ]);
-      return { payment: { provider: ctx.payments.name, clientSecret: pay.clientSecret, orderId: pay.orderId } };
+      return { payment: { provider: pay.provider, clientSecret: pay.clientSecret, orderId: pay.orderId } };
     });
     reply.code(201);
     return result;
@@ -274,8 +270,9 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
 
   app.get('/v1/me/bookings', { preHandler: requireAuth }, async (req) => {
     const { rows } = await db.query(
-      `SELECT bk.id, bk.status, bk.party_size, bk.starts_at, bk.note, p.id AS place_id, p.name AS place_name FROM bookings bk JOIN places p ON p.id = bk.place_id
-       WHERE bk.user_id = $1 ORDER BY bk.starts_at DESC LIMIT 100`,
+      `SELECT bk.id, bk.status, bk.party_size, bk.starts_at, bk.note, p.id AS place_id, p.name AS place_name, pd.id AS product_id, pd.title AS product_title
+       FROM bookings bk LEFT JOIN places p ON p.id = bk.place_id LEFT JOIN products pd ON pd.id = bk.product_id
+       WHERE bk.user_id = $1 AND bk.status <> 'pending_payment' ORDER BY bk.starts_at DESC LIMIT 100`,
       [me(req).id],
     );
     return { items: rows };
@@ -293,15 +290,28 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
     return { items: rows };
   });
 
+  /** The place's owner, or the seller of a booked service, confirms or declines. Declining a paid service booking refunds it. */
   app.post('/v1/bookings/:id/decide', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
     const { confirm } = parse(z.object({ confirm: z.boolean() }), req.body);
-    const r = await db.query(
-      `UPDATE bookings bk SET status = $3, decided_at = now() FROM places p JOIN businesses b ON b.id = p.business_id
-       WHERE bk.id = $1 AND p.id = bk.place_id AND b.owner_id = $2 AND bk.status = 'requested' RETURNING bk.user_id`,
-      [id, u.id, confirm ? 'confirmed' : 'declined'],
-    );
+    const r = await tx(db, async (c) => {
+      const res = await c.query(
+        `UPDATE bookings bk SET status = $3, decided_at = now()
+         WHERE bk.id = $1 AND bk.status = 'requested' AND (
+           EXISTS (SELECT 1 FROM places p JOIN businesses b ON b.id = p.business_id WHERE p.id = bk.place_id AND b.owner_id = $2)
+           OR EXISTS (SELECT 1 FROM products pd WHERE pd.id = bk.product_id AND pd.seller_id = $2))
+         RETURNING bk.user_id, bk.order_id`,
+        [id, u.id, confirm ? 'confirmed' : 'declined'],
+      );
+      if (res.rows[0]?.order_id && !confirm) {
+        await c.query(`SELECT 1 FROM orders WHERE id = $1 FOR UPDATE`, [res.rows[0].order_id]);
+        await refundOrder(c, ctx.paymentProviders, res.rows[0].order_id, u.id, 'Booking declined');
+        // refundOrder cancels the booking; the buyer should see that it was declined.
+        await c.query(`UPDATE bookings SET status = 'declined' WHERE id = $1`, [id]);
+      }
+      return res;
+    });
     if (!r.rowCount) throw notFound('Booking');
     await notify(db, ctx.realtime, {
       userId: r.rows[0].user_id,
@@ -316,14 +326,24 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
     return { status: confirm ? 'confirmed' : 'declined' };
   });
 
+  /**
+   * Cancel your booking. A paid service booking the seller hasn't confirmed yet
+   * is refunded; once confirmed, ask the seller (they can refund the order).
+   */
   app.post('/v1/bookings/:id/cancel', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
     const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
-    const r = await db.query(
-      `UPDATE bookings SET status = 'cancelled', decided_at = now() WHERE id = $1 AND user_id = $2 AND status IN ('requested','confirmed')`,
-      [id, me(req).id],
-    );
-    if (!r.rowCount) throw notFound('Booking');
-    return { status: 'cancelled' };
+    return tx(db, async (c) => {
+      const b = (await c.query(`SELECT status, order_id FROM bookings WHERE id = $1 AND user_id = $2 FOR UPDATE`, [id, u.id])).rows[0];
+      if (!b || !['pending_payment', 'requested', 'confirmed'].includes(b.status)) throw notFound('Booking');
+      if (b.order_id && b.status === 'confirmed') throw new AppError(409, 'conflict', 'The seller already confirmed this booking. Message them to cancel it.');
+      if (b.order_id) {
+        await refundOrder(c, ctx.paymentProviders, b.order_id, u.id, 'Booking cancelled');
+        await c.query(`UPDATE orders SET status = 'cancelled', updated_at = now() WHERE id = $1 AND status = 'pending'`, [b.order_id]);
+      }
+      await c.query(`UPDATE bookings SET status = 'cancelled', decided_at = now() WHERE id = $1`, [id]);
+      return { status: 'cancelled' };
+    });
   });
 }
 

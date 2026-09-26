@@ -25,6 +25,7 @@ const VISIBILITY = [
   { id: 'followers', label: 'visibility.followers' },
   { id: 'friends', label: 'visibility.friends' },
   { id: 'private', label: 'visibility.private' },
+  { id: 'subscribers', label: 'visibility.subscribers' },
 ] as const satisfies readonly { id: string; label: MessageKey }[];
 
 const KINDS = [
@@ -62,7 +63,16 @@ export default function Create() {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Posting for subscribers needs a subscription plan (set up in Studio on the web).
+  const [hasPlans, setHasPlans] = useState(false);
   const uploading = progress !== null;
+  useEffect(() => {
+    if (!me) return;
+    void client()
+      .then((api) => api.economy.plans(me.id))
+      .then((r) => setHasPlans(r.items.length > 0))
+      .catch(() => {});
+  }, [me]);
 
   function switchTo(k: Kind) {
     setKind(k);
@@ -70,7 +80,7 @@ export default function Create() {
     setNote(null);
     // Keep only what the new kind can hold: a reel is a video, a post here is text only.
     setMedia((m) => (k === 'post' || (k === 'reel' && m?.kind !== 'video') ? null : m));
-    if (k === 'story' && visibility === 'public') setVisibility('friends');
+    if (k === 'story' && (visibility === 'public' || visibility === 'subscribers')) setVisibility('friends');
   }
 
   // Home ("Your story") and Reels ("Make a reel") open this tab in a given mode.
@@ -133,7 +143,12 @@ export default function Create() {
     try {
       const api = await client();
       if (kind === 'story') {
-        await api.moments.create({ body: body.trim() || undefined, mediaId: media?.id, expiresIn, visibility });
+        await api.moments.create({
+          body: body.trim() || undefined,
+          mediaId: media?.id,
+          expiresIn,
+          visibility: visibility === 'subscribers' ? 'friends' : visibility,
+        });
         setBody('');
         setMedia(null);
         Alert.alert(t('m.create.storyShared'));
@@ -233,7 +248,7 @@ export default function Create() {
         <Text style={{ color: c.ink, fontWeight: '600' }}>{t('create.visibility')}</Text>
         <Segmented
           label={t('create.visibility')}
-          options={VISIBILITY.map((v) => ({ id: v.id, label: t(v.label) }))}
+          options={VISIBILITY.filter((v) => v.id !== 'subscribers' || (hasPlans && kind !== 'story')).map((v) => ({ id: v.id, label: t(v.label) }))}
           value={visibility}
           onChange={setVisibility}
         />

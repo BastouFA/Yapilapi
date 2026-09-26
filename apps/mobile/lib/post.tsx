@@ -7,6 +7,7 @@ import { client, mediaUrl } from './api';
 import { useT, type Translate } from './i18n';
 import { radius, space } from './theme';
 import { Avatar, Card, Icon, PlusBadge, useColors, userText } from './ui';
+import { LockedPanel } from './money';
 
 export const conversationTitle = (c: Conversation, meId: string | undefined, t: Translate) =>
   c.title ??
@@ -94,6 +95,8 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
       ) : null}
 
       {post.body ? <RichText text={post.body} style={{ color: c.ink, fontSize: 15, lineHeight: 22 }} /> : null}
+
+      {post.locked ? <LockedPanel post={post} /> : null}
 
       {imageUri ? (
         <Image

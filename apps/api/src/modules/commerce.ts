@@ -9,11 +9,13 @@ import { emitWebhook } from '../lib/webhooks.ts';
 import { signDevWebhook } from '../lib/payments.ts';
 import { businessOverview } from '../lib/ai/agents.ts';
 import { refundUnspentBudget } from '../lib/ad-refunds.ts';
+import { submitBoostForReview } from '../lib/boosts.ts';
 import { publicUserFrom } from '../lib/users.ts';
 import { EVENT_SELECT, toEvent } from './events.ts';
 import { eventVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
-import { grantPlus, revokePlusForOrder } from '../lib/plus.ts';
+import { grantPlus } from '../lib/plus.ts';
+import { refundOrder, startPayment } from '../lib/checkout.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 const PLATFORM_FEE_BPS = 500; // 5%
@@ -302,10 +304,23 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     const order = await tx(db, async (c) => {
       const ids = input.items.map((i) => i.productId);
       const { rows: products } = await c.query(
-        `SELECT id, seller_id, price_cents, currency, inventory FROM products WHERE id = ANY($1) AND deleted_at IS NULL AND status = 'active' FOR UPDATE`,
-        [ids],
+        `SELECT pd.id, pd.seller_id, pd.kind, pd.price_cents, pd.currency, pd.inventory,
+                EXISTS (SELECT 1 FROM product_files f WHERE f.product_id = pd.id) AS has_file,
+                EXISTS (SELECT 1 FROM order_items oi JOIN orders o ON o.id = oi.order_id
+                        WHERE oi.product_id = pd.id AND o.buyer_id = $2 AND o.status = 'paid') AS owned
+         FROM products pd WHERE pd.id = ANY($1) AND pd.deleted_at IS NULL AND pd.status = 'active' FOR UPDATE OF pd`,
+        [ids, u.id],
       );
       if (products.length !== new Set(ids).size) throw notFound('One of those products');
+      for (const p of products) {
+        // A download is sold once per buyer, and only once the seller has uploaded the file.
+        if (p.kind === 'digital' && !p.has_file) throw new AppError(409, 'not_ready', "This download isn't ready yet. Try again later.");
+        if (p.kind === 'digital' && p.owned) throw new AppError(409, 'conflict', 'You already bought this. Find it in your purchases.');
+        // Services are booked for a time, from the Book button.
+        if (p.kind === 'service') throw badRequest('Book a time for this service instead.');
+      }
+      if (input.items.some((i) => products.find((p) => p.id === i.productId)!.kind === 'digital' && i.quantity !== 1))
+        throw badRequest('Buy one of each download.');
       if (input.liveSessionId) {
         const live = (await c.query(`SELECT ticket_product_id FROM live_sessions WHERE id = $1 AND status <> 'ended'`, [input.liveSessionId])).rows[0];
         if (!live?.ticket_product_id || !ids.includes(live.ticket_product_id)) throw badRequest("That isn't the ticket for this live.");
@@ -334,20 +349,18 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
           p.price_cents,
         ]);
       }
-      const intent = await ctx.payments.createIntent({ amountCents: total, currency: [...currencies][0], orderId, idempotencyKey: input.idempotencyKey });
-      await c.query(`INSERT INTO payments (order_id, provider, provider_ref, status, amount_cents, currency) VALUES ($1,$2,$3,$4,$5,$6)`, [
+      const pay = await startPayment(c, ctx.paymentProviders, {
         orderId,
-        ctx.payments.name,
-        intent.providerRef,
-        intent.status,
-        total,
-        [...currencies][0],
-      ]);
+        buyerId: u.id,
+        amountCents: total,
+        currency: [...currencies][0],
+        idempotencyKey: input.idempotencyKey,
+      });
       await audit(c, { actorId: u.id, action: 'order.create', entityType: 'order', entityId: orderId, metadata: { total } });
-      return { orderId, clientSecret: intent.clientSecret };
+      return { orderId, ...pay };
     });
     reply.code(201);
-    return { order: await loadOrder(order.orderId, u.id), payment: { provider: ctx.payments.name, clientSecret: order.clientSecret } };
+    return { order: await loadOrder(order.orderId, u.id), payment: { provider: order.provider, clientSecret: order.clientSecret, orderId: order.orderId } };
   });
 
   async function loadOrder(id: string, userId: string) {
@@ -386,7 +399,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
    * provider event id is processed once (replays are acknowledged and ignored).
    */
   /** What the browser needs to collect payment (the provider's public key, never a secret). */
-  app.get('/v1/payments/config', async () => ctx.payments.publicConfig());
+  app.get('/v1/payments/config', async () => ctx.paymentProviders.publicConfig());
 
   /**
    * Development only: complete a payment with the test provider, so purchases
@@ -397,10 +410,10 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     if (ctx.payments.name !== 'dev' || ctx.config.APP_ENV === 'production') throw notFound('Route');
     const { orderId } = parse(z.object({ orderId: z.string().uuid() }), req.body);
     const pay = (
-      await db.query(`SELECT p.provider_ref, p.amount_cents, p.status FROM payments p JOIN orders o ON o.id = p.order_id WHERE o.id = $1 AND o.buyer_id = $2`, [
-        orderId,
-        me(req).id,
-      ])
+      await db.query(
+        `SELECT p.provider_ref, p.amount_cents, p.status FROM payments p JOIN orders o ON o.id = p.order_id WHERE o.id = $1 AND o.buyer_id = $2 AND p.provider = 'dev'`,
+        [orderId, me(req).id],
+      )
     ).rows[0];
     if (!pay) throw notFound('Order');
     if (pay.status === 'succeeded') return { status: 'paid' };
@@ -418,11 +431,12 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
 
   app.post('/v1/payments/webhook/:provider', { config: { rateLimit: false, rawBody: true } }, async (req, reply) => {
     const { provider } = parse(z.object({ provider: z.string() }), req.params);
-    if (provider !== ctx.payments.name) throw notFound('Payment provider');
+    const verifier = ctx.paymentProviders.byName(provider);
+    if (!verifier) throw notFound('Payment provider');
     const raw = (req as unknown as { rawBody?: string }).rawBody ?? JSON.stringify(req.body);
     let event;
     try {
-      event = ctx.payments.verifyWebhook(raw, req.headers);
+      event = verifier.verifyWebhook(raw, req.headers);
     } catch {
       reply.code(400);
       return { error: { code: 'bad_signature', message: 'Webhook signature is invalid.' } };
@@ -436,20 +450,29 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     ]);
     if (!fresh.rowCount) return { ok: true, duplicate: true };
     await tx(db, async (c) => {
-      const pay = await c.query(`SELECT id, order_id, amount_cents, status FROM payments WHERE provider = $1 AND provider_ref = $2 FOR UPDATE`, [
+      const pay = await c.query(`SELECT id, order_id, amount_cents, currency, status FROM payments WHERE provider = $1 AND provider_ref = $2 FOR UPDATE`, [
         provider,
         event.providerRef,
       ]);
       const p = pay.rows[0];
       if (!p) return;
       if (event.type === 'payment.succeeded' && p.status !== 'succeeded') {
-        // Reconciliation: the amount the provider captured must match what we charged.
+        // Reconciliation: the amount and currency the provider captured must match what we charged.
         if (event.amountCents !== undefined && event.amountCents !== p.amount_cents) {
           await audit(c, {
             action: 'payment.amount_mismatch',
             entityType: 'payment',
             entityId: p.id,
             metadata: { expected: p.amount_cents, got: event.amountCents },
+          });
+          return;
+        }
+        if (event.currency !== undefined && event.currency !== p.currency.trim().toUpperCase()) {
+          await audit(c, {
+            action: 'payment.currency_mismatch',
+            entityType: 'payment',
+            entityId: p.id,
+            metadata: { expected: p.currency, got: event.currency },
           });
           return;
         }
@@ -487,6 +510,25 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
           await announceLiveGift(c, p.order_id);
         }
         if (o.purpose === 'plus') await grantPlus(c, o.buyer_id, 'purchase', { orderId: p.order_id });
+        // A paid service booking goes to the seller to confirm.
+        const booked = await c.query(
+          `UPDATE bookings bk SET status = 'requested' FROM products pd
+           WHERE bk.order_id = $1 AND bk.status = 'pending_payment' AND pd.id = bk.product_id RETURNING bk.id, bk.starts_at, pd.seller_id`,
+          [p.order_id],
+        );
+        // Paid after the booking was cancelled: the money goes straight back.
+        const cancelled = await c.query(`SELECT 1 FROM bookings WHERE order_id = $1 AND status = 'cancelled'`, [p.order_id]);
+        if (cancelled.rowCount) await refundOrder(c, ctx.paymentProviders, p.order_id, null, 'Booking was cancelled before payment');
+        for (const b of booked.rows)
+          await notify(c, ctx.realtime, {
+            userId: b.seller_id,
+            category: 'commerce',
+            type: 'booking_request',
+            actorId: o.buyer_id,
+            entityType: 'booking',
+            entityId: b.id,
+            data: { startsAt: b.starts_at },
+          });
         if (o.purpose === 'ad_budget') {
           const camp = await c.query(
             `UPDATE ad_campaigns SET budget_millicents = budget_millicents + (o.total_cents::bigint * 1000) FROM orders o
@@ -494,7 +536,9 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
             [p.order_id],
           );
           // Money that arrives after a campaign was rejected or ended goes straight back.
-          if (camp.rows[0] && ['rejected', 'ended'].includes(camp.rows[0].status)) await refundUnspentBudget(c, ctx.payments, camp.rows[0].id, null);
+          if (camp.rows[0] && ['rejected', 'ended'].includes(camp.rows[0].status)) await refundUnspentBudget(c, ctx.paymentProviders, camp.rows[0].id, null);
+          // A boost goes to ad review once its budget is paid.
+          if (camp.rows[0]?.status === 'draft') await submitBoostForReview(c, ctx.paymentProviders, camp.rows[0].id);
         }
         const sellers = await c.query<{ seller_id: string }>(
           `SELECT DISTINCT p.seller_id FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = $1`,
@@ -526,36 +570,18 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     const { reason } = parse(z.object({ reason: z.string().max(500).optional() }), req.body ?? {});
     return tx(db, async (c) => {
       const o = await c.query(
-        `SELECT o.id, o.status, pay.id AS payment_id, pay.provider_ref, pay.amount_cents,
+        `SELECT o.id, o.status,
                 EXISTS (SELECT 1 FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id AND p.seller_id = $2) AS is_seller
-         FROM orders o JOIN payments pay ON pay.order_id = o.id WHERE o.id = $1 FOR UPDATE OF o`,
+         FROM orders o WHERE o.id = $1 AND EXISTS (SELECT 1 FROM payments pay WHERE pay.order_id = o.id) FOR UPDATE OF o`,
         [id, u.id],
       );
       const r = o.rows[0];
       if (!r || (!r.is_seller && u.role !== 'admin')) throw notFound('Order');
       if (r.status !== 'paid') throw badRequest('Only paid orders can be refunded.');
-      const result = await ctx.payments.refund({ providerRef: r.provider_ref, amountCents: r.amount_cents });
-      await c.query(`INSERT INTO refunds (payment_id, amount_cents, reason, status, requested_by) VALUES ($1,$2,$3,$4,$5)`, [
-        r.payment_id,
-        r.amount_cents,
-        reason ?? null,
-        result.status,
-        u.id,
-      ]);
-      if (result.status === 'succeeded') {
-        // Refunding ad budget takes back what the campaign hasn't spent yet.
-        await c.query(
-          `UPDATE ad_campaigns SET budget_millicents = greatest(spent_millicents, budget_millicents - $2::bigint * 1000)
-           FROM orders o WHERE o.id = $1 AND o.purpose = 'ad_budget' AND ad_campaigns.id = o.campaign_id`,
-          [id, r.amount_cents],
-        );
-        // Refunding a Plus month takes those days back.
-        await revokePlusForOrder(c, id);
-        await c.query(`UPDATE orders SET status = 'refunded', updated_at = now() WHERE id = $1`, [id]);
-        await c.query(`UPDATE payments SET status = 'refunded', updated_at = now() WHERE id = $1`, [r.payment_id]);
-      }
-      await audit(c, { actorId: u.id, action: 'order.refund', entityType: 'order', entityId: id, metadata: { status: result.status } });
-      return { status: result.status };
+      const status = await refundOrder(c, ctx.paymentProviders, id, u.id, reason ?? null);
+      const result = status === 'succeeded' ? 'succeeded' : 'failed';
+      await audit(c, { actorId: u.id, action: 'order.refund', entityType: 'order', entityId: id, metadata: { status: result } });
+      return { status: result };
     });
   });
 

@@ -6,7 +6,8 @@ import { client, errorMessage } from './api';
 import { useT } from './i18n';
 import { PostCard, RichText } from './post';
 import { space } from './theme';
-import { Avatar, Button, Card, EmptyState, Loading, Notice, PlusBadge, useColors, userText } from './ui';
+import { Avatar, Button, Card, EmptyState, Loading, Notice, PlusBadge, Segmented, useColors, userText } from './ui';
+import { ShopList } from './money';
 
 /**
  * A profile: name, bio, counts, Follow and Message for other people, and
@@ -23,6 +24,7 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [tab, setTab] = useState<'posts' | 'shop'>('posts');
 
   const load = useCallback(async () => {
     const api = await client();
@@ -130,6 +132,15 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
       </Card>
       {actions}
       {error ? <Notice tone="danger">{error}</Notice> : null}
+      <Segmented
+        label={t('m.title.profile')}
+        value={tab}
+        onChange={setTab}
+        options={[
+          { id: 'posts', label: t('profile.posts') },
+          { id: 'shop', label: t('m.shop.tab') },
+        ]}
+      />
     </View>
   );
 
@@ -137,11 +148,11 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
     <FlatList
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: bottom + space[4] }}
-      data={posts}
+      data={tab === 'posts' ? posts : []}
       keyExtractor={(p) => p.id}
       ListHeaderComponent={header}
       renderItem={({ item }) => <PostCard post={item} />}
-      onEndReached={() => void more()}
+      onEndReached={() => void (tab === 'posts' && more())}
       onEndReachedThreshold={0.5}
       refreshControl={
         <RefreshControl
@@ -153,7 +164,13 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
           }}
         />
       }
-      ListEmptyComponent={<EmptyState title={locked ? t('m.profile.private') : t('m.profile.noPosts')} />}
+      ListEmptyComponent={
+        tab === 'shop' ? (
+          <ShopList userId={profile.id} username={profile.username} isSelf={rel.isSelf} />
+        ) : (
+          <EmptyState title={locked ? t('m.profile.private') : t('m.profile.noPosts')} />
+        )
+      }
     />
   );
 }
