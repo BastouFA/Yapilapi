@@ -11,18 +11,20 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { FlatList, Image, KeyboardAvoidingView, Linking, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Conversation, Message } from '../../../../packages/shared/src/types';
 import { useCalls } from '../../lib/calls';
 import { client, errorMessage, mediaUrl } from '../../lib/api';
-import { clock, pickOne, uploadFile, uploadPicked, VOICE_MIME } from '../../lib/media';
+import { clock, MAX_UPLOAD_BYTES, pickOne, uploadFile, uploadPicked, VOICE_MIME } from '../../lib/media';
 import { useT } from '../../lib/i18n';
 import { conversationTitle } from '../../lib/post';
 import { isVerificationError, SensitiveCover, UnavailableMedia, VerifyPrompt } from '../../lib/safety';
 import { useRealtime, useSession } from '../../lib/session';
 import { elevation, gradient, radius, space } from '../../lib/theme';
-import { Icon, Notice, useColors, userText } from '../../lib/ui';
+import { Icon, Notice, SwitchRow, useColors, userText } from '../../lib/ui';
+import { ViewOnceBubble } from '../../lib/view-once';
+import { Waveform, YAP_MAX_MS, YAP_MIN_MS } from '../../lib/yaps';
 
 /** Voice messages shorter than this are treated as a slip of the finger and not sent. */
 const MIN_VOICE_MS = 1000;
@@ -76,26 +78,53 @@ export default function Chat() {
     }
     if ((e.type === 'message.deleted' || e.type === 'message.released') && e.data?.conversationId === id) void load();
     if (e.type === 'app.foreground') void load();
+    // Someone opened a view-once photo you sent, or its file was deleted.
+    if (e.type === 'view_once.updated' && e.data?.conversationId === id)
+      setMessages((cur) => cur.map((x) => (x.id === e.data.id ? { ...x, viewOnce: e.data.viewOnce } : x)));
   });
+
+  const replaceMessage = (m: Message) => setMessages((cur) => cur.map((x) => (x.id === m.id ? m : x)));
+  const yaps = conversation?.yaps;
+  const [yapSettings, setYapSettings] = useState(false);
 
   const canCall = !!conversation && conversation.kind !== 'community' && conversation.members.length <= 8 && conversation.members.length > 1;
   useLayoutEffect(() => {
     navigation.setOptions({
       title: conversation ? conversationTitle(conversation, me?.id, t) : t('m.title.conversation'),
-      headerRight: canCall
-        ? () => (
-            <View style={{ flexDirection: 'row', gap: space[4] }}>
-              <Pressable accessibilityRole="button" accessibilityLabel={t('m.calls.startAudio')} hitSlop={10} onPress={() => void calls.start(id, 'audio')}>
-                <Icon name="call-outline" size={22} color={c.yapi} />
-              </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel={t('m.calls.startVideo')} hitSlop={10} onPress={() => void calls.start(id, 'video')}>
-                <Icon name="videocam-outline" size={24} color={c.yapi} />
-              </Pressable>
-            </View>
-          )
-        : undefined,
+      headerRight:
+        canCall || yaps?.available
+          ? () => (
+              <View style={{ flexDirection: 'row', gap: space[4] }}>
+                {yaps?.available ? (
+                  <Pressable accessibilityRole="button" accessibilityLabel={t('m.yap.settings')} hitSlop={10} onPress={() => setYapSettings(true)}>
+                    <Icon name={yaps.paused ? 'volume-mute-outline' : 'volume-high-outline'} size={22} color={c.yapi} />
+                  </Pressable>
+                ) : null}
+                {canCall ? (
+                  <>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t('m.calls.startAudio')}
+                      hitSlop={10}
+                      onPress={() => void calls.start(id, 'audio')}
+                    >
+                      <Icon name="call-outline" size={22} color={c.yapi} />
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t('m.calls.startVideo')}
+                      hitSlop={10}
+                      onPress={() => void calls.start(id, 'video')}
+                    >
+                      <Icon name="videocam-outline" size={24} color={c.yapi} />
+                    </Pressable>
+                  </>
+                ) : null}
+              </View>
+            )
+          : undefined,
     });
-  }, [navigation, conversation, me?.id, canCall, calls, id, c.yapi, t]);
+  }, [navigation, conversation, me?.id, canCall, calls, id, c.yapi, t, yaps?.available, yaps?.paused]);
 
   const [sending, setSending] = useState(false);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -158,6 +187,99 @@ export default function Chat() {
     if (recordingOn && recording.durationMillis >= MAX_VOICE_MS) void stopVoice(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recordingOn, recording.durationMillis]);
+
+  // ── Yap: hold to talk, let go to send ──
+  const [yapping, setYapping] = useState(false);
+  const yapHeld = useRef(false);
+
+  async function startYap() {
+    if (sending || recordingOn || yapHeld.current) return;
+    yapHeld.current = true;
+    setError(null);
+    try {
+      const perm = await requestRecordingPermissionsAsync();
+      if (!perm.granted) {
+        yapHeld.current = false;
+        setMicDenied(true);
+        return;
+      }
+      setMicDenied(false);
+      // Let go while the permission prompt was up: nothing to record.
+      if (!yapHeld.current) return;
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      if (!yapHeld.current) return;
+      recorder.record();
+      setYapping(true);
+    } catch (e) {
+      yapHeld.current = false;
+      setYapping(false);
+      setError(errorMessage(e));
+    }
+  }
+
+  async function stopYap() {
+    const was = yapHeld.current;
+    yapHeld.current = false;
+    if (!was || !recorder.isRecording) {
+      setYapping(false);
+      return;
+    }
+    const ms = recorder.getStatus().durationMillis;
+    setYapping(false);
+    try {
+      await recorder.stop();
+    } catch {
+      // Already stopped at the limit.
+    }
+    await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
+    const uri = recorder.uri;
+    if (!uri || ms < YAP_MIN_MS) return;
+    setSending(true);
+    try {
+      const media = await uploadFile(uri, `yap-${Date.now()}.m4a`, VOICE_MIME);
+      const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const { message } = await (await client()).conversations.send(id, '', clientId, [{ mediaId: media.id }], { kind: 'yap' });
+      setMessages((cur) => (cur.some((x) => x.id === message.id) ? cur : [...cur, message]));
+    } catch (e) {
+      fail(e);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  // Yaps stop at 60 seconds and send.
+  useEffect(() => {
+    if (yapping && recording.durationMillis >= YAP_MAX_MS) void stopYap();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [yapping, recording.durationMillis]);
+
+  /** Pick a photo or video and send it to view once: stored privately, each person opens it one time. */
+  async function sendViewOnce() {
+    const asset = await pickOne(['images', 'videos']).catch(() => null);
+    if (!asset || asset === 'denied') {
+      if (asset === 'denied') setError(t('m.create.photosPermission'));
+      return;
+    }
+    if ((asset.fileSize ?? 0) > MAX_UPLOAD_BYTES) {
+      setError(t('m.viewOnce.tooBig'));
+      return;
+    }
+    setSending(true);
+    setError(null);
+    try {
+      const video = asset.type === 'video';
+      const type = asset.mimeType ?? (video ? 'video/mp4' : 'image/jpeg');
+      const media = await uploadFile(asset.uri, asset.fileName ?? `view-once.${video ? 'mp4' : 'jpg'}`, type, undefined, { viewOnce: true });
+      const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const { message } = await (await client()).conversations.send(id, '', clientId, [{ mediaId: media.id }], { viewOnce: true });
+      setMessages((cur) => (cur.some((x) => x.id === message.id) ? cur : [...cur, message]));
+    } catch (e) {
+      fail(e);
+    } finally {
+      setSending(false);
+    }
+  }
 
   // Leaving the conversation while recording discards it.
   useEffect(
@@ -237,7 +359,17 @@ export default function Chat() {
         renderItem={({ item }) => {
           const mine = item.sender.id === me?.id;
           const text = item.body || (item.attachments.length ? '' : t('m.message.deleted'));
-          const media = <Attachments items={item.attachments} tint={mine ? c.onYapi : c.ink} />;
+          const tint = mine ? c.onYapi : c.ink;
+          const media = item.viewOnce ? (
+            <ViewOnceBubble message={item} mine={mine} tint={tint} onChange={replaceMessage} />
+          ) : (
+            <>
+              {item.kind === 'yap' ? (
+                <Text style={{ color: tint, fontSize: 11, fontWeight: '800', letterSpacing: 0.5, opacity: 0.8 }}>{t('m.yap.label')}</Text>
+              ) : null}
+              <Attachments items={item.attachments} tint={tint} />
+            </>
+          );
           // Your messages sit at the end edge (the right in English, the left in Arabic), with the
           // tail corner on that side.
           return mine ? (
@@ -259,6 +391,39 @@ export default function Chat() {
           );
         }}
       />
+      {yaps?.available && !recordingOn ? (
+        <View style={{ paddingHorizontal: space[3], paddingTop: space[2] }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('m.yap.a11y')}
+            accessibilityState={{ selected: yapping, disabled: sending }}
+            disabled={sending}
+            onPressIn={() => void startYap()}
+            onPressOut={() => void stopYap()}
+            delayLongPress={60_000}
+            style={{ opacity: sending ? 0.5 : 1 }}
+          >
+            <LinearGradient
+              {...gradient(c)}
+              style={{
+                height: 56,
+                borderRadius: 28,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: space[2],
+                transform: [{ scale: yapping ? 0.97 : 1 }],
+              }}
+            >
+              <Icon name="mic" size={22} color={c.onYapi} />
+              <Text style={{ color: c.onYapi, fontSize: 16, fontWeight: '800', fontVariant: ['tabular-nums'] }}>
+                {yapping ? t('m.yap.release', { time: clock(recording.durationMillis / 1000) }) : t('m.yap.hold')}
+              </Text>
+              {yapping ? <Waveform color={c.onYapi} bars={7} height={18} /> : null}
+            </LinearGradient>
+          </Pressable>
+        </View>
+      ) : null}
       <View
         style={{
           flexDirection: 'row',
@@ -309,6 +474,15 @@ export default function Chat() {
             >
               <Icon name="image-outline" size={24} color={c.inkMuted} />
             </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('m.viewOnce.send')}
+              disabled={sending}
+              onPress={() => void sendViewOnce()}
+              style={{ width: 36, height: 44, alignItems: 'center', justifyContent: 'center', opacity: sending ? 0.45 : 1 }}
+            >
+              <Icon name="eye-outline" size={24} color={c.inkMuted} />
+            </Pressable>
             <TextInput
               accessibilityLabel={t('inbox.placeholder')}
               placeholder={t('inbox.placeholder')}
@@ -357,6 +531,54 @@ export default function Chat() {
           </>
         )}
       </View>
+      {yaps ? (
+        <Modal visible={yapSettings} transparent animationType="slide" onRequestClose={() => setYapSettings(false)}>
+          <Pressable style={{ flex: 1, backgroundColor: c.overlay }} accessibilityLabel={t('m.common.close')} onPress={() => setYapSettings(false)} />
+          <View
+            style={{
+              backgroundColor: c.surface,
+              borderTopStartRadius: radius.lg,
+              borderTopEndRadius: radius.lg,
+              padding: space[4],
+              paddingBottom: Math.max(insets.bottom, space[4]),
+              gap: space[4],
+            }}
+          >
+            <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 18, fontWeight: '800' }}>
+              {t('m.yap.settings')}
+            </Text>
+            <SwitchRow
+              label={t('m.yap.outLoud')}
+              hint={yaps.playOutLoud === null ? t(conversation?.kind === 'direct' ? 'm.yap.defaultDirect' : 'm.yap.defaultGroup') : t('m.yap.outLoudHint')}
+              value={yaps.playOutLoud ?? yaps.defaultOutLoud}
+              onValueChange={async (on) => {
+                try {
+                  const r = await (await client()).conversations.setYaps(id, on);
+                  setConversation((cur) => (cur ? { ...cur, yaps: r.yaps } : cur));
+                } catch (e) {
+                  setError(errorMessage(e));
+                }
+              }}
+            />
+            <SwitchRow
+              label={t('m.yap.pause')}
+              hint={t('m.yap.quietNote')}
+              value={yaps.paused}
+              onValueChange={async (paused) => {
+                try {
+                  await (await client()).yaps.setPaused(paused);
+                  setConversation((cur) => (cur?.yaps ? { ...cur, yaps: { ...cur.yaps, paused } } : cur));
+                } catch (e) {
+                  setError(errorMessage(e));
+                }
+              }}
+            />
+            <Pressable accessibilityRole="button" onPress={() => setYapSettings(false)} style={{ alignSelf: 'flex-end', padding: space[2] }}>
+              <Text style={{ color: c.yapi, fontWeight: '700', fontSize: 15 }}>{t('m.common.done')}</Text>
+            </Pressable>
+          </View>
+        </Modal>
+      ) : null}
     </KeyboardAvoidingView>
   );
 }

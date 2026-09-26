@@ -200,11 +200,10 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
         let mediaId = m.id;
         if (mediaId) {
           // Reuse the uploaded item (only your own), updating its alt text.
-          const own = await c.query(`UPDATE media SET alt_text = coalesce($3, alt_text) WHERE id = $1 AND owner_id = $2 RETURNING id, moderation`, [
-            mediaId,
-            u.id,
-            m.altText ?? null,
-          ]);
+          const own = await c.query(
+            `UPDATE media SET alt_text = coalesce($3, alt_text) WHERE id = $1 AND owner_id = $2 AND NOT private RETURNING id, moderation`,
+            [mediaId, u.id, m.altText ?? null],
+          );
           if (!own.rowCount) throw notFound('One of the photos or videos');
           if (own.rows[0].moderation === 'blocked') throw new AppError(422, 'media_blocked', MEDIA_BLOCKED_MESSAGE);
         } else {

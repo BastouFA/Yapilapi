@@ -1,10 +1,10 @@
 import { createReadStream, createWriteStream } from 'node:fs';
-import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
-import { CreateBucketCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 export interface StoredObject {
   key: string;
@@ -24,6 +24,8 @@ export interface MediaStorage {
   download(key: string, file: string): Promise<void>;
   /** Stream an object (S3 driver; local files are served statically). */
   get?(key: string, range?: string): Promise<{ body: Readable; contentType?: string; contentLength?: number; contentRange?: string; status: number } | null>;
+  /** Delete an object for good (view-once media). Deleting something already gone is not an error. */
+  remove?(key: string): Promise<void>;
 }
 
 function newKey(ext: string) {
@@ -111,6 +113,9 @@ export function s3Storage(opts: {
         throw e;
       }
     },
+    async remove(key) {
+      await s3.send(new DeleteObjectCommand({ Bucket: opts.bucket, Key: key }));
+    },
   };
 }
 
@@ -152,6 +157,9 @@ export function localDiskStorage(dir: string, publicBase: string): MediaStorage 
     },
     async download(key, file) {
       await copyFile(path.join(dir, key), file);
+    },
+    async remove(key) {
+      await rm(path.join(dir, key), { force: true });
     },
   };
 }

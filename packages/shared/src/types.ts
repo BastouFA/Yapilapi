@@ -184,6 +184,41 @@ export interface Conversation {
   lastMessage: Message | null;
   unreadCount: number;
   updatedAt: string;
+  /** Yaps in this chat, for you. */
+  yaps?: ConversationYaps;
+}
+
+export interface ConversationYaps {
+  /** Yaps work in one-to-one chats and groups of up to 12 people. */
+  available: boolean;
+  /** Your "Let Yaps play out loud" setting here: null is the default (on for yaps from friends). */
+  playOutLoud: boolean | null;
+  /** What the default means here: in a one-to-one chat, whether you are friends. In a group, true (yaps from friends play). */
+  defaultOutLoud: boolean;
+  /** Your "Pause Yaps" switch, for every chat. */
+  paused: boolean;
+}
+
+/** A view-once photo or video, as the person reading it sees it. */
+export interface ViewOnceInfo {
+  /**
+   * ready: can be opened (for the sender: waiting to be opened).
+   * viewed: you opened it (for the sender: everyone has, and the file is deleted).
+   * expired: 14 days passed; the file is deleted.
+   */
+  state: 'ready' | 'viewed' | 'expired';
+  /** 'image' or 'video'. */
+  kind: string;
+  expiresAt: string;
+  /** Only on your own messages: who opened it and when, and whether they took a screenshot we could detect. */
+  openedBy?: { user: PublicUser; openedAt: string; viewedAt: string | null; screenshot: boolean }[];
+}
+
+/** The `yap` realtime event: autoplay is true only when this person allows it right now. */
+export interface YapEvent {
+  message: Message;
+  conversationId: string;
+  autoplay: boolean;
 }
 
 export interface Message {
@@ -209,6 +244,10 @@ export interface Message {
   moderation?: 'review';
   createdAt: string;
   clientId?: string | null;
+  /** 'yap' for a hold-to-talk voice clip; absent for other messages. */
+  kind?: 'yap';
+  /** Present on view-once messages. Their attachment has no url: open it with POST /v1/messages/:id/view-once/open. */
+  viewOnce?: ViewOnceInfo;
 }
 
 export interface Community {

@@ -17,7 +17,7 @@ const REALS_PER_DAY = 3;
 /** Media must be captured in-app moments ago and never used before: that is what makes a Real real. */
 async function freshMedia(c: { query: AppContext['db']['query'] }, userId: string, ids: string[]) {
   const { rows } = await c.query(
-    `SELECT id, kind, url, moderation FROM media WHERE id = ANY($1) AND owner_id = $2 AND used_at IS NULL AND created_at > now() - make_interval(mins => $3)`,
+    `SELECT id, kind, url, moderation FROM media WHERE id = ANY($1) AND owner_id = $2 AND NOT private AND used_at IS NULL AND created_at > now() - make_interval(mins => $3)`,
     [ids, userId, FRESH_MINUTES],
   );
   if (rows.length !== new Set(ids).size)

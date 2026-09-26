@@ -4,14 +4,15 @@ import { isVideoFile, MEDIA_ACCEPT } from '@yapilapi/shared';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { AIPanel, Button, ChatBubble, Icon, Menu, Skeleton } from '@yapilapi/design-system';
+import { AIPanel, BottomSheet, Button, ChatBubble, Icon, Menu, Skeleton, Switch } from '@yapilapi/design-system';
 import type { Conversation, Message } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { ReportSheet } from '@/components/PostList';
 import { useRealtime, useSession } from '../../../providers';
 import { useCalls } from '@/components/Calls';
 import { MiniAppsSheet } from '@/components/MiniApps';
-import { MessageAttachments, VoiceRecorder } from '@/components/ChatAttachments';
+import { MessageAttachments, ViewOnceMessage, VoiceRecorder } from '@/components/ChatAttachments';
+import { TurnOnYapsPrompt, YapButton } from '@/components/Yap';
 
 type Pending = Message & { pending?: boolean };
 
@@ -64,6 +65,9 @@ export default function ChatPage() {
       if (e.data.sender.id !== me?.id) void api.conversations.read(id);
     }
     if (e.type === 'message.deleted' && e.data.conversationId === id) setMessages((cur) => cur?.filter((x) => x.id !== e.data.id) ?? cur);
+    // Someone opened a view-once photo you sent, or its file was deleted.
+    if (e.type === 'view_once.updated' && e.data.conversationId === id)
+      setMessages((cur) => cur?.map((x) => (x.id === e.data.id ? { ...x, viewOnce: e.data.viewOnce } : x)) ?? cur);
     // A message held for a check was let through: load it (or clear the "waiting" label on your own).
     if (e.type === 'message.released' && e.data.conversationId === id)
       api.conversations.messages(id).then(
@@ -78,17 +82,19 @@ export default function ChatPage() {
   });
 
   const fileInput = useRef<HTMLInputElement>(null);
+  const viewOnceInput = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [yapSettings, setYapSettings] = useState(false);
 
-  /** Upload a photo, video or voice recording, then send it as a message. */
-  async function sendFile(file: File, label: string) {
+  /** Upload a photo, video or voice recording, then send it as a message (a yap, or view once). */
+  async function sendFile(file: File, label: string, o: { kind?: 'yap'; viewOnce?: boolean } = {}) {
     if (!me) return;
     if (file.size > 50 * 1024 * 1024) return toast('Files in chats can be up to 50 MB.');
     setUploading(label);
     try {
-      const { media } = await api.media.upload(file);
+      const { media } = await api.media.upload(file, undefined, { viewOnce: o.viewOnce });
       const clientId = crypto.randomUUID();
-      const { message, notice } = await api.conversations.send(id, '', clientId, [{ mediaId: media.id }]);
+      const { message, notice } = await api.conversations.send(id, '', clientId, [{ mediaId: media.id }], o);
       setMessages((cur) => (cur?.some((x) => x.id === message.id) ? cur : [...(cur ?? []), message]));
       if (notice) toast(notice);
     } catch (e) {
@@ -180,6 +186,7 @@ export default function ChatPage() {
             ...(others.length === 1
               ? [{ label: `View ${others[0]!.displayName}'s profile`, icon: 'user' as const, onSelect: () => (location.href = `/u/${others[0]!.username}`) }]
               : []),
+            ...(conv?.yaps?.available ? [{ label: 'Yap settings', icon: 'volume' as const, onSelect: () => setYapSettings(true) }] : []),
           ]}
         />
       </div>
@@ -252,8 +259,18 @@ export default function ChatPage() {
                     mine={mine}
                     sender={others.length > 1 ? m.sender.displayName : undefined}
                     body={
-                      m.attachments.length ? (
+                      m.viewOnce ? (
                         <>
+                          <ViewOnceMessage
+                            message={m}
+                            mine={mine}
+                            onChange={(next) => setMessages((cur) => cur?.map((x) => (x.id === next.id ? next : x)) ?? cur)}
+                          />
+                          {m.body ? <div>{m.body}</div> : null}
+                        </>
+                      ) : m.attachments.length ? (
+                        <>
+                          {m.kind === 'yap' ? <span className="chat-yap-label">Yap</span> : null}
                           <MessageAttachments items={m.attachments} />
                           {m.body ? <div>{m.body}</div> : null}
                         </>
@@ -278,6 +295,12 @@ export default function ChatPage() {
         </div>
       )}
 
+      {conv?.yaps?.available ? (
+        <div className="yap-row">
+          <TurnOnYapsPrompt />
+          <YapButton disabled={!!uploading} onError={toast} onRecorded={(f) => void sendFile(f, 'Sending Yap…', { kind: 'yap' })} />
+        </div>
+      ) : null}
       <form
         className="yp-composer"
         onSubmit={(e) => {
@@ -296,8 +319,29 @@ export default function ChatPage() {
             if (f) void sendFile(f, isVideoFile(f) ? 'Sending video…' : 'Sending photo…');
           }}
         />
+        <input
+          ref={viewOnceInput}
+          type="file"
+          accept="image/*,video/*,.heic,.heif"
+          hidden
+          onChange={(e) => {
+            const f = e.currentTarget.files?.[0];
+            e.currentTarget.value = '';
+            if (f) void sendFile(f, 'Sending to view once…', { viewOnce: true });
+          }}
+        />
         <button type="button" className="yp-action" aria-label="Send a photo or video" disabled={!!uploading} onClick={() => fileInput.current?.click()}>
           <Icon name="image" />
+        </button>
+        <button
+          type="button"
+          className="yp-action"
+          aria-label="Send a photo or video to view once. Each person can open it one time."
+          title="View once"
+          disabled={!!uploading}
+          onClick={() => viewOnceInput.current?.click()}
+        >
+          <Icon name="eye" />
         </button>
         <VoiceRecorder disabled={!!uploading} onError={toast} onRecorded={(f) => void sendFile(f, 'Sending voice message…')} />
         {uploading ? (
@@ -327,6 +371,46 @@ export default function ChatPage() {
         </Button>
       </form>
       <ReportSheet target={reportId ? { type: 'message', id: reportId } : null} onClose={() => setReportId(null)} />
+      {conv?.yaps ? (
+        <BottomSheet open={yapSettings} onClose={() => setYapSettings(false)} title="Yaps">
+          <div className="stack" style={{ gap: 16 }}>
+            <Switch
+              label="Let Yaps play out loud in this chat"
+              checked={conv.yaps.playOutLoud ?? conv.yaps.defaultOutLoud}
+              onChange={async (on) => {
+                try {
+                  const { yaps } = await api.conversations.setYaps(id, on);
+                  setConv((c) => (c ? { ...c, yaps } : c));
+                } catch (e) {
+                  toast(errorMessage(e));
+                }
+              }}
+            />
+            <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+              {conv.yaps.playOutLoud === null
+                ? conv.kind === 'direct'
+                  ? 'Right now this follows the default: Yaps play out loud from friends.'
+                  : 'Right now this follows the default: Yaps from friends play out loud.'
+                : 'Yaps always arrive in the chat. This only decides whether they play by themselves.'}
+            </p>
+            <Switch
+              label="Pause Yaps in every chat"
+              checked={conv.yaps.paused}
+              onChange={async (paused) => {
+                try {
+                  await api.yaps.setPaused(paused);
+                  setConv((c) => (c?.yaps ? { ...c, yaps: { ...c.yaps, paused } } : c));
+                } catch (e) {
+                  toast(errorMessage(e));
+                }
+              }}
+            />
+            <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+              Yaps also stay quiet in focus mode and during quiet hours set in family settings.
+            </p>
+          </div>
+        </BottomSheet>
+      ) : null}
       <MiniAppsSheet
         open={appsOpen}
         onClose={() => setAppsOpen(false)}

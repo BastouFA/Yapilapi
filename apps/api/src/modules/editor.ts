@@ -33,7 +33,7 @@ export default async function editorModule(app: FastifyInstance, ctx: AppContext
     const { id } = parse(idParam, req.params);
     const input = parse(mediaEditSchema, req.body);
     const { rows } = await db.query(
-      `SELECT m.id, m.kind, m.mime, m.url, m.alt_text, m.storage_key, m.duration_ms FROM media m WHERE m.id = $1 AND m.owner_id = $2`,
+      `SELECT m.id, m.kind, m.mime, m.url, m.alt_text, m.storage_key, m.duration_ms FROM media m WHERE m.id = $1 AND m.owner_id = $2 AND NOT m.private`,
       [id, u.id],
     );
     const src = rows[0];

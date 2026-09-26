@@ -47,6 +47,8 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
   media_blocked: () =>
     'A photo or video you shared looks like it goes against our community rules, so it isn’t shown for now. Someone on our team will check it, and we’ll let you know.',
   media_restored: () => 'We checked your photo or video and it’s back up. Sorry for the trouble.',
+  yap_received: () => 'sent you a Yap',
+  view_once_screenshot: () => 'took a screenshot of your view-once photo or video',
   account_limited: () =>
     'Some of your recent posts or messages were flagged, so your account is limited while our team takes a look. You can still post for yourself and message friends.',
   account_review: (n) =>
@@ -66,6 +68,7 @@ function hrefFor(n: NotificationItem): string | undefined {
   if (n.entityType === 'user' && n.actor) return `/u/${n.actor.username}`;
   if (n.entityType === 'event') return `/events/${n.entityId}`;
   if (n.entityType === 'friend_request') return '/inbox';
+  if (n.entityType === 'conversation') return `/inbox/${n.entityId}`;
   if (n.entityType === 'moderation_case') return '/settings#moderation';
   if (n.type === 'account_limited' || n.type === 'account_review') return '/settings#moderation';
   if (n.actor) return `/u/${n.actor.username}`;
