@@ -9,6 +9,7 @@ import { useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
 import { Avatar, Button, Card, Field, Icon, Loading, Notice, Row, Segmented, SwitchRow, Title, useColors, userText } from '../lib/ui';
 import { VerificationCard } from '../lib/safety';
+import { registerForPush } from '../lib/push';
 
 /** Settings: email and phone confirmation, family supervision and advertising consent (same endpoints as the web settings page). */
 export default function Settings() {
@@ -47,6 +48,7 @@ export default function Settings() {
       <VerificationCard />
       <Family />
       <Advertising />
+      <PushAndSignOut />
     </ScrollView>
   );
 }
@@ -410,6 +412,28 @@ function GuardianControls({ link, onSaved }: { link: FamilyLink; onSaved: () => 
           }
         }}
       />
+    </View>
+  );
+}
+
+/** Phone notifications and signing out (moved here from the profile so the profile shows your posts first). */
+function PushAndSignOut() {
+  const { t } = useT();
+  const { signOut } = useSession();
+  const [note, setNote] = useState<string | null>(null);
+  return (
+    <View style={{ gap: space[3] }}>
+      <Button
+        label={t('m.push.enable')}
+        icon="notifications-outline"
+        variant="secondary"
+        onPress={async () => {
+          const r = await registerForPush().catch(() => 'unavailable' as const);
+          setNote(r === 'registered' ? t('m.push.on') : r === 'denied' ? t('m.push.blocked') : t('m.push.unavailable'));
+        }}
+      />
+      {note ? <Notice>{note}</Notice> : null}
+      <Button label={t('auth.logout')} variant="ghost" onPress={signOut} />
     </View>
   );
 }

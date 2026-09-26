@@ -1,19 +1,16 @@
-import { router } from 'expo-router';
-import { useState } from 'react';
-import { View } from 'react-native';
+import { router, type Href } from 'expo-router';
+import { Pressable, Text, View } from 'react-native';
 import { useT } from '../../lib/i18n';
-import { registerForPush } from '../../lib/push';
 import { useSession } from '../../lib/session';
-import { space } from '../../lib/theme';
+import { radius, space } from '../../lib/theme';
 import { ProfileView } from '../../lib/profile';
-import { Button, Loading, Notice, Screen, useTabBarSpace } from '../../lib/ui';
+import { Icon, Loading, Notice, Screen, useColors, useTabBarSpace, type IconName } from '../../lib/ui';
 
-/** Your profile with counts, your posts, settings and sign out. */
+/** Your profile: counts, a row of shortcuts, then your chapters and posts. Push and sign out live in Settings. */
 export default function ProfileScreen() {
   const { t } = useT();
-  const { me, signOut } = useSession();
+  const { me } = useSession();
   const bottom = useTabBarSpace();
-  const [note, setNote] = useState<string | null>(null);
 
   if (me === null)
     return (
@@ -22,30 +19,43 @@ export default function ProfileScreen() {
       </Screen>
     );
   if (!me) return <Loading />;
+  const shortcuts: { label: string; icon: IconName; href: Href }[] = [
+    { label: t('friends.title'), icon: 'people-outline', href: '/find-friends' },
+    { label: t('invite.title'), icon: 'gift-outline', href: '/invite' },
+    { label: t('m.title.real'), icon: 'camera-outline', href: '/real' },
+    { label: t('notifications.title'), icon: 'notifications-outline', href: '/notifications' },
+    { label: t('m.title.settings'), icon: 'settings-outline', href: '/settings' },
+  ];
   return (
     <ProfileView
       username={me.username}
       bottom={bottom}
       actions={
-        <View style={{ gap: space[3] }}>
-          <Button label={t('friends.title')} icon="people-outline" onPress={() => router.push('/find-friends')} />
-          <Button label={t('notifications.title')} icon="notifications-outline" variant="secondary" onPress={() => router.push('/notifications')} />
-          <Button label={t('invite.title')} icon="gift-outline" variant="secondary" onPress={() => router.push('/invite')} />
-          <Button label={t('m.real.capture')} icon="camera-outline" variant="secondary" onPress={() => router.push('/real')} />
-          <Button label={t('m.title.settings')} icon="settings-outline" variant="secondary" onPress={() => router.push('/settings')} />
-          <Button
-            label={t('m.push.enable')}
-            icon="notifications-outline"
-            variant="secondary"
-            onPress={async () => {
-              const r = await registerForPush().catch(() => 'unavailable' as const);
-              setNote(r === 'registered' ? t('m.push.on') : r === 'denied' ? t('m.push.blocked') : t('m.push.unavailable'));
-            }}
-          />
-          {note ? <Notice>{note}</Notice> : null}
-          <Button label={t('auth.logout')} variant="ghost" onPress={signOut} />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space[2] }}>
+          {shortcuts.map((s) => (
+            <Shortcut key={String(s.href)} {...s} />
+          ))}
         </View>
       }
     />
+  );
+}
+
+function Shortcut({ label, icon, href }: { label: string; icon: IconName; href: Href }) {
+  const c = useColors();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={() => router.push(href)}
+      style={({ pressed }) => ({ flex: 1, alignItems: 'center', gap: 6, opacity: pressed ? 0.7 : 1 })}
+    >
+      <View style={{ width: 52, height: 52, borderRadius: radius.lg, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name={icon} size={24} color={c.yapi} />
+      </View>
+      <Text style={{ color: c.ink, fontSize: 12, fontWeight: '600', textAlign: 'center' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
