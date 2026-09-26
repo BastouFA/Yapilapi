@@ -14,6 +14,8 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
   post_reaction: () => 'liked your post',
   post_comment: () => 'commented on your post',
   post_repost: () => 'reposted your post',
+  post_mention: () => 'mentioned you in a post',
+  comment_mention: () => 'mentioned you in a comment',
   join_request: () => 'asked to join your community',
   join_approved: () => 'approved your request to join',
   event_rsvp: () => 'is going to your event',

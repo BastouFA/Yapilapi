@@ -1,11 +1,12 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
-import { Avatar, Badge, BottomSheet, Button, EmptyState, PostCard, Select, Skeleton, TextField } from '@yapilapi/design-system';
+import { Avatar, Badge, BottomSheet, Button, EmptyState, PostCard, Select, Skeleton, TaggedText, TextField } from '@yapilapi/design-system';
 import type { SponsoredAd } from '@yapilapi/api-client';
 import { formatRelativeTime, REPORT_REASONS, type Comment, type Page, type Post } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
+import { AutocompleteText } from '@/components/Autocomplete';
 import { useSession } from '@/app/providers';
 
 /**
@@ -304,7 +305,7 @@ export function CommentsSheet({ post, onClose, onAdded }: { post: Post; onClose:
                 <strong>
                   {c.author.displayName} <span className="muted">· {formatRelativeTime(c.createdAt, locale)}</span>
                 </strong>
-                {c.body}
+                <TaggedText text={c.body} linkAs={NextLink} />
               </div>
             </div>
           ))
@@ -329,7 +330,19 @@ export function CommentsSheet({ post, onClose, onAdded }: { post: Post; onClose:
             }
           }}
         >
-          <TextField label={t('comment.placeholder')} value={body} onChange={(e) => setBody(e.currentTarget.value)} maxLength={2000} />
+          <label className="yp-visually-hidden" htmlFor={`comment-${post.id}`}>
+            {t('comment.placeholder')}
+          </label>
+          <AutocompleteText
+            as="input"
+            id={`comment-${post.id}`}
+            className="yp-input"
+            placeholder={t('comment.placeholder')}
+            value={body}
+            onValueChange={setBody}
+            maxLength={2000}
+            autoComplete="off"
+          />
           <Button type="submit" loading={busy} disabled={!body.trim()}>
             {t('comment.submit')}
           </Button>

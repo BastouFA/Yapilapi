@@ -67,6 +67,8 @@ const TEXT: Record<string, (actor: string) => string> = {
   booking_decided: () => 'Your booking was updated',
   tip_received: (a) => `${a} sent you a tip`,
   post_repost: (a) => `${a} reposted your post`,
+  post_mention: (a) => `${a} mentioned you in a post`,
+  comment_mention: (a) => `${a} mentioned you in a comment`,
   family_invite: (a) => `${a} asked to supervise your account`,
   ad_approved: () => 'Your ad was approved',
   ad_rejected: () => "Your ad wasn't approved",

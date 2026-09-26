@@ -59,3 +59,30 @@ describe('hashtags', () => {
     expect((await as(t.app, null).put(`/v1/tags/${tag}/follow`)).status).toBe(401);
   });
 });
+
+describe('mentions', () => {
+  it('notifies people mentioned in posts and comments, only when they can see the post', async () => {
+    const author = await signUp(t.app, { birthDate: '1990-01-01' });
+    const friend = await signUp(t.app, { birthDate: '1990-01-01' });
+    const stranger = await signUp(t.app, { birthDate: '1990-01-01' });
+    await as(t.app, friend).post(`/v1/users/${author.id}/follow`);
+    const count = async (userId: string, type: string) =>
+      (await t.ctx.db.query(`SELECT 1 FROM notifications WHERE user_id = $1 AND type = $2`, [userId, type])).rowCount;
+
+    const pub = (await as(t.app, author).post('/v1/posts', { body: `Lunch with @${friend.username.toUpperCase()} and @${stranger.username}.` })).body.post;
+    expect(await count(friend.id, 'post_mention')).toBe(1);
+    expect(await count(stranger.id, 'post_mention')).toBe(1);
+
+    await as(t.app, author).post('/v1/posts', { body: `Followers only, @${stranger.username} @${friend.username}`, visibility: 'followers' });
+    expect(await count(stranger.id, 'post_mention')).toBe(1); // can't see it, so not told
+    expect(await count(friend.id, 'post_mention')).toBe(2);
+
+    await as(t.app, friend).post(`/v1/posts/${pub.id}/comments`, { body: `Agreed @${stranger.username} and @${author.username}` });
+    expect(await count(stranger.id, 'comment_mention')).toBe(1);
+    expect(await count(author.id, 'comment_mention')).toBe(0); // already told about the comment
+    expect(await count(author.id, 'post_comment')).toBe(1);
+
+    await as(t.app, author).post('/v1/posts', { body: `Talking to myself @${author.username}` });
+    expect(await count(author.id, 'post_mention')).toBe(0);
+  });
+});

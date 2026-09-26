@@ -4,7 +4,7 @@ import {
   formatMoney,
   formatRelativeTime,
   safeTimeZone,
-  splitHashtags,
+  splitRichText,
   t,
   type CaptionTrackRef,
   type EventItem,
@@ -333,13 +333,17 @@ export function BottomSheet({ open, onClose, title, children }: { open: boolean;
 }
 
 // ── Post ────────────────────────────────────────────────────────────────
-/** Text with each #tag linked to its tag page. */
+/** Text with each #tag linked to its tag page and each @mention to that profile. */
 export function TaggedText({ text, linkAs: L = A }: { text: string; linkAs?: LinkLike }) {
   return (
     <>
-      {splitHashtags(text).map((part, i) =>
+      {splitRichText(text).map((part, i) =>
         'tag' in part ? (
           <L key={i} href={`/t/${encodeURIComponent(part.tag)}`} className="yp-hashtag">
+            {part.text}
+          </L>
+        ) : 'mention' in part ? (
+          <L key={i} href={`/u/${part.mention}`} className="yp-hashtag">
             {part.text}
           </L>
         ) : (

@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Avatar, EmptyState, Icon, Menu, Skeleton } from '@yapilapi/design-system';
+import { Avatar, EmptyState, Icon, Menu, Skeleton, TaggedText } from '@yapilapi/design-system';
 import type { Post } from '@yapilapi/shared';
+import { NextLink } from '@/lib/link';
 import { api, errorMessage } from '@/lib/api';
 import { CommentsSheet, ReportSheet } from '@/components/PostList';
 import { useSession } from '../../providers';
@@ -311,7 +312,7 @@ function Caption({ text }: { text: string }) {
   const long = text.length > 90;
   return (
     <p className={`reel__caption${open ? ' reel__caption--open' : ''}`} dir="auto">
-      {open || !long ? text : `${text.slice(0, 90)}…`}{' '}
+      <TaggedText text={open || !long ? text : `${text.slice(0, 90)}…`} linkAs={NextLink} />{' '}
       {long ? (
         <button type="button" className="reel__more-text" onClick={() => setOpen((o) => !o)}>
           {open ? 'less' : 'more'}

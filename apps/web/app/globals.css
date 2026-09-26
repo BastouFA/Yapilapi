@@ -1687,3 +1687,45 @@ h3 {
   background: #1d2033;
   color: #ffffff;
 }
+
+/* @mention and #tag suggestions */
+.ac {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.ac > textarea,
+.ac > input {
+  width: 100%;
+}
+.ac__list {
+  position: absolute;
+  z-index: 30;
+  inset-inline: 0;
+  top: calc(100% + 4px);
+  max-height: 280px;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  list-style: none;
+}
+.ac__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.ac__item[aria-selected='true'] {
+  background: var(--yapi-soft);
+}
+.ac__text {
+  display: grid;
+  min-width: 0;
+  font-size: 14px;
+}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
+import { AutocompleteText } from '@/components/Autocomplete';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { AIPanel, Alert, Button, Checkbox, Segments, Select, TextField } from '@yapilapi/design-system';
 import { VISIBILITIES, type Community, type MessageKey, type Visibility } from '@yapilapi/shared';
@@ -193,10 +194,10 @@ function Create() {
         <label htmlFor="body" className="yp-visually-hidden">
           {t('create.placeholder')}
         </label>
-        <textarea
+        <AutocompleteText
           id="body"
           value={body}
-          onChange={(e) => setBody(e.currentTarget.value)}
+          onValueChange={setBody}
           placeholder={kind === 'reel' ? 'Write a caption' : kind === 'story' ? 'Add a few words (optional)' : t('create.placeholder')}
           maxLength={kind === 'story' ? 500 : kind === 'reel' ? 2200 : 5000}
           aria-invalid={!!fields.body}

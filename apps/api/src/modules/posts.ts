@@ -16,6 +16,7 @@ import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, encodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
 import { analyzeText, statusForRisk } from '../lib/moderation.ts';
 import { hydratePosts } from '../lib/posts.ts';
+import { notifyMentions } from '../lib/mentions.ts';
 import { topicsFor } from './tags.ts';
 import { notify, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
@@ -181,6 +182,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     });
     track(db, u.id, 'post_created', { kind, visibility: input.visibility, community: !!input.communityId });
     await emitWebhook(db, u.id, 'post.created', { postId, kind, visibility: input.visibility });
+    if (analysis.risk === 'normal') await notifyMentions(db, ctx.realtime, { text: input.body, actorId: u.id, postId });
     reply.code(201);
     const [post] = await hydratePosts(db, [postId], u.id);
     return {
@@ -674,6 +676,8 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       entityId: id,
       data: { commentId: comment.id },
     });
+    if (analysis.risk === 'normal')
+      await notifyMentions(db, ctx.realtime, { text: input.body, actorId: u.id, postId: id, commentId: comment.id, skip: [post.author_id] });
     track(db, u.id, 'comment_created');
     const author = (
       await db.query(
