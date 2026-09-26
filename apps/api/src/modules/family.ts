@@ -45,13 +45,18 @@ export default async function familyModule(app: FastifyInstance, ctx: AppContext
     if (await isBlockedEitherWay(db, u.id, teen.id)) throw forbidden();
     const open = await db.query(`SELECT count(*) AS n FROM family_links WHERE teen_id = $1 AND status IN ('pending','active')`, [teen.id]);
     if (Number(open.rows[0].n) >= 2) throw new AppError(409, 'conflict', 'This account already has two guardians.');
-    const { rows } = await db
-      .query(`INSERT INTO family_links (guardian_id, teen_id) VALUES ($1,$2) RETURNING id, status`, [u.id, teen.id])
-      .catch((e) => {
-        if (e.code === '23505') throw new AppError(409, 'conflict', "You've already invited this account.");
-        throw e;
-      });
-    await notify(db, ctx.realtime, { userId: teen.id, category: 'security', type: 'family_invite', actorId: u.id, entityType: 'family_link', entityId: rows[0].id });
+    const { rows } = await db.query(`INSERT INTO family_links (guardian_id, teen_id) VALUES ($1,$2) RETURNING id, status`, [u.id, teen.id]).catch((e) => {
+      if (e.code === '23505') throw new AppError(409, 'conflict', "You've already invited this account.");
+      throw e;
+    });
+    await notify(db, ctx.realtime, {
+      userId: teen.id,
+      category: 'security',
+      type: 'family_invite',
+      actorId: u.id,
+      entityType: 'family_link',
+      entityId: rows[0].id,
+    });
     await audit(db, { actorId: u.id, action: 'family.invite', entityType: 'family_link', entityId: rows[0].id });
     reply.code(201);
     return { link: rows[0] };
@@ -69,9 +74,7 @@ export default async function familyModule(app: FastifyInstance, ctx: AppContext
     const users = await usersByIds(db, [...new Set(rows.flatMap((r) => [r.guardian_id, r.teen_id]))]);
     const teenIds = rows.filter((r) => r.guardian_id === u.id && r.status === 'active').map((r) => r.teen_id);
     const usage = teenIds.length
-      ? (
-          await db.query(`SELECT user_id, day, minutes FROM usage_days WHERE user_id = ANY($1) AND day > current_date - 7 ORDER BY day`, [teenIds])
-        ).rows
+      ? (await db.query(`SELECT user_id, day, minutes FROM usage_days WHERE user_id = ANY($1) AND day > current_date - 7 ORDER BY day`, [teenIds])).rows
       : [];
     return {
       items: rows.map((r) => ({
@@ -82,7 +85,13 @@ export default async function familyModule(app: FastifyInstance, ctx: AppContext
         teen: users.get(r.teen_id) ?? null,
         controls:
           r.status === 'active'
-            ? { messagesFrom: r.messages_from, dailyLimitMinutes: r.daily_limit_minutes, quietStart: r.quiet_start, quietEnd: r.quiet_end, timezone: r.timezone }
+            ? {
+                messagesFrom: r.messages_from,
+                dailyLimitMinutes: r.daily_limit_minutes,
+                quietStart: r.quiet_start,
+                quietEnd: r.quiet_end,
+                timezone: r.timezone,
+              }
             : null,
         // Only the guardian sees the teen's daily minutes; that is all usage data they get.
         usage: r.guardian_id === u.id ? usage.filter((x) => x.user_id === r.teen_id).map((x) => ({ day: x.day, minutes: x.minutes })) : undefined,
@@ -101,7 +110,14 @@ export default async function familyModule(app: FastifyInstance, ctx: AppContext
       await c.query(`UPDATE family_links SET status = 'active', accepted_at = now() WHERE id = $1`, [id]);
       await c.query(`INSERT INTO teen_controls (teen_id, updated_by) VALUES ($1,$2) ON CONFLICT (teen_id) DO NOTHING`, [u.id, l.guardian_id]);
     });
-    await notify(db, ctx.realtime, { userId: l.guardian_id, category: 'security', type: 'family_accepted', actorId: u.id, entityType: 'family_link', entityId: id });
+    await notify(db, ctx.realtime, {
+      userId: l.guardian_id,
+      category: 'security',
+      type: 'family_accepted',
+      actorId: u.id,
+      entityType: 'family_link',
+      entityId: id,
+    });
     await audit(db, { actorId: u.id, action: 'family.accept', entityType: 'family_link', entityId: id });
     return { status: 'active' };
   });
@@ -145,7 +161,14 @@ export default async function familyModule(app: FastifyInstance, ctx: AppContext
       [l.teen_id, input.messagesFrom, input.dailyLimitMinutes, input.quietStart, input.quietEnd, input.timezone, u.id],
     );
     // The teen is always told when their settings change.
-    await notify(db, ctx.realtime, { userId: l.teen_id, category: 'security', type: 'family_controls_changed', actorId: u.id, entityType: 'family_link', entityId: id });
+    await notify(db, ctx.realtime, {
+      userId: l.teen_id,
+      category: 'security',
+      type: 'family_controls_changed',
+      actorId: u.id,
+      entityType: 'family_link',
+      entityId: id,
+    });
     await audit(db, { actorId: u.id, action: 'family.controls', entityType: 'family_link', entityId: id, metadata: input });
     return { controls: input };
   });

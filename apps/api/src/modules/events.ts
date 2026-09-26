@@ -148,7 +148,7 @@ export default async function eventsModule(app: FastifyInstance, ctx: AppContext
     if (stored === 'going') {
       await notify(db, ctx.realtime, { userId: ev.h_id, category: 'events', type: 'event_rsvp', actorId: u.id, entityType: 'event', entityId: id });
       track(db, u.id, 'event_rsvp_going');
-      void emitWebhook(db, ev.h_id, 'event.rsvp', { eventId: id, status: stored });
+      await emitWebhook(db, ev.h_id, 'event.rsvp', { eventId: id, status: stored });
     }
     return { status: stored, event: toEvent(await load(id, u.id)) };
   });

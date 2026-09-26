@@ -1,7 +1,17 @@
-import { useCallback, useEffect, useId, useRef, useState, type ComponentType, type ReactNode } from 'react';
-import { formatMoney, formatRelativeTime, safeTimeZone, t, type CaptionTrackRef, type EventItem, type MediaItem, type MessageKey, type Post } from '@yapilapi/shared';
+import { useCallback, useEffect, useId, useRef, useState, type ComponentType, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import {
+  formatMoney,
+  formatRelativeTime,
+  safeTimeZone,
+  t,
+  type CaptionTrackRef,
+  type EventItem,
+  type MediaItem,
+  type MessageKey,
+  type Post,
+} from '@yapilapi/shared';
 import { Icon, type IconName } from './icons.tsx';
-import { Avatar, Badge, Button, cx } from './primitives.tsx';
+import { Avatar, Badge, Button, cx, useModalFocus } from './primitives.tsx';
 
 /** A link component (e.g. next/link). Defaults to a plain anchor. */
 export type LinkLike = ComponentType<{ href: string; className?: string; children?: ReactNode; 'aria-current'?: 'page' | undefined; 'aria-label'?: string }>;
@@ -52,7 +62,14 @@ export function NavBar({
             <Icon name={NAV_ICON[it.id]} size={24} />
           </span>
           <span>{t(`nav.${it.id}` as MessageKey, locale)}</span>
-          {it.badge ? <span className="yp-nav__badge">{it.badge > 99 ? '99+' : it.badge}</span> : null}
+          {it.badge ? (
+            <>
+              <span className="yp-nav__badge" aria-hidden>
+                {it.badge > 99 ? '99+' : it.badge}
+              </span>
+              <span className="yp-visually-hidden">, {it.badge} unread</span>
+            </>
+          ) : null}
         </L>
       ))}
     </nav>
@@ -143,10 +160,9 @@ export function MediaViewer({ media, index, onClose }: { media: MediaItem[]; ind
   const ref = useRef<HTMLDivElement>(null);
   const m = media[i]!;
   const go = useCallback((d: number) => setI((x) => (x + d + media.length) % media.length), [media.length]);
+  useModalFocus(ref, true, onClose);
   useEffect(() => {
-    ref.current?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
       if (e.key === 'ArrowRight') go(1);
       if (e.key === 'ArrowLeft') go(-1);
     };
@@ -210,46 +226,77 @@ export interface MenuAction {
   onSelect: () => void;
 }
 
+/**
+ * Menu button (WAI-ARIA menu pattern): Enter, Space or ArrowDown opens it on the
+ * first item, arrows/Home/End move, Escape closes and returns focus to the button,
+ * Tab closes it and moves on.
+ */
 export function Menu({ label, actions, icon = 'more' }: { label: string; actions: MenuAction[]; icon?: IconName }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState<false | 'first' | 'last'>(false);
   const wrap = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   const listId = useId();
+  const items = () => [...(wrap.current?.querySelectorAll<HTMLButtonElement>('.yp-menu__item') ?? [])];
   useEffect(() => {
     if (!open) return;
-    const close = (e: MouseEvent | KeyboardEvent) => {
-      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !wrap.current?.contains(e.target as Node)) setOpen(false);
+    const close = (e: MouseEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener('mousedown', close);
-    document.addEventListener('keydown', close);
-    wrap.current?.querySelector<HTMLButtonElement>('.yp-menu__item')?.focus();
-    return () => {
-      document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown', close);
-    };
+    const list = items();
+    (open === 'last' ? list.at(-1) : list[0])?.focus();
+    return () => document.removeEventListener('mousedown', close);
   }, [open]);
+  const onKeyDown = (e: ReactKeyboardEvent) => {
+    if (!open) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        setOpen(e.key === 'ArrowUp' ? 'last' : 'first');
+      }
+      return;
+    }
+    const list = items();
+    const i = list.indexOf(document.activeElement as HTMLButtonElement);
+    const move = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: list.length - 1 }[e.key];
+    if (move !== undefined) {
+      e.preventDefault();
+      list[(move + list.length) % list.length]?.focus();
+    } else if (e.key === 'Escape') {
+      // Handled here so an enclosing dialog or sheet stays open.
+      e.preventDefault();
+      e.stopPropagation();
+      setOpen(false);
+      trigger.current?.focus();
+    } else if (e.key === 'Tab') setOpen(false);
+  };
   return (
-    <div className="yp-menu" ref={wrap}>
+    <div className="yp-menu" ref={wrap} onKeyDown={onKeyDown}>
       <button
+        ref={trigger}
         type="button"
         className="yp-action"
         aria-label={label}
         aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={listId}
-        onClick={() => setOpen((o) => !o)}
+        aria-expanded={!!open}
+        aria-controls={open ? listId : undefined}
+        onClick={() => setOpen((o) => (o ? false : 'first'))}
       >
         <Icon name={icon} />
       </button>
       {open ? (
-        <ul className="yp-menu__list" role="menu" id={listId}>
+        <ul className="yp-menu__list" role="menu" id={listId} aria-label={label}>
           {actions.map((a) => (
             <li key={a.label} role="none">
               <button
                 type="button"
                 role="menuitem"
+                tabIndex={-1}
                 className={cx('yp-menu__item', a.danger && 'yp-menu__item--danger')}
                 onClick={() => {
                   setOpen(false);
+                  // Focus goes back to the button first, so a sheet or dialog the
+                  // action opens returns focus there when it closes.
+                  trigger.current?.focus();
                   a.onSelect();
                 }}
               >
@@ -268,13 +315,7 @@ export function Menu({ label, actions, icon = 'more' }: { label: string; actions
 export function BottomSheet({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    document.addEventListener('keydown', onKey);
-    ref.current?.focus();
-    return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  useModalFocus(ref, open, onClose);
   if (!open) return null;
   return (
     <div className="yp-sheet__backdrop" onClick={onClose}>
@@ -630,31 +671,28 @@ export function MomentsStrip({
   onCreate?: () => void;
 }) {
   return (
-    <div className="yp-moments" role="list" aria-label="Moments">
+    <ul className="yp-moments" aria-label="Moments">
       {onCreate ? (
-        <button type="button" className="yp-moment" onClick={onCreate} role="listitem">
-          <span className="yp-avatar yp-avatar--lg" style={{ background: 'var(--surface-sunken)', color: 'var(--yapi)' }}>
-            <Icon name="plus" />
-          </span>
-          <span className="yp-moment__name">Your moment</span>
-        </button>
+        <li>
+          <button type="button" className="yp-moment" onClick={onCreate}>
+            <span className="yp-avatar yp-avatar--lg" style={{ background: 'var(--surface-sunken)', color: 'var(--yapi)' }} aria-hidden>
+              <Icon name="plus" />
+            </span>
+            <span className="yp-moment__name">Your moment</span>
+          </button>
+        </li>
       ) : null}
       {groups.map((g, i) => (
-        <button
-          key={g.author.id}
-          type="button"
-          className="yp-moment"
-          onClick={() => onOpen(i)}
-          role="listitem"
-          aria-label={`${g.author.displayName}, ${g.moments.length} moments`}
-        >
-          <span className="yp-moment__ring">
-            <Avatar name={g.author.displayName} src={g.author.avatarUrl} size="lg" />
-          </span>
-          <span className="yp-moment__name">{g.author.displayName}</span>
-        </button>
+        <li key={g.author.id}>
+          <button type="button" className="yp-moment" onClick={() => onOpen(i)} aria-label={`${g.author.displayName}, ${g.moments.length} moments`}>
+            <span className="yp-moment__ring">
+              <Avatar name={g.author.displayName} src={g.author.avatarUrl} size="lg" />
+            </span>
+            <span className="yp-moment__name">{g.author.displayName}</span>
+          </button>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 

@@ -100,7 +100,8 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
     if (c.status === 'pending_review' && status !== 'ended') throw new AppError(409, 'in_review', 'This campaign is waiting for review.');
     if (status === 'active') {
       await adsOn();
-      if (Number(c.budget_millicents) - Number(c.spent_millicents) < c.cpm_cents) throw new AppError(409, 'no_budget', 'Add budget before starting this campaign.');
+      if (Number(c.budget_millicents) - Number(c.spent_millicents) < c.cpm_cents)
+        throw new AppError(409, 'no_budget', 'Add budget before starting this campaign.');
       const post = (await db.query(`SELECT body, visibility, moderation_status, deleted_at, updated_at FROM posts WHERE id = $1`, [c.post_id])).rows[0];
       if (!post || post.deleted_at || post.visibility !== 'public') throw badRequest('The promoted post is no longer public.');
       // First start, or the post changed since it was approved: a moderator reviews it before it runs.
@@ -133,9 +134,10 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
     const { rows } = await tx(db, async (q) => {
       // Withdrawing a campaign that is waiting for review closes its review.
       if (c.status === 'pending_review' && c.review_case_id)
-        await q.query(`UPDATE moderation_cases SET status = 'decided', decision = 'no_action', note = 'Withdrawn by the advertiser', decided_at = now() WHERE id = $1 AND status = 'open'`, [
-          c.review_case_id,
-        ]);
+        await q.query(
+          `UPDATE moderation_cases SET status = 'decided', decision = 'no_action', note = 'Withdrawn by the advertiser', decided_at = now() WHERE id = $1 AND status = 'open'`,
+          [c.review_case_id],
+        );
       return q.query(`UPDATE ad_campaigns SET status = $2 WHERE id = $1 RETURNING *`, [id, status]);
     });
     await audit(db, { actorId: u.id, action: `ads.campaign.${status}`, entityType: 'ad_campaign', entityId: id });

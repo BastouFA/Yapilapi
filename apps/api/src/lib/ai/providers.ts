@@ -70,7 +70,7 @@ export function anthropicProvider(apiKey: string, model: string): AiProvider {
         betaTool({
           name: t.name,
           description: t.description,
-          inputSchema: t.inputSchema as Parameters<typeof betaTool>[0]["inputSchema"],
+          inputSchema: t.inputSchema as Parameters<typeof betaTool>[0]['inputSchema'],
           run: async (input) => {
             try {
               return await t.run(input as Record<string, unknown>);

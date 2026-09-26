@@ -51,7 +51,7 @@ export async function searchAll(db: Pool, viewer: string | null, q: SearchInput)
       db
         .query(
           `SELECT p.id FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
-             WHERE (p.search @@ ${tsqEn} OR $2 = ANY(p.topics)) AND ${postVisibleSql('$1')}
+             WHERE (p.search @@ ${tsqEn} OR p.topics @> ARRAY[$2]::text[]) AND ${postVisibleSql('$1')}
              ORDER BY ts_rank(p.search, ${tsqEn}) DESC, p.created_at DESC LIMIT $3`,
           [viewer, terms, q.limit],
         )

@@ -24,6 +24,8 @@ import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 const VISIBLE = postVisibleSql('$1');
+/** For You scores posts from your connections plus this many of the newest other posts. */
+const RECENT_CANDIDATES = 1000;
 const POST_FROM = `FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id`;
 
 export default async function postsModule(app: FastifyInstance, ctx: AppContext) {
@@ -125,7 +127,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       return id;
     });
     track(db, u.id, 'post_created', { kind, visibility: input.visibility, community: !!input.communityId });
-    void emitWebhook(db, u.id, 'post.created', { postId, kind, visibility: input.visibility });
+    await emitWebhook(db, u.id, 'post.created', { postId, kind, visibility: input.visibility });
     reply.code(201);
     const [post] = await hydratePosts(db, [postId], u.id);
     return {
@@ -232,35 +234,61 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       o: 0,
     };
     const connectionOnly = reduced
-      ? `AND (p.author_id = $1 OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = p.author_id)
+      ? `AND (p.author_id = $1 OR p.author_id IN (SELECT id FROM followed)
               OR EXISTS (SELECT 1 FROM community_members cm WHERE cm.community_id = p.community_id AND cm.user_id = $1))`
       : '';
+    // Candidates: everything in the window from you, people you follow, friends and your
+    // communities, plus the newest RECENT_CANDIDATES other posts. Scoring every post of the
+    // last 14 days made this query grow with the whole platform (docs/architecture/performance.md).
+    // The viewer's follows, friends and topic lists are built once (hashed sets and arrays)
+    // instead of being looked up with correlated subqueries for each post.
     const { rows } = await db.query(
-      `WITH my_topics AS (SELECT t.slug FROM user_interests ui JOIN topics t ON t.id = ui.topic_id WHERE ui.user_id = $1),
-            less AS (SELECT DISTINCT unnest(p2.topics) AS topic FROM feed_feedback ff JOIN posts p2 ON p2.id = ff.post_id WHERE ff.user_id = $1 AND ff.signal = 'less_like_this'),
-            more AS (SELECT DISTINCT unnest(p2.topics) AS topic FROM feed_feedback ff JOIN posts p2 ON p2.id = ff.post_id WHERE ff.user_id = $1 AND ff.signal = 'more_like_this')
-       SELECT p.id, p.author_id, ap.display_name, cm_c.name AS community_name, (cm_self.user_id IS NOT NULL) AS member,
-              EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = p.author_id) AS followed,
-              EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = p.author_id) OR (fr.user_b = $1 AND fr.user_a = p.author_id)) AS friend,
-              (SELECT t FROM unnest(p.topics) t WHERE t IN (SELECT slug FROM my_topics) LIMIT 1) AS matched_topic,
-              (
-                CASE WHEN p.author_id = $1 THEN 1 ELSE 0 END
-                + CASE WHEN EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = p.author_id) OR (fr.user_b = $1 AND fr.user_a = p.author_id)) THEN 3 ELSE 0 END
-                + CASE WHEN EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = p.author_id) THEN 2 ELSE 0 END
-                + CASE WHEN cm_self.user_id IS NOT NULL THEN 1.5 ELSE 0 END
-                + (SELECT count(*) FROM unnest(p.topics) t WHERE t IN (SELECT slug FROM my_topics)) * 1.2
-                + (SELECT count(*) FROM unnest(p.topics) t WHERE t IN (SELECT topic FROM more)) * 1.0
-                - (SELECT count(*) FROM unnest(p.topics) t WHERE t IN (SELECT topic FROM less)) * 2.0
+      `WITH me AS (
+         SELECT coalesce((SELECT array_agg(t.slug) FROM user_interests ui JOIN topics t ON t.id = ui.topic_id WHERE ui.user_id = $1), '{}') AS interests,
+                coalesce((SELECT array_agg(DISTINCT x) FROM feed_feedback ff JOIN posts p2 ON p2.id = ff.post_id, unnest(p2.topics) x
+                          WHERE ff.user_id = $1 AND ff.signal = 'more_like_this'), '{}') AS more,
+                coalesce((SELECT array_agg(DISTINCT x) FROM feed_feedback ff JOIN posts p2 ON p2.id = ff.post_id, unnest(p2.topics) x
+                          WHERE ff.user_id = $1 AND ff.signal = 'less_like_this'), '{}') AS less
+       ),
+       followed AS (SELECT followee_id AS id FROM follows WHERE follower_id = $1),
+       friends AS (SELECT user_b AS id FROM friendships WHERE user_a = $1 UNION ALL SELECT user_a FROM friendships WHERE user_b = $1),
+       candidates AS (
+         SELECT p.id FROM (SELECT $1::uuid AS id UNION SELECT id FROM followed UNION SELECT id FROM friends) a
+         JOIN posts p ON p.author_id = a.id
+         WHERE p.deleted_at IS NULL AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '14 days'
+         UNION
+         SELECT p.id FROM community_members cm JOIN posts p ON p.community_id = cm.community_id
+         WHERE cm.user_id = $1 AND cm.status = 'active'
+           AND p.deleted_at IS NULL AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '14 days'
+         UNION
+         (SELECT id FROM posts
+          WHERE deleted_at IS NULL AND created_at <= $2::timestamptz AND created_at > $2::timestamptz - interval '14 days'
+          ORDER BY created_at DESC, id DESC LIMIT ${RECENT_CANDIDATES})
+       ),
+       scored AS (
+         SELECT p.id, p.author_id, p.created_at, p.topics, ap.display_name, cm_c.name AS community_name, (cm_self.user_id IS NOT NULL) AS member,
+                p.author_id IN (SELECT id FROM followed) AS followed,
+                p.author_id IN (SELECT id FROM friends) AS friend,
+                (SELECT 1.2 * count(*) FILTER (WHERE t = ANY(me.interests)) + 1.0 * count(*) FILTER (WHERE t = ANY(me.more))
+                        - 2.0 * count(*) FILTER (WHERE t = ANY(me.less)) FROM unnest(p.topics) t)
                 + ln(1 + p.like_count + 2 * p.comment_count) * 0.6
-                + 4.0 * exp(-extract(epoch FROM ($2::timestamptz - p.created_at)) / 86400.0)
-              ) AS score
-       ${POST_FROM}
-       LEFT JOIN communities cm_c ON cm_c.id = p.community_id
-       LEFT JOIN community_members cm_self ON cm_self.community_id = p.community_id AND cm_self.user_id = $1 AND cm_self.status = 'active'
-       WHERE ${VISIBLE} ${personal} ${connectionOnly}
-         AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '14 days'
-         AND (p.community_id IS NULL OR cm_self.user_id IS NOT NULL OR cm_c.visibility = 'public')
-       ORDER BY score DESC, p.created_at DESC, p.id DESC
+                + 4.0 * exp(-extract(epoch FROM ($2::timestamptz - p.created_at)) / 86400.0) AS base
+         ${POST_FROM}
+         CROSS JOIN me
+         LEFT JOIN communities cm_c ON cm_c.id = p.community_id
+         LEFT JOIN community_members cm_self ON cm_self.community_id = p.community_id AND cm_self.user_id = $1 AND cm_self.status = 'active'
+         WHERE p.id IN (SELECT id FROM candidates) AND ${VISIBLE} ${personal} ${connectionOnly}
+           AND (p.community_id IS NULL OR cm_self.user_id IS NOT NULL OR cm_c.visibility = 'public')
+       )
+       SELECT s.id, s.author_id, s.display_name, s.community_name, s.member, s.followed, s.friend,
+              (SELECT t FROM unnest(s.topics) t WHERE t = ANY(me.interests) LIMIT 1) AS matched_topic,
+              s.base
+                + CASE WHEN s.author_id = $1 THEN 1 ELSE 0 END
+                + CASE WHEN s.friend THEN 3 ELSE 0 END
+                + CASE WHEN s.followed THEN 2 ELSE 0 END
+                + CASE WHEN s.member THEN 1.5 ELSE 0 END AS score
+       FROM scored s CROSS JOIN me
+       ORDER BY score DESC, s.created_at DESC, s.id DESC
        LIMIT $3 OFFSET $4`,
       [userId, c.asOf, limit * 2 + 1, c.o],
     );

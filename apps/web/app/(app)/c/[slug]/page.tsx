@@ -165,6 +165,8 @@ export default function CommunityPage() {
       ) : null}
 
       <Tabs
+        id="community-tabs"
+        panelId="community-panel"
         value={tab}
         onChange={setTab}
         tabs={[
@@ -174,46 +176,48 @@ export default function CommunityPage() {
           { id: 'members', label: 'Members', count: c.memberCount },
         ]}
       />
-      {tab === 'posts' ? (
-        c.visibility === 'private' && !isMember ? (
-          <Alert tone="info">Join this private community to see its posts.</Alert>
+      <div role="tabpanel" id="community-panel" aria-labelledby={`community-tabs-${tab}`}>
+        {tab === 'posts' ? (
+          c.visibility === 'private' && !isMember ? (
+            <Alert tone="info">Join this private community to see its posts.</Alert>
+          ) : (
+            <PostList load={load} reloadKey={slug} empty="No posts yet. Start the first discussion." />
+          )
+        ) : tab === 'faq' ? (
+          c.visibility === 'private' && !isMember ? (
+            <Alert tone="info">Join this private community to see its FAQ.</Alert>
+          ) : (
+            <CommunityFaq slug={slug} />
+          )
+        ) : tab === 'events' ? (
+          events === null ? (
+            <Skeleton height={80} />
+          ) : events.length ? (
+            <div className="yp-grid">
+              {events.map((e) => (
+                <EventCard key={e.id} event={e} linkAs={NextLink} locale={locale} />
+              ))}
+            </div>
+          ) : (
+            <p className="muted">No upcoming events.</p>
+          )
+        ) : members === null ? (
+          <Skeleton height={120} />
         ) : (
-          <PostList load={load} reloadKey={slug} empty="No posts yet. Start the first discussion." />
-        )
-      ) : tab === 'faq' ? (
-        c.visibility === 'private' && !isMember ? (
-          <Alert tone="info">Join this private community to see its FAQ.</Alert>
-        ) : (
-          <CommunityFaq slug={slug} />
-        )
-      ) : tab === 'events' ? (
-        events === null ? (
-          <Skeleton height={80} />
-        ) : events.length ? (
-          <div className="yp-grid">
-            {events.map((e) => (
-              <EventCard key={e.id} event={e} linkAs={NextLink} locale={locale} />
+          <List>
+            {members.map((m) => (
+              <ListItem
+                key={m.user.id}
+                href={`/u/${m.user.username}`}
+                linkAs={NextLink}
+                start={<Avatar name={m.user.displayName} src={m.user.avatarUrl} size="sm" />}
+                primary={m.user.displayName}
+                end={m.role !== 'member' ? <Badge tone="neutral">{m.role}</Badge> : null}
+              />
             ))}
-          </div>
-        ) : (
-          <p className="muted">No upcoming events.</p>
-        )
-      ) : members === null ? (
-        <Skeleton height={120} />
-      ) : (
-        <List>
-          {members.map((m) => (
-            <ListItem
-              key={m.user.id}
-              href={`/u/${m.user.username}`}
-              linkAs={NextLink}
-              start={<Avatar name={m.user.displayName} src={m.user.avatarUrl} size="sm" />}
-              primary={m.user.displayName}
-              end={m.role !== 'member' ? <Badge tone="neutral">{m.role}</Badge> : null}
-            />
-          ))}
-        </List>
-      )}
+          </List>
+        )}
+      </div>
     </div>
   );
 }

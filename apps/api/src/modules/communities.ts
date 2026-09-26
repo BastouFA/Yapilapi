@@ -287,8 +287,18 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
   });
 
   // ── FAQ ───────────────────────────────────────────────────────────────
-  const faqDto = (r: Record<string, any>) => ({ id: r.id, question: r.question, answer: r.answer, position: r.position, updatedAt: r.updated_at.toISOString() });
-  const faqInput = z.object({ question: z.string().trim().min(5).max(300), answer: z.string().trim().min(1).max(4000), position: z.number().int().min(0).max(999).optional() });
+  const faqDto = (r: Record<string, any>) => ({
+    id: r.id,
+    question: r.question,
+    answer: r.answer,
+    position: r.position,
+    updatedAt: r.updated_at.toISOString(),
+  });
+  const faqInput = z.object({
+    question: z.string().trim().min(5).max(300),
+    answer: z.string().trim().min(1).max(4000),
+    position: z.number().int().min(0).max(999).optional(),
+  });
 
   async function readable(slug: string, viewer: string | null) {
     const row = await bySlug(slug, viewer);
@@ -311,10 +321,13 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
     if (!atLeast(row.my_role, 'moderator')) throw forbidden();
     const count = await db.query(`SELECT count(*) AS n FROM community_faqs WHERE community_id = $1`, [row.id]);
     if (Number(count.rows[0].n) >= 100) throw new AppError(409, 'conflict', 'A community can have up to 100 FAQ entries.');
-    const { rows } = await db.query(
-      `INSERT INTO community_faqs (community_id, question, answer, position, created_by) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [row.id, input.question, input.answer, input.position ?? Number(count.rows[0].n), u.id],
-    );
+    const { rows } = await db.query(`INSERT INTO community_faqs (community_id, question, answer, position, created_by) VALUES ($1,$2,$3,$4,$5) RETURNING *`, [
+      row.id,
+      input.question,
+      input.answer,
+      input.position ?? Number(count.rows[0].n),
+      u.id,
+    ]);
     await audit(db, { actorId: u.id, action: 'community.faq.create', entityType: 'community', entityId: row.id });
     reply.code(201);
     return { faq: faqDto(rows[0]) };
@@ -373,5 +386,4 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
       posts: hydrated.map((p) => ({ post: p, score: Number(Number(scores.get(p.id) ?? 0).toFixed(2)) })),
     };
   });
-
 }

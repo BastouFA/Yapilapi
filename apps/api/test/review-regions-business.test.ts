@@ -110,11 +110,18 @@ describe('regional rules', () => {
     const before = (await as(t.app, author).post('/v1/posts', { body: `A post that says ${word} in it` })).body.post;
     const topicPost = (await as(t.app, author).post('/v1/posts', { body: 'About a topic', topics: [`testtopic${word.slice(-4)}`] })).body.post;
 
-    expect((await as(t.app, here).post('/v1/admin/regional-rules', { kind: 'blocked_term', country: 'ZZ', term: word, legalBasis: 'Test order 1' })).status).toBe(403);
+    expect(
+      (await as(t.app, here).post('/v1/admin/regional-rules', { kind: 'blocked_term', country: 'ZZ', term: word, legalBasis: 'Test order 1' })).status,
+    ).toBe(403);
     const rule = await as(t.app, admin).post('/v1/admin/regional-rules', { kind: 'blocked_term', country: 'zz', term: word, legalBasis: 'Test order 1' });
     expect(rule.status).toBe(201);
     expect(rule.body.rule.withheldPosts).toBe(1); // applied to existing posts
-    await as(t.app, admin).post('/v1/admin/regional-rules', { kind: 'restrict_topic', country: 'ZZ', topic: `testtopic${word.slice(-4)}`, legalBasis: 'Test order 2' });
+    await as(t.app, admin).post('/v1/admin/regional-rules', {
+      kind: 'restrict_topic',
+      country: 'ZZ',
+      topic: `testtopic${word.slice(-4)}`,
+      legalBasis: 'Test order 2',
+    });
     // Applied to posts written after the rule too.
     const after = (await as(t.app, author).post('/v1/posts', { body: `Later: ${word.toUpperCase()}` })).body.post;
 
@@ -156,7 +163,10 @@ describe('business insights', () => {
     await as(t.app, guest).get(`/v1/businesses/${slug}`); // once per person per day
     await as(t.app, guest).get(`/v1/places/${place.id}`);
     await as(t.app, guest).put(`/v1/places/${place.id}/reviews`, { rating: 5, body: 'Great soup' });
-    const booking = await as(t.app, guest).post(`/v1/places/${place.id}/bookings`, { partySize: 3, startsAt: new Date(Date.now() + 3 * 86_400_000).toISOString() });
+    const booking = await as(t.app, guest).post(`/v1/places/${place.id}/bookings`, {
+      partySize: 3,
+      startsAt: new Date(Date.now() + 3 * 86_400_000).toISOString(),
+    });
     expect(booking.status).toBe(201);
     await new Promise((r) => setTimeout(r, 50)); // view inserts are fire-and-forget
 

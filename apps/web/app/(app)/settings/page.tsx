@@ -18,6 +18,8 @@ export default function Settings() {
         <h1>Settings</h1>
       </div>
       <Tabs
+        id="settings-tabs"
+        panelId="settings-panel"
         value={tab}
         onChange={setTab}
         tabs={[
@@ -28,17 +30,19 @@ export default function Settings() {
           { id: 'safety', label: 'Safety' },
         ]}
       />
-      {tab === 'profile' ? (
-        <ProfileSettings />
-      ) : tab === 'attention' ? (
-        <AttentionSettings />
-      ) : tab === 'privacy' ? (
-        <PrivacyCenter />
-      ) : tab === 'security' ? (
-        <SecuritySettings />
-      ) : (
-        <SafetySettings />
-      )}
+      <div role="tabpanel" id="settings-panel" aria-labelledby={`settings-tabs-${tab}`}>
+        {tab === 'profile' ? (
+          <ProfileSettings />
+        ) : tab === 'attention' ? (
+          <AttentionSettings />
+        ) : tab === 'privacy' ? (
+          <PrivacyCenter />
+        ) : tab === 'security' ? (
+          <SecuritySettings />
+        ) : (
+          <SafetySettings />
+        )}
+      </div>
     </div>
   );
 }

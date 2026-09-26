@@ -132,7 +132,13 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
   });
 
   /** Ad reviews aren't enforcement: approval starts the campaign (paused if its budget ran out meanwhile); rejection tells the advertiser why. */
-  async function applyAdDecision(c: PoolClient, mc: { target_id: string; subject_user_id: string | null }, approve: boolean, reviewer: string, note: string | null) {
+  async function applyAdDecision(
+    c: PoolClient,
+    mc: { target_id: string; subject_user_id: string | null },
+    approve: boolean,
+    reviewer: string,
+    note: string | null,
+  ) {
     const { rows } = await c.query(
       approve
         ? `UPDATE ad_campaigns SET status = CASE WHEN budget_millicents - spent_millicents >= cpm_cents THEN 'active' ELSE 'paused' END,
@@ -198,11 +204,20 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     const admin = me(req);
     const input = parse(
       z.discriminatedUnion('kind', [
-        z.object({ kind: z.literal('blocked_term'), country: z.string().regex(/^[A-Za-z]{2}$/), term: z.string().trim().min(2).max(100), legalBasis: z.string().trim().min(3).max(1000) }),
+        z.object({
+          kind: z.literal('blocked_term'),
+          country: z.string().regex(/^[A-Za-z]{2}$/),
+          term: z.string().trim().min(2).max(100),
+          legalBasis: z.string().trim().min(3).max(1000),
+        }),
         z.object({
           kind: z.literal('restrict_topic'),
           country: z.string().regex(/^[A-Za-z]{2}$/),
-          topic: z.string().trim().toLowerCase().regex(/^[a-z0-9_-]{1,40}$/),
+          topic: z
+            .string()
+            .trim()
+            .toLowerCase()
+            .regex(/^[a-z0-9_-]{1,40}$/),
           legalBasis: z.string().trim().min(3).max(1000),
         }),
       ]),

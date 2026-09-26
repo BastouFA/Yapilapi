@@ -38,14 +38,16 @@ export default async function callsModule(app: FastifyInstance, ctx: AppContext)
 
   async function loadCall(id: string, userId: string) {
     const { rows } = await db.query(
-      `SELECT c.*, (SELECT array_agg(user_id) FROM call_participants WHERE call_id = c.id) AS participants FROM calls c
+      `SELECT c.*, (SELECT array_agg(user_id) FROM call_participants WHERE call_id = c.id) AS participants,
+              (c.status = 'ringing' AND c.created_at < now() - make_interval(secs => $3)) AS ring_expired
+       FROM calls c
        WHERE c.id = $1 AND EXISTS (SELECT 1 FROM call_participants p WHERE p.call_id = c.id AND p.user_id = $2)`,
-      [id, userId],
+      [id, userId, RING_SECONDS],
     );
     const c = rows[0];
     if (!c) throw notFound('Call');
-    // Ringing calls nobody answered become missed.
-    if (c.status === 'ringing' && Date.now() - c.created_at.getTime() > RING_SECONDS * 1000) {
+    // Ringing calls nobody answered become missed. Timed by the database clock, which also stamped created_at.
+    if (c.ring_expired) {
       await db.query(`UPDATE calls SET status = 'missed', ended_at = now() WHERE id = $1 AND status = 'ringing'`, [id]);
       c.status = 'missed';
     }

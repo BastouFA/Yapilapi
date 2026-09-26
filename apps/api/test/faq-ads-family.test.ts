@@ -20,7 +20,12 @@ async function pay(orderId: string, amountCents: number) {
   const ref = (await t.ctx.db.query(`SELECT provider_ref FROM payments WHERE order_id = $1`, [orderId])).rows[0].provider_ref;
   const payload = JSON.stringify({ id: `evt_${orderId}`, type: 'payment.succeeded', providerRef: ref, amountCents });
   const sig = signDevWebhook(t.ctx.config.PAYMENTS_WEBHOOK_SECRET, payload);
-  const res = await t.app.inject({ method: 'POST', url: '/v1/payments/webhook/dev', payload, headers: { 'content-type': 'application/json', 'x-signature': sig } });
+  const res = await t.app.inject({
+    method: 'POST',
+    url: '/v1/payments/webhook/dev',
+    payload,
+    headers: { 'content-type': 'application/json', 'x-signature': sig },
+  });
   expect(res.statusCode).toBe(200);
 }
 
@@ -190,7 +195,12 @@ describe('live gifts', () => {
     const live = (await as(t.app, host).post('/v1/live', { title: 'Studio session' })).body.live;
     await as(t.app, host).post(`/v1/live/${live.id}/start`);
     await as(t.app, fan).post(`/v1/live/${live.id}/join`);
-    const tip = await as(t.app, fan).post(`/v1/users/${host.id}/tips`, { amountCents: 300, message: 'Play the new one', liveId: live.id, idempotencyKey: key() });
+    const tip = await as(t.app, fan).post(`/v1/users/${host.id}/tips`, {
+      amountCents: 300,
+      message: 'Play the new one',
+      liveId: live.id,
+      idempotencyKey: key(),
+    });
     expect(tip.status).toBe(201);
     // Nothing in chat until the payment is confirmed.
     expect((await as(t.app, host).get(`/v1/live/${live.id}/chat`)).body.items.filter((m: any) => m.kind === 'gift')).toHaveLength(0);

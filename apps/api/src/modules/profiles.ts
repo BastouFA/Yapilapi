@@ -169,7 +169,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     if (r.rowCount) {
       await notify(db, ctx.realtime, { userId: id, category: 'friends', type: 'follow', actorId: u.id, entityType: 'user', entityId: u.id });
       track(db, u.id, 'follow', { followee: id });
-      void emitWebhook(db, id, 'follower.new', { followerId: u.id });
+      await emitWebhook(db, id, 'follower.new', { followerId: u.id });
     }
     return { following: true };
   });

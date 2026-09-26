@@ -21,6 +21,8 @@ export default function Admin() {
         <h1>Admin</h1>
       </div>
       <Tabs
+        id="admin-tabs"
+        panelId="admin-panel"
         value={tab}
         onChange={setTab}
         tabs={[
@@ -35,17 +37,19 @@ export default function Admin() {
             : []),
         ]}
       />
-      {tab === 'moderation' ? (
-        <Moderation />
-      ) : tab === 'overview' ? (
-        <Overview />
-      ) : tab === 'flags' ? (
-        <Flags />
-      ) : tab === 'regions' ? (
-        <RegionalRules />
-      ) : (
-        <Audit />
-      )}
+      <div role="tabpanel" id="admin-panel" aria-labelledby={`admin-tabs-${tab}`}>
+        {tab === 'moderation' ? (
+          <Moderation />
+        ) : tab === 'overview' ? (
+          <Overview />
+        ) : tab === 'flags' ? (
+          <Flags />
+        ) : tab === 'regions' ? (
+          <RegionalRules />
+        ) : (
+          <Audit />
+        )}
+      </div>
     </div>
   );
 }

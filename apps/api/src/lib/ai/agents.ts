@@ -62,7 +62,14 @@ const SYSTEMS: Record<AgentKind, string> = {
  * can't invent venues or reach content the person couldn't see. Actions are
  * proposals; the person confirms them in the app.
  */
-export async function runAgent(db: Pool, provider: AiProvider, userId: string, kind: AgentKind, prompt: string, opts: { businessId?: string } = {}): Promise<AgentResult> {
+export async function runAgent(
+  db: Pool,
+  provider: AiProvider,
+  userId: string,
+  kind: AgentKind,
+  prompt: string,
+  opts: { businessId?: string } = {},
+): Promise<AgentResult> {
   if (analyzeText(prompt).risk === 'escalate') throw forbidden('This request can’t be processed.');
   const started = Date.now();
   const seen = new Map<string, Entity>();
@@ -90,13 +97,33 @@ export async function runAgent(db: Pool, provider: AiProvider, userId: string, k
     const r = res.results as Record<string, any[] | undefined>;
     const out: Entity[] = [];
     for (const e of r.events ?? [])
-      out.push(remember({ type: 'event', id: e.id, title: e.title, startsAt: e.startsAt, subtitle: e.place?.name ?? e.locationText ?? undefined, href: `/events/${e.id}` }));
-    for (const p of r.places ?? []) out.push(remember({ type: 'place', id: p.id, title: p.name, subtitle: [p.category, p.city].filter(Boolean).join(' · '), href: `/places/${p.id}` }));
+      out.push(
+        remember({
+          type: 'event',
+          id: e.id,
+          title: e.title,
+          startsAt: e.startsAt,
+          subtitle: e.place?.name ?? e.locationText ?? undefined,
+          href: `/events/${e.id}`,
+        }),
+      );
+    for (const p of r.places ?? [])
+      out.push(remember({ type: 'place', id: p.id, title: p.name, subtitle: [p.category, p.city].filter(Boolean).join(' · '), href: `/places/${p.id}` }));
     for (const c of r.communities ?? [])
-      if (c.visibility === 'public') out.push(remember({ type: 'community', id: c.id, title: c.name, subtitle: `${c.memberCount} members`, href: `/c/${c.slug}` }));
-    for (const u of r.people ?? []) out.push(remember({ type: 'person', id: u.id, title: u.displayName, subtitle: `@${u.username}`, href: `/u/${u.username}` }));
+      if (c.visibility === 'public')
+        out.push(remember({ type: 'community', id: c.id, title: c.name, subtitle: `${c.memberCount} members`, href: `/c/${c.slug}` }));
+    for (const u of r.people ?? [])
+      out.push(remember({ type: 'person', id: u.id, title: u.displayName, subtitle: `@${u.username}`, href: `/u/${u.username}` }));
     for (const p of r.products ?? [])
-      out.push(remember({ type: 'product', id: p.id, title: p.title, subtitle: `${(p.priceCents / 100).toFixed(2)} ${p.currency} · ${p.kind}`, href: `/discover?q=${encodeURIComponent(p.title)}` }));
+      out.push(
+        remember({
+          type: 'product',
+          id: p.id,
+          title: p.title,
+          subtitle: `${(p.priceCents / 100).toFixed(2)} ${p.currency} · ${p.kind}`,
+          href: `/discover?q=${encodeURIComponent(p.title)}`,
+        }),
+      );
     for (const b of r.businesses ?? []) out.push(remember({ type: 'business', id: b.id, title: b.name, subtitle: b.category, href: `/b/${b.slug}` }));
     return { intent: res.intent, results: out };
   }
@@ -166,7 +193,11 @@ export async function runAgent(db: Pool, provider: AiProvider, userId: string, k
       description: 'Show an item from a search result to the person as a card, with a one-sentence reason grounded in the data.',
       inputSchema: {
         type: 'object',
-        properties: { type: { type: 'string', enum: ['event', 'place', 'community', 'person', 'product', 'business'] }, id: { type: 'string' }, reason: { type: 'string' } },
+        properties: {
+          type: { type: 'string', enum: ['event', 'place', 'community', 'person', 'product', 'business'] },
+          id: { type: 'string' },
+          reason: { type: 'string' },
+        },
         required: ['type', 'id', 'reason'],
         additionalProperties: false,
       },
@@ -202,7 +233,8 @@ export async function runAgent(db: Pool, provider: AiProvider, userId: string, k
           name: 'business_overview',
           description: `Numbers for ${business.name} over the last N days: bookings by status, upcoming bookings, review count and average, product sales.`,
           inputSchema: { type: 'object', properties: { days: { type: 'number', description: '1 to 90' } }, additionalProperties: false },
-          run: async (input) => JSON.stringify(await businessOverview(db, business!.id, z.object({ days: z.number().int().min(1).max(90).default(30) }).parse(input).days)),
+          run: async (input) =>
+            JSON.stringify(await businessOverview(db, business!.id, z.object({ days: z.number().int().min(1).max(90).default(30) }).parse(input).days)),
         },
         {
           name: 'recent_reviews',
@@ -222,12 +254,7 @@ export async function runAgent(db: Pool, provider: AiProvider, userId: string, k
       ]
     : [];
 
-  const tools =
-    kind === 'business'
-      ? [...businessTools, baseTools[0]!]
-      : kind === 'shopping'
-        ? baseTools.filter((t) => t.name !== 'place_details')
-        : baseTools;
+  const tools = kind === 'business' ? [...businessTools, baseTools[0]!] : kind === 'shopping' ? baseTools.filter((t) => t.name !== 'place_details') : baseTools;
 
   let text: string;
   let refused = false;
@@ -313,7 +340,12 @@ export async function businessOverview(db: Pool, businessId: string, days: numbe
 async function devAgent(
   kind: AgentKind,
   prompt: string,
-  s: { search: (q: string, t: string, l?: number) => Promise<{ results: Entity[] }>; tools: AgentTool[]; business: { id: string; name: string } | null; recommendations: Recommendation[] },
+  s: {
+    search: (q: string, t: string, l?: number) => Promise<{ results: Entity[] }>;
+    tools: AgentTool[];
+    business: { id: string; name: string } | null;
+    recommendations: Recommendation[];
+  },
 ): Promise<string> {
   const call = (name: string, input: Record<string, unknown>) => s.tools.find((t) => t.name === name)!.run(input);
   if (kind === 'business') {

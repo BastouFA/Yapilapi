@@ -424,7 +424,14 @@ export function createClient(opts: ClientOptions) {
         get<{
           enabled: boolean;
           recording: { status: 'pending' | 'ready' | 'none' | 'failed' | null; mediaId: string | null };
-          clips: { id: string; startMs: number; endMs: number; status: string; error: string | null; media: { id: string; url: string; posterUrl: string | null; hlsUrl: string | null } | null }[];
+          clips: {
+            id: string;
+            startMs: number;
+            endMs: number;
+            status: string;
+            error: string | null;
+            media: { id: string; url: string; posterUrl: string | null; hlsUrl: string | null } | null;
+          }[];
         }>(`/v1/live/${id}/clips`),
       update: (id: string, b: { title?: string; ticketProductId?: string | null }) => patch<{ live: LiveSummary }>(`/v1/live/${id}`, b),
       products: (id: string) => get<{ items: LiveProduct[] }>(`/v1/live/${id}/products`),
@@ -454,7 +461,9 @@ export function createClient(opts: ClientOptions) {
       fund: (id: string, amountCents: number, idempotencyKey: string) =>
         post<{ payment: { provider: string; clientSecret: string; orderId: string } }>(`/v1/ads/campaigns/${id}/fund`, { amountCents, idempotencyKey }),
       stats: (id: string) =>
-        get<{ campaign: AdCampaign; days: { day: string; impressions: number; clicks: number; hides: number; reach: number }[] }>(`/v1/ads/campaigns/${id}/stats`),
+        get<{ campaign: AdCampaign; days: { day: string; impressions: number; clicks: number; hides: number; reach: number }[] }>(
+          `/v1/ads/campaigns/${id}/stats`,
+        ),
     },
     family: {
       list: () => get<{ items: FamilyLink[] }>('/v1/family'),
@@ -475,7 +484,9 @@ export function createClient(opts: ClientOptions) {
       auditLogs: () => get<{ items: Record<string, any>[] }>('/v1/admin/audit-logs'),
       regionalRules: () => get<{ items: RegionalRule[] }>('/v1/admin/regional-rules'),
       addRegionalRule: (
-        b: { kind: 'blocked_term'; country: string; term: string; legalBasis: string } | { kind: 'restrict_topic'; country: string; topic: string; legalBasis: string },
+        b:
+          | { kind: 'blocked_term'; country: string; term: string; legalBasis: string }
+          | { kind: 'restrict_topic'; country: string; topic: string; legalBasis: string },
       ) => post<{ rule: RegionalRule }>('/v1/admin/regional-rules', b),
       deleteRegionalRule: (id: string) => del(`/v1/admin/regional-rules/${id}`),
     },

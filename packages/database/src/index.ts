@@ -14,6 +14,9 @@ export type DbClient = pg.PoolClient | pg.Pool;
  * fails within a minute instead of hanging until the OS gives up on TCP.
  */
 export function createPool(connectionString: string, max = 10): pg.Pool {
+  // JIT off: our queries are short OLTP reads and writes. On larger tables the planner's
+  // cost estimate for the ranked feed crosses jit_above_cost and Postgres spent over a
+  // second compiling a query that runs in a fraction of that (docs/architecture/performance.md).
   return new pg.Pool({
     connectionString,
     max,
@@ -23,6 +26,7 @@ export function createPool(connectionString: string, max = 10): pg.Pool {
     keepAliveInitialDelayMillis: 10_000,
     statement_timeout: 60_000,
     query_timeout: 65_000,
+    options: '-c jit=off',
   });
 }
 
