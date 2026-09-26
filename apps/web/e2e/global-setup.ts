@@ -85,6 +85,9 @@ export default async function globalSetup(config: FullConfig) {
   await must(friend.ctx.post('/api/v1/products', { data: { title: 'Sourdough loaf', priceCents: 650, businessId: business.business.id } }));
 
   await must(friend.ctx.post(`/api/v1/users/${main.id}/follow`, { data: {} }));
+  // A story from the friend, for the story viewer checks.
+  await must(main.ctx.post(`/api/v1/users/${friend.id}/follow`, { data: {} }));
+  await must(friend.ctx.post('/api/v1/moments', { data: { body: 'Proofing the dough since 6am', visibility: 'followers' } }));
   await must(friend.ctx.post(`/api/v1/communities/${communitySlug}/join`, { data: {} }));
   const convo = await must(friend.ctx.post('/api/v1/conversations', { data: { memberIds: [main.id] } }));
   const conversationId = convo.conversation.id;

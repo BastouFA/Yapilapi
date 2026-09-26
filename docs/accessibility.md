@@ -27,11 +27,11 @@ node apps/web/e2e/summary.ts            # counts by project and rule (--details 
 
 ### What is checked
 
-**`a11y.spec.ts`**: axe-core (`@axe-core/playwright` 4.13) with the `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa` and `best-practice` rule sets (contrast, names and labels, ARIA validity, landmarks, heading order, target size, document language and title…) on 23 pages:
+**`a11y.spec.ts`**: axe-core (`@axe-core/playwright` 4.13) with the `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa` and `best-practice` rule sets (contrast, names and labels, ARIA validity, landmarks, heading order, target size, document language and title…) on 24 pages:
 
-landing, login, signup, home, discover, create, inbox, a conversation, profile, community, event, place, settings, studio, notifications, a single post, events, assistant, live, forgot password, a business page, developers, memories
+landing, login, signup, home, discover, create, inbox, a conversation, profile, community, event, place, settings, studio, notifications, a single post, events, assistant, live, forgot password, a business page, developers, memories, reels
 
-in four projects: **desktop** (1440×900) and **mobile** (Pixel 7, 412×915, touch) × **light** and **dark** color schemes. That is 92 page audits; each must have zero violations. The page is audited after network idle, after loading states (`aria-busy`) clear and after finite animations finish.
+in four projects: **desktop** (1440×900) and **mobile** (Pixel 7, 412×915, touch) × **light** and **dark** color schemes. That is 96 page audits; each must have zero violations. The page is audited after network idle, after loading states (`aria-busy`) clear and after finite animations finish.
 
 **Right-to-left:** every signed-in page is loaded with `dir="rtl"` in all four projects and must not be wider than the viewport. (An offscreen skip link placed with `left: -9999px` once made every page scroll to blank space in RTL.) The design system uses logical properties (`inset-inline-*`, `margin-inline-*`, logical corner radii), mirrors directional icons, and marks user-written text with `dir="auto"` / `<bdi>` so mixed-direction names, handles, tags and messages read correctly.
 
@@ -40,6 +40,7 @@ in four projects: **desktop** (1440×900) and **mobile** (Pixel 7, 412×915, tou
 - The first Tab reaches a visible "Skip to content" link; following it puts the next Tab inside `main`. The primary navigation is reached next, in visual order, with `aria-current="page"` on the current destination.
 - Post options **menu**: Enter opens it on the first item, arrows/Home/End move with wrap-around, ArrowUp opens on the last item, Escape closes it and returns focus to the button, Tab closes it.
 - Comments **bottom sheet**: focus moves into it, Tab and Shift+Tab stay inside, Escape closes it and focus returns to the Comments button. The open sheet is audited with axe.
+- **Story viewer**: opens from the stories strip, focus moves in and stays in, Space pauses, the open viewer is audited with axe, Escape closes it and the ring then reads as seen.
 - **Checkout** sheet: opens from a Buy button, focus moves in and stays in, the open sheet and the paid state are audited with axe, Escape closes it.
 - Delete-account **dialog** and settings **tabs**: arrows and Home/End move between tabs, the dialog traps focus, closes on Escape and returns focus to its button. The open dialog is audited with axe.
 

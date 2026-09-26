@@ -41,6 +41,7 @@ const APP_PAGES: [string, (d: SeedData) => string][] = [
   ['business', (d) => `/b/${d.businessSlug}`],
   ['developers', () => '/developers'],
   ['memories', () => '/memories'],
+  ['reels', () => '/reels'],
 ];
 
 async function settle(page: Page) {

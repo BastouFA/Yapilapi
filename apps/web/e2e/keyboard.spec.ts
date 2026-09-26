@@ -148,3 +148,24 @@ test('checkout sheet', async ({ page }) => {
   await page.keyboard.press('Escape');
   await expect(sheet).toBeHidden();
 });
+
+test('story viewer', async ({ page }) => {
+  await page.goto('/home');
+  await page.waitForLoadState('networkidle');
+  // The projects share one seeded account, so the story may already be seen by an earlier project.
+  const opener = page.getByRole('button', { name: /Ben Keyboard, 1 story/ });
+  await opener.focus();
+  await page.keyboard.press('Enter');
+  const viewer = page.getByRole('dialog', { name: /Ben Keyboard's story/ });
+  await expect(viewer).toBeVisible();
+  expect(await focusInside(page, '.story'), `focus should move into the story: ${await focused(page)}`).toBe(true);
+  // Space pauses, so the story doesn't move on while it's audited.
+  await page.keyboard.press('Space');
+  await expect(viewer.getByRole('button', { name: 'Play' })).toBeVisible();
+  await auditOpen(page, '.story');
+  await tabStaysInside(page, '.story', 6);
+  await page.keyboard.press('Escape');
+  await expect(viewer).toBeHidden();
+  // Once seen, the ring says so.
+  await expect(page.getByRole('button', { name: /Ben Keyboard, 1 story, seen/ })).toBeVisible();
+});
