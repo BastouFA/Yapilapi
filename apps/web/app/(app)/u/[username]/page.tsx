@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { Avatar, Badge, Button, EmptyState, Menu, Skeleton } from '@yapilapi/design-system';
+import { Avatar, Badge, Button, EmptyState, Menu, Segments, Skeleton } from '@yapilapi/design-system';
+import { FollowList } from '@/components/FollowList';
 import type { Profile } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { PostList, ReportSheet } from '@/components/PostList';
@@ -12,11 +13,14 @@ import { useSession } from '../../../providers';
 
 export default function ProfilePage() {
   const { username } = useParams<{ username: string }>();
-  const { me, t, toast, setMe, flags } = useSession();
+  const { me, t, toast, setMe, flags, locale } = useSession();
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [missing, setMissing] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const [list, setList] = useState<'followers' | 'following' | null>(null);
+  const [tab, setTab] = useState<'posts' | 'reposts'>('posts');
+  const compact = new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 });
 
   const reload = useCallback(
     () =>
@@ -30,6 +34,7 @@ export default function ProfilePage() {
     void reload();
   }, [reload]);
   const load = useCallback((cursor?: string) => api.users.posts(username, cursor), [username]);
+  const loadReposts = useCallback((cursor?: string) => api.users.reposts(profile?.id ?? '', cursor), [profile?.id]);
 
   if (missing) return <EmptyState title="This profile isn't available" body="It may have been removed, or you may not be able to see it." />;
   if (!profile)
@@ -149,14 +154,14 @@ export default function ProfilePage() {
         ) : null}
         <div className="profile__counts">
           <span>
-            <strong>{profile.counts.posts}</strong> {t('profile.posts')}
+            <strong>{compact.format(profile.counts.posts)}</strong> {t('profile.posts')}
           </span>
-          <span>
-            <strong>{profile.counts.followers}</strong> {t('profile.followers')}
-          </span>
-          <span>
-            <strong>{profile.counts.following}</strong> {t('profile.following')}
-          </span>
+          <button type="button" className="profile__count" onClick={() => setList('followers')}>
+            <strong>{compact.format(profile.counts.followers)}</strong> {t('profile.followers')}
+          </button>
+          <button type="button" className="profile__count" onClick={() => setList('following')}>
+            <strong>{compact.format(profile.counts.following)}</strong> {t('profile.following')}
+          </button>
           <span>
             <strong>{profile.counts.friends}</strong> {t('profile.friends')}
           </span>
@@ -185,7 +190,32 @@ export default function ProfilePage() {
         ) : null}
       </div>
       {!rel.isSelf ? <SupportCreator userId={profile.id} name={profile.displayName} isCreator={profile.mode === 'creator'} /> : null}
-      <PostList load={load} reloadKey={username} empty={rel.isSelf ? 'Share your first post from Create.' : 'No posts yet.'} />
+      <Segments
+        label="Show"
+        value={tab}
+        onChange={setTab}
+        options={[
+          { id: 'posts', label: 'Posts' },
+          { id: 'reposts', label: 'Reposts' },
+        ]}
+      />
+      {tab === 'posts' ? (
+        <PostList load={load} reloadKey={username} empty={rel.isSelf ? 'Share your first post from Create.' : 'No posts yet.'} />
+      ) : (
+        <PostList
+          load={loadReposts}
+          reloadKey={`${username}-reposts`}
+          empty={rel.isSelf ? 'Posts and reels you repost show up here.' : `${profile.displayName} hasn't reposted anything yet.`}
+        />
+      )}
+      <FollowList
+        userId={profile.id}
+        name={profile.displayName}
+        initial={list ?? 'followers'}
+        open={list !== null}
+        onClose={() => setList(null)}
+        onFollowChange={reload}
+      />
       <ReportSheet target={reporting ? { type: 'user', id: profile.id } : null} onClose={() => setReporting(false)} />
     </div>
   );

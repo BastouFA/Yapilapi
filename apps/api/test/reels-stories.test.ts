@@ -97,3 +97,62 @@ describe('stories', () => {
     expect((await as(t.app, author).post(`/v1/moments/${s.id}/reply`, { body: 'me' })).status).toBe(400);
   });
 });
+
+describe('reposts', () => {
+  it('shares public posts with your followers at the time you repost', async () => {
+    const author = await signUp(t.app, { birthDate: '1990-01-01', displayName: 'Author' });
+    const sharer = await signUp(t.app, { birthDate: '1990-01-01', displayName: 'Sharer' });
+    const follower = await signUp(t.app, { birthDate: '1990-01-01' });
+    await as(t.app, follower).post(`/v1/users/${sharer.id}/follow`);
+    const post = (await as(t.app, author).post('/v1/posts', { body: 'Worth sharing' })).body.post;
+    const privatePost = (await as(t.app, author).post('/v1/posts', { body: 'Friends only', visibility: 'friends' })).body.post;
+
+    expect((await as(t.app, author).put(`/v1/posts/${post.id}/repost`)).status).toBe(400); // your own
+    expect((await as(t.app, sharer).put(`/v1/posts/${privatePost.id}/repost`)).status).toBe(404); // can't even see it
+    const r = await as(t.app, sharer).put(`/v1/posts/${post.id}/repost`);
+    expect(r.body).toEqual({ reposted: true, reposts: 1 });
+    expect((await as(t.app, sharer).put(`/v1/posts/${post.id}/repost`)).body.reposts).toBe(1); // idempotent
+
+    // The follower doesn't follow the author, but sees the repost, labelled.
+    const feed = (await as(t.app, follower).get('/v1/feed?mode=following')).body.items;
+    const item = feed.find((p: any) => p.id === post.id);
+    expect(item).toMatchObject({ reason: 'Sharer reposted', counts: { reposts: 1 } });
+    expect((await as(t.app, sharer).get(`/v1/posts/${post.id}`)).body.post.viewer.reposted).toBe(true);
+    expect((await as(t.app, follower).get(`/v1/users/${sharer.id}/reposts`)).body.items.map((p: any) => p.id)).toEqual([post.id]);
+    expect((await t.ctx.db.query(`SELECT 1 FROM notifications WHERE user_id = $1 AND type = 'post_repost'`, [author.id])).rowCount).toBe(1);
+
+    expect((await as(t.app, sharer).del(`/v1/posts/${post.id}/repost`)).body).toEqual({ reposted: false, reposts: 0 });
+    const after = (await as(t.app, follower).get('/v1/feed?mode=following')).body.items;
+    expect(after.some((p: any) => p.id === post.id)).toBe(false);
+  });
+
+  it('gives each reel author a follower count and whether you follow them', async () => {
+    const creator = await signUp(t.app, { birthDate: '1990-01-01' });
+    const fan = await signUp(t.app, { birthDate: '1990-01-01' });
+    await as(t.app, fan).post(`/v1/users/${creator.id}/follow`);
+    const v = await video(creator);
+    await as(t.app, creator).post('/v1/posts', { format: 'reel', body: 'Hi', media: [{ id: v.id, url: v.url, kind: 'video' }] });
+    const res = await as(t.app, fan).get('/v1/reels?limit=20');
+    expect(res.body.authors[creator.id]).toEqual({ followers: 1, following: true });
+  });
+});
+
+describe('follower lists', () => {
+  it('keeps a private account’s lists to itself and approved followers, and says who you follow', async () => {
+    const owner = await signUp(t.app, { birthDate: '1990-01-01' });
+    const fan = await signUp(t.app, { birthDate: '1990-01-01' });
+    const stranger = await signUp(t.app, { birthDate: '1990-01-01' });
+    await as(t.app, fan).post(`/v1/users/${owner.id}/follow`);
+    await as(t.app, stranger).post(`/v1/users/${fan.id}/follow`);
+
+    const open = await as(t.app, stranger).get(`/v1/users/${owner.id}/followers`);
+    expect(open.body.items.map((u: any) => u.id)).toEqual([fan.id]);
+    expect(open.body.viewerFollows).toEqual([fan.id]);
+
+    await t.ctx.db.query(`UPDATE profiles SET is_private = true WHERE user_id = $1`, [owner.id]);
+    expect((await as(t.app, stranger).get(`/v1/users/${owner.id}/followers`)).status).toBe(403);
+    expect((await as(t.app, stranger).get(`/v1/users/${owner.id}/following`)).status).toBe(403);
+    expect((await as(t.app, fan).get(`/v1/users/${owner.id}/followers`)).status).toBe(200);
+    expect((await as(t.app, owner).get(`/v1/users/${owner.id}/following`)).status).toBe(200);
+  });
+});

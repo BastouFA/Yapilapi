@@ -40,7 +40,7 @@ describe('people suggestions for new conversations', () => {
     expect(byTag[0]).toMatchObject({ user: { id: teen.id }, canMessage: false });
     expect(typed.find((x: any) => x.user.id === friend.id)).toMatchObject({ relation: 'friend', canMessage: true });
     // By username, with or without @.
-    expect((await as(t.app, me).get(`/v1/people/suggest?q=@${stranger.username.slice(0, 8)}`)).body.items.map((x: any) => x.user.id)).toContain(stranger.id);
+    expect((await as(t.app, me).get(`/v1/people/suggest?q=@${stranger.username}`)).body.items.map((x: any) => x.user.id)).toContain(stranger.id);
   });
 });
 

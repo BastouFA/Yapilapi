@@ -64,12 +64,21 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       [u.id, c.asOf, q.limit + 1, c.o],
     );
     const page = rows.slice(0, q.limit);
+    const items = await hydratePosts(
+      db,
+      page.map((r) => r.id),
+      u.id,
+    );
+    // Each author's follower count, and whether you follow them, for the follow button on the reel.
+    const stats = await db.query(
+      `SELECT pr.user_id, (SELECT count(*) FROM follows f WHERE f.followee_id = pr.user_id)::int AS followers,
+              EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $2 AND f.followee_id = pr.user_id) AS following
+       FROM profiles pr WHERE pr.user_id = ANY($1)`,
+      [[...new Set(items.map((p) => p.author.id))], u.id],
+    );
     return {
-      items: await hydratePosts(
-        db,
-        page.map((r) => r.id),
-        u.id,
-      ),
+      items,
+      authors: Object.fromEntries(stats.rows.map((r) => [r.user_id, { followers: r.followers, following: r.following }])),
       nextCursor: rows.length > q.limit ? encodeCursor({ asOf: c.asOf, o: c.o + q.limit }) : null,
     };
   });
@@ -245,6 +254,37 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
                               WHERE ea.user_id = $1 ORDER BY ea.updated_at DESC LIMIT 1))`,
     };
     const c = decodeCursor<KeyCursor>(q.cursor);
+    if (mode === 'following') {
+      // Posts by people you follow, and posts they reposted (placed at the time of the repost, newest per post).
+      const { rows } = await db.query(
+        `WITH items AS (
+           SELECT p.id, p.created_at AS at, NULL::uuid AS by FROM posts p
+           WHERE (p.author_id = $1 OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = p.author_id)) AND p.community_id IS NULL
+           UNION ALL
+           SELECT r.post_id, r.created_at, r.user_id FROM post_reposts r
+           WHERE EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = r.user_id)
+         ), latest AS (
+           SELECT DISTINCT ON (id) id, at, by FROM items ORDER BY id, at DESC
+         )
+         SELECT p.id, l.at AS created_at, l.by, rp.display_name AS by_name ${POST_FROM}
+         JOIN latest l ON l.id = p.id LEFT JOIN profiles rp ON rp.user_id = l.by
+         WHERE ${VISIBLE} ${personal} ${c ? 'AND (l.at, p.id) < ($3::timestamptz, $4::uuid)' : ''}
+         ORDER BY l.at DESC, p.id DESC LIMIT $2`,
+        c ? [u.id, q.limit + 1, c.t, c.id] : [u.id, q.limit + 1],
+      );
+      const page = rows.slice(0, q.limit);
+      const reasons = new Map<string, string>(page.filter((r) => r.by).map((r) => [r.id as string, `${r.by_name} reposted`]));
+      return {
+        mode,
+        items: await hydratePosts(
+          db,
+          page.map((r) => r.id),
+          u.id,
+          reasons,
+        ),
+        nextCursor: rows.length > q.limit ? keyCursorOf(page.at(-1)!) : null,
+      };
+    }
     const { rows } = await db.query(
       `SELECT p.id, p.created_at ${POST_FROM} WHERE ${scope[mode]} AND ${VISIBLE} ${personal}
        ${c ? 'AND (p.created_at, p.id) < ($3::timestamptz, $4::uuid)' : ''}
@@ -463,6 +503,67 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     });
     const likes = (await db.query(`SELECT like_count FROM posts WHERE id = $1`, [id])).rows[0]?.like_count ?? 0;
     return { liked: false, likes };
+  });
+
+  /**
+   * Repost: share someone else's public post or reel with your followers. It
+   * shows in their Following feed as "<you> reposted", at the time you reposted.
+   * Only public posts can be reposted, so a repost never widens who can see it.
+   */
+  app.put('/v1/posts/:id/repost', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    await assertVisible(id, u.id);
+    const p = (await db.query(`SELECT author_id, visibility, community_id FROM posts WHERE id = $1`, [id])).rows[0];
+    if (p.author_id === u.id) throw badRequest("You can't repost your own post.");
+    if (p.visibility !== 'public') throw badRequest('Only public posts can be reposted.');
+    const inserted = await tx(db, async (c) => {
+      const r = await c.query(`INSERT INTO post_reposts (user_id, post_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [u.id, id]);
+      if (r.rowCount) await c.query(`UPDATE posts SET repost_count = repost_count + 1 WHERE id = $1`, [id]);
+      return !!r.rowCount;
+    });
+    if (inserted) {
+      await notify(db, ctx.realtime, { userId: p.author_id, category: 'creators', type: 'post_repost', actorId: u.id, entityType: 'post', entityId: id });
+      track(db, u.id, 'post_reposted');
+    }
+    const reposts = (await db.query(`SELECT repost_count FROM posts WHERE id = $1`, [id])).rows[0].repost_count;
+    return { reposted: true, reposts };
+  });
+
+  app.delete('/v1/posts/:id/repost', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    await tx(db, async (c) => {
+      const r = await c.query(`DELETE FROM post_reposts WHERE user_id = $1 AND post_id = $2`, [u.id, id]);
+      if (r.rowCount) await c.query(`UPDATE posts SET repost_count = greatest(repost_count - 1, 0) WHERE id = $1`, [id]);
+    });
+    const reposts = (await db.query(`SELECT repost_count FROM posts WHERE id = $1`, [id])).rows[0]?.repost_count ?? 0;
+    return { reposted: false, reposts };
+  });
+
+  /** A person's reposts, newest first (what they chose to share). */
+  app.get('/v1/users/:id/reposts', async (req) => {
+    const viewer = req.user?.id ?? null;
+    const { id } = parse(idParam, req.params);
+    const q = parse(pageQuerySchema, req.query);
+    const c = decodeCursor<KeyCursor>(q.cursor);
+    const { rows } = await db.query(
+      `SELECT p.id, r.created_at, r.post_id AS rid FROM post_reposts r JOIN posts p ON p.id = r.post_id
+       JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
+       WHERE r.user_id = $2 AND ${VISIBLE} AND ${notBlockedSql('r.user_id', '$1')}
+       ${c ? 'AND (r.created_at, r.post_id) < ($4::timestamptz, $5::uuid)' : ''}
+       ORDER BY r.created_at DESC, r.post_id DESC LIMIT $3`,
+      c ? [viewer, id, q.limit + 1, c.t, c.id] : [viewer, id, q.limit + 1],
+    );
+    const page = rows.slice(0, q.limit);
+    return {
+      items: await hydratePosts(
+        db,
+        page.map((r) => r.id),
+        viewer,
+      ),
+      nextCursor: rows.length > q.limit ? keyCursorOf({ created_at: page.at(-1)!.created_at, id: page.at(-1)!.rid }) : null,
+    };
   });
 
   app.put('/v1/posts/:id/save', { preHandler: requireAuth }, async (req) => {

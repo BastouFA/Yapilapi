@@ -5,6 +5,7 @@ import { FlatList, Platform, Pressable, Share, StyleSheet, Text, View, type View
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Post } from '../../../packages/shared/src/types';
 import { client, errorMessage, mediaUrl, webUrl } from '../lib/api';
+import { useSession } from '../lib/session';
 import { useT } from '../lib/i18n';
 import { radius, space } from '../lib/theme';
 import { Avatar, Button, EmptyState, Icon, Loading, Notice, useColors, userText, type IconName } from '../lib/ui';
@@ -27,6 +28,7 @@ export default function Reels() {
   const [items, setItems] = useState<Post[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { me } = useSession();
   const [muted, setMuted] = useState(true);
   const [active, setActive] = useState(0);
   const [height, setHeight] = useState(0);
@@ -86,6 +88,35 @@ export default function Reels() {
       patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, liked: r.liked }, counts: { ...x.counts, likes: r.likes } }));
     } catch {
       patch(p.id, () => p);
+    }
+  }
+
+  async function repost(p: Post) {
+    const reposted = !p.viewer.reposted;
+    patch(p.id, (x) => ({
+      ...x,
+      viewer: { ...x.viewer, reposted },
+      counts: { ...x.counts, reposts: Math.max(0, (x.counts.reposts ?? 0) + (reposted ? 1 : -1)) },
+    }));
+    try {
+      const api = await client();
+      const r = reposted ? await api.posts.repost(p.id) : await api.posts.unrepost(p.id);
+      patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, reposted: r.reposted }, counts: { ...x.counts, reposts: r.reposts } }));
+    } catch (e) {
+      patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, reposted: !reposted }, counts: { ...x.counts, reposts: p.counts.reposts } }));
+      setError(errorMessage(e));
+    }
+  }
+
+  async function save(p: Post) {
+    const saved = !p.viewer.saved;
+    patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, saved } }));
+    try {
+      const api = await client();
+      await (saved ? api.posts.save(p.id) : api.posts.unsave(p.id));
+    } catch (e) {
+      patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, saved: !saved } }));
+      setError(errorMessage(e));
     }
   }
 
@@ -165,6 +196,8 @@ export default function Reels() {
               onLike={() => void like(item)}
               onComments={() => router.push(`/p/${item.id}`)}
               onShare={() => void share(item)}
+              onRepost={item.author.id !== me?.id && item.visibility === 'public' ? () => void repost(item) : undefined}
+              onSave={() => void save(item)}
             />
           )}
           ListFooterComponent={
@@ -197,6 +230,8 @@ function Reel({
   onLike,
   onComments,
   onShare,
+  onRepost,
+  onSave,
 }: {
   post: Post;
   height: number;
@@ -209,6 +244,9 @@ function Reel({
   onLike: () => void;
   onComments: () => void;
   onShare: () => void;
+  /** Absent for your own reels and ones that aren't public. */
+  onRepost?: () => void;
+  onSave: () => void;
 }) {
   const c = useColors();
   const { t, tp, number } = useT();
@@ -286,6 +324,23 @@ function Reel({
           label={tp('m.post.commentCount', post.counts.comments)}
           count={post.counts.comments ? number(post.counts.comments) : ''}
           onPress={onComments}
+        />
+        {onRepost ? (
+          <Action
+            icon="repeat"
+            color={post.viewer.reposted ? '#2dd4bf' : WHITE}
+            label={post.viewer.reposted ? t('m.reels.undoRepost') : t('m.reels.repost')}
+            count={post.counts.reposts ? number(post.counts.reposts) : ''}
+            selected={post.viewer.reposted}
+            onPress={onRepost}
+          />
+        ) : null}
+        <Action
+          icon={post.viewer.saved ? 'bookmark' : 'bookmark-outline'}
+          color={post.viewer.saved ? '#facc15' : WHITE}
+          label={post.viewer.saved ? t('m.reels.unsave') : t('post.save')}
+          selected={post.viewer.saved}
+          onPress={onSave}
         />
         <Action icon="paper-plane-outline" label={t('m.common.share')} onPress={onShare} />
         <Action

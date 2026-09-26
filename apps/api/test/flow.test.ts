@@ -106,7 +106,7 @@ describe('core vertical slice', () => {
     expect(list.body.items[0].body).toBe('Nice one');
 
     const reloaded = await as(t.app, ada).get(`/v1/posts/${post.id}`);
-    expect(reloaded.body.post.counts).toEqual({ likes: 1, comments: 1 });
+    expect(reloaded.body.post.counts).toMatchObject({ likes: 1, comments: 1 });
     expect(reloaded.body.post.viewer.liked).toBe(true);
 
     const notes = await as(t.app, ben).get('/v1/notifications');

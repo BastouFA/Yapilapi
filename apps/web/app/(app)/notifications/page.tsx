@@ -13,6 +13,7 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
   friend_accepted: () => 'accepted your friend request',
   post_reaction: () => 'liked your post',
   post_comment: () => 'commented on your post',
+  post_repost: () => 'reposted your post',
   join_request: () => 'asked to join your community',
   join_approved: () => 'approved your request to join',
   event_rsvp: () => 'is going to your event',

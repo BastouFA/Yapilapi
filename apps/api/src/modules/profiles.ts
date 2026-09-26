@@ -234,12 +234,31 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     const c = decodeCursor<{ o: number }>(cursor);
     const offset = c?.o ?? 0;
     const { rows } = await db.query<PublicUserRow>(`${sql} LIMIT ${limit + 1} OFFSET ${offset}`, params);
-    return { items: rows.slice(0, limit).map(toPublicUser), nextCursor: rows.length > limit ? encodeCursor({ o: offset + limit }) : null };
+    const items = rows.slice(0, limit).map(toPublicUser);
+    // Which of these people the viewer already follows, for the Follow buttons.
+    const viewer = params[1] as string | null;
+    const followed = viewer
+      ? (await db.query(`SELECT followee_id FROM follows WHERE follower_id = $1 AND followee_id = ANY($2)`, [viewer, items.map((u) => u.id)])).rows.map(
+          (r) => r.followee_id as string,
+        )
+      : [];
+    return { items, viewerFollows: followed, nextCursor: rows.length > limit ? encodeCursor({ o: offset + limit }) : null };
+  }
+
+  /** A private account's followers and following are only visible to the account and the people it approved. */
+  async function assertListsVisible(id: string, viewer: string | null) {
+    const p = (await db.query(`SELECT is_private FROM profiles WHERE user_id = $1`, [id])).rows[0];
+    if (!p) throw notFound('That person');
+    if (viewer && (await isBlockedEitherWay(db, viewer, id))) throw notFound('That person');
+    if (!p.is_private || viewer === id) return;
+    const follows = viewer ? await db.query(`SELECT 1 FROM follows WHERE follower_id = $1 AND followee_id = $2`, [viewer, id]) : null;
+    if (!follows?.rowCount) throw forbidden('This account is private.');
   }
 
   app.get('/v1/users/:id/followers', async (req) => {
     const { id } = parse(idParam, req.params);
     const q = parse(pageQuerySchema, req.query);
+    await assertListsVisible(id, req.user?.id ?? null);
     return listUsers(
       `SELECT ${PUBLIC_USER_COLS} FROM follows f JOIN profiles pr ON pr.user_id = f.follower_id WHERE f.followee_id = $1 AND ${notBlockedSql('pr.user_id', '$2')} ORDER BY f.created_at DESC`,
       [id, req.user?.id ?? null],
@@ -251,6 +270,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
   app.get('/v1/users/:id/following', async (req) => {
     const { id } = parse(idParam, req.params);
     const q = parse(pageQuerySchema, req.query);
+    await assertListsVisible(id, req.user?.id ?? null);
     return listUsers(
       `SELECT ${PUBLIC_USER_COLS} FROM follows f JOIN profiles pr ON pr.user_id = f.followee_id WHERE f.follower_id = $1 AND ${notBlockedSql('pr.user_id', '$2')} ORDER BY f.created_at DESC`,
       [id, req.user?.id ?? null],

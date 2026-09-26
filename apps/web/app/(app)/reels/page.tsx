@@ -3,26 +3,32 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Avatar, EmptyState, Icon, Skeleton } from '@yapilapi/design-system';
+import { Avatar, EmptyState, Icon, Menu, Skeleton } from '@yapilapi/design-system';
 import type { Post } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
-import { CommentsSheet } from '@/components/PostList';
+import { CommentsSheet, ReportSheet } from '@/components/PostList';
 import { useSession } from '../../providers';
 
+type AuthorStats = Record<string, { followers: number; following: boolean }>;
+
 /**
- * Reels: short vertical videos, one per screen. The one on screen plays
- * (muted until you turn sound on) and loops; scroll or use ↑/↓ for the next.
- * Like, comment and share from the side; tap the video to pause.
+ * Reels: short vertical videos, one per screen. The reel on screen plays
+ * (muted until you turn sound on) and loops; scroll or ↑/↓ for the next.
+ * Double-tap to like; the side rail has like, comments, repost, save, share
+ * and more; follow the author from their picture.
  */
 export default function Reels() {
-  const { toast } = useSession();
+  const { toast, me, locale } = useSession();
   const start = useSearchParams().get('start');
   const [items, setItems] = useState<Post[] | null>(null);
+  const [authors, setAuthors] = useState<AuthorStats>({});
   const [cursor, setCursor] = useState<string | null>(null);
   const [muted, setMuted] = useState(true);
   const [commentsFor, setCommentsFor] = useState<Post | null>(null);
+  const [reporting, setReporting] = useState<Post | null>(null);
   const loading = useRef(false);
   const list = useRef<HTMLDivElement>(null);
+  const compact = new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 });
 
   const more = useCallback(
     async (c?: string | null) => {
@@ -31,6 +37,7 @@ export default function Reels() {
       try {
         const r = await api.reels(c ?? undefined);
         setItems((cur) => [...(cur ?? []), ...r.items.filter((x) => !cur?.some((y) => y.id === x.id))]);
+        setAuthors((a) => ({ ...a, ...r.authors }));
         setCursor(r.nextCursor);
       } catch (e) {
         setItems((cur) => cur ?? []);
@@ -58,17 +65,44 @@ export default function Reels() {
   }, [start]);
 
   const patch = (id: string, fn: (p: Post) => Post) => setItems((cur) => cur?.map((p) => (p.id === id ? fn(p) : p)) ?? cur);
-  async function like(p: Post) {
-    const liked = !p.viewer.liked;
-    patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, liked }, counts: { ...x.counts, likes: x.counts.likes + (liked ? 1 : -1) } }));
+
+  async function toggle(p: Post, what: 'like' | 'repost' | 'save', force?: boolean) {
+    const on = force ?? !(what === 'like' ? p.viewer.liked : what === 'repost' ? p.viewer.reposted : p.viewer.saved);
+    const d = on ? 1 : -1;
+    patch(p.id, (x) => ({
+      ...x,
+      viewer: { ...x.viewer, ...(what === 'like' ? { liked: on } : what === 'repost' ? { reposted: on } : { saved: on }) },
+      counts: { ...x.counts, ...(what === 'like' ? { likes: x.counts.likes + d } : what === 'repost' ? { reposts: x.counts.reposts + d } : {}) },
+    }));
     try {
-      const r = liked ? await api.posts.like(p.id) : await api.posts.unlike(p.id);
-      patch(p.id, (x) => ({ ...x, counts: { ...x.counts, likes: r.likes } }));
+      if (what === 'like') {
+        const r = on ? await api.posts.like(p.id) : await api.posts.unlike(p.id);
+        patch(p.id, (x) => ({ ...x, counts: { ...x.counts, likes: r.likes } }));
+      } else if (what === 'repost') {
+        const r = on ? await api.posts.repost(p.id) : await api.posts.unrepost(p.id);
+        patch(p.id, (x) => ({ ...x, counts: { ...x.counts, reposts: r.reposts } }));
+        toast(on ? 'Reposted to your followers' : 'Repost removed');
+      } else {
+        await (on ? api.posts.save(p.id) : api.posts.unsave(p.id));
+        toast(on ? 'Saved' : 'Removed from saved');
+      }
     } catch (e) {
       patch(p.id, () => p);
       toast(errorMessage(e));
     }
   }
+
+  async function follow(authorId: string, name: string) {
+    setAuthors((a) => ({ ...a, [authorId]: { followers: (a[authorId]?.followers ?? 0) + 1, following: true } }));
+    try {
+      await api.users.follow(authorId);
+      toast(`Following ${name}`);
+    } catch (e) {
+      setAuthors((a) => ({ ...a, [authorId]: { followers: Math.max(0, (a[authorId]?.followers ?? 1) - 1), following: false } }));
+      toast(errorMessage(e));
+    }
+  }
+
   async function share(p: Post) {
     const url = `${location.origin}/reels?start=${p.id}`;
     try {
@@ -107,21 +141,128 @@ export default function Reels() {
       }}
     >
       <h1 className="yp-visually-hidden">Reels</h1>
-      {items.map((p, i) => (
-        <Reel
-          key={p.id}
-          post={p}
-          muted={muted}
-          onToggleMute={() => setMuted((m) => !m)}
-          onLike={() => like(p)}
-          onComments={() => setCommentsFor(p)}
-          onShare={() => share(p)}
-          onVisible={() => {
-            if (i >= items.length - 2 && cursor) void more(cursor);
-          }}
-        />
-      ))}
-      {!cursor ? <p className="reels__end">You&apos;re all caught up.</p> : null}
+      <button
+        type="button"
+        className="reels__sound"
+        onClick={() => setMuted((m) => !m)}
+        aria-pressed={!muted}
+        aria-label={muted ? 'Turn sound on' : 'Turn sound off'}
+      >
+        <Icon name={muted ? 'volume-off' : 'volume'} size={20} />
+      </button>
+      {items.map((p, i) => {
+        const a = authors[p.author.id];
+        const mine = p.author.id === me?.id;
+        return (
+          <article key={p.id} className="reel" aria-label={`Reel by ${p.author.displayName}`}>
+            <ReelVideo
+              post={p}
+              muted={muted}
+              onDoubleTap={() => void toggle(p, 'like', true)}
+              onVisible={() => {
+                if (i >= items.length - 2 && cursor) void more(cursor);
+              }}
+            />
+            <div className="reel__info">
+              <div className="reel__byline">
+                <Link href={`/u/${p.author.username}`} className="reel__author">
+                  <bdi>{p.author.displayName}</bdi>
+                </Link>
+                {!mine && a && !a.following ? (
+                  <button type="button" className="reel__follow" onClick={() => follow(p.author.id, p.author.displayName)}>
+                    Follow
+                  </button>
+                ) : null}
+              </div>
+              {a ? (
+                <span className="reel__stats">
+                  {compact.format(a.followers)} {a.followers === 1 ? 'follower' : 'followers'}
+                  {a.following && !mine ? ' · Following' : ''}
+                </span>
+              ) : null}
+              {p.body ? <Caption text={p.body} /> : null}
+              {p.topics.length ? (
+                <div className="reel__tags">
+                  {p.topics.map((t) => (
+                    <Link key={t} href={`/discover?q=${encodeURIComponent(t)}`}>
+                      <bdi>#{t}</bdi>
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            <div className="reel__rail">
+              <Link href={`/u/${p.author.username}`} className="reel__avatar" aria-label={`${p.author.displayName}'s profile`}>
+                <Avatar name={p.author.displayName} src={p.author.avatarUrl} size="md" />
+              </Link>
+              <RailButton
+                label={p.viewer.liked ? 'Unlike' : 'Like'}
+                pressed={p.viewer.liked}
+                count={p.counts.likes}
+                fmt={compact}
+                onClick={() => toggle(p, 'like')}
+                tone="like"
+              >
+                <Icon name="heart" filled={p.viewer.liked} size={26} />
+              </RailButton>
+              <RailButton label="Comments" count={p.counts.comments} fmt={compact} onClick={() => setCommentsFor(p)}>
+                <Icon name="message" size={26} />
+              </RailButton>
+              {!mine && p.visibility === 'public' ? (
+                <RailButton
+                  label={p.viewer.reposted ? 'Undo repost' : 'Repost'}
+                  pressed={p.viewer.reposted}
+                  count={p.counts.reposts}
+                  fmt={compact}
+                  onClick={() => toggle(p, 'repost')}
+                  tone="repost"
+                >
+                  <Icon name="repost" size={26} />
+                </RailButton>
+              ) : null}
+              <RailButton label={p.viewer.saved ? 'Remove from saved' : 'Save'} pressed={p.viewer.saved} onClick={() => toggle(p, 'save')} tone="save">
+                <Icon name="bookmark" filled={p.viewer.saved} size={26} />
+              </RailButton>
+              <RailButton label="Share" onClick={() => share(p)}>
+                <Icon name="send" size={26} />
+              </RailButton>
+              <div className="reel__more">
+                <Menu
+                  label="More"
+                  actions={[
+                    {
+                      label: 'Not interested',
+                      icon: 'eye',
+                      onSelect: async () => {
+                        await api.feedback({ signal: 'not_interested', postId: p.id }).catch(() => {});
+                        setItems((cur) => cur?.filter((x) => x.id !== p.id) ?? cur);
+                        toast("We'll show fewer like this.");
+                      },
+                    },
+                    {
+                      label: 'Copy link',
+                      icon: 'link',
+                      onSelect: async () => {
+                        await navigator.clipboard.writeText(`${location.origin}/reels?start=${p.id}`).catch(() => {});
+                        toast('Link copied');
+                      },
+                    },
+                    ...(mine ? [] : [{ label: 'Report', icon: 'flag' as const, danger: true, onSelect: () => setReporting(p) }]),
+                  ]}
+                />
+              </div>
+            </div>
+          </article>
+        );
+      })}
+      {!cursor ? (
+        <div className="reels__end">
+          <p>You&apos;re all caught up.</p>
+          <Link href="/create?mode=reel" className="yp-btn yp-btn--primary yp-btn--sm">
+            Make a reel
+          </Link>
+        </div>
+      ) : null}
       {commentsFor ? (
         <CommentsSheet
           post={commentsFor}
@@ -129,30 +270,65 @@ export default function Reels() {
           onAdded={() => patch(commentsFor.id, (x) => ({ ...x, counts: { ...x.counts, comments: x.counts.comments + 1 } }))}
         />
       ) : null}
+      <ReportSheet target={reporting ? { type: 'post', id: reporting.id } : null} onClose={() => setReporting(null)} />
     </div>
   );
 }
 
-function Reel({
-  post,
-  muted,
-  onToggleMute,
-  onLike,
-  onComments,
-  onShare,
-  onVisible,
+function RailButton({
+  label,
+  pressed,
+  count,
+  fmt,
+  onClick,
+  tone,
+  children,
 }: {
-  post: Post;
-  muted: boolean;
-  onToggleMute: () => void;
-  onLike: () => void;
-  onComments: () => void;
-  onShare: () => void;
-  onVisible: () => void;
+  label: string;
+  pressed?: boolean;
+  count?: number;
+  fmt?: Intl.NumberFormat;
+  onClick: () => void;
+  tone?: 'like' | 'repost' | 'save';
+  children: React.ReactNode;
 }) {
-  const box = useRef<HTMLElement>(null);
+  return (
+    <button
+      type="button"
+      className={`reel__btn${tone ? ` reel__btn--${tone}` : ''}`}
+      onClick={onClick}
+      aria-pressed={pressed}
+      aria-label={count !== undefined ? `${label}, ${count}` : label}
+    >
+      <span className="reel__disc">{children}</span>
+      {count !== undefined ? <span className="reel__count">{count ? fmt?.format(count) : ''}</span> : null}
+    </button>
+  );
+}
+
+function Caption({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const long = text.length > 90;
+  return (
+    <p className={`reel__caption${open ? ' reel__caption--open' : ''}`} dir="auto">
+      {open || !long ? text : `${text.slice(0, 90)}…`}{' '}
+      {long ? (
+        <button type="button" className="reel__more-text" onClick={() => setOpen((o) => !o)}>
+          {open ? 'less' : 'more'}
+        </button>
+      ) : null}
+    </p>
+  );
+}
+
+function ReelVideo({ post, muted, onDoubleTap, onVisible }: { post: Post; muted: boolean; onDoubleTap: () => void; onVisible: () => void }) {
+  const box = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [burst, setBurst] = useState(0);
+  const lastTap = useRef(0);
+  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const media = post.media[0];
   const src = (media?.variants as Record<string, string> | undefined)?.mp4 ?? media?.url;
 
@@ -182,8 +358,18 @@ function Reel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const togglePlay = () => {
+    const v = video.current;
+    if (!v) return;
+    if (v.paused) void v.play().then(() => setPlaying(true));
+    else {
+      v.pause();
+      setPlaying(false);
+    }
+  };
+
   return (
-    <article ref={box} className="reel" aria-label={`Reel by ${post.author.displayName}`}>
+    <div ref={box} className="reel__stage">
       {src ? (
         <video
           ref={video}
@@ -195,49 +381,40 @@ function Reel({
           playsInline
           preload="metadata"
           aria-label={media?.altText || post.body || `Video by ${post.author.displayName}`}
+          onTimeUpdate={(e) => {
+            const v = e.currentTarget;
+            if (v.duration) setProgress(v.currentTime / v.duration);
+          }}
           onClick={() => {
-            const v = video.current;
-            if (!v) return;
-            if (v.paused) void v.play().then(() => setPlaying(true));
-            else {
-              v.pause();
-              setPlaying(false);
+            // One tap pauses; a quick second tap likes instead.
+            const now = Date.now();
+            if (now - lastTap.current < 280) {
+              if (tapTimer.current) clearTimeout(tapTimer.current);
+              lastTap.current = 0;
+              setBurst((b) => b + 1);
+              onDoubleTap();
+              return;
             }
+            lastTap.current = now;
+            tapTimer.current = setTimeout(togglePlay, 280);
           }}
         />
       ) : null}
       {!playing ? (
         <span className="reel__paused" aria-hidden>
-          ▶
+          <svg viewBox="0 0 24 24" width="64" height="64">
+            <path d="M8 5v14l11-7z" fill="currentColor" />
+          </svg>
         </span>
       ) : null}
-      <div className="reel__info">
-        <Link href={`/u/${post.author.username}`} className="reel__author">
-          <Avatar name={post.author.displayName} src={post.author.avatarUrl} size="sm" />
-          <bdi>{post.author.displayName}</bdi>
-        </Link>
-        {post.body ? (
-          <p className="reel__caption" dir="auto">
-            {post.body}
-          </p>
-        ) : null}
-      </div>
-      <div className="reel__actions">
-        <button type="button" onClick={onLike} aria-pressed={post.viewer.liked} aria-label={`${post.viewer.liked ? 'Unlike' : 'Like'}, ${post.counts.likes}`}>
-          <Icon name="heart" filled={post.viewer.liked} size={28} />
-          <span>{post.counts.likes || ''}</span>
-        </button>
-        <button type="button" onClick={onComments} aria-label={`Comments, ${post.counts.comments}`}>
-          <Icon name="message" size={28} />
-          <span>{post.counts.comments || ''}</span>
-        </button>
-        <button type="button" onClick={onShare} aria-label="Share">
-          <Icon name="send" size={28} />
-        </button>
-        <button type="button" onClick={onToggleMute} aria-pressed={!muted} aria-label={muted ? 'Turn sound on' : 'Turn sound off'}>
-          <span className="reel__sound">{muted ? 'Sound off' : 'Sound on'}</span>
-        </button>
-      </div>
-    </article>
+      {burst ? (
+        <span key={burst} className="reel__burst" aria-hidden>
+          <Icon name="heart" filled size={96} />
+        </span>
+      ) : null}
+      <span className="reel__progress" aria-hidden>
+        <span style={{ width: `${progress * 100}%` }} />
+      </span>
+    </div>
   );
 }

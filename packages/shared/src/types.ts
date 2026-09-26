@@ -76,8 +76,8 @@ export interface Post {
   community: { id: string; slug: string; name: string } | null;
   event: { id: string; title: string; startsAt: string } | null;
   product: { id: string; title: string; priceCents: number; currency: string } | null;
-  counts: { likes: number; comments: number };
-  viewer: { liked: boolean; saved: boolean };
+  counts: { likes: number; comments: number; reposts: number };
+  viewer: { liked: boolean; saved: boolean; reposted: boolean };
   aiAssisted: boolean;
   /** Set on Real posts: captured in-app moments before posting, unedited. */
   real?: { capturedAt: string; dual: boolean; locationText: string | null } | null;
