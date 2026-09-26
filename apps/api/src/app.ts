@@ -72,6 +72,7 @@ import { liveRecordingJobHandlers } from './lib/live-recording.ts';
 import { shareVideoJobHandlers } from './lib/share-video.ts';
 import { fastifyTracingPlugin, traceLogMixin } from './lib/tracing.ts';
 import { endExpiredCampaigns } from './lib/boosts.ts';
+import { sendCountdownReminders } from './lib/stories.ts';
 
 export interface BuiltApp {
   app: FastifyInstance;
@@ -382,6 +383,8 @@ export async function buildApp(
       await processJobs(db, jobHandlers).catch((e) => app.log.warn({ err: e.message }, 'job worker'));
       // Campaigns and boosts past their end date stop, and their unspent budget is refunded.
       await endExpiredCampaigns(db, ctx.paymentProviders).catch((e) => app.log.warn({ err: e.message }, 'ad expiry'));
+      // Story countdowns that ended: remind the people who asked.
+      await sendCountdownReminders(db, ctx.realtime).catch((e) => app.log.warn({ err: e.message }, 'countdown reminders'));
       busy = false;
     }, 2_000);
     jobTimer.unref();

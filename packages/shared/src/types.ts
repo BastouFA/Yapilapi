@@ -1,3 +1,4 @@
+import type { StoryCard } from './stories.ts';
 import type { CommunityRole, PostKind, ProfileMode, Visibility } from './constants.ts';
 
 export interface PublicUser {
@@ -207,6 +208,8 @@ export interface Message {
   }[];
   /** Only on your own messages: 'review' while held for a quick check before delivery. */
   moderation?: 'review';
+  /** A shared story. It opens only if you can see the story yourself. */
+  story?: StoryCard | null;
   createdAt: string;
   clientId?: string | null;
 }
