@@ -54,7 +54,11 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       circles: await q(
         `SELECT c.name, c.kind, array_agg(cm.user_id) AS members FROM circles c LEFT JOIN circle_members cm ON cm.circle_id = c.id WHERE c.owner_id = $1 GROUP BY c.id`,
       ),
-      posts: await q(`SELECT id, kind, body, visibility, topics, created_at, deleted_at FROM posts WHERE author_id = $1`),
+      closeFriends: await q(`SELECT friend_id, created_at FROM close_friends WHERE owner_id = $1`),
+      posts: await q(
+        `SELECT id, kind, format, body, visibility, topics, allow_remix, remix_of_post_id, remix_mode, sound_id, created_at, deleted_at FROM posts WHERE author_id = $1`,
+      ),
+      sounds: await q(`SELECT id, title, source_post_id, duration_ms, created_at FROM sounds WHERE owner_id = $1`),
       comments: await q(`SELECT id, post_id, body, created_at FROM comments WHERE author_id = $1`),
       reactions: await q(`SELECT post_id, kind, created_at FROM reactions WHERE user_id = $1`),
       messagesSent: await q(`SELECT conversation_id, body, attachments, created_at FROM messages WHERE sender_id = $1 AND deleted_at IS NULL`),
@@ -96,6 +100,8 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       for (const sql of [
         `DELETE FROM follows WHERE follower_id = $1 OR followee_id = $1`,
         `DELETE FROM friendships WHERE user_a = $1 OR user_b = $1`,
+        `DELETE FROM close_friends WHERE owner_id = $1 OR friend_id = $1`,
+        `DELETE FROM sounds WHERE owner_id = $1`,
         `DELETE FROM circles WHERE owner_id = $1`,
         `DELETE FROM circle_members WHERE user_id = $1`,
         `DELETE FROM user_interests WHERE user_id = $1`,

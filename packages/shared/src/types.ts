@@ -80,8 +80,14 @@ export interface Post {
   community: { id: string; slug: string; name: string } | null;
   event: { id: string; title: string; startsAt: string } | null;
   product: { id: string; title: string; priceCents: number; currency: string } | null;
-  /** Views count each person once and never the author; recorded for reels. */
-  counts: { likes: number; comments: number; reposts: number; views: number };
+  /** Views count each person once and never the author; recorded for reels. Remixes counts duets and remixes of a reel. */
+  counts: { likes: number; comments: number; reposts: number; views: number; remixes?: number };
+  /** Reels: whether other people may duet or remix it. */
+  allowRemix?: boolean;
+  /** Reels posted as a duet or remix of another reel. */
+  remixOf?: RemixRef | null;
+  /** Reels: the sound it uses (its own, or one it borrowed). */
+  sound?: SoundRef | null;
   /** Pinned to the top of its author's profile (only set in profile listings). */
   pinned?: boolean;
   viewer: { liked: boolean; saved: boolean; reposted: boolean };
@@ -93,6 +99,39 @@ export interface Post {
   reason?: string;
   /** Only on the author's own posts: countries where regional rules withhold it. */
   withheldIn?: string[];
+}
+
+export interface SoundRef {
+  id: string;
+  title: string;
+  durationMs: number | null;
+  /** Plays the sound: the source reel's video, whose audio track is the sound. */
+  audioUrl: string | null;
+  /** True when this reel is where the sound comes from (so its own audio plays). */
+  original: boolean;
+}
+
+export interface RemixRef {
+  mode: 'duet' | 'remix';
+  /** The original reel, while the viewer can still see it. */
+  post: { id: string; body: string; author: PublicUser; media: MediaItem | null } | null;
+}
+
+export interface Sound {
+  id: string;
+  title: string;
+  owner: PublicUser;
+  /** The reel the sound comes from, while the viewer can see it. */
+  sourcePostId: string | null;
+  durationMs: number | null;
+  audioUrl: string | null;
+  /** Posterframe of the source reel, for the sound's cover. */
+  coverUrl: string | null;
+  /** Reels you can see that use it. */
+  reels: number;
+  /** Whether you can make a reel with it (its source reel is public and allows remixes). */
+  canUse: boolean;
+  createdAt: string;
 }
 
 export interface Comment {

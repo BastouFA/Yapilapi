@@ -1,3 +1,4 @@
+import { useAudioPlayer } from 'expo-audio';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -17,7 +18,8 @@ const VIEWABILITY = { itemVisiblePercentThreshold: 60 };
 /**
  * Reels: short vertical videos, one per screen. The one on screen plays (muted until you turn
  * sound on) and loops; swipe up for the next. Like, comment and share from the side; tap the
- * video to pause. `?start=<post id>` opens a particular reel first.
+ * video to pause. `?start=<post id>` opens a particular reel first. Duets play beside their
+ * original; reels that use another sound play that sound; the sound's name opens its page.
  */
 export default function Reels() {
   const c = useColors();
@@ -258,20 +260,44 @@ function Reel({
     p.loop = true;
     p.muted = true;
   });
+  // A duet plays beside the original (on the left); a reel using another sound plays that sound.
+  const original = post.remixOf?.mode === 'duet' ? (post.remixOf.post?.media ?? null) : null;
+  const originalSrc = original ? mediaUrl(original.variants?.mp4 ?? original.url) : null;
+  const borrowed = !original && post.sound && !post.sound.original && post.sound.audioUrl ? mediaUrl(post.sound.audioUrl) : null;
+  const originalPlayer = useVideoPlayer(originalSrc, (p) => {
+    p.loop = true;
+    p.muted = true;
+  });
+  const sound = useAudioPlayer(visible ? borrowed : null);
 
   // Only the reel on screen plays; scrolling away rewinds it and clears a tap-to-pause.
+  const playing = visible && focused && !paused;
   useEffect(() => {
-    if (visible && focused && !paused) player.play();
-    else player.pause();
-  }, [visible, focused, paused, player]);
+    for (const p of [player, originalSrc ? originalPlayer : null]) {
+      if (!p) continue;
+      if (playing) p.play();
+      else p.pause();
+    }
+    if (borrowed) {
+      if (playing) sound.play();
+      else sound.pause();
+    }
+  }, [playing, player, originalPlayer, originalSrc, borrowed, sound]);
   useEffect(() => {
     if (visible) return;
     player.currentTime = 0;
+    if (originalSrc) originalPlayer.currentTime = 0;
     setPaused(false);
-  }, [visible, player]);
+  }, [visible, player, originalPlayer, originalSrc]);
   useEffect(() => {
-    player.muted = muted;
-  }, [muted, player]);
+    // With a borrowed sound the reel's own audio stays off.
+    player.muted = muted || !!borrowed;
+    if (originalSrc) originalPlayer.muted = muted;
+    if (borrowed) {
+      sound.muted = muted;
+      sound.loop = true;
+    }
+  }, [muted, player, originalPlayer, originalSrc, borrowed, sound]);
 
   return (
     <View style={{ height, backgroundColor: '#000' }} accessibilityLabel={t('m.reels.by', { name: post.author.displayName })}>
@@ -282,7 +308,14 @@ function Reel({
         onPress={() => setPaused((p) => !p)}
         style={StyleSheet.absoluteFill}
       >
-        {src ? <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} pointerEvents="none" /> : null}
+        {originalSrc ? (
+          <View style={[StyleSheet.absoluteFill, { flexDirection: 'row', gap: 2 }]} pointerEvents="none">
+            <VideoView player={originalPlayer} style={{ flex: 1 }} contentFit="cover" nativeControls={false} />
+            {src ? <VideoView player={player} style={{ flex: 1 }} contentFit="cover" nativeControls={false} /> : <View style={{ flex: 1 }} />}
+          </View>
+        ) : src ? (
+          <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} pointerEvents="none" />
+        ) : null}
         {paused ? (
           <View style={s.center} pointerEvents="none">
             <View style={s.playBadge}>
@@ -303,10 +336,40 @@ function Reel({
             {post.author.displayName}
           </Text>
         </Pressable>
+        {post.remixOf ? (
+          post.remixOf.post ? (
+            <Pressable
+              accessibilityRole="link"
+              hitSlop={6}
+              onPress={() => router.push({ pathname: '/reels', params: { start: post.remixOf!.post!.id } })}
+              style={s.chip}
+            >
+              <Icon name="copy-outline" size={14} color={WHITE} />
+              <Text style={[s.chipText, userText]} numberOfLines={1}>
+                {t(post.remixOf.mode === 'duet' ? 'm.reels.duetWith' : 'm.reels.remixOf', { name: post.remixOf.post.author.username })}
+              </Text>
+            </Pressable>
+          ) : (
+            <View style={s.chip}>
+              <Icon name="copy-outline" size={14} color={WHITE} />
+              <Text style={s.chipText} numberOfLines={1}>
+                {t('m.reels.remixUnavailable')}
+              </Text>
+            </View>
+          )
+        ) : null}
         {post.body ? (
           <Text style={[s.caption, userText]} numberOfLines={3}>
             {post.body}
           </Text>
+        ) : null}
+        {post.sound ? (
+          <Pressable accessibilityRole="link" hitSlop={6} onPress={() => router.push(`/sounds/${post.sound!.id}`)} style={s.chip}>
+            <Icon name="musical-notes" size={14} color={WHITE} />
+            <Text style={[s.chipText, userText]} numberOfLines={1}>
+              {post.sound.title}
+            </Text>
+          </Pressable>
         ) : null}
       </View>
 
@@ -405,4 +468,6 @@ const s = StyleSheet.create({
   actions: { position: 'absolute', end: space[3], alignItems: 'center', gap: space[4] },
   actionIcon: { width: 48, height: 48, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: SCRIM },
   count: { color: WHITE, fontSize: 12, fontWeight: '700' },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', maxWidth: '100%' },
+  chipText: { color: WHITE, fontSize: 13, fontWeight: '700', flexShrink: 1, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 4 },
 });

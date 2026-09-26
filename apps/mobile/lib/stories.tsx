@@ -67,6 +67,8 @@ export function StoriesStrip({ groups, onOpen, onCreate }: { groups: StoryGroup[
       ) : null}
       {groups.map((g, i) => {
         const name = g.mine ? t('m.stories.yours') : g.author.displayName;
+        // A green ring for close friends stories you haven't seen (or your own).
+        const close = g.moments.some((m) => m.closeFriends && (g.mine || !m.seen));
         const avatar = (
           <View style={[st.inner, { backgroundColor: c.ground }]}>
             <Avatar name={g.author.displayName} url={g.author.avatarUrl} size={RING - 10} />
@@ -76,11 +78,13 @@ export function StoriesStrip({ groups, onOpen, onCreate }: { groups: StoryGroup[
           <View key={g.author.id} style={st.item}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={g.allSeen ? t('m.stories.a11y.seen', { name }) : t('m.stories.a11y.new', { name })}
+              accessibilityLabel={`${g.allSeen ? t('m.stories.a11y.seen', { name }) : t('m.stories.a11y.new', { name })}${close ? `, ${t('m.closeFriends.title')}` : ''}`}
               onPress={() => onOpen(i)}
               style={{ alignItems: 'center', gap: 4 }}
             >
-              {g.allSeen ? (
+              {close ? (
+                <View style={[st.ring, { backgroundColor: c.closeFriends }]}>{avatar}</View>
+              ) : g.allSeen ? (
                 <View style={[st.ring, { borderWidth: 2, borderColor: c.lineStrong }]}>{avatar}</View>
               ) : (
                 <LinearGradient {...gradient(c)} style={st.ring}>
@@ -343,6 +347,12 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
               </Text>
               <Text style={st.when}>{timeAgo(story.createdAt)}</Text>
             </View>
+            {story.closeFriends ? (
+              <View style={[st.closeFriends, { backgroundColor: c.closeFriends }]}>
+                <Icon name="people" size={12} color={c.onCloseFriends} />
+                <Text style={{ color: c.onCloseFriends, fontSize: 12, fontWeight: '700' }}>{t('m.closeFriends.title')}</Text>
+              </View>
+            ) : null}
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={paused ? t('m.common.play') : t('m.common.pause')}
@@ -557,6 +567,7 @@ const st = StyleSheet.create({
   who: { color: WHITE, fontWeight: '700', fontSize: 14 },
   when: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
   icon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  closeFriends: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full },
   caption: {
     color: WHITE,
     fontSize: 16,

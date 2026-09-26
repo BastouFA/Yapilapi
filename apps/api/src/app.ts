@@ -51,6 +51,7 @@ import adsModule from './modules/ads.ts';
 import familyModule from './modules/family.ts';
 import studioModule from './modules/studio.ts';
 import tagsModule from './modules/tags.ts';
+import soundsModule from './modules/sounds.ts';
 import plusModule from './modules/plus.ts';
 import invitesModule from './modules/invites.ts';
 import publicModule from './modules/public.ts';
@@ -292,6 +293,7 @@ export async function buildApp(
     developerModule,
     memoryModule,
     tagsModule,
+    soundsModule,
     liveModule,
     uploadsModule,
     callsModule,

@@ -1441,6 +1441,10 @@ a.yp-ecard:hover {
 .yp-moment__ring--seen {
   background: var(--line-strong);
 }
+/* Close friends stories: a green ring. */
+.yp-moment__ring--close {
+  background: var(--close-friends);
+}
 .yp-moments > li {
   position: relative;
 }
@@ -1517,4 +1521,26 @@ a.yp-ecard:hover {
     outline: none;
     box-shadow: var(--focus-ring);
   }
+}
+
+/* Reels in a post list: remix credit and sound, as links. */
+.yp-post__reel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  font: 600 13px/18px var(--font-sans);
+  color: var(--ink-muted);
+}
+.yp-post__reel-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+a.yp-post__reel-link:hover {
+  color: var(--ink);
+  text-decoration: underline;
 }

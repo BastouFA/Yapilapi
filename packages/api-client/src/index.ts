@@ -15,6 +15,7 @@ import type {
   PublicPostPreview,
   PublicProfilePreview,
   PublicUser,
+  Sound,
 } from '@yapilapi/shared';
 
 export class ApiError extends Error {
@@ -148,6 +149,22 @@ export function createClient(opts: ClientOptions) {
       why: (id: string) => get<{ reasons: string[] }>(`/v1/posts/${id}/why`),
       comments: (id: string, cursor?: string) => get<Page<Comment>>(`/v1/posts/${id}/comments${qs({ cursor })}`),
       comment: (id: string, body: string, parentId?: string) => post<{ comment: Comment }>(`/v1/posts/${id}/comments`, { body, parentId }),
+      /** Duets and remixes of a reel, newest first. */
+      remixes: (id: string, mode?: 'duet' | 'remix', cursor?: string) => get<Page<Post>>(`/v1/posts/${id}/remixes${qs({ mode, cursor })}`),
+      /** Allow or stop duets and remixes of your reel. */
+      setAllowRemix: (id: string, allowRemix: boolean) => put<{ allowRemix: boolean }>(`/v1/posts/${id}/remix-settings`, { allowRemix }),
+    },
+    sounds: {
+      /** Sounds you can use in a reel, most used first; `q` matches the name or its owner. */
+      list: (q = '', limit = 12) => get<{ items: Sound[] }>(`/v1/sounds${qs({ q, limit })}`),
+      get: (id: string) => get<{ sound: Sound }>(`/v1/sounds/${id}`),
+      rename: (id: string, title: string) => patch<{ sound: Sound }>(`/v1/sounds/${id}`, { title }),
+      reels: (id: string, sort: 'recent' | 'top' = 'recent', cursor?: string) => get<Page<Post>>(`/v1/sounds/${id}/reels${qs({ sort, cursor })}`),
+    },
+    closeFriends: {
+      list: () => get<{ items: { user: PublicUser; addedAt: string; followsYou: boolean }[] }>('/v1/me/close-friends'),
+      add: (userId: string) => put<{ closeFriend: boolean }>(`/v1/me/close-friends/${userId}`),
+      remove: (userId: string) => del<{ closeFriend: boolean }>(`/v1/me/close-friends/${userId}`),
     },
     media: {
       upload: (file: File, altText?: string) => {
@@ -242,8 +259,8 @@ export function createClient(opts: ClientOptions) {
     },
     people: {
       /** People to add to a conversation: connections first, prefix matches as you type. */
-      suggest: (q = '', limit = 8) =>
-        get<{ items: { user: PublicUser; relation: 'friend' | 'following' | null; canMessage: boolean }[] }>(`/v1/people/suggest${qs({ q, limit })}`),
+      suggest: (q = '', limit = 8, scope?: 'all' | 'followers') =>
+        get<{ items: { user: PublicUser; relation: 'friend' | 'following' | null; canMessage: boolean }[] }>(`/v1/people/suggest${qs({ q, limit, scope })}`),
     },
     payments: {
       config: () => get<{ provider: string; publishableKey?: string }>('/v1/payments/config'),
@@ -822,6 +839,8 @@ export interface Story {
   hlsUrl: string | null;
   durationMs: number | null;
   locationText: string | null;
+  /** Shared with the author's close friends only. */
+  closeFriends: boolean;
   expiresAt: string | null;
   createdAt: string;
   seen: boolean;

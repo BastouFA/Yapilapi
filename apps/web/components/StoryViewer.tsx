@@ -137,6 +137,12 @@ export function StoryViewer({
             <bdi>{group.mine ? 'Your story' : group.author.displayName}</bdi>
             <span>{formatRelativeTime(story.createdAt, locale)}</span>
           </span>
+          {story.closeFriends ? (
+            <span className="story__close-friends">
+              <Icon name="users" size={14} />
+              Close friends
+            </span>
+          ) : null}
           <button type="button" className="story__icon" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Play' : 'Pause'}>
             <Icon name={paused ? 'play' : 'pause'} filled />
           </button>

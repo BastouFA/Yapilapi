@@ -5,14 +5,20 @@ import { AppError, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { track } from '../lib/services.ts';
-import { publicUserFrom } from '../lib/users.ts';
+import { plusCol, publicUserFrom } from '../lib/users.ts';
 import { notBlockedSql } from '../lib/visibility.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
-/** Stories the viewer ($1) may see: their own, and active ones from people they follow or are friends with. */
+/**
+ * Stories the viewer ($1) may see: their own, and active ones from people they follow or are friends with.
+ * Close friends stories reach only the people on the author's close friends list who still follow them.
+ */
 const STORY_VISIBLE = `m.deleted_at IS NULL AND (m.expires_at IS NULL OR m.expires_at > now()) AND au.status = 'active'
   AND ${notBlockedSql('m.author_id', '$1')}
   AND (m.author_id = $1
+    OR (m.visibility = 'close_friends'
+        AND EXISTS (SELECT 1 FROM close_friends cf WHERE cf.owner_id = m.author_id AND cf.friend_id = $1)
+        AND EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = m.author_id))
     OR (m.visibility IN ('public','followers') AND EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = m.author_id))
     OR (m.visibility IN ('public','followers','friends') AND EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = m.author_id) OR (fr.user_b = $1 AND fr.user_a = m.author_id))))`;
 
@@ -66,7 +72,7 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
   app.get('/v1/moments', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const { rows } = await db.query(
-      `SELECT m.id, m.body, m.media_url, m.media_kind, m.location_text, m.expires_at, m.created_at,
+      `SELECT m.id, m.body, m.media_url, m.media_kind, m.location_text, m.expires_at, m.created_at, m.visibility = 'close_friends' AS close_friends,
               md.poster_url, md.hls_url, md.variants, md.duration_ms,
               v.viewer_id IS NOT NULL AS seen, coalesce(v.liked, false) AS liked,
               CASE WHEN m.author_id = $1 THEN (SELECT count(*) FROM moment_views mv WHERE mv.moment_id = m.id AND mv.viewer_id <> $1) END AS views,
@@ -93,6 +99,7 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
         hlsUrl: r.hls_url ?? null,
         durationMs: r.duration_ms ?? null,
         locationText: r.location_text,
+        closeFriends: r.close_friends,
         expiresAt: r.expires_at,
         createdAt: r.created_at,
         seen,
@@ -108,6 +115,46 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
   });
 
   const idParam = z.object({ id: z.string().uuid() });
+  const userParam = z.object({ userId: z.string().uuid() });
+
+  // ── Close friends ─────────────────────────────────────────────────────
+  /** Your close friends list (people who follow you), most recently added first. */
+  app.get('/v1/me/close-friends', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { rows } = await db.query(
+      `SELECT cf.created_at, EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = cf.friend_id AND f.followee_id = $1) AS follows_you,
+              pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode, ${plusCol('a_')}
+       FROM close_friends cf JOIN profiles pr ON pr.user_id = cf.friend_id JOIN users fu ON fu.id = cf.friend_id
+       WHERE cf.owner_id = $1 AND fu.status = 'active' AND ${notBlockedSql('cf.friend_id', '$1')}
+       ORDER BY cf.created_at DESC LIMIT 1000`,
+      [u.id],
+    );
+    return { items: rows.map((r) => ({ user: publicUserFrom(r, 'a_'), addedAt: r.created_at, followsYou: r.follows_you })) };
+  });
+
+  /** Add someone who follows you to your close friends. They aren't told. */
+  app.put('/v1/me/close-friends/:userId', { preHandler: requireAuth, config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (req) => {
+    const u = me(req);
+    const { userId } = parse(userParam, req.params);
+    if (userId === u.id) throw new AppError(400, 'validation_failed', "You can't add yourself.");
+    const follows = await db.query(
+      `SELECT 1 FROM follows f JOIN users fu ON fu.id = f.follower_id
+       WHERE f.follower_id = $2 AND f.followee_id = $1 AND fu.status = 'active' AND ${notBlockedSql('f.follower_id', '$1')}`,
+      [u.id, userId],
+    );
+    if (!follows.rowCount) throw new AppError(400, 'validation_failed', 'Only people who follow you can be on your close friends list.');
+    const count = await db.query(`SELECT count(*)::int AS n FROM close_friends WHERE owner_id = $1`, [u.id]);
+    if (count.rows[0].n >= 1000) throw new AppError(400, 'validation_failed', 'Your close friends list is full.');
+    await db.query(`INSERT INTO close_friends (owner_id, friend_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [u.id, userId]);
+    return { closeFriend: true };
+  });
+
+  app.delete('/v1/me/close-friends/:userId', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { userId } = parse(userParam, req.params);
+    await db.query(`DELETE FROM close_friends WHERE owner_id = $1 AND friend_id = $2`, [u.id, userId]);
+    return { closeFriend: false };
+  });
 
   app.post('/v1/moments/:id/view', { preHandler: requireAuth, config: { rateLimit: { max: 600, timeWindow: '1 minute' } } }, async (req) => {
     const u = me(req);

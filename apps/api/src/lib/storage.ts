@@ -118,6 +118,9 @@ export const ALLOWED_MIME: Record<string, { ext: string; kind: 'image' | 'video'
   'video/webm': { ext: 'webm', kind: 'video' },
   'audio/mpeg': { ext: 'mp3', kind: 'audio' },
   'audio/mp4': { ext: 'm4a', kind: 'audio' },
+  // Voice messages recorded on phones: some platforms label AAC in MPEG-4 this way.
+  'audio/x-m4a': { ext: 'm4a', kind: 'audio' },
+  'audio/m4a': { ext: 'm4a', kind: 'audio' },
   'audio/webm': { ext: 'weba', kind: 'audio' },
 };
 
@@ -162,6 +165,9 @@ export function sniffMatches(buf: Buffer, mime: string): boolean {
       return hex.startsWith('52494646') && buf.subarray(8, 12).toString() === 'WEBP';
     case 'video/mp4':
     case 'audio/mp4':
+    case 'audio/x-m4a':
+    case 'audio/m4a':
+      // ISO base media (MP4, M4A): a box whose type is "ftyp" comes first.
       return buf.subarray(4, 8).toString() === 'ftyp';
     case 'video/webm':
     case 'audio/webm':

@@ -47,8 +47,19 @@ export async function uploadPicked(asset: Picked, onProgress?: (fraction: number
   const type = asset.mimeType ?? (video ? 'video/mp4' : 'image/jpeg');
   const name = asset.fileName ?? `upload.${type.split('/')[1] ?? (video ? 'mp4' : 'jpg')}`;
   if ((asset.fileSize ?? 0) > MAX_UPLOAD_BYTES * 0.9) return uploadInChunks(asset.uri, name, type, onProgress);
+  return uploadFile(asset.uri, name, type, onProgress);
+}
+
+/** A voice message recorded in the app (AAC in an .m4a file). */
+export const VOICE_MIME = 'audio/mp4';
+
+/**
+ * Upload a file on the phone (a picked photo or video, or a voice recording) in one multipart
+ * request to /v1/media, the endpoint the web app uses. XMLHttpRequest, so progress shows.
+ */
+export async function uploadFile(uri: string, name: string, type: string, onProgress?: (fraction: number) => void): Promise<Uploaded> {
   const form = new FormData();
-  form.append('file', { uri: asset.uri, name, type } as unknown as Blob);
+  form.append('file', { uri, name, type } as unknown as Blob);
   const token = await getToken();
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();

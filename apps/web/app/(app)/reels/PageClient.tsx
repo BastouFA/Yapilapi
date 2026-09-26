@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Avatar, EmptyState, Icon, Menu, Skeleton, TaggedText } from '@yapilapi/design-system';
 import type { Post } from '@yapilapi/shared';
@@ -16,11 +16,13 @@ type AuthorStats = Record<string, { followers: number; following: boolean }>;
 /**
  * Reels: short vertical videos, one per screen. The reel on screen plays
  * (muted until you turn sound on) and loops; scroll or ↑/↓ for the next.
- * Double-tap to like; the side rail has like, comments, repost, save, share
- * and more; follow the author from their picture.
+ * Double-tap to like; the side rail has like, comments, repost, save, share,
+ * duet or remix, and more; follow the author from their picture. Duets play
+ * side by side with the original; reels using another sound play that sound.
  */
 function Reels() {
   const { toast, me, locale } = useSession();
+  const router = useRouter();
   const start = useSearchParams().get('start');
   const [items, setItems] = useState<Post[] | null>(null);
   const [authors, setAuthors] = useState<AuthorStats>({});
@@ -101,6 +103,17 @@ function Reels() {
       toast(`Following ${name}`);
     } catch (e) {
       setAuthors((a) => ({ ...a, [authorId]: { followers: Math.max(0, (a[authorId]?.followers ?? 1) - 1), following: false } }));
+      toast(errorMessage(e));
+    }
+  }
+
+  async function setAllowRemix(p: Post, allowRemix: boolean) {
+    patch(p.id, (x) => ({ ...x, allowRemix }));
+    try {
+      await api.posts.setAllowRemix(p.id, allowRemix);
+      toast(allowRemix ? 'People can duet and remix this reel' : 'Duets and remixes are off for this reel');
+    } catch (e) {
+      patch(p.id, (x) => ({ ...x, allowRemix: !allowRemix }));
       toast(errorMessage(e));
     }
   }
@@ -192,7 +205,14 @@ function Reels() {
                   .filter(Boolean)
                   .join(' · ')}
               </span>
+              {p.remixOf ? <RemixCredit remix={p.remixOf} /> : null}
               {p.body ? <Caption text={p.body} /> : null}
+              {p.sound ? (
+                <Link href={`/sounds/${p.sound.id}`} className="reel__soundlink">
+                  <Icon name="music" size={14} />
+                  <bdi>{p.sound.title}</bdi>
+                </Link>
+              ) : null}
               {p.topics.length ? (
                 <div className="reel__tags">
                   {p.topics.map((t) => (
@@ -235,6 +255,28 @@ function Reels() {
               <RailButton label={p.viewer.saved ? 'Remove from saved' : 'Save'} pressed={p.viewer.saved} onClick={() => toggle(p, 'save')} tone="save">
                 <Icon name="bookmark" filled={p.viewer.saved} size={26} />
               </RailButton>
+              {p.allowRemix && p.visibility === 'public' ? (
+                <div className="reel__remix">
+                  <Menu
+                    label="Duet or remix"
+                    icon="duet"
+                    actions={[
+                      { label: 'Duet', icon: 'duet', onSelect: () => router.push(`/create?mode=reel&remixOf=${p.id}&remixMode=duet`) },
+                      { label: 'Remix with this sound', icon: 'music', onSelect: () => router.push(`/create?mode=reel&remixOf=${p.id}&remixMode=remix`) },
+                      ...(p.counts.remixes
+                        ? [
+                            {
+                              label: `See remixes (${compact.format(p.counts.remixes)})`,
+                              icon: 'repost' as const,
+                              onSelect: () => router.push(`/reels/${p.id}/remixes`),
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
+                  <span className="reel__count">{p.counts.remixes ? compact.format(p.counts.remixes) : ''}</span>
+                </div>
+              ) : null}
               <RailButton label="Share" onClick={() => share(p)}>
                 <Icon name="send" size={26} />
               </RailButton>
@@ -259,6 +301,18 @@ function Reels() {
                         toast('Link copied');
                       },
                     },
+                    ...((!p.allowRemix || p.visibility !== 'public') && p.counts.remixes
+                      ? [{ label: 'See remixes', icon: 'repost' as const, onSelect: () => router.push(`/reels/${p.id}/remixes`) }]
+                      : []),
+                    ...(mine
+                      ? [
+                          {
+                            label: p.allowRemix ? 'Turn off duets and remixes' : 'Allow duets and remixes',
+                            icon: 'duet' as const,
+                            onSelect: () => void setAllowRemix(p, !p.allowRemix),
+                          },
+                        ]
+                      : []),
                     ...(mine ? [] : [{ label: 'Report', icon: 'flag' as const, danger: true, onSelect: () => setReporting(p) }]),
                   ]}
                 />
@@ -333,6 +387,33 @@ function Caption({ text }: { text: string }) {
   );
 }
 
+/** "Duet with @name" or "Remix of @name", linking to the original reel. */
+function RemixCredit({ remix }: { remix: NonNullable<Post['remixOf']> }) {
+  const verb = remix.mode === 'duet' ? 'Duet with' : 'Remix of';
+  if (!remix.post)
+    return (
+      <span className="reel__credit">
+        <Icon name="duet" size={14} />
+        {verb} a reel that is no longer available
+      </span>
+    );
+  return (
+    <Link href={`/reels?start=${remix.post.id}`} className="reel__credit">
+      <Icon name="duet" size={14} />
+      {verb} <bdi>@{remix.post.author.username}</bdi>
+    </Link>
+  );
+}
+
+/** Keep a companion (the duet's original, or a borrowed sound) in step with the reel's own video. */
+function follow(v: HTMLVideoElement, other: HTMLMediaElement | null, event: 'play' | 'pause' | 'time') {
+  if (!other) return;
+  if (event === 'pause') return other.pause();
+  const target = other.duration && Number.isFinite(other.duration) ? v.currentTime % other.duration : v.currentTime;
+  if (Math.abs(other.currentTime - target) > 0.35) other.currentTime = target;
+  if (event === 'play' && other.paused) void other.play().catch(() => {});
+}
+
 function ReelVideo({
   post,
   muted,
@@ -357,6 +438,11 @@ function ReelVideo({
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const media = post.media[0];
   const src = (media?.variants as Record<string, string> | undefined)?.mp4 ?? media?.url;
+  // Duets play beside the original (left); reels using another sound play that sound instead of their own.
+  const original = post.remixOf?.mode === 'duet' ? (post.remixOf.post?.media ?? null) : null;
+  const originalSrc = original ? ((original.variants as Record<string, string> | undefined)?.mp4 ?? original.url) : null;
+  const borrowed = !original && post.sound && !post.sound.original ? post.sound.audioUrl : null;
+  const companion = useRef<HTMLVideoElement & HTMLAudioElement>(null);
 
   // Play only the reel that is mostly on screen.
   useEffect(() => {
@@ -395,20 +481,39 @@ function ReelVideo({
   };
 
   return (
-    <div ref={box} className="reel__stage">
+    <div ref={box} className={`reel__stage${originalSrc ? ' reel__stage--duet' : ''}`}>
+      {originalSrc ? (
+        <video
+          ref={companion}
+          className="reel__video reel__video--original"
+          src={originalSrc}
+          poster={original?.posterUrl ?? undefined}
+          muted={muted}
+          loop
+          playsInline
+          preload="metadata"
+          aria-label={`Original reel by ${post.remixOf?.post?.author.displayName ?? ''}`}
+          onClick={togglePlay}
+        />
+      ) : null}
+      {borrowed ? <audio ref={companion} src={borrowed} muted={muted} loop preload="metadata" /> : null}
       {src ? (
         <video
           ref={video}
           className="reel__video"
           src={src}
           poster={media?.posterUrl ?? undefined}
-          muted={muted}
+          muted={muted || !!borrowed}
           loop
           playsInline
           preload="metadata"
           aria-label={media?.altText || post.body || `Video by ${post.author.displayName}`}
+          onPlay={(e) => follow(e.currentTarget, companion.current, 'play')}
+          onPause={(e) => follow(e.currentTarget, companion.current, 'pause')}
+          onSeeked={(e) => follow(e.currentTarget, companion.current, 'time')}
           onTimeUpdate={(e) => {
             const v = e.currentTarget;
+            follow(v, companion.current, 'time');
             if (v.duration) setProgress(v.currentTime / v.duration);
             if (!watched.current && v.duration && v.currentTime >= Math.min(2, v.duration / 2)) {
               watched.current = true;
