@@ -386,10 +386,13 @@ export function PostCard({
         </L>
         <div className="yp-post__who">
           <L href={`/u/${post.author.username}`} className="yp-post__name">
-            <span id={`post-${post.id}-author`}>{post.author.displayName}</span>
+            <bdi id={`post-${post.id}-author`}>{post.author.displayName}</bdi>
           </L>
           <span className="yp-post__meta">
-            @{post.author.username} · <time dateTime={post.createdAt}>{formatRelativeTime(post.createdAt, locale)}</time>
+            <bdi>@{post.author.username}</bdi> ·{' '}
+            <bdi>
+              <time dateTime={post.createdAt}>{formatRelativeTime(post.createdAt, locale)}</time>
+            </bdi>
             {post.community ? (
               <>
                 {' · '}
@@ -402,7 +405,11 @@ export function PostCard({
         {menu.length ? <Menu label="Post options" actions={menu} /> : null}
       </header>
 
-      {post.body ? <div className="yp-post__body">{post.body}</div> : null}
+      {post.body ? (
+        <div className="yp-post__body" dir="auto">
+          {post.body}
+        </div>
+      ) : null}
 
       {post.poll ? (
         <div className="yp-poll" role="group" aria-label="Poll">
@@ -448,7 +455,7 @@ export function PostCard({
           ) : null}
           {post.topics.map((tp) => (
             <L key={tp} href={`/discover?q=${encodeURIComponent(tp)}`} className="yp-chip">
-              #{tp}
+              <bdi>#{tp}</bdi>
             </L>
           ))}
         </div>
@@ -538,7 +545,7 @@ export function ListItem({
     <>
       {start}
       <span className="yp-list__text">
-        <span className="yp-list__primary">{primary}</span>
+        <bdi className="yp-list__primary">{primary}</bdi>
         {secondary ? <span className="yp-list__secondary">{secondary}</span> : null}
       </span>
       {end ? <span className="yp-list__end">{end}</span> : null}
@@ -564,8 +571,8 @@ export function ListItem({
 export function ChatBubble({ mine, sender, body, time, pending }: { mine: boolean; sender?: string; body: ReactNode; time?: string; pending?: boolean }) {
   return (
     <div className={cx('yp-bubble', mine ? 'yp-bubble--me' : 'yp-bubble--them', pending && 'yp-bubble--pending')}>
-      {sender && !mine ? <span className="yp-bubble__sender">{sender}</span> : null}
-      {body}
+      {sender && !mine ? <bdi className="yp-bubble__sender">{sender}</bdi> : null}
+      <span dir="auto">{body}</span>
       {time ? <span className="yp-bubble__time">{pending ? 'Sending…' : time}</span> : null}
     </div>
   );

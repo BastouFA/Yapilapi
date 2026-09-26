@@ -33,6 +33,10 @@ const APP_PAGES: [string, (d: SeedData) => string][] = [
   ['settings', () => '/settings'],
   ['studio', () => '/studio'],
   ['notifications', () => '/notifications'],
+  ['post', (d) => `/p/${d.postId}`],
+  ['events', () => '/events'],
+  ['assistant', () => '/assistant'],
+  ['live', () => '/live'],
 ];
 
 async function settle(page: Page) {
@@ -84,5 +88,25 @@ test.describe('signed-in pages', () => {
       await page.goto(url(data()));
       await expect(page.locator('main#main')).toBeVisible();
       await audit(page, name, info.project.name);
+    });
+});
+
+/**
+ * Right-to-left (Arabic, Hebrew, Persian, Urdu): the layout mirrors and nothing
+ * pushes the page sideways. An offscreen element placed with a physical
+ * `left: -9999px` once made every page scroll to blank space in RTL.
+ */
+test.describe('right-to-left layout', () => {
+  test.use({ storageState: STATE });
+  for (const [name, url] of APP_PAGES)
+    test(`${name} has no horizontal overflow in RTL`, async ({ page }) => {
+      await page.goto(url(data()));
+      await expect(page.locator('main#main')).toBeVisible();
+      await settle(page);
+      const overflow = await page.evaluate(() => {
+        document.documentElement.dir = 'rtl';
+        return document.documentElement.scrollWidth - document.documentElement.clientWidth;
+      });
+      expect(overflow, `${name} is ${overflow}px wider than the viewport in RTL`).toBeLessThanOrEqual(1);
     });
 });

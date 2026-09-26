@@ -51,10 +51,13 @@ const PATHS = {
 export type IconName = keyof typeof PATHS;
 export const ICON_NAMES = Object.keys(PATHS) as IconName[];
 
+/** Icons that point along the reading direction; they mirror in right-to-left layouts. */
+const DIRECTIONAL = new Set<IconName>(['chevron-right', 'chevron-left', 'arrow-left', 'send', 'logout']);
+
 export function Icon({ name, size = 20, label, className, filled }: { name: IconName; size?: number; label?: string; className?: string; filled?: boolean }) {
   return (
     <svg
-      className={className}
+      className={DIRECTIONAL.has(name) ? [className, 'yp-icon--directional'].filter(Boolean).join(' ') : className}
       width={size}
       height={size}
       viewBox="0 0 24 24"

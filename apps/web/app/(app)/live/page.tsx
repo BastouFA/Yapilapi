@@ -1,5 +1,6 @@
 'use client';
 
+import { FeatureOff } from '@/components/FeatureOff';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -33,7 +34,7 @@ export default function LiveList() {
     );
   }, [flags.LIVE, toast]);
 
-  if (flags.LIVE === false) return <EmptyState title="Live isn't available yet" body="It's being rolled out gradually." />;
+  if (flags.LIVE === false) return <FeatureOff name="Live" />;
 
   return (
     <div className="yp-shell__inner">

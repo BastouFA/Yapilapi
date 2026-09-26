@@ -1,5 +1,6 @@
 'use client';
 
+import { FeatureOff } from '@/components/FeatureOff';
 import { useCallback, useEffect, useState } from 'react';
 import { Button, EmptyState, PostCard, Select, TextField } from '@yapilapi/design-system';
 import type { Post } from '@yapilapi/shared';
@@ -28,7 +29,7 @@ export default function RealPage() {
     if (flags.REAL) void load();
   }, [flags.REAL, load]);
 
-  if (!flags.REAL) return <EmptyState title="Real isn't available yet" body="It's being rolled out gradually." />;
+  if (!flags.REAL) return <FeatureOff name="Real" />;
 
   async function share(files: File[]) {
     setBusy(true);

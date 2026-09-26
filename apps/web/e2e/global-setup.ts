@@ -13,6 +13,7 @@ export interface SeedData {
   eventId: string;
   placeId: string;
   conversationId: string;
+  postId: string;
 }
 
 /**
@@ -53,7 +54,7 @@ export default async function globalSetup(config: FullConfig) {
   const main = await signUp('main');
   const friend = await signUp('ben');
 
-  await must(main.ctx.post('/api/v1/posts', { data: { body: 'Sunday market run: peaches, bread and a new mug. #food', topics: ['food'] } }));
+  const post = await must(main.ctx.post('/api/v1/posts', { data: { body: 'Sunday market run: peaches, bread and a new mug. #food', topics: ['food'] } }));
   const communitySlug = `a11y-${run}`.slice(0, 40);
   const community = await must(
     main.ctx.post('/api/v1/communities', {
@@ -86,7 +87,7 @@ export default async function globalSetup(config: FullConfig) {
 
   await mkdir(AUTH_DIR, { recursive: true });
   await main.ctx.storageState({ path: STATE });
-  const data: SeedData = { username: main.username, communitySlug, eventId: event.event.id, placeId: place.place.id, conversationId };
+  const data: SeedData = { username: main.username, communitySlug, eventId: event.event.id, placeId: place.place.id, conversationId, postId: post.post.id };
   await writeFile(DATA, JSON.stringify(data, null, 2));
   await main.ctx.dispose();
   await friend.ctx.dispose();

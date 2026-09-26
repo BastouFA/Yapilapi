@@ -254,7 +254,7 @@ textarea.yp-input {
   content: '';
   position: absolute;
   top: 2px;
-  left: 2px;
+  inset-inline-start: 2px;
   width: 17px;
   height: 17px;
   border-radius: var(--radius-full);
@@ -478,7 +478,7 @@ textarea.yp-input {
   box-shadow: var(--focus-ring);
 }
 .yp-tabs__count {
-  margin-left: var(--space-1);
+  margin-inline-start: var(--space-1);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
@@ -521,7 +521,7 @@ textarea.yp-input {
 }
 .yp-avatar__status {
   position: absolute;
-  right: 0;
+  inset-inline-end: 0;
   bottom: 0;
   width: 30%;
   height: 30%;
@@ -536,7 +536,7 @@ textarea.yp-input {
   box-shadow: 0 0 0 2px var(--surface);
 }
 .yp-avatars .yp-avatar + .yp-avatar {
-  margin-left: -8px;
+  margin-inline-start: -8px;
 }
 
 /* Dialog */
@@ -601,4 +601,9 @@ textarea.yp-input {
 
 .yp-tabs__list::-webkit-scrollbar {
   display: none;
+}
+
+/* Right-to-left: the switch thumb travels the other way. */
+[dir='rtl'] .yp-switch button[aria-checked='true']::after {
+  transform: translateX(-16px);
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { FeatureOff } from '@/components/FeatureOff';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -28,7 +29,7 @@ export default function TogetherList() {
     );
   }, [flags.REAL_TOGETHER, me]);
 
-  if (!flags.REAL_TOGETHER) return <EmptyState title="Real Together isn't available yet" body="It's being rolled out gradually." />;
+  if (!flags.REAL_TOGETHER) return <FeatureOff name="Real Together" />;
 
   return (
     <div className="yp-shell__inner">

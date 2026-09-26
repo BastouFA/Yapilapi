@@ -1,5 +1,6 @@
 'use client';
 
+import { FeatureOff } from '@/components/FeatureOff';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -29,7 +30,7 @@ export default function Memories() {
       .catch(() => {});
   }, [flags.MEMORY, toast]);
 
-  if (flags.MEMORY === false) return <EmptyState title="Memory isn't available yet" body="It's being rolled out gradually." />;
+  if (flags.MEMORY === false) return <FeatureOff name="Memory" />;
 
   return (
     <div className="yp-shell__inner">
