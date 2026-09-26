@@ -547,6 +547,12 @@ function ReelVideo({
           onPlay={(e) => follow(e.currentTarget, companion.current, 'play')}
           onPause={(e) => follow(e.currentTarget, companion.current, 'pause')}
           onSeeked={(e) => follow(e.currentTarget, companion.current, 'time')}
+          // Reels repeat. \`loop\` does this, but some files and browsers still end; start again from the top if so.
+          onEnded={(e) => {
+            const v = e.currentTarget;
+            v.currentTime = 0;
+            void v.play().catch(() => {});
+          }}
           onTimeUpdate={(e) => {
             const v = e.currentTarget;
             follow(v, companion.current, 'time');

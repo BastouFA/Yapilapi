@@ -50,6 +50,11 @@ export function s3Storage(opts: {
     endpoint: opts.endpoint || undefined,
     forcePathStyle: opts.forcePathStyle,
     credentials: { accessKeyId: opts.accessKeyId, secretAccessKey: opts.secretAccessKey },
+    // Newer SDKs add CRC checksums to every request, sent as a trailer on streamed uploads. S3-compatible
+    // stores (Cloudflare R2, SeaweedFS, MinIO) reject that trailer, which broke every streamed upload (the
+    // processed web MP4 of each video). Only send checksums when an operation requires them.
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
   });
   return {
     driver: 's3',

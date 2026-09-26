@@ -13,6 +13,9 @@ RUN pnpm install --frozen-lockfile --filter @yapilapi/api...
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production APP_ENV=production MIGRATE_ON_START=true
+# System ffmpeg: the bundled Linux build has no drawtext (editor text, shared-reel watermark).
+RUN apk add --no-cache ffmpeg
+ENV FFMPEG_PATH=/usr/bin/ffmpeg
 RUN addgroup -S ypl && adduser -S ypl -G ypl
 COPY --from=deps /app ./
 COPY packages/shared packages/shared

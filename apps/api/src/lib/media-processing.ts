@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import ffmpegPath from 'ffmpeg-static';
+import ffmpegPath from './ffmpeg-path.ts';
 import sharp from 'sharp';
 import type { Pool } from 'pg';
 import type { MediaStorage } from './storage.ts';

@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import ffmpegPath from 'ffmpeg-static';
+import ffmpegPath from '../src/lib/ffmpeg-path.ts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { detectMedia } from '../src/lib/media-formats.ts';
 import { mediaJobHandlers } from '../src/lib/media-processing.ts';

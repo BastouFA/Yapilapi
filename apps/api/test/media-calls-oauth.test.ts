@@ -1,3 +1,6 @@
+import os from 'node:os';
+import path from 'node:path';
+import fs from 'node:fs/promises';
 import { createHash, randomBytes } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp, type BuiltApp } from '../src/app.ts';
@@ -96,6 +99,13 @@ describe('S3 storage', () => {
       expect(part.rawPayload.equals(PNG.subarray(0, 8))).toBe(true);
       expect((await s3app.app.inject({ url: '/media/2026/01/missing.png' })).statusCode).toBe(404);
       expect((await s3app.app.inject({ url: '/media/../etc/passwd' })).statusCode).toBe(404);
+      // Streamed uploads (how processed videos are stored) must work against S3-compatible stores too.
+      const tmp = path.join(os.tmpdir(), `ypl-s3-${Date.now()}.bin`);
+      const big = Buffer.alloc(3 * 1024 * 1024, 7);
+      await fs.writeFile(tmp, big);
+      const streamed = await s3app.ctx.storage.putFile(tmp, 'mp4', 'video/mp4');
+      await fs.rm(tmp, { force: true });
+      expect((await s3app.ctx.storage.read(streamed.key)).equals(big)).toBe(true);
     } finally {
       await s3app.close();
     }

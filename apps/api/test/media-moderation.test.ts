@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import ffmpegPath from 'ffmpeg-static';
+import ffmpegPath from '../src/lib/ffmpeg-path.ts';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { as, signUp, testApp, type TestUser } from './helpers.ts';

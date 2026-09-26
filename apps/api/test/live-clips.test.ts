@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import ffmpegPath from 'ffmpeg-static';
+import ffmpegPath from '../src/lib/ffmpeg-path.ts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { processJobs } from '../src/lib/jobs.ts';
 import { liveRecordingJobHandlers, pickHighlights, recordingSegments, timelineMapper } from '../src/lib/live-recording.ts';
