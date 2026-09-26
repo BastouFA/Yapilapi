@@ -3,7 +3,8 @@ import type { FastifyInstance } from 'fastify';
 import { buildApp, type BuiltApp } from '../src/app.ts';
 import { loadConfig } from '../src/config.ts';
 
-export async function testApp(): Promise<BuiltApp> {
+/** A test app. `env` overrides configuration; `opts` passes build options (e.g. a fake fetch for Paystack). */
+export async function testApp(env: Record<string, string> = {}, opts: Parameters<typeof buildApp>[1] = {}): Promise<BuiltApp> {
   const config = loadConfig({
     ...process.env,
     APP_ENV: 'test',
@@ -11,9 +12,11 @@ export async function testApp(): Promise<BuiltApp> {
     REDIS_URL: '',
     AI_PROVIDER: 'dev',
     UPLOAD_DIR: `/tmp/ypl-test-uploads`,
+    PRIVATE_UPLOAD_DIR: `/tmp/ypl-test-private`,
     RATE_LIMIT_MAX: '10000',
+    ...env,
   });
-  return buildApp(config, { logger: false });
+  return buildApp(config, { logger: false, ...opts });
 }
 
 export interface TestUser {

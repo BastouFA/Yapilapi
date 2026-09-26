@@ -277,13 +277,14 @@ export function createClient(opts: ClientOptions) {
         get<{ items: { user: PublicUser; relation: 'friend' | 'following' | null; canMessage: boolean }[] }>(`/v1/people/suggest${qs({ q, limit, scope })}`),
     },
     payments: {
-      config: () => get<{ provider: string; publishableKey?: string }>('/v1/payments/config'),
+      /** The default provider, and providers that take particular currencies (Paystack: NGN, GHS, KES, ZAR). */
+      config: () => get<PaymentsConfig>('/v1/payments/config'),
       /** Development provider only: finish a test payment. */
       devComplete: (orderId: string) => post<{ status: string }>('/v1/payments/dev/complete', { orderId }),
     },
     orders: {
       create: (items: { productId: string; quantity: number }[], idempotencyKey: string, liveSessionId?: string) =>
-        post<{ order: Record<string, any>; payment?: { provider: string; clientSecret: string } }>('/v1/orders', { items, idempotencyKey, liveSessionId }),
+        post<{ order: Record<string, any>; payment?: CheckoutPayment }>('/v1/orders', { items, idempotencyKey, liveSessionId }),
       list: () => get<{ items: Record<string, any>[] }>('/v1/orders'),
       get: (id: string) => get<{ order: Record<string, any> }>(`/v1/orders/${id}`),
     },
@@ -363,11 +364,11 @@ export function createClient(opts: ClientOptions) {
         }>(`/v1/users/${userId}/plans`),
       createPlan: (b: { name: string; description?: string; priceCents: number; currency: string }) => post('/v1/creator/plans', b),
       subscribe: (planId: string, idempotencyKey: string) =>
-        post<{ subscription: { id: string; status: string }; payment: { orderId: string; clientSecret: string } }>(`/v1/creator/plans/${planId}/subscribe`, {
+        post<{ subscription: { id: string; status: string }; payment: CheckoutPayment }>(`/v1/creator/plans/${planId}/subscribe`, {
           idempotencyKey,
         }),
       tip: (userId: string, b: { amountCents: number; currency: string; message?: string; postId?: string; liveId?: string; idempotencyKey: string }) =>
-        post<{ payment: { orderId: string; clientSecret: string; provider: string } }>(`/v1/users/${userId}/tips`, b),
+        post<{ payment: CheckoutPayment }>(`/v1/users/${userId}/tips`, b),
       subscribers: () => get<{ active: number; cancelled: number }>('/v1/creator/subscribers'),
       mySubscriptions: () =>
         get<{ items: { id: string; status: string; plan: string; priceCents: number; currency: string; creator: PublicUser }[] }>('/v1/me/subscriptions'),
@@ -384,7 +385,18 @@ export function createClient(opts: ClientOptions) {
       create: (placeId: string, b: { partySize: number; startsAt: string; note?: string }) =>
         post<{ booking: { id: string; status: string } }>(`/v1/places/${placeId}/bookings`, b),
       mine: () =>
-        get<{ items: { id: string; status: string; party_size: number; starts_at: string; place_id: string; place_name: string }[] }>('/v1/me/bookings'),
+        get<{
+          items: {
+            id: string;
+            status: string;
+            party_size: number;
+            starts_at: string;
+            place_id: string | null;
+            place_name: string | null;
+            product_id: string | null;
+            product_title: string | null;
+          }[];
+        }>('/v1/me/bookings'),
       forPlace: (placeId: string) =>
         get<{ items: { id: string; status: string; party_size: number; starts_at: string; note: string; guest: string }[] }>(`/v1/places/${placeId}/bookings`),
       decide: (id: string, confirm: boolean) => post(`/v1/bookings/${id}/decide`, { confirm }),
@@ -553,6 +565,58 @@ export function createClient(opts: ClientOptions) {
           },
         ),
     },
+    shop: {
+      /** What a person sells on their profile. */
+      list: (userId: string) => get<{ items: ShopItem[] }>(`/v1/users/${userId}/shop`),
+      create: (b: { kind: 'product' | 'digital' | 'service'; title: string; description?: string; priceCents: number; currency: string; inventory?: number }) =>
+        post<{ product: { id: string; kind: string; title: string; priceCents: number; currency: string } }>('/v1/products', b),
+      /** The file buyers of a digital product download (stored privately). */
+      uploadFile: (productId: string, file: File | Blob, name?: string) => {
+        const fd = new FormData();
+        if (name) fd.append('file', file, name);
+        else fd.append('file', file);
+        return put<{ file: { name: string; mime: string; sizeBytes: number } }>(`/v1/products/${productId}/file`, fd);
+      },
+      /** A download link for something you bought. It works for a few minutes. */
+      download: (productId: string) => post<{ url: string; expiresAt: string }>(`/v1/products/${productId}/download`),
+      purchases: () =>
+        get<{
+          items: {
+            productId: string;
+            title: string;
+            orderId: string;
+            boughtAt: string;
+            file: { name: string; sizeBytes: number } | null;
+            seller: PublicUser;
+          }[];
+        }>('/v1/me/purchases'),
+      book: (productId: string, b: { startsAt: string; note?: string; idempotencyKey: string }) =>
+        post<{
+          booking: { id: string; status: string; startsAt: string };
+          payment: CheckoutPayment | null;
+          amount: { cents: number; currency: string; title: string };
+        }>(`/v1/products/${productId}/book`, b),
+      serviceBookings: () => get<{ items: ServiceBooking[] }>('/v1/me/service-bookings'),
+      sales: (days = 30) => get<SalesReport>(`/v1/me/sales${qs({ days })}`),
+    },
+    boosts: {
+      start: (
+        postId: string,
+        b: {
+          budgetCents: number;
+          currency: string;
+          days: number;
+          audience: { type: 'country'; countries: string[] } | { type: 'interests'; topics: string[] };
+          idempotencyKey: string;
+        },
+      ) =>
+        post<{ boost: { campaignId: string; budgetCents: number; currency: string; days: number; estimatedImpressions: number }; payment: CheckoutPayment }>(
+          `/v1/posts/${postId}/boost`,
+          b,
+        ),
+      forPost: (postId: string) => get<{ items: Boost[] }>(`/v1/posts/${postId}/boosts`),
+      mine: () => get<{ items: (Boost & { postId: string; excerpt: string })[] }>('/v1/me/boosts'),
+    },
     invites: {
       mine: () => get<InvitesInfo>('/v1/invites'),
       /** Who a code belongs to (public). */
@@ -576,7 +640,7 @@ export function createClient(opts: ClientOptions) {
       }) => post<{ campaign: AdCampaign }>('/v1/ads/campaigns', b),
       setStatus: (id: string, status: 'active' | 'paused' | 'ended') => patch<{ campaign: AdCampaign }>(`/v1/ads/campaigns/${id}`, { status }),
       fund: (id: string, amountCents: number, idempotencyKey: string) =>
-        post<{ payment: { provider: string; clientSecret: string; orderId: string } }>(`/v1/ads/campaigns/${id}/fund`, { amountCents, idempotencyKey }),
+        post<{ payment: CheckoutPayment }>(`/v1/ads/campaigns/${id}/fund`, { amountCents, idempotencyKey }),
       stats: (id: string) =>
         get<{ campaign: AdCampaign; days: { day: string; impressions: number; clicks: number; hides: number; reach: number }[] }>(
           `/v1/ads/campaigns/${id}/stats`,
@@ -683,6 +747,77 @@ export interface TogetherDetail {
   contributions: { id: string; caption: string; capturedAt: string; media: { url: string; kind: string; altText: string | null } | null; author: PublicUser }[];
 }
 
+export interface PaymentsConfig {
+  provider: string;
+  publishableKey?: string;
+  providers?: { provider: string; publishableKey?: string; currencies: string[] }[];
+}
+
+/** What checkout needs for an order the API just created. With Paystack, clientSecret is Paystack's hosted checkout URL. */
+export interface CheckoutPayment {
+  provider: string;
+  clientSecret: string;
+  orderId: string;
+}
+
+export interface ShopItem {
+  id: string;
+  kind: 'product' | 'digital' | 'service' | 'booking';
+  title: string;
+  description: string;
+  priceCents: number;
+  currency: string;
+  inventory: number | null;
+  /** Digital products: the file buyers get (never its location). */
+  file: { name: string; mime: string; sizeBytes: number } | null;
+  /** You bought this download. */
+  owned: boolean;
+}
+
+export interface ServiceBooking {
+  id: string;
+  status: 'requested' | 'confirmed' | 'declined' | 'cancelled';
+  startsAt: string;
+  note: string;
+  product: { id: string; title: string };
+  amountCents: number;
+  currency: string | null;
+  customer: PublicUser;
+}
+
+export interface SalesReport {
+  days: number;
+  totals: { currency: string; orders: number; grossCents: number; feeCents: number; netCents: number }[];
+  items: {
+    orderId: string;
+    status: 'paid' | 'refunded';
+    createdAt: string;
+    product: { id: string; title: string; kind: string };
+    quantity: number;
+    amountCents: number;
+    currency: string;
+    buyer: PublicUser;
+  }[];
+}
+
+export interface Boost {
+  campaignId: string;
+  status: 'draft' | 'pending_review' | 'active' | 'paused' | 'ended' | 'rejected';
+  audience: { type: 'country'; countries: string[] } | { type: 'interests'; topics: string[] };
+  days: number | null;
+  currency: string;
+  budgetCents: number;
+  spentCents: number;
+  refundedCents: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  reviewNote: string | null;
+  approvedAt: string | null;
+  endsAt: string | null;
+  createdAt: string;
+}
+
 export interface FaqEntry {
   id: string;
   question: string;
@@ -705,6 +840,10 @@ export interface AdCampaign {
   postId: string;
   topics: string[];
   locales: string[];
+  /** Only shown in these countries (empty: everywhere). */
+  countries: string[];
+  /** Set for boosts: how many days it runs once approved. */
+  boostDays: number | null;
   cpmCents: number;
   currency: string;
   budgetCents: number;

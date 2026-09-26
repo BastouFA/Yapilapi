@@ -14,7 +14,9 @@ export async function postShareImage(id: string) {
     eyebrow: post.format === 'reel' ? 'Reel' : (post.community?.name ?? undefined),
     title: post.author.displayName,
     subtitle: `@${post.author.username}`,
-    body: post.excerpt || (post.format === 'reel' ? 'Watch the reel on YAPILAPI.' : 'See the post on YAPILAPI.'),
+    body: post.locked
+      ? `For ${post.author.displayName}'s subscribers. Subscribe on YAPILAPI to see it.`
+      : post.excerpt || (post.format === 'reel' ? 'Watch the reel on YAPILAPI.' : 'See the post on YAPILAPI.'),
     avatar: { src: avatar, name: post.author.displayName },
     image,
     footer: `${plural(post.counts.likes, 'like', 'likes')} · ${plural(post.counts.comments, 'comment', 'comments')}`,

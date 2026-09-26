@@ -1,5 +1,8 @@
+/** Who can see a moment or an event-style item. */
 export const VISIBILITIES = ['public', 'followers', 'friends', 'circle', 'selected', 'private'] as const;
-export type Visibility = (typeof VISIBILITIES)[number];
+/** Posts and reels can also be for subscribers: others see a locked card. Needs a subscription plan. */
+export const POST_VISIBILITIES = [...VISIBILITIES, 'subscribers'] as const;
+export type Visibility = (typeof POST_VISIBILITIES)[number];
 
 /** Stories can also go to your close friends list only. */
 export const STORY_VISIBILITIES = [...VISIBILITIES, 'close_friends'] as const;
@@ -64,3 +67,71 @@ export const MEDIA_ACCEPT = `${IMAGE_ACCEPT},${VIDEO_ACCEPT}`;
 export function isVideoFile(file: { type: string; name: string }): boolean {
   return file.type.startsWith('video/') || /\.(mov|mkv|avi|3gp|3g2|m4v|mpg|mpeg|ts|webm|mp4)$/i.test(file.name);
 }
+
+/**
+ * Currencies people can price in. Paystack takes NGN, GHS, KES and ZAR (cards
+ * and mobile money) when it is configured; the others go to the default provider.
+ */
+export const CURRENCIES = ['USD', 'EUR', 'GBP', 'NGN', 'GHS', 'KES', 'ZAR', 'XOF'] as const;
+export type Currency = (typeof CURRENCIES)[number];
+
+/**
+ * Roughly how many units of each currency a US dollar buys, rounded, so price
+ * limits (the biggest tip or plan) mean about the same everywhere.
+ */
+export const CURRENCY_SCALE: Record<Currency, number> = { USD: 1, EUR: 1, GBP: 1, NGN: 1000, GHS: 10, KES: 100, ZAR: 10, XOF: 500 };
+
+/** A sensible default currency for someone's country (ISO 3166-1 alpha-2). */
+export function currencyForCountry(country: string | null | undefined): Currency {
+  switch ((country ?? '').toUpperCase()) {
+    case 'NG':
+      return 'NGN';
+    case 'GH':
+      return 'GHS';
+    case 'KE':
+      return 'KES';
+    case 'ZA':
+      return 'ZAR';
+    case 'GB':
+      return 'GBP';
+    case 'SN':
+    case 'CI':
+    case 'ML':
+    case 'BF':
+    case 'NE':
+    case 'TG':
+    case 'BJ':
+    case 'GW':
+      return 'XOF';
+    case 'FR':
+    case 'DE':
+    case 'ES':
+    case 'IT':
+    case 'PT':
+    case 'NL':
+    case 'BE':
+    case 'IE':
+    case 'AT':
+    case 'FI':
+      return 'EUR';
+    default:
+      return 'USD';
+  }
+}
+
+/**
+ * Boosting a post: the budgets offered in each currency (in hundredths) and
+ * the price of 1,000 impressions. Budgets are round local amounts, not
+ * conversions, so the numbers people see make sense where they live.
+ */
+export const BOOST_OPTIONS: Record<string, { budgets: number[]; cpmCents: number }> = {
+  USD: { budgets: [500, 1000, 2500], cpmCents: 500 },
+  EUR: { budgets: [500, 1000, 2500], cpmCents: 500 },
+  GBP: { budgets: [500, 1000, 2500], cpmCents: 400 },
+  NGN: { budgets: [500_000, 1_000_000, 2_500_000], cpmCents: 500_000 },
+  GHS: { budgets: [5_000, 10_000, 25_000], cpmCents: 5_000 },
+  KES: { budgets: [50_000, 100_000, 250_000], cpmCents: 50_000 },
+  ZAR: { budgets: [10_000, 20_000, 50_000], cpmCents: 10_000 },
+  XOF: { budgets: [300_000, 600_000, 1_500_000], cpmCents: 300_000 },
+};
+export const BOOST_DAYS = [1, 3, 7, 14] as const;

@@ -22,12 +22,13 @@ import { isPlus, PLUS_REEL_MAX_MS, REEL_MAX_MS } from '../lib/plus.ts';
 import { notify, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
 import { plusCol, publicUserFrom } from '../lib/users.ts';
-import { notBlockedSql, postVisibleSql } from '../lib/visibility.ts';
+import { notBlockedSql, postUnlockedSql, postVisibleSql } from '../lib/visibility.ts';
 import { assertRemixable, assertSoundUsable, registerOwnSound } from '../lib/sounds.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 const VISIBLE = postVisibleSql('$1');
+const UNLOCKED = postUnlockedSql('$1');
 /** For You scores posts from your connections plus this many of the newest other posts. */
 const RECENT_CANDIDATES = 1000;
 /** …and up to this many of the newest posts on the viewer's interests. */
@@ -40,6 +41,13 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
   async function assertVisible(postId: string, viewer: string | null) {
     const r = await db.query(`SELECT 1 ${POST_FROM} WHERE p.id = $2 AND ${VISIBLE}`, [viewer, postId]);
     if (!r.rowCount) throw notFound('That post');
+  }
+
+  /** Visible and open to this viewer: subscriber-only posts need a current subscription (or to be the author). */
+  async function assertUnlocked(postId: string, viewer: string | null) {
+    const r = await db.query(`SELECT coalesce(${UNLOCKED}, false) AS unlocked ${POST_FROM} WHERE p.id = $2 AND ${VISIBLE}`, [viewer, postId]);
+    if (!r.rows[0]) throw notFound('That post');
+    if (!r.rows[0].unlocked) throw new AppError(403, 'subscribers_only', 'This post is for subscribers. Subscribe to see it.');
   }
 
   // ── Create ────────────────────────────────────────────────────────────
@@ -112,6 +120,12 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
               : input.linkUrl
                 ? 'link'
                 : input.kind;
+
+    if (input.visibility === 'subscribers') {
+      if (input.communityId) throw badRequest('Posts in a community are for its members, not for subscribers.');
+      const plan = await db.query(`SELECT 1 FROM creator_plans WHERE creator_id = $1 AND active LIMIT 1`, [u.id]);
+      if (!plan.rowCount) throw badRequest('Add a subscription plan in Studio before posting for subscribers.');
+    }
 
     let remixAuthor = null as string | null;
     const postId = await tx(db, async (c) => {
@@ -575,7 +589,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       `SELECT pr.display_name, p.topics, p.like_count, p.comment_count, c.name AS community,
         EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = p.author_id) AS followed,
         EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = p.author_id) OR (fr.user_b = $1 AND fr.user_a = p.author_id)) AS friend,
-        ARRAY(SELECT t FROM unnest(p.topics) t WHERE t IN (SELECT tp.slug FROM user_interests ui JOIN topics tp ON tp.id = ui.topic_id WHERE ui.user_id = $1)) AS matched,
+        ARRAY(SELECT t FROM unnest(p.topics) t WHERE ${UNLOCKED} AND t IN (SELECT tp.slug FROM user_interests ui JOIN topics tp ON tp.id = ui.topic_id WHERE ui.user_id = $1)) AS matched,
         EXISTS (SELECT 1 FROM community_members cm WHERE cm.community_id = p.community_id AND cm.user_id = $1) AS member
        FROM posts p JOIN profiles pr ON pr.user_id = p.author_id LEFT JOIN communities c ON c.id = p.community_id WHERE p.id = $2`,
       [u.id, id],
@@ -727,7 +741,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     const u = me(req);
     const { id } = parse(idParam, req.params);
     const { optionId } = parse(z.object({ optionId: z.string().uuid() }), req.body);
-    await assertVisible(id, u.id);
+    await assertUnlocked(id, u.id);
     const opt = await db.query(`SELECT 1 FROM poll_options WHERE id = $1 AND post_id = $2`, [optionId, id]);
     if (!opt.rowCount) throw notFound('Poll option');
     await db.query(
@@ -743,7 +757,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     const viewer = req.user?.id ?? null;
     const { id } = parse(idParam, req.params);
     const q = parse(pageQuerySchema, req.query);
-    await assertVisible(id, viewer);
+    await assertUnlocked(id, viewer);
     const c = decodeCursor<KeyCursor>(q.cursor);
     const { rows } = await db.query(
       `SELECT cm.id, cm.post_id, cm.parent_id, cm.body, cm.created_at,
@@ -772,7 +786,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     const u = me(req);
     const { id } = parse(idParam, req.params);
     const input = parse(commentSchema, req.body);
-    await assertVisible(id, u.id);
+    await assertUnlocked(id, u.id);
     const analysis = analyzeText(input.body);
     if (analysis.risk === 'escalate') throw new AppError(422, 'content_blocked', "This comment can't be posted because it may put someone at risk.");
     const comment = await tx(db, async (c) => {

@@ -143,13 +143,16 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     const { rows } = await c.query(
       approve
         ? `UPDATE ad_campaigns SET status = CASE WHEN budget_millicents - spent_millicents >= cpm_cents THEN 'active' ELSE 'paused' END,
-             approved_at = now(), reviewed_by = $2, review_note = NULL WHERE id = $1 AND status = 'pending_review' RETURNING advertiser_id, name`
+             approved_at = now(), reviewed_by = $2, review_note = NULL,
+             -- A boost runs for its number of days from approval.
+             ends_at = coalesce(ends_at, CASE WHEN boost_days IS NOT NULL THEN now() + make_interval(days => boost_days) END)
+           WHERE id = $1 AND status = 'pending_review' RETURNING advertiser_id, name`
         : `UPDATE ad_campaigns SET status = 'rejected', reviewed_by = $2, review_note = $3 WHERE id = $1 AND status = 'pending_review' RETURNING advertiser_id, name`,
       approve ? [mc.target_id, reviewer] : [mc.target_id, reviewer, note],
     );
     if (!rows[0]) throw badRequest('This campaign is no longer waiting for review.');
     // A rejected campaign can't run, so whatever budget it holds goes back to the advertiser.
-    if (!approve) await refundUnspentBudget(c, ctx.payments, mc.target_id, reviewer);
+    if (!approve) await refundUnspentBudget(c, ctx.paymentProviders, mc.target_id, reviewer);
     await notify(c, ctx.realtime, {
       userId: rows[0].advertiser_id,
       category: 'moderation',

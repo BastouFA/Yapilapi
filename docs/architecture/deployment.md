@@ -23,6 +23,18 @@ The API refuses to start in production with the development payment provider. To
 
 Amounts are stored in hundredths of the currency; for zero-decimal currencies (JPY, XOF, …) the adapter converts to and from Stripe's whole units. Try it end to end in test mode first (sk_test_/pk_test_ keys, `stripe listen --forward-to localhost:4000/v1/payments/webhook/stripe`).
 
+## Payments in local currencies (Paystack)
+
+Paystack takes NGN, GHS, KES and ZAR (cards, bank transfer and mobile money). It runs next to the default provider: orders in those currencies go to Paystack, everything else stays with `PAYMENTS_PROVIDER`. Refunds and webhooks go to whichever provider took the payment (`payments.provider`).
+
+1. Set `PAYSTACK_SECRET_KEY` (sk_live_…) and `PAYSTACK_PUBLIC_KEY` (pk_live_…). The API refuses to start with only one of them.
+2. In the Paystack dashboard, set the webhook URL to `https://<api-domain>/v1/payments/webhook/paystack`. Paystack signs each event with an HMAC SHA512 of the raw body using the secret key (`x-paystack-signature`); the API checks it before reading anything, handles `charge.success` and `refund.processed`, and only marks an order paid when the amount and currency match what it charged.
+3. The web checkout opens Paystack's hosted page (`authorization_url`) in a new window, then waits for the webhook. Paystack sends people back to `{WEB_ORIGIN}/checkout/done`.
+
+## Digital products
+
+Files sellers upload for digital products are never public media. With `STORAGE_DRIVER=local` they are written to `PRIVATE_UPLOAD_DIR` (outside `UPLOAD_DIR`, which is served at `/media/`); with S3 they go under `private/` in the bucket, which the `/media/` route refuses. Buyers download through `/v1/downloads/<token>`, a link that works for 10 minutes and checks the order is still paid on every use. Back up `PRIVATE_UPLOAD_DIR` (or the bucket) with the rest of the media.
+
 ## Live video (MediaMTX)
 
 - `LIVE_RTMP_URL` and `LIVE_HLS_BASE` point at MediaMTX; its `authHTTPAddress` points back at `/v1/live/hooks/auth?secret=<LIVE_HOOK_SECRET>`.

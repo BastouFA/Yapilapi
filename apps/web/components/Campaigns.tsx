@@ -141,6 +141,7 @@ export function Campaigns() {
                     checkout({
                       orderId: r.payment.orderId,
                       clientSecret: r.payment.clientSecret,
+                      provider: r.payment.provider,
                       label: `Ad budget for ${stats.campaign.name}, ${formatMoney(2000, stats.campaign.currency, locale)}`,
                       onPaid: async () => {
                         await load();

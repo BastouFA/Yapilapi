@@ -510,6 +510,9 @@ function ReelVideo({
     }
   };
 
+  // For subscribers only, and you aren't one: a blurred preview and a way to subscribe, never the video.
+  if (post.locked) return <LockedReel post={post} />;
+
   return (
     <div ref={box} className={`reel__stage${originalSrc ? ' reel__stage--duet' : ''}`}>
       {originalSrc ? (
@@ -580,6 +583,24 @@ function ReelVideo({
       <span className="reel__progress" aria-hidden>
         <span style={{ width: `${progress * 100}%` }} />
       </span>
+    </div>
+  );
+}
+
+function LockedReel({ post }: { post: Post }) {
+  const { t } = useSession();
+  const placeholder = post.locked?.placeholder;
+  const bg = placeholder && /^data:image\/[a-z+]+;base64,[A-Za-z0-9+/=]+$/.test(placeholder) ? { backgroundImage: `url(${placeholder})` } : undefined;
+  return (
+    <div className="reel__stage reel__locked" style={bg}>
+      <div className="reel__locked-inner">
+        <Icon name="lock" size={32} />
+        <strong>{t('post.locked.title')}</strong>
+        <span>{t('post.locked.body', { name: post.author.displayName })}</span>
+        <Link href={`/u/${post.author.username}?subscribe=1`} className="yp-btn yp-btn--primary yp-btn--sm">
+          {t('post.locked.cta')}
+        </Link>
+      </div>
     </div>
   );
 }

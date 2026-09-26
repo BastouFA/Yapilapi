@@ -6,6 +6,7 @@ import type { AppContext } from '../lib/context.ts';
 import { MAX_RESUMABLE_BYTES, PLUS_DAYS, PLUS_MAX_AHEAD_DAYS, PLUS_MAX_RESUMABLE_BYTES, PLUS_REEL_MAX_MS, REEL_MAX_MS } from '../lib/plus.ts';
 import { isEnabled, track } from '../lib/services.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
+import { startPayment } from '../lib/checkout.ts';
 
 const MB = 1024 * 1024;
 
@@ -79,19 +80,17 @@ export default async function plusModule(app: FastifyInstance, ctx: AppContext) 
         [u.id, price.priceCents, price.currency, idempotencyKey],
       );
       const orderId = rows[0].id as string;
-      const intent = await ctx.payments.createIntent({ amountCents: price.priceCents, currency: price.currency, orderId, idempotencyKey });
-      await c.query(`INSERT INTO payments (order_id, provider, provider_ref, status, amount_cents, currency) VALUES ($1,$2,$3,$4,$5,$6)`, [
+      const pay = await startPayment(c, ctx.paymentProviders, {
         orderId,
-        ctx.payments.name,
-        intent.providerRef,
-        intent.status,
-        price.priceCents,
-        price.currency,
-      ]);
-      return { orderId, clientSecret: intent.clientSecret };
+        buyerId: u.id,
+        amountCents: price.priceCents,
+        currency: price.currency,
+        idempotencyKey,
+      });
+      return { orderId, ...pay };
     });
     track(db, u.id, 'plus_checkout');
     reply.code(201);
-    return { ...price, days: PLUS_DAYS, payment: { provider: ctx.payments.name, orderId: result.orderId, clientSecret: result.clientSecret } };
+    return { ...price, days: PLUS_DAYS, payment: { provider: result.provider, orderId: result.orderId, clientSecret: result.clientSecret } };
   });
 }

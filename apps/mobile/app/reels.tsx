@@ -12,6 +12,7 @@ import { useSession } from '../lib/session';
 import { useT } from '../lib/i18n';
 import { radius, space } from '../lib/theme';
 import { Avatar, Button, EmptyState, Icon, Loading, Notice, useColors, userText, type IconName } from '../lib/ui';
+import { LockedPanel } from '../lib/money';
 
 const WHITE = '#FFFFFF';
 const SCRIM = 'rgba(0,0,0,0.35)';
@@ -358,6 +359,11 @@ function Reel({
           </View>
         ) : src ? (
           <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} pointerEvents="none" />
+        ) : null}
+        {post.locked ? (
+          <View style={StyleSheet.absoluteFill}>
+            <LockedPanel post={post} dark />
+          </View>
         ) : null}
         {paused ? (
           <View style={s.center} pointerEvents="none">

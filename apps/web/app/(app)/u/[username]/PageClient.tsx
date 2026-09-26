@@ -9,6 +9,7 @@ import type { Profile } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { PostList, ReportSheet } from '@/components/PostList';
 import { SupportCreator } from '@/components/SupportCreator';
+import { Shop } from '@/components/Shop';
 import { JoinNote, NeedsAccount, useSignIn } from '@/components/SignedOut';
 import { useSession } from '../../../providers';
 
@@ -26,7 +27,22 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
   const [missing, setMissing] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [list, setList] = useState<'followers' | 'following' | null>(null);
-  const [tab, setTab] = useState<'posts' | 'reposts'>('posts');
+  const [tab, setTab] = useState<'posts' | 'reposts' | 'shop'>('posts');
+  // Bumped when you subscribe, so posts for subscribers reload unlocked.
+  const [version, setVersion] = useState(0);
+  // Links from a locked post (?subscribe=1) and to the shop (?shop=1).
+  const [intent, setIntent] = useState<'subscribe' | 'shop' | null>(null);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.has('subscribe')) setIntent('subscribe');
+    else if (q.has('shop')) {
+      setIntent('shop');
+      setTab('shop');
+    }
+  }, []);
+  useEffect(() => {
+    if (intent === 'subscribe' && profile) document.getElementById('subscribe')?.scrollIntoView({ block: 'center' });
+  }, [intent, profile]);
   const compact = new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 });
 
   const reload = useCallback(
@@ -219,8 +235,20 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
           </Button>
         ) : null}
       </div>
-      {signedOut ? <JoinNote text={`Join YAPILAPI to follow ${profile.displayName} and see more from the people you care about.`} /> : null}
-      {!rel.isSelf && !signedOut ? <SupportCreator userId={profile.id} name={profile.displayName} isCreator={profile.mode === 'creator'} /> : null}
+      {signedOut ? (
+        <JoinNote
+          text={
+            intent === 'subscribe'
+              ? `Join YAPILAPI to subscribe to ${profile.displayName} and see posts for subscribers.`
+              : `Join YAPILAPI to follow ${profile.displayName} and see more from the people you care about.`
+          }
+        />
+      ) : null}
+      {!rel.isSelf && !signedOut ? (
+        <div id="subscribe" className={intent === 'subscribe' ? 'profile__subscribe profile__subscribe--focus' : 'profile__subscribe'}>
+          <SupportCreator userId={profile.id} name={profile.displayName} isCreator={profile.mode === 'creator'} onSubscribed={() => setVersion((v) => v + 1)} />
+        </div>
+      ) : null}
       <Segments
         label="Show"
         value={tab}
@@ -228,10 +256,13 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
         options={[
           { id: 'posts', label: 'Posts' },
           { id: 'reposts', label: 'Reposts' },
+          { id: 'shop', label: 'Shop' },
         ]}
       />
       {tab === 'posts' ? (
-        <PostList load={load} reloadKey={username} empty={rel.isSelf ? 'Share your first post from Create.' : 'No posts yet.'} />
+        <PostList load={load} reloadKey={`${username}-${version}`} empty={rel.isSelf ? 'Share your first post from Create.' : 'No posts yet.'} />
+      ) : tab === 'shop' ? (
+        <Shop userId={profile.id} name={profile.displayName} isSelf={rel.isSelf} />
       ) : (
         <PostList
           load={loadReposts}

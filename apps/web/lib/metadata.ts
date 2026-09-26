@@ -40,6 +40,7 @@ export async function privateMetadata(title: string): Promise<Metadata> {
 }
 
 function postWhat(p: PublicPostPreview): string {
+  if (p.locked) return p.format === 'reel' ? 'A reel for subscribers' : 'A post for subscribers';
   if (p.format === 'reel') return 'A reel';
   if (p.kind === 'photo' || p.kind === 'carousel') return 'A photo';
   if (p.kind === 'video') return 'A video';

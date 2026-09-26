@@ -10,6 +10,7 @@ import { NextLink } from '@/lib/link';
 import { AutocompleteText } from '@/components/Autocomplete';
 import { useSession } from '@/app/providers';
 import { signInHref, useSignIn } from './SignedOut';
+import { BoostSheet } from './Boost';
 
 /**
  * A paginated list of posts with every post interaction wired to the API:
@@ -38,6 +39,7 @@ export function PostList({
   const [commentsFor, setCommentsFor] = useState<Post | null>(null);
   const [why, setWhy] = useState<{ post: Post; reasons: string[] } | null>(null);
   const [reporting, setReporting] = useState<Post | null>(null);
+  const [boosting, setBoosting] = useState<Post | null>(null);
   const sentinel = useRef<HTMLDivElement>(null);
   const [ad, setAd] = useState<SponsoredAd | null>(null);
   const [adWhy, setAdWhy] = useState(false);
@@ -279,6 +281,7 @@ export function PostList({
             onReport={guard(setReporting)}
             onDelete={remove}
             onPin={me ? pin : undefined}
+            onBoost={me && flags.ADS && flags.COMMERCE !== false ? setBoosting : undefined}
             onAddToMemory={me && flags.MEMORY ? setMemoryFor : undefined}
           />
           {ad && i === Math.min(2, posts.length - 1) ? renderAd(ad) : null}
@@ -332,6 +335,19 @@ export function PostList({
       </BottomSheet>
 
       <ReportSheet target={reporting ? { type: 'post', id: reporting.id } : null} onClose={() => setReporting(null)} />
+      <BoostSheet
+        post={boosting}
+        onClose={() => setBoosting(null)}
+        onDone={() => {
+          // Show the boost's status (and later its results) on the post.
+          const id = boosting?.id;
+          if (id)
+            void api.posts.get(id).then(
+              (r) => patch(id, () => r.post),
+              () => {},
+            );
+        }}
+      />
       {memoryFor ? <AddToMemorySheet post={memoryFor} onClose={() => setMemoryFor(null)} /> : null}
     </div>
   );

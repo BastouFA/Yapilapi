@@ -198,7 +198,14 @@ async function processVideo(deps: ProcessDeps, id: string, key: string) {
         dir,
       );
     });
-    const poster = await deps.storage.putKey(`${base}_poster.jpg`, await readFile(path.join(dir, 'poster.jpg')), 'image/jpeg');
+    const posterJpg = await readFile(path.join(dir, 'poster.jpg'));
+    const poster = await deps.storage.putKey(`${base}_poster.jpg`, posterJpg, 'image/jpeg');
+    // A tiny blurred preview of the poster frame, like photos have: shown while loading, and as the locked preview of a reel for subscribers.
+    const tiny = await sharp(posterJpg)
+      .resize({ width: 16 })
+      .webp({ quality: 40 })
+      .toBuffer()
+      .catch(() => null);
     const mp4 = await deps.storage.putFile(path.join(dir, 'web.mp4'), 'mp4', 'video/mp4', `${base}_web.mp4`);
     let hls: string | null = null;
     for (const f of await readdir(dir)) {
@@ -212,8 +219,9 @@ async function processVideo(deps: ProcessDeps, id: string, key: string) {
     }
     await deps.db.query(
       `UPDATE media SET poster_url = $2, hls_url = $3, variants = jsonb_build_object('mp4', $4::text), status = 'ready',
-                        duration_ms = coalesce($5, duration_ms), width = coalesce(width, $6), height = coalesce(height, $7) WHERE id = $1`,
-      [id, poster.url, hls, mp4.url, info.durationMs, info.width, info.height],
+                        duration_ms = coalesce($5, duration_ms), width = coalesce(width, $6), height = coalesce(height, $7),
+                        blurhash = coalesce($8, blurhash) WHERE id = $1`,
+      [id, poster.url, hls, mp4.url, info.durationMs, info.width, info.height, tiny ? `data:image/webp;base64,${tiny.toString('base64')}` : null],
     );
   } finally {
     await rm(dir, { recursive: true, force: true });

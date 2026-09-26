@@ -1544,3 +1544,43 @@ a.yp-post__reel-link:hover {
   color: var(--ink);
   text-decoration: underline;
 }
+
+/* Subscriber-only post, viewer not subscribed: a blurred preview and a way to subscribe. */
+.yp-post__locked {
+  position: relative;
+  margin: var(--space-3) var(--space-3) 0;
+  border-radius: calc(var(--radius-lg) - 6px);
+  overflow: hidden;
+  background: var(--surface-sunken, var(--yapi-soft));
+  background-size: cover;
+  background-position: center;
+}
+.yp-post__locked--media {
+  min-height: 240px;
+}
+.yp-post__locked--media::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  backdrop-filter: blur(18px);
+  background: color-mix(in srgb, var(--surface, #000) 35%, transparent);
+}
+.yp-post__locked-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: inherit;
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  color: var(--ink);
+}
+.yp-post__locked-inner span {
+  color: var(--ink-muted);
+  font-size: 14px;
+}
+.yp-post__boost {
+  color: var(--yapi);
+}

@@ -141,6 +141,7 @@ export default function LivePage() {
                   checkout({
                     orderId: r.order.id,
                     clientSecret: r.payment.clientSecret,
+                    provider: r.payment.provider,
                     label: `${live.ticket!.title}, ${formatMoney(live.ticket!.priceCents, live.ticket!.currency, locale)}`,
                   });
                 setWaitingForTicket(true);

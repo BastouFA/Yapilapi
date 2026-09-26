@@ -40,6 +40,8 @@ export function postVisibleSql(v: string): string {
       OR (p.visibility = 'friends' AND EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = ${v} AND fr.user_b = p.author_id) OR (fr.user_b = ${v} AND fr.user_a = p.author_id)))
       OR (p.visibility = 'circle' AND EXISTS (SELECT 1 FROM circle_members cm WHERE cm.circle_id = p.circle_id AND cm.user_id = ${v}))
       OR (p.visibility = 'selected' AND EXISTS (SELECT 1 FROM post_audience pa WHERE pa.post_id = p.id AND pa.user_id = ${v}))
+      /* Subscriber-only posts are listed wherever a public post would be; postUnlockedSql decides who sees the content. */
+      OR (p.visibility = 'subscribers' AND (NOT ap.is_private OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${v} AND f.followee_id = p.author_id)))
     )
     AND (
       p.community_id IS NULL
@@ -51,8 +53,26 @@ export function postVisibleSql(v: string): string {
 }
 
 /**
+ * Posts aliased `p`: whether the viewer may see the content (text, media,
+ * poll, link, topics) and not only a locked card. Everything but
+ * subscriber-only posts is unlocked for anyone who can see it; those are
+ * unlocked for their author and for people whose subscription to the author
+ * is paid up (a cancelled subscription keeps access until its period ends).
+ * Use together with postVisibleSql.
+ */
+export function postUnlockedSql(v: string): string {
+  return `(
+    p.visibility <> 'subscribers'
+    OR p.author_id = ${v}
+    OR EXISTS (SELECT 1 FROM creator_subscriptions cs
+               WHERE cs.subscriber_id = ${v} AND cs.creator_id = p.author_id
+                 AND cs.status IN ('active', 'cancelled') AND cs.current_period_end > now())
+  )`;
+}
+
+/**
  * Media aliased `m`. Media has no audience of its own: the owner always sees it,
- * and anyone else sees it when it's attached to a post they can see.
+ * and anyone else sees it when it's attached to a post they can see and open.
  */
 export function mediaVisibleSql(v: string): string {
   return `(
@@ -61,7 +81,7 @@ export function mediaVisibleSql(v: string): string {
                JOIN posts p ON p.id = pm.post_id
                JOIN profiles ap ON ap.user_id = p.author_id
                JOIN users au ON au.id = p.author_id
-               WHERE pm.media_id = m.id AND ${postVisibleSql(v)})
+               WHERE pm.media_id = m.id AND ${postVisibleSql(v)} AND ${postUnlockedSql(v)})
   )`;
 }
 

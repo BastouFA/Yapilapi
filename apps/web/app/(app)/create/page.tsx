@@ -6,7 +6,20 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { AutocompleteText } from '@/components/Autocomplete';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { AIPanel, Alert, Button, Checkbox, Segments, Select, TextField } from '@yapilapi/design-system';
-import { STORY_VISIBILITIES, VISIBILITIES, type Community, type MessageKey, type Post, type Sound, type StoryVisibility } from '@yapilapi/shared';
+import {
+  POST_VISIBILITIES,
+  STORY_VISIBILITIES,
+  VISIBILITIES,
+  type Community,
+  type MessageKey,
+  type Post,
+  type Sound,
+  type StoryVisibility,
+  type Visibility,
+} from '@yapilapi/shared';
+
+/** Posts can be for subscribers, stories for close friends; one picker holds either. */
+type Audience = Visibility | StoryVisibility;
 import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { SimilarQuestions } from '@/components/CommunityExtras';
 import { SoundPicker, SoundPlayButton } from '@/components/SoundPicker';
@@ -48,7 +61,7 @@ function Create() {
     params.get('mode') === 'reel' || remixOf || params.get('sound') ? 'reel' : params.get('mode') === 'story' || params.get('moment') ? 'story' : 'post';
   const [kind, setKind] = useState<'post' | 'reel' | 'story'>(initialMode);
   const [body, setBody] = useState(() => (params.get('text') ?? '').slice(0, 5000));
-  const [visibility, setVisibility] = useState<StoryVisibility>(initialMode === 'story' ? 'friends' : 'public');
+  const [visibility, setVisibility] = useState<Audience>(initialMode === 'story' ? 'friends' : 'public');
   const [original, setOriginal] = useState<Post | null>(null);
   const [originalMissing, setOriginalMissing] = useState(false);
   const [sound, setSound] = useState<Sound | null>(null);
@@ -59,6 +72,8 @@ function Create() {
   const [communities, setCommunities] = useState<Community[]>([]);
   const [circles, setCircles] = useState<{ id: string; name: string }[]>([]);
   const [circleId, setCircleId] = useState('');
+  // Posting for subscribers needs a subscription plan (set up in Studio).
+  const [hasPlans, setHasPlans] = useState(false);
   const [media, setMedia] = useState<Uploaded[]>([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
@@ -97,7 +112,12 @@ function Create() {
       .circles()
       .then((r) => setCircles(r.items))
       .catch(() => {});
-  }, []);
+    if (me)
+      api.economy
+        .plans(me.id)
+        .then((r) => setHasPlans(r.items.length > 0))
+        .catch(() => {});
+  }, [me]);
 
   async function upload(files: FileList | null) {
     if (!files?.length) return;
@@ -209,7 +229,7 @@ function Create() {
             setPoll(null);
             setMedia((m) => m.filter((x) => k !== 'reel' || x.kind === 'video').slice(0, 1));
           }
-          if (k === 'story' && visibility === 'selected') setVisibility('friends');
+          if (k === 'story' && (visibility === 'selected' || visibility === 'subscribers')) setVisibility('friends');
           if (k !== 'story' && visibility === 'close_friends') setVisibility('friends');
         }}
         options={[
@@ -445,9 +465,9 @@ function Create() {
           </Select>
         )}
         {!communityId ? (
-          <Select label={t('create.visibility')} value={visibility} onChange={(e) => setVisibility(e.currentTarget.value as StoryVisibility)}>
-            {(kind === 'story' ? STORY_VISIBILITIES : VISIBILITIES)
-              .filter((v) => kind !== 'story' || v !== 'selected')
+          <Select label={t('create.visibility')} value={visibility} onChange={(e) => setVisibility(e.currentTarget.value as Audience)}>
+            {(kind === 'story' ? STORY_VISIBILITIES : POST_VISIBILITIES)
+              .filter((v) => (kind !== 'story' || (v !== 'selected' && v !== 'subscribers')) && (v !== 'subscribers' || hasPlans))
               .map((v) => (
                 <option key={v} value={v} disabled={v === 'circle' && !circles.length}>
                   {t(`visibility.${v}` as MessageKey)}
@@ -467,6 +487,11 @@ function Create() {
             checked={allowRemix}
             onChange={(e) => setAllowRemix(e.currentTarget.checked)}
           />
+        ) : null}
+        {visibility === 'subscribers' && !communityId && kind !== 'story' ? (
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+            Only people with a paid subscription see this. Everyone else sees a locked preview with a link to subscribe.
+          </p>
         ) : null}
         {visibility === 'circle' && !communityId ? (
           <Select label="Circle" value={circleId} onChange={(e) => setCircleId(e.currentTarget.value)}>

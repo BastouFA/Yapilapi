@@ -1,11 +1,15 @@
 import type { Pool, PoolClient } from 'pg';
 import type { MediaItem, Post, RemixRef } from '@yapilapi/shared';
 import { plusCol, publicUserFrom } from './users.ts';
-import { allowDownloadSql, postVisibleSql } from './visibility.ts';
+import { allowDownloadSql, postUnlockedSql, postVisibleSql } from './visibility.ts';
 
 type Q = Pool | PoolClient;
 
-/** Load full Post DTOs for ids (already authorized by the caller), preserving order. */
+/**
+ * Load full Post DTOs for ids (already authorized by the caller), preserving order.
+ * Subscriber-only posts the viewer can't open come back locked: no text, media,
+ * poll, link, topics or attachments, only a blurred preview (see Post.locked).
+ */
 export async function hydratePosts(db: Q, ids: string[], viewer: string | null, reasons?: Map<string, string>): Promise<Post[]> {
   if (!ids.length) return [];
   const { rows } = await db.query(
@@ -29,7 +33,15 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
             CASE WHEN p.format = 'reel' THEN (SELECT count(*) FROM posts rx WHERE rx.remix_of_post_id = p.id AND rx.deleted_at IS NULL)::int END AS remix_count,
             s.id AS s_id, s.title AS s_title, s.source_post_id AS s_source, coalesce(s.duration_ms, sm.duration_ms) AS s_duration,
             coalesce(sm.variants->>'mp4', sm.url) AS s_audio,
-            CASE WHEN p.format = 'reel' THEN (p.author_id IS NOT DISTINCT FROM $2 OR ${allowDownloadSql('pr', 'au')}) END AS downloadable
+            CASE WHEN p.format = 'reel' THEN (p.author_id IS NOT DISTINCT FROM $2 OR ${allowDownloadSql('pr', 'au')}) END AS downloadable,
+            coalesce(${postUnlockedSql('$2')}, false) AS unlocked,
+            (SELECT count(*)::int FROM post_media pm WHERE pm.post_id = p.id) AS media_count,
+            (SELECT m.blurhash FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id ORDER BY pm.position LIMIT 1) AS cover_placeholder,
+            (SELECT json_build_object('campaignId', ac.id, 'status', ac.status, 'impressions', ac.impressions, 'clicks', ac.clicks,
+                                      'spentCents', ceil(ac.spent_millicents / 1000.0)::int, 'budgetCents', floor(ac.budget_millicents / 1000.0)::int,
+                                      'currency', ac.currency, 'endsAt', ac.ends_at)
+               FROM ad_campaigns ac WHERE ac.post_id = p.id AND ac.advertiser_id = $2 AND p.author_id = $2
+               ORDER BY ac.created_at DESC LIMIT 1) AS boost
      FROM posts p
      JOIN profiles pr ON pr.user_id = p.author_id
      JOIN users au ON au.id = p.author_id
@@ -43,53 +55,80 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
   );
   const originals = await remixOriginals(
     db,
-    rows.map((r) => r.remix_of_post_id as string | null).filter((x): x is string => !!x),
+    rows
+      .filter((r) => r.unlocked)
+      .map((r) => r.remix_of_post_id as string | null)
+      .filter((x): x is string => !!x),
     viewer,
   );
-  const byId = new Map<string, Post>(
-    rows.map((r) => [
-      r.id as string,
-      {
-        id: r.id,
-        kind: r.kind,
-        body: r.body,
-        visibility: r.visibility,
-        author: publicUserFrom(r, 'a_'),
-        media: r.media,
-        linkUrl: r.link_url,
-        poll: r.poll_options ? { options: r.poll_options, myVote: r.my_vote } : null,
-        topics: r.topics,
-        community: r.c_id ? { id: r.c_id, slug: r.c_slug, name: r.c_name } : null,
-        event: r.e_id ? { id: r.e_id, title: r.e_title, startsAt: r.e_starts_at.toISOString() } : null,
-        product: r.pd_id ? { id: r.pd_id, title: r.pd_title, priceCents: r.pd_price, currency: r.pd_currency } : null,
-        counts: {
-          likes: r.like_count,
-          comments: r.comment_count,
-          reposts: r.repost_count ?? 0,
-          views: r.view_count ?? 0,
-          ...(r.remix_count === null ? {} : { remixes: r.remix_count }),
-        },
-        viewer: { liked: r.liked, saved: r.saved, reposted: r.reposted },
-        aiAssisted: !!r.ai_provenance?.assisted,
-        real: r.real ?? null,
-        createdAt: r.created_at.toISOString(),
-        format: r.format ?? 'post',
-        ...(r.format === 'reel'
-          ? {
-              allowRemix: r.allow_remix,
-              remixOf: r.remix_mode ? { mode: r.remix_mode, post: (r.remix_of_post_id && originals.get(r.remix_of_post_id)) || null } : null,
-              sound: r.s_id
-                ? { id: r.s_id, title: r.s_title, durationMs: r.s_duration ?? null, audioUrl: r.s_audio ?? null, original: r.s_source === r.id }
-                : null,
-            }
-          : {}),
-        reason: reasons?.get(r.id),
-        ...(r.withheld_in ? { withheldIn: r.withheld_in.map((c: string) => c.trim()) } : {}),
-        ...(r.downloadable === null ? {} : { downloadable: !!r.downloadable }),
-      } satisfies Post,
-    ]),
-  );
+  const byId = new Map<string, Post>(rows.map((r) => [r.id as string, r.unlocked ? toPost(r, originals, reasons) : lockedPost(r, reasons)]));
   return ids.map((id) => byId.get(id)).filter((p): p is Post => !!p);
+}
+
+function toPost(r: Record<string, any>, originals: Map<string, NonNullable<RemixRef['post']>>, reasons?: Map<string, string>): Post {
+  return {
+    id: r.id,
+    kind: r.kind,
+    body: r.body,
+    visibility: r.visibility,
+    author: publicUserFrom(r, 'a_'),
+    media: r.media,
+    linkUrl: r.link_url,
+    poll: r.poll_options ? { options: r.poll_options, myVote: r.my_vote } : null,
+    topics: r.topics,
+    community: r.c_id ? { id: r.c_id, slug: r.c_slug, name: r.c_name } : null,
+    event: r.e_id ? { id: r.e_id, title: r.e_title, startsAt: r.e_starts_at.toISOString() } : null,
+    product: r.pd_id ? { id: r.pd_id, title: r.pd_title, priceCents: r.pd_price, currency: r.pd_currency } : null,
+    counts: {
+      likes: r.like_count,
+      comments: r.comment_count,
+      reposts: r.repost_count ?? 0,
+      views: r.view_count ?? 0,
+      ...(r.remix_count === null ? {} : { remixes: r.remix_count }),
+    },
+    viewer: { liked: r.liked, saved: r.saved, reposted: r.reposted },
+    aiAssisted: !!r.ai_provenance?.assisted,
+    real: r.real ?? null,
+    createdAt: r.created_at.toISOString(),
+    format: r.format ?? 'post',
+    ...(r.format === 'reel'
+      ? {
+          allowRemix: r.allow_remix,
+          remixOf: r.remix_mode ? { mode: r.remix_mode, post: (r.remix_of_post_id && originals.get(r.remix_of_post_id)) || null } : null,
+          sound: r.s_id ? { id: r.s_id, title: r.s_title, durationMs: r.s_duration ?? null, audioUrl: r.s_audio ?? null, original: r.s_source === r.id } : null,
+        }
+      : {}),
+    reason: reasons?.get(r.id),
+    ...(r.withheld_in ? { withheldIn: r.withheld_in.map((c: string) => c.trim()) } : {}),
+    ...(r.downloadable === null ? {} : { downloadable: !!r.downloadable }),
+    ...(r.boost ? { boost: r.boost } : {}),
+  } satisfies Post;
+}
+
+/** What someone who isn't subscribed sees of a subscriber-only post: who posted it and when, never what it says or shows. */
+function lockedPost(r: Record<string, any>, reasons?: Map<string, string>): Post {
+  return {
+    id: r.id,
+    kind: r.kind,
+    body: '',
+    visibility: r.visibility,
+    author: publicUserFrom(r, 'a_'),
+    media: [],
+    linkUrl: null,
+    poll: null,
+    topics: [],
+    community: r.c_id ? { id: r.c_id, slug: r.c_slug, name: r.c_name } : null,
+    event: null,
+    product: null,
+    counts: { likes: r.like_count, comments: r.comment_count, reposts: r.repost_count ?? 0, views: r.view_count ?? 0 },
+    viewer: { liked: r.liked, saved: r.saved, reposted: r.reposted },
+    aiAssisted: false,
+    real: null,
+    createdAt: r.created_at.toISOString(),
+    format: r.format ?? 'post',
+    reason: reasons?.get(r.id),
+    locked: { placeholder: r.cover_placeholder ?? null, mediaCount: r.media_count ?? 0 },
+  };
 }
 
 /** The reels that remixes and duets credit: author, text and first video, only where the viewer can still see them. */

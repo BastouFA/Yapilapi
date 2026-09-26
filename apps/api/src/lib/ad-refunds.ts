@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg';
-import type { PaymentProvider } from './payments.ts';
+import type { PaymentRegistry } from './payments.ts';
 
 /**
  * Hand back what a campaign didn't spend: rejected or ended campaigns can't
@@ -8,13 +8,13 @@ import type { PaymentProvider } from './payments.ts';
  * reduced by what was refunded, so it can never be spent afterwards.
  * Returns the cents refunded.
  */
-export async function refundUnspentBudget(c: PoolClient, payments: PaymentProvider, campaignId: string, actorId: string | null): Promise<number> {
+export async function refundUnspentBudget(c: PoolClient, payments: PaymentRegistry, campaignId: string, actorId: string | null): Promise<number> {
   const camp = (await c.query(`SELECT budget_millicents, spent_millicents FROM ad_campaigns WHERE id = $1 FOR UPDATE`, [campaignId])).rows[0];
   if (!camp) return 0;
   let owed = Math.floor((Number(camp.budget_millicents) - Number(camp.spent_millicents)) / 1000);
   if (owed <= 0) return 0;
   const funding = await c.query(
-    `SELECT o.id AS order_id, pay.id AS payment_id, pay.provider_ref, pay.amount_cents,
+    `SELECT o.id AS order_id, pay.id AS payment_id, pay.provider, pay.provider_ref, pay.amount_cents,
             coalesce((SELECT sum(r.amount_cents) FROM refunds r WHERE r.payment_id = pay.id AND r.status = 'succeeded'), 0)::int AS refunded
      FROM orders o JOIN payments pay ON pay.order_id = o.id
      WHERE o.campaign_id = $1 AND o.purpose = 'ad_budget' AND o.status = 'paid'
@@ -26,7 +26,9 @@ export async function refundUnspentBudget(c: PoolClient, payments: PaymentProvid
     if (owed <= 0) break;
     const take = Math.min(owed, f.amount_cents - f.refunded);
     if (take <= 0) continue;
-    const result = await payments.refund({ providerRef: f.provider_ref, amountCents: take });
+    // The provider that took this payment gives it back.
+    const provider = payments.byName(f.provider);
+    const result = provider ? await provider.refund({ providerRef: f.provider_ref, amountCents: take }) : { status: 'failed' as const };
     await c.query(`INSERT INTO refunds (payment_id, amount_cents, reason, status, requested_by) VALUES ($1,$2,$3,$4,$5)`, [
       f.payment_id,
       take,

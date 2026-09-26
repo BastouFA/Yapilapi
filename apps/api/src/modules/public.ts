@@ -15,6 +15,8 @@ import { eventVisibleSql, postVisibleSql } from '../lib/visibility.ts';
  * visibility rules (evaluated for a viewer who isn't signed in, including
  * regional withholding by the request's country), a preview needs:
  * - public audience (not followers, friends, circles or chosen people);
+ *   subscriber-only posts get a locked preview (author and counts, never the
+ *   text, image or video);
  * - an active, public account that doesn't belong to someone under 18;
  * - nothing waiting for review, restricted or removed.
  */
@@ -54,17 +56,18 @@ export default async function publicModule(app: FastifyInstance, ctx: AppContext
     const { id } = parse(idParam, req.params);
     reply.header('cache-control', 'no-store');
     const { rows } = await db.query(
-      `SELECT p.id, p.format, p.kind, p.body, p.like_count, p.comment_count, p.repost_count, p.created_at,
+      `SELECT p.id, p.format, p.kind, p.visibility, p.like_count, p.comment_count, p.repost_count, p.created_at,
+              CASE WHEN p.visibility = 'public' THEN p.body ELSE '' END AS body,
               ap.username, ap.display_name, ap.avatar_url, c.slug AS c_slug, c.name AS c_name,
               (SELECT json_build_object('kind', m.kind, 'url', m.url, 'mime', m.mime, 'posterUrl', m.poster_url, 'mp4', m.variants->>'mp4',
                                         'width', m.width, 'height', m.height, 'durationMs', m.duration_ms, 'alt', m.alt_text)
                  FROM post_media pm JOIN media m ON m.id = pm.media_id
-                 WHERE pm.post_id = p.id AND m.kind IN ('image', 'video') AND m.status = 'ready'
+                 WHERE pm.post_id = p.id AND p.visibility = 'public' AND m.kind IN ('image', 'video') AND m.status = 'ready'
                  ORDER BY pm.position LIMIT 1) AS media
        FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
        LEFT JOIN communities c ON c.id = p.community_id
        WHERE p.id = $2 AND ${postVisibleSql('$1')}
-         AND p.visibility = 'public' AND p.moderation_status = 'normal' AND p.deleted_at IS NULL
+         AND p.visibility IN ('public', 'subscribers') AND p.moderation_status = 'normal' AND p.deleted_at IS NULL
          AND (p.community_id IS NULL OR (c.visibility = 'public' AND c.deleted_at IS NULL))
          AND ${publicAccountSql('ap', 'au')}`,
       [null, id],
@@ -95,6 +98,7 @@ export default async function publicModule(app: FastifyInstance, ctx: AppContext
       counts: { likes: r.like_count, comments: r.comment_count, reposts: r.repost_count ?? 0 },
       community: r.c_slug ? { slug: r.c_slug, name: r.c_name } : null,
       createdAt: r.created_at.toISOString(),
+      ...(r.visibility === 'subscribers' ? { locked: true } : {}),
     };
     cacheable(reply);
     return { post };
