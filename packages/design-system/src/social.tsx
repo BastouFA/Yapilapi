@@ -39,6 +39,7 @@ export function NavBar({
   locale = 'en',
   brandHref = '/home',
   logoSrc,
+  searchHref,
 }: {
   items: NavEntry[];
   current?: NavEntry['id'];
@@ -46,6 +47,8 @@ export function NavBar({
   locale?: string;
   brandHref?: string;
   logoSrc?: string;
+  /** Adds a Search button under the logo on wide screens (phones get one in the page header). */
+  searchHref?: string;
 }) {
   return (
     <nav className="yp-nav" aria-label="Primary">
@@ -53,6 +56,12 @@ export function NavBar({
         {logoSrc ? <img src={logoSrc} alt="" /> : null}
         YAPILAPI
       </L>
+      {searchHref ? (
+        <L href={searchHref} className="yp-nav__search">
+          <Icon name="search" size={20} />
+          Search
+        </L>
+      ) : null}
       {items.map((it) => (
         <L
           key={it.id}
@@ -362,6 +371,8 @@ export interface PostCardProps {
   onLike?: (post: Post) => void;
   onComment?: (post: Post) => void;
   onSave?: (post: Post) => void;
+  /** Share someone else's public post with your followers. */
+  onRepost?: (post: Post) => void;
   onVote?: (post: Post, optionId: string) => void;
   onFeedback?: (post: Post, signal: 'more_like_this' | 'less_like_this' | 'not_interested' | 'mute_creator') => void;
   onWhy?: (post: Post) => void;
@@ -382,6 +393,7 @@ export function PostCard({
   onLike,
   onComment,
   onSave,
+  onRepost,
   onVote,
   onFeedback,
   onWhy,
@@ -544,6 +556,23 @@ export function PostCard({
           <Icon name="message" />
           {post.counts.comments || ''}
         </button>
+        {onRepost && !isOwn && post.visibility === 'public' ? (
+          <button
+            type="button"
+            className={cx('yp-action', post.viewer.reposted && 'yp-action--reposted')}
+            aria-pressed={post.viewer.reposted}
+            onClick={() => onRepost(post)}
+            aria-label={`${post.viewer.reposted ? 'Undo repost' : 'Repost'}, ${post.counts.reposts}`}
+          >
+            <Icon name="repost" />
+            {post.counts.reposts || ''}
+          </button>
+        ) : post.counts.reposts ? (
+          <span className="yp-action yp-action--static" aria-label={`Reposts, ${post.counts.reposts}`}>
+            <Icon name="repost" />
+            {post.counts.reposts}
+          </span>
+        ) : null}
         <span className="yp-spacer" />
         <button type="button" className="yp-action" aria-pressed={post.viewer.saved} onClick={() => onSave?.(post)} aria-label={tt('post.save')}>
           <Icon name="bookmark" filled={post.viewer.saved} />

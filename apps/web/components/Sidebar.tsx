@@ -54,7 +54,7 @@ export function Sidebar() {
         aria-label="Quick search"
         onSubmit={(e) => {
           e.preventDefault();
-          if (q.trim()) router.push(`/discover?q=${encodeURIComponent(q.trim())}`);
+          if (q.trim()) router.push(`/search?q=${encodeURIComponent(q.trim())}`);
         }}
       >
         <label className="yp-visually-hidden" htmlFor="aside-search">

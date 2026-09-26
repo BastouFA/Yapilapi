@@ -13,7 +13,15 @@ import { useSession } from '../providers';
 
 function currentTab(path: string, username?: string): NavEntry['id'] | undefined {
   if (path.startsWith('/home')) return 'home';
-  if (path.startsWith('/discover') || path.startsWith('/c/') || path.startsWith('/events') || path.startsWith('/places')) return 'discover';
+  if (
+    path.startsWith('/discover') ||
+    path.startsWith('/search') ||
+    path.startsWith('/t/') ||
+    path.startsWith('/c/') ||
+    path.startsWith('/events') ||
+    path.startsWith('/places')
+  )
+    return 'discover';
   if (path.startsWith('/create')) return 'create';
   if (path.startsWith('/inbox') || path.startsWith('/notifications')) return 'inbox';
   if (username && path.startsWith(`/u/${username}`)) return 'profile';
@@ -63,7 +71,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <CallsProvider>
       <CheckoutProvider>
         <div className="yp-shell">
-          <NavBar items={items} current={currentTab(path, me.username)} linkAs={NextLink} locale={locale} logoSrc="/mark.svg" />
+          <NavBar items={items} current={currentTab(path, me.username)} linkAs={NextLink} locale={locale} logoSrc="/mark.svg" searchHref="/search" />
           <main className="yp-shell__main" id="main">
             {children}
           </main>

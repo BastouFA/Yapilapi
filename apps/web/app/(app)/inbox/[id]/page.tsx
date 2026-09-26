@@ -1,5 +1,6 @@
 'use client';
 
+import { isVideoFile, MEDIA_ACCEPT } from '@yapilapi/shared';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -278,12 +279,12 @@ export default function ChatPage() {
         <input
           ref={fileInput}
           type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
+          accept={MEDIA_ACCEPT}
           hidden
           onChange={(e) => {
             const f = e.currentTarget.files?.[0];
             e.currentTarget.value = '';
-            if (f) void sendFile(f, f.type.startsWith('video') ? 'Sending video…' : 'Sending photo…');
+            if (f) void sendFile(f, isVideoFile(f) ? 'Sending video…' : 'Sending photo…');
           }}
         />
         <button type="button" className="yp-action" aria-label="Send a photo or video" disabled={!!uploading} onClick={() => fileInput.current?.click()}>

@@ -133,7 +133,8 @@ a.yp-aside-row:hover {
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-lg);
 }
-.yp-nav__brand {
+.yp-nav__brand,
+.yp-nav__search {
   display: none;
 }
 .yp-nav__item {
@@ -1484,4 +1485,36 @@ a.yp-ecard:hover {
 }
 .yp-post__pinned + .yp-post__head {
   padding-top: var(--space-2);
+}
+
+.yp-action--reposted,
+.yp-action--reposted svg {
+  color: var(--success);
+}
+.yp-action--static {
+  cursor: default;
+}
+
+@media (min-width: 900px) {
+  .yp-nav__search {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin: 0 0 var(--space-4);
+    padding: 10px var(--space-4);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface-sunken);
+    color: var(--ink-muted);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .yp-nav__search:hover {
+    border-color: var(--yapi);
+    color: var(--ink);
+  }
+  .yp-nav__search:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
 }

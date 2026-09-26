@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import ffmpegPath from 'ffmpeg-static';
@@ -87,9 +87,10 @@ async function processVideo(deps: ProcessDeps, id: string, key: string) {
     const base = key.replace(/\.[^.]+$/, '');
     const info = await probe(input);
     // Poster frame.
-    await run(['-ss', '1', '-i', input, '-frames:v', '1', '-vf', 'scale=1280:-2', '-q:v', '3', path.join(dir, 'poster.jpg')]).catch(() =>
-      run(['-i', input, '-frames:v', '1', '-vf', 'scale=1280:-2', '-q:v', '3', path.join(dir, 'poster.jpg')]),
-    );
+    // One second in, or the first frame of a video shorter than that (ffmpeg writes nothing, without failing, past the end).
+    const posterFile = path.join(dir, 'poster.jpg');
+    await run(['-ss', '1', '-i', input, '-frames:v', '1', '-vf', 'scale=1280:-2', '-q:v', '3', posterFile]).catch(() => {});
+    if (!(await stat(posterFile).catch(() => null))?.size) await run(['-i', input, '-frames:v', '1', '-vf', 'scale=1280:-2', '-q:v', '3', posterFile]);
     // Web-safe MP4 (H.264/AAC, fast start) as the universal fallback.
     await run([
       '-i',

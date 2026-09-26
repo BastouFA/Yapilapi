@@ -1,5 +1,6 @@
 'use client';
 
+import { isVideoFile, MEDIA_ACCEPT, VIDEO_ACCEPT } from '@yapilapi/shared';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AutocompleteText } from '@/components/Autocomplete';
 import { Suspense, useEffect, useRef, useState } from 'react';
@@ -75,7 +76,7 @@ function Create() {
     if (!files?.length) return;
     if (kind === 'reel') {
       const f = files[0]!;
-      if (!f.type.startsWith('video/')) return toast('A reel is a video.');
+      if (!isVideoFile(f)) return toast('A reel is a video.');
       // Check the length before uploading a long file for nothing.
       const seconds = await videoSeconds(f);
       if (seconds > reelMax)
@@ -272,7 +273,7 @@ function Create() {
           <input
             ref={fileRef}
             type="file"
-            accept={kind === 'reel' ? 'video/mp4,video/webm' : 'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm'}
+            accept={kind === 'reel' ? VIDEO_ACCEPT : MEDIA_ACCEPT}
             multiple={kind === 'post'}
             hidden
             onChange={(e) => upload(e.currentTarget.files)}

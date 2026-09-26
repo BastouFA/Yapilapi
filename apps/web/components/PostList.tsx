@@ -109,6 +109,19 @@ export function PostList({
     }
   }
 
+  async function repost(p: Post) {
+    const reposted = !p.viewer.reposted;
+    patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, reposted }, counts: { ...x.counts, reposts: Math.max(0, x.counts.reposts + (reposted ? 1 : -1)) } }));
+    try {
+      const r = reposted ? await api.posts.repost(p.id) : await api.posts.unrepost(p.id);
+      patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, reposted: r.reposted }, counts: { ...x.counts, reposts: r.reposts } }));
+      toast(reposted ? 'Reposted to your followers' : 'Repost removed');
+    } catch (e) {
+      patch(p.id, () => p);
+      toast(errorMessage(e));
+    }
+  }
+
   async function save(p: Post) {
     const saved = !p.viewer.saved;
     patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, saved } }));
@@ -236,6 +249,7 @@ export function PostList({
             isOwn={p.author.id === me?.id}
             onLike={guard(like)}
             onSave={guard(save)}
+            onRepost={guard(repost)}
             onVote={guard(vote)}
             onComment={setCommentsFor}
             onFeedback={me ? feedback : undefined}

@@ -41,3 +41,18 @@ export const PLACE_CATEGORIES = ['restaurant', 'store', 'venue', 'attraction', '
 
 export const USER_ROLES = ['user', 'moderator', 'admin'] as const;
 export type UserRole = (typeof USER_ROLES)[number];
+
+/**
+ * File picker filters. The server works out each file's real format from its
+ * contents and converts what browsers can't show (HEIC photos to JPEG, any
+ * video to a web MP4), so pickers accept everything phones and cameras make.
+ * Extensions are listed too because some browsers don't know HEIC or MKV types.
+ */
+export const IMAGE_ACCEPT = 'image/*,.heic,.heif,.avif,.tif,.tiff,.bmp';
+export const VIDEO_ACCEPT = 'video/*,.mov,.mkv,.avi,.3gp,.3g2,.m4v,.mpg,.mpeg,.ts,.webm';
+export const MEDIA_ACCEPT = `${IMAGE_ACCEPT},${VIDEO_ACCEPT}`;
+
+/** Whether a picked file is a video, from its type or, when the browser doesn't know it, its extension. */
+export function isVideoFile(file: { type: string; name: string }): boolean {
+  return file.type.startsWith('video/') || /\.(mov|mkv|avi|3gp|3g2|m4v|mpg|mpeg|ts|webm|mp4)$/i.test(file.name);
+}

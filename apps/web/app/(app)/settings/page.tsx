@@ -1,5 +1,6 @@
 'use client';
 
+import { IMAGE_ACCEPT } from '@yapilapi/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -117,7 +118,7 @@ function ProfileSettings() {
           {uploading ? 'Uploading…' : 'Change photo'}
           <input
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept={IMAGE_ACCEPT}
             hidden
             onChange={async (e) => {
               const file = e.currentTarget.files?.[0];

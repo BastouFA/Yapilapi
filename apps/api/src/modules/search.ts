@@ -145,8 +145,27 @@ export async function searchAll(db: Pool, viewer: string | null, q: SearchInput)
   if (wants('topics') && terms)
     jobs.push(
       db
-        .query(`SELECT slug, name FROM topics WHERE slug ILIKE $1 OR name ILIKE $1 ORDER BY name LIMIT $2`, [like, q.limit])
-        .then((r) => void (out.topics = r.rows)),
+        // Hashtags people use (from public posts of the last 90 days), most used first, plus interest topics nobody has posted yet.
+        .query(
+          `WITH used AS (
+             SELECT t AS slug, count(*) AS posts FROM posts p, unnest(p.topics) t
+             WHERE p.visibility = 'public' AND p.deleted_at IS NULL AND p.moderation_status = 'normal' AND p.created_at > now() - interval '90 days'
+               AND t LIKE $3 ESCAPE '\\'
+             GROUP BY t ORDER BY count(*) DESC LIMIT $2)
+           SELECT slug, slug AS name, posts FROM used
+           UNION ALL
+           SELECT slug, name, 0 FROM topics WHERE (slug ILIKE $1 OR name ILIKE $1) AND slug NOT IN (SELECT slug FROM used)
+           ORDER BY posts DESC, name LIMIT $2`,
+          [
+            like,
+            q.limit,
+            `${terms
+              .toLowerCase()
+              .replace(/^#/, '')
+              .replace(/[\\%_]/g, (c) => `\\${c}`)}%`,
+          ],
+        )
+        .then((r) => void (out.topics = r.rows.map((x) => ({ slug: x.slug, name: x.name, posts: Number(x.posts) })))),
     );
 
   await Promise.all(jobs);

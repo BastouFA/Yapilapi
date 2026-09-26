@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { AppError, badRequest, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
-import { ALLOWED_MIME, sniffMatches } from '../lib/storage.ts';
+import { detectMedia, SUPPORTED_FORMATS, toWebFormat } from '../lib/media-formats.ts';
 import { enqueue } from '../lib/jobs.ts';
 import { isPlus, MAX_RESUMABLE_BYTES, PLUS_MAX_RESUMABLE_BYTES } from '../lib/plus.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
@@ -39,7 +39,9 @@ export default async function uploadsModule(app: FastifyInstance, ctx: AppContex
   app.post('/v1/uploads', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (req, reply) => {
     const u = me(req);
     const input = parse(z.object({ filename: z.string().trim().min(1).max(200), mime: z.string().max(100), size: z.number().int().positive() }), req.body);
-    if (!ALLOWED_MIME[input.mime]) throw new AppError(415, 'unsupported_media', 'Upload a JPEG, PNG, WebP, GIF, MP4, WebM, MP3 or M4A file.');
+    // The real type is checked from the contents when the upload completes; here only rule out obvious non-media.
+    if (input.mime && !/^(image|video|audio)\//.test(input.mime) && !/^application\/(octet-stream|mp4)$/.test(input.mime))
+      throw new AppError(415, 'unsupported_media', `That file type isn't supported. ${SUPPORTED_FORMATS}`);
     if (input.size > MAX_RESUMABLE_BYTES) {
       // Plus members can upload bigger files.
       if (!(await isPlus(db, u.id))) throw new AppError(413, 'too_large', 'Files can be up to 200 MB, or 500 MB with YAPILAPI Plus.');
@@ -92,16 +94,22 @@ export default async function uploadsModule(app: FastifyInstance, ctx: AppContex
     const parts = (await readdir(dir)).map(Number).sort((a, b) => a - b);
     const data = Buffer.concat(await Promise.all(parts.map((i) => readFile(path.join(dir, String(i))))));
     if (data.length !== Number(s.size)) throw badRequest('The uploaded size does not match.');
-    if (!sniffMatches(data, s.mime)) {
+    const detected = detectMedia(data, s.mime);
+    const web = detected ? await toWebFormat(data, detected).catch(() => null) : null;
+    if (!detected || !web) {
       await db.query(`UPDATE upload_sessions SET status = 'failed' WHERE id = $1`, [id]);
       await rm(dir, { recursive: true, force: true });
-      throw new AppError(415, 'unsupported_media', "That file's contents don't match its type.");
+      throw new AppError(
+        415,
+        'unsupported_media',
+        detected ? "That file couldn't be read. It may be damaged; try exporting it again." : `That file type isn't supported. ${SUPPORTED_FORMATS}`,
+      );
     }
-    const kind = ALLOWED_MIME[s.mime]!;
-    const stored = await ctx.storage.put(data, kind.ext, s.mime);
+    const kind = { kind: detected.kind };
+    const stored = await ctx.storage.put(web.buf, web.ext, web.mime);
     const { rows } = await db.query(
-      `INSERT INTO media (owner_id, kind, url, mime, alt_text, status, storage_key, size_bytes) VALUES ($1,$2,$3,$4,$5,'ready',$6,$7) RETURNING id, kind, url, alt_text AS "altText"`,
-      [u.id, kind.kind, stored.url, s.mime, alt, stored.key, data.length],
+      `INSERT INTO media (owner_id, kind, url, mime, alt_text, status, storage_key, size_bytes, duration_ms) VALUES ($1,$2,$3,$4,$5,'ready',$6,$7,$8) RETURNING id, kind, url, alt_text AS "altText"`,
+      [u.id, kind.kind, stored.url, web.mime, alt, stored.key, web.buf.length, web.durationMs ?? null],
     );
     await db.query(`UPDATE upload_sessions SET status = 'completed', media_id = $2 WHERE id = $1`, [id, rows[0].id]);
     await enqueue(db, 'media.process', { mediaId: rows[0].id });

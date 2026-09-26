@@ -4,6 +4,7 @@ import { Image, Pressable, Text, View, type StyleProp, type TextStyle } from 're
 import { splitRichText } from '../../../packages/shared/src/hashtags';
 import type { Conversation, Post } from '../../../packages/shared/src/types';
 import { client, mediaUrl } from './api';
+import { useSession } from './session';
 import { useT, type Translate } from './i18n';
 import { radius, space } from './theme';
 import { Avatar, Card, Icon, PlusBadge, useColors, userText } from './ui';
@@ -47,6 +48,10 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
   const [liked, setLiked] = useState(post.viewer.liked);
   const [likes, setLikes] = useState(post.counts.likes);
   const [saved, setSaved] = useState(post.viewer.saved);
+  const [reposted, setReposted] = useState(post.viewer.reposted);
+  const [reposts, setReposts] = useState(post.counts.reposts);
+  const { me } = useSession();
+  const canRepost = post.visibility === 'public' && post.author.id !== me?.id;
   const image = post.media.find((m) => m.kind === 'image');
   const imageUri = image ? (image.variants?.medium ?? image.url) : null;
 
@@ -148,6 +153,32 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
           <Icon name="chatbubble-outline" size={19} color={c.inkMuted} />
           <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>{number(post.counts.comments)}</Text>
         </View>
+        {canRepost ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={reposted ? t('m.reels.undoRepost') : t('m.reels.repost')}
+            accessibilityState={{ selected: reposted }}
+            hitSlop={8}
+            onPress={async () => {
+              const next = !reposted;
+              setReposted(next);
+              setReposts((n) => Math.max(0, n + (next ? 1 : -1)));
+              try {
+                const api = await client();
+                const r = next ? await api.posts.repost(post.id) : await api.posts.unrepost(post.id);
+                setReposted(r.reposted);
+                setReposts(r.reposts);
+              } catch {
+                setReposted(!next);
+                setReposts((n) => Math.max(0, n + (next ? -1 : 1)));
+              }
+            }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+          >
+            <Icon name="repeat" size={20} color={reposted ? c.success : c.inkMuted} />
+            <Text style={{ color: reposted ? c.success : c.inkMuted, fontSize: 13, fontWeight: '600' }}>{number(reposts)}</Text>
+          </Pressable>
+        ) : null}
         <View style={{ flex: 1 }} />
         <Pressable
           accessibilityRole="button"

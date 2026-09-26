@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { MomentsStrip, Segments } from '@yapilapi/design-system';
+import { Icon, MomentsStrip, Segments } from '@yapilapi/design-system';
 import type { StoryGroup } from '@yapilapi/api-client';
 import { useRouter } from 'next/navigation';
 import { StoryViewer } from '@/components/StoryViewer';
@@ -33,6 +33,9 @@ export default function Home() {
       <div className="yp-topbar">
         <h1>{t('nav.home')}</h1>
         <div className="row">
+          <Link href="/search" className="yp-action home__search" aria-label="Search">
+            <Icon name="search" />
+          </Link>
           <Link href="/reels" className="yp-btn yp-btn--secondary yp-btn--sm">
             Reels
           </Link>
