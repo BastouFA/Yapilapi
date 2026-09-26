@@ -7,6 +7,7 @@ import type { AppContext } from '../lib/context.ts';
 import { audit, isEnabled, notify, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
 import { businessOverview } from '../lib/ai/agents.ts';
+import { refundUnspentBudget } from '../lib/ad-refunds.ts';
 import { publicUserFrom } from '../lib/users.ts';
 import { EVENT_SELECT, toEvent } from './events.ts';
 import { eventVisibleSql } from '../lib/visibility.ts';
@@ -209,7 +210,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     const own = await db.query(`SELECT owner_id FROM businesses WHERE id = $1 AND deleted_at IS NULL`, [id]);
     if (!own.rows[0]) throw notFound('Business');
     if (own.rows[0].owner_id !== u.id) throw forbidden();
-    const [overview, views, ratings, ads] = await Promise.all([
+    const [overview, views, ratings, ads, visitors] = await Promise.all([
       businessOverview(db, id, days),
       db.query(
         `SELECT day, count(*) FILTER (WHERE kind = 'business')::int AS business, count(*) FILTER (WHERE kind = 'place')::int AS places, count(DISTINCT viewer_id)::int AS visitors
@@ -227,10 +228,13 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
          FROM ad_campaigns WHERE advertiser_id = $1`,
         [u.id],
       ),
+      db.query(`SELECT count(DISTINCT viewer_id)::int AS n FROM business_views WHERE business_id = $1 AND day > current_date - $2::int`, [id, days]),
     ]);
     return {
       ...overview,
       views: views.rows,
+      // Different people over the whole period (the daily rows count each person once per day).
+      visitorsTotal: visitors.rows[0].n,
       ratingTrend: ratings.rows.map((r) => ({ week: r.week, reviews: r.reviews, average: Number(r.average) })),
       ads: { impressions: ads.rows[0].impressions, clicks: ads.rows[0].clicks, spentCents: ads.rows[0].spent_cents },
     };
@@ -295,6 +299,10 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
         [ids],
       );
       if (products.length !== new Set(ids).size) throw notFound('One of those products');
+      if (input.liveSessionId) {
+        const live = (await c.query(`SELECT ticket_product_id FROM live_sessions WHERE id = $1 AND status <> 'ended'`, [input.liveSessionId])).rows[0];
+        if (!live?.ticket_product_id || !ids.includes(live.ticket_product_id)) throw badRequest("That isn't the ticket for this live.");
+      }
       const currencies = new Set(products.map((p) => p.currency));
       if (currencies.size > 1) throw badRequest('All items in one order must use the same currency.');
       let total = 0;
@@ -306,8 +314,8 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       }
       const fee = Math.round((total * PLATFORM_FEE_BPS) / 10_000);
       const { rows } = await c.query<{ id: string }>(
-        `INSERT INTO orders (buyer_id, total_cents, platform_fee_cents, currency, idempotency_key) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-        [u.id, total, fee, [...currencies][0], input.idempotencyKey],
+        `INSERT INTO orders (buyer_id, total_cents, platform_fee_cents, currency, idempotency_key, live_session_id) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+        [u.id, total, fee, [...currencies][0], input.idempotencyKey, input.liveSessionId ?? null],
       );
       const orderId = rows[0]!.id;
       for (const item of input.items) {
@@ -439,11 +447,15 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
           });
           await announceLiveGift(c, p.order_id);
         }
-        if (o.purpose === 'ad_budget')
-          await c.query(
-            `UPDATE ad_campaigns SET budget_millicents = budget_millicents + (o.total_cents::bigint * 1000) FROM orders o WHERE o.id = $1 AND ad_campaigns.id = o.campaign_id`,
+        if (o.purpose === 'ad_budget') {
+          const camp = await c.query(
+            `UPDATE ad_campaigns SET budget_millicents = budget_millicents + (o.total_cents::bigint * 1000) FROM orders o
+             WHERE o.id = $1 AND ad_campaigns.id = o.campaign_id RETURNING ad_campaigns.id, ad_campaigns.status`,
             [p.order_id],
           );
+          // Money that arrives after a campaign was rejected or ended goes straight back.
+          if (camp.rows[0] && ['rejected', 'ended'].includes(camp.rows[0].status)) await refundUnspentBudget(c, ctx.payments, camp.rows[0].id, null);
+        }
         const sellers = await c.query<{ seller_id: string }>(
           `SELECT DISTINCT p.seller_id FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = $1`,
           [p.order_id],
@@ -491,6 +503,12 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
         u.id,
       ]);
       if (result.status === 'succeeded') {
+        // Refunding ad budget takes back what the campaign hasn't spent yet.
+        await c.query(
+          `UPDATE ad_campaigns SET budget_millicents = greatest(spent_millicents, budget_millicents - $2::bigint * 1000)
+           FROM orders o WHERE o.id = $1 AND o.purpose = 'ad_budget' AND ad_campaigns.id = o.campaign_id`,
+          [id, r.amount_cents],
+        );
         await c.query(`UPDATE orders SET status = 'refunded', updated_at = now() WHERE id = $1`, [id]);
         await c.query(`UPDATE payments SET status = 'refunded', updated_at = now() WHERE id = $1`, [r.payment_id]);
       }

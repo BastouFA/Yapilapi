@@ -219,6 +219,8 @@ export const createOrderSchema = z.object({
     .min(1)
     .max(50),
   idempotencyKey: z.string().min(8).max(100),
+  /** Buying a ticket for this live: the order must contain the live's ticket, and it only unlocks this live. */
+  liveSessionId: uuid.optional(),
 });
 
 export const reportSchema = z.object({

@@ -19,10 +19,31 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
   event_cancelled: () => 'cancelled an event you were going to',
   order_paid: () => 'paid for an order',
   enforcement: (n) => `A moderator took action on your content (${String(n.data.decision).replace('_', ' ')}). You can appeal from Settings.`,
+  tip_received: () => 'sent you a tip',
+  subscription_started: () => 'subscribed to you',
+  live_started: () => 'is live now',
+  booking_request: () => 'asked to book',
+  booking_decided: () => 'Your booking was updated',
+  call_incoming: () => 'called you',
+  together_invite: () => 'invited you to a Together',
+  family_invite: () => 'asked to supervise your account. You can accept or decline in Settings.',
+  family_accepted: () => 'accepted your family link',
+  family_ended: () => 'ended your family link',
+  family_controls_changed: () => 'changed your family settings',
+  ad_approved: (n) => `Your ad "${String(n.data.name ?? '')}" was approved and is running.`,
+  ad_rejected: (n) => `Your ad "${String(n.data.name ?? '')}" wasn't approved: ${String(n.data.note ?? 'see Studio for details')}`,
+  mfa_enabled: () => 'Two-step verification was turned on for your account.',
+  mfa_disabled: () => 'Two-step verification was turned off for your account.',
+  mfa_recovery_code_used: () => 'A recovery code was used to sign in to your account.',
+  passkey_added: () => 'A passkey was added to your account.',
 };
 
 function hrefFor(n: NotificationItem): string | undefined {
-  if (n.entityType === 'post') return `/home`;
+  if (n.entityType === 'post') return `/p/${n.entityId}`;
+  if (n.entityType === 'live') return `/live/${n.entityId}`;
+  if (n.entityType === 'family_link') return '/settings';
+  if (n.entityType === 'ad_campaign') return '/studio';
+  if (n.entityType === 'together') return `/together/${n.entityId}`;
   if (n.entityType === 'user' && n.actor) return `/u/${n.actor.username}`;
   if (n.entityType === 'event') return `/events/${n.entityId}`;
   if (n.entityType === 'friend_request') return '/inbox';

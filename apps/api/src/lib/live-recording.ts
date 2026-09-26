@@ -1,7 +1,8 @@
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { Pool } from 'pg';
+import { tx } from '@yapilapi/database';
 import { enqueue } from './jobs.ts';
 import { probe, run } from './media-processing.ts';
 import type { MediaStorage } from './storage.ts';
@@ -73,53 +74,97 @@ export function pickHighlights(
   return picked.sort((a, b) => a.startMs - b.startMs);
 }
 
+/** How long after a live ends we keep waiting for the encoder to stop writing. */
+const SETTLE_LIMIT_MS = 10 * 60_000;
+/** A segment untouched for this long is finished. */
+const QUIET_MS = 10_000;
+
+/**
+ * Chat times are wall-clock; the joined recording has no gaps (segments are
+ * concatenated), so each moment maps to its own segment's position in the
+ * joined file. Moments that fall between segments (the stream dropped) map to
+ * nothing.
+ */
+export function timelineMapper(segments: { startedAt: Date; durationMs: number }[]) {
+  let offset = 0;
+  const spans = segments.map((sg) => {
+    const span = { from: sg.startedAt.getTime(), to: sg.startedAt.getTime() + sg.durationMs, offset };
+    offset += sg.durationMs;
+    return span;
+  });
+  return (at: Date): number | null => {
+    const t = at.getTime();
+    const sp = spans.find((x) => t >= x.from && t < x.to);
+    return sp ? sp.offset + (t - sp.from) : null;
+  };
+}
+
 /** After a live ends: store the recording as the host's video and queue highlight clips from it. */
 export async function processLiveRecording(deps: LiveRecordingDeps, sessionId: string) {
   if (!deps.recordingsDir) return;
-  const live = (await deps.db.query(`SELECT id, host_id, title, status, recording_media_id FROM live_sessions WHERE id = $1`, [sessionId])).rows[0];
+  const live = (await deps.db.query(`SELECT id, host_id, title, status, ended_at, recording_media_id FROM live_sessions WHERE id = $1`, [sessionId])).rows[0];
   if (!live || live.status !== 'ended' || live.recording_media_id) return;
   const segments = await recordingSegments(deps.recordingsDir, sessionId);
   if (!segments.length) {
     await deps.db.query(`UPDATE live_sessions SET recording_status = 'none' WHERE id = $1`, [sessionId]);
     return;
   }
+  // Ending the live doesn't stop an encoder that keeps pushing; wait until the last segment stops growing.
+  const lastWrite = Math.max(...(await Promise.all(segments.map(async (sg) => (await stat(sg.file)).mtimeMs))));
+  const endedAgo = Date.now() - new Date(live.ended_at ?? Date.now()).getTime();
+  if (Date.now() - lastWrite < QUIET_MS && endedAgo < SETTLE_LIMIT_MS) {
+    await enqueue(deps.db, 'live.recording', { sessionId }, 15);
+    return;
+  }
+
   const work = await mkdtemp(path.join(tmpdir(), 'ypl-live-'));
   try {
+    const timed: { file: string; startedAt: Date; durationMs: number }[] = [];
+    for (const sg of segments) timed.push({ ...sg, durationMs: (await probe(sg.file)).durationMs ?? 0 });
     const list = path.join(work, 'list.txt');
-    await writeFile(list, segments.map((s) => `file '${s.file.replace(/'/g, "'\\''")}'`).join('\n'));
+    await writeFile(list, segments.map((sg) => `file '${sg.file.replace(/'/g, "'\\''")}'`).join('\n'));
     const out = path.join(work, 'recording.mp4');
     // Segments share codecs, so they are joined without re-encoding.
     await run(['-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', '-movflags', '+faststart', out]);
     const info = await probe(out);
-    const data = await readFile(out);
-    const stored = await deps.storage.put(data, 'mp4', 'video/mp4');
-    const media = await deps.db.query(
-      `INSERT INTO media (owner_id, kind, url, mime, alt_text, status, storage_key, size_bytes, duration_ms)
-       VALUES ($1,'video',$2,'video/mp4',$3,'processing',$4,$5,$6) RETURNING id`,
-      [live.host_id, stored.url, `Recording of the live "${live.title}"`, stored.key, data.length, info.durationMs],
-    );
-    const mediaId = media.rows[0].id as string;
-    await enqueue(deps.db, 'media.process', { mediaId });
-    await deps.db.query(`UPDATE live_sessions SET recording_media_id = $2, recording_status = 'ready' WHERE id = $1`, [sessionId, mediaId]);
+    // Streamed from disk: a long live can be many gigabytes.
+    const stored = await deps.storage.putFile(out, 'mp4', 'video/mp4');
+    const size = (await stat(out)).size;
 
     const chat = await deps.db.query<{ created_at: Date; kind: string }>(
       `SELECT created_at, kind FROM live_chat WHERE session_id = $1 AND deleted_at IS NULL`,
       [sessionId],
     );
+    const toOffset = timelineMapper(timed);
     const highlights = pickHighlights(
-      chat.rows.map((r) => ({ at: r.created_at, weight: r.kind === 'gift' ? 5 : r.kind === 'reaction' ? 0.5 : 1 })),
-      segments[0]!.startedAt,
+      chat.rows.flatMap((r) => {
+        const off = toOffset(r.created_at);
+        return off === null ? [] : [{ at: new Date(timed[0]!.startedAt.getTime() + off), weight: r.kind === 'gift' ? 5 : r.kind === 'reaction' ? 0.5 : 1 }];
+      }),
+      timed[0]!.startedAt,
       info.durationMs ?? 0,
     );
-    for (const h of highlights) {
-      const edit = await deps.db.query(
-        `INSERT INTO media_edits (source_media_id, owner_id, kind, start_ms, end_ms, auto) VALUES ($1,$2,'clip',$3,$4,true) RETURNING id`,
-        [mediaId, live.host_id, h.startMs, h.endMs],
+
+    // The recording, its link on the live and the clip jobs are saved together, so a retry never duplicates them.
+    await tx(deps.db, async (c) => {
+      const media = await c.query(
+        `INSERT INTO media (owner_id, kind, url, mime, alt_text, status, storage_key, size_bytes, duration_ms)
+         VALUES ($1,'video',$2,'video/mp4',$3,'processing',$4,$5,$6) RETURNING id`,
+        [live.host_id, stored.url, `Recording of the live "${live.title}"`, stored.key, size, info.durationMs],
       );
-      await enqueue(deps.db, 'media.edit', { editId: edit.rows[0].id });
-    }
+      const mediaId = media.rows[0].id as string;
+      await enqueue(c, 'media.process', { mediaId });
+      await c.query(`UPDATE live_sessions SET recording_media_id = $2, recording_status = 'ready' WHERE id = $1`, [sessionId, mediaId]);
+      for (const h of highlights) {
+        const edit = await c.query(
+          `INSERT INTO media_edits (source_media_id, owner_id, kind, start_ms, end_ms, auto) VALUES ($1,$2,'clip',$3,$4,true) RETURNING id`,
+          [mediaId, live.host_id, h.startMs, h.endMs],
+        );
+        await enqueue(c, 'media.edit', { editId: edit.rows[0].id });
+      }
+    });
   } catch (err) {
-    await deps.db.query(`UPDATE live_sessions SET recording_status = 'failed' WHERE id = $1`, [sessionId]);
+    await deps.db.query(`UPDATE live_sessions SET recording_status = 'failed' WHERE id = $1 AND recording_media_id IS NULL`, [sessionId]);
     throw err;
   } finally {
     await rm(work, { recursive: true, force: true });

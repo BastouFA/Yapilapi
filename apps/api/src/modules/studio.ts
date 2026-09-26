@@ -33,7 +33,7 @@ const cuesSchema = z.object({
   cues: z.array(z.object({ start: z.number().finite().min(0), end: z.number().finite().positive(), text: z.string().max(MAX_CUE_TEXT) })).max(MAX_CUES),
 });
 
-const EDIT_STATUS = `CASE WHEN e.status = 'processing' AND j.status = 'done' THEN 'ready'
+export const EDIT_STATUS = `CASE WHEN e.status = 'processing' AND j.status = 'done' THEN 'ready'
                           WHEN e.status = 'processing' AND j.status = 'failed' THEN 'failed'
                           ELSE e.status END`;
 

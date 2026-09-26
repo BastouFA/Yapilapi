@@ -83,7 +83,7 @@ export function Campaigns() {
                     {c.name} <Badge tone={STATUS_TONE[c.status]}>{STATUS_LABEL[c.status]}</Badge>
                   </span>
                 }
-                secondary={`${c.impressions.toLocaleString(locale)} impressions · ${c.clicks} clicks · ${c.ctr}% · ${formatMoney(c.spentCents, c.currency, locale)} of ${formatMoney(c.budgetCents, c.currency, locale)}`}
+                secondary={`${c.impressions.toLocaleString(locale)} impressions · ${c.clicks} clicks · ${c.ctr}% · ${formatMoney(c.spentCents, c.currency, locale)} of ${formatMoney(c.budgetCents, c.currency, locale)}${c.refundedCents ? ` · ${formatMoney(c.refundedCents, c.currency, locale)} refunded` : ''}`}
               />
             ))}
           </List>

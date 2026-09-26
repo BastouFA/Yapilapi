@@ -83,7 +83,7 @@ async function processVideo(deps: ProcessDeps, id: string, key: string) {
   const dir = await mkdtemp(path.join(tmpdir(), 'ypl-video-'));
   try {
     const input = path.join(dir, 'input');
-    await writeFile(input, await deps.storage.read(key));
+    await deps.storage.download(key, input);
     const base = key.replace(/\.[^.]+$/, '');
     const info = await probe(input);
     // Poster frame.
@@ -198,7 +198,7 @@ async function processVideo(deps: ProcessDeps, id: string, key: string) {
       );
     });
     const poster = await deps.storage.putKey(`${base}_poster.jpg`, await readFile(path.join(dir, 'poster.jpg')), 'image/jpeg');
-    const mp4 = await deps.storage.putKey(`${base}_web.mp4`, await readFile(path.join(dir, 'web.mp4')), 'video/mp4');
+    const mp4 = await deps.storage.putFile(path.join(dir, 'web.mp4'), 'mp4', 'video/mp4', `${base}_web.mp4`);
     let hls: string | null = null;
     for (const f of await readdir(dir)) {
       if (!/\.(m3u8|ts)$/.test(f)) continue;

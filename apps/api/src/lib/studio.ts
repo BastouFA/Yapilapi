@@ -22,7 +22,7 @@ async function withLocalCopy<T>(storage: MediaStorage, key: string, fn: (file: s
   const dir = await mkdtemp(path.join(tmpdir(), 'ypl-studio-'));
   try {
     const file = path.join(dir, 'input');
-    await writeFile(file, await storage.read(key));
+    await storage.download(key, file);
     return await fn(file, dir);
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -102,13 +102,15 @@ async function renderEdit(deps: StudioDeps, editId: string) {
         'make_zero',
         file,
       ]);
-      return { data: await readFile(file), durationMs: (await probe(file)).durationMs };
+      // Stored from disk while the temp copy still exists; never loaded whole into memory.
+      const stored = await deps.storage.putFile(file, 'mp4', 'video/mp4');
+      return { stored, size: (await stat(file)).size, durationMs: (await probe(file)).durationMs };
     });
-    const stored = await deps.storage.put(out.data, 'mp4', 'video/mp4');
+    const stored = out.stored;
     const media = await deps.db.query(
       `INSERT INTO media (owner_id, kind, url, mime, alt_text, status, storage_key, size_bytes, duration_ms)
        VALUES ($1,'video',$2,'video/mp4',$3,'processing',$4,$5,$6) RETURNING id`,
-      [e.owner_id, stored.url, e.alt_text, stored.key, out.data.length, out.durationMs],
+      [e.owner_id, stored.url, e.alt_text, stored.key, out.size, out.durationMs],
     );
     const jobId = await enqueue(deps.db, 'media.process', { mediaId: media.rows[0].id });
     await deps.db.query(`UPDATE media_edits SET status = 'processing', result_media_id = $2, process_job_id = $3, finished_at = now() WHERE id = $1`, [
@@ -148,10 +150,18 @@ async function transcribeTrack(deps: StudioDeps, trackId: string) {
     const vtt = await deps.transcription.transcribe({ audio, filename: 'audio.m4a', mime: 'audio/mp4', language: t.lang });
     const cues = parseVtt(vtt);
     if (!cues.length) return fail('No speech was found in this video.');
-    // The owner may have written or uploaded captions in this language meanwhile; theirs win.
-    const still = await deps.db.query(`SELECT 1 FROM caption_tracks WHERE id = $1 AND status = 'processing'`, [trackId]);
-    if (!still.rowCount) return;
-    await saveCaptionTrack(deps, { mediaId: t.media_id, lang: t.lang, label: t.label, source: 'auto', cues, userId: t.created_by });
+    // The owner may have written or uploaded captions in this language meanwhile; theirs win. The check and the write
+    // are one statement, so a save that lands in between is never overwritten.
+    const stored = await deps.storage.putKey(
+      `captions/${t.media_id}/${t.lang}-${randomUUID().slice(0, 8)}.vtt`,
+      Buffer.from(serializeVtt(cues), 'utf8'),
+      'text/vtt; charset=utf-8',
+    );
+    await deps.db.query(
+      `UPDATE caption_tracks SET source = 'auto', status = 'ready', storage_key = $2, url = $3, cue_count = $4, error = NULL
+       WHERE id = $1 AND status = 'processing'`,
+      [trackId, stored.key, stored.url, cues.length],
+    );
   } catch (err) {
     await fail(`Automatic captions failed. ${String((err as Error).message).slice(0, 200)}`);
   }

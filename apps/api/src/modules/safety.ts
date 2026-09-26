@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg';
+import { refundUnspentBudget } from '../lib/ad-refunds.ts';
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
 import { appealSchema, FEATURE_FLAG_KEYS, moderationDecisionSchema, reportSchema } from '@yapilapi/shared';
@@ -147,6 +148,8 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       approve ? [mc.target_id, reviewer] : [mc.target_id, reviewer, note],
     );
     if (!rows[0]) throw badRequest('This campaign is no longer waiting for review.');
+    // A rejected campaign can't run, so whatever budget it holds goes back to the advertiser.
+    if (!approve) await refundUnspentBudget(c, ctx.payments, mc.target_id, reviewer);
     await notify(c, ctx.realtime, {
       userId: rows[0].advertiser_id,
       category: 'moderation',
@@ -256,7 +259,11 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     const u = me(req);
     const input = parse(appealSchema, req.body);
     await tx(db, async (c) => {
-      const mc = await c.query(`SELECT status FROM moderation_cases WHERE id = $1 AND subject_user_id = $2 FOR UPDATE`, [input.caseId, u.id]);
+      // Ad reviews aren't penalties: the advertiser sees the reason in Studio and can promote the post again after fixing it.
+      const mc = await c.query(`SELECT status FROM moderation_cases WHERE id = $1 AND subject_user_id = $2 AND target_type <> 'ad_campaign' FOR UPDATE`, [
+        input.caseId,
+        u.id,
+      ]);
       if (!mc.rows[0]) throw notFound('Case');
       if (mc.rows[0].status !== 'decided') throw badRequest('This decision can’t be appealed.');
       await c.query(`INSERT INTO appeals (case_id, user_id, statement) VALUES ($1,$2,$3)`, [input.caseId, u.id, input.statement]).catch((e) => {
@@ -273,7 +280,8 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     const { rows } = await db.query(
       `SELECT mc.id, mc.target_type, mc.target_id, mc.status, mc.decision, mc.decided_at,
               (SELECT status FROM appeals a WHERE a.case_id = mc.id) AS appeal_status
-       FROM moderation_cases mc WHERE mc.subject_user_id = $1 AND mc.decision IS NOT NULL AND mc.decision <> 'no_action' ORDER BY mc.decided_at DESC`,
+       FROM moderation_cases mc WHERE mc.subject_user_id = $1 AND mc.decision IS NOT NULL AND mc.decision <> 'no_action'
+         AND mc.target_type <> 'ad_campaign' ORDER BY mc.decided_at DESC`,
       [me(req).id],
     );
     return { items: rows };

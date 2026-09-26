@@ -9,6 +9,7 @@ import { Redis } from 'ioredis';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { createPool } from '@yapilapi/database';
+import { runInRequest, withRequestContext } from './lib/request-context.ts';
 import type { Config } from './config.ts';
 import type { AppContext } from './lib/context.ts';
 import { AppError } from './lib/errors.ts';
@@ -84,11 +85,16 @@ export async function buildApp(
     bodyLimit: 1_000_000,
   });
   if (opts.onRoute) app.addHook('onRoute', opts.onRoute);
+  // The country a trusted CDN reports for this request; regional rules use it, including for people who aren't signed in.
+  app.addHook('onRequest', (req, _reply, done) => {
+    const header = config.TRUSTED_COUNTRY_HEADER;
+    runInRequest(header ? String(req.headers[header.toLowerCase()] ?? '').toUpperCase() : null, done);
+  });
   // Route, hook and handler spans. Registered first so it sees every route.
   const tracing = fastifyTracingPlugin();
   if (tracing) await app.register(tracing);
 
-  const db = createPool(config.DATABASE_URL);
+  const db = withRequestContext(createPool(config.DATABASE_URL));
   let redis: Redis | undefined;
   let sub: Redis | undefined;
   if (config.REDIS_URL) {

@@ -82,14 +82,18 @@ export function VideoEditor() {
 
   // Poll while any edit is still being made; refresh the video list when one finishes.
   const working = edits.some((e) => e.status !== 'ready' && e.status !== 'failed');
+  // Read by the poller, which would otherwise see the edits from when it started.
+  const readyCount = useRef(0);
+  readyCount.current = edits.filter((e) => e.status === 'ready').length;
   useEffect(() => {
     if (!working || !video) return;
     const timer = setInterval(async () => {
-      const before = edits.filter((e) => e.status === 'ready').length;
       const r = await api.studio.edits(video.id).catch(() => null);
       if (!r) return;
+      const ready = r.items.filter((e) => e.status === 'ready').length;
+      const finished = ready > readyCount.current;
       setEdits(r.items);
-      if (r.items.filter((e) => e.status === 'ready').length > before) void loadVideos();
+      if (finished) void loadVideos();
     }, 3000);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -378,11 +382,18 @@ function CaptionsEditor({
     return r.items;
   };
 
+  // Only the latest request may fill the editor (switching language quickly must not load one language into another).
+  const cueRequest = useRef(0);
+  // Unsaved edits in the editor; background refreshes never replace them.
+  const dirty = useRef(false);
   const loadCues = async (code: string, list: CaptionTrack[]) => {
+    const req = ++cueRequest.current;
     const track = list.find((t) => t.lang === code);
     setLabel(track?.label ?? names(code));
+    dirty.current = false;
     if (!track || track.status !== 'ready') return setCues([]);
     const r = await api.studio.captionCues(mediaId, code).catch(() => null);
+    if (req !== cueRequest.current) return;
     setCues((r?.cues ?? []).map((c) => ({ ...c, key: nextKey.current++ })));
   };
 
@@ -397,11 +408,16 @@ function CaptionsEditor({
 
   // Automatic captions take a while; check back until they finish.
   const making = tracks.some((t) => t.status === 'processing');
+  const tracksRef = useRef(tracks);
+  tracksRef.current = tracks;
   useEffect(() => {
     if (!making) return;
     const timer = setInterval(async () => {
+      const before = tracksRef.current.find((t) => t.lang === lang)?.status;
       const list = await loadTracks();
-      if (!list.some((t) => t.status === 'processing')) void loadCues(lang, list);
+      // Refresh the editor only when the language being edited just finished, and nothing unsaved would be lost.
+      const now = list.find((t) => t.lang === lang)?.status;
+      if (before === 'processing' && now === 'ready' && !dirty.current) void loadCues(lang, list);
     }, 4000);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -410,8 +426,12 @@ function CaptionsEditor({
   const current = tracks.find((t) => t.lang === lang);
   const options = Array.from(new Set([...LANGS, ...tracks.map((t) => t.lang)]));
 
-  const update = (key: number, patch: Partial<CaptionCue>) => setCues((cs) => cs.map((c) => (c.key === key ? { ...c, ...patch } : c)));
+  const update = (key: number, patch: Partial<CaptionCue>) => {
+    dirty.current = true;
+    setCues((cs) => cs.map((c) => (c.key === key ? { ...c, ...patch } : c)));
+  };
   const addCue = () => {
+    dirty.current = true;
     const at = round(videoRef.current?.currentTime ?? cues.at(-1)?.end ?? 0);
     const s = Math.min(at, Math.max(0, duration - 0.5));
     setCues((cs) => [...cs, { key: nextKey.current++, start: s, end: round(Math.min(duration, s + 2)), text: '' }].sort((a, b) => a.start - b.start));
@@ -464,7 +484,7 @@ function CaptionsEditor({
             </option>
           ))}
         </Select>
-        <TextField label="Label shown to viewers" value={label} maxLength={60} onChange={(e) => setLabel(e.currentTarget.value)} />
+        <TextField label="Label shown to viewers" value={label} maxLength={60} onChange={(e) => ((dirty.current = true), setLabel(e.currentTarget.value))} />
       </div>
       {current?.status === 'failed' && current.error ? <p className="yp-field__error">{current.error}</p> : null}
       {current?.status === 'processing' ? <p className="muted">Making captions automatically. This can take a few minutes.</p> : null}
@@ -503,7 +523,12 @@ function CaptionsEditor({
               aria-label={`Caption ${i + 1} text`}
               style={{ minWidth: 240 }}
             />
-            <Button variant="ghost" size="sm" onClick={() => setCues((cs) => cs.filter((x) => x.key !== c.key))} aria-label={`Remove caption ${i + 1}`}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => ((dirty.current = true), setCues((cs) => cs.filter((x) => x.key !== c.key)))}
+              aria-label={`Remove caption ${i + 1}`}
+            >
               Remove
             </Button>
           </li>

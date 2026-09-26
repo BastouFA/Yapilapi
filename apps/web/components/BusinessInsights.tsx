@@ -14,13 +14,21 @@ export function BusinessInsights({ businessId }: { businessId: string }) {
   const [days, setDays] = useState<'7' | '30' | '90'>('30');
   const [data, setData] = useState<BusinessAnalytics | null>(null);
   useEffect(() => {
+    let current = true;
     setData(null);
-    api.businesses.analytics(businessId, Number(days)).then(setData, () => {});
+    // A slow response for a period you've switched away from is dropped.
+    api.businesses.analytics(businessId, Number(days)).then(
+      (d) => current && setData(d),
+      () => {},
+    );
+    return () => {
+      current = false;
+    };
   }, [businessId, days]);
 
   const bookings = data ? Object.values(data.bookingsByStatus).reduce((a, b) => a + b.bookings, 0) : 0;
   const confirmed = data?.bookingsByStatus.confirmed?.bookings ?? 0;
-  const visitors = data ? data.views.reduce((a, d) => a + d.visitors, 0) : 0;
+  const visitors = data?.visitorsTotal ?? 0;
   const maxVisitors = Math.max(1, ...(data?.views.map((d) => d.visitors) ?? []));
 
   return (
@@ -45,7 +53,7 @@ export function BusinessInsights({ businessId }: { businessId: string }) {
               <Stat label="Booking requests" value={bookings} delta={bookings ? `${confirmed} confirmed` : undefined} />
               <Stat label="Upcoming bookings" value={data.upcomingBookings} />
               <Stat label="Rating" value={data.reviews.average ?? '–'} delta={`${data.reviews.count} review${data.reviews.count === 1 ? '' : 's'}`} />
-              {data.ads.impressions ? <Stat label="Ad views" value={data.ads.impressions} delta={`${data.ads.clicks} clicks`} /> : null}
+              {data.ads.impressions ? <Stat label="Ad views (all your campaigns)" value={data.ads.impressions} delta={`${data.ads.clicks} clicks`} /> : null}
             </div>
             {data.views.length ? (
               <div className="usage" aria-label="Visitors per day">

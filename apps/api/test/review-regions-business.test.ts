@@ -180,3 +180,76 @@ describe('business insights', () => {
     expect(a.body.ratingTrend[0].average).toBe(5);
   });
 });
+
+describe('regional rules with a CDN country', () => {
+  it('withholds for logged-out visitors and for accounts that pick another country', async () => {
+    process.env.TRUSTED_COUNTRY_HEADER = 'cf-ipcountry';
+    const cdn = await testApp();
+    delete process.env.TRUSTED_COUNTRY_HEADER;
+    try {
+      const author = await signUp(cdn.app);
+      const reader = await signUp(cdn.app);
+      const word = `forbiddenword${tag()}`;
+      const post = (await as(cdn.app, author).post('/v1/posts', { body: `Mentions ${word} here` })).body.post;
+      await as(cdn.app, admin).post('/v1/admin/regional-rules', { kind: 'blocked_term', country: 'ZZ', term: word, legalBasis: 'Test order 3' });
+      const get = (headers: Record<string, string>) => cdn.app.inject({ method: 'GET', url: `/v1/posts/${post.id}`, headers });
+
+      // Logged out: the request's country decides.
+      expect((await get({ 'cf-ipcountry': 'ZZ' })).statusCode).toBe(404);
+      expect((await get({ 'cf-ipcountry': 'YY' })).statusCode).toBe(200);
+
+      // Signed in from ZZ, then picking another country doesn't lift the rule.
+      const auth = { authorization: `Bearer ${reader.token}` };
+      await cdn.app.inject({ method: 'GET', url: '/v1/auth/me', headers: { ...auth, 'cf-ipcountry': 'ZZ' } });
+      await as(cdn.app, reader).patch('/v1/me/profile', { country: 'YY' });
+      expect((await get(auth)).statusCode).toBe(404);
+    } finally {
+      await cdn.close();
+    }
+  });
+
+  it('hides posts waiting for review from accounts without a birth date', async () => {
+    const author = await signUp(t.app, { birthDate: ADULT });
+    const noAge = await signUp(t.app);
+    const post = (await as(t.app, author).post('/v1/posts', { body: 'Needs a second look' })).body.post;
+    await t.ctx.db.query(`UPDATE posts SET moderation_status = 'review' WHERE id = $1`, [post.id]);
+    expect((await as(t.app, noAge).get(`/v1/posts/${post.id}`)).status).toBe(404);
+    expect((await as(t.app, null).get(`/v1/posts/${post.id}`)).status).toBe(404);
+  });
+});
+
+describe('ad budget refunds', () => {
+  it('refunds unspent budget on rejection, and money that arrives afterwards', async () => {
+    const shop = await signUp(t.app, { birthDate: ADULT });
+    const { camp } = await fundedCampaign(shop, 'Hand-thrown bowls'); // $10 paid and credited
+    await as(t.app, shop).patch(`/v1/ads/campaigns/${camp.id}`, { status: 'active' });
+    // A second payment is started while the campaign waits for review.
+    const late = await as(t.app, shop).post(`/v1/ads/campaigns/${camp.id}/fund`, { amountCents: 700, idempotencyKey: key() });
+    const mc = await caseFor(camp.id);
+    await as(t.app, admin).post(`/v1/admin/moderation/cases/${mc.id}/decide`, { decision: 'reject_ad', note: 'Show the price.' });
+
+    let c = (await as(t.app, shop).get('/v1/ads/campaigns')).body.items.find((x: any) => x.id === camp.id);
+    expect(c).toMatchObject({ status: 'rejected', budgetCents: 0, refundedCents: 1000 });
+
+    // The second payment lands after the rejection and goes straight back.
+    const ref = (await t.ctx.db.query(`SELECT provider_ref FROM payments WHERE order_id = $1`, [late.body.payment.orderId])).rows[0].provider_ref;
+    const payload = JSON.stringify({ id: `evt_${late.body.payment.orderId}`, type: 'payment.succeeded', providerRef: ref, amountCents: 700 });
+    await t.app.inject({
+      method: 'POST',
+      url: '/v1/payments/webhook/dev',
+      payload,
+      headers: { 'content-type': 'application/json', 'x-signature': signDevWebhook(t.ctx.config.PAYMENTS_WEBHOOK_SECRET, payload) },
+    });
+    c = (await as(t.app, shop).get('/v1/ads/campaigns')).body.items.find((x: any) => x.id === camp.id);
+    expect(c).toMatchObject({ budgetCents: 0, refundedCents: 1700 });
+    const refunds = await t.ctx.db.query(
+      `SELECT r.amount_cents FROM refunds r JOIN payments p ON p.id = r.payment_id JOIN orders o ON o.id = p.order_id WHERE o.campaign_id = $1 ORDER BY r.amount_cents`,
+      [camp.id],
+    );
+    expect(refunds.rows.map((r) => r.amount_cents)).toEqual([700, 1000]);
+
+    // Ad reviews can't be appealed and aren't listed as decisions against the advertiser.
+    expect((await as(t.app, shop).post('/v1/appeals', { caseId: mc.id, statement: 'Please look again' })).status).toBe(404);
+    expect((await as(t.app, shop).get('/v1/me/moderation')).body.items.some((x: any) => x.id === mc.id)).toBe(false);
+  });
+});

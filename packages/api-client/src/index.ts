@@ -210,8 +210,8 @@ export function createClient(opts: ClientOptions) {
       get: (slug: string) => get<{ business: Record<string, any>; places: Record<string, any>[]; products: Record<string, any>[] }>(`/v1/businesses/${slug}`),
     },
     orders: {
-      create: (items: { productId: string; quantity: number }[], idempotencyKey: string) =>
-        post<{ order: Record<string, any>; payment?: { provider: string; clientSecret: string } }>('/v1/orders', { items, idempotencyKey }),
+      create: (items: { productId: string; quantity: number }[], idempotencyKey: string, liveSessionId?: string) =>
+        post<{ order: Record<string, any>; payment?: { provider: string; clientSecret: string } }>('/v1/orders', { items, idempotencyKey, liveSessionId }),
       list: () => get<{ items: Record<string, any>[] }>('/v1/orders'),
     },
     search: (q: string, type = 'all') => get<{ query: string; intent: Record<string, any>; results: Record<string, any> }>(`/v1/search${qs({ q, type })}`),
@@ -592,6 +592,8 @@ export interface AdCampaign {
   currency: string;
   budgetCents: number;
   spentCents: number;
+  /** Unspent budget given back after the campaign was rejected or ended. */
+  refundedCents: number;
   impressions: number;
   clicks: number;
   ctr: number;
@@ -663,6 +665,7 @@ export interface BusinessAnalytics {
   reviews: { count: number; average: number | null };
   topProducts: { title: string; currency: string; units: number; revenue_cents: number }[];
   views: { day: string; business: number; places: number; visitors: number }[];
+  visitorsTotal: number;
   ratingTrend: { week: string; reviews: number; average: number }[];
   ads: { impressions: number; clicks: number; spentCents: number };
 }

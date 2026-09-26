@@ -1,11 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import ffmpegPath from 'ffmpeg-static';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { processJobs } from '../src/lib/jobs.ts';
-import { liveRecordingJobHandlers, pickHighlights, recordingSegments } from '../src/lib/live-recording.ts';
+import { liveRecordingJobHandlers, pickHighlights, recordingSegments, timelineMapper } from '../src/lib/live-recording.ts';
 import { mediaJobHandlers } from '../src/lib/media-processing.ts';
 import { studioJobHandlers } from '../src/lib/studio.ts';
 import { as, signUp, testApp } from './helpers.ts';
@@ -48,6 +48,20 @@ describe('highlight picking', () => {
   });
 });
 
+describe('recording timeline', () => {
+  it('maps chat times onto the joined recording and skips reconnect gaps', () => {
+    const t0 = new Date('2026-09-25T20:00:00Z');
+    // 60s segment, then the stream dropped for 2 minutes, then a 30s segment.
+    const map = timelineMapper([
+      { startedAt: t0, durationMs: 60_000 },
+      { startedAt: new Date(t0.getTime() + 180_000), durationMs: 30_000 },
+    ]);
+    expect(map(new Date(t0.getTime() + 10_000))).toBe(10_000);
+    expect(map(new Date(t0.getTime() + 120_000))).toBeNull(); // during the gap
+    expect(map(new Date(t0.getTime() + 190_000))).toBe(70_000); // 10s into the second segment
+  });
+});
+
 describe('live recording and auto-clips', () => {
   it('stores the recording for the host and cuts the busiest moment into a clip', async () => {
     const host = await signUp(t.app, { birthDate: '1990-01-01' });
@@ -84,6 +98,9 @@ describe('live recording and auto-clips', () => {
       path.join(folder, name),
     ]);
     expect(r.status).toBe(0);
+    // A finished segment: MediaMTX stopped writing to it a while ago.
+    const past = new Date(Date.now() - 30_000);
+    utimesSync(path.join(folder, name), past, past);
 
     // Four messages about 35 seconds into the recording.
     for (let i = 0; i < 4; i++) {

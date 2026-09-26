@@ -1,4 +1,6 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createReadStream, createWriteStream } from 'node:fs';
+import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { pipeline } from 'node:stream/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
@@ -16,6 +18,10 @@ export interface MediaStorage {
   /** Store at an exact key (derived files such as variants and HLS segments). */
   putKey(key: string, data: Buffer, mime: string): Promise<StoredObject>;
   read(key: string): Promise<Buffer>;
+  /** Store a file from disk without loading it into memory (videos, recordings). */
+  putFile(file: string, ext: string, mime: string, key?: string): Promise<StoredObject>;
+  /** Copy an object to a file on disk without loading it into memory. */
+  download(key: string, file: string): Promise<void>;
   /** Stream an object (S3 driver; local files are served statically). */
   get?(key: string, range?: string): Promise<{ body: Readable; contentType?: string; contentLength?: number; contentRange?: string; status: number } | null>;
 }
@@ -67,6 +73,24 @@ export function s3Storage(opts: {
       const r = await s3.send(new GetObjectCommand({ Bucket: opts.bucket, Key: key }));
       return Buffer.from(await r.Body!.transformToByteArray());
     },
+    async putFile(file, ext, mime, key = newKey(ext)) {
+      const { size } = await stat(file);
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: opts.bucket,
+          Key: key,
+          Body: createReadStream(file),
+          ContentLength: size,
+          ContentType: mime,
+          CacheControl: 'public, max-age=31536000, immutable',
+        }),
+      );
+      return { key, url: `${opts.publicBase}/media/${key}` };
+    },
+    async download(key, file) {
+      const r = await s3.send(new GetObjectCommand({ Bucket: opts.bucket, Key: key }));
+      await pipeline(r.Body as Readable, createWriteStream(file));
+    },
     async get(key, range) {
       try {
         const r = await s3.send(new GetObjectCommand({ Bucket: opts.bucket, Key: key, Range: range }));
@@ -111,6 +135,15 @@ export function localDiskStorage(dir: string, publicBase: string): MediaStorage 
     },
     async read(key) {
       return readFile(path.join(dir, key));
+    },
+    async putFile(file, ext, _mime, key = newKey(ext)) {
+      const full = path.join(dir, key);
+      await mkdir(path.dirname(full), { recursive: true });
+      await copyFile(file, full);
+      return { key, url: `${publicBase}/media/${key}` };
+    },
+    async download(key, file) {
+      await copyFile(path.join(dir, key), file);
     },
   };
 }

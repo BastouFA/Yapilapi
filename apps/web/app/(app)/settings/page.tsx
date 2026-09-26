@@ -71,7 +71,10 @@ function ProfileSettings() {
             bio: String(f.get('bio') ?? ''),
             mode: String(f.get('mode')),
             locale: String(f.get('locale')),
-            country: f.get('country') ? String(f.get('country')) : null,
+            // Only when changed: saving other fields mustn't turn a detected country into a chosen one.
+            ...((f.get('country') ? String(f.get('country')) : null) !== (me?.country ?? null)
+              ? { country: f.get('country') ? String(f.get('country')) : null }
+              : {}),
             isPrivate: f.get('isPrivate') === 'on',
             avatarUrl: profile.avatarUrl ?? null,
           });

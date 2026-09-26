@@ -4,6 +4,7 @@ import { hashToken } from '@yapilapi/auth';
 import { tx } from '@yapilapi/database';
 import { z } from 'zod';
 import { enqueue } from '../lib/jobs.ts';
+import { EDIT_STATUS } from './studio.ts';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { analyzeText } from '../lib/moderation.ts';
@@ -68,7 +69,8 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
       tp.price_cents AS ticket_price_cents, tp.currency AS ticket_currency, tp.title AS ticket_title,
       (l.ticket_product_id IS NULL OR l.host_id = $1
         OR EXISTS (SELECT 1 FROM live_participants p WHERE p.session_id = l.id AND p.user_id = $1 AND p.role IN ('cohost','moderator'))
-        OR EXISTS (SELECT 1 FROM orders o JOIN order_items oi ON oi.order_id = o.id WHERE o.buyer_id = $1 AND o.status = 'paid' AND oi.product_id = l.ticket_product_id)
+        OR EXISTS (SELECT 1 FROM orders o JOIN order_items oi ON oi.order_id = o.id
+                   WHERE o.buyer_id = $1 AND o.status = 'paid' AND o.live_session_id = l.id AND oi.product_id = l.ticket_product_id)
       ) AS has_access
     FROM live_sessions l JOIN profiles pr ON pr.user_id = l.host_id LEFT JOIN products tp ON tp.id = l.ticket_product_id`;
 
@@ -133,8 +135,8 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
     const l = await load(id, u.id);
     if (l.host_id !== u.id) throw forbidden();
     const clips = await db.query(
-      `SELECT e.id, e.start_ms, e.end_ms, e.status, e.error, r.id AS media_id, r.url, r.poster_url, r.hls_url, r.status AS media_status
-       FROM media_edits e LEFT JOIN media r ON r.id = e.result_media_id
+      `SELECT e.id, e.start_ms, e.end_ms, ${EDIT_STATUS} AS status, coalesce(e.error, j.last_error) AS error, r.id AS media_id, r.url, r.poster_url, r.hls_url
+       FROM media_edits e LEFT JOIN jobs j ON j.id = e.process_job_id LEFT JOIN media r ON r.id = e.result_media_id
        WHERE e.source_media_id = $1 AND e.auto ORDER BY e.start_ms`,
       [l.recording_media_id],
     );
@@ -145,8 +147,9 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
         id: c.id,
         startMs: c.start_ms,
         endMs: c.end_ms,
-        status: c.media_status === 'ready' ? 'ready' : c.status,
-        error: c.error,
+        status: c.status,
+        // Job errors are internal; the host gets a plain message.
+        error: c.status === 'failed' ? "This clip couldn't be made." : null,
         media: c.media_id ? { id: c.media_id, url: c.url, posterUrl: c.poster_url, hlsUrl: c.hls_url } : null,
       })),
     };
@@ -297,7 +300,8 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
   app.get('/v1/live/:id/chat', { preHandler: gate }, async (req) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
-    await load(id, u.id);
+    const l = await load(id, u.id);
+    if (!l.has_access) throw new AppError(402, 'ticket_required', 'This live needs a ticket.');
     const { rows } = await db.query(
       `SELECT c.id, c.kind, c.body, c.answered, c.amount_cents, c.currency, c.created_at, pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode
        FROM live_chat c JOIN profiles pr ON pr.user_id = c.user_id WHERE c.session_id = $1 AND c.deleted_at IS NULL AND ${notBlockedSql('c.user_id', '$2')}
@@ -409,7 +413,11 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
       return reply.code(200).send();
     }
     if (b.action === 'read' || b.action === 'playback') {
-      if (l.status !== 'live' || !checkView(sessionId, params.get('token') ?? '')) return reply.code(401).send();
+      const token = params.get('token') ?? '';
+      if (l.status !== 'live' || !checkView(sessionId, token)) return reply.code(401).send();
+      // The token is valid for hours; bans and refunded tickets take effect at the next check.
+      const viewer = await load(sessionId, token.split('.')[0]!).catch(() => null);
+      if (!viewer || viewer.banned || !viewer.has_access) return reply.code(401).send();
       return reply.code(200).send();
     }
     return reply.code(401).send();

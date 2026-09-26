@@ -1,3 +1,4 @@
+import { REQUEST_COUNTRY } from './request-context.ts';
 /**
  * SQL predicates that decide what a viewer may see. Every read path (feed,
  * profile, search, AI context) uses these, so authorization lives in one place
@@ -14,8 +15,10 @@ export function notBlockedSql(otherUserCol: string, v: string): string {
 
 /**
  * Posts aliased `p`, author's profile aliased `ap`, author user aliased `au`.
- * Posts waiting for a moderator (flagged as possibly sensitive) stay hidden from people under 18 until cleared,
- * and posts withheld by a regional rule are hidden from viewers in that country.
+ * Posts waiting for a moderator (flagged as possibly sensitive) stay hidden until cleared from people under 18 and
+ * from anyone whose age isn't known (no birth date, or not signed in). Posts withheld by a regional rule are hidden
+ * from viewers in that country: the one they chose, the one the CDN reports for their account, and the one the CDN
+ * reports for this request (which also covers people who aren't signed in).
  */
 export function postVisibleSql(v: string): string {
   return `(
@@ -23,10 +26,13 @@ export function postVisibleSql(v: string): string {
     AND au.status = 'active'
     AND (p.moderation_status IN ('normal', 'review') OR p.author_id = ${v})
     AND (p.moderation_status <> 'review' OR p.author_id = ${v}
-         OR coalesce((SELECT uv.birth_date FROM users uv WHERE uv.id = ${v}) <= current_date - interval '18 years', true))
+         OR coalesce((SELECT uv.birth_date FROM users uv WHERE uv.id = ${v}) <= current_date - interval '18 years', false))
     AND ${notBlockedSql('p.author_id', v)}
     AND (p.author_id = ${v} OR NOT EXISTS (
-      SELECT 1 FROM post_withholdings w WHERE w.post_id = p.id AND w.country = (SELECT pv.country FROM profiles pv WHERE pv.user_id = ${v})))
+      SELECT 1 FROM post_withholdings w WHERE w.post_id = p.id AND w.country IN (
+        (SELECT pv.country FROM profiles pv WHERE pv.user_id = ${v}),
+        (SELECT pv.cdn_country FROM profiles pv WHERE pv.user_id = ${v}),
+        ${REQUEST_COUNTRY})))
     AND (
       p.author_id = ${v}
       OR (p.visibility = 'public' AND (NOT ap.is_private OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${v} AND f.followee_id = p.author_id)))

@@ -250,7 +250,12 @@ describe('ticketed lives and live shopping', () => {
     expect(refused.status).toBe(402);
     expect(refused.body.error.code).toBe('ticket_required');
 
-    const order = await as(t.app, fan).post('/v1/orders', { items: [{ productId: ticket.id, quantity: 1 }], idempotencyKey: key() });
+    expect((await as(t.app, fan).get(`/v1/live/${live.id}/chat`)).status).toBe(402); // no ticket, no chat either
+    // The order must be the ticket for this live.
+    expect(
+      (await as(t.app, fan).post('/v1/orders', { items: [{ productId: mug.id, quantity: 1 }], idempotencyKey: key(), liveSessionId: live.id })).status,
+    ).toBe(400);
+    const order = await as(t.app, fan).post('/v1/orders', { items: [{ productId: ticket.id, quantity: 1 }], idempotencyKey: key(), liveSessionId: live.id });
     await pay(order.body.order.id, 800);
     const joined = await as(t.app, fan).post(`/v1/live/${live.id}/join`);
     expect(joined.status).toBe(200);
@@ -265,5 +270,10 @@ describe('ticketed lives and live shopping', () => {
     await as(t.app, host).del(`/v1/live/${live.id}/products/${mug.id}`);
     expect((await as(t.app, fan).get(`/v1/live/${live.id}/products`)).body.items).toEqual([]);
     expect((await as(t.app, host).patch(`/v1/live/${live.id}`, { ticketProductId: null })).status).toBe(400); // already started
+
+    // A ticket unlocks one live: the same ticket product on a second live needs a new purchase.
+    const second = (await as(t.app, host).post('/v1/live', { title: 'Second show', ticketProductId: ticket.id })).body.live;
+    await as(t.app, host).post(`/v1/live/${second.id}/start`);
+    expect((await as(t.app, fan).post(`/v1/live/${second.id}/join`)).status).toBe(402);
   });
 });

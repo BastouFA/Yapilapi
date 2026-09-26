@@ -8,7 +8,6 @@ import { api, errorMessage } from '@/lib/api';
 import { useRealtime, useSession } from '../../../providers';
 import { HlsVideo } from '@/components/HlsVideo';
 import { TipSheet } from '@/components/SupportCreator';
-import { BuyButton } from '@/components/BuyButton';
 import { LiveShop } from '@/components/LiveShop';
 import { LiveClips } from '@/components/LiveClips';
 import { formatMoney } from '@yapilapi/shared';
@@ -17,6 +16,19 @@ export default function LivePage() {
   const { id } = useParams<{ id: string }>();
   const { me, toast, locale, flags } = useSession();
   const [live, setLive] = useState<LiveSummary | null>(null);
+  const [waitingForTicket, setWaitingForTicket] = useState(false);
+  // After buying a ticket, check until the payment is confirmed, then join and start playback.
+  useEffect(() => {
+    if (!waitingForTicket) return;
+    const timer = setInterval(async () => {
+      const r = await api.live.get(id).catch(() => null);
+      if (!r?.live.ticket?.hasTicket) return;
+      setWaitingForTicket(false);
+      setLive(r.live.status === 'live' ? (await api.live.join(id).catch(() => r)).live : r.live);
+      setChat((await api.live.chat(id).catch(() => ({ items: [] }))).items);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [waitingForTicket, id]);
   const [missing, setMissing] = useState(false);
   const [chat, setChat] = useState<LiveChatMessage[]>([]);
   const [body, setBody] = useState('');
@@ -112,8 +124,26 @@ export default function LivePage() {
 
       {live.ticket && !live.ticket.hasTicket ? (
         <Alert tone="warning" title={`${live.ticket.title}: ${formatMoney(live.ticket.priceCents, live.ticket.currency, locale)}`}>
-          <p style={{ margin: '0 0 8px' }}>This live needs a ticket. Once your payment is confirmed, the video starts here.</p>
-          <BuyButton productId={live.ticket.productId} />
+          <p style={{ margin: '0 0 8px' }}>
+            {waitingForTicket
+              ? 'Waiting for your payment to be confirmed. The video starts here as soon as it is.'
+              : 'This live needs a ticket. Once your payment is confirmed, the video starts here.'}
+          </p>
+          <Button
+            size="sm"
+            loading={waitingForTicket}
+            onClick={async () => {
+              try {
+                const r = await api.orders.create([{ productId: live.ticket!.productId, quantity: 1 }], crypto.randomUUID(), live.id);
+                if (r.order.status !== 'paid') toast('Complete payment to get your ticket.');
+                setWaitingForTicket(true);
+              } catch (e) {
+                toast(errorMessage(e));
+              }
+            }}
+          >
+            Buy ticket
+          </Button>
         </Alert>
       ) : null}
 

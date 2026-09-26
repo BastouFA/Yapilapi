@@ -170,8 +170,12 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
     const header = ctx.config.TRUSTED_COUNTRY_HEADER;
     const cc = header ? String(req.headers[header.toLowerCase()] ?? '').toUpperCase() : '';
     if (/^[A-Z]{2}$/.test(cc) && cc !== 'XX' && cc !== 'T1')
+      // cdn_country always follows the CDN, so regional rules still apply when someone picks another country.
       await ctx.db.query(
-        `UPDATE profiles SET country = $2, country_source = 'cdn' WHERE user_id = $1 AND country_source IS DISTINCT FROM 'user' AND country IS DISTINCT FROM $2`,
+        `UPDATE profiles SET cdn_country = $2,
+           country = CASE WHEN country_source IS DISTINCT FROM 'user' THEN $2 ELSE country END,
+           country_source = CASE WHEN country_source IS DISTINCT FROM 'user' THEN 'cdn' ELSE country_source END
+         WHERE user_id = $1 AND (cdn_country IS DISTINCT FROM $2 OR (country_source IS DISTINCT FROM 'user' AND country IS DISTINCT FROM $2))`,
         [me(req).id, cc],
       );
     return { user: await loadMe(ctx, me(req).id) };

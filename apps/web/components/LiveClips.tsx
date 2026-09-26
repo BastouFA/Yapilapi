@@ -34,7 +34,7 @@ export function LiveClips({ liveId }: { liveId: string }) {
     <Card title="Recording and highlights" subtitle="Highlights are the moments your chat was busiest. Only you can see these until you post them.">
       {recording.status === 'pending' ? (
         <p className="muted">Saving the recording. This takes a minute or two.</p>
-      ) : recording.status === 'none' ? (
+      ) : recording.status === 'none' || recording.status === null ? (
         <p className="muted">No recording was made for this live.</p>
       ) : recording.status === 'failed' ? (
         <p className="yp-field__error">The recording couldn&apos;t be saved.</p>

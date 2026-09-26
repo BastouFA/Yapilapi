@@ -125,11 +125,12 @@ export class AiGateway {
       );
       const row = c.rows[0];
       if (!row || (row.visibility === 'private' && !row.role)) throw notFound('Community');
+      // Only posts this person could see themselves: blocks, regional rules and private audiences apply.
       const { rows } = await this.db.query<{ name: string; body: string }>(
-        `SELECT pr.display_name AS name, p.body FROM posts p JOIN profiles pr ON pr.user_id = p.author_id
-         WHERE p.community_id = $1 AND p.deleted_at IS NULL AND p.moderation_status = 'normal'
+        `SELECT ap.display_name AS name, p.body FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
+         WHERE p.community_id = $1 AND p.moderation_status = 'normal' AND ${postVisibleSql('$2')}
          ORDER BY p.created_at DESC LIMIT 100`,
-        [req.communityId],
+        [req.communityId, req.userId],
       );
       return { text: rows.map((r) => `${r.name}: ${r.body}`).join('\n'), scopes: [`community:${req.communityId}`] };
     }
