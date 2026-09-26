@@ -6,6 +6,8 @@ import ffmpegPath from 'ffmpeg-static';
 import sharp from 'sharp';
 import type { Pool } from 'pg';
 import type { MediaStorage } from './storage.ts';
+import type { RealtimeHub } from './realtime.ts';
+import { recordVerdict, type MediaFrame, type MediaModerator } from './media-moderation.ts';
 
 /** Image sizes served to clients. Metadata (including GPS) is stripped from every derivative. */
 const IMAGE_SIZES = { thumb: 320, medium: 1080, large: 2048 } as const;
@@ -13,6 +15,31 @@ const IMAGE_SIZES = { thumb: 320, medium: 1080, large: 2048 } as const;
 export interface ProcessDeps {
   db: Pool;
   storage: MediaStorage;
+  /** Automated image and video checks. Without one (or with "none"), media stays "pending" and is shown normally. */
+  moderator?: MediaModerator;
+  /** Tells the uploader when something is blocked. */
+  realtime?: RealtimeHub;
+}
+
+interface MediaRow {
+  id: string;
+  ownerId: string;
+  kind: 'image' | 'video';
+  key: string;
+  filename: string | null;
+}
+
+/** Run the moderator on the frames and store its verdict. Errors propagate so the job retries. */
+async function moderate(deps: ProcessDeps, m: MediaRow, frames: MediaFrame[]) {
+  if (!deps.moderator || deps.moderator.name === 'none' || !frames.length) return;
+  const result = await deps.moderator.moderate(frames, { mediaId: m.id, kind: m.kind, filename: m.filename });
+  await recordVerdict(deps.db, deps.realtime, { id: m.id, ownerId: m.ownerId, kind: m.kind }, deps.moderator.name, result);
+}
+
+/** Evenly spaced moments to sample from a video (a quarter, half and three quarters in). */
+export function sampleTimes(durationMs: number | null, count = 3): number[] {
+  if (!durationMs || durationMs < 1500) return [];
+  return Array.from({ length: count }, (_, i) => Math.round((durationMs * (i + 1)) / (count + 1)) / 1000);
 }
 
 export function run(args: string[], cwd?: string): Promise<void> {
@@ -55,7 +82,8 @@ export function probe(file: string): Promise<VideoInfo> {
   });
 }
 
-async function processImage(deps: ProcessDeps, id: string, key: string) {
+async function processImage(deps: ProcessDeps, m: MediaRow) {
+  const { id, key } = m;
   const original = await deps.storage.read(key);
   const base = key.replace(/\.[^.]+$/, '');
   const meta = await sharp(original).metadata();
@@ -77,9 +105,18 @@ async function processImage(deps: ProcessDeps, id: string, key: string) {
       `data:image/webp;base64,${tiny.toString('base64')}`,
     ],
   );
+  if (deps.moderator && deps.moderator.name !== 'none') {
+    const still = await sharp(original)
+      .rotate()
+      .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+    await moderate(deps, m, [{ data: still, mime: 'image/jpeg', label: 'image' }]);
+  }
 }
 
-async function processVideo(deps: ProcessDeps, id: string, key: string) {
+async function processVideo(deps: ProcessDeps, m: MediaRow) {
+  const { id, key } = m;
   const dir = await mkdtemp(path.join(tmpdir(), 'ypl-video-'));
   try {
     const input = path.join(dir, 'input');
@@ -223,6 +260,19 @@ async function processVideo(deps: ProcessDeps, id: string, key: string) {
                         blurhash = coalesce($8, blurhash) WHERE id = $1`,
       [id, poster.url, hls, mp4.url, info.durationMs, info.width, info.height, tiny ? `data:image/webp;base64,${tiny.toString('base64')}` : null],
     );
+    if (deps.moderator && deps.moderator.name !== 'none') {
+      // The poster plus a few frames sampled across the video.
+      const frames: MediaFrame[] = [{ data: await readFile(path.join(dir, 'poster.jpg')), mime: 'image/jpeg', label: 'poster' }];
+      for (const [i, t] of sampleTimes(info.durationMs).entries()) {
+        const out = path.join(dir, `frame${i}.jpg`);
+        const ok = await run(['-ss', String(t), '-i', input, '-frames:v', '1', '-vf', "scale='min(1024,iw)':-2", '-q:v', '4', out]).then(
+          () => true,
+          () => false,
+        );
+        if (ok) frames.push({ data: await readFile(out), mime: 'image/jpeg', label: `frame@${t}s` });
+      }
+      await moderate(deps, m, frames);
+    }
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -230,12 +280,14 @@ async function processVideo(deps: ProcessDeps, id: string, key: string) {
 
 export function mediaJobHandlers(deps: ProcessDeps) {
   return {
-    'media.process': async ({ mediaId }: { mediaId: string }) => {
-      const { rows } = await deps.db.query(`SELECT id, kind, storage_key FROM media WHERE id = $1`, [mediaId]);
-      const m = rows[0];
-      if (!m?.storage_key) return;
-      if (m.kind === 'image') await processImage(deps, m.id, m.storage_key);
-      else if (m.kind === 'video') await processVideo(deps, m.id, m.storage_key);
+    /** `filename` is the name the file had on the uploader's device; the dev moderator reads it. */
+    'media.process': async ({ mediaId, filename }: { mediaId: string; filename?: string | null }) => {
+      const { rows } = await deps.db.query(`SELECT id, owner_id, kind, storage_key FROM media WHERE id = $1`, [mediaId]);
+      const r = rows[0];
+      if (!r?.storage_key) return;
+      const m: MediaRow = { id: r.id, ownerId: r.owner_id, kind: r.kind, key: r.storage_key, filename: filename ?? null };
+      if (r.kind === 'image') await processImage(deps, m);
+      else if (r.kind === 'video') await processVideo(deps, m);
     },
   };
 }

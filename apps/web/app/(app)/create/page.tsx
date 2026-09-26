@@ -21,6 +21,7 @@ import {
 /** Posts can be for subscribers, stories for close friends; one picker holds either. */
 type Audience = Visibility | StoryVisibility;
 import { api, errorMessage, fieldErrors } from '@/lib/api';
+import { isVerificationError, VerifyPrompt } from '@/components/Verification';
 import { SimilarQuestions } from '@/components/CommunityExtras';
 import { SoundPicker, SoundPlayButton } from '@/components/SoundPicker';
 import { useSession } from '../../providers';
@@ -84,6 +85,7 @@ function Create() {
   const [aiUsed, setAiUsed] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsVerify, setNeedsVerify] = useState(false);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -164,6 +166,7 @@ function Create() {
     e.preventDefault();
     setBusy(true);
     setError(null);
+    setNeedsVerify(false);
     setFields({});
     try {
       if (kind === 'story') {
@@ -207,7 +210,8 @@ function Create() {
       toast(r.moderation ? r.moderation.message : t('create.published'));
       router.push(communityId ? `/c/${communities.find((c) => c.id === communityId)?.slug ?? ''}` : '/home');
     } catch (err) {
-      setError(errorMessage(err));
+      if (isVerificationError(err)) setNeedsVerify(true);
+      else setError(errorMessage(err));
       setFields(fieldErrors(err));
     } finally {
       setBusy(false);
@@ -282,6 +286,7 @@ function Create() {
             : 'A photo, video or a few words for your people. It disappears when you choose.'}
       </p>
       {error ? <Alert tone="danger">{error}</Alert> : null}
+      {needsVerify || (me?.needsVerification && kind !== 'story' && (visibility === 'public' || !!communityId)) ? <VerifyPrompt action="post" /> : null}
 
       <div className="composer-box">
         <label htmlFor="body" className="yp-visually-hidden">

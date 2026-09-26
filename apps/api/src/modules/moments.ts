@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { AppError, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { analyzeText } from '../lib/moderation.ts';
+import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
 import { track } from '../lib/services.ts';
 import { plusCol, publicUserFrom } from '../lib/users.ts';
 import { notBlockedSql } from '../lib/visibility.ts';
@@ -12,6 +13,7 @@ import { me, requireAuth } from '../plugins/auth.ts';
 /**
  * Stories the viewer ($1) may see: their own, and active ones from people they follow or are friends with.
  * Close friends stories reach only the people on the author's close friends list who still follow them.
+ * Stories whose photo or video was blocked are gone for everyone; sensitive ones are never shown to people under 18.
  */
 const STORY_VISIBLE = `m.deleted_at IS NULL AND (m.expires_at IS NULL OR m.expires_at > now()) AND au.status = 'active'
   AND ${notBlockedSql('m.author_id', '$1')}
@@ -20,7 +22,9 @@ const STORY_VISIBLE = `m.deleted_at IS NULL AND (m.expires_at IS NULL OR m.expir
         AND EXISTS (SELECT 1 FROM close_friends cf WHERE cf.owner_id = m.author_id AND cf.friend_id = $1)
         AND EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = m.author_id))
     OR (m.visibility IN ('public','followers') AND EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = m.author_id))
-    OR (m.visibility IN ('public','followers','friends') AND EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = m.author_id) OR (fr.user_b = $1 AND fr.user_a = m.author_id))))`;
+    OR (m.visibility IN ('public','followers','friends') AND EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = m.author_id) OR (fr.user_b = $1 AND fr.user_a = m.author_id))))
+  AND NOT EXISTS (SELECT 1 FROM media x WHERE x.id = m.media_id AND (x.moderation = 'blocked'
+    OR (x.moderation = 'sensitive' AND NOT coalesce((SELECT uv.birth_date <= current_date - interval '18 years' FROM users uv WHERE uv.id = $1), false))))`;
 
 /**
  * Stories (called moments in the API): short-lived photos, videos or text
@@ -46,8 +50,9 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
     let mediaKind = input.mediaKind ?? null;
     if (input.mediaId) {
       // Only your own upload; its URL and kind come from the stored item, not the request.
-      const m = (await db.query(`SELECT url, kind FROM media WHERE id = $1 AND owner_id = $2`, [input.mediaId, u.id])).rows[0];
+      const m = (await db.query(`SELECT url, kind, moderation FROM media WHERE id = $1 AND owner_id = $2`, [input.mediaId, u.id])).rows[0];
       if (!m) throw notFound('That photo or video');
+      if (m.moderation === 'blocked') throw new AppError(422, 'media_blocked', MEDIA_BLOCKED_MESSAGE);
       mediaUrl = m.url;
       mediaKind = m.kind;
     }
@@ -73,7 +78,7 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
     const u = me(req);
     const { rows } = await db.query(
       `SELECT m.id, m.body, m.media_url, m.media_kind, m.location_text, m.expires_at, m.created_at, m.visibility = 'close_friends' AS close_friends,
-              md.poster_url, md.hls_url, md.variants, md.duration_ms,
+              md.poster_url, md.hls_url, md.variants, md.duration_ms, md.moderation,
               v.viewer_id IS NOT NULL AS seen, coalesce(v.liked, false) AS liked,
               CASE WHEN m.author_id = $1 THEN (SELECT count(*) FROM moment_views mv WHERE mv.moment_id = m.id AND mv.viewer_id <> $1) END AS views,
               pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode
@@ -98,6 +103,7 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
         posterUrl: r.poster_url ?? null,
         hlsUrl: r.hls_url ?? null,
         durationMs: r.duration_ms ?? null,
+        ...(r.moderation === 'sensitive' ? { sensitive: true } : {}),
         locationText: r.location_text,
         closeFriends: r.close_friends,
         expiresAt: r.expires_at,

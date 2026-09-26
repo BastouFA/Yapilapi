@@ -44,6 +44,15 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
   mfa_disabled: () => 'Two-step verification was turned off for your account.',
   mfa_recovery_code_used: () => 'A recovery code was used to sign in to your account.',
   passkey_added: () => 'A passkey was added to your account.',
+  media_blocked: () =>
+    'A photo or video you shared looks like it goes against our community rules, so it isn’t shown for now. Someone on our team will check it, and we’ll let you know.',
+  media_restored: () => 'We checked your photo or video and it’s back up. Sorry for the trouble.',
+  account_limited: () =>
+    'Some of your recent posts or messages were flagged, so your account is limited while our team takes a look. You can still post for yourself and message friends.',
+  account_review: (n) =>
+    n.data.outcome === 'cleared'
+      ? 'We reviewed your account and lifted the limit. Held posts and messages are now shared.'
+      : 'We reviewed your account. It stays limited for now. You can see decisions and appeal from Settings.',
 };
 
 function hrefFor(n: NotificationItem): string | undefined {
@@ -58,6 +67,7 @@ function hrefFor(n: NotificationItem): string | undefined {
   if (n.entityType === 'event') return `/events/${n.entityId}`;
   if (n.entityType === 'friend_request') return '/inbox';
   if (n.entityType === 'moderation_case') return '/settings#moderation';
+  if (n.type === 'account_limited' || n.type === 'account_review') return '/settings#moderation';
   if (n.actor) return `/u/${n.actor.username}`;
   return undefined;
 }

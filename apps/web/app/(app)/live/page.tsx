@@ -8,6 +8,7 @@ import { Avatar, Badge, Button, EmptyState, Select, Skeleton, TextField } from '
 import type { LiveProduct, LiveSummary } from '@yapilapi/api-client';
 import { formatMoney } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
+import { isVerificationError, VerifyPrompt } from '@/components/Verification';
 import { useSession } from '../../providers';
 
 export default function LiveList() {
@@ -18,6 +19,7 @@ export default function LiveList() {
   const [visibility, setVisibility] = useState('public');
   const [ticketId, setTicketId] = useState('');
   const [tickets, setTickets] = useState<LiveProduct[]>([]);
+  const [needsVerify, setNeedsVerify] = useState(false);
   useEffect(() => {
     if (!me || flags.LIVE === false) return;
     api.raw.get<{ items: LiveProduct[] }>(`/v1/products?sellerId=${me.id}&limit=50`).then(
@@ -51,10 +53,12 @@ export default function LiveList() {
             sessionStorage.setItem(`ypl-ingest-${r.live.id}`, JSON.stringify(r.ingest));
             router.push(`/live/${r.live.id}`);
           } catch (err) {
-            toast(errorMessage(err));
+            if (isVerificationError(err)) setNeedsVerify(true);
+            else toast(errorMessage(err));
           }
         }}
       >
+        {needsVerify || me?.needsVerification ? <VerifyPrompt action="live" /> : null}
         <TextField label="Go live about…" value={title} onChange={(e) => setTitle(e.currentTarget.value)} maxLength={120} />
         <Select label="Who can watch" value={visibility} onChange={(e) => setVisibility(e.currentTarget.value)}>
           <option value="public">Everyone</option>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Button, Icon } from '@yapilapi/design-system';
+import { Button, Icon, SensitiveCover } from '@yapilapi/design-system';
 import type { Message } from '@yapilapi/shared';
 
 type Attachment = Message['attachments'][number];
@@ -13,11 +13,21 @@ const clock = (ms: number) => {
 
 /** Photos, videos and voice messages inside a chat bubble. */
 export function MessageAttachments({ items }: { items: Attachment[] }) {
+  const [revealed, setRevealed] = useState<number[]>([]);
   if (!items.length) return null;
   return (
     <div className="chat-att">
       {items.map((a, i) =>
-        a.kind === 'image' ? (
+        a.removed ? (
+          <p key={i} className="chat-att__removed">
+            This photo or video isn’t available.
+          </p>
+        ) : a.sensitive && !revealed.includes(i) && (a.kind === 'image' || a.kind === 'video') ? (
+          <div key={i} className="chat-att__media chat-att__sensitive">
+            {a.kind === 'image' || a.posterUrl ? <img src={a.kind === 'image' ? a.url : a.posterUrl!} alt="" aria-hidden className="yp-blurred" /> : null}
+            <SensitiveCover compact onReveal={() => setRevealed((r) => [...r, i])} />
+          </div>
+        ) : a.kind === 'image' ? (
           <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" className="chat-att__media">
             <img src={a.url} alt={a.name || 'Photo'} loading="lazy" />
           </a>

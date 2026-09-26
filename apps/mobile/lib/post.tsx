@@ -9,6 +9,7 @@ import { useT, type Translate } from './i18n';
 import { radius, space } from './theme';
 import { Avatar, Card, Icon, PlusBadge, useColors, userText } from './ui';
 import { LockedPanel } from './money';
+import { SensitiveCover } from './safety';
 
 export const conversationTitle = (c: Conversation, meId: string | undefined, t: Translate) =>
   c.title ??
@@ -53,7 +54,10 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
   const [reposts, setReposts] = useState(post.counts.reposts);
   const { me } = useSession();
   const canRepost = post.visibility === 'public' && post.author.id !== me?.id;
+  // Sensitive photos stay blurred until the person chooses to view them (the API never sends them to under-18s).
+  const [revealed, setRevealed] = useState(false);
   const image = post.media.find((m) => m.kind === 'image');
+  const covered = !!image?.sensitive && !revealed;
   const imageUri = image ? (image.variants?.medium ?? image.url) : null;
 
   return (
@@ -128,17 +132,21 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
       ) : null}
 
       {imageUri ? (
-        <Image
-          source={{ uri: mediaUrl(imageUri) }}
-          accessibilityLabel={image?.altText ?? t('m.post.photo')}
-          style={{
-            width: '100%',
-            aspectRatio: image?.width && image?.height ? Math.max(0.75, Math.min(1.9, image.width / image.height)) : 4 / 3,
-            borderRadius: radius.md,
-            backgroundColor: c.surfaceSunken,
-          }}
-          resizeMode="cover"
-        />
+        <View style={{ borderRadius: radius.md, overflow: 'hidden' }}>
+          <Image
+            source={{ uri: mediaUrl(imageUri) }}
+            accessibilityLabel={covered ? undefined : (image?.altText ?? t('m.post.photo'))}
+            accessibilityElementsHidden={covered}
+            blurRadius={covered ? 40 : 0}
+            style={{
+              width: '100%',
+              aspectRatio: image?.width && image?.height ? Math.max(0.75, Math.min(1.9, image.width / image.height)) : 4 / 3,
+              backgroundColor: c.surfaceSunken,
+            }}
+            resizeMode="cover"
+          />
+          {covered ? <SensitiveCover onReveal={() => setRevealed(true)} /> : null}
+        </View>
       ) : null}
 
       {post.poll ? (

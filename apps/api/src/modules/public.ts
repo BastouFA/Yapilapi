@@ -63,6 +63,8 @@ export default async function publicModule(app: FastifyInstance, ctx: AppContext
                                         'width', m.width, 'height', m.height, 'durationMs', m.duration_ms, 'alt', m.alt_text)
                  FROM post_media pm JOIN media m ON m.id = pm.media_id
                  WHERE pm.post_id = p.id AND p.visibility = 'public' AND m.kind IN ('image', 'video') AND m.status = 'ready'
+                   -- Link previews are seen by anyone, whatever their age: never sensitive or blocked media.
+                   AND m.moderation NOT IN ('sensitive', 'blocked')
                  ORDER BY pm.position LIMIT 1) AS media
        FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
        LEFT JOIN communities c ON c.id = p.community_id

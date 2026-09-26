@@ -2,11 +2,27 @@
 
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { Avatar, AvatarGroup, Badge, Button, EmptyState, Skeleton, TextField } from '@yapilapi/design-system';
+import { Avatar, AvatarGroup, Badge, Button, EmptyState, SensitiveCover, Skeleton, TextField } from '@yapilapi/design-system';
 import type { TogetherDetail } from '@yapilapi/api-client';
 import { api, errorMessage } from '@/lib/api';
 import { Capture } from '@/components/Capture';
 import { useRealtime, useSession } from '../../../providers';
+
+/** A contribution's photo; sensitive ones stay blurred until the viewer chooses to see them. */
+function ContributionPhoto({ media, author }: { media: NonNullable<TogetherDetail['contributions'][number]['media']>; author: string }) {
+  const [shown, setShown] = useState(!media.sensitive);
+  return (
+    <div style={{ position: 'relative', overflow: 'hidden' }}>
+      <img
+        src={media.url}
+        alt={shown ? (media.altText ?? `Photo by ${author}`) : ''}
+        className={shown ? undefined : 'yp-blurred'}
+        style={{ display: 'block', width: '100%', aspectRatio: '4 / 5', objectFit: 'cover' }}
+      />
+      {shown ? null : <SensitiveCover onReveal={() => setShown(true)} />}
+    </div>
+  );
+}
 
 export default function TogetherPage() {
   const { id } = useParams<{ id: string }>();
@@ -82,13 +98,7 @@ export default function TogetherPage() {
         <div className="yp-grid">
           {t.contributions.map((c) => (
             <figure key={c.id} className="yp-card" style={{ margin: 0, overflow: 'hidden' }}>
-              {c.media ? (
-                <img
-                  src={c.media.url}
-                  alt={c.media.altText ?? `Photo by ${c.author.displayName}`}
-                  style={{ width: '100%', aspectRatio: '4 / 5', objectFit: 'cover' }}
-                />
-              ) : null}
+              {c.media ? <ContributionPhoto media={c.media} author={c.author.displayName} /> : null}
               <figcaption style={{ padding: 12 }}>
                 <strong>{c.author.displayName}</strong>
                 <span className="muted"> · {new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(c.capturedAt))}</span>

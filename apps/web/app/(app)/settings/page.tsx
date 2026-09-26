@@ -13,11 +13,20 @@ import { currentSubscription, disableBrowserPush, enableBrowserPush, pushSupport
 import { FamilyCard } from '@/components/Family';
 import { CloseFriendsCard } from '@/components/CloseFriends';
 import { PurchasesCard } from '@/components/Shop';
+import { VerificationCard } from '@/components/Verification';
 import { useSession } from '../../providers';
 
 export default function Settings() {
   const [tab, setTab] = useState(() =>
-    typeof location === 'undefined' ? 'profile' : location.hash === '#moderation' ? 'safety' : location.hash === '#close-friends' ? 'privacy' : 'profile',
+    typeof location === 'undefined'
+      ? 'profile'
+      : location.hash === '#moderation'
+        ? 'safety'
+        : location.hash === '#close-friends'
+          ? 'privacy'
+          : location.hash === '#verification'
+            ? 'security'
+            : 'profile',
   );
   return (
     <div className="yp-shell__inner">
@@ -486,6 +495,7 @@ function SecuritySettings() {
   }, []);
   return (
     <div className="stack">
+      <VerificationCard />
       <Card title="Where you're signed in">
         <List>
           {sessions.map((s) => (

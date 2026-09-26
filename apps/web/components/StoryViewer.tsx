@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Avatar, BottomSheet, Button, Icon, List, ListItem, useModalFocus } from '@yapilapi/design-system';
+import { Avatar, BottomSheet, Button, Icon, List, ListItem, SensitiveCover, useModalFocus } from '@yapilapi/design-system';
 import type { StoryGroup } from '@yapilapi/api-client';
 import { formatRelativeTime, type PublicUser } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
@@ -39,6 +39,9 @@ export function StoryViewer({
   const videoRef = useRef<HTMLVideoElement>(null);
   const group = groups[g];
   const story = group?.moments[i];
+  // Sensitive stories wait, blurred and paused, until the viewer chooses to see them.
+  const [revealed, setRevealed] = useState<string[]>([]);
+  const covered = !!story?.sensitive && !revealed.includes(story.id);
   useModalFocus(root, true, onClose);
 
   const next = useCallback(() => {
@@ -66,6 +69,7 @@ export function StoryViewer({
   useEffect(() => {
     setProgress(0);
     setReply('');
+    if (covered) setPaused(true);
     if (!story || story.seen || group?.mine) return;
     void api.moments.view(story.id).catch(() => {});
     onChange(
@@ -158,7 +162,8 @@ export function StoryViewer({
               ref={videoRef}
               src={story.mediaUrl}
               poster={story.posterUrl ?? undefined}
-              autoPlay
+              className={covered ? 'yp-blurred' : undefined}
+              autoPlay={!covered}
               playsInline
               onTimeUpdate={(e) => {
                 const v = e.currentTarget;
@@ -167,7 +172,12 @@ export function StoryViewer({
               onEnded={next}
             />
           ) : story.mediaKind === 'image' && story.mediaUrl ? (
-            <img key={story.id} src={story.mediaUrl} alt={story.body || `Story from ${group.author.displayName}`} />
+            <img
+              key={story.id}
+              src={story.mediaUrl}
+              alt={covered ? '' : story.body || `Story from ${group.author.displayName}`}
+              className={covered ? 'yp-blurred' : undefined}
+            />
           ) : (
             <p className="story__text" dir="auto">
               {story.body}
@@ -177,6 +187,15 @@ export function StoryViewer({
             <p className="story__caption" dir="auto">
               {story.body}
             </p>
+          ) : null}
+          {covered ? (
+            <SensitiveCover
+              onReveal={() => {
+                setRevealed((r) => [...r, story.id]);
+                setPaused(false);
+                void videoRef.current?.play().catch(() => {});
+              }}
+            />
           ) : null}
           <button type="button" className="story__tap story__tap--prev" onClick={prev} aria-label="Previous" />
           <button type="button" className="story__tap story__tap--next" onClick={next} aria-label="Next" />

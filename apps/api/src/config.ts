@@ -74,12 +74,44 @@ const schema = z.object({
   TRANSCRIBE_API_KEY: z.string().optional().default(''),
   TRANSCRIBE_MODEL: z.string().default('whisper-1'),
   RATE_LIMIT_MAX: z.coerce.number().default(300),
+  /**
+   * Posting publicly, messaging people who aren't friends and going live need a confirmed email or phone number.
+   * Unset: on in production, off elsewhere (tests and local development sign up without confirming).
+   */
+  REQUIRE_VERIFICATION: z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined || v === '' ? undefined : v === 'true' || v === '1')),
+  /** Sign-up risk scoring, new-account velocity limits and link-spam checks. Unset: on everywhere except tests. */
+  SPAM_CHECKS: z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined || v === '' ? undefined : v === 'true' || v === '1')),
+  /** Phone verification codes: dev logs them (and keeps them for tests); twilio sends them with Twilio Verify. */
+  SMS_PROVIDER: z.enum(['dev', 'twilio']).default('dev'),
+  TWILIO_ACCOUNT_SID: z.string().default(''),
+  TWILIO_AUTH_TOKEN: z.string().default(''),
+  TWILIO_VERIFY_SERVICE_SID: z.string().default(''),
+  /** Automated image and video checks in the media job. Unset: dev outside production, none in production. */
+  MEDIA_MODERATION_PROVIDER: z.enum(['dev', 'rekognition', 'none']).optional(),
+  /** AWS Rekognition (MEDIA_MODERATION_PROVIDER=rekognition). */
+  REKOGNITION_REGION: z.string().default('us-east-1'),
+  REKOGNITION_ACCESS_KEY_ID: z.string().default(''),
+  REKOGNITION_SECRET_ACCESS_KEY: z.string().default(''),
+  REKOGNITION_SESSION_TOKEN: z.string().default(''),
 });
 
-export type Config = z.infer<typeof schema>;
+const resolved = schema.transform((c) => ({
+  ...c,
+  REQUIRE_VERIFICATION: c.REQUIRE_VERIFICATION ?? c.APP_ENV === 'production',
+  SPAM_CHECKS: c.SPAM_CHECKS ?? c.APP_ENV !== 'test',
+  MEDIA_MODERATION_PROVIDER: c.MEDIA_MODERATION_PROVIDER ?? (c.APP_ENV === 'production' ? ('none' as const) : ('dev' as const)),
+}));
+
+export type Config = z.infer<typeof resolved>;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const parsed = schema.safeParse(env);
+  const parsed = resolved.safeParse(env);
   if (!parsed.success) {
     const msg = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
     throw new Error(`Invalid configuration:\n${msg}`);
@@ -88,6 +120,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (cfg.PAYMENTS_PROVIDER === 'stripe' && (!cfg.STRIPE_SECRET_KEY || !cfg.STRIPE_WEBHOOK_SECRET || !cfg.STRIPE_PUBLISHABLE_KEY))
     throw new Error('PAYMENTS_PROVIDER=stripe needs STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and STRIPE_PUBLISHABLE_KEY.');
   if (!!cfg.PAYSTACK_SECRET_KEY !== !!cfg.PAYSTACK_PUBLIC_KEY) throw new Error('Paystack needs both PAYSTACK_SECRET_KEY and PAYSTACK_PUBLIC_KEY.');
+  if (cfg.SMS_PROVIDER === 'twilio' && (!cfg.TWILIO_ACCOUNT_SID || !cfg.TWILIO_AUTH_TOKEN || !cfg.TWILIO_VERIFY_SERVICE_SID))
+    throw new Error('SMS_PROVIDER=twilio needs TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_VERIFY_SERVICE_SID.');
+  if (cfg.MEDIA_MODERATION_PROVIDER === 'rekognition' && (!cfg.REKOGNITION_ACCESS_KEY_ID || !cfg.REKOGNITION_SECRET_ACCESS_KEY))
+    throw new Error('MEDIA_MODERATION_PROVIDER=rekognition needs REKOGNITION_ACCESS_KEY_ID and REKOGNITION_SECRET_ACCESS_KEY.');
   if (cfg.APP_ENV === 'production') {
     if (cfg.PAYMENTS_PROVIDER === 'dev') throw new Error('The development payment provider moves no money. Set PAYMENTS_PROVIDER for production.');
     if (Buffer.from(cfg.MFA_ENCRYPTION_KEY, 'base64').length !== 32) throw new Error('Set MFA_ENCRYPTION_KEY (32 bytes, base64) for production.');

@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { badRequest, conflict, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { audit, getFlags, notify } from '../lib/services.ts';
+import { applyMediaDecision } from '../lib/media-moderation.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -79,7 +80,10 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       `SELECT mc.*, pr.username AS subject_username,
          CASE mc.target_type WHEN 'post' THEN (SELECT body FROM posts WHERE id = mc.target_id)
                              WHEN 'comment' THEN (SELECT body FROM comments WHERE id = mc.target_id)
-                             WHEN 'ad_campaign' THEN (SELECT p.body FROM ad_campaigns a JOIN posts p ON p.id = a.post_id WHERE a.id = mc.target_id) END AS excerpt
+                             WHEN 'message' THEN (SELECT body FROM messages WHERE id = mc.target_id)
+                             WHEN 'ad_campaign' THEN (SELECT p.body FROM ad_campaigns a JOIN posts p ON p.id = a.post_id WHERE a.id = mc.target_id) END AS excerpt,
+         CASE WHEN mc.target_type = 'media' THEN (SELECT json_build_object('kind', m.kind, 'url', coalesce(m.variants->>'medium', m.poster_url, m.url), 'moderation', m.moderation)
+                                                    FROM media m WHERE m.id = mc.target_id) END AS media
        FROM moderation_cases mc LEFT JOIN profiles pr ON pr.user_id = mc.subject_user_id
        WHERE mc.status = $1 ORDER BY CASE mc.risk WHEN 'escalate' THEN 0 WHEN 'restrict' THEN 1 ELSE 2 END, mc.created_at LIMIT 100`,
       [q.status],
@@ -101,7 +105,16 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
         throw badRequest(isAd ? 'Approve or reject this ad.' : 'That decision is only for ad reviews.');
       if (input.decision === 'reject_ad' && !input.note?.trim()) throw badRequest('Say why the ad was rejected. The advertiser sees this.');
       if (isAd) await applyAdDecision(c, mc, input.decision === 'approve_ad', mod.id, input.note ?? null);
-      else await applyDecision(c, mc, input.decision);
+      else if (mc.target_type === 'media') {
+        await applyMediaDecision(c, ctx.realtime, mc, input.decision);
+        if (input.decision === 'suspend_user') await applyDecision(c, mc, input.decision);
+      } else await applyDecision(c, mc, input.decision);
+      // Spam signals attached to this item follow the decision.
+      if (!isAd)
+        await c.query(
+          `UPDATE risk_signals SET status = $3, reviewed_by = $4, reviewed_at = now() WHERE target_type = $1 AND target_id = $2 AND status = 'open'`,
+          [mc.target_type, mc.target_id, input.decision === 'no_action' ? 'cleared' : 'confirmed', mod.id],
+        );
       await c.query(`UPDATE moderation_cases SET status = $2, decision = $3, reviewer_id = $4, note = $5, decided_at = now() WHERE id = $1`, [
         id,
         mc.status === 'appealed' ? 'final' : 'decided',
@@ -171,10 +184,13 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     const table: Record<string, string> = { post: 'posts', comment: 'comments' };
     const t = table[mc.target_type];
     if (decision === 'no_action' && t) await c.query(`UPDATE ${t} SET moderation_status = 'normal' WHERE id = $1`, [mc.target_id]);
+    // A held message is delivered once a moderator lets it through.
+    if (decision === 'no_action' && mc.target_type === 'message') await releaseMessages(c, [mc.target_id]);
     if (decision === 'restrict' && t) await c.query(`UPDATE ${t} SET moderation_status = 'restricted' WHERE id = $1`, [mc.target_id]);
     if (decision === 'remove') {
       if (t) await c.query(`UPDATE ${t} SET moderation_status = 'removed', deleted_at = coalesce(deleted_at, now()) WHERE id = $1`, [mc.target_id]);
-      if (mc.target_type === 'message') await c.query(`UPDATE messages SET deleted_at = now(), body = '' WHERE id = $1`, [mc.target_id]);
+      if (mc.target_type === 'message')
+        await c.query(`UPDATE messages SET deleted_at = now(), body = '', attachments = '[]', moderation_status = 'removed' WHERE id = $1`, [mc.target_id]);
       if (mc.target_type === 'community') await c.query(`UPDATE communities SET deleted_at = now() WHERE id = $1`, [mc.target_id]);
       if (mc.target_type === 'event') await c.query(`UPDATE events SET deleted_at = now() WHERE id = $1`, [mc.target_id]);
       if (mc.target_type === 'product') await c.query(`UPDATE products SET deleted_at = now() WHERE id = $1`, [mc.target_id]);
@@ -184,6 +200,134 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       await c.query(`UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`, [mc.subject_user_id]);
     }
   }
+
+  /** Let held messages through and tell the conversation, so they show up without a reload. */
+  async function releaseMessages(c: { query: typeof db.query }, ids: string[]) {
+    if (!ids.length) return;
+    const { rows } = await c.query(
+      `UPDATE messages SET moderation_status = 'normal' WHERE id = ANY($1::uuid[]) AND moderation_status = 'review' AND deleted_at IS NULL RETURNING id, conversation_id`,
+      [ids],
+    );
+    for (const r of rows) {
+      await c.query(`UPDATE conversations SET last_message_at = now() WHERE id = $1`, [r.conversation_id]);
+      const members = await c.query(`SELECT user_id FROM conversation_members WHERE conversation_id = $1 AND left_at IS NULL`, [r.conversation_id]);
+      await ctx.realtime.publish(
+        members.rows.map((m) => m.user_id),
+        { type: 'message.released', data: { id: r.id, conversationId: r.conversation_id } },
+      );
+    }
+  }
+
+  // ── Account risk (spam and bot signals) ───────────────────────────────
+  // Accounts with open signals, or limited after repeated flags. Moderators clear
+  // the signals (and lift any limit, releasing held posts and messages) or confirm them.
+  app.get('/v1/admin/risk/accounts', { preHandler: requireRole('moderator', 'admin') }, async (req) => {
+    const q = parse(z.object({ status: z.enum(['open', 'reviewed']).default('open') }), req.query);
+    const where =
+      q.status === 'open'
+        ? `u.restricted_at IS NOT NULL OR EXISTS (SELECT 1 FROM risk_signals s WHERE s.user_id = u.id AND s.status = 'open' AND s.weight > 0)`
+        : `EXISTS (SELECT 1 FROM risk_signals s WHERE s.user_id = u.id AND s.status <> 'open' AND s.reviewed_at > now() - interval '30 days')`;
+    const { rows } = await db.query(
+      `SELECT u.id, u.email, u.created_at, u.status, u.restricted_at, u.email_verified_at IS NOT NULL AS email_verified,
+              u.phone_verified_at IS NOT NULL AS phone_verified, pr.username, pr.display_name,
+              (SELECT coalesce(sum(weight), 0) FROM risk_signals s WHERE s.user_id = u.id AND s.status = 'open')::int AS score,
+              (SELECT coalesce(json_agg(json_build_object(
+                  'id', s.id, 'kind', s.kind, 'weight', s.weight, 'detail', s.detail, 'status', s.status, 'createdAt', s.created_at,
+                  'targetType', s.target_type, 'targetId', s.target_id,
+                  'excerpt', CASE s.target_type WHEN 'post' THEN (SELECT left(p.body, 200) FROM posts p WHERE p.id = s.target_id)
+                                                WHEN 'message' THEN (SELECT left(m.body, 200) FROM messages m WHERE m.id = s.target_id) END)
+                ORDER BY s.created_at DESC), '[]')
+               FROM (SELECT * FROM risk_signals x WHERE x.user_id = u.id ORDER BY x.created_at DESC LIMIT 50) s) AS signals
+       FROM users u JOIN profiles pr ON pr.user_id = u.id
+       WHERE u.deleted_at IS NULL AND (${where})
+       ORDER BY u.restricted_at IS NULL, score DESC, u.created_at DESC LIMIT 100`,
+    );
+    return {
+      items: rows.map((r) => ({
+        user: {
+          id: r.id,
+          username: r.username,
+          displayName: r.display_name,
+          email: r.email,
+          status: r.status,
+          createdAt: r.created_at,
+          emailVerified: r.email_verified,
+          phoneVerified: r.phone_verified,
+        },
+        restrictedAt: r.restricted_at,
+        score: r.score,
+        signals: r.signals,
+      })),
+    };
+  });
+
+  app.post('/v1/admin/risk/accounts/:id/review', { preHandler: requireRole('moderator', 'admin') }, async (req) => {
+    const mod = me(req);
+    const { id } = parse(idParam, req.params);
+    const input = parse(z.object({ action: z.enum(['clear', 'confirm']), note: z.string().trim().max(2000).optional() }), req.body);
+    if (id === mod.id) throw badRequest("You can't review your own account.");
+    const result = await tx(db, async (c) => {
+      const u = await c.query(`SELECT restricted_at FROM users WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, [id]);
+      if (!u.rows[0]) throw notFound('User');
+      const signals = await c.query<{ kind: string; target_type: string | null; target_id: string | null }>(
+        `UPDATE risk_signals SET status = $2, reviewed_by = $3, reviewed_at = now() WHERE user_id = $1 AND status = 'open' RETURNING kind, target_type, target_id`,
+        [id, input.action === 'clear' ? 'cleared' : 'confirmed', mod.id],
+      );
+      if (!signals.rowCount && !u.rows[0].restricted_at) throw badRequest('This account has nothing waiting for review.');
+      const ids = (type: string, held: boolean) => [
+        ...new Set(
+          signals.rows.filter((s) => s.target_type === type && s.target_id && (s.kind === 'held_while_limited') === held).map((s) => s.target_id as string),
+        ),
+      ];
+      const flaggedPosts = ids('post', false);
+      const flaggedMessages = ids('message', false);
+      const heldPosts = ids('post', true);
+      const decision = input.action === 'clear' ? 'no_action' : 'remove';
+      if (input.action === 'clear') {
+        await c.query(`UPDATE users SET restricted_at = NULL WHERE id = $1`, [id]);
+        await c.query(`UPDATE posts SET moderation_status = 'normal' WHERE id = ANY($1::uuid[]) AND moderation_status = 'review'`, [flaggedPosts]);
+        // Posts made while the account was limited were only visible to their author.
+        await c.query(`UPDATE posts SET moderation_status = 'normal' WHERE id = ANY($1::uuid[]) AND moderation_status = 'restricted'`, [heldPosts]);
+        await releaseMessages(c, flaggedMessages);
+      } else {
+        await c.query(`UPDATE users SET restricted_at = coalesce(restricted_at, now()) WHERE id = $1 AND role = 'user'`, [id]);
+        await c.query(`UPDATE posts SET moderation_status = 'removed' WHERE id = ANY($1::uuid[]) AND moderation_status IN ('review', 'restricted')`, [
+          flaggedPosts,
+        ]);
+        await c.query(
+          `UPDATE messages SET moderation_status = 'removed', deleted_at = coalesce(deleted_at, now()) WHERE id = ANY($1::uuid[]) AND moderation_status = 'review'`,
+          [flaggedMessages],
+        );
+      }
+      // The automated cases for the flagged items are decided along with the account.
+      const cases = await c.query<{ id: string }>(
+        `UPDATE moderation_cases SET status = 'decided', decision = $3, reviewer_id = $4, note = $5, decided_at = now()
+         WHERE status = 'open' AND source = 'automated' AND subject_user_id = $1
+           AND ((target_type = 'post' AND target_id = ANY($2::uuid[])) OR (target_type = 'message' AND target_id = ANY($6::uuid[])))
+         RETURNING id`,
+        [id, flaggedPosts, decision, mod.id, input.note ?? null, flaggedMessages],
+      );
+      if (decision === 'remove')
+        for (const k of cases.rows) await c.query(`INSERT INTO enforcements (case_id, user_id, action) VALUES ($1,$2,'remove')`, [k.id, id]);
+      await audit(c, {
+        actorId: mod.id,
+        action: `account_risk.${input.action}`,
+        entityType: 'user',
+        entityId: id,
+        metadata: { signals: signals.rowCount, posts: flaggedPosts.length, messages: flaggedMessages.length, note: input.note },
+      });
+      await notify(c, ctx.realtime, {
+        userId: id,
+        category: 'moderation',
+        type: 'account_review',
+        entityType: 'user',
+        entityId: id,
+        data: { outcome: input.action === 'clear' ? 'cleared' : 'confirmed' },
+      });
+      return { restricted: input.action === 'confirm', signals: signals.rowCount ?? 0 };
+    });
+    return result;
+  });
 
   // ── Regional rules ────────────────────────────────────────────────────
   // Content that is legal in most places but not in one country is withheld

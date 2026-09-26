@@ -32,7 +32,7 @@ export default async function mediaModule(app: FastifyInstance, ctx: AppContext)
       `INSERT INTO media (owner_id, kind, url, mime, alt_text, status, storage_key, size_bytes, duration_ms) VALUES ($1,$2,$3,$4,$5,'ready',$6,$7,$8) RETURNING id, kind, url, alt_text`,
       [u.id, allowed.kind, stored.url, web.mime, alt, stored.key, web.buf.length, web.durationMs ?? null],
     );
-    await enqueue(ctx.db, 'media.process', { mediaId: rows[0].id });
+    await enqueue(ctx.db, 'media.process', { mediaId: rows[0].id, filename: file.filename?.slice(0, 200) ?? null });
     reply.code(201);
     return { media: { id: rows[0].id, kind: rows[0].kind, url: rows[0].url, altText: rows[0].alt_text } };
   });

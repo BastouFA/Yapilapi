@@ -13,6 +13,13 @@ export interface PublicUser {
 export interface Me extends PublicUser {
   email: string;
   emailVerified: boolean;
+  /** E.164, once added in Settings. */
+  phone: string | null;
+  phoneVerified: boolean;
+  /** Posting publicly, messaging people who aren't friends and going live need a confirmed email or phone first. */
+  needsVerification: boolean;
+  /** Set while the account is limited pending a moderator's review. */
+  limited?: boolean;
   role: 'user' | 'moderator' | 'admin';
   onboarded: boolean;
   locale: string;
@@ -56,6 +63,8 @@ export interface MediaItem {
   placeholder?: string | null;
   /** WebVTT subtitle tracks for videos. */
   captions?: CaptionTrackRef[];
+  /** Flagged by automated checks: show it blurred with a "View" button. Never sent to people under 18. */
+  sensitive?: boolean;
 }
 
 export interface CaptionTrackRef {
@@ -191,7 +200,13 @@ export interface Message {
     /** Videos and voice messages. */
     durationMs?: number | null;
     posterUrl?: string | null;
+    /** Show blurred until the person chooses to view it. */
+    sensitive?: boolean;
+    /** Taken down by moderation: there is nothing to show (url is empty). */
+    removed?: boolean;
   }[];
+  /** Only on your own messages: 'review' while held for a quick check before delivery. */
+  moderation?: 'review';
   createdAt: string;
   clientId?: string | null;
 }

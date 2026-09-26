@@ -8,6 +8,7 @@ import { PostCard, RichText } from './post';
 import { space } from './theme';
 import { Avatar, Button, Card, EmptyState, Loading, Notice, PlusBadge, Segmented, useColors, userText } from './ui';
 import { ShopList } from './money';
+import { isVerificationError, VerifyPrompt } from './safety';
 
 /**
  * A profile: name, bio, counts, Follow and Message for other people, and
@@ -23,6 +24,7 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
   const [locked, setLocked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needsVerify, setNeedsVerify] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState<'posts' | 'shop'>('posts');
 
@@ -119,11 +121,13 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
               icon="chatbubble-outline"
               disabled={busy || rel.blocked}
               onPress={async () => {
+                setNeedsVerify(false);
                 try {
                   const { conversation } = await (await client()).conversations.create([profile.id]);
                   router.push(`/chat/${conversation.id}`);
                 } catch (e) {
-                  setError(errorMessage(e));
+                  if (isVerificationError(e)) setNeedsVerify(true);
+                  else setError(errorMessage(e));
                 }
               }}
             />
@@ -141,6 +145,7 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
           { id: 'shop', label: t('m.shop.tab') },
         ]}
       />
+      {needsVerify ? <VerifyPrompt action="message" /> : null}
     </View>
   );
 

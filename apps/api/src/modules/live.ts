@@ -11,6 +11,8 @@ import { analyzeText } from '../lib/moderation.ts';
 import { isEnabled, notify, track } from '../lib/services.ts';
 import { publicUserFrom } from '../lib/users.ts';
 import { notBlockedSql } from '../lib/visibility.ts';
+import { isRestricted, restrictedError } from '../lib/spam.ts';
+import { requireVerified } from '../lib/verification.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -221,6 +223,12 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
       return { ok: true };
     });
 
+  /** Going live reaches everyone: it needs a confirmed email or phone, and isn't open to limited accounts. */
+  async function canGoLive(userId: string) {
+    await requireVerified(db, ctx.config, userId, 'live');
+    if (await isRestricted(db, userId)) throw restrictedError('live');
+  }
+
   app.get('/v1/live', { preHandler: gate }, async (req) => {
     const { rows } = await db.query(
       `${SELECT} WHERE ${VISIBLE} AND l.status IN ('live','scheduled') ORDER BY l.status = 'live' DESC, coalesce(l.started_at, l.scheduled_for) DESC LIMIT 50`,
@@ -240,6 +248,7 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
       }),
       req.body,
     );
+    await canGoLive(u.id);
     if (input.ticketProductId) await assertTicket(input.ticketProductId, u.id);
     const streamKey = `sk_${randomBytes(20).toString('base64url')}`;
     const id = await tx(db, async (c) => {
@@ -262,6 +271,7 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
   app.post('/v1/live/:id/start', { preHandler: gate }, async (req) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
+    await canGoLive(u.id);
     const r = await db.query(
       `UPDATE live_sessions SET status = 'live', started_at = now() WHERE id = $1 AND host_id = $2 AND status = 'scheduled' RETURNING id`,
       [id, u.id],

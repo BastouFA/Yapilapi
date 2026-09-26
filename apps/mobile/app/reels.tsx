@@ -4,7 +4,7 @@ import * as Sharing from 'expo-sharing';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Platform, Pressable, Share, StyleSheet, Text, View, type ViewToken } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Platform, Pressable, Share, StyleSheet, Text, View, type ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Post } from '../../../packages/shared/src/types';
 import { client, errorMessage, mediaUrl, webUrl } from '../lib/api';
@@ -13,6 +13,7 @@ import { useT } from '../lib/i18n';
 import { radius, space } from '../lib/theme';
 import { Avatar, Button, EmptyState, Icon, Loading, Notice, useColors, userText, type IconName } from '../lib/ui';
 import { LockedPanel } from '../lib/money';
+import { SensitiveCover } from '../lib/safety';
 
 const WHITE = '#FFFFFF';
 const SCRIM = 'rgba(0,0,0,0.35)';
@@ -300,6 +301,9 @@ function Reel({
   const media = post.media.find((m) => m.kind === 'video') ?? post.media[0];
   const src = media ? mediaUrl(media.variants?.mp4 ?? media.url) : null;
   const [paused, setPaused] = useState(false);
+  // A sensitive reel shows a blurred still until the viewer chooses to watch it.
+  const [revealed, setRevealed] = useState(false);
+  const covered = !!media?.sensitive && !revealed;
   const player = useVideoPlayer(src, (p) => {
     p.loop = true;
     p.muted = true;
@@ -315,7 +319,7 @@ function Reel({
   const sound = useAudioPlayer(visible ? borrowed : null);
 
   // Only the reel on screen plays; scrolling away rewinds it and clears a tap-to-pause.
-  const playing = visible && focused && !paused;
+  const playing = visible && focused && !paused && !covered;
   useEffect(() => {
     for (const p of [player, originalSrc ? originalPlayer : null]) {
       if (!p) continue;
@@ -352,20 +356,24 @@ function Reel({
         onPress={() => setPaused((p) => !p)}
         style={StyleSheet.absoluteFill}
       >
-        {originalSrc ? (
+        {originalSrc && !covered ? (
           <View style={[StyleSheet.absoluteFill, { flexDirection: 'row', gap: 2 }]} pointerEvents="none">
             <VideoView player={originalPlayer} style={{ flex: 1 }} contentFit="cover" nativeControls={false} />
             {src ? <VideoView player={player} style={{ flex: 1 }} contentFit="cover" nativeControls={false} /> : <View style={{ flex: 1 }} />}
           </View>
-        ) : src ? (
+        ) : src && !covered ? (
           <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} pointerEvents="none" />
         ) : null}
+        {covered && media?.posterUrl ? (
+          <Image source={{ uri: mediaUrl(media.posterUrl) }} blurRadius={50} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : null}
+        {covered ? <SensitiveCover onReveal={() => setRevealed(true)} /> : null}
         {post.locked ? (
           <View style={StyleSheet.absoluteFill}>
             <LockedPanel post={post} dark />
           </View>
         ) : null}
-        {paused ? (
+        {paused && !covered ? (
           <View style={s.center} pointerEvents="none">
             <View style={s.playBadge}>
               <Icon name="play" size={40} color={WHITE} />

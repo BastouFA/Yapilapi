@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Avatar, EmptyState, Icon, Menu, Skeleton, TaggedText } from '@yapilapi/design-system';
+import { Avatar, EmptyState, Icon, Menu, SensitiveCover, Skeleton, TaggedText } from '@yapilapi/design-system';
 import type { Post } from '@yapilapi/shared';
 import { NextLink } from '@/lib/link';
 import { api, errorMessage } from '@/lib/api';
@@ -473,6 +473,9 @@ function ReelVideo({
   const originalSrc = original ? ((original.variants as Record<string, string> | undefined)?.mp4 ?? original.url) : null;
   const borrowed = !original && post.sound && !post.sound.original ? post.sound.audioUrl : null;
   const companion = useRef<HTMLVideoElement & HTMLAudioElement>(null);
+  // A sensitive reel plays blurred until the viewer chooses to see it.
+  const [revealed, setRevealed] = useState(false);
+  const covered = !!media?.sensitive && !revealed;
 
   // Play only the reel that is mostly on screen.
   useEffect(() => {
@@ -533,7 +536,7 @@ function ReelVideo({
       {src ? (
         <video
           ref={video}
-          className="reel__video"
+          className={covered ? 'reel__video yp-blurred' : 'reel__video'}
           src={src}
           poster={media?.posterUrl ?? undefined}
           muted={muted || !!borrowed}
@@ -568,7 +571,8 @@ function ReelVideo({
           }}
         />
       ) : null}
-      {!playing ? (
+      {covered ? <SensitiveCover onReveal={() => setRevealed(true)} /> : null}
+      {!playing && !covered ? (
         <span className="reel__paused" aria-hidden>
           <svg viewBox="0 0 24 24" width="64" height="64">
             <path d="M8 5v14l11-7z" fill="currentColor" />

@@ -64,6 +64,12 @@ export default function ChatPage() {
       if (e.data.sender.id !== me?.id) void api.conversations.read(id);
     }
     if (e.type === 'message.deleted' && e.data.conversationId === id) setMessages((cur) => cur?.filter((x) => x.id !== e.data.id) ?? cur);
+    // A message held for a check was let through: load it (or clear the "waiting" label on your own).
+    if (e.type === 'message.released' && e.data.conversationId === id)
+      api.conversations.messages(id).then(
+        (r) => setMessages(r.items),
+        () => {},
+      );
     if (e.type === 'typing' && e.data.conversationId === id) {
       const who = conv?.members.find((m) => m.id === e.data.userId)?.displayName ?? 'Someone';
       setTyping(who);
@@ -82,8 +88,9 @@ export default function ChatPage() {
     try {
       const { media } = await api.media.upload(file);
       const clientId = crypto.randomUUID();
-      const { message } = await api.conversations.send(id, '', clientId, [{ mediaId: media.id }]);
+      const { message, notice } = await api.conversations.send(id, '', clientId, [{ mediaId: media.id }]);
       setMessages((cur) => (cur?.some((x) => x.id === message.id) ? cur : [...(cur ?? []), message]));
+      if (notice) toast(notice);
     } catch (e) {
       toast(errorMessage(e));
     } finally {
@@ -109,8 +116,9 @@ export default function ChatPage() {
     setMessages((cur) => [...(cur ?? []), optimistic]);
     setBody('');
     try {
-      const { message } = await api.conversations.send(id, text, clientId);
+      const { message, notice } = await api.conversations.send(id, text, clientId);
       setMessages((cur) => cur?.map((x) => (x.clientId === clientId ? message : x)) ?? cur);
+      if (notice) toast(notice);
     } catch (e) {
       setMessages((cur) => cur?.filter((x) => x.clientId !== clientId) ?? cur);
       setBody(text);
@@ -256,6 +264,7 @@ export default function ChatPage() {
                     pending={m.pending}
                     time={new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(m.createdAt))}
                   />
+                  {m.moderation === 'review' ? <span className="chat-held">Waiting for a quick check before it’s delivered</span> : null}
                 </div>
               </div>
             );
