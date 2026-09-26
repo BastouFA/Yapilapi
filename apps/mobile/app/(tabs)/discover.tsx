@@ -60,7 +60,8 @@ export default function Discover() {
         </View>
         <Button label={busy ? t('m.discover.searching') : t('m.discover.search')} onPress={search} disabled={!q.trim() || busy} />
       </View>
-      <View style={{ flexDirection: 'row', gap: space[2] }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+        <Button label={t('m.title.reels')} icon="film-outline" variant="secondary" size="sm" onPress={() => router.push('/reels')} />
         <Button label={t('m.title.assistant')} variant="secondary" size="sm" onPress={() => router.push('/assistant')} />
         <Button label={t('events.title')} variant="secondary" size="sm" onPress={() => router.push('/events')} />
       </View>

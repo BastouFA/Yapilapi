@@ -53,10 +53,20 @@
         {
           "supportedLocales": ["en", "fr", "ar", "es", "pt", "sw", "yo", "ha"]
         }
+      ],
+      "expo-video",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "YAPILAPI uses your photos and videos so you can share them in posts, reels and stories.",
+          "cameraPermission": "YAPILAPI uses the camera for video calls and to capture Reals.",
+          "microphonePermission": "YAPILAPI uses the microphone for audio and video calls."
+        }
       ]
     ],
     "extra": {
       "apiUrl": "http://localhost:4000",
+      "webUrl": "http://localhost:3000",
       "eas": {
         "projectId": ""
       }

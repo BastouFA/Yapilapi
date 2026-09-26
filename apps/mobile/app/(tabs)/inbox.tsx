@@ -7,9 +7,9 @@ import { useT } from '../../lib/i18n';
 import { conversationTitle } from '../../lib/post';
 import { useRealtime, useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
-import { Avatar, EmptyState, Loading, Notice, Row, Screen, useColors, useTabBarSpace } from '../../lib/ui';
+import { Avatar, Button, EmptyState, Loading, Notice, Row, Screen, useColors, useTabBarSpace } from '../../lib/ui';
 
-/** Inbox: conversations with unread counts; tap to open the chat. Updates live. */
+/** Inbox: conversations with unread counts; tap to open the chat, or start a group. Updates live. */
 export default function Inbox() {
   const c = useColors();
   const { t, timeAgo } = useT();
@@ -34,6 +34,14 @@ export default function Inbox() {
   if (!items) return <Loading />;
   return (
     <Screen style={{ paddingBottom: 0 }}>
+      <Button
+        label={t('m.inbox.newGroup')}
+        icon="people-outline"
+        variant="secondary"
+        size="sm"
+        onPress={() => router.push('/new-group')}
+        style={{ alignSelf: 'flex-start' }}
+      />
       <FlatList
         data={items}
         keyExtractor={(x) => x.id}

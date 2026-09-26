@@ -12,7 +12,7 @@ function Heartbeat() {
   return null;
 }
 
-/** Tabs live in (tabs); detail screens (chat, post, community, settings, Real) push on top. */
+/** Tabs live in (tabs); detail screens (chat, post, community, settings, Real, Reels) push on top. */
 function Screens() {
   const c = useColors();
   const { t } = useT();
@@ -37,6 +37,8 @@ function Screens() {
         <Stack.Screen name="real" options={{ title: t('m.title.real') }} />
         <Stack.Screen name="assistant" options={{ title: t('m.title.assistant') }} />
         <Stack.Screen name="events" options={{ title: t('events.title') }} />
+        <Stack.Screen name="reels" options={{ title: t('m.title.reels'), headerShown: false, contentStyle: { backgroundColor: '#000' } }} />
+        <Stack.Screen name="new-group" options={{ title: t('m.inbox.newGroup'), presentation: 'modal' }} />
       </Stack>
     </>
   );

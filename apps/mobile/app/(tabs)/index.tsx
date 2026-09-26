@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, RefreshControl, Text, View } from 'react-native';
+import { router, useFocusEffect, useNavigation } from 'expo-router';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { FlatList, KeyboardAvoidingView, Platform, Pressable, RefreshControl, Text, View } from 'react-native';
+import type { StoryGroup } from '../../../../packages/api-client/src/index';
 import type { FeedMode } from '../../../../packages/shared/src/constants';
 import type { Post } from '../../../../packages/shared/src/types';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
 import { client, errorMessage, signIn } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { PostCard } from '../../lib/post';
+import { orderStories, StoriesStrip, StoryViewer } from '../../lib/stories';
 import { useSession } from '../../lib/session';
 import { space } from '../../lib/theme';
-import { Button, Card, EmptyState, Field, Loading, Notice, Segmented, useColors, useTabBarSpace } from '../../lib/ui';
+import { Button, Card, EmptyState, Field, Icon, Loading, Notice, Segmented, useColors, useTabBarSpace } from '../../lib/ui';
 
 const MODES = [
   { id: 'for_you', label: 'feed.for_you' },
@@ -16,7 +19,7 @@ const MODES = [
   { id: 'friends', label: 'feed.friends' },
 ] as const satisfies readonly { id: FeedMode; label: MessageKey }[];
 
-/** Home: sign in if needed, then the feed with cursor pagination. */
+/** Home: sign in if needed, then stories and the feed with cursor pagination. */
 export default function Home() {
   const { me } = useSession();
   if (me === undefined) return <Loading />;
@@ -33,6 +36,40 @@ function Feed() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stories, setStories] = useState<StoryGroup[]>([]);
+  const [viewing, setViewing] = useState<number | null>(null);
+  const navigation = useNavigation();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('m.title.reels')}
+          hitSlop={10}
+          onPress={() => router.push('/reels')}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginEnd: space[4] }}
+        >
+          <Icon name="film-outline" size={22} color={c.yapi} />
+          <Text style={{ color: c.yapi, fontWeight: '700', fontSize: 15 }}>{t('m.title.reels')}</Text>
+        </Pressable>
+      ),
+    });
+  }, [navigation, c.yapi, t]);
+
+  const loadStories = useCallback(async () => {
+    try {
+      setStories(orderStories((await (await client()).moments.list()).items));
+    } catch {
+      // Stories are a bonus on Home: the feed still works without them.
+    }
+  }, []);
+  // Refresh when coming back (after adding a story in Create, for example), not while one is open.
+  useFocusEffect(
+    useCallback(() => {
+      if (viewing === null) void loadStories();
+    }, [loadStories, viewing]),
+  );
 
   const load = useCallback(
     async (next?: string) => {
@@ -55,37 +92,41 @@ function Feed() {
   }, [load]);
 
   return (
-    <FlatList
-      style={{ backgroundColor: c.ground }}
-      contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: bottom }}
-      data={posts ?? []}
-      keyExtractor={(p) => p.id}
-      ListHeaderComponent={
-        <View style={{ gap: space[3] }}>
-          <Segmented label={t('m.feed.label')} options={MODES.map((m) => ({ id: m.id, label: t(m.label) }))} value={mode} onChange={setMode} />
-          {error ? <Notice tone="danger">{error}</Notice> : null}
-        </View>
-      }
-      refreshControl={
-        <RefreshControl
-          tintColor={c.yapi}
-          refreshing={refreshing}
-          onRefresh={async () => {
-            setRefreshing(true);
-            await load();
-            setRefreshing(false);
-          }}
-        />
-      }
-      onEndReached={() => cursor && load(cursor)}
-      ListEmptyComponent={posts === null ? <Loading /> : <EmptyState title={t('m.feed.empty.title')} body={t('m.feed.empty.body')} />}
-      ListFooterComponent={
-        posts?.length ? (
-          <Text style={{ color: c.inkMuted, textAlign: 'center', padding: space[4] }}>{cursor ? t('m.common.loadingMore') : t('feed.end')}</Text>
-        ) : null
-      }
-      renderItem={({ item }) => <PostCard post={item} />}
-    />
+    <>
+      <FlatList
+        style={{ backgroundColor: c.ground }}
+        contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: bottom }}
+        data={posts ?? []}
+        keyExtractor={(p) => p.id}
+        ListHeaderComponent={
+          <View style={{ gap: space[3] }}>
+            <StoriesStrip groups={stories} onOpen={setViewing} onCreate={() => router.navigate({ pathname: '/create', params: { mode: 'story' } })} />
+            <Segmented label={t('m.feed.label')} options={MODES.map((m) => ({ id: m.id, label: t(m.label) }))} value={mode} onChange={setMode} />
+            {error ? <Notice tone="danger">{error}</Notice> : null}
+          </View>
+        }
+        refreshControl={
+          <RefreshControl
+            tintColor={c.yapi}
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await Promise.all([load(), loadStories()]);
+              setRefreshing(false);
+            }}
+          />
+        }
+        onEndReached={() => cursor && load(cursor)}
+        ListEmptyComponent={posts === null ? <Loading /> : <EmptyState title={t('m.feed.empty.title')} body={t('m.feed.empty.body')} />}
+        ListFooterComponent={
+          posts?.length ? (
+            <Text style={{ color: c.inkMuted, textAlign: 'center', padding: space[4] }}>{cursor ? t('m.common.loadingMore') : t('feed.end')}</Text>
+          ) : null
+        }
+        renderItem={({ item }) => <PostCard post={item} />}
+      />
+      <StoryViewer groups={stories} start={viewing} onClose={() => setViewing(null)} onChange={setStories} />
+    </>
   );
 }
 
