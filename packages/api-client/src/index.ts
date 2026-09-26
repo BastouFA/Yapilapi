@@ -15,6 +15,7 @@ import type {
   PublicPostPreview,
   PublicProfilePreview,
   PublicUser,
+  EditorParamsInput,
 } from '@yapilapi/shared';
 
 export class ApiError extends Error {
@@ -155,6 +156,29 @@ export function createClient(opts: ClientOptions) {
         if (altText) fd.append('altText', altText);
         fd.append('file', file);
         return req<{ media: { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string | null } }>('POST', '/v1/media', fd);
+      },
+      /** One of your media items, with its processing status. */
+      get: (id: string) => get<{ media: MediaItemStatus }>(`/v1/media/${id}`),
+      /**
+       * Apply the editor to one of your uploads: a look, adjustments, crop, turn, flips, text and,
+       * for videos, trim, mute and cover. Makes a new media item; wait for it with waitUntilReady.
+       */
+      edit: (id: string, b: EditorParamsInput) =>
+        post<{ media: { id: string; kind: 'image' | 'video'; url: string; altText: string | null; status: 'processing'; editOf: string } }>(
+          `/v1/media/${id}/edit`,
+          b,
+        ),
+      /** Poll GET /v1/media/:id until it is ready (resolves) or failed (rejects). */
+      waitUntilReady: async (id: string, o: { intervalMs?: number; timeoutMs?: number; signal?: AbortSignal } = {}) => {
+        const started = Date.now();
+        for (;;) {
+          if (o.signal?.aborted) throw new ApiError(0, 'aborted', 'Stopped waiting.');
+          const { media } = await get<{ media: MediaItemStatus }>(`/v1/media/${id}`);
+          if (media.status === 'ready') return media;
+          if (media.status === 'failed') throw new ApiError(422, 'edit_failed', media.error ?? "We couldn't apply your edits.");
+          if (Date.now() - started > (o.timeoutMs ?? 10 * 60_000)) throw new ApiError(0, 'timeout', 'This is taking longer than usual. Try again in a moment.');
+          await new Promise((r) => setTimeout(r, o.intervalMs ?? 1500));
+        }
       },
     },
     studio: {
@@ -751,6 +775,26 @@ export interface BusinessAnalytics {
   visitorsTotal: number;
   ratingTrend: { week: string; reviews: number; average: number }[];
   ads: { impressions: number; clicks: number; spentCents: number };
+}
+
+/** GET /v1/media/:id */
+export interface MediaItemStatus {
+  id: string;
+  kind: 'image' | 'video' | 'audio' | 'file';
+  url: string;
+  mime: string | null;
+  altText: string | null;
+  status: 'uploading' | 'processing' | 'ready' | 'failed';
+  variants: Record<string, string>;
+  posterUrl: string | null;
+  hlsUrl: string | null;
+  blurhash: string | null;
+  width: number | null;
+  height: number | null;
+  durationMs: number | null;
+  /** The upload this one was edited from, for editor results. */
+  editOf: string | null;
+  error: string | null;
 }
 
 export interface StudioVideo {

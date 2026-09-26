@@ -1983,3 +1983,296 @@ video.chat-att__media {
     animation: none;
   }
 }
+
+/* ─── Photo and video editor (Create) ───────────────────────────────── */
+.ed {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--surface);
+  color: var(--ink);
+}
+.ed:focus {
+  outline: none;
+}
+.ed__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+.ed__title {
+  margin: 0;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ed__stage {
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+  padding: var(--space-3);
+  background: #111;
+}
+.ed__video {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+}
+.ed__fit {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+}
+.ed__frame {
+  position: relative;
+  overflow: hidden;
+  touch-action: none;
+}
+.ed__frame--crop {
+  /* Corner handles sit half outside the picture. */
+  overflow: visible;
+}
+.ed__frame canvas,
+.ed__frame video {
+  display: block;
+}
+.ed__notice {
+  margin: auto;
+  color: #fff;
+}
+.ed__transport {
+  justify-content: center;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.ed__transport .muted {
+  color: #ddd;
+}
+.ed__vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.ed__text {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.ed__text:active {
+  cursor: grabbing;
+}
+.ed__text:focus-visible,
+.ed__crop:focus-visible,
+.ed__handle:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--yapi);
+}
+.ed__crop {
+  position: absolute;
+  border: 1px solid #fff;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+  cursor: move;
+  touch-action: none;
+}
+.ed__grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      to right,
+      transparent 33.2%,
+      rgba(255, 255, 255, 0.45) 33.3%,
+      transparent 33.5%,
+      transparent 66.5%,
+      rgba(255, 255, 255, 0.45) 66.6%,
+      transparent 66.8%
+    ),
+    linear-gradient(
+      to bottom,
+      transparent 33.2%,
+      rgba(255, 255, 255, 0.45) 33.3%,
+      transparent 33.5%,
+      transparent 66.5%,
+      rgba(255, 255, 255, 0.45) 66.6%,
+      transparent 66.8%
+    );
+}
+.ed__handle {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  margin: -12px 0 0 -12px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: var(--yapi);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+.ed__tools {
+  max-height: 42vh;
+  overflow-y: auto;
+  padding: var(--space-2) var(--space-3) var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.ed__hint {
+  margin: 0;
+  font-size: 13px;
+}
+.ed__filters {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding: var(--space-1) 0;
+}
+.ed__filter {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ed__filter[aria-pressed='true'] {
+  border-color: var(--yapi);
+  font-weight: 600;
+}
+.ed__filter:focus-visible,
+.ed__chip:focus-visible,
+.ed__swatch:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ed__filter-thumb {
+  position: relative;
+  display: block;
+  width: 72px;
+  height: 72px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+.ed__filter-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ed__sliders {
+  display: grid;
+  gap: var(--space-1);
+}
+.ed__slider {
+  display: grid;
+  grid-template-columns: 6.5em minmax(0, 1fr) 2.5em auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+.ed__slider input[type='range'] {
+  width: 100%;
+  accent-color: var(--yapi);
+}
+.ed__value {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+.ed__text-panel .ed__slider {
+  grid-template-columns: 6.5em minmax(0, 1fr) 2.5em;
+}
+.ed__chip {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.ed__chip[aria-pressed='true'] {
+  border-color: var(--yapi);
+  box-shadow: inset 0 0 0 1px var(--yapi);
+}
+.ed__swatch {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.ed__swatch[aria-pressed='true'] {
+  outline: 3px solid var(--yapi);
+  outline-offset: 2px;
+}
+.ed__strip {
+  /* Media timelines run left to right in every language. */
+  direction: ltr;
+  position: relative;
+  height: 56px;
+}
+.ed__strip-frames {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+.ed__strip-frames img {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  object-fit: cover;
+}
+.ed__strip::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.6) var(--from), transparent var(--from), transparent var(--to), rgba(0, 0, 0, 0.6) var(--to));
+}
+.ed__scrubber {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  height: 100%;
+}
+.ed__scrubber::before {
+  display: none;
+}
+.ed__scrubber::after {
+  top: 0;
+  bottom: 0;
+  height: auto;
+  border: 3px solid var(--yapi);
+  border-radius: var(--radius-sm);
+  background: none;
+}
+.ed__scrubber input[type='range']::-webkit-slider-thumb {
+  height: 56px;
+}
+.ed__scrubber input[type='range']::-moz-range-thumb {
+  height: 52px;
+}
