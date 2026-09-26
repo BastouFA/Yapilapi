@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Avatar, Button, EmptyState, List, ListItem, Skeleton } from '@yapilapi/design-system';
 import { formatRelativeTime, type NotificationItem } from '@yapilapi/shared';
@@ -55,9 +56,42 @@ function hrefFor(n: NotificationItem): string | undefined {
   return undefined;
 }
 
+/** Likes, comments, reposts and follows on the same thing collapse into one row ("Ada and 2 others liked your post"). */
+const GROUPED = new Set(['post_reaction', 'post_comment', 'post_repost', 'follow']);
+
+type Group = { key: string; items: NotificationItem[] };
+
+function bucket(iso: string): 'Today' | 'This week' | 'Earlier' {
+  const age = Date.now() - new Date(iso).getTime();
+  return age < 86_400_000 ? 'Today' : age < 7 * 86_400_000 ? 'This week' : 'Earlier';
+}
+
+function group(items: NotificationItem[]): { title: string; groups: Group[] }[] {
+  const sections: { title: string; groups: Group[] }[] = [];
+  for (const n of items) {
+    const title = bucket(n.createdAt);
+    let section = sections.at(-1);
+    if (!section || section.title !== title) sections.push((section = { title, groups: [] }));
+    const key = GROUPED.has(n.type) ? `${n.type}:${n.entityId ?? ''}` : n.id;
+    const existing = section.groups.find((g) => g.key === key);
+    if (existing) existing.items.push(n);
+    else section.groups.push({ key, items: [n] });
+  }
+  return sections;
+}
+
+function names(g: Group): string {
+  const people = [...new Map(g.items.filter((n) => n.actor).map((n) => [n.actor!.id, n.actor!.displayName])).values()];
+  if (people.length <= 1) return people[0] ?? '';
+  if (people.length === 2) return `${people[0]} and ${people[1]}`;
+  const others = people.length - 2;
+  return `${people[0]}, ${people[1]} and ${others} ${others === 1 ? 'other' : 'others'}`;
+}
+
 export default function Notifications() {
   const { t, locale, toast, setUnread } = useSession();
   const [items, setItems] = useState<NotificationItem[] | null>(null);
+  const [followed, setFollowed] = useState<Set<string>>(new Set());
   const load = () =>
     api.notifications.list().then(
       (r) => setItems(r.items),
@@ -88,28 +122,77 @@ export default function Notifications() {
       {items === null ? (
         <Skeleton height={240} />
       ) : items.length ? (
-        <List>
-          {items.map((n) => (
-            <ListItem
-              key={n.id}
-              href={hrefFor(n)}
-              linkAs={NextLink}
-              start={n.actor ? <Avatar name={n.actor.displayName} src={n.actor.avatarUrl} size="sm" /> : undefined}
-              primary={
-                <span style={{ fontWeight: n.readAt ? 400 : 600, whiteSpace: 'normal' }}>
-                  {n.actor && n.type !== 'enforcement' ? `${n.actor.displayName} ` : ''}
-                  {(TEXT[n.type] ?? (() => n.type.replace(/_/g, ' ')))(n)}
-                </span>
-              }
-              end={
-                <>
-                  {formatRelativeTime(n.createdAt, locale)}
-                  {!n.readAt ? <span className="yp-unread" aria-label="Unread" style={{ minWidth: 8, height: 8, padding: 0 }} /> : null}
-                </>
-              }
-            />
+        <div className="stack">
+          {group(items).map((section) => (
+            <section key={section.title} className="stack-sm" aria-labelledby={`n-${section.title}`}>
+              <h2 id={`n-${section.title}`} className="section-title">
+                {section.title}
+              </h2>
+              <List>
+                {section.groups.map((g) => {
+                  const n = g.items[0]!;
+                  const unread = g.items.some((x) => !x.readAt);
+                  const actors = [...new Map(g.items.filter((x) => x.actor).map((x) => [x.actor!.id, x.actor!])).values()];
+                  const followBack = n.type === 'follow' && actors.length === 1 && !n.followsActor && !followed.has(actors[0]!.id);
+                  const text = (
+                    <span style={{ fontWeight: unread ? 600 : 400, whiteSpace: 'normal' }}>
+                      {n.actor && n.type !== 'enforcement' ? `${names(g)} ` : ''}
+                      {(TEXT[n.type] ?? (() => n.type.replace(/_/g, ' ')))(n)}
+                    </span>
+                  );
+                  const start = actors.length ? (
+                    <span className={actors.length > 1 ? 'notif__stack' : undefined}>
+                      {actors.slice(0, 3).map((a) => (
+                        <Avatar key={a.id} name={a.displayName} src={a.avatarUrl} size="sm" />
+                      ))}
+                    </span>
+                  ) : undefined;
+                  const when = (
+                    <>
+                      {formatRelativeTime(n.createdAt, locale)}
+                      {unread ? <span className="yp-unread" aria-label="Unread" style={{ minWidth: 8, height: 8, padding: 0 }} /> : null}
+                    </>
+                  );
+                  return followBack ? (
+                    <ListItem
+                      key={g.key}
+                      start={start}
+                      primary={
+                        <Link href={`/u/${actors[0]!.username}`} className="notif__link">
+                          {text}
+                        </Link>
+                      }
+                      secondary={formatRelativeTime(n.createdAt, locale)}
+                      end={
+                        <Button
+                          size="sm"
+                          onClick={async () => {
+                            setFollowed((f) => new Set(f).add(actors[0]!.id));
+                            try {
+                              await api.users.follow(actors[0]!.id);
+                              toast(`You follow ${actors[0]!.displayName} now`);
+                            } catch (e) {
+                              setFollowed((f) => {
+                                const next = new Set(f);
+                                next.delete(actors[0]!.id);
+                                return next;
+                              });
+                              toast(errorMessage(e));
+                            }
+                          }}
+                        >
+                          Follow back
+                        </Button>
+                      }
+                    />
+                  ) : (
+                    <ListItem key={g.key} href={hrefFor(n)} linkAs={NextLink} start={start} primary={text} end={when} />
+                  );
+                })}
+              </List>
+            </section>
           ))}
-        </List>
+        </div>
       ) : (
         <EmptyState title="You're all caught up" body="Likes, comments, follows and event updates show up here." />
       )}

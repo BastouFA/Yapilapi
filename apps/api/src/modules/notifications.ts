@@ -15,7 +15,8 @@ export default async function notificationsModule(app: FastifyInstance, ctx: App
     const c = decodeCursor<KeyCursor>(q.cursor);
     const { rows } = await db.query(
       `SELECT n.id, n.category, n.type, n.entity_type, n.entity_id, n.data, n.read_at, n.created_at,
-              pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode
+              pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode,
+              EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = n.actor_id) AS follows_actor
        FROM notifications n LEFT JOIN profiles pr ON pr.user_id = n.actor_id
        WHERE n.user_id = $1 ${c ? 'AND (n.created_at, n.id) < ($3::timestamptz, $4::uuid)' : ''}
        ORDER BY n.created_at DESC, n.id DESC LIMIT $2`,
@@ -28,6 +29,7 @@ export default async function notificationsModule(app: FastifyInstance, ctx: App
       category: r.category,
       type: r.type,
       actor: r.a_id ? publicUserFrom(r, 'a_') : null,
+      followsActor: r.follows_actor,
       entityType: r.entity_type,
       entityId: r.entity_id,
       data: r.data,

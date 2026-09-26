@@ -9,6 +9,7 @@ import { StoryViewer } from '@/components/StoryViewer';
 import type { FeedMode } from '@yapilapi/shared';
 import { api } from '@/lib/api';
 import { PostList } from '@/components/PostList';
+import { SuggestedPeople } from '@/components/SuggestedPeople';
 import { useSession } from '../../providers';
 
 export default function Home() {
@@ -60,6 +61,8 @@ export default function Home() {
         onChange={setMode}
         options={(['for_you', 'following', 'friends', 'communities', 'local'] as FeedMode[]).map((m) => ({ id: m, label: t(`feed.${m}`) }))}
       />
+
+      {mode === 'for_you' || mode === 'following' ? <SuggestedPeople /> : null}
 
       <PostList load={load} reloadKey={mode} sponsored={mode === 'for_you'} />
 

@@ -162,6 +162,8 @@ export interface NotificationItem {
   category: string;
   type: string;
   actor: PublicUser | null;
+  /** Whether you follow the actor (for "Follow back"). */
+  followsActor?: boolean;
   entityType: string | null;
   entityId: string | null;
   data: Record<string, unknown>;
