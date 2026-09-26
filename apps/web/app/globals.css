@@ -3298,7 +3298,9 @@ span.cam__icon {
 }
 .chapter-swatch:has(input:checked),
 .chapter-symbol:has(input:checked) {
-  box-shadow: 0 0 0 2px var(--ground), 0 0 0 4px var(--yapi);
+  box-shadow:
+    0 0 0 2px var(--ground),
+    0 0 0 4px var(--yapi);
 }
 .chapter-swatch:has(input:focus-visible),
 .chapter-symbol:has(input:focus-visible) {

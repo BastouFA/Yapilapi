@@ -34,6 +34,13 @@ export default function Settings() {
         end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
         onPress={() => router.push('/close-friends')}
       />
+      <Row
+        title={t('m.archive.title')}
+        subtitle={t('m.archive.manage')}
+        start={<Icon name="archive-outline" size={18} color={c.inkMuted} />}
+        end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
+        onPress={() => router.push('/archive')}
+      />
       <Sharing />
       <VerificationCard />
       <Family />

@@ -31,7 +31,8 @@ const minor = (birthCol: string) => `coalesce(${birthCol} > current_date - inter
 const follows = (v: string, other: string) => `EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${v} AND f.followee_id = ${other})`;
 const friends = (v: string, other: string) =>
   `EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = ${v} AND fr.user_b = ${other}) OR (fr.user_b = ${v} AND fr.user_a = ${other}))`;
-const contributor = (user: string) => `EXISTS (SELECT 1 FROM chapter_members cm WHERE cm.chapter_id = ch.id AND cm.user_id = ${user} AND cm.status = 'accepted')`;
+const contributor = (user: string) =>
+  `EXISTS (SELECT 1 FROM chapter_members cm WHERE cm.chapter_id = ch.id AND cm.user_id = ${user} AND cm.status = 'accepted')`;
 const invited = (user: string) => `EXISTS (SELECT 1 FROM chapter_members cm WHERE cm.chapter_id = ch.id AND cm.user_id = ${user} AND cm.status = 'invited')`;
 
 /** Before its opening date a time capsule shows only its cover, the date and how many stories are inside. */
@@ -101,7 +102,13 @@ function toSummary(r: Row, viewer: string | null) {
   const role = r.owner_id === viewer ? 'owner' : r.my_status === 'accepted' ? 'contributor' : r.my_status === 'invited' ? 'invited' : null;
   const cover =
     r.cov_media_url || r.cov_body
-      ? { kind: 'story' as const, mediaUrl: r.cov_media_url ?? null, mediaKind: r.cov_media_kind ?? null, posterUrl: r.cov_poster_url ?? null, text: r.cov_body || null }
+      ? {
+          kind: 'story' as const,
+          mediaUrl: r.cov_media_url ?? null,
+          mediaKind: r.cov_media_kind ?? null,
+          posterUrl: r.cov_poster_url ?? null,
+          text: r.cov_body || null,
+        }
       : { kind: 'gradient' as const, gradient: r.cover_gradient as ChapterGradient, symbol: r.cover_symbol };
   return {
     id: r.id as string,
@@ -165,7 +172,12 @@ const patchSchema = z.object({
   coverStoryId: z.string().uuid().nullable().optional(),
   opensAt: opensAt.nullable().optional(),
 });
-const monthSchema = z.object({ month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Use YYYY-MM.').optional() });
+const monthSchema = z.object({
+  month: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Use YYYY-MM.')
+    .optional(),
+});
 
 const CAPSULE_MIN_MS = 60 * 60 * 1000;
 const CAPSULE_MAX_MS = 25 * 365 * 24 * 60 * 60 * 1000;
@@ -642,9 +654,14 @@ export async function openDueChapters(db: Pool, realtime: RealtimeHub): Promise<
   for (const ch of rows) {
     const members = await db.query<{ user_id: string }>(`SELECT user_id FROM chapter_members WHERE chapter_id = $1 AND status = 'accepted'`, [ch.id]);
     for (const userId of [ch.owner_id, ...members.rows.map((r) => r.user_id)])
-      await notify(db, realtime, { userId, category: 'friends', type: 'chapter_opened', entityType: 'chapter', entityId: ch.id, data: { title: ch.title } }).catch(
-        () => {},
-      );
+      await notify(db, realtime, {
+        userId,
+        category: 'friends',
+        type: 'chapter_opened',
+        entityType: 'chapter',
+        entityId: ch.id,
+        data: { title: ch.title },
+      }).catch(() => {});
   }
   return rows.length;
 }

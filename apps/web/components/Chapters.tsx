@@ -462,7 +462,13 @@ export function AddToChapter({ momentId, open, onClose, onAdded }: { momentId: s
             if (title.trim()) void run(async () => (await api.chapters.create({ title: title.trim(), momentIds: [momentId!] }), `Started ${title.trim()}`));
           }}
         >
-          <TextField label="New chapter" placeholder="Summer in Accra" value={title} maxLength={CHAPTER_TITLE_MAX} onChange={(e) => setTitle(e.currentTarget.value)} />
+          <TextField
+            label="New chapter"
+            placeholder="Summer in Accra"
+            value={title}
+            maxLength={CHAPTER_TITLE_MAX}
+            onChange={(e) => setTitle(e.currentTarget.value)}
+          />
           <Button type="submit" disabled={!title.trim() || busy}>
             Create
           </Button>
@@ -541,7 +547,14 @@ export function ChapterEditor({
           }
         }}
       >
-        <TextField label="Title" value={title} maxLength={CHAPTER_TITLE_MAX} required onChange={(e) => setTitle(e.currentTarget.value)} hint={`${title.length}/${CHAPTER_TITLE_MAX}`} />
+        <TextField
+          label="Title"
+          value={title}
+          maxLength={CHAPTER_TITLE_MAX}
+          required
+          onChange={(e) => setTitle(e.currentTarget.value)}
+          hint={`${title.length}/${CHAPTER_TITLE_MAX}`}
+        />
         <TextField
           label="Description (optional)"
           multiline

@@ -9,6 +9,7 @@ import { space } from './theme';
 import { Avatar, Button, Card, EmptyState, Loading, Notice, PlusBadge, Segmented, useColors, userText } from './ui';
 import { ShopList } from './money';
 import { isVerificationError, VerifyPrompt } from './safety';
+import { ChaptersRow } from './chapters';
 
 /**
  * A profile: name, bio, counts, Follow and Message for other people, and
@@ -136,6 +137,7 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
       </Card>
       {actions}
       {error ? <Notice tone="danger">{error}</Notice> : null}
+      <ChaptersRow userId={profile.id} isSelf={rel.isSelf} />
       <Segmented
         label={t('m.title.profile')}
         value={tab}

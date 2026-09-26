@@ -92,8 +92,8 @@ export default function ChapterPage() {
           </strong>
           <span className="muted">
             {chapter.storyCount === 1 ? '1 story inside.' : `${chapter.storyCount} stories inside.`}{' '}
-            {chapter.capsule!.sealed ? 'Nothing more can be added.' : 'Stories can still be added until it is sealed.'} Everyone who can see it finds
-            out what is inside on that day.
+            {chapter.capsule!.sealed ? 'Nothing more can be added.' : 'Stories can still be added until it is sealed.'} Everyone who can see it finds out what
+            is inside on that day.
           </span>
           {owner && !chapter.capsule!.sealed ? (
             <Button size="sm" variant="secondary" onClick={act(() => api.chapters.seal(chapter.id), 'Sealed')} disabled={!chapter.storyCount}>
