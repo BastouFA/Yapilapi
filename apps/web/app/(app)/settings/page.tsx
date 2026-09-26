@@ -379,6 +379,14 @@ function PrivacyCenter() {
   return (
     <div className="stack">
       <CloseFriendsCard />
+      <Card title="Your archive">
+        <p className="muted" style={{ marginTop: 0 }}>
+          Your stories stay in your archive after they expire. Only you can see it. From there you can put them into chapters on your profile.
+        </p>
+        <Link href="/archive" className="yp-btn yp-btn--secondary yp-btn--sm">
+          Open your archive
+        </Link>
+      </Card>
       <SharingSettings />
       <TaggingSettings />
       <Card title="What we hold about you">

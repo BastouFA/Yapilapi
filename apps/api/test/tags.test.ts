@@ -124,12 +124,10 @@ describe('realtime tickets', () => {
     expect(sessionId).toBeTruthy();
     // Forged, expired and tampered tickets are refused.
     expect(readTicket(t.ctx.config, issueTicket(t.ctx.config, sessionId!, Date.now() - 120_000))).toBeNull();
-    expect(
-      readTicket(
-        t.ctx.config,
-        r.body.ticket.replace(/.$/, (c: string) => (c === 'A' ? 'B' : 'A')),
-      ),
-    ).toBeNull();
+    // Change a character early in the signature: the last one can be padding bits that don't change the bytes.
+    const [body, mac] = r.body.ticket.split('.');
+    const tampered = `${body}.${mac[0] === 'A' ? 'B' : 'A'}${mac.slice(1)}`;
+    expect(readTicket(t.ctx.config, tampered)).toBeNull();
     expect(readTicket(t.ctx.config, 'bm90LWEtdGlja2V0.abc')).toBeNull();
     expect((await as(t.app, null).post('/v1/realtime/ticket')).status).toBe(401);
   });

@@ -36,6 +36,9 @@ function Screens() {
         <Stack.Screen name="t/[tag]" options={{ title: t('m.title.tag') }} />
         <Stack.Screen name="sounds/[id]" options={{ title: t('m.sound.title') }} />
         <Stack.Screen name="close-friends" options={{ title: t('m.closeFriends.title') }} />
+        <Stack.Screen name="archive" options={{ title: t('m.archive.title') }} />
+        <Stack.Screen name="chapter/[id]" options={{ title: t('m.chapters.title') }} />
+        <Stack.Screen name="chapter-edit" options={{ title: t('m.chapters.new'), presentation: 'modal' }} />
         <Stack.Screen name="invite" options={{ title: t('invite.title') }} />
         <Stack.Screen name="find-friends" options={{ title: t('friends.title') }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />

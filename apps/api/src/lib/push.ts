@@ -87,6 +87,8 @@ const TEXT: Record<string, (actor: string) => string> = {
   media_restored: () => 'Your photo or video is back up after review',
   account_limited: () => 'Your account is limited while our team reviews some recent activity',
   account_review: () => 'Our team finished reviewing your account',
+  chapter_invite: (a) => `${a} invited you to add stories to a chapter`,
+  chapter_opened: () => 'A time capsule you are part of has opened',
 };
 
 /** Human text for a notification type, or null for types that shouldn't push. */

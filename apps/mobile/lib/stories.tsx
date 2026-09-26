@@ -29,6 +29,7 @@ import { useT } from './i18n';
 import { gradient, radius, space } from './theme';
 import { Avatar, Icon, useColors, userText } from './ui';
 import { SensitiveCover } from './safety';
+import { AddToChapterSheet } from './chapters';
 
 const PHOTO_MS = 5000;
 const WHITE = '#FFFFFF';
@@ -154,12 +155,13 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
   const [typing, setTyping] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
   const [viewers, setViewers] = useState<{ user: PublicUser; liked: boolean }[] | null>(null);
+  const [chapterFor, setChapterFor] = useState<string | null>(null);
   const group = groups[g];
   const story = group?.moments[i];
   // Sensitive stories wait, blurred and paused, until the viewer chooses to see them.
   const [revealed, setRevealed] = useState<string[]>([]);
   const covered = !!story?.sensitive && !revealed.includes(story.id);
-  const stopped = held || paused || typing || viewers !== null || covered;
+  const stopped = held || paused || typing || viewers !== null || covered || chapterFor !== null;
 
   const next = useCallback(() => {
     if (!group) return onClose();
@@ -392,7 +394,7 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
             </Text>
           ) : null}
           {group.mine ? (
-            <View style={{ flexDirection: 'row', gap: space[2] }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
               <Pressable
                 accessibilityRole="button"
                 onPress={async () => {
@@ -405,6 +407,10 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
               >
                 <Icon name="eye-outline" size={18} color={WHITE} />
                 <Text style={st.pillText}>{t('m.stories.seenBy', { count: story.views ?? 0 })}</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={() => setChapterFor(story.id)} style={st.pill}>
+                <Icon name="albums-outline" size={18} color={WHITE} />
+                <Text style={st.pillText}>{t('m.chapters.add')}</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
@@ -479,6 +485,7 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
         </View>
       </Animated.View>
 
+      <AddToChapterSheet momentId={chapterFor} onClose={() => setChapterFor(null)} onAdded={setSent} />
       {viewers !== null ? (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay, justifyContent: 'flex-end' }]}>
           <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} style={{ flex: 1 }} onPress={() => setViewers(null)} />

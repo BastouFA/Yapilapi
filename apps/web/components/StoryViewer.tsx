@@ -6,6 +6,7 @@ import type { StoryGroup } from '@yapilapi/api-client';
 import { formatRelativeTime, type PublicUser } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
+import { AddToChapter } from '@/components/Chapters';
 
 const PHOTO_MS = 5000;
 
@@ -35,6 +36,7 @@ export function StoryViewer({
   const [progress, setProgress] = useState(0);
   const [reply, setReply] = useState('');
   const [viewers, setViewers] = useState<{ user: PublicUser; liked: boolean }[] | null>(null);
+  const [addingToChapter, setAddingToChapter] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const group = groups[g];
@@ -206,6 +208,9 @@ export function StoryViewer({
             <Button size="sm" variant="secondary" onClick={async () => setViewers((await api.moments.viewers(story.id).catch(() => ({ items: [] }))).items)}>
               Seen by {story.views ?? 0}
             </Button>
+            <Button size="sm" variant="secondary" onClick={() => (setPaused(true), setAddingToChapter(true))}>
+              Add to a chapter
+            </Button>
             <Button
               size="sm"
               variant="ghost"
@@ -274,6 +279,7 @@ export function StoryViewer({
         )}
       </div>
 
+      <AddToChapter momentId={group.mine ? story.id : null} open={addingToChapter} onClose={() => (setAddingToChapter(false), setPaused(false))} />
       <BottomSheet open={viewers !== null} onClose={() => setViewers(null)} title="Seen by">
         {viewers?.length ? (
           <List>

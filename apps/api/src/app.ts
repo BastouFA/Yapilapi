@@ -37,6 +37,7 @@ import safetyModule from './modules/safety.ts';
 import privacyModule from './modules/privacy.ts';
 import aiModule from './modules/ai.ts';
 import momentsModule from './modules/moments.ts';
+import chaptersModule, { openDueChapters } from './modules/chapters.ts';
 import mediaModule from './modules/media.ts';
 import creatorModule from './modules/creator.ts';
 import developerModule from './modules/developer.ts';
@@ -330,6 +331,7 @@ export async function buildApp(
     privacyModule,
     aiModule,
     momentsModule,
+    chaptersModule,
     mediaModule,
     creatorModule,
     developerModule,
@@ -384,6 +386,8 @@ export async function buildApp(
       await processJobs(db, jobHandlers).catch((e) => app.log.warn({ err: e.message }, 'job worker'));
       // Campaigns and boosts past their end date stop, and their unspent budget is refunded.
       await endExpiredCampaigns(db, ctx.paymentProviders).catch((e) => app.log.warn({ err: e.message }, 'ad expiry'));
+      // Time capsules whose date has come: tell the owner and contributors.
+      await openDueChapters(db, ctx.realtime).catch((e) => app.log.warn({ err: e.message }, 'chapter capsules'));
       busy = false;
     }, 2_000);
     jobTimer.unref();

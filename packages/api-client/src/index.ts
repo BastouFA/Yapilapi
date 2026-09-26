@@ -1,4 +1,7 @@
 import type {
+  ChapterAudience,
+  ChapterGradient,
+  ChapterSymbol,
   Comment,
   Community,
   Conversation,
@@ -214,6 +217,34 @@ export function createClient(opts: ClientOptions) {
       list: () => get<{ items: { user: PublicUser; addedAt: string; followsYou: boolean }[] }>('/v1/me/close-friends'),
       add: (userId: string) => put<{ closeFriend: boolean }>(`/v1/me/close-friends/${userId}`),
       remove: (userId: string) => del<{ closeFriend: boolean }>(`/v1/me/close-friends/${userId}`),
+    },
+    /** Your expired stories, private to you. `month` is YYYY-MM (UTC). */
+    archive: {
+      months: () => get<{ items: { month: string; count: number }[] }>('/v1/me/archive/months'),
+      list: (month?: string) => get<{ items: ArchivedStory[] }>(`/v1/me/archive${qs({ month })}`),
+      remove: (id: string) => del<{ ok: true }>(`/v1/me/archive/${id}`),
+    },
+    chapters: {
+      /** Chapters on a profile that you may see. */
+      forUser: (userId: string) => get<{ items: Chapter[] }>(`/v1/users/${userId}/chapters`),
+      /** Chapters you own, contribute to or are invited to. */
+      mine: () => get<{ items: Chapter[] }>('/v1/me/chapters'),
+      get: (id: string) => get<ChapterDetail>(`/v1/chapters/${id}`),
+      create: (b: Partial<ChapterInput> & { title: string; momentIds?: string[] }) => post<{ chapter: Chapter }>('/v1/chapters', b),
+      update: (id: string, b: Partial<ChapterInput> & { coverStoryId?: string | null }) => patch<{ chapter: Chapter }>(`/v1/chapters/${id}`, b),
+      remove: (id: string) => del<{ ok: true }>(`/v1/chapters/${id}`),
+      seal: (id: string) => post<{ chapter: Chapter }>(`/v1/chapters/${id}/seal`),
+      addStory: (id: string, momentId: string) => post<{ added: boolean }>(`/v1/chapters/${id}/stories`, { momentId }),
+      removeStory: (id: string, momentId: string) => del<{ ok: true }>(`/v1/chapters/${id}/stories/${momentId}`),
+      invite: (id: string, userId: string) => post<{ invited: true }>(`/v1/chapters/${id}/contributors`, { userId }),
+      join: (id: string) => post<{ chapter: Chapter }>(`/v1/chapters/${id}/join`),
+      /** The owner removes a contributor, or you leave (or decline) with your own id. */
+      removeContributor: (id: string, userId: string) => del<{ ok: true }>(`/v1/chapters/${id}/contributors/${userId}`),
+      showOnProfile: (id: string, showOnProfile: boolean) => patch<{ showOnProfile: boolean }>(`/v1/chapters/${id}/membership`, { showOnProfile }),
+      guestbook: (id: string) => get<{ open: boolean; items: GuestbookEntry[] }>(`/v1/chapters/${id}/guestbook`),
+      sign: (id: string, body: string) => post<{ entry: Omit<GuestbookEntry, 'author'> }>(`/v1/chapters/${id}/guestbook`, { body }),
+      hideLine: (id: string, entryId: string, hidden: boolean) => put<{ hidden: boolean }>(`/v1/chapters/${id}/guestbook/${entryId}/hidden`, { hidden }),
+      deleteLine: (id: string, entryId: string) => del<{ ok: true }>(`/v1/chapters/${id}/guestbook/${entryId}`),
     },
     contacts: {
       /** The salt and identifier kinds to hash with (see contactHashInput in @yapilapi/shared). */
@@ -1237,4 +1268,97 @@ export interface ShareVideoState {
   url: string | null;
   /** A suggested name for the downloaded file. */
   fileName: string;
+}
+
+/** One of your stories after it expired, in your private archive. */
+export interface ArchivedStory {
+  id: string;
+  body: string;
+  mediaUrl: string | null;
+  mediaKind: 'image' | 'video' | 'audio' | null;
+  posterUrl: string | null;
+  hlsUrl: string | null;
+  durationMs: number | null;
+  locationText: string | null;
+  sensitive?: boolean;
+  /** Its photo or video failed a check: it stays here but can't go in a chapter. */
+  blocked?: boolean;
+  closeFriends: boolean;
+  createdAt: string;
+  expiresAt: string;
+  chapters: { id: string; title: string }[];
+}
+
+export interface ChapterInput {
+  title: string;
+  description: string;
+  audience: ChapterAudience;
+  coverGradient: ChapterGradient;
+  coverSymbol: ChapterSymbol;
+  /** A time capsule's opening date (ISO). Null makes it an ordinary chapter again, until it's sealed. */
+  opensAt: string | null;
+}
+
+export interface Chapter {
+  id: string;
+  title: string;
+  description: string;
+  audience: ChapterAudience;
+  owner: PublicUser;
+  /** One of its stories, or the chosen gradient and symbol. Always the gradient while a capsule is sealed. */
+  cover:
+    | { kind: 'story'; mediaUrl: string | null; mediaKind: 'image' | 'video' | 'audio' | null; posterUrl: string | null; text: string | null }
+    | { kind: 'gradient'; gradient: ChapterGradient; symbol: ChapterSymbol };
+  coverGradient: ChapterGradient;
+  coverSymbol: ChapterSymbol;
+  /** Only for the owner. */
+  coverStoryId?: string | null;
+  /** A time capsule. `sealed`: nothing more can be added. `open`: its date has come. */
+  capsule: { opensAt: string; sealed: boolean; open: boolean } | null;
+  storyCount: number;
+  /** Has contributors. */
+  shared: boolean;
+  role: 'owner' | 'contributor' | 'invited' | null;
+  /** You can add one of your stories now. */
+  canAdd: boolean;
+  /** For contributors: also shown on your profile. */
+  showOnProfile?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChapterStory {
+  id: string;
+  body: string;
+  mediaUrl: string | null;
+  mediaKind: 'image' | 'video' | 'audio' | null;
+  posterUrl: string | null;
+  hlsUrl: string | null;
+  durationMs: number | null;
+  sensitive?: boolean;
+  locationText: string | null;
+  createdAt: string;
+  /** Who shared it: the credit on each story. */
+  author: PublicUser;
+  mine: boolean;
+}
+
+export interface ChapterDetail {
+  chapter: Chapter;
+  /** In playing order. Empty before a time capsule opens, except your own stories for you. */
+  stories: ChapterStory[];
+  /** Accepted contributors; the owner also sees people still invited. */
+  contributors: { user: PublicUser; status: 'invited' | 'accepted' }[];
+}
+
+export interface GuestbookEntry {
+  id: string;
+  body: string;
+  author: PublicUser;
+  mine: boolean;
+  /** Hidden by the owner (only the owner sees these). */
+  hidden: boolean;
+  /** Waiting for a check: only you see it for now. */
+  pending: boolean;
+  createdAt: string;
 }
