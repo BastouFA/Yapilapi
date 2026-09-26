@@ -433,8 +433,14 @@ export function PostCard({
         </div>
       ) : null}
 
-      {post.linkUrl || post.event || post.product || post.topics.length ? (
+      {post.format === 'reel' || post.linkUrl || post.event || post.product || post.topics.length ? (
         <div className="yp-post__chips">
+          {post.format === 'reel' ? (
+            <L href={`/reels?start=${post.id}`} className="yp-chip">
+              <Icon name="sparkle" />
+              Reel · watch full screen
+            </L>
+          ) : null}
           {post.linkUrl ? (
             <a className="yp-chip" href={post.linkUrl} target="_blank" rel="noopener noreferrer nofollow">
               <Icon name="globe" />
@@ -673,30 +679,43 @@ export function MomentsStrip({
   onOpen,
   onCreate,
 }: {
-  groups: { author: { id: string; displayName: string; avatarUrl: string | null }; moments: unknown[] }[];
+  groups: { author: { id: string; displayName: string; avatarUrl: string | null }; moments: unknown[]; allSeen?: boolean; mine?: boolean }[];
   onOpen: (index: number) => void;
   onCreate?: () => void;
 }) {
+  const hasOwn = groups.some((g) => g.mine);
   return (
-    <ul className="yp-moments" aria-label="Moments">
-      {onCreate ? (
+    <ul className="yp-moments" aria-label="Stories">
+      {onCreate && !hasOwn ? (
         <li>
           <button type="button" className="yp-moment" onClick={onCreate}>
             <span className="yp-avatar yp-avatar--lg" style={{ background: 'var(--surface-sunken)', color: 'var(--yapi)' }} aria-hidden>
               <Icon name="plus" />
             </span>
-            <span className="yp-moment__name">Your moment</span>
+            <span className="yp-moment__name">Your story</span>
           </button>
         </li>
       ) : null}
       {groups.map((g, i) => (
         <li key={g.author.id}>
-          <button type="button" className="yp-moment" onClick={() => onOpen(i)} aria-label={`${g.author.displayName}, ${g.moments.length} moments`}>
-            <span className="yp-moment__ring">
+          <button
+            type="button"
+            className="yp-moment"
+            onClick={() => onOpen(i)}
+            aria-label={`${g.mine ? 'Your story' : g.author.displayName}, ${g.moments.length} ${g.moments.length === 1 ? 'story' : 'stories'}${g.allSeen ? ', seen' : ', new'}`}
+          >
+            <span className={g.allSeen ? 'yp-moment__ring yp-moment__ring--seen' : 'yp-moment__ring'}>
               <Avatar name={g.author.displayName} src={g.author.avatarUrl} size="lg" />
             </span>
-            <span className="yp-moment__name">{g.author.displayName}</span>
+            <span className="yp-moment__name">
+              <bdi>{g.mine ? 'Your story' : g.author.displayName}</bdi>
+            </span>
           </button>
+          {g.mine && onCreate ? (
+            <button type="button" className="yp-moment__add" onClick={onCreate} aria-label="Add to your story">
+              <Icon name="plus" size={14} />
+            </button>
+          ) : null}
         </li>
       ))}
     </ul>

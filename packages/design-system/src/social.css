@@ -1430,3 +1430,30 @@ a.yp-ecard:hover {
 [dir='rtl'] .yp-icon--directional {
   transform: scaleX(-1);
 }
+
+/* Stories you've already seen: a quiet ring instead of the gradient. */
+.yp-moment__ring--seen {
+  background: var(--line-strong);
+}
+.yp-moments > li {
+  position: relative;
+}
+.yp-moment__add {
+  position: absolute;
+  top: 48px;
+  inset-inline-start: 50px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 2px solid var(--ground);
+  border-radius: var(--radius-full);
+  background: var(--grad);
+  color: var(--on-yapi);
+  cursor: pointer;
+}
+.yp-moment__add:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

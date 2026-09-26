@@ -280,7 +280,7 @@ export function PostList({
   );
 }
 
-function CommentsSheet({ post, onClose, onAdded }: { post: Post; onClose: () => void; onAdded: () => void }) {
+export function CommentsSheet({ post, onClose, onAdded }: { post: Post; onClose: () => void; onAdded: () => void }) {
   const { toast, t, locale } = useSession();
   const [items, setItems] = useState<Comment[] | null>(null);
   const [body, setBody] = useState('');

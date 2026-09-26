@@ -2,35 +2,39 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { BottomSheet, Button, MomentsStrip, Segments } from '@yapilapi/design-system';
-import { formatRelativeTime, type FeedMode, type PublicUser } from '@yapilapi/shared';
+import { MomentsStrip, Segments } from '@yapilapi/design-system';
+import type { StoryGroup } from '@yapilapi/api-client';
+import { useRouter } from 'next/navigation';
+import { StoryViewer } from '@/components/StoryViewer';
+import type { FeedMode } from '@yapilapi/shared';
 import { api } from '@/lib/api';
 import { PostList } from '@/components/PostList';
 import { useSession } from '../../providers';
 
-type MomentGroup = { author: PublicUser; moments: { id: string; body: string; mediaUrl: string | null; mediaKind: string | null; createdAt: string }[] };
-
 export default function Home() {
-  const { t, locale, unread, flags } = useSession();
+  const { t, unread, flags } = useSession();
+  const router = useRouter();
   const [mode, setMode] = useState<FeedMode>('for_you');
-  const [moments, setMoments] = useState<MomentGroup[]>([]);
+  const [moments, setMoments] = useState<StoryGroup[]>([]);
   const [viewing, setViewing] = useState<number | null>(null);
 
   useEffect(() => {
     api.moments
       .list()
-      .then((r) => setMoments(r.items as MomentGroup[]))
+      .then((r) => setMoments(r.items))
       .catch(() => {});
   }, []);
 
   const load = useCallback((cursor?: string) => api.feed(mode, cursor), [mode]);
-  const group = viewing !== null ? moments[viewing] : null;
 
   return (
     <div className="yp-shell__inner">
       <div className="yp-topbar">
         <h1>{t('nav.home')}</h1>
         <div className="row">
+          <Link href="/reels" className="yp-btn yp-btn--secondary yp-btn--sm">
+            Reels
+          </Link>
           {flags.REAL ? (
             <Link href="/real" className="yp-btn yp-btn--ghost yp-btn--sm">
               Real
@@ -48,7 +52,7 @@ export default function Home() {
         </Link>
       </div>
 
-      <MomentsStrip groups={moments} onOpen={setViewing} onCreate={() => (location.href = '/create?moment=1')} />
+      <MomentsStrip groups={moments} onOpen={setViewing} onCreate={() => router.push('/create?mode=story')} />
 
       <Segments
         label="Feed"
@@ -59,25 +63,7 @@ export default function Home() {
 
       <PostList load={load} reloadKey={mode} sponsored={mode === 'for_you'} />
 
-      <BottomSheet open={!!group} onClose={() => setViewing(null)} title={group ? `${group.author.displayName}'s moments` : ''}>
-        <div className="stack">
-          {group?.moments.map((m) => (
-            <figure key={m.id} className="stack-sm" style={{ margin: 0 }}>
-              {m.mediaUrl && m.mediaKind === 'image' ? <img src={m.mediaUrl} alt="" style={{ borderRadius: 8 }} /> : null}
-              {m.mediaUrl && m.mediaKind === 'video' ? <video src={m.mediaUrl} controls playsInline style={{ borderRadius: 8 }} /> : null}
-              {m.body ? <figcaption>{m.body}</figcaption> : null}
-              <span className="muted" style={{ fontSize: 12 }}>
-                {formatRelativeTime(m.createdAt, locale)}
-              </span>
-            </figure>
-          ))}
-          {viewing !== null && viewing < moments.length - 1 ? (
-            <Button variant="secondary" onClick={() => setViewing(viewing + 1)}>
-              Next
-            </Button>
-          ) : null}
-        </div>
-      </BottomSheet>
+      {viewing !== null && moments[viewing] ? <StoryViewer groups={moments} start={viewing} onClose={() => setViewing(null)} onChange={setMoments} /> : null}
     </div>
   );
 }

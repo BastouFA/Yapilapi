@@ -159,15 +159,22 @@ export function createClient(opts: ClientOptions) {
       transcribe: (mediaId: string, b: { lang: string; label: string }) => post<{ track: CaptionTrack }>(`/v1/media/${mediaId}/captions/transcribe`, b),
     },
     moments: {
-      list: () =>
-        get<{
-          items: {
-            author: PublicUser;
-            moments: { id: string; body: string; mediaUrl: string | null; mediaKind: string | null; expiresAt: string | null; createdAt: string }[];
-          }[];
-        }>('/v1/moments'),
-      create: (b: Record<string, unknown>) => post('/v1/moments', b),
+      list: () => get<{ items: StoryGroup[] }>('/v1/moments'),
+      create: (b: {
+        body?: string;
+        mediaId?: string;
+        mediaUrl?: string;
+        mediaKind?: 'image' | 'video' | 'audio';
+        expiresIn?: '1h' | '24h' | 'permanent' | 'custom';
+        visibility?: string;
+      }) => post<{ moment: { id: string; expiresAt: string | null } }>('/v1/moments', b),
+      view: (id: string) => post(`/v1/moments/${id}/view`),
+      like: (id: string, liked: boolean) => put<{ liked: boolean }>(`/v1/moments/${id}/like`, { liked }),
+      viewers: (id: string) => get<{ items: { user: PublicUser; liked: boolean; viewedAt: string }[] }>(`/v1/moments/${id}/viewers`),
+      reply: (id: string, body: string) => post<{ conversationId: string }>(`/v1/moments/${id}/reply`, { body }),
+      remove: (id: string) => del(`/v1/moments/${id}`),
     },
+    reels: (cursor?: string) => get<Page<Post>>(`/v1/reels${qs({ cursor })}`),
     conversations: {
       list: () => get<{ items: Conversation[] }>('/v1/conversations'),
       get: (id: string) => get<{ conversation: Conversation }>(`/v1/conversations/${id}`),
@@ -745,4 +752,28 @@ export interface CaptionCue {
   start: number;
   end: number;
   text: string;
+}
+
+export interface Story {
+  id: string;
+  body: string;
+  mediaUrl: string | null;
+  mediaKind: 'image' | 'video' | 'audio' | null;
+  posterUrl: string | null;
+  hlsUrl: string | null;
+  durationMs: number | null;
+  locationText: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  seen: boolean;
+  liked: boolean;
+  /** Only on your own stories. */
+  views?: number;
+}
+
+export interface StoryGroup {
+  author: PublicUser;
+  mine: boolean;
+  allSeen: boolean;
+  moments: Story[];
 }

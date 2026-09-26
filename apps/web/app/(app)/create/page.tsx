@@ -10,13 +10,34 @@ import { useSession } from '../../providers';
 
 type Uploaded = { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string };
 
+const REEL_MAX_SECONDS = 180;
+
+/** A video file's length, read in the browser before uploading. */
+function videoSeconds(file: File): Promise<number> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const v = document.createElement('video');
+    v.preload = 'metadata';
+    v.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      resolve(Number.isFinite(v.duration) ? v.duration : 0);
+    };
+    v.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(0);
+    };
+    v.src = url;
+  });
+}
+
 function Create() {
   const { t, toast } = useSession();
   const router = useRouter();
   const params = useSearchParams();
-  const [kind, setKind] = useState<'post' | 'moment'>(params.get('moment') ? 'moment' : 'post');
+  const initialMode = params.get('mode') === 'reel' ? 'reel' : params.get('mode') === 'story' || params.get('moment') ? 'story' : 'post';
+  const [kind, setKind] = useState<'post' | 'reel' | 'story'>(initialMode);
   const [body, setBody] = useState('');
-  const [visibility, setVisibility] = useState<Visibility>(params.get('moment') ? 'friends' : 'public');
+  const [visibility, setVisibility] = useState<Visibility>(initialMode === 'story' ? 'friends' : 'public');
   const [communityId, setCommunityId] = useState(params.get('community') ?? '');
   const [communities, setCommunities] = useState<Community[]>([]);
   const [circles, setCircles] = useState<{ id: string; name: string }[]>([]);
@@ -48,9 +69,17 @@ function Create() {
 
   async function upload(files: FileList | null) {
     if (!files?.length) return;
+    if (kind === 'reel') {
+      const f = files[0]!;
+      if (!f.type.startsWith('video/')) return toast('A reel is a video.');
+      // Check the length before uploading a long file for nothing.
+      const seconds = await videoSeconds(f);
+      if (seconds > REEL_MAX_SECONDS) return toast(`Reels can be up to 3 minutes. This one is ${Math.round(seconds / 60)} minutes; trim it in Studio first.`);
+    }
     setUploading(true);
     try {
-      for (const f of Array.from(files).slice(0, 10 - media.length)) {
+      const limit = kind === 'post' ? 10 : 1;
+      for (const f of Array.from(files).slice(0, Math.max(0, limit - media.length))) {
         // Large files (mostly video) go through resumable, chunked uploads.
         const { media: m } = f.size > 8 * 1024 * 1024 ? await api.uploads.resumable(f, (p) => setProgress(Math.round(p * 100))) : await api.media.upload(f);
         setMedia((cur) => [...cur, { id: m.id, kind: m.kind, url: m.url, altText: '' }]);
@@ -82,10 +111,27 @@ function Create() {
     setError(null);
     setFields({});
     try {
-      if (kind === 'moment') {
-        await api.moments.create({ body, mediaUrl: media[0]?.url, mediaKind: media[0]?.kind, expiresIn, visibility });
-        toast('Moment shared');
+      if (kind === 'story') {
+        await api.moments.create({ body, mediaId: media[0]?.id, expiresIn, visibility });
+        toast('Added to your story');
         router.push('/home');
+        return;
+      }
+      if (kind === 'reel') {
+        const v = media[0]!;
+        const r = await api.posts.create({
+          format: 'reel',
+          body,
+          visibility,
+          media: [{ id: v.id, url: new URL(v.url, location.origin).toString(), kind: 'video', altText: v.altText || undefined }],
+          topics: topics
+            .split(/[,\s#]+/)
+            .filter(Boolean)
+            .slice(0, 5),
+          aiAssisted: aiUsed,
+        });
+        toast(r.moderation ? r.moderation.message : 'Reel published');
+        router.push(`/reels?start=${r.post.id}`);
         return;
       }
       const r = await api.posts.create({
@@ -119,12 +165,28 @@ function Create() {
       <Segments
         label="What to create"
         value={kind}
-        onChange={setKind}
+        onChange={(k) => {
+          setKind(k);
+          // Keep only what the new kind can hold.
+          if (k !== 'post') {
+            setPoll(null);
+            setMedia((m) => m.filter((x) => k !== 'reel' || x.kind === 'video').slice(0, 1));
+          }
+          if (k === 'story' && visibility === 'selected') setVisibility('friends');
+        }}
         options={[
           { id: 'post', label: 'Post' },
-          { id: 'moment', label: 'Moment' },
+          { id: 'reel', label: 'Reel' },
+          { id: 'story', label: 'Story' },
         ]}
       />
+      <p className="muted" style={{ margin: 0, fontSize: 14 }}>
+        {kind === 'post'
+          ? 'Text, photos, videos, a link or a poll, on your profile or in a community.'
+          : kind === 'reel'
+            ? 'One vertical video up to 3 minutes, shown full screen in Reels and on your profile.'
+            : 'A photo, video or a few words for your people. It disappears when you choose.'}
+      </p>
       {error ? <Alert tone="danger">{error}</Alert> : null}
 
       <div className="composer-box">
@@ -133,10 +195,10 @@ function Create() {
         </label>
         <textarea
           id="body"
-          placeholder={t('create.placeholder')}
           value={body}
           onChange={(e) => setBody(e.currentTarget.value)}
-          maxLength={kind === 'moment' ? 500 : 5000}
+          placeholder={kind === 'reel' ? 'Write a caption' : kind === 'story' ? 'Add a few words (optional)' : t('create.placeholder')}
+          maxLength={kind === 'story' ? 500 : kind === 'reel' ? 2200 : 5000}
           aria-invalid={!!fields.body}
         />
         {fields.body ? <span className="yp-field__error">{fields.body}</span> : null}
@@ -203,13 +265,13 @@ function Create() {
           <input
             ref={fileRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
+            accept={kind === 'reel' ? 'video/mp4,video/webm' : 'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm'}
             multiple={kind === 'post'}
             hidden
             onChange={(e) => upload(e.currentTarget.files)}
           />
           <Button size="sm" variant="secondary" icon="image" loading={uploading} onClick={() => fileRef.current?.click()}>
-            {progress !== null ? `Uploading ${progress}%` : 'Photo or video'}
+            {progress !== null ? `Uploading ${progress}%` : kind === 'reel' ? (media.length ? 'Replace video' : 'Choose a video') : 'Photo or video'}
           </Button>
           {kind === 'post' && !poll ? (
             <Button size="sm" variant="secondary" icon="poll" onClick={() => setPoll(['', ''])}>
@@ -249,7 +311,7 @@ function Create() {
       ) : null}
 
       <div className="stack">
-        {kind === 'post' ? (
+        {kind === 'reel' ? null : kind === 'post' ? (
           <Select label="Post in" value={communityId} onChange={(e) => setCommunityId(e.currentTarget.value)}>
             <option value="">My profile</option>
             {communities.map((c) => (
@@ -267,7 +329,7 @@ function Create() {
         )}
         {!communityId ? (
           <Select label={t('create.visibility')} value={visibility} onChange={(e) => setVisibility(e.currentTarget.value as Visibility)}>
-            {VISIBILITIES.filter((v) => kind === 'post' || v !== 'selected').map((v) => (
+            {VISIBILITIES.filter((v) => kind !== 'story' || v !== 'selected').map((v) => (
               <option key={v} value={v} disabled={v === 'circle' && !circles.length}>
                 {t(`visibility.${v}` as MessageKey)}
               </option>
@@ -284,14 +346,20 @@ function Create() {
             ))}
           </Select>
         ) : null}
-        {kind === 'post' ? (
+        {kind !== 'story' ? (
           <TextField label="Topics (optional)" hint="Up to 5, separated by commas." value={topics} onChange={(e) => setTopics(e.currentTarget.value)} />
         ) : null}
         {aiUsed ? <Checkbox label="Label this post as made with AI assistance" checked readOnly disabled /> : null}
       </div>
 
-      <Button type="submit" size="lg" block loading={busy} disabled={uploading || (!body.trim() && !media.length && !poll)}>
-        {kind === 'moment' ? 'Share moment' : t('create.publish')}
+      <Button
+        type="submit"
+        size="lg"
+        block
+        loading={busy}
+        disabled={uploading || (kind === 'reel' ? media.length !== 1 || media[0]!.kind !== 'video' : !body.trim() && !media.length && !poll)}
+      >
+        {kind === 'story' ? 'Share to your story' : kind === 'reel' ? 'Publish reel' : t('create.publish')}
       </Button>
     </form>
   );

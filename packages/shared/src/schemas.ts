@@ -95,6 +95,8 @@ export const createPostSchema = z
     poll: z.object({ options: z.array(trimmed(80)).min(2).max(6) }).optional(),
     topics: z.array(z.string().min(1).max(40)).max(5).default([]),
     aiAssisted: z.boolean().default(false),
+    /** 'reel': one short vertical video, shown in the full-screen Reels feed as well as on the profile. */
+    format: z.enum(['post', 'reel']).default('post'),
   })
   .superRefine((v, ctx) => {
     if (!v.body && v.media.length === 0 && !v.linkUrl && !v.poll)
@@ -102,6 +104,9 @@ export const createPostSchema = z
     if (v.visibility === 'circle' && !v.circleId) ctx.addIssue({ code: 'custom', message: 'Choose a circle.', path: ['circleId'] });
     if (v.visibility === 'selected' && !v.audience?.length) ctx.addIssue({ code: 'custom', message: 'Choose at least one person.', path: ['audience'] });
     if (v.kind === 'poll' && !v.poll) ctx.addIssue({ code: 'custom', message: 'Add poll options.', path: ['poll'] });
+    if (v.format === 'reel' && (v.media.length !== 1 || v.media[0]!.kind !== 'video'))
+      ctx.addIssue({ code: 'custom', message: 'A reel is one video.', path: ['media'] });
+    if (v.format === 'reel' && v.poll) ctx.addIssue({ code: 'custom', message: "Reels can't have polls.", path: ['poll'] });
   });
 
 export const feedQuerySchema = z.object({
@@ -239,6 +244,8 @@ export const appealSchema = z.object({ caseId: uuid, statement: trimmed(2000) })
 
 export const createMomentSchema = z.object({
   body: z.string().trim().max(500).default(''),
+  /** An item uploaded through /v1/media or /v1/uploads (plays its processed versions). */
+  mediaId: uuid.optional(),
   mediaUrl: z.string().url().optional(),
   mediaKind: z.enum(['image', 'video', 'audio']).optional(),
   expiresIn: z.enum(['1h', '24h', 'permanent', 'custom']).default('24h'),

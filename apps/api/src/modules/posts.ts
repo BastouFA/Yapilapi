@@ -24,6 +24,7 @@ import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 const VISIBLE = postVisibleSql('$1');
+const REEL_MAX_MS = 180_000;
 /** For You scores posts from your connections plus this many of the newest other posts. */
 const RECENT_CANDIDATES = 1000;
 const POST_FROM = `FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id`;
@@ -37,6 +38,42 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
   }
 
   // ── Create ────────────────────────────────────────────────────────────
+  /**
+   * Reels: short vertical videos in a full-screen feed. Ranked like For You
+   * (people you're close to, your interests, engagement, freshness) but only
+   * reels, with a stable window so paging never repeats or skips.
+   */
+  app.get('/v1/reels', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const q = parse(z.object({ cursor: z.string().max(200).optional(), limit: z.coerce.number().int().min(1).max(20).default(8) }), req.query);
+    const c = decodeCursor<{ asOf: string; o: number }>(q.cursor) ?? {
+      asOf: ((await db.query<{ t: Date }>(`SELECT now() AS t`)).rows[0]!.t as Date).toISOString(),
+      o: 0,
+    };
+    const { rows } = await db.query(
+      `SELECT p.id ${POST_FROM}
+       WHERE p.format = 'reel' AND ${VISIBLE} AND p.moderation_status = 'normal' AND p.created_at <= $2::timestamptz
+       ORDER BY (
+           CASE WHEN EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = p.author_id) OR (fr.user_b = $1 AND fr.user_a = p.author_id)) THEN 3 ELSE 0 END
+         + CASE WHEN EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = p.author_id) THEN 2 ELSE 0 END
+         + (SELECT count(*) FROM unnest(p.topics) t WHERE t IN (SELECT tp.slug FROM user_interests ui JOIN topics tp ON tp.id = ui.topic_id WHERE ui.user_id = $1)) * 1.2
+         + ln(1 + p.like_count + 2 * p.comment_count) * 0.6
+         + 4.0 * exp(-extract(epoch FROM ($2::timestamptz - p.created_at)) / 86400.0)
+       ) DESC, p.created_at DESC, p.id DESC
+       LIMIT $3 OFFSET $4`,
+      [u.id, c.asOf, q.limit + 1, c.o],
+    );
+    const page = rows.slice(0, q.limit);
+    return {
+      items: await hydratePosts(
+        db,
+        page.map((r) => r.id),
+        u.id,
+      ),
+      nextCursor: rows.length > q.limit ? encodeCursor({ asOf: c.asOf, o: c.o + q.limit }) : null,
+    };
+  });
+
   app.post('/v1/posts', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => {
     const u = me(req);
     const input = parse(createPostSchema, req.body);
@@ -76,8 +113,8 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
         if (!own.rowCount) throw forbidden('You can only link products you sell.');
       }
       const { rows } = await c.query<{ id: string }>(
-        `INSERT INTO posts (author_id, kind, body, visibility, circle_id, community_id, event_id, product_id, link_url, topics, moderation_status, ai_provenance, rights)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
+        `INSERT INTO posts (author_id, kind, body, visibility, circle_id, community_id, event_id, product_id, link_url, topics, moderation_status, ai_provenance, rights, format)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
         [
           u.id,
           kind,
@@ -92,6 +129,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
           statusForRisk(analysis.risk),
           input.aiAssisted ? { assisted: true, at: new Date().toISOString() } : {},
           { owner: u.id, license: 'all_rights_reserved' },
+          input.format,
         ],
       );
       const id = rows[0]!.id;
@@ -113,6 +151,11 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
           mediaId = media.rows[0]!.id;
         }
         await c.query(`INSERT INTO post_media (post_id, media_id, position) VALUES ($1,$2,$3)`, [id, mediaId, i]);
+        if (input.format === 'reel') {
+          // Reels are short. Uploads still processing have no length yet; those are checked by the player, not refused here.
+          const len = (await c.query(`SELECT duration_ms FROM media WHERE id = $1`, [mediaId])).rows[0]?.duration_ms;
+          if (len && len > REEL_MAX_MS) throw new AppError(400, 'validation_failed', 'Reels can be up to 3 minutes. Trim it in Studio first.');
+        }
       }
       if (input.poll)
         for (const [i, label] of input.poll.options.entries())

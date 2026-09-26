@@ -64,6 +64,8 @@ export interface CaptionTrackRef {
 export interface Post {
   id: string;
   kind: PostKind;
+  /** 'reel' posts are short vertical videos shown in the Reels feed. */
+  format: 'post' | 'reel';
   body: string;
   visibility: Visibility;
   author: PublicUser;
