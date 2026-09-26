@@ -3347,6 +3347,7 @@ span.cam__icon {
 }
 .story-card__text {
   padding: 4px;
+  overflow-wrap: anywhere;
   color: #ffffff;
   font: 700 11px/1.25 var(--font-sans);
   text-align: center;
@@ -3510,4 +3511,17 @@ span.cam__icon {
 .tag-stories__title {
   margin: 0;
   font-size: 17px;
+}
+.story__frame {
+  grid-template-columns: minmax(0, 1fr);
+}
+.story__text,
+.story__caption {
+  overflow-wrap: anywhere;
+}
+.story__text .yp-hashtag,
+.story__caption .yp-hashtag {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }

@@ -92,7 +92,7 @@ export default function TagPage() {
             Post with #{tag}
           </Button>
           {me ? (
-            <Button variant="ghost" size="sm" onClick={() => router.push(`/create?mode=story&text=${encodeURIComponent(`#${tag} `)}`)}>
+            <Button variant="secondary" size="sm" onClick={() => router.push(`/create?mode=story&text=${encodeURIComponent(`#${tag} `)}`)}>
               Story with #{tag}
             </Button>
           ) : null}
