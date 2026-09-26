@@ -5,6 +5,8 @@ import { tr } from './locale';
 /** Reels are up to 3 minutes, as on the web (10 with Plus). */
 export const REEL_MAX_SECONDS = 180;
 export const PLUS_REEL_MAX_SECONDS = 600;
+/** A video recorded in the camera for a post or a story stops after a minute. */
+export const CLIP_MAX_SECONDS = 60;
 /** Largest resumable upload (the API's limit; bigger with Plus). */
 export const RESUMABLE_MAX_BYTES = 200 * 1024 * 1024;
 export const PLUS_RESUMABLE_MAX_BYTES = 500 * 1024 * 1024;
@@ -33,18 +35,6 @@ export async function pickOne(kinds: ImagePicker.MediaType[], maxSeconds = REEL_
     quality: 0.9,
     videoMaxDuration: kinds.includes('videos') && !kinds.includes('images') ? maxSeconds : undefined,
   });
-  if (r.canceled || !r.assets[0]) return null;
-  return r.assets[0];
-}
-
-/**
- * Take a photo or record a video with the camera. Returns null when the person closed the camera,
- * or 'denied' when camera access is off.
- */
-export async function captureOne(maxSeconds = REEL_MAX_SECONDS): Promise<Picked | 'denied' | null> {
-  const perm = await ImagePicker.requestCameraPermissionsAsync();
-  if (!perm.granted) return 'denied';
-  const r = await ImagePicker.launchCameraAsync({ mediaTypes: ['images', 'videos'], quality: 0.9, videoMaxDuration: maxSeconds });
   if (r.canceled || !r.assets[0]) return null;
   return r.assets[0];
 }

@@ -10,8 +10,8 @@
       "bundleIdentifier": "com.yapilapi.app",
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "YAPILAPI uses the camera for video calls and to capture Reals.",
-        "NSMicrophoneUsageDescription": "YAPILAPI uses the microphone for audio and video calls and to record voice messages.",
+        "NSCameraUsageDescription": "YAPILAPI uses the camera for video calls, and to take photos and videos for your posts, reels, stories and Reals.",
+        "NSMicrophoneUsageDescription": "YAPILAPI uses the microphone for audio and video calls, voice messages, and the sound of the videos you record.",
         "UIBackgroundModes": ["audio"],
         "NSContactsUsageDescription": "YAPILAPI uses your contacts to show which of your friends are already here. Emails and numbers are turned into codes on your phone before anything is sent, and nothing is kept."
       }
@@ -35,8 +35,8 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "YAPILAPI uses the camera for video calls and to capture Reals.",
-          "microphonePermission": "YAPILAPI uses the microphone for audio and video calls and to record voice messages.",
+          "cameraPermission": "YAPILAPI uses the camera for video calls, and to take photos and videos for your posts, reels, stories and Reals.",
+          "microphonePermission": "YAPILAPI uses the microphone for audio and video calls, voice messages, and the sound of the videos you record.",
           "recordAudioAndroid": true
         }
       ],
@@ -45,8 +45,8 @@
       [
         "@config-plugins/react-native-webrtc",
         {
-          "cameraPermission": "YAPILAPI uses the camera for video calls and to capture Reals.",
-          "microphonePermission": "YAPILAPI uses the microphone for audio and video calls and to record voice messages."
+          "cameraPermission": "YAPILAPI uses the camera for video calls, and to take photos and videos for your posts, reels, stories and Reals.",
+          "microphonePermission": "YAPILAPI uses the microphone for audio and video calls, voice messages, and the sound of the videos you record."
         }
       ],
       "expo-dev-client",
@@ -62,14 +62,14 @@
         "expo-image-picker",
         {
           "photosPermission": "YAPILAPI uses your photos and videos so you can share them in posts, reels and stories.",
-          "cameraPermission": "YAPILAPI uses the camera for video calls and to capture Reals.",
-          "microphonePermission": "YAPILAPI uses the microphone for audio and video calls and to record voice messages."
+          "cameraPermission": "YAPILAPI uses the camera for video calls, and to take photos and videos for your posts, reels, stories and Reals.",
+          "microphonePermission": "YAPILAPI uses the microphone for audio and video calls, voice messages, and the sound of the videos you record."
         }
       ],
       [
         "expo-audio",
         {
-          "microphonePermission": "YAPILAPI uses the microphone for audio and video calls and to record voice messages.",
+          "microphonePermission": "YAPILAPI uses the microphone for audio and video calls, voice messages, and the sound of the videos you record.",
           "recordAudioAndroid": true
         }
       ],

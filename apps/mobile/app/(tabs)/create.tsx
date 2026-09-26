@@ -1,5 +1,5 @@
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { onPendingAsset, takePendingAsset } from '../../lib/create-sheet';
 import { useEffect, useState } from 'react';
 import { Alert, Image, Linking, ScrollView, Text, View } from 'react-native';
@@ -91,8 +91,8 @@ export default function Create() {
     setKind(k);
     setError(null);
     setNote(null);
-    // Keep only what the new kind can hold: a reel is a video, a post here is text only.
-    setMedia((m) => (k === 'post' || (k === 'reel' && m?.kind !== 'video') ? null : m));
+    // Keep only what the new kind can hold: a reel is a video.
+    setMedia((m) => (k === 'reel' && m?.kind !== 'video' ? null : m));
     if (k === 'story' && (visibility === 'public' || visibility === 'subscribers')) setVisibility('friends');
   }
 
@@ -119,16 +119,28 @@ export default function Create() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.mode]);
 
-  // Taken or picked straight from "+" (the tab bar or the story strip), possibly for another kind.
+  // Taken or picked in the camera screen ("+", the story strip, or a double tap on a mode), possibly for another kind.
+  // It is taken once this tab is showing and the camera has slid away: the editor is a modal, and
+  // iOS can't present one while the camera is still being dismissed.
+  const focused = useIsFocused();
   const [incoming, setIncoming] = useState<ReturnType<typeof takePendingAsset>>(null);
   useEffect(() => {
+    if (!focused) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const take = () => {
-      const p = takePendingAsset();
-      if (p) setIncoming(p);
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const p = takePendingAsset();
+        if (p) setIncoming(p);
+      }, 500);
     };
     take();
-    return onPendingAsset(take);
-  }, []);
+    const off = onPendingAsset(take);
+    return () => {
+      off();
+      clearTimeout(timer);
+    };
+  }, [focused]);
   useEffect(() => {
     if (!incoming) return;
     if (incoming.mode !== kind) {
@@ -136,8 +148,7 @@ export default function Create() {
       return;
     }
     setIncoming(null);
-    if (incoming.asset === 'denied-camera') return setError(t('m.create.cameraPermission'));
-    if (incoming.asset === 'denied-library') return setDenied(true);
+    setError(null);
     handlePicked(incoming.asset);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incoming, kind]);
@@ -238,8 +249,13 @@ export default function Create() {
         router.push({ pathname: '/reels', params: { start: r.post.id } });
         return;
       }
-      const r = await api.posts.create({ body, visibility });
+      const r = await api.posts.create({
+        body,
+        visibility,
+        ...(media ? { media: [{ id: media.id, url: mediaUrl(media.url), kind: media.kind }] } : {}),
+      });
       setBody('');
+      setMedia(null);
       if (r.moderation) setNote(r.moderation.message);
       else router.navigate('/');
     } catch (e) {
@@ -251,7 +267,7 @@ export default function Create() {
   }
 
   const hint = KINDS.find((k) => k.id === kind)!.hint;
-  const canPublish = !busy && !uploading && (kind === 'reel' ? media?.kind === 'video' : kind === 'story' ? !!body.trim() || !!media : !!body.trim());
+  const canPublish = !busy && !uploading && (kind === 'reel' ? media?.kind === 'video' : !!body.trim() || !!media);
 
   return (
     <ScrollView
@@ -259,7 +275,15 @@ export default function Create() {
       contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: bottom }}
       keyboardShouldPersistTaps="handled"
     >
-      <Segmented label={t('m.create.mode')} options={KINDS.map((k) => ({ id: k.id, label: t(k.label) }))} value={kind} onChange={switchTo} />
+      <Segmented
+        label={t('m.create.mode')}
+        options={KINDS.map((k) => ({ id: k.id, label: t(k.label) }))}
+        value={kind}
+        onChange={switchTo}
+        // A quick double tap on Post, Reel or Story opens the camera in that mode.
+        onDoublePress={(k) => router.push({ pathname: '/camera', params: { mode: k } })}
+        doublePressLabel={t('m.create.openCamera')}
+      />
       <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t(hint)}</Text>
       <Card style={{ gap: space[3] }}>
         <Field
@@ -271,44 +295,42 @@ export default function Create() {
           style={{ minHeight: kind === 'post' ? 140 : 96, textAlignVertical: 'top', paddingTop: 12 }}
         />
 
-        {kind !== 'post' ? (
-          <View style={{ gap: space[2] }}>
-            {media ? <Preview media={media} onRemove={() => setMedia(null)} /> : null}
-            <Button
-              label={
-                applying
-                  ? t('m.editor.applying')
-                  : uploading
-                    ? t('m.create.uploading', { progress: number(progress ?? 0, { style: 'percent' }) })
-                    : kind === 'reel'
-                      ? media
-                        ? t('m.create.replaceVideo')
-                        : t('m.create.chooseVideo')
-                      : media
-                        ? t('m.create.replaceMedia')
-                        : t('m.create.choosePhotoVideo')
-              }
-              icon={kind === 'reel' ? 'videocam-outline' : 'image-outline'}
-              variant="secondary"
-              size="sm"
-              disabled={uploading || busy}
-              onPress={() => void choose()}
-              style={{ alignSelf: 'flex-start' }}
-            />
-            {denied ? (
-              <Notice tone="warn">
-                <Text style={{ color: c.ink, lineHeight: 20 }}>{t('m.create.photosPermission')}</Text>
-                <Button
-                  label={t('m.common.openSettings')}
-                  size="sm"
-                  variant="secondary"
-                  onPress={() => void Linking.openSettings()}
-                  style={{ alignSelf: 'flex-start' }}
-                />
-              </Notice>
-            ) : null}
-          </View>
-        ) : null}
+        <View style={{ gap: space[2] }}>
+          {media ? <Preview media={media} onRemove={() => setMedia(null)} /> : null}
+          <Button
+            label={
+              applying
+                ? t('m.editor.applying')
+                : uploading
+                  ? t('m.create.uploading', { progress: number(progress ?? 0, { style: 'percent' }) })
+                  : kind === 'reel'
+                    ? media
+                      ? t('m.create.replaceVideo')
+                      : t('m.create.chooseVideo')
+                    : media
+                      ? t('m.create.replaceMedia')
+                      : t('m.create.choosePhotoVideo')
+            }
+            icon={kind === 'reel' ? 'videocam-outline' : 'image-outline'}
+            variant="secondary"
+            size="sm"
+            disabled={uploading || busy}
+            onPress={() => void choose()}
+            style={{ alignSelf: 'flex-start' }}
+          />
+          {denied ? (
+            <Notice tone="warn">
+              <Text style={{ color: c.ink, lineHeight: 20 }}>{t('m.create.photosPermission')}</Text>
+              <Button
+                label={t('m.common.openSettings')}
+                size="sm"
+                variant="secondary"
+                onPress={() => void Linking.openSettings()}
+                style={{ alignSelf: 'flex-start' }}
+              />
+            </Notice>
+          ) : null}
+        </View>
 
         {kind === 'reel' && sound ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>

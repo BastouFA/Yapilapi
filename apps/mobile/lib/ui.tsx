@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import type { ComponentProps, ReactNode } from 'react';
+import { useRef, type ComponentProps, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   I18nManager,
@@ -156,19 +156,40 @@ export function Row({ title, subtitle, start, end, onPress }: { title: string; s
   );
 }
 
-/** Pill segmented control, like the web Tabs. */
+/** Two taps on the same segment within this many milliseconds count as a double tap. */
+const DOUBLE_PRESS_MS = 300;
+
+/**
+ * Pill segmented control, like the web Tabs. With `onDoublePress`, tapping a segment twice
+ * quickly calls it (screen readers get it as a named action, `doublePressLabel`).
+ */
 export function Segmented<T extends string>({
   options,
   value,
   onChange,
   label,
+  onDoublePress,
+  doublePressLabel,
 }: {
   options: readonly { id: T; label: string; count?: number }[];
   value: T;
   onChange: (id: T) => void;
   label?: string;
+  onDoublePress?: (id: T) => void;
+  doublePressLabel?: string;
 }) {
   const c = useColors();
+  const lastTap = useRef<{ id: T; at: number } | null>(null);
+  const press = (id: T) => {
+    const now = Date.now();
+    const last = lastTap.current;
+    if (onDoublePress && last && last.id === id && now - last.at < DOUBLE_PRESS_MS) {
+      lastTap.current = null;
+      return onDoublePress(id);
+    }
+    lastTap.current = { id, at: now };
+    onChange(id);
+  };
   return (
     <View accessibilityRole="tablist" accessibilityLabel={label} style={[s.segmented, { backgroundColor: c.surfaceSunken }]}>
       {options.map((o) => {
@@ -178,7 +199,11 @@ export function Segmented<T extends string>({
             key={o.id}
             accessibilityRole="tab"
             accessibilityState={{ selected: on }}
-            onPress={() => onChange(o.id)}
+            accessibilityActions={onDoublePress && doublePressLabel ? [{ name: 'doublePress', label: doublePressLabel }] : undefined}
+            onAccessibilityAction={(e) => {
+              if (e.nativeEvent.actionName === 'doublePress') onDoublePress?.(o.id);
+            }}
+            onPress={() => press(o.id)}
             style={[s.segment, on && [{ backgroundColor: c.surface }, elevation(c)]]}
           >
             <Text style={{ color: on ? c.ink : c.inkMuted, fontWeight: on ? '700' : '600', fontSize: 14 }} numberOfLines={1}>

@@ -1,6 +1,5 @@
-import { openCreateSheet } from '../../lib/create-sheet';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Tabs } from 'expo-router';
+import { router, Tabs } from 'expo-router';
 import { useEffect, useState, type ComponentProps } from 'react';
 import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,8 +45,8 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
                 accessibilityRole="tab"
                 accessibilityLabel={label}
                 accessibilityState={{ selected: focused }}
-                // Straight to the camera or the library; Create opens behind it.
-                onPress={() => openCreateSheet('post')}
+                // Straight to the camera; what is taken there opens in Create.
+                onPress={() => router.push('/camera')}
                 style={({ pressed }) => [s.createHit, pressed && { transform: [{ scale: 0.96 }] }]}
               >
                 <LinearGradient {...gradient(c)} style={[s.create, elevation(c, 'lg'), c.theme === 'dark' && { borderWidth: 0 }]}>
