@@ -135,3 +135,29 @@ export const BOOST_OPTIONS: Record<string, { budgets: number[]; cpmCents: number
   XOF: { budgets: [300_000, 600_000, 1_500_000], cpmCents: 300_000 },
 };
 export const BOOST_DAYS = [1, 3, 7, 14] as const;
+
+/**
+ * Chapters: titled collections of stories on a profile. The audience is the
+ * chapter's own; people under 18 can't choose 'public'.
+ */
+export const CHAPTER_AUDIENCES = ['public', 'followers', 'friends', 'close_friends', 'only_me'] as const;
+export type ChapterAudience = (typeof CHAPTER_AUDIENCES)[number];
+export const CHAPTER_TITLE_MAX = 40;
+export const CHAPTER_DESCRIPTION_MAX = 200;
+export const CHAPTER_GUESTBOOK_MAX = 140;
+export const CHAPTER_STORIES_MAX = 100;
+export const CHAPTER_CONTRIBUTORS_MAX = 20;
+/** Cover gradients from the brand palette, as [start, end] (135deg). White symbols read on all of them. */
+export const CHAPTER_GRADIENTS = {
+  yapi: ['#D21D4A', '#C2410C'],
+  sunrise: ['#FF5C7A', '#C2410C'],
+  saffron: ['#C2410C', '#FFB020'],
+  dusk: ['#0E1020', '#D21D4A'],
+  lagoon: ['#00735F', '#1E8A3E'],
+  ink: ['#555B75', '#0E1020'],
+} as const satisfies Record<string, readonly [string, string]>;
+export type ChapterGradient = keyof typeof CHAPTER_GRADIENTS;
+export const CHAPTER_GRADIENT_NAMES = Object.keys(CHAPTER_GRADIENTS) as ChapterGradient[];
+/** Cover symbols: plain line icons, never emoji. Each app maps them to its own icon set. */
+export const CHAPTER_SYMBOLS = ['star', 'sparkle', 'heart', 'music', 'globe', 'calendar', 'compass', 'home', 'bookmark', 'image'] as const;
+export type ChapterSymbol = (typeof CHAPTER_SYMBOLS)[number];
