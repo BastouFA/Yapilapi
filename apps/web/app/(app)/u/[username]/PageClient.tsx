@@ -10,6 +10,7 @@ import { api, errorMessage } from '@/lib/api';
 import { PostList, ReportSheet } from '@/components/PostList';
 import { SupportCreator } from '@/components/SupportCreator';
 import { Shop } from '@/components/Shop';
+import { ChaptersRow } from '@/components/Chapters';
 import { JoinNote, NeedsAccount, useSignIn } from '@/components/SignedOut';
 import { useSession } from '../../../providers';
 
@@ -249,6 +250,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
           <SupportCreator userId={profile.id} name={profile.displayName} isCreator={profile.mode === 'creator'} onSubscribed={() => setVersion((v) => v + 1)} />
         </div>
       ) : null}
+      <ChaptersRow userId={profile.id} isSelf={rel.isSelf} />
       <Segments
         label="Show"
         value={tab}

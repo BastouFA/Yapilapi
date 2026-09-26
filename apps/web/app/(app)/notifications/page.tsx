@@ -49,6 +49,8 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
   media_restored: () => 'We checked your photo or video and it’s back up. Sorry for the trouble.',
   account_limited: () =>
     'Some of your recent posts or messages were flagged, so your account is limited while our team takes a look. You can still post for yourself and message friends.',
+  chapter_invite: (n) => `invited you to add your stories to the chapter "${String(n.data.title ?? '')}"`,
+  chapter_opened: (n) => `The time capsule "${String(n.data.title ?? '')}" has opened.`,
   account_review: (n) =>
     n.data.outcome === 'cleared'
       ? 'We reviewed your account and lifted the limit. Held posts and messages are now shared.'
@@ -57,6 +59,7 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
 
 function hrefFor(n: NotificationItem): string | undefined {
   if (n.type === 'reel_duet' || n.type === 'reel_remix') return `/reels?start=${n.entityId}`;
+  if (n.entityType === 'chapter') return `/chapters/${n.entityId}`;
   if (n.entityType === 'post') return `/p/${n.entityId}`;
   if (n.entityType === 'live') return `/live/${n.entityId}`;
   if (n.entityType === 'family_link') return '/settings';

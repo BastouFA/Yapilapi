@@ -3154,3 +3154,233 @@ span.cam__icon {
 .create-kinds {
   display: contents;
 }
+
+/* ── Chapters and the story archive ─────────────────────────────────── */
+.chapters {
+  display: grid;
+  gap: var(--space-2);
+}
+.chapters__row {
+  display: flex;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 2px 2px var(--space-2);
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.chapters__item {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 84px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.chapters__item:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-md);
+}
+.chapters__title {
+  max-width: 84px;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chapters__meta {
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+.chapter-cover {
+  display: grid;
+  flex: none;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  color: #fff;
+}
+.chapter-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.chapter-cover--new {
+  background: var(--surface-sunken) !important;
+  border: 2px dashed var(--line-strong);
+  color: var(--yapi);
+}
+.chapter-end {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: var(--space-3);
+  min-height: 0;
+  padding: var(--space-6);
+  text-align: center;
+}
+.chapter-end h2 {
+  margin: 0;
+  font: 800 24px/30px var(--font-display);
+}
+.chapter-end__desc {
+  margin: 0;
+  opacity: 0.8;
+  white-space: pre-wrap;
+}
+.chapter-end__form {
+  display: flex;
+  gap: var(--space-2);
+  width: 100%;
+}
+.chapter-pick {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chapter-pick button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.chapter-pick button > span:last-child {
+  display: grid;
+  min-width: 0;
+}
+.chapter-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.chapter-swatches legend {
+  margin-bottom: var(--space-2);
+}
+.chapter-swatch,
+.chapter-symbol {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.chapter-symbol {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+.chapter-swatch input,
+.chapter-symbol input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.chapter-swatch:has(input:checked),
+.chapter-symbol:has(input:checked) {
+  box-shadow: 0 0 0 2px var(--ground), 0 0 0 4px var(--yapi);
+}
+.chapter-swatch:has(input:focus-visible),
+.chapter-symbol:has(input:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+.chapter-hero {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+.chapter-hero h1 {
+  margin: 0;
+  font: 800 26px/32px var(--font-display);
+}
+.story-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.story-tile {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.story-tile__media {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 9 / 16;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: linear-gradient(160deg, #d21d4a, #c2410c);
+  color: #fff;
+  font: 700 14px/18px var(--font-sans);
+  padding: 0;
+  cursor: pointer;
+}
+.story-tile__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.story-tile__media > p {
+  margin: 0;
+  padding: var(--space-2);
+  overflow: hidden;
+  text-align: center;
+}
+.story-tile__meta {
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+.guestbook {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.guestbook li {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+.guestbook li > div {
+  flex: 1;
+  min-width: 0;
+}
+.guestbook p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.guestbook__hidden {
+  opacity: 0.55;
+}
+button.yp-chip[aria-pressed='true'] {
+  border-color: var(--yapi);
+  background: var(--yapi-soft);
+  color: var(--ink);
+}
