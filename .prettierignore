@@ -10,3 +10,4 @@ apps/web/e2e/.auth
 apps/web/e2e/.output
 apps/web/e2e/.results
 apps/web/e2e/.report
+apps/web/next-env.d.ts
