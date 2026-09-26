@@ -32,6 +32,7 @@ import { onPendingMedia, takePendingMedia } from '@/lib/pending-media';
 import { SoundPicker, SoundPlayButton } from '@/components/SoundPicker';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { PhotoTagger, type DraftTag } from '@/components/PhotoTags';
+import { StoryStickerEditor, type DraftSticker } from '@/components/StoryStickerEditor';
 import { useSession } from '../../providers';
 
 type Uploaded = { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string; tags: DraftTag[] };
@@ -97,6 +98,9 @@ function Create() {
   const [poll, setPoll] = useState<string[] | null>(null);
   const [topics, setTopics] = useState('');
   const [expiresIn, setExpiresIn] = useState<'1h' | '24h' | 'permanent'>('24h');
+  // Stories: stickers placed on the preview, and whether people may add it to their own story.
+  const [stickers, setStickers] = useState<DraftSticker[]>([]);
+  const [allowReshare, setAllowReshare] = useState(true);
   const [ai, setAi] = useState<{ text: string; notice?: string } | null>(null);
   const [aiUsed, setAiUsed] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -238,7 +242,14 @@ function Create() {
     setFields({});
     try {
       if (kind === 'story') {
-        await api.moments.create({ body, mediaId: media[0]?.id, expiresIn, visibility });
+        await api.moments.create({
+          body,
+          mediaId: media[0]?.id,
+          expiresIn,
+          visibility,
+          allowReshare,
+          stickers: stickers.map(({ key: _key, label: _label, ...s }) => s),
+        });
         toast('Added to your story');
         router.push('/home');
         return;
@@ -369,7 +380,7 @@ function Create() {
             ? 'Text, photos, videos, a link or a poll, on your profile or in a community.'
             : kind === 'reel'
               ? `One vertical video up to ${reelMax / 60} minutes, shown full screen in Reels and on your profile.`
-              : 'A photo, video or a few words for your people. It disappears when you choose.'}
+              : 'A photo, video or a few words for your people, with stickers if you like. It disappears when you choose. Use @ to mention people and # for tags.'}
         </p>
         {error ? <Alert tone="danger">{error}</Alert> : null}
         {needsVerify || (me?.needsVerification && kind !== 'story' && (visibility === 'public' || !!communityId)) ? <VerifyPrompt action="post" /> : null}
@@ -524,6 +535,9 @@ function Create() {
             onChange={setCollaborators}
           />
         ) : null}
+        {kind === 'story' ? (
+          <StoryStickerEditor stickers={stickers} onChange={setStickers} preview={{ mediaUrl: media[0]?.url, mediaKind: media[0]?.kind, body }} />
+        ) : null}
 
         {kind === 'reel' && !remixOf ? (
           <section className="stack-sm" aria-labelledby="sound-heading">
@@ -596,6 +610,14 @@ function Create() {
                 ))}
             </Select>
           ) : null}
+          {kind === 'story' ? (
+            <Checkbox
+              label="Let people add this story to theirs"
+              description="People can reshare public stories, and stories that mention them. Your story shows as a card credited to you."
+              checked={allowReshare}
+              onChange={(e) => setAllowReshare(e.currentTarget.checked)}
+            />
+          ) : null}
           {kind === 'story' && visibility === 'close_friends' ? (
             <p className="muted" style={{ margin: 0, fontSize: 14 }}>
               Only people on your close friends list see this story, with a green ring. <Link href="/settings#close-friends">Edit your list</Link>
@@ -637,7 +659,9 @@ function Create() {
           loading={busy}
           disabled={
             uploading ||
-            (kind === 'reel' ? media.length !== 1 || media[0]!.kind !== 'video' || (!!remixOf && !original) : !body.trim() && !media.length && !poll)
+            (kind === 'reel'
+              ? media.length !== 1 || media[0]!.kind !== 'video' || (!!remixOf && !original)
+              : !body.trim() && !media.length && !poll && !(kind === 'story' && stickers.length))
           }
         >
           {kind === 'story'

@@ -19,6 +19,9 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
   reel_remix: () => 'remixed your reel',
   post_mention: () => 'mentioned you in a post',
   comment_mention: () => 'mentioned you in a comment',
+  story_mention: () => 'mentioned you in their story. You can add it to yours.',
+  story_reshare: () => 'added your story to theirs',
+  story_countdown: (n) => `The countdown “${String(n.data.title ?? '')}” has ended`,
   join_request: () => 'asked to join your community',
   join_approved: () => 'approved your request to join',
   event_rsvp: () => 'is going to your event',
@@ -66,6 +69,7 @@ function hrefFor(n: NotificationItem): string | undefined {
   if (n.type === 'reel_duet' || n.type === 'reel_remix') return `/reels?start=${n.entityId}`;
   if (n.entityType === 'chapter') return `/chapters/${n.entityId}`;
   if (n.entityType === 'post') return `/p/${n.entityId}`;
+  if (n.entityType === 'moment') return `/s/${n.entityId}`;
   if (n.entityType === 'live') return `/live/${n.entityId}`;
   if (n.entityType === 'family_link') return '/settings';
   if (n.entityType === 'ad_campaign') return '/studio';
@@ -175,7 +179,7 @@ export default function Notifications() {
                   const followBack = n.type === 'follow' && actors.length === 1 && !n.followsActor && !followed.has(actors[0]!.id);
                   const text = (
                     <span style={{ fontWeight: unread ? 600 : 400, whiteSpace: 'normal' }}>
-                      {n.actor && n.type !== 'enforcement' ? `${names(g)} ` : ''}
+                      {n.actor && n.type !== 'enforcement' && n.type !== 'story_countdown' ? `${names(g)} ` : ''}
                       {(TEXT[n.type] ?? (() => n.type.replace(/_/g, ' ')))(n)}
                     </span>
                   );

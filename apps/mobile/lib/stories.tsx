@@ -1,4 +1,6 @@
 import { useEventListener } from 'expo';
+import * as Notifications from 'expo-notifications';
+import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -15,6 +17,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -22,14 +25,18 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { StoryGroup } from '../../../packages/api-client/src/index';
+import type { Story, StoryGroup } from '../../../packages/api-client/src/index';
+import type { StickerResults, StorySticker } from '../../../packages/shared/src/stories';
 import type { PublicUser } from '../../../packages/shared/src/types';
-import { client, errorMessage, mediaUrl } from './api';
+import { client, errorMessage, mediaUrl, webUrl } from './api';
 import { useT } from './i18n';
+import { RichText } from './post';
+import { useSession } from './session';
 import { gradient, radius, space } from './theme';
-import { Avatar, Icon, useColors, userText } from './ui';
+import { Avatar, Icon, Segmented, SwitchRow, useColors, userText } from './ui';
 import { SensitiveCover } from './safety';
 import { AddToChapterSheet } from './chapters';
+import { StickerLayer, StoryCardView } from './story-stickers';
 
 const PHOTO_MS = 5000;
 const WHITE = '#FFFFFF';
@@ -44,7 +51,7 @@ export const orderStories = (groups: StoryGroup[]) => [...groups.filter((g) => g
  * ring. "Your story" is always first: with no story yet it adds one, otherwise it opens yours
  * and the small plus adds another.
  */
-export function StoriesStrip({ groups, onOpen, onCreate }: { groups: StoryGroup[]; onOpen: (index: number) => void; onCreate: () => void }) {
+export function StoriesStrip({ groups, onOpen, onCreate }: { groups: StoryGroup[]; onOpen: (index: number) => void; onCreate?: () => void }) {
   const c = useColors();
   const { t } = useT();
   const hasOwn = groups.some((g) => g.mine);
@@ -55,7 +62,7 @@ export function StoriesStrip({ groups, onOpen, onCreate }: { groups: StoryGroup[
       accessibilityLabel={t('m.stories.label')}
       contentContainerStyle={{ gap: space[3], paddingVertical: space[1] }}
     >
-      {!hasOwn ? (
+      {!hasOwn && onCreate ? (
         <Pressable accessibilityRole="button" accessibilityLabel={t('m.stories.add')} onPress={onCreate} style={st.item}>
           <View style={[st.ring, { borderWidth: 2, borderColor: c.line, borderStyle: 'dashed' }]}>
             <View style={[st.inner, { backgroundColor: c.surfaceSunken }]}>
@@ -97,7 +104,7 @@ export function StoriesStrip({ groups, onOpen, onCreate }: { groups: StoryGroup[
                 {name}
               </Text>
             </Pressable>
-            {g.mine ? (
+            {g.mine && onCreate ? (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t('m.stories.add')}
@@ -143,7 +150,7 @@ export function StoryViewer({
 
 function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; start: number; onClose: () => void; onChange: (groups: StoryGroup[]) => void }) {
   const c = useColors();
-  const { t, timeAgo } = useT();
+  const { t, tp, timeAgo } = useT();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [g, setG] = useState(start);
@@ -154,14 +161,21 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
   const [reply, setReply] = useState('');
   const [typing, setTyping] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
-  const [viewers, setViewers] = useState<{ user: PublicUser; liked: boolean }[] | null>(null);
+  const [viewers, setViewers] = useState<{
+    items: { user: PublicUser; liked: boolean }[];
+    results: StickerResults[];
+    reshares: number;
+    allowReshare: boolean;
+  } | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const [answering, setAnswering] = useState(false);
   const [chapterFor, setChapterFor] = useState<string | null>(null);
   const group = groups[g];
   const story = group?.moments[i];
   // Sensitive stories wait, blurred and paused, until the viewer chooses to see them.
   const [revealed, setRevealed] = useState<string[]>([]);
   const covered = !!story?.sensitive && !revealed.includes(story.id);
-  const stopped = held || paused || typing || viewers !== null || covered || chapterFor !== null;
+  const stopped = held || paused || typing || viewers !== null || covered || sharing || answering || chapterFor !== null;
 
   const next = useCallback(() => {
     if (!group) return onClose();
@@ -278,6 +292,17 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
   if (!group || !story) return null;
   const name = group.author.displayName;
   const uri = story.mediaUrl ? mediaUrl(story.mediaUrl) : null;
+  const patchStory = (patch: Partial<Story>) =>
+    onChange(groups.map((x, gi) => (gi !== g ? x : { ...x, moments: x.moments.map((m, mi) => (mi === i ? { ...m, ...patch } : m)) })));
+  const addToStory = async (visibility: string) => {
+    try {
+      await (await client()).moments.reshare(story.id, { visibility });
+      setSharing(false);
+      setSent(t('m.stories.added'));
+    } catch (e) {
+      setSent(errorMessage(e));
+    }
+  };
 
   async function remove() {
     if (!group || !story) return;
@@ -338,15 +363,47 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
               style={StyleSheet.absoluteFill}
               resizeMode="contain"
             />
+          ) : story.reshareOf ? (
+            <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', padding: space[6], backgroundColor: '#1D1430' }]} />
           ) : (
-            <LinearGradient {...gradient(c)} style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', padding: space[6] }]}>
-              <Text style={[{ color: WHITE, fontSize: 28, fontWeight: '800', textAlign: 'center', lineHeight: 36 }, userText]}>{story.body}</Text>
-            </LinearGradient>
+            <LinearGradient {...gradient(c)} style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', padding: space[6] }]} />
           )}
-          {story.body && uri ? (
-            <View style={{ position: 'absolute', start: space[4], end: space[4], bottom: 110 + insets.bottom }} pointerEvents="none">
-              <Text style={[st.caption, userText]}>{story.body}</Text>
+        </View>
+
+        {/* Text, reshare cards and stickers sit above the tap area; only their own controls take touches. */}
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+          {!uri && !story.reshareOf && !covered ? (
+            <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', padding: space[6] }]} pointerEvents="box-none">
+              <RichText text={story.body} style={{ color: WHITE, fontSize: 28, fontWeight: '800', textAlign: 'center', lineHeight: 36 }} />
             </View>
+          ) : null}
+          {story.reshareOf && !uri ? (
+            <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]} pointerEvents="box-none">
+              <View style={{ backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: radius.lg, padding: space[3] }}>
+                <StoryCardView
+                  dark
+                  card={story.reshareOf}
+                  label={story.reshareOf.available ? t('m.stories.from', { username: story.reshareOf.author.username }) : undefined}
+                  action={t('m.stories.openOriginal')}
+                />
+              </View>
+            </View>
+          ) : null}
+          {story.body && (uri || story.reshareOf) ? (
+            <View style={{ position: 'absolute', start: space[4], end: space[4], bottom: 110 + insets.bottom }} pointerEvents="box-none">
+              <View style={st.captionBox}>
+                <RichText text={story.body} style={st.caption} />
+              </View>
+            </View>
+          ) : null}
+          {!covered && story.stickers.length ? (
+            <StickerLayer
+              story={story}
+              mine={group.mine}
+              onBusy={setAnswering}
+              onMessage={setSent}
+              onChange={(stickers: StorySticker[]) => patchStory({ stickers })}
+            />
           ) : null}
         </View>
 
@@ -372,6 +429,9 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
                 <Text style={{ color: c.onCloseFriends, fontSize: 12, fontWeight: '700' }}>{t('m.closeFriends.title')}</Text>
               </View>
             ) : null}
+            <Pressable accessibilityRole="button" accessibilityLabel={t('m.stories.share')} hitSlop={8} onPress={() => setSharing(true)} style={st.icon}>
+              <Icon name="paper-plane-outline" size={20} color={WHITE} directional />
+            </Pressable>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={paused ? t('m.common.play') : t('m.common.pause')}
@@ -400,8 +460,8 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
                 onPress={async () => {
                   const r = await client()
                     .then((api) => api.moments.viewers(story.id))
-                    .catch(() => ({ items: [] }));
-                  setViewers(r.items);
+                    .catch(() => ({ items: [], results: [], reshares: 0, allowReshare: !!story.allowReshare }));
+                  setViewers(r);
                 }}
                 style={st.pill}
               >
@@ -435,51 +495,59 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
               </Pressable>
             </View>
           ) : (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
-              <TextInput
-                accessibilityLabel={t('m.stories.replyTo', { name })}
-                placeholder={t('m.stories.replyTo', { name })}
-                placeholderTextColor="rgba(255,255,255,0.75)"
-                value={reply}
-                onChangeText={setReply}
-                onFocus={() => setTyping(true)}
-                onBlur={() => setTyping(false)}
-                maxLength={1000}
-                returnKeyType="send"
-                onSubmitEditing={() => void sendReply()}
-                style={[st.reply, userText]}
-              />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={story.liked ? t('post.unlike') : t('post.like')}
-                accessibilityState={{ selected: story.liked }}
-                hitSlop={8}
-                onPress={async () => {
-                  const liked = !story.liked;
-                  const set = (v: boolean) =>
-                    onChange(groups.map((x, gi) => (gi !== g ? x : { ...x, moments: x.moments.map((m, mi) => (mi === i ? { ...m, liked: v } : m)) })));
-                  set(liked);
-                  try {
-                    await (await client()).moments.like(story.id, liked);
-                  } catch {
-                    set(!liked);
-                  }
-                }}
-                style={st.icon}
-              >
-                <Icon name={story.liked ? 'heart' : 'heart-outline'} size={26} color={story.liked ? c.yapi : WHITE} />
-              </Pressable>
-              {reply.trim() ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t('m.stories.sendReply')}
-                  hitSlop={8}
-                  onPress={() => void sendReply()}
-                  style={st.icon}
-                >
-                  <Icon name="send" size={22} color={WHITE} directional />
+            <View style={{ gap: space[2] }}>
+              {story.mentionsYou && story.canReshare ? (
+                <Pressable accessibilityRole="button" onPress={() => void addToStory('followers')} style={[st.pill, { alignSelf: 'flex-start' }]}>
+                  <Icon name="add-circle-outline" size={18} color={WHITE} />
+                  <Text style={st.pillText}>{t('m.stories.add')}</Text>
                 </Pressable>
               ) : null}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+                <TextInput
+                  accessibilityLabel={t('m.stories.replyTo', { name })}
+                  placeholder={t('m.stories.replyTo', { name })}
+                  placeholderTextColor="rgba(255,255,255,0.75)"
+                  value={reply}
+                  onChangeText={setReply}
+                  onFocus={() => setTyping(true)}
+                  onBlur={() => setTyping(false)}
+                  maxLength={1000}
+                  returnKeyType="send"
+                  onSubmitEditing={() => void sendReply()}
+                  style={[st.reply, userText]}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={story.liked ? t('post.unlike') : t('post.like')}
+                  accessibilityState={{ selected: story.liked }}
+                  hitSlop={8}
+                  onPress={async () => {
+                    const liked = !story.liked;
+                    const set = (v: boolean) =>
+                      onChange(groups.map((x, gi) => (gi !== g ? x : { ...x, moments: x.moments.map((m, mi) => (mi === i ? { ...m, liked: v } : m)) })));
+                    set(liked);
+                    try {
+                      await (await client()).moments.like(story.id, liked);
+                    } catch {
+                      set(!liked);
+                    }
+                  }}
+                  style={st.icon}
+                >
+                  <Icon name={story.liked ? 'heart' : 'heart-outline'} size={26} color={story.liked ? c.yapi : WHITE} />
+                </Pressable>
+                {reply.trim() ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('m.stories.sendReply')}
+                    hitSlop={8}
+                    onPress={() => void sendReply()}
+                    style={st.icon}
+                  >
+                    <Icon name="send" size={22} color={WHITE} directional />
+                  </Pressable>
+                ) : null}
+              </View>
             </View>
           )}
         </View>
@@ -509,8 +577,14 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
                 <Icon name="close" size={24} color={c.ink} />
               </Pressable>
             </View>
+            {viewers.results.length || viewers.reshares ? (
+              <ScrollView style={{ maxHeight: 260 }} contentContainerStyle={{ gap: space[3] }}>
+                <StickerResultList results={viewers.results} />
+                {viewers.reshares ? <Text style={{ color: c.inkMuted }}>{tp('m.stories.reshares', viewers.reshares)}</Text> : null}
+              </ScrollView>
+            ) : null}
             <FlatList
-              data={viewers}
+              data={viewers.items}
               keyExtractor={(v) => v.user.id}
               contentContainerStyle={{ gap: space[3] }}
               ListEmptyComponent={<Text style={{ color: c.inkMuted }}>{t('m.stories.noViewers')}</Text>}
@@ -535,6 +609,27 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
             />
           </View>
         </View>
+      ) : null}
+
+      {sharing ? (
+        <ShareSheet
+          story={story}
+          mine={group.mine}
+          onClose={() => setSharing(false)}
+          onAddToStory={addToStory}
+          onSent={(text) => {
+            setSharing(false);
+            setSent(text);
+          }}
+          onAllowReshare={async (allow) => {
+            try {
+              const r = await (await client()).moments.update(story.id, { allowReshare: allow });
+              patchStory({ allowReshare: r.allowReshare });
+            } catch (e) {
+              setSent(errorMessage(e));
+            }
+          }}
+        />
       ) : null}
     </KeyboardAvoidingView>
   );
@@ -597,6 +692,8 @@ const st = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
     textAlign: 'center',
+  },
+  captionBox: {
     backgroundColor: SCRIM,
     borderRadius: radius.md,
     padding: space[2],
@@ -634,4 +731,265 @@ const st = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.4)',
   },
   pillText: { color: WHITE, fontWeight: '700', fontSize: 14 },
+  search: { height: 44, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: space[3], fontSize: 15 },
+  sheetButton: { height: 44, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
 });
+
+const AUDIENCES = ['followers', 'friends', 'public', 'close_friends'] as const;
+
+/** Send to people, share the link, add to your own story, or (your own) choose whether others can reshare it. */
+function ShareSheet({
+  story,
+  mine,
+  onClose,
+  onAddToStory,
+  onSent,
+  onAllowReshare,
+}: {
+  story: Story;
+  mine: boolean;
+  onClose: () => void;
+  onAddToStory: (visibility: string) => Promise<void>;
+  onSent: (text: string) => void;
+  onAllowReshare: (allow: boolean) => Promise<void>;
+}) {
+  const c = useColors();
+  const { t } = useT();
+  const insets = useSafeAreaInsets();
+  const [q, setQ] = useState('');
+  const [people, setPeople] = useState<{ user: PublicUser; canMessage: boolean }[]>([]);
+  const [picked, setPicked] = useState<PublicUser[]>([]);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [audience, setAudience] = useState<(typeof AUDIENCES)[number]>('followers');
+
+  useEffect(() => {
+    const timer = setTimeout(
+      () =>
+        void client()
+          .then((api) => api.people.suggest(q.trim(), 8))
+          .then(
+            (r) => setPeople(r.items),
+            () => setPeople([]),
+          ),
+      q ? 200 : 0,
+    );
+    return () => clearTimeout(timer);
+  }, [q]);
+
+  const toggle = (u: PublicUser) => setPicked((p) => (p.some((x) => x.id === u.id) ? p.filter((x) => x.id !== u.id) : [...p, u]));
+  const send = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await (await client()).moments.send(story.id, { userIds: picked.map((p) => p.id), body: note.trim() });
+      onSent(picked.length === 1 ? t('m.stories.sent', { name: picked[0]!.displayName }) : t('m.stories.sentMany', { count: r.conversationIds.length }));
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay, justifyContent: 'flex-end' }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} style={{ flex: 1 }} onPress={onClose} />
+      <View
+        accessibilityViewIsModal
+        style={{
+          backgroundColor: c.surface,
+          borderTopLeftRadius: radius.lg,
+          borderTopRightRadius: radius.lg,
+          padding: space[4],
+          paddingBottom: Math.max(insets.bottom, space[4]),
+          maxHeight: '80%',
+          gap: space[3],
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text accessibilityRole="header" style={{ flex: 1, color: c.ink, fontSize: 17, fontWeight: '800' }}>
+            {t('m.stories.share')}
+          </Text>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} hitSlop={8} onPress={onClose}>
+            <Icon name="close" size={24} color={c.ink} />
+          </Pressable>
+        </View>
+        <ScrollView contentContainerStyle={{ gap: space[3] }} keyboardShouldPersistTaps="handled">
+          <Text style={{ color: c.ink, fontWeight: '600' }}>{t('m.stories.sendTo')}</Text>
+          <TextInput
+            accessibilityLabel={t('m.stories.searchPeople')}
+            placeholder={t('m.stories.searchPeople')}
+            placeholderTextColor={c.inkMuted}
+            value={q}
+            onChangeText={setQ}
+            autoCapitalize="none"
+            style={[st.search, { borderColor: c.line, color: c.ink, backgroundColor: c.surface }, userText]}
+          />
+          {people.map(({ user, canMessage }) => {
+            const on = picked.some((p) => p.id === user.id);
+            return (
+              <Pressable
+                key={user.id}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: on, disabled: !canMessage }}
+                disabled={!canMessage}
+                onPress={() => toggle(user)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], opacity: canMessage ? 1 : 0.45 }}
+              >
+                <Avatar name={user.displayName} url={user.avatarUrl} size={36} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[{ color: c.ink, fontWeight: '700' }, userText]} numberOfLines={1}>
+                    {user.displayName}
+                  </Text>
+                  <Text style={[{ color: c.inkMuted, fontSize: 13 }, userText]} numberOfLines={1}>
+                    @{user.username}
+                  </Text>
+                </View>
+                <Icon name={on ? 'checkmark-circle' : 'ellipse-outline'} size={24} color={on ? c.yapi : c.inkMuted} />
+              </Pressable>
+            );
+          })}
+          {picked.length ? (
+            <>
+              <TextInput
+                accessibilityLabel={t('inbox.placeholder')}
+                placeholder={t('inbox.placeholder')}
+                placeholderTextColor={c.inkMuted}
+                value={note}
+                onChangeText={setNote}
+                maxLength={1000}
+                style={[st.search, { borderColor: c.line, color: c.ink, backgroundColor: c.surface }, userText]}
+              />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: busy }}
+                disabled={busy}
+                onPress={() => void send()}
+                style={[st.sheetButton, { backgroundColor: c.yapi }]}
+              >
+                <Text style={{ color: c.onYapi, fontWeight: '700' }}>{t('m.stories.send')}</Text>
+              </Pressable>
+            </>
+          ) : null}
+          {error ? <Text style={{ color: c.danger }}>{error}</Text> : null}
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              const url = `${webUrl}/s/${story.id}`;
+              void Share.share(Platform.OS === 'ios' ? { url } : { message: url }).catch(() => {});
+            }}
+            style={[st.sheetButton, { borderWidth: 1, borderColor: c.line, flexDirection: 'row', gap: space[2] }]}
+          >
+            <Icon name="link" size={18} color={c.ink} />
+            <Text style={{ color: c.ink, fontWeight: '700' }}>{t('m.stories.shareLink')}</Text>
+          </Pressable>
+          {!mine && story.canReshare ? (
+            <View style={{ gap: space[2] }}>
+              <Text style={{ color: c.ink, fontWeight: '600' }}>{t('m.stories.audience')}</Text>
+              <Segmented
+                label={t('m.stories.audience')}
+                options={AUDIENCES.map((a) => ({ id: a, label: t(`visibility.${a}`) }))}
+                value={audience}
+                onChange={setAudience}
+              />
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => void onAddToStory(audience)}
+                style={[st.sheetButton, { borderWidth: 1, borderColor: c.line, flexDirection: 'row', gap: space[2] }]}
+              >
+                <Icon name="add-circle-outline" size={18} color={c.ink} />
+                <Text style={{ color: c.ink, fontWeight: '700' }}>{t('m.stories.add')}</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {mine && !story.reshareOf ? (
+            <SwitchRow
+              label={t('m.stories.allowReshare')}
+              hint={t('m.stories.allowReshareHint')}
+              value={!!story.allowReshare}
+              onValueChange={(v) => void onAllowReshare(v)}
+            />
+          ) : null}
+        </ScrollView>
+      </View>
+    </View>
+  );
+}
+
+/** Poll results, slider averages, question answers and countdown reminders, for the author. */
+function StickerResultList({ results }: { results: StickerResults[] }) {
+  const c = useColors();
+  const { t, tp, number } = useT();
+  return (
+    <>
+      {results.map((r) => (
+        <View key={r.stickerId} style={{ gap: space[1] }}>
+          {r.type === 'poll' ? (
+            <>
+              <Text style={{ color: c.ink, fontWeight: '700' }}>
+                {t('m.sticker.kind.poll')} · {tp('m.sticker.votes', r.votes)}
+              </Text>
+              {r.options.map((o, k) => (
+                <View key={k} style={{ borderRadius: radius.sm, backgroundColor: c.surfaceSunken, overflow: 'hidden', padding: space[2] }}>
+                  <View style={{ position: 'absolute', top: 0, bottom: 0, start: 0, width: `${r.percents[k]}%`, backgroundColor: c.yapiSoft }} />
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={[{ color: c.ink }, userText]}>{o}</Text>
+                    <Text style={{ color: c.ink, fontWeight: '700' }}>
+                      {number(r.percents[k] / 100, { style: 'percent' })} ({number(r.counts[k])})
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </>
+          ) : r.type === 'slider' ? (
+            <>
+              <Text style={[{ color: c.ink, fontWeight: '700' }, userText]}>
+                {r.emoji} {r.prompt}
+              </Text>
+              <Text style={{ color: c.inkMuted }}>
+                {r.count ? t('m.sticker.average', { percent: number(r.average ?? 0, { style: 'percent' }), count: r.count }) : t('m.sticker.noAnswers')}
+              </Text>
+            </>
+          ) : r.type === 'countdown' ? (
+            <>
+              <Text style={[{ color: c.ink, fontWeight: '700' }, userText]}>{r.title}</Text>
+              <Text style={{ color: c.inkMuted }}>{t('m.sticker.reminders', { count: r.reminders })}</Text>
+            </>
+          ) : (
+            <>
+              <Text style={[{ color: c.ink, fontWeight: '700' }, userText]}>{r.prompt}</Text>
+              {r.answers.length ? (
+                r.answers.map((a) => (
+                  <View key={a.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+                    <Avatar name={a.user.displayName} url={a.user.avatarUrl} size={28} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[{ color: c.ink }, userText]}>{a.text}</Text>
+                      <Text style={[{ color: c.inkMuted, fontSize: 12 }, userText]}>@{a.user.username}</Text>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <Text style={{ color: c.inkMuted }}>{t('m.sticker.noAnswers')}</Text>
+              )}
+            </>
+          )}
+        </View>
+      ))}
+    </>
+  );
+}
+
+/** Taps on story notifications (mentions, reshares, countdowns) open the story. */
+export function useStoryPushLinks() {
+  const { me } = useSession();
+  useEffect(() => {
+    if (!me) return;
+    const handle = (resp: Notifications.NotificationResponse | null) => {
+      const data = resp?.notification.request.content.data as { entityType?: string; entityId?: string } | undefined;
+      if (data?.entityType === 'moment' && data.entityId) router.push(`/s/${data.entityId}`);
+    };
+    const sub = Notifications.addNotificationResponseReceivedListener(handle);
+    return () => sub.remove();
+  }, [me]);
+}

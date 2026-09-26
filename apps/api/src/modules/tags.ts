@@ -5,6 +5,7 @@ import { AppError, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, encodeCursor } from '../lib/cursor.ts';
 import { hydratePosts } from '../lib/posts.ts';
+import { groupStories, PUBLIC_STORY, STORY_FROM, STORY_SELECT, storyVisibleSql } from '../lib/stories.ts';
 import { notBlockedSql, postUnlockedSql, postVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
@@ -32,16 +33,23 @@ export default async function tagsModule(app: FastifyInstance, ctx: AppContext) 
 
   app.get('/v1/trending', { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (req) => {
     const { limit } = parse(z.object({ limit: z.coerce.number().int().min(1).max(30).default(10) }), req.query);
+    // Public posts from the last week, plus public stories while they're active (never followers-only or close friends ones).
     const { rows } = await db.query(
-      `SELECT t AS tag,
-              count(*) FILTER (WHERE p.created_at > now() - interval '24 hours') AS today,
-              count(*) FILTER (WHERE p.created_at <= now() - interval '24 hours' AND p.created_at > now() - interval '48 hours') AS yesterday,
+      `WITH uses AS (
+         SELECT t, p.author_id, p.created_at ${FROM}, unnest(p.topics) t
+         WHERE p.created_at > now() - interval '7 days' AND ${PUBLIC_POST}
+         UNION ALL
+         SELECT t, m.author_id, m.created_at FROM moments m JOIN users au ON au.id = m.author_id, unnest(m.tags) t
+         WHERE m.created_at > now() - interval '7 days' AND ${PUBLIC_STORY}
+       )
+       SELECT t AS tag,
+              count(*) FILTER (WHERE created_at > now() - interval '24 hours') AS today,
+              count(*) FILTER (WHERE created_at <= now() - interval '24 hours' AND created_at > now() - interval '48 hours') AS yesterday,
               count(*) AS week,
-              count(DISTINCT p.author_id) AS people
-       ${FROM}, unnest(p.topics) t
-       WHERE p.created_at > now() - interval '7 days' AND ${PUBLIC_POST}
+              count(DISTINCT author_id) AS people
+       FROM uses
        GROUP BY t
-       ORDER BY count(DISTINCT p.author_id) * 3 + count(*) FILTER (WHERE p.created_at > now() - interval '24 hours') * 2 + count(*) DESC, t
+       ORDER BY count(DISTINCT author_id) * 3 + count(*) FILTER (WHERE created_at > now() - interval '24 hours') * 2 + count(*) DESC, t
        LIMIT $1`,
       [limit],
     );
@@ -138,6 +146,24 @@ export default async function tagsModule(app: FastifyInstance, ctx: AppContext) 
       ),
       nextCursor: rows.length > q.limit && last ? encodeCursor({ t: new Date(last.created_at).toISOString(), id: last.id }) : null,
     };
+  });
+
+  /**
+   * "Stories now": active public stories with the tag, grouped by author, from
+   * accounts that aren't private. Followers-only and close friends stories
+   * never appear here, even for people who could see them elsewhere.
+   */
+  app.get('/v1/tags/:tag/stories', { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (req) => {
+    const viewer = req.user?.id ?? null;
+    const { tag } = parse(tagParam, req.params);
+    const { rows } = await db.query(
+      `SELECT ${STORY_SELECT} ${STORY_FROM}
+       WHERE m.tags @> ARRAY[$2::text] AND ${PUBLIC_STORY} AND ${storyVisibleSql('$1', { open: true })}
+       ORDER BY m.created_at DESC LIMIT 60`,
+      [viewer, tag],
+    );
+    rows.reverse(); // oldest first within each author, like the stories strip
+    return { items: (await groupStories(db, rows, viewer)).slice(0, 20) };
   });
 
   app.put('/v1/tags/:tag/follow', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req) => {

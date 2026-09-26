@@ -13,6 +13,7 @@ import { useCalls } from '@/components/Calls';
 import { MiniAppsSheet } from '@/components/MiniApps';
 import { MessageAttachments, ViewOnceMessage, VoiceRecorder } from '@/components/ChatAttachments';
 import { TurnOnYapsPrompt, YapButton } from '@/components/Yap';
+import { StoryCardView } from '@/components/StoryStickers';
 
 type Pending = Message & { pending?: boolean };
 
@@ -268,10 +269,11 @@ export default function ChatPage() {
                           />
                           {m.body ? <div>{m.body}</div> : null}
                         </>
-                      ) : m.attachments.length ? (
+                      ) : m.attachments.length || m.story ? (
                         <>
                           {m.kind === 'yap' ? <span className="chat-yap-label">Yap</span> : null}
-                          <MessageAttachments items={m.attachments} />
+                          {m.story ? <StoryCardView card={m.story} /> : null}
+                          {m.attachments.length ? <MessageAttachments items={m.attachments} /> : null}
                           {m.body ? <div>{m.body}</div> : null}
                         </>
                       ) : (

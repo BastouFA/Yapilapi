@@ -26,6 +26,7 @@ import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
 import { Button, Card, Field, Icon, Notice, Screen, Segmented, SwitchRow, useColors, useTabBarSpace, userText } from '../../lib/ui';
 import { isVerificationError, VerifyPrompt } from '../../lib/safety';
+import { StickerEditor, type DraftSticker } from '../../lib/story-stickers';
 
 const VISIBILITY = [
   { id: 'public', label: 'visibility.public' },
@@ -82,6 +83,9 @@ export default function Create() {
   const ac = useAutocomplete(body, setBody);
   // Tags belong to the photo they were placed on.
   useEffect(() => setPhotoTags([]), [media?.id]);
+  // Stories: stickers placed on the preview, and whether people may add it to their own story.
+  const [stickers, setStickers] = useState<DraftSticker[]>([]);
+  const [allowReshare, setAllowReshare] = useState(true);
   // Posting for subscribers needs a subscription plan (set up in Studio on the web).
   const [hasPlans, setHasPlans] = useState(false);
   const [editing, setEditing] = useState<Picked | null>(null);
@@ -234,9 +238,12 @@ export default function Create() {
           mediaId: media?.id,
           expiresIn,
           visibility: closeFriends ? 'close_friends' : visibility === 'subscribers' ? 'friends' : visibility,
+          allowReshare,
+          stickers: stickers.map(({ key: _key, label: _label, ...s }) => s),
         });
         setBody('');
         setMedia(null);
+        setStickers([]);
         Alert.alert(t('m.create.storyShared'));
         router.navigate('/');
         return;
@@ -291,7 +298,7 @@ export default function Create() {
   }
 
   const hint = KINDS.find((k) => k.id === kind)!.hint;
-  const canPublish = !busy && !uploading && (kind === 'reel' ? media?.kind === 'video' : !!body.trim() || !!media);
+  const canPublish = !busy && !uploading && (kind === 'reel' ? media?.kind === 'video' : !!body.trim() || !!media || (kind === 'story' && stickers.length > 0));
 
   return (
     <ScrollView
@@ -371,6 +378,8 @@ export default function Create() {
 
         {kind === 'story' ? (
           <>
+            <StickerEditor stickers={stickers} onChange={setStickers} preview={{ uri: media?.local, kind: media?.kind, body }} />
+            <SwitchRow label={t('m.stories.allowReshare')} hint={t('m.stories.allowReshareHint')} value={allowReshare} onValueChange={setAllowReshare} />
             <SwitchRow label={t('m.closeFriends.title')} hint={t('m.closeFriends.storyHint')} value={closeFriends} onValueChange={setCloseFriends} />
             <Button
               label={t('m.closeFriends.manage')}

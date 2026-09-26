@@ -27,6 +27,7 @@ import { assertMessagePace, assessMessage, flagContent, isRestricted, restricted
 import { requireVerified } from '../lib/verification.ts';
 import { me, requireAuth, resolveSession, sessionTokenOf } from '../plugins/auth.ts';
 import { issueTicket, readTicket } from '../lib/realtime-ticket.ts';
+import { canSeeStory, storyCards } from '../lib/stories.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 
@@ -117,6 +118,14 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     return info.size ? items.map((m) => (info.has(m.id) ? { ...m, viewOnce: info.get(m.id)! } : m)) : items;
   }
 
+  /** Shared stories become cards for the reader: each opens only if the reader can see the story. */
+  async function withStories<T extends { story_id?: string | null }>(items: T[], reader: string): Promise<(T & { story?: Message['story'] })[]> {
+    const ids = items.flatMap((m) => (m.story_id ? [m.story_id] : []));
+    if (!ids.length) return items;
+    const cards = await storyCards(db, ids, reader);
+    return items.map((m) => (m.story_id ? { ...m, story: cards.get(m.story_id) ?? { id: m.story_id, available: false } } : m));
+  }
+
   async function loadConversations(userId: string, ids?: string[]): Promise<Conversation[]> {
     const { rows } = await db.query(
       `SELECT c.id, c.kind, c.title, c.last_message_at, cm.last_read_at, cm.yaps_out_loud,
@@ -125,9 +134,9 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
          (SELECT count(*) FROM messages m WHERE m.conversation_id = c.id AND m.created_at > cm.last_read_at AND m.sender_id <> $1 AND m.deleted_at IS NULL
             AND m.moderation_status = 'normal') AS unread,
          (SELECT array_agg(user_id) FROM conversation_members WHERE conversation_id = c.id AND left_at IS NULL) AS member_ids,
-         lm.id AS lm_id, lm.body AS lm_body, lm.created_at AS lm_created_at, lm.sender_id AS lm_sender, lm.attachments AS lm_attachments
+         lm.id AS lm_id, lm.body AS lm_body, lm.created_at AS lm_created_at, lm.sender_id AS lm_sender, lm.attachments AS lm_attachments, lm.story_id
        FROM conversation_members cm JOIN conversations c ON c.id = cm.conversation_id
-       LEFT JOIN LATERAL (SELECT id, body, created_at, sender_id, attachments FROM messages
+       LEFT JOIN LATERAL (SELECT id, body, created_at, sender_id, attachments, story_id FROM messages
                           WHERE conversation_id = c.id AND deleted_at IS NULL AND (moderation_status = 'normal' OR (moderation_status = 'review' AND sender_id = $1))
                           ORDER BY created_at DESC LIMIT 1) lm ON true
        WHERE cm.user_id = $1 AND cm.left_at IS NULL ${ids ? 'AND c.id = ANY($2)' : ''}
@@ -137,9 +146,12 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const users = await usersByIds(db, [...new Set(rows.flatMap((r) => r.member_ids ?? []))]);
     const adult = await isAdultViewer(db, userId);
     const paused = !!(await db.query(`SELECT yaps_paused FROM user_preferences WHERE user_id = $1`, [userId])).rows[0]?.yaps_paused;
-    const withLast = await withVerdicts(
-      rows.map((r) => ({ ...r, attachments: r.lm_attachments as Attachment[] | null })),
-      adult,
+    const withLast = await withStories(
+      await withVerdicts(
+        rows.map((r) => ({ ...r, attachments: r.lm_attachments as Attachment[] | null })),
+        adult,
+      ),
+      userId,
     );
     return withLast.map((r) => ({
       id: r.id,
@@ -154,6 +166,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
             body: r.lm_body,
             replyToId: null,
             attachments: r.attachments ?? [],
+            ...(r.story ? { story: r.story } : {}),
             createdAt: r.lm_created_at.toISOString(),
           }
         : null,
@@ -252,7 +265,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     await assertMember(id, u.id);
     const c = decodeCursor<KeyCursor>(q.cursor);
     const { rows } = await db.query(
-      `SELECT m.id, m.conversation_id, m.body, m.reply_to_id, m.attachments, m.created_at, m.client_id, m.moderation_status, m.kind,
+      `SELECT m.id, m.conversation_id, m.body, m.reply_to_id, m.attachments, m.created_at, m.client_id, m.moderation_status, m.kind, m.story_id,
               pr.user_id AS s_id, pr.username AS s_username, pr.display_name AS s_display_name, pr.avatar_url AS s_avatar_url, pr.mode AS s_mode
        FROM messages m JOIN profiles pr ON pr.user_id = m.sender_id
        WHERE m.conversation_id = $1 AND m.deleted_at IS NULL
@@ -263,7 +276,10 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       c ? [id, u.id, q.limit + 1, c.t, c.id] : [id, u.id, q.limit + 1],
     );
     const page = rows.slice(0, q.limit);
-    const items: Message[] = await withViewOnce((await withVerdicts(page.map(toMessage), await isAdultViewer(db, u.id))).reverse(), u.id);
+    const items: Message[] = await withViewOnce(
+      (await withVerdicts((await withStories(page, u.id)).map(toMessage), await isAdultViewer(db, u.id))).reverse(),
+      u.id,
+    );
     return { items, nextCursor: rows.length > q.limit ? keyCursorOf(page.at(-1)!) : null };
   });
 
@@ -292,6 +308,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     }
     await assertMessagePace(db, ctx.config, u.id);
     if (yap && (await recentYaps(db, u.id)) >= YAP_PER_MINUTE) throw yapRateError();
+    // A shared story must be one you can see yourself.
+    if (input.storyId && !(await canSeeStory(db, input.storyId, u.id))) throw notFound('Story');
     const analysis = analyzeText(input.body);
     if (analysis.risk === 'escalate') {
       await db.query(
@@ -351,10 +369,10 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       }
       const { rows } = await c
         .query(
-          `INSERT INTO messages (conversation_id, sender_id, body, reply_to_id, attachments, client_id, moderation_status, kind, view_once, view_once_media_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+          `INSERT INTO messages (conversation_id, sender_id, body, reply_to_id, attachments, client_id, moderation_status, kind, view_once, view_once_media_id, story_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
            ON CONFLICT (sender_id, client_id) WHERE client_id IS NOT NULL DO UPDATE SET client_id = EXCLUDED.client_id
-           RETURNING id, conversation_id, body, reply_to_id, attachments, created_at, client_id, moderation_status, kind, view_once, (xmax = 0) AS inserted`,
+           RETURNING id, conversation_id, body, reply_to_id, attachments, created_at, client_id, moderation_status, kind, view_once, story_id, (xmax = 0) AS inserted`,
           [
             id,
             u.id,
@@ -366,6 +384,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
             input.kind,
             input.viewOnce,
             viewOnceMediaId,
+            input.storyId ?? null,
           ],
         )
         .catch((e: { code?: string; constraint?: string }) => {
@@ -388,6 +407,10 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       return rows[0];
     });
     const sender = (await usersByIds(db, [u.id])).get(u.id)!;
+    const storyId = (row.story_id as string | null) ?? null;
+    /** The message as one reader sees it: with the story card opening only if they can see the story. */
+    const cardFor = async (reader: string): Promise<Pick<Message, 'story'>> =>
+      storyId ? { story: (await storyCards(db, [storyId], reader)).get(storyId) ?? { id: storyId, available: false } } : {};
     const message: Message = {
       id: row.id,
       conversationId: id,
@@ -406,6 +429,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       if (info) message.viewOnce = { state: info.state, kind: info.kind, expiresAt: info.expiresAt };
     }
     const ownCopy = async (m: Message): Promise<Message> => (row.view_once ? (await withViewOnce([m], u.id))[0]! : m);
+    Object.assign(message, await cardFor(u.id));
     if (row.moderation_status === 'review') {
       // Held: only the sender sees it until a moderator lets it through.
       await ctx.realtime.publish([u.id], { type: 'message.created', data: message });
@@ -424,14 +448,20 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     );
     const [forAdults] = await withVerdicts([message], true);
     const [forOthers] = await withVerdicts([message], false);
-    await ctx.realtime.publish(
-      members.filter((m) => adults.has(m)),
-      { type: 'message.created', data: forAdults },
-    );
-    await ctx.realtime.publish(
-      members.filter((m) => !adults.has(m)),
-      { type: 'message.created', data: forOthers },
-    );
+    if (storyId) {
+      // Each reader gets the story card as they'd see it.
+      for (const m of members)
+        await ctx.realtime.publish([m], { type: 'message.created', data: { ...(adults.has(m) ? forAdults : forOthers)!, ...(await cardFor(m)) } });
+    } else {
+      await ctx.realtime.publish(
+        members.filter((m) => adults.has(m)),
+        { type: 'message.created', data: forAdults },
+      );
+      await ctx.realtime.publish(
+        members.filter((m) => !adults.has(m)),
+        { type: 'message.created', data: forOthers },
+      );
+    }
     if (yap && row.inserted) await deliverYap(u.id, id, members, (userId) => (adults.has(userId) ? forAdults! : forOthers!));
     track(db, u.id, row.kind === 'yap' ? 'yap_sent' : 'message_sent', { kind: conv.kind, ...(row.view_once ? { viewOnce: true } : {}) });
     reply.code(201);
@@ -721,5 +751,6 @@ function toMessage(r: Record<string, any>): Message {
     clientId: r.client_id,
     ...(r.moderation_status === 'review' ? { moderation: 'review' as const } : {}),
     ...(r.kind === 'yap' ? { kind: 'yap' as const } : {}),
+    ...(r.story ? { story: r.story } : {}),
   };
 }

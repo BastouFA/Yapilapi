@@ -24,6 +24,10 @@ import type {
   TagPermission,
   ConversationYaps,
   ViewOnceInfo,
+  StickerResults,
+  StoryCard,
+  StorySticker,
+  StoryStickerInput,
 } from '@yapilapi/shared';
 
 export class ApiError extends Error {
@@ -322,10 +326,34 @@ export function createClient(opts: ClientOptions) {
         mediaKind?: 'image' | 'video' | 'audio';
         expiresIn?: '1h' | '24h' | 'permanent' | 'custom';
         visibility?: string;
-      }) => post<{ moment: { id: string; expiresAt: string | null } }>('/v1/moments', b),
+        stickers?: StoryStickerInput[];
+        allowReshare?: boolean;
+      }) => post<{ moment: { id: string; expiresAt: string | null; tags: string[] } }>('/v1/moments', b),
+      /** One story (as a group of one), for links, story cards and notifications. */
+      get: (id: string) => get<{ group: StoryGroup }>(`/v1/moments/${id}`),
+      /** Your own story: whether others may reshare it. */
+      update: (id: string, b: { allowReshare: boolean }) => patch<{ allowReshare: boolean }>(`/v1/moments/${id}`, b),
+      /** Add a public story, or one that mentions you, to your own story. */
+      reshare: (id: string, b: { body?: string; visibility?: string; expiresIn?: '1h' | '24h' | 'permanent'; stickers?: StoryStickerInput[] } = {}) =>
+        post<{ moment: { id: string } }>(`/v1/moments/${id}/reshare`, b),
+      /** Send a story to people or conversations as a story card. */
+      send: (id: string, b: { userIds?: string[]; conversationIds?: string[]; body?: string }) =>
+        post<{ conversationIds: string[]; failed: { id: string; message: string }[] }>(`/v1/moments/${id}/send`, b),
+      vote: (id: string, stickerId: string, option: 0 | 1) =>
+        post<{ voted: number; results: [number, number]; votes: number }>(`/v1/moments/${id}/stickers/${stickerId}/vote`, { option }),
+      answer: (id: string, stickerId: string, text: string) => post<{ answered: number }>(`/v1/moments/${id}/stickers/${stickerId}/answers`, { text }),
+      slide: (id: string, stickerId: string, value: number) => post<{ mine: number }>(`/v1/moments/${id}/stickers/${stickerId}/slide`, { value }),
+      remind: (id: string, stickerId: string, on: boolean) =>
+        on
+          ? put<{ reminding: boolean }>(`/v1/moments/${id}/stickers/${stickerId}/reminder`)
+          : del<{ reminding: boolean }>(`/v1/moments/${id}/stickers/${stickerId}/reminder`),
       view: (id: string) => post(`/v1/moments/${id}/view`),
       like: (id: string, liked: boolean) => put<{ liked: boolean }>(`/v1/moments/${id}/like`, { liked }),
-      viewers: (id: string) => get<{ items: { user: PublicUser; liked: boolean; viewedAt: string }[] }>(`/v1/moments/${id}/viewers`),
+      /** Your own story: who saw it, sticker results, reshares. */
+      viewers: (id: string) =>
+        get<{ items: { user: PublicUser; liked: boolean; viewedAt: string }[]; results: StickerResults[]; reshares: number; allowReshare: boolean }>(
+          `/v1/moments/${id}/viewers`,
+        ),
       reply: (id: string, body: string) => post<{ conversationId: string }>(`/v1/moments/${id}/reply`, { body }),
       remove: (id: string) => del(`/v1/moments/${id}`),
     },
@@ -442,6 +470,8 @@ export function createClient(opts: ClientOptions) {
       get: (tag: string) => get<TagSummary>(`/v1/tags/${encodeURIComponent(tag)}`),
       posts: (tag: string, sort: 'recent' | 'top' = 'recent', cursor?: string) =>
         get<Page<Post>>(`/v1/tags/${encodeURIComponent(tag)}/posts${qs({ sort, cursor })}`),
+      /** "Stories now": active public stories with the tag. */
+      stories: (tag: string) => get<{ items: StoryGroup[] }>(`/v1/tags/${encodeURIComponent(tag)}/stories`),
       follow: (tag: string) => put<{ following: boolean }>(`/v1/tags/${encodeURIComponent(tag)}/follow`),
       unfollow: (tag: string) => del<{ following: boolean }>(`/v1/tags/${encodeURIComponent(tag)}/follow`),
     },
@@ -1216,6 +1246,19 @@ export interface Story {
   views?: number;
   /** Its photo or video is marked sensitive: show it blurred until the viewer chooses to see it. */
   sensitive?: boolean;
+  /** Shared with everyone (can be reshared, and shows on tag pages). */
+  public: boolean;
+  /** Hashtags from the text and hashtag stickers. */
+  tags: string[];
+  stickers: StorySticker[];
+  /** A reshare: the original story, which opens only if you can see it. */
+  reshareOf: StoryCard | null;
+  /** The story mentions you. */
+  mentionsYou: boolean;
+  /** You can add it to your own story. */
+  canReshare: boolean;
+  /** Your own stories: whether others may reshare it. */
+  allowReshare?: boolean;
 }
 
 export interface StoryGroup {

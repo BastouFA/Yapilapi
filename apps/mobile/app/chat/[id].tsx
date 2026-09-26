@@ -18,6 +18,7 @@ import { useCalls } from '../../lib/calls';
 import { client, errorMessage, mediaUrl } from '../../lib/api';
 import { clock, MAX_UPLOAD_BYTES, pickOne, uploadFile, uploadPicked, VOICE_MIME } from '../../lib/media';
 import { useT } from '../../lib/i18n';
+import { StoryCardView } from '../../lib/story-stickers';
 import { conversationTitle } from '../../lib/post';
 import { isVerificationError, SensitiveCover, UnavailableMedia, VerifyPrompt } from '../../lib/safety';
 import { useRealtime, useSession } from '../../lib/session';
@@ -358,7 +359,7 @@ export default function Chat() {
         onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
         renderItem={({ item }) => {
           const mine = item.sender.id === me?.id;
-          const text = item.body || (item.attachments.length ? '' : t('m.message.deleted'));
+          const text = item.body || (item.attachments.length || item.story ? '' : t('m.message.deleted'));
           const tint = mine ? c.onYapi : c.ink;
           const media = item.viewOnce ? (
             <ViewOnceBubble message={item} mine={mine} tint={tint} onChange={replaceMessage} />
@@ -367,6 +368,7 @@ export default function Chat() {
               {item.kind === 'yap' ? (
                 <Text style={{ color: tint, fontSize: 11, fontWeight: '800', letterSpacing: 0.5, opacity: 0.8 }}>{t('m.yap.label')}</Text>
               ) : null}
+              {item.story ? <StoryCardView card={item.story} dark={mine} /> : null}
               <Attachments items={item.attachments} tint={tint} />
             </>
           );

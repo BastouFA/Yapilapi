@@ -1,18 +1,19 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
-import type { TagSummary } from '../../../../packages/api-client/src/index';
+import type { StoryGroup, TagSummary } from '../../../../packages/api-client/src/index';
 import { normalizeTag } from '../../../../packages/shared/src/hashtags';
 import type { Post } from '../../../../packages/shared/src/types';
 import { client, errorMessage } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { PostCard } from '../../lib/post';
+import { StoriesStrip, StoryViewer } from '../../lib/stories';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
 import { Button, EmptyState, Loading, Notice, Segmented, useColors, userText } from '../../lib/ui';
 import { router } from 'expo-router';
 
-/** A hashtag: how many people use it, related tags, recent or top posts, and following it. */
+/** A hashtag: how many people use it, related tags, public stories with it now, recent or top posts, and following it. */
 export default function TagScreen() {
   const params = useLocalSearchParams<{ tag: string }>();
   const tag = normalizeTag(decodeURIComponent(params.tag));
@@ -24,9 +25,18 @@ export default function TagScreen() {
   const [posts, setPosts] = useState<Post[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // "Stories now": active public stories with the tag (never followers-only or close friends ones).
+  const [stories, setStories] = useState<StoryGroup[]>([]);
+  const [viewing, setViewing] = useState<number | null>(null);
 
   useEffect(() => {
     void (async () => setInfo((await (await client()).tags.get(tag)) as TagSummary))().catch(() => setInfo(null));
+    void client()
+      .then((api) => api.tags.stories(tag))
+      .then(
+        (r) => setStories(r.items),
+        () => setStories([]),
+      );
   }, [tag]);
 
   const load = useCallback(
@@ -89,6 +99,14 @@ export default function TagScreen() {
           ))}
         </View>
       ) : null}
+      {stories.length ? (
+        <View style={{ gap: space[2] }}>
+          <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 17, fontWeight: '800' }}>
+            {t('m.tag.storiesNow')}
+          </Text>
+          <StoriesStrip groups={stories} onOpen={setViewing} />
+        </View>
+      ) : null}
       <Segmented
         label={t('m.title.tag')}
         value={sort}
@@ -103,16 +121,19 @@ export default function TagScreen() {
   );
 
   return (
-    <FlatList
-      style={{ backgroundColor: c.ground }}
-      contentContainerStyle={{ padding: space[4], gap: space[3] }}
-      data={posts ?? []}
-      keyExtractor={(p) => p.id}
-      ListHeaderComponent={header}
-      renderItem={({ item }) => <PostCard post={item} />}
-      onEndReached={() => cursor && void load(cursor)}
-      onEndReachedThreshold={0.5}
-      ListEmptyComponent={posts === null ? <Loading /> : <EmptyState title={t('m.tag.empty')} />}
-    />
+    <>
+      <FlatList
+        style={{ backgroundColor: c.ground }}
+        contentContainerStyle={{ padding: space[4], gap: space[3] }}
+        data={posts ?? []}
+        keyExtractor={(p) => p.id}
+        ListHeaderComponent={header}
+        renderItem={({ item }) => <PostCard post={item} />}
+        onEndReached={() => cursor && void load(cursor)}
+        onEndReachedThreshold={0.5}
+        ListEmptyComponent={posts === null ? <Loading /> : <EmptyState title={t('m.tag.empty')} />}
+      />
+      <StoryViewer groups={stories} start={viewing} onClose={() => setViewing(null)} onChange={setStories} />
+    </>
   );
 }

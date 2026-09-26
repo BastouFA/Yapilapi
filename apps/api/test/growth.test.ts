@@ -24,9 +24,9 @@ const adult = () => signUp(t.app, { birthDate: '1990-01-01' });
 const verify = (u: TestUser) => t.ctx.db.query(`UPDATE users SET email_verified_at = now() WHERE id = $1`, [u.id]);
 const hashOf = (kind: string, value: string) => createHash('sha256').update(`${salt}:${kind}:${value}`).digest('hex');
 
-/** analytics are written without waiting; give them a moment. */
+/** analytics are written without waiting; give them a moment (up to 5 s: the full suite runs files in parallel). */
 async function events(userId: string, name: string) {
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 100; i++) {
     const { rows } = await t.ctx.db.query(`SELECT properties FROM analytics_events WHERE user_id = $1 AND name = $2`, [userId, name]);
     if (rows.length) return rows.map((r) => r.properties);
     await new Promise((r) => setTimeout(r, 50));

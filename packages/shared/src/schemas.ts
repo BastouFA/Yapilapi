@@ -17,6 +17,7 @@ import {
   STORY_VISIBILITIES,
   VISIBILITIES,
 } from './constants.ts';
+import { storyStickersSchema } from './stories.ts';
 
 const trimmed = (max: number) => z.string().trim().min(1).max(max);
 export const uuid = z.string().uuid();
@@ -199,8 +200,10 @@ export const sendMessageSchema = z
     kind: z.enum(['message', 'yap']).default('message'),
     /** One photo or video uploaded with POST /v1/media?viewOnce=true, opened once by each person. */
     viewOnce: z.boolean().default(false),
+    /** Share a story you can see: it shows as a card, which opens only for people who can see it too. */
+    storyId: uuid.optional(),
   })
-  .refine((v) => v.body.length > 0 || v.attachments.length > 0, { message: 'Write a message or attach a file.', path: ['body'] });
+  .refine((v) => v.body.length > 0 || v.attachments.length > 0 || !!v.storyId, { message: 'Write a message or attach a file.', path: ['body'] });
 
 /** "Let Yaps play out loud" in one chat. null goes back to the default (on for yaps from friends). */
 export const conversationYapsSchema = z.object({ playOutLoud: z.boolean().nullable() });
@@ -317,6 +320,18 @@ export const createMomentSchema = z.object({
   /** 'close_friends': only the people on your close friends list. */
   visibility: z.enum(STORY_VISIBILITIES).default('friends'),
   locationText: z.string().max(200).optional(),
+  /** Mentions, hashtags and interactive stickers placed on the story. */
+  stickers: storyStickersSchema,
+  /** Let people reshare this story into their own (public stories, or people it mentions). */
+  allowReshare: z.boolean().default(true),
+});
+
+/** Reshare a story into your own: it shows as a card, credited to its author. */
+export const reshareMomentSchema = z.object({
+  body: z.string().trim().max(500).default(''),
+  expiresIn: z.enum(['1h', '24h', 'permanent']).default('24h'),
+  visibility: z.enum(STORY_VISIBILITIES).default('friends'),
+  stickers: storyStickersSchema,
 });
 
 export const searchQuerySchema = z.object({

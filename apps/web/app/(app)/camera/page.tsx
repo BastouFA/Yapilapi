@@ -206,7 +206,7 @@ function Camera() {
           </span>
         ) : (
           <Link href={mode === 'post' ? '/create' : `/create?mode=${mode}`} className="cam__pill cam__pill--ghost" replace>
-            Write instead
+            {mode === 'story' ? 'Text and stickers' : 'Write instead'}
           </Link>
         )}
         {canFlip && !recording ? (

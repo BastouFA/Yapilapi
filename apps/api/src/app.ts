@@ -75,6 +75,7 @@ import { shareVideoJobHandlers } from './lib/share-video.ts';
 import { sweepViewOnce, viewOnceJobHandlers } from './lib/view-once.ts';
 import { fastifyTracingPlugin, traceLogMixin } from './lib/tracing.ts';
 import { endExpiredCampaigns } from './lib/boosts.ts';
+import { sendCountdownReminders } from './lib/stories.ts';
 
 export interface BuiltApp {
   app: FastifyInstance;
@@ -397,6 +398,8 @@ export async function buildApp(
         lastViewOnceSweep = Date.now();
         await sweepViewOnce(viewOnceDeps).catch((e) => app.log.warn({ err: e.message }, 'view-once sweep'));
       }
+      // Story countdowns that ended: remind the people who asked.
+      await sendCountdownReminders(db, ctx.realtime).catch((e) => app.log.warn({ err: e.message }, 'countdown reminders'));
       busy = false;
     }, 2_000);
     jobTimer.unref();
