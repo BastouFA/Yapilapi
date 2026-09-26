@@ -1,6 +1,6 @@
 # Build status against the master directive
 
-Last updated 2026-09-25 (fourth pass). Legend: **Built** = UI + API + database + validation + authorization + tests. **API** = working, tested endpoints without a dedicated UI yet. **Schema** = tables and design exist, no endpoints. **Not started** = nothing yet.
+Last updated 2026-09-26 (fifth pass). Legend: **Built** = UI + API + database + validation + authorization + tests. **API** = working, tested endpoints without a dedicated UI yet. **Schema** = tables and design exist, no endpoints. **Not started** = nothing yet.
 
 ## The first integrated flow (directive §60)
 
@@ -31,7 +31,7 @@ Sign up → profile → interests → follow → Home → Discover → create po
 | 20 | Places | Built | Place profiles, hours, map link, events, products, nearby search, **reviews and ratings**, **booking requests** with capacity per time slot and owner confirm/decline. |
 | 21 | Business | Built | Business profiles, places, products; **Insights** for owners (visitors, bookings, rating trend, sales, ads) and the **business assistant**. |
 | 22 | Commerce | Built | Products, services, tickets, bookings, digital; idempotent orders; stock. Cart and checkout UI minimal (Buy button). |
-| 23 | Payments | API | Provider abstraction, signed webhooks, replay protection, amount reconciliation, refunds, platform fees, payouts. Real provider: needs account. |
+| 23 | Payments | Built | Checkout sheet for products, tickets, tips, subscriptions and ad budget; **Stripe** adapter (Payment Element, signed webhooks, refunds, zero-decimal currencies); development provider with a labelled test payment through the same webhook path; signed webhooks, replay protection, amount reconciliation, refunds, platform fees, payouts. Live Stripe keys needed to take real money. |
 | 24–25 | AI, recommendations | Built | Gateway → permission → context → router → safety → audit log; caption, summaries, search intent, plans, translation; Claude adapter + offline dev provider; evaluation suite. **Assistants** (`/assistant` and on Discover): Discover, Trips, Shopping and Business run a model with tools that act as the person, only recommend items a tool returned, and propose actions the person confirms. |
 | 26 | Notifications | Built | In-app + realtime, categories, pause, focus mode, **browser push (VAPID)** and **mobile push (Expo)**, dead-token cleanup. |
 | 27 | Trust & safety | Built | Automated analysis, reports, cases, moderator console, decisions, enforcement, appeals, audit trail, **ad review** before campaigns run, **regional rules** (per-country withholding with a recorded legal basis; authors see where a post is withheld). |
@@ -45,7 +45,7 @@ Sign up → profile → interests → follow → Home → Discover → create po
 | 35 | Internationalization | Built (core) | All UI strings through `t()`, complete catalogs for English, French, Arabic, Spanish, Portuguese (Brazil), Swahili, Yorùbá and Hausa, RTL switching, Intl dates/money. Yorùbá and Hausa need a native-speaker review. |
 | 36 | Accessibility | Built | axe audit (WCAG 2.2 A/AA) of 15 pages in light/dark and desktop/mobile: 0 violations, keyboard focus traps, Escape and focus return for dialogs, sheets and menus; runs in CI. Manual screen-reader pass and RTL layouts: not done yet (docs/accessibility.md). |
 | — | Low bandwidth | Partial | Cursor pagination, lazy images, reduced motion, resumable uploads with retry. Image compression/variants: not started. |
-| — | Mobile | Built (core) | Expo app: Home, Discover, Create, Inbox + chat, Profile, Real capture (expo-camera), push registration. Type-checks and iOS/Android bundles build; not yet run on a device. **Calls** (react-native-webrtc, same signaling as web) in a development build; post, community with FAQ, settings with family supervision; the new look. |
+| — | Mobile | Built | Expo app: Home, Discover, Create, Inbox + chat, Profile, Real capture (expo-camera), push registration. Type-checks and iOS/Android bundles build; not yet run on a device. **Calls** (react-native-webrtc, same signaling as web) in a development build; post, community with FAQ, settings with family supervision, Assistant, Events; the new look. |
 | — | Design system | Built | Coral and sun palette, light/dark themes with contrast-checked tokens, soft radii, layered shadows; 11 primitives, 20 social components; three-column desktop layout with a live/events/people/trending sidebar; published reference artifact. |
 | — | CI/CD, observability | Built | CI workflow, Dockerfiles, health/readiness, Prometheus metrics and alerts, structured logs with request and trace ids, **OpenTelemetry tracing** (opt-in, Jaeger profile), **load tests** with p95 targets (docs/architecture/performance.md). |
 
