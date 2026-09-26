@@ -90,9 +90,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
         .catch(() => {});
     };
     loadCounts();
-    const connect = () => {
+    const connect = async () => {
       if (stopped) return;
-      ws = new WebSocket(WS_URL);
+      // The API may be on another host, where the session cookie doesn't reach: open the socket with a short ticket.
+      const ticket = await api.realtime.ticket().then(
+        (r) => r.ticket,
+        () => null,
+      );
+      if (stopped) return;
+      ws = new WebSocket(ticket ? `${WS_URL}?ticket=${encodeURIComponent(ticket)}` : WS_URL);
       ws.onopen = () => (attempt = 0);
       ws.onmessage = (ev) => {
         try {
@@ -108,10 +114,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
       ws.onclose = () => {
         if (stopped) return;
         attempt++;
-        setTimeout(connect, Math.min(30_000, 1000 * 2 ** attempt));
+        setTimeout(() => void connect(), Math.min(30_000, 1000 * 2 ** attempt));
       };
     };
-    connect();
+    void connect();
     const onFocus = () => loadCounts();
     window.addEventListener('focus', onFocus);
     return () => {

@@ -113,3 +113,24 @@ describe('message attachments', () => {
     ).toBe(400);
   });
 });
+
+describe('realtime tickets', () => {
+  it('opens the realtime socket from another origin with a short-lived ticket', async () => {
+    const { issueTicket, readTicket } = await import('../src/lib/realtime-ticket.ts');
+    const u = await signUp(t.app, { birthDate: '1990-01-01' });
+    const r = await as(t.app, u).post('/v1/realtime/ticket');
+    expect(r.status).toBe(200);
+    const sessionId = readTicket(t.ctx.config, r.body.ticket);
+    expect(sessionId).toBeTruthy();
+    // Forged, expired and tampered tickets are refused.
+    expect(readTicket(t.ctx.config, issueTicket(t.ctx.config, sessionId!, Date.now() - 120_000))).toBeNull();
+    expect(
+      readTicket(
+        t.ctx.config,
+        r.body.ticket.replace(/.$/, (c: string) => (c === 'A' ? 'B' : 'A')),
+      ),
+    ).toBeNull();
+    expect(readTicket(t.ctx.config, 'bm90LWEtdGlja2V0.abc')).toBeNull();
+    expect((await as(t.app, null).post('/v1/realtime/ticket')).status).toBe(401);
+  });
+});

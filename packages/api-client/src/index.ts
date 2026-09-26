@@ -256,6 +256,10 @@ export function createClient(opts: ClientOptions) {
       list: () => get<{ items: Record<string, any>[] }>('/v1/orders'),
       get: (id: string) => get<{ order: Record<string, any> }>(`/v1/orders/${id}`),
     },
+    realtime: {
+      /** A 60-second ticket for opening the realtime socket when the API is on another host. */
+      ticket: () => post<{ ticket: string }>('/v1/realtime/ticket'),
+    },
     trending: (limit = 10) => get<{ items: TrendingTag[] }>(`/v1/trending${qs({ limit })}`),
     tags: {
       get: (tag: string) => get<TagSummary>(`/v1/tags/${encodeURIComponent(tag)}`),

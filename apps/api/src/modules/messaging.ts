@@ -10,6 +10,7 @@ import { analyzeText } from '../lib/moderation.ts';
 import { track } from '../lib/services.ts';
 import { ageOf, areFriends, isBlockedEitherWay, publicUserFrom, usersByIds } from '../lib/users.ts';
 import { me, requireAuth, resolveSession, sessionTokenOf } from '../plugins/auth.ts';
+import { issueTicket, readTicket } from '../lib/realtime-ticket.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 
@@ -318,8 +319,28 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
   });
 
   // ── Realtime socket ───────────────────────────────────────────────────
+  /** A 60-second ticket for opening the realtime socket from another origin (see lib/realtime-ticket.ts). */
+  app.post('/v1/realtime/ticket', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req) => {
+    const u = me(req);
+    if (u.apiKey) throw forbidden();
+    return { ticket: issueTicket(ctx.config, u.sessionId) };
+  });
+
   app.get('/v1/realtime', { websocket: true }, async (socket, req) => {
-    const user = await resolveSession(ctx, sessionTokenOf(req) ?? (req.query as { token?: string }).token);
+    const query = req.query as { token?: string; ticket?: string };
+    let user: { id: string } | null = await resolveSession(ctx, sessionTokenOf(req) ?? query.token);
+    if (!user && query.ticket) {
+      const sessionId = readTicket(ctx.config, query.ticket);
+      const row = sessionId
+        ? (
+            await db.query(
+              `SELECT u.id FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = $1 AND s.revoked_at IS NULL AND s.expires_at > now() AND u.status = 'active'`,
+              [sessionId],
+            )
+          ).rows[0]
+        : null;
+      user = row ? { id: row.id } : null;
+    }
     if (!user) {
       socket.close(4401, 'unauthorized');
       return;
