@@ -6,3 +6,7 @@ pnpm-lock.yaml
 packages/design-system/src/tokens.css
 packages/database/migrations
 *.md
+apps/web/e2e/.auth
+apps/web/e2e/.output
+apps/web/e2e/.results
+apps/web/e2e/.report
