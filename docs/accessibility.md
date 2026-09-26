@@ -27,11 +27,11 @@ node apps/web/e2e/summary.ts            # counts by project and rule (--details 
 
 ### What is checked
 
-**`a11y.spec.ts`**: axe-core (`@axe-core/playwright` 4.13) with the `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa` and `best-practice` rule sets (contrast, names and labels, ARIA validity, landmarks, heading order, target size, document language and title…) on 19 pages:
+**`a11y.spec.ts`**: axe-core (`@axe-core/playwright` 4.13) with the `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa` and `best-practice` rule sets (contrast, names and labels, ARIA validity, landmarks, heading order, target size, document language and title…) on 23 pages:
 
-landing, login, signup, home, discover, create, inbox, a conversation, profile, community, event, place, settings, studio, notifications, a single post, events, assistant, live
+landing, login, signup, home, discover, create, inbox, a conversation, profile, community, event, place, settings, studio, notifications, a single post, events, assistant, live, forgot password, a business page, developers, memories
 
-in four projects: **desktop** (1440×900) and **mobile** (Pixel 7, 412×915, touch) × **light** and **dark** color schemes. That is 76 page audits; each must have zero violations. The page is audited after network idle, after loading states (`aria-busy`) clear and after finite animations finish.
+in four projects: **desktop** (1440×900) and **mobile** (Pixel 7, 412×915, touch) × **light** and **dark** color schemes. That is 92 page audits; each must have zero violations. The page is audited after network idle, after loading states (`aria-busy`) clear and after finite animations finish.
 
 **Right-to-left:** every signed-in page is loaded with `dir="rtl"` in all four projects and must not be wider than the viewport. (An offscreen skip link placed with `left: -9999px` once made every page scroll to blank space in RTL.) The design system uses logical properties (`inset-inline-*`, `margin-inline-*`, logical corner radii), mirrors directional icons, and marks user-written text with `dir="auto"` / `<bdi>` so mixed-direction names, handles, tags and messages read correctly.
 
@@ -83,7 +83,7 @@ The "before" run used the development server; the "after" run a production build
 
 ## Remaining known issues
 
-- **Not audited automatically:** admin, developers, real/together, memories, onboarding, OAuth consent, password reset and business pages; the incoming-call and Mini App overlays (they need a second live session or a registered app); media uploads and the media viewer (the seed has no media). They use the same components, but have not been run through axe.
+- **Not audited automatically:** admin, real/together, onboarding, OAuth consent, password reset and business pages; the incoming-call and Mini App overlays (they need a second live session or a registered app); media uploads and the media viewer (the seed has no media). They use the same components, but have not been run through axe.
 - **Color contrast** is checked by axe on rendered text only. Text over images and gradients (moment rings, media) is reported as "needs review" by axe, not as pass or fail, and has not been checked by hand.
 - **Screen readers:** no manual pass with VoiceOver, TalkBack or NVDA yet. Live regions exist for toasts and the AI panel; the conversation is a `role="log"` that announces new messages as they arrive (not yet confirmed with each screen reader).
 - **Reduced motion:** transitions respect `prefers-reduced-motion` in the design system, but the Real capture countdown and live video are not covered.

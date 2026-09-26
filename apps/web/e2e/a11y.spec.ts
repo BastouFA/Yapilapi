@@ -18,6 +18,7 @@ const PUBLIC_PAGES: [string, string][] = [
   ['landing', '/'],
   ['login', '/login'],
   ['signup', '/signup'],
+  ['forgot password', '/forgot-password'],
 ];
 
 const APP_PAGES: [string, (d: SeedData) => string][] = [
@@ -37,6 +38,9 @@ const APP_PAGES: [string, (d: SeedData) => string][] = [
   ['events', () => '/events'],
   ['assistant', () => '/assistant'],
   ['live', () => '/live'],
+  ['business', (d) => `/b/${d.businessSlug}`],
+  ['developers', () => '/developers'],
+  ['memories', () => '/memories'],
 ];
 
 async function settle(page: Page) {

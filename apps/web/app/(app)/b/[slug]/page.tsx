@@ -50,6 +50,7 @@ export default function BusinessPage() {
           ))}
         </List>
       ) : null}
+      {products.length ? <h2 className="section-title">Products and services</h2> : null}
       <div className="yp-grid">
         {products.map((p) => (
           <ProductCard key={p.id} product={p as never} locale={locale} action={<BuyButton productId={p.id} />} />
