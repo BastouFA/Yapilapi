@@ -87,7 +87,7 @@ export default function PlusPage() {
       </div>
       <p style={{ margin: 0 }}>{t('plus.intro')}</p>
 
-      <Card title={t('plus.price', { price })} subtitle={t('plus.noRenew')}>
+      <Card level={2} title={t('plus.price', { price })} subtitle={t('plus.noRenew')}>
         <div className="stack-sm">
           {status?.active && status.until ? (
             <Alert tone="success" title={t('plus.status.active', { date: date(status.until) })}>
@@ -110,7 +110,7 @@ export default function PlusPage() {
         </div>
       </Card>
 
-      <Card title={t('plus.benefits.title')}>
+      <Card level={2} title={t('plus.benefits.title')}>
         <ul className="stack-sm" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {info.benefits.map((b) => {
             const text = benefitText(b);
@@ -133,7 +133,7 @@ export default function PlusPage() {
       </p>
 
       {info.history.length ? (
-        <Card title={t('plus.history')}>
+        <Card level={2} title={t('plus.history')}>
           <List>
             {info.history.map((h) => (
               <ListItem

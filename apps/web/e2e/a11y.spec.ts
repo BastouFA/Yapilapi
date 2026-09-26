@@ -42,6 +42,9 @@ const APP_PAGES: [string, (d: SeedData) => string][] = [
   ['developers', () => '/developers'],
   ['memories', () => '/memories'],
   ['reels', () => '/reels'],
+  ['tag', () => '/t/photography'],
+  ['plus', () => '/plus'],
+  ['invite', () => '/invite'],
 ];
 
 async function settle(page: Page) {

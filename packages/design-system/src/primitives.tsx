@@ -271,7 +271,10 @@ export function Card({
   onClick,
   children,
   className,
+  level = 3,
 }: {
+  /** Heading level of the title: 2 for cards directly under a page's h1. */
+  level?: 2 | 3;
   title?: ReactNode;
   subtitle?: ReactNode;
   action?: ReactNode;
@@ -286,7 +289,7 @@ export function Card({
       {title || subtitle || action ? (
         <header className="yp-card__head">
           <div>
-            {title ? <h3 className="yp-card__title">{title}</h3> : null}
+            {title ? level === 2 ? <h2 className="yp-card__title">{title}</h2> : <h3 className="yp-card__title">{title}</h3> : null}
             {subtitle ? <p className="yp-card__sub">{subtitle}</p> : null}
           </div>
           {action}

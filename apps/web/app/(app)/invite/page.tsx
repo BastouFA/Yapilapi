@@ -60,7 +60,7 @@ export default function InvitePage() {
       </div>
       <p style={{ margin: 0 }}>{t('invite.intro')}</p>
 
-      <Card title={t('invite.yourLink')} subtitle={t('invite.code', { code: info.code })}>
+      <Card level={2} title={t('invite.yourLink')} subtitle={t('invite.code', { code: info.code })}>
         <div className="stack-sm">
           <TextField label={t('invite.yourLink')} value={info.link} readOnly onFocus={(e) => e.currentTarget.select()} />
           <div className="row">
@@ -76,7 +76,7 @@ export default function InvitePage() {
         </div>
       </Card>
 
-      <Card title={t('plus.title')} subtitle={t('invite.reward', { count: reward.perPeople, days: reward.days, max: reward.max })}>
+      <Card level={2} title={t('plus.title')} subtitle={t('invite.reward', { count: reward.perPeople, days: reward.days, max: reward.max })}>
         <div className="stack-sm">
           <p style={{ margin: 0 }}>{t('invite.stats', { joined: info.joined, confirmed: info.confirmed })}</p>
           {info.toNextReward === null ? (
@@ -97,7 +97,7 @@ export default function InvitePage() {
 
       {info.canEnterCode ? <EnterCode days={info.enterCodeDays} onDone={load} /> : null}
 
-      <Card title={t('invite.people')}>
+      <Card level={2} title={t('invite.people')}>
         {info.people.length ? (
           <List>
             {info.people.map((p) => (
@@ -131,7 +131,7 @@ function EnterCode({ days, onDone }: { days: number; onDone: () => void }) {
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   return (
-    <Card title={t('invite.enter.title')} subtitle={t('invite.enter.body', { days })}>
+    <Card level={2} title={t('invite.enter.title')} subtitle={t('invite.enter.body', { days })}>
       <form
         className="row"
         style={{ alignItems: 'flex-end' }}

@@ -57,12 +57,12 @@ function PlusAndInvites() {
   const until = me?.plusUntil ? new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(new Date(me.plusUntil)) : null;
   return (
     <div className="settings-duo">
-      <Card title={t('plus.title')} subtitle={until ? t('plus.status.active', { date: until }) : t('plus.status.none')}>
+      <Card level={2} title={t('plus.title')} subtitle={until ? t('plus.status.active', { date: until }) : t('plus.status.none')}>
         <Link href="/plus" className="yp-btn yp-btn--secondary yp-btn--sm">
           {t('plus.open')}
         </Link>
       </Card>
-      <Card title={t('invite.title')} subtitle={t('plus.inviteHint')}>
+      <Card level={2} title={t('invite.title')} subtitle={t('plus.inviteHint')}>
         <Link href="/invite" className="yp-btn yp-btn--secondary yp-btn--sm">
           {t('invite.title')}
         </Link>
