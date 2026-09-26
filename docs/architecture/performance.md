@@ -120,3 +120,16 @@ The seed now also creates a story per user and reels for a fifth of the users, a
 | stories | `GET /v1/moments` | 11.0 | 150 |
 | people suggest | `GET /v1/people/suggest` | 21.3 | 100 |
 | ads next (now serving ads) | `GET /v1/ads/next` | 17.0 | 100 |
+
+### 2026-09-26: trending and tag pages
+
+Two new scenarios. Tag queries match with `p.topics @> ARRAY[$tag]` so `posts_topics_idx` (GIN) serves them. Trending aggregates the last 7 days of public posts; it is the heaviest new read but well inside its budget. p95 at 16 connections, zero errors:
+
+| Scenario | Route | p95 ms | Target |
+| --- | --- | ---: | ---: |
+| trending tags | `GET /v1/trending` | 36.6 | 150 |
+| tag page posts | `GET /v1/tags/:tag/posts` (recent and top) | 16.5 | 200 |
+| home feed | `GET /v1/feed` | 59.0 | 250 |
+| notifications list | `GET /v1/notifications` | 4.7 | 100 |
+
+If trending ever gets close to its budget, cache it for a minute: it is the same for everyone.

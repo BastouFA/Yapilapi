@@ -60,12 +60,12 @@ export default async function tagsModule(app: FastifyInstance, ctx: AppContext) 
     const [counts, related, following] = await Promise.all([
       db.query(
         `SELECT count(*) AS posts, count(DISTINCT author_id) AS people, count(*) FILTER (WHERE created_at > now() - interval '7 days') AS week
-         FROM (SELECT p.author_id, p.created_at ${FROM} WHERE $2 = ANY(p.topics) AND ${VISIBLE} LIMIT 10000) x`,
+         FROM (SELECT p.author_id, p.created_at ${FROM} WHERE p.topics @> ARRAY[$2::text] AND ${VISIBLE} LIMIT 10000) x`,
         [viewer, tag],
       ),
       db.query(
         `SELECT t AS tag, count(*) AS n ${FROM}, unnest(p.topics) t
-         WHERE $1 = ANY(p.topics) AND t <> $1 AND ${PUBLIC_POST} AND p.created_at > now() - interval '30 days'
+         WHERE p.topics @> ARRAY[$1::text] AND t <> $1 AND ${PUBLIC_POST} AND p.created_at > now() - interval '30 days'
          GROUP BY t ORDER BY count(*) DESC, t LIMIT 8`,
         [tag],
       ),
@@ -98,7 +98,7 @@ export default async function tagsModule(app: FastifyInstance, ctx: AppContext) 
       const c = decodeCursor<{ o: number }>(q.cursor);
       const offset = Math.max(0, Math.min(c?.o ?? 0, 500));
       const { rows } = await db.query(
-        `SELECT p.id ${FROM} WHERE $2 = ANY(p.topics) AND ${VISIBLE} AND p.created_at > now() - interval '30 days'
+        `SELECT p.id ${FROM} WHERE p.topics @> ARRAY[$2::text] AND ${VISIBLE} AND p.created_at > now() - interval '30 days'
          ORDER BY p.like_count + 2 * p.comment_count + 3 * p.repost_count DESC, p.created_at DESC, p.id LIMIT $3 OFFSET $4`,
         [viewer, tag, q.limit + 1, offset],
       );
@@ -114,7 +114,7 @@ export default async function tagsModule(app: FastifyInstance, ctx: AppContext) 
     }
     const c = decodeCursor<{ t: string; id: string }>(q.cursor);
     const { rows } = await db.query(
-      `SELECT p.id, p.created_at ${FROM} WHERE $2 = ANY(p.topics) AND ${VISIBLE}
+      `SELECT p.id, p.created_at ${FROM} WHERE p.topics @> ARRAY[$2::text] AND ${VISIBLE}
        ${c ? 'AND (p.created_at, p.id) < ($4::timestamptz, $5::uuid)' : ''}
        ORDER BY p.created_at DESC, p.id DESC LIMIT $3`,
       c ? [viewer, tag, q.limit + 1, c.t, c.id] : [viewer, tag, q.limit + 1],

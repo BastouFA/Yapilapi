@@ -1,4 +1,4 @@
-import { rng, type Dataset } from './seed.ts';
+import { rng, TOPICS, type Dataset } from './seed.ts';
 
 export interface RequestSpec {
   method: 'GET' | 'POST' | 'PUT';
@@ -67,6 +67,22 @@ export function scenarios(d: Dataset): Scenario[] {
       route: 'GET /v1/search',
       sloP95Ms: 250,
       next: () => ({ method: 'GET', path: `/v1/search?q=${encodeURIComponent(r.pick(d.searchTerms))}`, token: user().token }),
+    },
+    {
+      name: 'trending tags',
+      route: 'GET /v1/trending',
+      sloP95Ms: 150,
+      next: () => ({ method: 'GET', path: '/v1/trending?limit=10', token: user().token }),
+    },
+    {
+      name: 'tag page posts',
+      route: 'GET /v1/tags/:tag/posts',
+      sloP95Ms: 200,
+      next: () => ({
+        method: 'GET',
+        path: `/v1/tags/${encodeURIComponent(r.pick(TOPICS))}/posts${Math.random() < 0.5 ? '?sort=top' : ''}`,
+        token: user().token,
+      }),
     },
     {
       name: 'notifications list',
