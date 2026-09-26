@@ -53,7 +53,7 @@ export function BusinessInsights({ businessId }: { businessId: string }) {
               <Stat label="Booking requests" value={bookings} delta={bookings ? `${confirmed} confirmed` : undefined} />
               <Stat label="Upcoming bookings" value={data.upcomingBookings} />
               <Stat label="Rating" value={data.reviews.average ?? '–'} delta={`${data.reviews.count} review${data.reviews.count === 1 ? '' : 's'}`} />
-              {data.ads.impressions ? <Stat label="Ad views (all your campaigns)" value={data.ads.impressions} delta={`${data.ads.clicks} clicks`} /> : null}
+              {data.ads.impressions ? <Stat label="Ad views" value={data.ads.impressions} delta={`${data.ads.clicks} clicks`} /> : null}
             </div>
             {data.views.length ? (
               <div className="usage" aria-label="Visitors per day">

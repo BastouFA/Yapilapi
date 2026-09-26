@@ -1,6 +1,10 @@
 # MediaMTX: RTMP ingest from streaming software, HLS/WebRTC playback.
 # Every publish/read is authorized by the YAPILAPI API (live module).
 logLevel: info
+# Control API: the YAPILAPI API uses it to disconnect an encoder when a host ends a live.
+# Access goes through the auth hook below (action "api"); the port is published on localhost only.
+api: yes
+apiAddress: :9997
 rtmp: yes
 rtmpAddress: :1935
 hls: yes

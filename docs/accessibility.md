@@ -84,7 +84,7 @@ The "before" run used the development server; the "after" run a production build
 
 - **Not audited automatically:** admin, developers, real/together, memories, onboarding, OAuth consent, password reset and business pages; the incoming-call and Mini App overlays (they need a second live session or a registered app); media uploads and the media viewer (the seed has no media). They use the same components, but have not been run through axe.
 - **Color contrast** is checked by axe on rendered text only. Text over images and gradients (moment rings, media) is reported as "needs review" by axe, not as pass or fail, and has not been checked by hand.
-- **Screen readers:** no manual pass with VoiceOver, TalkBack or NVDA yet. Live regions exist for toasts and the AI panel; new chat messages are not announced while the conversation is open.
+- **Screen readers:** no manual pass with VoiceOver, TalkBack or NVDA yet. Live regions exist for toasts and the AI panel; the conversation is a `role="log"` that announces new messages as they arrive (not yet confirmed with each screen reader).
 - **Reduced motion:** transitions respect `prefers-reduced-motion` in the design system, but the Real capture countdown and live video are not covered.
 - **Mobile tab order:** on phones the bottom navigation comes before the page content in tab order (it is first in the DOM); the skip link jumps over it.
 - **Localisation:** axe runs in English only. Right-to-left layout is checked for overflow automatically and was reviewed by eye on home, discover and settings at phone and desktop widths; a native Arabic or Hebrew reader hasn't reviewed it.

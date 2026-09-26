@@ -253,3 +253,22 @@ describe('ad budget refunds', () => {
     expect((await as(t.app, shop).get('/v1/me/moderation')).body.items.some((x: any) => x.id === mc.id)).toBe(false);
   });
 });
+
+describe('campaigns for a business', () => {
+  it('only links campaigns to your own business, and insights count that business only', async () => {
+    const owner = await signUp(t.app, { birthDate: ADULT });
+    const other = await signUp(t.app, { birthDate: ADULT });
+    const mine = (await as(t.app, owner).post('/v1/businesses', { name: 'Mine', slug: `mine-${tag()}` })).body.business;
+    const theirs = (await as(t.app, other).post('/v1/businesses', { name: 'Theirs', slug: `theirs-${tag()}` })).body.business;
+    const post = (await as(t.app, owner).post('/v1/posts', { body: 'Fresh bread daily' })).body.post;
+    expect((await as(t.app, owner).post('/v1/ads/campaigns', { postId: post.id, name: 'X', businessId: theirs.id })).status).toBe(403);
+    const camp = await as(t.app, owner).post('/v1/ads/campaigns', { postId: post.id, name: 'Bread', businessId: mine.id });
+    expect(camp.body.campaign.businessId).toBe(mine.id);
+    await t.ctx.db.query(`UPDATE ad_campaigns SET impressions = 7, clicks = 2 WHERE id = $1`, [camp.body.campaign.id]);
+    // A personal campaign by the same owner isn't counted for the business.
+    const personal = await as(t.app, owner).post('/v1/ads/campaigns', { postId: post.id, name: 'Me' });
+    await t.ctx.db.query(`UPDATE ad_campaigns SET impressions = 100 WHERE id = $1`, [personal.body.campaign.id]);
+    expect((await as(t.app, owner).get(`/v1/businesses/${mine.id}/analytics`)).body.ads).toMatchObject({ impressions: 7, clicks: 2 });
+    expect((await as(t.app, owner).get('/v1/me/businesses')).body.items.map((b: any) => b.id)).toEqual([mine.id]);
+  });
+});

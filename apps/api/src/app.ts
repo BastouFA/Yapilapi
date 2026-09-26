@@ -18,7 +18,7 @@ import { AiGateway } from './lib/ai/gateway.ts';
 import { anthropicProvider, devProvider } from './lib/ai/providers.ts';
 import { logEmailSender } from './lib/email.ts';
 import { localDiskStorage, s3Storage } from './lib/storage.ts';
-import { devPaymentProvider } from './lib/payments.ts';
+import { devPaymentProvider, stripePaymentProvider } from './lib/payments.ts';
 import { transcriberFromConfig } from './lib/transcription.ts';
 import { registerAuth } from './plugins/auth.ts';
 import { MAX_UPLOAD_BYTES } from './modules/media.ts';
@@ -133,7 +133,14 @@ export async function buildApp(
     ai: new AiGateway(db, provider),
     email: logEmailSender(app.log),
     storage,
-    payments: devPaymentProvider(config.PAYMENTS_WEBHOOK_SECRET),
+    payments:
+      config.PAYMENTS_PROVIDER === 'stripe'
+        ? stripePaymentProvider({
+            secretKey: config.STRIPE_SECRET_KEY,
+            webhookSecret: config.STRIPE_WEBHOOK_SECRET,
+            publishableKey: config.STRIPE_PUBLISHABLE_KEY,
+          })
+        : devPaymentProvider(config.PAYMENTS_WEBHOOK_SECRET),
     transcription: transcriberFromConfig(config),
   };
 

@@ -44,6 +44,7 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
     ctr: r.impressions ? Number(((r.clicks / r.impressions) * 100).toFixed(2)) : 0,
     startsAt: r.starts_at,
     endsAt: r.ends_at,
+    businessId: r.business_id ?? null,
     submittedAt: r.submitted_at,
     approvedAt: r.approved_at,
     reviewNote: r.review_note,
@@ -66,6 +67,8 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
     currency: z.string().length(3).toUpperCase().default('USD'),
     startsAt: z.coerce.date().optional(),
     endsAt: z.coerce.date().optional(),
+    /** Run the campaign for one of your businesses; its insights then show these ads. */
+    businessId: z.string().uuid().optional(),
   });
 
   app.post('/v1/ads/campaigns', { preHandler: requireAuth, config: { rateLimit: { max: 20, timeWindow: '1 hour' } } }, async (req, reply) => {
@@ -78,10 +81,25 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
     if (post.author_id !== u.id) throw forbidden('You can only promote your own posts.');
     if (post.visibility !== 'public') throw badRequest('Only public posts can be promoted.');
     if (post.moderation_status !== 'normal') throw new AppError(422, 'content_blocked', "This post can't be promoted.");
+    if (input.businessId) {
+      const own = await db.query(`SELECT 1 FROM businesses WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL`, [input.businessId, u.id]);
+      if (!own.rowCount) throw forbidden('You can only run ads for your own business.');
+    }
     const { rows } = await db.query(
-      `INSERT INTO ad_campaigns (advertiser_id, post_id, name, topics, locales, cpm_cents, currency, starts_at, ends_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [u.id, input.postId, input.name, input.topics, input.locales, input.cpmCents, input.currency, input.startsAt ?? null, input.endsAt ?? null],
+      `INSERT INTO ad_campaigns (advertiser_id, post_id, name, topics, locales, cpm_cents, currency, starts_at, ends_at, business_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      [
+        u.id,
+        input.postId,
+        input.name,
+        input.topics,
+        input.locales,
+        input.cpmCents,
+        input.currency,
+        input.startsAt ?? null,
+        input.endsAt ?? null,
+        input.businessId ?? null,
+      ],
     );
     await audit(db, { actorId: u.id, action: 'ads.campaign.create', entityType: 'ad_campaign', entityId: rows[0].id });
     reply.code(201);

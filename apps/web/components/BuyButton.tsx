@@ -4,14 +4,16 @@ import { useState } from 'react';
 import { Button } from '@yapilapi/design-system';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
+import { formatMoney } from '@yapilapi/shared';
+import { useCheckout } from './Checkout';
 
 /**
- * Starts an order. The idempotency key is created once per click so a retry
- * never charges twice. Payment is completed on the provider's hosted page;
- * in development the dev provider leaves the order pending until its webhook fires.
+ * Starts an order and opens checkout for it. The idempotency key is created
+ * once per click so a retry never charges twice.
  */
-export function BuyButton({ productId }: { productId: string }) {
+export function BuyButton({ productId, onPaid }: { productId: string; onPaid?: () => void }) {
   const { toast, flags } = useSession();
+  const checkout = useCheckout();
   const [busy, setBusy] = useState(false);
   if (flags.COMMERCE === false) return null;
   return (
@@ -22,7 +24,14 @@ export function BuyButton({ productId }: { productId: string }) {
         setBusy(true);
         try {
           const r = await api.orders.create([{ productId, quantity: 1 }], crypto.randomUUID());
-          toast(r.order.status === 'paid' ? 'Order confirmed' : 'Order created. Complete payment to confirm it.');
+          if (r.order.status === 'paid' || !r.payment) toast('Order confirmed');
+          else
+            checkout({
+              orderId: r.order.id,
+              clientSecret: r.payment.clientSecret,
+              label: `${(r.order.items as { title: string }[] | null)?.[0]?.title ?? 'Your order'}, ${formatMoney(r.order.totalCents, r.order.currency)}`,
+              onPaid,
+            });
         } catch (e) {
           toast(errorMessage(e));
         } finally {

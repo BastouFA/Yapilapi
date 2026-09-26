@@ -188,7 +188,7 @@ export default function ChatPage() {
       {messages === null ? (
         <Skeleton height={300} />
       ) : (
-        <div className="yp-chat" aria-live="polite">
+        <div className="yp-chat" role="log" aria-live="polite" aria-relevant="additions" aria-label="Messages">
           {cursor ? (
             <Button
               size="sm"

@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { NavBar, Skeleton, type NavEntry } from '@yapilapi/design-system';
 import { NextLink } from '@/lib/link';
 import { CallsProvider } from '@/components/Calls';
+import { CheckoutProvider } from '@/components/Checkout';
 import { Sidebar } from '@/components/Sidebar';
 import { UsageHeartbeat } from '@/components/UsageHeartbeat';
 import { useSession } from '../providers';
@@ -53,14 +54,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <CallsProvider>
-      <div className="yp-shell">
-        <NavBar items={items} current={currentTab(path, me.username)} linkAs={NextLink} locale={locale} logoSrc="/mark.svg" />
-        <main className="yp-shell__main" id="main">
-          {children}
-        </main>
-        <Sidebar />
-        <UsageHeartbeat />
-      </div>
+      <CheckoutProvider>
+        <div className="yp-shell">
+          <NavBar items={items} current={currentTab(path, me.username)} linkAs={NextLink} locale={locale} logoSrc="/mark.svg" />
+          <main className="yp-shell__main" id="main">
+            {children}
+          </main>
+          <Sidebar />
+          <UsageHeartbeat />
+        </div>
+      </CheckoutProvider>
     </CallsProvider>
   );
 }

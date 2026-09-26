@@ -9,6 +9,7 @@ import { useRealtime, useSession } from '../../../providers';
 import { HlsVideo } from '@/components/HlsVideo';
 import { TipSheet } from '@/components/SupportCreator';
 import { LiveShop } from '@/components/LiveShop';
+import { useCheckout } from '@/components/Checkout';
 import { LiveClips } from '@/components/LiveClips';
 import { formatMoney } from '@yapilapi/shared';
 
@@ -17,6 +18,7 @@ export default function LivePage() {
   const { me, toast, locale, flags } = useSession();
   const [live, setLive] = useState<LiveSummary | null>(null);
   const [waitingForTicket, setWaitingForTicket] = useState(false);
+  const checkout = useCheckout();
   // After buying a ticket, check until the payment is confirmed, then join and start playback.
   useEffect(() => {
     if (!waitingForTicket) return;
@@ -135,7 +137,12 @@ export default function LivePage() {
             onClick={async () => {
               try {
                 const r = await api.orders.create([{ productId: live.ticket!.productId, quantity: 1 }], crypto.randomUUID(), live.id);
-                if (r.order.status !== 'paid') toast('Complete payment to get your ticket.');
+                if (r.order.status !== 'paid' && r.payment)
+                  checkout({
+                    orderId: r.order.id,
+                    clientSecret: r.payment.clientSecret,
+                    label: `${live.ticket!.title}, ${formatMoney(live.ticket!.priceCents, live.ticket!.currency, locale)}`,
+                  });
                 setWaitingForTicket(true);
               } catch (e) {
                 toast(errorMessage(e));

@@ -20,7 +20,11 @@ const schema = z.object({
   AI_PROVIDER: z.enum(['dev', 'anthropic']).default('dev'),
   AI_MODEL: z.string().default('claude-opus-5'),
   ANTHROPIC_API_KEY: z.string().optional().default(''),
-  PAYMENTS_PROVIDER: z.enum(['dev']).default('dev'),
+  PAYMENTS_PROVIDER: z.enum(['dev', 'stripe']).default('dev'),
+  /** Stripe (PAYMENTS_PROVIDER=stripe): secret key, webhook signing secret, and the publishable key the browser uses. */
+  STRIPE_SECRET_KEY: z.string().default(''),
+  STRIPE_WEBHOOK_SECRET: z.string().default(''),
+  STRIPE_PUBLISHABLE_KEY: z.string().default(''),
   PAYMENTS_WEBHOOK_SECRET: z.string().default('dev-webhook-secret-change-me'),
   // 32 bytes, base64. Encrypts TOTP secrets at rest. Development falls back to a fixed dev key.
   MFA_ENCRYPTION_KEY: z.string().optional().default(''),
@@ -35,6 +39,8 @@ const schema = z.object({
   LIVE_HLS_BASE: z.string().default('http://localhost:8888'),
   LIVE_RTMP_URL: z.string().default('rtmp://localhost:1935'),
   LIVE_HOOK_SECRET: z.string().default('dev-live-hook-secret'),
+  /** MediaMTX control API (e.g. http://localhost:9997). When set, ending a live disconnects the encoder. */
+  LIVE_CONTROL_URL: z.string().default(''),
   /** Header a trusted CDN sets with the visitor's country (e.g. cf-ipcountry). Unset: only the country people choose is used. */
   TRUSTED_COUNTRY_HEADER: z.string().optional(),
   /** Folder MediaMTX records lives into (see infrastructure/media/mediamtx.yml). Unset: no recordings or auto-clips. */
@@ -71,8 +77,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     throw new Error(`Invalid configuration:\n${msg}`);
   }
   const cfg = parsed.data;
+  if (cfg.PAYMENTS_PROVIDER === 'stripe' && (!cfg.STRIPE_SECRET_KEY || !cfg.STRIPE_WEBHOOK_SECRET || !cfg.STRIPE_PUBLISHABLE_KEY))
+    throw new Error('PAYMENTS_PROVIDER=stripe needs STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and STRIPE_PUBLISHABLE_KEY.');
   if (cfg.APP_ENV === 'production') {
-    if (cfg.PAYMENTS_WEBHOOK_SECRET.startsWith('dev-')) throw new Error('Set PAYMENTS_WEBHOOK_SECRET for production.');
+    if (cfg.PAYMENTS_PROVIDER === 'dev') throw new Error('The development payment provider moves no money. Set PAYMENTS_PROVIDER for production.');
     if (Buffer.from(cfg.MFA_ENCRYPTION_KEY, 'base64').length !== 32) throw new Error('Set MFA_ENCRYPTION_KEY (32 bytes, base64) for production.');
     if (!cfg.COOKIE_SECURE) throw new Error('COOKIE_SECURE must be true in production.');
   }

@@ -5,6 +5,7 @@ import { BottomSheet, Button, Card, Select, TextField } from '@yapilapi/design-s
 import { formatMoney } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
+import { useCheckout } from './Checkout';
 
 /**
  * Subscribe to or tip a creator. Payment is completed with the payment provider;
@@ -12,6 +13,7 @@ import { useSession } from '@/app/providers';
  */
 export function SupportCreator({ userId, name, isCreator }: { userId: string; name: string; isCreator: boolean }) {
   const { toast, locale, flags } = useSession();
+  const checkout = useCheckout();
   const [data, setData] = useState<Awaited<ReturnType<typeof api.economy.plans>> | null>(null);
   const [tipping, setTipping] = useState(false);
 
@@ -39,8 +41,13 @@ export function SupportCreator({ userId, name, isCreator }: { userId: string; na
                 disabled={!!sub}
                 onClick={async () => {
                   try {
-                    await api.economy.subscribe(p.id, crypto.randomUUID());
-                    toast('Complete payment to start your subscription.');
+                    const r = await api.economy.subscribe(p.id, crypto.randomUUID());
+                    checkout({
+                      orderId: r.payment.orderId,
+                      clientSecret: r.payment.clientSecret,
+                      label: `${p.name} for ${name}, ${formatMoney(p.priceCents, p.currency, locale)} a month`,
+                      onPaid: async () => setData(await api.economy.plans(userId)),
+                    });
                     setData(await api.economy.plans(userId));
                   } catch (e) {
                     toast(errorMessage(e));
@@ -64,6 +71,7 @@ export function SupportCreator({ userId, name, isCreator }: { userId: string; na
 /** Send a tip. With a liveId it's a gift: once paid, it appears in that live's chat for everyone watching. */
 export function TipSheet({ open, onClose, userId, name, liveId }: { open: boolean; onClose: () => void; userId: string; name: string; liveId?: string }) {
   const { toast, locale } = useSession();
+  const checkout = useCheckout();
   const [amount, setAmount] = useState('300');
   const [currency, setCurrency] = useState('USD');
   const [message, setMessage] = useState('');
@@ -74,10 +82,21 @@ export function TipSheet({ open, onClose, userId, name, liveId }: { open: boolea
         onSubmit={async (e) => {
           e.preventDefault();
           try {
-            await api.economy.tip(userId, { amountCents: Math.round(Number(amount)), currency, message, liveId, idempotencyKey: crypto.randomUUID() });
-            toast(liveId ? 'Complete payment and your gift appears in the chat.' : 'Complete payment to send your tip.');
+            const r = await api.economy.tip(userId, {
+              amountCents: Math.round(Number(amount)),
+              currency,
+              message,
+              liveId,
+              idempotencyKey: crypto.randomUUID(),
+            });
             setMessage('');
             onClose();
+            checkout({
+              orderId: r.payment.orderId,
+              clientSecret: r.payment.clientSecret,
+              label: `${liveId ? 'Gift' : 'Tip'} for ${name}, ${formatMoney(Math.round(Number(amount)), currency, locale)}`,
+              onPaid: () => toast(liveId ? 'Your gift is in the chat.' : 'Tip sent. Thank you.'),
+            });
           } catch (err) {
             toast(errorMessage(err));
           }

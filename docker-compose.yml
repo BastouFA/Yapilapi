@@ -34,7 +34,7 @@ services:
   live:
     image: bluenviron/mediamtx:latest
     volumes: ['./infrastructure/media/mediamtx.yml:/mediamtx.yml:ro', './infrastructure/media/recordings:/recordings']
-    ports: ['1935:1935', '8888:8888', '8889:8889']
+    ports: ['1935:1935', '8888:8888', '8889:8889', '127.0.0.1:9997:9997']
     extra_hosts: ['host.docker.internal:host-gateway']
 
   # TURN relay for calls on networks that block peer-to-peer traffic.

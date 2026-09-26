@@ -6,6 +6,7 @@ import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } fro
 import type { AppContext } from '../lib/context.ts';
 import { audit, isEnabled, notify, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
+import { signDevWebhook } from '../lib/payments.ts';
 import { businessOverview } from '../lib/ai/agents.ts';
 import { refundUnspentBudget } from '../lib/ad-refunds.ts';
 import { publicUserFrom } from '../lib/users.ts';
@@ -66,6 +67,11 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     await db.query(`UPDATE profiles SET mode = 'business' WHERE user_id = $1 AND mode = 'personal'`, [u.id]);
     reply.code(201);
     return { business: rows[0] };
+  });
+
+  app.get('/v1/me/businesses', { preHandler: requireAuth }, async (req) => {
+    const { rows } = await db.query(`SELECT id, slug, name FROM businesses WHERE owner_id = $1 AND deleted_at IS NULL ORDER BY created_at`, [me(req).id]);
+    return { items: rows };
   });
 
   app.get('/v1/businesses/:slug', async (req) => {
@@ -225,8 +231,8 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       ),
       db.query(
         `SELECT coalesce(sum(impressions), 0)::int AS impressions, coalesce(sum(clicks), 0)::int AS clicks, coalesce(sum(spent_millicents) / 1000, 0)::int AS spent_cents
-         FROM ad_campaigns WHERE advertiser_id = $1`,
-        [u.id],
+         FROM ad_campaigns WHERE business_id = $1`,
+        [id],
       ),
       db.query(`SELECT count(DISTINCT viewer_id)::int AS n FROM business_views WHERE business_id = $1 AND day > current_date - $2::int`, [id, days]),
     ]);
@@ -378,17 +384,49 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
    * Provider webhook. Signature is verified before anything is read; each
    * provider event id is processed once (replays are acknowledged and ignored).
    */
+  /** What the browser needs to collect payment (the provider's public key, never a secret). */
+  app.get('/v1/payments/config', async () => ctx.payments.publicConfig());
+
+  /**
+   * Development only: complete a payment with the test provider, so purchases
+   * can be finished locally. It goes through the same signed webhook as a real
+   * provider. Not available with a real provider or in production.
+   */
+  app.post('/v1/payments/dev/complete', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {
+    if (ctx.payments.name !== 'dev' || ctx.config.APP_ENV === 'production') throw notFound('Route');
+    const { orderId } = parse(z.object({ orderId: z.string().uuid() }), req.body);
+    const pay = (
+      await db.query(`SELECT p.provider_ref, p.amount_cents, p.status FROM payments p JOIN orders o ON o.id = p.order_id WHERE o.id = $1 AND o.buyer_id = $2`, [
+        orderId,
+        me(req).id,
+      ])
+    ).rows[0];
+    if (!pay) throw notFound('Order');
+    if (pay.status === 'succeeded') return { status: 'paid' };
+    const payload = JSON.stringify({ id: `evt_dev_${orderId}`, type: 'payment.succeeded', providerRef: pay.provider_ref, amountCents: pay.amount_cents });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/payments/webhook/dev',
+      payload,
+      headers: { 'content-type': 'application/json', 'x-signature': signDevWebhook(ctx.config.PAYMENTS_WEBHOOK_SECRET, payload) },
+    });
+    if (res.statusCode !== 200) throw new AppError(502, 'payment_failed', "The test payment didn't go through.");
+    const o = (await db.query(`SELECT status FROM orders WHERE id = $1`, [orderId])).rows[0];
+    return { status: o.status };
+  });
+
   app.post('/v1/payments/webhook/:provider', { config: { rateLimit: false, rawBody: true } }, async (req, reply) => {
     const { provider } = parse(z.object({ provider: z.string() }), req.params);
     if (provider !== ctx.payments.name) throw notFound('Payment provider');
     const raw = (req as unknown as { rawBody?: string }).rawBody ?? JSON.stringify(req.body);
     let event;
     try {
-      event = ctx.payments.verifyWebhook(raw, req.headers['x-signature'] as string | undefined);
+      event = ctx.payments.verifyWebhook(raw, req.headers);
     } catch {
       reply.code(400);
       return { error: { code: 'bad_signature', message: 'Webhook signature is invalid.' } };
     }
+    if (!event) return { ok: true, ignored: true };
     const fresh = await db.query(`INSERT INTO payment_webhook_events (id, provider, type, payload) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`, [
       event.id,
       provider,

@@ -206,13 +206,20 @@ export function createClient(opts: ClientOptions) {
       get: (id: string) => get<{ place: Record<string, any>; events: EventItem[]; products: Record<string, any>[] }>(`/v1/places/${id}`),
     },
     businesses: {
+      mine: () => get<{ items: { id: string; slug: string; name: string }[] }>('/v1/me/businesses'),
       analytics: (id: string, days = 30) => get<BusinessAnalytics>(`/v1/businesses/${id}/analytics${qs({ days })}`),
       get: (slug: string) => get<{ business: Record<string, any>; places: Record<string, any>[]; products: Record<string, any>[] }>(`/v1/businesses/${slug}`),
+    },
+    payments: {
+      config: () => get<{ provider: string; publishableKey?: string }>('/v1/payments/config'),
+      /** Development provider only: finish a test payment. */
+      devComplete: (orderId: string) => post<{ status: string }>('/v1/payments/dev/complete', { orderId }),
     },
     orders: {
       create: (items: { productId: string; quantity: number }[], idempotencyKey: string, liveSessionId?: string) =>
         post<{ order: Record<string, any>; payment?: { provider: string; clientSecret: string } }>('/v1/orders', { items, idempotencyKey, liveSessionId }),
       list: () => get<{ items: Record<string, any>[] }>('/v1/orders'),
+      get: (id: string) => get<{ order: Record<string, any> }>(`/v1/orders/${id}`),
     },
     search: (q: string, type = 'all') => get<{ query: string; intent: Record<string, any>; results: Record<string, any> }>(`/v1/search${qs({ q, type })}`),
     now: () =>
@@ -275,7 +282,7 @@ export function createClient(opts: ClientOptions) {
           idempotencyKey,
         }),
       tip: (userId: string, b: { amountCents: number; currency: string; message?: string; postId?: string; liveId?: string; idempotencyKey: string }) =>
-        post<{ payment: { orderId: string } }>(`/v1/users/${userId}/tips`, b),
+        post<{ payment: { orderId: string; clientSecret: string; provider: string } }>(`/v1/users/${userId}/tips`, b),
       subscribers: () => get<{ active: number; cancelled: number }>('/v1/creator/subscribers'),
       mySubscriptions: () =>
         get<{ items: { id: string; status: string; plan: string; priceCents: number; currency: string; creator: PublicUser }[] }>('/v1/me/subscriptions'),
@@ -455,8 +462,16 @@ export function createClient(opts: ClientOptions) {
       click: (campaignId: string) => post(`/v1/ads/${campaignId}/click`),
       hide: (campaignId: string) => post(`/v1/ads/${campaignId}/hide`),
       campaigns: () => get<{ items: AdCampaign[] }>('/v1/ads/campaigns'),
-      create: (b: { postId: string; name: string; topics?: string[]; locales?: string[]; cpmCents?: number; startsAt?: string; endsAt?: string }) =>
-        post<{ campaign: AdCampaign }>('/v1/ads/campaigns', b),
+      create: (b: {
+        postId: string;
+        name: string;
+        topics?: string[];
+        locales?: string[];
+        cpmCents?: number;
+        startsAt?: string;
+        endsAt?: string;
+        businessId?: string;
+      }) => post<{ campaign: AdCampaign }>('/v1/ads/campaigns', b),
       setStatus: (id: string, status: 'active' | 'paused' | 'ended') => patch<{ campaign: AdCampaign }>(`/v1/ads/campaigns/${id}`, { status }),
       fund: (id: string, amountCents: number, idempotencyKey: string) =>
         post<{ payment: { provider: string; clientSecret: string; orderId: string } }>(`/v1/ads/campaigns/${id}/fund`, { amountCents, idempotencyKey }),
@@ -592,6 +607,7 @@ export interface AdCampaign {
   currency: string;
   budgetCents: number;
   spentCents: number;
+  businessId: string | null;
   /** Unspent budget given back after the campaign was rejected or ended. */
   refundedCents: number;
   impressions: number;

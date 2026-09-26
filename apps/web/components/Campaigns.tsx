@@ -6,6 +6,7 @@ import type { AdCampaign } from '@yapilapi/api-client';
 import { formatMoney, type Post } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
+import { useCheckout } from './Checkout';
 
 const STATUS_LABEL: Record<AdCampaign['status'], string> = {
   active: 'Running',
@@ -31,12 +32,15 @@ const STATUS_TONE: Record<AdCampaign['status'], 'success' | 'neutral' | 'warning
  */
 export function Campaigns() {
   const { me, toast, locale, flags } = useSession();
+  const checkout = useCheckout();
   const [items, setItems] = useState<AdCampaign[] | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [postId, setPostId] = useState('');
   const [name, setName] = useState('');
   const [topics, setTopics] = useState('');
   const [cpm, setCpm] = useState('500');
+  const [businesses, setBusinesses] = useState<{ id: string; name: string }[]>([]);
+  const [businessId, setBusinessId] = useState('');
   const [open, setOpen] = useState<string | null>(null);
   const [stats, setStats] = useState<Awaited<ReturnType<typeof api.ads.stats>> | null>(null);
 
@@ -48,6 +52,10 @@ export function Campaigns() {
   useEffect(() => {
     if (!flags.ADS || !me) return;
     void load();
+    api.businesses.mine().then(
+      (r) => setBusinesses(r.items),
+      () => {},
+    );
     api.users.posts(me.username).then(
       (r) => setPosts(r.items.filter((p) => p.visibility === 'public')),
       () => {},
@@ -124,7 +132,24 @@ export function Campaigns() {
               </p>
             )}
             <div className="row">
-              <Button size="sm" variant="secondary" onClick={() => act(() => api.ads.fund(open, 2000, crypto.randomUUID()), 'Complete payment to add budget.')}>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() =>
+                  act(async () => {
+                    const r = await api.ads.fund(open, 2000, crypto.randomUUID());
+                    checkout({
+                      orderId: r.payment.orderId,
+                      clientSecret: r.payment.clientSecret,
+                      label: `Ad budget for ${stats.campaign.name}, ${formatMoney(2000, stats.campaign.currency, locale)}`,
+                      onPaid: async () => {
+                        await load();
+                        setStats(await api.ads.stats(open));
+                      },
+                    });
+                  })
+                }
+              >
                 Add {formatMoney(2000, stats.campaign.currency, locale)}
               </Button>
               {stats.campaign.status === 'active' ? (
@@ -166,6 +191,7 @@ export function Campaigns() {
                   postId,
                   name,
                   cpmCents: Number(cpm),
+                  businessId: businessId || undefined,
                   topics: topics
                     .split(',')
                     .map((t) => t.trim().replace(/^#/, ''))
@@ -183,6 +209,16 @@ export function Campaigns() {
               </option>
             ))}
           </Select>
+          {businesses.length ? (
+            <Select label="For" value={businessId} onChange={(e) => setBusinessId(e.currentTarget.value)} hint="A business's insights show the ads run for it.">
+              <option value="">Just me</option>
+              {businesses.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </Select>
+          ) : null}
           <TextField label="Campaign name" value={name} onChange={(e) => setName(e.currentTarget.value)} maxLength={80} required />
           <TextField
             label="Topics (optional)"

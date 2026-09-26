@@ -130,3 +130,12 @@ describe('live recording and auto-clips', () => {
     expect((await as(t.app, fan).get(`/v1/live/${live.id}/clips`)).status).toBe(403);
   }, 120_000);
 });
+
+describe('video server control API access', () => {
+  it('lets only the API itself use the control API', async () => {
+    const hook = (body: object) => t.app.inject({ method: 'POST', url: `/v1/live/hooks/auth?secret=${t.ctx.config.LIVE_HOOK_SECRET}`, payload: body });
+    expect((await hook({ action: 'api', user: 'yapilapi', password: t.ctx.config.LIVE_HOOK_SECRET })).statusCode).toBe(200);
+    expect((await hook({ action: 'api', user: 'yapilapi', password: 'wrong' })).statusCode).toBe(401);
+    expect((await hook({ action: 'api', user: 'someone', password: t.ctx.config.LIVE_HOOK_SECRET })).statusCode).toBe(401);
+  });
+});

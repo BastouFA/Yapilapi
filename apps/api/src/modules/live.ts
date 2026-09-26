@@ -22,6 +22,8 @@ const idParam = z.object({ id: z.string().uuid() });
 export interface LiveVideoProvider {
   ingest(sessionId: string, streamKey: string): { url: string; streamKey: string };
   playback(sessionId: string, token: string): string;
+  /** Disconnect whoever is publishing (the host pressed End but the encoder is still sending). */
+  stop?(sessionId: string): Promise<void>;
 }
 
 /**
@@ -29,17 +31,36 @@ export interface LiveVideoProvider {
  * "<sessionId>?key=<secret>"; viewers get HLS at /live/<sessionId>/index.m3u8
  * with a short-lived signed token. MediaMTX asks /v1/live/hooks/auth for both.
  */
-export function mediamtxVideo(rtmpBase: string, hlsBase: string): LiveVideoProvider {
+export function mediamtxVideo(rtmpBase: string, hlsBase: string, control?: { url: string; secret: string }): LiveVideoProvider {
+  const KICK: Record<string, string> = { rtmpConn: 'rtmpconns', rtspSession: 'rtspsessions', srtConn: 'srtconns', webRTCSession: 'webrtcsessions' };
   return {
     ingest: (id, streamKey) => ({ url: `${rtmpBase}/live`, streamKey: `${id}?key=${streamKey}` }),
     playback: (id, token) => `${hlsBase}/live/${id}/index.m3u8?token=${encodeURIComponent(token)}`,
+    // MediaMTX's control API; it asks our auth hook, which accepts the shared secret for action "api".
+    stop: control?.url
+      ? async (id) => {
+          const auth = { authorization: `Basic ${Buffer.from(`yapilapi:${control.secret}`).toString('base64')}` };
+          const path = await fetch(`${control.url}/v3/paths/get/live/${id}`, { headers: auth, signal: AbortSignal.timeout(5000) });
+          if (!path.ok) return;
+          const source = ((await path.json()) as { source?: { type?: string; id?: string } | null }).source;
+          const kind = source?.type ? KICK[source.type] : undefined;
+          if (!kind || !source?.id) return;
+          await fetch(`${control.url}/v3/${kind}/kick/${source.id}`, { method: 'POST', headers: auth, signal: AbortSignal.timeout(5000) });
+        }
+      : undefined,
   };
 }
 
 /** Live sessions: host, co-hosts, audience, chat, Q&A, moderation. Behind the LIVE flag. */
 export default async function liveModule(app: FastifyInstance, ctx: AppContext, videoOverride?: LiveVideoProvider) {
   const db = ctx.db;
-  const video = videoOverride ?? mediamtxVideo(ctx.config.LIVE_RTMP_URL, ctx.config.LIVE_HLS_BASE);
+  const video =
+    videoOverride ??
+    mediamtxVideo(
+      ctx.config.LIVE_RTMP_URL,
+      ctx.config.LIVE_HLS_BASE,
+      ctx.config.LIVE_CONTROL_URL ? { url: ctx.config.LIVE_CONTROL_URL, secret: ctx.config.LIVE_HOOK_SECRET } : undefined,
+    );
   // Viewer tokens: HMAC(sessionId.userId.expiry), valid for 6 hours.
   const signView = (sessionId: string, userId: string) => {
     const exp = Math.floor(Date.now() / 1000) + 6 * 3600;
@@ -263,6 +284,8 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
     ]);
     if (!r.rowCount) throw badRequest('Only the host can end this live.');
     await ctx.realtime.publish(await audience(id), { type: 'live.status', data: { id, status: 'ended' } });
+    // New publishing is already refused once the live has ended; this also drops an encoder that is still connected.
+    await video.stop?.(id).catch((e) => req.log.warn({ err: (e as Error).message }, 'could not disconnect the encoder'));
     // Give the video server a moment to close the last recording segment, then make the recording and highlight clips.
     if (ctx.config.LIVE_RECORDINGS_DIR) {
       await db.query(`UPDATE live_sessions SET recording_status = 'pending' WHERE id = $1`, [id]);
@@ -399,7 +422,12 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
     const secret = (req.query as { secret?: string }).secret ?? '';
     const want = Buffer.from(ctx.config.LIVE_HOOK_SECRET);
     if (secret.length !== want.length || !timingSafeEqual(Buffer.from(secret), want)) return reply.code(401).send();
-    const b = (req.body ?? {}) as { action?: string; path?: string; query?: string };
+    const b = (req.body ?? {}) as { action?: string; path?: string; query?: string; user?: string; password?: string };
+    // The API itself, calling MediaMTX's control API (to disconnect an encoder after End).
+    if (b.action === 'api') {
+      const pw = Buffer.from(b.password ?? '');
+      return b.user === 'yapilapi' && pw.length === want.length && timingSafeEqual(pw, want) ? reply.code(200).send() : reply.code(401).send();
+    }
     const m = /^live\/([0-9a-f-]{36})$/.exec(b.path ?? '');
     if (!m) return reply.code(401).send();
     const sessionId = m[1]!;
