@@ -58,6 +58,10 @@ export default function Discover() {
         </View>
         <Button label={busy ? 'Searching…' : 'Search'} onPress={search} disabled={!q.trim() || busy} />
       </View>
+      <View style={{ flexDirection: 'row', gap: space[2] }}>
+        <Button label="Assistant" variant="secondary" size="sm" onPress={() => router.push('/assistant')} />
+        <Button label="Events" variant="secondary" size="sm" onPress={() => router.push('/events')} />
+      </View>
       {error ? <Notice tone="danger">{error}</Notice> : null}
       <FlatList
         data={results ?? []}

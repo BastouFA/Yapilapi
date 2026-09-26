@@ -35,6 +35,8 @@ export default function Root() {
           <Stack.Screen name="c/[slug]" options={{ title: 'Community' }} />
           <Stack.Screen name="settings" options={{ title: 'Settings' }} />
           <Stack.Screen name="real" options={{ title: 'Real' }} />
+          <Stack.Screen name="assistant" options={{ title: 'Assistant' }} />
+          <Stack.Screen name="events" options={{ title: 'Events' }} />
         </Stack>
       </CallsProvider>
     </SessionProvider>
