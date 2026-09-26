@@ -1564,3 +1564,10 @@ h3 {
 .follow-list__name:hover {
   text-decoration: underline;
 }
+
+/* Two cards side by side on wide screens, stacked on phones. */
+.settings-duo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  gap: var(--space-3);
+}

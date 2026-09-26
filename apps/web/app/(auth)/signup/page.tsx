@@ -1,15 +1,25 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
 import { Alert, Button, TextField } from '@yapilapi/design-system';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { useSession } from '../../providers';
 
-export default function SignupPage() {
+function SignupForm() {
   const { setMe, t } = useSession();
   const router = useRouter();
+  // From an invite link (/join/<code>): the code comes along, and we show who invited you.
+  const invite = useSearchParams().get('invite') ?? '';
+  const [invitedBy, setInvitedBy] = useState<string | null>(null);
+  useEffect(() => {
+    if (invite)
+      api.invites.preview(invite).then(
+        (r) => setInvitedBy(r.inviter.displayName),
+        () => setInvitedBy(null),
+      );
+  }, [invite]);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -38,6 +48,7 @@ export default function SignupPage() {
         displayName: String(f.get('displayName')),
         birthDate: String(f.get('birthDate') || '') || undefined,
         locale: navigator.language,
+        inviteCode: String(f.get('inviteCode') ?? '').trim() || undefined,
       });
       setMe(user);
       router.replace('/onboarding');
@@ -52,6 +63,7 @@ export default function SignupPage() {
   return (
     <form className="stack" onSubmit={submit} noValidate>
       <h1>{t('auth.signup.title')}</h1>
+      {invitedBy ? <p style={{ margin: 0 }}>{t('auth.invitedBy', { name: invitedBy })}</p> : null}
       {error ? <Alert tone="danger">{error}</Alert> : null}
       <TextField label={t('auth.displayName')} name="displayName" autoComplete="name" required maxLength={60} error={fields.displayName} />
       <TextField
@@ -84,6 +96,16 @@ export default function SignupPage() {
         hint="Used to keep younger people safe. Never shown on your profile."
         error={fields.birthDate}
       />
+      <TextField
+        label={t('auth.inviteCode')}
+        name="inviteCode"
+        defaultValue={invite}
+        autoComplete="off"
+        autoCapitalize="none"
+        spellCheck={false}
+        maxLength={32}
+        error={fields.inviteCode}
+      />
       <Button type="submit" block loading={busy}>
         {t('auth.signup.submit')}
       </Button>
@@ -91,5 +113,13 @@ export default function SignupPage() {
         {t('auth.haveAccount')} <Link href="/login">{t('auth.login.submit')}</Link>
       </p>
     </form>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense>
+      <SignupForm />
+    </Suspense>
   );
 }

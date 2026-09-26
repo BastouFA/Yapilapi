@@ -3,7 +3,7 @@ import { attentionSchema, NOTIFICATION_CATEGORIES, notificationPrefsSchema, page
 import { parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
-import { publicUserFrom } from '../lib/users.ts';
+import { plusCol, publicUserFrom } from '../lib/users.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 export default async function notificationsModule(app: FastifyInstance, ctx: AppContext) {
@@ -15,7 +15,7 @@ export default async function notificationsModule(app: FastifyInstance, ctx: App
     const c = decodeCursor<KeyCursor>(q.cursor);
     const { rows } = await db.query(
       `SELECT n.id, n.category, n.type, n.entity_type, n.entity_id, n.data, n.read_at, n.created_at,
-              pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode
+              pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode, ${plusCol('a_')}
        FROM notifications n LEFT JOIN profiles pr ON pr.user_id = n.actor_id
        WHERE n.user_id = $1 ${c ? 'AND (n.created_at, n.id) < ($3::timestamptz, $4::uuid)' : ''}
        ORDER BY n.created_at DESC, n.id DESC LIMIT $2`,

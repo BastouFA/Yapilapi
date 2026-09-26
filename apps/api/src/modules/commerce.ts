@@ -13,6 +13,7 @@ import { publicUserFrom } from '../lib/users.ts';
 import { EVENT_SELECT, toEvent } from './events.ts';
 import { eventVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
+import { grantPlus, revokePlusForOrder } from '../lib/plus.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 const PLATFORM_FEE_BPS = 500; // 5%
@@ -485,6 +486,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
           });
           await announceLiveGift(c, p.order_id);
         }
+        if (o.purpose === 'plus') await grantPlus(c, o.buyer_id, 'purchase', { orderId: p.order_id });
         if (o.purpose === 'ad_budget') {
           const camp = await c.query(
             `UPDATE ad_campaigns SET budget_millicents = budget_millicents + (o.total_cents::bigint * 1000) FROM orders o
@@ -547,6 +549,8 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
            FROM orders o WHERE o.id = $1 AND o.purpose = 'ad_budget' AND ad_campaigns.id = o.campaign_id`,
           [id, r.amount_cents],
         );
+        // Refunding a Plus month takes those days back.
+        await revokePlusForOrder(c, id);
         await c.query(`UPDATE orders SET status = 'refunded', updated_at = now() WHERE id = $1`, [id]);
         await c.query(`UPDATE payments SET status = 'refunded', updated_at = now() WHERE id = $1`, [r.payment_id]);
       }

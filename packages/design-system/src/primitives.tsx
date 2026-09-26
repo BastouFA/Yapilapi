@@ -223,6 +223,15 @@ export function Badge({
   return <span className={cx('yp-badge', `yp-badge--${tone}`, (dot === false || tone === 'new') && 'yp-badge--plain', className)}>{children}</span>;
 }
 
+/** The small mark shown next to a YAPILAPI Plus member's name. `label` is read out by screen readers. */
+export function PlusBadge({ label, className }: { label: string; className?: string }) {
+  return (
+    <span className={cx('yp-plus-badge', className)} role="img" aria-label={label} title={label}>
+      Plus
+    </span>
+  );
+}
+
 const ALERT_ICON: Record<string, IconName> = { info: 'info', success: 'check-circle', warning: 'alert', danger: 'x-circle' };
 export function Alert({
   tone = 'info',

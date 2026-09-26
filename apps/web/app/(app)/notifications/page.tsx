@@ -22,6 +22,8 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
   enforcement: (n) => `A moderator took action on your content (${String(n.data.decision).replace('_', ' ')}). You can appeal from Settings.`,
   tip_received: () => 'sent you a tip',
   subscription_started: () => 'subscribed to you',
+  invite_joined: () => 'joined YAPILAPI with your invite',
+  plus_referral_reward: (n) => `You have ${Number(n.data.days ?? 30)} more days of YAPILAPI Plus, thanks to friends you invited.`,
   live_started: () => 'is live now',
   booking_request: () => 'asked to book',
   booking_decided: () => 'Your booking was updated',
@@ -44,6 +46,7 @@ function hrefFor(n: NotificationItem): string | undefined {
   if (n.entityType === 'live') return `/live/${n.entityId}`;
   if (n.entityType === 'family_link') return '/settings';
   if (n.entityType === 'ad_campaign') return '/studio';
+  if (n.entityType === 'plus') return '/plus';
   if (n.entityType === 'together') return `/together/${n.entityId}`;
   if (n.entityType === 'user' && n.actor) return `/u/${n.actor.username}`;
   if (n.entityType === 'event') return `/events/${n.entityId}`;

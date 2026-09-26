@@ -7,6 +7,7 @@ import { AppError, badRequest, conflict, notFound, parse, unauthorized } from '.
 import type { AppContext } from '../lib/context.ts';
 import { audit, securityEvent, track } from '../lib/services.ts';
 import { ageOf } from '../lib/users.ts';
+import { announceReferral, applyReferral, inviterByCode, qualifyReferral } from '../lib/invites.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 import { registerMfa } from './mfa.ts';
 import { registerPasskeys } from './passkeys.ts';
@@ -16,7 +17,7 @@ const authLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } };
 
 export async function loadMe(ctx: AppContext, userId: string): Promise<Me> {
   const { rows } = await ctx.db.query(
-    `SELECT u.id, u.email, u.email_verified_at, u.role, u.onboarded_at, pr.username, pr.display_name, pr.avatar_url, pr.mode, pr.locale, pr.country
+    `SELECT u.id, u.email, u.email_verified_at, u.role, u.onboarded_at, pr.username, pr.display_name, pr.avatar_url, pr.mode, pr.locale, pr.country, pr.plus_until
      FROM users u JOIN profiles pr ON pr.user_id = u.id WHERE u.id = $1`,
     [userId],
   );
@@ -34,6 +35,8 @@ export async function loadMe(ctx: AppContext, userId: string): Promise<Me> {
     mode: r.mode,
     locale: r.locale,
     country: r.country?.trim() ?? null,
+    ...(r.plus_until && r.plus_until > new Date() ? { plus: true } : {}),
+    plusUntil: r.plus_until && r.plus_until > new Date() ? r.plus_until.toISOString() : null,
   };
 }
 
@@ -87,6 +90,7 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
         throw badRequest(`You need to be at least ${MIN_AGE} to join.`, { fields: { birthDate: `You need to be at least ${MIN_AGE}.` } });
     }
     const passwordHash = await hashPassword(input.password);
+    let inviterId: string | null = null;
     const userId = await tx(ctx.db, async (c) => {
       const taken = await c.query(
         `SELECT (SELECT 1 FROM users WHERE lower(email) = $1 AND deleted_at IS NULL) AS email, (SELECT 1 FROM profiles WHERE lower(username) = lower($2)) AS username`,
@@ -96,11 +100,15 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
       if (t.email)
         throw new AppError(409, 'conflict', 'An account with that email already exists. Log in instead.', { fields: { email: 'Already registered.' } });
       if (t.username) throw new AppError(409, 'conflict', 'That username is taken. Try another.', { fields: { username: 'Taken.' } });
-      const u = await c.query<{ id: string }>(`INSERT INTO users (email, password_hash, birth_date) VALUES ($1,$2,$3) RETURNING id`, [
-        input.email,
-        passwordHash,
-        input.birthDate ?? null,
-      ]);
+      const inviter = input.inviteCode ? await inviterByCode(c, input.inviteCode) : null;
+      if (input.inviteCode && !inviter)
+        throw new AppError(400, 'invalid_invite', "That invite code doesn't work. Check it, or leave it empty.", {
+          fields: { inviteCode: "That invite code doesn't work." },
+        });
+      const u = await c.query<{ id: string; created_at: Date }>(
+        `INSERT INTO users (email, password_hash, birth_date) VALUES ($1,$2,$3) RETURNING id, created_at`,
+        [input.email, passwordHash, input.birthDate ?? null],
+      );
       const id = u.rows[0]!.id;
       // Start in the person's own language when we support it.
       const base = input.locale?.split(/[-_]/)[0]?.toLowerCase() ?? 'en';
@@ -115,8 +123,13 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
         [id],
       );
       await securityEvent(c, id, 'account_created', req.ip, req.headers['user-agent']);
+      if (inviter) {
+        await applyReferral(c, { id, email: input.email, birthDate: input.birthDate ?? null, createdAt: u.rows[0]!.created_at }, inviter);
+        inviterId = inviter.id;
+      }
       return id;
     });
+    if (inviterId) await announceReferral(ctx.db, ctx.realtime, userId, inviterId);
     await sendVerification(userId, input.email);
     const token = await startSession(req, reply, userId);
     track(ctx.db, userId, 'signup');
@@ -191,7 +204,11 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
       [hashToken(token)],
     );
     if (!rows[0]) throw badRequest('This link has expired or was already used. Request a new one from Settings.');
-    await ctx.db.query(`UPDATE users SET email_verified_at = now() WHERE id = $1`, [rows[0].user_id]);
+    await tx(ctx.db, async (c) => {
+      await c.query(`UPDATE users SET email_verified_at = now() WHERE id = $1`, [rows[0]!.user_id]);
+      // A confirmed email makes an invite count toward the inviter's free month.
+      await qualifyReferral(c, ctx.realtime, rows[0]!.user_id);
+    });
     await securityEvent(ctx.db, rows[0].user_id, 'email_verified', req.ip);
     return { ok: true };
   });
