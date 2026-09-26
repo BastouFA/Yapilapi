@@ -196,7 +196,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
         {profile.interests.length ? (
           <div className="row">
             {profile.interests.map((i) => (
-              <Link key={i} href={`/discover?q=${encodeURIComponent(i)}`} className="yp-chip">
+              <Link key={i} href={`/t/${encodeURIComponent(i)}`} className="yp-chip">
                 #{i}
               </Link>
             ))}

@@ -1884,3 +1884,9 @@ h3 {
   margin: 0;
   flex: 1 1 240px;
 }
+/* The sidebar already suggests people on wide screens. */
+@media (min-width: 1220px) {
+  .suggested {
+    display: none;
+  }
+}

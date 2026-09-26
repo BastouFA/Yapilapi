@@ -160,7 +160,7 @@ export function Sidebar() {
           <h2 id="aside-topics">Trending</h2>
           <div className="row">
             {topics.map((t) => (
-              <Link key={t.topic} href={`/discover?q=${encodeURIComponent(t.topic)}`} className="yp-chip">
+              <Link key={t.topic} href={`/t/${encodeURIComponent(t.topic)}`} className="yp-chip">
                 #{t.topic}
               </Link>
             ))}
