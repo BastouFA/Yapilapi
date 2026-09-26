@@ -6,7 +6,8 @@ React Native + Expo Router app for iOS and Android. It shares the API client, ty
 
 ## What's in the app
 
-- **Tabs** (floating tab bar with a raised Create button): Home (sign-in, then the For you / Following / Friends feed), Discover (universal search), Create (text posts with visibility, or a Real), Inbox (conversations, live over the realtime socket), Profile (counts, settings, notifications, log out).
+- **Tabs** (floating tab bar with a raised Create button): Home (sign-in, then the For you / Following / Friends feed), Discover (universal search), Create (posts, reels and stories with visibility, or a Real), Inbox (conversations, live over the realtime socket), Profile (counts, settings, notifications, log out).
+- **Camera** (`/camera`, a full-screen modal): the raised "+" opens it in Post, the Home story "+" in Story, and a double tap on Post, Reel or Story in Create opens it in that mode. Pick the mode at the bottom (tap or swipe). Tap the shutter for a photo, or hold it to record up to a minute; in Reel, tap to start and stop (3 minutes, 10 with Plus). The gallery button chooses from the library instead. What is taken goes to Create, which opens the editor.
 - **Post** (`/p/[id]`): the post, likes, saves, comments and replies.
 - **Community** (`/c/[slug]`): join or leave, and Posts, FAQ and Members tabs. Moderators can add and remove FAQ entries.
 - **Chat** (`/chat/[id]`): messages arrive over the realtime socket; audio and video call buttons in the header.

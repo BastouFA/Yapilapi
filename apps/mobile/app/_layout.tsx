@@ -46,6 +46,16 @@ function Screens() {
         <Stack.Screen name="events" options={{ title: t('events.title') }} />
         <Stack.Screen name="reels" options={{ title: t('m.title.reels'), headerShown: false, contentStyle: { backgroundColor: '#000' } }} />
         <Stack.Screen name="new-group" options={{ title: t('m.inbox.newGroup'), presentation: 'modal' }} />
+        <Stack.Screen
+          name="camera"
+          options={{
+            title: t('m.camera.title'),
+            headerShown: false,
+            presentation: 'fullScreenModal',
+            animation: 'slide_from_bottom',
+            contentStyle: { backgroundColor: '#000' },
+          }}
+        />
       </Stack>
     </>
   );
