@@ -12,6 +12,7 @@ import { useRealtime, useSession } from '../../../providers';
 import { useCalls } from '@/components/Calls';
 import { MiniAppsSheet } from '@/components/MiniApps';
 import { MessageAttachments, VoiceRecorder } from '@/components/ChatAttachments';
+import { StoryCardView } from '@/components/StoryStickers';
 
 type Pending = Message & { pending?: boolean };
 
@@ -252,9 +253,10 @@ export default function ChatPage() {
                     mine={mine}
                     sender={others.length > 1 ? m.sender.displayName : undefined}
                     body={
-                      m.attachments.length ? (
+                      m.attachments.length || m.story ? (
                         <>
-                          <MessageAttachments items={m.attachments} />
+                          {m.story ? <StoryCardView card={m.story} /> : null}
+                          {m.attachments.length ? <MessageAttachments items={m.attachments} /> : null}
                           {m.body ? <div>{m.body}</div> : null}
                         </>
                       ) : (

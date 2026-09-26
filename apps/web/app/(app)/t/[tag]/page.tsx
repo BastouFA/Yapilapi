@@ -3,14 +3,18 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { Button, EmptyState, Segments, Skeleton } from '@yapilapi/design-system';
-import type { TagSummary } from '@yapilapi/api-client';
+import { Button, EmptyState, MomentsStrip, Segments, Skeleton } from '@yapilapi/design-system';
+import type { StoryGroup, TagSummary } from '@yapilapi/api-client';
 import { normalizeTag } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { PostList } from '@/components/PostList';
+import { StoryViewer } from '@/components/StoryViewer';
 import { useSession } from '../../../providers';
 
-/** One hashtag: how many people use it, related tags, and its recent or top posts. Follow it to see more of it in For you. */
+/**
+ * One hashtag: how many people use it, related tags, public stories with it right now, and its recent or top posts.
+ * Follow it to see more of it in For you.
+ */
 export default function TagPage() {
   const params = useParams<{ tag: string }>();
   const tag = normalizeTag(decodeURIComponent(params.tag));
@@ -20,12 +24,20 @@ export default function TagPage() {
   const [missing, setMissing] = useState(false);
   const [sort, setSort] = useState<'recent' | 'top'>('recent');
   const [busy, setBusy] = useState(false);
+  // "Stories now": active public stories with the tag (never followers-only or close friends ones).
+  const [stories, setStories] = useState<StoryGroup[]>([]);
+  const [viewing, setViewing] = useState<number | null>(null);
   const n = new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 });
 
   useEffect(() => {
     setInfo(null);
     setMissing(false);
     api.tags.get(tag).then(setInfo, () => setMissing(true));
+    setStories([]);
+    api.tags.stories(tag).then(
+      (r) => setStories(r.items),
+      () => {},
+    );
   }, [tag]);
 
   const load = useCallback((cursor?: string) => api.tags.posts(tag, sort, cursor), [tag, sort]);
@@ -79,6 +91,11 @@ export default function TagPage() {
           <Button variant="secondary" size="sm" icon="plus" onClick={() => router.push(`/create?text=${encodeURIComponent(`#${tag} `)}`)}>
             Post with #{tag}
           </Button>
+          {me ? (
+            <Button variant="ghost" size="sm" onClick={() => router.push(`/create?mode=story&text=${encodeURIComponent(`#${tag} `)}`)}>
+              Story with #{tag}
+            </Button>
+          ) : null}
         </div>
       </section>
 
@@ -90,6 +107,18 @@ export default function TagPage() {
             </Link>
           ))}
         </nav>
+      ) : null}
+
+      {stories.length ? (
+        <section className="stack-sm" aria-labelledby="stories-now">
+          <h2 id="stories-now" className="tag-stories__title">
+            Stories now
+          </h2>
+          <MomentsStrip groups={stories} onOpen={setViewing} />
+        </section>
+      ) : null}
+      {viewing !== null && stories[viewing] ? (
+        <StoryViewer groups={stories} start={viewing} onClose={() => setViewing(null)} onChange={setStories} />
       ) : null}
 
       <Segments

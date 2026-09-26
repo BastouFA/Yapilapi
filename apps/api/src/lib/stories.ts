@@ -128,7 +128,7 @@ export async function prepareStory(
   }
   const placeIds = list.flatMap((s) => (s.type === 'place' ? [s.placeId] : []));
   if (placeIds.length) {
-    const found = await db.query(`SELECT id FROM places WHERE id = ANY($1::uuid[])`, [placeIds]);
+    const found = await db.query(`SELECT id FROM places WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL`, [placeIds]);
     if (found.rowCount !== new Set(placeIds).size) throw notFound('That place');
   }
 
@@ -253,7 +253,7 @@ export async function hydrateStories(db: Q, rows: Record<string, any>[], viewer:
   const [users, places, mine, totals, cards] = await Promise.all([
     usersByIds(db, userIds),
     placeIds.length
-      ? db.query<{ id: string; name: string; city: string | null }>(`SELECT id, name, city FROM places WHERE id = ANY($1::uuid[])`, [placeIds])
+      ? db.query<{ id: string; name: string; city: string | null }>(`SELECT id, name, city FROM places WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL`, [placeIds])
       : null,
     interactive && viewer
       ? db.query(
