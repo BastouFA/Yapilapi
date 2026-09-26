@@ -30,6 +30,8 @@ const idParam = z.object({ id: z.string().uuid() });
 const VISIBLE = postVisibleSql('$1');
 /** For You scores posts from your connections plus this many of the newest other posts. */
 const RECENT_CANDIDATES = 1000;
+/** …and up to this many of the newest posts on the viewer's interests. */
+const INTEREST_CANDIDATES = 300;
 const POST_FROM = `FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id`;
 
 export default async function postsModule(app: FastifyInstance, ctx: AppContext) {
@@ -467,6 +469,13 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
          (SELECT id FROM posts
           WHERE deleted_at IS NULL AND created_at <= $2::timestamptz AND created_at > $2::timestamptz - interval '14 days'
           ORDER BY created_at DESC, id DESC LIMIT ${RECENT_CANDIDATES})
+         UNION
+         -- Posts about your interests, even when they're older than the newest window: someone who
+         -- just picked interests in onboarding sees them in For you straight away (topics GIN index).
+         (SELECT p.id FROM posts p CROSS JOIN me
+          WHERE cardinality(me.interests) > 0 AND p.topics && me.interests
+            AND p.deleted_at IS NULL AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '14 days'
+          ORDER BY p.created_at DESC, p.id DESC LIMIT ${INTEREST_CANDIDATES})
        ),
        scored AS (
          SELECT p.id, p.author_id, p.created_at, p.topics, ap.display_name, cm_c.name AS community_name, (cm_self.user_id IS NOT NULL) AS member,

@@ -1,8 +1,10 @@
 import { useAudioPlayer } from 'expo-audio';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, Platform, Pressable, Share, StyleSheet, Text, View, type ViewToken } from 'react-native';
+import { ActivityIndicator, FlatList, Platform, Pressable, Share, StyleSheet, Text, View, type ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Post } from '../../../packages/shared/src/types';
 import { client, errorMessage, mediaUrl, webUrl } from '../lib/api';
@@ -35,6 +37,7 @@ export default function Reels() {
   const [active, setActive] = useState(0);
   const [height, setHeight] = useState(0);
   const loading = useRef(false);
+  const [preparing, setPreparing] = useState<string | null>(null);
 
   const more = useCallback(async (next?: string | null) => {
     if (loading.current) return;
@@ -133,6 +136,33 @@ export default function Reels() {
     }
   }
 
+  /**
+   * Save the reel as a video (with a small YAPILAPI watermark and an end card) and open the
+   * share sheet, so it can go straight to WhatsApp status and other apps. The server renders
+   * it once per reel; we wait for it, download it to the cache, then share the file.
+   */
+  async function shareVideo(p: Post) {
+    if (preparing) return;
+    setPreparing(p.id);
+    setError(null);
+    try {
+      const api = await client();
+      let state = await api.posts.shareVideo(p.id);
+      for (let i = 0; i < 90 && (state.status === 'queued' || state.status === 'processing'); i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        state = await api.posts.shareVideoStatus(p.id);
+      }
+      if (state.status !== 'ready' || !state.url) throw new Error(t('share.video.failed'));
+      const file = await File.downloadFileAsync(mediaUrl(state.url), new File(Paths.cache, state.fileName), { idempotent: true });
+      if (!(await Sharing.isAvailableAsync())) throw new Error(t('share.video.failed'));
+      await Sharing.shareAsync(file.uri, { mimeType: 'video/mp4', UTI: 'public.mpeg-4', dialogTitle: t('share.video') });
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setPreparing(null);
+    }
+  }
+
   const back = (
     <Pressable
       accessibilityRole="button"
@@ -198,6 +228,8 @@ export default function Reels() {
               onLike={() => void like(item)}
               onComments={() => router.push(`/p/${item.id}`)}
               onShare={() => void share(item)}
+              onShareVideo={item.downloadable ? () => void shareVideo(item) : undefined}
+              preparing={preparing === item.id}
               onRepost={item.author.id !== me?.id && item.visibility === 'public' ? () => void repost(item) : undefined}
               onSave={() => void save(item)}
             />
@@ -217,6 +249,12 @@ export default function Reels() {
           <Notice tone="danger">{error}</Notice>
         </View>
       ) : null}
+      {preparing ? (
+        <View accessibilityLiveRegion="polite" style={[s.preparing, { top: insets.top + (error ? 120 : 56), backgroundColor: c.surface }]}>
+          <ActivityIndicator color={c.yapi} />
+          <Text style={{ color: c.ink, fontWeight: '600' }}>{t('share.video.preparing')}</Text>
+        </View>
+      ) : null}
       {back}
     </View>
   );
@@ -234,6 +272,8 @@ function Reel({
   onShare,
   onRepost,
   onSave,
+  onShareVideo,
+  preparing,
 }: {
   post: Post;
   height: number;
@@ -249,6 +289,9 @@ function Reel({
   /** Absent for your own reels and ones that aren't public. */
   onRepost?: () => void;
   onSave: () => void;
+  /** Absent when the creator doesn't allow downloads. */
+  onShareVideo?: () => void;
+  preparing?: boolean;
 }) {
   const c = useColors();
   const { t, tp, number } = useT();
@@ -406,6 +449,7 @@ function Reel({
           onPress={onSave}
         />
         <Action icon="paper-plane-outline" label={t('m.common.share')} onPress={onShare} />
+        {onShareVideo ? <Action icon="download-outline" label={t('share.video')} selected={preparing} onPress={onShareVideo} /> : null}
         <Action
           icon={muted ? 'volume-mute' : 'volume-high'}
           label={muted ? t('m.reels.soundOn') : t('m.reels.soundOff')}
@@ -470,4 +514,14 @@ const s = StyleSheet.create({
   count: { color: WHITE, fontSize: 12, fontWeight: '700' },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', maxWidth: '100%' },
   chipText: { color: WHITE, fontSize: 13, fontWeight: '700', flexShrink: 1, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 4 },
+  preparing: {
+    position: 'absolute',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    paddingHorizontal: space[4],
+    paddingVertical: space[2],
+    borderRadius: radius.full,
+  },
 });

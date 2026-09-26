@@ -313,6 +313,42 @@ export const consentSchema = z.object({
   granted: z.boolean(),
 });
 
+/** Maximum hashed contacts in one POST /v1/contacts/match; apps send an address book in chunks. */
+export const MAX_CONTACT_HASHES = 2000;
+
+/** Hashed contacts (hex sha256 of "<salt>:<kind>:<value>"), never the addresses themselves. */
+export const contactMatchSchema = z.object({
+  hashes: z
+    .array(z.string().regex(/^[0-9a-fA-F]{64}$/, 'Send SHA-256 hashes in hex.'))
+    .min(1)
+    .max(MAX_CONTACT_HASHES, `Send at most ${MAX_CONTACT_HASHES} contacts at a time.`),
+  source: z.enum(['mobile', 'web']).optional(),
+});
+
+export const sharingSettingsSchema = z
+  .object({
+    findableByContacts: z.boolean(),
+    allowDownload: z.boolean(),
+  })
+  .partial();
+
+export const ONBOARDING_STEPS = ['interests', 'follow', 'friends'] as const;
+
+/** What happened in onboarding, for the onboarding_completed analytics event. Counts only. */
+export const onboardingCompleteSchema = z.object({
+  platform: z.enum(['web', 'mobile']).optional(),
+  steps: z
+    .array(
+      z.object({
+        step: z.enum(ONBOARDING_STEPS),
+        skipped: z.boolean().default(false),
+        count: z.number().int().min(0).max(10_000).default(0),
+      }),
+    )
+    .max(10)
+    .default([]),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type CreatePostInput = z.infer<typeof createPostSchema>;
 export type CreateEventInput = z.infer<typeof createEventSchema>;

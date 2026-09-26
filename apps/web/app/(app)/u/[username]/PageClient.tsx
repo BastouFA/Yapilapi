@@ -94,6 +94,9 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
                   Memories
                 </Link>
               ) : null}
+              <Link href="/find-friends" className="yp-btn yp-btn--ghost yp-btn--sm">
+                {t('friends.title')}
+              </Link>
               <Link href="/invite" className="yp-btn yp-btn--ghost yp-btn--sm">
                 {t('invite.title')}
               </Link>

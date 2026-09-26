@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { ScrollView, Text, View } from 'react-native';
-import type { FamilyLink, TeenControls } from '../../../packages/api-client/src/index';
+import type { FamilyLink, SharingSettings, TeenControls } from '../../../packages/api-client/src/index';
 import { client, errorMessage } from '../lib/api';
 import { useT, type Translator } from '../lib/i18n';
 import { useSession } from '../lib/session';
@@ -33,9 +33,61 @@ export default function Settings() {
         end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
         onPress={() => router.push('/close-friends')}
       />
+      <Sharing />
       <Family />
       <Advertising />
     </ScrollView>
+  );
+}
+
+/** "Let people who have my email or phone number find me" and "Allow downloads of my reels". Both stay off under 18. */
+function Sharing() {
+  const { t } = useT();
+  const [settings, setSettings] = useState<SharingSettings | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    client()
+      .then((api) => api.me.sharing())
+      .then((r) => setSettings(r.settings))
+      .catch((e) => setError(errorMessage(e)));
+  }, []);
+  const set = async (k: 'findableByContacts' | 'allowDownload', v: boolean) => {
+    if (!settings) return;
+    const before = settings;
+    setSettings({ ...settings, [k]: v });
+    setError(null);
+    try {
+      setSettings((await (await client()).me.setSharing({ [k]: v })).settings);
+    } catch (e) {
+      setSettings(before);
+      setError(errorMessage(e));
+    }
+  };
+  return (
+    <Card style={{ gap: space[3] }}>
+      <Title sub={settings?.locked ? t('sharing.locked') : undefined}>{t('sharing.title')}</Title>
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {settings ? (
+        <>
+          <SwitchRow
+            label={t('sharing.findable')}
+            hint={t('sharing.findable.hint')}
+            value={settings.findableByContacts}
+            disabled={settings.locked}
+            onValueChange={(v) => void set('findableByContacts', v)}
+          />
+          <SwitchRow
+            label={t('sharing.allowDownload')}
+            hint={t('sharing.allowDownload.hint')}
+            value={settings.allowDownload}
+            disabled={settings.locked}
+            onValueChange={(v) => void set('allowDownload', v)}
+          />
+        </>
+      ) : !error ? (
+        <Loading />
+      ) : null}
+    </Card>
   );
 }
 

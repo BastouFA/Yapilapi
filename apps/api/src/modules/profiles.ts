@@ -1,6 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
-import { circleMembersSchema, circleSchema, pageQuerySchema, setInterestsSchema, updateProfileSchema, usernameSchema, type Profile } from '@yapilapi/shared';
+import {
+  circleMembersSchema,
+  circleSchema,
+  onboardingCompleteSchema,
+  pageQuerySchema,
+  setInterestsSchema,
+  updateProfileSchema,
+  usernameSchema,
+  type Profile,
+} from '@yapilapi/shared';
 import { z } from 'zod';
 import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
@@ -191,25 +200,59 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     return { interests: slugs };
   });
 
+  /**
+   * Finish onboarding. The first time, an `onboarding_completed` analytics event records
+   * what each step did (counts only: how many interests, follows and friends found).
+   */
   app.post('/v1/me/onboarding/complete', { preHandler: requireAuth }, async (req) => {
-    await db.query(`UPDATE users SET onboarded_at = coalesce(onboarded_at, now()) WHERE id = $1`, [me(req).id]);
+    const u = me(req);
+    const input = parse(onboardingCompleteSchema, req.body);
+    const first = await db.query(`UPDATE users SET onboarded_at = now() WHERE id = $1 AND onboarded_at IS NULL RETURNING id`, [u.id]);
+    if (first.rowCount) {
+      const following = Number((await db.query(`SELECT count(*) AS n FROM follows WHERE follower_id = $1`, [u.id])).rows[0].n);
+      track(db, u.id, 'onboarding_completed', {
+        platform: input.platform ?? null,
+        steps: input.steps,
+        completedSteps: input.steps.filter((s) => !s.skipped).map((s) => s.step),
+        following,
+      });
+    }
     return { ok: true };
   });
 
-  /** People to follow: shared interests, friends-of-follows, then popular. Excludes blocked and already-followed. */
+  /**
+   * People to follow: shared interests, friends-of-follows, then popular. Excludes blocked and
+   * already-followed. `kind=creators` (onboarding) only suggests people who posted publicly in
+   * the last 30 days, favouring reels, so following them fills Home right away.
+   */
   app.get('/v1/me/suggestions', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
+    const q = parse(z.object({ kind: z.enum(['people', 'creators']).default('people'), limit: z.coerce.number().int().min(1).max(30).default(12) }), req.query);
+    const creators = q.kind === 'creators';
+    const recent = `(SELECT count(*) FROM posts rp WHERE rp.author_id = pr.user_id AND rp.deleted_at IS NULL AND rp.visibility = 'public'
+                       AND rp.moderation_status = 'normal' AND rp.created_at > now() - interval '30 days')`;
+    const recentReels = `(SELECT count(*) FROM posts rp WHERE rp.author_id = pr.user_id AND rp.deleted_at IS NULL AND rp.visibility = 'public'
+                       AND rp.moderation_status = 'normal' AND rp.format = 'reel' AND rp.created_at > now() - interval '30 days')`;
+    // Recent public posts on the topics the person picked (onboarding saves interests first).
+    const topical = `(SELECT count(*) FROM posts rp WHERE rp.author_id = pr.user_id AND rp.deleted_at IS NULL AND rp.visibility = 'public'
+                       AND rp.moderation_status = 'normal' AND rp.created_at > now() - interval '30 days'
+                       AND rp.topics && coalesce((SELECT array_agg(t.slug) FROM user_interests ui JOIN topics t ON t.id = ui.topic_id WHERE ui.user_id = $1), '{}'))`;
     const { rows } = await db.query(
-      `SELECT ${PUBLIC_USER_COLS}, pr.bio,
-        (SELECT count(*) FROM user_interests a JOIN user_interests b ON a.topic_id = b.topic_id WHERE a.user_id = $1 AND b.user_id = pr.user_id) AS shared,
-        (SELECT count(*) FROM follows f1 JOIN follows f2 ON f2.follower_id = f1.followee_id WHERE f1.follower_id = $1 AND f2.followee_id = pr.user_id) AS mutual,
-        (SELECT count(*) FROM follows WHERE followee_id = pr.user_id) AS followers
-       FROM profiles pr JOIN users us ON us.id = pr.user_id
-       WHERE pr.user_id <> $1 AND us.status = 'active' AND NOT pr.is_private
-         AND NOT EXISTS (SELECT 1 FROM follows WHERE follower_id = $1 AND followee_id = pr.user_id)
-         AND ${notBlockedSql('pr.user_id', '$1')}
-       ORDER BY shared DESC, mutual DESC, followers DESC, pr.created_at DESC LIMIT 12`,
-      [u.id],
+      `SELECT * FROM (
+         SELECT ${PUBLIC_USER_COLS}, pr.bio, pr.created_at,
+          (SELECT count(*) FROM user_interests a JOIN user_interests b ON a.topic_id = b.topic_id WHERE a.user_id = $1 AND b.user_id = pr.user_id) AS shared,
+          (SELECT count(*) FROM follows f1 JOIN follows f2 ON f2.follower_id = f1.followee_id WHERE f1.follower_id = $1 AND f2.followee_id = pr.user_id) AS mutual,
+          (SELECT count(*) FROM follows WHERE followee_id = pr.user_id) AS followers
+          ${creators ? `, ${recent} AS recent, ${recentReels} AS reels, ${topical} AS topical` : ''}
+         FROM profiles pr JOIN users us ON us.id = pr.user_id
+         WHERE pr.user_id <> $1 AND us.status = 'active' AND NOT pr.is_private
+           AND NOT EXISTS (SELECT 1 FROM follows WHERE follower_id = $1 AND followee_id = pr.user_id)
+           AND ${notBlockedSql('pr.user_id', '$1')}
+       ) s
+       ${creators ? 'WHERE s.recent > 0' : ''}
+       ORDER BY ${creators ? '(s.topical > 0) DESC, s.shared DESC, (s.reels > 0) DESC, s.mutual DESC, s.followers DESC, s.topical DESC, s.recent DESC' : 's.shared DESC, s.mutual DESC, s.followers DESC'}, s.created_at DESC
+       LIMIT $2`,
+      [u.id, q.limit],
     );
     return {
       items: rows.map((r) => ({
@@ -220,7 +263,11 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
             ? `Followed by ${r.mutual} people you follow`
             : r.shared > 0
               ? `${r.shared} shared interest${r.shared > 1 ? 's' : ''}`
-              : 'Popular on YAPILAPI',
+              : creators && r.topical > 0
+                ? 'Posts about your interests'
+                : creators && r.reels > 0
+                  ? 'Posts reels'
+                  : 'Popular on YAPILAPI',
       })),
     };
   });

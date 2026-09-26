@@ -37,6 +37,8 @@ function Screens() {
         <Stack.Screen name="sounds/[id]" options={{ title: t('m.sound.title') }} />
         <Stack.Screen name="close-friends" options={{ title: t('m.closeFriends.title') }} />
         <Stack.Screen name="invite" options={{ title: t('invite.title') }} />
+        <Stack.Screen name="find-friends" options={{ title: t('friends.title') }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="c/[slug]" options={{ title: t('m.title.community') }} />
         <Stack.Screen name="settings" options={{ title: t('m.title.settings') }} />
         <Stack.Screen name="real" options={{ title: t('m.title.real') }} />

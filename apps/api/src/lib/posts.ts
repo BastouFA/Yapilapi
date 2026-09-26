@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import type { MediaItem, Post, RemixRef } from '@yapilapi/shared';
 import { plusCol, publicUserFrom } from './users.ts';
-import { postVisibleSql } from './visibility.ts';
+import { allowDownloadSql, postVisibleSql } from './visibility.ts';
 
 type Q = Pool | PoolClient;
 
@@ -28,9 +28,11 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
             p.allow_remix, p.remix_mode, p.remix_of_post_id,
             CASE WHEN p.format = 'reel' THEN (SELECT count(*) FROM posts rx WHERE rx.remix_of_post_id = p.id AND rx.deleted_at IS NULL)::int END AS remix_count,
             s.id AS s_id, s.title AS s_title, s.source_post_id AS s_source, coalesce(s.duration_ms, sm.duration_ms) AS s_duration,
-            coalesce(sm.variants->>'mp4', sm.url) AS s_audio
+            coalesce(sm.variants->>'mp4', sm.url) AS s_audio,
+            CASE WHEN p.format = 'reel' THEN (p.author_id IS NOT DISTINCT FROM $2 OR ${allowDownloadSql('pr', 'au')}) END AS downloadable
      FROM posts p
      JOIN profiles pr ON pr.user_id = p.author_id
+     JOIN users au ON au.id = p.author_id
      LEFT JOIN sounds s ON s.id = p.sound_id
      LEFT JOIN media sm ON sm.id = s.media_id
      LEFT JOIN communities c ON c.id = p.community_id
@@ -83,6 +85,7 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
           : {}),
         reason: reasons?.get(r.id),
         ...(r.withheld_in ? { withheldIn: r.withheld_in.map((c: string) => c.trim()) } : {}),
+        ...(r.downloadable === null ? {} : { downloadable: !!r.downloadable }),
       } satisfies Post,
     ]),
   );

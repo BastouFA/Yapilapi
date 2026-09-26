@@ -44,6 +44,8 @@ async function upload(name: string, data: Buffer, type = 'application/octet-stre
   });
   const media =
     res.statusCode === 201 ? (await t.ctx.db.query(`SELECT id, kind, mime, duration_ms FROM media WHERE id = $1`, [res.json().media.id])).rows[0] : null;
+  // Processing runs explicitly where a test needs it; don't leave jobs queued for other test files' job runners.
+  if (media) await t.ctx.db.query(`DELETE FROM jobs WHERE kind = 'media.process' AND payload->>'mediaId' = $1`, [media.id]);
   return { status: res.statusCode, media };
 }
 

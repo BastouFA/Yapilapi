@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Button, Card, Dialog, List, ListItem, Select, Switch, Tabs, TextField } from '@yapilapi/design-system';
 import { NOTIFICATION_CATEGORIES, PROFILE_MODES, SUPPORTED_LOCALES, formatRelativeTime } from '@yapilapi/shared';
 import { startRegistration } from '@simplewebauthn/browser';
+import type { SharingSettings as SharingSettingsState } from '@yapilapi/api-client';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { currentSubscription, disableBrowserPush, enableBrowserPush, pushSupported } from '@/lib/push';
 import { FamilyCard } from '@/components/Family';
@@ -259,6 +260,48 @@ const PURPOSES: Record<string, string> = {
   analytics: 'Help improve YAPILAPI with usage analytics',
 };
 
+/** Who can find you from their contacts, and whether others can save your reels as a video. */
+function SharingSettings() {
+  const { toast, t } = useSession();
+  const [settings, setSettings] = useState<SharingSettingsState | null>(null);
+  useEffect(() => {
+    api.me.sharing().then(
+      (r) => setSettings(r.settings),
+      () => {},
+    );
+  }, []);
+  if (!settings) return null;
+  const set = async (k: 'findableByContacts' | 'allowDownload', v: boolean) => {
+    const before = settings;
+    setSettings({ ...settings, [k]: v });
+    try {
+      setSettings((await api.me.setSharing({ [k]: v })).settings);
+    } catch (e) {
+      setSettings(before);
+      toast(errorMessage(e));
+    }
+  };
+  return (
+    <Card title={t('sharing.title')} subtitle={settings.locked ? t('sharing.locked') : undefined}>
+      <div className="stack">
+        <div className="stack-sm">
+          <Switch
+            label={t('sharing.findable')}
+            checked={settings.findableByContacts}
+            disabled={settings.locked}
+            onChange={(v) => set('findableByContacts', v)}
+          />
+          <p className="muted setting-hint">{t('sharing.findable.hint')}</p>
+        </div>
+        <div className="stack-sm">
+          <Switch label={t('sharing.allowDownload')} checked={settings.allowDownload} disabled={settings.locked} onChange={(v) => set('allowDownload', v)} />
+          <p className="muted setting-hint">{t('sharing.allowDownload.hint')}</p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 function PrivacyCenter() {
   const { toast, setMe } = useSession();
   const router = useRouter();
@@ -282,6 +325,7 @@ function PrivacyCenter() {
   return (
     <div className="stack">
       <CloseFriendsCard />
+      <SharingSettings />
       <Card title="What we hold about you">
         <div className="stats">
           {Object.entries(data.dataSummary).map(([k, v]) => (
