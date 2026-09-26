@@ -20,7 +20,7 @@ type AuthorStats = Record<string, { followers: number; following: boolean }>;
  * and more; follow the author from their picture.
  */
 function Reels() {
-  const { toast, me, locale } = useSession();
+  const { toast, me, locale, t } = useSession();
   const start = useSearchParams().get('start');
   const [items, setItems] = useState<Post[] | null>(null);
   const [authors, setAuthors] = useState<AuthorStats>({});
@@ -101,6 +101,35 @@ function Reels() {
       toast(`Following ${name}`);
     } catch (e) {
       setAuthors((a) => ({ ...a, [authorId]: { followers: Math.max(0, (a[authorId]?.followers ?? 1) - 1), following: false } }));
+      toast(errorMessage(e));
+    }
+  }
+
+  /**
+   * Save the reel as a video with a small YAPILAPI watermark and an end card, for WhatsApp
+   * status and other apps. Rendered once on the server; we wait for it, then download it.
+   */
+  async function downloadToShare(p: Post) {
+    toast(t('share.video.preparing'));
+    try {
+      let state = await api.posts.shareVideo(p.id);
+      for (let i = 0; i < 90 && (state.status === 'queued' || state.status === 'processing'); i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        state = await api.posts.shareVideoStatus(p.id);
+      }
+      if (state.status !== 'ready' || !state.url) {
+        toast(t('share.video.failed'));
+        return;
+      }
+      // Media is served through this origin too (/media/…), which lets the browser save it under our file name.
+      const url = new URL(state.url, location.origin);
+      const a = document.createElement('a');
+      a.href = url.pathname.startsWith('/media/') ? url.pathname : state.url;
+      a.download = state.fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
       toast(errorMessage(e));
     }
   }
@@ -259,6 +288,7 @@ function Reels() {
                         toast('Link copied');
                       },
                     },
+                    ...(p.downloadable ? [{ label: t('share.video.download'), icon: 'download' as const, onSelect: () => void downloadToShare(p) }] : []),
                     ...(mine ? [] : [{ label: 'Report', icon: 'flag' as const, danger: true, onSelect: () => setReporting(p) }]),
                   ]}
                 />

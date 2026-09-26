@@ -9,6 +9,7 @@ import { StoryViewer } from '@/components/StoryViewer';
 import type { FeedMode } from '@yapilapi/shared';
 import { api } from '@/lib/api';
 import { PostList } from '@/components/PostList';
+import { StarterRow } from '@/components/StarterRow';
 import { SuggestedPeople } from '@/components/SuggestedPeople';
 import { useSession } from '../../providers';
 
@@ -61,6 +62,9 @@ export default function Home() {
         onChange={setMode}
         options={(['for_you', 'following', 'friends', 'communities', 'local'] as FeedMode[]).map((m) => ({ id: m, label: t(`feed.${m}`) }))}
       />
+
+      {/* Someone who follows fewer than three people still gets a full Home: reels to start with and trending tags. */}
+      <StarterRow />
 
       {mode === 'for_you' || mode === 'following' ? <SuggestedPeople /> : null}
 

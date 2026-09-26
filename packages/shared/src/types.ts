@@ -93,6 +93,8 @@ export interface Post {
   reason?: string;
   /** Only on the author's own posts: countries where regional rules withhold it. */
   withheldIn?: string[];
+  /** Reels only: whether the viewer can save it as a video to share (the creator allows downloads). */
+  downloadable?: boolean;
 }
 
 export interface Comment {

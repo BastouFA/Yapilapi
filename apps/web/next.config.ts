@@ -12,6 +12,10 @@ const config: NextConfig = {
       { source: '/media/:path*', destination: `${API}/media/:path*` },
     ];
   },
+  // Share videos print yapilapi.com/@username on their end card.
+  async redirects() {
+    return [{ source: '/@:username', destination: '/u/:username', permanent: false }];
+  },
   async headers() {
     return [
       {

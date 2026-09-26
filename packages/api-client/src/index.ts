@@ -112,8 +112,13 @@ export function createClient(opts: ClientOptions) {
     me: {
       updateProfile: (b: Record<string, unknown>) => patch<{ profile: Profile }>('/v1/me/profile', b),
       setInterests: (topics: string[]) => put<{ interests: string[] }>('/v1/me/interests', { topics }),
-      completeOnboarding: () => post('/v1/me/onboarding/complete'),
-      suggestions: () => get<{ items: { user: PublicUser; bio: string; reason: string }[] }>('/v1/me/suggestions'),
+      /** `steps` is recorded (counts only) in the onboarding_completed analytics event. */
+      completeOnboarding: (b: { platform?: 'web' | 'mobile'; steps?: OnboardingStep[] } = {}) => post('/v1/me/onboarding/complete', b),
+      /** `kind: 'creators'` suggests people who post publicly, for onboarding. */
+      suggestions: (o: { kind?: 'people' | 'creators'; limit?: number } = {}) =>
+        get<{ items: { user: PublicUser; bio: string; reason: string }[] }>(`/v1/me/suggestions${qs(o)}`),
+      sharing: () => get<{ settings: SharingSettings }>('/v1/me/sharing'),
+      setSharing: (b: Partial<Pick<SharingSettings, 'findableByContacts' | 'allowDownload'>>) => put<{ settings: SharingSettings }>('/v1/me/sharing', b),
       friendRequests: () => get<{ items: { id: string; from: PublicUser; createdAt: string }[] }>('/v1/me/friend-requests'),
       acceptFriend: (id: string) => post(`/v1/friend-requests/${id}/accept`),
       declineFriend: (id: string) => post(`/v1/friend-requests/${id}/decline`),
@@ -148,6 +153,15 @@ export function createClient(opts: ClientOptions) {
       why: (id: string) => get<{ reasons: string[] }>(`/v1/posts/${id}/why`),
       comments: (id: string, cursor?: string) => get<Page<Comment>>(`/v1/posts/${id}/comments${qs({ cursor })}`),
       comment: (id: string, body: string, parentId?: string) => post<{ comment: Comment }>(`/v1/posts/${id}/comments`, { body, parentId }),
+      /** Ask for a reel as a watermarked video to share elsewhere; poll shareVideoStatus until it's ready. */
+      shareVideo: (id: string) => post<ShareVideoState>(`/v1/posts/${id}/share-video`),
+      shareVideoStatus: (id: string) => get<ShareVideoState>(`/v1/posts/${id}/share-video`),
+    },
+    contacts: {
+      /** The salt and identifier kinds to hash with (see contactHashInput in @yapilapi/shared). */
+      salt: () => get<ContactHashing>('/v1/contacts/salt'),
+      /** Send only hashes, at most `maxHashes` per call. */
+      match: (hashes: string[], source?: 'web' | 'mobile') => post<{ items: ContactMatch[] }>('/v1/contacts/match', { hashes, source }),
     },
     media: {
       upload: (file: File, altText?: string) => {
@@ -879,4 +893,43 @@ export interface InvitesInfo {
   canEnterCode: boolean;
   enterCodeDays: number;
   people: { user: PublicUser; joinedAt: string; confirmed: boolean }[];
+}
+
+export interface OnboardingStep {
+  step: 'interests' | 'follow' | 'friends';
+  skipped: boolean;
+  count: number;
+}
+
+export interface SharingSettings {
+  /** "Let people who have my email or phone number find me". */
+  findableByContacts: boolean;
+  /** Others can save your reels as a video to share elsewhere. */
+  allowDownload: boolean;
+  /** Both stay off for people under 18. */
+  locked: boolean;
+}
+
+export interface ContactHashing {
+  salt: string;
+  /** Identifier kinds the server matches today (email; phone later). */
+  kinds: ('email' | 'phone')[];
+  maxHashes: number;
+  format: string;
+}
+
+export interface ContactMatch {
+  user: PublicUser;
+  following: boolean;
+  followsYou: boolean;
+  /** Which of the hashes you sent belong to this person. */
+  hashes: string[];
+}
+
+export interface ShareVideoState {
+  status: 'none' | 'queued' | 'processing' | 'ready' | 'failed';
+  /** Set once ready. */
+  url: string | null;
+  /** A suggested name for the downloaded file. */
+  fileName: string;
 }

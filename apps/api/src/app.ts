@@ -54,6 +54,7 @@ import tagsModule from './modules/tags.ts';
 import plusModule from './modules/plus.ts';
 import invitesModule from './modules/invites.ts';
 import publicModule from './modules/public.ts';
+import growthModule from './modules/growth.ts';
 import { createPushSender } from './lib/push.ts';
 import { setPushSender } from './lib/services.ts';
 import { processWebhooks } from './lib/webhooks.ts';
@@ -61,6 +62,7 @@ import { processJobs } from './lib/jobs.ts';
 import { mediaJobHandlers } from './lib/media-processing.ts';
 import { studioJobHandlers } from './lib/studio.ts';
 import { liveRecordingJobHandlers } from './lib/live-recording.ts';
+import { shareVideoJobHandlers } from './lib/share-video.ts';
 import { fastifyTracingPlugin, traceLogMixin } from './lib/tracing.ts';
 
 export interface BuiltApp {
@@ -305,6 +307,7 @@ export async function buildApp(
     studioModule,
     plusModule,
     invitesModule,
+    growthModule,
     publicModule,
   ])
     await mod(app, ctx);
@@ -324,6 +327,7 @@ export async function buildApp(
     ...mediaJobHandlers({ db, storage }),
     ...studioJobHandlers({ db, storage, transcription: ctx.transcription }),
     ...liveRecordingJobHandlers({ db, storage, recordingsDir: config.LIVE_RECORDINGS_DIR }),
+    ...shareVideoJobHandlers({ db, storage }),
   };
   if (opts.webhookWorker ?? config.APP_ENV !== 'test') {
     let busy = false;

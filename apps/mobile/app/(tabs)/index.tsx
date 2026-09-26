@@ -1,4 +1,4 @@
-import { router, useFocusEffect, useNavigation } from 'expo-router';
+import { Redirect, router, useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, RefreshControl, Text, View } from 'react-native';
 import type { StoryGroup } from '../../../../packages/api-client/src/index';
@@ -10,6 +10,7 @@ import { useT } from '../../lib/i18n';
 import { PostCard } from '../../lib/post';
 import { orderStories, StoriesStrip, StoryViewer } from '../../lib/stories';
 import { useSession } from '../../lib/session';
+import { StarterRow } from '../../lib/starter';
 import { space } from '../../lib/theme';
 import { Button, Card, EmptyState, Field, Icon, Loading, Notice, Segmented, useColors, useTabBarSpace } from '../../lib/ui';
 
@@ -24,6 +25,8 @@ export default function Home() {
   const { me } = useSession();
   if (me === undefined) return <Loading />;
   if (!me) return <SignIn />;
+  // New accounts go through the three onboarding steps first, so Home starts full.
+  if (!me.onboarded) return <Redirect href="/onboarding" />;
   return <Feed />;
 }
 
@@ -101,6 +104,7 @@ function Feed() {
         ListHeaderComponent={
           <View style={{ gap: space[3] }}>
             <StoriesStrip groups={stories} onOpen={setViewing} onCreate={() => router.navigate({ pathname: '/create', params: { mode: 'story' } })} />
+            <StarterRow />
             <Segmented label={t('m.feed.label')} options={MODES.map((m) => ({ id: m.id, label: t(m.label) }))} value={mode} onChange={setMode} />
             {error ? <Notice tone="danger">{error}</Notice> : null}
           </View>

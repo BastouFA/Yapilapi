@@ -81,3 +81,12 @@ export function eventVisibleSql(v: string): string {
       c.visibility = 'public' OR EXISTS (SELECT 1 FROM community_members cm WHERE cm.community_id = c.id AND cm.user_id = ${v} AND cm.status = 'active'))))
   )`;
 }
+
+/**
+ * Whether others may download an author's reels as a video to share elsewhere. The author's
+ * choice, defaulting to on for public accounts and off for private ones; never for people
+ * under 18. `pr` is the author's profile and `au` the author's user row.
+ */
+export function allowDownloadSql(pr = 'pr', au = 'au'): string {
+  return `(coalesce(${pr}.allow_download, NOT ${pr}.is_private) AND NOT coalesce(${au}.birth_date > current_date - interval '18 years', false))`;
+}

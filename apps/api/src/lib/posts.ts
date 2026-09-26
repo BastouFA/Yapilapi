@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import type { Post } from '@yapilapi/shared';
 import { plusCol, publicUserFrom } from './users.ts';
+import { allowDownloadSql } from './visibility.ts';
 
 type Q = Pool | PoolClient;
 
@@ -23,9 +24,11 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
             (SELECT json_agg(json_build_object('id', o.id, 'label', o.label, 'votes', (SELECT count(*) FROM poll_votes v WHERE v.option_id = o.id)) ORDER BY o.position)
                FROM poll_options o WHERE o.post_id = p.id) AS poll_options,
             (SELECT option_id FROM poll_votes v WHERE v.post_id = p.id AND v.user_id = $2) AS my_vote,
-            (SELECT array_agg(DISTINCT w.country ORDER BY w.country) FROM post_withholdings w WHERE w.post_id = p.id AND p.author_id = $2) AS withheld_in
+            (SELECT array_agg(DISTINCT w.country ORDER BY w.country) FROM post_withholdings w WHERE w.post_id = p.id AND p.author_id = $2) AS withheld_in,
+            CASE WHEN p.format = 'reel' THEN (p.author_id IS NOT DISTINCT FROM $2 OR ${allowDownloadSql('pr', 'au')}) END AS downloadable
      FROM posts p
      JOIN profiles pr ON pr.user_id = p.author_id
+     JOIN users au ON au.id = p.author_id
      LEFT JOIN communities c ON c.id = p.community_id
      LEFT JOIN events e ON e.id = p.event_id AND e.deleted_at IS NULL
      LEFT JOIN products pd ON pd.id = p.product_id AND pd.deleted_at IS NULL
@@ -56,6 +59,7 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
         format: r.format ?? 'post',
         reason: reasons?.get(r.id),
         ...(r.withheld_in ? { withheldIn: r.withheld_in.map((c: string) => c.trim()) } : {}),
+        ...(r.downloadable === null ? {} : { downloadable: !!r.downloadable }),
       } satisfies Post,
     ]),
   );

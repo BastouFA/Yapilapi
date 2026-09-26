@@ -12,7 +12,8 @@
       "infoPlist": {
         "NSCameraUsageDescription": "YAPILAPI uses the camera for video calls and to capture Reals.",
         "NSMicrophoneUsageDescription": "YAPILAPI uses the microphone for audio and video calls.",
-        "UIBackgroundModes": ["audio"]
+        "UIBackgroundModes": ["audio"],
+        "NSContactsUsageDescription": "YAPILAPI uses your contacts to show which of your friends are already here. Emails and numbers are turned into codes on your phone before anything is sent, and nothing is kept."
       }
     },
     "android": {
@@ -23,8 +24,10 @@
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.WAKE_LOCK"
-      ]
+        "android.permission.WAKE_LOCK",
+        "android.permission.READ_CONTACTS"
+      ],
+      "blockedPermissions": ["android.permission.WRITE_CONTACTS"]
     },
     "plugins": [
       "expo-router",
@@ -61,6 +64,13 @@
           "photosPermission": "YAPILAPI uses your photos and videos so you can share them in posts, reels and stories.",
           "cameraPermission": "YAPILAPI uses the camera for video calls and to capture Reals.",
           "microphonePermission": "YAPILAPI uses the microphone for audio and video calls."
+        }
+      ],
+      "expo-sharing",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "YAPILAPI uses your contacts to show which of your friends are already here. Emails and numbers are turned into codes on your phone before anything is sent, and nothing is kept."
         }
       ]
     ],

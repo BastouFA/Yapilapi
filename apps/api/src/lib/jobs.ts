@@ -3,7 +3,7 @@ import type { Pool, PoolClient } from 'pg';
 type Q = Pool | PoolClient;
 export type JobHandler = (payload: any) => Promise<void>;
 
-const MAX_ATTEMPTS = 5;
+export const MAX_ATTEMPTS = 5;
 
 /** Queue a job and return its id. */
 export async function enqueue(db: Q, kind: string, payload: object, delaySeconds = 0): Promise<string> {
