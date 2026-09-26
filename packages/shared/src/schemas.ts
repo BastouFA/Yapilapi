@@ -144,8 +144,9 @@ export const sendMessageSchema = z
   .object({
     body: z.string().trim().max(4000).default(''),
     replyToId: uuid.optional(),
+    /** Your own uploads (POST /v1/media or /v1/uploads); the server fills in the address and kind. */
     attachments: z
-      .array(z.object({ url: z.string().url(), kind: z.enum(['image', 'video', 'audio', 'file']), name: z.string().max(200).optional() }))
+      .array(z.object({ mediaId: uuid, name: z.string().max(200).optional() }))
       .max(10)
       .default([]),
     clientId: z.string().max(64).optional(),

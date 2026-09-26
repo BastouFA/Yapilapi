@@ -1826,11 +1826,13 @@ h3 {
 .suggested__hide:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
+}
 /* Two cards side by side on wide screens, stacked on phones. */
 .settings-duo {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
   gap: var(--space-3);
+}
 /* ── Shared links seen without an account ─────────────────────────────── */
 .public-shell {
   min-height: 100dvh;
@@ -1888,5 +1890,96 @@ h3 {
 @media (min-width: 1220px) {
   .suggested {
     display: none;
+  }
+}
+
+/* Chat attachments and voice messages */
+.chat-att {
+  display: grid;
+  gap: 6px;
+}
+.chat-att__media {
+  display: block;
+  max-width: min(280px, 70vw);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.chat-att__media img,
+video.chat-att__media {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  object-fit: cover;
+  background: #000;
+}
+.voice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 200px;
+}
+.voice__play {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  color: inherit;
+  cursor: pointer;
+}
+.voice__play > * {
+  font-size: 13px;
+}
+.voice__play:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.voice__bar {
+  position: relative;
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, currentColor 25%, transparent);
+  overflow: hidden;
+}
+.voice__bar > span {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  background: currentColor;
+}
+.voice__time {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.voice-rec {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-2);
+}
+.voice-rec__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: voice-pulse 1s ease-in-out infinite alternate;
+}
+.voice-rec__time {
+  flex: 1;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+@keyframes voice-pulse {
+  to {
+    opacity: 0.3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .voice-rec__dot {
+    animation: none;
   }
 }

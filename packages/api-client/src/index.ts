@@ -202,7 +202,8 @@ export function createClient(opts: ClientOptions) {
       get: (id: string) => get<{ conversation: Conversation }>(`/v1/conversations/${id}`),
       create: (memberIds: string[], title?: string) => post<{ conversation: Conversation }>('/v1/conversations', { memberIds, title }),
       messages: (id: string, cursor?: string) => get<Page<Message>>(`/v1/conversations/${id}/messages${qs({ cursor })}`),
-      send: (id: string, body: string, clientId?: string) => post<{ message: Message }>(`/v1/conversations/${id}/messages`, { body, clientId }),
+      send: (id: string, body: string, clientId?: string, attachments: { mediaId: string; name?: string }[] = []) =>
+        post<{ message: Message }>(`/v1/conversations/${id}/messages`, { body, clientId, attachments }),
       read: (id: string) => post(`/v1/conversations/${id}/read`),
       createPlan: (id: string, title: string, details: Record<string, unknown>) => post(`/v1/conversations/${id}/plans`, { title, details }),
       plans: (id: string) => get<{ items: { id: string; title: string; details: Record<string, unknown>; status: string }[] }>(`/v1/conversations/${id}/plans`),

@@ -125,7 +125,15 @@ export interface Message {
   sender: PublicUser;
   body: string;
   replyToId: string | null;
-  attachments: { url: string; kind: string; name?: string }[];
+  attachments: {
+    url: string;
+    kind: string;
+    name?: string;
+    mediaId?: string;
+    /** Videos and voice messages. */
+    durationMs?: number | null;
+    posterUrl?: string | null;
+  }[];
   createdAt: string;
   clientId?: string | null;
 }

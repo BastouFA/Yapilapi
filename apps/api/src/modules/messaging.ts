@@ -212,12 +212,34 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       );
       throw new AppError(422, 'content_blocked', "This message wasn't sent because it may put someone at risk.");
     }
+    // Attachments are the sender's own uploads; their address and kind come from storage, never from the request.
+    let attachments: Message['attachments'] = [];
+    if (input.attachments.length) {
+      const ids = input.attachments.map((a) => a.mediaId);
+      const { rows: media } = await db.query(
+        `SELECT id, kind, url, variants, poster_url, duration_ms FROM media WHERE id = ANY($1::uuid[]) AND owner_id = $2 AND status <> 'failed'`,
+        [ids, u.id],
+      );
+      if (media.length !== new Set(ids).size) throw notFound('That photo, video or voice message');
+      const byId = new Map(media.map((m) => [m.id as string, m]));
+      attachments = input.attachments.map((a) => {
+        const m = byId.get(a.mediaId)!;
+        return {
+          mediaId: m.id,
+          kind: m.kind,
+          url: m.variants?.mp4 ?? m.variants?.large ?? m.url,
+          name: a.name,
+          durationMs: m.duration_ms ?? null,
+          posterUrl: m.poster_url ?? null,
+        };
+      });
+    }
     const row = await tx(db, async (c) => {
       const { rows } = await c.query(
         `INSERT INTO messages (conversation_id, sender_id, body, reply_to_id, attachments, client_id) VALUES ($1,$2,$3,$4,$5,$6)
          ON CONFLICT (sender_id, client_id) WHERE client_id IS NOT NULL DO UPDATE SET client_id = EXCLUDED.client_id
          RETURNING id, conversation_id, body, reply_to_id, attachments, created_at, client_id`,
-        [id, u.id, input.body, input.replyToId ?? null, JSON.stringify(input.attachments), input.clientId ?? null],
+        [id, u.id, input.body, input.replyToId ?? null, JSON.stringify(attachments), input.clientId ?? null],
       );
       await c.query(`UPDATE conversations SET last_message_at = now() WHERE id = $1`, [id]);
       await c.query(`UPDATE conversation_members SET last_read_at = now() WHERE conversation_id = $1 AND user_id = $2`, [id, u.id]);

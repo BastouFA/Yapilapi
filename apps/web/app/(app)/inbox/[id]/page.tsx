@@ -10,6 +10,7 @@ import { ReportSheet } from '@/components/PostList';
 import { useRealtime, useSession } from '../../../providers';
 import { useCalls } from '@/components/Calls';
 import { MiniAppsSheet } from '@/components/MiniApps';
+import { MessageAttachments, VoiceRecorder } from '@/components/ChatAttachments';
 
 type Pending = Message & { pending?: boolean };
 
@@ -68,6 +69,26 @@ export default function ChatPage() {
       setTimeout(() => setTyping(null), 3000);
     }
   });
+
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState<string | null>(null);
+
+  /** Upload a photo, video or voice recording, then send it as a message. */
+  async function sendFile(file: File, label: string) {
+    if (!me) return;
+    if (file.size > 50 * 1024 * 1024) return toast('Files in chats can be up to 50 MB.');
+    setUploading(label);
+    try {
+      const { media } = await api.media.upload(file);
+      const clientId = crypto.randomUUID();
+      const { message } = await api.conversations.send(id, '', clientId, [{ mediaId: media.id }]);
+      setMessages((cur) => (cur?.some((x) => x.id === message.id) ? cur : [...(cur ?? []), message]));
+    } catch (e) {
+      toast(errorMessage(e));
+    } finally {
+      setUploading(null);
+    }
+  }
 
   async function send() {
     const text = body.trim();
@@ -221,7 +242,16 @@ export default function ChatPage() {
                   <ChatBubble
                     mine={mine}
                     sender={others.length > 1 ? m.sender.displayName : undefined}
-                    body={m.body}
+                    body={
+                      m.attachments.length ? (
+                        <>
+                          <MessageAttachments items={m.attachments} />
+                          {m.body ? <div>{m.body}</div> : null}
+                        </>
+                      ) : (
+                        m.body
+                      )
+                    }
                     pending={m.pending}
                     time={new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(m.createdAt))}
                   />
@@ -245,6 +275,26 @@ export default function ChatPage() {
           void send();
         }}
       >
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"
+          hidden
+          onChange={(e) => {
+            const f = e.currentTarget.files?.[0];
+            e.currentTarget.value = '';
+            if (f) void sendFile(f, f.type.startsWith('video') ? 'Sending video…' : 'Sending photo…');
+          }}
+        />
+        <button type="button" className="yp-action" aria-label="Send a photo or video" disabled={!!uploading} onClick={() => fileInput.current?.click()}>
+          <Icon name="image" />
+        </button>
+        <VoiceRecorder disabled={!!uploading} onError={toast} onRecorded={(f) => void sendFile(f, 'Sending voice message…')} />
+        {uploading ? (
+          <span className="muted" role="status" style={{ fontSize: 13 }}>
+            {uploading}
+          </span>
+        ) : null}
         <label htmlFor="msg" className="yp-visually-hidden">
           {t('inbox.placeholder')}
         </label>

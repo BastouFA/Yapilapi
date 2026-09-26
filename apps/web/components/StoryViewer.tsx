@@ -138,7 +138,7 @@ export function StoryViewer({
             <span>{formatRelativeTime(story.createdAt, locale)}</span>
           </span>
           <button type="button" className="story__icon" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Play' : 'Pause'}>
-            {paused ? '▶' : '❚❚'}
+            <Icon name={paused ? 'play' : 'pause'} filled />
           </button>
           <button type="button" className="story__icon" onClick={onClose} aria-label="Close">
             <Icon name="x" />

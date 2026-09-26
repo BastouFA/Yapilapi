@@ -117,7 +117,11 @@ export default function Inbox() {
                   )
                 }
                 primary={conversationTitle(c, me!.id)}
-                secondary={c.lastMessage ? `${c.lastMessage.sender.id === me?.id ? 'You: ' : ''}${c.lastMessage.body || 'Attachment'}` : 'No messages yet'}
+                secondary={
+                  c.lastMessage
+                    ? `${c.lastMessage.sender.id === me?.id ? 'You: ' : ''}${c.lastMessage.body || ({ image: 'Photo', video: 'Video', audio: 'Voice message' } as Record<string, string>)[c.lastMessage.attachments[0]?.kind ?? ''] || 'Attachment'}`
+                    : 'No messages yet'
+                }
                 end={
                   <>
                     {formatRelativeTime(c.updatedAt, locale)}

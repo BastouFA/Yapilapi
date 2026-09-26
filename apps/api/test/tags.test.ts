@@ -86,3 +86,30 @@ describe('mentions', () => {
     expect(await count(author.id, 'post_mention')).toBe(0);
   });
 });
+
+describe('message attachments', () => {
+  it('sends your own uploads and refuses anyone else’s or raw addresses', async () => {
+    const a = await signUp(t.app, { birthDate: '1990-01-01' });
+    const b = await signUp(t.app, { birthDate: '1990-01-01' });
+    await as(t.app, a).post(`/v1/users/${b.id}/follow`);
+    await as(t.app, b).post(`/v1/users/${a.id}/follow`);
+    const conv = (await as(t.app, a).post('/v1/conversations', { memberIds: [b.id] })).body.conversation;
+    const media = async (owner: typeof a, kind: string, mime: string) =>
+      (
+        await t.ctx.db.query(
+          `INSERT INTO media (owner_id, kind, url, mime, status, duration_ms) VALUES ($1,$2,'http://localhost:4000/media/x','${mime}','ready',4200) RETURNING id`,
+          [owner.id, kind],
+        )
+      ).rows[0].id as string;
+    const voice = await media(a, 'audio', 'audio/webm');
+    const sent = await as(t.app, a).post(`/v1/conversations/${conv.id}/messages`, { attachments: [{ mediaId: voice }] });
+    expect(sent.status).toBe(201);
+    expect(sent.body.message.attachments).toEqual([expect.objectContaining({ mediaId: voice, kind: 'audio', durationMs: 4200 })]);
+
+    const theirs = await media(b, 'image', 'image/png');
+    expect((await as(t.app, a).post(`/v1/conversations/${conv.id}/messages`, { attachments: [{ mediaId: theirs }] })).status).toBe(404);
+    expect(
+      (await as(t.app, a).post(`/v1/conversations/${conv.id}/messages`, { attachments: [{ url: 'https://evil.example/x.png', kind: 'image' }] })).status,
+    ).toBe(400);
+  });
+});
