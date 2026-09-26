@@ -2,17 +2,19 @@ import { useCallback, useEffect, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, RefreshControl, Text, View } from 'react-native';
 import type { FeedMode } from '../../../../packages/shared/src/constants';
 import type { Post } from '../../../../packages/shared/src/types';
+import type { MessageKey } from '../../../../packages/shared/src/i18n';
 import { client, errorMessage, signIn } from '../../lib/api';
+import { useT } from '../../lib/i18n';
 import { PostCard } from '../../lib/post';
 import { useSession } from '../../lib/session';
 import { space } from '../../lib/theme';
 import { Button, Card, EmptyState, Field, Loading, Notice, Segmented, useColors, useTabBarSpace } from '../../lib/ui';
 
 const MODES = [
-  { id: 'for_you', label: 'For you' },
-  { id: 'following', label: 'Following' },
-  { id: 'friends', label: 'Friends' },
-] as const satisfies readonly { id: FeedMode; label: string }[];
+  { id: 'for_you', label: 'feed.for_you' },
+  { id: 'following', label: 'feed.following' },
+  { id: 'friends', label: 'feed.friends' },
+] as const satisfies readonly { id: FeedMode; label: MessageKey }[];
 
 /** Home: sign in if needed, then the feed with cursor pagination. */
 export default function Home() {
@@ -24,6 +26,7 @@ export default function Home() {
 
 function Feed() {
   const c = useColors();
+  const { t } = useT();
   const bottom = useTabBarSpace();
   const [mode, setMode] = useState<(typeof MODES)[number]['id']>('for_you');
   const [posts, setPosts] = useState<Post[] | null>(null);
@@ -59,7 +62,7 @@ function Feed() {
       keyExtractor={(p) => p.id}
       ListHeaderComponent={
         <View style={{ gap: space[3] }}>
-          <Segmented label="Feed" options={MODES} value={mode} onChange={setMode} />
+          <Segmented label={t('m.feed.label')} options={MODES.map((m) => ({ id: m.id, label: t(m.label) }))} value={mode} onChange={setMode} />
           {error ? <Notice tone="danger">{error}</Notice> : null}
         </View>
       }
@@ -75,10 +78,10 @@ function Feed() {
         />
       }
       onEndReached={() => cursor && load(cursor)}
-      ListEmptyComponent={posts === null ? <Loading /> : <EmptyState title="Nothing here yet" body="Follow people and join communities to fill your feed." />}
+      ListEmptyComponent={posts === null ? <Loading /> : <EmptyState title={t('m.feed.empty.title')} body={t('m.feed.empty.body')} />}
       ListFooterComponent={
         posts?.length ? (
-          <Text style={{ color: c.inkMuted, textAlign: 'center', padding: space[4] }}>{cursor ? 'Loading…' : "You're all caught up."}</Text>
+          <Text style={{ color: c.inkMuted, textAlign: 'center', padding: space[4] }}>{cursor ? t('m.common.loadingMore') : t('feed.end')}</Text>
         ) : null
       }
       renderItem={({ item }) => <PostCard post={item} />}
@@ -88,6 +91,7 @@ function Feed() {
 
 function SignIn() {
   const c = useColors();
+  const { t } = useT();
   const { refresh } = useSession();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -100,14 +104,14 @@ function SignIn() {
     >
       <Card style={{ gap: space[3] }}>
         <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 28, fontWeight: '800', letterSpacing: -0.5 }}>
-          Log in
+          {t('auth.login.title')}
         </Text>
-        <Text style={{ color: c.inkMuted }}>Your social world. One place.</Text>
+        <Text style={{ color: c.inkMuted }}>{t('app.tagline')}</Text>
         {error ? <Notice tone="danger">{error}</Notice> : null}
-        <Field label="Email address" autoCapitalize="none" autoComplete="email" keyboardType="email-address" value={email} onChangeText={setEmail} />
-        <Field label="Password" secureTextEntry autoComplete="current-password" value={password} onChangeText={setPassword} />
+        <Field label={t('auth.email')} autoCapitalize="none" autoComplete="email" keyboardType="email-address" value={email} onChangeText={setEmail} />
+        <Field label={t('auth.password')} secureTextEntry autoComplete="current-password" value={password} onChangeText={setPassword} />
         <Button
-          label={busy ? 'Logging in…' : 'Log in'}
+          label={busy ? t('m.auth.loggingIn') : t('auth.login.submit')}
           disabled={busy || !email || !password}
           onPress={async () => {
             setBusy(true);

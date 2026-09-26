@@ -2,6 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useEffect } from 'react';
 import { Alert, AppState } from 'react-native';
 import { client } from './api';
+import { tr } from './locale';
 
 const SHOWN_KEY = 'ypl_break_day';
 const today = () => new Date().toISOString().slice(0, 10);
@@ -23,11 +24,7 @@ export function useUsageHeartbeat(enabled: boolean) {
         const shown = await SecureStore.getItemAsync(SHOWN_KEY).catch(() => null);
         if (shown === today()) return;
         await SecureStore.setItemAsync(SHOWN_KEY, today()).catch(() => {});
-        Alert.alert(
-          'Time for a break?',
-          `You've spent ${r.minutesToday} minutes on YAPILAPI today, which is past the daily reminder your family set. Everything will still be here later.`,
-          [{ text: 'Close' }],
-        );
+        Alert.alert(tr('m.break.title'), tr('m.break.body', { minutes: r.minutesToday }), [{ text: tr('m.common.close') }]);
       } catch {
         // Offline or signed out: nothing to record.
       }

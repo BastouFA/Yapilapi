@@ -4,18 +4,25 @@ import { FlatList, Pressable, Text, View } from 'react-native';
 import type { FaqEntry } from '../../../../packages/api-client/src/index';
 import type { Community, Post, PublicUser } from '../../../../packages/shared/src/types';
 import { client, errorMessage } from '../../lib/api';
+import { useT, type Translate } from '../../lib/i18n';
 import { PostCard } from '../../lib/post';
 import { useSession } from '../../lib/session';
 import { space } from '../../lib/theme';
-import { Avatar, Button, Card, EmptyState, Field, Icon, Loading, Notice, Row, Segmented, Title, useColors } from '../../lib/ui';
+import { Avatar, Button, Card, EmptyState, Field, Icon, Loading, Notice, Row, Segmented, Title, useColors, userText } from '../../lib/ui';
 
 type Tab = 'posts' | 'faq' | 'members';
 type Item = { key: string; post?: Post; faq?: FaqEntry; member?: { user: PublicUser; role: string } };
+
+const LOCKED = { posts: 'm.community.locked.posts', faq: 'm.community.locked.faq', members: 'm.community.locked.members' } as const;
+
+/** Owner and moderator are labelled; other roles (plain members) are not. */
+const roleLabel = (role: string, t: Translate) => (role === 'owner' ? t('m.role.owner') : role === 'moderator' ? t('m.role.moderator') : role);
 
 /** A community: posts, its FAQ and members, with join and leave. */
 export default function CommunityScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const c = useColors();
+  const { t, tp } = useT();
   const navigation = useNavigation();
   const { me } = useSession();
   const [community, setCommunity] = useState<(Community & { membershipStatus: string | null }) | null | undefined>(undefined);
@@ -77,7 +84,7 @@ export default function CommunityScreen() {
   if (community === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>
-        <EmptyState title="Community not found" body="It may have been removed or renamed." />
+        <EmptyState title={t('m.community.notFound.title')} body={t('m.community.notFound.body')} />
       </View>
     );
 
@@ -93,16 +100,16 @@ export default function CommunityScreen() {
     <View style={{ gap: space[3], marginBottom: space[1] }}>
       <Card style={{ gap: space[2] }}>
         <Title
-          sub={`${community.memberCount} ${community.memberCount === 1 ? 'member' : 'members'} · ${community.visibility === 'private' ? 'Private' : 'Public'}`}
+          sub={`${tp('m.community.members', community.memberCount)} · ${community.visibility === 'private' ? t('m.community.private') : t('m.community.public')}`}
         >
           {community.name}
         </Title>
-        {community.description ? <Text style={{ color: c.ink, lineHeight: 21 }}>{community.description}</Text> : null}
+        {community.description ? <Text style={[{ color: c.ink, lineHeight: 21 }, userText]}>{community.description}</Text> : null}
         {me ? (
           community.myRole ? (
             community.myRole !== 'owner' ? (
               <Button
-                label="Leave"
+                label={t('communities.leave')}
                 variant="secondary"
                 size="sm"
                 style={{ alignSelf: 'flex-start' }}
@@ -113,16 +120,16 @@ export default function CommunityScreen() {
               />
             ) : null
           ) : community.membershipStatus === 'pending' ? (
-            <Text style={{ color: c.inkMuted }}>Your request to join is waiting for the moderators.</Text>
+            <Text style={{ color: c.inkMuted }}>{t('m.community.pending')}</Text>
           ) : (
             <Button
-              label={community.visibility === 'private' ? 'Request to join' : 'Join'}
+              label={community.visibility === 'private' ? t('m.community.requestJoin') : t('communities.join')}
               size="sm"
               style={{ alignSelf: 'flex-start' }}
               onPress={async () => {
                 try {
                   const r = await (await client()).communities.join(slug);
-                  setNote(r.status === 'pending' ? 'Request sent to the moderators.' : `Welcome to ${community.name}.`);
+                  setNote(r.status === 'pending' ? t('m.community.requestSent') : t('m.community.welcome', { name: community.name }));
                   setPosts(null);
                   setFaq(null);
                   setMembers(null);
@@ -136,18 +143,18 @@ export default function CommunityScreen() {
         ) : null}
       </Card>
       <Segmented
-        label="Community sections"
+        label={t('m.community.sections')}
         options={[
-          { id: 'posts', label: 'Posts' },
-          { id: 'faq', label: 'FAQ' },
-          { id: 'members', label: 'Members', count: community.memberCount },
+          { id: 'posts', label: t('profile.posts') },
+          { id: 'faq', label: t('m.community.faq') },
+          { id: 'members', label: t('m.community.membersTab'), count: community.memberCount },
         ]}
         value={tab}
         onChange={setTab}
       />
       {note ? <Notice>{note}</Notice> : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}
-      {locked ? <Notice>{`Join this private community to see its ${tab === 'faq' ? 'FAQ' : tab}.`}</Notice> : null}
+      {locked ? <Notice>{t(LOCKED[tab])}</Notice> : null}
     </View>
   );
 
@@ -162,11 +169,11 @@ export default function CommunityScreen() {
         locked ? null : loadingTab ? (
           <Loading />
         ) : tab === 'posts' ? (
-          <EmptyState title="No posts yet" body="Start the first discussion from the web app." />
+          <EmptyState title={t('m.community.noPosts.title')} body={t('m.community.noPosts.body')} />
         ) : tab === 'faq' ? (
-          <EmptyState title="No FAQ yet" body={faq?.canEdit ? 'Add the questions members ask most.' : 'Moderators can add answers to common questions here.'} />
+          <EmptyState title={t('m.community.noFaq.title')} body={faq?.canEdit ? t('m.community.noFaq.editor') : t('m.community.noFaq.body')} />
         ) : (
-          <EmptyState title="No members to show" />
+          <EmptyState title={t('m.community.noMembers')} />
         )
       }
       ListFooterComponent={tab === 'faq' && faq?.canEdit && !locked ? <AddFaq slug={slug} onAdded={loadFaq} /> : null}
@@ -197,7 +204,7 @@ export default function CommunityScreen() {
         ) : item.member ? (
           <Row
             title={item.member.user.displayName}
-            subtitle={`@${item.member.user.username}${item.member.role !== 'member' ? ` · ${item.member.role}` : ''}`}
+            subtitle={`@${item.member.user.username}${item.member.role !== 'member' ? ` · ${roleLabel(item.member.role, t)}` : ''}`}
             start={<Avatar name={item.member.user.displayName} url={item.member.user.avatarUrl} size={36} />}
           />
         ) : null
@@ -208,6 +215,7 @@ export default function CommunityScreen() {
 
 function FaqItem({ entry, canEdit, onRemove }: { entry: FaqEntry; canEdit: boolean; onRemove: () => void }) {
   const c = useColors();
+  const { t } = useT();
   const [open, setOpen] = useState(false);
   return (
     <Card style={{ padding: 0 }}>
@@ -217,13 +225,13 @@ function FaqItem({ entry, canEdit, onRemove }: { entry: FaqEntry; canEdit: boole
         onPress={() => setOpen(!open)}
         style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], padding: space[4] }}
       >
-        <Text style={{ flex: 1, color: c.ink, fontWeight: '700', fontSize: 15 }}>{entry.question}</Text>
+        <Text style={[{ flex: 1, color: c.ink, fontWeight: '700', fontSize: 15 }, userText]}>{entry.question}</Text>
         <Icon name={open ? 'chevron-up' : 'chevron-down'} size={18} color={c.inkMuted} />
       </Pressable>
       {open ? (
         <View style={{ paddingHorizontal: space[4], paddingBottom: space[4], gap: space[2] }}>
-          <Text style={{ color: c.ink, lineHeight: 21 }}>{entry.answer}</Text>
-          {canEdit ? <Button label="Remove" variant="ghost" size="sm" style={{ alignSelf: 'flex-start' }} onPress={onRemove} /> : null}
+          <Text style={[{ color: c.ink, lineHeight: 21 }, userText]}>{entry.answer}</Text>
+          {canEdit ? <Button label={t('m.common.remove')} variant="ghost" size="sm" style={{ alignSelf: 'flex-start' }} onPress={onRemove} /> : null}
         </View>
       ) : null}
     </Card>
@@ -231,18 +239,26 @@ function FaqItem({ entry, canEdit, onRemove }: { entry: FaqEntry; canEdit: boole
 }
 
 function AddFaq({ slug, onAdded }: { slug: string; onAdded: () => Promise<void> }) {
+  const { t } = useT();
   const [q, setQ] = useState('');
   const [a, setA] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
     <Card style={{ gap: space[3], marginTop: space[3] }}>
-      <Title>Add a question</Title>
+      <Title>{t('m.faq.add.title')}</Title>
       {error ? <Notice tone="danger">{error}</Notice> : null}
-      <Field label="Question" value={q} onChangeText={setQ} maxLength={300} />
-      <Field label="Answer" value={a} onChangeText={setA} multiline maxLength={4000} style={{ minHeight: 100, textAlignVertical: 'top', paddingTop: 12 }} />
+      <Field label={t('m.faq.question')} value={q} onChangeText={setQ} maxLength={300} />
+      <Field
+        label={t('m.faq.answer')}
+        value={a}
+        onChangeText={setA}
+        multiline
+        maxLength={4000}
+        style={{ minHeight: 100, textAlignVertical: 'top', paddingTop: 12 }}
+      />
       <Button
-        label={saving ? 'Adding…' : 'Add to FAQ'}
+        label={saving ? t('m.faq.adding') : t('m.faq.add')}
         disabled={!q.trim() || !a.trim() || saving}
         onPress={async () => {
           setSaving(true);

@@ -6,10 +6,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MediaStream, RTCPeerConnection } from 'react-native-webrtc';
 import type { CallInfo } from '../../../packages/api-client/src/index';
 import { client, errorMessage } from './api';
+import { useT } from './i18n';
+import { tr } from './locale';
 import { configureCallNotifications } from './push';
 import { useRealtime, useSession } from './session';
 import { gradient, radius, space } from './theme';
-import { Avatar, Icon, useColors, type IconName } from './ui';
+import { Avatar, Icon, useColors, userText, type IconName } from './ui';
 import { audio, callsSupported, rtc } from './webrtc';
 
 type Phase = 'idle' | 'incoming' | 'outgoing' | 'active';
@@ -30,17 +32,13 @@ class PermissionError extends Error {}
 class UnsupportedError extends Error {}
 
 function explain(e: unknown, action: 'call' | 'answer') {
-  if (e instanceof UnsupportedError)
-    return Alert.alert(
-      'Calls need the full app',
-      'Calls use native audio and video that Expo Go does not include. Install a development build of YAPILAPI to make and answer calls.',
-    );
+  if (e instanceof UnsupportedError) return Alert.alert(tr('m.calls.unsupported.title'), tr('m.calls.unsupported.body'));
   if (e instanceof PermissionError)
-    return Alert.alert(e.message, 'Allow microphone and camera access for YAPILAPI in Settings, then try again.', [
-      { text: 'Not now', style: 'cancel' },
-      { text: 'Open Settings', onPress: () => void Linking.openSettings() },
+    return Alert.alert(e.message, tr('m.calls.blocked.body'), [
+      { text: tr('m.common.notNow'), style: 'cancel' },
+      { text: tr('m.common.openSettings'), onPress: () => void Linking.openSettings() },
     ]);
-  Alert.alert(action === 'call' ? "Couldn't start the call" : "Couldn't answer the call", errorMessage(e));
+  Alert.alert(action === 'call' ? tr('m.calls.startFailed') : tr('m.calls.answerFailed'), errorMessage(e));
 }
 
 /**
@@ -56,6 +54,7 @@ function explain(e: unknown, action: 'call' | 'answer') {
  */
 export function CallsProvider({ children }: { children: ReactNode }) {
   const { me, setKeepAlive, waitForRealtime } = useSession();
+  const { t, lang } = useT();
   const [call, setCall] = useState<CallInfo | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
   const [local, setLocal] = useState<MediaStream | null>(null);
@@ -112,16 +111,16 @@ export function CallsProvider({ children }: { children: ReactNode }) {
     try {
       stream = await rtc.mediaDevices.getUserMedia({ audio: true, video: kind === 'video' ? { facingMode: 'user' } : false });
     } catch {
-      throw new PermissionError(kind === 'video' ? 'Camera and microphone are blocked' : 'Microphone is blocked');
+      throw new PermissionError(kind === 'video' ? tr('m.calls.blocked.both') : tr('m.calls.blocked.mic'));
     }
     if (!stream.getAudioTracks().length) {
       stream.getTracks().forEach((t) => t.stop());
       stream.release();
-      throw new PermissionError('Microphone is blocked');
+      throw new PermissionError(tr('m.calls.blocked.mic'));
     }
     if (kind === 'video' && !stream.getVideoTracks().length) {
       setCameraOff(true);
-      flash('Camera access is off, so they will only hear you.');
+      flash(tr('m.calls.cameraBlocked'));
     }
     localRef.current = stream;
     setLocal(stream);
@@ -167,7 +166,7 @@ export function CallsProvider({ children }: { children: ReactNode }) {
       };
       created.onconnectionstatechange = () => {
         if (created.connectionState === 'connected') setConnectedAt((t) => t ?? Date.now());
-        if (created.connectionState === 'failed') flash('The connection dropped. Try calling again.');
+        if (created.connectionState === 'failed') flash(tr('m.calls.dropped'));
       };
       peers.current.set(userId, created);
       return created;
@@ -183,7 +182,7 @@ export function CallsProvider({ children }: { children: ReactNode }) {
 
   const start = useCallback(
     async (conversationId: string, kind: Kind) => {
-      if (callRef.current || starting.current) return void Alert.alert("You're already in a call");
+      if (callRef.current || starting.current) return void Alert.alert(tr('m.calls.busy'));
       starting.current = true;
       try {
         await getMedia(kind);
@@ -311,12 +310,12 @@ export function CallsProvider({ children }: { children: ReactNode }) {
           return n;
         });
         if (cur.participants.length === 2) {
-          flash(e.type === 'call.declined' ? 'Call declined' : 'Call ended');
+          flash(e.type === 'call.declined' ? tr('m.calls.declined') : tr('m.calls.ended'));
           cleanup();
         }
       }
     } catch {
-      flash('The call hit a problem. Try calling again.');
+      flash(tr('m.calls.problem'));
     }
   });
 
@@ -324,17 +323,17 @@ export function CallsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (phase !== 'incoming' && phase !== 'outgoing') return;
     const id = setTimeout(() => {
-      flash(phase === 'incoming' ? 'Missed call' : 'No answer');
+      flash(phase === 'incoming' ? tr('m.calls.missed') : tr('m.calls.noAnswer'));
       void hangUp();
     }, RING_MS);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  // Push: the call_incoming category (Answer / Decline) and taps on call notifications.
+  // Push: the call_incoming category (Answer / Decline, in the app's language) and taps on call notifications.
   useEffect(() => {
     void configureCallNotifications();
-  }, []);
+  }, [lang]);
   useEffect(() => {
     if (!me) return;
     const handle = async (resp: Notifications.NotificationResponse | null) => {
@@ -346,11 +345,11 @@ export function CallsProvider({ children }: { children: ReactNode }) {
       if (callRef.current) return;
       try {
         const { call: c } = await api.calls.get(data.entityId);
-        if (c.status !== 'ringing') return flash('Missed call');
+        if (c.status !== 'ringing') return flash(tr('m.calls.missed'));
         ringIncoming(c);
         if (resp.actionIdentifier === 'answer') void answer(c);
       } catch {
-        flash('That call has ended.');
+        flash(tr('m.calls.over'));
       }
     };
     void Notifications.getLastNotificationResponseAsync().then(handle);
@@ -360,7 +359,7 @@ export function CallsProvider({ children }: { children: ReactNode }) {
   }, [me, flash, ringIncoming]);
 
   const others = call ? call.participants.filter((p) => p !== me?.id) : [];
-  const title = others.map((id) => names[id]?.name ?? 'Someone').join(', ') || 'Call';
+  const title = others.map((id) => names[id]?.name ?? t('m.calls.someone')).join(', ') || t('m.calls.call');
 
   return (
     <Ctx.Provider value={{ start, supported: callsSupported }}>
@@ -416,7 +415,7 @@ function Toast({ text }: { text: string }) {
   const c = useColors();
   const insets = useSafeAreaInsets();
   return (
-    <View pointerEvents="none" style={{ position: 'absolute', top: insets.top + 8, left: 16, right: 16, alignItems: 'center' }}>
+    <View pointerEvents="none" style={{ position: 'absolute', top: insets.top + 8, start: 16, end: 16, alignItems: 'center' }}>
       <View accessibilityLiveRegion="polite" style={{ backgroundColor: c.ink, borderRadius: radius.full, paddingHorizontal: 18, paddingVertical: 10 }}>
         <Text style={{ color: c.ground, fontWeight: '600' }}>{text}</Text>
       </View>
@@ -458,12 +457,18 @@ function CallView(p: {
   onSpeaker: () => void;
 }) {
   const c = useColors();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
   const elapsed = useElapsed(p.connectedAt);
   const video = p.call.kind === 'video';
   const remote = Object.values(p.remotes).find((s) => s.getVideoTracks().length);
   const RTCView = rtc?.RTCView;
-  const status = p.phase === 'incoming' ? `Incoming ${p.call.kind} call` : p.phase === 'outgoing' ? 'Calling…' : (elapsed ?? 'Connecting…');
+  const status =
+    p.phase === 'incoming'
+      ? t(p.call.kind === 'video' ? 'm.calls.incoming.video' : 'm.calls.incoming.audio')
+      : p.phase === 'outgoing'
+        ? t('m.calls.calling')
+        : (elapsed ?? t('m.calls.connecting'));
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0B0C14' }}>
@@ -475,23 +480,26 @@ function CallView(p: {
 
       <View style={{ paddingTop: insets.top + space[6], alignItems: 'center', gap: space[3], paddingHorizontal: space[6] }}>
         {!(video && remote && p.phase === 'active') ? <Avatar name={p.title} url={p.avatarUrl} size={104} /> : null}
-        <Text style={s.name} numberOfLines={2}>
+        <Text style={[s.name, userText]} numberOfLines={2}>
           {p.title}
         </Text>
         <Text style={s.status} accessibilityLiveRegion="polite">
           {status}
         </Text>
         {p.notice ? <Text style={[s.status, { color: '#FFBE3D' }]}>{p.notice}</Text> : null}
-        {!callsSupported ? (
-          <Text style={[s.status, { textAlign: 'center' }]}>
-            Calls need the development build of YAPILAPI. Expo Go can't carry audio or video, so you can only decline here.
-          </Text>
-        ) : null}
+        {!callsSupported ? <Text style={[s.status, { textAlign: 'center' }]}>{t('m.calls.unsupported.note')}</Text> : null}
       </View>
 
       {video && p.local && RTCView && !p.cameraOff && p.phase !== 'incoming' ? (
         <View style={[s.self, { top: insets.top + space[4] }]}>
-          <RTCView streamURL={p.local.toURL()} mirror={p.frontCamera} objectFit="cover" zOrder={1} style={{ flex: 1 }} accessibilityLabel="Your camera" />
+          <RTCView
+            streamURL={p.local.toURL()}
+            mirror={p.frontCamera}
+            objectFit="cover"
+            zOrder={1}
+            style={{ flex: 1 }}
+            accessibilityLabel={t('m.calls.yourCamera')}
+          />
         </View>
       ) : null}
 
@@ -499,26 +507,31 @@ function CallView(p: {
 
       {p.phase === 'incoming' ? (
         <View style={[s.controls, { paddingBottom: insets.bottom + space[8], justifyContent: 'space-evenly' }]}>
-          <RoundButton label="Decline" icon="call" rotate tone="danger" onPress={p.onDecline} />
-          {callsSupported ? <RoundButton label="Answer" icon={video ? 'videocam' : 'call'} tone="accept" onPress={p.onAnswer} /> : null}
+          <RoundButton label={t('m.common.decline')} icon="call" rotate tone="danger" onPress={p.onDecline} />
+          {callsSupported ? <RoundButton label={t('m.calls.answer')} icon={video ? 'videocam' : 'call'} tone="accept" onPress={p.onAnswer} /> : null}
         </View>
       ) : (
         <View style={[s.controls, { paddingBottom: insets.bottom + space[6] }]}>
-          <RoundButton label={p.muted ? 'Unmute' : 'Mute'} icon={p.muted ? 'mic-off' : 'mic'} on={p.muted} onPress={p.onMute} />
+          <RoundButton label={p.muted ? t('m.calls.unmute') : t('m.calls.mute')} icon={p.muted ? 'mic-off' : 'mic'} on={p.muted} onPress={p.onMute} />
           {video ? (
             <RoundButton
-              label={p.cameraOff ? 'Camera on' : 'Camera off'}
+              label={p.cameraOff ? t('m.calls.cameraOn') : t('m.calls.cameraOff')}
               icon={p.cameraOff ? 'videocam-off' : 'videocam'}
               on={p.cameraOff}
               onPress={p.onCamera}
             />
           ) : null}
-          {video ? <RoundButton label="Switch camera" icon="camera-reverse" onPress={p.onFlip} disabled={p.cameraOff} /> : null}
-          <RoundButton label={p.speaker ? 'Speaker off' : 'Speaker'} icon={p.speaker ? 'volume-high' : 'ear'} on={p.speaker} onPress={p.onSpeaker} />
-          <RoundButton label="Hang up" icon="call" rotate tone="danger" onPress={p.onHangUp} />
+          {video ? <RoundButton label={t('m.calls.switchCamera')} icon="camera-reverse" onPress={p.onFlip} disabled={p.cameraOff} /> : null}
+          <RoundButton
+            label={p.speaker ? t('m.calls.speakerOff') : t('m.calls.speaker')}
+            icon={p.speaker ? 'volume-high' : 'ear'}
+            on={p.speaker}
+            onPress={p.onSpeaker}
+          />
+          <RoundButton label={t('m.calls.hangUp')} icon="call" rotate tone="danger" onPress={p.onHangUp} />
         </View>
       )}
-      <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 4 }}>
+      <View pointerEvents="none" style={{ position: 'absolute', start: 0, end: 0, bottom: 0, height: 4 }}>
         <LinearGradient {...gradient(c)} style={{ flex: 1 }} />
       </View>
     </View>
@@ -579,7 +592,7 @@ const s = StyleSheet.create({
   status: { color: 'rgba(255,255,255,0.78)', fontSize: 16, fontWeight: '500' },
   self: {
     position: 'absolute',
-    right: space[4],
+    end: space[4],
     width: 112,
     height: 160,
     borderRadius: radius.md,
