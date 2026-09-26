@@ -2,6 +2,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Image, Linking, ScrollView, Text, View } from 'react-native';
+import type { EditorParamsInput } from '../../../../packages/shared/src/filters';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
 import type { Sound } from '../../../../packages/shared/src/types';
 import { client, errorMessage, mediaUrl } from '../../lib/api';
@@ -17,6 +18,7 @@ import {
   type Picked,
   type Uploaded,
 } from '../../lib/media';
+import { PhotoEditor, VideoEditor } from '../../lib/editor';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
 import { Button, Card, Field, Icon, Notice, Screen, Segmented, SwitchRow, useColors, useTabBarSpace, userText } from '../../lib/ui';
@@ -73,6 +75,8 @@ export default function Create() {
   const [closeFriends, setCloseFriends] = useState(false);
   // Posting for subscribers needs a subscription plan (set up in Studio on the web).
   const [hasPlans, setHasPlans] = useState(false);
+  const [editing, setEditing] = useState<Picked | null>(null);
+  const [applying, setApplying] = useState(false);
   const uploading = progress !== null;
   useEffect(() => {
     if (!me) return;
@@ -134,13 +138,28 @@ export default function Create() {
     if (!asset) return;
     const check = validate(asset);
     if (check) return setError(check);
+    // Photos (not GIFs) and videos open in the editor first.
+    if (asset.type === 'video' || (asset.type === 'image' && asset.mimeType !== 'image/gif')) setEditing(asset);
+    else void upload(asset, null);
+  }
+
+  /** Upload the picked (or edited) file, then have the server apply the look, trim and the rest. */
+  async function upload(asset: Picked, edits: EditorParamsInput | null) {
     setProgress(0);
     try {
       const m = await uploadPicked(asset, setProgress);
-      setMedia({ ...m, local: asset.uri, seconds: asset.duration ? asset.duration / 1000 : null });
+      const seconds = asset.duration ? asset.duration / 1000 : null;
+      if (!edits) return setMedia({ ...m, local: asset.uri, seconds });
+      setApplying(true);
+      const api = await client();
+      const started = await api.media.edit(m.id, edits);
+      const done = await api.media.waitUntilReady(started.media.id);
+      const url = done.kind === 'video' ? (done.variants.mp4 ?? done.url) : (done.variants.large ?? done.variants.medium ?? done.url);
+      setMedia({ id: done.id, kind: m.kind, url, local: mediaUrl(url), seconds: done.durationMs ? done.durationMs / 1000 : seconds });
     } catch (e) {
       setError(errorMessage(e));
     } finally {
+      setApplying(false);
       setProgress(null);
     }
   }
@@ -148,10 +167,7 @@ export default function Create() {
   function validate(asset: Picked): string | null {
     const video = asset.type === 'video';
     if (kind === 'reel' && !video) return t('m.create.notVideo');
-    // Check the length before uploading a long file for nothing.
-    const seconds = asset.duration ? asset.duration / 1000 : 0;
-    const maxSeconds = me?.plus ? PLUS_REEL_MAX_SECONDS : REEL_MAX_SECONDS;
-    if (kind === 'reel' && seconds > maxSeconds) return t('m.create.reelTooLongMinutes', { minutes: maxSeconds / 60, length: clock(seconds) });
+    // A reel longer than the limit opens in the editor, which keeps a part that fits.
     const maxBytes = me?.plus ? PLUS_RESUMABLE_MAX_BYTES : RESUMABLE_MAX_BYTES;
     if (asset.fileSize && asset.fileSize > maxBytes) return t('m.create.tooLargeSize', { size: Math.round(maxBytes / 1024 / 1024) });
     return null;
@@ -231,15 +247,17 @@ export default function Create() {
             {media ? <Preview media={media} onRemove={() => setMedia(null)} /> : null}
             <Button
               label={
-                uploading
-                  ? t('m.create.uploading', { progress: number(progress ?? 0, { style: 'percent' }) })
-                  : kind === 'reel'
-                    ? media
-                      ? t('m.create.replaceVideo')
-                      : t('m.create.chooseVideo')
-                    : media
-                      ? t('m.create.replaceMedia')
-                      : t('m.create.choosePhotoVideo')
+                applying
+                  ? t('m.editor.applying')
+                  : uploading
+                    ? t('m.create.uploading', { progress: number(progress ?? 0, { style: 'percent' }) })
+                    : kind === 'reel'
+                      ? media
+                        ? t('m.create.replaceVideo')
+                        : t('m.create.chooseVideo')
+                      : media
+                        ? t('m.create.replaceMedia')
+                        : t('m.create.choosePhotoVideo')
               }
               icon={kind === 'reel' ? 'videocam-outline' : 'image-outline'}
               variant="secondary"
@@ -317,6 +335,31 @@ export default function Create() {
         />
       </Card>
       {kind === 'post' ? <Button label={t('m.real.capture')} icon="camera-outline" variant="secondary" onPress={() => router.push('/real')} /> : null}
+      {editing?.type === 'video' ? (
+        <VideoEditor
+          asset={editing}
+          maxSeconds={me.plus ? PLUS_REEL_MAX_SECONDS : REEL_MAX_SECONDS}
+          mustFit={kind === 'reel'}
+          onCancel={() => setEditing(null)}
+          onDone={(edits) => {
+            setEditing(null);
+            void upload(editing, edits);
+          }}
+        />
+      ) : editing ? (
+        <PhotoEditor
+          asset={editing}
+          onCancel={() => setEditing(null)}
+          onDone={(p) => {
+            setEditing(null);
+            const edited =
+              p.uri === editing.uri
+                ? editing
+                : { ...editing, uri: p.uri, width: p.width, height: p.height, mimeType: 'image/jpeg', fileName: 'photo.jpg', fileSize: undefined };
+            void upload(edited, p.edits);
+          }}
+        />
+      ) : null}
     </ScrollView>
   );
 }

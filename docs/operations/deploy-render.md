@@ -21,6 +21,16 @@ About $30/month to start, in Frankfurt (the closest Render region to West and Ea
    - note the S3 endpoint (`https://<account id>.r2.cloudflarestorage.com`), the access key id and the secret.
    The bucket stays private: the app serves media itself.
 
+### Optional, can be added later
+
+- **Paystack** (mobile money and local cards in Nigeria, Ghana, Kenya and South Africa): `PAYSTACK_SECRET_KEY` and `PAYSTACK_PUBLIC_KEY`. Webhook: `https://yapilapi-api.onrender.com/v1/payments/webhook/paystack`.
+- **Twilio Verify** (phone confirmation by text):
+  - set `SMS_PROVIDER=twilio` with `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `TWILIO_VERIFY_SERVICE_SID`;
+  - without it, people confirm by email, and asking for a text says it isn't available yet.
+- **AWS Rekognition** (checks photos and videos for nudity and violence): `MEDIA_MODERATION_PROVIDER=rekognition` with `REKOGNITION_ACCESS_KEY_ID` and `REKOGNITION_SECRET_ACCESS_KEY`. Strongly recommended before opening sign-ups to everyone.
+
+In production, new accounts must confirm their email (or phone) before posting publicly or messaging people who aren't friends, so email must work from day one.
+
 ## Deploy
 
 1. In Render: **New > Blueprint**, connect `github.com/BastouFA/Yapilapi`, branch `main`.

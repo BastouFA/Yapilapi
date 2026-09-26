@@ -52,6 +52,7 @@ import economyModule from './modules/economy.ts';
 import adsModule from './modules/ads.ts';
 import familyModule from './modules/family.ts';
 import studioModule from './modules/studio.ts';
+import editorModule from './modules/editor.ts';
 import tagsModule from './modules/tags.ts';
 import soundsModule from './modules/sounds.ts';
 import plusModule from './modules/plus.ts';
@@ -66,6 +67,7 @@ import { processWebhooks } from './lib/webhooks.ts';
 import { processJobs } from './lib/jobs.ts';
 import { mediaJobHandlers } from './lib/media-processing.ts';
 import { studioJobHandlers } from './lib/studio.ts';
+import { editorJobHandlers } from './lib/media-edit.ts';
 import { liveRecordingJobHandlers } from './lib/live-recording.ts';
 import { shareVideoJobHandlers } from './lib/share-video.ts';
 import { fastifyTracingPlugin, traceLogMixin } from './lib/tracing.ts';
@@ -344,6 +346,7 @@ export async function buildApp(
     adsModule,
     familyModule,
     studioModule,
+    editorModule,
     plusModule,
     invitesModule,
     growthModule,
@@ -367,6 +370,7 @@ export async function buildApp(
   const jobHandlers = {
     ...mediaJobHandlers({ db, storage, moderator: ctx.mediaModerator, realtime: ctx.realtime }),
     ...studioJobHandlers({ db, storage, transcription: ctx.transcription }),
+    ...editorJobHandlers({ db, storage }),
     ...liveRecordingJobHandlers({ db, storage, recordingsDir: config.LIVE_RECORDINGS_DIR }),
     ...shareVideoJobHandlers({ db, storage }),
   };

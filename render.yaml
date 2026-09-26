@@ -65,6 +65,30 @@ envVarGroups:
         value: dev
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Optional: mobile money and local cards (NGN, GHS, KES, ZAR) through Paystack. Both keys or neither.
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: PAYSTACK_PUBLIC_KEY
+        sync: false
+      # Optional: confirming phone numbers by text (Twilio Verify). Without it, people confirm by email.
+      - key: SMS_PROVIDER
+        value: dev
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_VERIFY_SERVICE_SID
+        sync: false
+      # Photo and video checks for nudity and violence. "none" until you add AWS Rekognition keys, then set
+      # MEDIA_MODERATION_PROVIDER=rekognition. Recommended before opening sign-ups to the public.
+      - key: MEDIA_MODERATION_PROVIDER
+        value: none
+      - key: REKOGNITION_REGION
+        value: eu-central-1
+      - key: REKOGNITION_ACCESS_KEY_ID
+        sync: false
+      - key: REKOGNITION_SECRET_ACCESS_KEY
+        sync: false
       # Optional: browser push notifications (generate with `npx web-push generate-vapid-keys`).
       - key: VAPID_PUBLIC_KEY
         sync: false

@@ -16,6 +16,7 @@ import {
   type Sound,
   type StoryVisibility,
   type Visibility,
+  type EditorParamsInput,
 } from '@yapilapi/shared';
 
 /** Posts can be for subscribers, stories for close friends; one picker holds either. */
@@ -23,6 +24,8 @@ type Audience = Visibility | StoryVisibility;
 import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { isVerificationError, VerifyPrompt } from '@/components/Verification';
 import { SimilarQuestions } from '@/components/CommunityExtras';
+import { PhotoEditor } from '@/components/editor/PhotoEditor';
+import { VideoEditor } from '@/components/editor/VideoEditor';
 import { SoundPicker, SoundPlayButton } from '@/components/SoundPicker';
 import { useSession } from '../../providers';
 
@@ -31,6 +34,9 @@ type Uploaded = { id: string; kind: 'image' | 'video' | 'audio'; url: string; al
 /** Reels: 3 minutes, or 10 minutes with YAPILAPI Plus (the API enforces the same limits). */
 const REEL_MAX_SECONDS = 180;
 const PLUS_REEL_MAX_SECONDS = 600;
+
+/** Photos and videos that open in the editor before uploading (GIFs keep their animation, so they skip it). */
+const EDITABLE = new Set(['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm']);
 
 /** A video file's length, read in the browser before uploading. */
 function videoSeconds(file: File): Promise<number> {
@@ -121,33 +127,63 @@ function Create() {
         .catch(() => {});
   }, [me]);
 
-  async function upload(files: FileList | null) {
+  // Files waiting for the editor, one at a time, and uploads running one after another.
+  const [queue, setQueue] = useState<File[]>([]);
+  const [queued, setQueued] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const uploads = useRef<Promise<void>>(Promise.resolve());
+  const pendingUploads = useRef(0);
+
+  function choose(files: FileList | null) {
     if (!files?.length) return;
-    if (kind === 'reel') {
-      const f = files[0]!;
-      if (!isVideoFile(f)) return toast('A reel is a video.');
-      // Check the length before uploading a long file for nothing.
-      const seconds = await videoSeconds(f);
-      if (seconds > reelMax)
-        return toast(
-          `Reels can be up to ${reelMax / 60} minutes${me?.plus ? '' : ', or 10 minutes with YAPILAPI Plus'}. This one is ${Math.round(seconds / 60)} minutes; trim it in Studio first.`,
-        );
-    }
+    const limit = kind === 'post' ? 10 : 1;
+    const room = Math.max(0, limit - media.length - queue.length - pendingUploads.current);
+    const picked = Array.from(files).slice(0, room);
+    if (fileRef.current) fileRef.current.value = '';
+    if (kind === 'reel' && picked.some((f) => !isVideoFile(f))) return toast('A reel is a video.');
+    // Photos (not GIFs) and videos open in the editor first; anything else uploads as it is.
+    const editable = picked.filter((f) => EDITABLE.has(f.type));
+    for (const f of picked.filter((f) => !EDITABLE.has(f.type))) enqueueUpload(f, null);
+    setQueue((q) => [...q, ...editable]);
+    setQueued((n) => (queue.length ? n : 0) + editable.length);
+  }
+
+  function nextInQueue() {
+    setQueue((q) => q.slice(1));
+  }
+
+  /** Upload one file (and, for an edited video, apply the edits on the server), after any upload already running. */
+  function enqueueUpload(f: File, edits: EditorParamsInput | null) {
+    pendingUploads.current++;
     setUploading(true);
-    try {
-      const limit = kind === 'post' ? 10 : 1;
-      for (const f of Array.from(files).slice(0, Math.max(0, limit - media.length))) {
+    uploads.current = uploads.current.then(async () => {
+      try {
+        if (kind === 'reel' && !edits && isVideoFile(f)) {
+          // Check the length before uploading a long file for nothing.
+          const seconds = await videoSeconds(f);
+          if (seconds > reelMax + 0.5)
+            return toast(
+              `Reels can be up to ${reelMax / 60} minutes${me?.plus ? '' : ', or 10 minutes with YAPILAPI Plus'}. This one is ${Math.round(seconds / 60)} minutes; trim it in the editor.`,
+            );
+        }
         // Large files (mostly video) go through resumable, chunked uploads.
         const { media: m } = f.size > 8 * 1024 * 1024 ? await api.uploads.resumable(f, (p) => setProgress(Math.round(p * 100))) : await api.media.upload(f);
-        setMedia((cur) => [...cur, { id: m.id, kind: m.kind, url: m.url, altText: '' }]);
+        setProgress(null);
+        if (edits && m.kind === 'video') {
+          setEditing(true);
+          const { media: started } = await api.media.edit(m.id, edits);
+          const done = await api.media.waitUntilReady(started.id);
+          setMedia((cur) => [...cur, { id: done.id, kind: 'video', url: done.variants.mp4 ?? done.url, altText: '' }]);
+        } else setMedia((cur) => [...cur, { id: m.id, kind: m.kind, url: m.url, altText: '' }]);
+      } catch (e) {
+        toast(errorMessage(e));
+      } finally {
+        setEditing(false);
+        setProgress(null);
+        pendingUploads.current--;
+        if (!pendingUploads.current) setUploading(false);
       }
-    } catch (e) {
-      toast(errorMessage(e));
-    } finally {
-      setUploading(false);
-      setProgress(null);
-      if (fileRef.current) fileRef.current.value = '';
-    }
+    });
   }
 
   async function suggestCaption() {
@@ -219,323 +255,361 @@ function Create() {
   }
 
   return (
-    <form className="yp-shell__inner" onSubmit={publish}>
-      <div className="yp-topbar">
-        <h1>{t('create.title')}</h1>
-      </div>
-      <Segments
-        label="What to create"
-        value={kind}
-        onChange={(k) => {
-          setKind(k);
-          // Keep only what the new kind can hold.
-          if (k !== 'post') {
-            setPoll(null);
-            setMedia((m) => m.filter((x) => k !== 'reel' || x.kind === 'video').slice(0, 1));
-          }
-          if (k === 'story' && (visibility === 'selected' || visibility === 'subscribers')) setVisibility('friends');
-          if (k !== 'story' && visibility === 'close_friends') setVisibility('friends');
-        }}
-        options={[
-          { id: 'post', label: 'Post' },
-          { id: 'reel', label: 'Reel' },
-          { id: 'story', label: 'Story' },
-        ]}
-      />
-      {kind === 'reel' && remixOf ? (
-        originalMissing ? (
-          <Alert tone="danger">That reel isn&apos;t available to {remixMode === 'duet' ? 'duet' : 'remix'}.</Alert>
-        ) : original ? (
-          <div className="remix-source">
-            {original.media[0] ? (
-              <video
-                className="remix-source__video"
-                src={(original.media[0].variants as Record<string, string> | undefined)?.mp4 ?? original.media[0].url}
-                poster={original.media[0].posterUrl ?? undefined}
-                muted
-                playsInline
-                preload="metadata"
-                aria-hidden
-              />
-            ) : null}
-            <div className="remix-source__text">
-              <strong>
-                {remixMode === 'duet' ? 'Duet with' : 'Remix of'} <bdi>@{original.author.username}</bdi>
-              </strong>
-              <span className="muted">
-                {remixMode === 'duet'
-                  ? 'Add your own video. It plays beside the original, which stays on the left.'
-                  : 'Add your own video. It plays with the sound from the original.'}
-              </span>
-              {original.sound ? (
-                <span className="muted">
-                  Sound: <bdi>{original.sound.title}</bdi>
-                </span>
-              ) : null}
-            </div>
-          </div>
-        ) : (
-          <p className="muted">Loading the original reel</p>
-        )
-      ) : null}
-      <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-        {kind === 'post'
-          ? 'Text, photos, videos, a link or a poll, on your profile or in a community.'
-          : kind === 'reel'
-            ? `One vertical video up to ${reelMax / 60} minutes, shown full screen in Reels and on your profile.`
-            : 'A photo, video or a few words for your people. It disappears when you choose.'}
-      </p>
-      {error ? <Alert tone="danger">{error}</Alert> : null}
-      {needsVerify || (me?.needsVerification && kind !== 'story' && (visibility === 'public' || !!communityId)) ? <VerifyPrompt action="post" /> : null}
-
-      <div className="composer-box">
-        <label htmlFor="body" className="yp-visually-hidden">
-          {t('create.placeholder')}
-        </label>
-        <AutocompleteText
-          id="body"
-          value={body}
-          onValueChange={setBody}
-          placeholder={kind === 'reel' ? 'Write a caption' : kind === 'story' ? 'Add a few words (optional)' : t('create.placeholder')}
-          maxLength={kind === 'story' ? 500 : kind === 'reel' ? 2200 : 5000}
-          aria-invalid={!!fields.body}
-        />
-        {fields.body ? <span className="yp-field__error">{fields.body}</span> : null}
-        {kind === 'post' && communityId && communities.find((c) => c.id === communityId) ? (
-          <SimilarQuestions slug={communities.find((c) => c.id === communityId)!.slug} text={body} />
-        ) : null}
-
-        {media.length ? (
-          <div className="thumbs">
-            {media.map((m, i) => (
-              <div key={m.id} className="stack-sm" style={{ width: 96 }}>
-                <figure>
-                  {m.kind === 'video' ? <video src={m.url} muted /> : <img src={m.url} alt={m.altText} />}
-                  <button type="button" aria-label="Remove" onClick={() => setMedia((cur) => cur.filter((x) => x.id !== m.id))}>
-                    ×
-                  </button>
-                </figure>
-                <input
-                  className="yp-input"
-                  style={{ height: 32, fontSize: 12 }}
-                  placeholder="Alt text"
-                  aria-label={`Describe image ${i + 1} for people using screen readers`}
-                  value={m.altText}
-                  onChange={(e) => {
-                    const v = e.currentTarget.value;
-                    setMedia((cur) => cur.map((x) => (x.id === m.id ? { ...x, altText: v } : x)));
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        {poll ? (
-          <div className="stack-sm">
-            {poll.map((o, i) => (
-              <input
-                key={i}
-                className="yp-input"
-                placeholder={`Option ${i + 1}`}
-                aria-label={`Poll option ${i + 1}`}
-                value={o}
-                maxLength={80}
-                onChange={(e) => {
-                  const v = e.currentTarget.value;
-                  setPoll((p) => p!.map((x, j) => (j === i ? v : x)));
-                }}
-              />
-            ))}
-            <div className="row">
-              {poll.length < 6 ? (
-                <Button size="sm" variant="ghost" onClick={() => setPoll((p) => [...p!, ''])}>
-                  Add option
-                </Button>
-              ) : null}
-              <Button size="sm" variant="ghost" onClick={() => setPoll(null)}>
-                Remove poll
-              </Button>
-            </div>
-          </div>
-        ) : null}
-
-        <div className="row">
-          <input
-            ref={fileRef}
-            type="file"
-            accept={kind === 'reel' ? VIDEO_ACCEPT : MEDIA_ACCEPT}
-            multiple={kind === 'post'}
-            hidden
-            onChange={(e) => upload(e.currentTarget.files)}
-          />
-          <Button size="sm" variant="secondary" icon="image" loading={uploading} onClick={() => fileRef.current?.click()}>
-            {progress !== null ? `Uploading ${progress}%` : kind === 'reel' ? (media.length ? 'Replace video' : 'Choose a video') : 'Photo or video'}
-          </Button>
-          {kind === 'post' && !poll ? (
-            <Button size="sm" variant="secondary" icon="poll" onClick={() => setPoll(['', ''])}>
-              Poll
-            </Button>
-          ) : null}
-          <Button size="sm" variant="ghost" icon="sparkle" loading={aiLoading} onClick={suggestCaption}>
-            {t('create.aiCaption')}
-          </Button>
+    <>
+      <form className="yp-shell__inner" onSubmit={publish}>
+        <div className="yp-topbar">
+          <h1>{t('create.title')}</h1>
         </div>
-      </div>
-
-      {ai ? (
-        <AIPanel
-          title="Suggested caption"
-          notice={ai.notice}
-          actions={
-            <>
-              <Button
-                size="sm"
-                onClick={() => {
-                  setBody(ai.text);
-                  setAiUsed(true);
-                  setAi(null);
-                }}
-              >
-                Use this
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setAi(null)}>
-                Dismiss
-              </Button>
-            </>
-          }
-        >
-          {ai.text || 'No suggestion this time.'}
-        </AIPanel>
-      ) : null}
-
-      {kind === 'reel' && !remixOf ? (
-        <section className="stack-sm" aria-labelledby="sound-heading">
-          <h2 id="sound-heading" className="yp-field__label" style={{ margin: 0 }}>
-            Sound
-          </h2>
-          {sound ? (
-            <div className="sound-row sound-row--picked">
-              <SoundPlayButton sound={sound} />
-              <span className="sound-row__text">
-                <bdi className="sound-row__title">{sound.title}</bdi>
-                <span className="sound-row__meta">
-                  Plays instead of your video&apos;s own sound · <bdi>@{sound.owner.username}</bdi>
+        <Segments
+          label="What to create"
+          value={kind}
+          onChange={(k) => {
+            setKind(k);
+            // Keep only what the new kind can hold.
+            if (k !== 'post') {
+              setPoll(null);
+              setMedia((m) => m.filter((x) => k !== 'reel' || x.kind === 'video').slice(0, 1));
+            }
+            if (k === 'story' && (visibility === 'selected' || visibility === 'subscribers')) setVisibility('friends');
+            if (k !== 'story' && visibility === 'close_friends') setVisibility('friends');
+          }}
+          options={[
+            { id: 'post', label: 'Post' },
+            { id: 'reel', label: 'Reel' },
+            { id: 'story', label: 'Story' },
+          ]}
+        />
+        {kind === 'reel' && remixOf ? (
+          originalMissing ? (
+            <Alert tone="danger">That reel isn&apos;t available to {remixMode === 'duet' ? 'duet' : 'remix'}.</Alert>
+          ) : original ? (
+            <div className="remix-source">
+              {original.media[0] ? (
+                <video
+                  className="remix-source__video"
+                  src={(original.media[0].variants as Record<string, string> | undefined)?.mp4 ?? original.media[0].url}
+                  poster={original.media[0].posterUrl ?? undefined}
+                  muted
+                  playsInline
+                  preload="metadata"
+                  aria-hidden
+                />
+              ) : null}
+              <div className="remix-source__text">
+                <strong>
+                  {remixMode === 'duet' ? 'Duet with' : 'Remix of'} <bdi>@{original.author.username}</bdi>
+                </strong>
+                <span className="muted">
+                  {remixMode === 'duet'
+                    ? 'Add your own video. It plays beside the original, which stays on the left.'
+                    : 'Add your own video. It plays with the sound from the original.'}
                 </span>
-              </span>
-              <Button size="sm" variant="ghost" onClick={() => setSound(null)}>
-                Remove
-              </Button>
+                {original.sound ? (
+                  <span className="muted">
+                    Sound: <bdi>{original.sound.title}</bdi>
+                  </span>
+                ) : null}
+              </div>
             </div>
           ) : (
-            <TextField
-              label="Name your sound (optional)"
-              hint="Your video's own sound becomes a sound other people can use."
-              value={soundTitle}
-              maxLength={100}
-              onChange={(e) => setSoundTitle(e.currentTarget.value)}
-            />
-          )}
+            <p className="muted">Loading the original reel</p>
+          )
+        ) : null}
+        <p className="muted" style={{ margin: 0, fontSize: 14 }}>
+          {kind === 'post'
+            ? 'Text, photos, videos, a link or a poll, on your profile or in a community.'
+            : kind === 'reel'
+              ? `One vertical video up to ${reelMax / 60} minutes, shown full screen in Reels and on your profile.`
+              : 'A photo, video or a few words for your people. It disappears when you choose.'}
+        </p>
+        {error ? <Alert tone="danger">{error}</Alert> : null}
+        {needsVerify || (me?.needsVerification && kind !== 'story' && (visibility === 'public' || !!communityId)) ? <VerifyPrompt action="post" /> : null}
+
+        <div className="composer-box">
+          <label htmlFor="body" className="yp-visually-hidden">
+            {t('create.placeholder')}
+          </label>
+          <AutocompleteText
+            id="body"
+            value={body}
+            onValueChange={setBody}
+            placeholder={kind === 'reel' ? 'Write a caption' : kind === 'story' ? 'Add a few words (optional)' : t('create.placeholder')}
+            maxLength={kind === 'story' ? 500 : kind === 'reel' ? 2200 : 5000}
+            aria-invalid={!!fields.body}
+          />
+          {fields.body ? <span className="yp-field__error">{fields.body}</span> : null}
+          {kind === 'post' && communityId && communities.find((c) => c.id === communityId) ? (
+            <SimilarQuestions slug={communities.find((c) => c.id === communityId)!.slug} text={body} />
+          ) : null}
+
+          {media.length ? (
+            <div className="thumbs">
+              {media.map((m, i) => (
+                <div key={m.id} className="stack-sm" style={{ width: 96 }}>
+                  <figure>
+                    {m.kind === 'video' ? <video src={m.url} muted /> : <img src={m.url} alt={m.altText} />}
+                    <button type="button" aria-label="Remove" onClick={() => setMedia((cur) => cur.filter((x) => x.id !== m.id))}>
+                      ×
+                    </button>
+                  </figure>
+                  <input
+                    className="yp-input"
+                    style={{ height: 32, fontSize: 12 }}
+                    placeholder="Alt text"
+                    aria-label={`Describe image ${i + 1} for people using screen readers`}
+                    value={m.altText}
+                    onChange={(e) => {
+                      const v = e.currentTarget.value;
+                      setMedia((cur) => cur.map((x) => (x.id === m.id ? { ...x, altText: v } : x)));
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {poll ? (
+            <div className="stack-sm">
+              {poll.map((o, i) => (
+                <input
+                  key={i}
+                  className="yp-input"
+                  placeholder={`Option ${i + 1}`}
+                  aria-label={`Poll option ${i + 1}`}
+                  value={o}
+                  maxLength={80}
+                  onChange={(e) => {
+                    const v = e.currentTarget.value;
+                    setPoll((p) => p!.map((x, j) => (j === i ? v : x)));
+                  }}
+                />
+              ))}
+              <div className="row">
+                {poll.length < 6 ? (
+                  <Button size="sm" variant="ghost" onClick={() => setPoll((p) => [...p!, ''])}>
+                    Add option
+                  </Button>
+                ) : null}
+                <Button size="sm" variant="ghost" onClick={() => setPoll(null)}>
+                  Remove poll
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
           <div className="row">
-            <Button size="sm" variant="secondary" icon="music" onClick={() => setPicking(true)}>
-              {sound ? 'Choose another sound' : 'Choose a sound'}
+            <input
+              ref={fileRef}
+              type="file"
+              accept={kind === 'reel' ? VIDEO_ACCEPT : MEDIA_ACCEPT}
+              multiple={kind === 'post'}
+              hidden
+              onChange={(e) => choose(e.currentTarget.files)}
+            />
+            <Button size="sm" variant="secondary" icon="image" loading={uploading} onClick={() => fileRef.current?.click()}>
+              {editing
+                ? 'Applying your edits…'
+                : progress !== null
+                  ? `Uploading ${progress}%`
+                  : kind === 'reel'
+                    ? media.length
+                      ? 'Replace video'
+                      : 'Choose a video'
+                    : 'Photo or video'}
+            </Button>
+            {kind === 'post' && !poll ? (
+              <Button size="sm" variant="secondary" icon="poll" onClick={() => setPoll(['', ''])}>
+                Poll
+              </Button>
+            ) : null}
+            <Button size="sm" variant="ghost" icon="sparkle" loading={aiLoading} onClick={suggestCaption}>
+              {t('create.aiCaption')}
             </Button>
           </div>
-          <SoundPicker
-            open={picking}
-            onClose={() => setPicking(false)}
-            onPick={(s) => {
-              setSound(s);
-              setPicking(false);
-            }}
-          />
-        </section>
-      ) : null}
+        </div>
 
-      <div className="stack">
-        {kind === 'reel' ? null : kind === 'post' ? (
-          <Select label="Post in" value={communityId} onChange={(e) => setCommunityId(e.currentTarget.value)}>
-            <option value="">My profile</option>
-            {communities.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </Select>
-        ) : (
-          <Select label="Disappears after" value={expiresIn} onChange={(e) => setExpiresIn(e.currentTarget.value as typeof expiresIn)}>
-            <option value="1h">1 hour</option>
-            <option value="24h">24 hours</option>
-            <option value="permanent">Keep it</option>
-          </Select>
-        )}
-        {!communityId ? (
-          <Select label={t('create.visibility')} value={visibility} onChange={(e) => setVisibility(e.currentTarget.value as Audience)}>
-            {(kind === 'story' ? STORY_VISIBILITIES : POST_VISIBILITIES)
-              .filter((v) => (kind !== 'story' || (v !== 'selected' && v !== 'subscribers')) && (v !== 'subscribers' || hasPlans))
-              .map((v) => (
-                <option key={v} value={v} disabled={v === 'circle' && !circles.length}>
-                  {t(`visibility.${v}` as MessageKey)}
+        {ai ? (
+          <AIPanel
+            title="Suggested caption"
+            notice={ai.notice}
+            actions={
+              <>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setBody(ai.text);
+                    setAiUsed(true);
+                    setAi(null);
+                  }}
+                >
+                  Use this
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setAi(null)}>
+                  Dismiss
+                </Button>
+              </>
+            }
+          >
+            {ai.text || 'No suggestion this time.'}
+          </AIPanel>
+        ) : null}
+
+        {kind === 'reel' && !remixOf ? (
+          <section className="stack-sm" aria-labelledby="sound-heading">
+            <h2 id="sound-heading" className="yp-field__label" style={{ margin: 0 }}>
+              Sound
+            </h2>
+            {sound ? (
+              <div className="sound-row sound-row--picked">
+                <SoundPlayButton sound={sound} />
+                <span className="sound-row__text">
+                  <bdi className="sound-row__title">{sound.title}</bdi>
+                  <span className="sound-row__meta">
+                    Plays instead of your video&apos;s own sound · <bdi>@{sound.owner.username}</bdi>
+                  </span>
+                </span>
+                <Button size="sm" variant="ghost" onClick={() => setSound(null)}>
+                  Remove
+                </Button>
+              </div>
+            ) : (
+              <TextField
+                label="Name your sound (optional)"
+                hint="Your video's own sound becomes a sound other people can use."
+                value={soundTitle}
+                maxLength={100}
+                onChange={(e) => setSoundTitle(e.currentTarget.value)}
+              />
+            )}
+            <div className="row">
+              <Button size="sm" variant="secondary" icon="music" onClick={() => setPicking(true)}>
+                {sound ? 'Choose another sound' : 'Choose a sound'}
+              </Button>
+            </div>
+            <SoundPicker
+              open={picking}
+              onClose={() => setPicking(false)}
+              onPick={(s) => {
+                setSound(s);
+                setPicking(false);
+              }}
+            />
+          </section>
+        ) : null}
+
+        <div className="stack">
+          {kind === 'reel' ? null : kind === 'post' ? (
+            <Select label="Post in" value={communityId} onChange={(e) => setCommunityId(e.currentTarget.value)}>
+              <option value="">My profile</option>
+              {communities.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
                 </option>
               ))}
-          </Select>
-        ) : null}
-        {kind === 'story' && visibility === 'close_friends' ? (
-          <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-            Only people on your close friends list see this story, with a green ring. <Link href="/settings#close-friends">Edit your list</Link>
-          </p>
-        ) : null}
-        {kind === 'reel' ? (
-          <Checkbox
-            label="Allow duets and remixes"
-            description="People can post their own reel beside yours, or use your sound. You can change this later."
-            checked={allowRemix}
-            onChange={(e) => setAllowRemix(e.currentTarget.checked)}
-          />
-        ) : null}
-        {visibility === 'subscribers' && !communityId && kind !== 'story' ? (
-          <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-            Only people with a paid subscription see this. Everyone else sees a locked preview with a link to subscribe.
-          </p>
-        ) : null}
-        {visibility === 'circle' && !communityId ? (
-          <Select label="Circle" value={circleId} onChange={(e) => setCircleId(e.currentTarget.value)}>
-            <option value="">Choose a circle</option>
-            {circles.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </Select>
-        ) : null}
-        {kind !== 'story' ? (
-          <TextField label="Topics (optional)" hint="Up to 5, separated by commas." value={topics} onChange={(e) => setTopics(e.currentTarget.value)} />
-        ) : null}
-        {aiUsed ? <Checkbox label="Label this post as made with AI assistance" checked readOnly disabled /> : null}
-      </div>
+            </Select>
+          ) : (
+            <Select label="Disappears after" value={expiresIn} onChange={(e) => setExpiresIn(e.currentTarget.value as typeof expiresIn)}>
+              <option value="1h">1 hour</option>
+              <option value="24h">24 hours</option>
+              <option value="permanent">Keep it</option>
+            </Select>
+          )}
+          {!communityId ? (
+            <Select label={t('create.visibility')} value={visibility} onChange={(e) => setVisibility(e.currentTarget.value as Audience)}>
+              {(kind === 'story' ? STORY_VISIBILITIES : POST_VISIBILITIES)
+                .filter((v) => (kind !== 'story' || (v !== 'selected' && v !== 'subscribers')) && (v !== 'subscribers' || hasPlans))
+                .map((v) => (
+                  <option key={v} value={v} disabled={v === 'circle' && !circles.length}>
+                    {t(`visibility.${v}` as MessageKey)}
+                  </option>
+                ))}
+            </Select>
+          ) : null}
+          {kind === 'story' && visibility === 'close_friends' ? (
+            <p className="muted" style={{ margin: 0, fontSize: 14 }}>
+              Only people on your close friends list see this story, with a green ring. <Link href="/settings#close-friends">Edit your list</Link>
+            </p>
+          ) : null}
+          {kind === 'reel' ? (
+            <Checkbox
+              label="Allow duets and remixes"
+              description="People can post their own reel beside yours, or use your sound. You can change this later."
+              checked={allowRemix}
+              onChange={(e) => setAllowRemix(e.currentTarget.checked)}
+            />
+          ) : null}
+          {visibility === 'subscribers' && !communityId && kind !== 'story' ? (
+            <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+              Only people with a paid subscription see this. Everyone else sees a locked preview with a link to subscribe.
+            </p>
+          ) : null}
+          {visibility === 'circle' && !communityId ? (
+            <Select label="Circle" value={circleId} onChange={(e) => setCircleId(e.currentTarget.value)}>
+              <option value="">Choose a circle</option>
+              {circles.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
+          ) : null}
+          {kind !== 'story' ? (
+            <TextField label="Topics (optional)" hint="Up to 5, separated by commas." value={topics} onChange={(e) => setTopics(e.currentTarget.value)} />
+          ) : null}
+          {aiUsed ? <Checkbox label="Label this post as made with AI assistance" checked readOnly disabled /> : null}
+        </div>
 
-      <Button
-        type="submit"
-        size="lg"
-        block
-        loading={busy}
-        disabled={
-          uploading || (kind === 'reel' ? media.length !== 1 || media[0]!.kind !== 'video' || (!!remixOf && !original) : !body.trim() && !media.length && !poll)
-        }
-      >
-        {kind === 'story'
-          ? visibility === 'close_friends'
-            ? 'Share with close friends'
-            : 'Share to your story'
-          : kind === 'reel'
-            ? remixOf
-              ? remixMode === 'duet'
-                ? 'Publish duet'
-                : 'Publish remix'
-              : 'Publish reel'
-            : t('create.publish')}
-      </Button>
-    </form>
+        <Button
+          type="submit"
+          size="lg"
+          block
+          loading={busy}
+          disabled={
+            uploading ||
+            (kind === 'reel' ? media.length !== 1 || media[0]!.kind !== 'video' || (!!remixOf && !original) : !body.trim() && !media.length && !poll)
+          }
+        >
+          {kind === 'story'
+            ? visibility === 'close_friends'
+              ? 'Share with close friends'
+              : 'Share to your story'
+            : kind === 'reel'
+              ? remixOf
+                ? remixMode === 'duet'
+                  ? 'Publish duet'
+                  : 'Publish remix'
+                : 'Publish reel'
+              : t('create.publish')}
+        </Button>
+      </form>
+      {queue[0] ? (
+        queue[0].type.startsWith('video/') ? (
+          <VideoEditor
+            key={`${queue[0].name}-${queue[0].lastModified}-${queued - queue.length}`}
+            file={queue[0]}
+            maxSeconds={reelMax}
+            mustFit={kind === 'reel'}
+            title={queued > 1 ? `Edit video ${queued - queue.length + 1} of ${queued}` : 'Edit video'}
+            onDone={(edits) => {
+              enqueueUpload(queue[0]!, edits);
+              nextInQueue();
+            }}
+            onCancel={nextInQueue}
+          />
+        ) : (
+          <PhotoEditor
+            key={`${queue[0].name}-${queue[0].lastModified}-${queued - queue.length}`}
+            file={queue[0]}
+            title={queued > 1 ? `Edit photo ${queued - queue.length + 1} of ${queued}` : 'Edit photo'}
+            onDone={(edited) => {
+              enqueueUpload(edited, null);
+              nextInQueue();
+            }}
+            onCancel={nextInQueue}
+          />
+        )
+      ) : null}
+    </>
   );
 }
 

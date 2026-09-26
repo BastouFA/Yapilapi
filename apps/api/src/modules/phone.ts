@@ -77,6 +77,9 @@ export default async function phoneModule(app: FastifyInstance, ctx: AppContext)
 
   app.post('/v1/me/phone/code', { preHandler: requireAuth, config: { rateLimit: { max: 5, timeWindow: '10 minutes' } } }, async (req) => {
     const u = me(req);
+    // The development sender only writes codes to the log; in production that would leave people waiting for a text that never comes.
+    if (ctx.config.APP_ENV === 'production' && ctx.config.SMS_PROVIDER === 'dev')
+      throw new AppError(503, 'sms_unavailable', "Phone confirmation isn't available yet. Confirm your email instead.");
     const { rows } = await db.query(`SELECT phone_e164, phone_verified_at FROM users WHERE id = $1`, [u.id]);
     const phone = rows[0]?.phone_e164 as string | null;
     if (!phone) throw badRequest('Add a phone number first.');
