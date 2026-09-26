@@ -65,7 +65,23 @@ export interface MediaItem {
   captions?: CaptionTrackRef[];
   /** Flagged by automated checks: show it blurred with a "View" button. Never sent to people under 18. */
   sensitive?: boolean;
+  /** Photos in a post: people tagged in it. Absent when nobody is. */
+  tags?: PhotoTag[];
 }
+
+/** A person tagged in a photo, at a spot given as fractions of the photo's width and height (0 to 1, from the top left). */
+export interface PhotoTag {
+  id: string;
+  user: PublicUser;
+  x: number;
+  y: number;
+}
+
+/** Who may tag you in photos: anyone, only people you follow, or no one. */
+export type TagPermission = 'everyone' | 'following' | 'nobody';
+
+/** Your invite to co-author someone's post or reel. */
+export type CollabStatus = 'pending' | 'accepted';
 
 export interface CaptionTrackRef {
   /** BCP 47 language code, e.g. "en" or "pt-BR". */
@@ -99,7 +115,21 @@ export interface Post {
   sound?: SoundRef | null;
   /** Pinned to the top of its author's profile (only set in profile listings). */
   pinned?: boolean;
-  viewer: { liked: boolean; saved: boolean; reposted: boolean };
+  viewer: {
+    liked: boolean;
+    saved: boolean;
+    reposted: boolean;
+    /** Set when the viewer was invited to co-author this post: waiting for their answer, or accepted. */
+    collab?: CollabStatus;
+  };
+  /**
+   * Co-authors who accepted, in the order they were invited. The post shows as by
+   * "{author} and {collaborator}", sits on each of their profiles and reaches their
+   * followers, but only the original author can change or delete it. Absent when there are none.
+   */
+  collaborators?: PublicUser[];
+  /** Only on the original author's own posts: people invited to co-author who haven't answered yet. */
+  pendingCollaborators?: PublicUser[];
   aiAssisted: boolean;
   /** Set on Real posts: captured in-app moments before posting, unedited. */
   real?: { capturedAt: string; dual: boolean; locationText: string | null } | null;

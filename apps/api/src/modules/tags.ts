@@ -5,7 +5,7 @@ import { AppError, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, encodeCursor } from '../lib/cursor.ts';
 import { hydratePosts } from '../lib/posts.ts';
-import { postUnlockedSql, postVisibleSql } from '../lib/visibility.ts';
+import { notBlockedSql, postUnlockedSql, postVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 /** Tag pages list posts you can see and open: a subscriber-only post's tags are part of what it says. */
@@ -58,7 +58,7 @@ export default async function tagsModule(app: FastifyInstance, ctx: AppContext) 
   app.get('/v1/tags/:tag', async (req) => {
     const viewer = req.user?.id ?? null;
     const { tag } = parse(tagParam, req.params);
-    const [counts, related, following] = await Promise.all([
+    const [counts, related, following, comments] = await Promise.all([
       db.query(
         `SELECT count(*) AS posts, count(DISTINCT author_id) AS people, count(*) FILTER (WHERE created_at > now() - interval '7 days') AS week
          FROM (SELECT p.author_id, p.created_at ${FROM} WHERE p.topics @> ARRAY[$2::text] AND ${VISIBLE} LIMIT 10000) x`,
@@ -71,6 +71,13 @@ export default async function tagsModule(app: FastifyInstance, ctx: AppContext) 
         [tag],
       ),
       viewer ? db.query(`SELECT 1 FROM user_interests ui JOIN topics tp ON tp.id = ui.topic_id WHERE ui.user_id = $1 AND tp.slug = $2`, [viewer, tag]) : null,
+      // Comments using the tag, on posts you can see and open, by people you haven't blocked.
+      db.query(
+        `SELECT count(*) AS n FROM (SELECT 1 FROM comments cm JOIN posts p ON p.id = cm.post_id JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
+         WHERE cm.topics @> ARRAY[$2::text] AND cm.deleted_at IS NULL AND cm.moderation_status = 'normal' AND ${VISIBLE} AND ${notBlockedSql('cm.author_id', '$1')}
+         LIMIT 10000) x`,
+        [viewer, tag],
+      ),
     ]);
     const c = counts.rows[0];
     return {
@@ -78,6 +85,7 @@ export default async function tagsModule(app: FastifyInstance, ctx: AppContext) 
       posts: Number(c.posts),
       people: Number(c.people),
       postsThisWeek: Number(c.week),
+      comments: Number(comments.rows[0].n),
       related: related.rows.map((r) => r.tag as string),
       following: !!following?.rowCount,
     };

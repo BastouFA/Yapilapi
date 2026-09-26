@@ -15,8 +15,10 @@ import type {
   PublicPostPreview,
   PublicProfilePreview,
   PublicUser,
+  PhotoTag,
   Sound,
   EditorParamsInput,
+  TagPermission,
 } from '@yapilapi/shared';
 
 export class ApiError extends Error {
@@ -119,6 +121,9 @@ export function createClient(opts: ClientOptions) {
       followers: (id: string, cursor?: string) => get<Page<PublicUser> & { viewerFollows: string[] }>(`/v1/users/${id}/followers${qs({ cursor })}`),
       following: (id: string, cursor?: string) => get<Page<PublicUser> & { viewerFollows: string[] }>(`/v1/users/${id}/following${qs({ cursor })}`),
       reposts: (id: string, cursor?: string) => get<Page<Post>>(`/v1/users/${id}/reposts${qs({ cursor })}`),
+      /** Posts someone is tagged in that you can see. `hidden` is true when their profile is private and you don't follow them. */
+      tagged: (username: string, cursor?: string) =>
+        get<Page<Post> & { hidden?: boolean }>(`/v1/users/${encodeURIComponent(username)}/tagged${qs({ cursor })}`),
     },
     me: {
       updateProfile: (b: Record<string, unknown>) => patch<{ profile: Profile }>('/v1/me/profile', b),
@@ -130,6 +135,11 @@ export function createClient(opts: ClientOptions) {
         get<{ items: { user: PublicUser; bio: string; reason: string }[] }>(`/v1/me/suggestions${qs(o)}`),
       sharing: () => get<{ settings: SharingSettings }>('/v1/me/sharing'),
       setSharing: (b: Partial<Pick<SharingSettings, 'findableByContacts' | 'allowDownload'>>) => put<{ settings: SharingSettings }>('/v1/me/sharing', b),
+      /** Who may tag you in photos. */
+      tagging: () => get<{ allowFrom: TagPermission }>('/v1/me/tagging'),
+      setTagging: (allowFrom: TagPermission) => put<{ allowFrom: TagPermission }>('/v1/me/tagging', { allowFrom }),
+      /** Posts and reels you've been invited to co-author and haven't answered yet, newest first. */
+      collabInvites: () => get<{ items: Post[] }>('/v1/me/collab-invites'),
       friendRequests: () => get<{ items: { id: string; from: PublicUser; createdAt: string }[] }>('/v1/me/friend-requests'),
       acceptFriend: (id: string) => post(`/v1/friend-requests/${id}/accept`),
       declineFriend: (id: string) => post(`/v1/friend-requests/${id}/decline`),
@@ -179,6 +189,19 @@ export function createClient(opts: ClientOptions) {
       /** Ask for a reel as a watermarked video to share elsewhere; poll shareVideoStatus until it's ready. */
       shareVideo: (id: string) => post<ShareVideoState>(`/v1/posts/${id}/share-video`),
       shareVideoStatus: (id: string) => get<ShareVideoState>(`/v1/posts/${id}/share-video`),
+      /** Original author: invite more co-authors (at most 3 in all). */
+      inviteCollaborators: (id: string, userIds: string[]) => post<{ post: Post }>(`/v1/posts/${id}/collaborators`, { userIds }),
+      /** Original author: cancel an invite or take a co-author off the post. */
+      removeCollaborator: (id: string, userId: string) => del<{ post: Post }>(`/v1/posts/${id}/collaborators/${userId}`),
+      /** Invitee: accept co-authoring. The post then shows on your profile and reaches your followers. */
+      acceptCollab: (id: string) => post<{ post: Post }>(`/v1/posts/${id}/collab/accept`),
+      declineCollab: (id: string) => post<{ ok: true }>(`/v1/posts/${id}/collab/decline`),
+      /** Co-author: leave the post. It comes off your profile; the original author keeps it. */
+      leaveCollab: (id: string) => del<{ ok: true }>(`/v1/posts/${id}/collab`),
+      /** Original author: tag someone in one of the post's photos. */
+      addTag: (id: string, b: { mediaId: string; userId: string; x: number; y: number }) => post<{ tag: PhotoTag }>(`/v1/posts/${id}/tags`, b),
+      /** The original author, or the person tagged, removes a photo tag. */
+      removeTag: (id: string, tagId: string) => del<{ ok: true }>(`/v1/posts/${id}/tags/${tagId}`),
     },
     sounds: {
       /** Sounds you can use in a reel, most used first; `q` matches the name or its owner. */
@@ -314,8 +337,14 @@ export function createClient(opts: ClientOptions) {
     },
     people: {
       /** People to add to a conversation: connections first, prefix matches as you type. */
-      suggest: (q = '', limit = 8, scope?: 'all' | 'followers') =>
-        get<{ items: { user: PublicUser; relation: 'friend' | 'following' | null; canMessage: boolean }[] }>(`/v1/people/suggest${qs({ q, limit, scope })}`),
+      /**
+       * `scope=followers`: people who follow you. `scope=mutuals`: people you follow who follow you back and whom
+       * you can invite to co-author a post. `canTag` says whether you may tag them in a photo.
+       */
+      suggest: (q = '', limit = 8, scope?: 'all' | 'followers' | 'mutuals') =>
+        get<{ items: { user: PublicUser; relation: 'friend' | 'following' | null; canMessage: boolean; canTag: boolean }[] }>(
+          `/v1/people/suggest${qs({ q, limit, scope })}`,
+        ),
     },
     payments: {
       /** The default provider, and providers that take particular currencies (Paystack: NGN, GHS, KES, ZAR). */
@@ -1135,6 +1164,8 @@ export interface TagSummary {
   posts: number;
   people: number;
   postsThisWeek: number;
+  /** Comments using the tag, on posts you can see. */
+  comments: number;
   related: string[];
   following: boolean;
 }

@@ -8,6 +8,7 @@ import {
   pageQuerySchema,
   reactionSchema,
   usernameSchema,
+  extractHashtags,
   type Comment,
 } from '@yapilapi/shared';
 import { z } from 'zod';
@@ -17,6 +18,7 @@ import { decodeCursor, encodeCursor, keyCursorOf, type KeyCursor } from '../lib/
 import { analyzeText, statusForRisk } from '../lib/moderation.ts';
 import { hydratePosts } from '../lib/posts.ts';
 import { notifyMentions } from '../lib/mentions.ts';
+import { assertCanInvite, assertCanTag, coAuthoredSql, notifyCollabInvites, notifyPhotoTags } from '../lib/collabs.ts';
 import { topicsFor } from './tags.ts';
 import { isPlus, PLUS_REEL_MAX_MS, REEL_MAX_MS } from '../lib/plus.ts';
 import { notify, track } from '../lib/services.ts';
@@ -147,6 +149,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     }
 
     let remixAuthor = null as string | null;
+    let taggedIds: string[] = [];
     const postId = await tx(db, async (c) => {
       // Reels: a duet or remix borrows the original's sound; otherwise a chosen sound, or the reel's own audio.
       let soundId: string | null = null;
@@ -196,6 +199,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
         ],
       );
       const id = rows[0]!.id;
+      const mediaIds: string[] = [];
       for (const [i, m] of input.media.entries()) {
         let mediaId = m.id;
         if (mediaId) {
@@ -215,6 +219,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
           mediaId = media.rows[0]!.id;
         }
         await c.query(`INSERT INTO post_media (post_id, media_id, position) VALUES ($1,$2,$3)`, [id, mediaId, i]);
+        mediaIds.push(mediaId);
         if (input.format === 'reel') {
           // Reels are short. Uploads still processing have no length yet; those are checked by the player, not refused here.
           const len = (await c.query(`SELECT duration_ms FROM media WHERE id = $1`, [mediaId])).rows[0]?.duration_ms;
@@ -235,6 +240,26 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
           await c.query(`INSERT INTO poll_options (post_id, label, position) VALUES ($1,$2,$3)`, [id, label, i]);
       if (input.visibility === 'selected' && input.audience)
         await c.query(`INSERT INTO post_audience (post_id, user_id) SELECT $1, unnest($2::uuid[]) ON CONFLICT DO NOTHING`, [id, input.audience]);
+      // People tagged in the photos: each must allow tags from you (their setting, blocks, minor protection).
+      const tags = input.media.flatMap((m, i) => (m.tags ?? []).map((t) => ({ ...t, mediaId: mediaIds[i]! })));
+      if (tags.length) {
+        await assertCanTag(
+          c,
+          u.id,
+          tags.map((t) => t.userId),
+        );
+        for (const t of tags)
+          await c.query(
+            `INSERT INTO photo_tags (post_id, media_id, user_id, tagged_by, x, y) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (post_id, media_id, user_id) DO NOTHING`,
+            [id, t.mediaId, t.userId, u.id, t.x, t.y],
+          );
+        taggedIds = [...new Set(tags.map((t) => t.userId))];
+      }
+      // Co-authors: invited now, each accepts or declines.
+      if (input.collaborators.length) {
+        await assertCanInvite(c, u.id, input.collaborators, { visibility: input.communityId ? 'public' : input.visibility, communityId: input.communityId });
+        await c.query(`INSERT INTO post_collaborators (post_id, user_id, invited_by) SELECT $1, unnest($2::uuid[]), $3`, [id, input.collaborators, u.id]);
+      }
       // Flagged posts go to a moderator with the signals that flagged them.
       if (analysis.risk !== 'normal' || spam.flags.length || heldForAccount)
         await c.query(
@@ -256,7 +281,12 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     });
     track(db, u.id, 'post_created', { kind, visibility: input.visibility, community: !!input.communityId });
     await emitWebhook(db, u.id, 'post.created', { postId, kind, visibility: input.visibility });
-    if (status === 'normal') await notifyMentions(db, ctx.realtime, { text: input.body, actorId: u.id, postId });
+    if (status === 'normal') {
+      // Mentions in the text (posts and reel captions alike), photo tags and co-author invites.
+      await notifyMentions(db, ctx.realtime, { text: input.body, actorId: u.id, postId, skip: [...taggedIds, ...input.collaborators] });
+      await notifyPhotoTags(db, ctx.realtime, { postId, actorId: u.id, userIds: taggedIds });
+      await notifyCollabInvites(db, ctx.realtime, { postId, actorId: u.id, userIds: input.collaborators });
+    }
     // Tell the original's creator about a duet or remix, when they can see it.
     if (remixAuthor && status === 'normal') {
       const seen = await db.query(`SELECT 1 ${POST_FROM} WHERE p.id = $2 AND ${VISIBLE}`, [remixAuthor, postId]);
@@ -303,7 +333,11 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     return { ok: true };
   });
 
-  /** A person's posts, newest first, with their pinned post (if you can see it) at the top of the first page. */
+  /**
+   * A person's posts, newest first, with their pinned post (if you can see it) at the top of the first page.
+   * Posts they co-author are listed too, still only where you can see them. A private co-author's
+   * collabs are listed only to the people who can see that profile (them and their followers).
+   */
   app.get('/v1/users/:username/posts', async (req) => {
     const { username } = parse(z.object({ username: usernameSchema }), req.params);
     const q = parse(pageQuerySchema, req.query);
@@ -315,7 +349,11 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
           .rows[0]?.id;
     const { rows } = await db.query(
       `SELECT p.id, p.created_at ${POST_FROM}
-       WHERE lower(ap.username) = lower($2) AND p.community_id IS NULL AND ${VISIBLE} AND p.id IS DISTINCT FROM ap.pinned_post_id
+       CROSS JOIN (SELECT pr.user_id AS id, pr.is_private, pr.pinned_post_id FROM profiles pr WHERE lower(pr.username) = lower($2)) o
+       WHERE (p.author_id = o.id
+              OR (${coAuthoredSql('o.id')}
+                  AND (NOT o.is_private OR o.id = $1 OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = o.id))))
+         AND p.community_id IS NULL AND ${VISIBLE} AND p.id IS DISTINCT FROM o.pinned_post_id
          ${c ? 'AND (p.created_at, p.id) < ($4::timestamptz, $5::uuid)' : ''}
        ORDER BY p.created_at DESC, p.id DESC LIMIT $3`,
       c ? [req.user?.id ?? null, username, q.limit + 1, c.t, c.id] : [req.user?.id ?? null, username, q.limit + 1],
@@ -434,6 +472,11 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
            SELECT p.id, p.created_at AS at, NULL::uuid AS by FROM posts p
            WHERE (p.author_id = $1 OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = p.author_id)) AND p.community_id IS NULL
            UNION ALL
+           -- Collabs reach every co-author's followers (and the co-authors), still only where they can see them.
+           SELECT p.id, p.created_at, NULL::uuid FROM post_collaborators pc JOIN posts p ON p.id = pc.post_id
+           WHERE pc.status = 'accepted' AND p.community_id IS NULL
+             AND (pc.user_id = $1 OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = pc.user_id))
+           UNION ALL
            SELECT r.post_id, r.created_at, r.user_id FROM post_reposts r
            WHERE EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = r.user_id)
          ), latest AS (
@@ -513,6 +556,11 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
          JOIN posts p ON p.author_id = a.id
          WHERE p.deleted_at IS NULL AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '14 days'
          UNION
+         SELECT pc.post_id FROM (SELECT $1::uuid AS id UNION SELECT id FROM followed UNION SELECT id FROM friends) a
+         JOIN post_collaborators pc ON pc.user_id = a.id AND pc.status = 'accepted'
+         JOIN posts p ON p.id = pc.post_id
+         WHERE p.deleted_at IS NULL AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '14 days'
+         UNION
          SELECT p.id FROM community_members cm JOIN posts p ON p.community_id = cm.community_id
          WHERE cm.user_id = $1 AND cm.status = 'active'
            AND p.deleted_at IS NULL AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '14 days'
@@ -532,6 +580,11 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
          SELECT p.id, p.author_id, p.created_at, p.topics, ap.display_name, cm_c.name AS community_name, (cm_self.user_id IS NOT NULL) AS member,
                 p.author_id IN (SELECT id FROM followed) AS followed,
                 p.author_id IN (SELECT id FROM friends) AS friend,
+                -- A co-author you follow or are friends with counts like the author for ranking.
+                (SELECT cpr.display_name FROM post_collaborators pc JOIN profiles cpr ON cpr.user_id = pc.user_id
+                 WHERE pc.post_id = p.id AND pc.status = 'accepted' AND (pc.user_id IN (SELECT id FROM followed) OR pc.user_id IN (SELECT id FROM friends))
+                 ORDER BY (pc.user_id IN (SELECT id FROM friends)) DESC, pc.created_at LIMIT 1) AS collab_name,
+                EXISTS (SELECT 1 FROM post_collaborators pc WHERE pc.post_id = p.id AND pc.status = 'accepted' AND pc.user_id IN (SELECT id FROM friends)) AS collab_friend,
                 (SELECT 1.2 * count(*) FILTER (WHERE t = ANY(me.interests)) + 1.0 * count(*) FILTER (WHERE t = ANY(me.more))
                         - 2.0 * count(*) FILTER (WHERE t = ANY(me.less)) FROM unnest(p.topics) t)
                 + ln(1 + p.like_count + 2 * p.comment_count) * 0.6
@@ -543,12 +596,12 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
          WHERE p.id IN (SELECT id FROM candidates) AND ${VISIBLE} ${personal} ${connectionOnly}
            AND (p.community_id IS NULL OR cm_self.user_id IS NOT NULL OR cm_c.visibility = 'public')
        )
-       SELECT s.id, s.author_id, s.display_name, s.community_name, s.member, s.followed, s.friend,
+       SELECT s.id, s.author_id, s.display_name, s.community_name, s.member, s.followed, s.friend, s.collab_name, s.collab_friend,
               (SELECT t FROM unnest(s.topics) t WHERE t = ANY(me.interests) LIMIT 1) AS matched_topic,
               s.base
                 + CASE WHEN s.author_id = $1 THEN 1 ELSE 0 END
-                + CASE WHEN s.friend THEN 3 ELSE 0 END
-                + CASE WHEN s.followed THEN 2 ELSE 0 END
+                + CASE WHEN s.friend OR s.collab_friend THEN 3 ELSE 0 END
+                + CASE WHEN s.followed OR (s.collab_name IS NOT NULL AND NOT s.collab_friend) THEN 2 ELSE 0 END
                 + CASE WHEN s.member THEN 1.5 ELSE 0 END AS score
        FROM scored s CROSS JOIN me
        ORDER BY score DESC, s.created_at DESC, s.id DESC
@@ -575,15 +628,19 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
           ? 'Your post'
           : r.friend
             ? `You're friends with ${r.display_name}`
-            : r.followed
-              ? `You follow ${r.display_name}`
-              : r.community_name && r.member
-                ? `From ${r.community_name}, a community you're in`
-                : r.matched_topic
-                  ? `You're interested in ${r.matched_topic}`
-                  : r.community_name
-                    ? `Popular in ${r.community_name}`
-                    : 'Popular with people on YAPILAPI right now',
+            : r.collab_friend
+              ? `You're friends with ${r.collab_name}`
+              : r.followed
+                ? `You follow ${r.display_name}`
+                : r.collab_name
+                  ? `You follow ${r.collab_name}`
+                  : r.community_name && r.member
+                    ? `From ${r.community_name}, a community you're in`
+                    : r.matched_topic
+                      ? `You're interested in ${r.matched_topic}`
+                      : r.community_name
+                        ? `Popular in ${r.community_name}`
+                        : 'Popular with people on YAPILAPI right now',
       );
     const more = rows.length > consumed;
     return {
@@ -832,8 +889,9 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
         if (!parent.rowCount) throw notFound('The comment you replied to');
       }
       const { rows } = await c.query(
-        `INSERT INTO comments (post_id, author_id, parent_id, body, moderation_status) VALUES ($1,$2,$3,$4,$5) RETURNING id, created_at`,
-        [id, u.id, input.parentId ?? null, input.body, statusForRisk(analysis.risk)],
+        `INSERT INTO comments (post_id, author_id, parent_id, body, moderation_status, topics) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, created_at`,
+        // #tags in a comment count on the tag's page.
+        [id, u.id, input.parentId ?? null, input.body, statusForRisk(analysis.risk), extractHashtags(input.body)],
       );
       await c.query(`UPDATE posts SET comment_count = comment_count + 1 WHERE id = $1`, [id]);
       if (analysis.risk !== 'normal')

@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import type { MediaItem, Post, RemixRef } from '@yapilapi/shared';
 import { isAdultViewer, plusCol, publicUserFrom } from './users.ts';
 import { allowDownloadSql, postUnlockedSql, postVisibleSql } from './visibility.ts';
+import { attachCollabsAndTags } from './collabs.ts';
 
 type Q = Pool | PoolClient;
 
@@ -65,7 +66,10 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
     viewer,
   );
   const byId = new Map<string, Post>(rows.map((r) => [r.id as string, r.unlocked ? toPost(r, originals, reasons) : lockedPost(r, reasons)]));
-  return ids.map((id) => byId.get(id)).filter((p): p is Post => !!p);
+  const posts = ids.map((id) => byId.get(id)).filter((p): p is Post => !!p);
+  // Co-authors ("Ada and Bola") and people tagged in photos (none on locked posts, which carry no media).
+  await attachCollabsAndTags(db, [...new Set(posts)], viewer);
+  return posts;
 }
 
 function toPost(r: Record<string, any>, originals: Map<string, NonNullable<RemixRef['post']>>, reasons?: Map<string, string>): Post {

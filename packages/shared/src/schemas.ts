@@ -77,6 +77,12 @@ export const updateProfileSchema = z
 
 export const setInterestsSchema = z.object({ topics: z.array(z.string().min(1).max(40)).min(1).max(30) });
 
+/** At most this many co-authors on a post, besides its author. */
+export const MAX_COLLABORATORS = 3;
+/** At most this many people tagged in one photo. */
+export const MAX_PHOTO_TAGS = 20;
+const photoTagSpot = z.object({ userId: uuid, x: z.number().min(0).max(1), y: z.number().min(0).max(1) });
+
 export const createPostSchema = z
   .object({
     kind: z.enum(POST_KINDS).default('text'),
@@ -98,6 +104,8 @@ export const createPostSchema = z
           altText: z.string().max(500).optional(),
           width: z.number().int().positive().optional(),
           height: z.number().int().positive().optional(),
+          /** Photos: people to tag, each at a spot given as fractions of the width and height. */
+          tags: z.array(photoTagSpot).max(MAX_PHOTO_TAGS).optional(),
         }),
       )
       .max(10)
@@ -116,6 +124,8 @@ export const createPostSchema = z
     soundId: uuid.optional(),
     /** Reels: a name for this reel's own sound (when it doesn't use another one). */
     soundTitle: z.string().trim().min(1).max(100).optional(),
+    /** People to invite as co-authors (people you follow who follow you back). They each accept or decline. */
+    collaborators: z.array(uuid).max(MAX_COLLABORATORS).default([]),
   })
   .superRefine((v, ctx) => {
     if (!v.body && v.media.length === 0 && !v.linkUrl && !v.poll)
@@ -129,7 +139,24 @@ export const createPostSchema = z
     if (v.format !== 'reel' && (v.remixOf || v.soundId || v.soundTitle))
       ctx.addIssue({ code: 'custom', message: 'Only reels can use sounds or remix other reels.', path: ['format'] });
     if (!!v.remixOf !== !!v.remixMode) ctx.addIssue({ code: 'custom', message: 'Choose duet or remix.', path: ['remixMode'] });
+    if (new Set(v.collaborators).size !== v.collaborators.length)
+      ctx.addIssue({ code: 'custom', message: 'Invite each person once.', path: ['collaborators'] });
+    for (const [i, m] of v.media.entries()) {
+      if (!m.tags?.length) continue;
+      if (m.kind !== 'image') ctx.addIssue({ code: 'custom', message: 'You can tag people in photos.', path: ['media', i, 'tags'] });
+      if (new Set(m.tags.map((t) => t.userId)).size !== m.tags.length)
+        ctx.addIssue({ code: 'custom', message: 'Tag each person once in a photo.', path: ['media', i, 'tags'] });
+    }
   });
+
+/** Invite people to co-author a post you already shared. */
+export const collabInviteSchema = z.object({ userIds: z.array(uuid).min(1).max(MAX_COLLABORATORS) });
+
+/** Tag someone in one of the photos of your post. */
+export const photoTagSchema = photoTagSpot.extend({ mediaId: uuid });
+
+/** Who may tag you in photos. */
+export const tagSettingsSchema = z.object({ allowFrom: z.enum(['everyone', 'following', 'nobody']) });
 
 export const feedQuerySchema = z.object({
   mode: z.enum(FEED_MODES).default('for_you'),

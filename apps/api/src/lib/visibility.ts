@@ -14,11 +14,25 @@ export function notBlockedSql(otherUserCol: string, v: string): string {
 }
 
 /**
+ * Posts aliased `p`: the viewer and none of the post's accepted co-authors
+ * blocked each other, so a post stays out of sight when someone you blocked is
+ * on it as a co-author rather than as the author. (Co-authors never widen who
+ * can see a post: the rest of postVisibleSql is about the original author.)
+ */
+export function collabNotBlockedSql(v: string): string {
+  return `(p.author_id IS NOT DISTINCT FROM ${v} OR NOT EXISTS (
+            SELECT 1 FROM post_collaborators pcb JOIN blocks b
+              ON (b.blocker_id = ${v} AND b.blocked_id = pcb.user_id) OR (b.blocker_id = pcb.user_id AND b.blocked_id = ${v})
+            WHERE pcb.post_id = p.id AND pcb.status = 'accepted'))`;
+}
+
+/**
  * Posts aliased `p`, author's profile aliased `ap`, author user aliased `au`.
  * Posts waiting for a moderator (flagged as possibly sensitive) stay hidden until cleared from people under 18 and
  * from anyone whose age isn't known (no birth date, or not signed in). Posts withheld by a regional rule are hidden
  * from viewers in that country: the one they chose, the one the CDN reports for their account, and the one the CDN
- * reports for this request (which also covers people who aren't signed in).
+ * reports for this request (which also covers people who aren't signed in). Posts with a co-author the viewer
+ * blocked (or who blocked them) are hidden too.
  */
 export function postVisibleSql(v: string): string {
   return `(
@@ -28,6 +42,7 @@ export function postVisibleSql(v: string): string {
     AND (p.moderation_status <> 'review' OR p.author_id = ${v}
          OR coalesce((SELECT uv.birth_date FROM users uv WHERE uv.id = ${v}) <= current_date - interval '18 years', false))
     AND ${notBlockedSql('p.author_id', v)}
+    AND ${collabNotBlockedSql(v)}
     AND (p.author_id = ${v} OR NOT EXISTS (
       SELECT 1 FROM post_withholdings w WHERE w.post_id = p.id AND w.country IN (
         (SELECT pv.country FROM profiles pv WHERE pv.user_id = ${v}),

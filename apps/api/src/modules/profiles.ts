@@ -18,6 +18,7 @@ import { notify, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
 import { ageOf, areFriends, isBlockedEitherWay, PUBLIC_USER_COLS, toPublicUser, type PublicUserRow } from '../lib/users.ts';
 import { notBlockedSql } from '../lib/visibility.ts';
+import { byOrWithSql, canInviteSql, canTagSql } from '../lib/collabs.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -32,7 +33,10 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
    * people never appear; `canMessage` is false where minor protection or family
    * settings would refuse the conversation, so the app can say so up front.
    * `scope=followers` narrows to people who follow you (for picking close
-   * friends); with no query it then lists all of them.
+   * friends); with no query it then lists all of them. `scope=mutuals` narrows
+   * to people you can invite to co-author a post: you follow each other and
+   * minor protection allows it; with no query it lists all of them.
+   * `canTag` says whether you may tag them in a photo.
    */
   app.get('/v1/people/suggest', { preHandler: requireAuth, config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (req) => {
     const u = me(req);
@@ -40,7 +44,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       z.object({
         q: z.string().trim().max(60).default(''),
         limit: z.coerce.number().int().min(1).max(20).default(8),
-        scope: z.enum(['all', 'followers']).default('all'),
+        scope: z.enum(['all', 'followers', 'mutuals']).default('all'),
       }),
       req.query,
     );
@@ -57,8 +61,9 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
          FROM profiles pr JOIN users u2 ON u2.id = pr.user_id
          WHERE pr.user_id <> $1 AND u2.status = 'active' AND u2.deleted_at IS NULL AND ${notBlockedSql('pr.user_id', '$1')}
            AND ($4 = 'all' OR EXISTS (SELECT 1 FROM follows fb WHERE fb.follower_id = pr.user_id AND fb.followee_id = $1))
+           AND ($4 <> 'mutuals' OR ${canInviteSql('$1', 'pr.user_id')})
            AND (
-             ($2 = '' AND $4 = 'followers')
+             ($2 = '' AND $4 IN ('followers', 'mutuals'))
              OR ($2 = '' AND (EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = pr.user_id) OR (fr.user_b = $1 AND fr.user_a = pr.user_id))
                            OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = pr.user_id)
                            OR EXISTS (SELECT 1 FROM conversation_members a JOIN conversation_members b ON b.conversation_id = a.conversation_id
@@ -70,7 +75,8 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
               -- Minor protection: an adult and a minor can only message once they're friends.
               (rel.friend OR NOT (
                  (coalesce(u2.birth_date > current_date - interval '18 years', false)) <>
-                 (coalesce((SELECT birth_date FROM me) > current_date - interval '18 years', false)))) AS can_message
+                 (coalesce((SELECT birth_date FROM me) > current_date - interval '18 years', false)))) AS can_message,
+              ${canTagSql('$1', 'pr.user_id')} AS can_tag
        FROM rel JOIN profiles pr ON pr.user_id = rel.user_id JOIN users u2 ON u2.id = rel.user_id
        ORDER BY rel.friend DESC, rel.following DESC, rel.last_chat DESC NULLS LAST,
                 (pr.username ILIKE $2 || '%') DESC, pr.display_name
@@ -82,6 +88,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
         user: toPublicUser(r as PublicUserRow),
         relation: r.friend ? 'friend' : r.following ? 'following' : null,
         canMessage: !!r.can_message,
+        canTag: !!r.can_tag,
       })),
     };
   });
@@ -102,7 +109,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
         (SELECT count(*) FROM follows WHERE followee_id = pr.user_id) AS followers,
         (SELECT count(*) FROM follows WHERE follower_id = pr.user_id) AS following,
         (SELECT count(*) FROM friendships WHERE user_a = pr.user_id OR user_b = pr.user_id) AS friends,
-        (SELECT count(*) FROM posts WHERE author_id = pr.user_id AND deleted_at IS NULL AND community_id IS NULL) AS posts,
+        (SELECT count(*) FROM posts p WHERE ${byOrWithSql('pr.user_id')} AND p.deleted_at IS NULL AND p.community_id IS NULL) AS posts,
         (SELECT coalesce(array_agg(t.slug ORDER BY t.slug), '{}') FROM user_interests ui JOIN topics t ON t.id = ui.topic_id WHERE ui.user_id = pr.user_id) AS interests,
         EXISTS (SELECT 1 FROM follows WHERE follower_id = $2 AND followee_id = pr.user_id) AS following_them,
         EXISTS (SELECT 1 FROM follows WHERE follower_id = pr.user_id AND followee_id = $2) AS followed_by,
@@ -457,6 +464,16 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       await c.query(`DELETE FROM friendships WHERE user_a = $1 AND user_b = $2`, [a, b]);
       await c.query(
         `UPDATE friend_requests SET status = 'cancelled' WHERE status = 'pending' AND ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1))`,
+        [u.id, id],
+      );
+      // …and ends co-authoring and photo tags between the two, on either one's posts.
+      await c.query(
+        `UPDATE post_collaborators pc SET status = 'removed', responded_at = now() FROM posts p
+         WHERE p.id = pc.post_id AND pc.status IN ('pending', 'accepted') AND ((p.author_id = $1 AND pc.user_id = $2) OR (p.author_id = $2 AND pc.user_id = $1))`,
+        [u.id, id],
+      );
+      await c.query(
+        `DELETE FROM photo_tags t USING posts p WHERE p.id = t.post_id AND ((p.author_id = $1 AND t.user_id = $2) OR (p.author_id = $2 AND t.user_id = $1))`,
         [u.id, id],
       );
     });
