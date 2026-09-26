@@ -119,8 +119,16 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
   // ── Profile ───────────────────────────────────────────────────────────
   app.get('/v1/users/:username', async (req) => {
     const { username } = parse(z.object({ username: usernameSchema }), req.params);
-    const id = await userIdByUsername(username, req.user?.id ?? null);
-    return { profile: await loadProfile(id, req.user?.id ?? null) };
+    const viewer = req.user?.id ?? null;
+    const id = await userIdByUsername(username, viewer);
+    if (!viewer) {
+      // People without an account never see accounts of under-18s, and see only the name and picture of private ones.
+      const minor = await db.query(`SELECT 1 FROM users WHERE id = $1 AND birth_date > current_date - interval '18 years'`, [id]);
+      if (minor.rowCount) throw notFound('That person');
+    }
+    const profile = await loadProfile(id, viewer);
+    if (!viewer && profile.isPrivate) return { profile: { ...profile, bio: '', links: [], interests: [], coverUrl: null } };
+    return { profile };
   });
 
   app.patch('/v1/me/profile', { preHandler: requireAuth }, async (req) => {

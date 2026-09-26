@@ -19,7 +19,7 @@ function LoginForm() {
 
   function done(user: Me) {
     setMe(user);
-    router.replace(!user.onboarded ? '/onboarding' : next?.startsWith('/') ? next : '/home');
+    router.replace(!user.onboarded ? '/onboarding' : (safeNext(next) ?? '/home'));
   }
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -103,4 +103,15 @@ export default function LoginPage() {
       <LoginForm />
     </Suspense>
   );
+}
+
+/** Only same-site paths: "/p/123" yes; "//evil.com", "/\\evil.com" and full URLs no. */
+function safeNext(next: string | null): string | null {
+  if (!next || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')) return null;
+  try {
+    const u = new URL(next, 'https://yapilapi.invalid');
+    return u.origin === 'https://yapilapi.invalid' ? `${u.pathname}${u.search}${u.hash}` : null;
+  } catch {
+    return null;
+  }
 }

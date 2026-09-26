@@ -196,3 +196,16 @@ describe('views and pinned posts', () => {
     expect((await as(t.app, other).get(`/v1/users/${author.username}/posts`)).body.items.map((p: any) => p.id)).toEqual([third.id, second.id, first.id]);
   });
 });
+
+describe('profiles without an account', () => {
+  it('hides under-18 accounts and the details of private ones', async () => {
+    const teen = await signUp(t.app, { birthDate: new Date(Date.now() - 15 * 365.25 * 86_400_000).toISOString().slice(0, 10) });
+    const adult = await signUp(t.app, { birthDate: '1990-01-01' });
+    await as(t.app, adult).patch('/v1/me/profile', { bio: 'Hello there', isPrivate: true });
+    expect((await as(t.app, null).get(`/v1/users/${teen.username}`)).status).toBe(404);
+    expect((await as(t.app, adult).get(`/v1/users/${teen.username}`)).status).toBe(200);
+    const anon = (await as(t.app, null).get(`/v1/users/${adult.username}`)).body.profile;
+    expect(anon).toMatchObject({ username: adult.username, bio: '', isPrivate: true });
+    expect((await as(t.app, teen).get(`/v1/users/${adult.username}`)).body.profile.bio).toBe('Hello there');
+  });
+});
