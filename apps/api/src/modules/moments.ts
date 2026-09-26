@@ -50,7 +50,7 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
     let mediaKind = input.mediaKind ?? null;
     if (input.mediaId) {
       // Only your own upload; its URL and kind come from the stored item, not the request.
-      const m = (await db.query(`SELECT url, kind, moderation FROM media WHERE id = $1 AND owner_id = $2`, [input.mediaId, u.id])).rows[0];
+      const m = (await db.query(`SELECT url, kind, moderation FROM media WHERE id = $1 AND owner_id = $2 AND NOT private`, [input.mediaId, u.id])).rows[0];
       if (!m) throw notFound('That photo or video');
       if (m.moderation === 'blocked') throw new AppError(422, 'media_blocked', MEDIA_BLOCKED_MESSAGE);
       mediaUrl = m.url;

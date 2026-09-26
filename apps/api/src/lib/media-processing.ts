@@ -282,7 +282,7 @@ export function mediaJobHandlers(deps: ProcessDeps) {
   return {
     /** `filename` is the name the file had on the uploader's device; the dev moderator reads it. */
     'media.process': async ({ mediaId, filename }: { mediaId: string; filename?: string | null }) => {
-      const { rows } = await deps.db.query(`SELECT id, owner_id, kind, storage_key FROM media WHERE id = $1`, [mediaId]);
+      const { rows } = await deps.db.query(`SELECT id, owner_id, kind, storage_key FROM media WHERE id = $1 AND NOT private`, [mediaId]);
       const r = rows[0];
       if (!r?.storage_key) return;
       const m: MediaRow = { id: r.id, ownerId: r.owner_id, kind: r.kind, key: r.storage_key, filename: filename ?? null };

@@ -89,6 +89,8 @@ const TEXT: Record<string, (actor: string) => string> = {
   account_review: () => 'Our team finished reviewing your account',
   chapter_invite: (a) => `${a} invited you to add stories to a chapter`,
   chapter_opened: () => 'A time capsule you are part of has opened',
+  yap_received: (a) => `${a} sent you a Yap`,
+  view_once_screenshot: (a) => `${a} took a screenshot of your view-once photo or video`,
 };
 
 /** Human text for a notification type, or null for types that shouldn't push. */

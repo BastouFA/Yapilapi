@@ -9,6 +9,7 @@ import { CheckoutProvider } from '@/components/Checkout';
 import { Sidebar } from '@/components/Sidebar';
 import { isPublicPath, SignedOutShell } from '@/components/SignedOut';
 import { UsageHeartbeat } from '@/components/UsageHeartbeat';
+import { YapPlayer } from '@/components/Yap';
 import { useSession } from '../providers';
 
 function currentTab(path: string, username?: string): NavEntry['id'] | undefined {
@@ -78,6 +79,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </main>
           <Sidebar />
           <UsageHeartbeat />
+          <YapPlayer />
         </div>
       </CheckoutProvider>
     </CallsProvider>

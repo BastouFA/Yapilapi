@@ -53,7 +53,7 @@ export default async function studioModule(app: FastifyInstance, ctx: AppContext
 
   async function ownVideo(id: string, userId: string) {
     const { rows } = await db.query(
-      `SELECT id, storage_key, duration_ms, (variants ? 'mp4') AS processed FROM media WHERE id = $1 AND owner_id = $2 AND kind = 'video'`,
+      `SELECT id, storage_key, duration_ms, (variants ? 'mp4') AS processed FROM media WHERE id = $1 AND owner_id = $2 AND kind = 'video' AND NOT private`,
       [id, userId],
     );
     if (!rows[0]) throw notFound('That video');

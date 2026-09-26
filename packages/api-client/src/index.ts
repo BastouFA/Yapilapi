@@ -22,6 +22,8 @@ import type {
   Sound,
   EditorParamsInput,
   TagPermission,
+  ConversationYaps,
+  ViewOnceInfo,
 } from '@yapilapi/shared';
 
 export class ApiError extends Error {
@@ -253,11 +255,16 @@ export function createClient(opts: ClientOptions) {
       match: (hashes: string[], source?: 'web' | 'mobile') => post<{ items: ContactMatch[] }>('/v1/contacts/match', { hashes, source }),
     },
     media: {
-      upload: (file: File, altText?: string) => {
+      /** `viewOnce`: stored privately for a view-once chat message (no public address; url is empty). */
+      upload: (file: File, altText?: string, o: { viewOnce?: boolean } = {}) => {
         const fd = new FormData();
         if (altText) fd.append('altText', altText);
         fd.append('file', file);
-        return req<{ media: { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string | null } }>('POST', '/v1/media', fd);
+        return req<{ media: { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string | null } }>(
+          'POST',
+          `/v1/media${o.viewOnce ? '?viewOnce=true' : ''}`,
+          fd,
+        );
       },
       /** One of your media items, with its processing status. */
       get: (id: string) => get<{ media: MediaItemStatus }>(`/v1/media/${id}`),
@@ -328,11 +335,48 @@ export function createClient(opts: ClientOptions) {
       get: (id: string) => get<{ conversation: Conversation }>(`/v1/conversations/${id}`),
       create: (memberIds: string[], title?: string) => post<{ conversation: Conversation }>('/v1/conversations', { memberIds, title }),
       messages: (id: string, cursor?: string) => get<Page<Message>>(`/v1/conversations/${id}/messages${qs({ cursor })}`),
-      send: (id: string, body: string, clientId?: string, attachments: { mediaId: string; name?: string }[] = []) =>
-        post<{ message: Message; notice?: string }>(`/v1/conversations/${id}/messages`, { body, clientId, attachments }),
+      /** `kind: 'yap'` sends a hold-to-talk voice clip; `viewOnce` sends one photo or video uploaded with `viewOnce`. */
+      send: (
+        id: string,
+        body: string,
+        clientId?: string,
+        attachments: { mediaId: string; name?: string }[] = [],
+        o: { kind?: 'message' | 'yap'; viewOnce?: boolean } = {},
+      ) => post<{ message: Message; notice?: string }>(`/v1/conversations/${id}/messages`, { body, clientId, attachments, ...o }),
+      /** "Let Yaps play out loud" here; null goes back to the default (on for yaps from friends). */
+      setYaps: (id: string, playOutLoud: boolean | null) => put<{ yaps: ConversationYaps }>(`/v1/conversations/${id}/yaps`, { playOutLoud }),
       read: (id: string) => post(`/v1/conversations/${id}/read`),
       createPlan: (id: string, title: string, details: Record<string, unknown>) => post(`/v1/conversations/${id}/plans`, { title, details }),
       plans: (id: string) => get<{ items: { id: string; title: string; details: Record<string, unknown>; status: string }[] }>(`/v1/conversations/${id}/plans`),
+    },
+    yaps: {
+      /** "Pause Yaps" everywhere. */
+      settings: () => get<{ paused: boolean }>('/v1/me/yaps'),
+      setPaused: (paused: boolean) => put<{ paused: boolean }>('/v1/me/yaps', { paused }),
+    },
+    viewOnce: {
+      /** A link to the file that works for a few minutes, only for you. Fetch it with `file`. */
+      open: (messageId: string) => post<{ url: string; expiresAt: string; kind: string; mime: string | null }>(`/v1/messages/${messageId}/view-once/open`),
+      /** Closed: it can't be opened again. */
+      viewed: (messageId: string) => post<{ viewOnce: ViewOnceInfo }>(`/v1/messages/${messageId}/view-once/viewed`),
+      /** A screenshot was detected while it was open; the sender is told. */
+      screenshot: (messageId: string) => post<{ ok: true }>(`/v1/messages/${messageId}/view-once/screenshot`),
+      /** Download the file behind a link from `open` (signed in, never cached). */
+      file: async (url: string): Promise<Blob> => {
+        const headers: Record<string, string> = {};
+        if (opts.token) headers.authorization = `Bearer ${opts.token}`;
+        let res: Response;
+        try {
+          res = await f(`${opts.baseUrl}${url}`, { headers, credentials: 'include', cache: 'no-store' });
+        } catch {
+          throw new ApiError(0, 'network', "Can't reach YAPILAPI. Check your connection and try again.");
+        }
+        if (!res.ok) {
+          const e = ((await res.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null)?.error ?? {};
+          throw new ApiError(res.status, e.code ?? 'error', e.message ?? 'This photo or video is no longer available.');
+        }
+        return res.blob();
+      },
     },
     communities: {
       list: (scope: 'discover' | 'mine' = 'discover') => get<{ items: Community[] }>(`/v1/communities${qs({ scope })}`),

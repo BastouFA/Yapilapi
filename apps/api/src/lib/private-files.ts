@@ -1,5 +1,5 @@
 import { createReadStream } from 'node:fs';
-import { mkdir, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
@@ -33,6 +33,28 @@ export async function openPrivate(ctx: Pick<AppContext, 'config' | 'storage'>, k
   const info = await stat(full).catch(() => null);
   if (!info) return null;
   return { body: createReadStream(full), contentLength: info.size };
+}
+
+/** A private file's bytes, or null when it is gone. */
+export async function readPrivate(ctx: Pick<AppContext, 'config' | 'storage'>, key: string): Promise<Buffer | null> {
+  if (!/^private\/[\w/.-]+$/.test(key) || key.includes('..')) return null;
+  if (ctx.storage.driver === 's3') return ctx.storage.read(key).catch(() => null);
+  return readFile(privatePath(ctx, key)).catch(() => null);
+}
+
+/** Delete a private file for good. Deleting one that is already gone is fine. */
+export async function removePrivate(ctx: Pick<AppContext, 'config' | 'storage'>, key: string): Promise<void> {
+  if (!/^private\/[\w/.-]+$/.test(key) || key.includes('..')) return;
+  if (ctx.storage.driver === 's3') {
+    await ctx.storage.remove!(key);
+    return;
+  }
+  await rm(privatePath(ctx, key), { force: true });
+}
+
+/** Where a private file sits on disk with the local driver. */
+export function privatePath(ctx: Pick<AppContext, 'config'>, key: string): string {
+  return path.join(path.resolve(ctx.config.PRIVATE_UPLOAD_DIR), key);
 }
 
 /** What sellers can upload as a digital product, checked by the file's first bytes. */

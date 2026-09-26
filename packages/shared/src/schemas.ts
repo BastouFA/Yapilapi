@@ -195,8 +195,17 @@ export const sendMessageSchema = z
       .max(10)
       .default([]),
     clientId: z.string().max(64).optional(),
+    /** 'yap': a hold-to-talk voice clip (one audio attachment, up to 60 seconds) that plays out loud for people who allow it. */
+    kind: z.enum(['message', 'yap']).default('message'),
+    /** One photo or video uploaded with POST /v1/media?viewOnce=true, opened once by each person. */
+    viewOnce: z.boolean().default(false),
   })
   .refine((v) => v.body.length > 0 || v.attachments.length > 0, { message: 'Write a message or attach a file.', path: ['body'] });
+
+/** "Let Yaps play out loud" in one chat. null goes back to the default (on for yaps from friends). */
+export const conversationYapsSchema = z.object({ playOutLoud: z.boolean().nullable() });
+/** "Pause Yaps" everywhere. */
+export const yapSettingsSchema = z.object({ paused: z.boolean() });
 
 export const createCommunitySchema = z.object({
   name: trimmed(80),

@@ -1,13 +1,26 @@
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
-import { createConversationSchema, pageQuerySchema, sendMessageSchema, type Conversation, type Message } from '@yapilapi/shared';
+import {
+  conversationYapsSchema,
+  createConversationSchema,
+  pageQuerySchema,
+  sendMessageSchema,
+  yapSettingsSchema,
+  type Conversation,
+  type Message,
+  type YapEvent,
+} from '@yapilapi/shared';
 import { z } from 'zod';
 import { activeControls } from '../lib/family.ts';
+import { enqueue } from '../lib/jobs.ts';
+import { openPrivate } from '../lib/private-files.ts';
+import { issueViewToken, OPEN_WINDOW_MINUTES, publishViewOnce, readViewToken, VIEW_ONCE_DAYS, viewOnceFor } from '../lib/view-once.ts';
+import { planYap, recentYaps, YAP_LENGTH_SLACK_MS, YAP_MAX_MEMBERS, YAP_MAX_MS, YAP_PER_MINUTE } from '../lib/yaps.ts';
 import { AppError, badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
 import { analyzeText } from '../lib/moderation.ts';
-import { track } from '../lib/services.ts';
+import { notify, track } from '../lib/services.ts';
 import { ageOf, areFriends, isAdultViewer, isBlockedEitherWay, publicUserFrom, usersByIds } from '../lib/users.ts';
 import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
 import { assertMessagePace, assessMessage, flagContent, isRestricted, restrictedError } from '../lib/spam.ts';
@@ -94,9 +107,21 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     }));
   }
 
+  /** View-once messages carry their state for this reader (and, for the sender, who opened them). */
+  async function withViewOnce(items: Message[], viewerId: string): Promise<Message[]> {
+    const info = await viewOnceFor(
+      db,
+      items.map((m) => m.id),
+      viewerId,
+    );
+    return info.size ? items.map((m) => (info.has(m.id) ? { ...m, viewOnce: info.get(m.id)! } : m)) : items;
+  }
+
   async function loadConversations(userId: string, ids?: string[]): Promise<Conversation[]> {
     const { rows } = await db.query(
-      `SELECT c.id, c.kind, c.title, c.last_message_at, cm.last_read_at,
+      `SELECT c.id, c.kind, c.title, c.last_message_at, cm.last_read_at, cm.yaps_out_loud,
+         EXISTS (SELECT 1 FROM conversation_members o JOIN friendships f ON f.user_a = LEAST(o.user_id, $1::uuid) AND f.user_b = GREATEST(o.user_id, $1::uuid)
+                 WHERE o.conversation_id = c.id AND o.user_id <> $1 AND o.left_at IS NULL) AS has_friend,
          (SELECT count(*) FROM messages m WHERE m.conversation_id = c.id AND m.created_at > cm.last_read_at AND m.sender_id <> $1 AND m.deleted_at IS NULL
             AND m.moderation_status = 'normal') AS unread,
          (SELECT array_agg(user_id) FROM conversation_members WHERE conversation_id = c.id AND left_at IS NULL) AS member_ids,
@@ -111,6 +136,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     );
     const users = await usersByIds(db, [...new Set(rows.flatMap((r) => r.member_ids ?? []))]);
     const adult = await isAdultViewer(db, userId);
+    const paused = !!(await db.query(`SELECT yaps_paused FROM user_preferences WHERE user_id = $1`, [userId])).rows[0]?.yaps_paused;
     const withLast = await withVerdicts(
       rows.map((r) => ({ ...r, attachments: r.lm_attachments as Attachment[] | null })),
       adult,
@@ -133,6 +159,13 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
         : null,
       unreadCount: r.unread,
       updatedAt: r.last_message_at.toISOString(),
+      yaps: {
+        available: r.kind !== 'community' && (r.member_ids ?? []).length >= 2 && (r.member_ids ?? []).length <= YAP_MAX_MEMBERS,
+        playOutLoud: r.yaps_out_loud,
+        // One-to-one: on when you are friends. Groups: yaps from friends play.
+        defaultOutLoud: r.kind === 'direct' ? r.has_friend : true,
+        paused,
+      },
     }));
   }
 
@@ -219,7 +252,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     await assertMember(id, u.id);
     const c = decodeCursor<KeyCursor>(q.cursor);
     const { rows } = await db.query(
-      `SELECT m.id, m.conversation_id, m.body, m.reply_to_id, m.attachments, m.created_at, m.client_id, m.moderation_status,
+      `SELECT m.id, m.conversation_id, m.body, m.reply_to_id, m.attachments, m.created_at, m.client_id, m.moderation_status, m.kind,
               pr.user_id AS s_id, pr.username AS s_username, pr.display_name AS s_display_name, pr.avatar_url AS s_avatar_url, pr.mode AS s_mode
        FROM messages m JOIN profiles pr ON pr.user_id = m.sender_id
        WHERE m.conversation_id = $1 AND m.deleted_at IS NULL
@@ -230,7 +263,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       c ? [id, u.id, q.limit + 1, c.t, c.id] : [id, u.id, q.limit + 1],
     );
     const page = rows.slice(0, q.limit);
-    const items: Message[] = (await withVerdicts(page.map(toMessage), await isAdultViewer(db, u.id))).reverse();
+    const items: Message[] = await withViewOnce((await withVerdicts(page.map(toMessage), await isAdultViewer(db, u.id))).reverse(), u.id);
     return { items, nextCursor: rows.length > q.limit ? keyCursorOf(page.at(-1)!) : null };
   });
 
@@ -241,6 +274,14 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     await assertMember(id, u.id);
     const members = await memberIds(id);
     const conv = (await db.query(`SELECT kind FROM conversations WHERE id = $1`, [id])).rows[0];
+    const yap = input.kind === 'yap';
+    if (yap && input.viewOnce) throw badRequest('A Yap can’t be view once.');
+    if (yap) {
+      if (conv.kind === 'community' || members.length > YAP_MAX_MEMBERS)
+        throw new AppError(400, 'yaps_unavailable', `Yaps work in one-to-one chats and groups of up to ${YAP_MAX_MEMBERS} people.`);
+      if (input.attachments.length !== 1) throw badRequest('A Yap is one voice clip.');
+    }
+    if (input.viewOnce && input.attachments.length !== 1) throw badRequest('Send one photo or video at a time to view once.');
     let toStranger = false;
     if (conv.kind === 'direct') {
       const other = members.find((m) => m !== u.id);
@@ -250,6 +291,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       }
     }
     await assertMessagePace(db, ctx.config, u.id);
+    if (yap && (await recentYaps(db, u.id)) >= YAP_PER_MINUTE) throw yapRateError();
     const analysis = analyzeText(input.body);
     if (analysis.risk === 'escalate') {
       await db.query(
@@ -263,14 +305,30 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     if (input.attachments.length) {
       const ids = input.attachments.map((a) => a.mediaId);
       const { rows: media } = await db.query(
-        `SELECT id, kind, url, variants, poster_url, duration_ms, moderation FROM media WHERE id = ANY($1::uuid[]) AND owner_id = $2 AND status <> 'failed'`,
+        `SELECT id, kind, url, variants, poster_url, duration_ms, moderation, private FROM media
+         WHERE id = ANY($1::uuid[]) AND owner_id = $2 AND status <> 'failed' AND deleted_at IS NULL`,
         [ids, u.id],
       );
       if (media.length !== new Set(ids).size) throw notFound('That photo, video or voice message');
       if (media.some((m) => m.moderation === 'blocked')) throw new AppError(422, 'media_blocked', MEDIA_BLOCKED_MESSAGE);
+      if (yap) {
+        const clip = media[0]!;
+        if (clip.kind !== 'audio') throw new AppError(422, 'yap_not_voice', 'A Yap has to be a voice clip.');
+        if (clip.duration_ms == null) throw new AppError(422, 'yap_length_unknown', 'We couldn’t tell how long this clip is. Try recording it again.');
+        if (clip.duration_ms > YAP_MAX_MS + YAP_LENGTH_SLACK_MS) throw new AppError(422, 'yap_too_long', 'Yaps can be up to 60 seconds.');
+      }
+      if (input.viewOnce) {
+        const m = media[0]!;
+        if (!m.private || (m.kind !== 'image' && m.kind !== 'video'))
+          throw new AppError(400, 'view_once_upload', 'To send a photo or video to view once, upload it as view once first.');
+      } else if (media.some((m) => m.private)) {
+        throw new AppError(400, 'view_once_only', 'This photo or video was uploaded to view once. Send it as view once.');
+      }
       const byId = new Map(media.map((m) => [m.id as string, m]));
       attachments = input.attachments.map((a) => {
         const m = byId.get(a.mediaId)!;
+        // A view-once file has no address: each recipient asks for a short-lived link when they open it.
+        if (input.viewOnce) return { mediaId: m.id, kind: m.kind, url: '', durationMs: m.duration_ms ?? null, posterUrl: null };
         return {
           mediaId: m.id,
           kind: m.kind,
@@ -284,13 +342,39 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     // Messages to people who aren't friends are checked for spam; flagged ones wait for a moderator before delivery.
     const spam = toStranger ? await assessMessage(db, ctx.config, u.id, id, input.body) : null;
     const held = !!spam?.flags.length;
+    const viewOnceMediaId = input.viewOnce ? attachments[0]!.mediaId! : null;
     const row = await tx(db, async (c) => {
-      const { rows } = await c.query(
-        `INSERT INTO messages (conversation_id, sender_id, body, reply_to_id, attachments, client_id, moderation_status) VALUES ($1,$2,$3,$4,$5,$6,$7)
-         ON CONFLICT (sender_id, client_id) WHERE client_id IS NOT NULL DO UPDATE SET client_id = EXCLUDED.client_id
-         RETURNING id, conversation_id, body, reply_to_id, attachments, created_at, client_id, moderation_status`,
-        [id, u.id, input.body, input.replyToId ?? null, JSON.stringify(attachments), input.clientId ?? null, held ? 'review' : 'normal'],
-      );
+      if (yap) {
+        // Counted again under a per-sender lock, so parallel requests can't slip past 30 a minute.
+        await c.query(`SELECT pg_advisory_xact_lock(hashtext('yap:' || $1))`, [u.id]);
+        if ((await recentYaps(c, u.id)) >= YAP_PER_MINUTE) throw yapRateError();
+      }
+      const { rows } = await c
+        .query(
+          `INSERT INTO messages (conversation_id, sender_id, body, reply_to_id, attachments, client_id, moderation_status, kind, view_once, view_once_media_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+           ON CONFLICT (sender_id, client_id) WHERE client_id IS NOT NULL DO UPDATE SET client_id = EXCLUDED.client_id
+           RETURNING id, conversation_id, body, reply_to_id, attachments, created_at, client_id, moderation_status, kind, view_once, (xmax = 0) AS inserted`,
+          [
+            id,
+            u.id,
+            input.body,
+            input.replyToId ?? null,
+            JSON.stringify(attachments),
+            input.clientId ?? null,
+            held ? 'review' : 'normal',
+            input.kind,
+            input.viewOnce,
+            viewOnceMediaId,
+          ],
+        )
+        .catch((e: { code?: string; constraint?: string }) => {
+          if (e.code === '23505' && e.constraint === 'messages_view_once_media_key')
+            throw new AppError(409, 'view_once_used', 'This photo or video was already sent.');
+          throw e;
+        });
+      // The file is deleted 14 days after sending at the latest (sooner once everyone has viewed it).
+      if (rows[0].view_once && rows[0].inserted) await enqueue(c, 'viewonce.check', { messageId: rows[0].id }, VIEW_ONCE_DAYS * 86_400 + 60);
       if (!held) await c.query(`UPDATE conversations SET last_message_at = now() WHERE id = $1`, [id]);
       await c.query(`UPDATE conversation_members SET last_read_at = now() WHERE conversation_id = $1 AND user_id = $2`, [id, u.id]);
       if (held && spam) {
@@ -314,13 +398,20 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       createdAt: row.created_at.toISOString(),
       clientId: row.client_id,
       ...(row.moderation_status === 'review' ? { moderation: 'review' as const } : {}),
+      ...(row.kind === 'yap' ? { kind: 'yap' as const } : {}),
     };
+    if (row.view_once) {
+      // Everyone gets the same starting state; the sender's copy also lists who opened it (nobody yet).
+      const info = (await viewOnceFor(db, [row.id], u.id)).get(row.id);
+      if (info) message.viewOnce = { state: info.state, kind: info.kind, expiresAt: info.expiresAt };
+    }
+    const ownCopy = async (m: Message): Promise<Message> => (row.view_once ? (await withViewOnce([m], u.id))[0]! : m);
     if (row.moderation_status === 'review') {
       // Held: only the sender sees it until a moderator lets it through.
       await ctx.realtime.publish([u.id], { type: 'message.created', data: message });
       reply.code(201);
       return {
-        message,
+        message: await ownCopy(message),
         notice:
           'We’re holding this message for a quick check before it’s delivered. This sometimes happens with messages to people you aren’t friends with yet.',
       };
@@ -341,10 +432,39 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       members.filter((m) => !adults.has(m)),
       { type: 'message.created', data: forOthers },
     );
-    track(db, u.id, 'message_sent', { kind: conv.kind });
+    if (yap && row.inserted) await deliverYap(u.id, id, members, (userId) => (adults.has(userId) ? forAdults! : forOthers!));
+    track(db, u.id, row.kind === 'yap' ? 'yap_sent' : 'message_sent', { kind: conv.kind, ...(row.view_once ? { viewOnce: true } : {}) });
     reply.code(201);
-    return { message: adults.has(u.id) ? forAdults : forOthers };
+    return { message: await ownCopy(adults.has(u.id) ? forAdults! : forOthers!) };
   });
+
+  /**
+   * A yap goes out as a `yap` event to everyone in the chat who hasn't blocked the sender.
+   * `autoplay` is true only for people who allow it right now (see planYap); for everyone
+   * else it arrives silently. People who aren't connected get a notification.
+   */
+  async function deliverYap(senderId: string, conversationId: string, members: string[], copyFor: (userId: string) => Message) {
+    const plan = await planYap(
+      db,
+      senderId,
+      conversationId,
+      members.filter((m) => m !== senderId),
+    );
+    for (const r of plan) {
+      if (!r.deliver) continue;
+      const data: YapEvent = { message: copyFor(r.userId), conversationId, autoplay: r.autoplay };
+      await ctx.realtime.publish([r.userId], { type: 'yap', data });
+      if (!ctx.realtime.isOnline(r.userId))
+        await notify(db, ctx.realtime, {
+          userId: r.userId,
+          category: 'messages',
+          type: 'yap_received',
+          actorId: senderId,
+          entityType: 'conversation',
+          entityId: conversationId,
+        });
+    }
+  }
 
   app.post('/v1/conversations/:id/read', { preHandler: requireAuth }, async (req) => {
     const { id } = parse(idParam, req.params);
@@ -357,10 +477,12 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const u = me(req);
     const { id } = parse(idParam, req.params);
     const r = await db.query(
-      `UPDATE messages SET deleted_at = now(), body = '', attachments = '[]' WHERE id = $1 AND sender_id = $2 AND deleted_at IS NULL RETURNING conversation_id`,
+      `UPDATE messages SET deleted_at = now(), body = '', attachments = '[]' WHERE id = $1 AND sender_id = $2 AND deleted_at IS NULL RETURNING conversation_id, view_once`,
       [id, u.id],
     );
     if (!r.rowCount) throw notFound('Message');
+    // Unsending a view-once message deletes its file too.
+    if (r.rows[0].view_once) await enqueue(db, 'viewonce.check', { messageId: id });
     await ctx.realtime.publish(await memberIds(r.rows[0].conversation_id), {
       type: 'message.deleted',
       data: { id, conversationId: r.rows[0].conversation_id },
@@ -377,6 +499,141 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     await db.query(`INSERT INTO message_reactions (message_id, user_id, emoji) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, [id, u.id, emoji]);
     await ctx.realtime.publish(await memberIds(m.rows[0].conversation_id), { type: 'message.reaction', data: { id, emoji, userId: u.id } });
     return { ok: true };
+  });
+
+  // ── Yaps: settings ────────────────────────────────────────────────────
+  /** "Pause Yaps": they still arrive and stay in the chat, but never play by themselves. */
+  app.get('/v1/me/yaps', { preHandler: requireAuth }, async (req) => {
+    const r = await db.query(`SELECT yaps_paused FROM user_preferences WHERE user_id = $1`, [me(req).id]);
+    return { paused: !!r.rows[0]?.yaps_paused };
+  });
+
+  app.put('/v1/me/yaps', { preHandler: requireAuth }, async (req) => {
+    const { paused } = parse(yapSettingsSchema, req.body);
+    await db.query(
+      `INSERT INTO user_preferences (user_id, yaps_paused) VALUES ($1,$2) ON CONFLICT (user_id) DO UPDATE SET yaps_paused = EXCLUDED.yaps_paused, updated_at = now()`,
+      [me(req).id, paused],
+    );
+    return { paused };
+  });
+
+  /** "Let Yaps play out loud" in one chat; null goes back to the default (on for yaps from friends). */
+  app.put('/v1/conversations/:id/yaps', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const { playOutLoud } = parse(conversationYapsSchema, req.body);
+    await assertMember(id, u.id);
+    await db.query(`UPDATE conversation_members SET yaps_out_loud = $3 WHERE conversation_id = $1 AND user_id = $2`, [id, u.id, playOutLoud]);
+    const [conversation] = await loadConversations(u.id, [id]);
+    return { yaps: conversation!.yaps };
+  });
+
+  // ── View once ─────────────────────────────────────────────────────────
+  const gone = (code: string, message: string) => new AppError(410, code, message);
+
+  /** A view-once message this person can see, with their own opening record. */
+  async function viewOnceMessage(messageId: string, userId: string) {
+    const r = (
+      await db.query(
+        `SELECT m.id, m.conversation_id, m.sender_id, m.view_once, m.deleted_at, m.moderation_status, m.view_once_ended_at,
+                md.kind, md.mime, md.storage_key, md.moderation, md.deleted_at AS media_deleted_at,
+                v.opened_at, v.viewed_at, (v.opened_at < now() - interval '${OPEN_WINDOW_MINUTES} minutes') AS stale
+         FROM messages m LEFT JOIN media md ON md.id = m.view_once_media_id
+         LEFT JOIN message_views v ON v.message_id = m.id AND v.user_id = $2
+         WHERE m.id = $1`,
+        [messageId, userId],
+      )
+    ).rows[0];
+    if (!r || !r.view_once || r.deleted_at || r.moderation_status !== 'normal') throw notFound('That message');
+    await assertMember(r.conversation_id, userId);
+    // People who blocked the sender don't see their messages at all.
+    if ((await db.query(`SELECT 1 FROM blocks WHERE blocker_id = $1 AND blocked_id = $2`, [userId, r.sender_id])).rowCount) throw notFound('That message');
+    return r;
+  }
+
+  async function assertCanOpen(r: Awaited<ReturnType<typeof viewOnceMessage>>, userId: string) {
+    if (r.viewed_at || r.stale) throw gone('view_once_viewed', 'You already opened this. View-once photos and videos can only be opened once.');
+    if (r.view_once_ended_at || !r.storage_key || r.media_deleted_at) throw gone('view_once_expired', 'This photo or video is no longer available.');
+    if (r.moderation === 'blocked' || (r.moderation === 'sensitive' && !(await isAdultViewer(db, userId))))
+      throw gone('view_once_removed', 'This photo or video isn’t available.');
+  }
+
+  /**
+   * Open a view-once photo or video: returns a link that works for a few minutes, only for
+   * you. Opening again before closing it (a dropped connection) gives a fresh link; after
+   * closing it, or 10 minutes after opening, it can't be opened again.
+   */
+  app.post('/v1/messages/:id/view-once/open', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const r = await viewOnceMessage(id, u.id);
+    if (r.sender_id === u.id) throw new AppError(403, 'view_once_sender', 'You sent this, so there’s nothing to open. You can see who opened it.');
+    await assertCanOpen(r, u.id);
+    const first = await db.query(`INSERT INTO message_views (message_id, user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING RETURNING opened_at`, [id, u.id]);
+    if (first.rowCount) await publishViewOnce(db, ctx.realtime, id, [r.sender_id]);
+    const { token, expiresAt } = issueViewToken(ctx.config, id, u.id);
+    return { url: `/v1/view-once/${token}`, expiresAt: expiresAt.toISOString(), kind: r.kind, mime: r.mime };
+  });
+
+  /** Closed: from now on the file is never returned to you. When everyone has viewed it, the job worker deletes it. */
+  app.post('/v1/messages/:id/view-once/viewed', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const r = await viewOnceMessage(id, u.id);
+    if (r.sender_id === u.id) throw badRequest('You sent this message.');
+    await db.query(
+      `INSERT INTO message_views (message_id, user_id, viewed_at) VALUES ($1,$2,now())
+       ON CONFLICT (message_id, user_id) DO UPDATE SET viewed_at = coalesce(message_views.viewed_at, now())`,
+      [id, u.id],
+    );
+    await enqueue(db, 'viewonce.check', { messageId: id });
+    await publishViewOnce(db, ctx.realtime, id, [r.sender_id, u.id]);
+    return { viewOnce: (await viewOnceFor(db, [id], u.id)).get(id) };
+  });
+
+  /** The phone saw a screenshot while it was open: the sender is told, in plain words. */
+  app.post('/v1/messages/:id/view-once/screenshot', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const r = await viewOnceMessage(id, u.id);
+    if (!r.opened_at) throw badRequest('Open it first.');
+    const first = await db.query(
+      `UPDATE message_views SET screenshot_at = now() WHERE message_id = $1 AND user_id = $2 AND screenshot_at IS NULL RETURNING 1`,
+      [id, u.id],
+    );
+    if (first.rowCount) {
+      await notify(db, ctx.realtime, {
+        userId: r.sender_id,
+        category: 'messages',
+        type: 'view_once_screenshot',
+        actorId: u.id,
+        entityType: 'conversation',
+        entityId: r.conversation_id,
+        data: { messageId: id, kind: r.kind },
+      });
+      await publishViewOnce(db, ctx.realtime, id, [r.sender_id]);
+    }
+    return { ok: true };
+  });
+
+  /** The file itself, for the person the link was made for, while it is open. Never cached. */
+  app.get('/v1/view-once/:token', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const u = me(req);
+    const { token } = parse(z.object({ token: z.string().regex(/^[\w-]{60,80}$/) }), req.params);
+    const t = readViewToken(ctx.config, token);
+    if (!t || t.userId !== u.id) throw new AppError(403, 'view_once_denied', 'This link has expired or isn’t yours. Open it again from the chat.');
+    const r = await viewOnceMessage(t.messageId, u.id);
+    if (!r.opened_at) throw new AppError(403, 'view_once_denied', 'Open it from the chat first.');
+    await assertCanOpen(r, u.id);
+    const obj = await openPrivate(ctx, r.storage_key);
+    if (!obj) throw gone('view_once_expired', 'This photo or video is no longer available.');
+    reply
+      .header('content-type', r.mime ?? 'application/octet-stream')
+      .header('cache-control', 'private, no-store, max-age=0')
+      .header('x-content-type-options', 'nosniff')
+      .header('content-disposition', 'inline');
+    if (obj.contentLength) reply.header('content-length', obj.contentLength);
+    return reply.send(obj.body);
   });
 
   // Plans: turn a conversation into a structured activity. The AI suggests; people confirm.
@@ -450,6 +707,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
   });
 }
 
+const yapRateError = () => new AppError(429, 'yap_rate_limited', `You can send up to ${YAP_PER_MINUTE} Yaps a minute. Wait a moment, then try again.`);
+
 function toMessage(r: Record<string, any>): Message {
   return {
     id: r.id,
@@ -461,5 +720,6 @@ function toMessage(r: Record<string, any>): Message {
     createdAt: r.created_at.toISOString(),
     clientId: r.client_id,
     ...(r.moderation_status === 'review' ? { moderation: 'review' as const } : {}),
+    ...(r.kind === 'yap' ? { kind: 'yap' as const } : {}),
   };
 }

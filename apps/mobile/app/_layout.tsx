@@ -5,6 +5,7 @@ import { LocaleProvider, useT } from '../lib/i18n';
 import { SessionProvider, useSession } from '../lib/session';
 import { useColors } from '../lib/ui';
 import { useUsageHeartbeat } from '../lib/usage';
+import { YapPlayer } from '../lib/yaps';
 
 function Heartbeat() {
   const { me } = useSession();
@@ -73,6 +74,7 @@ export default function Root() {
         <CallsProvider>
           <Heartbeat />
           <Screens />
+          <YapPlayer />
         </CallsProvider>
       </LocaleProvider>
     </SessionProvider>

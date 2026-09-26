@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Icon, SensitiveCover } from '@yapilapi/design-system';
 import type { Message } from '@yapilapi/shared';
+import { api, ApiError, errorMessage } from '@/lib/api';
 
 type Attachment = Message['attachments'][number];
 
@@ -101,6 +102,121 @@ function VoiceNote({ url, durationMs }: { url: string; durationMs: number | null
       />
     </div>
   );
+}
+
+/**
+ * A view-once photo or video in a chat. Recipients tap to open it full screen; when they
+ * close it, it's gone for them. The sender sees who opened it. The file is fetched with a
+ * short-lived link and shown from memory, never from a public address.
+ */
+export function ViewOnceMessage({ message, mine, onChange }: { message: Message; mine: boolean; onChange: (m: Message) => void }) {
+  const info = message.viewOnce!;
+  const what = info.kind === 'video' ? 'Video' : 'Photo';
+  const [open, setOpen] = useState<{ src: string; kind: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function view() {
+    setError(null);
+    setLoading(true);
+    try {
+      const link = await api.viewOnce.open(message.id);
+      const blob = await api.viewOnce.file(link.url);
+      setOpen({ src: URL.createObjectURL(blob), kind: link.kind });
+    } catch (e) {
+      setError(errorMessage(e));
+      // Already opened elsewhere or expired: show the final state.
+      if (e instanceof ApiError && e.status === 410)
+        onChange({ ...message, viewOnce: { ...info, state: e.code === 'view_once_viewed' ? 'viewed' : 'expired' } });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function close() {
+    if (open) URL.revokeObjectURL(open.src);
+    setOpen(null);
+    try {
+      const r = await api.viewOnce.viewed(message.id);
+      onChange({ ...message, viewOnce: r.viewOnce });
+    } catch {
+      onChange({ ...message, viewOnce: { ...info, state: 'viewed' } });
+    }
+  }
+
+  // Leaving the page while it's open counts as closing it.
+  useEffect(() => {
+    if (!open) return;
+    const leave = () => navigator.sendBeacon?.(`/api/v1/messages/${message.id}/view-once/viewed`);
+    window.addEventListener('pagehide', leave);
+    return () => window.removeEventListener('pagehide', leave);
+  }, [open, message.id]);
+
+  const opened = info.openedBy ?? [];
+  const who = opened.map((o) => o.user.displayName);
+  const shots = opened.filter((o) => o.screenshot).map((o) => o.user.displayName);
+  return (
+    <div className="view-once">
+      {mine || info.state !== 'ready' ? (
+        <div className="view-once__row">
+          <Icon name={info.state === 'ready' ? 'eye' : 'check'} size={18} />
+          <span>{info.state === 'ready' ? `${what} · View once` : info.state === 'viewed' ? `${what}, viewed` : `${what}, expired`}</span>
+        </div>
+      ) : (
+        <button type="button" className="view-once__row view-once__open" onClick={() => void view()} disabled={loading}>
+          <Icon name="eye" size={18} />
+          <span>{loading ? 'Opening…' : `${what} · Tap to view once`}</span>
+        </button>
+      )}
+      {mine ? (
+        <span className="view-once__meta">
+          {who.length ? `Opened by ${who.join(', ')}` : info.state === 'ready' ? 'Not opened yet' : ''}
+          {shots.length ? `. ${shots.join(', ')} took a screenshot` : ''}
+        </span>
+      ) : null}
+      {error ? (
+        <span className="view-once__meta" role="alert">
+          {error}
+        </span>
+      ) : null}
+      {open ? (
+        <div className="view-once__viewer" role="dialog" aria-modal aria-label={`View-once ${what.toLowerCase()} from ${message.sender.displayName}`}>
+          <div className="view-once__bar">
+            <span>
+              {message.sender.displayName} · {what}, view once
+            </span>
+            <Button size="sm" variant="ghost" onClick={() => void close()} autoFocus>
+              Close
+            </Button>
+          </div>
+          {open.kind === 'video' ? (
+            <video
+              src={open.src}
+              autoPlay
+              playsInline
+              controls
+              controlsList="nodownload noplaybackrate"
+              disablePictureInPicture
+              onContextMenu={(e) => e.preventDefault()}
+            />
+          ) : (
+            <img src={open.src} alt={`Photo from ${message.sender.displayName}`} draggable={false} onContextMenu={(e) => e.preventDefault()} />
+          )}
+          <p className="view-once__note">When you close it, it’s gone. Browsers can’t block screenshots, so the sender isn’t told about them on the web.</p>
+          <EscapeToClose onClose={() => void close()} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function EscapeToClose({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [onClose]);
+  return null;
 }
 
 /**

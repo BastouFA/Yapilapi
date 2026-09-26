@@ -72,6 +72,7 @@ import { studioJobHandlers } from './lib/studio.ts';
 import { editorJobHandlers } from './lib/media-edit.ts';
 import { liveRecordingJobHandlers } from './lib/live-recording.ts';
 import { shareVideoJobHandlers } from './lib/share-video.ts';
+import { sweepViewOnce, viewOnceJobHandlers } from './lib/view-once.ts';
 import { fastifyTracingPlugin, traceLogMixin } from './lib/tracing.ts';
 import { endExpiredCampaigns } from './lib/boosts.ts';
 
@@ -371,12 +372,15 @@ export async function buildApp(
   }
   // Background jobs (media processing). Tests drive processJobs directly.
   let jobTimer: NodeJS.Timeout | undefined;
+  const viewOnceDeps = { db, config, storage, realtime: ctx.realtime, moderator: ctx.mediaModerator };
+  let lastViewOnceSweep = 0;
   const jobHandlers = {
     ...mediaJobHandlers({ db, storage, moderator: ctx.mediaModerator, realtime: ctx.realtime }),
     ...studioJobHandlers({ db, storage, transcription: ctx.transcription }),
     ...editorJobHandlers({ db, storage }),
     ...liveRecordingJobHandlers({ db, storage, recordingsDir: config.LIVE_RECORDINGS_DIR }),
     ...shareVideoJobHandlers({ db, storage }),
+    ...viewOnceJobHandlers(viewOnceDeps),
   };
   if (opts.webhookWorker ?? config.APP_ENV !== 'test') {
     let busy = false;
@@ -388,6 +392,11 @@ export async function buildApp(
       await endExpiredCampaigns(db, ctx.paymentProviders).catch((e) => app.log.warn({ err: e.message }, 'ad expiry'));
       // Time capsules whose date has come: tell the owner and contributors.
       await openDueChapters(db, ctx.realtime).catch((e) => app.log.warn({ err: e.message }, 'chapter capsules'));
+      // Once a minute: delete view-once files everyone has seen, 14-day-old ones and those of deleted messages.
+      if (Date.now() - lastViewOnceSweep > 60_000) {
+        lastViewOnceSweep = Date.now();
+        await sweepViewOnce(viewOnceDeps).catch((e) => app.log.warn({ err: e.message }, 'view-once sweep'));
+      }
       busy = false;
     }, 2_000);
     jobTimer.unref();

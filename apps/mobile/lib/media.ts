@@ -69,13 +69,20 @@ export const VOICE_MIME = 'audio/mp4';
  * Upload a file on the phone (a picked photo or video, or a voice recording) in one multipart
  * request to /v1/media, the endpoint the web app uses. XMLHttpRequest, so progress shows.
  */
-export async function uploadFile(uri: string, name: string, type: string, onProgress?: (fraction: number) => void): Promise<Uploaded> {
+export async function uploadFile(
+  uri: string,
+  name: string,
+  type: string,
+  onProgress?: (fraction: number) => void,
+  o: { viewOnce?: boolean } = {},
+): Promise<Uploaded> {
   const form = new FormData();
   form.append('file', { uri, name, type } as unknown as Blob);
   const token = await getToken();
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${baseUrl}/v1/media`);
+    // viewOnce: stored privately for a view-once chat message (it has no public address).
+    xhr.open('POST', `${baseUrl}/v1/media${o.viewOnce ? '?viewOnce=true' : ''}`);
     if (token) xhr.setRequestHeader('authorization', `Bearer ${token}`);
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && e.total) onProgress?.(e.loaded / e.total);
