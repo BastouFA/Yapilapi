@@ -257,7 +257,8 @@ export default function Create() {
       setBody('');
       setMedia(null);
       if (r.moderation) setNote(r.moderation.message);
-      else router.navigate('/');
+      // Home shows the new post at the top, whatever the feed's ranking.
+      else router.navigate({ pathname: '/', params: { posted: r.post.id } });
     } catch (e) {
       if (isVerificationError(e)) setNeedsVerify(true);
       else setError(errorMessage(e));

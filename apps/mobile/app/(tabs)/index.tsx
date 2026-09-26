@@ -1,4 +1,4 @@
-import { Redirect, router, useFocusEffect, useNavigation } from 'expo-router';
+import { Redirect, router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, RefreshControl, Text, View } from 'react-native';
 import type { StoryGroup } from '../../../../packages/api-client/src/index';
@@ -93,6 +93,20 @@ function Feed() {
     setPosts(null);
     void load();
   }, [load]);
+
+  // Just published from Create: put it at the top, as people expect to see what they posted.
+  const { posted } = useLocalSearchParams<{ posted?: string }>();
+  useEffect(() => {
+    if (!posted) return;
+    void (async () => {
+      try {
+        const { post } = await (await client()).posts.get(posted);
+        setPosts((cur) => [post, ...(cur ?? []).filter((p) => p.id !== post.id)]);
+      } catch {
+        // Not visible (e.g. waiting for review): the feed stays as it is.
+      }
+    })();
+  }, [posted]);
 
   return (
     <>

@@ -27,14 +27,24 @@ export const clock = (seconds: number) => {
  * or 'denied' when photo access is off.
  */
 export async function pickOne(kinds: ImagePicker.MediaType[], maxSeconds = REEL_MAX_SECONDS): Promise<Picked | 'denied' | null> {
-  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (!perm.granted && perm.accessPrivileges !== 'limited') return 'denied';
-  const r = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: kinds,
-    allowsMultipleSelection: false,
-    quality: 0.9,
-    videoMaxDuration: kinds.includes('videos') && !kinds.includes('images') ? maxSeconds : undefined,
-  });
+  const launch = () =>
+    ImagePicker.launchImageLibraryAsync({
+      mediaTypes: kinds,
+      allowsMultipleSelection: false,
+      quality: 0.9,
+      videoMaxDuration: kinds.includes('videos') && !kinds.includes('images') ? maxSeconds : undefined,
+    });
+  // The system photo picker needs no library permission (iOS 14+, Android 13+), so open it straight
+  // away. Asking first used to swallow the first tap: the permission alert closed and the picker never
+  // opened. Only if the picker can't open is permission asked for, then it's tried again.
+  let r: ImagePicker.ImagePickerResult;
+  try {
+    r = await launch();
+  } catch {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted && perm.accessPrivileges !== 'limited') return 'denied';
+    r = await launch();
+  }
   if (r.canceled || !r.assets[0]) return null;
   return r.assets[0];
 }

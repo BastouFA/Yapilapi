@@ -27,7 +27,12 @@
         "android.permission.WAKE_LOCK",
         "android.permission.READ_CONTACTS"
       ],
-      "blockedPermissions": ["android.permission.WRITE_CONTACTS"]
+      "blockedPermissions": ["android.permission.WRITE_CONTACTS"],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundImage": "./assets/adaptive-background.png",
+        "backgroundColor": "#E0204F"
+      }
     },
     "plugins": [
       "expo-router",
@@ -79,6 +84,20 @@
         {
           "contactsPermission": "YAPILAPI uses your contacts to show which of your friends are already here. Emails and numbers are turned into codes on your phone before anything is sent, and nothing is kept."
         }
+      ],
+      "./plugins/with-scene-lifecycle",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 120,
+          "resizeMode": "contain",
+          "backgroundColor": "#F4F5FA",
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#0B0C14"
+          }
+        }
       ]
     ],
     "extra": {
@@ -87,6 +106,7 @@
       "eas": {
         "projectId": ""
       }
-    }
+    },
+    "icon": "./assets/icon.png"
   }
 }

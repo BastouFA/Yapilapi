@@ -105,6 +105,8 @@ const s = StyleSheet.create({
   wrap: { position: 'absolute', start: 16, end: 16, alignItems: 'center' },
   bar: { flexDirection: 'row', alignItems: 'center', height: 64, borderRadius: radius.full, paddingHorizontal: 8, width: '100%', maxWidth: 480 },
   item: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2, height: 64 },
-  createHit: { flex: 1, alignItems: 'center', height: 64 },
-  create: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginTop: -20 },
+  // The circle rises above the bar. The touch area rises with it (instead of only the circle being moved up),
+  // so a tap anywhere on the circle counts; before, its top part didn't respond.
+  createHit: { flex: 1, alignItems: 'center', height: 84, marginTop: -20 },
+  create: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
 });
