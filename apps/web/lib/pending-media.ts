@@ -35,6 +35,12 @@ export function pickMediaForCreate(mode: CreateMode = 'post') {
   input.click();
 }
 
+/** Hand files (e.g. from the in-app camera) to the Create page. */
+export function deliverPendingMedia(files: File[], mode: CreateMode) {
+  pending = { files, mode };
+  window.dispatchEvent(new Event(EVENT));
+}
+
 /** Files picked from "+", once. */
 export function takePendingMedia(): Pending | null {
   const p = pending;

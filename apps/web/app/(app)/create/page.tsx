@@ -283,25 +283,34 @@ function Create() {
         <div className="yp-topbar">
           <h1>{t('create.title')}</h1>
         </div>
-        <Segments
-          label="What to create"
-          value={kind}
-          onChange={(k) => {
-            setKind(k);
-            // Keep only what the new kind can hold.
-            if (k !== 'post') {
-              setPoll(null);
-              setMedia((m) => m.filter((x) => k !== 'reel' || x.kind === 'video').slice(0, 1));
-            }
-            if (k === 'story' && (visibility === 'selected' || visibility === 'subscribers')) setVisibility('friends');
-            if (k !== 'story' && visibility === 'close_friends') setVisibility('friends');
+        {/* Double-tap Post, Reel or Story to open the camera in that mode. */}
+        <div
+          className="create-kinds"
+          onDoubleClick={(e) => {
+            const label = (e.target as HTMLElement).closest('button')?.textContent?.trim().toLowerCase();
+            if (label === 'post' || label === 'reel' || label === 'story') router.push(label === 'post' ? '/camera' : `/camera?mode=${label}`);
           }}
-          options={[
-            { id: 'post', label: 'Post' },
-            { id: 'reel', label: 'Reel' },
-            { id: 'story', label: 'Story' },
-          ]}
-        />
+        >
+          <Segments
+            label="What to create"
+            value={kind}
+            onChange={(k) => {
+              setKind(k);
+              // Keep only what the new kind can hold.
+              if (k !== 'post') {
+                setPoll(null);
+                setMedia((m) => m.filter((x) => k !== 'reel' || x.kind === 'video').slice(0, 1));
+              }
+              if (k === 'story' && (visibility === 'selected' || visibility === 'subscribers')) setVisibility('friends');
+              if (k !== 'story' && visibility === 'close_friends') setVisibility('friends');
+            }}
+            options={[
+              { id: 'post', label: 'Post' },
+              { id: 'reel', label: 'Reel' },
+              { id: 'story', label: 'Story' },
+            ]}
+          />
+        </div>
         {kind === 'reel' && remixOf ? (
           originalMissing ? (
             <Alert tone="danger">That reel isn&apos;t available to {remixMode === 'duet' ? 'duet' : 'remix'}.</Alert>

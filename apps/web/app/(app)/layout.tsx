@@ -9,7 +9,6 @@ import { CheckoutProvider } from '@/components/Checkout';
 import { Sidebar } from '@/components/Sidebar';
 import { isPublicPath, SignedOutShell } from '@/components/SignedOut';
 import { UsageHeartbeat } from '@/components/UsageHeartbeat';
-import { pickMediaForCreate } from '@/lib/pending-media';
 import { useSession } from '../providers';
 
 function currentTab(path: string, username?: string): NavEntry['id'] | undefined {
@@ -23,7 +22,7 @@ function currentTab(path: string, username?: string): NavEntry['id'] | undefined
     path.startsWith('/places')
   )
     return 'discover';
-  if (path.startsWith('/create')) return 'create';
+  if (path.startsWith('/create') || path.startsWith('/camera')) return 'create';
   if (path.startsWith('/inbox') || path.startsWith('/notifications')) return 'inbox';
   if (username && path.startsWith(`/u/${username}`)) return 'profile';
   if (path.startsWith('/settings') || path.startsWith('/studio')) return 'profile';
@@ -63,7 +62,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const items: NavEntry[] = [
     { id: 'home', href: '/home' },
     { id: 'discover', href: '/discover' },
-    { id: 'create', href: '/create' },
+    // "+" opens the camera, where you choose Post, Reel or Story (or the gallery, or writing).
+    { id: 'create', href: '/camera' },
     { id: 'inbox', href: '/inbox', badge: unread.messages + unread.notifications },
     { id: 'profile', href: `/u/${me.username}` },
   ];
@@ -72,16 +72,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <CallsProvider>
       <CheckoutProvider>
         <div className="yp-shell">
-          {/* Tapping "+" opens the photo and video chooser at once (and Create behind it). */}
-          <div
-            className="yp-nav-wrap"
-            onClickCapture={(e) => {
-              const a = (e.target as HTMLElement).closest('a');
-              if (a?.getAttribute('href') === '/create' && !e.metaKey && !e.ctrlKey) pickMediaForCreate('post');
-            }}
-          >
-            <NavBar items={items} current={currentTab(path, me.username)} linkAs={NextLink} locale={locale} logoSrc="/mark.svg" searchHref="/search" />
-          </div>
+          <NavBar items={items} current={currentTab(path, me.username)} linkAs={NextLink} locale={locale} logoSrc="/mark.svg" searchHref="/search" />
           <main className="yp-shell__main" id="main">
             {children}
           </main>

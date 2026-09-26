@@ -2944,3 +2944,213 @@ video.chat-att__media {
 .yp-nav-wrap {
   display: contents;
 }
+
+/* In-app camera ("+"): full screen, controls over the live picture. */
+.cam {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: #000;
+  color: #fff;
+  overscroll-behavior: contain;
+}
+.cam__view {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cam__view--mirror {
+  transform: scaleX(-1);
+}
+.cam__flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0.7;
+  pointer-events: none;
+}
+.cam__message {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  text-align: center;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.cam__message p {
+  max-width: 34ch;
+  margin: 0 auto;
+}
+.cam__top,
+.cam__bottom {
+  position: relative;
+  z-index: 1;
+  padding: max(var(--space-4), env(safe-area-inset-top)) var(--space-4) var(--space-4);
+}
+.cam__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(to bottom, rgb(0 0 0 / 0.45), transparent);
+}
+.cam__bottom {
+  display: grid;
+  gap: var(--space-4);
+  padding-bottom: max(var(--space-6), env(safe-area-inset-bottom));
+  background: linear-gradient(to top, rgb(0 0 0 / 0.6), transparent);
+}
+.cam__icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.35);
+  color: #fff;
+  cursor: pointer;
+}
+span.cam__icon {
+  background: transparent;
+}
+.cam__pill {
+  justify-self: center;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: #0b0c14;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.cam__pill--ghost {
+  background: rgb(0 0 0 / 0.35);
+  color: #fff;
+  font-size: 14px;
+}
+.cam__timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.45);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.cam__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff3b30;
+  animation: voice-pulse 1s ease-in-out infinite alternate;
+}
+.cam__controls {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  justify-items: center;
+  row-gap: var(--space-2);
+}
+.cam__gallery {
+  justify-self: start;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 2px solid #fff;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.15);
+  color: #fff;
+  cursor: pointer;
+}
+.cam__shutter {
+  --cam-progress: 0deg;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 78px;
+  height: 78px;
+  border: 0;
+  border-radius: 50%;
+  background: conic-gradient(#ff3b30 var(--cam-progress), rgb(255 255 255 / 0.9) 0);
+  cursor: pointer;
+  touch-action: none;
+}
+.cam__shutter > span {
+  width: 64px;
+  height: 64px;
+  border: 4px solid #000;
+  border-radius: 50%;
+  background: #fff;
+  transition:
+    transform 0.15s ease,
+    border-radius 0.15s ease,
+    background 0.15s ease;
+}
+.cam__shutter--reel > span {
+  background: #ff3b30;
+}
+.cam__shutter--rec > span {
+  transform: scale(0.55);
+  border-radius: 12px;
+  background: #ff3b30;
+}
+.cam__shutter:disabled {
+  opacity: 0.5;
+}
+.cam__shutter:focus-visible,
+.cam__gallery:focus-visible,
+.cam__icon:focus-visible,
+.cam__mode:focus-visible,
+.cam__pill:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+.cam__hint {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  opacity: 0.85;
+}
+.cam__modes {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+}
+.cam__mode {
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgb(255 255 255 / 0.75);
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.cam__mode[aria-selected='true'] {
+  background: #fff;
+  color: #0b0c14;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cam__dot {
+    animation: none;
+  }
+  .cam__shutter > span {
+    transition: none;
+  }
+}
+.create-kinds {
+  display: contents;
+}

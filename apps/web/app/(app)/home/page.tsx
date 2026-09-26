@@ -9,7 +9,6 @@ import { StoryViewer } from '@/components/StoryViewer';
 import type { FeedMode } from '@yapilapi/shared';
 import { api } from '@/lib/api';
 import { PostList } from '@/components/PostList';
-import { pickMediaForCreate } from '@/lib/pending-media';
 import { StarterRow } from '@/components/StarterRow';
 import { SuggestedPeople } from '@/components/SuggestedPeople';
 import { useSession } from '../../providers';
@@ -58,14 +57,7 @@ export default function Home() {
         </Link>
       </div>
 
-      <MomentsStrip
-        groups={moments}
-        onOpen={setViewing}
-        onCreate={() => {
-          pickMediaForCreate('story');
-          router.push('/create?mode=story');
-        }}
-      />
+      <MomentsStrip groups={moments} onOpen={setViewing} onCreate={() => router.push('/camera?mode=story')} />
 
       <Segments
         label="Feed"

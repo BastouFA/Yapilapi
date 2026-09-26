@@ -43,6 +43,7 @@ const APP_PAGES: [string, (d: SeedData) => string][] = [
   ['memories', () => '/memories'],
   ['reels', () => '/reels'],
   ['search', () => '/search'],
+  ['camera', () => '/camera'],
   ['tag', () => '/t/photography'],
   ['plus', () => '/plus'],
   ['invite', () => '/invite'],
