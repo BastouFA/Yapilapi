@@ -38,6 +38,18 @@ export async function pickOne(kinds: ImagePicker.MediaType[], maxSeconds = REEL_
 }
 
 /**
+ * Take a photo or record a video with the camera. Returns null when the person closed the camera,
+ * or 'denied' when camera access is off.
+ */
+export async function captureOne(maxSeconds = REEL_MAX_SECONDS): Promise<Picked | 'denied' | null> {
+  const perm = await ImagePicker.requestCameraPermissionsAsync();
+  if (!perm.granted) return 'denied';
+  const r = await ImagePicker.launchCameraAsync({ mediaTypes: ['images', 'videos'], quality: 0.9, videoMaxDuration: maxSeconds });
+  if (r.canceled || !r.assets[0]) return null;
+  return r.assets[0];
+}
+
+/**
  * Upload a picked file. Small files go in one request to the same multipart endpoint the web
  * app uses (XMLHttpRequest, so progress shows); large ones (long videos) go in resumable
  * chunks that are retried on a flaky connection, up to the server's resumable limit.

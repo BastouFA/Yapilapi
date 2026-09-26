@@ -1,3 +1,4 @@
+import { openCreateSheet } from '../../lib/create-sheet';
 import { Redirect, router, useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, RefreshControl, Text, View } from 'react-native';
@@ -103,7 +104,7 @@ function Feed() {
         keyExtractor={(p) => p.id}
         ListHeaderComponent={
           <View style={{ gap: space[3] }}>
-            <StoriesStrip groups={stories} onOpen={setViewing} onCreate={() => router.navigate({ pathname: '/create', params: { mode: 'story' } })} />
+            <StoriesStrip groups={stories} onOpen={setViewing} onCreate={() => openCreateSheet('story')} />
             <StarterRow />
             <Segmented label={t('m.feed.label')} options={MODES.map((m) => ({ id: m.id, label: t(m.label) }))} value={mode} onChange={setMode} />
             {error ? <Notice tone="danger">{error}</Notice> : null}

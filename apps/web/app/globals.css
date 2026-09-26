@@ -2940,3 +2940,7 @@ video.chat-att__media {
 .ed__scrubber input[type='range']::-moz-range-thumb {
   height: 52px;
 }
+/* The wrapper that catches taps on "+" must not change the navigation's layout. */
+.yp-nav-wrap {
+  display: contents;
+}

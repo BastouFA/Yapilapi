@@ -26,6 +26,7 @@ import { isVerificationError, VerifyPrompt } from '@/components/Verification';
 import { SimilarQuestions } from '@/components/CommunityExtras';
 import { PhotoEditor } from '@/components/editor/PhotoEditor';
 import { VideoEditor } from '@/components/editor/VideoEditor';
+import { onPendingMedia, takePendingMedia } from '@/lib/pending-media';
 import { SoundPicker, SoundPlayButton } from '@/components/SoundPicker';
 import { useSession } from '../../providers';
 
@@ -134,7 +135,7 @@ function Create() {
   const uploads = useRef<Promise<void>>(Promise.resolve());
   const pendingUploads = useRef(0);
 
-  function choose(files: FileList | null) {
+  function choose(files: FileList | File[] | null) {
     if (!files?.length) return;
     const limit = kind === 'post' ? 10 : 1;
     const room = Math.max(0, limit - media.length - queue.length - pendingUploads.current);
@@ -147,6 +148,28 @@ function Create() {
     setQueue((q) => [...q, ...editable]);
     setQueued((n) => (queue.length ? n : 0) + editable.length);
   }
+
+  // Files picked straight from "+" (in the navigation or the story strip) arrive here, possibly for another kind.
+  const [incoming, setIncoming] = useState<{ files: File[]; mode: 'post' | 'reel' | 'story' } | null>(null);
+  useEffect(() => {
+    const take = () => {
+      const p = takePendingMedia();
+      if (p) setIncoming(p);
+    };
+    take();
+    return onPendingMedia(take);
+  }, []);
+  useEffect(() => {
+    if (!incoming) return;
+    if (incoming.mode !== kind) {
+      setKind(incoming.mode);
+      return; // choose() runs again once the kind has changed
+    }
+    // A single video picked for a post can just as well be a reel; keep it a post unless asked.
+    choose(incoming.files);
+    setIncoming(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incoming, kind]);
 
   function nextInQueue() {
     setQueue((q) => q.slice(1));

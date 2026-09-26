@@ -9,6 +9,7 @@ import { CheckoutProvider } from '@/components/Checkout';
 import { Sidebar } from '@/components/Sidebar';
 import { isPublicPath, SignedOutShell } from '@/components/SignedOut';
 import { UsageHeartbeat } from '@/components/UsageHeartbeat';
+import { pickMediaForCreate } from '@/lib/pending-media';
 import { useSession } from '../providers';
 
 function currentTab(path: string, username?: string): NavEntry['id'] | undefined {
@@ -71,7 +72,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <CallsProvider>
       <CheckoutProvider>
         <div className="yp-shell">
-          <NavBar items={items} current={currentTab(path, me.username)} linkAs={NextLink} locale={locale} logoSrc="/mark.svg" searchHref="/search" />
+          {/* Tapping "+" opens the photo and video chooser at once (and Create behind it). */}
+          <div
+            className="yp-nav-wrap"
+            onClickCapture={(e) => {
+              const a = (e.target as HTMLElement).closest('a');
+              if (a?.getAttribute('href') === '/create' && !e.metaKey && !e.ctrlKey) pickMediaForCreate('post');
+            }}
+          >
+            <NavBar items={items} current={currentTab(path, me.username)} linkAs={NextLink} locale={locale} logoSrc="/mark.svg" searchHref="/search" />
+          </div>
           <main className="yp-shell__main" id="main">
             {children}
           </main>

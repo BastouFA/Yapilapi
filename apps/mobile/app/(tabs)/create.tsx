@@ -1,5 +1,6 @@
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { router, useLocalSearchParams } from 'expo-router';
+import { onPendingAsset, takePendingAsset } from '../../lib/create-sheet';
 import { useEffect, useState } from 'react';
 import { Alert, Image, Linking, ScrollView, Text, View } from 'react-native';
 import type { EditorParamsInput } from '../../../../packages/shared/src/filters';
@@ -118,6 +119,29 @@ export default function Create() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.mode]);
 
+  // Taken or picked straight from "+" (the tab bar or the story strip), possibly for another kind.
+  const [incoming, setIncoming] = useState<ReturnType<typeof takePendingAsset>>(null);
+  useEffect(() => {
+    const take = () => {
+      const p = takePendingAsset();
+      if (p) setIncoming(p);
+    };
+    take();
+    return onPendingAsset(take);
+  }, []);
+  useEffect(() => {
+    if (!incoming) return;
+    if (incoming.mode !== kind) {
+      setKind(incoming.mode);
+      return;
+    }
+    setIncoming(null);
+    if (incoming.asset === 'denied-camera') return setError(t('m.create.cameraPermission'));
+    if (incoming.asset === 'denied-library') return setDenied(true);
+    handlePicked(incoming.asset);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incoming, kind]);
+
   if (!me)
     return (
       <Screen>
@@ -136,6 +160,11 @@ export default function Create() {
     if (asset === 'denied') return setDenied(true);
     setDenied(false);
     if (!asset) return;
+    handlePicked(asset);
+  }
+
+  /** A photo or video from the library, the camera or the "+" button: check it, then edit or upload it. */
+  function handlePicked(asset: Picked) {
     const check = validate(asset);
     if (check) return setError(check);
     // Photos (not GIFs) and videos open in the editor first.
