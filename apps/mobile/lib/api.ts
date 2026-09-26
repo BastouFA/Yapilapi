@@ -5,6 +5,8 @@ import { tr } from './locale';
 
 const TOKEN_KEY = 'ypl_session';
 export const baseUrl = (Constants.expoConfig?.extra?.apiUrl as string | undefined) ?? 'http://localhost:4000';
+/** The web app, for links people share (a reel opens at `${webUrl}/reels?start=<id>`). */
+export const webUrl = ((Constants.expoConfig?.extra?.webUrl as string | undefined) ?? 'http://localhost:3000').replace(/\/+$/, '');
 
 export const getToken = async () => (await SecureStore.getItemAsync(TOKEN_KEY)) ?? undefined;
 
