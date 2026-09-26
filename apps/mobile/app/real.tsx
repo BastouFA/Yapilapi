@@ -5,6 +5,8 @@ import { Text, View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { client } from '../lib/api';
+import { tr } from '../lib/locale';
+import { useT } from '../lib/i18n';
 import { space } from '../lib/theme';
 import { Button, Field, Screen, useColors } from '../lib/ui';
 
@@ -17,13 +19,14 @@ async function upload(uri: string): Promise<string> {
   form.append('file', { uri, name: 'real.jpg', type: 'image/jpeg' } as unknown as Blob);
   const res = await fetch(`${baseUrl}/v1/media`, { method: 'POST', body: form, headers: token ? { authorization: `Bearer ${token}` } : {} });
   const json = await res.json();
-  if (!res.ok) throw new Error(json?.error?.message ?? 'Upload failed');
+  if (!res.ok) throw new Error(json?.error?.message ?? tr('m.real.uploadFailed'));
   return json.media.id;
 }
 
 /** Real: take a photo with the back camera, then the front one, and share both. */
 export default function Real() {
   const c = useColors();
+  const { t } = useT();
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
   const [facing, setFacing] = useState<CameraType>('back');
@@ -35,13 +38,13 @@ export default function Real() {
   if (!permission.granted)
     return (
       <Screen>
-        <Text style={{ color: c.ink }}>Real uses your camera to capture this moment.</Text>
-        <Button label="Allow camera" onPress={requestPermission} />
+        <Text style={{ color: c.ink }}>{t('m.real.permission')}</Text>
+        <Button label={t('m.real.allowCamera')} onPress={requestPermission} />
       </Screen>
     );
 
   async function share(uris: string[]) {
-    setStatus('Sharing…');
+    setStatus(t('m.real.sharing'));
     try {
       const ids = [];
       for (const u of uris) ids.push(await upload(u));
@@ -60,9 +63,9 @@ export default function Real() {
       <CameraView ref={camera} style={{ flex: 1 }} facing={facing} />
       <View style={{ padding: space[4], gap: space[2] }}>
         {status ? <Text style={{ color: c.ink }}>{status}</Text> : null}
-        <Field label="Caption (optional)" value={caption} onChangeText={setCaption} maxLength={300} />
+        <Field label={t('m.real.caption')} value={caption} onChangeText={setCaption} maxLength={300} />
         <Button
-          label={shots.length === 0 ? 'Capture (then the front camera)' : 'Capture front'}
+          label={shots.length === 0 ? t('m.real.captureFirst') : t('m.real.captureFront')}
           onPress={async () => {
             const photo = await camera.current?.takePictureAsync({ quality: 0.85, exif: false });
             if (!photo) return;
@@ -73,7 +76,7 @@ export default function Real() {
             } else void share(next);
           }}
         />
-        {shots.length === 1 ? <Button label="Share just one photo" variant="secondary" onPress={() => share(shots)} /> : null}
+        {shots.length === 1 ? <Button label={t('m.real.shareOne')} variant="secondary" onPress={() => share(shots)} /> : null}
       </View>
     </View>
   );

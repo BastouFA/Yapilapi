@@ -16,6 +16,20 @@ React Native + Expo Router app for iOS and Android. It shares the API client, ty
 
 There is no live screen on mobile yet, so live video and live gifts are web only.
 
+## Languages and right-to-left
+
+Every string on screen goes through `t()` from `useT()` (`lib/i18n.tsx`), backed by the shared catalogs in `packages/shared/src/i18n.ts`: English, French, Arabic, Spanish, Portuguese (Brazil), Swahili, Yorùbá and Hausa. Keys used only by the app start with `m.`. The `Catalog` type makes every catalog carry every key, so a missing translation is a type error. Code outside components (alerts from callbacks, errors in `lib/api.ts`, notification buttons) uses `tr()` from `lib/locale.ts`.
+
+- **Which language:** the signed-in person's `locale` if it has a catalog, then the phone's languages in order (`expo-localization`), then English. The per-app language setting on iOS and Android 13+ lists the eight languages (`supportedLocales` in `app.json`). New accounts default to `en` on the API, so a signed-in person sees English until they change their language on the web, even on a phone set to another language.
+- **Dates and numbers** use the same locale through `Intl` (`dateTime`, `timeAgo`, `number`, and `tp()` for plurals, which picks `.one` or `.other` with `Intl.PluralRules` when the runtime has it).
+- **Names and titles inside sentences** are wrapped in Unicode isolates, so "Replying to" followed by an Arabic name, or an English name in Arabic text, keeps each part in its own order. Text people wrote (posts, messages, names, bios, FAQ entries) uses the `userText` style (`writingDirection: 'auto'`); Android already takes the direction from the text.
+- **Right-to-left:** when the language is right-to-left (`isRtl`: Arabic today; Hebrew, Persian and Urdu once they have catalogs), the app calls `I18nManager.allowRTL(true)` and `forceRTL(true)`; for other languages it calls both with `false`, so a phone set to Arabic does not mirror an app showing English. React Native only reads the direction when the JavaScript starts, so when it changes (someone signs in with a different language, or changes the phone language) the app reloads once with `reloadAppAsync()` from `expo` (there is no `expo-updates` here), or `DevSettings.reload()` in development if that fails. The choice is stored natively, so later launches open in the right direction without a reload. If a reload doesn't apply it, the app doesn't try again; it applies on the next cold start.
+- **Why `supportsRTL` is not set:** with `supportsRTL`, `expo-localization` sets the direction from the phone's language every time the app starts, which would undo the direction for someone whose YAPILAPI language differs from their phone's and cause a reload on every launch. The app sets the direction itself instead. Android needs `android:supportsRtl="true"`, which Expo's template already has.
+- **Styles** use start and end (`marginStart`, `start`/`end`, `borderBottomEndRadius`) where the side matters; rows mirror on their own. Icons that point along the line should use `<Icon directional />`, which mirrors them in RTL. None do today: the back chevron is the native one (it mirrors itself), and the send arrow points up.
+- **Not translated:** text from the API (error messages, moderation notes, feed reasons, assistant answers and action labels) and the iOS permission prompts in `app.json`.
+
+To try Arabic: set the phone (or simulator) language to Arabic while signed out, or set your language to Arabic on the web and sign in. Right-to-left needs a development build to check properly; it has not been run on a device yet.
+
 ## Running it
 
 ```bash

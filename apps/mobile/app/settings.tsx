@@ -2,19 +2,21 @@ import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import type { FamilyLink, TeenControls } from '../../../packages/api-client/src/index';
 import { client, errorMessage } from '../lib/api';
+import { useT, type Translator } from '../lib/i18n';
 import { useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
-import { Avatar, Button, Card, Field, Loading, Notice, Segmented, SwitchRow, Title, useColors } from '../lib/ui';
+import { Avatar, Button, Card, Field, Loading, Notice, Segmented, SwitchRow, Title, useColors, userText } from '../lib/ui';
 
 /** Settings: family supervision and advertising consent (same endpoints as the web settings page). */
 export default function Settings() {
   const c = useColors();
+  const { t } = useT();
   const { me } = useSession();
   if (me === undefined) return <Loading />;
   if (!me)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground, padding: space[4] }}>
-        <Notice>Log in from the Home tab.</Notice>
+        <Notice>{t('m.common.signedOut')}</Notice>
       </View>
     );
   return (
@@ -30,6 +32,7 @@ export default function Settings() {
 }
 
 function Advertising() {
+  const { t } = useT();
   const [granted, setGranted] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -40,13 +43,13 @@ function Advertising() {
   }, []);
   return (
     <Card style={{ gap: space[3] }}>
-      <Title sub="Sponsored posts are always labelled. They are only shown to adults who turn this on, and never to supervised accounts.">Advertising</Title>
+      <Title sub={t('m.ads.body')}>{t('m.ads.title')}</Title>
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {granted === null && !error ? (
         <Loading />
       ) : granted !== null ? (
         <SwitchRow
-          label="Show me sponsored posts based on my interests"
+          label={t('m.ads.switch')}
           value={granted}
           onValueChange={async (v) => {
             setGranted(v);
@@ -64,10 +67,10 @@ function Advertising() {
   );
 }
 
-function describe(ctl: TeenControls): string {
-  const parts = [ctl.messagesFrom === 'nobody' ? 'Only family can message you.' : 'Only friends and family can message you.'];
-  if (ctl.dailyLimitMinutes) parts.push(`A reminder after ${ctl.dailyLimitMinutes} minutes a day.`);
-  if (ctl.quietStart && ctl.quietEnd) parts.push(`Quiet hours ${ctl.quietStart} to ${ctl.quietEnd} (${ctl.timezone}): notifications wait until morning.`);
+function describe(ctl: TeenControls, { t }: Translator): string {
+  const parts = [ctl.messagesFrom === 'nobody' ? t('m.family.rule.familyOnly') : t('m.family.rule.friends')];
+  if (ctl.dailyLimitMinutes) parts.push(t('m.family.rule.limit', { minutes: ctl.dailyLimitMinutes }));
+  if (ctl.quietStart && ctl.quietEnd) parts.push(t('m.family.rule.quiet', { start: ctl.quietStart, end: ctl.quietEnd, timezone: ctl.timezone }));
   return parts.join(' ');
 }
 
@@ -78,6 +81,8 @@ function describe(ctl: TeenControls): string {
  */
 function Family() {
   const c = useColors();
+  const i18n = useT();
+  const { t } = i18n;
   const [items, setItems] = useState<FamilyLink[] | null>(null);
   const [username, setUsername] = useState('');
   const [note, setNote] = useState<string | null>(null);
@@ -108,7 +113,7 @@ function Family() {
 
   return (
     <Card style={{ gap: space[3] }}>
-      <Title sub="Supervise a teen's account together. Guardians never see messages, posts in private spaces or searches.">Family</Title>
+      <Title sub={t('m.family.body')}>{t('m.family.title')}</Title>
       {note ? <Notice>{note}</Notice> : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {items === null ? <Loading /> : null}
@@ -117,38 +122,38 @@ function Family() {
         const status =
           l.status === 'pending'
             ? l.role === 'teen'
-              ? 'Wants to supervise your account'
-              : 'Invitation sent'
+              ? t('m.family.status.wants')
+              : t('m.family.status.invited')
             : l.role === 'guardian'
-              ? 'You supervise this account'
-              : 'Supervises your account';
+              ? t('m.family.status.guardian')
+              : t('m.family.status.teen');
         return (
           <View key={l.id} style={{ gap: space[3] }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
               <Avatar name={other?.displayName ?? '?'} url={other?.avatarUrl ?? null} size={40} />
               <View style={{ flex: 1 }}>
-                <Text style={{ color: c.ink, fontWeight: '700' }} numberOfLines={1}>
-                  {other?.displayName ?? 'Account'}
+                <Text style={[{ color: c.ink, fontWeight: '700' }, userText]} numberOfLines={1}>
+                  {other?.displayName ?? t('m.family.account')}
                 </Text>
                 <Text style={{ color: c.inkMuted, fontSize: 13 }}>{status}</Text>
               </View>
             </View>
             <View style={{ flexDirection: 'row', gap: space[2] }}>
               {l.status === 'pending' && l.role === 'teen' ? (
-                <Button label="Accept" size="sm" onPress={() => act(async () => (await client()).family.accept(l.id), 'Family link accepted.')} />
+                <Button label={t('m.common.accept')} size="sm" onPress={() => act(async () => (await client()).family.accept(l.id), t('m.family.accepted'))} />
               ) : null}
               <Button
-                label={l.status === 'pending' && l.role === 'teen' ? 'Decline' : l.status === 'pending' ? 'Cancel' : 'End'}
+                label={l.status === 'pending' && l.role === 'teen' ? t('m.common.decline') : l.status === 'pending' ? t('common.cancel') : t('m.family.end')}
                 size="sm"
                 variant="secondary"
-                onPress={() => act(async () => (await client()).family.end(l.id), l.status === 'pending' ? 'Declined.' : 'Family link ended.')}
+                onPress={() => act(async () => (await client()).family.end(l.id), l.status === 'pending' ? t('m.family.declined') : t('m.family.ended'))}
               />
             </View>
             {l.status === 'active' && l.controls ? (
               l.role === 'guardian' ? (
                 <GuardianControls link={l} onSaved={load} />
               ) : (
-                <Notice title={`${l.guardian?.displayName ?? 'Your guardian'} set these for you`}>{describe(l.controls)}</Notice>
+                <Notice title={t('m.family.setForYou', { name: l.guardian?.displayName ?? t('m.family.yourGuardian') })}>{describe(l.controls, i18n)}</Notice>
               )
             ) : null}
           </View>
@@ -156,21 +161,19 @@ function Family() {
       })}
       <View style={{ gap: space[2] }}>
         <Field
-          label="Supervise a teen (their username)"
-          placeholder="@username"
+          label={t('m.family.invite.label')}
+          placeholder={t('m.family.invite.placeholder')}
           autoCapitalize="none"
           autoCorrect={false}
           value={username}
           onChangeText={setUsername}
         />
         <Button
-          label="Invite"
+          label={t('m.family.invite')}
           variant="secondary"
           disabled={!username.trim()}
           onPress={() =>
-            act(async () => (await client()).family.invite(username.trim().replace(/^@/, '')), 'Invitation sent. They need to accept it.').then(() =>
-              setUsername(''),
-            )
+            act(async () => (await client()).family.invite(username.trim().replace(/^@/, '')), t('m.family.invite.sent')).then(() => setUsername(''))
           }
         />
       </View>
@@ -179,52 +182,55 @@ function Family() {
 }
 
 const LIMITS = [null, 30, 60, 90, 120, 180] as const;
-const limitLabel = (m: number | null) => (m === null ? 'Off' : m >= 60 ? `${m / 60}h` : `${m}m`);
+const limitLabel = (m: number | null, { t }: Translator) =>
+  m === null ? t('m.family.limit.off') : m >= 60 ? t('m.unit.hours', { count: m / 60 }) : t('m.unit.minutes', { count: m });
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 function GuardianControls({ link, onSaved }: { link: FamilyLink; onSaved: () => Promise<void> }) {
   const c = useColors();
+  const i18n = useT();
+  const { t, number, date } = i18n;
   const [ctl, setCtl] = useState<TeenControls>(link.controls!);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const week = link.usage ?? [];
   const max = Math.max(60, ...week.map((d) => d.minutes));
-  const limitOptions = LIMITS.map((m) => ({ id: String(m) as string, label: limitLabel(m) }));
+  const limitOptions = LIMITS.map((m) => ({ id: String(m) as string, label: limitLabel(m, i18n) }));
   const quietValid = (!ctl.quietStart && !ctl.quietEnd) || (HHMM.test(ctl.quietStart ?? '') && HHMM.test(ctl.quietEnd ?? ''));
 
   return (
     <View style={{ gap: space[3], backgroundColor: c.surfaceSunken, borderRadius: radius.md, padding: space[3] }}>
-      <Text style={{ color: c.ink, fontWeight: '700' }}>{link.teen?.displayName ?? 'Supervised account'}</Text>
+      <Text style={[{ color: c.ink, fontWeight: '700' }, userText]}>{link.teen?.displayName ?? t('m.family.supervised')}</Text>
       {week.length ? (
         <View
           accessible
-          accessibilityLabel={`Minutes per day, last 7 days: ${week.map((d) => d.minutes).join(', ')}`}
+          accessibilityLabel={t('m.family.week', { minutes: week.map((d) => number(d.minutes)).join(', ') })}
           style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space[2], height: 84 }}
         >
           {week.map((d) => (
             <View key={d.day} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
               <View style={{ width: '70%', height: Math.max(4, (d.minutes / max) * 64), borderRadius: 4, backgroundColor: c.yapi }} />
-              <Text style={{ color: c.inkMuted, fontSize: 11 }}>{new Date(d.day).toLocaleDateString(undefined, { weekday: 'narrow' })}</Text>
+              <Text style={{ color: c.inkMuted, fontSize: 11 }}>{date(d.day, { weekday: 'narrow' })}</Text>
             </View>
           ))}
         </View>
       ) : (
-        <Text style={{ color: c.inkMuted }}>No time recorded this week yet.</Text>
+        <Text style={{ color: c.inkMuted }}>{t('m.family.noUsage')}</Text>
       )}
-      <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>Who can message them</Text>
+      <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.family.whoCanMessage')}</Text>
       <Segmented
-        label="Who can message them"
+        label={t('m.family.whoCanMessage')}
         options={[
-          { id: 'friends', label: 'Friends and family' },
-          { id: 'nobody', label: 'Family only' },
+          { id: 'friends', label: t('m.family.friendsAndFamily') },
+          { id: 'nobody', label: t('m.family.familyOnly') },
         ]}
         value={ctl.messagesFrom}
         onChange={(v) => setCtl({ ...ctl, messagesFrom: v })}
       />
-      <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>Daily reminder</Text>
+      <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.family.dailyReminder')}</Text>
       <Segmented
-        label="Daily reminder"
+        label={t('m.family.dailyReminder')}
         options={limitOptions}
         value={String(ctl.dailyLimitMinutes)}
         onChange={(v) => setCtl({ ...ctl, dailyLimitMinutes: v === 'null' ? null : Number(v) })}
@@ -232,7 +238,7 @@ function GuardianControls({ link, onSaved }: { link: FamilyLink; onSaved: () => 
       <View style={{ flexDirection: 'row', gap: space[2] }}>
         <View style={{ flex: 1 }}>
           <Field
-            label="Quiet from"
+            label={t('m.family.quietFrom')}
             placeholder="21:00"
             keyboardType="numbers-and-punctuation"
             value={ctl.quietStart ?? ''}
@@ -241,7 +247,7 @@ function GuardianControls({ link, onSaved }: { link: FamilyLink; onSaved: () => 
         </View>
         <View style={{ flex: 1 }}>
           <Field
-            label="Until"
+            label={t('m.family.until')}
             placeholder="07:00"
             keyboardType="numbers-and-punctuation"
             value={ctl.quietEnd ?? ''}
@@ -249,11 +255,15 @@ function GuardianControls({ link, onSaved }: { link: FamilyLink; onSaved: () => 
           />
         </View>
       </View>
-      {!quietValid ? <Text style={{ color: c.danger, fontSize: 13 }}>Use 24-hour times like 21:00, and set both or neither.</Text> : null}
+      {!quietValid ? <Text style={{ color: c.danger, fontSize: 13 }}>{t('m.family.quietInvalid')}</Text> : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}
-      {saved ? <Text style={{ color: c.success, fontSize: 13 }}>Saved. {link.teen?.displayName ?? 'They'} will be told.</Text> : null}
+      {saved ? (
+        <Text style={{ color: c.success, fontSize: 13 }}>
+          {link.teen?.displayName ? t('m.family.savedTold', { name: link.teen.displayName }) : t('m.family.savedToldThem')}
+        </Text>
+      ) : null}
       <Button
-        label={saving ? 'Saving…' : 'Save settings'}
+        label={saving ? t('m.common.saving') : t('m.family.save')}
         size="sm"
         disabled={saving || !quietValid}
         onPress={async () => {

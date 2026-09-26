@@ -3,7 +3,8 @@ import { useCallback, useState } from 'react';
 import { FlatList, Text, View } from 'react-native';
 import type { Conversation } from '../../../../packages/shared/src/types';
 import { client } from '../../lib/api';
-import { conversationTitle, timeAgo } from '../../lib/post';
+import { useT } from '../../lib/i18n';
+import { conversationTitle } from '../../lib/post';
 import { useRealtime, useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
 import { Avatar, EmptyState, Loading, Notice, Row, Screen, useColors, useTabBarSpace } from '../../lib/ui';
@@ -11,6 +12,7 @@ import { Avatar, EmptyState, Loading, Notice, Row, Screen, useColors, useTabBarS
 /** Inbox: conversations with unread counts; tap to open the chat. Updates live. */
 export default function Inbox() {
   const c = useColors();
+  const { t, timeAgo } = useT();
   const { me } = useSession();
   const bottom = useTabBarSpace();
   const [items, setItems] = useState<Conversation[] | null>(null);
@@ -26,7 +28,7 @@ export default function Inbox() {
   if (me === null)
     return (
       <Screen>
-        <Notice>Log in from the Home tab to see your messages.</Notice>
+        <Notice>{t('m.inbox.signedOut')}</Notice>
       </Screen>
     );
   if (!items) return <Loading />;
@@ -36,14 +38,16 @@ export default function Inbox() {
         data={items}
         keyExtractor={(x) => x.id}
         contentContainerStyle={{ gap: space[2], paddingBottom: bottom }}
-        ListEmptyComponent={<EmptyState title="No conversations yet" body="Message someone from their profile on the web app." />}
+        ListEmptyComponent={<EmptyState title={t('m.inbox.empty.title')} body={t('m.inbox.empty.body')} />}
         renderItem={({ item }) => {
-          const title = conversationTitle(item, me?.id);
+          const title = conversationTitle(item, me?.id, t);
           const other = item.members.find((m) => m.id !== me?.id);
           return (
             <Row
               title={title}
-              subtitle={item.lastMessage ? `${item.lastMessage.body || 'Attachment'} · ${timeAgo(item.lastMessage.createdAt)}` : 'No messages yet'}
+              subtitle={
+                item.lastMessage ? `${item.lastMessage.body || t('m.message.attachment')} · ${timeAgo(item.lastMessage.createdAt)}` : t('m.inbox.noMessages')
+              }
               start={<Avatar name={title} url={item.kind === 'direct' ? (other?.avatarUrl ?? null) : null} size={44} />}
               end={
                 item.unreadCount ? (
@@ -58,7 +62,7 @@ export default function Inbox() {
                       paddingHorizontal: 6,
                     }}
                   >
-                    <Text style={{ color: c.onYapi, fontWeight: '700', fontSize: 12 }} accessibilityLabel={`${item.unreadCount} unread`}>
+                    <Text style={{ color: c.onYapi, fontWeight: '700', fontSize: 12 }} accessibilityLabel={t('m.inbox.unread', { count: item.unreadCount })}>
                       {item.unreadCount}
                     </Text>
                   </View>

@@ -6,15 +6,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Conversation, Message } from '../../../../packages/shared/src/types';
 import { useCalls } from '../../lib/calls';
 import { client, errorMessage } from '../../lib/api';
+import { useT } from '../../lib/i18n';
 import { conversationTitle } from '../../lib/post';
 import { useRealtime, useSession } from '../../lib/session';
 import { elevation, gradient, radius, space } from '../../lib/theme';
-import { Icon, Notice, useColors } from '../../lib/ui';
+import { Icon, Notice, useColors, userText } from '../../lib/ui';
 
 /** A conversation, updated live over the realtime socket, with audio and video call buttons. */
 export default function Chat() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const c = useColors();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { me } = useSession();
@@ -54,21 +56,21 @@ export default function Chat() {
   const canCall = !!conversation && conversation.kind !== 'community' && conversation.members.length <= 8 && conversation.members.length > 1;
   useLayoutEffect(() => {
     navigation.setOptions({
-      title: conversation ? conversationTitle(conversation, me?.id) : 'Conversation',
+      title: conversation ? conversationTitle(conversation, me?.id, t) : t('m.title.conversation'),
       headerRight: canCall
         ? () => (
             <View style={{ flexDirection: 'row', gap: space[4] }}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Start audio call" hitSlop={10} onPress={() => void calls.start(id, 'audio')}>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('m.calls.startAudio')} hitSlop={10} onPress={() => void calls.start(id, 'audio')}>
                 <Icon name="call-outline" size={22} color={c.yapi} />
               </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="Start video call" hitSlop={10} onPress={() => void calls.start(id, 'video')}>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('m.calls.startVideo')} hitSlop={10} onPress={() => void calls.start(id, 'video')}>
                 <Icon name="videocam-outline" size={24} color={c.yapi} />
               </Pressable>
             </View>
           )
         : undefined,
     });
-  }, [navigation, conversation, me?.id, canCall, calls, id, c.yapi]);
+  }, [navigation, conversation, me?.id, canCall, calls, id, c.yapi, t]);
 
   async function send() {
     const text = body.trim();
@@ -103,17 +105,19 @@ export default function Chat() {
         onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
         renderItem={({ item }) => {
           const mine = item.sender.id === me?.id;
-          const text = item.body || (item.attachments.length ? 'Attachment' : 'Message deleted');
+          const text = item.body || (item.attachments.length ? t('m.message.attachment') : t('m.message.deleted'));
+          // Your messages sit at the end edge (the right in English, the left in Arabic), with the
+          // tail corner on that side.
           return mine ? (
-            <LinearGradient {...gradient(c)} style={[bubble, { alignSelf: 'flex-end', borderBottomRightRadius: 6 }]}>
-              <Text style={{ color: c.onYapi, fontSize: 15, lineHeight: 21 }}>{text}</Text>
+            <LinearGradient {...gradient(c)} style={[bubble, { alignSelf: 'flex-end', borderBottomEndRadius: 6 }]}>
+              <Text style={[{ color: c.onYapi, fontSize: 15, lineHeight: 21 }, userText]}>{text}</Text>
             </LinearGradient>
           ) : (
-            <View style={[bubble, { alignSelf: 'flex-start', backgroundColor: c.surface, borderBottomLeftRadius: 6 }, elevation(c)]}>
+            <View style={[bubble, { alignSelf: 'flex-start', backgroundColor: c.surface, borderBottomStartRadius: 6 }, elevation(c)]}>
               {conversation && conversation.members.length > 2 ? (
-                <Text style={{ color: c.yapi, fontSize: 12, fontWeight: '700' }}>{item.sender.displayName}</Text>
+                <Text style={[{ color: c.yapi, fontSize: 12, fontWeight: '700' }, userText]}>{item.sender.displayName}</Text>
               ) : null}
-              <Text style={{ color: c.ink, fontSize: 15, lineHeight: 21 }}>{text}</Text>
+              <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 21 }, userText]}>{text}</Text>
             </View>
           );
         }}
@@ -129,8 +133,8 @@ export default function Chat() {
         }}
       >
         <TextInput
-          accessibilityLabel="Message"
-          placeholder="Message"
+          accessibilityLabel={t('inbox.placeholder')}
+          placeholder={t('inbox.placeholder')}
           placeholderTextColor={c.inkMuted}
           value={body}
           onChangeText={setBody}
@@ -149,11 +153,19 @@ export default function Chat() {
               color: c.ink,
               backgroundColor: c.surface,
             },
+            userText,
             elevation(c),
           ]}
         />
-        <Pressable accessibilityRole="button" accessibilityLabel="Send" disabled={!body.trim()} onPress={send} style={{ opacity: body.trim() ? 1 : 0.45 }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('inbox.send')}
+          disabled={!body.trim()}
+          onPress={send}
+          style={{ opacity: body.trim() ? 1 : 0.45 }}
+        >
           <LinearGradient {...gradient(c)} style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}>
+            {/* Points up, not along the line, so it stays the same in right-to-left layouts. */}
             <Icon name="arrow-up" size={22} color={c.onYapi} />
           </LinearGradient>
         </Pressable>

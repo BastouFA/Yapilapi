@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { useEffect, useState, type ComponentProps } from 'react';
 import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useT } from '../../lib/i18n';
 import { elevation, gradient, radius } from '../../lib/theme';
 import { Icon, useColors, type IconName } from '../../lib/ui';
 
@@ -78,6 +79,7 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
 // Primary navigation: Home | Discover | Create | Inbox | Profile.
 export default function TabsLayout() {
   const c = useColors();
+  const { t } = useT();
   return (
     <Tabs
       tabBar={(props) => <FloatingTabBar {...props} />}
@@ -89,17 +91,17 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: c.ground },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Home' }} />
-      <Tabs.Screen name="discover" options={{ title: 'Discover' }} />
-      <Tabs.Screen name="create" options={{ title: 'Create' }} />
-      <Tabs.Screen name="inbox" options={{ title: 'Inbox' }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+      <Tabs.Screen name="index" options={{ title: t('nav.home') }} />
+      <Tabs.Screen name="discover" options={{ title: t('nav.discover') }} />
+      <Tabs.Screen name="create" options={{ title: t('nav.create') }} />
+      <Tabs.Screen name="inbox" options={{ title: t('nav.inbox') }} />
+      <Tabs.Screen name="profile" options={{ title: t('nav.profile') }} />
     </Tabs>
   );
 }
 
 const s = StyleSheet.create({
-  wrap: { position: 'absolute', left: 16, right: 16, alignItems: 'center' },
+  wrap: { position: 'absolute', start: 16, end: 16, alignItems: 'center' },
   bar: { flexDirection: 'row', alignItems: 'center', height: 64, borderRadius: radius.full, paddingHorizontal: 8, width: '100%', maxWidth: 480 },
   item: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2, height: 64 },
   createHit: { flex: 1, alignItems: 'center', height: 64 },

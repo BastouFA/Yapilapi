@@ -3,29 +3,22 @@ import { useState } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import type { Conversation, Post } from '../../../packages/shared/src/types';
 import { client, mediaUrl } from './api';
+import { useT, type Translate } from './i18n';
 import { radius, space } from './theme';
-import { Avatar, Card, Icon, useColors } from './ui';
+import { Avatar, Card, Icon, useColors, userText } from './ui';
 
-export function timeAgo(iso: string) {
-  const s = Math.max(1, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-  if (s < 60) return `${s}s`;
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  if (s < 604800) return `${Math.floor(s / 86400)}d`;
-  return new Date(iso).toLocaleDateString();
-}
-
-export const conversationTitle = (c: Conversation, meId?: string) =>
+export const conversationTitle = (c: Conversation, meId: string | undefined, t: Translate) =>
   c.title ??
   (c.members
     .filter((m) => m.id !== meId)
     .map((m) => m.displayName)
     .join(', ') ||
-    'Just you');
+    t('m.chat.justYou'));
 
 /** A post as a rounded card. Tapping it opens the post; like and save update in place. */
 export function PostCard({ post, open = true }: { post: Post; open?: boolean }) {
   const c = useColors();
+  const { t, tp, number, timeAgo } = useT();
   const [liked, setLiked] = useState(post.viewer.liked);
   const [likes, setLikes] = useState(post.counts.likes);
   const [saved, setSaved] = useState(post.viewer.saved);
@@ -35,16 +28,16 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
   return (
     <Card
       onPress={open ? () => router.push(`/p/${post.id}`) : undefined}
-      label={open ? `Post by ${post.author.displayName}` : undefined}
+      label={open ? t('m.post.by', { name: post.author.displayName }) : undefined}
       style={{ gap: space[3] }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
         <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={40} />
         <View style={{ flex: 1 }}>
-          <Text style={{ color: c.ink, fontWeight: '700', fontSize: 15 }} numberOfLines={1}>
+          <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 15 }, userText]} numberOfLines={1}>
             {post.author.displayName}
           </Text>
-          <Text style={{ color: c.inkMuted, fontSize: 12 }} numberOfLines={1}>
+          <Text style={[{ color: c.inkMuted, fontSize: 12 }, userText]} numberOfLines={1}>
             @{post.author.username} · {timeAgo(post.createdAt)}
             {post.reason ? ` · ${post.reason}` : ''}
           </Text>
@@ -57,16 +50,16 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
           onPress={() => router.push(`/c/${post.community!.slug}`)}
           style={{ alignSelf: 'flex-start', backgroundColor: c.yapiSoft, borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 4 }}
         >
-          <Text style={{ color: c.yapi, fontSize: 12, fontWeight: '700' }}>{post.community.name}</Text>
+          <Text style={[{ color: c.yapi, fontSize: 12, fontWeight: '700' }, userText]}>{post.community.name}</Text>
         </Pressable>
       ) : null}
 
-      {post.body ? <Text style={{ color: c.ink, fontSize: 15, lineHeight: 22 }}>{post.body}</Text> : null}
+      {post.body ? <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 22 }, userText]}>{post.body}</Text> : null}
 
       {imageUri ? (
         <Image
           source={{ uri: mediaUrl(imageUri) }}
-          accessibilityLabel={image?.altText ?? 'Photo'}
+          accessibilityLabel={image?.altText ?? t('m.post.photo')}
           style={{
             width: '100%',
             aspectRatio: image?.width && image?.height ? Math.max(0.75, Math.min(1.9, image.width / image.height)) : 4 / 3,
@@ -80,8 +73,8 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
       {post.poll ? (
         <View style={{ gap: space[1] }}>
           {post.poll.options.map((o) => (
-            <Text key={o.id} style={{ color: c.inkMuted, fontSize: 14 }}>
-              {o.label} · {o.votes} {o.votes === 1 ? 'vote' : 'votes'}
+            <Text key={o.id} style={[{ color: c.inkMuted, fontSize: 14 }, userText]}>
+              {o.label} · {tp('m.poll.votes', o.votes)}
             </Text>
           ))}
         </View>
@@ -90,7 +83,7 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[4] }}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={liked ? 'Unlike' : 'Like'}
+          accessibilityLabel={liked ? t('post.unlike') : t('post.like')}
           accessibilityState={{ selected: liked }}
           hitSlop={8}
           onPress={async () => {
@@ -110,16 +103,16 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
           style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
         >
           <Icon name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? c.yapi : c.inkMuted} />
-          <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>{likes}</Text>
+          <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>{number(likes)}</Text>
         </Pressable>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} accessible accessibilityLabel={`${post.counts.comments} comments`}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} accessible accessibilityLabel={tp('m.post.commentCount', post.counts.comments)}>
           <Icon name="chatbubble-outline" size={19} color={c.inkMuted} />
-          <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>{post.counts.comments}</Text>
+          <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>{number(post.counts.comments)}</Text>
         </View>
         <View style={{ flex: 1 }} />
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={saved ? 'Remove from saved' : 'Save'}
+          accessibilityLabel={saved ? t('m.post.unsave') : t('post.save')}
           accessibilityState={{ selected: saved }}
           hitSlop={8}
           onPress={async () => {

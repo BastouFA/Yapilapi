@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { ComponentProps, ReactNode } from 'react';
 import {
   ActivityIndicator,
+  I18nManager,
   Image,
   Pressable,
   StyleSheet,
@@ -13,16 +14,31 @@ import {
   View,
   type StyleProp,
   type TextInputProps,
+  type TextStyle,
   type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mediaUrl } from './api';
+import { useT } from './i18n';
 import { elevation, gradient, palette, radius, space } from './theme';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
-export function Icon({ name, size = 22, color }: { name: IconName; size?: number; color: string }) {
-  return <Ionicons name={name} size={size} color={color} />;
+/**
+ * `directional` mirrors the glyph in right-to-left layouts: use it for icons that point along the
+ * reading direction (back or forward arrows and chevrons, a send arrow pointing sideways). Icons
+ * that point up or down, and symbols like a phone or a heart, stay as they are.
+ */
+export function Icon({ name, size = 22, color, directional }: { name: IconName; size?: number; color: string; directional?: boolean }) {
+  return <Ionicons name={name} size={size} color={color} style={directional && I18nManager.isRTL ? { transform: [{ scaleX: -1 }] } : undefined} />;
 }
+
+/**
+ * For text people wrote (posts, messages, names, bios): take the direction from the text itself,
+ * so English inside the Arabic app, or Arabic inside the English app, reads in its own order.
+ * iOS honours `writingDirection`; Android already picks the direction from the first strong
+ * character of the text.
+ */
+export const userText = { writingDirection: 'auto' } as const satisfies TextStyle;
 
 export function useColors() {
   return palette(useColorScheme() === 'dark' ? 'dark' : 'light');
@@ -114,7 +130,7 @@ export function Field(props: TextInputProps & { label: string; hideLabel?: boole
         accessibilityLabel={props.label}
         placeholderTextColor={c.inkMuted}
         {...props}
-        style={[s.input, { borderColor: c.line, color: c.ink, backgroundColor: c.surface }, props.style]}
+        style={[s.input, userText, { borderColor: c.line, color: c.ink, backgroundColor: c.surface }, props.style]}
       />
     </View>
   );
@@ -126,11 +142,11 @@ export function Row({ title, subtitle, start, end, onPress }: { title: string; s
     <Card onPress={onPress} label={onPress ? title : undefined} style={s.row}>
       {start}
       <View style={{ flex: 1 }}>
-        <Text style={{ color: c.ink, fontWeight: '600', fontSize: 15 }} numberOfLines={1}>
+        <Text style={[{ color: c.ink, fontWeight: '600', fontSize: 15 }, userText]} numberOfLines={1}>
           {title}
         </Text>
         {subtitle ? (
-          <Text style={{ color: c.inkMuted, fontSize: 13 }} numberOfLines={1}>
+          <Text style={[{ color: c.inkMuted, fontSize: 13 }, userText]} numberOfLines={1}>
             {subtitle}
           </Text>
         ) : null}
@@ -244,7 +260,7 @@ export function Title({ children, sub }: { children: ReactNode; sub?: string }) 
   const c = useColors();
   return (
     <View style={{ gap: 2 }}>
-      <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 20, fontWeight: '800', letterSpacing: -0.3 }}>
+      <Text accessibilityRole="header" style={[{ color: c.ink, fontSize: 20, fontWeight: '800', letterSpacing: -0.3 }, userText]}>
         {children}
       </Text>
       {sub ? <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{sub}</Text> : null}
@@ -264,7 +280,8 @@ export function EmptyState({ title, body }: { title: string; body?: string }) {
 
 export function Loading() {
   const c = useColors();
-  return <ActivityIndicator style={{ flex: 1, backgroundColor: c.ground }} color={c.yapi} />;
+  const { t } = useT();
+  return <ActivityIndicator accessibilityLabel={t('common.loading')} style={{ flex: 1, backgroundColor: c.ground }} color={c.yapi} />;
 }
 
 const s = StyleSheet.create({

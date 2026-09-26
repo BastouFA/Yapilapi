@@ -4,15 +4,17 @@ import { FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, V
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Comment, Post } from '../../../../packages/shared/src/types';
 import { client, errorMessage } from '../../lib/api';
-import { PostCard, timeAgo } from '../../lib/post';
+import { useT } from '../../lib/i18n';
+import { PostCard } from '../../lib/post';
 import { useSession } from '../../lib/session';
 import { elevation, radius, space } from '../../lib/theme';
-import { Avatar, Button, EmptyState, Loading, Notice, useColors } from '../../lib/ui';
+import { Avatar, Button, EmptyState, Loading, Notice, useColors, userText } from '../../lib/ui';
 
 /** A single post with its comments (link target for notifications, search and the feed). */
 export default function PostScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const c = useColors();
+  const { t, timeAgo } = useT();
   const insets = useSafeAreaInsets();
   const { me } = useSession();
   const [post, setPost] = useState<Post | null | undefined>(undefined);
@@ -47,7 +49,7 @@ export default function PostScreen() {
   if (post === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>
-        <EmptyState title="This post isn't available" body="It may have been removed, or it isn't shared with you." />
+        <EmptyState title={t('m.post.unavailable.title')} body={t('m.post.unavailable.body')} />
       </View>
     );
 
@@ -67,26 +69,26 @@ export default function PostScreen() {
           <View style={{ gap: space[3], marginBottom: space[2] }}>
             <PostCard post={post} open={false} />
             <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '800', fontSize: 17 }}>
-              Comments
+              {t('post.comments')}
             </Text>
           </View>
         }
-        ListEmptyComponent={<Text style={{ color: c.inkMuted }}>No comments yet.</Text>}
+        ListEmptyComponent={<Text style={{ color: c.inkMuted }}>{t('m.comment.none')}</Text>}
         onEndReached={() => cursor && void loadComments(cursor).catch(() => {})}
         renderItem={({ item }) => {
           const parent = item.parentId ? byId.get(item.parentId) : undefined;
           return (
-            <View style={{ flexDirection: 'row', gap: space[2], marginLeft: item.parentId ? space[6] : 0 }}>
+            <View style={{ flexDirection: 'row', gap: space[2], marginStart: item.parentId ? space[6] : 0 }}>
               <Avatar name={item.author.displayName} url={item.author.avatarUrl} size={32} />
               <View style={[{ flex: 1, backgroundColor: c.surface, borderRadius: radius.md, padding: space[3], gap: 2 }, elevation(c)]}>
-                <Text style={{ color: c.ink, fontWeight: '700', fontSize: 13 }}>
+                <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 13 }, userText]}>
                   {item.author.displayName} <Text style={{ color: c.inkMuted, fontWeight: '400' }}>· {timeAgo(item.createdAt)}</Text>
                 </Text>
-                {parent ? <Text style={{ color: c.inkMuted, fontSize: 12 }}>Replying to {parent.author.displayName}</Text> : null}
-                <Text style={{ color: c.ink, fontSize: 15, lineHeight: 21 }}>{item.body}</Text>
+                {parent ? <Text style={{ color: c.inkMuted, fontSize: 12 }}>{t('m.comment.replyingTo', { name: parent.author.displayName })}</Text> : null}
+                <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 21 }, userText]}>{item.body}</Text>
                 {me ? (
                   <Pressable accessibilityRole="button" onPress={() => setReplyTo(item)} hitSlop={6} style={{ alignSelf: 'flex-start', marginTop: 2 }}>
-                    <Text style={{ color: c.yapi, fontWeight: '700', fontSize: 12 }}>Reply</Text>
+                    <Text style={{ color: c.yapi, fontWeight: '700', fontSize: 12 }}>{t('m.comment.reply')}</Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -109,39 +111,42 @@ export default function PostScreen() {
           {replyTo ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
               <Text style={{ color: c.inkMuted, flex: 1 }} numberOfLines={1}>
-                Replying to {replyTo.author.displayName}
+                {t('m.comment.replyingTo', { name: replyTo.author.displayName })}
               </Text>
               <Pressable accessibilityRole="button" onPress={() => setReplyTo(null)} hitSlop={6}>
-                <Text style={{ color: c.yapi, fontWeight: '700' }}>Cancel</Text>
+                <Text style={{ color: c.yapi, fontWeight: '700' }}>{t('common.cancel')}</Text>
               </Pressable>
             </View>
           ) : null}
           <View style={{ flexDirection: 'row', gap: space[2], alignItems: 'flex-end' }}>
             <TextInput
-              accessibilityLabel="Add a comment"
-              placeholder="Add a comment"
+              accessibilityLabel={t('comment.placeholder')}
+              placeholder={t('comment.placeholder')}
               placeholderTextColor={c.inkMuted}
               value={body}
               onChangeText={setBody}
               multiline
               maxLength={2000}
-              style={{
-                flex: 1,
-                minHeight: 44,
-                maxHeight: 120,
-                borderRadius: radius.lg,
-                borderWidth: 1,
-                borderColor: c.line,
-                backgroundColor: c.surface,
-                color: c.ink,
-                paddingHorizontal: space[4],
-                paddingTop: 12,
-                paddingBottom: 12,
-                fontSize: 15,
-              }}
+              style={[
+                {
+                  flex: 1,
+                  minHeight: 44,
+                  maxHeight: 120,
+                  borderRadius: radius.lg,
+                  borderWidth: 1,
+                  borderColor: c.line,
+                  backgroundColor: c.surface,
+                  color: c.ink,
+                  paddingHorizontal: space[4],
+                  paddingTop: 12,
+                  paddingBottom: 12,
+                  fontSize: 15,
+                },
+                userText,
+              ]}
             />
             <Button
-              label={busy ? 'Posting…' : 'Post'}
+              label={busy ? t('m.comment.posting') : t('m.comment.post')}
               disabled={!body.trim() || busy}
               onPress={async () => {
                 setBusy(true);

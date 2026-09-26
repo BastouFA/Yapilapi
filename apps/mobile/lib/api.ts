@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { createClient } from '../../../packages/api-client/src/index';
+import { tr } from './locale';
 
 const TOKEN_KEY = 'ypl_session';
 export const baseUrl = (Constants.expoConfig?.extra?.apiUrl as string | undefined) ?? 'http://localhost:4000';
@@ -18,7 +19,8 @@ export const realtimeUrl = () => `${baseUrl.replace(/^http/, 'ws')}/v1/realtime`
 /** Media URLs from the API may be relative to the API origin. */
 export const mediaUrl = (url: string) => (/^https?:\/\//.test(url) ? url : `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`);
 
-export const errorMessage = (e: unknown) => (e instanceof Error && e.message ? e.message : 'Something went wrong. Try again.');
+/** Messages from the API are shown as they come (in English today); ours are translated. */
+export const errorMessage = (e: unknown) => (e instanceof Error && e.message ? e.message : tr('error.generic'));
 
 export async function signIn(email: string, password: string) {
   const res = await fetch(`${baseUrl}/v1/auth/login`, {
@@ -27,8 +29,8 @@ export async function signIn(email: string, password: string) {
     body: JSON.stringify({ email, password }),
   });
   const json = await res.json();
-  if (!res.ok) throw new Error(json?.error?.message ?? 'Sign-in failed');
-  if (!json.token) throw new Error('This account uses two-step verification, which the app does not support yet. Log in on the web for now.');
+  if (!res.ok) throw new Error(json?.error?.message ?? tr('m.auth.failed'));
+  if (!json.token) throw new Error(tr('m.auth.twoStep'));
   await SecureStore.setItemAsync(TOKEN_KEY, json.token);
   return json.user;
 }

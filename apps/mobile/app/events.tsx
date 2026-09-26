@@ -1,20 +1,23 @@
 import { useEffect, useState } from 'react';
 import { FlatList } from 'react-native';
+import type { MessageKey } from '../../../packages/shared/src/i18n';
 import type { EventItem } from '../../../packages/shared/src/index';
 import { client, errorMessage } from '../lib/api';
+import { useT } from '../lib/i18n';
 import { space } from '../lib/theme';
 import { EmptyState, Loading, Notice, Row, Screen, Segmented } from '../lib/ui';
 
 type Scope = 'upcoming' | 'now' | 'going' | 'hosting';
-const EMPTY: Record<Scope, string> = {
-  upcoming: 'No upcoming events you can see yet.',
-  now: 'Nothing is happening right now.',
-  going: "You haven't said you're going to anything yet.",
-  hosting: "You aren't hosting any events.",
-};
+const SCOPES: { id: Scope; label: MessageKey; empty: MessageKey }[] = [
+  { id: 'upcoming', label: 'm.events.upcoming', empty: 'm.events.empty.upcoming' },
+  { id: 'now', label: 'm.events.now', empty: 'm.events.empty.now' },
+  { id: 'going', label: 'm.events.goingTab', empty: 'm.events.empty.going' },
+  { id: 'hosting', label: 'm.events.hosting', empty: 'm.events.empty.hosting' },
+];
 
 /** Events you can see: upcoming, happening now, ones you're going to and ones you host. */
 export default function Events() {
+  const { t, dateTime } = useT();
   const [scope, setScope] = useState<Scope>('upcoming');
   const [items, setItems] = useState<EventItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -34,17 +37,7 @@ export default function Events() {
   }, [scope]);
   return (
     <Screen style={{ gap: space[3] }}>
-      <Segmented
-        label="Which events"
-        value={scope}
-        onChange={setScope}
-        options={[
-          { id: 'upcoming', label: 'Upcoming' },
-          { id: 'now', label: 'Now' },
-          { id: 'going', label: 'Going' },
-          { id: 'hosting', label: 'Hosting' },
-        ]}
-      />
+      <Segmented label={t('m.events.scope')} value={scope} onChange={setScope} options={SCOPES.map((x) => ({ id: x.id, label: t(x.label) }))} />
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {items === null ? (
         <Loading />
@@ -54,9 +47,9 @@ export default function Events() {
           keyExtractor={(e) => e.id}
           contentContainerStyle={{ gap: space[2], paddingBottom: space[8] }}
           renderItem={({ item }) => (
-            <Row title={item.title} subtitle={[new Date(item.startsAt).toLocaleString(), item.place?.name ?? item.locationText].filter(Boolean).join(' · ')} />
+            <Row title={item.title} subtitle={[dateTime(item.startsAt), item.place?.name ?? item.locationText].filter(Boolean).join(' · ')} />
           )}
-          ListEmptyComponent={<EmptyState title="No events" body={EMPTY[scope]} />}
+          ListEmptyComponent={<EmptyState title={t('m.events.none')} body={t(SCOPES.find((x) => x.id === scope)!.empty)} />}
         />
       )}
     </Screen>

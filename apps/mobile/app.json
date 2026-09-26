@@ -47,7 +47,13 @@
         }
       ],
       "expo-dev-client",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": ["en", "fr", "ar", "es", "pt", "sw", "yo", "ha"]
+        }
+      ]
     ],
     "extra": {
       "apiUrl": "http://localhost:4000",

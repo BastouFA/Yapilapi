@@ -1,21 +1,24 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, Text } from 'react-native';
+import type { MessageKey } from '../../../../packages/shared/src/i18n';
 import { client, errorMessage } from '../../lib/api';
+import { useT } from '../../lib/i18n';
 import { useSession } from '../../lib/session';
 import { space } from '../../lib/theme';
 import { Button, Card, Field, Notice, Screen, Segmented, useColors, useTabBarSpace } from '../../lib/ui';
 
 const VISIBILITY = [
-  { id: 'public', label: 'Everyone' },
-  { id: 'followers', label: 'Followers' },
-  { id: 'friends', label: 'Friends' },
-  { id: 'private', label: 'Only me' },
-] as const;
+  { id: 'public', label: 'visibility.public' },
+  { id: 'followers', label: 'visibility.followers' },
+  { id: 'friends', label: 'visibility.friends' },
+  { id: 'private', label: 'visibility.private' },
+] as const satisfies readonly { id: string; label: MessageKey }[];
 
 /** Create: a text post with a visibility choice, or a Real. */
 export default function Create() {
   const c = useColors();
+  const { t } = useT();
   const { me } = useSession();
   const bottom = useTabBarSpace();
   const [body, setBody] = useState('');
@@ -27,7 +30,7 @@ export default function Create() {
   if (!me)
     return (
       <Screen>
-        <Notice>Log in from the Home tab to post.</Notice>
+        <Notice>{t('m.create.signedOut')}</Notice>
       </Screen>
     );
 
@@ -39,19 +42,24 @@ export default function Create() {
     >
       <Card style={{ gap: space[3] }}>
         <Field
-          label="What's happening?"
+          label={t('create.placeholder')}
           value={body}
           onChangeText={setBody}
           multiline
           maxLength={5000}
           style={{ minHeight: 140, textAlignVertical: 'top', paddingTop: 12 }}
         />
-        <Text style={{ color: c.ink, fontWeight: '600' }}>Who can see this</Text>
-        <Segmented label="Who can see this" options={VISIBILITY} value={visibility} onChange={setVisibility} />
+        <Text style={{ color: c.ink, fontWeight: '600' }}>{t('create.visibility')}</Text>
+        <Segmented
+          label={t('create.visibility')}
+          options={VISIBILITY.map((v) => ({ id: v.id, label: t(v.label) }))}
+          value={visibility}
+          onChange={setVisibility}
+        />
         {error ? <Notice tone="danger">{error}</Notice> : null}
         {note ? <Notice>{note}</Notice> : null}
         <Button
-          label={busy ? 'Publishing…' : 'Publish'}
+          label={busy ? t('m.create.publishing') : t('create.publish')}
           disabled={!body.trim() || busy}
           onPress={async () => {
             setBusy(true);
@@ -70,7 +78,7 @@ export default function Create() {
           }}
         />
       </Card>
-      <Button label="Capture a Real" icon="camera-outline" variant="secondary" onPress={() => router.push('/real')} />
+      <Button label={t('m.real.capture')} icon="camera-outline" variant="secondary" onPress={() => router.push('/real')} />
     </ScrollView>
   );
 }

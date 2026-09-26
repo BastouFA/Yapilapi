@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Text, View } from 'react-native';
 import { client, errorMessage } from '../../lib/api';
+import { useT } from '../../lib/i18n';
 import { space } from '../../lib/theme';
 import { Avatar, Button, EmptyState, Field, Notice, Row, Screen, useColors, useTabBarSpace } from '../../lib/ui';
 
@@ -10,6 +11,7 @@ type Result = { key: string; title: string; subtitle: string; href?: string; ava
 /** Discover: universal search with natural-language intent. */
 export default function Discover() {
   const c = useColors();
+  const { t, tp, dateTime } = useT();
   const bottom = useTabBarSpace();
   const [q, setQ] = useState('');
   const [results, setResults] = useState<Result[] | null>(null);
@@ -29,8 +31,8 @@ export default function Discover() {
           subtitle: `@${u.username}`,
           avatar: { name: u.displayName, url: u.avatarUrl },
         })),
-        ...(r.communities ?? []).map((x) => ({ key: `c${x.id}`, title: x.name, subtitle: `${x.memberCount} members`, href: `/c/${x.slug}` })),
-        ...(r.events ?? []).map((e) => ({ key: `e${e.id}`, title: e.title, subtitle: new Date(e.startsAt).toLocaleString() })),
+        ...(r.communities ?? []).map((x) => ({ key: `c${x.id}`, title: x.name, subtitle: tp('m.community.members', x.memberCount), href: `/c/${x.slug}` })),
+        ...(r.events ?? []).map((e) => ({ key: `e${e.id}`, title: e.title, subtitle: dateTime(e.startsAt) })),
         ...(r.places ?? []).map((p) => ({ key: `p${p.id}`, title: p.name, subtitle: [p.category, p.city].filter(Boolean).join(' · ') })),
         ...(r.posts ?? []).map((p) => ({ key: `po${p.id}`, title: p.author.displayName, subtitle: p.body, href: `/p/${p.id}` })),
       ]);
@@ -46,9 +48,9 @@ export default function Discover() {
       <View style={{ flexDirection: 'row', gap: space[2], alignItems: 'flex-end' }}>
         <View style={{ flex: 1 }}>
           <Field
-            label="Search"
+            label={t('m.discover.search')}
             hideLabel
-            placeholder='Try "something to do tonight"'
+            placeholder={t('m.discover.placeholder')}
             value={q}
             onChangeText={setQ}
             onSubmitEditing={search}
@@ -56,11 +58,11 @@ export default function Discover() {
             style={{ borderRadius: 9999, paddingHorizontal: space[4] }}
           />
         </View>
-        <Button label={busy ? 'Searching…' : 'Search'} onPress={search} disabled={!q.trim() || busy} />
+        <Button label={busy ? t('m.discover.searching') : t('m.discover.search')} onPress={search} disabled={!q.trim() || busy} />
       </View>
       <View style={{ flexDirection: 'row', gap: space[2] }}>
-        <Button label="Assistant" variant="secondary" size="sm" onPress={() => router.push('/assistant')} />
-        <Button label="Events" variant="secondary" size="sm" onPress={() => router.push('/events')} />
+        <Button label={t('m.title.assistant')} variant="secondary" size="sm" onPress={() => router.push('/assistant')} />
+        <Button label={t('events.title')} variant="secondary" size="sm" onPress={() => router.push('/events')} />
       </View>
       {error ? <Notice tone="danger">{error}</Notice> : null}
       <FlatList
@@ -77,9 +79,9 @@ export default function Discover() {
         )}
         ListEmptyComponent={
           results ? (
-            <EmptyState title="No results" body="Try fewer words, or search for a person, a place or a community." />
+            <EmptyState title={t('m.discover.noResults.title')} body={t('m.discover.noResults.body')} />
           ) : (
-            <Text style={{ color: c.inkMuted, textAlign: 'center', padding: space[4] }}>Search people, communities, events, places and posts.</Text>
+            <Text style={{ color: c.inkMuted, textAlign: 'center', padding: space[4] }}>{t('m.discover.hint')}</Text>
           )
         }
       />

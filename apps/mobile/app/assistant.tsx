@@ -2,23 +2,25 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import type { AgentKind, AgentResult } from '../../../packages/api-client/src/index';
+import type { MessageKey } from '../../../packages/shared/src/i18n';
 import { client, errorMessage } from '../lib/api';
+import { useT } from '../lib/i18n';
 import { space } from '../lib/theme';
-import { Button, Card, Field, Notice, Row, Screen, Segmented, useColors } from '../lib/ui';
+import { Button, Card, Field, Notice, Row, Screen, Segmented, useColors, userText } from '../lib/ui';
 
-const KINDS: { id: AgentKind; label: string; placeholder: string }[] = [
-  { id: 'discover', label: 'Discover', placeholder: 'What are you in the mood for?' },
-  { id: 'travel', label: 'Trips', placeholder: 'Where are you going, and when?' },
-  { id: 'shopping', label: 'Shopping', placeholder: 'What do you need?' },
-  { id: 'business', label: 'Business', placeholder: 'Ask about your bookings, reviews or sales' },
+const KINDS: { id: AgentKind; label: MessageKey; placeholder: MessageKey }[] = [
+  { id: 'discover', label: 'nav.discover', placeholder: 'm.assistant.placeholder.discover' },
+  { id: 'travel', label: 'm.assistant.kind.travel', placeholder: 'm.assistant.placeholder.travel' },
+  { id: 'shopping', label: 'm.assistant.kind.shopping', placeholder: 'm.assistant.placeholder.shopping' },
+  { id: 'business', label: 'm.assistant.kind.business', placeholder: 'm.assistant.placeholder.business' },
 ];
-const TYPE_LABEL: Record<string, string> = {
-  event: 'Event',
-  place: 'Place',
-  community: 'Community',
-  person: 'Person',
-  product: 'Product',
-  business: 'Business',
+const TYPE_LABEL: Record<string, MessageKey> = {
+  event: 'm.type.event',
+  place: 'm.type.place',
+  community: 'm.type.community',
+  person: 'm.type.person',
+  product: 'm.type.product',
+  business: 'm.type.business',
 };
 
 /** Screens that exist in the app; other results show their details without opening. */
@@ -31,6 +33,7 @@ const route = (href: string) => (/^\/(c|p)\//.test(href) ? href : null);
  */
 export default function Assistant() {
   const c = useColors();
+  const { t, dateTime } = useT();
   const [kind, setKind] = useState<AgentKind>('discover');
   const [prompt, setPrompt] = useState('');
   const [busy, setBusy] = useState(false);
@@ -47,7 +50,7 @@ export default function Assistant() {
       setRes(await (await client()).agents.run(kind, prompt.trim()));
     } catch (e) {
       setRes(null);
-      setError(kind === 'business' && /not found/i.test(errorMessage(e)) ? 'The business assistant works for business owners.' : errorMessage(e));
+      setError(kind === 'business' && /not found/i.test(errorMessage(e)) ? t('m.assistant.businessOnly') : errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -69,8 +72,8 @@ export default function Assistant() {
     <Screen>
       <ScrollView contentContainerStyle={{ gap: space[3], paddingBottom: space[8] }} keyboardShouldPersistTaps="handled">
         <Segmented
-          label="Assistant"
-          options={KINDS}
+          label={t('m.title.assistant')}
+          options={KINDS.map((x) => ({ id: x.id, label: t(x.label) }))}
           value={kind}
           onChange={(v) => {
             setKind(v);
@@ -79,51 +82,48 @@ export default function Assistant() {
           }}
         />
         <Field
-          label="Ask"
+          label={t('m.assistant.ask')}
           hideLabel
-          placeholder={k.placeholder}
+          placeholder={t(k.placeholder)}
           value={prompt}
           onChangeText={setPrompt}
           onSubmitEditing={ask}
           returnKeyType="send"
           maxLength={1000}
         />
-        <Button label={busy ? 'Thinking…' : 'Ask'} onPress={ask} disabled={busy || !prompt.trim()} />
+        <Button label={busy ? t('m.assistant.thinking') : t('m.assistant.ask')} onPress={ask} disabled={busy || !prompt.trim()} />
         {error ? <Notice tone="danger">{error}</Notice> : null}
         {res ? (
           <Card style={{ gap: space[3] }}>
-            {res.text ? <Text style={{ color: c.ink, fontSize: 15, lineHeight: 22 }}>{res.text}</Text> : null}
+            {res.text ? <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 22 }, userText]}>{res.text}</Text> : null}
             {res.recommendations.map((r) => (
               <Row
                 key={`${r.type}:${r.id}`}
                 title={r.title}
-                subtitle={`${TYPE_LABEL[r.type]}${r.startsAt ? ` · ${new Date(r.startsAt).toLocaleString()}` : ''}${r.subtitle ? ` · ${r.subtitle}` : ''}\n${r.reason}`}
+                subtitle={`${TYPE_LABEL[r.type] ? t(TYPE_LABEL[r.type]!) : r.type}${r.startsAt ? ` · ${dateTime(r.startsAt)}` : ''}${r.subtitle ? ` · ${r.subtitle}` : ''}\n${r.reason}`}
                 onPress={route(r.href) ? () => router.push(route(r.href) as never) : undefined}
               />
             ))}
             {res.actions.map((a) =>
               a.kind === 'book' || a.kind === 'buy' ? (
                 <Text key={a.target.id} style={{ color: c.inkMuted, fontSize: 13 }}>
-                  {a.label}: finish this on the item's page on the web.
+                  {t('m.assistant.finishOnWeb', { action: a.label })}
                 </Text>
               ) : (
                 <Button
                   key={a.target.id}
-                  label={done[a.target.id] ? 'Done' : a.label}
+                  label={done[a.target.id] ? t('m.common.done') : a.label}
                   variant={done[a.target.id] ? 'secondary' : 'primary'}
                   disabled={done[a.target.id]}
                   onPress={() => act(a)}
                 />
               ),
             )}
-            <Text style={{ color: c.inkMuted, fontSize: 12 }}>{res.notice ?? `Answered by ${res.model}. It only used what you can see on YAPILAPI.`}</Text>
+            <Text style={{ color: c.inkMuted, fontSize: 12 }}>{res.notice ?? t('m.assistant.answeredBy', { model: res.model })}</Text>
           </Card>
         ) : null}
         <View>
-          <Text style={{ color: c.inkMuted, fontSize: 12, lineHeight: 18 }}>
-            The assistant searches YAPILAPI as you, so it only finds what you could find yourself. Your question is sent to the AI provider to answer it;
-            YAPILAPI keeps a record that you asked, not what you asked.
-          </Text>
+          <Text style={{ color: c.inkMuted, fontSize: 12, lineHeight: 18 }}>{t('m.assistant.privacy')}</Text>
         </View>
       </ScrollView>
     </Screen>
