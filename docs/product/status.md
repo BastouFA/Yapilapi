@@ -43,11 +43,11 @@ Sign up → profile → interests → follow → Home → Discover → create po
 | 33 | Developer platform | Built | Developer apps, scoped API keys, signed webhooks, and Sign in with YAPILAPI (OAuth 2.0 code flow with mandatory PKCE, exact redirect matching, rotating refresh tokens, connected-apps list with revoke). |
 | 34 | Mini apps | Built (behind `MINI_APPS`) | Developer submission, admin review, installs per conversation/community/event/profile/business with permission checks, sandboxed iframe host with a postMessage bridge, signed context tokens with a verify endpoint, user-confirmed actions. |
 | 35 | Internationalization | Built (core) | All UI strings through `t()`, complete catalogs for English, French, Arabic, Spanish, Portuguese (Brazil), Swahili, Yorùbá and Hausa, RTL switching, Intl dates/money. Yorùbá and Hausa need a native-speaker review. |
-| 36 | Accessibility | Built (core) | Keyboard focus rings, ARIA roles, alt text on upload, reduced motion, contrast-checked tokens. Formal audit not done. |
+| 36 | Accessibility | Built | axe audit (WCAG 2.2 A/AA) of 15 pages in light/dark and desktop/mobile: 0 violations, keyboard focus traps, Escape and focus return for dialogs, sheets and menus; runs in CI. Manual screen-reader pass and RTL layouts: not done yet (docs/accessibility.md). |
 | — | Low bandwidth | Partial | Cursor pagination, lazy images, reduced motion, resumable uploads with retry. Image compression/variants: not started. |
 | — | Mobile | Built (core) | Expo app: Home, Discover, Create, Inbox + chat, Profile, Real capture (expo-camera), push registration. Type-checks and iOS/Android bundles build; not yet run on a device. **Calls** (react-native-webrtc, same signaling as web) in a development build; post, community with FAQ, settings with family supervision; the new look. |
 | — | Design system | Built | Coral and sun palette, light/dark themes with contrast-checked tokens, soft radii, layered shadows; 11 primitives, 20 social components; three-column desktop layout with a live/events/people/trending sidebar; published reference artifact. |
-| — | CI/CD, observability | Built | CI workflow, Dockerfiles, health/readiness, Prometheus metrics and alerts, structured logs with request ids. Tracing: not started. |
+| — | CI/CD, observability | Built | CI workflow, Dockerfiles, health/readiness, Prometheus metrics and alerts, structured logs with request and trace ids, **OpenTelemetry tracing** (opt-in, Jaeger profile), **load tests** with p95 targets (docs/architecture/performance.md). |
 
 ## Not built yet
 
