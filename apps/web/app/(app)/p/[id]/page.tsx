@@ -1,20 +1,17 @@
-'use client';
+import type { Metadata } from 'next';
+import { getPublicPost } from '@/lib/public';
+import { postMetadata, privateMetadata } from '@/lib/metadata';
+import PostPageClient from './PageClient';
 
-import { useParams } from 'next/navigation';
-import { useCallback } from 'react';
-import { api } from '@/lib/api';
-import { PostList } from '@/components/PostList';
+type Props = { params: Promise<{ id: string }> };
 
-/** A single post, with every post action available (link target for notifications and search). */
-export default function PostPage() {
-  const { id } = useParams<{ id: string }>();
-  const load = useCallback(() => api.posts.get(id).then((r) => ({ items: [r.post], nextCursor: null })), [id]);
-  return (
-    <div className="yp-shell__inner">
-      <div className="yp-topbar">
-        <h1>Post</h1>
-      </div>
-      <PostList load={load} reloadKey={id} empty="This post isn't available. It may have been removed, or it isn't shared with you." />
-    </div>
-  );
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params;
+  const post = await getPublicPost(id);
+  return post ? postMetadata(post, `/p/${post.id}`) : privateMetadata('Post');
+}
+
+export default async function PostPage({ params }: Props) {
+  const { id } = await params;
+  return <PostPageClient isPublic={!!(await getPublicPost(id))} />;
 }

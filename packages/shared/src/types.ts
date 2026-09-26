@@ -169,3 +169,73 @@ export interface NotificationItem {
 export interface ApiErrorBody {
   error: { code: string; message: string; details?: unknown; requestId?: string };
 }
+
+// ─── Public previews ────────────────────────────────────────────────────
+// What anyone can see without an account: link previews (Open Graph cards)
+// and the signed-out view of a shared link. Only public content from active,
+// public adult accounts; never anything that needs a relationship to see.
+
+export interface PublicAuthor {
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
+export interface PublicPreviewImage {
+  url: string;
+  width: number | null;
+  height: number | null;
+  alt: string | null;
+}
+
+export interface PublicPostPreview {
+  id: string;
+  format: 'post' | 'reel';
+  kind: PostKind;
+  /** The post text, trimmed to about 200 characters. */
+  excerpt: string;
+  author: PublicAuthor;
+  /** The first image, or the poster frame of the first video. */
+  image: PublicPreviewImage | null;
+  /** A direct MP4 file for the first video, when one exists. */
+  video: { url: string; width: number | null; height: number | null; durationMs: number | null } | null;
+  counts: { likes: number; comments: number; reposts: number };
+  community: { slug: string; name: string } | null;
+  createdAt: string;
+}
+
+export interface PublicProfilePreview {
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+  coverUrl: string | null;
+  mode: ProfileMode;
+  /** The bio, trimmed to about 200 characters. */
+  bio: string;
+  counts: { followers: number; following: number; posts: number };
+}
+
+export interface PublicEventPreview {
+  id: string;
+  title: string;
+  /** The description, trimmed to about 200 characters. */
+  excerpt: string;
+  host: PublicAuthor;
+  startsAt: string;
+  endsAt: string | null;
+  timezone: string;
+  online: boolean;
+  locationText: string | null;
+  place: { name: string } | null;
+  community: { slug: string; name: string } | null;
+  counts: { going: number; interested: number };
+}
+
+export interface PublicCommunityPreview {
+  slug: string;
+  name: string;
+  /** The description, trimmed to about 200 characters. */
+  excerpt: string;
+  memberCount: number;
+  topics: string[];
+}

@@ -5,7 +5,9 @@ WORKDIR /app
 RUN corepack enable
 ARG API_INTERNAL_URL=http://api:4000
 ARG NEXT_PUBLIC_WS_URL=ws://localhost:4000/v1/realtime
-ENV API_INTERNAL_URL=$API_INTERNAL_URL NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL NEXT_TELEMETRY_DISABLED=1
+# Public origin of the site (e.g. https://yapilapi.com), used in link previews. Empty: taken from each request.
+ARG SITE_URL=
+ENV API_INTERNAL_URL=$API_INTERNAL_URL NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL SITE_URL=$SITE_URL NEXT_TELEMETRY_DISABLED=1
 COPY . .
 RUN pnpm install --frozen-lockfile --filter @yapilapi/web...
 RUN pnpm --filter @yapilapi/web build

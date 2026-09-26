@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { Avatar, Badge, BottomSheet, Button, EmptyState, PostCard, Select, Skeleton, TextField } from '@yapilapi/design-system';
 import type { SponsoredAd } from '@yapilapi/api-client';
@@ -7,6 +8,7 @@ import { formatRelativeTime, REPORT_REASONS, type Comment, type Page, type Post 
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { useSession } from '@/app/providers';
+import { signInHref, useSignIn } from './SignedOut';
 
 /**
  * A paginated list of posts with every post interaction wired to the API:
@@ -36,6 +38,12 @@ export function PostList({
   const [ad, setAd] = useState<SponsoredAd | null>(null);
   const [adWhy, setAdWhy] = useState(false);
   const adClicked = useRef(false);
+  // Without an account, anything that acts on a post goes to sign in first (reading comments doesn't).
+  const signIn = useSignIn();
+  const guard =
+    <A extends unknown[]>(fn: (...a: A) => unknown) =>
+    (...a: A) =>
+      me ? fn(...a) : signIn();
 
   useEffect(() => {
     setAd(null);
@@ -214,15 +222,15 @@ export function PostList({
             locale={locale}
             linkAs={NextLink}
             isOwn={p.author.id === me?.id}
-            onLike={like}
-            onSave={save}
-            onVote={vote}
+            onLike={guard(like)}
+            onSave={guard(save)}
+            onVote={guard(vote)}
             onComment={setCommentsFor}
-            onFeedback={feedback}
-            onWhy={async (post) => setWhy({ post, reasons: (await api.posts.why(post.id)).reasons })}
-            onReport={setReporting}
+            onFeedback={me ? feedback : undefined}
+            onWhy={me ? async (post) => setWhy({ post, reasons: (await api.posts.why(post.id)).reasons }) : undefined}
+            onReport={guard(setReporting)}
             onDelete={remove}
-            onAddToMemory={flags.MEMORY ? setMemoryFor : undefined}
+            onAddToMemory={me && flags.MEMORY ? setMemoryFor : undefined}
           />
           {ad && i === Math.min(2, posts.length - 1) ? renderAd(ad) : null}
         </Fragment>
@@ -281,7 +289,7 @@ export function PostList({
 }
 
 export function CommentsSheet({ post, onClose, onAdded }: { post: Post; onClose: () => void; onAdded: () => void }) {
-  const { toast, t, locale } = useSession();
+  const { toast, t, locale, me } = useSession();
   const [items, setItems] = useState<Comment[] | null>(null);
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
@@ -311,29 +319,38 @@ export function CommentsSheet({ post, onClose, onAdded }: { post: Post; onClose:
         ) : (
           <p className="muted">No comments yet. Start the conversation.</p>
         )}
-        <form
-          className="stack-sm"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            if (!body.trim()) return;
-            setBusy(true);
-            try {
-              const { comment } = await api.posts.comment(post.id, body.trim());
-              setItems((cur) => [...(cur ?? []), comment]);
-              setBody('');
-              onAdded();
-            } catch (err) {
-              toast(errorMessage(err));
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          <TextField label={t('comment.placeholder')} value={body} onChange={(e) => setBody(e.currentTarget.value)} maxLength={2000} />
-          <Button type="submit" loading={busy} disabled={!body.trim()}>
-            {t('comment.submit')}
-          </Button>
-        </form>
+        {!me ? (
+          <div className="row">
+            <span className="muted">Sign in to join the conversation.</span>
+            <Link href={signInHref()} className="yp-btn yp-btn--primary yp-btn--sm">
+              Sign in
+            </Link>
+          </div>
+        ) : (
+          <form
+            className="stack-sm"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!body.trim()) return;
+              setBusy(true);
+              try {
+                const { comment } = await api.posts.comment(post.id, body.trim());
+                setItems((cur) => [...(cur ?? []), comment]);
+                setBody('');
+                onAdded();
+              } catch (err) {
+                toast(errorMessage(err));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <TextField label={t('comment.placeholder')} value={body} onChange={(e) => setBody(e.currentTarget.value)} maxLength={2000} />
+            <Button type="submit" loading={busy} disabled={!body.trim()}>
+              {t('comment.submit')}
+            </Button>
+          </form>
+        )}
       </div>
     </BottomSheet>
   );

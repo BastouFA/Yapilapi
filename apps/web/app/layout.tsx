@@ -5,10 +5,15 @@ import '@yapilapi/design-system/social.css';
 import './globals.css';
 import { Providers } from './providers';
 
+const SITE_URL = (process.env.SITE_URL || process.env.WEB_ORIGIN?.split(',')[0] || 'http://localhost:3000').replace(/\/+$/, '');
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: { default: 'YAPILAPI', template: '%s · YAPILAPI' },
   description: 'Your social world. One place.',
   applicationName: 'YAPILAPI',
+  openGraph: { siteName: 'YAPILAPI', type: 'website', title: 'YAPILAPI', description: 'Your social world. One place.' },
+  twitter: { card: 'summary_large_image', title: 'YAPILAPI', description: 'Your social world. One place.' },
 };
 
 export const viewport: Viewport = {

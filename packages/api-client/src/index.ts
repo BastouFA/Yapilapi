@@ -1,4 +1,21 @@
-import type { Comment, Community, Conversation, EventItem, FeedMode, Me, Message, NotificationItem, Page, Post, Profile, PublicUser } from '@yapilapi/shared';
+import type {
+  Comment,
+  Community,
+  Conversation,
+  EventItem,
+  FeedMode,
+  Me,
+  Message,
+  NotificationItem,
+  Page,
+  Post,
+  Profile,
+  PublicCommunityPreview,
+  PublicEventPreview,
+  PublicPostPreview,
+  PublicProfilePreview,
+  PublicUser,
+} from '@yapilapi/shared';
 
 export class ApiError extends Error {
   constructor(
@@ -260,6 +277,13 @@ export function createClient(opts: ClientOptions) {
         ),
     },
     flags: () => get<{ flags: Record<string, boolean> }>('/v1/flags'),
+    /** What anyone can see of a shared link without an account (link previews, signed-out views). */
+    public: {
+      post: (id: string) => get<{ post: PublicPostPreview }>(`/v1/public/posts/${encodeURIComponent(id)}`),
+      user: (username: string) => get<{ profile: PublicProfilePreview }>(`/v1/public/users/${encodeURIComponent(username)}`),
+      event: (id: string) => get<{ event: PublicEventPreview }>(`/v1/public/events/${encodeURIComponent(id)}`),
+      community: (slug: string) => get<{ community: PublicCommunityPreview }>(`/v1/public/communities/${encodeURIComponent(slug)}`),
+    },
     passkeys: {
       list: () => get<{ items: { id: string; label: string; created_at: string; last_used_at: string | null; backed_up: boolean }[] }>('/v1/auth/passkeys'),
       registerOptions: () => post<{ options: any; challengeId: string }>('/v1/auth/passkeys/register/options'),
