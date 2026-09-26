@@ -95,6 +95,31 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
 
       {post.body ? <RichText text={post.body} style={{ color: c.ink, fontSize: 15, lineHeight: 22 }} /> : null}
 
+      {post.remixOf?.post ? (
+        <Pressable
+          accessibilityRole="link"
+          onPress={() => router.push({ pathname: '/reels', params: { start: post.remixOf!.post!.id } })}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' }}
+        >
+          <Icon name="copy-outline" size={14} color={c.inkMuted} />
+          <Text style={[{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }, userText]} numberOfLines={1}>
+            {t(post.remixOf.mode === 'duet' ? 'm.reels.duetWith' : 'm.reels.remixOf', { name: post.remixOf.post.author.username })}
+          </Text>
+        </Pressable>
+      ) : null}
+      {post.sound ? (
+        <Pressable
+          accessibilityRole="link"
+          onPress={() => router.push(`/sounds/${post.sound!.id}`)}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', maxWidth: '100%' }}
+        >
+          <Icon name="musical-notes" size={14} color={c.inkMuted} />
+          <Text style={[{ color: c.inkMuted, fontSize: 13, fontWeight: '600', flexShrink: 1 }, userText]} numberOfLines={1}>
+            {post.sound.title}
+          </Text>
+        </Pressable>
+      ) : null}
+
       {imageUri ? (
         <Image
           source={{ uri: mediaUrl(imageUri) }}

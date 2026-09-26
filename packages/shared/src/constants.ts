@@ -1,6 +1,14 @@
 export const VISIBILITIES = ['public', 'followers', 'friends', 'circle', 'selected', 'private'] as const;
 export type Visibility = (typeof VISIBILITIES)[number];
 
+/** Stories can also go to your close friends list only. */
+export const STORY_VISIBILITIES = [...VISIBILITIES, 'close_friends'] as const;
+export type StoryVisibility = (typeof STORY_VISIBILITIES)[number];
+
+/** 'duet' plays side by side with the original reel; 'remix' reuses its sound only. */
+export const REMIX_MODES = ['duet', 'remix'] as const;
+export type RemixMode = (typeof REMIX_MODES)[number];
+
 export const POST_KINDS = ['text', 'photo', 'video', 'carousel', 'audio', 'poll', 'link'] as const;
 export type PostKind = (typeof POST_KINDS)[number];
 

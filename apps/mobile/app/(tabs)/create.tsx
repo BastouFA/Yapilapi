@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Image, Linking, ScrollView, Text, View } from 'react-native';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
+import type { Sound } from '../../../../packages/shared/src/types';
 import { client, errorMessage, mediaUrl } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import {
@@ -18,7 +19,7 @@ import {
 } from '../../lib/media';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
-import { Button, Card, Field, Icon, Notice, Screen, Segmented, useColors, useTabBarSpace } from '../../lib/ui';
+import { Button, Card, Field, Icon, Notice, Screen, Segmented, SwitchRow, useColors, useTabBarSpace, userText } from '../../lib/ui';
 
 const VISIBILITY = [
   { id: 'public', label: 'visibility.public' },
@@ -45,13 +46,16 @@ type Attached = Uploaded & { local: string; seconds: number | null };
 
 const kindFrom = (mode: string | undefined): Kind | null => (mode === 'reel' || mode === 'story' || mode === 'post' ? mode : null);
 
-/** Create: a text post, a reel (one video up to 3 minutes) or a story, like the web composer. */
+/**
+ * Create: a text post, a reel (one video up to 3 minutes, optionally with a sound from the
+ * sound page) or a story (optionally for close friends only), like the web composer.
+ */
 export default function Create() {
   const c = useColors();
   const { t, number } = useT();
   const { me } = useSession();
   const bottom = useTabBarSpace();
-  const params = useLocalSearchParams<{ mode?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; sound?: string }>();
   const [kind, setKind] = useState<Kind>(kindFrom(params.mode) ?? 'post');
   const [body, setBody] = useState('');
   const [visibility, setVisibility] = useState<Visibility>(kind === 'story' ? 'friends' : 'public');
@@ -62,6 +66,8 @@ export default function Create() {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sound, setSound] = useState<Sound | null>(null);
+  const [closeFriends, setCloseFriends] = useState(false);
   const uploading = progress !== null;
 
   function switchTo(k: Kind) {
@@ -72,6 +78,19 @@ export default function Create() {
     setMedia((m) => (k === 'post' || (k === 'reel' && m?.kind !== 'video') ? null : m));
     if (k === 'story' && visibility === 'public') setVisibility('friends');
   }
+
+  // "Use this sound" on a sound page opens this tab as a reel with that sound.
+  useEffect(() => {
+    if (!params.sound) return;
+    const soundId = params.sound;
+    router.setParams({ sound: '' });
+    client()
+      .then((api) => api.sounds.get(soundId))
+      .then(
+        (r) => setSound(r.sound),
+        (e) => setError(errorMessage(e)),
+      );
+  }, [params.sound]);
 
   // Home ("Your story") and Reels ("Make a reel") open this tab in a given mode.
   useEffect(() => {
@@ -133,7 +152,7 @@ export default function Create() {
     try {
       const api = await client();
       if (kind === 'story') {
-        await api.moments.create({ body: body.trim() || undefined, mediaId: media?.id, expiresIn, visibility });
+        await api.moments.create({ body: body.trim() || undefined, mediaId: media?.id, expiresIn, visibility: closeFriends ? 'close_friends' : visibility });
         setBody('');
         setMedia(null);
         Alert.alert(t('m.create.storyShared'));
@@ -142,9 +161,16 @@ export default function Create() {
       }
       if (kind === 'reel') {
         const v = media!;
-        const r = await api.posts.create({ format: 'reel', body, visibility, media: [{ id: v.id, url: mediaUrl(v.url), kind: 'video' }] });
+        const r = await api.posts.create({
+          format: 'reel',
+          body,
+          visibility,
+          media: [{ id: v.id, url: mediaUrl(v.url), kind: 'video' }],
+          ...(sound ? { soundId: sound.id } : {}),
+        });
         setBody('');
         setMedia(null);
+        setSound(null);
         if (r.moderation) Alert.alert(r.moderation.message);
         router.push({ pathname: '/reels', params: { start: r.post.id } });
         return;
@@ -218,8 +244,27 @@ export default function Create() {
           </View>
         ) : null}
 
+        {kind === 'reel' && sound ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+            <Icon name="musical-notes" size={18} color={c.ink} />
+            <Text style={[{ color: c.ink, fontWeight: '600', flex: 1 }, userText]} numberOfLines={2}>
+              {t('m.create.sound', { title: sound.title })}
+            </Text>
+            <Button label={t('m.create.ownSound')} variant="ghost" size="sm" onPress={() => setSound(null)} />
+          </View>
+        ) : null}
+
         {kind === 'story' ? (
           <>
+            <SwitchRow label={t('m.closeFriends.title')} hint={t('m.closeFriends.storyHint')} value={closeFriends} onValueChange={setCloseFriends} />
+            <Button
+              label={t('m.closeFriends.manage')}
+              variant="ghost"
+              size="sm"
+              icon="people-outline"
+              onPress={() => router.push('/close-friends')}
+              style={{ alignSelf: 'flex-start' }}
+            />
             <Text style={{ color: c.ink, fontWeight: '600' }}>{t('m.create.expires')}</Text>
             <Segmented
               label={t('m.create.expires')}
@@ -230,13 +275,17 @@ export default function Create() {
           </>
         ) : null}
 
-        <Text style={{ color: c.ink, fontWeight: '600' }}>{t('create.visibility')}</Text>
-        <Segmented
-          label={t('create.visibility')}
-          options={VISIBILITY.map((v) => ({ id: v.id, label: t(v.label) }))}
-          value={visibility}
-          onChange={setVisibility}
-        />
+        {kind === 'story' && closeFriends ? null : (
+          <>
+            <Text style={{ color: c.ink, fontWeight: '600' }}>{t('create.visibility')}</Text>
+            <Segmented
+              label={t('create.visibility')}
+              options={VISIBILITY.map((v) => ({ id: v.id, label: t(v.label) }))}
+              value={visibility}
+              onChange={setVisibility}
+            />
+          </>
+        )}
         {error ? <Notice tone="danger">{error}</Notice> : null}
         {note ? <Notice>{note}</Notice> : null}
         <Button

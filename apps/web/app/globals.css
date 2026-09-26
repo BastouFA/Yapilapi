@@ -1983,3 +1983,284 @@ video.chat-att__media {
     animation: none;
   }
 }
+
+/* ── Retention: duets, remixes, sounds, close friends ───────────────── */
+/* Duets: the original on the left, the new reel on the right. */
+.reel__stage--duet {
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  background: #05060b;
+}
+.reel__stage--duet .reel__video {
+  object-fit: cover;
+}
+.reel__credit,
+.reel__soundlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  color: #fff;
+  font: 700 13px/18px var(--font-sans);
+  text-decoration: none;
+  text-shadow: 0 1px 4px #000;
+}
+.reel__soundlink bdi {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reel__credit:hover,
+.reel__soundlink:hover {
+  text-decoration: underline;
+}
+.reel__credit:focus-visible,
+.reel__soundlink:focus-visible {
+  outline: 2px solid #ff5c7a;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.reel__remix {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font: 700 12px/14px var(--font-sans);
+}
+.reel__remix .yp-menu > button,
+.reel__remix button[aria-haspopup] {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full);
+  background: #00000059;
+  color: #fff;
+  border: 1px solid #ffffff26;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.reel__remix .yp-menu__list {
+  bottom: 100%;
+  top: auto;
+  color: var(--ink);
+}
+.reel__remix button[aria-haspopup]:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px #05060b,
+    0 0 0 4px #ff5c7a;
+}
+
+/* Stories shared with close friends only. */
+.story__close-friends {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  background: var(--close-friends);
+  color: var(--on-close-friends);
+  font: 700 12px/16px var(--font-sans);
+  white-space: nowrap;
+}
+
+/* Sounds: play button, rows in the picker, and the sound page. */
+.sound-play {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--grad);
+  color: #fff;
+  cursor: pointer;
+}
+.sound-play--lg {
+  width: 64px;
+  height: 64px;
+}
+.sound-play:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.sound-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sound-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.sound-row--picked {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+.sound-row__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.sound-row__title {
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sound-row__meta {
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+.sound-hero {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: center;
+}
+.sound-hero__cover {
+  display: grid;
+  place-items: center;
+  width: 128px;
+  height: 128px;
+  flex: none;
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken) center / cover no-repeat;
+}
+.sound-hero__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 200px;
+}
+.sound-hero__text h1 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 22px;
+  overflow-wrap: anywhere;
+}
+.sound-hero__owner {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* A grid of reels (sound pages, remixes). */
+.reel-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.reel-grid__item {
+  position: relative;
+  display: block;
+  aspect-ratio: 9 / 16;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: #05060b;
+  color: #fff;
+  text-decoration: none;
+}
+.reel-grid__item img,
+.reel-grid__item video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.reel-grid__item:focus-visible {
+  outline: 2px solid var(--yapi);
+  outline-offset: 2px;
+}
+.reel-grid__badge {
+  position: absolute;
+  top: 6px;
+  inset-inline-start: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  background: #000000a6;
+  font: 700 11px/14px var(--font-sans);
+}
+.reel-grid__meta {
+  position: absolute;
+  inset-inline: 6px;
+  bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  font: 700 12px/16px var(--font-sans);
+  text-shadow: 0 1px 4px #000;
+}
+.reel-grid__meta bdi {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Create: the reel a duet or remix is made from. */
+.remix-source {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+.remix-source__video {
+  width: 64px;
+  aspect-ratio: 9 / 16;
+  flex: none;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  background: #05060b;
+}
+.remix-source__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 14px;
+}
+
+/* Settings: close friends list. */
+.close-friends__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.close-friends__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.close-friends__row .sound-row__text {
+  flex: 1;
+}
+.close-friends__dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--close-friends);
+}

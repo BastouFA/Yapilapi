@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
+import { router } from 'expo-router';
 import { ScrollView, Text, View } from 'react-native';
 import type { FamilyLink, TeenControls } from '../../../packages/api-client/src/index';
 import { client, errorMessage } from '../lib/api';
 import { useT, type Translator } from '../lib/i18n';
 import { useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
-import { Avatar, Button, Card, Field, Loading, Notice, Segmented, SwitchRow, Title, useColors, userText } from '../lib/ui';
+import { Avatar, Button, Card, Field, Icon, Loading, Notice, Row, Segmented, SwitchRow, Title, useColors, userText } from '../lib/ui';
 
 /** Settings: family supervision and advertising consent (same endpoints as the web settings page). */
 export default function Settings() {
@@ -25,6 +26,13 @@ export default function Settings() {
       contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
       keyboardShouldPersistTaps="handled"
     >
+      <Row
+        title={t('m.closeFriends.title')}
+        subtitle={t('m.closeFriends.manage')}
+        start={<View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: c.closeFriends }} />}
+        end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
+        onPress={() => router.push('/close-friends')}
+      />
       <Family />
       <Advertising />
     </ScrollView>

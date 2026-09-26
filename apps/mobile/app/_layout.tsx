@@ -34,6 +34,8 @@ function Screens() {
         <Stack.Screen name="p/[id]" options={{ title: t('m.title.post') }} />
         <Stack.Screen name="u/[username]" options={{ title: t('m.title.profile') }} />
         <Stack.Screen name="t/[tag]" options={{ title: t('m.title.tag') }} />
+        <Stack.Screen name="sounds/[id]" options={{ title: t('m.sound.title') }} />
+        <Stack.Screen name="close-friends" options={{ title: t('m.closeFriends.title') }} />
         <Stack.Screen name="invite" options={{ title: t('invite.title') }} />
         <Stack.Screen name="c/[slug]" options={{ title: t('m.title.community') }} />
         <Stack.Screen name="settings" options={{ title: t('m.title.settings') }} />

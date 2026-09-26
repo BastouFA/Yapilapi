@@ -23,6 +23,7 @@ import { notify, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
 import { plusCol, publicUserFrom } from '../lib/users.ts';
 import { notBlockedSql, postVisibleSql } from '../lib/visibility.ts';
+import { assertRemixable, assertSoundUsable, registerOwnSound } from '../lib/sounds.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -110,7 +111,18 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
                 ? 'link'
                 : input.kind;
 
+    let remixAuthor = null as string | null;
     const postId = await tx(db, async (c) => {
+      // Reels: a duet or remix borrows the original's sound; otherwise a chosen sound, or the reel's own audio.
+      let soundId: string | null = null;
+      if (input.format === 'reel' && input.remixOf) {
+        const o = await assertRemixable(c, input.remixOf, u.id);
+        remixAuthor = o.authorId;
+        soundId = o.soundId;
+      } else if (input.format === 'reel' && input.soundId) {
+        await assertSoundUsable(c, input.soundId, u.id);
+        soundId = input.soundId;
+      }
       if (input.communityId) {
         const m = await c.query(`SELECT role FROM community_members WHERE community_id = $1 AND user_id = $2 AND status = 'active'`, [input.communityId, u.id]);
         if (!m.rows[0] || m.rows[0].role === 'guest') throw forbidden('Join the community to post in it.');
@@ -124,8 +136,9 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
         if (!own.rowCount) throw forbidden('You can only link products you sell.');
       }
       const { rows } = await c.query<{ id: string }>(
-        `INSERT INTO posts (author_id, kind, body, visibility, circle_id, community_id, event_id, product_id, link_url, topics, moderation_status, ai_provenance, rights, format)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
+        `INSERT INTO posts (author_id, kind, body, visibility, circle_id, community_id, event_id, product_id, link_url, topics, moderation_status, ai_provenance, rights, format,
+                            allow_remix, remix_of_post_id, remix_mode, sound_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id`,
         [
           u.id,
           kind,
@@ -141,6 +154,10 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
           input.aiAssisted ? { assisted: true, at: new Date().toISOString() } : {},
           { owner: u.id, license: 'all_rights_reserved' },
           input.format,
+          input.allowRemix,
+          input.format === 'reel' ? (input.remixOf ?? null) : null,
+          input.format === 'reel' && input.remixOf ? input.remixMode : null,
+          soundId,
         ],
       );
       const id = rows[0]!.id;
@@ -173,6 +190,10 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
           }
         }
       }
+      if (input.format === 'reel' && !soundId) {
+        const mediaId = (await c.query(`SELECT media_id FROM post_media WHERE post_id = $1 ORDER BY position LIMIT 1`, [id])).rows[0]?.media_id;
+        if (mediaId) await registerOwnSound(c, { postId: id, ownerId: u.id, mediaId, title: input.soundTitle });
+      }
       if (input.poll)
         for (const [i, label] of input.poll.options.entries())
           await c.query(`INSERT INTO poll_options (post_id, label, position) VALUES ($1,$2,$3)`, [id, label, i]);
@@ -188,6 +209,21 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     track(db, u.id, 'post_created', { kind, visibility: input.visibility, community: !!input.communityId });
     await emitWebhook(db, u.id, 'post.created', { postId, kind, visibility: input.visibility });
     if (analysis.risk === 'normal') await notifyMentions(db, ctx.realtime, { text: input.body, actorId: u.id, postId });
+    // Tell the original's creator about a duet or remix, when they can see it.
+    if (remixAuthor && analysis.risk === 'normal') {
+      const seen = await db.query(`SELECT 1 ${POST_FROM} WHERE p.id = $2 AND ${VISIBLE}`, [remixAuthor, postId]);
+      if (seen.rowCount)
+        await notify(db, ctx.realtime, {
+          userId: remixAuthor,
+          category: 'creators',
+          type: input.remixMode === 'duet' ? 'reel_duet' : 'reel_remix',
+          actorId: u.id,
+          entityType: 'post',
+          entityId: postId,
+          data: { originalId: input.remixOf },
+        });
+      track(db, u.id, 'reel_remixed', { mode: input.remixMode });
+    }
     reply.code(201);
     const [post] = await hydratePosts(db, [postId], u.id);
     return {
@@ -261,6 +297,55 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       [id, u.id],
     );
     return { views: r.rows[0]?.view_count ?? 0 };
+  });
+
+  // ── Remixes ───────────────────────────────────────────────────────────
+  /** Turn duets and remixes of your reel on or off. Existing ones stay up. */
+  app.put('/v1/posts/:id/remix-settings', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const { allowRemix } = parse(z.object({ allowRemix: z.boolean() }), req.body);
+    const r = await db.query(`UPDATE posts SET allow_remix = $3 WHERE id = $1 AND author_id = $2 AND format = 'reel' AND deleted_at IS NULL`, [
+      id,
+      u.id,
+      allowRemix,
+    ]);
+    if (!r.rowCount) throw notFound('That reel');
+    return { allowRemix };
+  });
+
+  /** Duets and remixes of a reel that you can see, newest first. `mode` narrows to one kind. */
+  app.get('/v1/posts/:id/remixes', async (req) => {
+    const { id } = parse(idParam, req.params);
+    const q = parse(
+      z.object({
+        mode: z.enum(['duet', 'remix']).optional(),
+        cursor: z.string().max(200).optional(),
+        limit: z.coerce.number().int().min(1).max(50).default(20),
+      }),
+      req.query,
+    );
+    const viewer = req.user?.id ?? null;
+    await assertVisible(id, viewer);
+    const c = decodeCursor<KeyCursor>(q.cursor);
+    const params: unknown[] = [viewer, id, q.limit + 1, q.mode ?? null];
+    if (c) params.push(c.t, c.id);
+    const { rows } = await db.query(
+      `SELECT p.id, p.created_at ${POST_FROM}
+       WHERE p.remix_of_post_id = $2 AND p.format = 'reel' AND ($4::text IS NULL OR p.remix_mode = $4) AND ${VISIBLE}
+       ${c ? 'AND (p.created_at, p.id) < ($5::timestamptz, $6::uuid)' : ''}
+       ORDER BY p.created_at DESC, p.id DESC LIMIT $3`,
+      params,
+    );
+    const page = rows.slice(0, q.limit);
+    return {
+      items: await hydratePosts(
+        db,
+        page.map((r) => r.id),
+        viewer,
+      ),
+      nextCursor: rows.length > q.limit ? keyCursorOf(page.at(-1)!) : null,
+    };
   });
 
   // ── Feed ──────────────────────────────────────────────────────────────

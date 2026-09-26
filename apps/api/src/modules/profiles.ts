@@ -22,10 +22,19 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
    * matches, friends first, then people you follow, then everyone else. Blocked
    * people never appear; `canMessage` is false where minor protection or family
    * settings would refuse the conversation, so the app can say so up front.
+   * `scope=followers` narrows to people who follow you (for picking close
+   * friends); with no query it then lists all of them.
    */
   app.get('/v1/people/suggest', { preHandler: requireAuth, config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (req) => {
     const u = me(req);
-    const { q, limit } = parse(z.object({ q: z.string().trim().max(60).default(''), limit: z.coerce.number().int().min(1).max(20).default(8) }), req.query);
+    const { q, limit, scope } = parse(
+      z.object({
+        q: z.string().trim().max(60).default(''),
+        limit: z.coerce.number().int().min(1).max(20).default(8),
+        scope: z.enum(['all', 'followers']).default('all'),
+      }),
+      req.query,
+    );
     // Literal match: %, _ and backslash are escaped rather than dropped (usernames often contain _).
     const term = q.replace(/^@/, '').replace(/[\\%_]/g, (c) => `\\${c}`);
     const { rows } = await ctx.db.query(
@@ -38,8 +47,10 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
                    JOIN conversation_members b ON b.conversation_id = m.conversation_id AND b.user_id = pr.user_id) AS last_chat
          FROM profiles pr JOIN users u2 ON u2.id = pr.user_id
          WHERE pr.user_id <> $1 AND u2.status = 'active' AND u2.deleted_at IS NULL AND ${notBlockedSql('pr.user_id', '$1')}
+           AND ($4 = 'all' OR EXISTS (SELECT 1 FROM follows fb WHERE fb.follower_id = pr.user_id AND fb.followee_id = $1))
            AND (
-             ($2 = '' AND (EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = pr.user_id) OR (fr.user_b = $1 AND fr.user_a = pr.user_id))
+             ($2 = '' AND $4 = 'followers')
+             OR ($2 = '' AND (EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = pr.user_id) OR (fr.user_b = $1 AND fr.user_a = pr.user_id))
                            OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = pr.user_id)
                            OR EXISTS (SELECT 1 FROM conversation_members a JOIN conversation_members b ON b.conversation_id = a.conversation_id
                                       WHERE a.user_id = $1 AND b.user_id = pr.user_id)))
@@ -55,7 +66,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
        ORDER BY rel.friend DESC, rel.following DESC, rel.last_chat DESC NULLS LAST,
                 (pr.username ILIKE $2 || '%') DESC, pr.display_name
        LIMIT $3`,
-      [u.id, term, limit],
+      [u.id, term, limit, scope],
     );
     return {
       items: rows.map((r) => ({

@@ -15,6 +15,8 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
   post_reaction: () => 'liked your post',
   post_comment: () => 'commented on your post',
   post_repost: () => 'reposted your post',
+  reel_duet: () => 'made a duet with your reel',
+  reel_remix: () => 'remixed your reel',
   post_mention: () => 'mentioned you in a post',
   comment_mention: () => 'mentioned you in a comment',
   join_request: () => 'asked to join your community',
@@ -45,6 +47,7 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
 };
 
 function hrefFor(n: NotificationItem): string | undefined {
+  if (n.type === 'reel_duet' || n.type === 'reel_remix') return `/reels?start=${n.entityId}`;
   if (n.entityType === 'post') return `/p/${n.entityId}`;
   if (n.entityType === 'live') return `/live/${n.entityId}`;
   if (n.entityType === 'family_link') return '/settings';

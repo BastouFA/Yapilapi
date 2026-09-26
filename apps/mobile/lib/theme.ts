@@ -27,6 +27,8 @@ export function palette(theme: Theme) {
     saffron: color('saffron', theme),
     saffronSoft: color('saffron-soft', theme),
     success: color('success', theme),
+    closeFriends: color('close-friends', theme),
+    onCloseFriends: color('on-close-friends', theme),
     danger: color('danger', theme),
     onDanger: color('on-danger', theme),
     dangerSoft: color('danger-soft', theme),

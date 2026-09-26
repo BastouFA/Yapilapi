@@ -1,12 +1,14 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AutocompleteText } from '@/components/Autocomplete';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { AIPanel, Alert, Button, Checkbox, Segments, Select, TextField } from '@yapilapi/design-system';
-import { VISIBILITIES, type Community, type MessageKey, type Visibility } from '@yapilapi/shared';
+import { STORY_VISIBILITIES, VISIBILITIES, type Community, type MessageKey, type Post, type Sound, type StoryVisibility } from '@yapilapi/shared';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { SimilarQuestions } from '@/components/CommunityExtras';
+import { SoundPicker, SoundPlayButton } from '@/components/SoundPicker';
 import { useSession } from '../../providers';
 
 type Uploaded = { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string };
@@ -38,10 +40,20 @@ function Create() {
   const reelMax = me?.plus ? PLUS_REEL_MAX_SECONDS : REEL_MAX_SECONDS;
   const router = useRouter();
   const params = useSearchParams();
-  const initialMode = params.get('mode') === 'reel' ? 'reel' : params.get('mode') === 'story' || params.get('moment') ? 'story' : 'post';
+  // Duet, remix or "Use this sound" links open Create as a reel, prefilled.
+  const remixOf = params.get('remixOf');
+  const remixMode = params.get('remixMode') === 'remix' ? 'remix' : 'duet';
+  const initialMode =
+    params.get('mode') === 'reel' || remixOf || params.get('sound') ? 'reel' : params.get('mode') === 'story' || params.get('moment') ? 'story' : 'post';
   const [kind, setKind] = useState<'post' | 'reel' | 'story'>(initialMode);
   const [body, setBody] = useState(() => (params.get('text') ?? '').slice(0, 5000));
-  const [visibility, setVisibility] = useState<Visibility>(initialMode === 'story' ? 'friends' : 'public');
+  const [visibility, setVisibility] = useState<StoryVisibility>(initialMode === 'story' ? 'friends' : 'public');
+  const [original, setOriginal] = useState<Post | null>(null);
+  const [originalMissing, setOriginalMissing] = useState(false);
+  const [sound, setSound] = useState<Sound | null>(null);
+  const [soundTitle, setSoundTitle] = useState('');
+  const [picking, setPicking] = useState(false);
+  const [allowRemix, setAllowRemix] = useState(true);
   const [communityId, setCommunityId] = useState(params.get('community') ?? '');
   const [communities, setCommunities] = useState<Community[]>([]);
   const [circles, setCircles] = useState<{ id: string; name: string }[]>([]);
@@ -59,6 +71,21 @@ function Create() {
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (remixOf)
+      api.posts.get(remixOf).then(
+        (r) => (r.post.format === 'reel' ? setOriginal(r.post) : setOriginalMissing(true)),
+        () => setOriginalMissing(true),
+      );
+    const soundId = params.get('sound');
+    if (soundId && !remixOf)
+      api.sounds.get(soundId).then(
+        (r) => setSound(r.sound),
+        () => toast("That sound isn't available."),
+      );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remixOf]);
 
   useEffect(() => {
     api.communities
@@ -130,6 +157,8 @@ function Create() {
           format: 'reel',
           body,
           visibility,
+          allowRemix,
+          ...(remixOf && original ? { remixOf, remixMode } : sound ? { soundId: sound.id } : soundTitle.trim() ? { soundTitle: soundTitle.trim() } : {}),
           media: [{ id: v.id, url: new URL(v.url, location.origin).toString(), kind: 'video', altText: v.altText || undefined }],
           topics: topics
             .split(/[,\s#]+/)
@@ -180,6 +209,7 @@ function Create() {
             setMedia((m) => m.filter((x) => k !== 'reel' || x.kind === 'video').slice(0, 1));
           }
           if (k === 'story' && visibility === 'selected') setVisibility('friends');
+          if (k !== 'story' && visibility === 'close_friends') setVisibility('friends');
         }}
         options={[
           { id: 'post', label: 'Post' },
@@ -187,6 +217,42 @@ function Create() {
           { id: 'story', label: 'Story' },
         ]}
       />
+      {kind === 'reel' && remixOf ? (
+        originalMissing ? (
+          <Alert tone="danger">That reel isn&apos;t available to {remixMode === 'duet' ? 'duet' : 'remix'}.</Alert>
+        ) : original ? (
+          <div className="remix-source">
+            {original.media[0] ? (
+              <video
+                className="remix-source__video"
+                src={(original.media[0].variants as Record<string, string> | undefined)?.mp4 ?? original.media[0].url}
+                poster={original.media[0].posterUrl ?? undefined}
+                muted
+                playsInline
+                preload="metadata"
+                aria-hidden
+              />
+            ) : null}
+            <div className="remix-source__text">
+              <strong>
+                {remixMode === 'duet' ? 'Duet with' : 'Remix of'} <bdi>@{original.author.username}</bdi>
+              </strong>
+              <span className="muted">
+                {remixMode === 'duet'
+                  ? 'Add your own video. It plays beside the original, which stays on the left.'
+                  : 'Add your own video. It plays with the sound from the original.'}
+              </span>
+              {original.sound ? (
+                <span className="muted">
+                  Sound: <bdi>{original.sound.title}</bdi>
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          <p className="muted">Loading the original reel</p>
+        )
+      ) : null}
       <p className="muted" style={{ margin: 0, fontSize: 14 }}>
         {kind === 'post'
           ? 'Text, photos, videos, a link or a poll, on your profile or in a community.'
@@ -317,6 +383,49 @@ function Create() {
         </AIPanel>
       ) : null}
 
+      {kind === 'reel' && !remixOf ? (
+        <section className="stack-sm" aria-labelledby="sound-heading">
+          <h2 id="sound-heading" className="yp-field__label" style={{ margin: 0 }}>
+            Sound
+          </h2>
+          {sound ? (
+            <div className="sound-row sound-row--picked">
+              <SoundPlayButton sound={sound} />
+              <span className="sound-row__text">
+                <bdi className="sound-row__title">{sound.title}</bdi>
+                <span className="sound-row__meta">
+                  Plays instead of your video&apos;s own sound · <bdi>@{sound.owner.username}</bdi>
+                </span>
+              </span>
+              <Button size="sm" variant="ghost" onClick={() => setSound(null)}>
+                Remove
+              </Button>
+            </div>
+          ) : (
+            <TextField
+              label="Name your sound (optional)"
+              hint="Your video's own sound becomes a sound other people can use."
+              value={soundTitle}
+              maxLength={100}
+              onChange={(e) => setSoundTitle(e.currentTarget.value)}
+            />
+          )}
+          <div className="row">
+            <Button size="sm" variant="secondary" icon="music" onClick={() => setPicking(true)}>
+              {sound ? 'Choose another sound' : 'Choose a sound'}
+            </Button>
+          </div>
+          <SoundPicker
+            open={picking}
+            onClose={() => setPicking(false)}
+            onPick={(s) => {
+              setSound(s);
+              setPicking(false);
+            }}
+          />
+        </section>
+      ) : null}
+
       <div className="stack">
         {kind === 'reel' ? null : kind === 'post' ? (
           <Select label="Post in" value={communityId} onChange={(e) => setCommunityId(e.currentTarget.value)}>
@@ -335,13 +444,28 @@ function Create() {
           </Select>
         )}
         {!communityId ? (
-          <Select label={t('create.visibility')} value={visibility} onChange={(e) => setVisibility(e.currentTarget.value as Visibility)}>
-            {VISIBILITIES.filter((v) => kind !== 'story' || v !== 'selected').map((v) => (
-              <option key={v} value={v} disabled={v === 'circle' && !circles.length}>
-                {t(`visibility.${v}` as MessageKey)}
-              </option>
-            ))}
+          <Select label={t('create.visibility')} value={visibility} onChange={(e) => setVisibility(e.currentTarget.value as StoryVisibility)}>
+            {(kind === 'story' ? STORY_VISIBILITIES : VISIBILITIES)
+              .filter((v) => kind !== 'story' || v !== 'selected')
+              .map((v) => (
+                <option key={v} value={v} disabled={v === 'circle' && !circles.length}>
+                  {t(`visibility.${v}` as MessageKey)}
+                </option>
+              ))}
           </Select>
+        ) : null}
+        {kind === 'story' && visibility === 'close_friends' ? (
+          <p className="muted" style={{ margin: 0, fontSize: 14 }}>
+            Only people on your close friends list see this story, with a green ring. <Link href="/settings#close-friends">Edit your list</Link>
+          </p>
+        ) : null}
+        {kind === 'reel' ? (
+          <Checkbox
+            label="Allow duets and remixes"
+            description="People can post their own reel beside yours, or use your sound. You can change this later."
+            checked={allowRemix}
+            onChange={(e) => setAllowRemix(e.currentTarget.checked)}
+          />
         ) : null}
         {visibility === 'circle' && !communityId ? (
           <Select label="Circle" value={circleId} onChange={(e) => setCircleId(e.currentTarget.value)}>
@@ -364,9 +488,21 @@ function Create() {
         size="lg"
         block
         loading={busy}
-        disabled={uploading || (kind === 'reel' ? media.length !== 1 || media[0]!.kind !== 'video' : !body.trim() && !media.length && !poll)}
+        disabled={
+          uploading || (kind === 'reel' ? media.length !== 1 || media[0]!.kind !== 'video' || (!!remixOf && !original) : !body.trim() && !media.length && !poll)
+        }
       >
-        {kind === 'story' ? 'Share to your story' : kind === 'reel' ? 'Publish reel' : t('create.publish')}
+        {kind === 'story'
+          ? visibility === 'close_friends'
+            ? 'Share with close friends'
+            : 'Share to your story'
+          : kind === 'reel'
+            ? remixOf
+              ? remixMode === 'duet'
+                ? 'Publish duet'
+                : 'Publish remix'
+              : 'Publish reel'
+            : t('create.publish')}
       </Button>
     </form>
   );

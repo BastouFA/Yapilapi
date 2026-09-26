@@ -18,6 +18,8 @@
   --saffron-soft: #FFF3D6;
   --success: #00735F;
   --success-soft: #E3F5EF;
+  --close-friends: #1E8A3E;
+  --on-close-friends: #FFFFFF;
   --danger: #C0262D;
   --on-danger: #FFFFFF;
   --danger-soft: #FDECEC;
@@ -65,6 +67,8 @@
     --saffron-soft: #3A2C0C;
     --success: #3DDBC2;
     --success-soft: #0E2B27;
+    --close-friends: #3CCB63;
+    --on-close-friends: #0B0C14;
     --danger: #FF7B7B;
     --on-danger: #0B0C14;
     --danger-soft: #3D1714;
@@ -93,6 +97,8 @@
   --saffron-soft: #3A2C0C;
   --success: #3DDBC2;
   --success-soft: #0E2B27;
+  --close-friends: #3CCB63;
+  --on-close-friends: #0B0C14;
   --danger: #FF7B7B;
   --on-danger: #0B0C14;
   --danger-soft: #3D1714;

@@ -451,6 +451,30 @@ export function PostCard({
         </div>
       ) : null}
 
+      {post.remixOf || post.sound ? (
+        <p className="yp-post__reel">
+          {post.remixOf ? (
+            post.remixOf.post ? (
+              <L href={`/reels?start=${post.remixOf.post.id}`} className="yp-post__reel-link">
+                <Icon name="duet" size={14} />
+                {post.remixOf.mode === 'duet' ? 'Duet with' : 'Remix of'} <bdi>@{post.remixOf.post.author.username}</bdi>
+              </L>
+            ) : (
+              <span className="yp-post__reel-link">
+                <Icon name="duet" size={14} />
+                {post.remixOf.mode === 'duet' ? 'Duet with a reel that is no longer available' : 'Remix of a reel that is no longer available'}
+              </span>
+            )
+          ) : null}
+          {post.sound ? (
+            <L href={`/sounds/${post.sound.id}`} className="yp-post__reel-link">
+              <Icon name="music" size={14} />
+              <bdi>{post.sound.title}</bdi>
+            </L>
+          ) : null}
+        </p>
+      ) : null}
+
       {post.poll ? (
         <div className="yp-poll" role="group" aria-label="Poll">
           {post.poll.options.map((o) => {
@@ -719,7 +743,12 @@ export function MomentsStrip({
   onOpen,
   onCreate,
 }: {
-  groups: { author: { id: string; displayName: string; avatarUrl: string | null }; moments: unknown[]; allSeen?: boolean; mine?: boolean }[];
+  groups: {
+    author: { id: string; displayName: string; avatarUrl: string | null };
+    moments: { closeFriends?: boolean; seen?: boolean }[];
+    allSeen?: boolean;
+    mine?: boolean;
+  }[];
   onOpen: (index: number) => void;
   onCreate?: () => void;
 }) {
@@ -736,28 +765,32 @@ export function MomentsStrip({
           </button>
         </li>
       ) : null}
-      {groups.map((g, i) => (
-        <li key={g.author.id}>
-          <button
-            type="button"
-            className="yp-moment"
-            onClick={() => onOpen(i)}
-            aria-label={`${g.mine ? 'Your story' : g.author.displayName}, ${g.moments.length} ${g.moments.length === 1 ? 'story' : 'stories'}${g.allSeen ? ', seen' : ', new'}`}
-          >
-            <span className={g.allSeen ? 'yp-moment__ring yp-moment__ring--seen' : 'yp-moment__ring'}>
-              <Avatar name={g.author.displayName} src={g.author.avatarUrl} size="lg" />
-            </span>
-            <span className="yp-moment__name">
-              <bdi>{g.mine ? 'Your story' : g.author.displayName}</bdi>
-            </span>
-          </button>
-          {g.mine && onCreate ? (
-            <button type="button" className="yp-moment__add" onClick={onCreate} aria-label="Add to your story">
-              <Icon name="plus" size={14} />
+      {groups.map((g, i) => {
+        // A green ring for close friends stories you haven't seen (or your own).
+        const close = g.moments.some((m) => m.closeFriends && (g.mine || !m.seen));
+        return (
+          <li key={g.author.id}>
+            <button
+              type="button"
+              className="yp-moment"
+              onClick={() => onOpen(i)}
+              aria-label={`${g.mine ? 'Your story' : g.author.displayName}, ${g.moments.length} ${g.moments.length === 1 ? 'story' : 'stories'}${g.allSeen ? ', seen' : ', new'}${close ? ', close friends' : ''}`}
+            >
+              <span className={close ? 'yp-moment__ring yp-moment__ring--close' : g.allSeen ? 'yp-moment__ring yp-moment__ring--seen' : 'yp-moment__ring'}>
+                <Avatar name={g.author.displayName} src={g.author.avatarUrl} size="lg" />
+              </span>
+              <span className="yp-moment__name">
+                <bdi>{g.mine ? 'Your story' : g.author.displayName}</bdi>
+              </span>
             </button>
-          ) : null}
-        </li>
-      ))}
+            {g.mine && onCreate ? (
+              <button type="button" className="yp-moment__add" onClick={onCreate} aria-label="Add to your story">
+                <Icon name="plus" size={14} />
+              </button>
+            ) : null}
+          </li>
+        );
+      })}
     </ul>
   );
 }

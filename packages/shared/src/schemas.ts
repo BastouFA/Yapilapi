@@ -8,9 +8,11 @@ import {
   POST_KINDS,
   PRODUCT_KINDS,
   PROFILE_MODES,
+  REMIX_MODES,
   REPORT_REASONS,
   REPORT_TARGETS,
   RSVP_STATUSES,
+  STORY_VISIBILITIES,
   VISIBILITIES,
 } from './constants.ts';
 
@@ -101,6 +103,15 @@ export const createPostSchema = z
     aiAssisted: z.boolean().default(false),
     /** 'reel': one short vertical video, shown in the full-screen Reels feed as well as on the profile. */
     format: z.enum(['post', 'reel']).default('post'),
+    /** Reels: whether other people may duet or remix this reel. On by default. */
+    allowRemix: z.boolean().default(true),
+    /** Reels: post as a duet or remix of another public reel. */
+    remixOf: uuid.optional(),
+    remixMode: z.enum(REMIX_MODES).optional(),
+    /** Reels: use an existing sound instead of the video's own audio. */
+    soundId: uuid.optional(),
+    /** Reels: a name for this reel's own sound (when it doesn't use another one). */
+    soundTitle: z.string().trim().min(1).max(100).optional(),
   })
   .superRefine((v, ctx) => {
     if (!v.body && v.media.length === 0 && !v.linkUrl && !v.poll)
@@ -111,6 +122,9 @@ export const createPostSchema = z
     if (v.format === 'reel' && (v.media.length !== 1 || v.media[0]!.kind !== 'video'))
       ctx.addIssue({ code: 'custom', message: 'A reel is one video.', path: ['media'] });
     if (v.format === 'reel' && v.poll) ctx.addIssue({ code: 'custom', message: "Reels can't have polls.", path: ['poll'] });
+    if (v.format !== 'reel' && (v.remixOf || v.soundId || v.soundTitle))
+      ctx.addIssue({ code: 'custom', message: 'Only reels can use sounds or remix other reels.', path: ['format'] });
+    if (!!v.remixOf !== !!v.remixMode) ctx.addIssue({ code: 'custom', message: 'Choose duet or remix.', path: ['remixMode'] });
   });
 
 export const feedQuerySchema = z.object({
@@ -260,7 +274,8 @@ export const createMomentSchema = z.object({
     .min(1)
     .max(24 * 30)
     .optional(),
-  visibility: z.enum(VISIBILITIES).default('friends'),
+  /** 'close_friends': only the people on your close friends list. */
+  visibility: z.enum(STORY_VISIBILITIES).default('friends'),
   locationText: z.string().max(200).optional(),
 });
 

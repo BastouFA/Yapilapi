@@ -9,10 +9,13 @@ import { startRegistration } from '@simplewebauthn/browser';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { currentSubscription, disableBrowserPush, enableBrowserPush, pushSupported } from '@/lib/push';
 import { FamilyCard } from '@/components/Family';
+import { CloseFriendsCard } from '@/components/CloseFriends';
 import { useSession } from '../../providers';
 
 export default function Settings() {
-  const [tab, setTab] = useState(() => (typeof location !== 'undefined' && location.hash === '#moderation' ? 'safety' : 'profile'));
+  const [tab, setTab] = useState(() =>
+    typeof location === 'undefined' ? 'profile' : location.hash === '#moderation' ? 'safety' : location.hash === '#close-friends' ? 'privacy' : 'profile',
+  );
   return (
     <div className="yp-shell__inner">
       <div className="yp-topbar">
@@ -277,6 +280,7 @@ function PrivacyCenter() {
 
   return (
     <div className="stack">
+      <CloseFriendsCard />
       <Card title="What we hold about you">
         <div className="stats">
           {Object.entries(data.dataSummary).map(([k, v]) => (
