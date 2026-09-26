@@ -17,6 +17,8 @@ WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
 RUN addgroup -S ypl && adduser -S ypl -G ypl
 COPY --from=build /app ./
+WORKDIR /app/apps/web
 USER ypl
 EXPOSE 3000
-CMD ["node_modules/.bin/next", "start", "apps/web", "--port", "3000"]
+# Next is installed in the web app's own node_modules (pnpm); PORT is honoured when a host sets it.
+CMD ["sh", "-c", "exec node node_modules/next/dist/bin/next start --port ${PORT:-3000}"]

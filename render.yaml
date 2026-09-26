@@ -1,0 +1,148 @@
+# Render Blueprint for YAPILAPI (https://render.com/docs/blueprint-spec).
+#
+# Creates: the API (Fastify, Docker), the web app (Next.js, Docker), a Postgres 16 database and a
+# Key Value (Redis-compatible) instance. Apply it from the Render Dashboard:
+#   New > Blueprint > connect github.com/BastouFA/Yapilapi > Apply.
+# Full walkthrough: docs/operations/deploy-render.md.
+#
+# Plans: the API and web app use "starter" because a free service sleeps after 15 minutes, which drops
+# live connections (messages, notifications) and pauses background jobs (video processing). The database
+# uses "basic-256mb" because free Render Postgres is deleted after 30 days.
+#
+# Settings marked `sync: false` are secrets you type into the Dashboard the first time you apply this file
+# (they are never stored in git). The API refuses to start in production without the required ones,
+# so a missing secret shows up as a failed deploy with a clear message, not as a half-working site.
+#
+# Hostnames assume Render gives each service https://<name>.onrender.com. If a name is taken, or when you
+# add your own domain, update WEB_ORIGIN, PUBLIC_API_URL, WEBAUTHN_* and the web app's API_INTERNAL_URL,
+# NEXT_PUBLIC_WS_URL and SITE_URL to match, then redeploy the web app (those three are built into it).
+
+envVarGroups:
+  - name: yapilapi-secrets
+    envVars:
+      # Generated once by Render and kept.
+      - key: MFA_ENCRYPTION_KEY
+        generateValue: true
+      - key: PAYMENTS_WEBHOOK_SECRET
+        generateValue: true
+      - key: LIVE_HOOK_SECRET
+        generateValue: true
+      # Payments. Required in production: the development provider moves no money and is refused.
+      # Stripe test-mode keys (sk_test_…, pk_test_…) work until you are ready to take real money.
+      - key: PAYMENTS_PROVIDER
+        value: stripe
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      # Email (verification, password reset). Any SMTP relay, e.g. smtps://resend:<api key>@smtp.resend.com:465
+      - key: EMAIL_TRANSPORT
+        value: smtp
+      - key: SMTP_URL
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      # Photos and videos. S3-compatible storage (Cloudflare R2 recommended: no fees for downloads).
+      # Without it, uploads would be lost on every deploy.
+      - key: STORAGE_DRIVER
+        value: s3
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_REGION
+        value: auto
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_FORCE_PATH_STYLE
+        value: 'true'
+      # Optional: the assistants and AI features. Without a key they use the offline provider.
+      - key: AI_PROVIDER
+        value: dev
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Optional: browser push notifications (generate with `npx web-push generate-vapid-keys`).
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+
+databases:
+  - name: yapilapi-db
+    databaseName: yapilapi
+    user: yapilapi
+    plan: basic-256mb
+    postgresMajorVersion: '16'
+    region: frankfurt
+
+services:
+  - type: keyvalue
+    name: yapilapi-cache
+    plan: starter
+    region: frankfurt
+    # Rate limits and realtime fan-out tolerate losing keys, so evict rather than refuse writes.
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: [] # private network only
+
+  - type: web
+    name: yapilapi-api
+    runtime: docker
+    dockerfilePath: infrastructure/docker/api.Dockerfile
+    dockerContext: .
+    plan: starter
+    region: frankfurt
+    branch: main
+    healthCheckPath: /health/live
+    # The image applies database migrations on start (MIGRATE_ON_START=true).
+    envVars:
+      - fromGroup: yapilapi-secrets
+      - key: NODE_ENV
+        value: production
+      - key: APP_ENV
+        value: production
+      - key: COOKIE_SECURE
+        value: 'true'
+      - key: API_PORT
+        value: '10000'
+      - key: WEB_ORIGIN
+        value: https://yapilapi-web.onrender.com
+      # Media addresses go through the web app's /media proxy, so photos and videos are same-origin.
+      - key: PUBLIC_API_URL
+        value: https://yapilapi-web.onrender.com
+      - key: WEBAUTHN_RP_ID
+        value: yapilapi-web.onrender.com
+      - key: WEBAUTHN_ORIGIN
+        value: https://yapilapi-web.onrender.com
+      - key: DATABASE_URL
+        fromDatabase:
+          name: yapilapi-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: yapilapi-cache
+          type: keyvalue
+          property: connectionString
+
+  - type: web
+    name: yapilapi-web
+    runtime: docker
+    dockerfilePath: infrastructure/docker/web.Dockerfile
+    dockerContext: .
+    plan: starter
+    region: frankfurt
+    branch: main
+    healthCheckPath: /login
+    # Render passes these to the Docker build as build arguments; they are built into the app.
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_INTERNAL_URL
+        value: https://yapilapi-api.onrender.com
+      - key: NEXT_PUBLIC_WS_URL
+        value: wss://yapilapi-api.onrender.com/v1/realtime
+      - key: SITE_URL
+        value: https://yapilapi-web.onrender.com
