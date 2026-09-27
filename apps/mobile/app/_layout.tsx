@@ -1,4 +1,5 @@
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
+import { Pressable, Text } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { BoardsProvider } from '../lib/boards';
 import { CallsProvider } from '../lib/calls';
@@ -25,6 +26,12 @@ function Heartbeat() {
 function Screens() {
   const c = useColors();
   const { t } = useT();
+  // Sheets (modal screens) get a Cancel at the top, so there's always a way out besides swiping down.
+  const closeButton = () => (
+    <Pressable accessibilityRole="button" hitSlop={12} onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}>
+      <Text style={{ color: c.yapi, fontSize: 17, fontWeight: '600' }}>{t('common.cancel')}</Text>
+    </Pressable>
+  );
   return (
     <>
       <StatusBar style={c.theme === 'dark' ? 'light' : 'dark'} />
@@ -49,16 +56,16 @@ function Screens() {
         <Stack.Screen name="close-friends" options={{ title: t('m.closeFriends.title') }} />
         <Stack.Screen name="circles" options={{ title: t('m.circles.title') }} />
         <Stack.Screen name="circle/[id]" options={{ title: t('m.circles.title') }} />
-        <Stack.Screen name="now-status" options={{ title: t('m.now.title'), presentation: 'modal' }} />
+        <Stack.Screen name="now-status" options={{ title: t('m.now.title'), presentation: 'modal', headerLeft: closeButton }} />
         <Stack.Screen name="archive" options={{ title: t('m.archive.title') }} />
         <Stack.Screen name="drafts" options={{ title: t('m.drafts.title') }} />
         <Stack.Screen name="recaps" options={{ title: t('m.recap.title') }} />
         <Stack.Screen name="recap-new" options={{ title: t('m.recap.new') }} />
         <Stack.Screen name="chapter/[id]" options={{ title: t('m.chapters.title') }} />
-        <Stack.Screen name="chapter-edit" options={{ title: t('m.chapters.new'), presentation: 'modal' }} />
+        <Stack.Screen name="chapter-edit" options={{ title: t('m.chapters.new'), presentation: 'modal', headerLeft: closeButton }} />
         <Stack.Screen name="saved" options={{ title: t('m.saved.title') }} />
         <Stack.Screen name="board/[id]" options={{ title: t('m.boards.board') }} />
-        <Stack.Screen name="board-edit" options={{ title: t('m.boards.new'), presentation: 'modal' }} />
+        <Stack.Screen name="board-edit" options={{ title: t('m.boards.new'), presentation: 'modal', headerLeft: closeButton }} />
         <Stack.Screen name="invite" options={{ title: t('invite.title') }} />
         <Stack.Screen name="find-friends" options={{ title: t('friends.title') }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
@@ -73,9 +80,9 @@ function Screens() {
         <Stack.Screen name="place/[id]" options={{ title: t('m.place.title') }} />
         <Stack.Screen name="communities" options={{ title: t('communities.title') }} />
         <Stack.Screen name="follows" options={{ title: t('profile.followers') }} />
-        <Stack.Screen name="profile-edit" options={{ title: t('profile.edit'), presentation: 'modal' }} />
+        <Stack.Screen name="profile-edit" options={{ title: t('profile.edit'), presentation: 'modal', headerLeft: closeButton }} />
         <Stack.Screen name="reels" options={{ title: t('m.title.reels'), headerShown: false, contentStyle: { backgroundColor: '#000' } }} />
-        <Stack.Screen name="new-group" options={{ title: t('m.inbox.newGroup'), presentation: 'modal' }} />
+        <Stack.Screen name="new-group" options={{ title: t('m.inbox.newGroup'), presentation: 'modal', headerLeft: closeButton }} />
         <Stack.Screen
           name="camera"
           options={{
