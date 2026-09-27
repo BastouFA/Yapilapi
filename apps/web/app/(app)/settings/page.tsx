@@ -16,6 +16,7 @@ import { PurchasesCard } from '@/components/Shop';
 import { VerificationCard } from '@/components/Verification';
 import { DataSaverCard } from '@/components/DataSaver';
 import { HiddenWordsCard } from '@/components/HiddenWords';
+import { TranslationCard } from '@/components/TranslationSettings';
 import { useSession } from '../../providers';
 
 export default function Settings() {
@@ -57,6 +58,9 @@ export default function Settings() {
             <ProfileSettings />
             <div id="data-saver">
               <DataSaverCard />
+            </div>
+            <div id="translation">
+              <TranslationCard />
             </div>
           </div>
         ) : tab === 'attention' ? (

@@ -13,6 +13,8 @@ import { registerForPush } from '../lib/push';
 import { CAN_DETECT_CELLULAR, useDataSaver, type DeviceDataSaver } from '../lib/data-saver';
 import type { DataSaverMode } from '../../../packages/shared/src/data-saver';
 import { HIDDEN_WORD_MAX, HIDDEN_WORDS_MAX } from '../../../packages/shared/src/constants';
+import { baseLanguage, languageName, MAX_UNDERSTOOD_LANGUAGES, TRANSLATION_LANGUAGES } from '../../../packages/shared/src/translation';
+import { useTranslationSettings } from '../lib/translation';
 
 /** Settings: email and phone confirmation, family supervision and advertising consent (same endpoints as the web settings page). */
 export default function Settings() {
@@ -61,6 +63,7 @@ export default function Settings() {
         onPress={() => router.push('/recaps')}
       />
       <DataSaver />
+      <Translation />
       <Sharing />
       <Tagging />
       <HiddenWords />
@@ -327,6 +330,68 @@ function DataSaver() {
       <Text accessibilityLiveRegion="polite" style={{ color: c.ink, fontSize: 14, fontWeight: '600' }}>
         {ds.active ? t('dataSaver.nowOn') : t('dataSaver.nowOff')}
       </Text>
+    </Card>
+  );
+}
+
+/**
+ * "Languages I understand" (the app's language always counts, so it's ticked and fixed)
+ * and "Translate automatically" (off by default). Saved on the account.
+ */
+function Translation() {
+  const c = useColors();
+  const { t, lang, locale } = useT();
+  const { enabled, settings, save } = useTranslationSettings();
+  const [error, setError] = useState<string | null>(null);
+  const app = baseLanguage(lang);
+  const listed = settings.languages.filter((l) => l !== app);
+  const full = listed.length >= MAX_UNDERSTOOD_LANGUAGES;
+  const update = (next: typeof settings) => {
+    setError(null);
+    save(next).catch((e) => setError(errorMessage(e)));
+  };
+  return (
+    <Card style={{ gap: space[3] }}>
+      <Title>{t('translate.settingsTitle')}</Title>
+      {!enabled ? <Notice>{t('translate.off')}</Notice> : null}
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      <View style={{ gap: space[1] }}>
+        <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 15, fontWeight: '700' }}>
+          {t('translate.languages')}
+        </Text>
+        <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('translate.languagesHint', { language: languageName(app, locale) })}</Text>
+        {TRANSLATION_LANGUAGES.map((l) => {
+          const isApp = l.code === app;
+          const on = isApp || listed.includes(l.code);
+          const disabled = isApp || (full && !on);
+          const local = languageName(l.code, locale);
+          const sub = isApp ? t('translate.appLanguage') : local.toLowerCase() !== l.autonym.toLowerCase() ? local : undefined;
+          return (
+            <Pressable
+              key={l.code}
+              accessibilityRole="checkbox"
+              accessibilityLabel={sub ? `${l.autonym}, ${sub}` : l.autonym}
+              accessibilityLanguage={l.code}
+              accessibilityState={{ checked: on, disabled }}
+              disabled={disabled}
+              onPress={() => update({ ...settings, languages: on ? listed.filter((x) => x !== l.code) : [...listed, l.code] })}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44, opacity: disabled && !isApp ? 0.5 : 1 }}
+            >
+              <Icon name={on ? 'checkbox' : 'square-outline'} size={22} color={on ? c.yapi : c.inkMuted} />
+              <View style={{ flex: 1 }}>
+                <Text style={[{ color: c.ink, fontSize: 15, fontWeight: on ? '700' : '500' }, userText]}>{l.autonym}</Text>
+                {sub ? <Text style={{ color: c.inkMuted, fontSize: 12 }}>{sub}</Text> : null}
+              </View>
+            </Pressable>
+          );
+        })}
+        {full ? (
+          <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted, fontSize: 13 }}>
+            {t('translate.max', { count: MAX_UNDERSTOOD_LANGUAGES })}
+          </Text>
+        ) : null}
+      </View>
+      <SwitchRow label={t('translate.auto')} hint={t('translate.autoHint')} value={settings.auto} onValueChange={(v) => update({ ...settings, auto: v })} />
     </Card>
   );
 }

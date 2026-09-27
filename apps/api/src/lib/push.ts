@@ -99,6 +99,8 @@ const TEXT: Record<string, (actor: string) => string> = {
   chapter_opened: () => 'A time capsule you are part of has opened',
   yap_received: (a) => `${a} sent you a Yap`,
   view_once_screenshot: (a) => `${a} took a screenshot of your view-once photo or video`,
+  // A reminder you set yourself on a chat message (there is no one else in it).
+  chat_reminder: () => 'You asked to be reminded about a message',
   scheduled_post_failed: () => "A scheduled post couldn't be published. It's back in your drafts",
   recap_ready: () => 'Your recap video is ready',
   recap_failed: () => "We couldn't make your recap video",

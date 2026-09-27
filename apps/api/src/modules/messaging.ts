@@ -36,25 +36,20 @@ import { me, requireAuth, resolveSession, sessionTokenOf } from '../plugins/auth
 import { issueTicket, readTicket } from '../lib/realtime-ticket.ts';
 import { canSeeStory, storyCards } from '../lib/stories.ts';
 import { nowStatusesFor } from '../lib/now-status.ts';
-import { mediaIdsOf, messagePreviews, reactionSummaries, revokeChatMedia } from '../lib/chat.ts';
+import { mediaIdsOf, messagePreviews, messageVisibleSql, reactionSummaries, revokeChatMedia } from '../lib/chat.ts';
+import { langOf } from '../lib/translation.ts';
+import { listsFor, myReminders, pollsFor } from '../lib/chat-polls.ts';
+import { registerChatPollsLists } from './chat-polls-lists.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 
-const MESSAGE_COLS = `m.id, m.conversation_id, m.body, m.reply_to_id, m.attachments, m.created_at, m.client_id, m.moderation_status, m.kind, m.story_id,
+const MESSAGE_COLS = `m.id, m.conversation_id, m.body, m.lang, m.reply_to_id, m.attachments, m.created_at, m.client_id, m.moderation_status, m.kind, m.story_id,
   m.edited_at, m.unsent_at, m.expires_at, m.meta,
   EXISTS (SELECT 1 FROM conversation_pins p WHERE p.message_id = m.id) AS pinned,
   pr.user_id AS s_id, pr.username AS s_username, pr.display_name AS s_display_name, pr.avatar_url AS s_avatar_url, pr.mode AS s_mode`;
 
-/**
- * The messages reader $2 sees (message alias m): not deleted (unsent ones stay as a
- * placeholder), not past their disappearing time, not held for a check unless their own,
- * not from someone they blocked, and not deleted just for them.
- */
-const VISIBLE_TO_READER = `(m.deleted_at IS NULL OR m.unsent_at IS NOT NULL)
-  AND (m.expires_at IS NULL OR m.expires_at > now())
-  AND (m.moderation_status = 'normal' OR (m.moderation_status = 'review' AND m.sender_id = $2))
-  AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $2 AND b.blocked_id = m.sender_id)
-  AND NOT EXISTS (SELECT 1 FROM message_hides h WHERE h.user_id = $2 AND h.message_id = m.id)`;
+/** The messages reader $2 sees (see messageVisibleSql). */
+const VISIBLE_TO_READER = messageVisibleSql('$2');
 
 export default async function messagingModule(app: FastifyInstance, ctx: AppContext) {
   const db = ctx.db;
@@ -360,20 +355,31 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
   }
 
   async function decorate(items: Message[], reader: string): Promise<Message[]> {
+    // A "Remind the group" line quotes the message it's about, as this reader sees it.
+    const remindedOf = (m: Message) => (m.system?.type === 'reminder' ? m.system.messageId : null);
     const previews = await messagePreviews(
       db,
-      items.flatMap((m) => (m.replyToId ? [m.replyToId] : [])),
+      items.flatMap((m) => [m.replyToId, remindedOf(m)].filter((x): x is string => !!x)),
       reader,
     );
-    const reactions = await reactionSummaries(
-      db,
-      items.map((m) => m.id),
-      reader,
-    );
+    const ids = items.map((m) => m.id);
+    const reactions = await reactionSummaries(db, ids, reader);
+    // Polls and shared lists (an unsent one has none left), and your own "Remind me".
+    const live = items.filter((m) => !m.unsent && m.kind !== 'system').map((m) => m.id);
+    const polls = await pollsFor(db, live, [reader]);
+    const lists = await listsFor(db, live, [reader]);
+    const reminders = await myReminders(db, live, reader);
     return items.map((m) => {
       const out: Message = { ...m };
       if (m.replyToId) out.replyTo = previews.get(m.replyToId) ?? null;
       if (reactions.has(m.id)) out.reactions = reactions.get(m.id);
+      const poll = polls(m.id, reader);
+      if (poll) out.poll = poll;
+      const list = lists(m.id, reader);
+      if (list) out.list = list;
+      if (reminders.has(m.id)) out.reminder = reminders.get(m.id);
+      const reminded = remindedOf(m);
+      if (reminded && m.system?.type === 'reminder') out.system = { ...m.system, message: previews.get(reminded) ?? null };
       // An unsent view-once message has nothing left to open.
       if (m.unsent) delete out.viewOnce;
       return out;
@@ -397,7 +403,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const m = (
       await db.query(
         `SELECT id, conversation_id, sender_id, kind, body, attachments, story_id, view_once, created_at, deleted_at, unsent_at, moderation_status, expires_at,
-                (created_at > now() - make_interval(mins => $2)) AS editable
+                (created_at > now() - make_interval(mins => $2)) AS editable,
+                EXISTS (SELECT 1 FROM chat_polls p WHERE p.message_id = messages.id) OR EXISTS (SELECT 1 FROM chat_lists l WHERE l.message_id = messages.id) AS rich
          FROM messages WHERE id = $1`,
         [messageId, MESSAGE_EDIT_MINUTES],
       )
@@ -505,10 +512,10 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       }
       const { rows } = await c
         .query(
-          `INSERT INTO messages (conversation_id, sender_id, body, reply_to_id, attachments, client_id, moderation_status, kind, view_once, view_once_media_id, story_id, expires_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now() + make_interval(secs => $12::int))
+          `INSERT INTO messages (conversation_id, sender_id, body, reply_to_id, attachments, client_id, moderation_status, kind, view_once, view_once_media_id, story_id, expires_at, lang)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now() + make_interval(secs => $12::int), $13)
            ON CONFLICT (sender_id, client_id) WHERE client_id IS NOT NULL DO UPDATE SET client_id = EXCLUDED.client_id
-           RETURNING id, conversation_id, body, reply_to_id, attachments, created_at, client_id, moderation_status, kind, view_once, story_id, expires_at, (xmax = 0) AS inserted`,
+           RETURNING id, conversation_id, body, lang, reply_to_id, attachments, created_at, client_id, moderation_status, kind, view_once, story_id, expires_at, (xmax = 0) AS inserted`,
           [
             id,
             u.id,
@@ -523,6 +530,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
             input.storyId ?? null,
             // Disappearing messages: deleted this long after sending (NULL when off).
             conv.disappearing_seconds ?? null,
+            langOf(input.body),
           ],
         )
         .catch((e: { code?: string; constraint?: string }) => {
@@ -555,6 +563,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       conversationId: id,
       sender,
       body: row.body,
+      lang: row.lang ?? null,
       replyToId: row.reply_to_id,
       attachments: row.attachments,
       createdAt: row.created_at.toISOString(),
@@ -653,7 +662,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const { body } = parse(editMessageSchema, req.body);
     const m = await messageFor(id, u.id, { ownOnly: 'Only the person who sent a message can edit it.' });
     if (m.deleted_at) throw notFound('Message');
-    if (m.kind !== 'message' || m.view_once) throw new AppError(400, 'not_editable', 'Only text messages can be edited.');
+    // A poll's question and a list's title are part of what people answered, so they stay as they are.
+    if (m.kind !== 'message' || m.view_once || m.rich) throw new AppError(400, 'not_editable', 'Only text messages can be edited.');
     if (!m.editable) throw new AppError(403, 'edit_window_closed', `Messages can be edited for ${MESSAGE_EDIT_MINUTES} minutes after sending.`);
     if (!body && !(m.attachments ?? []).length && !m.story_id) throw badRequest('Write a message. To remove it, unsend it instead.');
     if (body !== m.body) {
@@ -673,14 +683,14 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       await tx(db, async (c) => {
         // The earlier text is kept for safety reports, and removed if the message is unsent.
         await c.query(`INSERT INTO message_edits (message_id, body) SELECT id, body FROM messages WHERE id = $1`, [id]);
-        await c.query(`UPDATE messages SET body = $2, edited_at = now() WHERE id = $1`, [id, body]);
+        await c.query(`UPDATE messages SET body = $2, lang = $3, edited_at = now() WHERE id = $1`, [id, body, langOf(body)]);
       });
-      const edited = (await db.query(`SELECT body, edited_at FROM messages WHERE id = $1`, [id])).rows[0];
+      const edited = (await db.query(`SELECT body, lang, edited_at FROM messages WHERE id = $1`, [id])).rows[0];
       // A message held for a check is still only the sender's.
       const to = m.moderation_status === 'normal' ? await notBlocking(u.id, await memberIds(m.conversation_id)) : [u.id];
       await ctx.realtime.publish(to, {
         type: 'message.edited',
-        data: { id, conversationId: m.conversation_id, body: edited.body, editedAt: edited.edited_at.toISOString() },
+        data: { id, conversationId: m.conversation_id, body: edited.body, lang: edited.lang, editedAt: edited.edited_at.toISOString() },
       });
     }
     return { message: await loadMessage(id, u.id) };
@@ -701,6 +711,10 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       if (!r.rowCount) return null;
       await c.query(`DELETE FROM message_edits WHERE message_id = $1`, [messageId]);
       await c.query(`DELETE FROM message_reactions WHERE message_id = $1`, [messageId]);
+      // A poll or list goes with it (votes and items too), and nobody gets reminded about it.
+      await c.query(`DELETE FROM chat_polls WHERE message_id = $1`, [messageId]);
+      await c.query(`DELETE FROM chat_lists WHERE message_id = $1`, [messageId]);
+      await c.query(`DELETE FROM chat_reminders WHERE message_id = $1 AND sent_at IS NULL`, [messageId]);
       return (await c.query(`DELETE FROM conversation_pins WHERE message_id = $1`, [messageId])).rowCount ?? 0;
     });
     if (pinsRemoved === null) return; // already unsent or deleted
@@ -731,6 +745,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const { id } = parse(idParam, req.params);
     const m = await messageFor(id, u.id);
     await db.query(`INSERT INTO message_hides (message_id, user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [id, u.id]);
+    // Your reminders about it go too.
+    await db.query(`DELETE FROM chat_reminders WHERE message_id = $1 AND user_id = $2 AND sent_at IS NULL`, [id, u.id]);
     // Your other devices drop it too.
     await ctx.realtime.publish([u.id], { type: 'message.hidden', data: { id, conversationId: m.conversation_id } });
     return { ok: true };
@@ -1049,6 +1065,17 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     return { items: rows };
   });
 
+  // Polls, shared lists and reminders (modules/chat-polls-lists.ts).
+  registerChatPollsLists(app, ctx, {
+    assertMember,
+    memberIds,
+    notBlocking,
+    assertCanMessage,
+    assertGroupSafe,
+    messageFor: (messageId, userId) => messageFor(messageId, userId),
+    loadMessage,
+  });
+
   // ── Realtime socket ───────────────────────────────────────────────────
   /** A 60-second ticket for opening the realtime socket from another origin (see lib/realtime-ticket.ts). */
   app.post('/v1/realtime/ticket', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req) => {
@@ -1106,6 +1133,7 @@ function toMessage(r: Record<string, any>): Message {
     conversationId: r.conversation_id,
     sender: publicUserFrom(r, 's_'),
     body: r.body,
+    lang: r.lang ?? langOf(r.body),
     replyToId: r.reply_to_id,
     attachments: r.attachments,
     createdAt: r.created_at.toISOString(),

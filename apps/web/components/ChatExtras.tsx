@@ -22,6 +22,8 @@ export const disappearingLabel = (t: T, seconds: number | null | undefined) => {
 export function previewText(t: T, p: MessagePreview): string {
   if (!p.available) return t('m.chat.quoteUnavailable');
   if (p.unsent) return t('m.chat.unsent');
+  if (p.kind === 'poll') return t('m.chat.poll.preview', { question: p.body });
+  if (p.kind === 'list') return t('m.chat.list.preview', { title: p.body });
   if (p.body) return p.body;
   switch (p.attachmentKind) {
     case 'image':
@@ -153,11 +155,31 @@ export function applyReaction(m: Message, emoji: string, byMe: boolean, removed:
   return { ...m, reactions: list };
 }
 
-/** The line in the chat that tells everyone who changed disappearing messages. */
-export function SystemLine({ message, meId }: { message: Message; meId?: string }) {
+/**
+ * A line in the chat that tells everyone about a change (who changed disappearing messages), or
+ * a group reminder at its time. A reminder line goes to the message it's about.
+ */
+export function SystemLine({ message, meId, onJump }: { message: Message; meId?: string; onJump?: (id: string) => void }) {
   const { t } = useSession();
   const who = message.sender.id === meId ? t('m.chat.you') : message.sender.displayName;
   const s = message.system;
+  if (s?.type === 'reminder') {
+    const about = s.message;
+    const text = about?.available ? t('m.chat.systemReminder', { name: who, text: previewText(t, about) }) : t('m.chat.systemReminderGone', { name: who });
+    return (
+      <p className="chat-system" role="note">
+        {about?.available && onJump ? (
+          <button type="button" className="chat-system__link" onClick={() => onJump(s.messageId)}>
+            <Icon name="bell" size={14} /> <bdi>{text}</bdi>
+          </button>
+        ) : (
+          <>
+            <Icon name="bell" size={14} /> <bdi>{text}</bdi>
+          </>
+        )}
+      </p>
+    );
+  }
   const text =
     s?.type === 'disappearing'
       ? s.seconds

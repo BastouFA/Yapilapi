@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { DATA_SAVER_MODES } from './data-saver.ts';
+import { MAX_UNDERSTOOD_LANGUAGES, TRANSLATABLE_KINDS, TRANSLATION_LANGUAGE_CODES } from './translation.ts';
 import {
   CIRCLE_KINDS,
   COMMENT_POLICIES,
@@ -17,6 +18,13 @@ import {
   PRODUCT_KINDS,
   POST_VISIBILITIES,
   CURRENCIES,
+  CHAT_LIST_ITEM_MAX,
+  CHAT_LIST_MAX_ITEMS,
+  CHAT_LIST_TITLE_MAX,
+  CHAT_POLL_MAX_OPTIONS,
+  CHAT_POLL_MIN_OPTIONS,
+  CHAT_POLL_OPTION_MAX,
+  CHAT_POLL_QUESTION_MAX,
   DISAPPEARING_SECONDS,
   PROFILE_MODES,
   RECAP_ASPECTS,
@@ -220,6 +228,25 @@ export const tagSettingsSchema = z.object({ allowFrom: z.enum(['everyone', 'foll
 /** PUT /v1/me/data-saver. */
 export const dataSaverSchema = z.object({ mode: z.enum(DATA_SAVER_MODES) });
 
+const translationLanguage = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .refine((c) => TRANSLATION_LANGUAGE_CODES.includes(c), 'Choose a language from the list.');
+
+/** POST /v1/translate: a post, comment, story or message, into one language. */
+export const translateSchema = z.object({
+  kind: z.enum(TRANSLATABLE_KINDS),
+  id: z.string().uuid(),
+  target: translationLanguage,
+});
+
+/** PUT /v1/me/translation: "Languages I understand" and "Translate automatically". */
+export const translationSettingsSchema = z.object({
+  languages: z.array(translationLanguage).max(MAX_UNDERSTOOD_LANGUAGES),
+  auto: z.boolean(),
+});
+
 export const feedQuerySchema = z.object({
   mode: z.enum(FEED_MODES).default('for_you'),
   cursor: z.string().max(200).optional(),
@@ -310,6 +337,39 @@ export const disappearingSchema = z.object({
     .int()
     .refine((s) => (DISAPPEARING_SECONDS as readonly number[]).includes(s), { message: 'Choose 24 hours, 7 days or 90 days.' })
     .nullable(),
+});
+/** A poll in a chat. The end time, if set, is between 5 minutes and 30 days from now (checked by the server). */
+export const createChatPollSchema = z
+  .object({
+    question: z.string().trim().min(1).max(CHAT_POLL_QUESTION_MAX),
+    options: z.array(z.string().trim().min(1).max(CHAT_POLL_OPTION_MAX)).min(CHAT_POLL_MIN_OPTIONS).max(CHAT_POLL_MAX_OPTIONS),
+    multiple: z.boolean().default(false),
+    anonymous: z.boolean().default(false),
+    allowAddOptions: z.boolean().default(false),
+    endsAt: z.string().datetime({ offset: true }).nullable().optional(),
+    clientId: z.string().max(64).optional(),
+  })
+  .refine((v) => new Set(v.options.map((o) => o.toLowerCase())).size === v.options.length, {
+    message: 'Each option needs to be different.',
+    path: ['options'],
+  });
+/** Your choice in a poll: one option (or several when it allows it). An empty list takes your vote back. */
+export const chatPollVoteSchema = z.object({ optionIds: z.array(uuid).max(CHAT_POLL_MAX_OPTIONS) });
+export const chatPollOptionSchema = z.object({ text: z.string().trim().min(1).max(CHAT_POLL_OPTION_MAX) });
+/** A shared list in a chat, with its first items if any. */
+export const createChatListSchema = z.object({
+  title: z.string().trim().min(1).max(CHAT_LIST_TITLE_MAX),
+  items: z.array(z.string().trim().min(1).max(CHAT_LIST_ITEM_MAX)).max(CHAT_LIST_MAX_ITEMS).default([]),
+  clientId: z.string().max(64).optional(),
+});
+export const chatListItemSchema = z.object({ text: z.string().trim().min(1).max(CHAT_LIST_ITEM_MAX) });
+export const chatListItemPatchSchema = z.object({ done: z.boolean() });
+/** Every item of the list, in the new order. */
+export const chatListOrderSchema = z.object({ itemIds: z.array(uuid).min(1).max(CHAT_LIST_MAX_ITEMS) });
+/** "Remind me" (just you) or "Remind the group" (group admins), at a time from a minute to a year ahead. */
+export const chatReminderSchema = z.object({
+  at: z.string().datetime({ offset: true }),
+  scope: z.enum(['me', 'group']).default('me'),
 });
 /** Search the messages of one chat. */
 export const messageSearchSchema = z.object({

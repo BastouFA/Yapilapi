@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Avatar, BottomSheet, Button, Icon, Segments, Select, Skeleton, TaggedText } from '@yapilapi/design-system';
+import { Avatar, BottomSheet, Button, Icon, Segments, Select, Skeleton, TaggedText, TranslatableText } from '@yapilapi/design-system';
 import {
   COMMENT_POLICIES,
   formatRelativeTime,
@@ -379,7 +379,15 @@ export function Comments({ post, onCountChange }: { post: Post; onCountChange: (
                 </div>
               </form>
             ) : (
-              <TaggedText text={c.body} linkAs={NextLink} />
+              <TranslatableText
+                kind="comment"
+                id={c.id}
+                text={c.body}
+                lang={c.lang}
+                own={c.author.id === me?.id}
+                locale={locale}
+                render={(text) => <TaggedText text={text} linkAs={NextLink} />}
+              />
             )}
           </div>
           <div className="comment__actions">
@@ -510,7 +518,15 @@ export function Comments({ post, onCountChange }: { post: Post; onCountChange: (
                       <strong>
                         {c.author.displayName} <span className="muted">· {formatRelativeTime(c.createdAt, locale)}</span>
                       </strong>
-                      <TaggedText text={c.body} linkAs={NextLink} />
+                      <TranslatableText
+                        kind="comment"
+                        id={c.id}
+                        text={c.body}
+                        lang={c.lang}
+                        own={c.author.id === me?.id}
+                        locale={locale}
+                        render={(text) => <TaggedText text={text} linkAs={NextLink} />}
+                      />
                     </div>
                     <div className="comment__actions">
                       <button type="button" className="comment__action" onClick={() => void unhide(c)}>

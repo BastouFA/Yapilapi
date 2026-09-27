@@ -3455,6 +3455,243 @@ video.chat-att__media {
     transition: none;
   }
 }
+
+/* ── Chat: polls, shared lists, reminders ───────────────────────────── */
+.chat-poll,
+.chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: min(260px, 60vw);
+  white-space: normal;
+}
+.chat-poll__set {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.chat-poll__question {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  font-weight: 700;
+}
+.chat-poll__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  font: 700 11px/14px var(--font-sans);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+.chat-poll__hint {
+  font: 400 12px/16px var(--font-sans);
+  opacity: 0.8;
+}
+.chat-poll__option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  isolation: isolate;
+}
+.chat-poll--mine .chat-poll__option {
+  border-color: rgb(255 255 255 / 0.4);
+}
+.chat-poll__option--mine {
+  border-color: var(--yapi);
+}
+.chat-poll--mine .chat-poll__option--mine {
+  border-color: var(--on-yapi);
+}
+.chat-poll__choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  cursor: pointer;
+}
+.chat-poll__set:disabled .chat-poll__choice {
+  cursor: default;
+}
+.chat-poll__choice input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--yapi);
+}
+.chat-poll--mine .chat-poll__choice input {
+  accent-color: var(--on-yapi);
+}
+.chat-poll__text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.chat-poll__count {
+  flex: none;
+  font: 700 13px/18px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.chat-poll__bar {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  z-index: -1;
+  background: var(--surface-sunken);
+  transition: inline-size var(--duration-fast) var(--ease-out);
+}
+.chat-poll--mine .chat-poll__bar {
+  background: rgb(255 255 255 / 0.18);
+}
+.chat-poll__voters {
+  padding-inline-start: 26px;
+  font-size: 12px;
+  line-height: 16px;
+  opacity: 0.85;
+}
+.chat-poll__status {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  opacity: 0.85;
+}
+.chat-poll__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.chat-link-button {
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: 700 13px/18px var(--font-sans);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.chat-link-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.chat-inline-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chat-inline-form__input {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 400 14px/20px var(--font-sans);
+}
+.chat-list__title {
+  margin: 0;
+  font-weight: 700;
+}
+.chat-list__items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chat-list__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 4px;
+}
+.chat-list__check {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 36px;
+  cursor: pointer;
+}
+.chat-list__check input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--yapi);
+}
+.chat-list--mine .chat-list__check input {
+  accent-color: var(--on-yapi);
+}
+.chat-list__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.chat-list__text--done {
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+.chat-list__tools {
+  display: inline-flex;
+  flex: none;
+}
+.chat-list__tool {
+  width: 32px;
+  height: 32px;
+  color: inherit;
+}
+.chat-list__tool:disabled {
+  opacity: 0.35;
+}
+.chat-list__up {
+  transform: rotate(180deg);
+}
+.chat-list__by {
+  flex-basis: 100%;
+  padding-inline-start: 26px;
+  font-size: 12px;
+  line-height: 16px;
+  opacity: 0.85;
+}
+.chat-reminder-note {
+  align-self: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.chat-system__link {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-poll__bar {
+    transition: none;
+  }
+}
 .chat-att__sensitive {
   position: relative;
   min-width: 200px;
@@ -4915,6 +5152,29 @@ button.yp-chip[aria-pressed='true'] {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+.story__text p,
+.story__caption p {
+  margin: 0;
+}
+.story__text {
+  align-content: center;
+  gap: var(--space-3);
+}
+/* Above the previous/next tap areas, so "See translation" can be pressed. */
+.story__translate {
+  position: relative;
+  z-index: 2;
+  justify-content: center;
+  color: #ffffffcc;
+}
+.story__caption .story__translate {
+  justify-content: flex-start;
+}
+.story__translate .yp-translate__link,
+.story__translate .yp-translate__link:disabled,
+.story__translate .yp-translate__error {
+  color: #fff;
+}
 
 /* ── Saved and boards ───────────────────────────────────────────────── */
 .board-grid {
@@ -5783,4 +6043,22 @@ button.yp-chip[aria-pressed='true'] {
 /* Empty but still in the accessibility tree, so the first raised hand is announced. */
 .room__hands:empty {
   margin: 0;
+}
+
+/* ── Settings: translation ──────────────────────────────────────────── */
+.translation-langs {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.translation-langs legend {
+  padding: 0;
+  font-weight: 600;
+}
+.translation-langs__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-3);
 }

@@ -372,3 +372,34 @@ describe('counts', () => {
     expect((await as(t.app, writer).get(`/v1/posts/${post.id}`)).body.post.counts.comments).toBe(1);
   });
 });
+
+describe('translation', () => {
+  it('detects the language on create and edit, forgets translations on edit and hide, and never translates a hidden comment for others', async () => {
+    const author = await adult();
+    const writer = await adult();
+    const reader = await adult();
+    const post = await postBy(author);
+    const translations = async (id: string) =>
+      Number((await t.ctx.db.query(`SELECT count(*) AS n FROM translations WHERE kind = 'comment' AND item_id = $1`, [id])).rows[0].n);
+    const cache = (id: string) =>
+      t.ctx.db.query(
+        `INSERT INTO translations (kind, item_id, target, content_hash, source_lang, body, provider, model) VALUES ('comment', $1, 'en', 'h', 'fr', 'x', 'dev', 'dev')`,
+        [id],
+      );
+
+    const c = (await comment(writer, post.id, 'Bonjour à tous, quelle belle journée à la plage avec mes amis')).body.comment;
+    expect(c.lang).toBe('fr');
+    expect((await list(reader, post.id)).items[0].lang).toBe('fr');
+
+    await cache(c.id);
+    const edited = (await as(t.app, writer).patch(`/v1/comments/${c.id}`, { body: 'Hola a todos, qué día tan bonito en la playa' })).body.comment;
+    expect(edited.lang).toBe('es');
+    expect(await translations(c.id)).toBe(0);
+
+    // Hidden by the author's hidden words: its translations go, and others can't ask for one.
+    await cache(c.id);
+    await as(t.app, author).put('/v1/me/hidden-words', { words: ['playa'] });
+    expect(await translations(c.id)).toBe(0);
+    expect((await as(t.app, reader).post('/v1/translate', { kind: 'comment', id: c.id, target: 'en' })).status).toBe(404);
+  });
+});

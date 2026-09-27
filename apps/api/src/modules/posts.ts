@@ -40,6 +40,7 @@ import {
   type Screening,
 } from '../lib/publishing.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
+import { langOf } from '../lib/translation.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 const VISIBLE = postVisibleSql('$1');
@@ -277,9 +278,10 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       const status = screened ? worseStatus(cur.moderation_status, screening!.status) : cur.moderation_status;
       if (changed) await c.query(`INSERT INTO post_edits (post_id, body) VALUES ($1, $2)`, [id, cur.body]);
       await c.query(
-        `UPDATE posts SET body = $2, visibility = $3, topics = $4, moderation_status = $5, edited_at = CASE WHEN $6 THEN now() ELSE edited_at END, updated_at = now()
+        `UPDATE posts SET body = $2, visibility = $3, topics = $4, moderation_status = $5, edited_at = CASE WHEN $6 THEN now() ELSE edited_at END, updated_at = now(),
+                          lang = CASE WHEN $6 THEN $7 ELSE lang END
          WHERE id = $1`,
-        [id, changed ? input.body : cur.body, visibility, topics, status, changed],
+        [id, changed ? input.body : cur.body, visibility, topics, status, changed, changed ? langOf(input.body!) : null],
       );
       // Descriptions of the post's own photos and videos (an empty one clears it).
       for (const m of input.media ?? []) {

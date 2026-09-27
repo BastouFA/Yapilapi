@@ -8,7 +8,8 @@ import type { CommentPolicy, CommentSort } from '../../../../packages/shared/src
 import { client, errorMessage } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { useAutocomplete } from '../../lib/autocomplete';
-import { PostCard, RichText } from '../../lib/post';
+import { PostCard } from '../../lib/post';
+import { TranslatableText } from '../../lib/translation';
 import { useSession } from '../../lib/session';
 import { elevation, radius, space } from '../../lib/theme';
 import { Avatar, Button, EmptyState, Icon, Loading, Notice, Segmented, useColors, userText } from '../../lib/ui';
@@ -328,7 +329,14 @@ export default function PostScreen() {
                   </View>
                 </View>
               ) : (
-                <RichText text={x.body} style={{ color: c.ink, fontSize: 15, lineHeight: 21 }} />
+                <TranslatableText
+                  kind="comment"
+                  id={x.id}
+                  text={x.body}
+                  lang={x.lang}
+                  own={x.author.id === me?.id}
+                  style={{ color: c.ink, fontSize: 15, lineHeight: 21 }}
+                />
               )}
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[3], paddingStart: space[2] }}>
@@ -478,7 +486,14 @@ export default function PostScreen() {
                   ? hidden.map((x) => (
                       <View key={x.id} style={{ gap: 4 }}>
                         <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 13 }, userText]}>{x.author.displayName}</Text>
-                        <RichText text={x.body} style={{ color: c.ink, fontSize: 15 }} />
+                        <TranslatableText
+                          kind="comment"
+                          id={x.id}
+                          text={x.body}
+                          lang={x.lang}
+                          own={x.author.id === me?.id}
+                          style={{ color: c.ink, fontSize: 15 }}
+                        />
                         <View style={{ flexDirection: 'row', columnGap: space[3] }}>
                           {action(t('comments.hidden.unhide'), () => void unhide(x))}
                           {action(t('m.common.delete'), () => remove(x, true))}

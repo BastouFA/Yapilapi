@@ -1,5 +1,6 @@
 import type { StoryCard } from './stories.ts';
 import type { DataSaverMode } from './data-saver.ts';
+import type { TranslationSettings } from './translation.ts';
 import type {
   BoardVisibility,
   CircleKind,
@@ -43,6 +44,8 @@ export interface Me extends PublicUser {
   plusUntil: string | null;
   /** Data saver, as saved on the account (PUT /v1/me/data-saver). A device may override it locally. */
   dataSaver: DataSaverMode;
+  /** "Languages I understand" and "Translate automatically" (PUT /v1/me/translation). */
+  translation: TranslationSettings;
 }
 
 /** A short "Now" line, for 24 hours. `audience` is only included for its owner. */
@@ -185,6 +188,8 @@ export interface Post {
   /** Set on Real posts: captured in-app moments before posting, unedited. */
   real?: { capturedAt: string; dual: boolean; locationText: string | null } | null;
   createdAt: string;
+  /** Detected language of the text (ISO 639-1), or null when it couldn't be told. Drives "See translation". */
+  lang?: string | null;
   /** Set once the text was changed after publishing: shown as "Edited", which opens the history (GET /v1/posts/:id/history). */
   editedAt?: string;
   /** Only on your own drafts and scheduled posts, which nobody else sees. Published posts leave it out. */
@@ -273,6 +278,8 @@ export interface Comment {
   /** The comment this one answers: its top-level comment, or a reply in the same thread. */
   replyToId: string | null;
   body: string;
+  /** Detected language of the text (ISO 639-1), or null when it couldn't be told. Drives "See translation". */
+  lang?: string | null;
   author: PublicUser;
   createdAt: string;
   /** Set once the text was changed (shown as "Edited"). */
@@ -342,6 +349,8 @@ export interface MessagePreview {
   /** The first attachment's kind ('image', 'video', 'audio'), for "Photo" or "Voice message". */
   attachmentKind: string | null;
   createdAt: string | null;
+  /** A poll (body is its question) or a shared list (body is its title). */
+  kind?: 'poll' | 'list';
 }
 
 export interface PinnedMessage {
@@ -358,10 +367,83 @@ export interface MessageReaction {
 }
 
 /** What a system line in a chat says. */
-export interface MessageSystemInfo {
-  type: 'disappearing';
-  /** The new setting: seconds, or null when turned off. */
-  seconds: number | null;
+export type MessageSystemInfo =
+  | {
+      type: 'disappearing';
+      /** The new setting: seconds, or null when turned off. */
+      seconds: number | null;
+    }
+  | {
+      /** "Remind the group": a group admin asked for this line at this time. The sender is that admin. */
+      type: 'reminder';
+      messageId: string;
+      /** The message it's about, as you see it (null when it's gone). */
+      message?: MessagePreview | null;
+    };
+
+/** One option of a poll in a chat. */
+export interface ChatPollOption {
+  id: string;
+  text: string;
+  votes: number;
+  /** You voted for it. */
+  mine: boolean;
+  /** Who voted for it. Absent when the poll is anonymous. */
+  voters?: PublicUser[];
+  /** Who added it (the poll's creator, or anyone when the poll lets people add options). */
+  addedBy: string;
+}
+
+/** A poll in a chat, as one member sees it. It shows as a message whose body is the question. */
+export interface ChatPoll {
+  question: string;
+  options: ChatPollOption[];
+  /** Several choices allowed. */
+  multiple: boolean;
+  /** Nobody sees who voted for what (you still see your own choice). */
+  anonymous: boolean;
+  /** Anyone in the chat can add options. */
+  allowAddOptions: boolean;
+  /** When it ends by itself, if set. */
+  endsAt: string | null;
+  /** It ended (at its time, or early by the person who made it): no more votes. */
+  ended: boolean;
+  endedAt: string | null;
+  createdBy: string;
+  /** How many people voted. */
+  voterCount: number;
+}
+
+/** One item of a shared list in a chat. */
+export interface ChatListItem {
+  id: string;
+  text: string;
+  addedBy: PublicUser | null;
+  done: boolean;
+  /** Who ticked it off (null when not done, or when you can't see them). */
+  doneBy: PublicUser | null;
+  doneAt: string | null;
+}
+
+/** A shared list (checklist) in a chat. It shows as a message whose body is the title. */
+export interface ChatList {
+  title: string;
+  items: ChatListItem[];
+  createdBy: string;
+  /** Items allowed (100). */
+  max: number;
+}
+
+/** A reminder about a chat message: just for you, or (admins in groups) a line for the whole group. */
+export interface ChatReminder {
+  id: string;
+  messageId: string;
+  conversationId: string;
+  scope: 'me' | 'group';
+  remindAt: string;
+  createdAt: string;
+  /** The message, as you see it. */
+  message?: MessagePreview | null;
 }
 
 export interface ConversationYaps {
@@ -402,6 +484,8 @@ export interface Message {
   conversationId: string;
   sender: PublicUser;
   body: string;
+  /** Detected language of the text (ISO 639-1), or null when it couldn't be told. Drives "See translation". */
+  lang?: string | null;
   replyToId: string | null;
   attachments: {
     url: string;
@@ -439,6 +523,12 @@ export interface Message {
   pinned?: boolean;
   /** On system lines: what changed (the sender is who changed it). */
   system?: MessageSystemInfo;
+  /** A poll: body is its question. */
+  poll?: ChatPoll;
+  /** A shared list: body is its title. */
+  list?: ChatList;
+  /** Your earliest waiting "Remind me" on this message. */
+  reminder?: { id: string; remindAt: string };
 }
 
 export interface Community {

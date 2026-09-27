@@ -14,6 +14,7 @@ import { LockedPanel } from './money';
 import { SensitiveCover } from './safety';
 import { EditPostSheet, HistorySheet } from './post-edit';
 import { RichText } from './rich-text';
+import { TranslatableText } from './translation';
 
 export { RichText };
 
@@ -351,7 +352,16 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
         </Pressable>
       ) : null}
 
-      {post.body ? <RichText text={post.body} style={{ color: c.ink, fontSize: 15, lineHeight: 22 }} /> : null}
+      {post.body ? (
+        <TranslatableText
+          kind="post"
+          id={post.id}
+          text={post.body}
+          lang={post.lang}
+          own={post.author.id === me?.id || !!post.status}
+          style={{ color: c.ink, fontSize: 15, lineHeight: 22 }}
+        />
+      ) : null}
 
       {post.locked ? <LockedPanel post={post} /> : null}
       {post.remixOf?.post ? (

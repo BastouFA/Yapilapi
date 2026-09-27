@@ -35,6 +35,7 @@ import {
   type CommentScreening,
 } from '../lib/comments.ts';
 import { notifyMentions } from '../lib/mentions.ts';
+import { langOf } from '../lib/translation.ts';
 import { notify, track } from '../lib/services.ts';
 import { flagContent, recordSignals } from '../lib/spam.ts';
 import { plusCol, publicUserFrom } from '../lib/users.ts';
@@ -235,10 +236,10 @@ export default async function commentsModule(app: FastifyInstance, ctx: AppConte
     const screening = await screenComment(db, ctx.config, { userId: u.id, postId: id, postAuthorId: post.author_id, body: input.body });
     const commentId = await tx(db, async (c) => {
       const { rows } = await c.query(
-        `INSERT INTO comments (post_id, author_id, parent_id, reply_to_id, body, moderation_status, topics, hidden_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $8 THEN now() END) RETURNING id`,
-        // #tags in a comment count on the tag's page.
-        [id, u.id, parentId, replyTo?.id ?? null, input.body, screening.status, extractHashtags(input.body), screening.hidden],
+        `INSERT INTO comments (post_id, author_id, parent_id, reply_to_id, body, moderation_status, topics, hidden_at, lang)
+         VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $8 THEN now() END, $9) RETURNING id`,
+        // #tags in a comment count on the tag's page; its language drives "See translation".
+        [id, u.id, parentId, replyTo?.id ?? null, input.body, screening.status, extractHashtags(input.body), screening.hidden, langOf(input.body)],
       );
       await syncCommentCounts(c, id);
       await recordCommentFlags(c, u.id, rows[0].id, screening);
@@ -316,11 +317,12 @@ export default async function commentsModule(app: FastifyInstance, ctx: AppConte
       await tx(db, async (c) => {
         await c.query(`INSERT INTO comment_edits (comment_id, body) VALUES ($1,$2)`, [id, cm.body]);
         await c.query(
-          `UPDATE comments SET body = $2, topics = $3, moderation_status = $4, edited_at = now(),
+          // A new text drops its cached translations (trigger in 0035) and gets its language again.
+          `UPDATE comments SET body = $2, topics = $3, moderation_status = $4, edited_at = now(), lang = $6,
                   hidden_at = CASE WHEN $5 THEN coalesce(hidden_at, now()) END,
                   unhidden_at = CASE WHEN $5 THEN NULL ELSE unhidden_at END
            WHERE id = $1`,
-          [id, body, extractHashtags(body), status, screening.hidden],
+          [id, body, extractHashtags(body), status, screening.hidden, langOf(body)],
         );
         if (screening.hidden) await c.query(`UPDATE posts SET pinned_comment_id = NULL WHERE pinned_comment_id = $1`, [id]);
         await syncCommentCounts(c, cm.post_id);

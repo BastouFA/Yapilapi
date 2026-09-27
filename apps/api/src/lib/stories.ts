@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import {
+  detectLanguage,
   extractHashtags,
   extractMentions,
   linkDomain,
@@ -60,7 +61,7 @@ export const PUBLIC_STORY = `m.visibility = 'public' AND m.deleted_at IS NULL AN
   AND NOT EXISTS (SELECT 1 FROM media x WHERE x.id = m.media_id AND x.moderation IN ('blocked', 'sensitive'))`;
 
 /** Columns for hydrateStories; the viewer is $1. Use with STORY_FROM. */
-export const STORY_SELECT = `m.id, m.author_id, m.body, m.media_url, m.media_kind, m.location_text, m.expires_at, m.created_at, m.visibility,
+export const STORY_SELECT = `m.id, m.author_id, m.body, m.lang, m.media_url, m.media_kind, m.location_text, m.expires_at, m.created_at, m.visibility,
   m.stickers, m.tags, m.mentions, m.reshare_of, m.allow_reshare, m.sound_id, m.music,
   md.poster_url, md.hls_url, md.variants, md.duration_ms, md.moderation, ${mediaSizesSql('md')} AS sizes,
   v.viewer_id IS NOT NULL AS seen, coalesce(v.liked, false) AS liked,
@@ -229,6 +230,8 @@ export async function storyCards(db: Q, ids: string[], viewer: string | null): P
 export interface StoryOut {
   id: string;
   body: string;
+  /** Detected language of the text, for "See translation" (null when unknown or there's no text). */
+  lang: string | null;
   mediaUrl: string | null;
   mediaKind: string | null;
   posterUrl: string | null;
@@ -411,6 +414,7 @@ export async function hydrateStories(db: Q, rows: Record<string, any>[], viewer:
     return {
       id: r.id,
       body: r.body,
+      lang: r.lang ?? detectLanguage(r.body),
       mediaUrl: r.variants?.mp4 ?? r.media_url,
       mediaKind: r.media_kind,
       posterUrl: r.poster_url ?? null,

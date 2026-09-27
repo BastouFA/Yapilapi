@@ -1,7 +1,7 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { DataSaverProvider, Toast, type ToastAction } from '@yapilapi/design-system';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { DataSaverProvider, Toast, TranslationProvider, type ToastAction, type TranslationContextValue } from '@yapilapi/design-system';
 import {
   isRtl,
   t as translate,
@@ -207,6 +207,21 @@ export function Providers({ children }: { children: React.ReactNode }) {
     [locale],
   );
 
+  // "See translation": signed in, and while translation is turned on.
+  const translationOn = !!me && !!flags.AI_TRANSLATION;
+  const translation = useMemo<TranslationContextValue | null>(
+    () =>
+      translationOn && me
+        ? {
+            locale,
+            languages: me.translation?.languages ?? [],
+            auto: !!me.translation?.auto,
+            translate: (kind, id, target) => api.translate({ kind, id, target }).then((r) => r.translation),
+          }
+        : null,
+    [translationOn, locale, me],
+  );
+
   return (
     <Ctx.Provider
       value={{
@@ -225,7 +240,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         dataSaver: { account: accountSaver, device: deviceSaver, mode: saverMode, active: saverOn, hints, setDevice },
       }}
     >
-      <DataSaverProvider on={saverOn}>{children}</DataSaverProvider>
+      <DataSaverProvider on={saverOn}>
+        <TranslationProvider value={translation}>{children}</TranslationProvider>
+      </DataSaverProvider>
       <Toast id={toastState?.id} message={toastState?.message ?? null} action={toastState?.action} onDone={clearToast} />
     </Ctx.Provider>
   );

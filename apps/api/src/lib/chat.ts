@@ -5,6 +5,7 @@ import type { RealtimeHub } from './realtime.ts';
 import type { MediaStorage } from './storage.ts';
 import { endViewOnce } from './view-once.ts';
 import { usersByIds } from './users.ts';
+import { chatPollJobHandlers } from './chat-polls.ts';
 
 type Q = Pool | PoolClient;
 
@@ -20,6 +21,19 @@ export interface ChatDeps {
   realtime?: RealtimeHub;
 }
 
+/**
+ * The messages reader `r` sees (message alias m): not deleted (unsent ones stay as a
+ * placeholder), not past their disappearing time, not held for a check unless their own,
+ * not from someone they blocked, and not deleted just for them. Membership is checked separately.
+ */
+export function messageVisibleSql(r: string): string {
+  return `(m.deleted_at IS NULL OR m.unsent_at IS NOT NULL)
+  AND (m.expires_at IS NULL OR m.expires_at > now())
+  AND (m.moderation_status = 'normal' OR (m.moderation_status = 'review' AND m.sender_id = ${r}))
+  AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = ${r} AND b.blocked_id = m.sender_id)
+  AND NOT EXISTS (SELECT 1 FROM message_hides h WHERE h.user_id = ${r} AND h.message_id = m.id)`;
+}
+
 // ─── Previews and reactions ─────────────────────────────────────────────
 
 /** How each message looks as a quote (a reply's original, or a pinned message) to one reader. */
@@ -30,7 +44,9 @@ export async function messagePreviews(db: Q, ids: string[], readerId: string): P
   const { rows } = await db.query(
     `SELECT m.id, m.sender_id, left(m.body, 200) AS body, m.attachments->0->>'kind' AS attachment_kind, m.created_at, m.deleted_at, m.unsent_at,
             m.moderation_status, m.kind, (m.expires_at IS NOT NULL AND m.expires_at <= now()) AS expired,
-            EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $2 AND b.blocked_id = m.sender_id) AS blocked
+            EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $2 AND b.blocked_id = m.sender_id) AS blocked,
+            CASE WHEN EXISTS (SELECT 1 FROM chat_polls p WHERE p.message_id = m.id) THEN 'poll'
+                 WHEN EXISTS (SELECT 1 FROM chat_lists l WHERE l.message_id = m.id) THEN 'list' END AS rich_kind
      FROM messages m WHERE m.id = ANY($1::uuid[])`,
     [unique, readerId],
   );
@@ -47,7 +63,9 @@ export async function messagePreviews(db: Q, ids: string[], readerId: string): P
     const base = { id: r.id, available: true, sender: users.get(r.sender_id) ?? null, createdAt: r.created_at.toISOString() };
     out.set(
       r.id,
-      r.unsent_at ? { ...base, unsent: true, body: '', attachmentKind: null } : { ...base, body: r.body, attachmentKind: r.attachment_kind ?? null },
+      r.unsent_at
+        ? { ...base, unsent: true, body: '', attachmentKind: null }
+        : { ...base, body: r.body, attachmentKind: r.attachment_kind ?? null, ...(r.rich_kind ? { kind: r.rich_kind } : {}) },
     );
   }
   return out;
@@ -149,11 +167,13 @@ export async function expireMessages(deps: ChatDeps, limit = 200): Promise<numbe
   return n;
 }
 
-export function chatJobHandlers(deps: ChatDeps) {
+export function chatJobHandlers(deps: ChatDeps & { realtime: RealtimeHub }) {
   return {
-    /** Queued for each disappearing message at its expiry; deletes every message that is due. */
+    /** Queued for each disappearing message at its expiry; deletes every message that is due (with its poll or list). */
     'messages.expire': async () => {
       await expireMessages(deps);
     },
+    // Polls that end at a set time, and reminders.
+    ...chatPollJobHandlers(deps),
   };
 }

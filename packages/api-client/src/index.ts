@@ -2,6 +2,9 @@ import type {
   Circle,
   CircleKind,
   DataSaverMode,
+  TranslatableKind,
+  Translation,
+  TranslationSettings,
   NowStatus,
   NowStatusAudience,
   NowStatusIcon,
@@ -49,6 +52,9 @@ import type {
   ConversationYaps,
   PinnedMessage,
   ViewOnceInfo,
+  ChatList,
+  ChatPoll,
+  ChatReminder,
   StickerResults,
   StoryCard,
   StoryMusic,
@@ -192,6 +198,9 @@ export function createClient(opts: ClientOptions) {
       /** Data saver as saved on the account (also Me.dataSaver). Each device may override it locally. */
       dataSaver: () => get<{ mode: DataSaverMode }>('/v1/me/data-saver'),
       setDataSaver: (mode: DataSaverMode) => put<{ mode: DataSaverMode }>('/v1/me/data-saver', { mode }),
+      /** "Languages I understand" and "Translate automatically" (also Me.translation). */
+      translation: () => get<TranslationSettings>('/v1/me/translation'),
+      setTranslation: (b: TranslationSettings) => put<TranslationSettings>('/v1/me/translation', b),
       /** Posts and reels you've been invited to co-author and haven't answered yet, newest first. */
       collabInvites: () => get<{ items: Post[] }>('/v1/me/collab-invites'),
       friendRequests: () => get<{ items: { id: string; from: PublicUser; createdAt: string }[] }>('/v1/me/friend-requests'),
@@ -536,6 +545,24 @@ export function createClient(opts: ClientOptions) {
       /** "Let Yaps play out loud" here; null goes back to the default (on for yaps from friends). */
       setYaps: (id: string, playOutLoud: boolean | null) => put<{ yaps: ConversationYaps }>(`/v1/conversations/${id}/yaps`, { playOutLoud }),
       read: (id: string) => post(`/v1/conversations/${id}/read`),
+      /** A poll: 2 to 10 options; one choice unless `multiple`; `endsAt` from 5 minutes to 30 days ahead. */
+      createPoll: (
+        id: string,
+        input: {
+          question: string;
+          options: string[];
+          multiple?: boolean;
+          anonymous?: boolean;
+          allowAddOptions?: boolean;
+          endsAt?: string | null;
+          clientId?: string;
+        },
+      ) => post<{ message: Message }>(`/v1/conversations/${id}/polls`, input),
+      /** A shared list (checklist) with its first items, up to 100. */
+      createList: (id: string, input: { title: string; items?: string[]; clientId?: string }) =>
+        post<{ message: Message }>(`/v1/conversations/${id}/lists`, input),
+      /** Your reminders waiting in this chat. */
+      reminders: (id: string) => get<{ items: ChatReminder[] }>(`/v1/conversations/${id}/reminders`),
       createPlan: (id: string, title: string, details: Record<string, unknown>) => post(`/v1/conversations/${id}/plans`, { title, details }),
       plans: (id: string) => get<{ items: { id: string; title: string; details: Record<string, unknown>; status: string }[] }>(`/v1/conversations/${id}/plans`),
     },
@@ -550,6 +577,20 @@ export function createClient(opts: ClientOptions) {
       unreact: (id: string, emoji: string) => del<{ ok: true }>(`/v1/messages/${id}/reactions/${encodeURIComponent(emoji)}`),
       pin: (id: string) => put<{ items: PinnedMessage[] }>(`/v1/messages/${id}/pin`),
       unpin: (id: string) => del<{ items: PinnedMessage[] }>(`/v1/messages/${id}/pin`),
+      /** Vote, change your vote, or take it back (an empty list). */
+      vote: (id: string, optionIds: string[]) => put<{ poll: ChatPoll | null }>(`/v1/messages/${id}/poll/vote`, { optionIds }),
+      addPollOption: (id: string, text: string) => post<{ poll: ChatPoll | null }>(`/v1/messages/${id}/poll/options`, { text }),
+      /** End the poll now (the person who made it). */
+      endPoll: (id: string) => post<{ poll: ChatPoll | null }>(`/v1/messages/${id}/poll/end`),
+      addListItem: (id: string, text: string) => post<{ list: ChatList | null }>(`/v1/messages/${id}/list/items`, { text }),
+      /** Tick an item off, or back on. */
+      tickListItem: (id: string, itemId: string, done: boolean) => patch<{ list: ChatList | null }>(`/v1/messages/${id}/list/items/${itemId}`, { done }),
+      removeListItem: (id: string, itemId: string) => del<{ list: ChatList | null }>(`/v1/messages/${id}/list/items/${itemId}`),
+      /** Every item, in the new order. */
+      reorderList: (id: string, itemIds: string[]) => put<{ list: ChatList | null }>(`/v1/messages/${id}/list/order`, { itemIds }),
+      /** "Remind me" at a time (just you), or "Remind the group" (group admins). */
+      remind: (id: string, at: string, scope: 'me' | 'group' = 'me') => post<{ reminder: ChatReminder }>(`/v1/messages/${id}/reminders`, { at, scope }),
+      cancelReminder: (reminderId: string) => del<{ ok: true }>(`/v1/reminders/${reminderId}`),
     },
     yaps: {
       /** "Pause Yaps" everywhere. */
@@ -685,6 +726,11 @@ export function createClient(opts: ClientOptions) {
       markRead: (ids?: string[]) => post('/v1/notifications/read', ids ? { ids } : {}),
     },
     reports: { create: (b: { targetType: string; targetId: string; reason: string; details?: string }) => post<{ message: string }>('/v1/reports', b) },
+    /**
+     * "See translation": a post, comment, story or message machine-translated into `target`.
+     * Errors: 503 translation_off (turned off) or translation_unavailable (not working right now), 429 translation_limit, 404 when not visible.
+     */
+    translate: (b: { kind: TranslatableKind; id: string; target: string }) => post<{ translation: Translation }>('/v1/translate', b),
     ai: {
       assist: (b: { task: string; input?: string; conversationId?: string; communityId?: string; targetLanguage?: string }) =>
         post<{ output: unknown; provider: string; model: string; notice?: string; contextScopes: string[] }>('/v1/ai/assist', b),
@@ -1454,6 +1500,8 @@ export interface CaptionCue {
 export interface Story {
   id: string;
   body: string;
+  /** Detected language of the text, for "See translation". */
+  lang?: string | null;
   mediaUrl: string | null;
   mediaKind: 'image' | 'video' | 'audio' | null;
   posterUrl: string | null;

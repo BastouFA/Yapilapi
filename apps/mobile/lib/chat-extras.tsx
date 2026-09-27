@@ -30,6 +30,8 @@ export function disappearingText(t: T, seconds: number | null | undefined): stri
 export function previewText(t: T, p: MessagePreview): string {
   if (!p.available) return t('m.chat.quoteUnavailable');
   if (p.unsent) return t('m.chat.unsent');
+  if (p.kind === 'poll') return t('m.chat.poll.preview', { question: p.body });
+  if (p.kind === 'list') return t('m.chat.list.preview', { title: p.body });
   if (p.body) return p.body;
   if (p.attachmentKind === 'image') return t('m.post.photo');
   if (p.attachmentKind === 'video') return t('m.chat.video');
@@ -46,6 +48,7 @@ export function previewOf(m: Message): MessagePreview {
     body: m.body.slice(0, 200),
     attachmentKind: m.attachments[0]?.kind ?? m.viewOnce?.kind ?? null,
     createdAt: m.createdAt,
+    ...(m.poll ? { kind: 'poll' as const } : m.list ? { kind: 'list' as const } : {}),
   };
 }
 
@@ -144,12 +147,30 @@ export function SwipeToReply({ onReply, children, enabled }: { onReply: () => vo
   );
 }
 
-/** The line in the chat that tells everyone who changed disappearing messages. */
-export function SystemLine({ message, meId }: { message: Message; meId?: string }) {
+/**
+ * A line in the chat that tells everyone who changed disappearing messages, or a group reminder at
+ * its time (tapping it goes to the message it's about).
+ */
+export function SystemLine({ message, meId, onJump }: { message: Message; meId?: string; onJump?: (id: string) => void }) {
   const c = useColors();
   const { t } = useT();
   const name = message.sender.id === meId ? t('m.chat.you') : message.sender.displayName;
   const s = message.system;
+  if (s?.type === 'reminder') {
+    const about = s.message;
+    const text = about?.available ? t('m.chat.systemReminder', { name, text: previewText(t, about) }) : t('m.chat.systemReminderGone', { name });
+    return (
+      <Pressable
+        accessibilityRole={about?.available && onJump ? 'button' : 'text'}
+        disabled={!about?.available || !onJump}
+        onPress={() => onJump?.(s.messageId)}
+        style={{ alignSelf: 'center', flexDirection: 'row', gap: space[1], alignItems: 'center', maxWidth: '90%', paddingVertical: space[1], minHeight: 32 }}
+      >
+        <Icon name="notifications-outline" size={14} color={c.inkMuted} />
+        <Text style={[{ color: c.inkMuted, fontSize: 13, textAlign: 'center', lineHeight: 18 }, userText]}>{text}</Text>
+      </Pressable>
+    );
+  }
   if (s?.type !== 'disappearing') return null;
   const text = s.seconds ? t('m.chat.systemOn', { name, time: disappearingText(t, s.seconds) }) : t('m.chat.systemOff', { name });
   return (

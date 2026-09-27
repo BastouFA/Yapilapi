@@ -56,6 +56,7 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
   media_restored: () => 'We checked your photo or video and it’s back up. Sorry for the trouble.',
   yap_received: () => 'sent you a Yap',
   view_once_screenshot: () => 'took a screenshot of your view-once photo or video',
+  chat_reminder: () => 'You asked to be reminded about a message in a chat.',
   scheduled_post_failed: (n) => `A scheduled post couldn't be published, so it's back in your drafts. ${String(n.data.reason ?? '')}`.trim(),
   account_limited: () =>
     'Some of your recent posts or messages were flagged, so your account is limited while our team takes a look. You can still post for yourself and message friends.',
