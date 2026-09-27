@@ -379,6 +379,14 @@ function PrivacyCenter() {
   return (
     <div className="stack">
       <CloseFriendsCard />
+      <Card title="Circles">
+        <p className="muted" style={{ marginTop: 0 }}>
+          Small groups you share posts with, like Family or Work. Only you see your circles, and people aren&rsquo;t told which ones they&rsquo;re in.
+        </p>
+        <Link href="/circles" className="yp-btn yp-btn--secondary yp-btn--sm">
+          Manage circles
+        </Link>
+      </Card>
       <Card title="Your archive">
         <p className="muted" style={{ marginTop: 0 }}>
           Your stories stay in your archive after they expire. Only you can see it. From there you can put them into chapters on your profile.

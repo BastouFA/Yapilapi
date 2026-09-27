@@ -1,4 +1,9 @@
 import type {
+  Circle,
+  CircleKind,
+  NowStatus,
+  NowStatusAudience,
+  NowStatusIcon,
   ChapterAudience,
   ChapterGradient,
   ChapterSymbol,
@@ -160,7 +165,27 @@ export function createClient(opts: ClientOptions) {
       exportData: () => get<Record<string, unknown>>('/v1/me/export'),
       deleteAccount: (password: string) => del('/v1/me', { password }),
       saved: () => get<{ items: Post[] }>('/v1/me/saved'),
-      circles: () => get<{ items: { id: string; name: string; kind: string; memberCount: number }[] }>('/v1/me/circles'),
+      circles: () => get<{ items: Circle[] }>('/v1/me/circles'),
+      /** Make one of your uploaded photos your cover. Refused (409 media_processing) until the photo has been prepared. */
+      setCover: (mediaId: string, altText?: string) => put<{ profile: Profile }>('/v1/me/cover', { mediaId, altText }),
+      /** setCover, trying again while the photo is still being prepared (up to about a minute). */
+      setCoverWhenReady: async (mediaId: string, altText?: string, o: { intervalMs?: number; timeoutMs?: number } = {}) => {
+        const started = Date.now();
+        for (;;) {
+          try {
+            return await put<{ profile: Profile }>('/v1/me/cover', { mediaId, altText });
+          } catch (e) {
+            if (!(e instanceof ApiError) || e.code !== 'media_processing' || Date.now() - started > (o.timeoutMs ?? 60_000)) throw e;
+          }
+          await new Promise((r) => setTimeout(r, o.intervalMs ?? 1200));
+        }
+      },
+      removeCover: () => del<{ profile: Profile }>('/v1/me/cover'),
+      /** Your "Now" status, with who it's for, or null. */
+      status: () => get<{ status: NowStatus | null }>('/v1/me/status'),
+      /** Set your "Now" status (up to 60 characters). It ends after 24 hours. */
+      setStatus: (b: { text: string; icon?: NowStatusIcon | null; audience?: NowStatusAudience }) => put<{ status: NowStatus }>('/v1/me/status', b),
+      clearStatus: () => del<{ status: null }>('/v1/me/status'),
       moderation: () =>
         get<{ items: { id: string; target_type: string; decision: string; status: string; appeal_status: string | null }[] }>('/v1/me/moderation'),
     },
@@ -218,6 +243,17 @@ export function createClient(opts: ClientOptions) {
       get: (id: string) => get<{ sound: Sound }>(`/v1/sounds/${id}`),
       rename: (id: string, title: string) => patch<{ sound: Sound }>(`/v1/sounds/${id}`, { title }),
       reels: (id: string, sort: 'recent' | 'top' = 'recent', cursor?: string) => get<Page<Post>>(`/v1/sounds/${id}/reels${qs({ sort, cursor })}`),
+    },
+    /** Your circles. Only you see them; nobody is told which circles they're in. */
+    circles: {
+      list: () => get<{ items: Circle[] }>('/v1/me/circles'),
+      get: (id: string) => get<{ circle: Circle }>(`/v1/me/circles/${id}`),
+      create: (b: { name: string; kind?: CircleKind }) => post<{ circle: Circle }>('/v1/me/circles', b),
+      update: (id: string, b: { name?: string; kind?: CircleKind }) => patch<{ circle: Circle }>(`/v1/me/circles/${id}`, b),
+      remove: (id: string) => del<{ ok: true }>(`/v1/me/circles/${id}`),
+      members: (id: string) => get<{ items: PublicUser[] }>(`/v1/me/circles/${id}/members`),
+      addMembers: (id: string, userIds: string[]) => post<{ ok: true; added: number; circle: Circle }>(`/v1/me/circles/${id}/members`, { userIds }),
+      removeMember: (id: string, userId: string) => del<{ ok: true; circle: Circle }>(`/v1/me/circles/${id}/members/${userId}`),
     },
     closeFriends: {
       list: () => get<{ items: { user: PublicUser; addedAt: string; followsYou: boolean }[] }>('/v1/me/close-friends'),

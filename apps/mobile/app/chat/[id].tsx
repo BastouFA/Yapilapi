@@ -19,6 +19,7 @@ import { client, errorMessage, mediaUrl } from '../../lib/api';
 import { clock, MAX_UPLOAD_BYTES, pickOne, uploadFile, uploadPicked, VOICE_MIME } from '../../lib/media';
 import { useT } from '../../lib/i18n';
 import { StoryCardView } from '../../lib/story-stickers';
+import { liveStatus, NowStatusLine } from '../../lib/now-status';
 import { conversationTitle } from '../../lib/post';
 import { isVerificationError, SensitiveCover, UnavailableMedia, VerifyPrompt } from '../../lib/safety';
 import { useRealtime, useSession } from '../../lib/session';
@@ -89,9 +90,22 @@ export default function Chat() {
   const [yapSettings, setYapSettings] = useState(false);
 
   const canCall = !!conversation && conversation.kind !== 'community' && conversation.members.length <= 8 && conversation.members.length > 1;
+  // One-to-one chats: the other person's "Now" status, small and muted under their name.
+  const nowStatus = conversation?.kind === 'direct' ? liveStatus(conversation.nowStatus) : null;
   useLayoutEffect(() => {
+    const title = conversation ? conversationTitle(conversation, me?.id, t) : t('m.title.conversation');
     navigation.setOptions({
-      title: conversation ? conversationTitle(conversation, me?.id, t) : t('m.title.conversation'),
+      title,
+      headerTitle: nowStatus
+        ? () => (
+            <View style={{ maxWidth: 220, alignItems: Platform.OS === 'ios' ? 'center' : 'flex-start' }}>
+              <Text accessibilityRole="header" numberOfLines={1} style={[{ color: c.ink, fontWeight: '700', fontSize: 17 }, userText]}>
+                {title}
+              </Text>
+              <NowStatusLine status={nowStatus} small />
+            </View>
+          )
+        : undefined,
       headerRight:
         canCall || yaps?.available
           ? () => (
@@ -125,7 +139,7 @@ export default function Chat() {
             )
           : undefined,
     });
-  }, [navigation, conversation, me?.id, canCall, calls, id, c.yapi, t, yaps?.available, yaps?.paused]);
+  }, [navigation, conversation, me?.id, canCall, calls, id, c.yapi, c.ink, t, yaps?.available, yaps?.paused, nowStatus]);
 
   const [sending, setSending] = useState(false);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);

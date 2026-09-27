@@ -417,6 +417,10 @@ a.yp-aside-row:hover {
   color: inherit;
   font-weight: 600;
 }
+.yp-post__circle {
+  margin-inline-start: 4px;
+  font-weight: 600;
+}
 .yp-post__body {
   padding: var(--space-3) var(--space-4) 0;
   font-size: 16px;

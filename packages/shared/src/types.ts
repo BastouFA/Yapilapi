@@ -1,5 +1,5 @@
 import type { StoryCard } from './stories.ts';
-import type { CommunityRole, PostKind, ProfileMode, Visibility } from './constants.ts';
+import type { CircleKind, CommunityRole, NowStatusAudience, NowStatusIcon, PostKind, ProfileMode, Visibility } from './constants.ts';
 
 export interface PublicUser {
   id: string;
@@ -30,9 +30,30 @@ export interface Me extends PublicUser {
   plusUntil: string | null;
 }
 
+/** A short "Now" line, for 24 hours. `audience` is only included for its owner. */
+export interface NowStatus {
+  text: string;
+  icon: NowStatusIcon | null;
+  expiresAt: string;
+  audience?: NowStatusAudience;
+}
+
+/** One of your circles. Only you see your circles; people are never told which circles they're in. */
+export interface Circle {
+  id: string;
+  name: string;
+  kind: CircleKind;
+  memberCount: number;
+  createdAt: string;
+}
+
 export interface Profile extends PublicUser {
   bio: string;
   coverUrl: string | null;
+  /** Describes the cover photo for screen readers. */
+  coverAlt: string | null;
+  /** Their current "Now" status, when there is one and you're in its audience. */
+  nowStatus: NowStatus | null;
   links: { label: string; url: string }[];
   isPrivate: boolean;
   interests: string[];
@@ -131,6 +152,8 @@ export interface Post {
   collaborators?: PublicUser[];
   /** Only on the original author's own posts: people invited to co-author who haven't answered yet. */
   pendingCollaborators?: PublicUser[];
+  /** Only on the author's own posts shared with a circle: which one. Members of the circle never see its name. */
+  circle?: { id: string; name: string } | null;
   aiAssisted: boolean;
   /** Set on Real posts: captured in-app moments before posting, unedited. */
   real?: { capturedAt: string; dual: boolean; locationText: string | null } | null;
@@ -217,6 +240,8 @@ export interface Conversation {
   updatedAt: string;
   /** Yaps in this chat, for you. */
   yaps?: ConversationYaps;
+  /** One-to-one chats: the other person's "Now" status, when you're in its audience. */
+  nowStatus?: NowStatus | null;
 }
 
 export interface ConversationYaps {

@@ -394,13 +394,165 @@ h3 {
 
 /* Profile */
 .profile__cover {
+  position: relative;
   height: 200px;
+  overflow: hidden;
   border-radius: var(--radius-lg);
   background:
     radial-gradient(400px 200px at 80% 20%, color-mix(in oklab, var(--saffron) 80%, transparent), transparent 70%),
     linear-gradient(135deg, var(--yapi-strong), var(--yapi) 45%, color-mix(in oklab, var(--yapi) 50%, var(--saffron)));
   background-size: cover;
   background-position: center;
+}
+.profile__cover--photo {
+  background: var(--surface-sunken);
+}
+.profile__cover-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* A soft fade into the page under the avatar, in either theme. */
+.profile__cover-fade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent 45%,
+    color-mix(in oklab, var(--ground) 30%, transparent) 75%,
+    color-mix(in oklab, var(--ground) 80%, transparent)
+  );
+}
+.profile__cover-edit {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  box-shadow: var(--shadow-sm);
+}
+.cover-sheet__preview {
+  display: grid;
+  place-items: center;
+  height: 140px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.cover-sheet__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.now-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+}
+.now-status svg {
+  flex: none;
+  color: var(--yapi);
+}
+.now-status__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.now-status--compact {
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 16px;
+}
+.now-status__edit {
+  align-self: flex-start;
+}
+.now-status__icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.now-status__icons legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+}
+.now-status__icon {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--control-md);
+  height: var(--control-md);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  cursor: pointer;
+}
+.now-status__icon:has(input:checked) {
+  border-color: var(--yapi);
+  background: var(--yapi-soft);
+  color: var(--yapi-strong);
+}
+.now-status__icon:has(input:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+.share-profile__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.qr-code {
+  max-width: 100%;
+  height: auto;
+  margin-bottom: var(--space-2);
+  border-radius: var(--radius-sm);
+}
+.chat-title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* Circles */
+.circles-form__name {
+  flex: 1;
+  min-width: 12rem;
+}
+.circles__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.circles__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.circles__row[aria-current='true'] {
+  border-color: var(--yapi);
+}
+.circles__row .sound-row__text {
+  flex: 1;
 }
 .profile__head {
   display: flex;

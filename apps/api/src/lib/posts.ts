@@ -34,6 +34,10 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
             (SELECT option_id FROM poll_votes v WHERE v.post_id = p.id AND v.user_id = $2) AS my_vote,
             (SELECT array_agg(DISTINCT w.country ORDER BY w.country) FROM post_withholdings w WHERE w.post_id = p.id AND p.author_id = $2) AS withheld_in,
             p.allow_remix, p.remix_mode, p.remix_of_post_id,
+            -- Which circle a post went to is for its author only; members never see a circle's name.
+            (p.visibility = 'circle' AND p.author_id IS NOT DISTINCT FROM $2) AS own_circle_post,
+            CASE WHEN p.visibility = 'circle' AND p.author_id IS NOT DISTINCT FROM $2
+                 THEN (SELECT json_build_object('id', ci.id, 'name', ci.name) FROM circles ci WHERE ci.id = p.circle_id) END AS own_circle,
             CASE WHEN p.format = 'reel' THEN (SELECT count(*) FROM posts rx WHERE rx.remix_of_post_id = p.id AND rx.deleted_at IS NULL)::int END AS remix_count,
             s.id AS s_id, s.title AS s_title, s.source_post_id AS s_source, coalesce(s.duration_ms, sm.duration_ms) AS s_duration,
             coalesce(sm.variants->>'mp4', sm.url) AS s_audio,
@@ -109,6 +113,7 @@ function toPost(r: Record<string, any>, originals: Map<string, NonNullable<Remix
     ...(r.withheld_in ? { withheldIn: r.withheld_in.map((c: string) => c.trim()) } : {}),
     ...(r.downloadable === null ? {} : { downloadable: !!r.downloadable }),
     ...(r.boost ? { boost: r.boost } : {}),
+    ...(r.own_circle_post ? { circle: r.own_circle ?? null } : {}),
   } satisfies Post;
 }
 

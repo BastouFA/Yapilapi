@@ -4,6 +4,9 @@ import {
   COMMUNITY_ROLES,
   FEED_MODES,
   FEEDBACK_SIGNALS,
+  NOW_STATUS_AUDIENCES,
+  NOW_STATUS_ICONS,
+  NOW_STATUS_MAX,
   PLACE_CATEGORIES,
   POST_KINDS,
   PRODUCT_KINDS,
@@ -62,7 +65,10 @@ export const updateProfileSchema = z
     displayName: trimmed(60),
     bio: z.string().trim().max(300),
     avatarUrl: z.string().url().max(500).nullable(),
+    /** Only null (remove the cover) is accepted here; set a cover from your uploads with PUT /v1/me/cover. */
     coverUrl: z.string().url().max(500).nullable(),
+    /** Describes your cover photo for screen readers. */
+    coverAlt: z.string().trim().max(300).nullable(),
     links: z.array(z.object({ label: trimmed(40), url: z.string().url().max(500) })).max(5),
     mode: z.enum(PROFILE_MODES),
     locale: z.string().min(2).max(10),
@@ -180,7 +186,26 @@ export const feedbackSchema = z.object({
 });
 
 export const circleSchema = z.object({ name: trimmed(40), kind: z.enum(CIRCLE_KINDS).default('custom') });
+/** Rename a circle or change its kind. */
+export const circleUpdateSchema = z
+  .object({ name: trimmed(40), kind: z.enum(CIRCLE_KINDS) })
+  .partial()
+  .refine((v) => v.name !== undefined || v.kind !== undefined, { message: 'Nothing to change.' });
 export const circleMembersSchema = z.object({ userIds: z.array(uuid).min(1).max(200) });
+
+/** Set your cover photo: one of your own uploaded photos (POST /v1/media or /v1/uploads). */
+export const setCoverSchema = z.object({
+  mediaId: uuid,
+  /** Describes the photo for people using screen readers. Defaults to the upload's own description. */
+  altText: z.string().trim().max(300).optional(),
+});
+
+/** Set your "Now" status. It ends after 24 hours. */
+export const nowStatusSchema = z.object({
+  text: trimmed(NOW_STATUS_MAX),
+  icon: z.enum(NOW_STATUS_ICONS).nullable().default(null),
+  audience: z.enum(NOW_STATUS_AUDIENCES).default('everyone'),
+});
 
 export const createConversationSchema = z.object({
   memberIds: z.array(uuid).min(1).max(255),

@@ -14,6 +14,7 @@ import { MiniAppsSheet } from '@/components/MiniApps';
 import { MessageAttachments, ViewOnceMessage, VoiceRecorder } from '@/components/ChatAttachments';
 import { TurnOnYapsPrompt, YapButton } from '@/components/Yap';
 import { StoryCardView } from '@/components/StoryStickers';
+import { NowStatusLine } from '@/components/ProfilePlus';
 
 type Pending = Message & { pending?: boolean };
 
@@ -172,9 +173,12 @@ export default function ChatPage() {
           <Link href="/inbox" className="yp-action" aria-label="Back to inbox">
             <Icon name="arrow-left" />
           </Link>
-          <h1 style={{ fontSize: 20, lineHeight: '26px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {title || <Skeleton width={160} />}
-          </h1>
+          <div className="chat-title">
+            <h1 style={{ fontSize: 20, lineHeight: '26px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {title || <Skeleton width={160} />}
+            </h1>
+            {conv?.nowStatus ? <NowStatusLine status={conv.nowStatus} compact /> : null}
+          </div>
         </div>
         <Menu
           label="Conversation options"
