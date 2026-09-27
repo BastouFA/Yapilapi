@@ -20,7 +20,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Chapter, ChapterDetail } from '../../../packages/api-client/src/index';
-import { CHAPTER_GRADIENTS, CHAPTER_GUESTBOOK_MAX, CHAPTER_TITLE_MAX, type ChapterSymbol } from '../../../packages/shared/src/constants';
+import { CHAPTER_GRADIENTS, CHAPTER_GUESTBOOK_MAX, CHAPTER_TITLE_MAX, type ChapterGradient, type ChapterSymbol } from '../../../packages/shared/src/constants';
 import { client, errorMessage, mediaUrl } from './api';
 import { useT } from './i18n';
 import { SensitiveCover } from './safety';
@@ -48,19 +48,51 @@ export const SYMBOL_ICON: Record<ChapterSymbol, IconName> = {
 
 export const isSealed = (c: Chapter) => !!c.capsule && !c.capsule.open;
 
-/** A chapter's cover: one of its stories, or its gradient and symbol. A sealed capsule shows a lock. */
+/**
+ * A chapter's cover: one of its stories, or its gradient and symbol. A time capsule keeps its
+ * gradient and symbol with a small lock, since people may see the cover before it opens.
+ */
 export function ChapterCover({ chapter, size = 72 }: { chapter: Chapter; size?: number }) {
   const sealed = isSealed(chapter);
   const cv = chapter.cover;
+  const image = cv.kind === 'story' && !sealed ? (cv.mediaKind === 'image' ? cv.mediaUrl : cv.posterUrl) : null;
+  return (
+    <CoverPreview size={size} gradient={chapter.coverGradient} symbol={chapter.coverSymbol} image={image} locked={!!chapter.capsule && !chapter.capsule.open} />
+  );
+}
+
+/** The cover square itself, also the live preview while choosing a colour and symbol. */
+export function CoverPreview({
+  size,
+  gradient,
+  symbol,
+  image,
+  locked,
+}: {
+  size: number;
+  gradient: ChapterGradient;
+  symbol: ChapterSymbol;
+  image?: string | null;
+  locked?: boolean;
+}) {
   const box = { width: size, height: size, borderRadius: radius.md, overflow: 'hidden' as const };
-  if (cv.kind === 'story' && !sealed) {
-    const src = cv.mediaKind === 'image' ? cv.mediaUrl : cv.posterUrl;
-    if (src) return <Image source={{ uri: mediaUrl(src) }} style={box} accessibilityIgnoresInvertColors />;
-  }
-  const [from, to] = CHAPTER_GRADIENTS[chapter.coverGradient];
+  const lock = locked ? (
+    <View style={{ position: 'absolute', bottom: 4, end: 4, padding: 3, borderRadius: 99, backgroundColor: 'rgba(0,0,0,0.45)' }}>
+      <Icon name="lock-closed" size={Math.max(11, Math.round(size * 0.17))} color={WHITE} />
+    </View>
+  ) : null;
+  if (image)
+    return (
+      <View style={box}>
+        <Image source={{ uri: mediaUrl(image) }} style={{ width: size, height: size }} accessibilityIgnoresInvertColors />
+        {lock}
+      </View>
+    );
+  const [from, to] = CHAPTER_GRADIENTS[gradient];
   return (
     <LinearGradient colors={[from, to]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[box, { alignItems: 'center', justifyContent: 'center' }]}>
-      <Icon name={sealed ? 'lock-closed' : SYMBOL_ICON[chapter.coverSymbol]} size={Math.round(size * 0.4)} color={WHITE} />
+      <Icon name={SYMBOL_ICON[symbol]} size={Math.round(size * 0.4)} color={WHITE} />
+      {lock}
     </LinearGradient>
   );
 }

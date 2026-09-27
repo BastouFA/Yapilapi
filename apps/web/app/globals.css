@@ -4073,6 +4073,35 @@ span.cam__icon {
   height: 100%;
   object-fit: cover;
 }
+.chapter-cover {
+  position: relative;
+}
+/* A time capsule keeps its colour and symbol, with a small lock in the corner. */
+.chapter-cover__lock {
+  position: absolute;
+  inset-block-end: 4px;
+  inset-inline-end: 4px;
+  display: grid;
+  place-items: center;
+  padding: 3px;
+  border-radius: var(--radius-full);
+  background: rgb(0 0 0 / 0.45);
+  color: #fff;
+}
+/* The live preview at the top of the chapter editor. */
+.chapter-preview {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.chapter-preview .muted {
+  font-size: 13px;
+  line-height: 18px;
+}
 .chapter-cover--new {
   background: var(--surface-sunken) !important;
   border: 2px dashed var(--line-strong);

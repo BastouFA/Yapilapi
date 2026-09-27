@@ -16,11 +16,11 @@ import {
 } from '../../../packages/shared/src/constants';
 import { addDays, startOfDay } from '../../../packages/shared/src/date-picker';
 import { client, errorMessage } from '../lib/api';
-import { SYMBOL_ICON } from '../lib/chapters';
+import { CoverPreview, SYMBOL_ICON } from '../lib/chapters';
 import { DateField } from '../lib/date-time';
 import { useT } from '../lib/i18n';
 import { radius, space } from '../lib/theme';
-import { Button, Field, Icon, Loading, Notice, SwitchRow, useColors } from '../lib/ui';
+import { Button, Field, Icon, Loading, Notice, SwitchRow, useColors, userText } from '../lib/ui';
 
 const DAY = 86_400_000;
 /** The API's window for a time capsule's opening: an hour to 25 years from now (apps/api/src/modules/chapters.ts). */
@@ -120,6 +120,8 @@ export default function ChapterEdit() {
     </Pressable>
   );
 
+  // A story picked as the cover shows instead of the colour and symbol.
+  const coverStory = coverStoryId ? stories.find((x) => x.id === coverStoryId) : undefined;
   return (
     <ScrollView
       style={{ backgroundColor: c.ground }}
@@ -160,6 +162,36 @@ export default function ChapterEdit() {
           </View>
         </View>
       ) : null}
+      {/* Live preview: how the cover will look with the colour, symbol and story chosen below. */}
+      <View
+        accessibilityLiveRegion="polite"
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: space[3],
+          padding: space[3],
+          borderRadius: radius.md,
+          borderWidth: 1,
+          borderColor: c.line,
+          backgroundColor: c.surfaceSunken,
+        }}
+      >
+        <CoverPreview
+          size={60}
+          gradient={gradient}
+          symbol={symbol}
+          image={coverStory ? (coverStory.mediaKind === 'image' ? coverStory.mediaUrl : coverStory.posterUrl) : null}
+          locked={capsule}
+        />
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={[{ color: c.ink, fontWeight: '700' }, userText]} numberOfLines={1}>
+            {title.trim() || t('chapters.previewTitle')}
+          </Text>
+          <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>
+            {coverStory ? t('chapters.previewStoryCover') : capsule ? t('chapters.previewCapsule') : t('chapters.previewHint')}
+          </Text>
+        </View>
+      </View>
       <View style={{ gap: space[2] }}>
         <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.chapters.colour')}</Text>
         <View accessibilityRole="radiogroup" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>

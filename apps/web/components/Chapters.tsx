@@ -66,23 +66,49 @@ export const gradientCss = (g: ChapterGradient) => `linear-gradient(135deg, ${CH
 export const formatDay = (d: string, locale: string) => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(d));
 export const isSealed = (c: Chapter) => !!c.capsule && !c.capsule.open;
 
-/** A chapter's cover: one of its stories, or its gradient and symbol. A sealed capsule shows a lock. */
+/**
+ * A chapter's cover: one of its stories, or its gradient and symbol. A time capsule keeps its
+ * gradient and symbol with a small lock, since people may see the cover before it opens.
+ */
 export function ChapterCover({ chapter, size = 72 }: { chapter: Chapter; size?: number }) {
   const sealed = isSealed(chapter);
   const c = chapter.cover;
-  const style = { width: size, height: size, background: gradientCss(chapter.coverGradient) };
   if (c.kind === 'story' && !sealed) {
     const src = c.mediaKind === 'image' ? c.mediaUrl : c.posterUrl;
-    if (src)
-      return (
-        <span className="chapter-cover" style={style} aria-hidden>
-          <img src={src} alt="" />
-        </span>
-      );
+    if (src) return <CoverPreview size={size} gradient={chapter.coverGradient} image={src} />;
   }
   return (
-    <span className="chapter-cover" style={style} aria-hidden>
-      <Icon name={sealed ? 'lock' : ((c.kind === 'gradient' ? c.symbol : chapter.coverSymbol) as IconName)} size={Math.round(size * 0.4)} />
+    <CoverPreview
+      size={size}
+      gradient={chapter.coverGradient}
+      symbol={(c.kind === 'gradient' ? c.symbol : chapter.coverSymbol) as ChapterSymbol}
+      locked={!!chapter.capsule && !chapter.capsule.open}
+    />
+  );
+}
+
+/** The cover square itself, also used as the live preview while choosing a colour and symbol. */
+function CoverPreview({
+  size,
+  gradient,
+  symbol,
+  image,
+  locked,
+}: {
+  size: number;
+  gradient: ChapterGradient;
+  symbol?: ChapterSymbol;
+  image?: string | null;
+  locked?: boolean;
+}) {
+  return (
+    <span className="chapter-cover" style={{ width: size, height: size, background: gradientCss(gradient) }} aria-hidden>
+      {image ? <img src={image} alt="" /> : <Icon name={(symbol ?? 'star') as IconName} size={Math.round(size * 0.4)} />}
+      {locked ? (
+        <span className="chapter-cover__lock">
+          <Icon name="lock" size={Math.max(12, Math.round(size * 0.18))} />
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -546,6 +572,8 @@ export function ChapterEditor({
   }, [open, chapter]);
 
   const tomorrow = localDay(new Date(Date.now() + 86_400_000).toISOString());
+  // A story picked as the cover shows instead of the colour and symbol (they're kept for when it's gone).
+  const coverStory = coverStoryId ? stories.find((x) => x.id === coverStoryId) : undefined;
 
   return (
     <BottomSheet open={open} onClose={onClose} title={t(chapter ? 'chapters.editTitle' : 'm.chapters.new')}>
@@ -601,6 +629,19 @@ export function ChapterEditor({
             ))}
           </Select>
         ) : null}
+        <div className="chapter-preview" aria-live="polite">
+          <CoverPreview
+            size={64}
+            gradient={gradient}
+            symbol={symbol}
+            image={coverStory ? (coverStory.mediaKind === 'image' ? coverStory.mediaUrl : coverStory.posterUrl) : null}
+            locked={capsule}
+          />
+          <div className="stack-sm" style={{ gap: 2, minWidth: 0 }}>
+            <strong dir="auto">{title.trim() || t('chapters.previewTitle')}</strong>
+            <span className="muted">{coverStory ? t('chapters.previewStoryCover') : capsule ? t('chapters.previewCapsule') : t('chapters.previewHint')}</span>
+          </div>
+        </div>
         <fieldset className="chapter-swatches">
           <legend className="yp-field__label">{t('m.chapters.colour')}</legend>
           {CHAPTER_GRADIENT_NAMES.map((g) => (

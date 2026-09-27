@@ -277,13 +277,23 @@ export function SwitchRow({
 }) {
   const c = useColors();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
+    // The whole row toggles, not only the small switch; screen readers get one switch with its label.
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityLabel={label}
+      accessibilityHint={hint}
+      accessibilityState={{ checked: value, disabled: !!disabled }}
+      disabled={disabled}
+      onPress={() => onValueChange(!value)}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], opacity: disabled ? 0.5 : 1 }}
+    >
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={{ color: c.ink, fontSize: 15, fontWeight: '600' }}>{label}</Text>
         {hint ? <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{hint}</Text> : null}
       </View>
       <Switch
-        accessibilityLabel={label}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
         value={value}
         disabled={disabled}
         onValueChange={onValueChange}
@@ -291,7 +301,7 @@ export function SwitchRow({
         thumbColor={c.theme === 'dark' ? c.ink : '#FFFFFF'}
         ios_backgroundColor={c.line}
       />
-    </View>
+    </Pressable>
   );
 }
 
