@@ -29,6 +29,8 @@ export function FollowList({
   const [cursor, setCursor] = useState<string | null>(null);
   const [follows, setFollows] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  // People followed from this list just now keep a (no longer active) button, so focus isn't lost.
+  const [justFollowed, setJustFollowed] = useState<Set<string>>(new Set());
 
   useEffect(() => setTab(initial), [initial, open]);
   useEffect(() => {
@@ -59,7 +61,7 @@ export function FollowList({
   };
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={name}>
+    <BottomSheet open={open} onClose={onClose} title={t(tab === 'followers' ? 'follow.titleFollowers' : 'follow.titleFollowing', { name })}>
       <div className="stack">
         <Segments
           label={t('follow.list')}
@@ -88,14 +90,26 @@ export function FollowList({
                   }
                   secondary={`@${u.username}`}
                   end={
-                    u.id === me?.id ? null : follows.has(u.id) ? (
+                    u.id === me?.id ? null : justFollowed.has(u.id) && follows.has(u.id) ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        aria-disabled="true"
+                        aria-label={t('follow.followingName', { name: u.displayName })}
+                        onClick={() => {}}
+                      >
+                        {t('profile.unfollow')}
+                      </Button>
+                    ) : follows.has(u.id) ? (
                       <span className="muted" style={{ fontSize: 13 }}>
                         {t('profile.unfollow')}
                       </span>
                     ) : (
                       <Button
                         size="sm"
+                        aria-label={t('follow.followName', { name: u.displayName })}
                         onClick={async () => {
+                          setJustFollowed((f) => new Set(f).add(u.id));
                           setFollows((f) => new Set(f).add(u.id));
                           try {
                             await api.users.follow(u.id);

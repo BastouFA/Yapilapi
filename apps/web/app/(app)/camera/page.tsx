@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { Icon } from '@yapilapi/design-system';
+import { Icon, useModalFocus } from '@yapilapi/design-system';
 import { isVideoFile, MEDIA_ACCEPT, VIDEO_ACCEPT, type DualCorner, type MessageKey } from '@yapilapi/shared';
 import { DualReview, type DualShots } from '@/components/DualReview';
 import { canvasBlob, composeDual, grabFrame } from '@/lib/dual-photo';
@@ -56,6 +56,9 @@ function Camera() {
   const [dualCorner, setDualCorner] = useState<DualCorner>('top-left');
   const [dualBusy, setDualBusy] = useState(false);
   const readyWaiters = useRef<(() => void)[]>([]);
+  // Full screen over the app: focus moves in and stays in, Escape closes it (unless the both-sides review is open).
+  const root = useRef<HTMLDivElement>(null);
+  const modeTabs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const reelMax = me?.plus ? 600 : 180;
   const maxSeconds = mode === 'reel' ? reelMax : CLIP_MAX_SECONDS;
@@ -237,18 +240,46 @@ function Camera() {
     else if (Date.now() - pressAt.current < HOLD_MS + 50) takePhoto();
   };
 
+  useModalFocus(root, !dualShots, () => {
+    if (recording) stopRecording();
+    else router.back();
+  });
+
+  /** Choose a mode with the keyboard; `focus` moves focus to its tab (when the tabs have it). */
+  const pickMode = (to: number, focus: boolean) => {
+    if (recording || dualBusy) return;
+    const next = MODES[(to + MODES.length) % MODES.length]!;
+    setMode(next.id);
+    if (focus) modeTabs.current[next.id]?.focus();
+  };
+
   const onKey = (e: React.KeyboardEvent) => {
     // Keyboard: Enter or Space acts like a tap (photo, or start/stop a reel); R starts and stops a video.
     if (dualShots) return;
-    if ((e.key === 'r' || e.key === 'R') && !dual) {
+    const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+    if ((e.key === 'r' || e.key === 'R') && !dual && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) {
       e.preventDefault();
       return recording ? stopRecording() : startRecording();
     }
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    // Left and right switch the mode from anywhere on the camera, like swiping.
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !typing) {
       // The modes read right to left in right-to-left languages, so the arrows follow what is on screen.
       const rtl = getComputedStyle(e.currentTarget).direction === 'rtl';
       const i = MODES.findIndex((m) => m.id === mode) + ((e.key === 'ArrowRight') !== rtl ? 1 : -1);
-      if (MODES[i] && !recording) setMode(MODES[i]!.id);
+      // On the tabs, arrows wrap around; elsewhere they stop at the ends.
+      const onTabs = !!(e.target as HTMLElement).closest?.('[role="tablist"]');
+      if (MODES[i] || onTabs) {
+        e.preventDefault();
+        pickMode(i, onTabs);
+      }
+    }
+  };
+
+  // Tabs pattern: one tab stop; arrows (above), Home and End move and select.
+  const onTabsKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'Home' || e.key === 'End') {
+      e.preventDefault();
+      pickMode(e.key === 'Home' ? 0 : MODES.length - 1, true);
     }
   };
 
@@ -258,7 +289,7 @@ function Camera() {
   );
 
   return (
-    <div className="cam" role="dialog" aria-modal="true" aria-label={t('m.camera.title')} onKeyDown={onKey}>
+    <div ref={root} tabIndex={-1} className="cam" role="dialog" aria-modal="true" aria-label={t('m.camera.title')} onKeyDown={onKey}>
       <video ref={video} className={`cam__view${facing === 'user' ? ' cam__view--mirror' : ''}`} muted playsInline autoPlay aria-hidden />
       {flash ? <span className="cam__flash" aria-hidden /> : null}
 
@@ -362,13 +393,17 @@ function Camera() {
             )}
           </span>
         </div>
-        <div className="cam__modes" role="tablist" aria-label={t('m.create.mode')}>
+        <div className="cam__modes" role="tablist" aria-label={t('m.create.mode')} onKeyDown={onTabsKey}>
           {MODES.map((m) => (
             <button
               key={m.id}
+              ref={(el) => {
+                modeTabs.current[m.id] = el;
+              }}
               type="button"
               role="tab"
               aria-selected={m.id === mode}
+              tabIndex={m.id === mode ? 0 : -1}
               disabled={recording || dualBusy}
               className="cam__mode"
               onClick={() => setMode(m.id)}

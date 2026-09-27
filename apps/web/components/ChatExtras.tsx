@@ -58,7 +58,7 @@ export function MessageQuote({ preview, mine, meId, onJump }: { preview: Message
 
 /** Reaction counts under a bubble; selecting one adds or removes yours. */
 export function ReactionRow({ message, mine, onToggle }: { message: Message; mine: boolean; onToggle: (emoji: string, on: boolean) => void }) {
-  const { t } = useSession();
+  const { tp } = useSession();
   if (!message.reactions?.length) return null;
   return (
     <div className={`chat-reactions${mine ? ' chat-reactions--mine' : ''}`}>
@@ -67,8 +67,9 @@ export function ReactionRow({ message, mine, onToggle }: { message: Message; min
           key={r.emoji}
           type="button"
           className={`chat-reaction${r.mine ? ' chat-reaction--mine' : ''}`}
+          // A toggle: the name stays the same and aria-pressed says whether you reacted.
           aria-pressed={r.mine}
-          aria-label={t(r.mine ? 'chat.reaction.remove' : 'chat.reaction.add', { emoji: r.emoji, count: r.count })}
+          aria-label={tp('m.chat.reactionCount', r.count, { emoji: r.emoji })}
           onClick={() => onToggle(r.emoji, !r.mine)}
         >
           <span aria-hidden>{r.emoji}</span>
@@ -79,18 +80,32 @@ export function ReactionRow({ message, mine, onToggle }: { message: Message; min
   );
 }
 
-/** The row of quick reactions, shown from a message's actions. */
+/**
+ * The row of quick reactions, shown from a message's actions. Focus moves to the first one;
+ * arrows move between them; Escape closes it and focus goes back to where it came from (the
+ * React button or the message menu), as does picking one.
+ */
 export function ReactionPicker({ onPick, onClose }: { onPick: (emoji: string) => void; onClose: () => void }) {
   const { t } = useSession();
   const ref = useRef<HTMLDivElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
+    // Once: in development React runs this twice, and by then focus is already inside.
+    opener.current ??= document.activeElement instanceof HTMLElement ? document.activeElement : null;
     ref.current?.querySelector('button')?.focus();
-    const close = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) onClose();
+    const outside = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) close.current();
     };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [onClose]);
+    document.addEventListener('mousedown', outside);
+    return () => {
+      document.removeEventListener('mousedown', outside);
+      // Back to the opener, unless focus already moved on (a click elsewhere).
+      const lost = !document.activeElement || document.activeElement === document.body || ref.current?.contains(document.activeElement);
+      if (lost && opener.current?.isConnected) opener.current.focus({ preventScroll: true });
+    };
+  }, []);
   return (
     <div
       ref={ref}
@@ -98,7 +113,21 @@ export function ReactionPicker({ onPick, onClose }: { onPick: (emoji: string) =>
       role="group"
       aria-label={t('chat.react')}
       onKeyDown={(e) => {
-        if (e.key === 'Escape') onClose();
+        const items = [...(ref.current?.querySelectorAll<HTMLButtonElement>('button') ?? [])];
+        const i = items.indexOf(document.activeElement as HTMLButtonElement);
+        const move = { ArrowRight: i + 1, ArrowDown: i + 1, ArrowLeft: i - 1, ArrowUp: i - 1, Home: 0, End: items.length - 1 }[e.key];
+        if (move !== undefined) {
+          e.preventDefault();
+          items[(move + items.length) % items.length]?.focus();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        }
+      }}
+      onBlur={(e) => {
+        // Tabbing out closes it.
+        if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) onClose();
       }}
     >
       {QUICK_REACTIONS.map((e) => (
@@ -187,13 +216,23 @@ export function PinnedBar({
 
 /** Search the messages of this chat. Selecting a result goes to it. */
 export function ChatSearch({ conversationId, onJump, onClose }: { conversationId: string; onJump: (id: string) => void; onClose: () => void }) {
-  const { t, locale } = useSession();
+  const { t, tp, locale } = useSession();
   const [q, setQ] = useState('');
   const [results, setResults] = useState<Message[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
-  useEffect(() => input.current?.focus(), []);
+  // Focus moves into the search, and back to what opened it (the chat's options button) when it closes.
+  const opener = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    // Once: in development React runs this twice, and by then focus is already in the search box.
+    opener.current ??= document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    input.current?.focus();
+    return () => {
+      const back = opener.current;
+      if (back?.isConnected && (document.activeElement === document.body || !document.activeElement)) back.focus({ preventScroll: true });
+    };
+  }, []);
 
   useEffect(() => {
     const text = q.trim();
@@ -230,13 +269,27 @@ export function ChatSearch({ conversationId, onJump, onClose }: { conversationId
           maxLength={100}
           onChange={(e) => setQ(e.currentTarget.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Escape') onClose();
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              onClose();
+            }
           }}
         />
         <button type="button" className="yp-action" aria-label={t('chat.closeSearch')} onClick={onClose}>
           <Icon name="x" />
         </button>
       </div>
+      {/* Always present, so the number of results is announced as you type. */}
+      <p className="yp-visually-hidden" role="status">
+        {error ??
+          (results
+            ? results.length
+              ? cursor
+                ? t('m.chat.searchFoundMore', { count: results.length })
+                : tp('m.chat.searchFound', results.length)
+              : t('m.chat.searchNone')
+            : '')}
+      </p>
       {error ? <p className="muted">{error}</p> : null}
       {results ? (
         results.length ? (
@@ -268,9 +321,7 @@ export function ChatSearch({ conversationId, onJump, onClose }: { conversationId
             ) : null}
           </ul>
         ) : (
-          <p className="muted" role="status">
-            {t('m.chat.searchNone')}
-          </p>
+          <p className="muted">{t('m.chat.searchNone')}</p>
         )
       ) : null}
     </div>

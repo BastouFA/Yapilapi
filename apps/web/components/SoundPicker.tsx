@@ -34,7 +34,7 @@ export function SoundPlayButton({ sound, size = 'md' }: { sound: Pick<Sound, 'ti
       <button
         type="button"
         className={`sound-play${size === 'lg' ? ' sound-play--lg' : ''}`}
-        aria-pressed={playing}
+        // The name says what pressing does (Play or Pause), so no aria-pressed as well.
         aria-label={t(playing ? 'sounds.pause' : 'sounds.play', { title: sound.title })}
         onClick={() => {
           const a = audio.current;
@@ -96,7 +96,9 @@ export function SoundPicker({ open, onClose, onPick }: { open: boolean; onClose:
         />
         {error ? <p className="muted">{error}</p> : null}
         {items === null ? (
-          <p className="muted">{t('m.music.loading')}</p>
+          <p className="muted" role="status">
+            {t('m.music.loading')}
+          </p>
         ) : items.length ? (
           <ul className="sound-list">
             {items.map((s) => (
@@ -110,7 +112,7 @@ export function SoundPicker({ open, onClose, onPick }: { open: boolean; onClose:
                     {s.stories ? ` · ${tp('m.sound.storyCount', s.stories)}` : ''}
                   </span>
                 </span>
-                <Button size="sm" variant="secondary" onClick={() => onPick(s)}>
+                <Button size="sm" variant="secondary" aria-label={t('m.music.useTitle', { title: s.title })} onClick={() => onPick(s)}>
                   {t('m.music.use')}
                 </Button>
               </li>

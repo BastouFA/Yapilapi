@@ -587,8 +587,9 @@ export default function ChatPage() {
         }}
       >
         {replyTo || editing ? (
-          <div className="chat-compose-context" role="status">
-            <div style={{ minWidth: 0 }}>
+          <div className="chat-compose-context">
+            {/* The message box is described by this, so "Replying to …" is read when it gets focus. */}
+            <div style={{ minWidth: 0 }} id="compose-context">
               <span className="chat-compose-context__label">
                 {editing
                   ? t('m.chat.editing')
@@ -609,7 +610,16 @@ export default function ChatPage() {
                 </span>
               ) : null}
             </div>
-            <button type="button" className="yp-action" aria-label={editing ? t('m.chat.cancelEdit') : t('m.chat.cancelReply')} onClick={cancelCompose}>
+            <button
+              type="button"
+              className="yp-action"
+              aria-label={editing ? t('m.chat.cancelEdit') : t('m.chat.cancelReply')}
+              onClick={() => {
+                cancelCompose();
+                // This button goes away; keep focus in the message box.
+                composer.current?.focus();
+              }}
+            >
               <Icon name="x" size={18} />
             </button>
           </div>
@@ -663,6 +673,7 @@ export default function ChatPage() {
           id="msg"
           rows={1}
           placeholder={t('inbox.placeholder')}
+          aria-describedby={replyTo || editing ? 'compose-context' : undefined}
           value={body}
           maxLength={4000}
           onChange={(e) => setBody(e.currentTarget.value)}

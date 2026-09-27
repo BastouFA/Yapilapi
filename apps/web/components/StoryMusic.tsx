@@ -182,6 +182,12 @@ export function StoryMusicField({ value, onChange, video }: { value: DraftMusic 
   const { t } = useSession();
   const [picking, setPicking] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+  // After a sound is picked the "Add music" button is gone: focus goes to "Choose another sound".
+  const another = useRef<HTMLButtonElement>(null);
+  const [picked, setPicked] = useState(0);
+  useEffect(() => {
+    if (picked) another.current?.focus();
+  }, [picked]);
   const preview = value ? draftAsStoryMusic(value) : null;
   useMusicLoop(preview, previewing);
   useEffect(() => {
@@ -200,7 +206,7 @@ export function StoryMusicField({ value, onChange, video }: { value: DraftMusic 
             <button
               type="button"
               className="sound-play"
-              aria-pressed={previewing}
+              // The name says what pressing does, so no aria-pressed as well.
               aria-label={t(previewing ? 'm.music.stopPart' : 'm.music.playPart')}
               disabled={!value.sound.audioUrl}
               onClick={() => setPreviewing((p) => !p)}
@@ -250,7 +256,7 @@ export function StoryMusicField({ value, onChange, video }: { value: DraftMusic 
             {t(video ? 'm.music.videoHint' : 'm.music.moveHint')}
           </p>
           <div className="row">
-            <Button size="sm" variant="secondary" icon="music" onClick={() => (setPreviewing(false), setPicking(true))}>
+            <Button ref={another} size="sm" variant="secondary" icon="music" onClick={() => (setPreviewing(false), setPicking(true))}>
               {t('m.music.another')}
             </Button>
           </div>
@@ -268,6 +274,7 @@ export function StoryMusicField({ value, onChange, video }: { value: DraftMusic 
         onPick={(s) => {
           onChange(value ? { ...value, sound: s, startMs: 0 } : draftMusic(s));
           setPicking(false);
+          setPicked((n) => n + 1);
         }}
       />
     </section>

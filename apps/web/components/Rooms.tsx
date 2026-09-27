@@ -384,12 +384,18 @@ export function RoomsProvider({ children }: { children: React.ReactNode }) {
         ctx.createMediaStreamSource(s).connect(analyser);
         return { uid, analyser, buf: new Uint8Array(analyser.fftSize) };
       });
+    // Someone stays "speaking" through short pauses, so the ring doesn't flicker between words
+    // (longer with reduced motion, where it should change as little as possible).
+    const hold = matchMedia('(prefers-reduced-motion: reduce)').matches ? 2000 : 700;
+    const lastLoud = new Map<string, number>();
     const timer = setInterval(() => {
       if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
+      const at = Date.now();
       const now = new Set<string>();
       for (const m of meters) {
         m.analyser.getByteTimeDomainData(m.buf);
-        if (speechLevel(m.buf) > ROOM_SPEAKING_LEVEL) now.add(m.uid);
+        if (speechLevel(m.buf) > ROOM_SPEAKING_LEVEL) lastLoud.set(m.uid, at);
+        if (at - (lastLoud.get(m.uid) ?? 0) < hold) now.add(m.uid);
       }
       setSpeaking((prev) => (prev.size === now.size && [...now].every((x) => prev.has(x)) ? prev : now));
     }, 200);
@@ -489,6 +495,14 @@ export function RoomView({ id }: { id: string }) {
   const [env, setEnv] = useState<RoomEnvelope | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
+  // Joining swaps the Join button for the room controls: focus goes to the room's title, not nowhere.
+  const title = useRef<HTMLHeadingElement>(null);
+  const wasJoined = useRef(false);
+  const isJoined = rooms.room?.id === id;
+  useEffect(() => {
+    if (isJoined && !wasJoined.current && (!document.activeElement || document.activeElement === document.body)) title.current?.focus();
+    wasJoined.current = isJoined;
+  }, [isJoined]);
 
   const load = useCallback(
     () =>
@@ -521,7 +535,7 @@ export function RoomView({ id }: { id: string }) {
         {room.community.name}
       </Link>
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <h1 className="profile__name" style={{ margin: 0 }}>
+        <h1 ref={title} tabIndex={-1} className="profile__name" style={{ margin: 0 }}>
           {room.title}
         </h1>
         {room.status === 'live' ? (
@@ -574,7 +588,7 @@ export function RoomView({ id }: { id: string }) {
         {header}
         {env.removed ? <Alert tone="warning">{t('m.rooms.removed')}</Alert> : null}
         {room.speakers.length ? (
-          <div className="room-stage" aria-label={t('m.rooms.speakers')}>
+          <div className="room-stage" role="group" aria-label={t('m.rooms.speakers')}>
             {room.speakers.map((p) => (
               <SpeakerTile key={p.user.id} p={p} speaking={false} />
             ))}
@@ -648,7 +662,10 @@ export function RoomView({ id }: { id: string }) {
         <h2 id="room-listeners" className="room__heading">
           {t('m.rooms.listeners')} <span className="muted">{room.listeners.length}</span>
         </h2>
-        {canHost && hands.length ? <p className="muted">{tp('rooms.handsRaised', hands.length)}</p> : null}
+        {/* Always rendered, so hosts hear hands going up while they're elsewhere in the room. */}
+        <p className="muted room__hands" role="status">
+          {canHost && hands.length ? tp('rooms.handsRaised', hands.length) : ''}
+        </p>
         {room.listeners.length ? (
           <ul className="room-listeners">
             {room.listeners.map((p) => {
@@ -670,7 +687,7 @@ export function RoomView({ id }: { id: string }) {
         )}
       </section>
 
-      <div className="room-controls" role="toolbar" aria-label={t('rooms.controls')}>
+      <div className="room-controls" role="group" aria-label={t('rooms.controls')}>
         {mine?.role === 'speaker' ? (
           <>
             <Button
@@ -689,13 +706,14 @@ export function RoomView({ id }: { id: string }) {
             {t('m.rooms.speak')}
           </Button>
         ) : (
+          // A toggle: the name stays "Raise hand" and aria-pressed says whether it's up.
           <Button
             icon="hand"
             variant={mine?.handRaised ? 'primary' : 'secondary'}
             aria-pressed={!!mine?.handRaised}
             onClick={() => void rooms.act((rid) => api.rooms.hand(rid, !mine?.handRaised))}
           >
-            {mine?.handRaised ? t('m.rooms.lowerHand') : t('m.rooms.raiseHand')}
+            {t('m.rooms.raiseHand')}
           </Button>
         )}
         <span className="room-controls__reactions" role="group" aria-label={t('m.rooms.reactions')}>
@@ -808,7 +826,7 @@ function ScheduledRoom({
             }
           }}
         >
-          {room.remindMe ? t('m.rooms.reminding') : t('m.rooms.remind')}
+          {t('m.rooms.remind')}
         </Button>
         {canHost ? (
           <>
@@ -990,7 +1008,7 @@ export function CommunityRooms({ slug, isMember }: { slug: string; isMember: boo
                   }
                 }}
               >
-                {r.remindMe ? t('rooms.remindingShort') : t('m.rooms.remind')}
+                {t('m.rooms.remind')}
               </Button>
             </div>
           ) : null}
