@@ -44,6 +44,7 @@ import {
   SystemLine,
   type SheetAction,
 } from '../../lib/chat-extras';
+import { ListCard, ListComposer, PollCard, PollComposer, ReminderNote, ReminderPicker } from '../../lib/chat-polls';
 
 /** Voice messages shorter than this are treated as a slip of the finger and not sent. */
 const MIN_VOICE_MS = 1000;
@@ -77,6 +78,10 @@ export default function Chat() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [disappearingOpen, setDisappearingOpen] = useState(false);
   const [highlight, setHighlight] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [pollOpen, setPollOpen] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
+  const [remindFor, setRemindFor] = useState<{ message: Message; scope: 'me' | 'group' } | null>(null);
   const input = useRef<TextInput>(null);
   const patchMessage = (messageId: string, fn: (m: Message) => Message) => setMessages((cur) => cur.map((x) => (x.id === messageId ? fn(x) : x)));
   const loadPins = useCallback(async () => {
@@ -124,7 +129,18 @@ export default function Chat() {
       );
     }
     if (e.type === 'message.unsent' && e.data?.conversationId === id) {
-      patchMessage(e.data.id, (x) => ({ ...x, unsent: true, body: '', attachments: [], reactions: undefined, viewOnce: undefined, story: undefined }));
+      patchMessage(e.data.id, (x) => ({
+        ...x,
+        unsent: true,
+        body: '',
+        attachments: [],
+        reactions: undefined,
+        viewOnce: undefined,
+        story: undefined,
+        poll: undefined,
+        list: undefined,
+        reminder: undefined,
+      }));
       setMessages((cur) =>
         cur.map((x) => (x.replyTo && x.replyTo.id === e.data.id ? { ...x, replyTo: { ...x.replyTo, unsent: true, body: '', attachmentKind: null } } : x)),
       );
@@ -135,6 +151,10 @@ export default function Chat() {
     if (e.type === 'message.reaction' && e.data?.conversationId === id && e.data.userId !== me?.id)
       patchMessage(e.data.id, (x) => applyReaction(x, e.data.emoji, false, !!e.data.removed));
     if (e.type === 'conversation.pins' && e.data?.conversationId === id) void loadPins();
+    // Live poll results and list changes, each as you see them; your next reminder on a message.
+    if (e.type === 'poll.updated' && e.data?.conversationId === id) patchMessage(e.data.id, (x) => (x.unsent ? x : { ...x, poll: e.data.poll }));
+    if (e.type === 'list.updated' && e.data?.conversationId === id) patchMessage(e.data.id, (x) => (x.unsent ? x : { ...x, list: e.data.list }));
+    if (e.type === 'message.reminder' && e.data?.conversationId === id) patchMessage(e.data.id, (x) => ({ ...x, reminder: e.data.reminder ?? undefined }));
     if (e.type === 'conversation.updated' && e.data?.id === id)
       setConversation((cur) => (cur ? { ...cur, disappearingSeconds: e.data.disappearingSeconds } : cur));
     if (e.type === 'app.foreground') void load();
@@ -452,7 +472,8 @@ export default function Chat() {
   /** The long-press menu for one message. */
   function sheetActions(m: Message): SheetAction[] {
     const mine = m.sender.id === me?.id;
-    const editable = mine && !m.kind && !m.viewOnce && !m.unsent && Date.now() - new Date(m.createdAt).getTime() < MESSAGE_EDIT_MINUTES * 60_000;
+    const editable =
+      mine && !m.kind && !m.viewOnce && !m.poll && !m.list && !m.unsent && Date.now() - new Date(m.createdAt).getTime() < MESSAGE_EDIT_MINUTES * 60_000;
     const out: SheetAction[] = [];
     if (!m.unsent) out.push({ label: t('m.chat.reply'), icon: 'arrow-undo-outline', onPress: () => startReply(m) });
     if (editable) out.push({ label: t('m.chat.edit'), icon: 'create-outline', onPress: () => startEdit(m) });
@@ -462,6 +483,38 @@ export default function Chat() {
           ? { label: t('m.chat.unpin'), icon: 'pin-outline', onPress: () => void run(async () => setPins((await (await client()).messages.unpin(m.id)).items)) }
           : { label: t('m.chat.pin'), icon: 'pin-outline', onPress: () => void run(async () => setPins((await (await client()).messages.pin(m.id)).items)) },
       );
+    if (!m.unsent && !m.moderation) {
+      const reminder = m.reminder;
+      out.push(
+        reminder
+          ? {
+              label: t('m.chat.remind.cancel'),
+              icon: 'notifications-off-outline',
+              onPress: () =>
+                void run(async () => {
+                  await (await client()).messages.cancelReminder(reminder.id);
+                  patchMessage(m.id, (x) => ({ ...x, reminder: undefined }));
+                }),
+            }
+          : {
+              label: t('m.chat.remind.me'),
+              icon: 'notifications-outline',
+              onPress: () => {
+                setActionsFor(null);
+                setRemindFor({ message: m, scope: 'me' });
+              },
+            },
+      );
+      if (conversation?.kind === 'group' && conversation.myRole === 'admin')
+        out.push({
+          label: t('m.chat.remind.group'),
+          icon: 'people-outline',
+          onPress: () => {
+            setActionsFor(null);
+            setRemindFor({ message: m, scope: 'group' });
+          },
+        });
+    }
     out.push({
       label: t('m.chat.deleteForMe'),
       icon: 'trash-outline',
@@ -588,17 +641,24 @@ export default function Chat() {
           setTimeout(() => list.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: true }), 100);
         }}
         renderItem={({ item }) => {
-          if (item.kind === 'system') return <SystemLine message={item} meId={me?.id} />;
+          if (item.kind === 'system') return <SystemLine message={item} meId={me?.id} onJump={(mid) => void jumpTo(mid)} />;
           const mine = item.sender.id === me?.id;
+          const rich = !item.unsent && (item.poll || item.list);
           const text = item.unsent
             ? t(mine ? 'm.chat.unsentMine' : 'm.chat.unsent')
-            : item.body || (item.attachments.length || item.story ? '' : t('m.message.deleted'));
+            : rich
+              ? ''
+              : item.body || (item.attachments.length || item.story ? '' : t('m.message.deleted'));
           const tint = mine ? c.onYapi : c.ink;
           const quote = item.replyTo && !item.unsent ? <Quote preview={item.replyTo} tint={tint} meId={me?.id} onJump={(mid) => void jumpTo(mid)} /> : null;
           const textStyle = item.unsent ? { fontStyle: 'italic' as const, opacity: 0.8 } : null;
           const meta = item.editedAt && !item.unsent ? <Text style={{ color: tint, fontSize: 11, opacity: 0.75 }}>{t('m.chat.edited')}</Text> : null;
           const openActions = () => setActionsFor(item);
-          const media = item.unsent ? null : item.viewOnce ? (
+          const media = item.unsent ? null : item.poll ? (
+            <PollCard message={item} meId={me?.id} tint={tint} onPoll={(poll) => patchMessage(item.id, (x) => ({ ...x, poll }))} />
+          ) : item.list ? (
+            <ListCard message={item} meId={me?.id} tint={tint} onList={(l) => patchMessage(item.id, (x) => ({ ...x, list: l }))} />
+          ) : item.viewOnce ? (
             <ViewOnceBubble message={item} mine={mine} tint={tint} onChange={replaceMessage} />
           ) : (
             <>
@@ -623,6 +683,7 @@ export default function Chat() {
               </Pressable>
               <ReactionRow message={item} mine onToggle={(emoji, on) => void react(item, emoji, on)} />
               {item.moderation === 'review' ? <Text style={{ color: c.inkMuted, fontSize: 12, alignSelf: 'flex-end' }}>{t('m.chat.held')}</Text> : null}
+              {item.reminder && !item.unsent ? <ReminderNote at={item.reminder.remindAt} alignEnd /> : null}
             </View>
           ) : (
             <View style={{ alignSelf: 'flex-start', maxWidth: '80%', gap: 2 }}>
@@ -640,6 +701,7 @@ export default function Chat() {
                 {meta}
               </Pressable>
               <ReactionRow message={item} mine={false} onToggle={(emoji, on) => void react(item, emoji, on)} />
+              {item.reminder && !item.unsent ? <ReminderNote at={item.reminder.remindAt} alignEnd={false} /> : null}
             </View>
           );
           return (
@@ -779,6 +841,15 @@ export default function Chat() {
           </View>
         ) : (
           <>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('m.chat.addMenu')}
+              disabled={sending}
+              onPress={() => setAddOpen(true)}
+              style={{ width: 32, height: 44, alignItems: 'center', justifyContent: 'center', opacity: sending ? 0.45 : 1 }}
+            >
+              <Icon name="add-circle-outline" size={26} color={c.inkMuted} />
+            </Pressable>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('m.chat.sendPhoto')}
@@ -927,6 +998,48 @@ export default function Chat() {
           </Pressable>
         ))}
       </Sheet>
+      <Sheet open={addOpen} onClose={() => setAddOpen(false)} title={t('m.chat.addMenu')}>
+        {[
+          { label: t('m.chat.poll.new'), icon: 'stats-chart-outline' as const, onPress: () => setPollOpen(true) },
+          { label: t('m.chat.list.new'), icon: 'checkbox-outline' as const, onPress: () => setListOpen(true) },
+        ].map((row) => (
+          <Pressable
+            key={row.icon}
+            accessibilityRole="button"
+            onPress={() => {
+              setAddOpen(false);
+              row.onPress();
+            }}
+            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44, opacity: pressed ? 0.7 : 1 })}
+          >
+            <Icon name={row.icon} size={22} color={c.ink} />
+            <Text style={{ color: c.ink, fontSize: 16, fontWeight: '600' }}>{row.label}</Text>
+          </Pressable>
+        ))}
+      </Sheet>
+      <PollComposer
+        open={pollOpen}
+        onClose={() => setPollOpen(false)}
+        conversationId={id}
+        onSent={(m) => setMessages((cur) => (cur.some((x) => x.id === m.id) ? cur : [...cur, m]))}
+      />
+      <ListComposer
+        open={listOpen}
+        onClose={() => setListOpen(false)}
+        conversationId={id}
+        onSent={(m) => setMessages((cur) => (cur.some((x) => x.id === m.id) ? cur : [...cur, m]))}
+      />
+      <ReminderPicker
+        message={remindFor?.message ?? null}
+        scope={remindFor?.scope ?? 'me'}
+        onClose={() => setRemindFor(null)}
+        onError={setError}
+        onSet={(r) => {
+          // Your own reminder shows on the message (the earliest one); the group's shows as a line at its time.
+          if (r.scope === 'me')
+            patchMessage(r.messageId, (x) => (x.reminder && x.reminder.remindAt <= r.remindAt ? x : { ...x, reminder: { id: r.id, remindAt: r.remindAt } }));
+        }}
+      />
       <SearchSheet conversationId={id} open={searchOpen} onClose={() => setSearchOpen(false)} onJump={(mid) => void jumpTo(mid)} />
       <DisappearingSheet
         open={disappearingOpen}
