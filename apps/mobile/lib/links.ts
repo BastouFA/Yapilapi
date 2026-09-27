@@ -20,6 +20,9 @@ export function notificationHref(n: NotificationTarget): string | null {
   const id = n.entityId ? encodeURIComponent(n.entityId) : null;
   if ((n.type === 'reel_duet' || n.type === 'reel_remix') && id) return `/reels?start=${id}`;
   if (n.type === 'recap_ready' || n.type === 'recap_failed' || n.entityType === 'recap') return id ? `/recaps?open=${id}` : '/recaps';
+  // Watch together: an invite opens the session (it says when it has ended); the weekly wrap opens that week.
+  if (n.type === 'watch_invite' || n.entityType === 'watch') return id ? `/watch/${id}` : null;
+  if (n.type === 'weekly_wrap' || n.entityType === 'wrap') return id ? `/wraps/${id}` : '/wraps';
   if (n.type === 'account_limited' || n.type === 'account_review') return '/settings';
   // A sign-in from a new device: where you're signed in, to log it out, and your password.
   if (n.type === 'new_sign_in') return '/settings/security';

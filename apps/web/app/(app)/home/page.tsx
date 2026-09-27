@@ -12,6 +12,7 @@ import { PostList } from '@/components/PostList';
 import { StarterRow } from '@/components/StarterRow';
 import { CatchUpCard } from '@/components/AiHelpers';
 import { SuggestedPeople } from '@/components/SuggestedPeople';
+import { PulseCards } from '@/components/WeeklyWrap';
 import { useSession } from '../../providers';
 
 export default function Home() {
@@ -66,6 +67,9 @@ export default function Home() {
           </Link>
         </div>
       </div>
+
+      {/* This week's wrap and "On this day", when there are any: gentle, and easy to put away. */}
+      <PulseCards />
 
       <MomentsStrip groups={moments} onOpen={setViewing} onCreate={() => router.push('/camera?mode=story')} locale={locale} />
 

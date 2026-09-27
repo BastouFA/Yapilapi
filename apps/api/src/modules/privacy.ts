@@ -90,6 +90,10 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       usernameChanges: await q(`SELECT old_username, new_username, changed_at, held_until FROM username_history WHERE user_id = $1 ORDER BY changed_at DESC`),
       signInDevices: await q(`SELECT fingerprint, first_seen_at, last_seen_at FROM known_sign_ins WHERE user_id = $1 ORDER BY last_seen_at DESC`),
       scheduledMessages: await q(`SELECT conversation_id, body, send_at, status, created_at FROM scheduled_messages WHERE sender_id = $1 ORDER BY send_at`),
+      // Your weekly wraps (weeks with something in them): the counts and what they pointed to.
+      weeklyWraps: await q(
+        `SELECT week_start, timezone, summary, moment_post_id, created_at FROM weekly_wraps WHERE user_id = $1 AND NOT empty ORDER BY week_start DESC`,
+      ),
     };
     await db.query(`INSERT INTO privacy_requests (user_id, kind, status, completed_at) VALUES ($1,'export','completed',now())`, [u.id]);
     reply.header('content-disposition', `attachment; filename="yapilapi-export-${u.id}.json"`);
@@ -158,6 +162,9 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         `DELETE FROM media WHERE owner_id = $1`,
         `DELETE FROM share_videos sv USING posts p WHERE p.id = sv.post_id AND p.author_id = $1`,
         `UPDATE recaps SET deleted_at = coalesce(deleted_at, now()) WHERE owner_id = $1`,
+        // Weekly wraps are theirs alone; they stop watching together.
+        `DELETE FROM weekly_wraps WHERE user_id = $1`,
+        `UPDATE watch_participants SET left_at = now() WHERE user_id = $1 AND left_at IS NULL`,
         // Product analytics stay in the totals without being linked to them.
         `UPDATE analytics_events SET user_id = NULL WHERE user_id = $1`,
         `UPDATE conversation_members SET left_at = now() WHERE user_id = $1`,

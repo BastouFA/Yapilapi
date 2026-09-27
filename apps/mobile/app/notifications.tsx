@@ -49,6 +49,7 @@ const TEXT: Record<string, MessageKey> = {
   yap_received: 'm.notif.yap',
   view_once_screenshot: 'm.notif.viewOnceScreenshot',
   chapter_invite: 'm.notif.chapterInvite',
+  watch_invite: 'watch.invite',
 };
 
 /** Several people doing the same thing to the same post (or following you), in one row. */
@@ -79,6 +80,7 @@ const OWN_TEXT: Record<string, MessageKey> = {
   media_restored: 'm.notif.mediaRestored',
   account_limited: 'm.notif.accountLimited',
   chapter_opened: 'm.notif.capsuleOpened',
+  weekly_wrap: 'wrap.notif',
 };
 
 type Group = { key: string; items: NotificationItem[]; actors: PublicUser[] };

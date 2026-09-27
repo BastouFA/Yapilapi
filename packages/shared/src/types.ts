@@ -501,6 +501,11 @@ export type MessageSystemInfo =
       messageId: string;
       /** The message it's about, as you see it (null when it's gone). */
       message?: MessagePreview | null;
+    }
+  | {
+      /** "Watch together" started here. The sender started it; the session may have ended since. */
+      type: 'watch';
+      sessionId: string;
     };
 
 /** One option of a poll in a chat. */

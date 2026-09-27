@@ -79,6 +79,8 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
 function hrefFor(n: NotificationItem): string | undefined {
   if (n.type === 'new_sign_in') return '/settings/security?review=sign-in';
   if (n.type === 'reel_duet' || n.type === 'reel_remix') return `/reels?start=${n.entityId}`;
+  if (n.type === 'weekly_wrap' || n.entityType === 'wrap') return n.entityId ? `/wraps/${n.entityId}` : '/wraps';
+  if (n.type === 'watch_invite' || n.entityType === 'watch') return n.entityId ? `/watch/${n.entityId}` : '/inbox';
   if (n.entityType === 'chapter') return `/chapters/${n.entityId}`;
   if (n.entityType === 'recap' || n.type === 'recap_ready' || n.type === 'recap_failed') return n.entityId ? `/recaps?open=${n.entityId}` : '/recaps';
   if (n.entityType === 'board') return `/boards/${n.entityId}`;
@@ -112,6 +114,9 @@ function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): s
     return typeof n.data.place === 'string' && n.data.place ? t('m.notif.newSignInPlace', { device, place: n.data.place }) : t('m.notif.newSignIn', { device });
   }
   if (n.type === 'scheduled_message_failed') return t('m.notif.scheduledMessageFailed');
+  // Whole sentences in your language (the name, when there is one, is part of them).
+  if (n.type === 'weekly_wrap') return t('wrap.notif');
+  if (n.type === 'watch_invite') return t('watch.invite', { name: n.actor?.displayName ?? t('m.calls.someone') });
   if (n.type !== 'comment_like' && n.type !== 'comment_reply') return null;
   const name = n.actor?.displayName ?? '';
   const others = Math.max(0, Number(n.data.count ?? 1) - 1);

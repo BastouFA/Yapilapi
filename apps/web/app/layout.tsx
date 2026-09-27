@@ -5,6 +5,7 @@ import '@yapilapi/design-system/components.css';
 import '@yapilapi/design-system/social.css';
 import './globals.css';
 import './settings.css';
+import './watch.css';
 import { Providers } from './providers';
 import { THEME_SCRIPT } from '@/lib/theme-script';
 

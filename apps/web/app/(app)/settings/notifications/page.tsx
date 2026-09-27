@@ -1,9 +1,9 @@
 'use client';
 
-import { BrowserPushCard, CategoriesCard, PauseCard, QuietHoursCard } from '@/components/settings/Notifications';
+import { BrowserPushCard, CategoriesCard, PauseCard, QuietHoursCard, WeeklyWrapCard } from '@/components/settings/Notifications';
 import { SettingsPage } from '@/components/settings/Shell';
 
-/** Notifications: on this browser, pausing, quiet hours, and which kinds you get. */
+/** Notifications: on this browser, pausing, quiet hours, which kinds you get, and the weekly wrap. */
 export default function NotificationSettings() {
   return (
     <SettingsPage section="notifications">
@@ -11,6 +11,7 @@ export default function NotificationSettings() {
       <PauseCard />
       <QuietHoursCard />
       <CategoriesCard />
+      <WeeklyWrapCard />
     </SettingsPage>
   );
 }

@@ -5,6 +5,7 @@ import { useT } from '../../lib/i18n';
 import { VerificationCard } from '../../lib/safety';
 import { useSession } from '../../lib/session';
 import { SECTIONS, type SectionId } from '../../lib/settings-catalog';
+import { WeeklyWrapSettingsCard } from '../../lib/wrap';
 import {
   About,
   AccountDetails,
@@ -62,6 +63,7 @@ function Content({ section }: { section: SectionId }): ReactNode {
           <PushOnThisPhone />
           <QuietHours />
           <NotificationSettings />
+          <WeeklyWrapSettingsCard />
         </>
       );
     case 'feed':

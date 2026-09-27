@@ -107,6 +107,8 @@ const TEXT: Record<string, (actor: string) => string> = {
   new_sign_in: () => 'New sign-in to your account from a device we haven’t seen before',
   recap_ready: () => 'Your recap video is ready',
   recap_failed: () => "We couldn't make your recap video",
+  watch_invite: (a) => `${a} wants to watch together`,
+  weekly_wrap: () => 'Your week in YAPILAPI is ready to look back on',
 };
 
 /** Human text for a notification type, or null for types that shouldn't push. */

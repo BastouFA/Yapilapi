@@ -22,3 +22,5 @@ export * from './profile-style.ts';
 export * from './usernames.ts';
 export * from './chat-theme.ts';
 export * from './accounts.ts';
+export * from './watch.ts';
+export * from './wrap.ts';
