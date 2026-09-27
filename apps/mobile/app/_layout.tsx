@@ -19,7 +19,8 @@ function Heartbeat() {
 }
 
 /**
- * Tabs live in (tabs); detail screens (chat, post, community, event, place, settings, Real, Reels) push on top.
+ * Tabs live in (tabs); detail screens (chat, post, community, event, place, settings, Real, Reels, memories,
+ * Together, Live) push on top.
  * Links from outside (yapilapi://…, web paths) are mapped in +native-intent.tsx; push taps in useNotificationLinks.
  */
 function Screens() {
@@ -67,6 +68,12 @@ function Screens() {
         <Stack.Screen name="settings" options={{ title: t('m.title.settings') }} />
         <Stack.Screen name="notifications" options={{ title: t('notifications.title') }} />
         <Stack.Screen name="real" options={{ title: t('m.title.real') }} />
+        <Stack.Screen name="memories/index" options={{ title: t('memories.title') }} />
+        <Stack.Screen name="memories/[id]" options={{ title: t('memories.title') }} />
+        <Stack.Screen name="together/index" options={{ title: t('m.together.title') }} />
+        <Stack.Screen name="together/[id]" options={{ title: t('m.together.title') }} />
+        <Stack.Screen name="live/index" options={{ title: t('m.live.title') }} />
+        <Stack.Screen name="live/[id]" options={{ title: t('m.live.title') }} />
         <Stack.Screen name="assistant" options={{ title: t('m.title.assistant') }} />
         <Stack.Screen name="events" options={{ title: t('events.title') }} />
         <Stack.Screen name="event/[id]" options={{ title: t('m.event.title') }} />

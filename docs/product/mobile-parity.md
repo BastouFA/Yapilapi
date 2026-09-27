@@ -6,7 +6,7 @@ on the web for now), **No** (not in the phone app yet), **Web only** (on purpose
 
 Last reviewed: September 2026, after the parity pass that added the Wander search, grouped
 notifications, event and place pages, follow lists, the profile menu, profile editing and the
-remaining settings.
+remaining settings, then memories, Together and watching lives.
 
 ## Pages
 
@@ -48,9 +48,9 @@ remaining settings.
 | `/real`                                      | Real                                                                                        | `real`                                                            | Yes      |                                                                                                                                                                                                              |
 | `/assistant`                                 | Assistant                                                                                   | `assistant`                                                       | Yes      |                                                                                                                                                                                                              |
 | `/settings`                                  | Profile, attention, privacy, security, safety                                               | `settings`, `profile-edit`                                        | Partial  | See the settings table.                                                                                                                                                                                      |
-| `/live`, `/live/[id]`                        | Live video                                                                                  | -                                                                 | No       | Needs a native broadcast pipeline; live notifications open the person's profile.                                                                                                                             |
-| `/together`, `/together/[id]`                | Together albums                                                                             | -                                                                 | No       |                                                                                                                                                                                                              |
-| `/memories`, `/memories/[id]`                | Memories                                                                                    | -                                                                 | No       | Recaps cover the everyday part.                                                                                                                                                                              |
+| `/live`, `/live/[id]` | Live video | `live/index`, `live/[id]` | Partial | Watching: live now and coming up, the video (HLS with each viewer's signed link), chat and questions that update live, gifts shown in the chat, host and moderators remove messages or people, the host can end. Tickets and gifts are paid for on the web ("Buy a ticket on the web", "Send a gift on the web"); the screen checks the ticket again on coming back. Going live needs streaming software on a computer, and the screen says so. |
+| `/together`, `/together/[id]` | Together albums | `together/index`, `together/[id]`, `real?together=<id>` | Yes | Your Togethers, starting one with friends, members, photos with sensitive ones blurred, closing (creator). "Add your view" takes a photo with the Real camera. New photos arrive live. |
+| `/memories`, `/memories/[id]` | Memories | `memories/index`, `memories/[id]`, post More menu | Yes | Your memories and ones shared with you, making one, from an event you went to, On this day, rename, delete, remove items, share with friends, the AI recap, and making a recap video. "Add to a memory" is in a post's More menu. The phone adds rename and removing items, which the web page doesn't have. |
 | `/plus`                                      | YAPILAPI Plus                                                                               | `invite` (status only)                                            | Partial  | Buying Plus is on the web.                                                                                                                                                                                   |
 | `/studio`                                    | Creator studio: analytics, ads, sales                                                       | -                                                                 | Web only |                                                                                                                                                                                                              |
 | `/developers`                                | API keys and webhooks                                                                       | -                                                                 | Web only |                                                                                                                                                                                                              |
@@ -107,6 +107,9 @@ Taps on push notifications open the screen the notification is about (`lib/links
 | `yapilapi://event/<id>`, `/events/<id>`       | Event                   |
 | `yapilapi://chapter/<id>`, `/chapters/<id>`   | Chapter                 |
 | `yapilapi://search?q=…`                       | Wander, searching       |
+| `yapilapi://memories/<id>`, `/memories/<id>`  | Memory                  |
+| `yapilapi://together/<id>`, `/together/<id>`  | Together                |
+| `yapilapi://live/<id>`, `/live/<id>`          | Live                    |
 
 Universal links (https links opening the app) need `associatedDomains` and an Android intent
 filter with a verified host, which are native configuration changes and not set up yet; the
@@ -114,8 +117,10 @@ mapping above already handles those paths once they are.
 
 ## Still missing, and why
 
-- **Live and Together**: need native video broadcasting or shared albums that aren't built for
-  the phone yet.
+- **Going live**: publishing needs streaming software (RTMP) on a computer; the phone app watches
+  lives, and says where to go live from.
+- **Buying live tickets and sending gifts**: checkout isn't in the phone app, so these open the
+  live's page on the web.
 - **Creating communities and events**: rarely done, long forms; on the web.
 - **Two-step verification, passkeys, connected apps, data export, account deletion, appeals**:
   security and account flows that need care on a phone (authenticator setup, passkey native

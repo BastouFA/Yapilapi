@@ -14,7 +14,7 @@ export type NotificationTarget = {
 /**
  * Where a notification opens in the app: the same places as the web notifications page
  * (apps/web/app/(app)/notifications/page.tsx, hrefFor), at the phone app's paths. Things the
- * phone app can't show yet (a live, a Together, an ad) open the person who did it, or nothing.
+ * phone app can't show yet (an ad) open the person who did it, or nothing.
  */
 export function notificationHref(n: NotificationTarget): string | null {
   const id = n.entityId ? encodeURIComponent(n.entityId) : null;
@@ -36,6 +36,12 @@ export function notificationHref(n: NotificationTarget): string | null {
       return id ? `/room/${id}` : null;
     case 'event':
       return id ? `/event/${id}` : null;
+    case 'live':
+      return id ? `/live/${id}` : '/live';
+    case 'together':
+      return id ? `/together/${id}` : '/together';
+    case 'memory':
+      return id ? `/memories/${id}` : '/memories';
     case 'conversation':
       return id ? `/chat/${id}` : null;
     case 'friend_request':
@@ -90,6 +96,8 @@ const RENAMED: Record<string, string> = {
   tags: 't',
   stories: 's',
   story: 's',
+  memory: 'memories',
+  lives: 'live',
 };
 
 /**

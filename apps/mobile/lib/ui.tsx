@@ -101,6 +101,8 @@ export function Button({
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
+      // Small buttons are 36pt tall; the touch area still reaches 44pt.
+      hitSlop={size === 'sm' ? 4 : undefined}
       style={({ pressed }) => [{ borderRadius: radius.full, opacity: disabled ? 0.45 : pressed ? 0.85 : 1, overflow: 'hidden' }, style]}
     >
       {variant === 'primary' ? (
@@ -353,6 +355,16 @@ export function PlusBadge() {
       style={{ backgroundColor: c.saffronSoft, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1, alignSelf: 'center' }}
     >
       <Text style={{ color: c.ink, fontSize: 10, fontWeight: '800' }}>{t('plus.short')}</Text>
+    </View>
+  );
+}
+
+/** A small label: "Closed", "Scheduled", or (tone live) "Live". */
+export function Pill({ text, tone = 'neutral' }: { text: string; tone?: 'neutral' | 'live' }) {
+  const c = useColors();
+  return (
+    <View style={{ backgroundColor: tone === 'live' ? c.danger : c.surfaceSunken, borderRadius: radius.full, paddingHorizontal: space[2], paddingVertical: 2 }}>
+      <Text style={{ color: tone === 'live' ? c.onDanger : c.inkMuted, fontSize: 12, fontWeight: '700' }}>{text}</Text>
     </View>
   );
 }
