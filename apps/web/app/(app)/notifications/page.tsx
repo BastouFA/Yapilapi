@@ -33,6 +33,7 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
   invite_joined: () => 'joined YAPILAPI with your invite',
   plus_referral_reward: (n) => `You have ${Number(n.data.days ?? 30)} more days of YAPILAPI Plus, thanks to friends you invited.`,
   live_started: () => 'is live now',
+  room_live: (n) => `started the room “${String(n.data.title ?? '')}” you asked about`,
   booking_request: () => 'asked to book',
   booking_decided: () => 'Your booking was updated',
   call_incoming: () => 'called you',
@@ -79,6 +80,7 @@ function hrefFor(n: NotificationItem): string | undefined {
   if (n.entityType === 'post') return `/p/${n.entityId}`;
   if (n.entityType === 'moment') return `/s/${n.entityId}`;
   if (n.entityType === 'live') return `/live/${n.entityId}`;
+  if (n.entityType === 'room') return `/rooms/${n.entityId}`;
   if (n.entityType === 'family_link') return '/settings';
   if (n.entityType === 'ad_campaign') return '/studio';
   if (n.entityType === 'plus') return '/plus';

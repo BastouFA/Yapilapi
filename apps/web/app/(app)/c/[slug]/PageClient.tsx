@@ -4,11 +4,12 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { AIPanel, Alert, Avatar, Badge, Button, EmptyState, EventCard, List, ListItem, Skeleton, Tabs } from '@yapilapi/design-system';
-import type { Community, EventItem, PublicUser } from '@yapilapi/shared';
+import type { Community, EventItem, PublicUser, RoomSummary } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { PostList } from '@/components/PostList';
 import { CommunityFaq } from '@/components/CommunityExtras';
+import { CommunityRooms } from '@/components/Rooms';
 import { JoinNote, NeedsAccount, useSignIn } from '@/components/SignedOut';
 import { useSession } from '../../../providers';
 
@@ -26,6 +27,7 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
   const [summary, setSummary] = useState<{ text: string; notice?: string } | null>(null);
   const [summarizing, setSummarizing] = useState(false);
   const [tab, setTab] = useState('posts');
+  const [liveRoom, setLiveRoom] = useState<RoomSummary | null>(null);
 
   const reload = useCallback(
     () =>
@@ -55,6 +57,14 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
         () => setEvents([]),
       );
   }, [tab, c, slug, members, events, toast]);
+  // A live room shows above the tabs.
+  useEffect(() => {
+    if (!c || signedOut) return;
+    api.communities.rooms(slug).then(
+      (r) => setLiveRoom(r.items.find((x) => x.status === 'live') ?? null),
+      () => setLiveRoom(null),
+    );
+  }, [c, slug, signedOut]);
   const load = useCallback((cursor?: string) => api.communities.posts(slug, cursor), [slug]);
 
   if (signedOut && !isPublic) return <NeedsAccount title="Sign in to see this community" body="Private communities are only open to their members." />;
@@ -175,6 +185,14 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
         </AIPanel>
       ) : null}
 
+      {liveRoom && tab !== 'rooms' ? (
+        <Link href={`/rooms/${liveRoom.id}`} className="room-banner">
+          <Badge tone="danger">Live</Badge>
+          <span className="room-banner__title">{liveRoom.title}</span>
+          <span className="muted">{liveRoom.listenerCount} listening</span>
+        </Link>
+      ) : null}
+
       <Tabs
         id="community-tabs"
         panelId="community-panel"
@@ -183,6 +201,7 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
         tabs={[
           { id: 'posts', label: 'Posts' },
           { id: 'faq', label: 'FAQ' },
+          { id: 'rooms', label: 'Rooms' },
           { id: 'events', label: 'Events' },
           ...(signedOut ? [] : [{ id: 'members', label: 'Members', count: c.memberCount }]),
         ]}
@@ -199,6 +218,12 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
             <Alert tone="info">Join this private community to see its FAQ.</Alert>
           ) : (
             <CommunityFaq slug={slug} />
+          )
+        ) : tab === 'rooms' ? (
+          signedOut ? (
+            <Alert tone="info">Sign in and join this community to listen to its rooms.</Alert>
+          ) : (
+            <CommunityRooms slug={slug} isMember={isMember} />
           )
         ) : tab === 'events' ? (
           events === null ? (

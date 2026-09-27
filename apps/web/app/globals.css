@@ -752,6 +752,285 @@ h3 {
   flex-wrap: wrap;
 }
 
+/* Audio rooms */
+.room-audio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.room {
+  position: relative;
+}
+.room__heading {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  margin: 0 0 var(--space-3);
+  font: 700 16px/24px var(--font-sans);
+}
+.room-stage {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: var(--space-3);
+}
+.room-speaker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  text-align: center;
+}
+.room-speaker .yp-menu {
+  position: absolute;
+  top: var(--space-1);
+  inset-inline-end: var(--space-1);
+}
+.room-speaker__avatar {
+  position: relative;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 3px transparent;
+  transition: box-shadow var(--duration-fast) ease-out;
+}
+.room-speaker.is-speaking .room-speaker__avatar {
+  box-shadow:
+    0 0 0 3px var(--surface),
+    0 0 0 6px var(--success);
+}
+.room-speaker__muted {
+  position: absolute;
+  inset-inline-end: -4px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  color: var(--ink-muted);
+  border: 2px solid var(--surface);
+}
+.room-speaker__name {
+  font: 600 14px/20px var(--font-sans);
+  overflow-wrap: anywhere;
+}
+.room-speaker__meta {
+  font: 500 12px/16px var(--font-sans);
+}
+.room-listeners {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.room-listeners li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-md);
+}
+.room-listeners__name {
+  flex: 1;
+  min-width: 0;
+  font: 500 14px/20px var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.room-controls {
+  position: sticky;
+  bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-lg);
+}
+@media (min-width: 900px) {
+  .room-controls {
+    bottom: var(--space-4);
+  }
+}
+.room-controls__reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  max-width: 100%;
+}
+.room-react {
+  display: grid;
+  place-items: center;
+  width: var(--control-md);
+  height: var(--control-md);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.room-react:hover {
+  background: var(--surface-sunken);
+  color: var(--yapi);
+}
+.room-react:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.room-reactions {
+  position: relative;
+  height: 0;
+  pointer-events: none;
+}
+.room-reactions__float {
+  position: absolute;
+  bottom: 0;
+  color: var(--yapi);
+  animation: room-float 2.6s ease-out forwards;
+}
+@keyframes room-float {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-140px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .room-reactions__float {
+    animation: room-fade 2.6s linear forwards;
+  }
+  @keyframes room-fade {
+    to {
+      opacity: 0;
+    }
+  }
+}
+.room-ended {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  text-align: center;
+}
+.room-ended p {
+  margin: 0;
+}
+.room-card,
+.room-new {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.room-card p,
+.room-new p {
+  margin: 0;
+}
+.room-card__head {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.room-card__title {
+  font: 700 16px/22px var(--font-sans);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.room-banner {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--yapi-soft);
+  color: var(--ink);
+  text-decoration: none;
+}
+.room-banner__title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.room-mini {
+  position: fixed;
+  z-index: 60;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-lg);
+}
+@media (min-width: 900px) {
+  .room-mini {
+    left: auto;
+    right: var(--space-4);
+    bottom: var(--space-4);
+    width: 360px;
+  }
+}
+.room-mini__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  color: var(--ink);
+  text-decoration: none;
+}
+.room-mini__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font: 500 13px/18px var(--font-sans);
+}
+.room-mini__text strong,
+.room-mini__text span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.room-mini__live {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  background: var(--danger);
+}
+.room-mini__live.is-speaking {
+  background: var(--success);
+  box-shadow: 0 0 0 4px var(--success-soft);
+}
+
 /* Community FAQ and similar questions */
 .faq {
   display: flex;

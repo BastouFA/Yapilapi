@@ -211,3 +211,14 @@ export const SAVE_NOTE_MAX = 280;
 /** Filters on the Saved page and inside a board. */
 export const SAVED_FILTERS = ['all', 'photos', 'videos', 'text'] as const;
 export type SavedFilter = (typeof SAVED_FILTERS)[number];
+/**
+ * Live audio rooms in communities. Audio runs as a WebRTC mesh today (every
+ * speaker sends to everyone in the room), which is what caps a room's size.
+ */
+export const ROOM_MAX_SPEAKERS = 6;
+export const ROOM_MAX_LISTENERS = 50;
+export const ROOM_TITLE_MAX = 120;
+/** Live reactions: names from the design-system icon set, never emoji. */
+export const ROOM_REACTIONS = ['heart', 'star', 'sparkle', 'check', 'music'] as const;
+export type RoomReaction = (typeof ROOM_REACTIONS)[number];
+export type RoomStatus = 'scheduled' | 'live' | 'ended' | 'cancelled';

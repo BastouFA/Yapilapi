@@ -6,6 +6,7 @@ import { NavBar, Skeleton, type NavEntry } from '@yapilapi/design-system';
 import { NextLink } from '@/lib/link';
 import { CallsProvider } from '@/components/Calls';
 import { CheckoutProvider } from '@/components/Checkout';
+import { RoomsProvider } from '@/components/Rooms';
 import { Sidebar } from '@/components/Sidebar';
 import { isPublicPath, SignedOutShell } from '@/components/SignedOut';
 import { UsageHeartbeat } from '@/components/UsageHeartbeat';
@@ -71,17 +72,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <CallsProvider>
-      <CheckoutProvider>
-        <div className="yp-shell">
-          <NavBar items={items} current={currentTab(path, me.username)} linkAs={NextLink} locale={locale} logoSrc="/mark.svg" searchHref="/search" />
-          <main className="yp-shell__main" id="main">
-            {children}
-          </main>
-          <Sidebar />
-          <UsageHeartbeat />
-          <YapPlayer />
-        </div>
-      </CheckoutProvider>
+      <RoomsProvider>
+        <CheckoutProvider>
+          <div className="yp-shell">
+            <NavBar items={items} current={currentTab(path, me.username)} linkAs={NextLink} locale={locale} logoSrc="/mark.svg" searchHref="/search" />
+            <main className="yp-shell__main" id="main">
+              {children}
+            </main>
+            <Sidebar />
+            <UsageHeartbeat />
+            <YapPlayer />
+          </div>
+        </CheckoutProvider>
+      </RoomsProvider>
     </CallsProvider>
   );
 }

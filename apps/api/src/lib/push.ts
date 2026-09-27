@@ -61,6 +61,7 @@ const TEXT: Record<string, (actor: string) => string> = {
   event_rsvp: (a) => `${a} is going to your event`,
   call_incoming: (a) => `${a} is calling you`,
   live_started: (a) => `${a} is live now`,
+  room_live: () => 'A room you asked about has started',
   together_invite: (a) => `${a} invited you to a Together`,
   order_paid: () => 'You have a new paid order',
   booking_request: (a) => `${a} asked to book`,
