@@ -112,7 +112,7 @@ export const REPORT_REASONS = [
 ] as const;
 
 /** What can be reported. A story is a moment; a live is a live session; a room is an audio room. */
-export const REPORT_TARGETS = ['user', 'post', 'comment', 'message', 'community', 'event', 'product', 'story', 'room', 'live'] as const;
+export const REPORT_TARGETS = ['user', 'post', 'comment', 'message', 'community', 'event', 'product', 'story', 'room', 'live', 'drop'] as const;
 
 export const FEEDBACK_SIGNALS = ['more_like_this', 'less_like_this', 'not_interested', 'mute_topic', 'mute_creator'] as const;
 

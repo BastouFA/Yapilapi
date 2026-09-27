@@ -14,7 +14,12 @@ import { LegalLinks } from './Legal';
 
 /** Pages someone can open from a shared link without signing in. */
 export function isPublicPath(path: string): boolean {
-  return /^\/(p|u|c|t|boards)\/[^/]+\/?$/.test(path) || /^\/events\/(?!new\/?$)[^/]+\/?$/.test(path) || /^\/reels\/?$/.test(path);
+  return (
+    /^\/(p|u|c|t|boards)\/[^/]+\/?$/.test(path) ||
+    /^\/events\/(?!new\/?$)[^/]+\/?$/.test(path) ||
+    /^\/drops\/(?!new\/?$)[^/]+\/?$/.test(path) ||
+    /^\/reels\/?$/.test(path)
+  );
 }
 
 /** The current page (with its query), for coming back after signing in. Falls back to `path` on the server. */

@@ -29,6 +29,7 @@ import {
 import { ShopList, SupportCard } from './money';
 import { isVerificationError, VerifyPrompt } from './safety';
 import { ChaptersRow } from './chapters';
+import { DropsRow } from './drops';
 import { ProfileBoards } from './boards';
 import { ProfileMenu } from './profile-menu';
 import { FeaturedRow, ProfileAbout, ProfileLinks, ProfileSongChip, tabLabel, useTint } from './profile-style';
@@ -407,6 +408,7 @@ export function ProfileView({
         <SupportCard userId={profile.id} username={profile.username} name={profile.displayName} isCreator={profile.mode === 'creator'} />
       )}
       <FeaturedRow posts={profile.featured} tint={tint} />
+      {rel.blocked ? null : <DropsRow userId={profile.id} isSelf={rel.isSelf} />}
       {profile.tabs.length > 1 ? (
         <Segmented
           label={t('m.title.profile')}

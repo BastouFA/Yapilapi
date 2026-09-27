@@ -69,6 +69,7 @@ import phoneModule from './modules/phone.ts';
 import publicModule from './modules/public.ts';
 import growthModule from './modules/growth.ts';
 import moneyModule from './modules/money.ts';
+import dropsModule from './modules/drops.ts';
 import musicModule from './modules/music.ts';
 import { musicCatalogFromConfig } from './lib/music/index.ts';
 import { createPushSender } from './lib/push.ts';
@@ -400,6 +401,7 @@ export async function buildApp(
     growthModule,
     publicModule,
     moneyModule,
+    dropsModule,
     phoneModule,
   ])
     await mod(app, ctx);

@@ -41,6 +41,8 @@ export function notificationHref(n: NotificationTarget): string | null {
       return id ? `/room/${id}` : null;
     case 'event':
       return id ? `/event/${id}` : null;
+    case 'drop':
+      return id ? `/drop/${id}` : null;
     case 'live':
       return id ? `/live/${id}` : '/live';
     case 'together':
@@ -94,6 +96,7 @@ const RENAMED: Record<string, string> = {
   rooms: 'room',
   chapters: 'chapter',
   events: 'event',
+  drops: 'drop',
   places: 'place',
   post: 'p',
   posts: 'p',
@@ -138,6 +141,8 @@ export function appPath(link: string): string {
   if (first === 'events' && second && parts[2] === 'edit') return `/event-edit?id=${encodeURIComponent(second)}`;
   if (first === 'c' && second && parts[2] === 'settings') return `/community-settings?slug=${encodeURIComponent(second)}`;
   if (first === 'plus') return '/plus';
+  // Making or changing a drop happens on the web; the phone opens your drops.
+  if (first === 'drops' && (second === 'new' || parts[2] === 'edit')) return '/drops';
   // A friend's invite link opens sign-up with their code filled in.
   if (first === 'join' && second) return `/signup?invite=${encodeURIComponent(second)}`;
   // Creators and money: Studio, a creator's plans, one thing from a shop, boosting and a post's insights.

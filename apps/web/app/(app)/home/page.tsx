@@ -12,6 +12,7 @@ import { PostList } from '@/components/PostList';
 import { StarterRow } from '@/components/StarterRow';
 import { CatchUpCard } from '@/components/AiHelpers';
 import { SuggestedPeople } from '@/components/SuggestedPeople';
+import { FollowingDrops } from '@/components/Drops';
 import { useSession } from '../../providers';
 
 export default function Home() {
@@ -71,6 +72,9 @@ export default function Home() {
 
       {/* After 12 hours or more away: a summary of what your people shared, on request. */}
       <CatchUpCard />
+
+      {/* Launches from people you follow: when they open, and a Notify me on each drop's page. */}
+      <FollowingDrops />
 
       <Segments
         label="Feed"

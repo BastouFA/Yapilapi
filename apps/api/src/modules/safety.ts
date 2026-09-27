@@ -36,6 +36,7 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       story: `SELECT author_id AS uid FROM moments WHERE id = $1 AND deleted_at IS NULL`,
       room: `SELECT created_by AS uid FROM rooms WHERE id = $1`,
       live: `SELECT host_id AS uid FROM live_sessions WHERE id = $1`,
+      drop: `SELECT seller_id AS uid FROM drops WHERE id = $1 AND status <> 'draft' AND deleted_at IS NULL`,
     };
     const r = await db.query(q[type]!, [id]);
     return r.rows[0]?.uid ?? null;
@@ -220,6 +221,15 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       if (mc.target_type === 'community') await c.query(`UPDATE communities SET deleted_at = now() WHERE id = $1`, [mc.target_id]);
       if (mc.target_type === 'event') await c.query(`UPDATE events SET deleted_at = now() WHERE id = $1`, [mc.target_id]);
       if (mc.target_type === 'product') await c.query(`UPDATE products SET deleted_at = now() WHERE id = $1`, [mc.target_id]);
+      // A removed drop is hidden from everyone and, if it hadn't ended, stops.
+      if (mc.target_type === 'drop')
+        await c.query(
+          `UPDATE drops SET deleted_at = coalesce(deleted_at, now()), updated_at = now(),
+                  status = CASE WHEN status IN ('draft', 'scheduled', 'open') THEN 'cancelled' ELSE status END,
+                  cancelled_at = CASE WHEN status IN ('draft', 'scheduled', 'open') THEN now() ELSE cancelled_at END
+           WHERE id = $1`,
+          [mc.target_id],
+        );
       if (mc.target_type === 'story') await c.query(`UPDATE moments SET deleted_at = coalesce(deleted_at, now()) WHERE id = $1`, [mc.target_id]);
       // A removed room or live ends now; its history stays for the case.
       if (mc.target_type === 'room')

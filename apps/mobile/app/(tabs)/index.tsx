@@ -14,6 +14,7 @@ import { orderStories, StoriesStrip, StoryViewer } from '../../lib/stories';
 import { useSession } from '../../lib/session';
 import { StarterRow } from '../../lib/starter';
 import { CatchUpCard } from '../../lib/ai-helpers';
+import { FollowingDrops } from '../../lib/drops';
 import { space } from '../../lib/theme';
 import { ErrorState, feedListProps, Icon, Loading, Segmented, SkeletonList, useColors, useTabBarSpace } from '../../lib/ui';
 
@@ -133,6 +134,8 @@ function Feed() {
             <StoriesStrip groups={stories} onOpen={setViewing} onCreate={() => router.push({ pathname: '/camera', params: { mode: 'story' } })} />
             {/* After 12 hours or more away: a summary of what your people shared, on request. */}
             <CatchUpCard />
+            {/* Launches from people you follow: when they open, and a Notify me on each drop. */}
+            <FollowingDrops />
             {/* With nothing in the feed, the empty state below does the starter row's job. */}
             {posts?.length ? <StarterRow /> : null}
             <Segmented label={t('m.feed.label')} options={MODES.map((m) => ({ id: m.id, label: t(m.label) }))} value={mode} onChange={setMode} />

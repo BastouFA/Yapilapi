@@ -619,7 +619,9 @@ export const createOrderSchema = z.object({
   items: z
     .array(z.object({ productId: uuid, quantity: z.number().int().min(1).max(100) }))
     .min(1)
-    .max(50),
+    .max(50)
+    // One line per product (with its quantity): stock and per-buyer limits count the whole amount.
+    .refine((items) => new Set(items.map((i) => i.productId)).size === items.length, 'List each product once, with its quantity.'),
   idempotencyKey: z.string().min(8).max(100),
   /** Buying a ticket for this live: the order must contain the live's ticket, and it only unlocks this live. */
   liveSessionId: uuid.optional(),

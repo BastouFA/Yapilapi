@@ -2,8 +2,8 @@
  * The share image for each kind of shared link. Anything that isn't public
  * gets the plain site card, so an image never reveals more than the page does.
  */
-import { getPublicCommunity, getPublicEvent, getPublicPost, getPublicProfile } from './public';
-import { eventWhen, eventWhere } from './metadata';
+import { getPublicCommunity, getPublicDrop, getPublicEvent, getPublicPost, getPublicProfile } from './public';
+import { dropWhen, eventWhen, eventWhere } from './metadata';
 import { card, embeddableImage, plural, siteCard } from './og';
 
 export async function postShareImage(id: string) {
@@ -62,5 +62,20 @@ export async function communityShareImage(slug: string) {
     subtitle: community.topics.length ? community.topics.map((t) => `#${t}`).join('  ') : undefined,
     body: community.excerpt || 'A community on YAPILAPI.',
     footer: plural(community.memberCount, 'member', 'members'),
+  });
+}
+
+export async function dropShareImage(id: string) {
+  const drop = await getPublicDrop(id);
+  if (!drop) return siteCard();
+  const [avatar, image] = await Promise.all([embeddableImage(drop.seller.avatarUrl), embeddableImage(drop.coverUrl)]);
+  return card({
+    eyebrow: 'Drop',
+    title: drop.title,
+    subtitle: dropWhen(drop),
+    body: drop.excerpt || `A drop by ${drop.seller.displayName}.`,
+    avatar: { src: avatar, name: drop.seller.displayName },
+    image,
+    footer: `By ${drop.seller.displayName} · ${plural(drop.itemCount, 'product', 'products')}`,
   });
 }

@@ -80,6 +80,7 @@ function hrefFor(n: NotificationItem): string | undefined {
   if (n.type === 'new_sign_in') return '/settings/security?review=sign-in';
   if (n.type === 'reel_duet' || n.type === 'reel_remix') return `/reels?start=${n.entityId}`;
   if (n.entityType === 'chapter') return `/chapters/${n.entityId}`;
+  if (n.entityType === 'drop') return `/drops/${n.entityId}`;
   if (n.entityType === 'recap' || n.type === 'recap_ready' || n.type === 'recap_failed') return n.entityId ? `/recaps?open=${n.entityId}` : '/recaps';
   if (n.entityType === 'board') return `/boards/${n.entityId}`;
   if (n.entityType === 'draft') return `/create?draft=${n.entityId}`;
@@ -112,6 +113,11 @@ function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): s
     return typeof n.data.place === 'string' && n.data.place ? t('m.notif.newSignInPlace', { device, place: n.data.place }) : t('m.notif.newSignIn', { device });
   }
   if (n.type === 'scheduled_message_failed') return t('m.notif.scheduledMessageFailed');
+  // Drops: plain words, with the drop's name.
+  const title = String(n.data.title ?? '');
+  if (n.type === 'drop_opened') return t('m.notif.dropOpened', { name: n.actor?.displayName ?? '', title });
+  if (n.type === 'drop_cancelled') return t('m.notif.dropCancelled', { name: n.actor?.displayName ?? '', title });
+  if (n.type === 'drop_sold_out') return t('m.notif.dropSoldOut', { title });
   if (n.type !== 'comment_like' && n.type !== 'comment_reply') return null;
   const name = n.actor?.displayName ?? '';
   const others = Math.max(0, Number(n.data.count ?? 1) - 1);

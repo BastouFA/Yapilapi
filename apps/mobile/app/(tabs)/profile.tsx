@@ -47,6 +47,7 @@ export default function ProfileScreen() {
     { label: t('invite.title'), icon: 'gift-outline', href: '/invite' },
     { label: t('m.studio.title'), icon: 'stats-chart-outline', href: '/studio', on: hasStudio(me.mode) },
     { label: t('m.purchases.title'), icon: 'bag-handle-outline', href: '/purchases' },
+    { label: t('m.drops.yours'), icon: 'pricetags-outline', href: '/drops' },
     { label: t('plus.title'), icon: 'sparkles-outline', href: '/plus' },
     { label: t('m.title.real'), icon: 'camera-outline', href: '/real' },
     { label: t('m.title.settings'), icon: 'settings-outline', href: '/settings' },
