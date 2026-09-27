@@ -3,9 +3,8 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import type { MemorySummary } from '../../../packages/api-client/src/index';
 import { client, errorMessage } from './api';
 import { useT } from './i18n';
-import { Sheet } from './post-edit';
 import { radius, space } from './theme';
-import { Button, Field, Icon, Notice, useColors, userText } from './ui';
+import { BottomSheet, Button, Field, Icon, Notice, useColors, userText } from './ui';
 
 /** "3 items · Private", "Shared", or "Shared with you" under a memory's name. */
 export function useMemoryMeta() {
@@ -86,7 +85,7 @@ export function AddToMemorySheet({ postId, onClose }: { postId: string | null; o
   }
 
   return (
-    <Sheet visible={!!postId} title={t('m.mem.addTitle')} onClose={onClose}>
+    <BottomSheet visible={!!postId} title={t('m.mem.addTitle')} onClose={onClose}>
       {note ? <Notice tone={note.tone}>{note.text}</Notice> : null}
       {items === null ? (
         <ActivityIndicator color={c.yapi} accessibilityLabel={t('common.loading')} style={{ paddingVertical: space[4] }} />
@@ -144,9 +143,9 @@ export function AddToMemorySheet({ postId, onClose }: { postId: string | null; o
         returnKeyType="done"
         onSubmitEditing={() => void createAndAdd()}
       />
-      <Button label={t('m.mem.createAndAdd')} variant="secondary" disabled={!title.trim() || !!busy} onPress={() => void createAndAdd()} />
+      <Button label={t('m.mem.createAndAdd')} variant="secondary" disabled={!title.trim() || !!busy} onPress={() => createAndAdd()} />
       <Button label={t('m.common.done')} onPress={onClose} />
-    </Sheet>
+    </BottomSheet>
   );
 }
 

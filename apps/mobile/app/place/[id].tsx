@@ -8,7 +8,7 @@ import { BookPlace, ManageBookings, MyBookings, PlaceReviews, RatingLine, usePla
 import { SectionHeader } from '../../lib/chips';
 import { useT } from '../../lib/i18n';
 import { space } from '../../lib/theme';
-import { Button, Card, EmptyState, Icon, Loading, Row, useColors, userText } from '../../lib/ui';
+import { Button, Card, EmptyState, Icon, Loading, Row, useColors, useRefresh, userText } from '../../lib/ui';
 
 type PlaceData = { place: Record<string, any>; events: EventItem[]; products: Record<string, any>[] };
 
@@ -27,11 +27,16 @@ export default function PlaceScreen() {
   const hasBusiness = !!data?.place.business;
   const owner = usePlaceOwner(id, hasBusiness);
 
-  useEffect(() => {
-    void client()
-      .then((api) => api.places.get(id))
-      .then(setData, () => setData(null));
+  const load = useCallback(async () => {
+    try {
+      setData(await (await client()).places.get(id));
+    } catch {
+      setData((cur) => cur ?? null);
+    }
   }, [id]);
+  useEffect(() => {
+    void load();
+  }, [load]);
   const loadReviews = useCallback(async () => {
     try {
       setReviews(await (await client()).reviews.list(id));
@@ -42,12 +47,13 @@ export default function PlaceScreen() {
   useEffect(() => {
     void loadReviews();
   }, [loadReviews]);
+  const refresh = useRefresh(() => Promise.all([load(), loadReviews()]));
 
   if (data === undefined) return <Loading />;
   if (data === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>
-        <EmptyState title={t('m.place.notFound')} />
+        <EmptyState title={t('m.place.notFound')} action={{ label: t('m.common.retry'), icon: 'refresh', onPress: () => void load() }} />
       </View>
     );
 
@@ -57,7 +63,12 @@ export default function PlaceScreen() {
   const hasMap = typeof place.lat === 'number' && typeof place.lng === 'number';
 
   return (
-    <ScrollView style={{ backgroundColor: c.ground }} contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}>
+    <ScrollView
+      keyboardShouldPersistTaps="handled"
+      refreshControl={refresh}
+      style={{ backgroundColor: c.ground }}
+      contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
+    >
       <Card style={{ gap: space[2] }}>
         {place.category ? (
           <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '700', textTransform: 'capitalize' }}>{String(place.category)}</Text>
@@ -80,7 +91,7 @@ export default function PlaceScreen() {
             variant="secondary"
             size="sm"
             style={{ alignSelf: 'flex-start' }}
-            onPress={() => void Linking.openURL(`https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lng}#map=17/${place.lat}/${place.lng}`)}
+            onPress={() => Linking.openURL(`https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lng}#map=17/${place.lat}/${place.lng}`)}
           />
         ) : null}
       </Card>

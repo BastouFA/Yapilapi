@@ -9,7 +9,22 @@ import { pickOne, uploadPicked } from './media';
 import { liveStatus, NowStatusLine, onStatusChanged } from './now-status';
 import { PostCard, RichText } from './post';
 import { radius, space } from './theme';
-import { Avatar, Button, Card, EmptyState, Icon, Notice, PlusBadge, Segmented, Skeleton, SkeletonList, useColors, userText } from './ui';
+import {
+  Avatar,
+  Button,
+  Card,
+  EmptyState,
+  feedListProps,
+  Icon,
+  Notice,
+  PlusBadge,
+  Segmented,
+  Skeleton,
+  SkeletonList,
+  useActionSheet,
+  useColors,
+  userText,
+} from './ui';
 import { ShopList, SupportCard } from './money';
 import { isVerificationError, VerifyPrompt } from './safety';
 import { ChaptersRow } from './chapters';
@@ -32,6 +47,7 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
+  const coverMenu = useActionSheet();
   const [needsVerify, setNeedsVerify] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState<'posts' | 'tagged' | 'boards' | 'shop'>('posts');
@@ -98,7 +114,7 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
   if (profile === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>
-        <EmptyState title={t('m.post.unavailable.title')} />
+        <EmptyState title={t('m.post.unavailable.title')} action={{ label: t('m.common.retry'), icon: 'refresh', onPress: () => void load() }} />
       </View>
     );
 
@@ -160,11 +176,13 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
 
   function editCover() {
     if (!profile?.coverUrl) return void changeCover();
-    Alert.alert(t('m.cover.edit'), undefined, [
-      { text: t('m.cover.choose'), onPress: () => void changeCover() },
-      { text: t('m.cover.remove'), style: 'destructive', onPress: removeCover },
-      { text: t('common.cancel'), style: 'cancel' },
-    ]);
+    coverMenu.show({
+      title: t('m.cover.edit'),
+      actions: [
+        { label: t('m.cover.choose'), icon: 'image-outline', onPress: () => void changeCover() },
+        { label: t('m.cover.remove'), icon: 'trash-outline', destructive: true, onPress: removeCover },
+      ],
+    });
   }
 
   const header = (
@@ -235,7 +253,7 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
               icon={status ? 'create-outline' : 'add-circle-outline'}
               onPress={() => router.push('/now-status')}
             />
-            <Button label={t('m.profile.share')} variant="secondary" size="sm" icon="share-outline" onPress={() => void shareProfile()} />
+            <Button label={t('m.profile.share')} variant="secondary" size="sm" icon="share-outline" onPress={() => shareProfile()} />
           </View>
         ) : (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: space[2], marginTop: space[2] }}>
@@ -346,11 +364,14 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
         ]}
       />
       {needsVerify ? <VerifyPrompt action="message" /> : null}
+      {coverMenu.sheet}
     </View>
   );
 
   return (
     <FlatList
+      keyboardShouldPersistTaps="handled"
+      {...feedListProps}
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: bottom + space[4] }}
       data={tab === 'posts' ? posts : tab === 'tagged' ? (tagged?.items ?? []) : []}

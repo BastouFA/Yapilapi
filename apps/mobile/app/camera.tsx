@@ -8,6 +8,7 @@ import {
   Alert,
   Animated,
   AppState,
+  BackHandler,
   Dimensions,
   Easing,
   I18nManager,
@@ -170,6 +171,17 @@ export default function Camera() {
     },
     [],
   );
+
+  // Android's back button: while the two photos are being checked, it goes back to the camera
+  // (like Retake) instead of leaving the screen.
+  useEffect(() => {
+    if (!dualShots) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (dualStep !== 'compose') setDualShots(null);
+      return true;
+    });
+    return () => sub.remove();
+  }, [dualShots, dualStep]);
 
   // Ask for the camera once when the screen opens, and for the microphone once Reel is chosen.
   const askedCam = useRef(false);
@@ -489,9 +501,9 @@ export default function Camera() {
             <Icon name="camera-outline" size={40} color={WHITE} />
             <Text style={s.permissionText}>{camPerm.canAskAgain ? t('m.camera.permission') : t('m.camera.denied')}</Text>
             {camPerm.canAskAgain ? (
-              <Button label={t('m.real.allowCamera')} onPress={() => void requestCam()} />
+              <Button label={t('m.real.allowCamera')} onPress={() => requestCam()} />
             ) : (
-              <Button label={t('m.common.openSettings')} onPress={() => void Linking.openSettings()} />
+              <Button label={t('m.common.openSettings')} onPress={() => Linking.openSettings()} />
             )}
           </View>
         </View>

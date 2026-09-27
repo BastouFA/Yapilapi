@@ -53,7 +53,7 @@ export function StarterRow() {
       </View>
       <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t('starter.body')}</Text>
       {reels.length ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space[2] }}>
+        <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space[2] }}>
           {reels.map((p) => {
             const media = p.media.find((m) => m.kind === 'video') ?? p.media[0];
             return (

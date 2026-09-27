@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, Alert, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   CHAT_LIST_ITEM_MAX,
@@ -17,7 +17,7 @@ import { client, errorMessage } from './api';
 import { DateField, DateTimeSheet, useWhenText } from './date-time';
 import { useT } from './i18n';
 import { radius, space } from './theme';
-import { Button, Field, Icon, SwitchRow, useColors, userText } from './ui';
+import { Button, Field, Icon, KeyboardAvoid, SwitchRow, useColors, userText } from './ui';
 
 /**
  * Polls, shared lists and reminders in a chat (mobile). Polls are radio buttons (checkboxes when
@@ -396,7 +396,7 @@ function FormModal({
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={open} animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.ground }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoid offset={0} style={{ backgroundColor: c.ground }}>
         <View
           style={{
             flexDirection: 'row',
@@ -429,7 +429,7 @@ function FormModal({
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: insets.bottom + space[6] }}>
           {children}
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAvoid>
     </Modal>
   );
 }

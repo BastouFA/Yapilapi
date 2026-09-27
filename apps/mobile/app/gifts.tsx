@@ -6,7 +6,7 @@ import { formatMoney } from '../../../packages/shared/src/i18n';
 import { client, errorMessage } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { space } from '../lib/theme';
-import { Avatar, Card, EmptyState, Icon, Loading, Notice, Segmented, useColors, userText } from '../lib/ui';
+import { Avatar, Card, EmptyState, ErrorState, Icon, Loading, Segmented, useColors, userText } from '../lib/ui';
 
 type Tab = 'received' | 'sent';
 
@@ -41,6 +41,7 @@ export default function GiftsScreen() {
 
   return (
     <FlatList
+      keyboardShouldPersistTaps="handled"
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: space[8] }}
       data={list ?? []}
@@ -56,7 +57,7 @@ export default function GiftsScreen() {
               { id: 'sent', label: t('m.gifts.sent') },
             ]}
           />
-          {error ? <Notice tone="danger">{error}</Notice> : null}
+          {error ? <ErrorState message={error} onRetry={() => load(tab)} /> : null}
         </View>
       }
       ListEmptyComponent={list === null ? <Loading /> : <EmptyState title={tab === 'received' ? t('m.gifts.emptyReceived') : t('m.gifts.emptySent')} />}

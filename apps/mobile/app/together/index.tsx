@@ -7,7 +7,7 @@ import { useFlag } from '../../lib/flags';
 import { FriendPicker, useFriends } from '../../lib/friend-picker';
 import { useT } from '../../lib/i18n';
 import { space } from '../../lib/theme';
-import { Button, Card, EmptyState, Field, Loading, Notice, Pill, useColors, userText } from '../../lib/ui';
+import { Button, Card, EmptyState, Field, KeyboardAvoid, Loading, Notice, Pill, useColors, userText } from '../../lib/ui';
 
 type TogetherItem = Awaited<ReturnType<YapilapiClient['together']['list']>>['items'][number];
 
@@ -68,61 +68,63 @@ export default function TogetherList() {
   }
 
   return (
-    <ScrollView
-      style={{ backgroundColor: c.ground }}
-      contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
-      keyboardShouldPersistTaps="handled"
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={async () => {
-            setRefreshing(true);
-            await load();
-            setRefreshing(false);
-          }}
-        />
-      }
-    >
-      <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('m.together.intro')}</Text>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+    <KeyboardAvoid>
+      <ScrollView
+        style={{ backgroundColor: c.ground }}
+        contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await load();
+              setRefreshing(false);
+            }}
+          />
+        }
+      >
+        <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('m.together.intro')}</Text>
+        {error ? <Notice tone="danger">{error}</Notice> : null}
 
-      <View style={{ gap: space[2] }}>
-        {items === null ? (
-          <Loading />
-        ) : items.length ? (
-          items.map((x) => {
-            const sub = `${tp('m.together.photos', x.contributions)} · ${tp('m.together.people', x.members)}`;
-            return (
-              <Card
-                key={x.id}
-                onPress={() => router.push(`/together/${x.id}`)}
-                label={`${x.title}, ${sub}${x.status === 'closed' ? `, ${t('m.together.closed')}` : ''}`}
-                style={{ gap: space[1] }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
-                  <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 16, flex: 1 }, userText]} numberOfLines={2}>
-                    {x.title}
-                  </Text>
-                  {x.status === 'closed' ? <Pill text={t('m.together.closed')} /> : null}
-                </View>
-                <Text style={{ color: c.inkMuted, fontSize: 13 }}>{sub}</Text>
-              </Card>
-            );
-          })
-        ) : (
-          <EmptyState title={t('m.together.empty')} body={t('m.together.emptyBody')} />
-        )}
-      </View>
+        <View style={{ gap: space[2] }}>
+          {items === null ? (
+            <Loading />
+          ) : items.length ? (
+            items.map((x) => {
+              const sub = `${tp('m.together.photos', x.contributions)} · ${tp('m.together.people', x.members)}`;
+              return (
+                <Card
+                  key={x.id}
+                  onPress={() => router.push(`/together/${x.id}`)}
+                  label={`${x.title}, ${sub}${x.status === 'closed' ? `, ${t('m.together.closed')}` : ''}`}
+                  style={{ gap: space[1] }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+                    <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 16, flex: 1 }, userText]} numberOfLines={2}>
+                      {x.title}
+                    </Text>
+                    {x.status === 'closed' ? <Pill text={t('m.together.closed')} /> : null}
+                  </View>
+                  <Text style={{ color: c.inkMuted, fontSize: 13 }}>{sub}</Text>
+                </Card>
+              );
+            })
+          ) : (
+            <EmptyState title={t('m.together.empty')} body={t('m.together.emptyBody')} />
+          )}
+        </View>
 
-      <Card style={{ gap: space[3] }}>
-        <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '800', fontSize: 17 }}>
-          {t('m.together.start')}
-        </Text>
-        <Field label={t('m.together.what')} placeholder={t('m.together.placeholder')} value={title} onChangeText={setTitle} maxLength={120} />
-        <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.together.invite')}</Text>
-        <FriendPicker friends={friends} picked={picked} onChange={setPicked} empty={t('m.together.noFriends')} />
-        <Button label={t('m.together.start')} disabled={!title.trim() || busy} onPress={() => void start()} />
-      </Card>
-    </ScrollView>
+        <Card style={{ gap: space[3] }}>
+          <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '800', fontSize: 17 }}>
+            {t('m.together.start')}
+          </Text>
+          <Field label={t('m.together.what')} placeholder={t('m.together.placeholder')} value={title} onChangeText={setTitle} maxLength={120} />
+          <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.together.invite')}</Text>
+          <FriendPicker friends={friends} picked={picked} onChange={setPicked} empty={t('m.together.noFriends')} />
+          <Button label={t('m.together.start')} disabled={!title.trim() || busy} onPress={() => start()} />
+        </Card>
+      </ScrollView>
+    </KeyboardAvoid>
   );
 }

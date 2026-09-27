@@ -8,7 +8,7 @@ import { CIRCLE_NAME_MAX, KindPicker } from '../lib/circles';
 import { useT } from '../lib/i18n';
 import { useSession } from '../lib/session';
 import { space } from '../lib/theme';
-import { Button, Card, Field, Icon, Loading, Notice, Row, Title, useColors } from '../lib/ui';
+import { Button, Card, Field, Icon, KeyboardAvoid, Loading, Notice, Row, Title, useColors } from '../lib/ui';
 
 /**
  * Circles: your own small groups (family, work, a trip) to share a post with. Only you see
@@ -66,53 +66,55 @@ export default function Circles() {
   const full = list.length >= MAX_CIRCLES;
 
   return (
-    <ScrollView
-      style={{ backgroundColor: c.ground }}
-      contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Title sub={t('m.circles.hint')}>{t('m.circles.title')}</Title>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
-      <Card style={{ gap: space[3] }}>
-        <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '700', fontSize: 15 }}>
-          {t('m.circles.new')}
-        </Text>
-        {full ? (
-          <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('m.circles.limit', { max: MAX_CIRCLES })}</Text>
-        ) : (
-          <>
-            <Field
-              label={t('m.circles.name')}
-              placeholder={t('m.circles.namePlaceholder')}
-              value={name}
-              onChangeText={setName}
-              maxLength={CIRCLE_NAME_MAX}
-              returnKeyType="done"
-            />
-            <KindPicker value={kind} onChange={setKind} />
-            <Button label={t('m.circles.create')} disabled={busy || !name.trim()} onPress={() => void create()} />
-          </>
-        )}
-      </Card>
-      <View style={{ gap: space[2] }}>
-        <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '700', fontSize: 15 }}>
-          {t('m.circles.yours')}
-        </Text>
-        {list.length ? (
-          list.map((x) => (
-            <Row
-              key={x.id}
-              title={x.name}
-              subtitle={`${t(`m.circles.kind.${x.kind}`)} · ${tp('m.circles.members', x.memberCount)}`}
-              start={<Icon name="ellipse-outline" size={18} color={c.yapi} />}
-              end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
-              onPress={() => router.push({ pathname: '/circle/[id]', params: { id: x.id } })}
-            />
-          ))
-        ) : (
-          <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('m.circles.empty')}</Text>
-        )}
-      </View>
-    </ScrollView>
+    <KeyboardAvoid>
+      <ScrollView
+        style={{ backgroundColor: c.ground }}
+        contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Title sub={t('m.circles.hint')}>{t('m.circles.title')}</Title>
+        {error ? <Notice tone="danger">{error}</Notice> : null}
+        <Card style={{ gap: space[3] }}>
+          <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '700', fontSize: 15 }}>
+            {t('m.circles.new')}
+          </Text>
+          {full ? (
+            <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('m.circles.limit', { max: MAX_CIRCLES })}</Text>
+          ) : (
+            <>
+              <Field
+                label={t('m.circles.name')}
+                placeholder={t('m.circles.namePlaceholder')}
+                value={name}
+                onChangeText={setName}
+                maxLength={CIRCLE_NAME_MAX}
+                returnKeyType="done"
+              />
+              <KindPicker value={kind} onChange={setKind} />
+              <Button label={t('m.circles.create')} disabled={busy || !name.trim()} onPress={() => create()} />
+            </>
+          )}
+        </Card>
+        <View style={{ gap: space[2] }}>
+          <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '700', fontSize: 15 }}>
+            {t('m.circles.yours')}
+          </Text>
+          {list.length ? (
+            list.map((x) => (
+              <Row
+                key={x.id}
+                title={x.name}
+                subtitle={`${t(`m.circles.kind.${x.kind}`)} · ${tp('m.circles.members', x.memberCount)}`}
+                start={<Icon name="ellipse-outline" size={18} color={c.yapi} />}
+                end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
+                onPress={() => router.push({ pathname: '/circle/[id]', params: { id: x.id } })}
+              />
+            ))
+          ) : (
+            <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('m.circles.empty')}</Text>
+          )}
+        </View>
+      </ScrollView>
+    </KeyboardAvoid>
   );
 }

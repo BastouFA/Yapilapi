@@ -11,7 +11,7 @@ import { useT } from '../../lib/i18n';
 import { PostCard } from '../../lib/post';
 import { clearRecent, forgetSearch, readRecent, rememberSearch } from '../../lib/recent-searches';
 import { radius, space } from '../../lib/theme';
-import { Avatar, EmptyState, Icon, Notice, Row, SkeletonList, useColors, userText, useTabBarSpace, type IconName } from '../../lib/ui';
+import { Avatar, EmptyState, ErrorState, Icon, type IconName, Row, SkeletonList, useColors, useRefresh, userText, useTabBarSpace } from '../../lib/ui';
 
 type Tab = 'all' | 'people' | 'topics' | 'posts' | 'communities' | 'events' | 'places';
 const TABS: { id: Tab; label: MessageKey }[] = [
@@ -64,23 +64,30 @@ export default function Wander() {
     if (params.q) setQ(params.q);
   }, [params.q]);
 
-  useEffect(() => {
-    void readRecent().then(setRecent);
-    void client().then((api) => {
+  // Before you type: trending tags, communities and events (again on pull to refresh).
+  const loadExplore = useCallback(async () => {
+    const api = await client();
+    await Promise.all([
       api.trending(10).then(
         (r) => setTrending(r.items),
-        () => setTrending([]),
-      );
+        () => setTrending((cur) => cur ?? []),
+      ),
       api.communities.list('discover').then(
         (r) => setCommunities(r.items.filter((x) => !x.myRole).slice(0, 5)),
         () => {},
-      );
+      ),
       api.events.list('upcoming').then(
         (r) => setEvents(r.items.slice(0, 5)),
         () => {},
-      );
-    });
+      ),
+    ]);
   }, []);
+  useEffect(() => {
+    void readRecent().then(setRecent);
+    void loadExplore().catch(() => setTrending((cur) => cur ?? []));
+  }, [loadExplore]);
+  // Try again (or pull to refresh) runs the same search again.
+  const [attempt, setAttempt] = useState(0);
 
   // Results a moment after typing stops; a newer search replaces an older one still on its way.
   const term = q.trim();
@@ -118,7 +125,8 @@ export default function Wander() {
       current = false;
       clearTimeout(timer);
     };
-  }, [term, tab]);
+  }, [term, tab, attempt]);
+  const refresh = useRefresh(() => (term ? setAttempt((a) => a + 1) : loadExplore()));
 
   const remember = useCallback(
     (value = term) => {
@@ -213,8 +221,9 @@ export default function Wander() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: bottom }}
+        refreshControl={refresh}
       >
-        {error ? <Notice tone="danger">{error}</Notice> : null}
+        {error ? <ErrorState message={error} onRetry={() => setAttempt((a) => a + 1)} /> : null}
 
         {!term ? (
           <>

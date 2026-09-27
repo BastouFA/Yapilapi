@@ -8,7 +8,7 @@ import { BoardGrid, NewBoardCard, SaveTile, tileRows, useBoards, useSavedFilters
 import { useT } from '../lib/i18n';
 import { useSession } from '../lib/session';
 import { space } from '../lib/theme';
-import { EmptyState, Loading, Notice, Segmented, useColors } from '../lib/ui';
+import { EmptyState, ErrorState, Loading, Notice, Segmented, useColors } from '../lib/ui';
 
 /** Boards shown before "Show all boards" (with the New board card, three rows). */
 const BOARDS_PREVIEW = 5;
@@ -97,7 +97,7 @@ export default function Saved() {
   const header = (
     <View style={{ gap: space[4], marginBottom: space[1] }}>
       <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('m.saved.hint')}</Text>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {error ? <ErrorState message={error} onRetry={() => (setError(null), Promise.all([loadSaves(filter), loadBoards()]))} /> : null}
       <View style={{ gap: space[3] }}>
         <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 17, fontWeight: '800' }}>
           {t('m.boards.title')}
@@ -135,6 +135,7 @@ export default function Saved() {
 
   return (
     <FlatList
+      keyboardShouldPersistTaps="handled"
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
       data={items ? tileRows(items) : []}

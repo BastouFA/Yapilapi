@@ -7,7 +7,7 @@ import { AddToChapterSheet } from '../lib/chapters';
 import { useT } from '../lib/i18n';
 import { useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
-import { Button, EmptyState, Loading, Notice, useColors, userText } from '../lib/ui';
+import { Button, EmptyState, ErrorState, Loading, Notice, useColors, useRefresh, userText } from '../lib/ui';
 
 /**
  * Your archive: your stories after they expire, private to you. Browse by month, add a story to
@@ -22,39 +22,44 @@ export default function Archive() {
   const [items, setItems] = useState<ArchivedStory[] | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
+  const loadMonths = useCallback(async () => {
+    setError(null);
+    try {
+      const r = await (await client()).archive.months();
+      setMonths(r.items);
+      // Stay on the month on screen if it still has stories.
+      setMonth((cur) => (cur && r.items.some((m) => m.month === cur) ? cur : (r.items[0]?.month ?? null)));
+    } catch (e) {
+      setMonths((cur) => cur ?? []);
+      setError(errorMessage(e));
+    }
+  }, []);
   useEffect(() => {
-    if (!me) return;
-    client()
-      .then((api) => api.archive.months())
-      .then(
-        (r) => {
-          setMonths(r.items);
-          setMonth(r.items[0]?.month ?? null);
-        },
-        (e) => {
-          setMonths([]);
-          setNote(errorMessage(e));
-        },
-      );
-  }, [me]);
+    if (me) void loadMonths();
+  }, [me, loadMonths]);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     if (!month) return setItems([]);
-    setItems(null);
-    client()
-      .then((api) => api.archive.list(month))
-      .then(
-        (r) => setItems(r.items),
-        (e) => {
-          setItems([]);
-          setNote(errorMessage(e));
-        },
-      );
+    try {
+      const r = await (await client()).archive.list(month);
+      setItems(r.items);
+    } catch (e) {
+      setItems((cur) => cur ?? []);
+      setError(errorMessage(e));
+    }
   }, [month]);
+  const haveMonths = months !== null;
   useEffect(() => {
-    if (months) load();
-  }, [load, months]);
+    if (!haveMonths) return;
+    setItems(null);
+    void load();
+  }, [load, haveMonths]);
+  const refresh = useRefresh(async () => {
+    await loadMonths();
+    await load();
+  });
 
   if (me === undefined) return <Loading />;
   if (!me)
@@ -89,12 +94,14 @@ export default function Archive() {
   return (
     <>
       <FlatList
+        keyboardShouldPersistTaps="handled"
         style={{ backgroundColor: c.ground }}
         contentContainerStyle={{ padding: space[4], gap: space[3] }}
         columnWrapperStyle={{ gap: space[3] }}
         numColumns={2}
         data={items ?? []}
         keyExtractor={(s) => s.id}
+        refreshControl={refresh}
         ListHeaderComponent={
           <View style={{ gap: space[3] }}>
             <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('m.archive.hint')}</Text>
@@ -107,8 +114,9 @@ export default function Archive() {
               style={{ alignSelf: 'flex-start' }}
             />
             {note ? <Notice>{note}</Notice> : null}
+            {error ? <ErrorState message={error} onRetry={() => Promise.all([loadMonths(), load()])} /> : null}
             {months.length ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space[2] }}>
+              <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space[2] }}>
                 {months.map((m) => {
                   const on = m.month === month;
                   return (

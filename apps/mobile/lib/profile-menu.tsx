@@ -1,13 +1,11 @@
 import { useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { REPORT_REASONS } from '../../../packages/shared/src/constants';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import type { Profile } from '../../../packages/shared/src/types';
 import { client, errorMessage } from './api';
 import { useT } from './i18n';
-import { Sheet } from './post-edit';
-import { radius, space } from './theme';
-import { Icon, useColors, type IconName } from './ui';
+import { BottomSheet, SheetItem } from './ui';
 
 const REASON_KEYS: Record<(typeof REPORT_REASONS)[number], MessageKey> = {
   spam: 'postList.reason.spam',
@@ -21,46 +19,6 @@ const REASON_KEYS: Record<(typeof REPORT_REASONS)[number], MessageKey> = {
   minor_safety: 'postList.reason.minorSafety',
   other: 'postList.reason.other',
 };
-
-/** One line in a sheet: an icon, a label, 48 high. */
-export function SheetItem({
-  icon,
-  label,
-  onPress,
-  danger,
-  disabled,
-}: {
-  icon: IconName;
-  label: string;
-  onPress: () => void;
-  danger?: boolean;
-  disabled?: boolean;
-}) {
-  const c = useColors();
-  const color = danger ? c.danger : c.ink;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled: !!disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: space[3],
-        minHeight: 48,
-        paddingHorizontal: space[2],
-        borderRadius: radius.md,
-        backgroundColor: pressed ? c.surfaceSunken : 'transparent',
-        opacity: disabled ? 0.5 : 1,
-      })}
-    >
-      <Icon name={icon} size={20} color={color} />
-      <Text style={{ color, fontSize: 15, fontWeight: '600', flex: 1 }}>{label}</Text>
-    </Pressable>
-  );
-}
 
 /**
  * More for someone else's profile: add or accept them as a friend, mute, block, or report them.
@@ -126,7 +84,7 @@ export function ProfileMenu({
   };
 
   return (
-    <Sheet visible={open} title={reporting ? t('m.profile.reportTitle', { name: profile.displayName }) : profile.displayName} onClose={close}>
+    <BottomSheet visible={open} title={reporting ? t('m.profile.reportTitle', { name: profile.displayName }) : profile.displayName} onClose={close}>
       {reporting ? (
         <View style={{ gap: 2 }}>
           {REPORT_REASONS.map((r) => (
@@ -176,6 +134,6 @@ export function ProfileMenu({
           <SheetItem icon="flag-outline" label={t('reel.report')} danger onPress={() => setReporting(true)} />
         </View>
       )}
-    </Sheet>
+    </BottomSheet>
   );
 }

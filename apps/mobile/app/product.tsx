@@ -72,6 +72,7 @@ export default function ProductScreen() {
 
   return (
     <ScrollView
+      keyboardShouldPersistTaps="handled"
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
       refreshControl={
@@ -128,13 +129,13 @@ export default function ProductScreen() {
       {self ? (
         <Card style={{ gap: space[2] }}>
           <Text style={{ color: c.ink, lineHeight: 20 }}>{t('m.product.yours')}</Text>
-          <Button label={t('m.studio.openWeb')} variant="secondary" icon="open-outline" onPress={() => void openOnWeb('/studio#shop')} />
+          <Button label={t('m.studio.openWeb')} variant="secondary" icon="open-outline" onPress={() => openOnWeb('/studio#shop')} />
         </Card>
       ) : commerce === false ? (
         <Notice>{t('shop.unavailable')}</Notice>
       ) : item.kind === 'digital' && item.owned ? (
         <View style={{ gap: space[2] }}>
-          <Button label={t('m.shop.download')} icon="download-outline" disabled={busy} onPress={() => void download()} />
+          <Button label={t('m.shop.download')} icon="download-outline" disabled={busy} onPress={() => download()} />
           <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('m.purchases.linkNote')}</Text>
         </View>
       ) : soldOut ? null : (

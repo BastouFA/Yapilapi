@@ -148,6 +148,7 @@ export function MediaViewer({ media, index, onClose }: { media: MediaItem[]; ind
         <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: backdrop }]} />
         <Animated.View style={{ flex: 1, transform: [{ translateY: drag }] }}>
           <FlatList
+            keyboardShouldPersistTaps="handled"
             ref={list}
             data={media}
             horizontal
@@ -243,7 +244,11 @@ function AltText({ text, bottom }: { text: string; bottom?: number }) {
   const { t } = useT();
   return (
     <View style={[s.alt, bottom !== undefined ? { position: 'absolute', start: space[3], end: space[3], bottom } : null]}>
-      <ScrollView style={{ maxHeight: 132 }} contentContainerStyle={{ flexDirection: 'row', gap: space[2], alignItems: 'flex-start' }}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        style={{ maxHeight: 132 }}
+        contentContainerStyle={{ flexDirection: 'row', gap: space[2], alignItems: 'flex-start' }}
+      >
         <View style={s.altBadge} accessibilityElementsHidden importantForAccessibility="no">
           <Text style={{ color: '#0B0C14', fontWeight: '800', fontSize: 11 }}>{t('ds.media.alt')}</Text>
         </View>

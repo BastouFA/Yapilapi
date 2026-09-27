@@ -359,7 +359,7 @@ function InterestsStep({
       <Button
         label={picked.size < need ? t('onboarding.pickMore', { count: need - picked.size }) : t('onboarding.continue')}
         disabled={busy || topics === null || picked.size < need}
-        onPress={() => void save()}
+        onPress={() => save()}
       />
       <Button
         label={t('onboarding.skip')}
@@ -521,8 +521,8 @@ function FollowStep({ record, onNext, setError }: StepProps & { record: (s: Onbo
           })}
         </>
       ) : null}
-      <Button label={t('onboarding.continue')} disabled={busy || people === null} onPress={() => void go(false)} />
-      <Button label={t('onboarding.skip')} variant="ghost" disabled={busy} onPress={() => void go(true)} />
+      <Button label={t('onboarding.continue')} disabled={busy || people === null} onPress={() => go(false)} />
+      <Button label={t('onboarding.skip')} variant="ghost" disabled={busy} onPress={() => go(true)} />
     </>
   );
 }
@@ -616,11 +616,11 @@ function ProfileStep({ onNext, setError }: StepProps) {
           variant="ghost"
           label={me?.avatarUrl ? t('m.onb.profile.changePhoto') : t('m.onb.profile.addPhoto')}
           disabled={!!photo}
-          onPress={() => void changePhoto()}
+          onPress={() => changePhoto()}
         />
       </View>
       <Field label={t('auth.displayName')} value={name} onChangeText={setName} maxLength={60} autoComplete="name" hint={t('m.onb.profile.nameHint')} />
-      <Button label={t('onboarding.continue')} disabled={busy || !!photo} onPress={() => void save()} />
+      <Button label={t('onboarding.continue')} disabled={busy || !!photo} onPress={() => save()} />
       <Button label={t('onboarding.skip')} variant="ghost" disabled={busy || !!photo} onPress={onNext} />
     </>
   );

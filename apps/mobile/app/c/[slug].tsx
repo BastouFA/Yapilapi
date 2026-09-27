@@ -12,7 +12,25 @@ import { PostCard } from '../../lib/post';
 import { roomDuration, roomStatusLabel } from '../../lib/rooms';
 import { useSession } from '../../lib/session';
 import { space } from '../../lib/theme';
-import { Avatar, Button, Card, EmptyState, Field, Icon, Loading, Notice, Row, Segmented, Title, useColors, userText } from '../../lib/ui';
+import {
+  Avatar,
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  feedListProps,
+  Field,
+  Icon,
+  KeyboardAvoid,
+  Loading,
+  Notice,
+  Row,
+  Segmented,
+  Title,
+  useColors,
+  useRefresh,
+  userText,
+} from '../../lib/ui';
 
 type Tab = 'posts' | 'faq' | 'rooms' | 'events' | 'members';
 type Item = { key: string; post?: Post; faq?: FaqEntry; room?: RoomSummary; event?: EventItem; member?: { user: PublicUser; role: string } };
@@ -50,7 +68,7 @@ export default function CommunityScreen() {
       setCommunity(r.community);
       setChatId(r.chatConversationId);
     } catch {
-      setCommunity(null);
+      setCommunity((cur) => cur ?? null);
     }
   }, [slug]);
   // Again on coming back, so changes from the settings screen (name, description) show.
@@ -100,11 +118,29 @@ export default function CommunityScreen() {
     })();
   }, [tab, community, locked, slug, posts, faq, members, rooms, events, loadFaq]);
 
+  // Pull to refresh or Try again: the community again, and the section on screen from the start
+  // (the effect above loads whichever section is empty).
+  const refreshAll = useCallback(async () => {
+    setError(null);
+    await reload();
+    setPosts(null);
+    setCursor(null);
+    setFaq(null);
+    setMembers(null);
+    setRooms(null);
+    setEvents(null);
+  }, [reload]);
+  const refresh = useRefresh(refreshAll);
+
   if (community === undefined) return <Loading />;
   if (community === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>
-        <EmptyState title={t('m.community.notFound.title')} body={t('m.community.notFound.body')} />
+        <EmptyState
+          title={t('m.community.notFound.title')}
+          body={t('m.community.notFound.body')}
+          action={{ label: t('m.common.retry'), icon: 'refresh', onPress: () => void reload() }}
+        />
       </View>
     );
 
@@ -208,7 +244,7 @@ export default function CommunityScreen() {
         onChange={setTab}
       />
       {note ? <Notice>{note}</Notice> : null}
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {error ? <ErrorState message={error} onRetry={refreshAll} /> : null}
       {locked ? <Notice>{t(LOCKED[tab])}</Notice> : null}
       {tab === 'posts' && community.myRole && !locked ? (
         <CommunityComposer slug={slug} communityId={community.id} name={community.name} onPosted={(p) => setPosts((cur) => [p, ...(cur ?? [])])} />
@@ -217,84 +253,89 @@ export default function CommunityScreen() {
   );
 
   return (
-    <FlatList
-      style={{ backgroundColor: c.ground }}
-      contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: space[8] }}
-      data={locked ? [] : items}
-      keyExtractor={(x) => x.key}
-      ListHeaderComponent={header}
-      ListEmptyComponent={
-        locked ? null : loadingTab ? (
-          <Loading />
-        ) : tab === 'posts' ? (
-          <EmptyState title={t('m.community.noPosts.title')} body={community?.myRole ? t('m.community.noPosts.member') : t('m.community.noPosts.body')} />
-        ) : tab === 'faq' ? (
-          <EmptyState title={t('m.community.noFaq.title')} body={faq?.canEdit ? t('m.community.noFaq.editor') : t('m.community.noFaq.body')} />
-        ) : tab === 'rooms' ? (
-          <EmptyState title={t('m.rooms.none')} body={t('m.rooms.noneBody')} />
-        ) : tab === 'events' ? (
-          <EmptyState title={t('m.events.none')} body={t('m.community.noEvents')} />
-        ) : (
-          <EmptyState title={t('m.community.noMembers')} />
-        )
-      }
-      ListFooterComponent={
-        tab === 'faq' && faq?.canEdit && !locked ? (
-          <AddFaq slug={slug} onAdded={loadFaq} />
-        ) : tab === 'rooms' && rooms?.canStart && !locked ? (
-          <StartRoom
-            slug={slug}
-            onScheduled={() =>
-              void client()
-                .then((api) => api.communities.rooms(slug))
-                .then(setRooms, () => {})
-            }
-          />
-        ) : null
-      }
-      onEndReached={async () => {
-        if (tab !== 'posts' || !cursor) return;
-        const page = await (await client()).communities.posts(slug, cursor).catch(() => null);
-        if (page) {
-          setPosts((cur) => [...(cur ?? []), ...page.items]);
-          setCursor(page.nextCursor);
+    <KeyboardAvoid>
+      <FlatList
+        keyboardShouldPersistTaps="handled"
+        {...feedListProps}
+        style={{ backgroundColor: c.ground }}
+        contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: space[8] }}
+        data={locked ? [] : items}
+        keyExtractor={(x) => x.key}
+        refreshControl={refresh}
+        ListHeaderComponent={header}
+        ListEmptyComponent={
+          locked ? null : loadingTab ? (
+            <Loading />
+          ) : tab === 'posts' ? (
+            <EmptyState title={t('m.community.noPosts.title')} body={community?.myRole ? t('m.community.noPosts.member') : t('m.community.noPosts.body')} />
+          ) : tab === 'faq' ? (
+            <EmptyState title={t('m.community.noFaq.title')} body={faq?.canEdit ? t('m.community.noFaq.editor') : t('m.community.noFaq.body')} />
+          ) : tab === 'rooms' ? (
+            <EmptyState title={t('m.rooms.none')} body={t('m.rooms.noneBody')} />
+          ) : tab === 'events' ? (
+            <EmptyState title={t('m.events.none')} body={t('m.community.noEvents')} />
+          ) : (
+            <EmptyState title={t('m.community.noMembers')} />
+          )
         }
-      }}
-      renderItem={({ item }) =>
-        item.post ? (
-          <PostCard post={item.post} />
-        ) : item.faq ? (
-          <FaqItem
-            entry={item.faq}
-            canEdit={!!faq?.canEdit}
-            onRemove={async () => {
-              try {
-                await (await client()).communities.deleteFaq(slug, item.faq!.id);
-                await loadFaq();
-              } catch (e) {
-                setError(errorMessage(e));
+        ListFooterComponent={
+          tab === 'faq' && faq?.canEdit && !locked ? (
+            <AddFaq slug={slug} onAdded={loadFaq} />
+          ) : tab === 'rooms' && rooms?.canStart && !locked ? (
+            <StartRoom
+              slug={slug}
+              onScheduled={() =>
+                void client()
+                  .then((api) => api.communities.rooms(slug))
+                  .then(setRooms, () => {})
               }
-            }}
-          />
-        ) : item.room ? (
-          <RoomCard room={item.room} />
-        ) : item.event ? (
-          <Row
-            title={item.event.title}
-            subtitle={[dateTime(item.event.startsAt), item.event.place?.name ?? item.event.locationText].filter(Boolean).join(' · ')}
-            start={<Icon name="calendar-outline" size={22} color={c.yapi} />}
-            onPress={() => router.push(`/event/${item.event!.id}`)}
-          />
-        ) : item.member ? (
-          <Row
-            title={item.member.user.displayName}
-            subtitle={`@${item.member.user.username}${item.member.role !== 'member' ? ` · ${roleName(item.member.role, t)}` : ''}`}
-            start={<Avatar name={item.member.user.displayName} url={item.member.user.avatarUrl} size={36} />}
-            onPress={() => router.push(`/u/${encodeURIComponent(item.member!.user.username)}`)}
-          />
-        ) : null
-      }
-    />
+            />
+          ) : null
+        }
+        onEndReached={async () => {
+          if (tab !== 'posts' || !cursor) return;
+          const page = await (await client()).communities.posts(slug, cursor).catch(() => null);
+          if (page) {
+            setPosts((cur) => [...(cur ?? []), ...page.items]);
+            setCursor(page.nextCursor);
+          }
+        }}
+        renderItem={({ item }) =>
+          item.post ? (
+            <PostCard post={item.post} />
+          ) : item.faq ? (
+            <FaqItem
+              entry={item.faq}
+              canEdit={!!faq?.canEdit}
+              onRemove={async () => {
+                try {
+                  await (await client()).communities.deleteFaq(slug, item.faq!.id);
+                  await loadFaq();
+                } catch (e) {
+                  setError(errorMessage(e));
+                }
+              }}
+            />
+          ) : item.room ? (
+            <RoomCard room={item.room} />
+          ) : item.event ? (
+            <Row
+              title={item.event.title}
+              subtitle={[dateTime(item.event.startsAt), item.event.place?.name ?? item.event.locationText].filter(Boolean).join(' · ')}
+              start={<Icon name="calendar-outline" size={22} color={c.yapi} />}
+              onPress={() => router.push(`/event/${item.event!.id}`)}
+            />
+          ) : item.member ? (
+            <Row
+              title={item.member.user.displayName}
+              subtitle={`@${item.member.user.username}${item.member.role !== 'member' ? ` · ${roleName(item.member.role, t)}` : ''}`}
+              start={<Avatar name={item.member.user.displayName} url={item.member.user.avatarUrl} size={36} />}
+              onPress={() => router.push(`/u/${encodeURIComponent(item.member!.user.username)}`)}
+            />
+          ) : null
+        }
+      />
+    </KeyboardAvoid>
   );
 }
 
@@ -539,7 +580,7 @@ function CommunityComposer({ slug, communityId, name, onPosted }: { slug: string
         </View>
       ) : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}
-      <Button label={t('create.publish')} size="sm" style={{ alignSelf: 'flex-end' }} disabled={!body.trim() || busy} onPress={() => void post()} />
+      <Button label={t('create.publish')} size="sm" style={{ alignSelf: 'flex-end' }} disabled={!body.trim() || busy} onPress={() => post()} />
     </Card>
   );
 }

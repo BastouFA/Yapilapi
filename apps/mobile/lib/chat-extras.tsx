@@ -6,7 +6,7 @@ import type { MessageKey } from '../../../packages/shared/src/i18n';
 import { client, errorMessage } from './api';
 import { useT } from './i18n';
 import { radius, space } from './theme';
-import { Icon, useColors, userText } from './ui';
+import { ActionSheet, BottomSheet, Icon, useColors, userText } from './ui';
 
 /**
  * Chat extras: quoted replies, reactions, pinned messages, search, disappearing
@@ -245,33 +245,6 @@ export function PinnedBar({
   );
 }
 
-/** A bottom sheet with a title. */
-export function Sheet({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
-  const c = useColors();
-  const { t } = useT();
-  const insets = useSafeAreaInsets();
-  return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={{ flex: 1, backgroundColor: c.overlay }} accessibilityLabel={t('m.common.close')} onPress={onClose} />
-      <View
-        style={{
-          backgroundColor: c.surface,
-          borderTopStartRadius: radius.lg,
-          borderTopEndRadius: radius.lg,
-          padding: space[4],
-          paddingBottom: Math.max(insets.bottom, space[4]),
-          gap: space[3],
-        }}
-      >
-        <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 18, fontWeight: '800' }}>
-          {title}
-        </Text>
-        {children}
-      </View>
-    </Modal>
-  );
-}
-
 export interface SheetAction {
   label: string;
   icon: React.ComponentProps<typeof Icon>['name'];
@@ -293,42 +266,36 @@ export function MessageActions({
 }) {
   const c = useColors();
   const { t } = useT();
-  return (
-    <Sheet open={open} onClose={onClose} title={t('m.chat.messageOptions')}>
-      {onReact ? (
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          {QUICK_REACTIONS.map((e) => (
-            <Pressable
-              key={e}
-              accessibilityRole="button"
-              accessibilityLabel={t('m.chat.reactWith', { emoji: e })}
-              onPress={() => onReact(e)}
-              style={({ pressed }) => ({
-                width: 48,
-                height: 48,
-                borderRadius: 24,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: pressed ? c.surfaceSunken : 'transparent',
-              })}
-            >
-              <Text style={{ fontSize: 26 }}>{e}</Text>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
-      {actions.map((a) => (
+  const reactions = onReact ? (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: space[2] }}>
+      {QUICK_REACTIONS.map((e) => (
         <Pressable
-          key={a.label}
+          key={e}
           accessibilityRole="button"
-          onPress={a.onPress}
-          style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44, opacity: pressed ? 0.7 : 1 })}
+          accessibilityLabel={t('m.chat.reactWith', { emoji: e })}
+          onPress={() => onReact(e)}
+          style={({ pressed }) => ({
+            width: 48,
+            height: 48,
+            borderRadius: 24,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: pressed ? c.surfaceSunken : 'transparent',
+          })}
         >
-          <Icon name={a.icon} size={22} color={a.danger ? c.danger : c.ink} />
-          <Text style={{ color: a.danger ? c.danger : c.ink, fontSize: 16, fontWeight: '600' }}>{a.label}</Text>
+          <Text style={{ fontSize: 26 }}>{e}</Text>
         </Pressable>
       ))}
-    </Sheet>
+    </View>
+  ) : null;
+  return (
+    <ActionSheet
+      visible={open}
+      onClose={onClose}
+      title={t('m.chat.messageOptions')}
+      header={reactions}
+      actions={actions.map((a) => ({ label: a.label, icon: a.icon, destructive: a.danger, onPress: a.onPress }))}
+    />
   );
 }
 
@@ -437,7 +404,7 @@ export function DisappearingSheet({
   const c = useColors();
   const { t } = useT();
   return (
-    <Sheet open={open} onClose={onClose} title={t('m.chat.disappearing')}>
+    <BottomSheet visible={open} onClose={onClose} title={t('m.chat.disappearing')}>
       <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t('m.chat.disappearingHint')}</Text>
       {!canChange ? <Text style={{ color: c.inkMuted, fontSize: 14 }}>{t('m.chat.disappearingAdmins')}</Text> : null}
       <View accessibilityRole="radiogroup">
@@ -458,6 +425,6 @@ export function DisappearingSheet({
           );
         })}
       </View>
-    </Sheet>
+    </BottomSheet>
   );
 }

@@ -204,7 +204,7 @@ export default function Signup() {
           <Text style={{ color: c.yapi, fontWeight: '700' }}>{t('m.auth.haveInvite')}</Text>
         </Pressable>
       )}
-      <Button label={busy ? t('m.auth.creating') : t('auth.signup.submit')} disabled={busy} onPress={() => void submit()} />
+      <Button label={busy ? t('m.auth.creating') : t('auth.signup.submit')} disabled={busy} onPress={() => submit()} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: space[1] }}>
         <Text style={{ color: c.inkMuted }}>{t('auth.haveAccount')}</Text>
         <Pressable

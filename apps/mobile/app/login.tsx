@@ -78,7 +78,7 @@ export default function Login() {
           onSubmitEditing={() => void submit()}
           error={fields.code}
         />
-        <Button label={busy ? t('m.auth.loggingIn') : t('m.auth.twoStep.submit')} disabled={busy || !ready} onPress={() => void submit()} />
+        <Button label={busy ? t('m.auth.loggingIn') : t('m.auth.twoStep.submit')} disabled={busy || !ready} onPress={() => submit()} />
         <Button
           label={t('m.common.back')}
           variant="ghost"
@@ -126,7 +126,7 @@ export default function Login() {
       >
         <Text style={{ color: c.yapi, fontWeight: '700' }}>{t('auth.forgot')}</Text>
       </Pressable>
-      <Button label={busy ? t('m.auth.loggingIn') : t('auth.login.submit')} disabled={busy || !ready} onPress={() => void submit()} />
+      <Button label={busy ? t('m.auth.loggingIn') : t('auth.login.submit')} disabled={busy || !ready} onPress={() => submit()} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: space[1], marginTop: space[2] }}>
         <Text style={{ color: c.inkMuted }}>{t('auth.noAccount')}</Text>
         <Pressable

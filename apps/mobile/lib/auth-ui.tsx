@@ -1,26 +1,26 @@
 import { router } from 'expo-router';
 import { useState, type ReactNode, type Ref } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, type TextInput, type TextInputProps } from 'react-native';
+import { Pressable, ScrollView, type TextInput, type TextInputProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError } from '../../../packages/api-client/src/index';
 import type { Me } from '../../../packages/shared/src/types';
 import type { Translate } from './locale';
 import { space } from './theme';
-import { Field, Icon, useColors } from './ui';
+import { Field, Icon, KeyboardAvoid, useColors } from './ui';
 
 /** The scrolling, keyboard-aware page the sign-up, log-in and reset screens share. */
 export function AuthPage({ children }: { children: ReactNode }) {
   const c = useColors();
   const insets = useSafeAreaInsets();
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.ground }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoid style={{ backgroundColor: c.ground }}>
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ padding: space[6], paddingBottom: insets.bottom + space[8], gap: space[4], maxWidth: 520, width: '100%', alignSelf: 'center' }}
       >
         {children}
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoid>
   );
 }
 

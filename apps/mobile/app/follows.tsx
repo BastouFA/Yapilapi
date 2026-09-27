@@ -1,12 +1,12 @@
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FlatList, View } from 'react-native';
 import type { PublicUser } from '../../../packages/shared/src/types';
 import { client, errorMessage } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { useSession } from '../lib/session';
 import { space } from '../lib/theme';
-import { Avatar, Button, EmptyState, Loading, Notice, Row, Screen, Segmented } from '../lib/ui';
+import { Avatar, Button, EmptyState, ErrorState, Loading, Row, Screen, Segmented, useRefresh } from '../lib/ui';
 
 type Kind = 'followers' | 'following';
 
@@ -32,25 +32,29 @@ export default function Follows() {
     navigation.setOptions({ title: t(kind === 'followers' ? 'follow.titleFollowers' : 'follow.titleFollowing', { name }) });
   }, [navigation, kind, name, t]);
 
-  useEffect(() => {
-    let current = true;
-    setItems(null);
+  // Only the latest request counts (switching tabs quickly, or pulling to refresh).
+  const seq = useRef(0);
+  const load = useCallback(async () => {
+    const run = ++seq.current;
     setError(null);
-    void client()
-      .then((api) => (kind === 'followers' ? api.users.followers(params.id) : api.users.following(params.id)))
-      .then(
-        (r) => {
-          if (!current) return;
-          setItems(r.items);
-          setCursor(r.nextCursor);
-          setFollows(new Set(r.viewerFollows));
-        },
-        (e) => current && (setItems([]), setError(errorMessage(e))),
-      );
-    return () => {
-      current = false;
-    };
+    try {
+      const api = await client();
+      const r = await (kind === 'followers' ? api.users.followers(params.id) : api.users.following(params.id));
+      if (run !== seq.current) return;
+      setItems(r.items);
+      setCursor(r.nextCursor);
+      setFollows(new Set(r.viewerFollows));
+    } catch (e) {
+      if (run !== seq.current) return;
+      setItems((cur) => cur ?? []);
+      setError(errorMessage(e));
+    }
   }, [kind, params.id]);
+  useEffect(() => {
+    setItems(null);
+    void load();
+  }, [load]);
+  const refresh = useRefresh(load);
 
   const more = async () => {
     if (!cursor) return;
@@ -101,17 +105,19 @@ export default function Follows() {
           { id: 'following', label: t('profile.following') },
         ]}
       />
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {error ? <ErrorState message={error} onRetry={load} /> : null}
       {items === null ? (
         <Loading />
       ) : (
         <FlatList
+          keyboardShouldPersistTaps="handled"
           data={items}
           keyExtractor={(u) => u.id}
+          refreshControl={refresh}
           contentContainerStyle={{ gap: space[2], paddingBottom: space[8] }}
           onEndReached={() => void more().catch(() => {})}
           onEndReachedThreshold={0.5}
-          ListEmptyComponent={<EmptyState title={empty} />}
+          ListEmptyComponent={error ? null : <EmptyState title={empty} />}
           renderItem={({ item: u }) => {
             const on = follows.has(u.id);
             return (
@@ -128,7 +134,7 @@ export default function Follows() {
                         variant={on ? 'secondary' : 'primary'}
                         size="sm"
                         disabled={busy === u.id}
-                        onPress={() => void toggle(u)}
+                        onPress={() => toggle(u)}
                       />
                     </View>
                   )

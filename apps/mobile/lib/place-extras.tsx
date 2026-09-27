@@ -404,8 +404,8 @@ export function ManageBookings({ items, reload }: { items: OwnerBooking[]; reloa
           {b.note ? <Text style={[{ color: c.inkMuted }, userText]}>{b.note}</Text> : null}
           {b.status === 'requested' ? (
             <View style={{ flexDirection: 'row', gap: space[2], flexWrap: 'wrap' }}>
-              <Button label={t('m.booking.confirm')} size="sm" icon="checkmark" disabled={busy === b.id} onPress={() => void decide(b.id, true)} />
-              <Button label={t('m.common.decline')} size="sm" variant="secondary" disabled={busy === b.id} onPress={() => void decide(b.id, false)} />
+              <Button label={t('m.booking.confirm')} size="sm" icon="checkmark" disabled={busy === b.id} onPress={() => decide(b.id, true)} />
+              <Button label={t('m.common.decline')} size="sm" variant="secondary" disabled={busy === b.id} onPress={() => decide(b.id, false)} />
             </View>
           ) : null}
         </Card>

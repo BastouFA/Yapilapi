@@ -1,12 +1,12 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text } from 'react-native';
+import { ScrollView, Text } from 'react-native';
 import { ApiError } from '../../../packages/api-client/src/index';
 import { client, errorMessage, webUrl } from '../lib/api';
 import { autoSlug, ChoiceField, FieldError, splitRules, TopicsField } from '../lib/forms';
 import { useT } from '../lib/i18n';
 import { space } from '../lib/theme';
-import { Button, Card, Field, Notice, useColors } from '../lib/ui';
+import { Button, Card, Field, KeyboardAvoid, Notice, useColors } from '../lib/ui';
 
 /**
  * Create a community (apps/web/app/(app)/communities/new): name, address, what it's about, who can
@@ -45,7 +45,7 @@ export default function NewCommunity() {
 
   const host = webUrl.replace(/^https?:\/\//, '');
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoid>
       <ScrollView
         style={{ backgroundColor: c.ground }}
         contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
@@ -113,9 +113,9 @@ export default function NewCommunity() {
         <Button
           label={busy ? t('m.communityForm.creating') : t('communities.create')}
           disabled={!name.trim() || slug.length < 3 || busy}
-          onPress={() => void create()}
+          onPress={() => create()}
         />
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoid>
   );
 }

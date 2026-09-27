@@ -1,12 +1,12 @@
 import { router, useNavigation } from 'expo-router';
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FlatList } from 'react-native';
 import type { Community } from '../../../packages/shared/src/types';
 import { client, errorMessage } from '../lib/api';
 import { HeaderAction } from '../lib/forms';
 import { useT } from '../lib/i18n';
 import { space } from '../lib/theme';
-import { Avatar, EmptyState, Icon, Notice, Row, Screen, Segmented, SkeletonList, useColors } from '../lib/ui';
+import { Avatar, EmptyState, ErrorState, Icon, Row, Screen, Segmented, SkeletonList, useColors, useRefresh } from '../lib/ui';
 
 type Scope = 'mine' | 'discover';
 
@@ -23,20 +23,25 @@ export default function Communities() {
     navigation.setOptions({ headerRight: () => <HeaderAction label={t('m.communities.new')} icon="add" onPress={() => router.push('/community-new')} /> });
   }, [navigation, t]);
 
-  useEffect(() => {
-    let live = true;
-    setItems(null);
+  // Only the latest request counts (switching tabs quickly, or pulling to refresh).
+  const seq = useRef(0);
+  const load = useCallback(async () => {
+    const run = ++seq.current;
     setError(null);
-    void client()
-      .then((api) => api.communities.list(scope))
-      .then(
-        (r) => live && setItems(r.items),
-        (e) => live && (setItems([]), setError(errorMessage(e))),
-      );
-    return () => {
-      live = false;
-    };
+    try {
+      const r = await (await client()).communities.list(scope);
+      if (run === seq.current) setItems(r.items);
+    } catch (e) {
+      if (run !== seq.current) return;
+      setItems((cur) => cur ?? []);
+      setError(errorMessage(e));
+    }
   }, [scope]);
+  useEffect(() => {
+    setItems(null);
+    void load();
+  }, [load]);
+  const refresh = useRefresh(load);
 
   return (
     <Screen style={{ paddingBottom: 0 }}>
@@ -49,15 +54,17 @@ export default function Communities() {
           { id: 'discover', label: t('m.communities.discover') },
         ]}
       />
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {error ? <ErrorState message={error} onRetry={load} /> : null}
       {items === null ? (
         <SkeletonList />
       ) : (
         <FlatList
+          keyboardShouldPersistTaps="handled"
           data={items}
           keyExtractor={(x) => x.id}
+          refreshControl={refresh}
           contentContainerStyle={{ gap: space[2], paddingBottom: space[8] }}
-          ListEmptyComponent={<EmptyState title={scope === 'mine' ? t('m.communities.emptyMine') : t('m.communities.emptyDiscover')} />}
+          ListEmptyComponent={error ? null : <EmptyState title={scope === 'mine' ? t('m.communities.emptyMine') : t('m.communities.emptyDiscover')} />}
           renderItem={({ item }) => (
             <Row
               title={item.name}

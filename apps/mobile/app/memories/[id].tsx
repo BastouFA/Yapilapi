@@ -7,9 +7,8 @@ import { FriendPicker, useFriends } from '../../lib/friend-picker';
 import { useT } from '../../lib/i18n';
 import { RecapCta, useMemoryMeta } from '../../lib/memories';
 import { PostCard } from '../../lib/post';
-import { Sheet } from '../../lib/post-edit';
 import { radius, space } from '../../lib/theme';
-import { Button, Card, EmptyState, Field, Icon, Loading, Notice, Row, useColors, userText } from '../../lib/ui';
+import { BottomSheet, Button, Card, EmptyState, Field, Icon, Loading, Notice, Row, useColors, userText } from '../../lib/ui';
 
 type MemoryData = Awaited<ReturnType<YapilapiClient['memories']['get']>>;
 type Note = { tone: 'info' | 'danger'; text: string };
@@ -101,6 +100,7 @@ export default function MemoryScreen() {
     <>
       <Stack.Screen options={{ title: m.title }} />
       <ScrollView
+        keyboardShouldPersistTaps="handled"
         style={{ backgroundColor: c.ground }}
         contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
         refreshControl={
@@ -160,7 +160,7 @@ export default function MemoryScreen() {
                 size="sm"
                 variant="secondary"
                 disabled={recapping}
-                onPress={() => void writeRecap()}
+                onPress={() => writeRecap()}
                 style={{ alignSelf: 'flex-start' }}
               />
             ) : null}
@@ -255,11 +255,11 @@ function RenameSheet({ id, title, onClose, onSaved }: { id: string; title: strin
     }
   }
   return (
-    <Sheet visible title={t('m.mem.rename')} onClose={onClose}>
+    <BottomSheet visible title={t('m.mem.rename')} onClose={onClose}>
       {error ? <Text style={{ color: c.danger }}>{error}</Text> : null}
       <Field label={t('m.mem.name')} value={value} onChangeText={setValue} maxLength={120} autoFocus returnKeyType="done" onSubmitEditing={() => void save()} />
-      <Button label={t('common.save')} disabled={!value.trim() || busy} onPress={() => void save()} />
-    </Sheet>
+      <Button label={t('common.save')} disabled={!value.trim() || busy} onPress={() => save()} />
+    </BottomSheet>
   );
 }
 
@@ -289,11 +289,11 @@ function ShareSheet({ id, onClose, onShared }: { id: string; onClose: () => void
     }
   }
   return (
-    <Sheet visible title={t('memories.shareTitle')} onClose={onClose}>
+    <BottomSheet visible title={t('memories.shareTitle')} onClose={onClose}>
       <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('m.mem.shareHint')}</Text>
       {error ? <Text style={{ color: c.danger }}>{error}</Text> : null}
       <FriendPicker friends={friends} picked={picked} onChange={setPicked} empty={t('memories.noFriends')} />
-      <Button label={picked.size ? tp('memories.shareWith', picked.size) : t('memories.keepPrivate')} disabled={busy} onPress={() => void share()} />
-    </Sheet>
+      <Button label={picked.size ? tp('memories.shareWith', picked.size) : t('memories.keepPrivate')} disabled={busy} onPress={() => share()} />
+    </BottomSheet>
   );
 }

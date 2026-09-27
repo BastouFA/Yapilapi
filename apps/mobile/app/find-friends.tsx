@@ -7,7 +7,11 @@ import { useColors } from '../lib/ui';
 export default function FindFriendsScreen() {
   const c = useColors();
   return (
-    <ScrollView style={{ backgroundColor: c.ground }} contentContainerStyle={{ padding: space[4], paddingBottom: space[8] }}>
+    <ScrollView
+      keyboardShouldPersistTaps="handled"
+      style={{ backgroundColor: c.ground }}
+      contentContainerStyle={{ padding: space[4], paddingBottom: space[8] }}
+    >
       <FriendsFinder />
     </ScrollView>
   );

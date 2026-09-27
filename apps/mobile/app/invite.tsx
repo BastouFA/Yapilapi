@@ -38,7 +38,7 @@ export default function InviteScreen() {
   };
 
   return (
-    <ScrollView style={{ backgroundColor: c.ground }} contentContainerStyle={{ padding: space[4], gap: space[3] }}>
+    <ScrollView keyboardShouldPersistTaps="handled" style={{ backgroundColor: c.ground }} contentContainerStyle={{ padding: space[4], gap: space[3] }}>
       <Text style={{ color: c.inkMuted, fontSize: 15, lineHeight: 21 }}>{t('invite.intro')}</Text>
       <Card style={{ gap: space[3] }}>
         <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 17, fontWeight: '800' }}>

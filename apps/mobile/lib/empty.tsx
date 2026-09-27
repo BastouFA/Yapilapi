@@ -134,7 +134,7 @@ export function PulseEmpty({ mode, onFollowed, onShowForYou }: { mode: FeedMode;
                       size="sm"
                       variant={on ? 'secondary' : 'primary'}
                       label={on ? t('profile.unfollow') : t('profile.follow')}
-                      onPress={() => void toggle(p.user.id)}
+                      onPress={() => toggle(p.user.id)}
                     />
                   }
                 />
@@ -245,7 +245,7 @@ export function YapEmpty() {
                     icon="chatbubble-outline"
                     label={t('m.empty.yap.message')}
                     disabled={opening !== null}
-                    onPress={() => void message(p.user)}
+                    onPress={() => message(p.user)}
                   />
                 }
               />

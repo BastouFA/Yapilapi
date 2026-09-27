@@ -1,19 +1,26 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useRef, useState, type ComponentProps, type ReactNode, type Ref } from 'react';
+import { HeaderHeightContext } from 'expo-router/react-navigation';
+import { useCallback, useContext, useEffect, useRef, useState, type ComponentProps, type ReactNode, type Ref } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
   Animated,
   I18nManager,
   Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
+  RefreshControl,
+  ScrollView,
   StyleSheet,
   Switch,
   Text,
   TextInput,
   useColorScheme,
   View,
+  type DimensionValue,
   type StyleProp,
   type TextInputProps,
   type TextStyle,
@@ -70,17 +77,21 @@ export function Card({ children, style, onPress, label }: { children: ReactNode;
   );
 }
 
+/**
+ * When `onPress` returns a promise (an async handler), the button stays disabled until it
+ * settles, so a second tap can't send the same thing twice.
+ */
 export function Button({
   label,
   onPress,
   variant = 'primary',
   size = 'md',
   icon,
-  disabled,
+  disabled: disabledProp,
   style,
 }: {
   label: string;
-  onPress: () => void;
+  onPress: () => unknown;
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   size?: 'sm' | 'md';
   icon?: IconName;
@@ -88,6 +99,29 @@ export function Button({
   style?: StyleProp<ViewStyle>;
 }) {
   const c = useColors();
+  const [pending, setPending] = useState(false);
+  // A ref as well as state: two quick taps can land before the button renders as disabled.
+  const running = useRef(false);
+  const mounted = useRef(true);
+  useEffect(
+    () => () => {
+      mounted.current = false;
+    },
+    [],
+  );
+  const disabled = disabledProp || pending;
+  const press = () => {
+    if (running.current) return;
+    const result = onPress();
+    if (!result || typeof (result as Promise<unknown>).then !== 'function') return;
+    running.current = true;
+    setPending(true);
+    const done = () => {
+      running.current = false;
+      if (mounted.current) setPending(false);
+    };
+    (result as Promise<unknown>).then(done, done);
+  };
   const fg = variant === 'primary' ? c.onYapi : variant === 'danger' ? c.onDanger : variant === 'ghost' ? c.yapi : c.ink;
   const height = size === 'sm' ? 36 : 44;
   const content = (
@@ -100,9 +134,9 @@ export function Button({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled, busy: pending }}
       disabled={disabled}
-      onPress={onPress}
+      onPress={press}
       // Small buttons are 36pt tall; the touch area still reaches 44pt.
       hitSlop={size === 'sm' ? 4 : undefined}
       style={({ pressed }) => [{ borderRadius: radius.full, opacity: disabled ? 0.45 : pressed ? 0.85 : 1, overflow: 'hidden' }, style]}
@@ -547,4 +581,297 @@ export function Pill({ text, tone = 'neutral' }: { text: string; tone?: 'neutral
       <Text style={{ color: tone === 'live' ? c.onDanger : c.inkMuted, fontSize: 12, fontWeight: '700' }}>{text}</Text>
     </View>
   );
+}
+
+/**
+ * For long lists of posts: render a few cards first and keep a modest window around the screen.
+ * Android also detaches cards scrolled far off screen (on iOS that can blank out rows).
+ */
+export const feedListProps = {
+  removeClippedSubviews: Platform.OS === 'android',
+  initialNumToRender: 4,
+  maxToRenderPerBatch: 4,
+  windowSize: 7,
+} as const;
+
+/**
+ * Keeps its content above the keyboard on iOS and Android. Android draws edge to edge, so the
+ * window no longer shrinks for the keyboard there either: both platforms pad the bottom. On a
+ * screen with a navigation header the offset is the header's height; inside a modal pass
+ * `offset={0}`.
+ */
+export function KeyboardAvoid({ children, style, offset }: { children: ReactNode; style?: StyleProp<ViewStyle>; offset?: number }) {
+  const header = useContext(HeaderHeightContext) ?? 0;
+  return (
+    <KeyboardAvoidingView style={[{ flex: 1 }, style]} behavior="padding" keyboardVerticalOffset={offset ?? header}>
+      {children}
+    </KeyboardAvoidingView>
+  );
+}
+
+/**
+ * Pull to refresh for a list: `refreshControl={useRefresh(load)}`. The spinner shows until `load`
+ * settles, whether it worked or not (the list shows its own error).
+ */
+export function useRefresh(load: () => unknown) {
+  const c = useColors();
+  const [refreshing, setRefreshing] = useState(false);
+  const latest = useRef(load);
+  latest.current = load;
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await latest.current();
+    } catch {
+      // The screen shows its own error.
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+  return <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={c.yapi} colors={[c.yapi]} progressBackgroundColor={c.surface} />;
+}
+
+/** What a list shows when it could not load: the reason, and a button to try again. */
+export function ErrorState({ message, onRetry, style }: { message: string; onRetry: () => unknown; style?: StyleProp<ViewStyle> }) {
+  const c = useColors();
+  const { t } = useT();
+  const [busy, setBusy] = useState(false);
+  const retry = async () => {
+    setBusy(true);
+    try {
+      await onRetry();
+    } catch {
+      // The screen shows the new error.
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <View accessibilityRole="alert" style={[{ backgroundColor: c.dangerSoft, borderRadius: radius.md, padding: space[3], gap: space[2] }, style]}>
+      <Text style={{ color: c.ink, lineHeight: 20 }}>{message}</Text>
+      <Button
+        label={t('m.common.retry')}
+        icon="refresh"
+        size="sm"
+        variant="secondary"
+        disabled={busy}
+        onPress={() => retry()}
+        style={{ alignSelf: 'flex-start' }}
+      />
+    </View>
+  );
+}
+
+/**
+ * A panel that slides up from the bottom over a dimmed screen. Tapping outside or the Android
+ * back button closes it; it stays above the keyboard, and taps on its buttons land the first
+ * time even while the keyboard is open. `done` adds a Done button next to the title; with
+ * `scroll={false}` the content manages its own scrolling (a list inside, for example).
+ */
+export function BottomSheet({
+  visible,
+  title,
+  subtitle,
+  onClose,
+  onDismiss,
+  children,
+  done,
+  scroll = true,
+  maxHeight = '85%',
+  gap = space[3],
+}: {
+  visible: boolean;
+  title: string;
+  subtitle?: string;
+  onClose: () => void;
+  /** After the closing animation (iOS), for opening something else. */
+  onDismiss?: () => void;
+  children: ReactNode;
+  done?: boolean;
+  scroll?: boolean;
+  maxHeight?: DimensionValue;
+  gap?: number;
+}) {
+  const c = useColors();
+  const { t } = useT();
+  const insets = useSafeAreaInsets();
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} onDismiss={onDismiss}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+        <View style={{ flex: 1, backgroundColor: c.overlay, justifyContent: 'flex-end' }}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} style={{ flex: 1 }} onPress={onClose} />
+          <View
+            accessibilityViewIsModal
+            style={{
+              backgroundColor: c.surface,
+              borderTopLeftRadius: radius.lg,
+              borderTopRightRadius: radius.lg,
+              paddingTop: space[4],
+              paddingBottom: Math.max(insets.bottom, space[4]),
+              maxHeight,
+              gap,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[4], gap: space[2] }}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text accessibilityRole="header" style={[{ color: c.ink, fontSize: 17, fontWeight: '800' }, userText]}>
+                  {title}
+                </Text>
+                {subtitle ? <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{subtitle}</Text> : null}
+              </View>
+              {done ? <Button label={t('m.common.done')} size="sm" variant="ghost" onPress={onClose} /> : null}
+            </View>
+            {scroll ? (
+              <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ gap, paddingHorizontal: space[4] }} keyboardShouldPersistTaps="handled">
+                {children}
+              </ScrollView>
+            ) : (
+              <View style={{ gap, paddingHorizontal: space[4], flexShrink: 1 }}>{children}</View>
+            )}
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+/** One line in a sheet: an icon, a label, 48 high. `danger` for destructive actions. */
+export function SheetItem({
+  icon,
+  label,
+  hint,
+  onPress,
+  danger,
+  disabled,
+  selected,
+  ref,
+}: {
+  icon: IconName;
+  label: string;
+  hint?: string;
+  onPress: () => void;
+  danger?: boolean;
+  disabled?: boolean;
+  selected?: boolean;
+  ref?: Ref<View>;
+}) {
+  const c = useColors();
+  const color = danger ? c.danger : selected ? c.yapi : c.ink;
+  return (
+    <Pressable
+      ref={ref}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={hint}
+      accessibilityState={selected === undefined ? { disabled: !!disabled } : { disabled: !!disabled, selected }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space[3],
+        minHeight: 48,
+        paddingHorizontal: space[2],
+        borderRadius: radius.md,
+        backgroundColor: pressed ? c.surfaceSunken : selected ? c.yapiSoft : 'transparent',
+        opacity: disabled ? 0.5 : 1,
+      })}
+    >
+      <Icon name={icon} size={20} color={color} />
+      <Text style={{ color, fontSize: 15, fontWeight: '600', flex: 1 }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+export interface ActionSheetAction {
+  label: string;
+  icon: IconName;
+  onPress: () => void;
+  /** Shown in the danger colour: delete, remove, leave, block, report. */
+  destructive?: boolean;
+  disabled?: boolean;
+  hint?: string;
+}
+
+export interface ActionSheetMenu {
+  title: string;
+  message?: string;
+  actions: ActionSheetAction[];
+}
+
+/**
+ * A menu of actions that slides up from the bottom, with Cancel at the end. Use it instead of an
+ * Alert with several buttons: Android shows at most three buttons in an alert. The chosen
+ * action runs once the sheet has gone, so it can open another sheet or an alert.
+ * Screen readers start on the first action; the rest of the screen is hidden from them.
+ */
+export function ActionSheet({
+  visible,
+  title,
+  message,
+  actions,
+  onClose,
+  header,
+}: ActionSheetMenu & { visible: boolean; onClose: () => void; /** Above the actions (quick reactions, for example). */ header?: ReactNode }) {
+  const { t } = useT();
+  const first = useRef<View>(null);
+  const pending = useRef<(() => void) | null>(null);
+
+  const run = useCallback(() => {
+    const fn = pending.current;
+    pending.current = null;
+    fn?.();
+  }, []);
+
+  const choose = (a: ActionSheetAction) => {
+    pending.current = a.onPress;
+    onClose();
+    // iOS runs it from onDismiss, once the sheet has gone (it can't show an alert or another
+    // sheet over one that is closing); the timer is a fallback. Android has no such limit.
+    setTimeout(run, Platform.OS === 'ios' ? 600 : 0);
+  };
+
+  useEffect(() => {
+    if (!visible) return;
+    const timer = setTimeout(() => {
+      if (first.current) AccessibilityInfo.sendAccessibilityEvent(first.current, 'focus');
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [visible]);
+
+  return (
+    <BottomSheet visible={visible} title={title} subtitle={message} onClose={onClose} onDismiss={run} gap={2}>
+      {header}
+      {actions.map((a, i) => (
+        <SheetItem
+          key={`${i}-${a.label}`}
+          ref={i === 0 ? first : undefined}
+          icon={a.icon}
+          label={a.label}
+          hint={a.hint}
+          danger={a.destructive}
+          disabled={a.disabled}
+          onPress={() => choose(a)}
+        />
+      ))}
+      <SheetItem ref={actions.length ? undefined : first} icon="close" label={t('common.cancel')} onPress={onClose} />
+    </BottomSheet>
+  );
+}
+
+/**
+ * `const menu = useActionSheet()`, then `menu.show({ title, actions })` from a press and
+ * `{menu.sheet}` somewhere in what the component renders.
+ */
+export function useActionSheet() {
+  const [menu, setMenu] = useState<ActionSheetMenu | null>(null);
+  const [open, setOpen] = useState(false);
+  const show = useCallback((m: ActionSheetMenu) => {
+    setMenu(m);
+    setOpen(true);
+  }, []);
+  const close = useCallback(() => setOpen(false), []);
+  // The last menu stays rendered while it slides away.
+  const sheet = menu ? <ActionSheet visible={open} {...menu} onClose={close} /> : null;
+  return { show, close, sheet };
 }

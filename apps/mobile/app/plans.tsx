@@ -44,6 +44,7 @@ export default function PlansScreen() {
 
   return (
     <ScrollView
+      keyboardShouldPersistTaps="handled"
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
       refreshControl={

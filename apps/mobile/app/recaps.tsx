@@ -14,7 +14,7 @@ import { conversationTitle } from '../lib/post';
 import { isMaking, isRecapsOff, RECAP_STATUS, recapError, recapRatio } from '../lib/recaps';
 import { useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
-import { Avatar, Button, Card, EmptyState, Field, Icon, Loading, Notice, Row, Segmented, Title, useColors, userText } from '../lib/ui';
+import { Avatar, Button, Card, EmptyState, Field, Icon, Loading, Notice, Row, Segmented, Title, useColors, useRefresh, userText } from '../lib/ui';
 
 type Note = { tone: 'info' | 'danger'; text: string };
 
@@ -127,6 +127,8 @@ export default function Recaps() {
     };
   }, [focused, making]);
 
+  const refresh = useRefresh(load);
+
   const close = () => {
     setOpenId(null);
     if (params.open) router.setParams({ open: '' });
@@ -153,7 +155,12 @@ export default function Recaps() {
 
   return (
     <>
-      <ScrollView style={{ backgroundColor: c.ground }} contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: space[8] }}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        refreshControl={refresh}
+        style={{ backgroundColor: c.ground }}
+        contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: space[8] }}
+      >
         <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('m.recap.intro')}</Text>
         {note ? (
           <Notice tone={note.tone} key={note.text}>
@@ -389,7 +396,7 @@ function RecapViewer({
 
         {ready ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-            <Button icon="download-outline" label={t('m.recap.save')} disabled={busy} onPress={() => void save()} />
+            <Button icon="download-outline" label={t('m.recap.save')} disabled={busy} onPress={() => save()} />
             {r.canPost ? <Button variant="secondary" icon="film-outline" label={t('m.recap.postReel')} disabled={busy} onPress={() => toggle('post')} /> : null}
             {r.canSend ? (
               <Button variant="secondary" icon="paper-plane-outline" label={t('m.recap.send')} disabled={busy} onPress={() => toggle('send')} />
@@ -489,7 +496,7 @@ function PostPanel({ recap: r, onPosted }: { recap: Recap; onPosted: (postId: st
         onChange={setVisibility}
       />
       {error ? <Notice tone="danger">{error}</Notice> : null}
-      <Button label={t('m.recap.post')} disabled={busy} onPress={() => void post()} />
+      <Button label={t('m.recap.post')} disabled={busy} onPress={() => post()} />
     </Card>
   );
 }
@@ -554,7 +561,7 @@ function SendPanel({ recap: r, onSent }: { recap: Recap; onSent: (text: string) 
               {done ? (
                 <Icon name="checkmark-circle" size={22} color={c.success} />
               ) : (
-                <Button size="sm" label={t('inbox.send')} disabled={!!busy} onPress={() => void send(chat)} />
+                <Button size="sm" label={t('inbox.send')} disabled={!!busy} onPress={() => send(chat)} />
               )}
             </View>
           );

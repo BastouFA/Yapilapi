@@ -194,7 +194,12 @@ function FilterChips({ value, onChange, thumb }: { value: FilterId; onChange: (f
   const c = useColors();
   const { t } = useT();
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space[2], paddingVertical: 4 }}>
+    <ScrollView
+      keyboardShouldPersistTaps="handled"
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ gap: space[2], paddingVertical: 4 }}
+    >
       {FILTERS.map((f) => {
         const on = f.id === value;
         return (

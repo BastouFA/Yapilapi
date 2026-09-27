@@ -6,8 +6,6 @@ import {
   AccessibilityInfo,
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -26,7 +24,21 @@ import { useT } from '../../lib/i18n';
 import { openOnWeb } from '../../lib/money';
 import { useRealtime, useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
-import { Avatar, Button, EmptyState, Icon, Loading, Notice, Pill, Segmented, useColors, userText } from '../../lib/ui';
+import {
+  type ActionSheetAction,
+  Avatar,
+  Button,
+  EmptyState,
+  Icon,
+  KeyboardAvoid,
+  Loading,
+  Notice,
+  Pill,
+  Segmented,
+  useActionSheet,
+  useColors,
+  userText,
+} from '../../lib/ui';
 
 type Tab = 'chat' | 'questions';
 type Note = { tone: 'info' | 'danger' | 'warn'; text: string };
@@ -57,6 +69,7 @@ export default function LiveScreen() {
   const scroller = useRef<ScrollView>(null);
   const nearBottom = useRef(true);
   const joined = useRef(false);
+  const menu = useActionSheet();
 
   useEffect(() => {
     void AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
@@ -158,10 +171,11 @@ export default function LiveScreen() {
 
   function messageMenu(m: LiveChatMessage) {
     const mine = m.author.id === me?.id;
-    const actions: { text: string; style?: 'destructive' | 'cancel'; onPress?: () => void }[] = [
+    const actions: ActionSheetAction[] = [
       {
-        text: t('m.live.removeMessage'),
-        style: 'destructive',
+        label: t('m.live.removeMessage'),
+        icon: 'trash-outline',
+        destructive: true,
         onPress: async () => {
           try {
             await (await client()).raw.del(`/v1/live/${id}/chat/${m.id}`);
@@ -174,8 +188,9 @@ export default function LiveScreen() {
     ];
     if (canModerate && !mine && m.author.id !== l.host.id)
       actions.push({
-        text: t('m.live.removePerson', { name: m.author.displayName }),
-        style: 'destructive',
+        label: t('m.live.removePerson', { name: m.author.displayName }),
+        icon: 'person-remove-outline',
+        destructive: true,
         onPress: async () => {
           try {
             await (await client()).live.ban(id, m.author.id);
@@ -185,8 +200,7 @@ export default function LiveScreen() {
           }
         },
       });
-    actions.push({ text: t('common.cancel'), style: 'cancel' });
-    Alert.alert(t('m.live.messageOptions'), undefined, actions);
+    menu.show({ title: t('m.live.messageOptions'), actions });
   }
 
   function endLive() {
@@ -215,11 +229,7 @@ export default function LiveScreen() {
   const statusText = l.status === 'live' ? t('m.live.badge', { count: l.viewers }) : l.status === 'ended' ? t('m.live.ended') : t('m.live.scheduled');
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: c.ground }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={insets.top + 44}
-    >
+    <KeyboardAvoid style={{ backgroundColor: c.ground }}>
       <Stack.Screen options={{ title: l.title }} />
       <View style={{ aspectRatio: 16 / 9, width: '100%', backgroundColor: '#0B100E', alignItems: 'center', justifyContent: 'center' }}>
         {l.status === 'live' && playUrl ? (
@@ -273,7 +283,7 @@ export default function LiveScreen() {
               label={t('m.live.buyOnWeb')}
               icon="open-outline"
               size="sm"
-              onPress={() => void openOnWeb(`/live/${encodeURIComponent(id)}`)}
+              onPress={() => openOnWeb(`/live/${encodeURIComponent(id)}`)}
               style={{ alignSelf: 'flex-start', marginTop: space[1] }}
             />
             <Text style={{ color: c.inkMuted, fontSize: 12 }}>{t('m.shop.onWeb')}</Text>
@@ -291,7 +301,7 @@ export default function LiveScreen() {
 
         {l.status === 'live' && !isHost && commerceOn !== false ? (
           <View style={{ gap: space[1] }}>
-            <Button label={t('m.live.giftOnWeb')} icon="gift-outline" variant="secondary" onPress={() => void openOnWeb(`/live/${encodeURIComponent(id)}`)} />
+            <Button label={t('m.live.giftOnWeb')} icon="gift-outline" variant="secondary" onPress={() => openOnWeb(`/live/${encodeURIComponent(id)}`)} />
             <Text style={{ color: c.inkMuted, fontSize: 12, textAlign: 'center' }}>{t('m.live.giftHint')}</Text>
           </View>
         ) : null}
@@ -383,7 +393,8 @@ export default function LiveScreen() {
         </View>
       ) : null}
       {canChat ? null : <View style={{ height: insets.bottom }} />}
-    </KeyboardAvoidingView>
+      {menu.sheet}
+    </KeyboardAvoid>
   );
 }
 

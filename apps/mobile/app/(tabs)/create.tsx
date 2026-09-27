@@ -28,7 +28,7 @@ import { useSession } from '../../lib/session';
 import { formatBytes } from '../../../../packages/shared/src/data-saver';
 import { listQueuedVideos, queuedAsAsset, queueVideo, removeQueuedVideo, useDataSaver, type QueuedVideo } from '../../lib/data-saver';
 import { radius, space } from '../../lib/theme';
-import { Button, Card, Field, Icon, Notice, Screen, Segmented, SwitchRow, useColors, useTabBarSpace, userText } from '../../lib/ui';
+import { Button, Card, Field, Icon, KeyboardAvoid, Notice, Screen, Segmented, SwitchRow, useColors, userText, useTabBarSpace } from '../../lib/ui';
 import { isVerificationError, VerifyPrompt } from '../../lib/safety';
 import { StickerEditor, type DraftSticker } from '../../lib/story-stickers';
 import { clipMax, draftMusic, MusicField, musicInput, soundAsTrack, type DraftMusic } from '../../lib/music';
@@ -566,326 +566,328 @@ export default function Create() {
   ];
 
   return (
-    <ScrollView
-      style={{ backgroundColor: c.ground }}
-      contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: bottom }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[2] }}>
-        {draftId ? (
-          <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 17, fontWeight: '800', flexShrink: 1 }}>
-            {t('m.create.continueDraft')}
-          </Text>
-        ) : (
-          <View />
-        )}
-        <Button label={t('m.create.drafts')} icon="document-text-outline" variant="ghost" size="sm" onPress={() => router.push('/drafts')} />
-      </View>
-      <Segmented
-        label={t('m.create.mode')}
-        options={KINDS.map((k) => ({ id: k.id, label: t(k.label) }))}
-        value={kind}
-        onChange={switchTo}
-        // A quick double tap on Post, Reel or Story opens the camera in that mode.
-        onDoublePress={(k) => router.push({ pathname: '/camera', params: { mode: k } })}
-        doublePressLabel={t('m.create.openCamera')}
-      />
-      <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t(hint)}</Text>
-      {kind === 'reel' && remix ? (
-        <RemixSource
-          mode={remix.mode}
-          original={original}
-          missing={originalMissing}
-          onCancel={() => {
-            setRemix(null);
-            setOriginal(null);
-            setOriginalMissing(false);
-          }}
+    <KeyboardAvoid>
+      <ScrollView
+        style={{ backgroundColor: c.ground }}
+        contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: bottom }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[2] }}>
+          {draftId ? (
+            <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 17, fontWeight: '800', flexShrink: 1 }}>
+              {t('m.create.continueDraft')}
+            </Text>
+          ) : (
+            <View />
+          )}
+          <Button label={t('m.create.drafts')} icon="document-text-outline" variant="ghost" size="sm" onPress={() => router.push('/drafts')} />
+        </View>
+        <Segmented
+          label={t('m.create.mode')}
+          options={KINDS.map((k) => ({ id: k.id, label: t(k.label) }))}
+          value={kind}
+          onChange={switchTo}
+          // A quick double tap on Post, Reel or Story opens the camera in that mode.
+          onDoublePress={(k) => router.push({ pathname: '/camera', params: { mode: k } })}
+          doublePressLabel={t('m.create.openCamera')}
         />
-      ) : null}
-      <Card style={{ gap: space[3] }}>
-        <Field
-          label={kind === 'reel' ? t('m.create.reel.caption') : kind === 'story' ? t('m.create.story.body') : t('create.placeholder')}
-          {...ac.inputProps}
-          multiline
-          maxLength={kind === 'story' ? 500 : kind === 'reel' ? 2200 : 5000}
-          style={{ minHeight: kind === 'post' ? 140 : 96, textAlignVertical: 'top', paddingTop: 12 }}
-        />
-        {ac.list}
-
-        <View style={{ gap: space[2] }}>
-          {media ? <Preview media={media} onRemove={() => setMedia(null)} /> : null}
-          <Button
-            label={
-              applying
-                ? t('m.editor.applying')
-                : uploading
-                  ? t('m.create.uploading', { progress: number(progress ?? 0, { style: 'percent' }) })
-                  : kind === 'reel'
-                    ? media
-                      ? t('m.create.replaceVideo')
-                      : t('m.create.chooseVideo')
-                    : media
-                      ? t('m.create.replaceMedia')
-                      : t('m.create.choosePhotoVideo')
-            }
-            icon={kind === 'reel' ? 'videocam-outline' : 'image-outline'}
-            variant="secondary"
-            size="sm"
-            disabled={uploading || busy}
-            onPress={() => void choose()}
-            style={{ alignSelf: 'flex-start' }}
+        <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t(hint)}</Text>
+        {kind === 'reel' && remix ? (
+          <RemixSource
+            mode={remix.mode}
+            original={original}
+            missing={originalMissing}
+            onCancel={() => {
+              setRemix(null);
+              setOriginal(null);
+              setOriginalMissing(false);
+            }}
           />
-          {confirmVideo ? (
-            <Notice tone="warn" title={t('dataSaver.title')}>
-              <Text style={{ color: c.ink, lineHeight: 20 }}>
-                {confirmVideo.fileSize ? `${t('dataSaver.videoSize', { size: formatBytes(confirmVideo.fileSize) })} ` : ''}
-                {t('dataSaver.videoWifi')}
-              </Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-                <Button
-                  label={t('dataSaver.uploadNow')}
-                  size="sm"
-                  onPress={() => {
-                    const a = confirmVideo;
-                    setConfirmVideo(null);
-                    handlePicked(a, { confirmed: true });
-                  }}
-                />
-                <Button
-                  label={t('dataSaver.uploadLater')}
-                  size="sm"
-                  variant="secondary"
-                  onPress={async () => {
-                    const a = confirmVideo;
-                    setConfirmVideo(null);
-                    try {
-                      await queueVideo(a);
-                      setLater(await listQueuedVideos());
-                      setNote(t('dataSaver.queued'));
-                    } catch (e) {
-                      setError(errorMessage(e));
-                    }
-                  }}
-                />
-              </View>
-            </Notice>
-          ) : null}
-          {later.length ? (
-            <View style={{ gap: space[2] }}>
-              <Text style={{ color: c.ink, fontWeight: '700', fontSize: 14 }}>{t('dataSaver.queueTitle')}</Text>
-              <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('dataSaver.queueHint')}</Text>
-              {later.map((q) => (
-                <View key={q.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
-                  <Icon name="videocam-outline" size={18} color={c.inkMuted} />
-                  <Text style={{ color: c.ink, flex: 1, fontSize: 14 }} numberOfLines={1}>
-                    {[q.duration ? clock(q.duration / 1000) : null, q.fileSize ? formatBytes(q.fileSize) : null].filter(Boolean).join(' · ') || q.fileName}
-                  </Text>
+        ) : null}
+        <Card style={{ gap: space[3] }}>
+          <Field
+            label={kind === 'reel' ? t('m.create.reel.caption') : kind === 'story' ? t('m.create.story.body') : t('create.placeholder')}
+            {...ac.inputProps}
+            multiline
+            maxLength={kind === 'story' ? 500 : kind === 'reel' ? 2200 : 5000}
+            style={{ minHeight: kind === 'post' ? 140 : 96, textAlignVertical: 'top', paddingTop: 12 }}
+          />
+          {ac.list}
+
+          <View style={{ gap: space[2] }}>
+            {media ? <Preview media={media} onRemove={() => setMedia(null)} /> : null}
+            <Button
+              label={
+                applying
+                  ? t('m.editor.applying')
+                  : uploading
+                    ? t('m.create.uploading', { progress: number(progress ?? 0, { style: 'percent' }) })
+                    : kind === 'reel'
+                      ? media
+                        ? t('m.create.replaceVideo')
+                        : t('m.create.chooseVideo')
+                      : media
+                        ? t('m.create.replaceMedia')
+                        : t('m.create.choosePhotoVideo')
+              }
+              icon={kind === 'reel' ? 'videocam-outline' : 'image-outline'}
+              variant="secondary"
+              size="sm"
+              disabled={uploading || busy}
+              onPress={() => choose()}
+              style={{ alignSelf: 'flex-start' }}
+            />
+            {confirmVideo ? (
+              <Notice tone="warn" title={t('dataSaver.title')}>
+                <Text style={{ color: c.ink, lineHeight: 20 }}>
+                  {confirmVideo.fileSize ? `${t('dataSaver.videoSize', { size: formatBytes(confirmVideo.fileSize) })} ` : ''}
+                  {t('dataSaver.videoWifi')}
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
                   <Button
                     label={t('dataSaver.uploadNow')}
                     size="sm"
-                    variant="secondary"
-                    disabled={uploading || busy}
                     onPress={() => {
-                      fromQueue.current = q.id;
-                      handlePicked(queuedAsAsset(q), { confirmed: true });
+                      const a = confirmVideo;
+                      setConfirmVideo(null);
+                      handlePicked(a, { confirmed: true });
                     }}
                   />
                   <Button
-                    label={t('dataSaver.remove')}
+                    label={t('dataSaver.uploadLater')}
                     size="sm"
-                    variant="ghost"
+                    variant="secondary"
                     onPress={async () => {
-                      await removeQueuedVideo(q.id);
-                      setLater(await listQueuedVideos());
+                      const a = confirmVideo;
+                      setConfirmVideo(null);
+                      try {
+                        await queueVideo(a);
+                        setLater(await listQueuedVideos());
+                        setNote(t('dataSaver.queued'));
+                      } catch (e) {
+                        setError(errorMessage(e));
+                      }
                     }}
                   />
                 </View>
-              ))}
-            </View>
+              </Notice>
+            ) : null}
+            {later.length ? (
+              <View style={{ gap: space[2] }}>
+                <Text style={{ color: c.ink, fontWeight: '700', fontSize: 14 }}>{t('dataSaver.queueTitle')}</Text>
+                <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('dataSaver.queueHint')}</Text>
+                {later.map((q) => (
+                  <View key={q.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+                    <Icon name="videocam-outline" size={18} color={c.inkMuted} />
+                    <Text style={{ color: c.ink, flex: 1, fontSize: 14 }} numberOfLines={1}>
+                      {[q.duration ? clock(q.duration / 1000) : null, q.fileSize ? formatBytes(q.fileSize) : null].filter(Boolean).join(' · ') || q.fileName}
+                    </Text>
+                    <Button
+                      label={t('dataSaver.uploadNow')}
+                      size="sm"
+                      variant="secondary"
+                      disabled={uploading || busy}
+                      onPress={() => {
+                        fromQueue.current = q.id;
+                        handlePicked(queuedAsAsset(q), { confirmed: true });
+                      }}
+                    />
+                    <Button
+                      label={t('dataSaver.remove')}
+                      size="sm"
+                      variant="ghost"
+                      onPress={async () => {
+                        await removeQueuedVideo(q.id);
+                        setLater(await listQueuedVideos());
+                      }}
+                    />
+                  </View>
+                ))}
+              </View>
+            ) : null}
+            {denied ? (
+              <Notice tone="warn">
+                <Text style={{ color: c.ink, lineHeight: 20 }}>{t('m.create.photosPermission')}</Text>
+                <Button
+                  label={t('m.common.openSettings')}
+                  size="sm"
+                  variant="secondary"
+                  onPress={() => Linking.openSettings()}
+                  style={{ alignSelf: 'flex-start' }}
+                />
+              </Notice>
+            ) : null}
+          </View>
+
+          {media && media.kind !== 'audio' && kind !== 'story' ? (
+            <Field label={t('m.create.altText')} placeholder={t('m.create.altTextPlaceholder')} value={altText} onChangeText={setAltText} maxLength={500} />
           ) : null}
-          {denied ? (
-            <Notice tone="warn">
-              <Text style={{ color: c.ink, lineHeight: 20 }}>{t('m.create.photosPermission')}</Text>
+          {kind === 'post' && media?.kind === 'image' ? <PhotoTagger uri={media.local} value={photoTags} onChange={setPhotoTags} /> : null}
+          {kind !== 'story' ? <CoauthorPicker value={coauthors} onChange={setCoauthors} /> : null}
+
+          {kind === 'reel' && !remix ? <MusicField use="reel" value={music} onChange={setMusic} /> : null}
+          {kind === 'post' && postCanHaveMusic ? <MusicField use="post" value={music} onChange={setMusic} /> : null}
+
+          {kind === 'story' ? (
+            <>
+              {media?.kind !== 'audio' ? <MusicField use="story" value={music} onChange={setMusic} video={media?.kind === 'video'} /> : null}
+              <StickerEditor
+                stickers={stickers}
+                onChange={setStickers}
+                preview={{ uri: media?.local, kind: media?.kind, body }}
+                music={music ? { label: `${music.track.title} · ${music.track.artist}`, x: music.x, y: music.y } : null}
+                onMoveMusic={(x, y) => setMusic((m) => (m ? { ...m, x, y } : m))}
+              />
+              <SwitchRow label={t('m.stories.allowReshare')} hint={t('m.stories.allowReshareHint')} value={allowReshare} onValueChange={setAllowReshare} />
+              <SwitchRow label={t('m.closeFriends.title')} hint={t('m.closeFriends.storyHint')} value={closeFriends} onValueChange={setCloseFriends} />
               <Button
-                label={t('m.common.openSettings')}
+                label={t('m.closeFriends.manage')}
+                variant="ghost"
                 size="sm"
-                variant="secondary"
-                onPress={() => void Linking.openSettings()}
+                icon="people-outline"
+                onPress={() => router.push('/close-friends')}
                 style={{ alignSelf: 'flex-start' }}
               />
-            </Notice>
+              <Text style={{ color: c.ink, fontWeight: '600' }}>{t('m.create.expires')}</Text>
+              <Segmented
+                label={t('m.create.expires')}
+                options={EXPIRES.map((e) => ({ id: e.id, label: t(e.label) }))}
+                value={expiresIn}
+                onChange={setExpiresIn}
+              />
+            </>
           ) : null}
-        </View>
 
-        {media && media.kind !== 'audio' && kind !== 'story' ? (
-          <Field label={t('m.create.altText')} placeholder={t('m.create.altTextPlaceholder')} value={altText} onChangeText={setAltText} maxLength={500} />
-        ) : null}
-        {kind === 'post' && media?.kind === 'image' ? <PhotoTagger uri={media.local} value={photoTags} onChange={setPhotoTags} /> : null}
-        {kind !== 'story' ? <CoauthorPicker value={coauthors} onChange={setCoauthors} /> : null}
-
-        {kind === 'reel' && !remix ? <MusicField use="reel" value={music} onChange={setMusic} /> : null}
-        {kind === 'post' && postCanHaveMusic ? <MusicField use="post" value={music} onChange={setMusic} /> : null}
-
-        {kind === 'story' ? (
-          <>
-            {media?.kind !== 'audio' ? <MusicField use="story" value={music} onChange={setMusic} video={media?.kind === 'video'} /> : null}
-            <StickerEditor
-              stickers={stickers}
-              onChange={setStickers}
-              preview={{ uri: media?.local, kind: media?.kind, body }}
-              music={music ? { label: `${music.track.title} · ${music.track.artist}`, x: music.x, y: music.y } : null}
-              onMoveMusic={(x, y) => setMusic((m) => (m ? { ...m, x, y } : m))}
-            />
-            <SwitchRow label={t('m.stories.allowReshare')} hint={t('m.stories.allowReshareHint')} value={allowReshare} onValueChange={setAllowReshare} />
-            <SwitchRow label={t('m.closeFriends.title')} hint={t('m.closeFriends.storyHint')} value={closeFriends} onValueChange={setCloseFriends} />
-            <Button
-              label={t('m.closeFriends.manage')}
-              variant="ghost"
-              size="sm"
-              icon="people-outline"
-              onPress={() => router.push('/close-friends')}
-              style={{ alignSelf: 'flex-start' }}
-            />
-            <Text style={{ color: c.ink, fontWeight: '600' }}>{t('m.create.expires')}</Text>
-            <Segmented
-              label={t('m.create.expires')}
-              options={EXPIRES.map((e) => ({ id: e.id, label: t(e.label) }))}
-              value={expiresIn}
-              onChange={setExpiresIn}
-            />
-          </>
-        ) : null}
-
-        {kind === 'story' && closeFriends ? null : (
-          <>
-            <Text style={{ color: c.ink, fontWeight: '600' }}>{t('create.visibility')}</Text>
-            <Chips
-              label={t('create.visibility')}
-              options={audienceOptions}
-              value={keptAudience && kind !== 'story' ? (keptAudience.visibility as Visibility) : visibility}
-              onChange={(v) => {
-                if (!v) return;
-                if (keptAudience && v === keptAudience.visibility) return;
-                setKeptAudience(null);
-                setVisibility(v);
-                // With a single circle there is nothing to choose.
-                if (v === 'circle' && !circleId && circles?.length === 1) setCircleId(circles[0]!.id);
-              }}
-            />
-            {forCircle && circles?.length ? (
-              <View style={{ gap: space[2] }}>
-                <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.create.chooseCircle')}</Text>
-                <Chips
-                  label={t('m.create.chooseCircle')}
-                  options={circles.map((x) => ({ id: x.id, label: x.name, icon: 'ellipse-outline' as const }))}
-                  value={circleId}
-                  onChange={setCircleId}
-                />
-                <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('m.create.circleHint')}</Text>
+          {kind === 'story' && closeFriends ? null : (
+            <>
+              <Text style={{ color: c.ink, fontWeight: '600' }}>{t('create.visibility')}</Text>
+              <Chips
+                label={t('create.visibility')}
+                options={audienceOptions}
+                value={keptAudience && kind !== 'story' ? (keptAudience.visibility as Visibility) : visibility}
+                onChange={(v) => {
+                  if (!v) return;
+                  if (keptAudience && v === keptAudience.visibility) return;
+                  setKeptAudience(null);
+                  setVisibility(v);
+                  // With a single circle there is nothing to choose.
+                  if (v === 'circle' && !circleId && circles?.length === 1) setCircleId(circles[0]!.id);
+                }}
+              />
+              {forCircle && circles?.length ? (
+                <View style={{ gap: space[2] }}>
+                  <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.create.chooseCircle')}</Text>
+                  <Chips
+                    label={t('m.create.chooseCircle')}
+                    options={circles.map((x) => ({ id: x.id, label: x.name, icon: 'ellipse-outline' as const }))}
+                    value={circleId}
+                    onChange={setCircleId}
+                  />
+                  <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('m.create.circleHint')}</Text>
+                  <Button
+                    label={t('m.create.editCircles')}
+                    variant="ghost"
+                    size="sm"
+                    icon="people-outline"
+                    onPress={() => router.push('/circles')}
+                    style={{ alignSelf: 'flex-start' }}
+                  />
+                </View>
+              ) : null}
+              {kind !== 'story' && circles && !circles.length ? (
                 <Button
-                  label={t('m.create.editCircles')}
+                  label={t('m.create.makeCircle')}
                   variant="ghost"
                   size="sm"
-                  icon="people-outline"
+                  icon="add-circle-outline"
                   onPress={() => router.push('/circles')}
                   style={{ alignSelf: 'flex-start' }}
                 />
-              </View>
-            ) : null}
-            {kind !== 'story' && circles && !circles.length ? (
-              <Button
-                label={t('m.create.makeCircle')}
-                variant="ghost"
-                size="sm"
-                icon="add-circle-outline"
-                onPress={() => router.push('/circles')}
-                style={{ alignSelf: 'flex-start' }}
+              ) : null}
+            </>
+          )}
+          {kind !== 'story' ? (
+            <View style={{ gap: space[2] }}>
+              <Text style={{ color: c.ink, fontWeight: '600' }}>{t('comments.settings.title')}</Text>
+              <Chips
+                label={t('comments.settings.title')}
+                options={COMMENT_POLICIES.map((p) => ({ id: p, label: t(`comments.policy.${p}`) }))}
+                value={commentPolicy}
+                onChange={(p) => p && setCommentPolicy(p)}
               />
-            ) : null}
-          </>
-        )}
-        {kind !== 'story' ? (
-          <View style={{ gap: space[2] }}>
-            <Text style={{ color: c.ink, fontWeight: '600' }}>{t('comments.settings.title')}</Text>
-            <Chips
-              label={t('comments.settings.title')}
-              options={COMMENT_POLICIES.map((p) => ({ id: p, label: t(`comments.policy.${p}`) }))}
-              value={commentPolicy}
-              onChange={(p) => p && setCommentPolicy(p)}
-            />
-          </View>
+            </View>
+          ) : null}
+          {kind === 'reel' ? (
+            <SwitchRow label={t('compose.allowRemix')} hint={t('compose.allowRemixHint')} value={allowRemix} onValueChange={setAllowRemix} />
+          ) : null}
+          {error ? <Notice tone="danger">{error}</Notice> : null}
+          {needsVerify || (me?.needsVerification && kind !== 'story' && visibility === 'public') ? <VerifyPrompt action="post" /> : null}
+          {note ? <Notice>{note}</Notice> : null}
+          <Button
+            label={
+              busy
+                ? t('m.create.publishing')
+                : kind === 'story'
+                  ? t('m.create.shareStory')
+                  : kind === 'reel'
+                    ? remix
+                      ? t(remix.mode === 'duet' ? 'compose.publishDuet' : 'compose.publishRemix')
+                      : t('m.create.publishReel')
+                    : t('create.publish')
+            }
+            disabled={!canPublish}
+            onPress={() => publish()}
+          />
+          {kind !== 'story' ? (
+            <View style={{ flexDirection: 'row', gap: space[2] }}>
+              <Button label={t('m.create.saveDraft')} variant="secondary" size="sm" disabled={!canPublish} onPress={() => keep(null)} style={{ flex: 1 }} />
+              <Button
+                label={t('m.create.schedule')}
+                icon="calendar-outline"
+                variant="secondary"
+                size="sm"
+                disabled={!canPublish}
+                onPress={() => setScheduling(true)}
+                style={{ flex: 1 }}
+              />
+            </View>
+          ) : null}
+        </Card>
+        <SchedulePicker visible={scheduling} onClose={() => setScheduling(false)} onPick={(at) => void keep(at)} />
+        {kind === 'post' ? <Button label={t('m.real.capture')} icon="camera-outline" variant="secondary" onPress={() => router.push('/real')} /> : null}
+        {editing?.type === 'video' ? (
+          <VideoEditor
+            asset={editing}
+            maxSeconds={me.plus ? PLUS_REEL_MAX_SECONDS : REEL_MAX_SECONDS}
+            mustFit={kind === 'reel'}
+            onCancel={() => {
+              fromQueue.current = null;
+              setEditing(null);
+            }}
+            onDone={(edits) => {
+              setEditing(null);
+              void upload(editing, edits);
+            }}
+          />
+        ) : editing ? (
+          <PhotoEditor
+            asset={editing}
+            onCancel={() => {
+              fromQueue.current = null;
+              setEditing(null);
+            }}
+            onDone={(p) => {
+              setEditing(null);
+              const edited =
+                p.uri === editing.uri
+                  ? editing
+                  : { ...editing, uri: p.uri, width: p.width, height: p.height, mimeType: 'image/jpeg', fileName: 'photo.jpg', fileSize: undefined };
+              void upload(edited, p.edits);
+            }}
+          />
         ) : null}
-        {kind === 'reel' ? (
-          <SwitchRow label={t('compose.allowRemix')} hint={t('compose.allowRemixHint')} value={allowRemix} onValueChange={setAllowRemix} />
-        ) : null}
-        {error ? <Notice tone="danger">{error}</Notice> : null}
-        {needsVerify || (me?.needsVerification && kind !== 'story' && visibility === 'public') ? <VerifyPrompt action="post" /> : null}
-        {note ? <Notice>{note}</Notice> : null}
-        <Button
-          label={
-            busy
-              ? t('m.create.publishing')
-              : kind === 'story'
-                ? t('m.create.shareStory')
-                : kind === 'reel'
-                  ? remix
-                    ? t(remix.mode === 'duet' ? 'compose.publishDuet' : 'compose.publishRemix')
-                    : t('m.create.publishReel')
-                  : t('create.publish')
-          }
-          disabled={!canPublish}
-          onPress={() => void publish()}
-        />
-        {kind !== 'story' ? (
-          <View style={{ flexDirection: 'row', gap: space[2] }}>
-            <Button label={t('m.create.saveDraft')} variant="secondary" size="sm" disabled={!canPublish} onPress={() => void keep(null)} style={{ flex: 1 }} />
-            <Button
-              label={t('m.create.schedule')}
-              icon="calendar-outline"
-              variant="secondary"
-              size="sm"
-              disabled={!canPublish}
-              onPress={() => setScheduling(true)}
-              style={{ flex: 1 }}
-            />
-          </View>
-        ) : null}
-      </Card>
-      <SchedulePicker visible={scheduling} onClose={() => setScheduling(false)} onPick={(at) => void keep(at)} />
-      {kind === 'post' ? <Button label={t('m.real.capture')} icon="camera-outline" variant="secondary" onPress={() => router.push('/real')} /> : null}
-      {editing?.type === 'video' ? (
-        <VideoEditor
-          asset={editing}
-          maxSeconds={me.plus ? PLUS_REEL_MAX_SECONDS : REEL_MAX_SECONDS}
-          mustFit={kind === 'reel'}
-          onCancel={() => {
-            fromQueue.current = null;
-            setEditing(null);
-          }}
-          onDone={(edits) => {
-            setEditing(null);
-            void upload(editing, edits);
-          }}
-        />
-      ) : editing ? (
-        <PhotoEditor
-          asset={editing}
-          onCancel={() => {
-            fromQueue.current = null;
-            setEditing(null);
-          }}
-          onDone={(p) => {
-            setEditing(null);
-            const edited =
-              p.uri === editing.uri
-                ? editing
-                : { ...editing, uri: p.uri, width: p.width, height: p.height, mimeType: 'image/jpeg', fileName: 'photo.jpg', fileSize: undefined };
-            void upload(edited, p.edits);
-          }}
-        />
-      ) : null}
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoid>
   );
 }
 

@@ -7,7 +7,7 @@ import { client, errorMessage, mediaUrl } from '../lib/api';
 import { VISIBILITY_ICON } from '../lib/boards';
 import { useT } from '../lib/i18n';
 import { radius, space } from '../lib/theme';
-import { Button, Field, Icon, Loading, Notice, useColors } from '../lib/ui';
+import { Button, Field, Icon, KeyboardAvoid, Loading, Notice, useColors } from '../lib/ui';
 
 /** Posts offered as a cover choice. */
 const COVER_CHOICES = 12;
@@ -127,78 +127,80 @@ export default function BoardEdit() {
   );
 
   return (
-    <ScrollView
-      style={{ backgroundColor: c.ground }}
-      contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Stack.Screen options={{ title: board ? t('m.boards.edit') : t('m.boards.new') }} />
-      <Field label={t('m.boards.nameLabel')} value={name} onChangeText={setName} maxLength={BOARD_NAME_MAX} placeholder={t('m.boards.namePlaceholder')} />
-      <View style={{ gap: space[1] }}>
-        <Field
-          label={t('m.boards.descriptionLabel')}
-          value={description}
-          onChangeText={setDescription}
-          maxLength={BOARD_DESCRIPTION_MAX}
-          multiline
-          style={{ minHeight: 72, paddingTop: space[2], textAlignVertical: 'top' }}
-        />
-        <Text style={{ color: hasEmoji ? c.danger : c.inkMuted, fontSize: 12 }} accessibilityLiveRegion={hasEmoji ? 'polite' : undefined}>
-          {hasEmoji ? t('m.boards.noEmoji') : t('m.boards.descriptionHint')}
-        </Text>
-      </View>
-
-      <View style={{ gap: space[2] }}>
-        <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.boards.visibilityLabel')}</Text>
-        <View accessibilityRole="radiogroup" style={{ gap: space[2] }}>
-          {BOARD_VISIBILITIES.map((v) => {
-            const on = visibility === v;
-            return (
-              <Pressable
-                key={v}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: on }}
-                accessibilityLabel={`${t(`m.boards.visibility.${v}`)}. ${hint[v]}`}
-                onPress={() => setVisibility(v)}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: space[3],
-                  padding: space[3],
-                  borderRadius: radius.md,
-                  borderWidth: 1,
-                  borderColor: on ? c.yapi : c.line,
-                  backgroundColor: on ? c.yapiSoft : c.surface,
-                }}
-              >
-                <Icon name={VISIBILITY_ICON[v]} size={20} color={on ? c.yapi : c.inkMuted} />
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={{ color: c.ink, fontWeight: on ? '700' : '600' }}>{t(`m.boards.visibility.${v}`)}</Text>
-                  <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{hint[v]}</Text>
-                </View>
-                <Icon name={on ? 'radio-button-on' : 'radio-button-off'} size={20} color={on ? c.yapi : c.lineStrong} />
-              </Pressable>
-            );
-          })}
+    <KeyboardAvoid>
+      <ScrollView
+        style={{ backgroundColor: c.ground }}
+        contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Stack.Screen options={{ title: board ? t('m.boards.edit') : t('m.boards.new') }} />
+        <Field label={t('m.boards.nameLabel')} value={name} onChangeText={setName} maxLength={BOARD_NAME_MAX} placeholder={t('m.boards.namePlaceholder')} />
+        <View style={{ gap: space[1] }}>
+          <Field
+            label={t('m.boards.descriptionLabel')}
+            value={description}
+            onChangeText={setDescription}
+            maxLength={BOARD_DESCRIPTION_MAX}
+            multiline
+            style={{ minHeight: 72, paddingTop: space[2], textAlignVertical: 'top' }}
+          />
+          <Text style={{ color: hasEmoji ? c.danger : c.inkMuted, fontSize: 12 }} accessibilityLiveRegion={hasEmoji ? 'polite' : undefined}>
+            {hasEmoji ? t('m.boards.noEmoji') : t('m.boards.descriptionHint')}
+          </Text>
         </View>
-      </View>
 
-      {board && posts.length ? (
         <View style={{ gap: space[2] }}>
-          <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.boards.cover')}</Text>
-          <View accessibilityRole="radiogroup" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-            {coverChoice('first', cover === null, t('m.boards.coverFirst'), () => setCover(null), null)}
-            {posts.map((p, n) => {
-              const image = p.media.find((m) => m.kind === 'image');
-              const uri = p.locked ? null : image ? (image.variants?.thumb ?? image.url) : (p.media.find((m) => m.kind === 'video')?.posterUrl ?? null);
-              return coverChoice(p.id, cover === p.id, t('m.boards.coverItem', { index: n + 1 }), () => setCover(p.id), uri);
+          <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.boards.visibilityLabel')}</Text>
+          <View accessibilityRole="radiogroup" style={{ gap: space[2] }}>
+            {BOARD_VISIBILITIES.map((v) => {
+              const on = visibility === v;
+              return (
+                <Pressable
+                  key={v}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: on }}
+                  accessibilityLabel={`${t(`m.boards.visibility.${v}`)}. ${hint[v]}`}
+                  onPress={() => setVisibility(v)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: space[3],
+                    padding: space[3],
+                    borderRadius: radius.md,
+                    borderWidth: 1,
+                    borderColor: on ? c.yapi : c.line,
+                    backgroundColor: on ? c.yapiSoft : c.surface,
+                  }}
+                >
+                  <Icon name={VISIBILITY_ICON[v]} size={20} color={on ? c.yapi : c.inkMuted} />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={{ color: c.ink, fontWeight: on ? '700' : '600' }}>{t(`m.boards.visibility.${v}`)}</Text>
+                    <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{hint[v]}</Text>
+                  </View>
+                  <Icon name={on ? 'radio-button-on' : 'radio-button-off'} size={20} color={on ? c.yapi : c.lineStrong} />
+                </Pressable>
+              );
             })}
           </View>
         </View>
-      ) : null}
 
-      {error ? <Notice tone="danger">{error}</Notice> : null}
-      <Button label={board ? t('common.save') : t('m.boards.create')} disabled={!name.trim() || busy || hasEmoji} onPress={() => void save()} />
-    </ScrollView>
+        {board && posts.length ? (
+          <View style={{ gap: space[2] }}>
+            <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.boards.cover')}</Text>
+            <View accessibilityRole="radiogroup" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+              {coverChoice('first', cover === null, t('m.boards.coverFirst'), () => setCover(null), null)}
+              {posts.map((p, n) => {
+                const image = p.media.find((m) => m.kind === 'image');
+                const uri = p.locked ? null : image ? (image.variants?.thumb ?? image.url) : (p.media.find((m) => m.kind === 'video')?.posterUrl ?? null);
+                return coverChoice(p.id, cover === p.id, t('m.boards.coverItem', { index: n + 1 }), () => setCover(p.id), uri);
+              })}
+            </View>
+          </View>
+        ) : null}
+
+        {error ? <Notice tone="danger">{error}</Notice> : null}
+        <Button label={board ? t('common.save') : t('m.boards.create')} disabled={!name.trim() || busy || hasEmoji} onPress={() => save()} />
+      </ScrollView>
+    </KeyboardAvoid>
   );
 }

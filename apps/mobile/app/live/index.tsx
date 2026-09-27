@@ -7,7 +7,7 @@ import { useFlag } from '../../lib/flags';
 import { useT } from '../../lib/i18n';
 import { openOnWeb } from '../../lib/money';
 import { space } from '../../lib/theme';
-import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, Pill, useColors, userText } from '../../lib/ui';
+import { Avatar, Button, Card, EmptyState, ErrorState, Icon, Loading, Notice, Pill, useColors, userText } from '../../lib/ui';
 
 /**
  * Live: who's live now, and lives coming up, from people you can see. Watching happens here;
@@ -50,6 +50,7 @@ export default function LiveList() {
 
   return (
     <ScrollView
+      keyboardShouldPersistTaps="handled"
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
       refreshControl={
@@ -63,7 +64,7 @@ export default function LiveList() {
         />
       }
     >
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {error ? <ErrorState message={error} onRetry={load} /> : null}
       {items === null ? (
         <Loading />
       ) : (
@@ -85,7 +86,7 @@ export default function LiveList() {
           icon="open-outline"
           size="sm"
           variant="secondary"
-          onPress={() => void openOnWeb('/live')}
+          onPress={() => openOnWeb('/live')}
           style={{ alignSelf: 'flex-start', marginTop: space[1] }}
         />
       </Notice>

@@ -9,7 +9,7 @@ import { SectionHeader } from '../lib/chips';
 import { useT } from '../lib/i18n';
 import { openDownload } from '../lib/money';
 import { space } from '../lib/theme';
-import { Avatar, Button, Card, Icon, Loading, Notice, Row, useColors, userText } from '../lib/ui';
+import { Avatar, Button, Card, ErrorState, Icon, Loading, Notice, Row, useColors, userText } from '../lib/ui';
 
 type Purchase = { productId: string; title: string; boughtAt: string; file: { name: string; sizeBytes: number } | null; seller: PublicUser };
 type Subscription = { id: string; status: string; plan: string; priceCents: number; currency: string; creator: PublicUser };
@@ -78,6 +78,7 @@ export default function PurchasesScreen() {
 
   return (
     <ScrollView
+      keyboardShouldPersistTaps="handled"
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
       refreshControl={
@@ -91,7 +92,7 @@ export default function PurchasesScreen() {
         />
       }
     >
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {error ? <ErrorState message={error} onRetry={load} /> : null}
       {note ? (
         <View accessibilityLiveRegion="polite">
           <Notice>{note}</Notice>
@@ -116,7 +117,7 @@ export default function PurchasesScreen() {
                     size="sm"
                     style={{ alignSelf: 'flex-start' }}
                     disabled={busy === p.productId}
-                    onPress={() => void download(p.productId)}
+                    onPress={() => download(p.productId)}
                   />
                 ) : (
                   <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('m.purchases.noFile')}</Text>

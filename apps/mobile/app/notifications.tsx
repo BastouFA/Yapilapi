@@ -9,7 +9,7 @@ import { useT, type Translator } from '../lib/i18n';
 import { notificationHref } from '../lib/links';
 import { useRealtime, useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
-import { Avatar, Button, EmptyState, Notice, SkeletonList, useColors, userText } from '../lib/ui';
+import { Avatar, Button, EmptyState, ErrorState, Notice, SkeletonList, useColors, userText } from '../lib/ui';
 
 /** What each kind of notification says; {name} is the person (or the people, for grouped ones). */
 const TEXT: Record<string, MessageKey> = {
@@ -224,12 +224,13 @@ export default function Notifications() {
 
   return (
     <SectionList
+      keyboardShouldPersistTaps="handled"
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4], paddingBottom: space[8] }}
       sections={sections}
       keyExtractor={(g) => g.key}
       stickySectionHeadersEnabled={false}
-      ListHeaderComponent={error ? <Notice tone="danger">{error}</Notice> : null}
+      ListHeaderComponent={error ? <ErrorState message={error} onRetry={() => load()} /> : null}
       ListEmptyComponent={<EmptyState title={t('m.notif.caughtUp')} body={t('m.notif.caughtUpBody')} />}
       renderSectionHeader={({ section }) => (
         <View style={{ paddingTop: space[3], paddingBottom: space[2], backgroundColor: c.ground }}>
@@ -283,7 +284,7 @@ export default function Notifications() {
                     {t('m.notif.nowFollowing', { name: single.displayName })}
                   </Text>
                 ) : (
-                  <Button label={t('m.notif.followBack')} size="sm" onPress={() => void followBack(single)} />
+                  <Button label={t('m.notif.followBack')} size="sm" onPress={() => followBack(single)} />
                 )}
               </View>
             ) : null}
@@ -294,8 +295,8 @@ export default function Notifications() {
                 </Text>
               ) : (
                 <View style={{ flexDirection: 'row', gap: space[2] }}>
-                  <Button label={t('m.collab.accept')} size="sm" disabled={busy === n.id} onPress={() => void answer(n, true)} />
-                  <Button label={t('m.collab.decline')} size="sm" variant="secondary" disabled={busy === n.id} onPress={() => void answer(n, false)} />
+                  <Button label={t('m.collab.accept')} size="sm" disabled={busy === n.id} onPress={() => answer(n, true)} />
+                  <Button label={t('m.collab.decline')} size="sm" variant="secondary" disabled={busy === n.id} onPress={() => answer(n, false)} />
                 </View>
               )
             ) : null}

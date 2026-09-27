@@ -10,8 +10,8 @@ import {
 } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Alert, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Alert, FlatList, Image, Linking, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Conversation, Message, PinnedMessage } from '../../../../packages/shared/src/types';
 import { MESSAGE_EDIT_MINUTES } from '../../../../packages/shared/src/constants';
@@ -25,7 +25,7 @@ import { conversationTitle } from '../../lib/post';
 import { isVerificationError, SensitiveCover, UnavailableMedia, VerifyPrompt } from '../../lib/safety';
 import { useRealtime, useSession } from '../../lib/session';
 import { elevation, gradient, radius, space } from '../../lib/theme';
-import { Icon, Notice, SwitchRow, useColors, userText } from '../../lib/ui';
+import { ActionSheet, BottomSheet, Icon, KeyboardAvoid, Notice, SwitchRow, useColors, userText } from '../../lib/ui';
 import { ViewOnceBubble } from '../../lib/view-once';
 import { Waveform, YAP_MAX_MS, YAP_MIN_MS } from '../../lib/yaps';
 import {
@@ -39,7 +39,6 @@ import {
   Quote,
   ReactionRow,
   SearchSheet,
-  Sheet,
   SwipeToReply,
   SystemLine,
   type SheetAction,
@@ -217,6 +216,8 @@ export default function Chat() {
   }, [navigation, conversation, me?.id, canCall, calls, id, c.yapi, c.ink, t, yaps?.available, yaps?.paused, nowStatus]);
 
   const [sending, setSending] = useState(false);
+  // Set while a text message or an edit is on its way: a second tap on Send does nothing.
+  const submitting = useRef(false);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recording = useAudioRecorderState(recorder, 250);
   const [recordingOn, setRecordingOn] = useState(false);
@@ -406,6 +407,16 @@ export default function Chat() {
   }
 
   async function send() {
+    if (submitting.current) return;
+    submitting.current = true;
+    try {
+      await sendNow();
+    } finally {
+      submitting.current = false;
+    }
+  }
+
+  async function sendNow() {
     const text = body.trim();
     if (editing) return saveEdit(editing, text);
     if (!text) return;
@@ -590,15 +601,26 @@ export default function Chat() {
     setTimeout(() => list.current?.scrollToIndex({ index, viewPosition: 0.5, animated: true }), 50);
   }
 
+  // Stable handlers for the memoised rows; they call this render's functions.
+  const latest = useRef({ jumpTo, setActionsFor, startReply, react, patchMessage, replaceMessage });
+  latest.current = { jumpTo, setActionsFor, startReply, react, patchMessage, replaceMessage };
+  const rowHandlers = useMemo<RowHandlers>(
+    () => ({
+      jumpTo: (mid) => void latest.current.jumpTo(mid),
+      openActions: (m) => latest.current.setActionsFor(m),
+      startReply: (m) => latest.current.startReply(m),
+      react: (m, emoji, on) => void latest.current.react(m, emoji, on),
+      patchMessage: (mid, fn) => latest.current.patchMessage(mid, fn),
+      replaceMessage: (m) => latest.current.replaceMessage(m),
+    }),
+    [],
+  );
+
   // Follow the newest message, not when earlier ones are loaded above it.
   const followed = useRef<string | null>(null);
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: c.ground }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={insets.top + 44}
-    >
+    <KeyboardAvoid style={{ backgroundColor: c.ground }}>
       {error ? (
         <View style={{ padding: space[3] }}>
           <Notice tone="danger">{error}</Notice>
@@ -638,6 +660,7 @@ export default function Chat() {
         </Pressable>
       ) : null}
       <FlatList
+        keyboardShouldPersistTaps="handled"
         ref={list}
         data={messages}
         keyExtractor={(m) => m.id}
@@ -659,101 +682,19 @@ export default function Chat() {
           list.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
           setTimeout(() => list.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: true }), 100);
         }}
-        renderItem={({ item }) => {
-          if (item.kind === 'system') return <SystemLine message={item} meId={me?.id} onJump={(mid) => void jumpTo(mid)} />;
-          const mine = item.sender.id === me?.id;
-          const rich = !item.unsent && (item.poll || item.list);
-          const text = item.unsent
-            ? t(mine ? 'm.chat.unsentMine' : 'm.chat.unsent')
-            : rich
-              ? ''
-              : item.body || (item.attachments.length || item.story ? '' : t('m.message.deleted'));
-          const tint = mine ? c.onYapi : c.ink;
-          const quote = item.replyTo && !item.unsent ? <Quote preview={item.replyTo} tint={tint} meId={me?.id} onJump={(mid) => void jumpTo(mid)} /> : null;
-          const textStyle = item.unsent ? { fontStyle: 'italic' as const, opacity: 0.8 } : null;
-          const meta = item.editedAt && !item.unsent ? <Text style={{ color: tint, fontSize: 11, opacity: 0.75 }}>{t('m.chat.edited')}</Text> : null;
-          const openActions = () => setActionsFor(item);
-          const media = item.unsent ? null : item.poll ? (
-            <PollCard message={item} meId={me?.id} tint={tint} onPoll={(poll) => patchMessage(item.id, (x) => ({ ...x, poll }))} />
-          ) : item.list ? (
-            <ListCard message={item} meId={me?.id} tint={tint} onList={(l) => patchMessage(item.id, (x) => ({ ...x, list: l }))} />
-          ) : item.viewOnce ? (
-            <ViewOnceBubble message={item} mine={mine} tint={tint} onChange={replaceMessage} />
-          ) : (
-            <>
-              {item.kind === 'yap' ? (
-                <Text style={{ color: tint, fontSize: 11, fontWeight: '800', letterSpacing: 0.5, opacity: 0.8 }}>{t('m.yap.label')}</Text>
-              ) : null}
-              {item.story ? <StoryCardView card={item.story} dark={mine} /> : null}
-              <Attachments items={item.attachments} tint={tint} />
-            </>
-          );
-          // Your messages sit at the end edge (the right in English, the left in Arabic), with the
-          // tail corner on that side.
-          const bubbleView = mine ? (
-            <View style={{ alignSelf: 'flex-end', maxWidth: '80%', gap: 2 }}>
-              <Pressable onLongPress={openActions} accessibilityHint={t('m.chat.messageOptions')}>
-                <LinearGradient {...gradient(c)} style={[bubble, { maxWidth: '100%', alignSelf: 'flex-end', borderBottomEndRadius: 6 }]}>
-                  {quote}
-                  {media}
-                  {text ? <Text style={[{ color: c.onYapi, fontSize: 15, lineHeight: 21 }, userText, textStyle]}>{text}</Text> : null}
-                  {meta}
-                </LinearGradient>
-              </Pressable>
-              <ReactionRow message={item} mine onToggle={(emoji, on) => void react(item, emoji, on)} />
-              {item.moderation === 'review' ? <Text style={{ color: c.inkMuted, fontSize: 12, alignSelf: 'flex-end' }}>{t('m.chat.held')}</Text> : null}
-              {item.reminder && !item.unsent ? <ReminderNote at={item.reminder.remindAt} alignEnd /> : null}
-            </View>
-          ) : (
-            <View style={{ alignSelf: 'flex-start', maxWidth: '80%', gap: 2 }}>
-              <Pressable
-                onLongPress={openActions}
-                accessibilityHint={t('m.chat.messageOptions')}
-                style={[bubble, { maxWidth: '100%', backgroundColor: c.surface, borderBottomStartRadius: 6 }, elevation(c)]}
-              >
-                {conversation && conversation.members.length > 2 ? (
-                  <Text style={[{ color: c.yapi, fontSize: 12, fontWeight: '700' }, userText]}>{item.sender.displayName}</Text>
-                ) : null}
-                {quote}
-                {media}
-                {item.body && !item.unsent ? (
-                  // Their text, with "See translation" when it's in a language you don't understand.
-                  <TranslatableText
-                    kind="message"
-                    id={item.id}
-                    text={item.body}
-                    lang={item.lang}
-                    rich={false}
-                    style={{ color: c.ink, fontSize: 15, lineHeight: 21 }}
-                  />
-                ) : text ? (
-                  <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 21 }, userText, textStyle]}>{text}</Text>
-                ) : null}
-                {meta}
-              </Pressable>
-              <ReactionRow message={item} mine={false} onToggle={(emoji, on) => void react(item, emoji, on)} />
-              {item.reminder && !item.unsent ? <ReminderNote at={item.reminder.remindAt} alignEnd={false} /> : null}
-            </View>
-          );
-          return (
-            <View
-              style={{ borderRadius: radius.lg, backgroundColor: highlight === item.id ? c.surfaceSunken : 'transparent' }}
-              accessibilityActions={
-                item.unsent
-                  ? []
-                  : [
-                      { name: 'reply', label: t('m.chat.reply') },
-                      { name: 'longpress', label: t('m.chat.messageOptions') },
-                    ]
-              }
-              onAccessibilityAction={(e) => (e.nativeEvent.actionName === 'reply' ? startReply(item) : openActions())}
-            >
-              <SwipeToReply enabled={!item.unsent} onReply={() => startReply(item)}>
-                {bubbleView}
-              </SwipeToReply>
-            </View>
-          );
-        }}
+        renderItem={({ item }) => (
+          <MessageRow
+            item={item}
+            mine={item.sender.id === me?.id}
+            meId={me?.id}
+            showSender={!!conversation && conversation.members.length > 2}
+            highlighted={highlight === item.id}
+            h={rowHandlers}
+          />
+        )}
+        initialNumToRender={20}
+        maxToRenderPerBatch={12}
+        windowSize={11}
       />
       {yaps?.available && !recordingOn ? (
         <View style={{ paddingHorizontal: space[3], paddingTop: space[2] }}>
@@ -949,52 +890,34 @@ export default function Chat() {
         )}
       </View>
       {yaps ? (
-        <Modal visible={yapSettings} transparent animationType="slide" onRequestClose={() => setYapSettings(false)}>
-          <Pressable style={{ flex: 1, backgroundColor: c.overlay }} accessibilityLabel={t('m.common.close')} onPress={() => setYapSettings(false)} />
-          <View
-            style={{
-              backgroundColor: c.surface,
-              borderTopStartRadius: radius.lg,
-              borderTopEndRadius: radius.lg,
-              padding: space[4],
-              paddingBottom: Math.max(insets.bottom, space[4]),
-              gap: space[4],
+        <BottomSheet visible={yapSettings} title={t('m.yap.settings')} onClose={() => setYapSettings(false)} done gap={space[4]}>
+          <SwitchRow
+            label={t('m.yap.outLoud')}
+            hint={yaps.playOutLoud === null ? t(conversation?.kind === 'direct' ? 'm.yap.defaultDirect' : 'm.yap.defaultGroup') : t('m.yap.outLoudHint')}
+            value={yaps.playOutLoud ?? yaps.defaultOutLoud}
+            onValueChange={async (on) => {
+              try {
+                const r = await (await client()).conversations.setYaps(id, on);
+                setConversation((cur) => (cur ? { ...cur, yaps: r.yaps } : cur));
+              } catch (e) {
+                setError(errorMessage(e));
+              }
             }}
-          >
-            <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 18, fontWeight: '800' }}>
-              {t('m.yap.settings')}
-            </Text>
-            <SwitchRow
-              label={t('m.yap.outLoud')}
-              hint={yaps.playOutLoud === null ? t(conversation?.kind === 'direct' ? 'm.yap.defaultDirect' : 'm.yap.defaultGroup') : t('m.yap.outLoudHint')}
-              value={yaps.playOutLoud ?? yaps.defaultOutLoud}
-              onValueChange={async (on) => {
-                try {
-                  const r = await (await client()).conversations.setYaps(id, on);
-                  setConversation((cur) => (cur ? { ...cur, yaps: r.yaps } : cur));
-                } catch (e) {
-                  setError(errorMessage(e));
-                }
-              }}
-            />
-            <SwitchRow
-              label={t('m.yap.pause')}
-              hint={t('m.yap.quietNote')}
-              value={yaps.paused}
-              onValueChange={async (paused) => {
-                try {
-                  await (await client()).yaps.setPaused(paused);
-                  setConversation((cur) => (cur?.yaps ? { ...cur, yaps: { ...cur.yaps, paused } } : cur));
-                } catch (e) {
-                  setError(errorMessage(e));
-                }
-              }}
-            />
-            <Pressable accessibilityRole="button" onPress={() => setYapSettings(false)} style={{ alignSelf: 'flex-end', padding: space[2] }}>
-              <Text style={{ color: c.yapi, fontWeight: '700', fontSize: 15 }}>{t('m.common.done')}</Text>
-            </Pressable>
-          </View>
-        </Modal>
+          />
+          <SwitchRow
+            label={t('m.yap.pause')}
+            hint={t('m.yap.quietNote')}
+            value={yaps.paused}
+            onValueChange={async (paused) => {
+              try {
+                await (await client()).yaps.setPaused(paused);
+                setConversation((cur) => (cur?.yaps ? { ...cur, yaps: { ...cur.yaps, paused } } : cur));
+              } catch (e) {
+                setError(errorMessage(e));
+              }
+            }}
+          />
+        </BottomSheet>
       ) : null}
       <MessageActions
         open={!!actionsFor}
@@ -1006,48 +929,28 @@ export default function Chat() {
         }
         actions={actionsFor ? sheetActions(actionsFor) : []}
       />
-      <Sheet open={optionsOpen} onClose={() => setOptionsOpen(false)} title={t('m.chat.options')}>
-        {[
-          { label: t('m.chat.search'), icon: 'search-outline' as const, onPress: () => setSearchOpen(true) },
+      <ActionSheet
+        visible={optionsOpen}
+        onClose={() => setOptionsOpen(false)}
+        title={t('m.chat.options')}
+        actions={[
+          { label: t('m.chat.search'), icon: 'search-outline', onPress: () => setSearchOpen(true) },
           {
             label: `${t('m.chat.disappearing')} · ${disappearingText(t, conversation?.disappearingSeconds)}`,
-            icon: 'timer-outline' as const,
+            icon: 'timer-outline',
             onPress: () => setDisappearingOpen(true),
           },
-        ].map((row) => (
-          <Pressable
-            key={row.icon}
-            accessibilityRole="button"
-            onPress={() => {
-              setOptionsOpen(false);
-              row.onPress();
-            }}
-            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44, opacity: pressed ? 0.7 : 1 })}
-          >
-            <Icon name={row.icon} size={22} color={c.ink} />
-            <Text style={{ color: c.ink, fontSize: 16, fontWeight: '600' }}>{row.label}</Text>
-          </Pressable>
-        ))}
-      </Sheet>
-      <Sheet open={addOpen} onClose={() => setAddOpen(false)} title={t('m.chat.addMenu')}>
-        {[
-          { label: t('m.chat.poll.new'), icon: 'stats-chart-outline' as const, onPress: () => setPollOpen(true) },
-          { label: t('m.chat.list.new'), icon: 'checkbox-outline' as const, onPress: () => setListOpen(true) },
-        ].map((row) => (
-          <Pressable
-            key={row.icon}
-            accessibilityRole="button"
-            onPress={() => {
-              setAddOpen(false);
-              row.onPress();
-            }}
-            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44, opacity: pressed ? 0.7 : 1 })}
-          >
-            <Icon name={row.icon} size={22} color={c.ink} />
-            <Text style={{ color: c.ink, fontSize: 16, fontWeight: '600' }}>{row.label}</Text>
-          </Pressable>
-        ))}
-      </Sheet>
+        ]}
+      />
+      <ActionSheet
+        visible={addOpen}
+        onClose={() => setAddOpen(false)}
+        title={t('m.chat.addMenu')}
+        actions={[
+          { label: t('m.chat.poll.new'), icon: 'stats-chart-outline', onPress: () => setPollOpen(true) },
+          { label: t('m.chat.list.new'), icon: 'checkbox-outline', onPress: () => setListOpen(true) },
+        ]}
+      />
       <PollComposer
         open={pollOpen}
         onClose={() => setPollOpen(false)}
@@ -1091,9 +994,120 @@ export default function Chat() {
           })()
         }
       />
-    </KeyboardAvoidingView>
+    </KeyboardAvoid>
   );
 }
+
+/** What a message row can ask the chat to do. The object stays the same, so rows only render again when their message changes. */
+interface RowHandlers {
+  jumpTo: (id: string) => void;
+  openActions: (m: Message) => void;
+  startReply: (m: Message) => void;
+  react: (m: Message, emoji: string, on: boolean) => void;
+  patchMessage: (id: string, fn: (m: Message) => Message) => void;
+  replaceMessage: (m: Message) => void;
+}
+
+/** One message: its bubble (yours at the end edge), reactions, and swipe to reply. */
+const MessageRow = memo(function MessageRow({
+  item,
+  mine,
+  meId,
+  showSender,
+  highlighted,
+  h,
+}: {
+  item: Message;
+  mine: boolean;
+  meId: string | undefined;
+  showSender: boolean;
+  highlighted: boolean;
+  h: RowHandlers;
+}) {
+  const c = useColors();
+  const { t } = useT();
+  if (item.kind === 'system') return <SystemLine message={item} meId={meId} onJump={h.jumpTo} />;
+  const rich = !item.unsent && (item.poll || item.list);
+  const text = item.unsent
+    ? t(mine ? 'm.chat.unsentMine' : 'm.chat.unsent')
+    : rich
+      ? ''
+      : item.body || (item.attachments.length || item.story ? '' : t('m.message.deleted'));
+  const tint = mine ? c.onYapi : c.ink;
+  const quote = item.replyTo && !item.unsent ? <Quote preview={item.replyTo} tint={tint} meId={meId} onJump={h.jumpTo} /> : null;
+  const textStyle = item.unsent ? { fontStyle: 'italic' as const, opacity: 0.8 } : null;
+  const meta = item.editedAt && !item.unsent ? <Text style={{ color: tint, fontSize: 11, opacity: 0.75 }}>{t('m.chat.edited')}</Text> : null;
+  const openActions = () => h.openActions(item);
+  const media = item.unsent ? null : item.poll ? (
+    <PollCard message={item} meId={meId} tint={tint} onPoll={(poll) => h.patchMessage(item.id, (x) => ({ ...x, poll }))} />
+  ) : item.list ? (
+    <ListCard message={item} meId={meId} tint={tint} onList={(l) => h.patchMessage(item.id, (x) => ({ ...x, list: l }))} />
+  ) : item.viewOnce ? (
+    <ViewOnceBubble message={item} mine={mine} tint={tint} onChange={h.replaceMessage} />
+  ) : (
+    <>
+      {item.kind === 'yap' ? <Text style={{ color: tint, fontSize: 11, fontWeight: '800', letterSpacing: 0.5, opacity: 0.8 }}>{t('m.yap.label')}</Text> : null}
+      {item.story ? <StoryCardView card={item.story} dark={mine} /> : null}
+      <Attachments items={item.attachments} tint={tint} />
+    </>
+  );
+  // Your messages sit at the end edge (the right in English, the left in Arabic), with the
+  // tail corner on that side.
+  const bubbleView = mine ? (
+    <View style={{ alignSelf: 'flex-end', maxWidth: '80%', gap: 2 }}>
+      <Pressable onLongPress={openActions} accessibilityHint={t('m.chat.messageOptions')}>
+        <LinearGradient {...gradient(c)} style={[bubble, { maxWidth: '100%', alignSelf: 'flex-end', borderBottomEndRadius: 6 }]}>
+          {quote}
+          {media}
+          {text ? <Text style={[{ color: c.onYapi, fontSize: 15, lineHeight: 21 }, userText, textStyle]}>{text}</Text> : null}
+          {meta}
+        </LinearGradient>
+      </Pressable>
+      <ReactionRow message={item} mine onToggle={(emoji, on) => h.react(item, emoji, on)} />
+      {item.moderation === 'review' ? <Text style={{ color: c.inkMuted, fontSize: 12, alignSelf: 'flex-end' }}>{t('m.chat.held')}</Text> : null}
+      {item.reminder && !item.unsent ? <ReminderNote at={item.reminder.remindAt} alignEnd /> : null}
+    </View>
+  ) : (
+    <View style={{ alignSelf: 'flex-start', maxWidth: '80%', gap: 2 }}>
+      <Pressable
+        onLongPress={openActions}
+        accessibilityHint={t('m.chat.messageOptions')}
+        style={[bubble, { maxWidth: '100%', backgroundColor: c.surface, borderBottomStartRadius: 6 }, elevation(c)]}
+      >
+        {showSender ? <Text style={[{ color: c.yapi, fontSize: 12, fontWeight: '700' }, userText]}>{item.sender.displayName}</Text> : null}
+        {quote}
+        {media}
+        {item.body && !item.unsent ? (
+          // Their text, with "See translation" when it's in a language you don't understand.
+          <TranslatableText kind="message" id={item.id} text={item.body} lang={item.lang} rich={false} style={{ color: c.ink, fontSize: 15, lineHeight: 21 }} />
+        ) : text ? (
+          <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 21 }, userText, textStyle]}>{text}</Text>
+        ) : null}
+        {meta}
+      </Pressable>
+      <ReactionRow message={item} mine={false} onToggle={(emoji, on) => h.react(item, emoji, on)} />
+      {item.reminder && !item.unsent ? <ReminderNote at={item.reminder.remindAt} alignEnd={false} /> : null}
+    </View>
+  );
+  return (
+    <View
+      style={{ borderRadius: radius.lg, backgroundColor: highlighted ? c.surfaceSunken : 'transparent' }}
+      accessibilityActions={
+        item.unsent
+          ? []
+          : [
+              { name: 'reply', label: t('m.chat.reply') },
+              { name: 'longpress', label: t('m.chat.messageOptions') },
+            ]
+      }
+      onAccessibilityAction={(e) => (e.nativeEvent.actionName === 'reply' ? h.startReply(item) : openActions())}
+    >
+      <SwipeToReply enabled={!item.unsent} onReply={() => h.startReply(item)}>
+        {bubbleView}
+      </SwipeToReply>
+    </View>
+  );
+});
 
 const bubble = { maxWidth: '80%', paddingHorizontal: space[3] + 2, paddingVertical: space[2] + 2, borderRadius: radius.lg } as const;
 

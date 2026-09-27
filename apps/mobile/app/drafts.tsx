@@ -70,6 +70,7 @@ export default function Drafts() {
   return (
     <>
       <FlatList
+        keyboardShouldPersistTaps="handled"
         style={{ backgroundColor: c.ground }}
         contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: space[8] }}
         data={sorted}

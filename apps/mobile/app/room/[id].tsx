@@ -116,7 +116,7 @@ export default function RoomScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.ground }}>
-      <ScrollView contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: space[8] }}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: space[8] }}>
         {header}
         {room.notice ? <Notice>{room.notice}</Notice> : null}
 
@@ -137,7 +137,7 @@ export default function RoomScreen() {
               label={r.remindMe ? t('m.rooms.reminding') : t('m.rooms.remind')}
               icon="notifications-outline"
               variant={r.remindMe ? 'secondary' : 'primary'}
-              onPress={() => void room.act((api) => api.rooms.remind(id, !r.remindMe)).then(() => room.reload())}
+              onPress={() => room.act((api) => api.rooms.remind(id, !r.remindMe)).then(() => room.reload())}
             />
             {canHost ? (
               <View style={{ flexDirection: 'row', gap: space[2], flexWrap: 'wrap' }}>
@@ -151,7 +151,7 @@ export default function RoomScreen() {
                     }
                   }}
                 />
-                <Button label={t('m.rooms.cancel')} variant="ghost" onPress={() => void room.act((api) => api.rooms.end(id)).then(() => room.reload())} />
+                <Button label={t('m.rooms.cancel')} variant="ghost" onPress={() => room.act((api) => api.rooms.end(id)).then(() => room.reload())} />
               </View>
             ) : null}
           </Card>
@@ -162,8 +162,8 @@ export default function RoomScreen() {
             {mine?.invited ? (
               <Notice title={t('m.rooms.invited')}>
                 <View style={{ flexDirection: 'row', gap: space[2], marginTop: space[2], flexWrap: 'wrap' }}>
-                  <Button label={t('m.rooms.accept')} size="sm" icon="mic" onPress={() => void room.act((api) => api.rooms.speak(id, true))} />
-                  <Button label={t('m.common.notNow')} size="sm" variant="ghost" onPress={() => void room.act((api) => api.rooms.speak(id, false))} />
+                  <Button label={t('m.rooms.accept')} size="sm" icon="mic" onPress={() => room.act((api) => api.rooms.speak(id, true))} />
+                  <Button label={t('m.common.notNow')} size="sm" variant="ghost" onPress={() => room.act((api) => api.rooms.speak(id, false))} />
                 </View>
               </Notice>
             ) : null}
@@ -200,7 +200,7 @@ export default function RoomScreen() {
               full ? (
                 <Notice title={t('m.rooms.full')}>{t('m.rooms.fullBody', { speakers: r.limits.speakers, listeners: r.limits.listeners })}</Notice>
               ) : (
-                <Button label={t('m.rooms.join')} icon="headset-outline" disabled={room.joining || !callsSupported} onPress={() => void room.join()} />
+                <Button label={t('m.rooms.join')} icon="headset-outline" disabled={room.joining || !callsSupported} onPress={() => room.join()} />
               )
             ) : null}
 
@@ -213,18 +213,18 @@ export default function RoomScreen() {
                         label={mine.muted ? t('m.calls.unmute') : t('m.calls.mute')}
                         icon={mine.muted ? 'mic-off' : 'mic'}
                         variant={mine.muted ? 'primary' : 'secondary'}
-                        onPress={() => void room.act((api) => api.rooms.mute(id, !mine.muted))}
+                        onPress={() => room.act((api) => api.rooms.mute(id, !mine.muted))}
                       />
-                      <Button label={t('m.rooms.toListeners')} variant="ghost" onPress={() => void room.act((api) => api.rooms.toListener(id, me.id))} />
+                      <Button label={t('m.rooms.toListeners')} variant="ghost" onPress={() => room.act((api) => api.rooms.toListener(id, me.id))} />
                     </>
                   ) : canHost ? (
-                    <Button label={t('m.rooms.speak')} icon="mic" variant="secondary" onPress={() => void room.act((api) => api.rooms.speak(id, true))} />
+                    <Button label={t('m.rooms.speak')} icon="mic" variant="secondary" onPress={() => room.act((api) => api.rooms.speak(id, true))} />
                   ) : (
                     <Button
                       label={mine.handRaised ? t('m.rooms.lowerHand') : t('m.rooms.raiseHand')}
                       icon="hand-left-outline"
                       variant={mine.handRaised ? 'primary' : 'secondary'}
-                      onPress={() => void room.act((api) => api.rooms.hand(id, !mine.handRaised))}
+                      onPress={() => room.act((api) => api.rooms.hand(id, !mine.handRaised))}
                     />
                   )}
                 </View>

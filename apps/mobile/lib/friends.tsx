@@ -91,10 +91,10 @@ export function FriendsFinder({ onChecked }: { onChecked?: (r: { checked: number
     <View style={{ gap: space[3] }}>
       <Text style={{ color: c.inkMuted, fontSize: 15, lineHeight: 21 }}>{t('friends.body')}</Text>
       {error ? <Notice tone="danger">{error}</Notice> : null}
-      {state === 'idle' ? <Button label={t('friends.allow')} icon="people-outline" onPress={() => void check()} /> : null}
+      {state === 'idle' ? <Button label={t('friends.allow')} icon="people-outline" onPress={() => check()} /> : null}
       {/* Rather not share contacts (or can't): the invite link works without them. */}
       {link && (state === 'idle' || state === 'denied') ? (
-        <Button label={t('m.friends.shareLink')} icon="share-outline" variant="secondary" onPress={() => void invite()} />
+        <Button label={t('m.friends.shareLink')} icon="share-outline" variant="secondary" onPress={() => invite()} />
       ) : null}
       {state === 'checking' ? (
         <View style={{ gap: space[2], alignItems: 'center', paddingVertical: space[4] }}>
@@ -105,7 +105,7 @@ export function FriendsFinder({ onChecked }: { onChecked?: (r: { checked: number
       {state === 'denied' ? (
         <View style={{ gap: space[2] }}>
           <Notice tone="warn">{t('friends.denied')}</Notice>
-          <Button label={t('friends.openSettings')} variant="secondary" onPress={() => void Linking.openSettings()} />
+          <Button label={t('friends.openSettings')} variant="secondary" onPress={() => Linking.openSettings()} />
         </View>
       ) : null}
 
@@ -139,7 +139,7 @@ export function FriendsFinder({ onChecked }: { onChecked?: (r: { checked: number
                       size="sm"
                       variant={on ? 'secondary' : 'primary'}
                       label={on ? t('profile.unfollow') : t('profile.follow')}
-                      onPress={() => void toggle(f.user.id)}
+                      onPress={() => toggle(f.user.id)}
                     />
                   </View>
                 );
@@ -154,14 +154,14 @@ export function FriendsFinder({ onChecked }: { onChecked?: (r: { checked: number
               <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 17, fontWeight: '800' }}>
                 {t('friends.invite.title')}
               </Text>
-              <Button label={t('invite.share')} icon="share-outline" variant="secondary" onPress={() => void invite()} />
+              <Button label={t('invite.share')} icon="share-outline" variant="secondary" onPress={() => invite()} />
               {result.others.slice(0, INVITE_ROWS).map((o) => (
                 <View key={o.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
                   <Avatar name={o.name} size={36} />
                   <Text style={[{ flex: 1, color: c.ink, fontWeight: '600' }, userText]} numberOfLines={1}>
                     {o.name}
                   </Text>
-                  <Button size="sm" variant="ghost" label={t('friends.invite')} onPress={() => void invite(o)} />
+                  <Button size="sm" variant="ghost" label={t('friends.invite')} onPress={() => invite(o)} />
                 </View>
               ))}
             </Card>

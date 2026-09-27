@@ -12,7 +12,7 @@ import { useT } from '../lib/i18n';
 import { openOnWeb } from '../lib/money';
 import { useSession } from '../lib/session';
 import { space } from '../lib/theme';
-import { Button, Card, Icon, Loading, Notice, Row, useColors, userText } from '../lib/ui';
+import { Button, Card, ErrorState, Icon, Loading, Notice, Row, useColors, userText } from '../lib/ui';
 
 type Earnings = { currency: string; grossCents: number; feeCents: number; availableCents: number }[];
 
@@ -88,8 +88,7 @@ export default function StudioScreen() {
   if (data === null || !data.analytics)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground, padding: space[4], gap: space[3] }}>
-        <Notice tone="danger">{error ?? t('error.generic')}</Notice>
-        <Button label={t('m.studio.retry')} variant="secondary" onPress={() => void load()} />
+        <ErrorState message={error ?? t('error.generic')} onRetry={load} />
       </View>
     );
 
@@ -125,6 +124,7 @@ export default function StudioScreen() {
 
   return (
     <ScrollView
+      keyboardShouldPersistTaps="handled"
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
       refreshControl={
@@ -263,7 +263,7 @@ export default function StudioScreen() {
               {b.note ? <Text style={[{ color: c.inkMuted, fontSize: 13 }, userText]}>{b.note}</Text> : null}
               {b.status === 'requested' ? (
                 <View style={{ flexDirection: 'row', gap: space[2] }}>
-                  <Button label={t('m.studio.confirm')} size="sm" onPress={() => void decide(b, true)} />
+                  <Button label={t('m.studio.confirm')} size="sm" onPress={() => decide(b, true)} />
                   <Button
                     label={t('m.studio.decline')}
                     size="sm"
@@ -347,7 +347,7 @@ export default function StudioScreen() {
 
       <Card style={{ gap: space[2] }}>
         <Text style={{ color: c.ink, lineHeight: 20 }}>{t('m.studio.webHint')}</Text>
-        <Button label={t('m.studio.openWeb')} variant="secondary" icon="open-outline" onPress={() => void openOnWeb('/studio')} />
+        <Button label={t('m.studio.openWeb')} variant="secondary" icon="open-outline" onPress={() => openOnWeb('/studio')} />
       </Card>
     </ScrollView>
   );

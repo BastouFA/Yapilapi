@@ -10,7 +10,7 @@ import { PostCard } from '../../lib/post';
 import { StoriesStrip, StoryViewer } from '../../lib/stories';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
-import { Button, EmptyState, Loading, Notice, Segmented, useColors, userText } from '../../lib/ui';
+import { Button, EmptyState, ErrorState, feedListProps, Loading, Segmented, useColors, useRefresh, userText } from '../../lib/ui';
 import { router } from 'expo-router';
 
 /** A hashtag: how many people use it, related tags, public stories with it now, recent or top posts, and following it. */
@@ -29,15 +29,22 @@ export default function TagScreen() {
   const [stories, setStories] = useState<StoryGroup[]>([]);
   const [viewing, setViewing] = useState<number | null>(null);
 
-  useEffect(() => {
-    void (async () => setInfo((await (await client()).tags.get(tag)) as TagSummary))().catch(() => setInfo(null));
+  const loadInfo = useCallback(async () => {
     void client()
       .then((api) => api.tags.stories(tag))
       .then(
         (r) => setStories(r.items),
-        () => setStories([]),
+        () => setStories((cur) => cur),
       );
+    try {
+      setInfo((await (await client()).tags.get(tag)) as TagSummary);
+    } catch {
+      setInfo((cur) => cur ?? null);
+    }
   }, [tag]);
+  useEffect(() => {
+    void loadInfo();
+  }, [loadInfo]);
 
   const load = useCallback(
     async (next?: string) => {
@@ -47,16 +54,26 @@ export default function TagScreen() {
     },
     [tag, sort],
   );
+  const loadPosts = useCallback(async () => {
+    setError(null);
+    try {
+      await load();
+    } catch (e) {
+      setPosts((cur) => cur ?? []);
+      setError(errorMessage(e));
+    }
+  }, [load]);
   useEffect(() => {
     setPosts(null);
-    void load().catch((e) => (setPosts([]), setError(errorMessage(e))));
-  }, [load]);
+    void loadPosts();
+  }, [loadPosts]);
+  const refresh = useRefresh(() => Promise.all([loadInfo(), loadPosts()]));
 
   if (info === undefined) return <Loading />;
   if (info === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>
-        <EmptyState title={t('m.tag.empty')} />
+        <EmptyState title={t('m.tag.empty')} action={{ label: t('m.common.retry'), icon: 'refresh', onPress: () => void loadInfo() }} />
       </View>
     );
 
@@ -116,22 +133,25 @@ export default function TagScreen() {
           { id: 'top', label: t('m.tag.top') },
         ]}
       />
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {error ? <ErrorState message={error} onRetry={loadPosts} /> : null}
     </View>
   );
 
   return (
     <>
       <FlatList
+        keyboardShouldPersistTaps="handled"
+        {...feedListProps}
         style={{ backgroundColor: c.ground }}
         contentContainerStyle={{ padding: space[4], gap: space[3] }}
         data={posts ?? []}
         keyExtractor={(p) => p.id}
+        refreshControl={refresh}
         ListHeaderComponent={header}
         renderItem={({ item }) => <PostCard post={item} />}
         onEndReached={() => cursor && void load(cursor)}
         onEndReachedThreshold={0.5}
-        ListEmptyComponent={posts === null ? <Loading /> : <EmptyState title={t('m.tag.empty')} />}
+        ListEmptyComponent={posts === null ? <Loading /> : error ? null : <EmptyState title={t('m.tag.empty')} />}
       />
       <StoryViewer groups={stories} start={viewing} onClose={() => setViewing(null)} onChange={setStories} />
     </>

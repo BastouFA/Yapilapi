@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PROFILE_MODES } from '../../../packages/shared/src/constants';
 import { SUPPORTED_LOCALES, type MessageKey } from '../../../packages/shared/src/i18n';
 import type { Profile } from '../../../packages/shared/src/types';
@@ -12,7 +12,7 @@ import { useT } from '../lib/i18n';
 import { pickOne, uploadPicked } from '../lib/media';
 import { useSession } from '../lib/session';
 import { space } from '../lib/theme';
-import { Avatar, Button, Card, Field, Loading, Notice, SwitchRow, Title, useColors } from '../lib/ui';
+import { Avatar, Button, Card, Field, KeyboardAvoid, Loading, Notice, SwitchRow, Title, useColors } from '../lib/ui';
 
 /**
  * Edit profile: photo, name, bio, profile type, the app's language and a private account, the
@@ -103,7 +103,7 @@ export default function ProfileEdit() {
   if (!me || !profile) return error ? <Notice tone="danger">{error}</Notice> : <Loading />;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoid>
       <ScrollView
         style={{ backgroundColor: c.ground }}
         contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
@@ -123,7 +123,7 @@ export default function ProfileEdit() {
               {t('m.cover.uploading', { progress: number(photo.progress, { style: 'percent' }) })}
             </Text>
           ) : (
-            <Button label={t('settings.changePhoto')} variant="secondary" size="sm" icon="camera-outline" onPress={() => void changePhoto()} />
+            <Button label={t('settings.changePhoto')} variant="secondary" size="sm" icon="camera-outline" onPress={() => changePhoto()} />
           )}
         </Card>
 
@@ -166,8 +166,8 @@ export default function ProfileEdit() {
           <SwitchRow label={t('settings.private')} hint={t('settings.privateHint')} value={isPrivate} onValueChange={setIsPrivate} />
         </Card>
 
-        <Button label={busy ? t('m.common.saving') : t('settings.saveProfile')} disabled={busy || !displayName.trim()} onPress={() => void save()} />
+        <Button label={busy ? t('m.common.saving') : t('settings.saveProfile')} disabled={busy || !displayName.trim()} onPress={() => save()} />
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoid>
   );
 }

@@ -9,7 +9,7 @@ import { useT } from '../lib/i18n';
 import { openOnWeb } from '../lib/money';
 import { useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
-import { Button, Card, Icon, Loading, Notice, PlusBadge, useColors, type IconName } from '../lib/ui';
+import { Button, Card, ErrorState, Icon, type IconName, Loading, Notice, PlusBadge, useColors } from '../lib/ui';
 
 const ICON: Record<PlusInfo['benefits'][number]['id'], IconName> = {
   no_ads: 'shield-checkmark-outline',
@@ -64,11 +64,7 @@ export default function PlusScreen() {
 
   if (info === undefined) return <Loading />;
   if (info === null)
-    return (
-      <View style={{ flex: 1, backgroundColor: c.ground, padding: space[4] }}>
-        <Notice tone="danger">{error}</Notice>
-      </View>
-    );
+    return <View style={{ flex: 1, backgroundColor: c.ground, padding: space[4] }}>{error ? <ErrorState message={error} onRetry={load} /> : null}</View>;
 
   const price = formatMoney(info.priceCents, info.currency, locale);
   const long = (iso: string) => date(iso, { dateStyle: 'long' });
@@ -90,6 +86,7 @@ export default function PlusScreen() {
 
   return (
     <ScrollView
+      keyboardShouldPersistTaps="handled"
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
       refreshControl={

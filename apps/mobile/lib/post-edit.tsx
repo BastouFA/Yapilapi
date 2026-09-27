@@ -1,6 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { SCHEDULE_MAX_DAYS, SCHEDULE_MIN_MINUTES } from '../../../packages/shared/src/constants';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import type { Post, PostVersion } from '../../../packages/shared/src/types';
@@ -8,43 +7,8 @@ import { client, errorMessage } from './api';
 import { DateTimeSheet } from './date-time';
 import { useT } from './i18n';
 import { RichText } from './rich-text';
-import { radius, space } from './theme';
-import { Button, Field, Notice, Segmented, useColors, userText } from './ui';
-
-/** A panel that slides up from the bottom, over a dimmed screen; tapping outside closes it. */
-export function Sheet({ visible, title, onClose, children }: { visible: boolean; title: string; onClose: () => void; children: ReactNode }) {
-  const c = useColors();
-  const { t } = useT();
-  const insets = useSafeAreaInsets();
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={{ flex: 1, backgroundColor: c.overlay, justifyContent: 'flex-end' }}>
-          <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} style={{ flex: 1 }} onPress={onClose} />
-          <View
-            accessibilityViewIsModal
-            style={{
-              backgroundColor: c.surface,
-              borderTopLeftRadius: radius.lg,
-              borderTopRightRadius: radius.lg,
-              padding: space[4],
-              paddingBottom: Math.max(insets.bottom, space[4]),
-              maxHeight: '85%',
-              gap: space[3],
-            }}
-          >
-            <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 17, fontWeight: '800' }}>
-              {title}
-            </Text>
-            <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ gap: space[3] }} keyboardShouldPersistTaps="handled">
-              {children}
-            </ScrollView>
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
-  );
-}
+import { space } from './theme';
+import { BottomSheet, Button, Field, Notice, Segmented, useColors, userText } from './ui';
 
 const EDIT_AUDIENCES = [
   { id: 'public', label: 'visibility.public' },
@@ -94,7 +58,7 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
   }
 
   return (
-    <Sheet visible title={t('m.post.editTitle')} onClose={onClose}>
+    <BottomSheet visible title={t('m.post.editTitle')} onClose={onClose}>
       <Field
         label={t('m.post.text')}
         value={body}
@@ -126,8 +90,8 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
       )}
       <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('m.post.editNote')}</Text>
       {error ? <Notice tone="danger">{error}</Notice> : null}
-      <Button label={t('m.post.saveChanges')} disabled={!changed || busy} onPress={() => void save()} />
-    </Sheet>
+      <Button label={t('m.post.saveChanges')} disabled={!changed || busy} onPress={() => save()} />
+    </BottomSheet>
   );
 }
 
@@ -146,7 +110,7 @@ export function HistorySheet({ postId, onClose }: { postId: string; onClose: () 
       );
   }, [postId]);
   return (
-    <Sheet visible title={t('m.post.history')} onClose={onClose}>
+    <BottomSheet visible title={t('m.post.history')} onClose={onClose}>
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {items === null && !error ? <ActivityIndicator color={c.yapi} /> : null}
       {(items ?? []).map((v, i) => (
@@ -161,7 +125,7 @@ export function HistorySheet({ postId, onClose }: { postId: string; onClose: () 
           )}
         </View>
       ))}
-    </Sheet>
+    </BottomSheet>
   );
 }
 

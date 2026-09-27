@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { Fragment, useEffect, useState } from 'react';
-import { Alert, Image, Platform, Pressable, ScrollView, Share, Text, View, type StyleProp, type TextStyle } from 'react-native';
+import { Fragment, memo, useEffect, useState } from 'react';
+import { Image, Platform, Pressable, ScrollView, Share, Text, View, type StyleProp, type TextStyle } from 'react-native';
 import type { Conversation, MediaItem, PhotoTag, Post, PublicUser } from '../../../packages/shared/src/types';
 import { formatBytes } from '../../../packages/shared/src/data-saver';
 import { client, errorMessage, mediaUrl, webUrl } from './api';
@@ -9,7 +9,7 @@ import { useBoards, type SaveChange } from './boards';
 import { useSession } from './session';
 import { useT, type Translate } from './i18n';
 import { radius, space } from './theme';
-import { Avatar, Button, Card, Icon, Notice, PlusBadge, useColors, userText } from './ui';
+import { type ActionSheetAction, Avatar, Button, Card, Icon, Notice, PlusBadge, useActionSheet, useColors, userText } from './ui';
 import { LockedPanel, TipButton } from './money';
 import { SensitiveCover } from './safety';
 import { EditPostSheet, HistorySheet } from './post-edit';
@@ -137,8 +137,11 @@ function TagBubbles({
 /**
  * A post as a rounded card. Tapping it opens the post; like and save update in
  * place. Your own posts can be edited from More; "Edited" opens the history.
+ * Memoised: in a long feed a card only renders again when its post changes.
  */
-export function PostCard({ post: given, open = true }: { post: Post; open?: boolean }) {
+export const PostCard = memo(PostCardView);
+
+function PostCardView({ post: given, open = true }: { post: Post; open?: boolean }) {
   const c = useColors();
   const { t, tp, number, timeAgo, dateTime } = useT();
   // The post as shown: the one given, or the version you just saved.
@@ -233,17 +236,22 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
   const canTip = !!me && !isAuthor && !post.status && !post.locked && post.author.mode === 'creator';
 
   /** More: insights and boost, edit your post, save to a board, add to a memory, leave as co-author, remove your photo tag. */
+  const menu = useActionSheet();
   function more() {
-    const options: { text: string; style?: 'destructive' | 'cancel'; onPress?: () => void }[] = [];
-    if (canSeeInsights) options.push({ text: t('m.post.insights'), onPress: () => router.push(`/insights/${post.id}`) });
-    if (canBoost) options.push({ text: t('m.boost.cta'), onPress: () => router.push({ pathname: '/boost', params: { id: post.id } }) });
-    if (canEdit) options.push({ text: t('m.post.edit'), onPress: () => setEditing(true) });
-    if (me) options.push({ text: t('m.boards.saveTo'), onPress: saveTo });
-    if (canRemember) options.push({ text: t('m.mem.addToMemory'), onPress: () => setRemembering(true) });
-    if (collab === 'accepted') options.push({ text: t('m.collab.leave'), style: 'destructive', onPress: () => void leave() });
-    if (myTag) options.push({ text: t('m.tags.removeMine'), onPress: () => void removeTag(myTag) });
-    options.push({ text: t('common.cancel'), style: 'cancel' });
-    Alert.alert(t('m.post.more'), collab === 'accepted' ? t('m.collab.leaveBody', { name: post.author.displayName }) : undefined, options);
+    const actions: ActionSheetAction[] = [];
+    if (canSeeInsights) actions.push({ label: t('m.post.insights'), icon: 'stats-chart-outline', onPress: () => router.push(`/insights/${post.id}`) });
+    if (canBoost)
+      actions.push({ label: t('m.boost.cta'), icon: 'rocket-outline', onPress: () => router.push({ pathname: '/boost', params: { id: post.id } }) });
+    if (canEdit) actions.push({ label: t('m.post.edit'), icon: 'create-outline', onPress: () => setEditing(true) });
+    if (me) actions.push({ label: t('m.boards.saveTo'), icon: 'bookmarks-outline', onPress: saveTo });
+    if (canRemember) actions.push({ label: t('m.mem.addToMemory'), icon: 'albums-outline', onPress: () => setRemembering(true) });
+    if (collab === 'accepted') actions.push({ label: t('m.collab.leave'), icon: 'exit-outline', destructive: true, onPress: () => void leave() });
+    if (myTag) actions.push({ label: t('m.tags.removeMine'), icon: 'pricetag-outline', onPress: () => void removeTag(myTag) });
+    menu.show({
+      title: t('m.post.more'),
+      message: collab === 'accepted' ? t('m.collab.leaveBody', { name: post.author.displayName }) : undefined,
+      actions,
+    });
   }
 
   return (
@@ -350,8 +358,8 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
           <Text style={[{ color: c.ink, fontWeight: '700', lineHeight: 20 }, userText]}>{t('m.collab.invited', { name: post.author.displayName })}</Text>
           <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('m.collab.invitedHint')}</Text>
           <View style={{ flexDirection: 'row', gap: space[2] }}>
-            <Button label={t('m.collab.accept')} size="sm" disabled={collabBusy} onPress={() => void answerInvite(true)} />
-            <Button label={t('m.collab.decline')} size="sm" variant="secondary" disabled={collabBusy} onPress={() => void answerInvite(false)} />
+            <Button label={t('m.collab.accept')} size="sm" disabled={collabBusy} onPress={() => answerInvite(true)} />
+            <Button label={t('m.collab.decline')} size="sm" variant="secondary" disabled={collabBusy} onPress={() => answerInvite(false)} />
           </View>
         </View>
       ) : null}
@@ -559,6 +567,7 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
       {history ? <HistorySheet postId={post.id} onClose={() => setHistory(false)} /> : null}
       {repostersOpen ? <RepostersSheet postId={post.id} onClose={() => setRepostersOpen(false)} /> : null}
       {remembering ? <AddToMemorySheet postId={post.id} onClose={() => setRemembering(false)} /> : null}
+      {menu.sheet}
     </Card>
   );
 }
@@ -682,6 +691,7 @@ function MediaGallery({
         {many ? (
           width ? (
             <ScrollView
+              keyboardShouldPersistTaps="handled"
               horizontal
               pagingEnabled
               scrollEnabled={!covered}

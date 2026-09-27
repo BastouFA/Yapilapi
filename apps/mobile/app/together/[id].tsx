@@ -77,6 +77,7 @@ export default function TogetherScreen() {
     <>
       <Stack.Screen options={{ title: together.title }} />
       <ScrollView
+        keyboardShouldPersistTaps="handled"
         style={{ backgroundColor: c.ground }}
         contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
         refreshControl={

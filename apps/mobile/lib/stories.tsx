@@ -9,7 +9,6 @@ import {
   I18nManager,
   Image,
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
   PanResponder,
   Platform,
@@ -31,7 +30,7 @@ import { useDataSaver } from './data-saver';
 import { useT } from './i18n';
 import { RichText } from './post';
 import { gradient, radius, space } from './theme';
-import { Avatar, Icon, Segmented, SwitchRow, useColors, userText } from './ui';
+import { Avatar, Icon, KeyboardAvoid, Segmented, SwitchRow, useColors, userText } from './ui';
 import { SensitiveCover } from './safety';
 import { AddToChapterSheet } from './chapters';
 import { StickerLayer, StoryCardView } from './story-stickers';
@@ -57,6 +56,7 @@ export function StoriesStrip({ groups, onOpen, onCreate }: { groups: StoryGroup[
   const hasOwn = groups.some((g) => g.mine);
   return (
     <ScrollView
+      keyboardShouldPersistTaps="handled"
       horizontal
       showsHorizontalScrollIndicator={false}
       accessibilityLabel={t('m.stories.label')}
@@ -141,14 +141,36 @@ export function StoryViewer({
   /** Called after local changes (seen, liked, deleted) so the strip can update. */
   onChange: (groups: StoryGroup[]) => void;
 }) {
+  // Android's back button closes a panel open over the story (who saw it, share) before the stories.
+  const back = useRef<(() => boolean) | null>(null);
   return (
-    <Modal visible={start !== null} animationType="fade" presentationStyle="fullScreen" onRequestClose={onClose} statusBarTranslucent>
-      {start !== null && groups[start] ? <Viewer groups={groups} start={start} onClose={onClose} onChange={onChange} /> : null}
+    <Modal
+      visible={start !== null}
+      animationType="fade"
+      presentationStyle="fullScreen"
+      onRequestClose={() => {
+        if (!back.current?.()) onClose();
+      }}
+      statusBarTranslucent
+    >
+      {start !== null && groups[start] ? <Viewer groups={groups} start={start} onClose={onClose} onChange={onChange} backRef={back} /> : null}
     </Modal>
   );
 }
 
-function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; start: number; onClose: () => void; onChange: (groups: StoryGroup[]) => void }) {
+function Viewer({
+  groups,
+  start,
+  onClose,
+  onChange,
+  backRef,
+}: {
+  groups: StoryGroup[];
+  start: number;
+  onClose: () => void;
+  onChange: (groups: StoryGroup[]) => void;
+  backRef: { current: (() => boolean) | null };
+}) {
   const c = useColors();
   const { t, tp, timeAgo } = useT();
   const insets = useSafeAreaInsets();
@@ -160,6 +182,9 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
   const [progress, setProgress] = useState(0);
   const [reply, setReply] = useState('');
   const [typing, setTyping] = useState(false);
+  // A reply on its way: Send is off until it's done, so a second tap doesn't send it twice.
+  const [replying, setReplying] = useState(false);
+  const replyingRef = useRef(false);
   const [sent, setSent] = useState<string | null>(null);
   const [viewers, setViewers] = useState<{
     items: { user: PublicUser; liked: boolean }[];
@@ -170,6 +195,11 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
   const [sharing, setSharing] = useState(false);
   const [answering, setAnswering] = useState(false);
   const [chapterFor, setChapterFor] = useState<string | null>(null);
+  backRef.current = () => {
+    if (sharing) return (setSharing(false), true);
+    if (viewers) return (setViewers(null), true);
+    return false;
+  };
   const group = groups[g];
   const story = group?.moments[i];
   // Sensitive stories wait, blurred and paused, until the viewer chooses to see them.
@@ -335,7 +365,7 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#000' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoid offset={0} style={{ backgroundColor: '#000' }}>
       <Animated.View
         accessibilityViewIsModal
         accessibilityLabel={t('m.stories.viewer', { name: group.mine ? t('m.stories.yours') : name, index: i + 1, total: group.moments.length })}
@@ -609,9 +639,11 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={t('m.stories.sendReply')}
+                    accessibilityState={{ disabled: replying, busy: replying }}
+                    disabled={replying}
                     hitSlop={8}
                     onPress={() => void sendReply()}
-                    style={st.icon}
+                    style={[st.icon, replying && { opacity: 0.5 }]}
                   >
                     <Icon name="send" size={22} color={WHITE} directional />
                   </Pressable>
@@ -647,12 +679,13 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
               </Pressable>
             </View>
             {viewers.results.length || viewers.reshares ? (
-              <ScrollView style={{ maxHeight: 260 }} contentContainerStyle={{ gap: space[3] }}>
+              <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 260 }} contentContainerStyle={{ gap: space[3] }}>
                 <StickerResultList results={viewers.results} />
                 {viewers.reshares ? <Text style={{ color: c.inkMuted }}>{tp('m.stories.reshares', viewers.reshares)}</Text> : null}
               </ScrollView>
             ) : null}
             <FlatList
+              keyboardShouldPersistTaps="handled"
               data={viewers.items}
               keyExtractor={(v) => v.user.id}
               contentContainerStyle={{ gap: space[3] }}
@@ -700,18 +733,23 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
           }}
         />
       ) : null}
-    </KeyboardAvoidingView>
+    </KeyboardAvoid>
   );
 
   async function sendReply() {
     const body = reply.trim();
-    if (!body || !story) return;
+    if (!body || !story || replyingRef.current) return;
+    replyingRef.current = true;
+    setReplying(true);
     try {
       await (await client()).moments.reply(story.id, body);
       setReply('');
       setSent(t('m.stories.sent', { name }));
     } catch (e) {
       setSent(errorMessage(e));
+    } finally {
+      replyingRef.current = false;
+      setReplying(false);
     }
   }
 }

@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import type { Boost } from '../../../packages/api-client/src/index';
 import { BOOST_DAYS, BOOST_OPTIONS, currencyForCountry } from '../../../packages/shared/src/constants';
 import { formatMoney } from '../../../packages/shared/src/i18n';
@@ -14,7 +14,7 @@ import { useT } from '../lib/i18n';
 import { useWebCheckout } from '../lib/money';
 import { useSession } from '../lib/session';
 import { space } from '../lib/theme';
-import { Button, Card, EmptyState, Loading, Notice, useColors, userText } from '../lib/ui';
+import { Button, Card, EmptyState, KeyboardAvoid, Loading, Notice, useColors, userText } from '../lib/ui';
 
 /** Countries offered for a boost audience, as on the web (apps/web/components/Boost.tsx). Yours is always first. */
 const COUNTRIES = ['NG', 'GH', 'KE', 'ZA', 'CI', 'SN', 'CM', 'UG', 'TZ', 'RW', 'ET', 'EG', 'MA', 'US', 'CA', 'GB', 'FR', 'DE', 'BR', 'IN'];
@@ -110,7 +110,7 @@ export default function BoostScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoid>
       <ScrollView
         style={{ backgroundColor: c.ground }}
         contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
@@ -207,6 +207,6 @@ export default function BoostScreen() {
           </View>
         ) : null}
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoid>
   );
 }

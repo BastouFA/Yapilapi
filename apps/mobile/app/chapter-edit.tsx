@@ -20,7 +20,7 @@ import { CoverPreview, SYMBOL_ICON } from '../lib/chapters';
 import { DateField } from '../lib/date-time';
 import { useT } from '../lib/i18n';
 import { radius, space } from '../lib/theme';
-import { Button, Field, Icon, Loading, Notice, SwitchRow, useColors, userText } from '../lib/ui';
+import { Button, Field, Icon, KeyboardAvoid, Loading, Notice, SwitchRow, useColors, userText } from '../lib/ui';
 
 const DAY = 86_400_000;
 /** The API's window for a time capsule's opening: an hour to 25 years from now (apps/api/src/modules/chapters.ts). */
@@ -123,150 +123,152 @@ export default function ChapterEdit() {
   // A story picked as the cover shows instead of the colour and symbol.
   const coverStory = coverStoryId ? stories.find((x) => x.id === coverStoryId) : undefined;
   return (
-    <ScrollView
-      style={{ backgroundColor: c.ground }}
-      contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Field
-        label={t('m.chapters.titleLabel')}
-        value={title}
-        onChangeText={setTitle}
-        maxLength={CHAPTER_TITLE_MAX}
-        placeholder={t('m.chapters.newPlaceholder')}
-      />
-      <Field
-        label={t('m.chapters.descriptionLabel')}
-        value={description}
-        onChangeText={setDescription}
-        maxLength={CHAPTER_DESCRIPTION_MAX}
-        multiline
-        style={{ minHeight: 72, paddingTop: space[2] }}
-      />
-      <View style={{ gap: space[2] }}>
-        <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.chapters.audience')}</Text>
-        <View accessibilityRole="radiogroup" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-          {CHAPTER_AUDIENCES.map((a) => chip(a, audience === a, t(`m.chapters.audience.${a}`), () => setAudience(a)))}
-        </View>
-      </View>
-      {stories.length ? (
+    <KeyboardAvoid>
+      <ScrollView
+        style={{ backgroundColor: c.ground }}
+        contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Field
+          label={t('m.chapters.titleLabel')}
+          value={title}
+          onChangeText={setTitle}
+          maxLength={CHAPTER_TITLE_MAX}
+          placeholder={t('m.chapters.newPlaceholder')}
+        />
+        <Field
+          label={t('m.chapters.descriptionLabel')}
+          value={description}
+          onChangeText={setDescription}
+          maxLength={CHAPTER_DESCRIPTION_MAX}
+          multiline
+          style={{ minHeight: 72, paddingTop: space[2] }}
+        />
         <View style={{ gap: space[2] }}>
-          <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.chapters.cover')}</Text>
+          <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.chapters.audience')}</Text>
           <View accessibilityRole="radiogroup" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-            {chip('none', coverStoryId === null, t('m.chapters.coverColour'), () => setCoverStoryId(null))}
-            {stories.map((s, n) =>
-              chip(s.id, coverStoryId === s.id, t('m.chapters.coverStory', { index: n + 1, date: date(s.createdAt, { dateStyle: 'medium' }) }), () =>
-                setCoverStoryId(s.id),
-              ),
-            )}
+            {CHAPTER_AUDIENCES.map((a) => chip(a, audience === a, t(`m.chapters.audience.${a}`), () => setAudience(a)))}
           </View>
         </View>
-      ) : null}
-      {/* Live preview: how the cover will look with the colour, symbol and story chosen below. */}
-      <View
-        accessibilityLiveRegion="polite"
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: space[3],
-          padding: space[3],
-          borderRadius: radius.md,
-          borderWidth: 1,
-          borderColor: c.line,
-          backgroundColor: c.surfaceSunken,
-        }}
-      >
-        <CoverPreview
-          size={60}
-          gradient={gradient}
-          symbol={symbol}
-          image={coverStory ? (coverStory.mediaKind === 'image' ? coverStory.mediaUrl : coverStory.posterUrl) : null}
-          locked={capsule}
-        />
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text style={[{ color: c.ink, fontWeight: '700' }, userText]} numberOfLines={1}>
-            {title.trim() || t('chapters.previewTitle')}
-          </Text>
-          <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>
-            {coverStory ? t('chapters.previewStoryCover') : capsule ? t('chapters.previewCapsule') : t('chapters.previewHint')}
-          </Text>
-        </View>
-      </View>
-      <View style={{ gap: space[2] }}>
-        <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.chapters.colour')}</Text>
-        <View accessibilityRole="radiogroup" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-          {CHAPTER_GRADIENT_NAMES.map((g) => (
-            <Pressable
-              key={g}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: gradient === g }}
-              accessibilityLabel={`${t('m.chapters.colour')} ${CHAPTER_GRADIENT_NAMES.indexOf(g) + 1}`}
-              onPress={() => setGradient(g)}
-              style={{ borderRadius: radius.sm + 3, borderWidth: 2, borderColor: gradient === g ? c.yapi : 'transparent', padding: 2 }}
-            >
-              <LinearGradient
-                colors={[...CHAPTER_GRADIENTS[g]]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{ width: 40, height: 40, borderRadius: radius.sm }}
-              />
-            </Pressable>
-          ))}
-        </View>
-      </View>
-      <View style={{ gap: space[2] }}>
-        <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.chapters.symbol')}</Text>
-        <View accessibilityRole="radiogroup" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-          {CHAPTER_SYMBOLS.map((s) => (
-            <Pressable
-              key={s}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: symbol === s }}
-              accessibilityLabel={`${t('m.chapters.symbol')} ${CHAPTER_SYMBOLS.indexOf(s) + 1}`}
-              onPress={() => setSymbol(s)}
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: radius.sm,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderWidth: symbol === s ? 2 : 1,
-                borderColor: symbol === s ? c.yapi : c.line,
-                backgroundColor: c.surface,
-              }}
-            >
-              <Icon name={SYMBOL_ICON[s]} size={20} color={c.ink} />
-            </Pressable>
-          ))}
-        </View>
-      </View>
-      <SwitchRow label={t('m.chapters.capsule')} hint={t('m.chapters.capsuleHint')} value={capsule} disabled={dateLocked} onValueChange={setCapsule} />
-      {capsule ? (
-        <View style={{ gap: space[2] }}>
-          <DateField
-            label={t('m.chapters.sealUntil')}
-            sheetTitle={t('m.chapters.sealTitle')}
-            mode="date"
-            value={until}
-            onChange={setUntil}
-            disabled={dateLocked}
-            min={new Date(Date.now() + CAPSULE_MIN_MS)}
-            max={new Date(Date.now() + CAPSULE_MAX_MS)}
-            presets={[30, 182, 365, 365 * 5].map((days) => {
-              const at = startOfDay(addDays(new Date(), days));
-              return { id: String(days), label: date(at, { dateStyle: 'medium' }), at };
-            })}
-            hint={t('m.chapters.sealHint')}
+        {stories.length ? (
+          <View style={{ gap: space[2] }}>
+            <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.chapters.cover')}</Text>
+            <View accessibilityRole="radiogroup" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+              {chip('none', coverStoryId === null, t('m.chapters.coverColour'), () => setCoverStoryId(null))}
+              {stories.map((s, n) =>
+                chip(s.id, coverStoryId === s.id, t('m.chapters.coverStory', { index: n + 1, date: date(s.createdAt, { dateStyle: 'medium' }) }), () =>
+                  setCoverStoryId(s.id),
+                ),
+              )}
+            </View>
+          </View>
+        ) : null}
+        {/* Live preview: how the cover will look with the colour, symbol and story chosen below. */}
+        <View
+          accessibilityLiveRegion="polite"
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: space[3],
+            padding: space[3],
+            borderRadius: radius.md,
+            borderWidth: 1,
+            borderColor: c.line,
+            backgroundColor: c.surfaceSunken,
+          }}
+        >
+          <CoverPreview
+            size={60}
+            gradient={gradient}
+            symbol={symbol}
+            image={coverStory ? (coverStory.mediaKind === 'image' ? coverStory.mediaUrl : coverStory.posterUrl) : null}
+            locked={capsule}
           />
-          {dateLocked ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('m.chapters.dateFixed')}</Text> : null}
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={[{ color: c.ink, fontWeight: '700' }, userText]} numberOfLines={1}>
+              {title.trim() || t('chapters.previewTitle')}
+            </Text>
+            <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>
+              {coverStory ? t('chapters.previewStoryCover') : capsule ? t('chapters.previewCapsule') : t('chapters.previewHint')}
+            </Text>
+          </View>
         </View>
-      ) : null}
-      {error ? <Notice tone="danger">{error}</Notice> : null}
-      <Button
-        label={chapter ? t('m.chapters.save') : t('m.chapters.create')}
-        disabled={!title.trim() || busy || (capsule && !dateLocked && !validDay)}
-        onPress={() => void save()}
-      />
-    </ScrollView>
+        <View style={{ gap: space[2] }}>
+          <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.chapters.colour')}</Text>
+          <View accessibilityRole="radiogroup" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+            {CHAPTER_GRADIENT_NAMES.map((g) => (
+              <Pressable
+                key={g}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: gradient === g }}
+                accessibilityLabel={`${t('m.chapters.colour')} ${CHAPTER_GRADIENT_NAMES.indexOf(g) + 1}`}
+                onPress={() => setGradient(g)}
+                style={{ borderRadius: radius.sm + 3, borderWidth: 2, borderColor: gradient === g ? c.yapi : 'transparent', padding: 2 }}
+              >
+                <LinearGradient
+                  colors={[...CHAPTER_GRADIENTS[g]]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{ width: 40, height: 40, borderRadius: radius.sm }}
+                />
+              </Pressable>
+            ))}
+          </View>
+        </View>
+        <View style={{ gap: space[2] }}>
+          <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.chapters.symbol')}</Text>
+          <View accessibilityRole="radiogroup" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+            {CHAPTER_SYMBOLS.map((s) => (
+              <Pressable
+                key={s}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: symbol === s }}
+                accessibilityLabel={`${t('m.chapters.symbol')} ${CHAPTER_SYMBOLS.indexOf(s) + 1}`}
+                onPress={() => setSymbol(s)}
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: radius.sm,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: symbol === s ? 2 : 1,
+                  borderColor: symbol === s ? c.yapi : c.line,
+                  backgroundColor: c.surface,
+                }}
+              >
+                <Icon name={SYMBOL_ICON[s]} size={20} color={c.ink} />
+              </Pressable>
+            ))}
+          </View>
+        </View>
+        <SwitchRow label={t('m.chapters.capsule')} hint={t('m.chapters.capsuleHint')} value={capsule} disabled={dateLocked} onValueChange={setCapsule} />
+        {capsule ? (
+          <View style={{ gap: space[2] }}>
+            <DateField
+              label={t('m.chapters.sealUntil')}
+              sheetTitle={t('m.chapters.sealTitle')}
+              mode="date"
+              value={until}
+              onChange={setUntil}
+              disabled={dateLocked}
+              min={new Date(Date.now() + CAPSULE_MIN_MS)}
+              max={new Date(Date.now() + CAPSULE_MAX_MS)}
+              presets={[30, 182, 365, 365 * 5].map((days) => {
+                const at = startOfDay(addDays(new Date(), days));
+                return { id: String(days), label: date(at, { dateStyle: 'medium' }), at };
+              })}
+              hint={t('m.chapters.sealHint')}
+            />
+            {dateLocked ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('m.chapters.dateFixed')}</Text> : null}
+          </View>
+        ) : null}
+        {error ? <Notice tone="danger">{error}</Notice> : null}
+        <Button
+          label={chapter ? t('m.chapters.save') : t('m.chapters.create')}
+          disabled={!title.trim() || busy || (capsule && !dateLocked && !validDay)}
+          onPress={() => save()}
+        />
+      </ScrollView>
+    </KeyboardAvoid>
   );
 }

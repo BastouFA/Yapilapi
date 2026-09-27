@@ -191,7 +191,7 @@ export function DateTimeSheet({ visible, title, value, min, max, mode = 'datetim
             maxHeight: '92%',
           }}
         >
-          <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: space[4], gap: space[3] }}>
+          <ScrollView keyboardShouldPersistTaps="handled" style={{ flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: space[4], gap: space[3] }}>
             <View style={{ gap: 2 }}>
               <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 17, fontWeight: '800' }}>
                 {title}

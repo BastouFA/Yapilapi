@@ -9,7 +9,7 @@ import { useT } from '../../lib/i18n';
 import { conversationTitle } from '../../lib/post';
 import { useRealtime, useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
-import { Avatar, Button, Icon, Notice, Row, Screen, SkeletonList, useColors, useTabBarSpace } from '../../lib/ui';
+import { Avatar, Button, ErrorState, Icon, Notice, Row, Screen, SkeletonList, useColors, useTabBarSpace } from '../../lib/ui';
 
 type FriendRequest = { id: string; from: PublicUser; createdAt: string };
 
@@ -95,6 +95,7 @@ export default function Inbox() {
         style={{ alignSelf: 'flex-start' }}
       />
       <FlatList
+        keyboardShouldPersistTaps="handled"
         data={items}
         keyExtractor={(x) => x.id}
         contentContainerStyle={{ gap: space[2], paddingBottom: bottom }}
@@ -137,7 +138,7 @@ export default function Inbox() {
               }
               onPress={() => router.push('/notifications')}
             />
-            {error ? <Notice tone="danger">{error}</Notice> : null}
+            {error ? <ErrorState message={error} onRetry={fetchList} /> : null}
             {note ? (
               <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted, fontSize: 13 }}>
                 {note}
@@ -157,8 +158,8 @@ export default function Inbox() {
                       onPress={() => router.push(`/u/${encodeURIComponent(r.from.username)}`)}
                     />
                     <View style={{ flexDirection: 'row', gap: space[2] }}>
-                      <Button label={t('m.common.accept')} size="sm" onPress={() => void answer(r, true)} />
-                      <Button label={t('m.common.decline')} size="sm" variant="secondary" onPress={() => void answer(r, false)} />
+                      <Button label={t('m.common.accept')} size="sm" onPress={() => answer(r, true)} />
+                      <Button label={t('m.common.decline')} size="sm" variant="secondary" onPress={() => answer(r, false)} />
                     </View>
                   </View>
                 ))}

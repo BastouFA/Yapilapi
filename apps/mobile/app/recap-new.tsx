@@ -17,7 +17,7 @@ import { useT } from '../lib/i18n';
 import { recapError } from '../lib/recaps';
 import { useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
-import { Button, Card, EmptyState, Field, Icon, Loading, Notice, Segmented, useColors, userText } from '../lib/ui';
+import { Button, Card, EmptyState, Field, Icon, KeyboardAvoid, Loading, Notice, Segmented, useColors, userText } from '../lib/ui';
 
 type Length = 'auto' | `${(typeof RECAP_LENGTHS)[number]}`;
 
@@ -147,152 +147,154 @@ export default function RecapNew() {
   const styleHint = { calm: t('m.recap.style.calmHint'), quick: t('m.recap.style.quickHint'), film: t('m.recap.style.filmHint') }[style];
 
   return (
-    <ScrollView
-      style={{ backgroundColor: c.ground }}
-      contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Field label={t('m.recap.name')} value={title} onChangeText={setTitle} maxLength={RECAP_TITLE_MAX} />
+    <KeyboardAvoid>
+      <ScrollView
+        style={{ backgroundColor: c.ground }}
+        contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Field label={t('m.recap.name')} value={title} onChangeText={setTitle} maxLength={RECAP_TITLE_MAX} />
 
-      <View style={{ gap: space[2] }}>
-        {heading(t('m.recap.chosen'), t('m.recap.chosenCount', { count: chosen.length, max: RECAP_MAX_ITEMS }))}
-        {chosen.length ? (
-          chosen.map((id, i) => {
-            const item = byId.get(id);
-            if (!item) return null;
-            return (
-              <View key={id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
-                <Text style={{ color: c.inkMuted, width: 22, textAlign: 'center', fontWeight: '700' }}>{i + 1}</Text>
-                <Thumb item={item} size={56} />
-                <Text style={{ flex: 1, color: c.ink, fontSize: 13 }} numberOfLines={2}>
-                  {itemLabel(item)}
-                </Text>
-                <IconButton icon="arrow-up" label={t('m.recap.moveUp')} disabled={i === 0} onPress={() => move(i, -1)} />
-                <IconButton icon="arrow-down" label={t('m.recap.moveDown')} disabled={i === chosen.length - 1} onPress={() => move(i, 1)} />
-                <IconButton icon="close" label={t('m.common.remove')} onPress={() => setChosen((cur) => cur.filter((x) => x !== id))} />
-              </View>
-            );
-          })
-        ) : (
-          <Text style={{ color: c.inkMuted }}>{t('m.recap.chooseSome')}</Text>
-        )}
-      </View>
-
-      {rest.length ? (
         <View style={{ gap: space[2] }}>
-          {heading(t('m.recap.more'), full ? t('m.recap.full', { max: RECAP_MAX_ITEMS }) : undefined)}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[3] }}>
-            {rest.map((item) => (
-              <View key={item.mediaId} style={{ width: 96, gap: space[1] }}>
-                <Thumb item={item} size={96} label={itemLabel(item)} />
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  icon="add"
-                  label={t('m.recap.add')}
-                  disabled={full}
-                  onPress={() => setChosen((cur) => [...cur, item.mediaId])}
-                />
-              </View>
-            ))}
-          </View>
+          {heading(t('m.recap.chosen'), t('m.recap.chosenCount', { count: chosen.length, max: RECAP_MAX_ITEMS }))}
+          {chosen.length ? (
+            chosen.map((id, i) => {
+              const item = byId.get(id);
+              if (!item) return null;
+              return (
+                <View key={id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
+                  <Text style={{ color: c.inkMuted, width: 22, textAlign: 'center', fontWeight: '700' }}>{i + 1}</Text>
+                  <Thumb item={item} size={56} />
+                  <Text style={{ flex: 1, color: c.ink, fontSize: 13 }} numberOfLines={2}>
+                    {itemLabel(item)}
+                  </Text>
+                  <IconButton icon="arrow-up" label={t('m.recap.moveUp')} disabled={i === 0} onPress={() => move(i, -1)} />
+                  <IconButton icon="arrow-down" label={t('m.recap.moveDown')} disabled={i === chosen.length - 1} onPress={() => move(i, 1)} />
+                  <IconButton icon="close" label={t('m.common.remove')} onPress={() => setChosen((cur) => cur.filter((x) => x !== id))} />
+                </View>
+              );
+            })
+          ) : (
+            <Text style={{ color: c.inkMuted }}>{t('m.recap.chooseSome')}</Text>
+          )}
         </View>
-      ) : null}
 
-      <View style={{ gap: space[2] }}>
-        {heading(t('m.recap.style'))}
-        <Segmented
-          label={t('m.recap.style')}
-          options={[
-            { id: 'calm' as const, label: t('m.recap.style.calm') },
-            { id: 'quick' as const, label: t('m.recap.style.quick') },
-            { id: 'film' as const, label: t('m.recap.style.film') },
-          ]}
-          value={style}
-          onChange={setStyle}
-        />
-        <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{styleHint}</Text>
-      </View>
-
-      <View style={{ gap: space[2] }}>
-        {heading(t('m.recap.shape'))}
-        <Segmented
-          label={t('m.recap.shape')}
-          options={[
-            { id: '9:16' as const, label: t('m.recap.shape.tall') },
-            { id: '1:1' as const, label: t('m.recap.shape.square') },
-          ]}
-          value={aspect}
-          onChange={setAspect}
-        />
-      </View>
-
-      <View style={{ gap: space[2] }}>
-        {heading(t('m.recap.length'), t('m.recap.lengthHint'))}
-        <Segmented<Length>
-          label={t('m.recap.length')}
-          options={[
-            { id: 'auto', label: t('m.recap.length.auto') },
-            ...RECAP_LENGTHS.map((n) => ({ id: `${n}` as Length, label: t('m.recap.seconds', { count: n }) })),
-          ]}
-          value={length}
-          onChange={setLength}
-        />
-      </View>
-
-      <View style={{ gap: space[2] }}>
-        {heading(t('m.recap.sound'))}
-        {sound ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
-            <Icon name="musical-notes-outline" size={20} color={c.yapi} />
-            <View style={{ flex: 1 }}>
-              <Text style={[{ color: c.ink, fontWeight: '700' }, userText]} numberOfLines={1}>
-                {sound.title}
-              </Text>
-              <Text style={[{ color: c.inkMuted, fontSize: 13 }, userText]} numberOfLines={1}>
-                {t('m.sound.by', { name: sound.owner.displayName })}
-              </Text>
+        {rest.length ? (
+          <View style={{ gap: space[2] }}>
+            {heading(t('m.recap.more'), full ? t('m.recap.full', { max: RECAP_MAX_ITEMS }) : undefined)}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[3] }}>
+              {rest.map((item) => (
+                <View key={item.mediaId} style={{ width: 96, gap: space[1] }}>
+                  <Thumb item={item} size={96} label={itemLabel(item)} />
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    icon="add"
+                    label={t('m.recap.add')}
+                    disabled={full}
+                    onPress={() => setChosen((cur) => [...cur, item.mediaId])}
+                  />
+                </View>
+              ))}
             </View>
-            <Button size="sm" variant="ghost" label={t('m.common.remove')} onPress={() => setSound(null)} />
           </View>
-        ) : (
-          <>
-            <Text style={{ color: c.inkMuted }}>{t('m.recap.noSound')}</Text>
-            <Button
-              size="sm"
-              variant="secondary"
-              icon="musical-notes-outline"
-              label={t('m.recap.addSound')}
-              onPress={() => setPickingSound((v) => !v)}
-              style={{ alignSelf: 'flex-start' }}
-            />
-          </>
-        )}
-        {pickingSound && !sound ? (
-          <SoundPicker
-            onPick={(s) => {
-              setSound(s);
-              setPickingSound(false);
-            }}
-          />
         ) : null}
-      </View>
 
-      {remaining !== null ? (
-        noneLeft ? (
-          <Notice tone="warn">{t('m.recap.noneLeft')}</Notice>
-        ) : (
-          <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{tp('m.recap.remaining', remaining)}</Text>
-        )
-      ) : null}
-      {error ? (
-        <Notice tone="danger" key={error}>
-          {error}
-        </Notice>
-      ) : null}
-      <Button label={t('m.recap.create')} icon="film-outline" disabled={busy || noneLeft || !chosen.length || !title.trim()} onPress={() => void create()} />
-      {busy ? <ActivityIndicator color={c.yapi} /> : null}
-    </ScrollView>
+        <View style={{ gap: space[2] }}>
+          {heading(t('m.recap.style'))}
+          <Segmented
+            label={t('m.recap.style')}
+            options={[
+              { id: 'calm' as const, label: t('m.recap.style.calm') },
+              { id: 'quick' as const, label: t('m.recap.style.quick') },
+              { id: 'film' as const, label: t('m.recap.style.film') },
+            ]}
+            value={style}
+            onChange={setStyle}
+          />
+          <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{styleHint}</Text>
+        </View>
+
+        <View style={{ gap: space[2] }}>
+          {heading(t('m.recap.shape'))}
+          <Segmented
+            label={t('m.recap.shape')}
+            options={[
+              { id: '9:16' as const, label: t('m.recap.shape.tall') },
+              { id: '1:1' as const, label: t('m.recap.shape.square') },
+            ]}
+            value={aspect}
+            onChange={setAspect}
+          />
+        </View>
+
+        <View style={{ gap: space[2] }}>
+          {heading(t('m.recap.length'), t('m.recap.lengthHint'))}
+          <Segmented<Length>
+            label={t('m.recap.length')}
+            options={[
+              { id: 'auto', label: t('m.recap.length.auto') },
+              ...RECAP_LENGTHS.map((n) => ({ id: `${n}` as Length, label: t('m.recap.seconds', { count: n }) })),
+            ]}
+            value={length}
+            onChange={setLength}
+          />
+        </View>
+
+        <View style={{ gap: space[2] }}>
+          {heading(t('m.recap.sound'))}
+          {sound ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
+              <Icon name="musical-notes-outline" size={20} color={c.yapi} />
+              <View style={{ flex: 1 }}>
+                <Text style={[{ color: c.ink, fontWeight: '700' }, userText]} numberOfLines={1}>
+                  {sound.title}
+                </Text>
+                <Text style={[{ color: c.inkMuted, fontSize: 13 }, userText]} numberOfLines={1}>
+                  {t('m.sound.by', { name: sound.owner.displayName })}
+                </Text>
+              </View>
+              <Button size="sm" variant="ghost" label={t('m.common.remove')} onPress={() => setSound(null)} />
+            </View>
+          ) : (
+            <>
+              <Text style={{ color: c.inkMuted }}>{t('m.recap.noSound')}</Text>
+              <Button
+                size="sm"
+                variant="secondary"
+                icon="musical-notes-outline"
+                label={t('m.recap.addSound')}
+                onPress={() => setPickingSound((v) => !v)}
+                style={{ alignSelf: 'flex-start' }}
+              />
+            </>
+          )}
+          {pickingSound && !sound ? (
+            <SoundPicker
+              onPick={(s) => {
+                setSound(s);
+                setPickingSound(false);
+              }}
+            />
+          ) : null}
+        </View>
+
+        {remaining !== null ? (
+          noneLeft ? (
+            <Notice tone="warn">{t('m.recap.noneLeft')}</Notice>
+          ) : (
+            <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{tp('m.recap.remaining', remaining)}</Text>
+          )
+        ) : null}
+        {error ? (
+          <Notice tone="danger" key={error}>
+            {error}
+          </Notice>
+        ) : null}
+        <Button label={t('m.recap.create')} icon="film-outline" disabled={busy || noneLeft || !chosen.length || !title.trim()} onPress={() => create()} />
+        {busy ? <ActivityIndicator color={c.yapi} /> : null}
+      </ScrollView>
+    </KeyboardAvoid>
   );
 }
 

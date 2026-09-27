@@ -3,21 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  I18nManager,
-  Image,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { ActivityIndicator, I18nManager, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Chapter, ChapterDetail } from '../../../packages/api-client/src/index';
 import { CHAPTER_GRADIENTS, CHAPTER_GUESTBOOK_MAX, CHAPTER_TITLE_MAX, type ChapterGradient, type ChapterSymbol } from '../../../packages/shared/src/constants';
@@ -26,7 +12,7 @@ import { useT } from './i18n';
 import { SensitiveCover } from './safety';
 import { useSession } from './session';
 import { radius, space } from './theme';
-import { Avatar, Button, Field, Icon, useColors, userText, type IconName } from './ui';
+import { Avatar, BottomSheet, Button, Field, Icon, type IconName, KeyboardAvoid, useColors, userText } from './ui';
 
 const PHOTO_MS = 5000;
 const WHITE = '#FFFFFF';
@@ -148,7 +134,7 @@ export function ChaptersRow({ userId, isSelf }: { userId: string; isSelf: boolea
           </Pressable>
         ) : null}
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space[3] }}>
+      <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space[3] }}>
         {isSelf ? (
           <Pressable accessibilityRole="button" accessibilityLabel={t('m.chapters.new')} onPress={() => router.push('/chapter-edit')} style={st.tile}>
             <View style={[st.newCover, { borderColor: c.lineStrong, backgroundColor: c.surfaceSunken }]}>
@@ -215,6 +201,8 @@ function Player({ detail, start, onClose }: { detail: ChapterDetail; start: numb
   const [paused, setPaused] = useState(false);
   const [done, setDone] = useState(stories.length === 0);
   const [line, setLine] = useState('');
+  // A guestbook line on its way: a second tap doesn't sign twice.
+  const [signing, setSigning] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<string[]>([]);
   const story = stories[i];
@@ -249,7 +237,7 @@ function Player({ detail, start, onClose }: { detail: ChapterDetail; start: numb
   const canSign = !!me && !isSealed(chapter);
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#000' }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoid offset={0} style={{ backgroundColor: '#000' }}>
       {done ? (
         <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', padding: space[6], gap: space[3] }]}>
           <ChapterCover chapter={chapter} size={96} />
@@ -276,7 +264,15 @@ function Player({ detail, start, onClose }: { detail: ChapterDetail; start: numb
                   style={[st.input, userText]}
                 />
                 {line.trim() ? (
-                  <Pressable accessibilityRole="button" accessibilityLabel={t('m.chapters.sign')} hitSlop={8} onPress={() => void sign()} style={st.icon}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('m.chapters.sign')}
+                    accessibilityState={{ disabled: signing, busy: signing }}
+                    disabled={signing}
+                    hitSlop={8}
+                    onPress={() => void sign()}
+                    style={[st.icon, signing && { opacity: 0.5 }]}
+                  >
                     <Icon name="send" size={22} color={WHITE} directional />
                   </Pressable>
                 ) : null}
@@ -402,17 +398,20 @@ function Player({ detail, start, onClose }: { detail: ChapterDetail; start: numb
           </Pressable>
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </KeyboardAvoid>
   );
 
   async function sign() {
     const body = line.trim();
-    if (!body) return;
+    if (!body || signing) return;
+    setSigning(true);
     try {
       const { entry } = await (await client()).chapters.sign(chapter.id, body);
       setNote(entry.pending ? t('m.chapters.signedPending') : t('m.chapters.signed'));
     } catch (e) {
       setNote(errorMessage(e));
+    } finally {
+      setSigning(false);
     }
   }
 }
@@ -440,7 +439,6 @@ function ChapterVideo({ uri, paused, onProgress, onEnd }: { uri: string; paused:
 export function AddToChapterSheet({ momentId, onClose, onAdded }: { momentId: string | null; onClose: () => void; onAdded?: (message: string) => void }) {
   const c = useColors();
   const { t, tp } = useT();
-  const insets = useSafeAreaInsets();
   const [items, setItems] = useState<Chapter[] | null>(null);
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
@@ -474,88 +472,67 @@ export function AddToChapterSheet({ momentId, onClose, onAdded }: { momentId: st
   }
 
   return (
-    <Modal visible={!!momentId} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={{ flex: 1, backgroundColor: c.overlay, justifyContent: 'flex-end' }}>
-          <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} style={{ flex: 1 }} onPress={onClose} />
-          <View
-            accessibilityViewIsModal
-            style={{
-              backgroundColor: c.surface,
-              borderTopLeftRadius: radius.lg,
-              borderTopRightRadius: radius.lg,
-              padding: space[4],
-              paddingBottom: Math.max(insets.bottom, space[4]),
-              maxHeight: '75%',
-              gap: space[3],
-            }}
-          >
-            <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 17, fontWeight: '800' }}>
-              {t('m.chapters.add')}
-            </Text>
-            {items === null ? (
-              <ActivityIndicator color={c.yapi} />
-            ) : items.length ? (
-              <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ gap: space[2] }}>
-                {items.map((ch) => (
-                  <Pressable
-                    key={ch.id}
-                    accessibilityRole="button"
-                    disabled={busy}
-                    onPress={() =>
-                      run(async () => {
-                        await (await client()).chapters.addStory(ch.id, momentId!);
-                        return t('m.chapters.added', { title: ch.title });
-                      })
-                    }
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: space[3],
-                      padding: space[2],
-                      borderRadius: radius.md,
-                      borderWidth: 1,
-                      borderColor: c.line,
-                    }}
-                  >
-                    <ChapterCover chapter={ch} size={44} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[{ color: c.ink, fontWeight: '700' }, userText]} numberOfLines={1}>
-                        {ch.title}
-                      </Text>
-                      <Text style={{ color: c.inkMuted, fontSize: 13 }} numberOfLines={1}>
-                        {ch.role === 'contributor' ? `${t('m.chapters.by', { name: ch.owner.displayName })} · ` : ''}
-                        {tp('m.chapters.stories', ch.storyCount)}
-                      </Text>
-                    </View>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            ) : (
-              <Text style={{ color: c.inkMuted }}>{t('m.chapters.none')}</Text>
-            )}
-            <Field
-              label={t('m.chapters.newLabel')}
-              placeholder={t('m.chapters.newPlaceholder')}
-              value={title}
-              onChangeText={setTitle}
-              maxLength={CHAPTER_TITLE_MAX}
-            />
-            <Button
-              label={t('m.chapters.create')}
-              disabled={!title.trim() || busy}
+    <BottomSheet visible={!!momentId} title={t('m.chapters.add')} onClose={onClose} scroll={false} maxHeight="75%">
+      {items === null ? (
+        <ActivityIndicator color={c.yapi} />
+      ) : items.length ? (
+        <ScrollView keyboardShouldPersistTaps="handled" style={{ flexGrow: 0 }} contentContainerStyle={{ gap: space[2] }}>
+          {items.map((ch) => (
+            <Pressable
+              key={ch.id}
+              accessibilityRole="button"
+              disabled={busy}
               onPress={() =>
                 run(async () => {
-                  await (await client()).chapters.create({ title: title.trim(), momentIds: [momentId!] });
-                  return t('m.chapters.started', { title: title.trim() });
+                  await (await client()).chapters.addStory(ch.id, momentId!);
+                  return t('m.chapters.added', { title: ch.title });
                 })
               }
-            />
-            {error ? <Text style={{ color: c.danger }}>{error}</Text> : null}
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: space[3],
+                padding: space[2],
+                borderRadius: radius.md,
+                borderWidth: 1,
+                borderColor: c.line,
+              }}
+            >
+              <ChapterCover chapter={ch} size={44} />
+              <View style={{ flex: 1 }}>
+                <Text style={[{ color: c.ink, fontWeight: '700' }, userText]} numberOfLines={1}>
+                  {ch.title}
+                </Text>
+                <Text style={{ color: c.inkMuted, fontSize: 13 }} numberOfLines={1}>
+                  {ch.role === 'contributor' ? `${t('m.chapters.by', { name: ch.owner.displayName })} · ` : ''}
+                  {tp('m.chapters.stories', ch.storyCount)}
+                </Text>
+              </View>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : (
+        <Text style={{ color: c.inkMuted }}>{t('m.chapters.none')}</Text>
+      )}
+      <Field
+        label={t('m.chapters.newLabel')}
+        placeholder={t('m.chapters.newPlaceholder')}
+        value={title}
+        onChangeText={setTitle}
+        maxLength={CHAPTER_TITLE_MAX}
+      />
+      <Button
+        label={t('m.chapters.create')}
+        disabled={!title.trim() || busy}
+        onPress={() =>
+          run(async () => {
+            await (await client()).chapters.create({ title: title.trim(), momentIds: [momentId!] });
+            return t('m.chapters.started', { title: title.trim() });
+          })
+        }
+      />
+      {error ? <Text style={{ color: c.danger }}>{error}</Text> : null}
+    </BottomSheet>
   );
 }
 

@@ -60,7 +60,7 @@ export default function ForgotPassword() {
         label={busy ? t('m.auth.reset.sending') : sent ? t('m.auth.reset.again') : t('m.auth.reset.submit')}
         variant={sent ? 'secondary' : 'primary'}
         disabled={busy || !valid}
-        onPress={() => void send()}
+        onPress={() => send()}
       />
       <Button
         label={t('m.auth.reset.back')}

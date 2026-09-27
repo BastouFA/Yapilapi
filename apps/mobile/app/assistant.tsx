@@ -43,7 +43,7 @@ export default function Assistant() {
   const k = KINDS.find((x) => x.id === kind)!;
 
   async function ask() {
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || busy) return;
     setBusy(true);
     setError(null);
     try {

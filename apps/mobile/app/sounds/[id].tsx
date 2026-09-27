@@ -8,7 +8,7 @@ import { useT } from '../../lib/i18n';
 import { clock } from '../../lib/media';
 import { useSession } from '../../lib/session';
 import { gradient, radius, space } from '../../lib/theme';
-import { Avatar, Button, EmptyState, Icon, Loading, Notice, Segmented, useColors, userText } from '../../lib/ui';
+import { Avatar, Button, EmptyState, ErrorState, Icon, Loading, Segmented, useColors, useRefresh, userText } from '../../lib/ui';
 import { LinearGradient } from 'expo-linear-gradient';
 
 /** A sound: play it, who made it, the reels that use it (most recent or top), and "Use this sound". */
@@ -23,15 +23,18 @@ export default function SoundScreen() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const loadOne = useCallback(async () => {
+    try {
+      const r = await (await client()).sounds.get(id);
+      setSound(r.sound);
+    } catch {
+      setSound((cur) => cur ?? null);
+    }
+  }, [id]);
   useEffect(() => {
     setSound(undefined);
-    client()
-      .then((api) => api.sounds.get(id))
-      .then(
-        (r) => setSound(r.sound),
-        () => setSound(null),
-      );
-  }, [id]);
+    void loadOne();
+  }, [loadOne]);
 
   const load = useCallback(
     async (next?: string) => {
@@ -41,16 +44,26 @@ export default function SoundScreen() {
     },
     [id, sort],
   );
+  const loadList = useCallback(async () => {
+    setError(null);
+    try {
+      await load();
+    } catch (e) {
+      setReels((cur) => cur ?? []);
+      setError(errorMessage(e));
+    }
+  }, [load]);
   useEffect(() => {
     setReels(null);
-    void load().catch((e) => (setReels([]), setError(errorMessage(e))));
-  }, [load]);
+    void loadList();
+  }, [loadList]);
+  const refresh = useRefresh(() => Promise.all([loadOne(), loadList()]));
 
   if (sound === undefined) return <Loading />;
   if (sound === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>
-        <EmptyState title={t('m.sound.missing')} />
+        <EmptyState title={t('m.sound.missing')} action={{ label: t('m.common.retry'), icon: 'refresh', onPress: () => void loadOne() }} />
       </View>
     );
 
@@ -125,24 +138,26 @@ export default function SoundScreen() {
           { id: 'top', label: t('m.sound.top') },
         ]}
       />
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {error ? <ErrorState message={error} onRetry={loadList} /> : null}
     </View>
   );
 
   return (
     <FlatList
+      keyboardShouldPersistTaps="handled"
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4] }}
       columnWrapperStyle={{ gap: 4 }}
       data={reels ?? []}
       numColumns={3}
       keyExtractor={(p) => p.id}
+      refreshControl={refresh}
       ListHeaderComponent={header}
       ItemSeparatorComponent={() => <View style={{ height: 4 }} />}
       renderItem={({ item }) => <ReelTile post={item} />}
       onEndReached={() => cursor && void load(cursor)}
       onEndReachedThreshold={0.5}
-      ListEmptyComponent={reels === null ? <Loading /> : <EmptyState title={t('m.sound.empty')} />}
+      ListEmptyComponent={reels === null ? <Loading /> : error ? null : <EmptyState title={t('m.sound.empty')} />}
     />
   );
 }

@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Alert, findNodeHandle, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, Alert, findNodeHandle, FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
 import type { Comment, CommentPage, Post, PublicUser } from '../../../../packages/shared/src/types';
@@ -13,7 +13,7 @@ import { PostCard } from '../../lib/post';
 import { TranslatableText } from '../../lib/translation';
 import { useSession } from '../../lib/session';
 import { elevation, radius, space } from '../../lib/theme';
-import { Avatar, Button, EmptyState, Icon, Loading, Notice, Segmented, useColors, userText } from '../../lib/ui';
+import { Avatar, Button, EmptyState, Icon, KeyboardAvoid, Loading, Notice, Segmented, useColors, userText } from '../../lib/ui';
 
 const POLICIES: { id: CommentPolicy; label: MessageKey }[] = [
   { id: 'everyone', label: 'comments.policy.everyone' },
@@ -353,7 +353,7 @@ export default function PostScreen() {
                       label={editing.busy ? t('m.common.saving') : t('common.save')}
                       size="sm"
                       disabled={editing.busy || !editing.body.trim()}
-                      onPress={() => void saveEdit()}
+                      onPress={() => saveEdit()}
                     />
                     <Button label={t('common.cancel')} size="sm" variant="secondary" onPress={() => setEditing(null)} />
                   </View>
@@ -509,7 +509,7 @@ export default function PostScreen() {
                 size="sm"
                 variant="secondary"
                 label={hidden ? t('comments.hidden.close') : tp('comments.hidden.review', controls.hiddenCount ?? 0)}
-                onPress={() => void toggleHidden()}
+                onPress={() => toggleHidden()}
               />
               {hidden
                 ? hidden.length
@@ -544,11 +544,7 @@ export default function PostScreen() {
   );
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: c.ground }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={insets.top + 44}
-    >
+    <KeyboardAvoid style={{ backgroundColor: c.ground }}>
       <FlatList
         data={comments}
         keyExtractor={(x) => x.id}
@@ -634,12 +630,12 @@ export default function PostScreen() {
                     userText,
                   ]}
                 />
-                <Button label={busy ? t('m.comment.posting') : t('m.comment.post')} disabled={!body.trim() || busy} onPress={() => void send()} />
+                <Button label={busy ? t('m.comment.posting') : t('m.comment.post')} disabled={!body.trim() || busy} onPress={() => send()} />
               </View>
             </>
           )}
         </View>
       ) : null}
-    </KeyboardAvoidingView>
+    </KeyboardAvoid>
   );
 }

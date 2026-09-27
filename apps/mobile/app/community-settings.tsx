@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { ApiError, type FaqEntry } from '../../../packages/api-client/src/index';
 import { COMMUNITY_ROLE_RANK, type CommunityRole } from '../../../packages/shared/src/constants';
 import type { Community, PublicUser } from '../../../packages/shared/src/types';
@@ -11,7 +11,7 @@ import { ROLE_LABEL, roleName, roleRank as rank } from '../lib/community-roles';
 import { useT } from '../lib/i18n';
 import { useSession } from '../lib/session';
 import { space } from '../lib/theme';
-import { Avatar, Button, Card, EmptyState, Field, Icon, Loading, Notice, Title, useColors, userText } from '../lib/ui';
+import { Avatar, Button, Card, EmptyState, Field, Icon, KeyboardAvoid, Loading, Notice, Title, useColors, userText } from '../lib/ui';
 
 type Section = 'details' | 'members' | 'requests' | 'banned' | 'faq';
 type Member = { user: PublicUser; role: string; joinedAt?: string };
@@ -61,7 +61,7 @@ export default function CommunitySettings() {
   const current = section ?? sections[0]!.id;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoid>
       <ScrollView
         style={{ backgroundColor: c.ground }}
         contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
@@ -85,7 +85,7 @@ export default function CommunitySettings() {
           <FaqManager slug={slug} />
         )}
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoid>
   );
 }
 
@@ -157,7 +157,7 @@ function Details({ community, onSaved }: { community: Community; onSaved: (c: Co
         <FieldError text={fields.rules ?? fields['rules.0']} />
       </Card>
       {note ? <Notice>{note}</Notice> : null}
-      <Button label={busy ? t('m.common.saving') : t('common.save')} disabled={!name.trim() || busy} onPress={() => void save()} />
+      <Button label={busy ? t('m.common.saving') : t('common.save')} disabled={!name.trim() || busy} onPress={() => save()} />
     </View>
   );
 }
@@ -258,13 +258,13 @@ function Requests({ slug }: { slug: string }) {
                 label={t('m.common.accept')}
                 size="sm"
                 icon="checkmark"
-                onPress={() => void act(async () => (await client()).communities.approve(slug, m.user.id))}
+                onPress={() => act(async () => (await client()).communities.approve(slug, m.user.id))}
               />
               <Button
                 label={t('m.common.decline')}
                 size="sm"
                 variant="secondary"
-                onPress={() => void act(async () => (await client()).communities.decline(slug, m.user.id))}
+                onPress={() => act(async () => (await client()).communities.decline(slug, m.user.id))}
               />
             </View>
           </PersonCard>
@@ -291,7 +291,7 @@ function Banned({ slug }: { slug: string }) {
               size="sm"
               variant="secondary"
               style={{ alignSelf: 'flex-start' }}
-              onPress={() => void act(async () => (await client()).communities.unban(slug, m.user.id))}
+              onPress={() => act(async () => (await client()).communities.unban(slug, m.user.id))}
             />
           </PersonCard>
         ))

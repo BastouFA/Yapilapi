@@ -14,7 +14,6 @@ import {
   FlatList,
   I18nManager,
   Image,
-  Modal,
   PanResponder,
   Platform,
   Pressable,
@@ -46,7 +45,7 @@ import { useDataSaver } from '../lib/data-saver';
 import { useSession } from '../lib/session';
 import { useT } from '../lib/i18n';
 import { radius, space } from '../lib/theme';
-import { Avatar, Button, EmptyState, Field, Icon, Loading, Notice, Segmented, SwitchRow, useColors, userText, type IconName } from '../lib/ui';
+import { Avatar, BottomSheet, Button, EmptyState, Field, Icon, type IconName, Loading, Notice, Segmented, SwitchRow, useColors, userText } from '../lib/ui';
 import { LockedPanel } from '../lib/money';
 import { useBoards, type SaveChange } from '../lib/boards';
 import { AuthorNames, RichText } from '../lib/post';
@@ -54,7 +53,6 @@ import { SensitiveCover } from '../lib/safety';
 import { TranslatableText } from '../lib/translation';
 import { openMusic, useMusicCredit, useMusicLoop } from '../lib/music';
 import { CaptionOverlay, useCaptionCues } from '../lib/captions';
-import { Sheet } from '../lib/post-edit';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 
 /** What a reel plays: on Data saver the lowest MP4, or the 360p stream for videos processed before it existed. */
@@ -427,6 +425,7 @@ export default function Reels() {
     <View style={{ flex: 1, backgroundColor: '#05060B' }} onLayout={(e) => setHeight(e.nativeEvent.layout.height)}>
       {height ? (
         <FlatList
+          keyboardShouldPersistTaps="handled"
           ref={list}
           data={items}
           keyExtractor={(p) => p.id}
@@ -496,7 +495,7 @@ export default function Reels() {
           <Text style={{ color: c.ink, fontWeight: '600' }}>{t('share.video.preparing')}</Text>
         </View>
       ) : null}
-      <ReelSheet visible={sheet?.kind === 'share'} title={t('reel.share.title')} onClose={() => setSheet(null)}>
+      <BottomSheet done gap={space[2]} visible={sheet?.kind === 'share'} title={t('reel.share.title')} onClose={() => setSheet(null)}>
         {sheetPost ? (
           <>
             <SheetItem icon="share-outline" label={t('reel.share.link')} onPress={() => (setSheet(null), void shareLink(sheetPost))} />
@@ -537,7 +536,7 @@ export default function Reels() {
             ) : null}
           </>
         ) : null}
-      </ReelSheet>
+      </BottomSheet>
       <OptionsSheet
         post={sheet?.kind === 'options' ? sheetPost : null}
         mine={sheetPost?.author.id === me?.id}
@@ -1107,7 +1106,7 @@ function Reel({
               <Icon name="close" size={22} color={WHITE} />
             </Pressable>
           </View>
-          <ScrollView contentContainerStyle={{ gap: space[3], paddingTop: space[2] }}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space[3], paddingTop: space[2] }}>
             {post.body ? (
               <TranslatableText
                 kind="post"
@@ -1471,39 +1470,6 @@ function Action({
   );
 }
 
-function ReelSheet({ visible, title, onClose, children }: { visible: boolean; title: string; onClose: () => void; children: React.ReactNode }) {
-  const c = useColors();
-  const { t } = useT();
-  const insets = useSafeAreaInsets();
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: c.overlay, justifyContent: 'flex-end' }}>
-        <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} style={{ flex: 1 }} onPress={onClose} />
-        <View
-          accessibilityViewIsModal
-          style={{
-            backgroundColor: c.surface,
-            borderTopLeftRadius: radius.lg,
-            borderTopRightRadius: radius.lg,
-            padding: space[4],
-            paddingBottom: Math.max(insets.bottom, space[4]),
-            maxHeight: '85%',
-            gap: space[2],
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text accessibilityRole="header" style={{ flex: 1, color: c.ink, fontSize: 17, fontWeight: '800' }}>
-              {title}
-            </Text>
-            <Button label={t('m.common.done')} size="sm" variant="ghost" onPress={onClose} />
-          </View>
-          <ScrollView contentContainerStyle={{ gap: space[1] }}>{children}</ScrollView>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 function SheetItem({ icon, label, onPress, danger, selected }: { icon: IconName; label: string; onPress: () => void; danger?: boolean; selected?: boolean }) {
   const c = useColors();
   return (
@@ -1569,7 +1535,7 @@ function OptionsSheet({
     fn();
   };
   return (
-    <ReelSheet visible={!!post} title={t('reel.options')} onClose={onClose}>
+    <BottomSheet done gap={space[2]} visible={!!post} title={t('reel.options')} onClose={onClose}>
       {post && reporting ? (
         <>
           <Text style={{ color: c.inkMuted, fontWeight: '700', fontSize: 13 }}>{t('postList.reportWhat')}</Text>
@@ -1613,7 +1579,7 @@ function OptionsSheet({
           )}
         </>
       ) : null}
-    </ReelSheet>
+    </BottomSheet>
   );
 }
 
@@ -1664,7 +1630,7 @@ function HighlightsSheet({
   };
 
   return (
-    <Sheet visible title={t('reel.highlights.edit')} onClose={onClose}>
+    <BottomSheet visible title={t('reel.highlights.edit')} onClose={onClose}>
       <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t('reel.highlights.hint')}</Text>
       {list.length ? (
         <View style={{ gap: space[2] }}>
@@ -1732,9 +1698,9 @@ function HighlightsSheet({
       {error ? <Notice tone="danger">{error}</Notice> : null}
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: space[2] }}>
         <Button label={t('common.cancel')} variant="ghost" onPress={onClose} />
-        <Button label={t('common.save')} disabled={busy} onPress={() => void save()} />
+        <Button label={t('common.save')} disabled={busy} onPress={() => save()} />
       </View>
-    </Sheet>
+    </BottomSheet>
   );
 }
 

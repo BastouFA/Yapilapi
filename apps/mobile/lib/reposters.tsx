@@ -4,9 +4,8 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import type { PublicUser } from '../../../packages/shared/src/types';
 import { client, errorMessage } from './api';
 import { useT } from './i18n';
-import { Sheet } from './post-edit';
 import { radius, space } from './theme';
-import { Avatar, Button, useColors, userText } from './ui';
+import { Avatar, BottomSheet, Button, useColors, userText } from './ui';
 
 /**
  * "Reposted by": who reposted your post, newest first. People with private accounts show only
@@ -60,7 +59,7 @@ export function RepostersSheet({ postId, onClose }: { postId: string | null; onC
   }
 
   return (
-    <Sheet visible={!!postId} title={t('reposters.title')} onClose={onClose}>
+    <BottomSheet visible={!!postId} title={t('reposters.title')} onClose={onClose}>
       {error ? <Text style={{ color: c.danger, lineHeight: 20 }}>{error}</Text> : null}
       {items === null ? (
         <ActivityIndicator color={c.yapi} style={{ paddingVertical: space[4] }} accessibilityLabel={t('common.loading')} />
@@ -97,19 +96,12 @@ export function RepostersSheet({ postId, onClose }: { postId: string | null; onC
             </Pressable>
           ))}
           {cursor ? (
-            <Button
-              label={t('follow.showMore')}
-              variant="secondary"
-              size="sm"
-              disabled={loadingMore}
-              onPress={() => void more()}
-              style={{ alignSelf: 'center' }}
-            />
+            <Button label={t('follow.showMore')} variant="secondary" size="sm" disabled={loadingMore} onPress={() => more()} style={{ alignSelf: 'center' }} />
           ) : null}
         </View>
       ) : error ? null : (
         <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('reposters.empty')}</Text>
       )}
-    </Sheet>
+    </BottomSheet>
   );
 }

@@ -14,7 +14,7 @@ import { orderStories, StoriesStrip, StoryViewer } from '../../lib/stories';
 import { useSession } from '../../lib/session';
 import { StarterRow } from '../../lib/starter';
 import { space } from '../../lib/theme';
-import { Icon, Loading, Notice, Segmented, SkeletonList, useColors, useTabBarSpace } from '../../lib/ui';
+import { ErrorState, feedListProps, Icon, Loading, Segmented, SkeletonList, useColors, useTabBarSpace } from '../../lib/ui';
 
 const MODES = [
   { id: 'for_you', label: 'feed.for_you' },
@@ -121,6 +121,8 @@ function Feed() {
   return (
     <>
       <FlatList
+        keyboardShouldPersistTaps="handled"
+        {...feedListProps}
         style={{ backgroundColor: c.ground }}
         contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: bottom }}
         data={posts ?? []}
@@ -131,7 +133,7 @@ function Feed() {
             {/* With nothing in the feed, the empty state below does the starter row's job. */}
             {posts?.length ? <StarterRow /> : null}
             <Segmented label={t('m.feed.label')} options={MODES.map((m) => ({ id: m.id, label: t(m.label) }))} value={mode} onChange={setMode} />
-            {error ? <Notice tone="danger">{error}</Notice> : null}
+            {error ? <ErrorState message={error} onRetry={() => Promise.all([load(), loadStories()])} /> : null}
           </View>
         }
         refreshControl={

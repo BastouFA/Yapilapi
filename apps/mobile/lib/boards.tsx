@@ -1,26 +1,14 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import {
-  AccessibilityInfo,
-  ActivityIndicator,
-  Image,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-  type AccessibilityActionEvent,
-} from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Image, Pressable, Text, View, type AccessibilityActionEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BOARD_NAME_MAX, SAVE_NOTE_MAX, type BoardVisibility, type SavedFilter } from '../../../packages/shared/src/constants';
 import type { Board, Post } from '../../../packages/shared/src/types';
 import { client, errorMessage, mediaUrl } from './api';
 import { useT } from './i18n';
 import { palette, radius, space } from './theme';
-import { Button, EmptyState, Field, Icon, Loading, useColors, userText, type IconName } from './ui';
+import { BottomSheet, Button, EmptyState, Field, Icon, type IconName, Loading, useColors, userText } from './ui';
 
 const WHITE = '#FFFFFF';
 
@@ -469,42 +457,6 @@ function SavedSnack({ onAdd, onClose }: { onAdd: () => void; onClose: () => void
   );
 }
 
-/** The bottom sheet frame shared by "Save to…" and the note editor. */
-function Sheet({ visible, title, onClose, children }: { visible: boolean; title: string; onClose: () => void; children: ReactNode }) {
-  const c = useColors();
-  const { t } = useT();
-  const insets = useSafeAreaInsets();
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={{ flex: 1, backgroundColor: c.overlay, justifyContent: 'flex-end' }}>
-          <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} style={{ flex: 1 }} onPress={onClose} />
-          <View
-            accessibilityViewIsModal
-            style={{
-              backgroundColor: c.surface,
-              borderTopLeftRadius: radius.lg,
-              borderTopRightRadius: radius.lg,
-              padding: space[4],
-              paddingBottom: Math.max(insets.bottom, space[4]),
-              maxHeight: '85%',
-              gap: space[3],
-            }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text accessibilityRole="header" style={{ flex: 1, color: c.ink, fontSize: 17, fontWeight: '800' }}>
-                {title}
-              </Text>
-              <Button label={t('m.common.done')} size="sm" variant="ghost" onPress={onClose} />
-            </View>
-            {children}
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
-  );
-}
-
 function SaveSheet({ target, onClose }: { target: { post: Post; onChange?: OnChange } | null; onClose: () => void }) {
   const c = useColors();
   const { t, number } = useT();
@@ -629,21 +581,15 @@ function SaveSheet({ target, onClose }: { target: { post: Post; onChange?: OnCha
     });
 
   return (
-    <Sheet visible={!!post} title={t('m.boards.sheetTitle')} onClose={close}>
+    <BottomSheet done visible={!!post} title={t('m.boards.sheetTitle')} onClose={close}>
       {boards === null ? (
         <ActivityIndicator color={c.yapi} accessibilityLabel={t('common.loading')} />
       ) : (
-        <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ gap: space[3] }} keyboardShouldPersistTaps="handled">
+        <View style={{ gap: space[3] }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
             <Icon name={saved ? 'bookmark' : 'bookmark-outline'} size={18} color={saved ? c.yapi : c.inkMuted} />
             <Text style={{ flex: 1, color: c.ink, fontWeight: '600' }}>{saved ? t('m.saved.inSaved') : t('m.saved.notSaved')}</Text>
-            <Button
-              size="sm"
-              variant="secondary"
-              label={saved ? t('m.post.unsave') : t('post.save')}
-              disabled={busy !== null}
-              onPress={() => void toggleSaved()}
-            />
+            <Button size="sm" variant="secondary" label={saved ? t('m.post.unsave') : t('post.save')} disabled={busy !== null} onPress={() => toggleSaved()} />
           </View>
 
           <View accessibilityRole="list" style={{ gap: space[2] }}>
@@ -700,7 +646,7 @@ function SaveSheet({ target, onClose }: { target: { post: Post; onChange?: OnCha
                 onSubmitEditing={() => name.trim() && busy === null && void create()}
               />
             </View>
-            <Button label={t('m.boards.create')} size="md" disabled={!name.trim() || busy !== null} onPress={() => void create()} />
+            <Button label={t('m.boards.create')} size="md" disabled={!name.trim() || busy !== null} onPress={() => create()} />
           </View>
 
           <View style={{ gap: space[1] }}>
@@ -726,7 +672,7 @@ function SaveSheet({ target, onClose }: { target: { post: Post; onChange?: OnCha
                 size="sm"
                 variant="secondary"
                 disabled={busy !== null}
-                onPress={() => void saveNote()}
+                onPress={() => saveNote()}
                 style={{ alignSelf: 'flex-start' }}
               />
             ) : null}
@@ -742,9 +688,9 @@ function SaveSheet({ target, onClose }: { target: { post: Post; onChange?: OnCha
               {error}
             </Text>
           ) : null}
-        </ScrollView>
+        </View>
       )}
-    </Sheet>
+    </BottomSheet>
   );
 }
 
@@ -778,7 +724,7 @@ function NoteSheet({ target, onClose }: { target: { post: Post; onChange?: OnCha
   }
 
   return (
-    <Sheet visible={!!post} title={post?.viewer.note ? t('m.saved.editNote') : t('m.saved.addNote')} onClose={onClose}>
+    <BottomSheet done visible={!!post} title={post?.viewer.note ? t('m.saved.editNote') : t('m.saved.addNote')} onClose={onClose}>
       <Field
         label={t('m.saved.noteLabel')}
         placeholder={t('m.saved.notePlaceholder')}
@@ -801,8 +747,8 @@ function NoteSheet({ target, onClose }: { target: { post: Post; onChange?: OnCha
           {error}
         </Text>
       ) : null}
-      <Button label={t('m.saved.saveNote')} disabled={busy || draft.trim() === (post?.viewer.note ?? '')} onPress={() => void save()} />
-    </Sheet>
+      <Button label={t('m.saved.saveNote')} disabled={busy || draft.trim() === (post?.viewer.note ?? '')} onPress={() => save()} />
+    </BottomSheet>
   );
 }
 

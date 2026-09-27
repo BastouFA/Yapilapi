@@ -10,7 +10,7 @@ import { useFlag } from '../../lib/flags';
 import { useT } from '../../lib/i18n';
 import { useSession } from '../../lib/session';
 import { space } from '../../lib/theme';
-import { Button, Card, EmptyState, Loading, Notice, useColors, userText } from '../../lib/ui';
+import { Button, Card, EmptyState, ErrorState, Loading, Notice, useColors, userText } from '../../lib/ui';
 
 /**
  * How one of your posts is doing (from its More menu, "See insights"): views, likes, comments,
@@ -63,7 +63,7 @@ export default function InsightsScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: c.ground, padding: space[4], gap: space[3] }}>
         <EmptyState title={t('m.insights.unavailable')} />
-        {error ? <Notice tone="danger">{error}</Notice> : null}
+        {error ? <ErrorState message={error} onRetry={load} /> : null}
       </View>
     );
 
@@ -77,6 +77,7 @@ export default function InsightsScreen() {
 
   return (
     <ScrollView
+      keyboardShouldPersistTaps="handled"
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
       refreshControl={

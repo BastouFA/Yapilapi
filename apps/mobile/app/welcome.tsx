@@ -45,6 +45,7 @@ export default function Welcome() {
         pointerEvents="none"
       />
       <ScrollView
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
           flexGrow: 1,
           paddingTop: insets.top + space[8],

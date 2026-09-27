@@ -72,7 +72,7 @@ export function NotificationSettings() {
               <Text accessibilityLiveRegion="polite" style={{ color: c.ink }}>
                 {t('m.settings.pausedUntil', { time: dateTime(pausedUntil!) })}
               </Text>
-              <Button label={t('settings.resumeNow')} size="sm" variant="secondary" style={{ alignSelf: 'flex-start' }} onPress={() => void setPause(null)} />
+              <Button label={t('settings.resumeNow')} size="sm" variant="secondary" style={{ alignSelf: 'flex-start' }} onPress={() => setPause(null)} />
             </View>
           ) : (
             <Button
@@ -81,7 +81,7 @@ export function NotificationSettings() {
               variant="secondary"
               icon="moon-outline"
               style={{ alignSelf: 'flex-start' }}
-              onPress={() => void setPause(new Date(Date.now() + 8 * 3600_000).toISOString())}
+              onPress={() => setPause(new Date(Date.now() + 8 * 3600_000).toISOString())}
             />
           )}
           {NOTIFICATION_CATEGORIES.map((cat) => (

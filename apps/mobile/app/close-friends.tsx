@@ -5,7 +5,7 @@ import { client, errorMessage } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { useSession } from '../lib/session';
 import { space } from '../lib/theme';
-import { Avatar, Button, Card, Field, Loading, Notice, Title, useColors, userText } from '../lib/ui';
+import { Avatar, Button, Card, Field, KeyboardAvoid, Loading, Notice, Title, useColors, userText } from '../lib/ui';
 
 type Entry = { user: PublicUser; followsYou: boolean };
 
@@ -90,54 +90,56 @@ export default function CloseFriends() {
   const addable = suggestions.filter((u) => !onList.has(u.id));
 
   return (
-    <ScrollView
-      style={{ backgroundColor: c.ground }}
-      contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Title sub={t('m.closeFriends.hint')}>{t('m.closeFriends.title')}</Title>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
-      <Card style={{ gap: space[3] }}>
-        <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '700', fontSize: 15 }}>
-          {t('m.closeFriends.onList')} ({list.length})
-        </Text>
-        {list.length ? (
-          list.map((x) => (
-            <Person
-              key={x.user.id}
-              user={x.user}
-              note={x.followsYou ? undefined : t('m.closeFriends.notFollowing')}
-              dot={c.closeFriends}
-              action={t('m.closeFriends.remove')}
-              variant="ghost"
-              disabled={busy === x.user.id}
-              onPress={() => void remove(x.user)}
-            />
-          ))
-        ) : (
-          <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('m.closeFriends.empty')}</Text>
-        )}
-      </Card>
-      <Card style={{ gap: space[3] }}>
-        <Field
-          label={t('m.closeFriends.addHeading')}
-          placeholder={t('m.closeFriends.search')}
-          value={q}
-          onChangeText={setQ}
-          autoCorrect={false}
-          autoCapitalize="none"
-        />
-        {addable.length ? (
-          addable.map((u) => (
-            <Person key={u.id} user={u} action={t('m.closeFriends.add')} variant="secondary" disabled={busy === u.id} onPress={() => void add(u)} />
-          ))
-        ) : (
-          <Text style={{ color: c.inkMuted }} accessibilityLiveRegion="polite">
-            {t('m.closeFriends.none')}
+    <KeyboardAvoid>
+      <ScrollView
+        style={{ backgroundColor: c.ground }}
+        contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Title sub={t('m.closeFriends.hint')}>{t('m.closeFriends.title')}</Title>
+        {error ? <Notice tone="danger">{error}</Notice> : null}
+        <Card style={{ gap: space[3] }}>
+          <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '700', fontSize: 15 }}>
+            {t('m.closeFriends.onList')} ({list.length})
           </Text>
-        )}
-      </Card>
-    </ScrollView>
+          {list.length ? (
+            list.map((x) => (
+              <Person
+                key={x.user.id}
+                user={x.user}
+                note={x.followsYou ? undefined : t('m.closeFriends.notFollowing')}
+                dot={c.closeFriends}
+                action={t('m.closeFriends.remove')}
+                variant="ghost"
+                disabled={busy === x.user.id}
+                onPress={() => void remove(x.user)}
+              />
+            ))
+          ) : (
+            <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('m.closeFriends.empty')}</Text>
+          )}
+        </Card>
+        <Card style={{ gap: space[3] }}>
+          <Field
+            label={t('m.closeFriends.addHeading')}
+            placeholder={t('m.closeFriends.search')}
+            value={q}
+            onChangeText={setQ}
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          {addable.length ? (
+            addable.map((u) => (
+              <Person key={u.id} user={u} action={t('m.closeFriends.add')} variant="secondary" disabled={busy === u.id} onPress={() => void add(u)} />
+            ))
+          ) : (
+            <Text style={{ color: c.inkMuted }} accessibilityLiveRegion="polite">
+              {t('m.closeFriends.none')}
+            </Text>
+          )}
+        </Card>
+      </ScrollView>
+    </KeyboardAvoid>
   );
 }
 

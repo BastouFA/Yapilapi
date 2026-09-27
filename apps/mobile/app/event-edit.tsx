@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import { ApiError } from '../../../packages/api-client/src/index';
 import { utcToZonedWall, zonedWallToUtc } from '../../../packages/shared/src/scheduling';
 import type { Community, EventItem } from '../../../packages/shared/src/types';
@@ -11,7 +11,7 @@ import { ChoiceField, FieldError, isWebLink } from '../lib/forms';
 import { useT } from '../lib/i18n';
 import { space } from '../lib/theme';
 import { deviceTimeZone, TimeZoneField } from '../lib/time-zone';
-import { Button, Card, Field, Icon, Loading, Notice, Row, useColors, userText } from '../lib/ui';
+import { Button, Card, Field, Icon, KeyboardAvoid, Loading, Notice, Row, useColors, userText } from '../lib/ui';
 
 type Where = 'address' | 'place' | 'online';
 type Visibility = 'public' | 'followers' | 'friends' | 'private';
@@ -143,7 +143,7 @@ export default function EventEdit() {
 
   const now = new Date();
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoid>
       <ScrollView
         style={{ backgroundColor: c.ground }}
         contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
@@ -282,10 +282,10 @@ export default function EventEdit() {
           label={busy ? t('m.common.saving') : editing ? t('common.save') : t('events.create')}
           icon={editing ? undefined : 'calendar-outline'}
           disabled={!ready}
-          onPress={() => void save()}
+          onPress={() => save()}
         />
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoid>
   );
 }
 

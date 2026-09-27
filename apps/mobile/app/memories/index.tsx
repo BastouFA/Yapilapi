@@ -9,7 +9,7 @@ import { useT } from '../../lib/i18n';
 import { RecapCta, useMemoryMeta } from '../../lib/memories';
 import { PostCard } from '../../lib/post';
 import { space } from '../../lib/theme';
-import { Button, Card, EmptyState, Field, Loading, Notice, useColors, userText } from '../../lib/ui';
+import { Button, Card, EmptyState, ErrorState, Field, KeyboardAvoid, Loading, useColors, userText } from '../../lib/ui';
 
 /**
  * Memories: your collections of posts, moments and events (private unless shared with friends),
@@ -84,90 +84,92 @@ export default function Memories() {
   }
 
   return (
-    <ScrollView
-      style={{ backgroundColor: c.ground }}
-      contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
-      keyboardShouldPersistTaps="handled"
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={async () => {
-            setRefreshing(true);
-            await load();
-            setRefreshing(false);
-          }}
-        />
-      }
-    >
-      <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('memories.intro')}</Text>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+    <KeyboardAvoid>
+      <ScrollView
+        style={{ backgroundColor: c.ground }}
+        contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await load();
+              setRefreshing(false);
+            }}
+          />
+        }
+      >
+        <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('memories.intro')}</Text>
+        {error ? <ErrorState message={error} onRetry={load} /> : null}
 
-      <Card style={{ gap: space[3] }}>
-        <Field
-          label={t('memories.new')}
-          placeholder={t('memories.newPlaceholder')}
-          value={title}
-          onChangeText={setTitle}
-          maxLength={120}
-          returnKeyType="done"
-          onSubmitEditing={() => void create()}
-        />
-        <Button label={t('m.chapters.create')} disabled={!title.trim() || busy} onPress={() => void create()} />
-      </Card>
+        <Card style={{ gap: space[3] }}>
+          <Field
+            label={t('memories.new')}
+            placeholder={t('memories.newPlaceholder')}
+            value={title}
+            onChangeText={setTitle}
+            maxLength={120}
+            returnKeyType="done"
+            onSubmitEditing={() => void create()}
+          />
+          <Button label={t('m.chapters.create')} disabled={!title.trim() || busy} onPress={() => create()} />
+        </Card>
 
-      {sugg?.events.length ? (
+        {sugg?.events.length ? (
+          <View style={{ gap: space[2] }}>
+            <Heading>{t('memories.fromEvents')}</Heading>
+            {sugg.events.map((ev) => (
+              <Card key={ev.id} style={{ gap: space[2] }}>
+                <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 15 }, userText]} numberOfLines={2}>
+                  {ev.title}
+                </Text>
+                <Text style={{ color: c.inkMuted, fontSize: 13 }}>{dateTime(ev.startsAt)}</Text>
+                <View style={{ flexDirection: 'row', gap: space[2], flexWrap: 'wrap' }}>
+                  <Button label={t('memories.makeMemory')} icon="sparkles-outline" size="sm" variant="secondary" onPress={() => fromEvent(ev.id)} />
+                  <Button label={t('m.mem.openEvent')} size="sm" variant="ghost" onPress={() => router.push(`/event/${ev.id}`)} />
+                </View>
+              </Card>
+            ))}
+          </View>
+        ) : null}
+
         <View style={{ gap: space[2] }}>
-          <Heading>{t('memories.fromEvents')}</Heading>
-          {sugg.events.map((ev) => (
-            <Card key={ev.id} style={{ gap: space[2] }}>
-              <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 15 }, userText]} numberOfLines={2}>
-                {ev.title}
-              </Text>
-              <Text style={{ color: c.inkMuted, fontSize: 13 }}>{dateTime(ev.startsAt)}</Text>
-              <View style={{ flexDirection: 'row', gap: space[2], flexWrap: 'wrap' }}>
-                <Button label={t('memories.makeMemory')} icon="sparkles-outline" size="sm" variant="secondary" onPress={() => void fromEvent(ev.id)} />
-                <Button label={t('m.mem.openEvent')} size="sm" variant="ghost" onPress={() => router.push(`/event/${ev.id}`)} />
-              </View>
-            </Card>
+          <Heading>{t('m.recap.onThisDay')}</Heading>
+          <RecapCta hint={t('memories.onThisDayHint')} onPress={() => router.push('/recap-new?source=on_this_day')} />
+          {sugg?.onThisDay.map((p) => (
+            <PostCard key={p.id} post={p} />
           ))}
         </View>
-      ) : null}
 
-      <View style={{ gap: space[2] }}>
-        <Heading>{t('m.recap.onThisDay')}</Heading>
-        <RecapCta hint={t('memories.onThisDayHint')} onPress={() => router.push('/recap-new?source=on_this_day')} />
-        {sugg?.onThisDay.map((p) => (
-          <PostCard key={p.id} post={p} />
-        ))}
-      </View>
-
-      <View style={{ gap: space[2] }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[2] }}>
-          <Heading>{t('m.recap.memories')}</Heading>
-          <Button label={t('m.recap.yours')} size="sm" variant="ghost" icon="film-outline" onPress={() => router.push('/recaps')} />
-        </View>
-        {items === null ? (
-          <Loading />
-        ) : items.length ? (
-          items.map((m) => (
-            <Card key={m.id} onPress={() => router.push(`/memories/${m.id}`)} label={`${m.title}, ${meta(m)}`} style={{ gap: space[1] }}>
-              <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 16 }, userText]} numberOfLines={2}>
-                {m.title}
-              </Text>
-              {m.recap ? (
-                <Text style={[{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }, userText]} numberOfLines={2}>
-                  {m.recap}
+        <View style={{ gap: space[2] }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[2] }}>
+            <Heading>{t('m.recap.memories')}</Heading>
+            <Button label={t('m.recap.yours')} size="sm" variant="ghost" icon="film-outline" onPress={() => router.push('/recaps')} />
+          </View>
+          {items === null ? (
+            <Loading />
+          ) : items.length ? (
+            items.map((m) => (
+              <Card key={m.id} onPress={() => router.push(`/memories/${m.id}`)} label={`${m.title}, ${meta(m)}`} style={{ gap: space[1] }}>
+                <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 16 }, userText]} numberOfLines={2}>
+                  {m.title}
                 </Text>
-              ) : null}
-              <Text style={{ color: c.inkMuted, fontSize: 13 }}>{meta(m)}</Text>
-            </Card>
-          ))
-        ) : (
-          <EmptyState title={t('memories.emptyTitle')} body={t('memories.emptyBody')} />
-        )}
-      </View>
-      <Text style={{ color: c.inkMuted, fontSize: 12, textAlign: 'center' }}>{t('memories.earlyAccess')}</Text>
-    </ScrollView>
+                {m.recap ? (
+                  <Text style={[{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }, userText]} numberOfLines={2}>
+                    {m.recap}
+                  </Text>
+                ) : null}
+                <Text style={{ color: c.inkMuted, fontSize: 13 }}>{meta(m)}</Text>
+              </Card>
+            ))
+          ) : (
+            <EmptyState title={t('memories.emptyTitle')} body={t('memories.emptyBody')} />
+          )}
+        </View>
+        <Text style={{ color: c.inkMuted, fontSize: 12, textAlign: 'center' }}>{t('memories.earlyAccess')}</Text>
+      </ScrollView>
+    </KeyboardAvoid>
   );
 }
 

@@ -107,12 +107,7 @@ export function LockedPanel({ post, dark }: { post: Post; dark?: boolean }) {
         <Text style={[{ color: muted, textAlign: 'center', lineHeight: 20 }, userText]}>{t('post.locked.body', { name: post.author.displayName })}</Text>
         {media ? <Text style={{ color: muted, fontSize: 13 }}>{tp('m.money.lockedMedia', media)}</Text> : null}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: space[2], marginTop: space[1] }}>
-          <Button
-            label={t('m.money.subscribeOnWeb')}
-            size="sm"
-            icon="open-outline"
-            onPress={() => void openOnWeb(webCheckout.subscribe(post.author.username))}
-          />
+          <Button label={t('m.money.subscribeOnWeb')} size="sm" icon="open-outline" onPress={() => openOnWeb(webCheckout.subscribe(post.author.username))} />
           <Button
             label={t('m.money.seePlans')}
             size="sm"

@@ -8,7 +8,22 @@ import { BoardCover, SaveTile, tileRows, useBoardMeta, useBoards, usePostLabel, 
 import { useT } from '../../lib/i18n';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
-import { Avatar, Button, Card, EmptyState, Field, Icon, Loading, Notice, Segmented, Title, useColors, userText } from '../../lib/ui';
+import {
+  type ActionSheetAction,
+  Avatar,
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  Icon,
+  Loading,
+  Notice,
+  Segmented,
+  Title,
+  useActionSheet,
+  useColors,
+  userText,
+} from '../../lib/ui';
 
 /** Avatars shown in the header before "+N". */
 const FACES = 5;
@@ -46,6 +61,7 @@ export default function BoardScreen() {
   const markRemovable = (ids: string[]) => setRemovable((cur) => (ids.every((x) => cur.has(x)) ? cur : new Set([...cur, ...ids])));
   const orderStart = useRef('');
   const seq = useRef(0);
+  const menu = useActionSheet();
 
   const load = useCallback(async () => {
     try {
@@ -152,12 +168,12 @@ export default function BoardScreen() {
   };
 
   function more(post: Post) {
-    const options: { text: string; style?: 'destructive' | 'cancel'; onPress?: () => void }[] = [];
-    if (me) options.push({ text: t('m.boards.saveTo'), onPress: () => boardsApi.openSaveSheet(post, onChange(post)) });
-    if (owner) options.push({ text: t('m.boards.useAsCover'), onPress: () => void setCover(post) });
-    if (member && removable.has(post.id)) options.push({ text: t('m.boards.removeItem'), style: 'destructive', onPress: () => void removeItem(post) });
-    options.push({ text: t('common.cancel'), style: 'cancel' });
-    Alert.alert(postLabel(post), undefined, options);
+    const actions: ActionSheetAction[] = [];
+    if (me) actions.push({ label: t('m.boards.saveTo'), icon: 'bookmarks-outline', onPress: () => boardsApi.openSaveSheet(post, onChange(post)) });
+    if (owner) actions.push({ label: t('m.boards.useAsCover'), icon: 'image-outline', onPress: () => void setCover(post) });
+    if (member && removable.has(post.id))
+      actions.push({ label: t('m.boards.removeItem'), icon: 'trash-outline', destructive: true, onPress: () => void removeItem(post) });
+    menu.show({ title: postLabel(post), actions });
   }
 
   /** Arrange: load the whole board in order (no filter), then move posts up or down. */
@@ -310,7 +326,7 @@ export default function BoardScreen() {
         <Card style={{ gap: space[2] }}>
           <Text style={{ color: c.ink, lineHeight: 20 }}>{t('m.boards.arrangeHint')}</Text>
           <View style={{ flexDirection: 'row', gap: space[2] }}>
-            <Button label={t('m.common.done')} size="sm" disabled={busy} onPress={() => void finishArranging()} />
+            <Button label={t('m.common.done')} size="sm" disabled={busy} onPress={() => finishArranging()} />
             <Button label={t('common.cancel')} size="sm" variant="secondary" disabled={busy} onPress={() => setOrder(null)} />
           </View>
         </Card>
@@ -338,7 +354,7 @@ export default function BoardScreen() {
             </>
           ) : null}
           {(items?.length ?? 0) > 1 || cursor ? (
-            <Button variant="secondary" size="sm" icon="swap-vertical" label={t('m.boards.arrange')} disabled={busy} onPress={() => void startArranging()} />
+            <Button variant="secondary" size="sm" icon="swap-vertical" label={t('m.boards.arrange')} disabled={busy} onPress={() => startArranging()} />
           ) : null}
           {owner ? (
             <Button
@@ -427,12 +443,14 @@ export default function BoardScreen() {
       ) : null}
 
       {!order ? <Segmented label={t('m.saved.filter')} value={filter} onChange={setFilter} options={filters} /> : null}
+      {menu.sheet}
     </View>
   );
 
   if (order)
     return (
       <FlatList
+        keyboardShouldPersistTaps="handled"
         style={{ backgroundColor: c.ground }}
         contentContainerStyle={{ padding: space[4], gap: space[2], paddingBottom: space[8] }}
         data={order}
@@ -456,6 +474,7 @@ export default function BoardScreen() {
 
   return (
     <FlatList
+      keyboardShouldPersistTaps="handled"
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
       data={items ? tileRows(items) : []}

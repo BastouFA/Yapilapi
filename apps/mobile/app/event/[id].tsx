@@ -124,6 +124,7 @@ export default function EventScreen() {
 
   return (
     <ScrollView
+      keyboardShouldPersistTaps="handled"
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
       refreshControl={
@@ -258,7 +259,7 @@ export default function EventScreen() {
         </View>
       ) : null}
 
-      <Button label={t('m.common.share')} variant="secondary" icon="share-outline" onPress={() => void share()} />
+      <Button label={t('m.common.share')} variant="secondary" icon="share-outline" onPress={() => share()} />
     </ScrollView>
   );
 }

@@ -1,12 +1,12 @@
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
+import { FlatList, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { PublicUser } from '../../../packages/shared/src/types';
 import { client, errorMessage } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { radius, space } from '../lib/theme';
-import { Avatar, Button, Field, Icon, Notice, useColors, userText } from '../lib/ui';
+import { Avatar, Button, Field, Icon, KeyboardAvoid, Notice, useColors, userText } from '../lib/ui';
 
 type Suggestion = { user: PublicUser; relation: 'friend' | 'following' | null; canMessage: boolean };
 
@@ -68,11 +68,7 @@ export default function NewGroup() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: c.ground }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 56 : 0}
-    >
+    <KeyboardAvoid style={{ backgroundColor: c.ground }}>
       <FlatList
         data={shown}
         keyExtractor={(s) => s.user.id}
@@ -174,8 +170,8 @@ export default function NewGroup() {
       />
       <View style={{ padding: space[4], paddingBottom: Math.max(insets.bottom, space[4]), gap: space[2], borderTopWidth: 1, borderTopColor: c.line }}>
         {error ? <Notice tone="danger">{error}</Notice> : null}
-        <Button label={busy ? t('m.group.starting') : t('m.group.start')} disabled={!picked.length || busy} onPress={() => void start()} />
+        <Button label={busy ? t('m.group.starting') : t('m.group.start')} disabled={!picked.length || busy} onPress={() => start()} />
       </View>
-    </KeyboardAvoidingView>
+    </KeyboardAvoid>
   );
 }

@@ -7,7 +7,7 @@ import { client, errorMessage } from '../../lib/api';
 import { CIRCLE_NAME_MAX, KindPicker } from '../../lib/circles';
 import { useT } from '../../lib/i18n';
 import { space } from '../../lib/theme';
-import { Avatar, Button, Card, EmptyState, Field, Loading, Notice, Title, useColors, userText } from '../../lib/ui';
+import { Avatar, Button, Card, EmptyState, Field, KeyboardAvoid, Loading, Notice, Title, useColors, userText } from '../../lib/ui';
 
 /**
  * One circle: rename it, change its kind, add and remove people (suggestions come from your
@@ -123,60 +123,62 @@ export default function CircleScreen() {
   const addable = suggestions.filter((u) => !inCircle.has(u.id));
 
   return (
-    <ScrollView
-      style={{ backgroundColor: c.ground }}
-      contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Title sub={t('m.circles.hint')}>{circle.name}</Title>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
-      <Card style={{ gap: space[3] }}>
-        <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '700', fontSize: 15 }}>
-          {t('m.circles.details')}
-        </Text>
-        <Field label={t('m.circles.name')} value={name} onChangeText={setName} maxLength={CIRCLE_NAME_MAX} returnKeyType="done" />
-        <KindPicker value={kind} onChange={setKind} />
-        <Button
-          label={busy === 'save' ? t('m.common.saving') : t('common.save')}
-          size="sm"
-          disabled={!!busy || !changed || !name.trim()}
-          onPress={() => void save()}
-          style={{ alignSelf: 'flex-start' }}
-        />
-      </Card>
-      <Card style={{ gap: space[3] }}>
-        <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '700', fontSize: 15 }}>
-          {t('m.circles.inCircle')} · {tp('m.circles.members', members.length)}
-        </Text>
-        {members.length ? (
-          members.map((u) => (
-            <Person key={u.id} user={u} action={t('m.common.remove')} variant="ghost" disabled={busy === u.id} onPress={() => void remove(u)} />
-          ))
-        ) : (
-          <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('m.circles.noMembers')}</Text>
-        )}
-      </Card>
-      <Card style={{ gap: space[3] }}>
-        <Field
-          label={t('m.circles.addHeading')}
-          placeholder={t('m.closeFriends.search')}
-          value={q}
-          onChangeText={setQ}
-          autoCorrect={false}
-          autoCapitalize="none"
-        />
-        {addable.length ? (
-          addable.map((u) => (
-            <Person key={u.id} user={u} action={t('m.closeFriends.add')} variant="secondary" disabled={busy === u.id} onPress={() => void add(u)} />
-          ))
-        ) : (
-          <Text style={{ color: c.inkMuted }} accessibilityLiveRegion="polite">
-            {t('m.circles.noSuggestions')}
+    <KeyboardAvoid>
+      <ScrollView
+        style={{ backgroundColor: c.ground }}
+        contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Title sub={t('m.circles.hint')}>{circle.name}</Title>
+        {error ? <Notice tone="danger">{error}</Notice> : null}
+        <Card style={{ gap: space[3] }}>
+          <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '700', fontSize: 15 }}>
+            {t('m.circles.details')}
           </Text>
-        )}
-      </Card>
-      <Button label={t('m.circles.delete')} variant="danger" icon="trash-outline" disabled={!!busy} onPress={confirmDelete} />
-    </ScrollView>
+          <Field label={t('m.circles.name')} value={name} onChangeText={setName} maxLength={CIRCLE_NAME_MAX} returnKeyType="done" />
+          <KindPicker value={kind} onChange={setKind} />
+          <Button
+            label={busy === 'save' ? t('m.common.saving') : t('common.save')}
+            size="sm"
+            disabled={!!busy || !changed || !name.trim()}
+            onPress={() => save()}
+            style={{ alignSelf: 'flex-start' }}
+          />
+        </Card>
+        <Card style={{ gap: space[3] }}>
+          <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '700', fontSize: 15 }}>
+            {t('m.circles.inCircle')} · {tp('m.circles.members', members.length)}
+          </Text>
+          {members.length ? (
+            members.map((u) => (
+              <Person key={u.id} user={u} action={t('m.common.remove')} variant="ghost" disabled={busy === u.id} onPress={() => void remove(u)} />
+            ))
+          ) : (
+            <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('m.circles.noMembers')}</Text>
+          )}
+        </Card>
+        <Card style={{ gap: space[3] }}>
+          <Field
+            label={t('m.circles.addHeading')}
+            placeholder={t('m.closeFriends.search')}
+            value={q}
+            onChangeText={setQ}
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          {addable.length ? (
+            addable.map((u) => (
+              <Person key={u.id} user={u} action={t('m.closeFriends.add')} variant="secondary" disabled={busy === u.id} onPress={() => void add(u)} />
+            ))
+          ) : (
+            <Text style={{ color: c.inkMuted }} accessibilityLiveRegion="polite">
+              {t('m.circles.noSuggestions')}
+            </Text>
+          )}
+        </Card>
+        <Button label={t('m.circles.delete')} variant="danger" icon="trash-outline" disabled={!!busy} onPress={confirmDelete} />
+      </ScrollView>
+    </KeyboardAvoid>
   );
 }
 

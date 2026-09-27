@@ -11,7 +11,7 @@ import { useMusicCredit, useMusicLoop } from '../../lib/music';
 import { PostCard } from '../../lib/post';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
-import { Button, EmptyState, Icon, Loading, Notice, useColors, userText } from '../../lib/ui';
+import { Button, EmptyState, ErrorState, feedListProps, Icon, Loading, useColors, useRefresh, userText } from '../../lib/ui';
 
 /**
  * A song from the music catalogue: play the preview, its licence and the credit it asks for, save it,
@@ -31,15 +31,18 @@ export default function MusicTrackScreen() {
   const [playing, setPlaying] = useState(false);
   useMusicLoop(track?.previewUrl ? { sound: { audioUrl: track.previewUrl }, startMs: 0, durationMs: track.maxClipMs } : null, playing);
 
+  const loadOne = useCallback(async () => {
+    try {
+      const r = await (await client()).music.track(id);
+      setTrack(r.track);
+    } catch {
+      setTrack((cur) => cur ?? null);
+    }
+  }, [id]);
   useEffect(() => {
     setTrack(undefined);
-    client()
-      .then((api) => api.music.track(id))
-      .then(
-        (r) => setTrack(r.track),
-        () => setTrack(null),
-      );
-  }, [id]);
+    void loadOne();
+  }, [loadOne]);
 
   const load = useCallback(
     async (next?: string) => {
@@ -49,16 +52,26 @@ export default function MusicTrackScreen() {
     },
     [id],
   );
+  const loadList = useCallback(async () => {
+    setError(null);
+    try {
+      await load();
+    } catch (e) {
+      setPosts((cur) => cur ?? []);
+      setError(errorMessage(e));
+    }
+  }, [load]);
   useEffect(() => {
     setPosts(null);
-    void load().catch((e) => (setPosts([]), setError(errorMessage(e))));
-  }, [load]);
+    void loadList();
+  }, [loadList]);
+  const refresh = useRefresh(() => Promise.all([loadOne(), loadList()]));
 
   if (track === undefined) return <Loading />;
   if (track === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>
-        <EmptyState title={t('music.track.missing')} />
+        <EmptyState title={t('music.track.missing')} action={{ label: t('m.common.retry'), icon: 'refresh', onPress: () => void loadOne() }} />
       </View>
     );
 
@@ -138,25 +151,28 @@ export default function MusicTrackScreen() {
             label={track.saved ? t('music.unsave', { title: track.title }) : t('music.save', { title: track.title })}
             icon={track.saved ? 'bookmark' : 'bookmark-outline'}
             variant="ghost"
-            onPress={() => void toggleSave()}
+            onPress={() => toggleSave()}
           />
         </View>
       ) : null}
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {error ? <ErrorState message={error} onRetry={loadList} /> : null}
     </View>
   );
 
   return (
     <FlatList
+      keyboardShouldPersistTaps="handled"
+      {...feedListProps}
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4], gap: space[3] }}
       data={posts ?? []}
       keyExtractor={(p) => p.id}
+      refreshControl={refresh}
       ListHeaderComponent={header}
       renderItem={({ item }) => <PostCard post={item} />}
       onEndReached={() => cursor && void load(cursor)}
       onEndReachedThreshold={0.5}
-      ListEmptyComponent={posts === null ? <Loading /> : <EmptyState title={t('music.track.empty')} />}
+      ListEmptyComponent={posts === null ? <Loading /> : error ? null : <EmptyState title={t('music.track.empty')} />}
     />
   );
 }
