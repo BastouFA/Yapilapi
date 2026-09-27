@@ -676,6 +676,7 @@ export function BottomSheet({
   onDismiss,
   children,
   done,
+  closeButton = true,
   scroll = true,
   maxHeight = '85%',
   gap = space[3],
@@ -688,6 +689,8 @@ export function BottomSheet({
   onDismiss?: () => void;
   children: ReactNode;
   done?: boolean;
+  /** The small close button in the corner; off for menus that end with their own Cancel. */
+  closeButton?: boolean;
   scroll?: boolean;
   maxHeight?: DimensionValue;
   gap?: number;
@@ -719,7 +722,20 @@ export function BottomSheet({
                 </Text>
                 {subtitle ? <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{subtitle}</Text> : null}
               </View>
-              {done ? <Button label={t('m.common.done')} size="sm" variant="ghost" onPress={onClose} /> : null}
+              {done ? (
+                <Button label={t('m.common.done')} size="sm" variant="ghost" onPress={onClose} />
+              ) : closeButton ? (
+                // Always a visible way out, not only tapping outside or swiping.
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('m.common.close')}
+                  hitSlop={10}
+                  onPress={onClose}
+                  style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: c.surfaceSunken }}
+                >
+                  <Icon name="close" size={18} color={c.inkMuted} />
+                </Pressable>
+              ) : null}
             </View>
             {scroll ? (
               <ScrollView style={{ flexGrow: 0 }} contentContainerStyle={{ gap, paddingHorizontal: space[4] }} keyboardShouldPersistTaps="handled">
@@ -840,7 +856,7 @@ export function ActionSheet({
   }, [visible]);
 
   return (
-    <BottomSheet visible={visible} title={title} subtitle={message} onClose={onClose} onDismiss={run} gap={2}>
+    <BottomSheet visible={visible} title={title} subtitle={message} onClose={onClose} onDismiss={run} gap={2} closeButton={false}>
       {header}
       {actions.map((a, i) => (
         <SheetItem
