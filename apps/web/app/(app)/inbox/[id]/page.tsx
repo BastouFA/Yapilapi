@@ -85,6 +85,29 @@ export default function ChatPage() {
     endRef.current?.scrollIntoView({ block: 'end' });
   }, [lastId]);
 
+  // The search panel opens above the messages and grows as results arrive. Someone reading the
+  // newest messages stays there, rather than having them pushed under the message box.
+  const searchRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const panel = searchRef.current;
+    if (!searchOpen || !panel) return;
+    const atBottom = () => {
+      const root = document.scrollingElement ?? document.documentElement;
+      return root.scrollHeight - (root.scrollTop + innerHeight) < 240;
+    };
+    let wasAtBottom = true;
+    const onScroll = () => (wasAtBottom = atBottom());
+    const keep = new ResizeObserver(() => {
+      if (wasAtBottom) endRef.current?.scrollIntoView({ block: 'end' });
+    });
+    keep.observe(panel);
+    addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      keep.disconnect();
+      removeEventListener('scroll', onScroll);
+    };
+  }, [searchOpen]);
+
   // Go to a message once it's on the page, and mark it for a moment.
   useEffect(() => {
     if (!jump) return;
@@ -418,7 +441,11 @@ export default function ChatPage() {
         onJump={(mid) => void jumpTo(mid)}
         onUnpin={(mid) => void run(async () => setPins((await api.messages.unpin(mid)).items))}
       />
-      {searchOpen ? <ChatSearch conversationId={id} onJump={(mid) => void jumpTo(mid)} onClose={() => setSearchOpen(false)} /> : null}
+      {searchOpen ? (
+        <div ref={searchRef}>
+          <ChatSearch conversationId={id} onJump={(mid) => void jumpTo(mid)} onClose={() => setSearchOpen(false)} />
+        </div>
+      ) : null}
 
       {ai || aiLoading ? (
         <AIPanel
