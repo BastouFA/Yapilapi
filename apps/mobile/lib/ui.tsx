@@ -278,35 +278,53 @@ export function Segmented<T extends string>({
     lastTap.current = { id, at: now };
     onChange(id);
   };
+  // More than four: a row that scrolls sideways, every label at full size, the chosen one kept in view.
+  const scrolls = options.length > 4;
+  const row = useRef<ScrollView>(null);
+  const spots = useRef(new Map<T, number>());
+  useEffect(() => {
+    const x = spots.current.get(value);
+    if (scrolls && x !== undefined) row.current?.scrollTo({ x: Math.max(0, x - 48), animated: true });
+  }, [scrolls, value]);
+  const items = options.map((o) => {
+    const on = o.id === value;
+    return (
+      <Pressable
+        key={o.id}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: on }}
+        accessibilityActions={onDoublePress && doublePressLabel ? [{ name: 'doublePress', label: doublePressLabel }] : undefined}
+        onAccessibilityAction={(e) => {
+          if (e.nativeEvent.actionName === 'doublePress') onDoublePress?.(o.id);
+        }}
+        onPress={() => press(o.id)}
+        onLayout={scrolls ? (e) => spots.current.set(o.id, e.nativeEvent.layout.x) : undefined}
+        style={[s.segment, scrolls && { flex: 0, paddingHorizontal: space[3] + 2 }, on && [{ backgroundColor: tint?.accent ?? c.surface }, elevation(c)]]}
+      >
+        <Text
+          style={{ color: on ? (tint?.onAccent ?? c.ink) : c.inkMuted, fontWeight: on ? '700' : '600', fontSize: 14 }}
+          numberOfLines={1}
+          // A few tabs on a narrow phone: shrink a little rather than cut words off ("Mem…").
+          adjustsFontSizeToFit={!scrolls}
+          minimumFontScale={0.75}
+        >
+          {o.label}
+          {o.count !== undefined ? <Text style={{ color: on && tint ? tint.onAccent : c.inkMuted, fontWeight: '500' }}> {o.count}</Text> : null}
+        </Text>
+      </Pressable>
+    );
+  });
+  if (scrolls)
+    return (
+      <View accessibilityRole="tablist" accessibilityLabel={label} style={{ borderRadius: radius.full, overflow: 'hidden', backgroundColor: c.surfaceSunken }}>
+        <ScrollView ref={row} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.segmented}>
+          {items}
+        </ScrollView>
+      </View>
+    );
   return (
     <View accessibilityRole="tablist" accessibilityLabel={label} style={[s.segmented, { backgroundColor: c.surfaceSunken }]}>
-      {options.map((o) => {
-        const on = o.id === value;
-        return (
-          <Pressable
-            key={o.id}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: on }}
-            accessibilityActions={onDoublePress && doublePressLabel ? [{ name: 'doublePress', label: doublePressLabel }] : undefined}
-            onAccessibilityAction={(e) => {
-              if (e.nativeEvent.actionName === 'doublePress') onDoublePress?.(o.id);
-            }}
-            onPress={() => press(o.id)}
-            style={[s.segment, on && [{ backgroundColor: tint?.accent ?? c.surface }, elevation(c)]]}
-          >
-            <Text
-              style={{ color: on ? (tint?.onAccent ?? c.ink) : c.inkMuted, fontWeight: on ? '700' : '600', fontSize: 14 }}
-              numberOfLines={1}
-              // Many tabs on a narrow phone: shrink a little rather than cut words off ("Mem…").
-              adjustsFontSizeToFit
-              minimumFontScale={0.75}
-            >
-              {o.label}
-              {o.count !== undefined ? <Text style={{ color: on && tint ? tint.onAccent : c.inkMuted, fontWeight: '500' }}> {o.count}</Text> : null}
-            </Text>
-          </Pressable>
-        );
-      })}
+      {items}
     </View>
   );
 }
