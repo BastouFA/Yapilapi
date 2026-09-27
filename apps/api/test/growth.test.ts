@@ -76,8 +76,9 @@ describe('contact matching', () => {
     expect(upper.body.items.map((i: any) => i.user.id)).toEqual([friend.id]);
 
     // The hashes are never kept: only counts reach analytics.
+    // Two calls were made (the second without a source); rows come back in no set order.
     const tracked = await events(me.id, 'contacts_matched');
-    expect(tracked[0]).toMatchObject({ submitted: hashes.length, matched: 1, source: 'web' });
+    expect(tracked).toContainEqual(expect.objectContaining({ submitted: hashes.length, matched: 1, source: 'web' }));
     const leaked = await t.ctx.db.query(`SELECT count(*) AS n FROM analytics_events WHERE properties::text LIKE '%' || $1 || '%'`, [hashes[0]]);
     expect(Number(leaked.rows[0].n)).toBe(0);
   });
