@@ -241,8 +241,24 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
           "This change can't be saved because it may put someone at risk. If you or someone else is in danger, contact local emergency services.",
         );
       const spam = await assessPost(db, ctx.config, u.id, input.body);
-      const status = spam.restricted ? 'restricted' : analysis.risk !== 'normal' ? statusForRisk(analysis.risk) : spam.flags.length ? 'review' : 'normal';
-      screening = { analysis, spam, heldForAccount: false, status };
+      // As for a new post: a risky account's post that reaches everyone waits for review.
+      const heldForAccount = spam.risky && visibility === 'public';
+      const status = spam.restricted
+        ? 'restricted'
+        : analysis.risk !== 'normal'
+          ? statusForRisk(analysis.risk)
+          : spam.flags.length || heldForAccount
+            ? 'review'
+            : 'normal';
+      screening = { analysis, spam, heldForAccount, status };
+    }
+    // Opening a post up to everyone goes through the account checks a new public post does, so posting to
+    // followers first and widening it later doesn't skip them.
+    const widened = visibility === 'public' && post.visibility !== 'public';
+    if (widened && !screening) {
+      const spam = await assessPost(db, ctx.config, u.id, '');
+      if (spam.restricted || spam.risky)
+        screening = { analysis: analyzeText(''), spam, heldForAccount: spam.risky, status: spam.restricted ? 'restricted' : 'review' };
     }
 
     let limitedNow = false;
@@ -259,7 +275,8 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
           )
         : cur.topics;
       // An edit can put a post on hold, never take it off hold.
-      const status = changed && screening ? worseStatus(cur.moderation_status, screening.status) : cur.moderation_status;
+      const screened = (changed || widened) && screening;
+      const status = screened ? worseStatus(cur.moderation_status, screening!.status) : cur.moderation_status;
       if (changed) await c.query(`INSERT INTO post_edits (post_id, body) VALUES ($1, $2)`, [id, cur.body]);
       await c.query(
         `UPDATE posts SET body = $2, visibility = $3, topics = $4, moderation_status = $5, edited_at = CASE WHEN $6 THEN now() ELSE edited_at END, updated_at = now()
@@ -274,8 +291,8 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
         );
         if (!r.rowCount) throw notFound('One of the photos or videos');
       }
-      if (changed && screening) limitedNow = await recordFlags(c, ctx.realtime, u.id, id, screening);
-      return { changed, before: cur.body as string, status };
+      if (screened) limitedNow = await recordFlags(c, ctx.realtime, u.id, id, screening!);
+      return { changed, screened: !!screened, before: cur.body as string, status };
     });
     if (edit.changed && edit.status === 'normal') {
       // Only people the post didn't mention before hear about it.
@@ -284,7 +301,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     }
     if (edit.changed) track(db, u.id, 'post_edited');
     const [updated] = await hydratePosts(db, [id], u.id);
-    return { post: updated, moderation: edit.changed && screening ? moderationNotice({ ...screening, status: edit.status }, limitedNow) : undefined };
+    return { post: updated, moderation: edit.screened && screening ? moderationNotice({ ...screening, status: edit.status }, limitedNow) : undefined };
   });
 
   /** Every version of a post's text, newest first, for anyone who can see and open the post. */

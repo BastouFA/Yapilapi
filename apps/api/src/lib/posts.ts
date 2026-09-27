@@ -85,7 +85,7 @@ function toPost(r: Record<string, any>, originals: Map<string, NonNullable<Remix
     visibility: r.visibility,
     author: publicUserFrom(r, 'a_'),
     media: (r.media as (MediaItem & { sensitive: boolean })[]).map(({ sensitive, ...m }) => withSmallVariants(sensitive ? { ...m, sensitive: true } : m)),
-    linkUrl: r.link_url,
+    linkUrl: typeof r.link_url === 'string' && /^https?:\/\//i.test(r.link_url) ? r.link_url : null,
     poll: r.poll_options ? { options: r.poll_options, myVote: r.my_vote } : null,
     topics: r.topics,
     community: r.c_id ? { id: r.c_id, slug: r.c_slug, name: r.c_name } : null,
