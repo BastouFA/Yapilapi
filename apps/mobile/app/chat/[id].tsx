@@ -70,6 +70,8 @@ export default function Chat() {
   const [error, setError] = useState<string | null>(null);
   const [needsVerify, setNeedsVerify] = useState(false);
   const list = useRef<FlatList<Message>>(null);
+  // Whether the newest messages are on screen (then growth at the bottom keeps them in view).
+  const atBottom = useRef(true);
   const [cursor, setCursor] = useState<string | null>(null);
   const [pins, setPins] = useState<PinnedMessage[]>([]);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
@@ -104,6 +106,10 @@ export default function Chat() {
       setConversation(conv.conversation);
       setMessages(page.items); // oldest first, the latest page
       setCursor(page.nextCursor);
+      // Photos, voice notes and polls size themselves after the first layout: open at the newest
+      // message once they have, not just at the first pass.
+      atBottom.current = true;
+      for (const ms of [150, 500, 1200]) setTimeout(() => atBottom.current && list.current?.scrollToEnd({ animated: false }), ms);
       void api.conversations.read(id).catch(() => {});
       void loadPins();
     } catch (e) {
@@ -365,10 +371,15 @@ export default function Chat() {
     }
   }
 
-  // Leaving the conversation while recording discards it.
+  // Leaving the conversation while recording discards it. The recorder may already be released
+  // by the time this runs (the hook cleans up first), and then reading it throws: nothing to stop.
   useEffect(
     () => () => {
-      if (recorder.isRecording) void recorder.stop().catch(() => {});
+      try {
+        if (recorder.isRecording) void recorder.stop().catch(() => {});
+      } catch {
+        // Already released.
+      }
     },
     [recorder],
   );
@@ -633,10 +644,17 @@ export default function Chat() {
         contentContainerStyle={{ padding: space[4], gap: space[2] }}
         onContentSizeChange={() => {
           const last = messages.at(-1)?.id ?? null;
-          if (last === followed.current) return;
+          // A new message, or the newest one growing (a poll's results, a vote, a photo loading)
+          // while you're reading the bottom: stay at the bottom so nothing ends up cut off.
+          if (last === followed.current && !atBottom.current) return;
           followed.current = last;
           list.current?.scrollToEnd({ animated: false });
         }}
+        onScroll={(e) => {
+          const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+          atBottom.current = contentSize.height - (contentOffset.y + layoutMeasurement.height) < 120;
+        }}
+        scrollEventThrottle={100}
         onScrollToIndexFailed={(info) => {
           list.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
           setTimeout(() => list.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: true }), 100);
