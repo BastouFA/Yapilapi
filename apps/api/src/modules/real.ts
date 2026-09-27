@@ -11,6 +11,7 @@ import { assertRecapUse } from '../lib/recap-sharing.ts';
 import { requireVerified } from '../lib/verification.ts';
 import { eventVisibleSql, postVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
+import { langOf } from '../lib/translation.ts';
 
 const FRESH_MINUTES = 5;
 const REALS_PER_DAY = 3;
@@ -62,7 +63,7 @@ export default async function realModule(app: FastifyInstance, ctx: AppContext) 
       const media = await freshMedia(c, u.id, input.mediaIds);
       if (media.some((m) => m.kind !== 'image')) throw badRequest('Real is for photos.');
       const { rows } = await c.query(
-        `INSERT INTO posts (author_id, kind, body, visibility, topics, metadata, rights) VALUES ($1,$2,$3,$4,'{real}',$5,$6) RETURNING id`,
+        `INSERT INTO posts (author_id, kind, body, visibility, topics, metadata, rights, lang) VALUES ($1,$2,$3,$4,'{real}',$5,$6,$7) RETURNING id`,
         [
           u.id,
           media.length > 1 ? 'carousel' : 'photo',
@@ -70,6 +71,7 @@ export default async function realModule(app: FastifyInstance, ctx: AppContext) 
           input.visibility,
           { real: { capturedAt: new Date().toISOString(), dual: media.length > 1, locationText: input.locationText ?? null } },
           { owner: u.id, license: 'all_rights_reserved' },
+          langOf(input.caption),
         ],
       );
       for (const [i, id] of input.mediaIds.entries())

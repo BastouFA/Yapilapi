@@ -23,6 +23,7 @@ import {
   type StoredSticker,
 } from '../lib/stories.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
+import { langOf } from '../lib/translation.ts';
 
 /** Stories in the strip: your own and your people's (see storyVisibleSql). */
 const STORY_VISIBLE = storyVisibleSql('$1');
@@ -89,8 +90,8 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
     const prepared = await prepareStory(db, authorId, input.body, input.stickers);
     const { rows } = await db.query(
       `INSERT INTO moments (author_id, body, media_url, media_kind, media_id, visibility, location_text, expires_at, stickers, tags, mentions, reshare_of, allow_reshare,
-                            sound_id, music)
-       VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $8::int IS NULL THEN NULL ELSE now() + make_interval(hours => $8::int) END, $9, $10, $11, $12, $13, $14, $15)
+                            sound_id, music, lang)
+       VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $8::int IS NULL THEN NULL ELSE now() + make_interval(hours => $8::int) END, $9, $10, $11, $12, $13, $14, $15, $16)
        RETURNING id, expires_at, created_at, tags`,
       [
         authorId,
@@ -108,6 +109,7 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
         input.allowReshare,
         input.music?.soundId ?? null,
         input.music ? JSON.stringify(input.music.stored) : null,
+        langOf(input.body),
       ],
     );
     const moment = rows[0] as { id: string; expires_at: Date | null; created_at: Date; tags: string[] };
