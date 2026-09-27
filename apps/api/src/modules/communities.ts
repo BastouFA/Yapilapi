@@ -9,6 +9,7 @@ import { hydratePosts } from '../lib/posts.ts';
 import { audit, notify, track } from '../lib/services.ts';
 import { PUBLIC_USER_COLS, toPublicUser, type PublicUserRow } from '../lib/users.ts';
 import { postVisibleSql } from '../lib/visibility.ts';
+import { removeFromCommunityRooms } from '../lib/rooms.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const slugParam = z.object({ slug: z.string().min(1).max(40) });
@@ -244,6 +245,8 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
       );
     });
     await audit(db, { actorId: u.id, action: 'community.ban', entityType: 'community', entityId: row.id, metadata: { userId } });
+    // Out of the community's live audio room too, for good.
+    await removeFromCommunityRooms({ db, realtime: ctx.realtime, media: ctx.roomMedia }, row.id, userId, u.id);
     return { ok: true };
   });
 

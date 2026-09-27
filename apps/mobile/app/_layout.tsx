@@ -58,6 +58,7 @@ function Screens() {
         <Stack.Screen name="find-friends" options={{ title: t('friends.title') }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="c/[slug]" options={{ title: t('m.title.community') }} />
+        <Stack.Screen name="room/[id]" options={{ title: t('m.rooms.title') }} />
         <Stack.Screen name="settings" options={{ title: t('m.title.settings') }} />
         <Stack.Screen name="notifications" options={{ title: t('notifications.title') }} />
         <Stack.Screen name="real" options={{ title: t('m.title.real') }} />

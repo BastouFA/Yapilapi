@@ -9,3 +9,4 @@ export * from './filters.ts';
 export * from './stories.ts';
 export * from './dual.ts';
 export * from './data-saver.ts';
+export * from './rooms.ts';

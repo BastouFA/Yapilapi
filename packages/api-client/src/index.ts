@@ -36,6 +36,10 @@ import type {
   Recap,
   RecapCandidates,
   RecapSource,
+  RoomDetail,
+  RoomMediaSession,
+  RoomReaction,
+  RoomSummary,
   Sound,
   EditorParamsInput,
   TagPermission,
@@ -561,6 +565,32 @@ export function createClient(opts: ClientOptions) {
       deleteFaq: (slug: string, id: string) => del(`/v1/communities/${slug}/faq/${id}`),
       similar: (slug: string, q: string) =>
         get<{ faq: (FaqEntry & { score: number })[]; posts: { post: Post; score: number }[] }>(`/v1/communities/${slug}/similar${qs({ q })}`),
+      rooms: (slug: string) =>
+        get<{ items: RoomSummary[]; canStart: boolean; locked?: boolean; limits?: { speakers: number; listeners: number } }>(`/v1/communities/${slug}/rooms`),
+      /** Start a room now, or schedule it with `scheduledFor` (ISO time). Moderators, admins and owners only. */
+      startRoom: (slug: string, b: { title: string; scheduledFor?: string }) => post<{ room: RoomSummary }>(`/v1/communities/${slug}/rooms`, b),
+    },
+    /** Live audio rooms. Audio is WebRTC (see RoomMediaSession); these calls manage who is in the room and relay signaling. */
+    rooms: {
+      get: (id: string) => get<RoomEnvelope>(`/v1/rooms/${id}`),
+      join: (id: string) => post<RoomEnvelope>(`/v1/rooms/${id}/join`),
+      leave: (id: string) => post<{ ok: true }>(`/v1/rooms/${id}/leave`),
+      heartbeat: (id: string) => post<{ ok: true }>(`/v1/rooms/${id}/heartbeat`),
+      start: (id: string) => post<{ room: RoomSummary }>(`/v1/rooms/${id}/start`),
+      end: (id: string) => post<{ room: RoomSummary }>(`/v1/rooms/${id}/end`),
+      remind: (id: string, on: boolean) => post<{ remindMe: boolean }>(`/v1/rooms/${id}/remind`, { on }),
+      hand: (id: string, raised: boolean) => post<{ raised: boolean }>(`/v1/rooms/${id}/hand`, { raised }),
+      mute: (id: string, muted: boolean) => post<{ muted: boolean }>(`/v1/rooms/${id}/mute`, { muted }),
+      /** Accept a host's invite to speak (hosts step up without one), or decline it. */
+      speak: (id: string, accept = true) => post<{ role: 'speaker' | 'listener' }>(`/v1/rooms/${id}/speak`, { accept }),
+      invite: (id: string, userId: string) => post<{ ok: true }>(`/v1/rooms/${id}/participants/${userId}/invite`),
+      muteSpeaker: (id: string, userId: string) => post<{ ok: true }>(`/v1/rooms/${id}/participants/${userId}/mute`),
+      /** Back to listening: a host moving a speaker, or a speaker stepping down (their own id). */
+      toListener: (id: string, userId: string) => post<{ ok: true }>(`/v1/rooms/${id}/participants/${userId}/listener`),
+      remove: (id: string, userId: string) => post<{ ok: true }>(`/v1/rooms/${id}/participants/${userId}/remove`),
+      react: (id: string, kind: RoomReaction) => post<{ ok: true }>(`/v1/rooms/${id}/reactions`, { kind }),
+      signal: (id: string, toUserId: string, type: 'offer' | 'answer' | 'candidate', data: unknown) =>
+        post<{ ok: true }>(`/v1/rooms/${id}/signal`, { toUserId, type, data }),
     },
     events: {
       list: (scope: 'upcoming' | 'going' | 'hosting' | 'now' = 'upcoming') => get<{ items: EventItem[] }>(`/v1/events${qs({ scope })}`),
@@ -1057,6 +1087,14 @@ export interface LiveChatMessage {
   currency?: string;
   author: PublicUser;
   createdAt: string;
+}
+
+/** A room with the viewer's standing in it. `media` is set while the viewer is in the room. */
+export interface RoomEnvelope {
+  room: RoomDetail;
+  removed: boolean;
+  canHost: boolean;
+  media: RoomMediaSession | null;
 }
 
 export interface CallInfo {

@@ -9,6 +9,7 @@ import type { PaymentProvider, PaymentRegistry } from './payments.ts';
 import type { TranscriptionProvider } from './transcription.ts';
 import type { SmsProvider } from './sms.ts';
 import type { MediaModerator } from './media-moderation.ts';
+import type { RoomMedia } from './room-media.ts';
 
 /** Everything a module needs, created once in buildApp. */
 export interface AppContext {
@@ -29,4 +30,6 @@ export interface AppContext {
   sms: SmsProvider;
   /** Automated image and video checks, run in the media job. */
   mediaModerator: MediaModerator;
+  /** How audio rooms move their audio: a WebRTC mesh today; an SFU adapter can replace it (lib/room-media.ts). */
+  roomMedia: RoomMedia;
 }

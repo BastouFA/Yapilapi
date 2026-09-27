@@ -1,9 +1,9 @@
-import { createHmac } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
 import { z } from 'zod';
 import { AppError, badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
+import { iceServers as turnIceServers } from '../lib/ice.ts';
 import { notify, track } from '../lib/services.ts';
 import { isBlockedEitherWay } from '../lib/users.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
@@ -19,22 +19,8 @@ const RING_SECONDS = 45;
 export default async function callsModule(app: FastifyInstance, ctx: AppContext) {
   const db = ctx.db;
 
-  /**
-   * STUN plus time-limited TURN credentials (TURN REST API: username = expiry:userId,
-   * credential = base64(HMAC-SHA1(secret, username))), valid for 12 hours.
-   */
-  function iceServers(userId?: string) {
-    const servers: { urls: string | string[]; username?: string; credential?: string }[] = [{ urls: 'stun:stun.l.google.com:19302' }];
-    const urls = ctx.config.TURN_URLS.split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (urls.length && ctx.config.TURN_SECRET && userId) {
-      const username = `${Math.floor(Date.now() / 1000) + 12 * 3600}:${userId}`;
-      const credential = createHmac('sha1', ctx.config.TURN_SECRET).update(username).digest('base64');
-      servers.push({ urls, username, credential });
-    }
-    return servers;
-  }
+  /** STUN plus time-limited TURN credentials (see lib/ice.ts; audio rooms use the same ones). */
+  const iceServers = (userId?: string) => turnIceServers(ctx.config, userId);
 
   async function loadCall(id: string, userId: string) {
     const { rows } = await db.query(

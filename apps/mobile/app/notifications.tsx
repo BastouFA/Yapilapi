@@ -22,6 +22,7 @@ const TEXT: Record<string, MessageKey> = {
   collab_invite: 'm.notif.collabInvite',
   collab_accepted: 'm.notif.collabAccepted',
   photo_tag: 'm.notif.photoTag',
+  room_live: 'm.notif.roomLive',
 };
 
 /** Kinds about your own account or content, with no one else in them. */
@@ -131,13 +132,15 @@ export default function Notifications() {
             ? `/p/${n.entityId}`
             : n.entityType === 'board' && n.entityId
               ? `/board/${n.entityId}`
-              : n.entityType === 'draft'
-                ? '/drafts'
-                : n.entityType === 'recap' && n.entityId
-                  ? `/recaps?open=${n.entityId}`
-                  : n.actor
-                    ? `/u/${n.actor.username}`
-                    : null;
+              : n.entityType === 'room' && n.entityId
+                ? `/room/${n.entityId}`
+                : n.entityType === 'draft'
+                  ? '/drafts'
+                  : n.entityType === 'recap' && n.entityId
+                    ? `/recaps?open=${n.entityId}`
+                    : n.actor
+                      ? `/u/${n.actor.username}`
+                      : null;
         const answered = answers[n.id];
         const boardInvite = n.type === 'board_invite';
         const invite = (n.type === 'collab_invite' || boardInvite) && !!n.entityId;

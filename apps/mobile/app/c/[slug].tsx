@@ -1,24 +1,31 @@
-import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 import type { FaqEntry } from '../../../../packages/api-client/src/index';
-import type { Community, Post, PublicUser } from '../../../../packages/shared/src/types';
+import { ROOM_TITLE_MAX } from '../../../../packages/shared/src/constants';
+import type { Community, Post, PublicUser, RoomSummary } from '../../../../packages/shared/src/types';
 import { client, errorMessage } from '../../lib/api';
 import { useT, type Translate } from '../../lib/i18n';
 import { PostCard } from '../../lib/post';
+import { roomDuration, roomStatusLabel } from '../../lib/rooms';
 import { useSession } from '../../lib/session';
 import { space } from '../../lib/theme';
 import { Avatar, Button, Card, EmptyState, Field, Icon, Loading, Notice, Row, Segmented, Title, useColors, userText } from '../../lib/ui';
 
-type Tab = 'posts' | 'faq' | 'members';
-type Item = { key: string; post?: Post; faq?: FaqEntry; member?: { user: PublicUser; role: string } };
+type Tab = 'posts' | 'faq' | 'rooms' | 'members';
+type Item = { key: string; post?: Post; faq?: FaqEntry; room?: RoomSummary; member?: { user: PublicUser; role: string } };
 
-const LOCKED = { posts: 'm.community.locked.posts', faq: 'm.community.locked.faq', members: 'm.community.locked.members' } as const;
+const LOCKED = {
+  posts: 'm.community.locked.posts',
+  faq: 'm.community.locked.faq',
+  rooms: 'm.rooms.locked',
+  members: 'm.community.locked.members',
+} as const;
 
 /** Owner and moderator are labelled; other roles (plain members) are not. */
 const roleLabel = (role: string, t: Translate) => (role === 'owner' ? t('m.role.owner') : role === 'moderator' ? t('m.role.moderator') : role);
 
-/** A community: posts, its FAQ and members, with join and leave. */
+/** A community: posts, its FAQ, audio rooms and members, with join and leave. */
 export default function CommunityScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const c = useColors();
@@ -31,6 +38,7 @@ export default function CommunityScreen() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [faq, setFaq] = useState<{ items: FaqEntry[]; canEdit: boolean } | null>(null);
   const [members, setMembers] = useState<{ user: PublicUser; role: string }[] | null>(null);
+  const [rooms, setRooms] = useState<{ items: RoomSummary[]; canStart: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
@@ -72,13 +80,15 @@ export default function CommunityScreen() {
         }
         if (tab === 'faq' && !faq) await loadFaq();
         if (tab === 'members' && !members) setMembers((await api.communities.members(slug)).items);
+        if (tab === 'rooms' && !rooms) setRooms(await api.communities.rooms(slug));
       } catch (e) {
         setError(errorMessage(e));
         if (tab === 'posts') setPosts([]);
         if (tab === 'members') setMembers([]);
+        if (tab === 'rooms') setRooms({ items: [], canStart: false });
       }
     })();
-  }, [tab, community, locked, slug, posts, faq, members, loadFaq]);
+  }, [tab, community, locked, slug, posts, faq, members, rooms, loadFaq]);
 
   if (community === undefined) return <Loading />;
   if (community === null)
@@ -93,8 +103,10 @@ export default function CommunityScreen() {
       ? (posts ?? []).map((p) => ({ key: p.id, post: p }))
       : tab === 'faq'
         ? (faq?.items ?? []).map((f) => ({ key: f.id, faq: f }))
-        : (members ?? []).map((m) => ({ key: m.user.id, member: m }));
-  const loadingTab = !locked && ((tab === 'posts' && !posts) || (tab === 'faq' && !faq) || (tab === 'members' && !members));
+        : tab === 'rooms'
+          ? (rooms?.items ?? []).map((r) => ({ key: r.id, room: r }))
+          : (members ?? []).map((m) => ({ key: m.user.id, member: m }));
+  const loadingTab = !locked && ((tab === 'posts' && !posts) || (tab === 'faq' && !faq) || (tab === 'rooms' && !rooms) || (tab === 'members' && !members));
 
   const header = (
     <View style={{ gap: space[3], marginBottom: space[1] }}>
@@ -133,6 +145,7 @@ export default function CommunityScreen() {
                   setPosts(null);
                   setFaq(null);
                   setMembers(null);
+                  setRooms(null);
                   await reload();
                 } catch (e) {
                   setError(errorMessage(e));
@@ -147,6 +160,7 @@ export default function CommunityScreen() {
         options={[
           { id: 'posts', label: t('profile.posts') },
           { id: 'faq', label: t('m.community.faq') },
+          { id: 'rooms', label: t('m.rooms.tab') },
           { id: 'members', label: t('m.community.membersTab'), count: community.memberCount },
         ]}
         value={tab}
@@ -172,11 +186,19 @@ export default function CommunityScreen() {
           <EmptyState title={t('m.community.noPosts.title')} body={t('m.community.noPosts.body')} />
         ) : tab === 'faq' ? (
           <EmptyState title={t('m.community.noFaq.title')} body={faq?.canEdit ? t('m.community.noFaq.editor') : t('m.community.noFaq.body')} />
+        ) : tab === 'rooms' ? (
+          <EmptyState title={t('m.rooms.none')} body={t('m.rooms.noneBody')} />
         ) : (
           <EmptyState title={t('m.community.noMembers')} />
         )
       }
-      ListFooterComponent={tab === 'faq' && faq?.canEdit && !locked ? <AddFaq slug={slug} onAdded={loadFaq} /> : null}
+      ListFooterComponent={
+        tab === 'faq' && faq?.canEdit && !locked ? (
+          <AddFaq slug={slug} onAdded={loadFaq} />
+        ) : tab === 'rooms' && rooms?.canStart && !locked ? (
+          <StartRoom slug={slug} />
+        ) : null
+      }
       onEndReached={async () => {
         if (tab !== 'posts' || !cursor) return;
         const page = await (await client()).communities.posts(slug, cursor).catch(() => null);
@@ -201,6 +223,8 @@ export default function CommunityScreen() {
               }
             }}
           />
+        ) : item.room ? (
+          <RoomCard room={item.room} />
         ) : item.member ? (
           <Row
             title={item.member.user.displayName}
@@ -268,6 +292,63 @@ function AddFaq({ slug, onAdded }: { slug: string; onAdded: () => Promise<void> 
             setQ('');
             setA('');
             await onAdded();
+          } catch (e) {
+            setError(errorMessage(e));
+          } finally {
+            setSaving(false);
+          }
+        }}
+      />
+    </Card>
+  );
+}
+
+function RoomCard({ room }: { room: RoomSummary }) {
+  const c = useColors();
+  const { t, tp, dateTime } = useT();
+  const meta =
+    room.status === 'live'
+      ? tp('m.rooms.listening', room.listenerCount)
+      : room.status === 'scheduled'
+        ? room.scheduledFor
+          ? dateTime(room.scheduledFor)
+          : ''
+        : room.status === 'ended'
+          ? t('m.rooms.endedLine', { duration: roomDuration(room.durationSeconds, t), count: room.peakListeners })
+          : '';
+  return (
+    <Card label={room.title} onPress={() => router.push(`/room/${room.id}`)} style={{ gap: space[1] }}>
+      <Text style={{ color: room.status === 'live' ? c.danger : c.inkMuted, fontWeight: '700', fontSize: 12 }}>{roomStatusLabel(room, t)}</Text>
+      <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 16 }, userText]}>{room.title}</Text>
+      {meta ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{meta}</Text> : null}
+    </Card>
+  );
+}
+
+/** Moderators and owners start a room now; scheduling is on the web. */
+function StartRoom({ slug }: { slug: string }) {
+  const { t } = useT();
+  const c = useColors();
+  const [title, setTitle] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <Card style={{ gap: space[3], marginTop: space[3] }}>
+      <Title>{t('m.rooms.new')}</Title>
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      <Field label={t('m.rooms.titleLabel')} value={title} onChangeText={setTitle} maxLength={ROOM_TITLE_MAX} />
+      <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('m.rooms.startNote')}</Text>
+      <Button
+        label={t('m.rooms.start')}
+        icon="mic"
+        disabled={!title.trim() || saving}
+        onPress={async () => {
+          setSaving(true);
+          setError(null);
+          try {
+            const { room } = await (await client()).communities.startRoom(slug, { title: title.trim() });
+            setTitle('');
+            router.push(`/room/${room.id}`);
           } catch (e) {
             setError(errorMessage(e));
           } finally {

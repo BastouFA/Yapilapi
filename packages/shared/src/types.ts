@@ -1,6 +1,17 @@
 import type { StoryCard } from './stories.ts';
 import type { DataSaverMode } from './data-saver.ts';
-import type { BoardVisibility, CircleKind, CommunityRole, NowStatusAudience, NowStatusIcon, PostKind, ProfileMode, Visibility } from './constants.ts';
+import type {
+  BoardVisibility,
+  CircleKind,
+  CommunityRole,
+  NowStatusAudience,
+  NowStatusIcon,
+  PostKind,
+  ProfileMode,
+  RoomReaction,
+  RoomStatus,
+  Visibility,
+} from './constants.ts';
 
 export interface PublicUser {
   id: string;
@@ -604,4 +615,64 @@ export interface Recap {
   canSend: boolean;
   createdAt: string;
   finishedAt: string | null;
+}
+
+/** Someone in a live audio room. */
+export interface RoomParticipant {
+  user: PublicUser;
+  role: 'speaker' | 'listener';
+  /** The person who started the room, or a moderator, admin or owner of the community. */
+  host: boolean;
+  muted: boolean;
+  handRaised: boolean;
+  /** A host asked them to speak and they haven't answered yet. */
+  invited: boolean;
+}
+
+/** A room as shown on its community page. */
+export interface RoomSummary {
+  id: string;
+  title: string;
+  status: RoomStatus;
+  community: { id: string; slug: string; name: string };
+  createdBy: PublicUser;
+  scheduledFor: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  /** Whole seconds between start and end, once ended. */
+  durationSeconds: number | null;
+  /** The most people in the room at once. */
+  peakListeners: number;
+  /** People in the room now (speakers and listeners). */
+  listenerCount: number;
+  speakerCount: number;
+  /** Up to three people on stage, for the card. */
+  speakerPreview: PublicUser[];
+  /** The viewer asked to be told when this scheduled room starts. */
+  remindMe: boolean;
+  limits: { speakers: number; listeners: number };
+}
+
+/** A room with everyone in it. Sent on join and as `room.state` realtime events. */
+export interface RoomDetail extends RoomSummary {
+  speakers: RoomParticipant[];
+  listeners: RoomParticipant[];
+}
+
+/**
+ * How a client connects its audio. `mesh`: WebRTC peer connections to the other
+ * people in the room, signaling relayed by the API. An SFU adapter would return
+ * its own mode here without changing the room API.
+ */
+export interface RoomMediaSession {
+  mode: 'mesh';
+  iceServers: { urls: string | string[]; username?: string; credential?: string }[];
+  /** `relay` keeps the network address private by sending audio through TURN (used for people under 18 when TURN is set up). */
+  iceTransportPolicy: 'all' | 'relay';
+}
+
+export interface RoomReactionEvent {
+  roomId: string;
+  userId: string;
+  kind: RoomReaction;
 }

@@ -49,6 +49,7 @@ import recapsModule from './modules/recaps.ts';
 import liveModule from './modules/live.ts';
 import uploadsModule from './modules/uploads.ts';
 import callsModule from './modules/calls.ts';
+import roomsModule from './modules/rooms.ts';
 import realModule from './modules/real.ts';
 import oauthModule from './modules/oauth.ts';
 import pushModule from './modules/push.ts';
@@ -83,6 +84,8 @@ import { scheduledPostJobHandlers } from './lib/publishing.ts';
 import { fastifyTracingPlugin, traceLogMixin } from './lib/tracing.ts';
 import { endExpiredCampaigns } from './lib/boosts.ts';
 import { sendCountdownReminders } from './lib/stories.ts';
+import { meshRoomMedia } from './lib/room-media.ts';
+import { sweepRooms } from './lib/rooms.ts';
 
 export interface BuiltApp {
   app: FastifyInstance;
@@ -174,11 +177,12 @@ export async function buildApp(
       })
     : null;
 
+  const realtime = new RealtimeHub(redis, sub);
   const ctx: AppContext = {
     config,
     db,
     redis,
-    realtime: new RealtimeHub(redis, sub),
+    realtime,
     ai: new AiGateway(db, provider),
     email: logEmailSender(app.log),
     storage,
@@ -190,6 +194,7 @@ export async function buildApp(
         ? twilioSmsProvider({ accountSid: config.TWILIO_ACCOUNT_SID, authToken: config.TWILIO_AUTH_TOKEN, serviceSid: config.TWILIO_VERIFY_SERVICE_SID })
         : devSmsProvider((msg) => app.log.info(msg)),
     mediaModerator: mediaModeratorFromConfig(config),
+    roomMedia: meshRoomMedia(config, realtime),
   };
   if (config.APP_ENV === 'production' && config.SMS_PROVIDER === 'dev')
     app.log.warn('SMS_PROVIDER=dev in production: phone codes are only written to the log. Configure Twilio Verify.');
@@ -364,6 +369,7 @@ export async function buildApp(
     liveModule,
     uploadsModule,
     callsModule,
+    roomsModule,
     realModule,
     oauthModule,
     pushModule,
@@ -395,6 +401,7 @@ export async function buildApp(
   let jobTimer: NodeJS.Timeout | undefined;
   const viewOnceDeps = { db, config, storage, realtime: ctx.realtime, moderator: ctx.mediaModerator };
   let lastViewOnceSweep = 0;
+  let lastRoomSweep = 0;
   const jobHandlers = {
     ...mediaJobHandlers({ db, storage, moderator: ctx.mediaModerator, realtime: ctx.realtime }),
     ...studioJobHandlers({ db, storage, transcription: ctx.transcription }),
@@ -424,6 +431,11 @@ export async function buildApp(
         await sweepViewOnce(viewOnceDeps).catch((e) => app.log.warn({ err: e.message }, 'view-once sweep'));
         // Disappearing messages past their time (each also has its own job; this catches any that were missed).
         await expireMessages(viewOnceDeps).catch((e) => app.log.warn({ err: e.message }, 'disappearing messages'));
+      }
+      // Audio rooms: people whose app went quiet leave, and rooms without a host for five minutes end.
+      if (Date.now() - lastRoomSweep > 10_000) {
+        lastRoomSweep = Date.now();
+        await sweepRooms({ db, realtime: ctx.realtime, media: ctx.roomMedia }).catch((e) => app.log.warn({ err: e.message }, 'room sweep'));
       }
       // Story countdowns that ended: remind the people who asked.
       await sendCountdownReminders(db, ctx.realtime).catch((e) => app.log.warn({ err: e.message }, 'countdown reminders'));
