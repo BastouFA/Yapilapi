@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button, Icon, SensitiveCover } from '@yapilapi/design-system';
 import type { Message } from '@yapilapi/shared';
 import { api, ApiError, errorMessage } from '@/lib/api';
+import { useSession } from '@/app/providers';
 
 type Attachment = Message['attachments'][number];
 
@@ -14,6 +15,7 @@ const clock = (ms: number) => {
 
 /** Photos, videos and voice messages inside a chat bubble. */
 export function MessageAttachments({ items }: { items: Attachment[] }) {
+  const { t, locale } = useSession();
   const [revealed, setRevealed] = useState<number[]>([]);
   if (!items.length) return null;
   return (
@@ -21,16 +23,16 @@ export function MessageAttachments({ items }: { items: Attachment[] }) {
       {items.map((a, i) =>
         a.removed ? (
           <p key={i} className="chat-att__removed">
-            This photo or video isn’t available.
+            {t('m.media.unavailable')}
           </p>
         ) : a.sensitive && !revealed.includes(i) && (a.kind === 'image' || a.kind === 'video') ? (
           <div key={i} className="chat-att__media chat-att__sensitive">
             {a.kind === 'image' || a.posterUrl ? <img src={a.kind === 'image' ? a.url : a.posterUrl!} alt="" aria-hidden className="yp-blurred" /> : null}
-            <SensitiveCover compact onReveal={() => setRevealed((r) => [...r, i])} />
+            <SensitiveCover compact locale={locale} onReveal={() => setRevealed((r) => [...r, i])} />
           </div>
         ) : a.kind === 'image' ? (
           <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" className="chat-att__media">
-            <img src={a.url} alt={a.name || 'Photo'} loading="lazy" />
+            <img src={a.url} alt={a.name || t('m.post.photo')} loading="lazy" />
           </a>
         ) : a.kind === 'video' ? (
           <video
@@ -41,13 +43,13 @@ export function MessageAttachments({ items }: { items: Attachment[] }) {
             controls
             playsInline
             preload="metadata"
-            aria-label={a.name || 'Video'}
+            aria-label={a.name || t('m.chat.video')}
           />
         ) : a.kind === 'audio' ? (
           <VoiceNote key={i} url={a.url} durationMs={a.durationMs ?? null} />
         ) : (
           <a key={i} href={a.url} target="_blank" rel="noopener noreferrer">
-            {a.name || 'File'}
+            {a.name || t('chat.file')}
           </a>
         ),
       )}
@@ -56,6 +58,7 @@ export function MessageAttachments({ items }: { items: Attachment[] }) {
 }
 
 function VoiceNote({ url, durationMs }: { url: string; durationMs: number | null }) {
+  const { t } = useSession();
   const audio = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [pos, setPos] = useState(0);
@@ -65,7 +68,7 @@ function VoiceNote({ url, durationMs }: { url: string; durationMs: number | null
       <button
         type="button"
         className="voice__play"
-        aria-label={playing ? 'Pause voice message' : 'Play voice message'}
+        aria-label={playing ? t('m.chat.pauseVoice') : t('m.chat.playVoice')}
         onClick={() => {
           const a = audio.current;
           if (!a) return;
@@ -110,8 +113,10 @@ function VoiceNote({ url, durationMs }: { url: string; durationMs: number | null
  * short-lived link and shown from memory, never from a public address.
  */
 export function ViewOnceMessage({ message, mine, onChange }: { message: Message; mine: boolean; onChange: (m: Message) => void }) {
+  const { t, locale } = useSession();
+  const list = (names: string[]) => new Intl.ListFormat(locale, { type: 'conjunction' }).format(names);
   const info = message.viewOnce!;
-  const what = info.kind === 'video' ? 'Video' : 'Photo';
+  const video = info.kind === 'video';
   const [open, setOpen] = useState<{ src: string; kind: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -160,18 +165,28 @@ export function ViewOnceMessage({ message, mine, onChange }: { message: Message;
       {mine || info.state !== 'ready' ? (
         <div className="view-once__row">
           <Icon name={info.state === 'ready' ? 'eye' : 'check'} size={18} />
-          <span>{info.state === 'ready' ? `${what} · View once` : info.state === 'viewed' ? `${what}, viewed` : `${what}, expired`}</span>
+          <span>
+            {info.state === 'ready'
+              ? t(video ? 'm.viewOnce.videoSent' : 'm.viewOnce.photoSent')
+              : info.state === 'viewed'
+                ? t(video ? 'm.viewOnce.videoViewed' : 'm.viewOnce.photoViewed')
+                : t(video ? 'm.viewOnce.videoExpired' : 'm.viewOnce.photoExpired')}
+          </span>
         </div>
       ) : (
         <button type="button" className="view-once__row view-once__open" onClick={() => void view()} disabled={loading}>
           <Icon name="eye" size={18} />
-          <span>{loading ? 'Opening…' : `${what} · Tap to view once`}</span>
+          <span>{loading ? t('m.viewOnce.opening') : t(video ? 'm.viewOnce.tapVideo' : 'm.viewOnce.tapPhoto')}</span>
         </button>
       )}
       {mine ? (
         <span className="view-once__meta">
-          {who.length ? `Opened by ${who.join(', ')}` : info.state === 'ready' ? 'Not opened yet' : ''}
-          {shots.length ? `. ${shots.join(', ')} took a screenshot` : ''}
+          {[
+            who.length ? t('m.viewOnce.openedBy', { names: list(who) }) : info.state === 'ready' ? t('m.viewOnce.notOpened') : '',
+            shots.length ? t('m.viewOnce.screenshotBy', { names: list(shots) }) : '',
+          ]
+            .filter(Boolean)
+            .join('. ')}
         </span>
       ) : null}
       {error ? (
@@ -180,13 +195,16 @@ export function ViewOnceMessage({ message, mine, onChange }: { message: Message;
         </span>
       ) : null}
       {open ? (
-        <div className="view-once__viewer" role="dialog" aria-modal aria-label={`View-once ${what.toLowerCase()} from ${message.sender.displayName}`}>
+        <div
+          className="view-once__viewer"
+          role="dialog"
+          aria-modal
+          aria-label={t(video ? 'chat.viewOnce.videoFrom' : 'chat.viewOnce.photoFrom', { name: message.sender.displayName })}
+        >
           <div className="view-once__bar">
-            <span>
-              {message.sender.displayName} · {what}, view once
-            </span>
+            <span>{t(video ? 'chat.viewOnce.videoBar' : 'chat.viewOnce.photoBar', { name: message.sender.displayName })}</span>
             <Button size="sm" variant="ghost" onClick={() => void close()} autoFocus>
-              Close
+              {t('m.common.close')}
             </Button>
           </div>
           {open.kind === 'video' ? (
@@ -200,9 +218,14 @@ export function ViewOnceMessage({ message, mine, onChange }: { message: Message;
               onContextMenu={(e) => e.preventDefault()}
             />
           ) : (
-            <img src={open.src} alt={`Photo from ${message.sender.displayName}`} draggable={false} onContextMenu={(e) => e.preventDefault()} />
+            <img
+              src={open.src}
+              alt={t('chat.viewOnce.photoAlt', { name: message.sender.displayName })}
+              draggable={false}
+              onContextMenu={(e) => e.preventDefault()}
+            />
           )}
-          <p className="view-once__note">When you close it, it’s gone. Browsers can’t block screenshots, so the sender isn’t told about them on the web.</p>
+          <p className="view-once__note">{t('chat.viewOnce.webNote')}</p>
           <EscapeToClose onClose={() => void close()} />
         </div>
       ) : null}
@@ -232,6 +255,7 @@ export function VoiceRecorder({
   onError: (message: string) => void;
   disabled?: boolean;
 }) {
+  const { t } = useSession();
   const [state, setState] = useState<'idle' | 'recording'>('idle');
   const [elapsed, setElapsed] = useState(0);
   const rec = useRef<MediaRecorder | null>(null);
@@ -241,12 +265,12 @@ export function VoiceRecorder({
 
   useEffect(() => {
     if (state !== 'recording') return;
-    const t = setInterval(() => {
+    const timer = setInterval(() => {
       const ms = Date.now() - started.current;
       setElapsed(ms);
       if (ms >= 5 * 60_000) stop(true); // five minutes at most
     }, 250);
-    return () => clearInterval(t);
+    return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
@@ -254,7 +278,7 @@ export function VoiceRecorder({
 
   const start = async () => {
     if (typeof MediaRecorder === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-      onError("This browser can't record audio.");
+      onError(t('chat.noRecording'));
       return;
     }
     try {
@@ -277,7 +301,7 @@ export function VoiceRecorder({
       r.start(250);
       setState('recording');
     } catch {
-      onError('Microphone access is off. Allow it in your browser to send voice messages.');
+      onError(t('chat.micOffVoice'));
     }
   };
 
@@ -290,21 +314,21 @@ export function VoiceRecorder({
 
   if (state === 'recording')
     return (
-      <div className="voice-rec" role="group" aria-label="Recording a voice message">
+      <div className="voice-rec" role="group" aria-label={t('chat.recordingVoice')}>
         <span className="voice-rec__dot" aria-hidden />
         <span className="voice-rec__time" aria-live="off">
           {clock(elapsed)}
         </span>
         <Button type="button" size="sm" variant="ghost" onClick={() => stop(false)}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button type="button" size="sm" icon="send" onClick={() => stop(true)}>
-          Send
+          {t('inbox.send')}
         </Button>
       </div>
     );
   return (
-    <button type="button" className="yp-action" aria-label="Record a voice message" disabled={disabled} onClick={() => void start()}>
+    <button type="button" className="yp-action" aria-label={t('m.chat.record')} disabled={disabled} onClick={() => void start()}>
       <Icon name="mic" />
     </button>
   );

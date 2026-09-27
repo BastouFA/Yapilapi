@@ -4,9 +4,13 @@ import Link from 'next/link';
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { Avatar, Icon, TaggedText } from '@yapilapi/design-system';
 import type { Story } from '@yapilapi/api-client';
-import type { StoryCard, StorySticker } from '@yapilapi/shared';
+import { t as translate, type MessageKey, type StoryCard, type StorySticker } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
+import { useSession } from '@/app/providers';
+
+type Translate = (key: MessageKey, vars?: Record<string, string | number>) => string;
+const english: Translate = (key, vars) => translate(key, 'en', vars);
 
 /** Where a sticker sits on the frame: relative to its size, from the start edge and the top. */
 export function stickerStyle(s: { x: number; y: number; scale?: number; rotation?: number }): CSSProperties {
@@ -17,16 +21,16 @@ export function stickerStyle(s: { x: number; y: number; scale?: number; rotation
   };
 }
 
-/** Time left on a countdown, in plain words. */
-export function timeLeft(endsAt: string, now = Date.now()): string {
+/** Time left on a countdown, in plain words. Pass the session's `t` to get it in the viewer's language. */
+export function timeLeft(endsAt: string, now = Date.now(), t: Translate = english): string {
   const ms = new Date(endsAt).getTime() - now;
-  if (ms <= 0) return 'Ended';
+  if (ms <= 0) return t('m.sticker.ended');
   const m = Math.floor(ms / 60_000);
   const d = Math.floor(m / 1440);
   const h = Math.floor((m % 1440) / 60);
-  if (d) return `${d}d ${h}h left`;
-  if (h) return `${h}h ${m % 60}m left`;
-  return m ? `${m}m left` : 'Less than a minute left';
+  if (d) return t('m.sticker.leftDays', { days: d, hours: h });
+  if (h) return t('m.sticker.leftHours', { hours: h, minutes: m % 60 });
+  return m ? t('m.sticker.leftMinutes', { minutes: m }) : t('stickers.view.lessThanMinute');
 }
 
 /** Story text with @mentions and #tags as links. */
@@ -142,9 +146,10 @@ function Poll({
   update: (id: string, patch: Partial<StorySticker>) => void;
   toast: (m: string) => void;
 }) {
+  const { t, tp } = useSession();
   const shown = s.results !== undefined;
   return (
-    <div className="story-card-sticker" role="group" aria-label={s.question || 'Poll'}>
+    <div className="story-card-sticker" role="group" aria-label={s.question || t('m.sticker.kind.poll')}>
       {s.question ? <p className="story-card-sticker__title">{s.question}</p> : null}
       <div className="story-poll">
         {s.options.map((o, i) => (
@@ -171,11 +176,7 @@ function Poll({
           </button>
         ))}
       </div>
-      {shown ? (
-        <p className="story-card-sticker__meta">
-          {s.votes ?? 0} {s.votes === 1 ? 'vote' : 'votes'}
-        </p>
-      ) : null}
+      {shown ? <p className="story-card-sticker__meta">{tp('m.sticker.votes', s.votes ?? 0)}</p> : null}
     </div>
   );
 }
@@ -195,6 +196,7 @@ function Question({
   onBusy: (b: boolean) => void;
   toast: (m: string) => void;
 }) {
+  const { t, tp } = useSession();
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   return (
@@ -209,7 +211,7 @@ function Question({
           update(s.id, { answered: r.answered });
           setText('');
           onBusy(false);
-          toast('Answer sent');
+          toast(t('m.sticker.answerSent'));
         } catch (err) {
           toast(errorMessage(err));
         } finally {
@@ -219,28 +221,28 @@ function Question({
     >
       <p className="story-card-sticker__title">{s.prompt}</p>
       {mine ? (
-        <p className="story-card-sticker__meta">Answers show in Seen by</p>
+        <p className="story-card-sticker__meta">{t('m.sticker.answersInSeenBy')}</p>
       ) : (
         <>
           <label className="yp-visually-hidden" htmlFor={`q-${story.id}-${s.id}`}>
-            Your answer
+            {t('stickers.view.yourAnswer')}
           </label>
           <input
             id={`q-${story.id}-${s.id}`}
             className="story-question__input"
             value={text}
             maxLength={300}
-            placeholder="Type something"
+            placeholder={t('m.sticker.answerPlaceholder')}
             onFocus={() => onBusy(true)}
             onBlur={() => !text && onBusy(false)}
             onChange={(e) => setText(e.currentTarget.value)}
           />
           {text.trim() ? (
             <button type="submit" className="story-question__send" disabled={sending}>
-              Send
+              {t('m.stories.send')}
             </button>
           ) : s.answered ? (
-            <p className="story-card-sticker__meta">You sent {s.answered === 1 ? 'an answer' : `${s.answered} answers`}</p>
+            <p className="story-card-sticker__meta">{tp('stickers.view.sent', s.answered)}</p>
           ) : null}
         </>
       )}
@@ -261,6 +263,7 @@ function Slider({
   update: (id: string, patch: Partial<StorySticker>) => void;
   toast: (m: string) => void;
 }) {
+  const { t, tp } = useSession();
   const [value, setValue] = useState(s.mine ?? 0.5);
   const done = s.mine !== null;
   const send = async () => {
@@ -296,11 +299,11 @@ function Slider({
       <p className="story-card-sticker__meta">
         {mine
           ? s.count
-            ? `Average ${Math.round((s.average ?? 0) * 100)}% from ${s.count} ${s.count === 1 ? 'person' : 'people'}`
-            : 'No answers yet'
+            ? tp('stickers.view.average', s.count, { percent: `${Math.round((s.average ?? 0) * 100)}%` })
+            : t('m.sticker.noAnswers')
           : done
-            ? 'Answer sent'
-            : 'Slide and let go to answer'}
+            ? t('m.sticker.answerSent')
+            : t('m.sticker.slideHint')}
       </p>
     </div>
   );
@@ -317,16 +320,17 @@ function Countdown({
   update: (id: string, patch: Partial<StorySticker>) => void;
   toast: (m: string) => void;
 }) {
+  const { t } = useSession();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
   }, []);
   const ended = new Date(s.endsAt).getTime() <= now;
   return (
     <div className="story-card-sticker">
       <p className="story-card-sticker__title">{s.title}</p>
-      <p className="story-countdown__time">{timeLeft(s.endsAt, now)}</p>
+      <p className="story-countdown__time">{timeLeft(s.endsAt, now, t)}</p>
       {!ended ? (
         <button
           type="button"
@@ -336,14 +340,14 @@ function Countdown({
             try {
               const r = await api.moments.remind(story.id, s.id, !s.reminding);
               update(s.id, { reminding: r.reminding });
-              toast(r.reminding ? "We'll remind you when it ends" : 'Reminder off');
+              toast(r.reminding ? t('stickers.view.remindOn') : t('stickers.view.remindOff'));
             } catch (e) {
               toast(errorMessage(e));
             }
           }}
         >
           <Icon name="bell" size={16} filled={s.reminding} />
-          {s.reminding ? 'Reminder on' : 'Remind me'}
+          {s.reminding ? t('m.sticker.reminderOn') : t('m.sticker.remindMe')}
         </button>
       ) : null}
     </div>
@@ -355,15 +359,16 @@ function Countdown({
  * people who can see the story; for others it says it isn't available.
  */
 export function StoryCardView({ card, label, action }: { card: StoryCard; label?: string; action?: ReactNode }) {
+  const { t } = useSession();
   if (!card.available)
     return (
       <div className="story-card story-card--gone">
         <Icon name="eye" size={18} />
-        <span>This story isn&apos;t available</span>
+        <span>{t('m.stories.unavailable')}</span>
       </div>
     );
   return (
-    <Link href={`/s/${card.id}`} className="story-card" aria-label={`View story from ${card.author.displayName}`}>
+    <Link href={`/s/${card.id}`} className="story-card" aria-label={t('story.card.viewFrom', { name: card.author.displayName })}>
       <span className="story-card__preview" aria-hidden>
         {card.mediaKind === 'image' && card.mediaUrl ? (
           <img src={card.mediaUrl} alt="" />
@@ -383,7 +388,7 @@ export function StoryCardView({ card, label, action }: { card: StoryCard; label?
           <bdi>{label ?? `@${card.author.username}`}</bdi>
         </span>
         {card.body && card.mediaUrl ? <span className="story-card__body">{card.body.slice(0, 80)}</span> : null}
-        <span className="story-card__cta">{action ?? 'View story'}</span>
+        <span className="story-card__cta">{action ?? t('m.stories.view')}</span>
       </span>
     </Link>
   );

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Alert, Button, Card, TextField } from '@yapilapi/design-system';
 import type { VerificationStatus } from '@yapilapi/api-client';
+import type { MessageKey } from '@yapilapi/shared';
 import { api, ApiError, errorMessage, fieldErrors } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
@@ -11,18 +12,19 @@ import { useSession } from '@/app/providers';
 export const isVerificationError = (e: unknown) => e instanceof ApiError && e.code === 'verification_required';
 
 const WHY = {
-  post: 'To post for everyone, confirm your email address or a phone number first. Posts for friends or only you work now.',
-  message: 'To message people you aren’t friends with yet, confirm your email address or a phone number first.',
-  live: 'To go live, confirm your email address or a phone number first.',
-} as const;
+  post: 'm.verify.prompt.post',
+  message: 'm.verify.prompt.message',
+  live: 'verification.prompt.live',
+} as const satisfies Record<string, MessageKey>;
 
 /** A calm prompt with a way to confirm, shown before or after the API asks for it. */
 export function VerifyPrompt({ action }: { action: keyof typeof WHY }) {
+  const { t, locale } = useSession();
   return (
-    <Alert tone="info" title="Confirm your account">
-      <p style={{ margin: '0 0 8px' }}>{WHY[action]}</p>
+    <Alert tone="info" title={t('m.verify.prompt.title')} locale={locale}>
+      <p style={{ margin: '0 0 8px' }}>{t(WHY[action])}</p>
       <Link href="/settings#verification" className="yp-btn yp-btn--secondary yp-btn--sm">
-        Confirm email or phone
+        {t('m.verify.prompt.action')}
       </Link>
     </Alert>
   );
@@ -33,7 +35,7 @@ export function VerifyPrompt({ action }: { action: keyof typeof WHY }) {
  * unlocks posting publicly, messaging people who aren't friends and going live.
  */
 export function VerificationCard() {
-  const { refresh, toast } = useSession();
+  const { refresh, toast, t } = useSession();
   const [status, setStatus] = useState<VerificationStatus | null>(null);
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
@@ -71,23 +73,14 @@ export function VerificationCard() {
   const phoneVerified = !!status.phone?.verified;
 
   return (
-    <Card
-      title="Email and phone"
-      subtitle={
-        status.verified
-          ? 'Your account is confirmed.'
-          : status.required
-            ? 'Confirm your email address or a phone number to post publicly, message people you aren’t friends with yet, and go live.'
-            : 'Confirming your email or a phone number helps keep your account and YAPILAPI safe.'
-      }
-    >
+    <Card title={t('m.verify.title')} subtitle={status.verified ? t('m.verify.done') : status.required ? t('m.verify.required') : t('m.verify.optional')}>
       <div className="stack-sm" id="verification">
         {err ? <Alert tone="danger">{err}</Alert> : null}
         <div className="verify-row">
           <div>
-            <strong>Email</strong>
+            <strong>{t('m.verify.email')}</strong>
             <p className="muted" style={{ margin: 0 }}>
-              {status.email.address} · {status.email.verified ? 'Confirmed' : 'Not confirmed yet'}
+              {status.email.address} · {status.email.verified ? t('m.verify.confirmed') : t('m.verify.notConfirmed')}
             </p>
           </div>
           {!status.email.verified ? (
@@ -95,18 +88,18 @@ export function VerificationCard() {
               size="sm"
               variant="secondary"
               loading={busy}
-              onClick={() => run(async () => (await api.auth.resendVerification(), toast('We sent a new link. Check your inbox.')))}
+              onClick={() => run(async () => (await api.auth.resendVerification(), toast(t('m.verify.emailSent'))))}
             >
-              Send the link again
+              {t('m.verify.resendEmail')}
             </Button>
           ) : null}
         </div>
 
         <div className="verify-row">
           <div>
-            <strong>Phone</strong>
+            <strong>{t('m.verify.phone')}</strong>
             <p className="muted" style={{ margin: 0 }}>
-              {status.phone ? `${status.phone.number} · ${phoneVerified ? 'Confirmed' : 'Not confirmed yet'}` : 'No phone number added.'}
+              {status.phone ? `${status.phone.number} · ${phoneVerified ? t('m.verify.confirmed') : t('m.verify.notConfirmed')}` : t('m.verify.noPhone')}
             </p>
           </div>
           {status.phone ? (
@@ -120,11 +113,11 @@ export function VerificationCard() {
                   setPhone('');
                   setStep('idle');
                   await refresh();
-                  toast('Phone number removed');
+                  toast(t('verification.phoneRemoved'));
                 })
               }
             >
-              Remove
+              {t('m.common.remove')}
             </Button>
           ) : null}
         </div>
@@ -143,19 +136,19 @@ export function VerificationCard() {
             }}
           >
             <TextField
-              label="Phone number"
+              label={t('m.verify.phoneLabel')}
               name="phone"
               type="tel"
               autoComplete="tel"
               inputMode="tel"
               value={phone}
               onChange={(e) => setPhone(e.currentTarget.value)}
-              hint="Include the country code, for example +44 7700 900123. We only use it to confirm your account and keep it safe."
+              hint={t('m.verify.phoneHint')}
               error={fields.phone}
               required
             />
             <Button type="submit" size="sm" loading={busy} disabled={phone.trim().length < 6}>
-              Text me a code
+              {t('m.verify.sendCode')}
             </Button>
           </form>
         ) : null}
@@ -169,13 +162,13 @@ export function VerificationCard() {
                 setStatus(await api.verification.verifyPhone(code.trim()));
                 setStep('idle');
                 await refresh();
-                toast('Phone number confirmed');
+                toast(t('verification.phoneConfirmed'));
               });
             }}
           >
-            <p style={{ margin: 0 }}>We texted a 6-digit code to {status.phone?.number}. It works for 10 minutes.</p>
+            <p style={{ margin: 0 }}>{t('m.verify.codeSent', { phone: status.phone?.number ?? '' })}</p>
             <TextField
-              label="Code"
+              label={t('m.verify.codeLabel')}
               name="code"
               inputMode="numeric"
               autoComplete="one-time-code"
@@ -187,18 +180,18 @@ export function VerificationCard() {
             />
             <div className="row">
               <Button type="submit" size="sm" loading={busy} disabled={code.length < 4}>
-                Confirm
+                {t('m.verify.confirm')}
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
                 disabled={busy}
-                onClick={() => run(async () => (await api.verification.sendCode(), toast('We sent a new code')))}
+                onClick={() => run(async () => (await api.verification.sendCode(), toast(t('verification.newCodeSent'))))}
               >
-                Send a new code
+                {t('m.verify.newCode')}
               </Button>
               <Button size="sm" variant="ghost" disabled={busy} onClick={() => setStep('idle')}>
-                Change number
+                {t('m.verify.changeNumber')}
               </Button>
             </div>
           </form>

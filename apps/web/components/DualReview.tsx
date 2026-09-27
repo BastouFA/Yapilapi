@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { dualInsetBox, nearestDualCorner, type DualCorner } from '@yapilapi/shared';
+import { dualInsetBox, nearestDualCorner, type DualCorner, type MessageKey } from '@yapilapi/shared';
+import { useSession } from '@/app/providers';
 
 export interface DualShots {
   back: HTMLCanvasElement;
@@ -10,11 +11,11 @@ export interface DualShots {
   frontUrl: string;
 }
 
-const CORNER_NAMES: Record<DualCorner, string> = {
-  'top-left': 'top left',
-  'top-right': 'top right',
-  'bottom-left': 'bottom left',
-  'bottom-right': 'bottom right',
+const CORNER_NAMES: Record<DualCorner, MessageKey> = {
+  'top-left': 'm.camera.corner.topLeft',
+  'top-right': 'm.camera.corner.topRight',
+  'bottom-left': 'm.camera.corner.bottomLeft',
+  'bottom-right': 'm.camera.corner.bottomRight',
 };
 
 /**
@@ -36,6 +37,7 @@ export function DualReview({
   onUse: () => void;
   busy: boolean;
 }) {
+  const { t } = useSession();
   const frame = useRef<HTMLDivElement>(null);
   const use = useRef<HTMLButtonElement>(null);
   const [shown, setShown] = useState(0);
@@ -98,13 +100,13 @@ export function DualReview({
     <div className="cam__dual" role="dialog" aria-modal="true" aria-labelledby="dual-title">
       <div>
         <h2 id="dual-title" className="cam__dual-title">
-          Both sides
+          {t('m.camera.dual')}
         </h2>
-        <p className="cam__dual-hint">Drag the small photo to any corner.</p>
+        <p className="cam__dual-hint">{t('m.camera.dualDrag')}</p>
       </div>
       <div className="cam__dual-stage">
         <div ref={frame} className="cam__dual-frame">
-          <img src={shots.backUrl} alt="Back camera photo" draggable={false} />
+          <img src={shots.backUrl} alt={t('dual.backPhoto')} draggable={false} />
           <button
             type="button"
             className={`cam__dual-inset${drag ? ' cam__dual-inset--dragging' : ''}`}
@@ -117,7 +119,7 @@ export function DualReview({
               borderRadius: box.radius * scale,
               transform: drag ? `translate(${drag.dx}px, ${drag.dy}px)` : undefined,
             }}
-            aria-label={`Front camera photo, ${CORNER_NAMES[corner]} corner. Drag it or use the arrow keys to move it to another corner.`}
+            aria-label={t('dual.inset', { corner: t(CORNER_NAMES[corner]) })}
             onPointerDown={onDown}
             onPointerMove={onMove}
             onPointerUp={onUp}
@@ -130,10 +132,10 @@ export function DualReview({
       </div>
       <div className="cam__dual-actions">
         <button type="button" className="cam__pill cam__pill--ghost" onClick={onRetake} disabled={busy}>
-          Retake
+          {t('m.camera.dualRetake')}
         </button>
         <button ref={use} type="button" className="cam__pill" onClick={onUse} disabled={busy} aria-busy={busy}>
-          {busy ? 'Putting it together…' : 'Use photo'}
+          {t(busy ? 'm.camera.dualWorking' : 'm.camera.dualUse')}
         </button>
       </div>
     </div>

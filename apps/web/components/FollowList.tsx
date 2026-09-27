@@ -23,7 +23,7 @@ export function FollowList({
   onClose: () => void;
   onFollowChange?: () => void;
 }) {
-  const { me, toast } = useSession();
+  const { me, toast, t } = useSession();
   const [tab, setTab] = useState(initial);
   const [items, setItems] = useState<PublicUser[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -62,12 +62,12 @@ export function FollowList({
     <BottomSheet open={open} onClose={onClose} title={name}>
       <div className="stack">
         <Segments
-          label="List"
+          label={t('follow.list')}
           value={tab}
           onChange={setTab}
           options={[
-            { id: 'followers', label: 'Followers' },
-            { id: 'following', label: 'Following' },
+            { id: 'followers', label: t('profile.followers') },
+            { id: 'following', label: t('profile.following') },
           ]}
         />
         {error ? (
@@ -90,7 +90,7 @@ export function FollowList({
                   end={
                     u.id === me?.id ? null : follows.has(u.id) ? (
                       <span className="muted" style={{ fontSize: 13 }}>
-                        Following
+                        {t('profile.unfollow')}
                       </span>
                     ) : (
                       <Button
@@ -110,7 +110,7 @@ export function FollowList({
                           }
                         }}
                       >
-                        Follow
+                        {t('profile.follow')}
                       </Button>
                     )
                   }
@@ -119,7 +119,7 @@ export function FollowList({
             </List>
             {cursor ? (
               <Button variant="secondary" size="sm" onClick={more}>
-                Show more
+                {t('follow.showMore')}
               </Button>
             ) : null}
           </>
@@ -127,11 +127,11 @@ export function FollowList({
           <p className="muted">
             {userId === me?.id
               ? tab === 'followers'
-                ? 'Nobody follows you yet. Share your profile to get started.'
-                : "You aren't following anyone yet. Discover has people to start with."
+                ? t('follow.emptyFollowersSelf')
+                : t('follow.emptyFollowingSelf')
               : tab === 'followers'
-                ? `Nobody follows ${name} yet.`
-                : `${name} isn't following anyone yet.`}
+                ? t('follow.emptyFollowers', { name })
+                : t('follow.emptyFollowing', { name })}
           </p>
         )}
       </div>

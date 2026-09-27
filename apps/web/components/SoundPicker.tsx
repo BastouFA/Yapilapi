@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { BottomSheet, Button, Icon } from '@yapilapi/design-system';
 import type { Sound } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
+import { useSession } from '@/app/providers';
 
 /** "1:05" style length. */
 export function soundLength(ms: number | null | undefined): string | null {
@@ -17,6 +18,7 @@ export function soundLength(ms: number | null | undefined): string | null {
  * without the picture. Only one sound plays at a time on the page.
  */
 export function SoundPlayButton({ sound, size = 'md' }: { sound: Pick<Sound, 'title' | 'audioUrl'>; size?: 'md' | 'lg' }) {
+  const { t } = useSession();
   const audio = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   useEffect(() => {
@@ -33,7 +35,7 @@ export function SoundPlayButton({ sound, size = 'md' }: { sound: Pick<Sound, 'ti
         type="button"
         className={`sound-play${size === 'lg' ? ' sound-play--lg' : ''}`}
         aria-pressed={playing}
-        aria-label={playing ? `Pause ${sound.title}` : `Play ${sound.title}`}
+        aria-label={t(playing ? 'sounds.pause' : 'sounds.play', { title: sound.title })}
         onClick={() => {
           const a = audio.current;
           if (!a) return;
@@ -57,6 +59,7 @@ export function SoundPlayButton({ sound, size = 'md' }: { sound: Pick<Sound, 'ti
 
 /** Pick a sound for a reel or a story: the most used ones you can use, searchable by name or by who made it. */
 export function SoundPicker({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (s: Sound) => void }) {
+  const { t, tp } = useSession();
   const [q, setQ] = useState('');
   const [items, setItems] = useState<Sound[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -77,23 +80,23 @@ export function SoundPicker({ open, onClose, onPick }: { open: boolean; onClose:
   }, [q, open]);
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Choose a sound">
+    <BottomSheet open={open} onClose={onClose} title={t('m.music.choose')}>
       <div className="stack">
         <label className="yp-visually-hidden" htmlFor="sound-search">
-          Search sounds
+          {t('m.recap.searchSounds')}
         </label>
         <input
           id="sound-search"
           className="yp-input"
           type="search"
-          placeholder="Search by name or creator"
+          placeholder={t('m.music.search')}
           value={q}
           maxLength={60}
           onChange={(e) => setQ(e.currentTarget.value)}
         />
         {error ? <p className="muted">{error}</p> : null}
         {items === null ? (
-          <p className="muted">Loading sounds</p>
+          <p className="muted">{t('m.music.loading')}</p>
         ) : items.length ? (
           <ul className="sound-list">
             {items.map((s) => (
@@ -103,18 +106,18 @@ export function SoundPicker({ open, onClose, onPick }: { open: boolean; onClose:
                   <bdi className="sound-row__title">{s.title}</bdi>
                   <span className="sound-row__meta">
                     <bdi>@{s.owner.username}</bdi>
-                    {soundLength(s.durationMs) ? ` · ${soundLength(s.durationMs)}` : ''} · {s.reels} {s.reels === 1 ? 'reel' : 'reels'}
-                    {s.stories ? ` · ${s.stories} ${s.stories === 1 ? 'story' : 'stories'}` : ''}
+                    {soundLength(s.durationMs) ? ` · ${soundLength(s.durationMs)}` : ''} · {tp('m.sound.reelCount', s.reels)}
+                    {s.stories ? ` · ${tp('m.sound.storyCount', s.stories)}` : ''}
                   </span>
                 </span>
                 <Button size="sm" variant="secondary" onClick={() => onPick(s)}>
-                  Use
+                  {t('m.music.use')}
                 </Button>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="muted">{q.trim() ? `No sounds match "${q.trim()}".` : 'No sounds to use yet.'}</p>
+          <p className="muted">{q.trim() ? t('m.music.noMatch', { q: q.trim() }) : t('m.music.none')}</p>
         )}
       </div>
     </BottomSheet>

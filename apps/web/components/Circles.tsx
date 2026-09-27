@@ -2,17 +2,17 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { Avatar, Button, Card, Dialog, EmptyState, Select, Skeleton, TextField } from '@yapilapi/design-system';
-import type { Circle, CircleKind, PublicUser } from '@yapilapi/shared';
+import type { Circle, CircleKind, MessageKey, PublicUser } from '@yapilapi/shared';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
 /** Kinds offered when making a circle. ('close_friends' stays for older circles: close friends is its own list now.) */
-export const CIRCLE_KIND_LABELS: Partial<Record<CircleKind, string>> = {
-  custom: 'Other',
-  family: 'Family',
-  work: 'Work',
-  business: 'Business',
-  travel: 'Travel',
+export const CIRCLE_KIND_LABELS: Partial<Record<CircleKind, MessageKey>> = {
+  custom: 'm.circles.kind.custom',
+  family: 'm.circles.kind.family',
+  work: 'm.circles.kind.work',
+  business: 'm.circles.kind.business',
+  travel: 'm.circles.kind.travel',
 };
 
 /**
@@ -21,7 +21,7 @@ export const CIRCLE_KIND_LABELS: Partial<Record<CircleKind, string>> = {
  * circles they're in.
  */
 export function CirclesManager({ initialId }: { initialId?: string | null }) {
-  const { toast } = useSession();
+  const { toast, t, tp } = useSession();
   const [circles, setCircles] = useState<Circle[] | null>(null);
   const [selected, setSelected] = useState<string | null>(initialId ?? null);
   const [name, setName] = useState('');
@@ -41,7 +41,7 @@ export function CirclesManager({ initialId }: { initialId?: string | null }) {
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return setError('Give your circle a name.');
+    if (!name.trim()) return setError(t('circles.nameRequired'));
     setCreating(true);
     setError(undefined);
     try {
@@ -50,7 +50,7 @@ export function CirclesManager({ initialId }: { initialId?: string | null }) {
       setSelected(circle.id);
       setName('');
       setKind('custom');
-      toast(`${circle.name} created. Add people to it below.`);
+      toast(t('circles.created', { name: circle.name }));
     } catch (err) {
       setError(fieldErrors(err).name ?? errorMessage(err));
     } finally {
@@ -64,30 +64,29 @@ export function CirclesManager({ initialId }: { initialId?: string | null }) {
   return (
     <div className="stack">
       <p className="muted" style={{ margin: 0 }}>
-        Share posts with a small group, like Family or Work, by choosing the circle as the audience when you post. Only you see your circles. People
-        aren&rsquo;t told when you add or remove them, and never see which circles they&rsquo;re in.
+        {t('circles.intro')}
       </p>
-      <Card title="New circle" level={2}>
+      <Card title={t('m.circles.new')} level={2}>
         <form className="stack" onSubmit={create}>
           <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <TextField
-              label="Name"
-              placeholder="Family"
+              label={t('m.circles.name')}
+              placeholder={t('m.circles.kind.family')}
               value={name}
               maxLength={40}
               error={error}
               onChange={(e) => setName(e.currentTarget.value)}
               className="circles-form__name"
             />
-            <Select label="Kind" value={kind} onChange={(e) => setKind(e.currentTarget.value as CircleKind)}>
+            <Select label={t('circles.kind')} value={kind} onChange={(e) => setKind(e.currentTarget.value as CircleKind)}>
               {Object.entries(CIRCLE_KIND_LABELS).map(([k, label]) => (
                 <option key={k} value={k}>
-                  {label}
+                  {t(label)}
                 </option>
               ))}
             </Select>
             <Button type="submit" icon="plus" loading={creating}>
-              Create
+              {t('m.chapters.create')}
             </Button>
           </div>
         </form>
@@ -96,23 +95,23 @@ export function CirclesManager({ initialId }: { initialId?: string | null }) {
       {circles === null ? (
         <Skeleton height={120} />
       ) : circles.length ? (
-        <ul className="circles__list" aria-label="Your circles">
+        <ul className="circles__list" aria-label={t('m.circles.yours')}>
           {circles.map((c) => (
             <li key={c.id} className="circles__row" aria-current={c.id === selected ? 'true' : undefined}>
               <span className="sound-row__text">
                 <bdi className="sound-row__title">{c.name}</bdi>
                 <span className="sound-row__meta">
-                  {CIRCLE_KIND_LABELS[c.kind] ?? 'Other'} · {c.memberCount === 1 ? '1 person' : `${c.memberCount} people`}
+                  {t(CIRCLE_KIND_LABELS[c.kind] ?? 'm.circles.kind.custom')} · {tp('m.circles.members', c.memberCount)}
                 </span>
               </span>
               <Button size="sm" variant={c.id === selected ? 'primary' : 'secondary'} onClick={() => setSelected(c.id === selected ? null : c.id)}>
-                {c.id === selected ? 'Close' : 'Manage'}
+                {c.id === selected ? t('m.common.close') : t('circles.manage')}
               </Button>
             </li>
           ))}
         </ul>
       ) : (
-        <EmptyState title="No circles yet" body="Make one above, then add the people you want in it." />
+        <EmptyState title={t('circles.emptyTitle')} body={t('circles.emptyBody')} />
       )}
 
       {current ? (
@@ -131,7 +130,7 @@ export function CirclesManager({ initialId }: { initialId?: string | null }) {
 }
 
 function CircleDetail({ circle, onChange, onDeleted }: { circle: Circle; onChange: (c: Circle) => void; onDeleted: () => void }) {
-  const { toast } = useSession();
+  const { toast, t, tp } = useSession();
   const id = useId();
   const [members, setMembers] = useState<PublicUser[] | null>(null);
   const [q, setQ] = useState('');
@@ -172,7 +171,7 @@ function CircleDetail({ circle, onChange, onDeleted }: { circle: Circle; onChang
     try {
       const r = await api.circles.addMembers(circle.id, [u.id]);
       if (r.added) setMembers((cur) => [u, ...(cur ?? []).filter((x) => x.id !== u.id)]);
-      else toast(`${u.displayName} can't be added.`);
+      else toast(t('circles.cantAdd', { name: u.displayName }));
       onChange(r.circle);
     } catch (e) {
       toast(errorMessage(e));
@@ -196,14 +195,14 @@ function CircleDetail({ circle, onChange, onDeleted }: { circle: Circle; onChang
 
   async function rename(e: React.FormEvent) {
     e.preventDefault();
-    if (!newName.trim()) return setRenameError('Give your circle a name.');
+    if (!newName.trim()) return setRenameError(t('circles.nameRequired'));
     setBusy('rename');
     try {
       const { circle: c } = await api.circles.update(circle.id, { name: newName.trim() });
       onChange(c);
       setRenaming(false);
       setRenameError(undefined);
-      toast('Circle renamed');
+      toast(t('circles.renamed'));
     } catch (err) {
       setRenameError(fieldErrors(err).name ?? errorMessage(err));
     } finally {
@@ -215,7 +214,7 @@ function CircleDetail({ circle, onChange, onDeleted }: { circle: Circle; onChang
     setBusy('delete');
     try {
       await api.circles.remove(circle.id);
-      toast(`${circle.name} deleted`);
+      toast(t('circles.deleted', { name: circle.name }));
       onDeleted();
     } catch (e) {
       toast(errorMessage(e));
@@ -230,14 +229,14 @@ function CircleDetail({ circle, onChange, onDeleted }: { circle: Circle; onChang
     <Card
       level={2}
       title={<bdi>{circle.name}</bdi>}
-      subtitle={circle.memberCount === 1 ? '1 person' : `${circle.memberCount} people`}
+      subtitle={tp('m.circles.members', circle.memberCount)}
       action={
         <div className="row">
           <Button size="sm" variant="ghost" onClick={() => setRenaming((r) => !r)}>
-            Rename
+            {t('circles.rename')}
           </Button>
           <Button size="sm" variant="ghost" icon="trash" onClick={() => setConfirmDelete(true)}>
-            Delete
+            {t('m.common.delete')}
           </Button>
         </div>
       }
@@ -246,7 +245,7 @@ function CircleDetail({ circle, onChange, onDeleted }: { circle: Circle; onChang
         {renaming ? (
           <form className="row" style={{ alignItems: 'flex-end' }} onSubmit={rename}>
             <TextField
-              label="New name"
+              label={t('circles.newName')}
               value={newName}
               maxLength={40}
               error={renameError}
@@ -254,16 +253,16 @@ function CircleDetail({ circle, onChange, onDeleted }: { circle: Circle; onChang
               className="circles-form__name"
             />
             <Button type="submit" size="sm" loading={busy === 'rename'}>
-              Save
+              {t('common.save')}
             </Button>
           </form>
         ) : null}
 
         <h3 className="yp-field__label" style={{ margin: 0 }}>
-          In this circle
+          {t('m.circles.inCircle')}
         </h3>
         {members === null ? (
-          <p className="muted">Loading</p>
+          <p className="muted">{t('common.loading')}</p>
         ) : members.length ? (
           <ul className="close-friends__list">
             {members.map((u) => (
@@ -275,33 +274,39 @@ function CircleDetail({ circle, onChange, onDeleted }: { circle: Circle; onChang
                     <bdi>@{u.username}</bdi>
                   </span>
                 </span>
-                <Button size="sm" variant="ghost" loading={busy === u.id} onClick={() => remove(u)} aria-label={`Remove ${u.displayName} from ${circle.name}`}>
-                  Remove
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  loading={busy === u.id}
+                  onClick={() => remove(u)}
+                  aria-label={t('circles.removeMember', { name: u.displayName, circle: circle.name })}
+                >
+                  {t('m.common.remove')}
                 </Button>
               </li>
             ))}
           </ul>
         ) : (
           <p className="muted" style={{ margin: 0 }}>
-            Nobody yet. Add people below.
+            {t('m.circles.noMembers')}
           </p>
         )}
 
         <label htmlFor={`${id}-q`} className="yp-field__label">
-          Add people
+          {t('m.circles.addHeading')}
         </label>
         <input
           id={`${id}-q`}
           className="yp-input"
           type="search"
           autoComplete="off"
-          placeholder="Type a name or username"
+          placeholder={t('m.closeFriends.search')}
           value={q}
           maxLength={60}
           onChange={(e) => setQ(e.currentTarget.value)}
         />
         {addable.length ? (
-          <ul className="close-friends__list" aria-label="People you can add">
+          <ul className="close-friends__list" aria-label={t('circles.addable')}>
             {addable.map((u) => (
               <li key={u.id} className="close-friends__row">
                 <Avatar name={u.displayName} src={u.avatarUrl} size="sm" />
@@ -311,34 +316,40 @@ function CircleDetail({ circle, onChange, onDeleted }: { circle: Circle; onChang
                     <bdi>@{u.username}</bdi>
                   </span>
                 </span>
-                <Button size="sm" variant="secondary" loading={busy === u.id} onClick={() => add(u)} aria-label={`Add ${u.displayName} to ${circle.name}`}>
-                  Add
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  loading={busy === u.id}
+                  onClick={() => add(u)}
+                  aria-label={t('circles.addMember', { name: u.displayName, circle: circle.name })}
+                >
+                  {t('m.closeFriends.add')}
                 </Button>
               </li>
             ))}
           </ul>
         ) : (
           <p className="muted" role="status" style={{ margin: 0, fontSize: 14 }}>
-            {q.trim() ? `Nobody matches "${q.trim()}".` : 'Friends and people you follow show up here.'}
+            {q.trim() ? t('circles.noMatch', { query: q.trim() }) : t('circles.suggestHint')}
           </p>
         )}
       </div>
       <Dialog
         open={confirmDelete}
         onClose={() => setConfirmDelete(false)}
-        title={`Delete ${circle.name}?`}
+        title={t('m.circles.deleteTitle', { name: circle.name })}
         footer={
           <>
             <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
-              Keep it
+              {t('circles.keep')}
             </Button>
             <Button variant="danger" loading={busy === 'delete'} onClick={destroy}>
-              Delete circle
+              {t('m.circles.delete')}
             </Button>
           </>
         }
       >
-        <p style={{ margin: 0 }}>Posts you shared with this circle stay, but only you will see them. Nobody in it is told.</p>
+        <p style={{ margin: 0 }}>{t('circles.deleteBody')}</p>
       </Dialog>
     </Card>
   );

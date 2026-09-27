@@ -4,16 +4,16 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@yapilapi/design-system';
-import { isVideoFile, MEDIA_ACCEPT, VIDEO_ACCEPT, type DualCorner } from '@yapilapi/shared';
+import { isVideoFile, MEDIA_ACCEPT, VIDEO_ACCEPT, type DualCorner, type MessageKey } from '@yapilapi/shared';
 import { DualReview, type DualShots } from '@/components/DualReview';
 import { canvasBlob, composeDual, grabFrame } from '@/lib/dual-photo';
 import { deliverPendingMedia, type CreateMode } from '@/lib/pending-media';
 import { useSession } from '../../providers';
 
-const MODES: { id: CreateMode; label: string }[] = [
-  { id: 'post', label: 'Post' },
-  { id: 'reel', label: 'Reel' },
-  { id: 'story', label: 'Story' },
+const MODES: { id: CreateMode; label: MessageKey }[] = [
+  { id: 'post', label: 'm.create.mode.post' },
+  { id: 'reel', label: 'm.create.mode.reel' },
+  { id: 'story', label: 'm.create.mode.story' },
 ];
 /** Press longer than this on the shutter (post, story) records a video instead of taking a photo. */
 const HOLD_MS = 350;
@@ -33,7 +33,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 function Camera() {
   const router = useRouter();
   const params = useSearchParams();
-  const { me, toast } = useSession();
+  const { me, toast, t } = useSession();
   const initial = (['post', 'reel', 'story'] as const).find((m) => m === params.get('mode')) ?? 'post';
   const [mode, setMode] = useState<CreateMode>(initial);
   const [facing, setFacing] = useState<'user' | 'environment'>('environment');
@@ -156,7 +156,7 @@ function Camera() {
       const [b, f] = await Promise.all([canvasBlob(back, 0.85), canvasBlob(front, 0.85)]);
       setDualShots({ back, front, backUrl: URL.createObjectURL(b), frontUrl: URL.createObjectURL(f) });
     } catch {
-      toast("Couldn't take both photos. Try again.");
+      toast(t('m.camera.dualFailed'));
     } finally {
       setDualBusy(false);
     }
@@ -178,7 +178,7 @@ function Camera() {
       closeDual();
       finish([new File([blob], `both-sides-${Date.now()}.jpg`, { type: 'image/jpeg' })], mode);
     } catch {
-      toast("Couldn't put the photos together. Try again.");
+      toast(t('m.camera.dualComposeFailed'));
     } finally {
       setDualBusy(false);
     }
@@ -187,7 +187,7 @@ function Camera() {
   const startRecording = () => {
     const s = stream.current;
     if (!s || recording) return;
-    if (typeof MediaRecorder === 'undefined') return toast("This browser can't record video. Choose one from your gallery.");
+    if (typeof MediaRecorder === 'undefined') return toast(t('camera.noRecorder'));
     const type = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'].find((t) => MediaRecorder.isTypeSupported(t));
     const r = new MediaRecorder(s, type ? { mimeType: type, videoBitsPerSecond: 5_000_000 } : undefined);
     chunks.current = [];
@@ -245,46 +245,44 @@ function Camera() {
       return recording ? stopRecording() : startRecording();
     }
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-      const i = MODES.findIndex((m) => m.id === mode) + (e.key === 'ArrowRight' ? 1 : -1);
+      // The modes read right to left in right-to-left languages, so the arrows follow what is on screen.
+      const rtl = getComputedStyle(e.currentTarget).direction === 'rtl';
+      const i = MODES.findIndex((m) => m.id === mode) + ((e.key === 'ArrowRight') !== rtl ? 1 : -1);
       if (MODES[i] && !recording) setMode(MODES[i]!.id);
     }
   };
 
   const bothSides = dual && mode !== 'reel';
-  const shutterLabel = recording
-    ? 'Stop recording'
-    : mode === 'reel'
-      ? 'Start recording'
-      : bothSides
-        ? 'Take a photo with the back camera, then the front camera'
-        : 'Take photo, or hold to record a video';
+  const shutterLabel = t(
+    recording ? 'm.camera.stopRecording' : mode === 'reel' ? 'm.camera.startRecording' : bothSides ? 'm.camera.dualShutter' : 'camera.shutterPhoto',
+  );
 
   return (
-    <div className="cam" role="dialog" aria-modal="true" aria-label="Camera" onKeyDown={onKey}>
+    <div className="cam" role="dialog" aria-modal="true" aria-label={t('m.camera.title')} onKeyDown={onKey}>
       <video ref={video} className={`cam__view${facing === 'user' ? ' cam__view--mirror' : ''}`} muted playsInline autoPlay aria-hidden />
       {flash ? <span className="cam__flash" aria-hidden /> : null}
 
       {status !== 'ready' ? (
         <div className="cam__message">
           {status === 'starting' ? (
-            <p>Starting the camera…</p>
+            <p>{t('camera.starting')}</p>
           ) : status === 'denied' ? (
             <>
-              <p>Camera access is off. Allow it in your browser settings, or choose from your gallery.</p>
+              <p>{t('camera.denied')}</p>
             </>
           ) : (
-            <p>No camera found on this device. Choose a photo or video from your files.</p>
+            <p>{t('camera.none')}</p>
           )}
           {status !== 'starting' ? (
             <button type="button" className="cam__pill" onClick={() => gallery.current?.click()}>
-              Choose from gallery
+              {t('camera.gallery')}
             </button>
           ) : null}
         </div>
       ) : null}
 
       <div className="cam__top">
-        <button type="button" className="cam__icon" aria-label="Close camera" onClick={() => router.back()}>
+        <button type="button" className="cam__icon" aria-label={t('m.camera.close')} onClick={() => router.back()}>
           <Icon name="x" />
         </button>
         {recording ? (
@@ -293,11 +291,11 @@ function Camera() {
           </span>
         ) : (
           <Link href={mode === 'post' ? '/create' : `/create?mode=${mode}`} className="cam__pill cam__pill--ghost" replace>
-            {mode === 'story' ? 'Text and stickers' : 'Write instead'}
+            {t(mode === 'story' ? 'm.camera.storyStickers' : 'camera.writeInstead')}
           </Link>
         )}
         {canFlip && !recording && !bothSides ? (
-          <button type="button" className="cam__icon" aria-label="Switch camera" onClick={() => setFacing((f) => (f === 'user' ? 'environment' : 'user'))}>
+          <button type="button" className="cam__icon" aria-label={t('m.camera.flip')} onClick={() => setFacing((f) => (f === 'user' ? 'environment' : 'user'))}>
             <Icon name="repost" />
           </button>
         ) : (
@@ -318,11 +316,11 @@ function Camera() {
               if (!dual && facing !== 'environment') setFacing('environment');
             }}
           >
-            Both sides
+            {t('m.camera.dual')}
           </button>
         ) : null}
         <div className="cam__controls">
-          <button type="button" className="cam__gallery" aria-label="Choose from gallery" disabled={recording} onClick={() => gallery.current?.click()}>
+          <button type="button" className="cam__gallery" aria-label={t('camera.gallery')} disabled={recording} onClick={() => gallery.current?.click()}>
             <Icon name="image" />
           </button>
           <button
@@ -349,20 +347,22 @@ function Camera() {
             <span aria-hidden />
           </button>
           <span className="cam__hint" aria-hidden>
-            {mode === 'reel'
-              ? recording
-                ? 'Tap to stop'
-                : 'Tap to record'
-              : bothSides
-                ? dualBusy
-                  ? 'Hold still, now the front camera'
-                  : 'Tap for a photo of both sides'
-                : hasAudio
-                  ? 'Tap for photo, hold for video'
-                  : 'Tap for photo'}
+            {t(
+              mode === 'reel'
+                ? recording
+                  ? 'camera.tapToStop'
+                  : 'camera.tapToRecord'
+                : bothSides
+                  ? dualBusy
+                    ? 'm.camera.dualTaking'
+                    : 'm.camera.dualHint'
+                  : hasAudio
+                    ? 'camera.tapOrHold'
+                    : 'camera.tapPhoto',
+            )}
           </span>
         </div>
-        <div className="cam__modes" role="tablist" aria-label="What to create">
+        <div className="cam__modes" role="tablist" aria-label={t('m.create.mode')}>
           {MODES.map((m) => (
             <button
               key={m.id}
@@ -373,7 +373,7 @@ function Camera() {
               className="cam__mode"
               onClick={() => setMode(m.id)}
             >
-              {m.label}
+              {t(m.label)}
             </button>
           ))}
         </div>
@@ -393,7 +393,7 @@ function Camera() {
           const files = Array.from(e.currentTarget.files ?? []);
           e.currentTarget.value = '';
           if (!files.length) return;
-          if (mode === 'reel' && !files.every(isVideoFile)) return toast('A reel is a video.');
+          if (mode === 'reel' && !files.every(isVideoFile)) return toast(t('compose.reelIsVideo'));
           finish(files, mode);
         }}
       />

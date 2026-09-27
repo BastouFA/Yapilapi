@@ -9,6 +9,7 @@ import {
   RECAP_MAX_ITEMS,
   RECAP_SOURCES,
   RECAP_TITLE_MAX,
+  type MessageKey,
   type RecapAspect,
   type RecapCandidate,
   type RecapCandidates,
@@ -28,25 +29,30 @@ function backHref(source: RecapSource, sourceId: string | null): string {
   return '/memories';
 }
 
-function describe(c: RecapCandidate, locale: string): string {
-  const day = new Date(c.takenAt).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
-  const what = c.kind === 'video' ? `Video${clipLength(c.durationMs) ? `, ${clipLength(c.durationMs)}` : ''}` : 'Photo';
-  return `${what} from ${day}${c.mine ? '' : ', from someone else'}`;
+type T = (key: MessageKey, vars?: Record<string, string | number>) => string;
+
+function describe(c: RecapCandidate, locale: string, t: T): string {
+  const date = new Date(c.takenAt).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+  const length = c.kind === 'video' ? clipLength(c.durationMs) : null;
+  const item =
+    c.kind !== 'video' ? t('m.recap.photoFrom', { date }) : length ? t('recaps.item.videoLength', { length, date }) : t('m.recap.videoFrom', { date });
+  return c.mine ? item : t('recaps.item.fromOther', { item });
 }
 
 /** The picture of one photo or video: its thumbnail, a video mark with its length, and a mark when it's someone else's. */
 function Thumb({ c }: { c: RecapCandidate }) {
+  const { t } = useSession();
   return (
     <span className="recap-thumb">
       {c.thumbUrl ? <img src={c.thumbUrl} alt="" loading="lazy" /> : <Icon name={c.kind === 'video' ? 'play' : 'image'} size={24} />}
       {c.kind === 'video' ? (
         <span className="recap-thumb__badge">
           <Icon name="play" filled size={12} />
-          {clipLength(c.durationMs) ?? 'Video'}
+          {clipLength(c.durationMs) ?? t('m.create.video')}
         </span>
       ) : null}
       {!c.mine ? (
-        <span className="recap-thumb__other" title="From someone else">
+        <span className="recap-thumb__other" title={t('recaps.fromSomeoneElse')}>
           <Icon name="users" size={12} />
         </span>
       ) : null}
@@ -55,7 +61,7 @@ function Thumb({ c }: { c: RecapCandidate }) {
 }
 
 function Maker() {
-  const { flags, toast, locale } = useSession();
+  const { flags, toast, locale, t, tp } = useSession();
   const router = useRouter();
   const params = useSearchParams();
   const rawSource = params.get('source');
@@ -100,13 +106,13 @@ function Maker() {
   const remaining = cand?.remainingToday ?? 0;
   const hasOthers = chosen.some((c) => !c.mine);
 
-  if (flags.MEMORY === false || (loadError instanceof ApiError && loadError.code === 'feature_disabled')) return <FeatureOff name="Recap videos" />;
+  if (flags.MEMORY === false || (loadError instanceof ApiError && loadError.code === 'feature_disabled')) return <FeatureOff name={t('m.recap.title')} />;
 
   const header = (
     <div className="yp-topbar">
-      <h1>Make a recap video</h1>
+      <h1>{t('m.recap.make')}</h1>
       <Link href="/recaps" className="yp-btn yp-btn--ghost yp-btn--sm">
-        Your recaps
+        {t('m.recap.yours')}
       </Link>
     </div>
   );
@@ -116,11 +122,11 @@ function Maker() {
       <div className="yp-shell__inner">
         {header}
         <EmptyState
-          title="Choose what to make it from"
-          body="Open a memory or one of your chapters and choose Make a recap video, or make one from On this day in Memories."
+          title={t('recaps.new.pickTitle')}
+          body={t('recaps.new.pickBody')}
           action={
             <Link href="/memories" className="yp-btn yp-btn--secondary">
-              Go to Memories
+              {t('recaps.new.goToMemories')}
             </Link>
           }
         />
@@ -132,11 +138,11 @@ function Maker() {
       <div className="yp-shell__inner">
         {header}
         <EmptyState
-          title="Can't make a recap from this"
-          body={loadError instanceof ApiError ? loadError.message : 'Something went wrong. Try again.'}
+          title={t('recaps.new.cantMake')}
+          body={loadError instanceof ApiError ? loadError.message : t('error.generic')}
           action={
             <Link href={backHref(source, sourceId)} className="yp-btn yp-btn--secondary">
-              Go back
+              {t('recaps.new.goBack')}
             </Link>
           }
         />
@@ -157,17 +163,11 @@ function Maker() {
       <div className="yp-shell__inner">
         {header}
         <EmptyState
-          title="No photos or videos to use"
-          body={
-            source === 'on_this_day'
-              ? 'A recap is made from photos and videos you shared on this day in earlier years. There are none yet.'
-              : source === 'chapter'
-                ? 'A recap is made from the photos and videos in this chapter. Add some stories to it first.'
-                : 'A recap is made from the photos and videos in this memory that you can see. Add some posts with photos or videos to it first.'
-          }
+          title={t('recaps.new.noItemsTitle')}
+          body={t(source === 'on_this_day' ? 'recaps.new.noItemsOnThisDay' : source === 'chapter' ? 'recaps.new.noItemsChapter' : 'recaps.new.noItemsMemory')}
           action={
             <Link href={backHref(source, sourceId)} className="yp-btn yp-btn--secondary">
-              Go back
+              {t('recaps.new.goBack')}
             </Link>
           }
         />
@@ -182,7 +182,7 @@ function Maker() {
       next.splice(to, 0, item!);
       return next;
     });
-    setAnnounce(`Moved to position ${to + 1} of ${picked.length}.`);
+    setAnnounce(t('recaps.new.moved', { position: to + 1, total: picked.length }));
   };
 
   async function create() {
@@ -199,7 +199,7 @@ function Maker() {
         ...(sound ? { soundId: sound.id } : {}),
         ...(length !== 'auto' ? { lengthSeconds: Number(length) } : {}),
       });
-      toast("We're making your recap video. We'll let you know when it's ready.");
+      toast(t('recaps.new.making'));
       router.push(`/recaps?open=${recap.id}`);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'recap_limit') setCand((c) => (c ? { ...c, remainingToday: 0 } : c));
@@ -212,20 +212,20 @@ function Maker() {
     <div className="yp-shell__inner">
       {header}
       <p className="muted" style={{ margin: 0 }}>
-        A short video made from photos and videos you choose. Only you see it until you decide to share it.
+        {t('recaps.new.intro')}
       </p>
 
       <section className="stack-sm" aria-labelledby="recap-chosen">
         <h2 id="recap-chosen" className="section-title">
-          In your video ({picked.length} of {RECAP_MAX_ITEMS})
+          {t('recaps.new.inVideo', { count: picked.length, max: RECAP_MAX_ITEMS })}
         </h2>
         <p className="muted" style={{ margin: 0 }}>
-          They play in this order.
+          {t('recaps.new.order')}
         </p>
         {chosen.length ? (
           <ol className="recap-picked">
             {chosen.map((c, n) => {
-              const label = describe(c, locale);
+              const label = describe(c, locale, t);
               return (
                 <li key={c.mediaId} className="recap-picked__item">
                   <span className="recap-picked__num" aria-hidden>
@@ -234,13 +234,19 @@ function Maker() {
                   <Thumb c={c} />
                   <span className="recap-picked__text">{label}</span>
                   <span className="recap-picked__tools">
-                    <button type="button" className="recap-tool" aria-label={`Move ${label} earlier`} disabled={n === 0} onClick={() => move(n, n - 1)}>
+                    <button
+                      type="button"
+                      className="recap-tool"
+                      aria-label={t('recaps.new.moveEarlier', { item: label })}
+                      disabled={n === 0}
+                      onClick={() => move(n, n - 1)}
+                    >
                       <Icon name="chevron-down" size={18} className="recap-tool__up" />
                     </button>
                     <button
                       type="button"
                       className="recap-tool"
-                      aria-label={`Move ${label} later`}
+                      aria-label={t('recaps.new.moveLater', { item: label })}
                       disabled={n === chosen.length - 1}
                       onClick={() => move(n, n + 1)}
                     >
@@ -249,10 +255,10 @@ function Maker() {
                     <button
                       type="button"
                       className="recap-tool"
-                      aria-label={`Remove ${label}`}
+                      aria-label={t('recaps.new.removeItem', { item: label })}
                       onClick={() => {
                         setPicked((p) => p.filter((id) => id !== c.mediaId));
-                        setAnnounce('Removed from your video.');
+                        setAnnounce(t('recaps.new.removed'));
                       }}
                     >
                       <Icon name="x" size={18} />
@@ -264,13 +270,12 @@ function Maker() {
           </ol>
         ) : (
           <p className="muted" style={{ margin: 0 }}>
-            Nothing chosen yet. Add photos or videos from below.
+            {t('recaps.new.nothingChosen')}
           </p>
         )}
         {hasOthers ? (
           <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-            <Icon name="users" size={14} /> Some of these are from other people. You can watch and save the video, but you won&apos;t be able to post it as a
-            reel.
+            <Icon name="users" size={14} /> {t('recaps.new.othersNote')}
           </p>
         ) : null}
         <p className="yp-visually-hidden" role="status" aria-live="polite">
@@ -281,26 +286,26 @@ function Maker() {
       {others.length ? (
         <section className="stack-sm" aria-labelledby="recap-more">
           <h2 id="recap-more" className="section-title">
-            More to add
+            {t('recaps.new.moreToAdd')}
           </h2>
           {full ? (
             <p className="muted" style={{ margin: 0 }}>
-              You&apos;ve chosen {RECAP_MAX_ITEMS}, the most a recap can have. Remove one to add another.
+              {t('recaps.new.full', { max: RECAP_MAX_ITEMS })}
             </p>
           ) : null}
           <ul className="recap-grid">
             {others.map((c) => {
-              const label = describe(c, locale);
+              const label = describe(c, locale, t);
               return (
                 <li key={c.mediaId}>
                   <button
                     type="button"
                     className="recap-add"
                     disabled={full}
-                    aria-label={`Add ${label}`}
+                    aria-label={t('recaps.new.addItem', { item: label })}
                     onClick={() => {
                       setPicked((p) => (p.length >= RECAP_MAX_ITEMS || p.includes(c.mediaId) ? p : [...p, c.mediaId]));
-                      setAnnounce(`Added as number ${picked.length + 1}.`);
+                      setAnnounce(t('recaps.new.added', { position: picked.length + 1 }));
                     }}
                   >
                     <Thumb c={c} />
@@ -317,74 +322,69 @@ function Maker() {
 
       <section className="stack" aria-labelledby="recap-settings">
         <h2 id="recap-settings" className="section-title">
-          How it looks
+          {t('recaps.new.howItLooks')}
         </h2>
-        <TextField label="Title" value={title} maxLength={RECAP_TITLE_MAX} required onChange={(e) => setTitle(e.currentTarget.value)} />
+        <TextField label={t('m.recap.name')} value={title} maxLength={RECAP_TITLE_MAX} required onChange={(e) => setTitle(e.currentTarget.value)} />
 
         <fieldset className="recap-choices">
-          <legend className="yp-field__label">Style</legend>
+          <legend className="yp-field__label">{t('m.recap.style')}</legend>
           {RECAP_STYLE_CHOICES.map((o) => (
             <label key={o.id} className="recap-choice">
               <input type="radio" name="recap-style" value={o.id} checked={style === o.id} onChange={() => setStyle(o.id)} />
               <span>
-                <strong>{o.label}</strong>
-                <span className="muted">{o.hint}</span>
+                <strong>{t(o.label)}</strong>
+                <span className="muted">{t(o.hint)}</span>
               </span>
             </label>
           ))}
         </fieldset>
 
         <fieldset className="recap-choices">
-          <legend className="yp-field__label">Shape</legend>
+          <legend className="yp-field__label">{t('m.recap.shape')}</legend>
           {RECAP_ASPECT_CHOICES.map((o) => (
             <label key={o.id} className="recap-choice">
               <input type="radio" name="recap-aspect" value={o.id} checked={aspect === o.id} onChange={() => setAspect(o.id)} />
               <span className={`recap-shape recap-shape--${o.id === '1:1' ? 'square' : 'tall'}`} aria-hidden />
               <span>
-                <strong>{o.label}</strong>
-                <span className="muted">{o.hint}</span>
+                <strong>{t(o.label)}</strong>
+                <span className="muted">{o.hint ? t(o.hint) : o.id}</span>
               </span>
             </label>
           ))}
         </fieldset>
 
-        <Select
-          label="Length"
-          hint="Auto gives each photo and clip the time it needs, up to 60 seconds."
-          value={length}
-          onChange={(e) => setLength(e.currentTarget.value)}
-        >
-          <option value="auto">Auto</option>
+        <Select label={t('m.recap.length')} hint={t('recaps.new.lengthHint')} value={length} onChange={(e) => setLength(e.currentTarget.value)}>
+          <option value="auto">{t('m.recap.length.auto')}</option>
           {RECAP_LENGTHS.map((s) => (
             <option key={s} value={String(s)}>
-              Up to {s} seconds
+              {t('recaps.new.upToSeconds', { seconds: s })}
             </option>
           ))}
         </Select>
 
         <div className="stack-sm">
-          <span className="yp-field__label">Sound (optional)</span>
+          <span className="yp-field__label">{t('recaps.new.soundOptional')}</span>
           {sound ? (
             <div className="sound-row sound-row--picked">
               <SoundPlayButton sound={sound} />
               <span className="sound-row__text">
                 <bdi className="sound-row__title">{sound.title}</bdi>
                 <span className="sound-row__meta">
-                  Plays over your video · <bdi>@{sound.owner.username}</bdi>
+                  {t('recaps.new.playsOver')} · <bdi>@{sound.owner.username}</bdi>
                 </span>
               </span>
               <Button size="sm" variant="ghost" onClick={() => setSound(null)}>
-                Remove
+                {t('m.common.remove')}
               </Button>
             </div>
           ) : (
             <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-              Without a sound, the video is silent.
+              {t('recaps.new.silent')}
             </p>
           )}
           <div className="row">
             <Button size="sm" variant="secondary" icon="music" onClick={() => setPickingSound(true)}>
-              {sound ? 'Choose another sound' : 'Choose a sound'}
+              {t(sound ? 'recaps.new.chooseAnotherSound' : 'recaps.new.chooseSound')}
             </Button>
           </div>
           <SoundPicker
@@ -401,21 +401,19 @@ function Maker() {
       <div className="stack-sm">
         {error ? <Alert tone="danger">{error}</Alert> : null}
         <p className="muted" style={{ margin: 0 }}>
-          {remaining > 0
-            ? `You can make ${remaining} more ${remaining === 1 ? 'recap' : 'recaps'} today.`
-            : "You've made as many recaps as you can today. You can make more tomorrow."}
+          {remaining > 0 ? tp('m.recap.remaining', remaining) : t('m.recap.noneLeft')}
         </p>
         <div className="row">
           <Button loading={busy} disabled={!picked.length || !title.trim() || remaining <= 0} onClick={() => void create()}>
-            Make the video
+            {t('recaps.new.submit')}
           </Button>
           <Link href={backHref(source, sourceId)} className="yp-btn yp-btn--ghost">
-            Cancel
+            {t('common.cancel')}
           </Link>
         </div>
         {!picked.length ? (
           <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-            Choose at least one photo or video.
+            {t('m.recap.chooseSome')}
           </p>
         ) : null}
       </div>

@@ -11,7 +11,7 @@ type Suggestion = { user: PublicUser; bio: string; reason: string };
 
 /** A row of people you might want to follow, with why each is suggested. Dismissed people stay hidden on this device. */
 export function SuggestedPeople() {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const [items, setItems] = useState<Suggestion[] | null>(null);
   const [followed, setFollowed] = useState<Set<string>>(new Set());
 
@@ -42,14 +42,14 @@ export function SuggestedPeople() {
   return (
     <section className="suggested" aria-labelledby="suggested-title">
       <h2 id="suggested-title" className="section-title">
-        Suggested for you
+        {t('suggested.title')}
       </h2>
       <ul className="suggested__row">
         {items.map(({ user, reason }) => {
           const on = followed.has(user.id);
           return (
             <li key={user.id} className="suggested__card">
-              <button type="button" className="suggested__hide" aria-label={`Hide ${user.displayName}`} onClick={() => hide(user.id)}>
+              <button type="button" className="suggested__hide" aria-label={t('suggested.hide', { name: user.displayName })} onClick={() => hide(user.id)}>
                 <Icon name="x" size={14} />
               </button>
               <Link href={`/u/${user.username}`} className="suggested__who">
@@ -75,7 +75,7 @@ export function SuggestedPeople() {
                   }
                 }}
               >
-                {on ? 'Following' : 'Follow'}
+                {on ? t('profile.unfollow') : t('profile.follow')}
               </Button>
             </li>
           );

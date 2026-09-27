@@ -47,7 +47,7 @@ import { SaveToSheet } from './Boards';
 export function PostList({
   load,
   empty,
-  emptyTitle = 'Nothing here yet',
+  emptyTitle,
   reloadKey,
   sponsored = false,
   showEnd = true,
@@ -154,7 +154,7 @@ export function PostList({
     try {
       const r = reposted ? await api.posts.repost(p.id) : await api.posts.unrepost(p.id);
       patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, reposted: r.reposted }, counts: { ...x.counts, reposts: r.reposts } }));
-      toast(reposted ? 'Reposted to your followers' : 'Repost removed');
+      toast(t(reposted ? 'postList.reposted' : 'postList.repostRemoved'));
     } catch (e) {
       patch(p.id, () => p);
       toast(errorMessage(e));
@@ -164,17 +164,17 @@ export function PostList({
   /** The system share sheet where there is one (phones), otherwise copy the link. */
   async function share(p: Post) {
     const url = `${location.origin}${p.format === 'reel' ? `/reels?start=${p.id}` : `/p/${p.id}`}`;
-    const title = `${p.author.displayName} on YAPILAPI`;
+    const title = t('postList.shareTitle', { name: p.author.displayName });
     try {
       if (navigator.share) {
         await navigator.share({ title, text: p.body ? p.body.slice(0, 120) : title, url });
         return;
       }
       await navigator.clipboard.writeText(url);
-      toast('Link copied');
+      toast(t('invite.copied'));
     } catch (e) {
       // Closing the share sheet isn't an error.
-      if ((e as Error).name !== 'AbortError') toast("Couldn't share. Copy the address from your browser instead.");
+      if ((e as Error).name !== 'AbortError') toast(t('postList.shareFailed'));
     }
   }
 
@@ -184,8 +184,8 @@ export function PostList({
     try {
       if (saved) await api.posts.save(p.id);
       else await api.posts.unsave(p.id);
-      if (saved) toast(`${t('common.saved')}.`, { label: 'Add to a board', onClick: () => setSaveTo(p) });
-      else toast('Removed from saved');
+      if (saved) toast(t('m.saved.done'), { label: t('m.saved.addToBoard'), onClick: () => setSaveTo(p) });
+      else toast(t('postList.unsaved'));
     } catch (e) {
       patch(p.id, () => p);
       toast(errorMessage(e));
@@ -208,12 +208,12 @@ export function PostList({
         setPosts((cur) => cur?.filter((x) => (signal === 'mute_creator' ? x.author.id !== p.author.id : x.id !== p.id)) ?? cur);
       toast(
         signal === 'more_like_this'
-          ? "We'll show more like this."
+          ? t('postList.moreLikeThis')
           : signal === 'less_like_this'
-            ? "We'll show less like this."
+            ? t('postList.lessLikeThis')
             : signal === 'mute_creator'
-              ? `Muted ${p.author.displayName}.`
-              : 'Hidden.',
+              ? t('postList.muted', { name: p.author.displayName })
+              : t('postList.hidden'),
       );
     } catch (e) {
       toast(errorMessage(e));
@@ -225,7 +225,7 @@ export function PostList({
       await api.posts.pin(p.pinned ? null : p.id);
       // Only one post is pinned at a time; the list order changes on the next load.
       setPosts((cur) => cur?.map((x) => ({ ...x, pinned: x.id === p.id ? !p.pinned : false })) ?? cur);
-      toast(p.pinned ? 'Unpinned from your profile' : 'Pinned to the top of your profile');
+      toast(t(p.pinned ? 'postList.unpinned' : 'postList.pinned'));
     } catch (e) {
       toast(errorMessage(e));
     }
@@ -235,7 +235,7 @@ export function PostList({
     try {
       const r = await api.posts.acceptCollab(p.id);
       patch(p.id, () => r.post);
-      toast("You're a co-author now. It shows on your profile too.");
+      toast(t('postList.collabAccepted'));
     } catch (e) {
       toast(errorMessage(e));
     }
@@ -245,7 +245,7 @@ export function PostList({
     try {
       await api.posts.declineCollab(p.id);
       patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, collab: undefined } }));
-      toast('Declined');
+      toast(t('postList.collabDeclined'));
     } catch (e) {
       toast(errorMessage(e));
     }
@@ -259,7 +259,7 @@ export function PostList({
         collaborators: x.collaborators?.filter((c) => c.id !== me?.id),
         viewer: { ...x.viewer, collab: undefined },
       }));
-      toast("You're no longer a co-author. It's off your profile.");
+      toast(t('postList.collabLeft'));
     } catch (e) {
       toast(errorMessage(e));
     }
@@ -272,7 +272,7 @@ export function PostList({
         ...x,
         media: x.media.map((m) => (m.id === mediaId ? { ...m, tags: m.tags?.filter((t) => t.id !== tag.id) } : m)),
       }));
-      toast(tag.user.id === me?.id ? 'You were removed from the photo' : 'Tag removed');
+      toast(t(tag.user.id === me?.id ? 'postList.tagRemovedSelf' : 'postList.tagRemoved'));
     } catch (e) {
       toast(errorMessage(e));
     }
@@ -282,7 +282,7 @@ export function PostList({
     try {
       await api.posts.remove(p.id);
       setPosts((cur) => cur?.filter((x) => x.id !== p.id) ?? cur);
-      toast('Post deleted');
+      toast(t('postList.deleted'));
     } catch (e) {
       toast(errorMessage(e));
     }
@@ -290,12 +290,12 @@ export function PostList({
 
   // The sponsored post follows the third post in the list (or the last, in a short list).
   const renderAd = (slotAd: SponsoredAd) => (
-    <section className="yp-sponsored" aria-label="Sponsored post">
+    <section className="yp-sponsored" aria-label={t('postList.sponsoredPost')}>
       <div className="yp-sponsored__bar">
         <Badge tone="neutral">{slotAd.label}</Badge>
         <span className="yp-spacer" />
         <Button size="sm" variant="ghost" onClick={() => setAdWhy(true)}>
-          Why this ad?
+          {t('postList.whyAd')}
         </Button>
         <Button
           size="sm"
@@ -303,10 +303,10 @@ export function PostList({
           onClick={async () => {
             setAd(null);
             await api.ads.hide(slotAd.campaignId).catch(() => {});
-            toast("You won't see this ad again.");
+            toast(t('postList.adHidden'));
           }}
         >
-          Hide
+          {t('m.chapters.hide')}
         </Button>
       </div>
       <div
@@ -340,7 +340,7 @@ export function PostList({
         ))}
       </div>
     );
-  if (!posts.length) return <EmptyState title={emptyTitle} body={empty ?? t('feed.empty')} />;
+  if (!posts.length) return <EmptyState title={emptyTitle ?? t('m.feed.empty.title')} body={empty ?? t('feed.empty')} />;
 
   return (
     <div className="stack">
@@ -398,7 +398,7 @@ export function PostList({
       ) : null}
 
       <BottomSheet open={!!why} onClose={() => setWhy(null)} title={t('post.why')}>
-        <ul className="stack-sm" style={{ paddingLeft: 20, margin: 0 }}>
+        <ul className="stack-sm" style={{ paddingInlineStart: 20, margin: 0 }}>
           {why?.reasons.map((r) => (
             <li key={r}>{r}</li>
           ))}
@@ -413,16 +413,13 @@ export function PostList({
         </div>
       </BottomSheet>
 
-      <BottomSheet open={adWhy && !!ad} onClose={() => setAdWhy(false)} title="Why you're seeing this ad">
-        <ul className="stack-sm" style={{ paddingLeft: 20, margin: 0 }}>
+      <BottomSheet open={adWhy && !!ad} onClose={() => setAdWhy(false)} title={t('postList.whyAdTitle')}>
+        <ul className="stack-sm" style={{ paddingInlineStart: 20, margin: 0 }}>
           {ad?.why.map((r) => (
             <li key={r}>{r}</li>
           ))}
         </ul>
-        <p className="muted">
-          Ads are paid for by the account that posted them. You can turn advertising off in Settings, under Privacy, and no ads are ever shown to people under
-          18.
-        </p>
+        <p className="muted">{t('postList.adBody')}</p>
       </BottomSheet>
 
       <ReportSheet target={reporting ? { type: 'post', id: reporting.id } : null} onClose={() => setReporting(null)} />
@@ -483,7 +480,7 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
   const changed = body.trim() !== post.body || visibility !== post.visibility || changedAlts.length > 0;
   const audiences = EDIT_AUDIENCES.filter((v) => v !== 'subscribers' || hasPlans);
   return (
-    <BottomSheet open onClose={onClose} title="Edit post">
+    <BottomSheet open onClose={onClose} title={t('m.post.editTitle')}>
       <form
         className="stack"
         onSubmit={async (e) => {
@@ -498,7 +495,7 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
               ...(changedAlts.length ? { media: changedAlts.map((m) => ({ id: m.id, altText: (alts[m.id] ?? '').trim() })) } : {}),
             });
             onSaved(r.post);
-            toast(r.moderation ? r.moderation.message : 'Post updated');
+            toast(r.moderation ? r.moderation.message : t('m.post.updated'));
             onClose();
           } catch (err) {
             setError(errorMessage(err));
@@ -510,7 +507,7 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
       >
         {error ? <Alert tone="danger">{error}</Alert> : null}
         <label className="yp-field__label" htmlFor={`edit-${post.id}`}>
-          Text
+          {t('m.post.text')}
         </label>
         <AutocompleteText
           id={`edit-${post.id}`}
@@ -524,7 +521,7 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
         {fields.body ? <span className="yp-field__error">{fields.body}</span> : null}
         {describable.length ? (
           <div className="stack-sm">
-            <span className="yp-field__label">Describe your photos and videos</span>
+            <span className="yp-field__label">{t('postList.describeMedia')}</span>
             {describable.map((m, i) => (
               <div key={m.id} className="row" style={{ alignItems: 'center', flexWrap: 'nowrap' }}>
                 {m.kind === 'video' ? (
@@ -540,8 +537,8 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
                 <input
                   className="yp-input"
                   style={{ flex: 1 }}
-                  placeholder="What's in it, for people who can't see it"
-                  aria-label={`Describe ${m.kind === 'video' ? 'video' : 'photo'} ${i + 1}`}
+                  placeholder={t('postList.altPlaceholder')}
+                  aria-label={t(m.kind === 'video' ? 'postList.describeVideo' : 'postList.describePhoto', { index: i + 1 })}
                   maxLength={500}
                   value={alts[m.id] ?? ''}
                   onChange={(e) => {
@@ -555,7 +552,7 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
         ) : null}
         {post.community ? (
           <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-            Posts in a community are shared with its members.
+            {t('postList.communityAudience')}
           </p>
         ) : (
           <Select label={t('create.visibility')} value={visibility} onChange={(e) => setVisibility(e.currentTarget.value as Post['visibility'])}>
@@ -570,10 +567,10 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
           </Select>
         )}
         <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-          Photos, polls and links stay as they are. If you change the text, people can see earlier versions.
+          {t('m.post.editNote')}
         </p>
         <Button type="submit" loading={busy} disabled={!changed}>
-          Save changes
+          {t('m.post.saveChanges')}
         </Button>
       </form>
     </BottomSheet>
@@ -582,7 +579,7 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
 
 /** The versions of an edited post's text, newest first. */
 export function HistorySheet({ post, onClose }: { post: Post; onClose: () => void }) {
-  const { toast, locale } = useSession();
+  const { toast, locale, t } = useSession();
   const [items, setItems] = useState<PostVersion[] | null>(null);
   const close = useRef(onClose);
   useEffect(() => {
@@ -598,7 +595,7 @@ export function HistorySheet({ post, onClose }: { post: Post; onClose: () => voi
     );
   }, [post.id, toast]);
   return (
-    <BottomSheet open onClose={onClose} title="Edit history">
+    <BottomSheet open onClose={onClose} title={t('m.post.history')}>
       {items === null ? <Skeleton height={80} /> : <PostHistory versions={items} locale={locale} linkAs={NextLink} />}
     </BottomSheet>
   );
@@ -606,7 +603,7 @@ export function HistorySheet({ post, onClose }: { post: Post; onClose: () => voi
 
 /** The original author invites co-authors to a post, cancels invites, or takes a co-author off. */
 function CoauthorsSheet({ post, onClose, onChanged }: { post: Post; onClose: () => void; onChanged: (p: Post) => void }) {
-  const { toast } = useSession();
+  const { toast, t, tp } = useSession();
   const [picked, setPicked] = useState<PublicUser[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const people = [
@@ -626,16 +623,16 @@ function CoauthorsSheet({ post, onClose, onChanged }: { post: Post; onClose: () 
     }
   };
   return (
-    <BottomSheet open onClose={onClose} title="Co-authors">
+    <BottomSheet open onClose={onClose} title={t('postList.coauthors')}>
       <div className="stack">
         {people.length ? (
-          <List label="Co-authors">
+          <List label={t('postList.coauthors')}>
             {people.map(({ user, pending }) => (
               <ListItem
                 key={user.id}
                 start={<Avatar name={user.displayName} src={user.avatarUrl} size="sm" />}
                 primary={user.displayName}
-                secondary={pending ? 'Invited, not answered yet' : 'Co-author'}
+                secondary={t(pending ? 'boards.pending' : 'postList.coauthor')}
                 end={
                   <Button
                     size="sm"
@@ -646,11 +643,11 @@ function CoauthorsSheet({ post, onClose, onChanged }: { post: Post; onClose: () 
                       run(
                         user.id,
                         () => api.posts.removeCollaborator(post.id, user.id),
-                        pending ? 'Invite cancelled' : `${user.displayName} is no longer a co-author`,
+                        pending ? t('boards.inviteCancelled') : t('postList.coauthorRemoved', { name: user.displayName }),
                       )
                     }
                   >
-                    {pending ? 'Cancel invite' : 'Remove'}
+                    {t(pending ? 'boards.cancelInvite' : 'm.common.remove')}
                   </Button>
                 }
               />
@@ -658,14 +655,14 @@ function CoauthorsSheet({ post, onClose, onChanged }: { post: Post; onClose: () 
           </List>
         ) : (
           <p className="muted" style={{ margin: 0 }}>
-            No co-authors yet.
+            {t('postList.noCoauthors')}
           </p>
         )}
         {room > 0 ? (
           <>
             <PeoplePicker
-              label="Invite co-authors"
-              hint="They can accept or decline. Once they accept, it shows on their profile too."
+              label={t('m.collab.inviteTitle')}
+              hint={t('postList.coauthorHint')}
               scope="mutuals"
               max={room}
               canPick={() => true}
@@ -687,16 +684,16 @@ function CoauthorsSheet({ post, onClose, onChanged }: { post: Post; onClose: () 
                     setPicked([]);
                     return r;
                   },
-                  picked.length === 1 ? 'Invite sent' : 'Invites sent',
+                  tp('boards.invitesSent', picked.length),
                 )
               }
             >
-              Send {picked.length === 1 ? 'invite' : 'invites'}
+              {tp('boards.sendInvites', picked.length)}
             </Button>
           </>
         ) : (
           <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-            A post can have up to {MAX_COLLABORATORS} co-authors.
+            {t('postList.coauthorMax', { count: MAX_COLLABORATORS })}
           </p>
         )}
       </div>
@@ -733,13 +730,13 @@ export function CommentsSheet({ post, onClose, onAdded }: { post: Post; onClose:
             </div>
           ))
         ) : (
-          <p className="muted">No comments yet. Start the conversation.</p>
+          <p className="muted">{t('postList.noComments')}</p>
         )}
         {!me ? (
           <div className="row">
-            <span className="muted">Sign in to join the conversation.</span>
+            <span className="muted">{t('postList.signInToComment')}</span>
             <Link href={signInHref()} className="yp-btn yp-btn--primary yp-btn--sm">
-              Sign in
+              {t('postList.signIn')}
             </Link>
           </div>
         ) : (
@@ -784,26 +781,26 @@ export function CommentsSheet({ post, onClose, onAdded }: { post: Post; onClose:
   );
 }
 
-const REASON_LABEL: Record<string, string> = {
-  spam: 'Spam',
-  harassment: 'Harassment or bullying',
-  hate: 'Hate speech',
-  violence: 'Violence or threats',
-  nudity: 'Nudity or sexual content',
-  self_harm: 'Self-harm',
-  impersonation: 'Impersonation',
-  fraud: 'Scam or fraud',
-  minor_safety: 'Puts a young person at risk',
-  other: 'Something else',
+const REASON_LABEL: Record<string, MessageKey> = {
+  spam: 'postList.reason.spam',
+  harassment: 'postList.reason.harassment',
+  hate: 'postList.reason.hate',
+  violence: 'postList.reason.violence',
+  nudity: 'postList.reason.nudity',
+  self_harm: 'postList.reason.selfHarm',
+  impersonation: 'postList.reason.impersonation',
+  fraud: 'postList.reason.fraud',
+  minor_safety: 'postList.reason.minorSafety',
+  other: 'postList.reason.other',
 };
 
 export function ReportSheet({ target, onClose }: { target: { type: string; id: string } | null; onClose: () => void }) {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const [reason, setReason] = useState<string>('spam');
   const [details, setDetails] = useState('');
   const [busy, setBusy] = useState(false);
   return (
-    <BottomSheet open={!!target} onClose={onClose} title="Report">
+    <BottomSheet open={!!target} onClose={onClose} title={t('post.report')}>
       <form
         className="stack"
         onSubmit={async (e) => {
@@ -820,22 +817,16 @@ export function ReportSheet({ target, onClose }: { target: { type: string; id: s
           }
         }}
       >
-        <Select label="What's wrong?" value={reason} onChange={(e) => setReason(e.currentTarget.value)}>
+        <Select label={t('postList.reportWhat')} value={reason} onChange={(e) => setReason(e.currentTarget.value)}>
           {REPORT_REASONS.map((r) => (
             <option key={r} value={r}>
-              {REASON_LABEL[r]}
+              {REASON_LABEL[r] ? t(REASON_LABEL[r]) : r}
             </option>
           ))}
         </Select>
-        <TextField
-          label="Anything else we should know? (optional)"
-          multiline
-          value={details}
-          onChange={(e) => setDetails(e.currentTarget.value)}
-          maxLength={2000}
-        />
+        <TextField label={t('postList.reportDetails')} multiline value={details} onChange={(e) => setDetails(e.currentTarget.value)} maxLength={2000} />
         <Button type="submit" variant="danger" loading={busy}>
-          Send report
+          {t('postList.sendReport')}
         </Button>
       </form>
     </BottomSheet>
@@ -843,7 +834,7 @@ export function ReportSheet({ target, onClose }: { target: { type: string; id: s
 }
 
 function AddToMemorySheet({ post, onClose }: { post: Post; onClose: () => void }) {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const [memories, setMemories] = useState<{ id: string; title: string; mine: boolean }[] | null>(null);
   const [title, setTitle] = useState('');
   useEffect(() => {
@@ -855,14 +846,14 @@ function AddToMemorySheet({ post, onClose }: { post: Post; onClose: () => void }
   const add = async (memoryId: string, name: string) => {
     try {
       await api.memories.addItem(memoryId, 'post', post.id);
-      toast(`Added to ${name}`);
+      toast(t('boards.addedTo', { name }));
       onClose();
     } catch (e) {
       toast(errorMessage(e));
     }
   };
   return (
-    <BottomSheet open onClose={onClose} title="Add to a memory">
+    <BottomSheet open onClose={onClose} title={t('postList.addToMemory')}>
       <div className="stack-sm">
         {memories === null ? (
           <Skeleton height={60} />
@@ -881,9 +872,9 @@ function AddToMemorySheet({ post, onClose }: { post: Post; onClose: () => void }
             await add(memory.id, memory.title);
           }}
         >
-          <TextField label="Or start a new memory" value={title} onChange={(e) => setTitle(e.currentTarget.value)} maxLength={120} />
+          <TextField label={t('postList.newMemory')} value={title} onChange={(e) => setTitle(e.currentTarget.value)} maxLength={120} />
           <Button type="submit" disabled={!title.trim()}>
-            Create and add
+            {t('postList.createAndAdd')}
           </Button>
         </form>
       </div>

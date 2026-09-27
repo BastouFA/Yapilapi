@@ -6,23 +6,25 @@ import type { Conversation, MessageKey, Recap, RecapStatus } from '@yapilapi/sha
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '../app/providers';
 
-export const RECAP_STATUS_LABEL: Record<RecapStatus, string> = {
-  queued: 'Waiting',
-  rendering: 'Making your video',
-  ready: 'Ready',
-  failed: "Couldn't make it",
+/** Message keys for each status; translate with t() at render. */
+export const RECAP_STATUS_LABEL: Record<RecapStatus, MessageKey> = {
+  queued: 'recaps.status.queued',
+  rendering: 'recaps.status.rendering',
+  ready: 'm.recap.status.ready',
+  failed: 'recaps.status.failed',
 };
 
 export const RECAP_STYLE_CHOICES = [
-  { id: 'calm', label: 'Calm', hint: 'Slow crossfades' },
-  { id: 'quick', label: 'Quick', hint: 'Cuts on the beat' },
-  { id: 'film', label: 'Film', hint: 'Gentle zoom' },
-] as const;
+  { id: 'calm', label: 'm.recap.style.calm', hint: 'recaps.style.calmHint' },
+  { id: 'quick', label: 'm.recap.style.quick', hint: 'recaps.style.quickHint' },
+  { id: 'film', label: 'm.recap.style.film', hint: 'recaps.style.filmHint' },
+] as const satisfies readonly { id: string; label: MessageKey; hint: MessageKey }[];
 
+/** `hint` is a message key, or null when the ratio itself (the id) is the hint. */
 export const RECAP_ASPECT_CHOICES = [
-  { id: '9:16', label: 'Tall', hint: '9:16, for reels and stories' },
-  { id: '1:1', label: 'Square', hint: '1:1' },
-] as const;
+  { id: '9:16', label: 'm.recap.shape.tall', hint: 'recaps.shape.tallHint' },
+  { id: '1:1', label: 'm.recap.shape.square', hint: null },
+] as const satisfies readonly { id: string; label: MessageKey; hint: MessageKey | null }[];
 
 export function isPending(r: Recap): boolean {
   return r.status === 'queued' || r.status === 'rendering';
@@ -70,7 +72,7 @@ export function RecapPostForm({ recap, onDone, onCancel }: { recap: Recap; onDon
             media: [{ id: recap.video.mediaId, url: new URL(recap.video.url, location.origin).toString(), kind: 'video' }],
             ...(recap.sound ? { soundId: recap.sound.id } : {}),
           });
-          toast(r.moderation ? r.moderation.message : 'Posted as a reel');
+          toast(r.moderation ? r.moderation.message : t('m.recap.posted'));
           onDone(r.post.id);
         } catch (err) {
           toast(errorMessage(err));
@@ -79,8 +81,8 @@ export function RecapPostForm({ recap, onDone, onCancel }: { recap: Recap; onDon
         }
       }}
     >
-      <TextField label="Caption (optional)" multiline rows={3} value={caption} maxLength={2200} onChange={(e) => setCaption(e.currentTarget.value)} />
-      <Select label="Who can see it" value={visibility} onChange={(e) => setVisibility(e.currentTarget.value as (typeof REEL_AUDIENCES)[number])}>
+      <TextField label={t('recaps.captionOptional')} multiline rows={3} value={caption} maxLength={2200} onChange={(e) => setCaption(e.currentTarget.value)} />
+      <Select label={t('m.chapters.audience')} value={visibility} onChange={(e) => setVisibility(e.currentTarget.value as (typeof REEL_AUDIENCES)[number])}>
         {REEL_AUDIENCES.map((v) => (
           <option key={v} value={v}>
             {t(`visibility.${v}` as MessageKey)}
@@ -89,25 +91,25 @@ export function RecapPostForm({ recap, onDone, onCancel }: { recap: Recap; onDon
       </Select>
       <div className="row">
         <Button type="submit" loading={busy}>
-          Post
+          {t('m.recap.post')}
         </Button>
         <Button variant="ghost" onClick={onCancel} disabled={busy}>
-          Cancel
+          {t('common.cancel')}
         </Button>
       </div>
     </form>
   );
 }
 
-function conversationTitle(c: Conversation, meId: string | undefined): string {
+function conversationTitle(c: Conversation, meId: string | undefined, justYou: string): string {
   if (c.title) return c.title;
   const others = c.members.filter((m) => m.id !== meId);
-  return others.map((m) => m.displayName).join(', ') || 'Just you';
+  return others.map((m) => m.displayName).join(', ') || justYou;
 }
 
 /** Pick one of your chats and send the recap there as a video message. */
 export function RecapSendSheet({ recap, open, onClose }: { recap: Recap; open: boolean; onClose: () => void }) {
-  const { me, toast } = useSession();
+  const { me, toast, t } = useSession();
   const [items, setItems] = useState<Conversation[] | null>(null);
   const [q, setQ] = useState('');
   const [sending, setSending] = useState<string | null>(null);
@@ -121,22 +123,29 @@ export function RecapSendSheet({ recap, open, onClose }: { recap: Recap; open: b
     );
   }, [open, toast]);
 
-  const shown = (items ?? []).filter((c) => !q.trim() || conversationTitle(c, me?.id).toLowerCase().includes(q.trim().toLowerCase()));
+  const shown = (items ?? []).filter((c) => !q.trim() || conversationTitle(c, me?.id, t('recaps.justYou')).toLowerCase().includes(q.trim().toLowerCase()));
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Send in a chat">
+    <BottomSheet open={open} onClose={onClose} title={t('m.recap.send')}>
       <div className="stack-sm">
         <label className="yp-visually-hidden" htmlFor="recap-send-q">
-          Search your chats
+          {t('recaps.searchChats')}
         </label>
-        <input id="recap-send-q" className="yp-input" type="search" placeholder="Search your chats" value={q} onChange={(e) => setQ(e.currentTarget.value)} />
+        <input
+          id="recap-send-q"
+          className="yp-input"
+          type="search"
+          placeholder={t('recaps.searchChats')}
+          value={q}
+          onChange={(e) => setQ(e.currentTarget.value)}
+        />
         {items === null ? (
-          <p className="muted">Loading your chats</p>
+          <p className="muted">{t('recaps.loadingChats')}</p>
         ) : shown.length ? (
           <ul className="guestbook">
             {shown.map((c) => {
               const others = c.members.filter((m) => m.id !== me?.id);
-              const name = conversationTitle(c, me?.id);
+              const name = conversationTitle(c, me?.id, t('recaps.justYou'));
               return (
                 <li key={c.id} style={{ alignItems: 'center' }}>
                   {others.length > 1 ? (
@@ -155,13 +164,13 @@ export function RecapSendSheet({ recap, open, onClose }: { recap: Recap; open: b
                     size="sm"
                     loading={sending === c.id}
                     disabled={!!sending}
-                    aria-label={`Send to ${name}`}
+                    aria-label={t('recaps.sendTo', { name })}
                     onClick={async () => {
                       if (!recap.video) return;
                       setSending(c.id);
                       try {
                         const r = await api.conversations.send(c.id, '', crypto.randomUUID(), [{ mediaId: recap.video.mediaId }]);
-                        toast(r.notice ?? `Sent to ${name}`);
+                        toast(r.notice ?? t('m.recap.sent', { name }));
                         onClose();
                       } catch (e) {
                         toast(errorMessage(e));
@@ -170,14 +179,14 @@ export function RecapSendSheet({ recap, open, onClose }: { recap: Recap; open: b
                       }
                     }}
                   >
-                    Send
+                    {t('inbox.send')}
                   </Button>
                 </li>
               );
             })}
           </ul>
         ) : (
-          <p className="muted">{q.trim() ? `No chats match "${q.trim()}".` : 'You have no chats yet. Start one from your inbox, then send it there.'}</p>
+          <p className="muted">{q.trim() ? t('recaps.noChatsMatch', { query: q.trim() }) : t('recaps.noChats')}</p>
         )}
       </div>
     </BottomSheet>

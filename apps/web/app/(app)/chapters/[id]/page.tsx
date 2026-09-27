@@ -18,7 +18,8 @@ import { useSession } from '../../../providers';
  */
 export default function ChapterPage() {
   const { id } = useParams<{ id: string }>();
-  const { me, toast, locale, flags } = useSession();
+  const session = useSession();
+  const { me, toast, locale, flags, t, tp } = session;
   const router = useRouter();
   const [data, setData] = useState<ChapterDetail | null>(null);
   const [missing, setMissing] = useState(false);
@@ -42,7 +43,7 @@ export default function ChapterPage() {
     void load();
   }, [load]);
 
-  if (missing) return <EmptyState title="This chapter isn't available" body="It may have been deleted, or you may not be able to see it." />;
+  if (missing) return <EmptyState title={t('chapters.unavailable')} body={t('chapters.unavailableBody')} />;
   if (!data)
     return (
       <div className="yp-shell__inner">
@@ -71,11 +72,11 @@ export default function ChapterPage() {
         <div className="stack-sm" style={{ gap: 4, minWidth: 0 }}>
           <h1 dir="auto">{chapter.title}</h1>
           <span className="muted">
-            <Link href={`/u/${chapter.owner.username}`}>{chapter.owner.displayName}</Link> · {chapterMeta(chapter, locale)}
+            <Link href={`/u/${chapter.owner.username}`}>{chapter.owner.displayName}</Link> · {chapterMeta(chapter, session)}
           </span>
           <span className="row">
-            <Badge tone="neutral">{AUDIENCE_LABEL[chapter.audience]}</Badge>
-            {chapter.capsule ? <Badge tone="neutral">{chapter.capsule.open ? 'Time capsule, opened' : 'Time capsule'}</Badge> : null}
+            <Badge tone="neutral">{t(AUDIENCE_LABEL[chapter.audience])}</Badge>
+            {chapter.capsule ? <Badge tone="neutral">{t(chapter.capsule.open ? 'chapters.capsuleOpened' : 'm.chapters.capsule')}</Badge> : null}
           </span>
         </div>
       </div>
@@ -88,16 +89,15 @@ export default function ChapterPage() {
       {sealed ? (
         <div className="yp-card stack-sm" style={{ padding: 'var(--space-4)' }}>
           <strong>
-            <Icon name="lock" size={16} /> Sealed until {formatDay(chapter.capsule!.opensAt, locale)}
+            <Icon name="lock" size={16} /> {t('m.chapters.sealedUntil', { date: formatDay(chapter.capsule!.opensAt, locale) })}
           </strong>
           <span className="muted">
-            {chapter.storyCount === 1 ? '1 story inside.' : `${chapter.storyCount} stories inside.`}{' '}
-            {chapter.capsule!.sealed ? 'Nothing more can be added.' : 'Stories can still be added until it is sealed.'} Everyone who can see it finds out what
-            is inside on that day.
+            {tp('chapters.storiesInside', chapter.storyCount)} {t(chapter.capsule!.sealed ? 'm.chapters.addingClosed' : 'm.chapters.addingOpen')}{' '}
+            {t('m.chapters.sealedBody')}
           </span>
           {owner && !chapter.capsule!.sealed ? (
-            <Button size="sm" variant="secondary" onClick={act(() => api.chapters.seal(chapter.id), 'Sealed')} disabled={!chapter.storyCount}>
-              Seal it now
+            <Button size="sm" variant="secondary" onClick={act(() => api.chapters.seal(chapter.id), t('chapters.sealed'))} disabled={!chapter.storyCount}>
+              {t('m.chapters.seal')}
             </Button>
           ) : null}
         </div>
@@ -106,52 +106,52 @@ export default function ChapterPage() {
       <div className="row">
         {stories.length && !sealed ? (
           <Button icon="play" onClick={() => setPlaying(0)}>
-            Play
+            {t('m.chapters.play')}
           </Button>
         ) : null}
         {chapter.role === 'invited' ? (
           <>
-            <Button onClick={act(() => api.chapters.join(chapter.id), 'You can add your stories now')}>Add my stories to it</Button>
-            <Button variant="ghost" onClick={act(() => api.chapters.removeContributor(chapter.id, me!.id), 'Invitation declined')}>
-              Decline
+            <Button onClick={act(() => api.chapters.join(chapter.id), t('chapters.joined'))}>{t('m.chapters.join')}</Button>
+            <Button variant="ghost" onClick={act(() => api.chapters.removeContributor(chapter.id, me!.id), t('chapters.declined'))}>
+              {t('m.chapters.decline')}
             </Button>
           </>
         ) : null}
         {chapter.canAdd ? (
           <Link href="/archive" className="yp-btn yp-btn--secondary">
-            Add from your archive
+            {t('m.chapters.addFromArchive')}
           </Link>
         ) : null}
         {owner ? (
           <>
             <Button variant="secondary" onClick={() => setEditing(true)}>
-              Edit
+              {t('m.chapters.edit')}
             </Button>
             {chapter.canAdd ? (
               <Button variant="secondary" icon="users" onClick={() => setInviting(true)}>
-                Invite
+                {t('m.chapters.invite')}
               </Button>
             ) : null}
             {stories.length && flags.MEMORY !== false ? (
               <Link href={`/recaps/new?source=chapter&sourceId=${chapter.id}`} className="yp-btn yp-btn--secondary">
                 <Icon name="play" size={16} />
-                Make a recap video
+                {t('m.recap.make')}
               </Link>
             ) : null}
             <Button
               variant="ghost"
               onClick={async () => {
-                if (!confirm('Delete this chapter? The stories stay in your archive.')) return;
+                if (!confirm(`${t('m.chapters.delete.title')} ${t('m.chapters.delete.body')}`)) return;
                 try {
                   await api.chapters.remove(chapter.id);
-                  toast('Chapter deleted');
+                  toast(t('chapters.deleted'));
                   router.push(`/u/${chapter.owner.username}`);
                 } catch (e) {
                   toast(errorMessage(e));
                 }
               }}
             >
-              Delete
+              {t('m.common.delete')}
             </Button>
           </>
         ) : null}
@@ -160,30 +160,30 @@ export default function ChapterPage() {
       {chapter.role === 'contributor' ? (
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <Switch
-            label="Show on my profile too"
+            label={t('m.chapters.showOnProfile')}
             checked={!!chapter.showOnProfile}
             onChange={(v) => void act(() => api.chapters.showOnProfile(chapter.id, v))()}
           />
-          <Button size="sm" variant="ghost" onClick={act(() => api.chapters.removeContributor(chapter.id, me!.id), 'You left the chapter')}>
-            Leave
+          <Button size="sm" variant="ghost" onClick={act(() => api.chapters.removeContributor(chapter.id, me!.id), t('chapters.left'))}>
+            {t('m.chapters.leave')}
           </Button>
         </div>
       ) : null}
 
       {contributors.length ? (
         <section className="stack-sm">
-          <h2 className="section-title">Adding to it</h2>
+          <h2 className="section-title">{t('m.chapters.contributors')}</h2>
           <ul className="guestbook">
             {contributors.map((m) => (
               <li key={m.user.id}>
                 <Avatar name={m.user.displayName} src={m.user.avatarUrl} size="sm" />
                 <div>
                   <Link href={`/u/${m.user.username}`}>{m.user.displayName}</Link>
-                  {m.status === 'invited' ? <span className="muted"> · Invited</span> : null}
+                  {m.status === 'invited' ? <span className="muted"> · {t('m.chapters.pending')}</span> : null}
                 </div>
                 {owner ? (
-                  <Button size="sm" variant="ghost" onClick={act(() => api.chapters.removeContributor(chapter.id, m.user.id), 'Removed')}>
-                    Remove
+                  <Button size="sm" variant="ghost" onClick={act(() => api.chapters.removeContributor(chapter.id, m.user.id), t('chapters.removed'))}>
+                    {t('m.chapters.remove')}
                   </Button>
                 ) : null}
               </li>
@@ -194,11 +194,16 @@ export default function ChapterPage() {
 
       {stories.length ? (
         <section className="stack-sm">
-          <h2 className="section-title">{sealed ? 'Your stories inside' : 'Stories'}</h2>
+          <h2 className="section-title">{t(sealed ? 'm.chapters.yourStoriesInside' : 'm.chapters.storiesHeading')}</h2>
           <ul className="story-grid">
             {stories.map((s, n) => (
               <li key={s.id} className="story-tile">
-                <button type="button" className="story-tile__media" onClick={() => !sealed && setPlaying(n)} aria-label={`Play from story ${n + 1}`}>
+                <button
+                  type="button"
+                  className="story-tile__media"
+                  onClick={() => !sealed && setPlaying(n)}
+                  aria-label={t('chapters.playFrom', { index: n + 1 })}
+                >
                   {s.mediaKind === 'image' && s.mediaUrl ? (
                     <img src={s.mediaUrl} alt="" />
                   ) : s.posterUrl ? (
@@ -211,8 +216,8 @@ export default function ChapterPage() {
                   <bdi>{s.author.displayName}</bdi> · {formatDay(s.createdAt, locale)}
                 </span>
                 {owner || s.mine ? (
-                  <Button size="sm" variant="ghost" onClick={act(() => api.chapters.removeStory(chapter.id, s.id), 'Removed from the chapter')}>
-                    Remove
+                  <Button size="sm" variant="ghost" onClick={act(() => api.chapters.removeStory(chapter.id, s.id), t('chapters.storyRemoved'))}>
+                    {t('m.chapters.remove')}
                   </Button>
                 ) : null}
               </li>
@@ -220,12 +225,12 @@ export default function ChapterPage() {
           </ul>
         </section>
       ) : !sealed ? (
-        <EmptyState title="No stories yet" body={chapter.canAdd ? 'Add stories from your archive, or from your story while it is up.' : undefined} />
+        <EmptyState title={t('chapters.noStories')} body={chapter.canAdd ? t('chapters.noStoriesBody') : undefined} />
       ) : null}
 
       {!sealed ? (
         <section className="stack-sm">
-          <h2 className="section-title">Guestbook</h2>
+          <h2 className="section-title">{t('m.chapters.guestbook')}</h2>
           {me ? (
             <form
               className="row"
@@ -234,7 +239,7 @@ export default function ChapterPage() {
                 try {
                   const { entry } = await api.chapters.sign(chapter.id, line.trim());
                   setLine('');
-                  toast(entry.pending ? 'Your line shows to others after a quick check.' : 'Your line is in the guestbook.');
+                  toast(t(entry.pending ? 'chapters.linePending' : 'm.chapters.signed'));
                   await load();
                 } catch (err) {
                   toast(errorMessage(err));
@@ -242,7 +247,7 @@ export default function ChapterPage() {
               }}
             >
               <label htmlFor="guestbook-line" className="yp-visually-hidden">
-                Your line
+                {t('chapters.yourLine')}
               </label>
               <input
                 id="guestbook-line"
@@ -250,11 +255,11 @@ export default function ChapterPage() {
                 style={{ flex: 1 }}
                 value={line}
                 maxLength={CHAPTER_GUESTBOOK_MAX}
-                placeholder="One short line, up to 140 characters"
+                placeholder={t('chapters.linePlaceholder', { max: CHAPTER_GUESTBOOK_MAX })}
                 onChange={(e) => setLine(e.currentTarget.value)}
               />
               <Button type="submit" disabled={!line.trim()}>
-                Sign
+                {t('m.chapters.sign')}
               </Button>
             </form>
           ) : null}
@@ -266,23 +271,23 @@ export default function ChapterPage() {
                   <div>
                     <strong>{g.author.displayName}</strong> <span className="muted">{formatRelativeTime(g.createdAt, locale)}</span>
                     <p dir="auto">{g.body}</p>
-                    {g.pending ? <span className="muted">Only you see this until it has been checked.</span> : null}
-                    {g.hidden ? <span className="muted">Hidden from others.</span> : null}
+                    {g.pending ? <span className="muted">{t('m.chapters.onlyYou')}</span> : null}
+                    {g.hidden ? <span className="muted">{t('m.chapters.hidden')}</span> : null}
                   </div>
                   {owner ? (
                     <Button size="sm" variant="ghost" onClick={act(() => api.chapters.hideLine(chapter.id, g.id, !g.hidden))}>
-                      {g.hidden ? 'Show' : 'Hide'}
+                      {t(g.hidden ? 'm.chapters.show' : 'm.chapters.hide')}
                     </Button>
                   ) : g.mine ? (
-                    <Button size="sm" variant="ghost" onClick={act(() => api.chapters.deleteLine(chapter.id, g.id), 'Line deleted')}>
-                      Delete
+                    <Button size="sm" variant="ghost" onClick={act(() => api.chapters.deleteLine(chapter.id, g.id), t('chapters.lineDeleted'))}>
+                      {t('m.common.delete')}
                     </Button>
                   ) : null}
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="muted">No lines yet.</p>
+            <p className="muted">{t('m.chapters.noLines')}</p>
           )}
         </section>
       ) : null}
@@ -297,7 +302,7 @@ export default function ChapterPage() {
             onClose={() => setEditing(false)}
             onSaved={() => {
               setEditing(false);
-              toast('Saved');
+              toast(t('common.saved'));
               void load();
             }}
           />
@@ -308,7 +313,7 @@ export default function ChapterPage() {
             onPick={async (u) => {
               try {
                 await api.chapters.invite(chapter.id, u.id);
-                toast(`Invited ${u.displayName}`);
+                toast(t('m.chapters.invited', { name: u.displayName }));
                 await load();
               } catch (e) {
                 toast(errorMessage(e));
@@ -323,6 +328,7 @@ export default function ChapterPage() {
 
 /** People who follow you, to invite as contributors. Only people you also follow can accept. */
 function InviteSheet({ open, onClose, exclude, onPick }: { open: boolean; onClose: () => void; exclude: string[]; onPick: (u: PublicUser) => void }) {
+  const { t } = useSession();
   const [q, setQ] = useState('');
   const [items, setItems] = useState<{ user: PublicUser; relation: string | null }[]>([]);
   useEffect(() => {
@@ -338,15 +344,15 @@ function InviteSheet({ open, onClose, exclude, onPick }: { open: boolean; onClos
     return () => clearTimeout(timer);
   }, [q, open]);
   return (
-    <BottomSheet open={open} onClose={onClose} title="Invite to add stories">
+    <BottomSheet open={open} onClose={onClose} title={t('m.chapters.inviteTitle')}>
       <div className="stack-sm">
         <p className="muted" style={{ margin: 0 }}>
-          You can invite people you follow who follow you back. Their stories show with their name.
+          {t('m.chapters.inviteHint')}
         </p>
         <label htmlFor="invite-q" className="yp-visually-hidden">
-          Search people
+          {t('m.stories.searchPeople')}
         </label>
-        <input id="invite-q" className="yp-input" placeholder="Type a name or username" value={q} onChange={(e) => setQ(e.currentTarget.value)} />
+        <input id="invite-q" className="yp-input" placeholder={t('m.closeFriends.search')} value={q} onChange={(e) => setQ(e.currentTarget.value)} />
         <ul className="guestbook">
           {items
             .filter((s) => !exclude.includes(s.user.id))
@@ -358,7 +364,7 @@ function InviteSheet({ open, onClose, exclude, onPick }: { open: boolean; onClos
                   <div className="muted">@{s.user.username}</div>
                 </div>
                 <Button size="sm" onClick={() => onPick(s.user)}>
-                  Invite
+                  {t('m.chapters.invite')}
                 </Button>
               </li>
             ))}

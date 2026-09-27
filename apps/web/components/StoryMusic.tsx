@@ -5,6 +5,7 @@ import { Button, Icon, Segments } from '@yapilapi/design-system';
 import { STORY_MUSIC_MAX_MS, storyMusicMaxStart, storyMusicPart, type Sound, type StoryMusic, type StoryMusicStyle } from '@yapilapi/shared';
 import { SoundPicker } from '@/components/SoundPicker';
 import { stickerStyle } from '@/components/StoryStickers';
+import { useSession } from '@/app/providers';
 
 /** Music chosen for a story that isn't posted yet. */
 export interface DraftMusic {
@@ -139,7 +140,8 @@ export function useStoryMusicOn(): [boolean, (on: boolean) => void] {
  * the sound's cover. Tapping it opens the sound's page.
  */
 export function MusicSticker({ music, playing, onOpen }: { music: StoryMusic; playing: boolean; onOpen?: () => void }) {
-  const label = `Sound: ${music.sound.title}, by ${music.sound.artist}`;
+  const { t } = useSession();
+  const names = { title: music.sound.title, artist: music.sound.artist };
   const inner = (
     <>
       {music.style === 'card' ? (
@@ -162,11 +164,11 @@ export function MusicSticker({ music, playing, onOpen }: { music: StoryMusic; pl
   );
   const className = `music-sticker music-sticker--${music.style}`;
   return onOpen ? (
-    <button type="button" className={className} style={stickerStyle(music)} aria-label={`${label}. Open the sound`} onClick={onOpen}>
+    <button type="button" className={className} style={stickerStyle(music)} aria-label={t('m.music.sticker', names)} onClick={onOpen}>
       {inner}
     </button>
   ) : (
-    <span className={className} style={stickerStyle(music)} aria-label={label} role="img">
+    <span className={className} style={stickerStyle(music)} aria-label={t('storyMusic.stickerLabel', names)} role="img">
       {inner}
     </span>
   );
@@ -177,6 +179,7 @@ export function MusicSticker({ music, playing, onOpen }: { music: StoryMusic; pl
  * part that plays, and how the sticker looks. The sticker is moved on the sticker preview.
  */
 export function StoryMusicField({ value, onChange, video }: { value: DraftMusic | null; onChange: (m: DraftMusic | null) => void; video: boolean }) {
+  const { t } = useSession();
   const [picking, setPicking] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const preview = value ? draftAsStoryMusic(value) : null;
@@ -189,7 +192,7 @@ export function StoryMusicField({ value, onChange, video }: { value: DraftMusic 
   return (
     <section className="stack-sm" aria-labelledby="music-heading">
       <h2 id="music-heading" className="yp-field__label" style={{ margin: 0 }}>
-        Music
+        {t('m.music.title')}
       </h2>
       {value && preview ? (
         <div className="stack-sm">
@@ -198,7 +201,7 @@ export function StoryMusicField({ value, onChange, video }: { value: DraftMusic 
               type="button"
               className="sound-play"
               aria-pressed={previewing}
-              aria-label={previewing ? 'Stop the part' : 'Play the part'}
+              aria-label={t(previewing ? 'm.music.stopPart' : 'm.music.playPart')}
               disabled={!value.sound.audioUrl}
               onClick={() => setPreviewing((p) => !p)}
             >
@@ -207,16 +210,17 @@ export function StoryMusicField({ value, onChange, video }: { value: DraftMusic 
             <span className="sound-row__text">
               <bdi className="sound-row__title">{value.sound.title}</bdi>
               <span className="sound-row__meta">
-                <bdi>@{value.sound.owner.username}</bdi> · Plays {clock(preview.startMs)} to {clock(preview.startMs + preview.durationMs)}, in a loop
+                <bdi>@{value.sound.owner.username}</bdi> ·{' '}
+                {t('m.music.part', { from: clock(preview.startMs), to: clock(preview.startMs + preview.durationMs) })}
               </span>
             </span>
             <Button size="sm" variant="ghost" onClick={() => onChange(null)}>
-              Remove
+              {t('m.common.remove')}
             </Button>
           </div>
           {maxStart > 0 ? (
             <label className="yp-field">
-              <span className="yp-field__label">Start of the part</span>
+              <span className="yp-field__label">{t('m.music.start')}</span>
               <input
                 type="range"
                 className="music-range"
@@ -224,39 +228,37 @@ export function StoryMusicField({ value, onChange, video }: { value: DraftMusic 
                 max={maxStart}
                 step={500}
                 value={Math.min(value.startMs, maxStart)}
-                aria-valuetext={`Starts at ${clock(value.startMs)}`}
+                aria-valuetext={t('storyMusic.startsAt', { time: clock(value.startMs) })}
                 onChange={(e) => onChange({ ...value, startMs: Number(e.currentTarget.value) })}
               />
             </label>
           ) : (
             <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-              This sound is short, so all of it plays.
+              {t('m.music.short')}
             </p>
           )}
           <Segments
-            label="Sticker"
+            label={t('m.music.style')}
             value={value.style}
             onChange={(style) => onChange({ ...value, style })}
             options={[
-              { id: 'compact', label: 'Compact' },
-              { id: 'card', label: 'Card with cover' },
+              { id: 'compact', label: t('m.music.compact') },
+              { id: 'card', label: t('m.music.card') },
             ]}
           />
           <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-            {video
-              ? "On a video, the music plays instead of the video's own sound. Remove the music to keep the video's sound."
-              : 'Drag the music sticker on the preview to move it.'}
+            {t(video ? 'm.music.videoHint' : 'm.music.moveHint')}
           </p>
           <div className="row">
             <Button size="sm" variant="secondary" icon="music" onClick={() => (setPreviewing(false), setPicking(true))}>
-              Choose another sound
+              {t('m.music.another')}
             </Button>
           </div>
         </div>
       ) : (
         <div className="row">
           <Button size="sm" variant="secondary" icon="music" onClick={() => setPicking(true)}>
-            Add music
+            {t('m.music.add')}
           </Button>
         </div>
       )}

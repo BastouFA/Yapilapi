@@ -134,6 +134,7 @@ function Moderation() {
 /** Media an automated check flagged, blurred until the moderator chooses to look. */
 function CaseMedia({ media }: { media: { kind: string; url: string; moderation: string } }) {
   const [shown, setShown] = useState(false);
+  const { locale } = useSession();
   return (
     <div className="stack-sm">
       <p className="muted" style={{ margin: 0 }}>
@@ -145,7 +146,7 @@ function CaseMedia({ media }: { media: { kind: string; url: string; moderation: 
         ) : (
           <img src={media.url} alt="" className={shown ? undefined : 'yp-blurred'} />
         )}
-        {shown ? null : <SensitiveCover onReveal={() => setShown(true)} />}
+        {shown ? null : <SensitiveCover onReveal={() => setShown(true)} locale={locale} />}
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, EmptyState, Icon, Skeleton } from '@yapilapi/design-system';
-import type { Recap } from '@yapilapi/shared';
+import type { MessageKey, Recap } from '@yapilapi/shared';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { FeatureOff } from '@/components/FeatureOff';
 import { RECAP_STATUS_LABEL, RecapPostForm, RecapSendSheet, clipLength, downloadRecap, isPending } from '@/components/Recaps';
@@ -12,21 +12,23 @@ import { useRealtime, useSession } from '../../providers';
 
 const STATUS_TONE = { queued: 'neutral', rendering: 'neutral', ready: 'success', failed: 'danger' } as const;
 
-function statusLine(r: Recap): string {
-  if (r.status === 'failed') return r.error ? `${RECAP_STATUS_LABEL.failed}. ${r.error}` : RECAP_STATUS_LABEL.failed;
+type T = (key: MessageKey, vars?: Record<string, string | number>) => string;
+
+function statusLine(r: Recap, t: T): string {
+  if (r.status === 'failed') return r.error ? t('recaps.statusFailedError', { error: r.error }) : t(RECAP_STATUS_LABEL.failed);
   if (r.status === 'ready') {
     const len = clipLength(r.durationMs);
-    return len ? `${RECAP_STATUS_LABEL.ready} · ${len}` : RECAP_STATUS_LABEL.ready;
+    return len ? t('recaps.statusReadyLength', { length: len }) : t(RECAP_STATUS_LABEL.ready);
   }
-  return RECAP_STATUS_LABEL[r.status];
+  return t(RECAP_STATUS_LABEL[r.status]);
 }
 
-function sourceLabel(r: Recap): string {
-  return r.source === 'on_this_day' ? 'On this day' : r.source === 'chapter' ? 'From a chapter' : 'From a memory';
+function sourceLabel(r: Recap, t: T): string {
+  return t(r.source === 'on_this_day' ? 'm.recap.onThisDay' : r.source === 'chapter' ? 'recaps.source.chapter' : 'recaps.source.memory');
 }
 
 function Recaps() {
-  const { flags, toast, locale } = useSession();
+  const { flags, toast, locale, t, tp } = useSession();
   const router = useRouter();
   const params = useSearchParams();
   const openId = params.get('open');
@@ -96,21 +98,21 @@ function Recaps() {
 
   const open = (id: string | null) => router.replace(id ? `/recaps?open=${id}` : '/recaps', { scroll: false });
 
-  if (flags.MEMORY === false || off) return <FeatureOff name="Recap videos" />;
+  if (flags.MEMORY === false || off) return <FeatureOff name={t('m.recap.title')} />;
 
   const current = openId ? (items?.find((r) => r.id === openId) ?? null) : null;
 
   return (
     <div className="yp-shell__inner">
       <div className="yp-topbar">
-        <h1>Your recaps</h1>
+        <h1>{t('m.recap.yours')}</h1>
         <Link href="/memories" className="yp-btn yp-btn--ghost yp-btn--sm">
-          Memories
+          {t('memories.title')}
         </Link>
       </div>
       <p className="muted" style={{ margin: 0 }}>
-        Short videos made from your memories, chapters and On this day. Only you see them until you share one.
-        {remaining !== null ? ` You can make ${remaining} more ${remaining === 1 ? 'recap' : 'recaps'} today.` : ''}
+        {t('recaps.intro')}
+        {remaining !== null ? ` ${tp('m.recap.remaining', remaining)}` : ''}
       </p>
 
       {current ? (
@@ -125,7 +127,7 @@ function Recaps() {
         />
       ) : openId && missing ? (
         <p className="muted" role="status">
-          That recap isn&apos;t available anymore.
+          {t('recaps.missing')}
         </p>
       ) : null}
 
@@ -146,10 +148,10 @@ function Recaps() {
                 <span className="recap-row__text">
                   <bdi className="recap-row__title">{r.title}</bdi>
                   <span className="recap-row__meta">
-                    {sourceLabel(r)} · {new Date(r.createdAt).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
+                    {sourceLabel(r, t)} · {new Date(r.createdAt).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
                   </span>
                   <span className="recap-row__status">
-                    <Badge tone={STATUS_TONE[r.status]}>{RECAP_STATUS_LABEL[r.status]}</Badge>
+                    <Badge tone={STATUS_TONE[r.status]}>{t(RECAP_STATUS_LABEL[r.status])}</Badge>
                     {r.status === 'failed' && r.error ? <span className="muted">{r.error}</span> : null}
                   </span>
                 </span>
@@ -159,11 +161,11 @@ function Recaps() {
         </ul>
       ) : (
         <EmptyState
-          title="No recaps yet"
-          body="Open a memory or one of your chapters and choose Make a recap video, or make one from On this day."
+          title={t('recaps.emptyTitle')}
+          body={t('recaps.emptyBody')}
           action={
             <Link href="/recaps/new?source=on_this_day" className="yp-btn yp-btn--secondary">
-              Make one from On this day
+              {t('recaps.emptyAction')}
             </Link>
           }
         />
@@ -173,7 +175,7 @@ function Recaps() {
 }
 
 function RecapDetail({ recap: r, onClose, onDeleted }: { recap: Recap; onClose: () => void; onDeleted: () => void }) {
-  const { toast } = useSession();
+  const { toast, t, tp } = useSession();
   const heading = useRef<HTMLHeadingElement>(null);
   const [posting, setPosting] = useState(false);
   const [postedId, setPostedId] = useState<string | null>(null);
@@ -195,7 +197,7 @@ function RecapDetail({ recap: r, onClose, onDeleted }: { recap: Recap; onClose: 
         <h2 id="recap-detail-title" className="section-title" tabIndex={-1} ref={heading} style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
           <bdi>{r.title}</bdi>
         </h2>
-        <button type="button" className="recap-tool" aria-label="Close" onClick={onClose}>
+        <button type="button" className="recap-tool" aria-label={t('m.common.close')} onClick={onClose}>
           <Icon name="x" size={18} />
         </button>
       </div>
@@ -209,28 +211,28 @@ function RecapDetail({ recap: r, onClose, onDeleted }: { recap: Recap; onClose: 
           controls
           playsInline
           preload="metadata"
-          aria-label={`Recap video: ${r.title}`}
+          aria-label={t('recaps.videoLabel', { title: r.title })}
         />
       ) : (
         <div className="recap-video recap-video--waiting" style={{ aspectRatio: r.aspect === '1:1' ? '1 / 1' : '9 / 16' }} role="status">
           {r.status === 'failed' ? (
             <>
               <Icon name="alert" size={28} />
-              <strong>{RECAP_STATUS_LABEL.failed}</strong>
+              <strong>{t(RECAP_STATUS_LABEL.failed)}</strong>
               {r.error ? <span>{r.error}</span> : null}
             </>
           ) : (
             <>
               <Icon name="sparkle" size={28} />
-              <strong>{RECAP_STATUS_LABEL[r.status]}</strong>
-              <span>This usually takes a minute or two. You can leave this page; we&apos;ll let you know when it&apos;s ready.</span>
+              <strong>{t(RECAP_STATUS_LABEL[r.status])}</strong>
+              <span>{t('recaps.makingBody')}</span>
             </>
           )}
         </div>
       )}
 
       <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-        {statusLine(r)} · {r.itemCount === 1 ? '1 photo or video' : `${r.itemCount} photos and videos`}
+        {statusLine(r, t)} · {tp('m.recap.itemCount', r.itemCount)}
         {r.sound ? (
           <>
             {' · '}
@@ -240,7 +242,7 @@ function RecapDetail({ recap: r, onClose, onDeleted }: { recap: Recap; onClose: 
       </p>
       {left > 0 ? (
         <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-          {left === 1 ? '1 was left out because you can’t see it anymore.' : `${left} were left out because you can’t see them anymore.`}
+          {tp('recaps.leftOut', left)}
         </p>
       ) : null}
 
@@ -248,16 +250,16 @@ function RecapDetail({ recap: r, onClose, onDeleted }: { recap: Recap; onClose: 
         <div className="stack-sm">
           <div className="row">
             <Button icon="download" variant="secondary" onClick={() => downloadRecap(r)}>
-              Download
+              {t('m.shop.download')}
             </Button>
             {r.canPost && !postedId ? (
               <Button variant="secondary" icon="play" aria-expanded={posting} onClick={() => setPosting((v) => !v)}>
-                Post as reel
+                {t('m.recap.postReel')}
               </Button>
             ) : null}
             {r.canSend ? (
               <Button variant="secondary" icon="send" onClick={() => setSending(true)}>
-                Send in a chat
+                {t('m.recap.send')}
               </Button>
             ) : null}
           </div>
@@ -273,17 +275,17 @@ function RecapDetail({ recap: r, onClose, onDeleted }: { recap: Recap; onClose: 
           ) : null}
           {postedId ? (
             <p className="muted" style={{ margin: 0 }} role="status">
-              Posted. <Link href={`/reels?start=${postedId}`}>See your reel</Link>
+              {t('recaps.posted')} <Link href={`/reels?start=${postedId}`}>{t('recaps.seeReel')}</Link>
             </p>
           ) : null}
           {!r.canPost ? (
             <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-              This recap has photos or videos from other people, so it can&apos;t be posted.
+              {t('recaps.cantPost')}
             </p>
           ) : null}
           {!r.canSend ? (
             <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-              This recap has photos or videos from other people, so it can&apos;t be sent in a chat.
+              {t('recaps.cantSend')}
             </p>
           ) : null}
         </div>
@@ -295,11 +297,11 @@ function RecapDetail({ recap: r, onClose, onDeleted }: { recap: Recap; onClose: 
           icon="trash"
           loading={deleting}
           onClick={async () => {
-            if (!confirm(isPending(r) ? 'Stop making this recap video and delete it?' : 'Delete this recap video?')) return;
+            if (!confirm(t(isPending(r) ? 'recaps.confirmStop' : 'recaps.confirmDelete'))) return;
             setDeleting(true);
             try {
               const res = await api.recaps.remove(r.id);
-              toast(res.fileRemoved ? 'Recap deleted' : 'Recap deleted. The video stays where you already shared it.');
+              toast(t(res.fileRemoved ? 'm.recap.deleted' : 'm.recap.deletedKept'));
               onDeleted();
             } catch (e) {
               toast(errorMessage(e));
@@ -307,7 +309,7 @@ function RecapDetail({ recap: r, onClose, onDeleted }: { recap: Recap; onClose: 
             }
           }}
         >
-          {isPending(r) ? 'Stop and delete' : 'Delete'}
+          {t(isPending(r) ? 'recaps.stopAndDelete' : 'm.common.delete')}
         </Button>
       </div>
 
