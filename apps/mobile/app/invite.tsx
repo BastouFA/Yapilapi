@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Linking, Platform, ScrollView, Share, Text, View } from 'react-native';
+import { Platform, ScrollView, Share, Text, View } from 'react-native';
 import type { InvitesInfo } from '../../../packages/api-client/src/index';
-import { client, errorMessage, webUrl } from '../lib/api';
+import { client, errorMessage } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { radius, space } from '../lib/theme';
 import { Avatar, Button, Card, EmptyState, Loading, Notice, useColors, userText } from '../lib/ui';
@@ -76,7 +76,7 @@ export default function InviteScreen() {
         <Text style={{ color: c.inkMuted, fontSize: 13 }}>
           {t('invite.stats', { joined: info.joined, confirmed: info.confirmed })} · {t('invite.earned', { count: reward.earned })}
         </Text>
-        <Button label={t('plus.open')} variant="secondary" size="sm" onPress={() => void Linking.openURL(`${webUrl}/plus`)} />
+        <Button label={t('plus.open')} variant="secondary" size="sm" onPress={() => router.push('/plus')} />
       </Card>
 
       <Card style={{ gap: space[3] }}>

@@ -228,6 +228,48 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
   });
 
   // ── Bookings ──────────────────────────────────────────────────────────
+  /**
+   * Room left at some times, before someone asks to book: for each time given (up to 48, such as
+   * the half-hour slots of one day), how many more people the place can take, counted the same way
+   * as a booking request (requested and confirmed bookings within 90 minutes). `capacity` is null
+   * when the place sets no limit, and `takesBookings` is false for a place without a business.
+   */
+  app.get('/v1/places/:id/availability', async (req) => {
+    const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
+    const { at } = parse(
+      z.object({
+        at: z
+          .string()
+          .max(48 * 32)
+          .transform((v) => v.split(',').filter(Boolean))
+          .pipe(
+            z
+              .array(z.string().datetime({ offset: true }))
+              .min(1)
+              .max(48),
+          ),
+      }),
+      req.query,
+    );
+    const place = (await db.query(`SELECT p.booking_capacity, p.business_id FROM places p WHERE p.id = $1 AND p.deleted_at IS NULL`, [id])).rows[0];
+    if (!place) throw notFound('Place');
+    const capacity: number | null = place.booking_capacity ?? null;
+    if (!capacity) return { takesBookings: !!place.business_id, capacity: null, slots: at.map((t) => ({ startsAt: t, left: null })) };
+    const { rows } = await db.query(
+      `SELECT t.at, coalesce(sum(bk.party_size), 0)::int AS taken
+       FROM unnest($2::timestamptz[]) WITH ORDINALITY AS t(at, n)
+       LEFT JOIN bookings bk ON bk.place_id = $1 AND bk.status IN ('requested','confirmed')
+         AND bk.starts_at BETWEEN t.at - interval '90 minutes' AND t.at + interval '90 minutes'
+       GROUP BY t.at, t.n ORDER BY t.n`,
+      [id, at],
+    );
+    return {
+      takesBookings: !!place.business_id,
+      capacity,
+      slots: rows.map((r, i) => ({ startsAt: at[i]!, left: Math.max(0, capacity - Number(r.taken)) })),
+    };
+  });
+
   app.post('/v1/places/:id/bookings', { preHandler: requireAuth, config: { rateLimit: { max: 20, timeWindow: '1 hour' } } }, async (req, reply) => {
     const u = me(req);
     const { id } = parse(z.object({ id: z.string().uuid() }), req.params);

@@ -91,6 +91,13 @@ export default function Settings() {
         end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
         onPress={() => router.push('/recaps')}
       />
+      <Row
+        title={t('plus.title')}
+        subtitle={t('m.plus.settingsHint')}
+        start={<Icon name="sparkles-outline" size={18} color={c.inkMuted} />}
+        end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
+        onPress={() => router.push('/plus')}
+      />
 
       <SettingsHeading>{t('m.settings.section.attention')}</SettingsHeading>
       <NotificationSettings />

@@ -428,6 +428,23 @@ export const createEventSchema = z
     online: z.boolean().default(false),
   })
   .refine((v) => !v.endsAt || new Date(v.endsAt) > new Date(v.startsAt), { message: 'The end must be after the start.', path: ['endsAt'] });
+/**
+ * The host changes an event. Only the fields given change; null clears an optional one (the end,
+ * the place, the location, the capacity). The community stays as it was. The end is checked
+ * against the start after the change is applied (apps/api/src/modules/events.ts).
+ */
+export const updateEventSchema = z.object({
+  title: trimmed(120).optional(),
+  description: z.string().trim().max(5000).optional(),
+  startsAt: z.string().datetime({ offset: true }).optional(),
+  endsAt: z.string().datetime({ offset: true }).nullable().optional(),
+  timezone: z.string().max(60).optional(),
+  locationText: z.string().trim().max(300).nullable().optional(),
+  placeId: uuid.nullable().optional(),
+  capacity: z.number().int().positive().max(1_000_000).nullable().optional(),
+  visibility: z.enum(['public', 'followers', 'friends', 'private']).optional(),
+  online: z.boolean().optional(),
+});
 export const rsvpSchema = z.object({ status: z.enum(RSVP_STATUSES) });
 
 export const createPlaceSchema = z.object({

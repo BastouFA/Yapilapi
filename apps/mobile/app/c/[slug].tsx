@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams, useNavigation } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 import type { FaqEntry } from '../../../../packages/api-client/src/index';
@@ -6,7 +6,8 @@ import { ROOM_TITLE_MAX } from '../../../../packages/shared/src/constants';
 import type { Community, EventItem, Post, PublicUser, RoomSummary } from '../../../../packages/shared/src/types';
 import { client, errorMessage } from '../../lib/api';
 import { DateField } from '../../lib/date-time';
-import { useT, type Translate } from '../../lib/i18n';
+import { canManage, canOrganize, roleName } from '../../lib/community-roles';
+import { useT } from '../../lib/i18n';
 import { PostCard } from '../../lib/post';
 import { roomDuration, roomStatusLabel } from '../../lib/rooms';
 import { useSession } from '../../lib/session';
@@ -23,9 +24,6 @@ const LOCKED = {
   events: 'm.community.locked.events',
   members: 'm.community.locked.members',
 } as const;
-
-/** Owner and moderator are labelled; other roles (plain members) are not. */
-const roleLabel = (role: string, t: Translate) => (role === 'owner' ? t('m.role.owner') : role === 'moderator' ? t('m.role.moderator') : role);
 
 /** A community: posts, its FAQ, audio rooms, events and members, with join and leave, and its group chat for members. */
 export default function CommunityScreen() {
@@ -55,9 +53,12 @@ export default function CommunityScreen() {
       setCommunity(null);
     }
   }, [slug]);
-  useEffect(() => {
-    void reload();
-  }, [reload]);
+  // Again on coming back, so changes from the settings screen (name, description) show.
+  useFocusEffect(
+    useCallback(() => {
+      void reload();
+    }, [reload]),
+  );
 
   useLayoutEffect(() => {
     if (community) navigation.setOptions({ title: community.name });
@@ -130,15 +131,30 @@ export default function CommunityScreen() {
           {community.name}
         </Title>
         {community.description ? <Text style={[{ color: c.ink, lineHeight: 21 }, userText]}>{community.description}</Text> : null}
-        {community.myRole && chatId ? (
-          <Button
-            label={t('m.community.chat')}
-            icon="chatbubbles-outline"
-            size="sm"
-            variant="secondary"
-            style={{ alignSelf: 'flex-start' }}
-            onPress={() => router.push(`/chat/${chatId}`)}
-          />
+        {(community.myRole && chatId) || canOrganize(community.myRole) ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+            {community.myRole && chatId ? (
+              <Button label={t('m.community.chat')} icon="chatbubbles-outline" size="sm" variant="secondary" onPress={() => router.push(`/chat/${chatId}`)} />
+            ) : null}
+            {canOrganize(community.myRole) ? (
+              <Button
+                label={t('events.create')}
+                icon="calendar-outline"
+                size="sm"
+                variant="secondary"
+                onPress={() => router.push(`/event-edit?community=${encodeURIComponent(community.id)}`)}
+              />
+            ) : null}
+            {canManage(community.myRole) ? (
+              <Button
+                label={t('m.manage.open')}
+                icon="settings-outline"
+                size="sm"
+                variant="secondary"
+                onPress={() => router.push(`/community-settings?slug=${encodeURIComponent(community.slug)}`)}
+              />
+            ) : null}
+          </View>
         ) : null}
         {me ? (
           community.myRole ? (
@@ -269,7 +285,7 @@ export default function CommunityScreen() {
         ) : item.member ? (
           <Row
             title={item.member.user.displayName}
-            subtitle={`@${item.member.user.username}${item.member.role !== 'member' ? ` · ${roleLabel(item.member.role, t)}` : ''}`}
+            subtitle={`@${item.member.user.username}${item.member.role !== 'member' ? ` · ${roleName(item.member.role, t)}` : ''}`}
             start={<Avatar name={item.member.user.displayName} url={item.member.user.avatarUrl} size={36} />}
             onPress={() => router.push(`/u/${encodeURIComponent(item.member!.user.username)}`)}
           />

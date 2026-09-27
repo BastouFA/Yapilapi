@@ -26,6 +26,7 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
   join_approved: () => 'approved your request to join',
   event_rsvp: () => 'is going to your event',
   event_cancelled: () => 'cancelled an event you were going to',
+  event_updated: () => "changed the time or place of an event you're going to",
   order_paid: () => 'paid for an order',
   enforcement: (n) => `A moderator took action on your content (${String(n.data.decision).replace('_', ' ')}). You can appeal from Settings.`,
   tip_received: () => 'sent you a tip',

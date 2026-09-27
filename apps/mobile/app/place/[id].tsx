@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Linking, ScrollView, Text, View } from 'react-native';
 import { formatMoney } from '../../../../packages/shared/src/i18n';
 import type { EventItem } from '../../../../packages/shared/src/types';
 import { client } from '../../lib/api';
+import { BookPlace, ManageBookings, MyBookings, PlaceReviews, RatingLine, usePlaceOwner, type ReviewData } from '../../lib/place-extras';
 import { SectionHeader } from '../../lib/chips';
 import { useT } from '../../lib/i18n';
 import { space } from '../../lib/theme';
@@ -12,20 +13,35 @@ import { Button, Card, EmptyState, Icon, Loading, Row, useColors, userText } fro
 type PlaceData = { place: Record<string, any>; events: EventItem[]; products: Record<string, any>[] };
 
 /**
- * A place: what it is, where, its hours, what's on there and what it offers. Opened from Wander
- * and from events held there. Buying, booking a table and reviews are on the web for now.
+ * A place: what it is, where, its rating, its hours, what's on there and what it offers. People
+ * ask to book a time (places with a business on YAPILAPI) and read and write reviews; the owner
+ * confirms or declines bookings here. Buying is on the web for now.
  */
 export default function PlaceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const c = useColors();
   const { t, locale, dateTime } = useT();
   const [data, setData] = useState<PlaceData | null | undefined>(undefined);
+  const [reviews, setReviews] = useState<ReviewData | null>(null);
+  const [booked, setBooked] = useState(0);
+  const hasBusiness = !!data?.place.business;
+  const owner = usePlaceOwner(id, hasBusiness);
 
   useEffect(() => {
     void client()
       .then((api) => api.places.get(id))
       .then(setData, () => setData(null));
   }, [id]);
+  const loadReviews = useCallback(async () => {
+    try {
+      setReviews(await (await client()).reviews.list(id));
+    } catch {
+      setReviews({ average: null, count: 0, items: [] });
+    }
+  }, [id]);
+  useEffect(() => {
+    void loadReviews();
+  }, [loadReviews]);
 
   if (data === undefined) return <Loading />;
   if (data === null)
@@ -49,6 +65,7 @@ export default function PlaceScreen() {
         <Text accessibilityRole="header" style={[{ color: c.ink, fontSize: 24, fontWeight: '800', letterSpacing: -0.4 }, userText]}>
           {String(place.name)}
         </Text>
+        <RatingLine data={reviews} />
         {address ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
             <Icon name="location-outline" size={16} color={c.inkMuted} />
@@ -67,6 +84,16 @@ export default function PlaceScreen() {
           />
         ) : null}
       </Card>
+
+      {owner.bookings ? <ManageBookings items={owner.bookings} reload={owner.reload} /> : null}
+
+      {hasBusiness && owner.bookings === false ? (
+        <View style={{ gap: space[2] }}>
+          <SectionHeader title={t('m.booking.title')} />
+          <BookPlace placeId={id} hours={(place.hours ?? null) as Record<string, unknown> | null} onBooked={() => setBooked((n) => n + 1)} />
+        </View>
+      ) : null}
+      {hasBusiness ? <MyBookings placeId={id} version={booked} /> : null}
 
       {hours.length ? (
         <View style={{ gap: space[2] }}>
@@ -109,6 +136,8 @@ export default function PlaceScreen() {
           ))}
         </View>
       ) : null}
+
+      <PlaceReviews placeId={id} data={reviews} reload={loadReviews} isOwner={!!owner.bookings} />
     </ScrollView>
   );
 }

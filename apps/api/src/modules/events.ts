@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
-import { COMMUNITY_ROLE_RANK, createEventSchema, rsvpSchema, type EventItem } from '@yapilapi/shared';
+import { COMMUNITY_ROLE_RANK, createEventSchema, rsvpSchema, updateEventSchema, type EventItem } from '@yapilapi/shared';
 import { z } from 'zod';
-import { forbidden, notFound, parse } from '../lib/errors.ts';
+import { AppError, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { notify, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
@@ -163,6 +163,58 @@ export default async function eventsModule(app: FastifyInstance, ctx: AppContext
       [id],
     );
     return { items: rows.map((r) => ({ user: toPublicUser(r as PublicUserRow), status: r.status })) };
+  });
+
+  /**
+   * The host changes an event: only the fields sent change, and null clears an optional one.
+   * People who answered going or interested are told when the time or the place changes.
+   */
+  app.patch('/v1/events/:id', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const input = parse(updateEventSchema, req.body);
+    const cur = (await db.query(`SELECT host_id, starts_at, ends_at, place_id, location_text, online FROM events WHERE id = $1 AND deleted_at IS NULL`, [id]))
+      .rows[0];
+    if (!cur || cur.host_id !== u.id) throw notFound('Event');
+    if (input.placeId) {
+      const p = await db.query(`SELECT 1 FROM places WHERE id = $1 AND deleted_at IS NULL`, [input.placeId]);
+      if (!p.rowCount) throw notFound('Place');
+    }
+    const startsAt = input.startsAt ? new Date(input.startsAt) : (cur.starts_at as Date);
+    const endsAt = input.endsAt === undefined ? (cur.ends_at as Date | null) : input.endsAt === null ? null : new Date(input.endsAt);
+    if (endsAt && endsAt <= startsAt)
+      throw new AppError(400, 'validation_failed', 'The end must be after the start.', { fields: { endsAt: 'The end must be after the start.' } });
+    const sets: string[] = [];
+    const params: unknown[] = [id];
+    const set = (col: string, v: unknown) => {
+      params.push(v);
+      sets.push(`${col} = $${params.length}`);
+    };
+    if (input.title !== undefined) set('title', input.title);
+    if (input.description !== undefined) set('description', input.description);
+    if (input.startsAt !== undefined) set('starts_at', input.startsAt);
+    if (input.endsAt !== undefined) set('ends_at', input.endsAt);
+    if (input.timezone !== undefined) set('timezone', input.timezone);
+    if (input.locationText !== undefined) set('location_text', input.locationText || null);
+    if (input.placeId !== undefined) set('place_id', input.placeId);
+    if (input.capacity !== undefined) set('capacity', input.capacity);
+    if (input.visibility !== undefined) set('visibility', input.visibility);
+    if (input.online !== undefined) set('online', input.online);
+    if (sets.length) await db.query(`UPDATE events SET ${sets.join(', ')}, updated_at = now() WHERE id = $1`, params);
+    const moved =
+      (input.startsAt !== undefined && new Date(input.startsAt).getTime() !== (cur.starts_at as Date).getTime()) ||
+      (input.placeId !== undefined && input.placeId !== cur.place_id) ||
+      (input.locationText !== undefined && (input.locationText || null) !== cur.location_text) ||
+      (input.online !== undefined && input.online !== cur.online);
+    if (moved) {
+      const attendees = await db.query<{ user_id: string }>(
+        `SELECT user_id FROM event_attendees WHERE event_id = $1 AND user_id <> $2 AND status IN ('going','interested','waitlist')`,
+        [id, u.id],
+      );
+      for (const a of attendees.rows)
+        await notify(db, ctx.realtime, { userId: a.user_id, category: 'events', type: 'event_updated', actorId: u.id, entityType: 'event', entityId: id });
+    }
+    return { event: toEvent(await load(id, u.id)) };
   });
 
   app.delete('/v1/events/:id', { preHandler: requireAuth }, async (req) => {

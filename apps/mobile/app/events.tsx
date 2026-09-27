@@ -1,9 +1,10 @@
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect, useNavigation } from 'expo-router';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { FlatList } from 'react-native';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import type { EventItem } from '../../../packages/shared/src/index';
 import { client, errorMessage } from '../lib/api';
+import { HeaderAction } from '../lib/forms';
 import { useT } from '../lib/i18n';
 import { space } from '../lib/theme';
 import { EmptyState, Loading, Notice, Row, Screen, Segmented } from '../lib/ui';
@@ -22,9 +23,16 @@ export default function Events() {
   const [scope, setScope] = useState<Scope>('upcoming');
   const [items, setItems] = useState<EventItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [visit, setVisit] = useState(0);
+  const navigation = useNavigation();
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerRight: () => <HeaderAction label={t('m.events.new')} icon="add" onPress={() => router.push('/event-edit')} /> });
+  }, [navigation, t]);
+  // Again on coming back, so an event just made, changed or cancelled shows as it is now.
+  useFocusEffect(useCallback(() => setVisit((v) => v + 1), []));
   useEffect(() => {
+    if (!visit) return;
     let live = true;
-    setItems(null);
     setError(null);
     client()
       .then((api) => api.events.list(scope))
@@ -35,10 +43,15 @@ export default function Events() {
     return () => {
       live = false;
     };
-  }, [scope]);
+  }, [scope, visit]);
   return (
     <Screen style={{ gap: space[3] }}>
-      <Segmented label={t('m.events.scope')} value={scope} onChange={setScope} options={SCOPES.map((x) => ({ id: x.id, label: t(x.label) }))} />
+      <Segmented
+        label={t('m.events.scope')}
+        value={scope}
+        onChange={(v) => (setItems(null), setScope(v))}
+        options={SCOPES.map((x) => ({ id: x.id, label: t(x.label) }))}
+      />
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {items === null ? (
         <Loading />

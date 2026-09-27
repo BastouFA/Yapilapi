@@ -4,9 +4,10 @@ Every signed-in page of the web app (`apps/web/app/(app)/`) and where it lives i
 (`apps/mobile/app/`). Status: **Yes** (same features), **Partial** (the everyday parts; the rest
 on the web for now), **No** (not in the phone app yet), **Web only** (on purpose).
 
-Last reviewed: September 2026, after the parity pass that added the Wander search, grouped
-notifications, event and place pages, follow lists, the profile menu, profile editing and the
-remaining settings.
+Last reviewed: September 2026, after the parity pass that added creating communities and events,
+community settings, editing and cancelling events, place reviews and bookings, and the Plus
+screen (before it: the Wander search, grouped notifications, event and place pages, follow lists,
+the profile menu, profile editing and the remaining settings).
 
 ## Pages
 
@@ -35,13 +36,13 @@ remaining settings.
 | `/chapters/[id]`                             | A chapter or time capsule                                                                   | `chapter/[id]`                                                    | Yes      |                                                                                                                                                                                                              |
 | `/circles`                                   | Circles                                                                                     | `circles`, `circle/[id]`                                          | Yes      |                                                                                                                                                                                                              |
 | `/recaps`, `/recaps/new`                     | Recap videos                                                                                | `recaps`, `recap-new`                                             | Yes      |                                                                                                                                                                                                              |
-| `/c/[slug]`                                  | Community: posts, FAQ, rooms, events, members, chat                                         | `c/[slug]`                                                        | Yes      | Events tab, group chat button and member profiles added. The AI summary of a community is web only for now.                                                                                                  |
-| `/communities/new`                           | Create a community                                                                          | -                                                                 | No       | Rarely used; on the web.                                                                                                                                                                                     |
+| `/c/[slug]` | Community: posts, FAQ, rooms, events, members, chat | `c/[slug]` | Yes | Events tab, group chat button and member profiles. Organizers and up get Create event; owners, admins and moderators get Settings (`community-settings`). The AI summary of a community is web only for now. |
+| `/communities/new` | Create a community | `community-new` | Yes | Name, address, description, who can join, topics, rules; opens the new community. No cover photo: communities don't have one in the API. |
 | `/rooms/[id]`                                | An audio room                                                                               | `room/[id]`                                                       | Yes      | Rooms are listed in each community's Rooms tab.                                                                                                                                                              |
-| `/events`                                    | Events list                                                                                 | `events`                                                          | Yes      |                                                                                                                                                                                                              |
-| `/events/[id]`                               | An event with RSVP and who's going                                                          | `event/[id]`                                                      | Yes      | New. Going, interested or can't go, waitlist, host, attendees, share.                                                                                                                                        |
-| `/events/new`                                | Create an event                                                                             | -                                                                 | No       | On the web.                                                                                                                                                                                                  |
-| `/places/[id]`                               | A place: hours, events, menu and products, bookings, reviews                                | `place/[id]`                                                      | Partial  | New: what, where, map link, hours, events, offers. Buying, booking a table and reviews are on the web.                                                                                                       |
+| `/events` | Events list | `events` | Yes | New button to make an event. |
+| `/events/[id]` | An event with RSVP and who's going | `event/[id]` | Yes | Going, interested or can't go, waitlist, host, attendees, share, join link for online events. Hosts edit and cancel it (ahead of the web). Messaging attendees isn't in the API. |
+| `/events/new` | Create an event | `event-edit` | Yes | Title, details, start and end on the pure-JS date picker, time zone, an address, a place on YAPILAPI or online with a link, capacity, who can see it, community. `event-edit?id=` edits (`PATCH /v1/events/:id`). No cover photo: events don't have one in the API. |
+| `/places/[id]` | A place: hours, events, menu and products, bookings, reviews | `place/[id]` | Partial | What, where, map link, rating, hours, events, offers, reviews (read and write), asking to book a time slot with the room left at each (`GET /v1/places/:id/availability`), your bookings with cancel, and for the owner, requests to confirm or decline. Buying is on the web. |
 | `/b/[slug]`                                  | A business page                                                                             | -                                                                 | No       |                                                                                                                                                                                                              |
 | `/find-friends`                              | Contacts and suggestions                                                                    | `find-friends`                                                    | Yes      |                                                                                                                                                                                                              |
 | `/invite`                                    | Invite link and rewards                                                                     | `invite`                                                          | Yes      |                                                                                                                                                                                                              |
@@ -51,13 +52,15 @@ remaining settings.
 | `/live`, `/live/[id]`                        | Live video                                                                                  | -                                                                 | No       | Needs a native broadcast pipeline; live notifications open the person's profile.                                                                                                                             |
 | `/together`, `/together/[id]`                | Together albums                                                                             | -                                                                 | No       |                                                                                                                                                                                                              |
 | `/memories`, `/memories/[id]`                | Memories                                                                                    | -                                                                 | No       | Recaps cover the everyday part.                                                                                                                                                                              |
-| `/plus`                                      | YAPILAPI Plus                                                                               | `invite` (status only)                                            | Partial  | Buying Plus is on the web.                                                                                                                                                                                   |
+| `/plus` | YAPILAPI Plus | `plus` | Partial | Benefits, status and end date, history, progress to a free month from invites. Paying opens the web checkout in the browser; the app never handles card details. |
 | `/studio`                                    | Creator studio: analytics, ads, sales                                                       | -                                                                 | Web only |                                                                                                                                                                                                              |
 | `/developers`                                | API keys and webhooks                                                                       | -                                                                 | Web only |                                                                                                                                                                                                              |
 | `/admin`                                     | Moderation and admin                                                                        | -                                                                 | Web only |                                                                                                                                                                                                              |
 
 Phone-only screens: `close-friends`, `now-status`, `new-group`, `onboarding`, `board-edit`,
-`chapter-edit`, `communities` (yours and to discover), `follows`.
+`chapter-edit`, `communities` (yours and to discover), `follows`, `community-settings` (details,
+members and roles, join requests, bans and the FAQ, for owners, admins and moderators; the web
+has no such page yet).
 
 ## Settings
 
@@ -105,6 +108,12 @@ Taps on push notifications open the screen the notification is about (`lib/links
 | `yapilapi://recaps?open=<id>`                 | Recap                   |
 | `yapilapi://chat/<id>`, `/inbox/<id>`         | Chat                    |
 | `yapilapi://event/<id>`, `/events/<id>`       | Event                   |
+| `/events/new?community=<id>`                  | New event               |
+| `/events/<id>/edit`                           | Edit event              |
+| `/communities/new`                            | New community           |
+| `/c/<slug>/settings`                          | Community settings      |
+| `yapilapi://place/<id>`, `/places/<id>`       | Place                   |
+| `yapilapi://plus`, `/plus`                    | Plus                    |
 | `yapilapi://chapter/<id>`, `/chapters/<id>`   | Chapter                 |
 | `yapilapi://search?q=…`                       | Wander, searching       |
 
@@ -116,11 +125,11 @@ mapping above already handles those paths once they are.
 
 - **Live and Together**: need native video broadcasting or shared albums that aren't built for
   the phone yet.
-- **Creating communities and events**: rarely done, long forms; on the web.
+- **Covers for communities and events, messaging an event's attendees**: not in the API yet.
 - **Two-step verification, passkeys, connected apps, data export, account deletion, appeals**:
   security and account flows that need care on a phone (authenticator setup, passkey native
   modules we don't ship); on the web.
 - **Profile QR code**: the QR generator the web uses (`qrcode-generator`) doesn't resolve from
   the phone app, and no native dependency may be added, so the profile is shared as a link.
-- **Place bookings, reviews and buying**, **business pages**, **Plus checkout**: commerce flows
-  on the web.
+- **Buying at places**, **business pages**: commerce flows on the web. Plus is paid in the web
+  checkout, opened in the browser from the Plus screen.

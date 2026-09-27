@@ -35,6 +35,7 @@ export default function ProfileScreen() {
     { label: t('communities.title'), icon: 'people-circle-outline', href: '/communities' },
     { label: t('friends.title'), icon: 'people-outline', href: '/find-friends' },
     { label: t('invite.title'), icon: 'gift-outline', href: '/invite' },
+    { label: t('plus.title'), icon: 'sparkles-outline', href: '/plus' },
     { label: t('m.title.real'), icon: 'camera-outline', href: '/real' },
     { label: t('m.title.settings'), icon: 'settings-outline', href: '/settings' },
   ];

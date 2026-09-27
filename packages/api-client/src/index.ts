@@ -661,7 +661,18 @@ export function createClient(opts: ClientOptions) {
       join: (slug: string) => post<{ status: string }>(`/v1/communities/${slug}/join`),
       leave: (slug: string) => post(`/v1/communities/${slug}/leave`),
       posts: (slug: string, cursor?: string) => get<Page<Post> & { locked?: boolean }>(`/v1/communities/${slug}/posts${qs({ cursor })}`),
-      members: (slug: string) => get<{ items: { user: PublicUser; role: string }[] }>(`/v1/communities/${slug}/members`),
+      /** Members; moderators can also ask for `pending` join requests and `banned` people. */
+      members: (slug: string, status: 'active' | 'pending' | 'banned' = 'active') =>
+        get<{ items: { user: PublicUser; role: string; joinedAt?: string }[] }>(`/v1/communities/${slug}/members${status === 'active' ? '' : qs({ status })}`),
+      /** Admins and owners change the name, description, who can join, topics and rules. */
+      update: (slug: string, b: Partial<{ name: string; description: string; visibility: 'public' | 'private'; topics: string[]; rules: string[] }>) =>
+        patch<{ community: Community & { membershipStatus: string | null } }>(`/v1/communities/${slug}`, b),
+      approve: (slug: string, userId: string) => post<{ ok: true }>(`/v1/communities/${slug}/members/${userId}/approve`),
+      decline: (slug: string, userId: string) => post<{ ok: true }>(`/v1/communities/${slug}/members/${userId}/decline`),
+      setRole: (slug: string, userId: string, role: 'admin' | 'moderator' | 'organizer' | 'member' | 'guest') =>
+        put<{ role: string }>(`/v1/communities/${slug}/members/${userId}/role`, { role }),
+      ban: (slug: string, userId: string) => post<{ ok: true }>(`/v1/communities/${slug}/members/${userId}/ban`),
+      unban: (slug: string, userId: string) => post<{ ok: true }>(`/v1/communities/${slug}/members/${userId}/unban`),
       faq: (slug: string) => get<{ items: FaqEntry[]; canEdit: boolean }>(`/v1/communities/${slug}/faq`),
       addFaq: (slug: string, b: { question: string; answer: string }) => post<{ faq: FaqEntry }>(`/v1/communities/${slug}/faq`, b),
       updateFaq: (slug: string, id: string, b: Partial<{ question: string; answer: string; position: number }>) =>
@@ -700,12 +711,21 @@ export function createClient(opts: ClientOptions) {
       list: (scope: 'upcoming' | 'going' | 'hosting' | 'now' = 'upcoming') => get<{ items: EventItem[] }>(`/v1/events${qs({ scope })}`),
       get: (id: string) => get<{ event: EventItem }>(`/v1/events/${id}`),
       create: (b: Record<string, unknown>) => post<{ event: EventItem }>('/v1/events', b),
+      /** The host changes an event; null clears an optional field. */
+      update: (id: string, b: Record<string, unknown>) => patch<{ event: EventItem }>(`/v1/events/${id}`, b),
+      /** The host cancels an event; people who answered are told. */
+      cancel: (id: string) => del<{ ok: true }>(`/v1/events/${id}`),
       rsvp: (id: string, status: 'going' | 'interested' | 'not_going') => post<{ status: string; event: EventItem }>(`/v1/events/${id}/rsvp`, { status }),
       attendees: (id: string) => get<{ items: { user: PublicUser; status: string }[] }>(`/v1/events/${id}/attendees`),
     },
     places: {
       list: (params: Record<string, unknown> = {}) => get<{ items: Record<string, any>[] }>(`/v1/places${qs(params)}`),
       get: (id: string) => get<{ place: Record<string, any>; events: EventItem[]; products: Record<string, any>[] }>(`/v1/places/${id}`),
+      /** Room left at each time (ISO), counted like a booking request. `left` is null when the place sets no limit. */
+      availability: (id: string, at: string[]) =>
+        get<{ takesBookings: boolean; capacity: number | null; slots: { startsAt: string; left: number | null }[] }>(
+          `/v1/places/${id}/availability${qs({ at: at.join(',') })}`,
+        ),
     },
     businesses: {
       mine: () => get<{ items: { id: string; slug: string; name: string }[] }>('/v1/me/businesses'),
