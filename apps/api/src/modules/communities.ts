@@ -177,8 +177,8 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
     const { slug } = parse(slugParam, req.params);
     const row = await bySlug(slug, viewer);
     if (row.visibility === 'private' && !row.my_role) throw forbidden('Join this community to see its members.');
-    const status = parse(z.object({ status: z.enum(['active', 'pending']).default('active') }), req.query).status;
-    if (status === 'pending' && !atLeast(row.my_role, 'moderator')) throw forbidden();
+    const status = parse(z.object({ status: z.enum(['active', 'pending', 'banned']).default('active') }), req.query).status;
+    if (status !== 'active' && !atLeast(row.my_role, 'moderator')) throw forbidden();
     const { rows } = await db.query(
       `SELECT cm.role, cm.joined_at, ${PUBLIC_USER_COLS} FROM community_members cm JOIN profiles pr ON pr.user_id = cm.user_id
        WHERE cm.community_id = $1 AND cm.status = $2
@@ -203,6 +203,30 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
       await joinChat(c, row.id, userId);
     });
     await notify(db, ctx.realtime, { userId, category: 'communities', type: 'join_approved', actorId: u.id, entityType: 'community', entityId: row.id });
+    return { ok: true };
+  });
+
+  /** A moderator says no to a request to join. The person can ask again later. */
+  app.post('/v1/communities/:slug/members/:userId/decline', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { slug, userId } = parse(z.object({ slug: z.string(), userId: z.string().uuid() }), req.params);
+    const row = await bySlug(slug, u.id);
+    if (!atLeast(row.my_role, 'moderator')) throw forbidden();
+    const r = await db.query(`DELETE FROM community_members WHERE community_id = $1 AND user_id = $2 AND status = 'pending'`, [row.id, userId]);
+    if (!r.rowCount) throw notFound('Join request');
+    await audit(db, { actorId: u.id, action: 'community.decline', entityType: 'community', entityId: row.id, metadata: { userId } });
+    return { ok: true };
+  });
+
+  /** A moderator lifts a ban. The person is not a member again; they can join (or ask to) like anyone. */
+  app.post('/v1/communities/:slug/members/:userId/unban', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { slug, userId } = parse(z.object({ slug: z.string(), userId: z.string().uuid() }), req.params);
+    const row = await bySlug(slug, u.id);
+    if (!atLeast(row.my_role, 'moderator')) throw forbidden();
+    const r = await db.query(`DELETE FROM community_members WHERE community_id = $1 AND user_id = $2 AND status = 'banned'`, [row.id, userId]);
+    if (!r.rowCount) throw notFound('Ban');
+    await audit(db, { actorId: u.id, action: 'community.unban', entityType: 'community', entityId: row.id, metadata: { userId } });
     return { ok: true };
   });
 

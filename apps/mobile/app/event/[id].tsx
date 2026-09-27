@@ -1,13 +1,16 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { Platform, Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { Alert, Linking, Platform, Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
 import { formatEventWhen, safeTimeZone } from '../../../../packages/shared/src/i18n';
+import { timeZoneLabel } from '../../../../packages/shared/src/scheduling';
 import type { EventItem, PublicUser } from '../../../../packages/shared/src/types';
 import { client, errorMessage, webUrl } from '../../lib/api';
+import { isWebLink } from '../../lib/forms';
 import { useT } from '../../lib/i18n';
 import { RichText } from '../../lib/post';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
+import { deviceTimeZone } from '../../lib/time-zone';
 import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, Segmented, useColors, userText } from '../../lib/ui';
 
 type Rsvp = 'going' | 'interested' | 'not_going';
@@ -41,9 +44,12 @@ export default function EventScreen() {
     }
   }, [id]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // Again on coming back, so changes made on the edit screen show.
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   if (event === undefined) return <Loading />;
   if (event === null)
@@ -65,6 +71,30 @@ export default function EventScreen() {
   const hosting = event.host.id === me?.id;
   const full = !!event.capacity && event.counts.going >= event.capacity;
   const where = event.online ? t('m.event.online') : (event.place?.name ?? event.locationText ?? t('m.event.tba'));
+  const joinLink = event.online && event.locationText && isWebLink(event.locationText) ? event.locationText.trim() : null;
+  const otherZone = event.timezone && event.timezone !== deviceTimeZone() ? event.timezone : null;
+
+  function cancelEvent() {
+    Alert.alert(t('m.event.cancelTitle'), t('m.event.cancelBody'), [
+      { text: t('m.common.notNow'), style: 'cancel' },
+      {
+        text: t('m.event.cancel'),
+        style: 'destructive',
+        onPress: async () => {
+          setBusy(true);
+          setError(null);
+          try {
+            await (await client()).events.cancel(id);
+            router.back();
+          } catch (e) {
+            setError(errorMessage(e));
+          } finally {
+            setBusy(false);
+          }
+        },
+      },
+    ]);
+  }
 
   async function rsvp(status: Rsvp) {
     setBusy(true);
@@ -122,9 +152,24 @@ export default function EventScreen() {
           {event.title}
         </Text>
         <Line icon="calendar-outline" text={until ? t('m.event.range', { start: when, end: until }) : when} />
+        {otherZone ? (
+          <Text style={{ color: c.inkMuted, fontSize: 13, marginTop: -space[2], marginStart: 36 }}>
+            {t('m.event.inZone', { zone: timeZoneLabel(otherZone) })}
+          </Text>
+        ) : null}
         {event.place && !event.online ? (
           <Pressable accessibilityRole="link" onPress={() => router.push(`/place/${event.place!.id}`)} style={{ minHeight: 32, justifyContent: 'center' }}>
             <Line icon="location-outline" text={where} link />
+          </Pressable>
+        ) : joinLink ? (
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel={t('m.event.joinOnline')}
+            accessibilityHint={joinLink}
+            onPress={() => void Linking.openURL(joinLink)}
+            style={{ minHeight: 44, justifyContent: 'center' }}
+          >
+            <Line icon="videocam-outline" text={t('m.event.joinOnline')} link />
           </Pressable>
         ) : (
           <Line icon={event.online ? 'videocam-outline' : 'location-outline'} text={where} />
@@ -148,7 +193,19 @@ export default function EventScreen() {
       </Card>
 
       {hosting ? (
-        <Notice>{t('m.event.hosting')}</Notice>
+        <View style={{ gap: space[2] }}>
+          <Notice>{t('m.event.hosting')}</Notice>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+            <Button
+              label={t('m.event.edit')}
+              icon="create-outline"
+              variant="secondary"
+              size="sm"
+              onPress={() => router.push(`/event-edit?id=${encodeURIComponent(event.id)}`)}
+            />
+            <Button label={t('m.event.cancel')} variant="ghost" size="sm" disabled={busy} onPress={cancelEvent} />
+          </View>
+        </View>
       ) : (
         <View style={{ gap: space[2] }}>
           <Segmented<Rsvp | 'none'>

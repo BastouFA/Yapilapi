@@ -89,6 +89,7 @@ const RENAMED: Record<string, string> = {
   rooms: 'room',
   chapters: 'chapter',
   events: 'event',
+  places: 'place',
   post: 'p',
   posts: 'p',
   profile: 'u',
@@ -124,6 +125,12 @@ export function appPath(link: string): string {
   if (first === 'search') return `/discover${q}`;
   if (first === 'inbox') return second ? `/chat/${second}` : '/inbox';
   if (first === 'recaps' && second === 'new') return '/recap-new';
+  // Making and running things: a new community or event, an event's edit page, a community's settings.
+  if (first === 'communities' && second === 'new') return '/community-new';
+  if (first === 'events' && second === 'new') return `/event-edit${q}`;
+  if (first === 'events' && second && parts[2] === 'edit') return `/event-edit?id=${encodeURIComponent(second)}`;
+  if (first === 'c' && second && parts[2] === 'settings') return `/community-settings?slug=${encodeURIComponent(second)}`;
+  if (first === 'plus') return '/plus';
   // A reel's remixes open the reel itself; the phone app has no remixes page yet.
   if ((first === 'reels' || first === 'reel') && second) return `/reels?start=${encodeURIComponent(second)}`;
   if (first.startsWith('@') && first.length > 1) return `/u/${first.slice(1)}`;

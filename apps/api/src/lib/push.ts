@@ -59,6 +59,7 @@ const TEXT: Record<string, (actor: string) => string> = {
   post_reaction: (a) => `${a} liked your post`,
   post_comment: (a) => `${a} commented on your post`,
   event_rsvp: (a) => `${a} is going to your event`,
+  event_updated: (a) => `${a} changed the time or place of an event you're going to`,
   call_incoming: (a) => `${a} is calling you`,
   live_started: (a) => `${a} is live now`,
   room_live: () => 'A room you asked about has started',

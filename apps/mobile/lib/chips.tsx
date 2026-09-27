@@ -18,6 +18,7 @@ export function Chip({
   a11yLabel,
   a11yHint,
   radio,
+  disabled,
 }: {
   label: string;
   onPress: () => void;
@@ -28,6 +29,7 @@ export function Chip({
   a11yLabel?: string;
   a11yHint?: string;
   radio?: boolean;
+  disabled?: boolean;
 }) {
   const c = useColors();
   const tab = selected !== undefined;
@@ -36,7 +38,10 @@ export function Chip({
       accessibilityRole={radio ? 'radio' : tab ? 'tab' : 'button'}
       accessibilityLabel={a11yLabel ?? (meta ? `${label}, ${meta}` : label)}
       accessibilityHint={a11yHint}
-      accessibilityState={radio ? { checked: !!selected } : tab ? { selected } : undefined}
+      accessibilityState={
+        radio ? { checked: !!selected, disabled: !!disabled } : tab ? { selected, disabled: !!disabled } : disabled ? { disabled } : undefined
+      }
+      disabled={disabled}
       onPress={onPress}
       onLongPress={onLongPress}
       hitSlop={4}
@@ -50,7 +55,7 @@ export function Chip({
         borderWidth: 1,
         borderColor: selected ? c.yapi : c.line,
         backgroundColor: selected ? c.yapiSoft : c.surface,
-        opacity: pressed ? 0.8 : 1,
+        opacity: disabled ? 0.45 : pressed ? 0.8 : 1,
       })}
     >
       {icon ? <Icon name={icon} size={16} color={selected ? c.yapi : c.inkMuted} /> : null}

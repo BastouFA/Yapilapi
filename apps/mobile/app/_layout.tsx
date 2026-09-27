@@ -94,6 +94,10 @@ function Screens() {
         <Stack.Screen name="event/[id]" options={{ title: t('m.event.title') }} />
         <Stack.Screen name="place/[id]" options={{ title: t('m.place.title') }} />
         <Stack.Screen name="communities" options={{ title: t('communities.title') }} />
+        <Stack.Screen name="community-new" options={{ title: t('communities.create'), presentation: 'modal' }} />
+        <Stack.Screen name="community-settings" options={{ title: t('m.manage.title') }} />
+        <Stack.Screen name="event-edit" options={{ title: t('events.create'), presentation: 'modal' }} />
+        <Stack.Screen name="plus" options={{ title: t('plus.title') }} />
         <Stack.Screen name="follows" options={{ title: t('profile.followers') }} />
         <Stack.Screen name="profile-edit" options={{ title: t('profile.edit'), presentation: 'modal', headerLeft: closeButton }} />
         <Stack.Screen name="reels" options={{ title: t('m.title.reels'), headerShown: false, contentStyle: { backgroundColor: '#000' } }} />

@@ -1,8 +1,9 @@
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useNavigation } from 'expo-router';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { FlatList } from 'react-native';
 import type { Community } from '../../../packages/shared/src/types';
 import { client, errorMessage } from '../lib/api';
+import { HeaderAction } from '../lib/forms';
 import { useT } from '../lib/i18n';
 import { space } from '../lib/theme';
 import { Avatar, EmptyState, Icon, Loading, Notice, Row, Screen, Segmented, useColors } from '../lib/ui';
@@ -16,6 +17,11 @@ export default function Communities() {
   const [scope, setScope] = useState<Scope>('mine');
   const [items, setItems] = useState<Community[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const navigation = useNavigation();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerRight: () => <HeaderAction label={t('m.communities.new')} icon="add" onPress={() => router.push('/community-new')} /> });
+  }, [navigation, t]);
 
   useEffect(() => {
     let live = true;

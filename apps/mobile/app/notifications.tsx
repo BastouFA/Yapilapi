@@ -33,6 +33,7 @@ const TEXT: Record<string, MessageKey> = {
   join_approved: 'm.notif.joinApproved',
   event_rsvp: 'm.notif.eventRsvp',
   event_cancelled: 'm.notif.eventCancelled',
+  event_updated: 'm.notif.eventUpdated',
   order_paid: 'm.notif.orderPaid',
   tip_received: 'm.notif.tip',
   subscription_started: 'm.notif.subscribed',
