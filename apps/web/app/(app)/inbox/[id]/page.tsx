@@ -50,6 +50,12 @@ export default function ChatPage() {
   const [editing, setEditing] = useState<Message | null>(null);
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  // The chat's options menu opens search; closing search puts focus back on that button.
+  const chatMenu = useRef<HTMLDivElement>(null);
+  const closeSearch = () => {
+    setSearchOpen(false);
+    requestAnimationFrame(() => chatMenu.current?.querySelector<HTMLButtonElement>('button[aria-haspopup]')?.focus());
+  };
   const [disappearingOpen, setDisappearingOpen] = useState(false);
   const [jump, setJump] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<string | null>(null);
@@ -430,28 +436,30 @@ export default function ChatPage() {
             {conv?.nowStatus ? <NowStatusLine status={conv.nowStatus} compact /> : null}
           </div>
         </div>
-        <Menu
-          label={t('chat.options')}
-          actions={[
-            { label: t('chat.videoCall'), icon: 'eye', onSelect: () => void calls.start(id, 'video') },
-            { label: t('chat.apps'), icon: 'create', onSelect: () => setAppsOpen(true) },
-            { label: t('chat.audioCall'), icon: 'bell', onSelect: () => void calls.start(id, 'audio') },
-            { label: t('inbox.summarize'), icon: 'sparkle', onSelect: () => assist('summarize_conversation') },
-            { label: t('chat.ai.draftPlan'), icon: 'calendar', onSelect: () => assist('plan_from_message') },
-            { label: t('m.chat.search'), icon: 'search', onSelect: () => setSearchOpen(true) },
-            { label: t('m.chat.disappearing'), icon: 'info', onSelect: () => setDisappearingOpen(true) },
-            ...(others.length === 1
-              ? [
-                  {
-                    label: t('chat.viewProfile', { name: others[0]!.displayName }),
-                    icon: 'user' as const,
-                    onSelect: () => (location.href = `/u/${others[0]!.username}`),
-                  },
-                ]
-              : []),
-            ...(conv?.yaps?.available ? [{ label: t('m.yap.settings'), icon: 'volume' as const, onSelect: () => setYapSettings(true) }] : []),
-          ]}
-        />
+        <div ref={chatMenu} style={{ display: 'contents' }}>
+          <Menu
+            label={t('chat.options')}
+            actions={[
+              { label: t('chat.videoCall'), icon: 'eye', onSelect: () => void calls.start(id, 'video') },
+              { label: t('chat.apps'), icon: 'create', onSelect: () => setAppsOpen(true) },
+              { label: t('chat.audioCall'), icon: 'bell', onSelect: () => void calls.start(id, 'audio') },
+              { label: t('inbox.summarize'), icon: 'sparkle', onSelect: () => assist('summarize_conversation') },
+              { label: t('chat.ai.draftPlan'), icon: 'calendar', onSelect: () => assist('plan_from_message') },
+              { label: t('m.chat.search'), icon: 'search', onSelect: () => setSearchOpen(true) },
+              { label: t('m.chat.disappearing'), icon: 'info', onSelect: () => setDisappearingOpen(true) },
+              ...(others.length === 1
+                ? [
+                    {
+                      label: t('chat.viewProfile', { name: others[0]!.displayName }),
+                      icon: 'user' as const,
+                      onSelect: () => (location.href = `/u/${others[0]!.username}`),
+                    },
+                  ]
+                : []),
+              ...(conv?.yaps?.available ? [{ label: t('m.yap.settings'), icon: 'volume' as const, onSelect: () => setYapSettings(true) }] : []),
+            ]}
+          />
+        </div>
       </div>
 
       {conv?.disappearingSeconds ? (
@@ -466,7 +474,7 @@ export default function ChatPage() {
         onUnpin={(mid) => void run(async () => setPins((await api.messages.unpin(mid)).items))}
       />
       {/* Search opens over the chat, so the conversation underneath keeps its place. Picking a result closes it and goes there. */}
-      <BottomSheet open={searchOpen} onClose={() => setSearchOpen(false)} title={t('m.chat.search')}>
+      <BottomSheet open={searchOpen} onClose={closeSearch} title={t('m.chat.search')}>
         {searchOpen ? (
           <ChatSearch
             conversationId={id}
@@ -474,7 +482,7 @@ export default function ChatPage() {
               setSearchOpen(false);
               void jumpTo(mid);
             }}
-            onClose={() => setSearchOpen(false)}
+            onClose={closeSearch}
           />
         ) : null}
       </BottomSheet>
