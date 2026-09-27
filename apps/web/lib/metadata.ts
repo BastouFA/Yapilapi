@@ -4,7 +4,14 @@
  * gets the plain site card and says nothing about what's behind it.
  */
 import type { Metadata } from 'next';
-import { formatEventWhen, type PublicCommunityPreview, type PublicEventPreview, type PublicPostPreview, type PublicProfilePreview } from '@yapilapi/shared';
+import {
+  formatEventWhen,
+  type PublicCommunityPreview,
+  type PublicDropPreview,
+  type PublicEventPreview,
+  type PublicPostPreview,
+  type PublicProfilePreview,
+} from '@yapilapi/shared';
 import { absolute, siteOrigin } from './public';
 import { compact, plural } from './og';
 
@@ -143,5 +150,28 @@ export async function communityMetadata(c: PublicCommunityPreview): Promise<Meta
     alternates: { canonical: path },
     openGraph: { siteName: SITE_NAME, type: 'website', url: path, title: c.name, description },
     twitter: { card: 'summary_large_image', title: c.name, description },
+  };
+}
+
+/** A drop's time for link previews: the full date and time in UTC, since a preview can't know the reader's time zone. */
+export function dropWhen(d: PublicDropPreview): string {
+  const when = formatEventWhen(d.startsAt, 'en', 'UTC');
+  if (d.status === 'scheduled') return `Opens ${when}`;
+  if (d.status === 'open') return 'Open now';
+  return d.status === 'cancelled' ? 'Cancelled' : 'Ended';
+}
+
+export async function dropMetadata(d: PublicDropPreview): Promise<Metadata> {
+  const origin = await siteOrigin();
+  const title = `${d.title} · a drop by ${d.seller.displayName}`;
+  const description = [dropWhen(d), d.excerpt, plural(d.itemCount, 'product', 'products')].filter(Boolean).join(' · ');
+  const path = `/drops/${d.id}`;
+  return {
+    metadataBase: new URL(origin),
+    title: { absolute: `${title} on ${SITE_NAME}` },
+    description,
+    alternates: { canonical: path },
+    openGraph: { siteName: SITE_NAME, type: 'website', url: path, title, description },
+    twitter: { card: 'summary_large_image', title, description },
   };
 }

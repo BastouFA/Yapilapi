@@ -50,6 +50,8 @@ const TEXT: Record<string, MessageKey> = {
   view_once_screenshot: 'm.notif.viewOnceScreenshot',
   chapter_invite: 'm.notif.chapterInvite',
   watch_invite: 'watch.invite',
+  drop_opened: 'm.notif.dropOpened',
+  drop_cancelled: 'm.notif.dropCancelled',
 };
 
 /** Several people doing the same thing to the same post (or following you), in one row. */
@@ -69,6 +71,7 @@ const OWN_TEXT: Record<string, MessageKey> = {
   chat_reminder: 'm.notif.chatReminder',
   story_countdown: 'm.notif.countdownEnded',
   booking_decided: 'm.notif.bookingDecided',
+  drop_sold_out: 'm.notif.dropSoldOut',
   enforcement: 'm.notif.enforcement',
   ad_approved: 'm.notif.adApproved',
   ad_rejected: 'm.notif.adRejected',

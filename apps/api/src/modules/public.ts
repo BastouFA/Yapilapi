@@ -29,7 +29,7 @@ const slugParam = z.object({ slug: z.string().min(1).max(40) });
 const usernameParam = z.object({ username: usernameSchema });
 
 /** Accounts whose content may appear in a public preview. `pr` = profile, `u` = user. */
-function publicAccountSql(pr: string, u: string): string {
+export function publicAccountSql(pr: string, u: string): string {
   return `(${u}.status = 'active' AND ${u}.deleted_at IS NULL AND NOT ${pr}.is_private
            AND NOT coalesce(${u}.birth_date > current_date - interval '18 years', false))`;
 }

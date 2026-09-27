@@ -79,7 +79,7 @@ export function AppearancePicker({ compact }: { compact?: boolean }) {
 }
 
 /**
- * What the account menu holds: who you are, then View profile, Settings, Saved, Drafts,
+ * What the account menu holds: who you are, then View profile, Settings, Saved, Drafts, Your drops,
  * Appearance, Language, Help and legal, and Log out. `onClose` runs when a link is followed.
  */
 function AccountMenuBody({ onClose, onLogout }: { onClose: () => void; onLogout: () => void }) {
@@ -90,6 +90,7 @@ function AccountMenuBody({ onClose, onLogout }: { onClose: () => void; onLogout:
     { href: '/settings', icon: 'settings', label: t('settings.title') },
     { href: '/saved', icon: 'bookmark', label: t('m.saved.title') },
     { href: '/drafts', icon: 'edit', label: t('m.drafts.title') },
+    { href: '/drops', icon: 'bag', label: t('m.drops.yours') },
   ];
   const more: { href: string; icon: IconName; label: string }[] = [
     { href: '/settings/language', icon: 'globe', label: t('settings.language') },

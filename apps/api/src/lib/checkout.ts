@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import type { PaymentRegistry } from './payments.ts';
 import { revokePlusForOrder } from './plus.ts';
+import { releaseDropOrder } from './drops.ts';
 
 type Q = Pick<Pool | PoolClient, 'query'>;
 
@@ -84,6 +85,8 @@ export async function refundOrder(
     `UPDATE bookings SET status = 'cancelled', decided_at = coalesce(decided_at, now()) WHERE order_id = $1 AND status IN ('pending_payment', 'requested', 'confirmed')`,
     [orderId],
   );
+  // Units bought in a drop go back to it.
+  await releaseDropOrder(c, orderId);
   await c.query(`UPDATE orders SET status = 'refunded', updated_at = now() WHERE id = $1`, [orderId]);
   await c.query(`UPDATE payments SET status = 'refunded', updated_at = now() WHERE id = $1`, [r.payment_id]);
   return 'succeeded';

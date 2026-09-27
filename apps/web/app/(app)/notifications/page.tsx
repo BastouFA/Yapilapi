@@ -85,6 +85,7 @@ function hrefFor(n: NotificationItem): string | undefined {
   if (n.type === 'weekly_wrap' || n.entityType === 'wrap') return n.entityId ? `/wraps/${n.entityId}` : '/wraps';
   if (n.type === 'watch_invite' || n.entityType === 'watch') return n.entityId ? `/watch/${n.entityId}` : '/inbox';
   if (n.entityType === 'chapter') return `/chapters/${n.entityId}`;
+  if (n.entityType === 'drop') return `/drops/${n.entityId}`;
   if (n.entityType === 'recap' || n.type === 'recap_ready' || n.type === 'recap_failed') return n.entityId ? `/recaps?open=${n.entityId}` : '/recaps';
   if (n.entityType === 'board') return `/boards/${n.entityId}`;
   if (n.entityType === 'draft') return `/create?draft=${n.entityId}`;
@@ -123,6 +124,11 @@ function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): s
   // A question asked without a name has no actor: it never says who.
   if (n.type === 'question_received') return n.actor ? t('ask.notif.received', { name: n.actor.displayName }) : t('ask.notif.receivedHidden');
   if (n.type === 'question_answered') return t('ask.notif.answered', { name: n.actor?.displayName ?? '' });
+  // Drops: plain words, with the drop's name.
+  const title = String(n.data.title ?? '');
+  if (n.type === 'drop_opened') return t('m.notif.dropOpened', { name: n.actor?.displayName ?? '', title });
+  if (n.type === 'drop_cancelled') return t('m.notif.dropCancelled', { name: n.actor?.displayName ?? '', title });
+  if (n.type === 'drop_sold_out') return t('m.notif.dropSoldOut', { title });
   if (n.type !== 'comment_like' && n.type !== 'comment_reply') return null;
   const name = n.actor?.displayName ?? '';
   const others = Math.max(0, Number(n.data.count ?? 1) - 1);

@@ -15,6 +15,7 @@ import { useSession } from '../../lib/session';
 import { StarterRow } from '../../lib/starter';
 import { CatchUpCard } from '../../lib/ai-helpers';
 import { PulseCards } from '../../lib/wrap';
+import { FollowingDrops } from '../../lib/drops';
 import { space } from '../../lib/theme';
 import { ErrorState, feedListProps, Icon, Loading, Segmented, SkeletonList, useColors, useTabBarSpace } from '../../lib/ui';
 
@@ -136,6 +137,8 @@ function Feed() {
             <CatchUpCard />
             {/* Your weekly wrap and "On this day", when there are any: quiet, and easy to put away. */}
             <PulseCards />
+            {/* Launches from people you follow: when they open, and a Notify me on each drop. */}
+            <FollowingDrops />
             {/* With nothing in the feed, the empty state below does the starter row's job. */}
             {posts?.length ? <StarterRow /> : null}
             <Segmented label={t('m.feed.label')} options={MODES.map((m) => ({ id: m.id, label: t(m.label) }))} value={mode} onChange={setMode} />

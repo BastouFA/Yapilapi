@@ -8207,3 +8207,212 @@ button.profile-song__play::after {
 .ask-answer-form {
   padding: var(--space-3) var(--space-4) 0;
 }
+
+/* ── Drops ─────────────────────────────────────────────────────────── */
+.drop-cover {
+  display: block;
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  background: var(--surface-sunken);
+}
+.drop-cover--plain {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--yapi), var(--grad-end));
+  color: #fff;
+}
+.drop-cover--wide {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 7;
+  max-height: 320px;
+}
+.drops-row {
+  display: grid;
+  gap: var(--space-2);
+}
+.drops-row__list {
+  display: flex;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 2px 2px var(--space-2);
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.drops-row__list > li {
+  flex: 0 0 min(300px, 85%);
+}
+.drop-card {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  min-height: 44px;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+}
+.drop-card:hover {
+  border-color: var(--line-strong);
+}
+.drop-card:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.drop-card__body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.drop-card__title {
+  font: 700 16px/22px var(--font-sans);
+  overflow-wrap: anywhere;
+}
+.drop-card__meta {
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+.drop-card__when {
+  font-size: 14px;
+  font-weight: 600;
+}
+.drop-card__when--open {
+  color: var(--success);
+}
+.drops-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.drops-list__purchases {
+  margin: 0;
+  padding-inline-start: var(--space-4);
+  color: var(--ink);
+}
+.drop__seller {
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 600;
+}
+.drop__when,
+.drop__description {
+  margin: 0;
+}
+.drop__description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.drop__items {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.drop__item {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+.drop__item-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  align-items: baseline;
+}
+.drop__item-title {
+  margin: 0;
+  font: 700 17px/22px var(--font-sans);
+  overflow-wrap: anywhere;
+}
+.drop__item-desc {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.drop__item-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  align-items: center;
+  margin: 0;
+  font-size: 14px;
+}
+.drop__panel {
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.drop__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-3);
+}
+.drop__actions {
+  flex-wrap: wrap;
+}
+/* Main actions on a drop stay easy to tap. */
+.drop__actions .yp-btn,
+.drop__remind .yp-btn,
+.drop-buy .yp-btn {
+  min-height: 44px;
+}
+.drop-buy {
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.drop-buy__qty {
+  width: 96px;
+}
+.drop-form__group {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.drop-form__group legend {
+  padding: 0 var(--space-1);
+  font-weight: 700;
+}
+.drop-form__products {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.drop-form__product {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+.drop-form__product .yp-check {
+  min-height: 44px;
+  align-items: center;
+}
+.drop-form__numbers,
+.drop-form__price {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+.drop-form__new summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+  cursor: pointer;
+}

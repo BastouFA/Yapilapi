@@ -16,6 +16,7 @@ import { eventVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
 import { grantPlus } from '../lib/plus.ts';
 import { refundOrder, startPayment } from '../lib/checkout.ts';
+import { confirmDropOrder, dropGateSql, publishDropChange, releaseDropOrder, takeDropStock } from '../lib/drops.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 const PLATFORM_FEE_BPS = 500; // 5%
@@ -288,6 +289,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     const { rows } = await db.query(
       `SELECT pd.id, pd.kind, pd.title, pd.description, pd.price_cents, pd.currency, pd.inventory FROM products pd JOIN users u ON u.id = pd.seller_id
        WHERE pd.deleted_at IS NULL AND pd.status = 'active' AND u.status = 'active' ${q.sellerId ? 'AND pd.seller_id = $2' : ''}
+         AND coalesce(${dropGateSql('pd.id')}, 'open') = 'open'
        ORDER BY pd.created_at DESC LIMIT $1`,
       q.sellerId ? [q.limit, q.sellerId] : [q.limit],
     );
@@ -353,6 +355,8 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
           p.price_cents,
         ]);
       }
+      // Products in a drop: only while it's open, from what is really left, within the per-buyer limit.
+      await takeDropStock(c, ctx.realtime, { orderId, buyerId: u.id, items: input.items });
       const pay = await startPayment(c, ctx.paymentProviders, {
         orderId,
         buyerId: u.id,
@@ -482,6 +486,11 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
         }
         await c.query(`UPDATE payments SET status = 'succeeded', updated_at = now() WHERE id = $1`, [p.id]);
         await c.query(`UPDATE orders SET status = 'paid', updated_at = now() WHERE id = $1`, [p.order_id]);
+        // Paid after its hold in a drop ended and the units went to someone else (or the drop closed): the money goes straight back.
+        if (!(await confirmDropOrder(c, p.order_id))) {
+          await refundOrder(c, ctx.paymentProviders, p.order_id, null, 'The drop items were no longer available when the payment arrived');
+          return;
+        }
         await c.query(
           `UPDATE products pd SET inventory = pd.inventory - oi.quantity FROM order_items oi WHERE oi.order_id = $1 AND oi.product_id = pd.id AND pd.inventory IS NOT NULL`,
           [p.order_id],
@@ -561,6 +570,11 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       } else if (event.type === 'payment.failed') {
         await c.query(`UPDATE payments SET status = 'failed', updated_at = now() WHERE id = $1`, [p.id]);
         await c.query(`UPDATE orders SET status = 'failed', updated_at = now() WHERE id = $1 AND status = 'pending'`, [p.order_id]);
+        // Units it held in a drop go back on sale.
+        const drops = (await c.query<{ drop_id: string }>(`SELECT DISTINCT drop_id FROM drop_orders WHERE order_id = $1 AND status = 'held'`, [p.order_id]))
+          .rows;
+        await releaseDropOrder(c, p.order_id);
+        for (const d of drops) await publishDropChange(c, ctx.realtime, d.drop_id);
       }
     });
     await db.query(`UPDATE payment_webhook_events SET processed_at = now() WHERE id = $1`, [event.id]);

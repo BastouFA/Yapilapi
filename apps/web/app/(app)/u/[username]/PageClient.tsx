@@ -10,6 +10,7 @@ import { api, errorMessage } from '@/lib/api';
 import { PostList, ReportSheet } from '@/components/PostList';
 import { SupportCreator, TipSheet } from '@/components/SupportCreator';
 import { Shop } from '@/components/Shop';
+import { DropsRow } from '@/components/Drops';
 import { ChaptersRow } from '@/components/Chapters';
 import { ProfileBoards } from '@/components/Boards';
 import { JoinNote, NeedsAccount, useSignIn } from '@/components/SignedOut';
@@ -316,6 +317,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
       ) : null}
       {!signedOut || profile.ask?.enabled ? <AskCard profile={profile} onChanged={reload} /> : null}
       <FeaturedRow posts={profile.featured} />
+      {signedOut ? null : <DropsRow userId={profile.id} isSelf={rel.isSelf} />}
       {tabs.length > 1 ? (
         <Segments label={t('ps.tabs.title')} value={current} onChange={setTab} options={tabs.map((id) => ({ id, label: t(tabLabel(id)) }))} />
       ) : (

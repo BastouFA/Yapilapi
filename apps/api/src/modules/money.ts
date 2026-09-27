@@ -12,6 +12,7 @@ import { audit, isEnabled, notify, track } from '../lib/services.ts';
 import { assertAdultForMoney, isBlockedEitherWay, plusCol, publicUserFrom } from '../lib/users.ts';
 import { notBlockedSql } from '../lib/visibility.ts';
 import { MAX_UPLOAD_BYTES } from './media.ts';
+import { dropGateSql } from '../lib/drops.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -54,6 +55,8 @@ export default async function moneyModule(app: FastifyInstance, ctx: AppContext)
        WHERE pd.seller_id = $1 AND pd.deleted_at IS NULL AND pd.status = 'active' AND u.status = 'active'
          AND pd.kind IN ('product', 'digital', 'service', 'booking') AND ${notBlockedSql('pd.seller_id', '$2')}
          AND ($2::uuid = $1 OR pd.kind <> 'digital' OR f.product_id IS NOT NULL)
+         -- Products in a drop that isn't open are shown on the drop instead.
+         AND ($2::uuid = $1 OR coalesce(${dropGateSql('pd.id')}, 'open') = 'open')
        ORDER BY pd.created_at DESC LIMIT 100`,
       [id, viewer],
     );

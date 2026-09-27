@@ -112,6 +112,9 @@ const TEXT: Record<string, (actor: string) => string> = {
   // Questions asked without a name have no actor, so they read "Someone asked you a question".
   question_received: (a) => `${a} asked you a question`,
   question_answered: (a) => `${a} answered your question`,
+  drop_opened: (a) => `A drop from ${a} you asked about is open`,
+  drop_cancelled: (a) => `${a} cancelled a drop you were waiting for`,
+  drop_sold_out: () => 'Everything in your drop has sold',
 };
 
 /** Human text for a notification type, or null for types that shouldn't push. */

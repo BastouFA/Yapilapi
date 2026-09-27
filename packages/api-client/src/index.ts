@@ -46,6 +46,9 @@ import type {
   PublicCommunityPreview,
   PublicSitemap,
   PublicEventPreview,
+  PublicDropPreview,
+  Drop,
+  DropActivity,
   PublicPostPreview,
   PublicProfilePreview,
   PublicUser,
@@ -992,6 +995,7 @@ export function createClient(opts: ClientOptions) {
       user: (username: string) => get<{ profile: PublicProfilePreview }>(`/v1/public/users/${encodeURIComponent(username)}`),
       event: (id: string) => get<{ event: PublicEventPreview }>(`/v1/public/events/${encodeURIComponent(id)}`),
       community: (slug: string) => get<{ community: PublicCommunityPreview }>(`/v1/public/communities/${encodeURIComponent(slug)}`),
+      drop: (id: string) => get<{ drop: PublicDropPreview }>(`/v1/public/drops/${encodeURIComponent(id)}`),
       sitemap: () => get<PublicSitemap>('/v1/public/sitemap'),
     },
     passkeys: {
@@ -1244,6 +1248,59 @@ export function createClient(opts: ClientOptions) {
             idempotencyKey,
           },
         ),
+    },
+    /** Drops: product launches announced ahead of time (see apps/api/src/modules/drops.ts). */
+    drops: {
+      get: (id: string) => get<{ drop: Drop }>(`/v1/drops/${id}`),
+      /** A new draft. Times are checked by the server (5 minutes to 180 days ahead; open 15 minutes to 30 days). */
+      create: (b: {
+        title: string;
+        description?: string;
+        startsAt: string;
+        endsAt?: string | null;
+        items: { productId: string; quantity?: number | null; perBuyerLimit?: number | null }[];
+      }) => post<{ drop: Drop }>('/v1/drops', b),
+      /** Change a draft, or a published drop before it opens. */
+      update: (
+        id: string,
+        b: {
+          title?: string;
+          description?: string;
+          startsAt?: string;
+          endsAt?: string | null;
+          items?: { productId: string; quantity?: number | null; perBuyerLimit?: number | null }[];
+        },
+      ) => patch<{ drop: Drop }>(`/v1/drops/${id}`, b),
+      publish: (id: string) => post<{ drop: Drop }>(`/v1/drops/${id}/publish`),
+      /** Cancel a scheduled or open drop; the people waiting are told. */
+      cancel: (id: string) => post<{ drop: Drop }>(`/v1/drops/${id}/cancel`),
+      /** Delete a draft. */
+      remove: (id: string) => del<{ ok: true }>(`/v1/drops/${id}`),
+      setCover: (id: string, mediaId: string, altText?: string) => put<{ drop: Drop }>(`/v1/drops/${id}/cover`, { mediaId, altText }),
+      /** setCover, trying again while the photo is still being prepared (up to about a minute). */
+      setCoverWhenReady: async (id: string, mediaId: string, altText?: string, o: { intervalMs?: number; timeoutMs?: number } = {}) => {
+        const started = Date.now();
+        for (;;) {
+          try {
+            return await put<{ drop: Drop }>(`/v1/drops/${id}/cover`, { mediaId, altText });
+          } catch (e) {
+            if (!(e instanceof ApiError) || e.code !== 'media_processing' || Date.now() - started > (o.timeoutMs ?? 60_000)) throw e;
+          }
+          await new Promise((r) => setTimeout(r, o.intervalMs ?? 1200));
+        }
+      },
+      removeCover: (id: string) => del<{ drop: Drop }>(`/v1/drops/${id}/cover`),
+      /** "Notify me" when it opens. */
+      remind: (id: string) => post<{ reminded: true }>(`/v1/drops/${id}/remind`),
+      unremind: (id: string) => del<{ reminded: false }>(`/v1/drops/${id}/remind`),
+      /** Your drops as a seller, drafts included, with their numbers. */
+      mine: () => get<{ items: Drop[] }>('/v1/me/drops'),
+      /** Drops you asked about and what you bought in drops. */
+      activity: () => get<{ items: DropActivity[] }>('/v1/me/drop-activity'),
+      /** A person's open and coming drops (and recently ended ones). */
+      byUser: (userId: string) => get<{ items: Drop[] }>(`/v1/users/${userId}/drops`),
+      /** Open and coming drops from people you follow. */
+      following: () => get<{ items: Drop[] }>('/v1/drops/following'),
     },
     shop: {
       /** What a person sells on their profile. */

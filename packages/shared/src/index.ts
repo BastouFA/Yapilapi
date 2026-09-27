@@ -25,3 +25,5 @@ export * from './chat-theme.ts';
 export * from './accounts.ts';
 export * from './watch.ts';
 export * from './wrap.ts';
+export * from './drops.ts';
+export * from './drop-schemas.ts';

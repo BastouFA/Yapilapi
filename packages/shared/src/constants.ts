@@ -113,9 +113,24 @@ export const REPORT_REASONS = [
 
 /**
  * What can be reported. A story is a moment; a live is a live session; a room is an audio room. A
- * question (by whoever asked it) and an answer (the card, by the person who answered) share an id.
+ * question (by whoever asked it) and an answer (the card, by the person who answered) share an id. A drop is a
+ * seller's launch.
  */
-export const REPORT_TARGETS = ['user', 'post', 'comment', 'message', 'community', 'event', 'product', 'story', 'room', 'live', 'question', 'answer'] as const;
+export const REPORT_TARGETS = [
+  'user',
+  'post',
+  'comment',
+  'message',
+  'community',
+  'event',
+  'product',
+  'story',
+  'room',
+  'live',
+  'question',
+  'answer',
+  'drop',
+] as const;
 
 export const FEEDBACK_SIGNALS = ['more_like_this', 'less_like_this', 'not_interested', 'mute_topic', 'mute_creator'] as const;
 
