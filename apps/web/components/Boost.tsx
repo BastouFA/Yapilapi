@@ -10,32 +10,61 @@ import { useCheckout } from './Checkout';
 /** Countries offered for a boost audience. The one on your profile is always included. */
 const COUNTRIES = ['NG', 'GH', 'KE', 'ZA', 'CI', 'SN', 'CM', 'UG', 'TZ', 'RW', 'ET', 'EG', 'MA', 'US', 'CA', 'GB', 'FR', 'DE', 'BR', 'IN'];
 
+/** Choices made elsewhere (the phone app's boost screen) to start the form with. Anything not offered is ignored. */
+export interface BoostChoices {
+  currency?: string;
+  budgetCents?: number;
+  days?: number;
+  country?: string;
+  topics?: string[];
+}
+
+/** Boost choices from a link's query (?currency=&budget=&days=&country= or &topics=a,b). */
+export function boostChoicesFrom(q: URLSearchParams): BoostChoices {
+  const num = (k: string) => (q.get(k) && /^\d+$/.test(q.get(k)!) ? Number(q.get(k)) : undefined);
+  return {
+    currency: q.get('currency')?.toUpperCase() || undefined,
+    budgetCents: num('budget'),
+    days: num('days'),
+    country: /^[A-Za-z]{2}$/.test(q.get('country') ?? '') ? q.get('country')!.toUpperCase() : undefined,
+    topics: q
+      .get('topics')
+      ?.split(',')
+      .map((x) => x.trim().toLowerCase())
+      .filter(Boolean)
+      .slice(0, 10),
+  };
+}
+
 /**
  * Boost one of your public posts, on one screen: a budget, how many days, and
  * who sees it (people in a country, or people interested in a topic). It's
  * paid through checkout, then reviewed like any ad before it runs.
  */
-export function BoostSheet({ post, onClose, onDone }: { post: Post | null; onClose: () => void; onDone?: () => void }) {
+export function BoostSheet({ post, onClose, onDone, choices }: { post: Post | null; onClose: () => void; onDone?: () => void; choices?: BoostChoices }) {
   return (
     <BottomSheet open={!!post} onClose={onClose} title="Boost this post">
-      {post ? <BoostForm key={post.id} post={post} onClose={onClose} onDone={onDone} /> : null}
+      {post ? <BoostForm key={post.id} post={post} onClose={onClose} onDone={onDone} choices={choices} /> : null}
     </BottomSheet>
   );
 }
 
-function BoostForm({ post, onClose, onDone }: { post: Post; onClose: () => void; onDone?: () => void }) {
+function BoostForm({ post, onClose, onDone, choices }: { post: Post; onClose: () => void; onDone?: () => void; choices?: BoostChoices }) {
   const { me, toast, locale } = useSession();
   const checkout = useCheckout();
   const [currency, setCurrency] = useState<string>(() => {
+    if (choices?.currency && BOOST_OPTIONS[choices.currency]) return choices.currency;
     const c = currencyForCountry(me?.country);
     return BOOST_OPTIONS[c] ? c : 'USD';
   });
   const options = BOOST_OPTIONS[currency]!;
-  const [budget, setBudget] = useState<number>(options.budgets[0]!);
-  const [days, setDays] = useState<number>(3);
-  const [audience, setAudience] = useState<'country' | 'interests'>('country');
-  const [country, setCountry] = useState(me?.country ?? 'NG');
-  const [topics, setTopics] = useState(post.topics.slice(0, 3).join(', '));
+  const [budget, setBudget] = useState<number>(() =>
+    choices?.budgetCents && options.budgets.includes(choices.budgetCents) ? choices.budgetCents : options.budgets[0]!,
+  );
+  const [days, setDays] = useState<number>(() => (choices?.days && (BOOST_DAYS as readonly number[]).includes(choices.days) ? choices.days : 3));
+  const [audience, setAudience] = useState<'country' | 'interests'>(choices?.topics?.length ? 'interests' : 'country');
+  const [country, setCountry] = useState(choices?.country ?? me?.country ?? 'NG');
+  const [topics, setTopics] = useState((choices?.topics?.length ? choices.topics : post.topics.slice(0, 3)).join(', '));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,7 +75,7 @@ function BoostForm({ post, onClose, onDone }: { post: Post; onClose: () => void;
       return null;
     }
   }, [locale]);
-  const countries = [...new Set([...(me?.country ? [me.country] : []), ...COUNTRIES])];
+  const countries = [...new Set([...(me?.country ? [me.country] : []), ...(choices?.country ? [choices.country] : []), ...COUNTRIES])];
   const topicList = topics
     .split(',')
     .map((x) => x.trim().replace(/^#/, '').toLowerCase())

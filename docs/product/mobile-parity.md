@@ -6,11 +6,13 @@ on the web for now), **No** (not in the phone app yet), **Web only** (on purpose
 
 Last reviewed: September 2026, after the first-run pass (welcome, sign up, log in with two-step
 codes, forgot password, a six-step onboarding, the tour of the dock, empty states that point to
-the next thing to do, loading placeholders and the offline bar; see "First run" below) and the
-parity passes that added creating communities and events,
-community settings, editing and cancelling events, place reviews and bookings, the Plus screen,
-memories, Together and watching lives (before them: the Wander search, grouped notifications,
-event and place pages, follow lists, the profile menu, profile editing and the remaining settings).
+the next thing to do, loading placeholders and the offline bar; see "First run" below), the parity
+pass for creators and money (Studio, post insights, boosting, plans and tips, the shop and
+purchases), and the ones before them.
+
+The phone app has no checkout: anything that takes money (buying, booking a service, subscribing,
+tipping, gifts, boosting, Plus) opens the matching web page in the browser, with the choice already
+made, and the app never handles card details. Coming back to the app loads the result again.
 
 ## Pages
 
@@ -24,11 +26,11 @@ event and place pages, follow lists, the profile menu, profile editing and the r
 | `/inbox`                                     | Conversations, friend requests, notifications link                                          | `(tabs)/inbox`                                                    | Yes      | Now shows friend requests (accept or decline) and a Notifications row with the unread count.                                                                                                                 |
 | `/inbox/[id]`                                | A chat                                                                                      | `chat/[id]`                                                       | Yes      |                                                                                                                                                                                                              |
 | `/notifications`                             | Notifications grouped by day, "Ada and 3 others", Follow back, invites                      | `notifications`                                                   | Yes      | Every notification type has text on the phone and opens the right screen. The web marks read with a button; the phone marks read on opening.                                                                |
-| `/p/[id]`                                    | A post                                                                                      | `p/[id]`                                                          | Yes      |                                                                                                                                                                                                              |
+| `/p/[id]` | A post | `p/[id]` | Yes | Your own posts have See insights and Boost this post in the More menu; a creator's posts have a tip button (paid on the web). |
 | `/reels`                                     | Reels viewer                                                                                | `reels`                                                           | Yes      |                                                                                                                                                                                                              |
 | `/reels/[id]/remixes`                        | Duets and remixes of a reel                                                                 | -                                                                 | No       | Links open the reel itself.                                                                                                                                                                                  |
 | `/s/[id]`                                    | A story                                                                                     | `s/[id]`                                                          | Yes      |                                                                                                                                                                                                              |
-| `/u/[username]`                              | Profile: cover, status, posts, tagged, boards, chapters, shop, follow lists, menu, share    | `u/[username]`, `(tabs)/profile`                                  | Partial  | Follower and following lists, the More menu (add friend, mute, block, report) and Edit profile are now on the phone. QR code: shared as a link through the system share sheet (see below).                   |
+| `/u/[username]` | Profile: cover, status, posts, tagged, boards, chapters, shop, support, follow lists, menu, share | `u/[username]`, `(tabs)/profile`, `product`, `plans` | Partial | Follower and following lists, the More menu (add friend, mute, block, report) and Edit profile are on the phone. Support card with the creator's plans and perks, subscribe and tip (paid on the web). Shop tab lists products, downloads and services; each opens `product` (details, download if you bought it, buy or book on the web). Subscriber-only posts show a locked card with Subscribe on the web and See plans. QR code: shared as a link through the system share sheet (see below). |
 | `/t/[tag]`                                   | A tag                                                                                       | `t/[tag]`                                                         | Yes      |                                                                                                                                                                                                              |
 | `/sounds/[id]`                               | A sound                                                                                     | `sounds/[id]`                                                     | Yes      |                                                                                                                                                                                                              |
 | `/music/[id]`                                | A music track                                                                               | `music/[id]`                                                      | Yes      |                                                                                                                                                                                                              |
@@ -56,14 +58,17 @@ event and place pages, follow lists, the profile menu, profile editing and the r
 | `/together`, `/together/[id]` | Together albums | `together/index`, `together/[id]`, `real?together=<id>` | Yes | Your Togethers, starting one with friends, members, photos with sensitive ones blurred, closing (creator). "Add your view" takes a photo with the Real camera. New photos arrive live. |
 | `/memories`, `/memories/[id]` | Memories | `memories/index`, `memories/[id]`, post More menu | Yes | Your memories and ones shared with you, making one, from an event you went to, On this day, rename, delete, remove items, share with friends, the AI recap, and making a recap video. "Add to a memory" is in a post's More menu. The phone adds rename and removing items, which the web page doesn't have. |
 | `/plus` | YAPILAPI Plus | `plus` | Partial | Benefits, status and end date, history, progress to a free month from invites. Paying opens the web checkout in the browser; the app never handles card details. |
-| `/studio`                                    | Creator studio: analytics, ads, sales                                                       | -                                                                 | Web only |                                                                                                                                                                                                              |
+| `/studio` | Creator studio: analytics, earnings, sales, shop, plans, boosts, promotions, video editor | `studio`, `insights/[id]`, `boost` | Partial | Last 28 days: views, reach, likes, comments, saves, followers and new followers per day (bars drawn with Views), top posts and reels, earnings per currency, payout requests and their status, sales and service bookings (confirm or decline), subscribers and plans, boost and promotion results, tips and gifts. From You for creator, professional and business accounts. Post insights (`insights/[id]`) from a post's More menu. Boosting (`boost`) picks budget, days and audience with a summary, then opens the post on the web with those choices filled in to pay. Adding products and files, making plans, the video editor and new promotions stay on the web (Open Studio on the web). |
 | `/developers`                                | API keys and webhooks                                                                       | -                                                                 | Web only |                                                                                                                                                                                                              |
 | `/admin`                                     | Moderation and admin                                                                        | -                                                                 | Web only |                                                                                                                                                                                                              |
 
 Phone-only screens: `close-friends`, `now-status`, `new-group`, `onboarding`, `welcome`, `board-edit`,
 `chapter-edit`, `communities` (yours and to discover), `follows`, `community-settings` (details,
 members and roles, join requests, bans and the FAQ, for owners, admins and moderators; the web
-has no such page yet).
+has no such page yet), `purchases` (downloads you bought, opened with a 10-minute link in the
+system; your subscriptions, with cancel; tips you sent), `gifts` (tips and gifts received and
+sent), `plans` (a creator's plans and perks), `product` (one thing from a shop). On the web these
+live on the profile, in Studio and in Settings.
 
 ## First run
 
@@ -113,7 +118,7 @@ actions on the app icon (`expo-quick-actions` is not installed, and no native mo
 | Connected apps                               | -                                          | No      |
 | Export data, delete account, assistant memory | -                                         | No      |
 | Decisions about your content and appeals     | -                                          | No      |
-| Purchases                                    | -                                          | No      |
+| Purchases                                    | `purchases` (You)                          | Yes     |
 
 ## Links into the app
 
@@ -145,6 +150,20 @@ Taps on push notifications open the screen the notification is about (`lib/links
 | `yapilapi://live/<id>`, `/live/<id>`          | Live                    |
 | `/join/<code>`                                | Sign up, code filled in |
 | `/signup`, `/login`, `/forgot-password`       | The same screens        |
+| `yapilapi://studio`, `/studio`                | Studio                  |
+| `/p/<id>/insights`, `yapilapi://insights/<id>` | Post insights          |
+| `/p/<id>?boost=1`                             | Boost a post            |
+| `/u/<username>?subscribe=1`, `yapilapi://plans/<username>` | A creator's plans |
+| `/u/<username>?shop=1&product=<id>`           | One thing from a shop   |
+| `yapilapi://purchases`, `yapilapi://gifts`    | Purchases, tips and gifts |
+
+Notifications about money open the matching screen: a tip you got opens tips and gifts; a new
+subscriber, a sale or a booking to confirm opens Studio.
+
+The web pages the phone opens for checkout take the choice with them: `/u/<name>?subscribe=1`
+(plans), `/u/<name>?tip=1&post=<id>` (the tip sheet, for that post), `/u/<name>?shop=1&product=<id>`
+(the Shop tab with that item), `/p/<id>?boost=1&currency=&budget=&days=&country=` or `&topics=`
+(the boost sheet filled in).
 
 Universal links (https links opening the app) need `associatedDomains` and an Android intent
 filter with a verified host, which are native configuration changes and not set up yet; the
@@ -162,5 +181,11 @@ mapping above already handles those paths once they are.
   native modules we don't ship); on the web. Logging in with a two-step code works on the phone.
 - **Profile QR code**: the QR generator the web uses (`qrcode-generator`) doesn't resolve from
   the phone app, and no native dependency may be added, so the profile is shared as a link.
-- **Buying at places**, **business pages**: commerce flows on the web. Plus is paid in the web
-  checkout, opened in the browser from the Plus screen.
+- **Checkout**: buying, booking a service, subscribing, tipping, gifts, boosting and Plus are paid
+  on the web, opened in the browser with the choice made on the phone. The phone never handles
+  card details, and no payment native module is shipped.
+- **Selling and running promotions**: adding products and their files, making plans, the video
+  editor and new promotions are in Studio on the web; the phone shows how they are doing.
+- **Requesting a payout**: the phone shows payout requests and their status; there is no request
+  form on the web either yet.
+- **Buying at places**, **business pages**: commerce flows on the web.

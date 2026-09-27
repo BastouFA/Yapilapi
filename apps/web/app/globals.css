@@ -2637,6 +2637,11 @@ video.chat-att__media {
   border-radius: var(--radius-lg);
 }
 
+/* An item opened from a link (the phone app's Buy or Book). */
+.shop__item--focus {
+  box-shadow: 0 0 0 2px var(--yapi);
+}
+
 /* Launch safety: honeypot, verification, held messages, sensitive chat media */
 .hp-field {
   position: absolute;

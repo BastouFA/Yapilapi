@@ -37,7 +37,7 @@ function useWelcomeAfterSignOut() {
 
 /**
  * Tabs live in (tabs); detail screens (chat, post, community, event, place, settings, Real, Reels, memories,
- * Together, Live) push on top.
+ * Together, Live, Studio, post insights, plans, a shop item, purchases, tips and gifts) push on top.
  * Links from outside (yapilapi://…, web paths) are mapped in +native-intent.tsx; push taps in useNotificationLinks.
  */
 function Screens() {
@@ -118,6 +118,13 @@ function Screens() {
         <Stack.Screen name="community-settings" options={{ title: t('m.manage.title') }} />
         <Stack.Screen name="event-edit" options={{ title: t('events.create'), presentation: 'modal', headerLeft: closeButton }} />
         <Stack.Screen name="plus" options={{ title: t('plus.title') }} />
+        <Stack.Screen name="studio" options={{ title: t('m.studio.title') }} />
+        <Stack.Screen name="insights/[id]" options={{ title: t('m.insights.title') }} />
+        <Stack.Screen name="boost" options={{ title: t('m.boost.title'), presentation: 'modal', headerLeft: closeButton }} />
+        <Stack.Screen name="plans" options={{ title: t('m.money.plansTitle') }} />
+        <Stack.Screen name="product" options={{ title: t('m.product.title') }} />
+        <Stack.Screen name="purchases" options={{ title: t('m.purchases.title') }} />
+        <Stack.Screen name="gifts" options={{ title: t('m.gifts.title') }} />
         <Stack.Screen name="follows" options={{ title: t('profile.followers') }} />
         <Stack.Screen name="profile-edit" options={{ title: t('profile.edit'), presentation: 'modal', headerLeft: closeButton }} />
         <Stack.Screen name="reels" options={{ title: t('m.title.reels'), headerShown: false, contentStyle: { backgroundColor: '#000' } }} />

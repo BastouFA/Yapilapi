@@ -8,7 +8,7 @@ import { FollowList } from '@/components/FollowList';
 import type { Profile } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { PostList, ReportSheet } from '@/components/PostList';
-import { SupportCreator } from '@/components/SupportCreator';
+import { SupportCreator, TipSheet } from '@/components/SupportCreator';
 import { Shop } from '@/components/Shop';
 import { ChaptersRow } from '@/components/Chapters';
 import { ProfileBoards } from '@/components/Boards';
@@ -36,14 +36,24 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
   const [taggedHidden, setTaggedHidden] = useState(false);
   // Bumped when you subscribe, so posts for subscribers reload unlocked.
   const [version, setVersion] = useState(0);
-  // Links from a locked post (?subscribe=1) and to the shop (?shop=1).
-  const [intent, setIntent] = useState<'subscribe' | 'shop' | null>(null);
+  // Links from a locked post (?subscribe=1), to the shop (?shop=1, with &product=<id> for one item),
+  // and to tip (?tip=1, with &post=<id> for a tip on a post). The phone app opens these for checkout.
+  const [intent, setIntent] = useState<'subscribe' | 'shop' | 'tip' | null>(null);
+  const [focus, setFocus] = useState<{ product?: string; post?: string }>({});
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
+    const id = (k: string) => {
+      const v = q.get(k);
+      return v && /^[0-9a-f-]{36}$/i.test(v) ? v : undefined;
+    };
     if (q.has('subscribe')) setIntent('subscribe');
-    else if (q.has('shop')) {
+    else if (q.has('tip')) {
+      setIntent('tip');
+      setFocus({ post: id('post') });
+    } else if (q.has('shop')) {
       setIntent('shop');
       setTab('shop');
+      setFocus({ product: id('product') });
     }
   }, []);
   useEffect(() => {
@@ -316,7 +326,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
       ) : tab === 'boards' ? (
         <ProfileBoards username={profile.username} name={profile.displayName} isSelf={rel.isSelf} />
       ) : tab === 'shop' ? (
-        <Shop userId={profile.id} name={profile.displayName} isSelf={rel.isSelf} />
+        <Shop userId={profile.id} name={profile.displayName} isSelf={rel.isSelf} focusId={focus.product} />
       ) : (
         <PostList
           load={loadReposts}
@@ -333,6 +343,9 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
         onFollowChange={reload}
       />
       <ReportSheet target={reporting ? { type: 'user', id: profile.id } : null} onClose={() => setReporting(false)} />
+      {!rel.isSelf && !signedOut && flags.COMMERCE !== false ? (
+        <TipSheet open={intent === 'tip'} onClose={() => setIntent(null)} userId={profile.id} name={profile.displayName} postId={focus.post} />
+      ) : null}
       <ShareProfileSheet open={sheet === 'share'} onClose={() => setSheet(null)} profile={profile} />
       {rel.isSelf ? (
         <>

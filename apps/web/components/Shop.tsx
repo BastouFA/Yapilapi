@@ -32,7 +32,17 @@ export async function startDownload(productId: string) {
  * through checkout and then downloaded from here (or your purchases);
  * services are booked for a time and confirmed by the seller.
  */
-export function Shop({ userId, name, isSelf }: { userId: string; name: string; isSelf: boolean }) {
+export function Shop({
+  userId,
+  name,
+  isSelf,
+  focusId,
+}: {
+  userId: string;
+  name: string;
+  isSelf: boolean;
+  /** Scroll to this item (a link from the phone app). */ focusId?: string;
+}) {
   const { me, toast, locale, flags, t } = useSession();
   const signIn = useSignIn();
   const checkout = useCheckout();
@@ -51,6 +61,9 @@ export function Shop({ userId, name, isSelf }: { userId: string; name: string; i
   useEffect(() => {
     void load();
   }, [load]);
+  useEffect(() => {
+    if (focusId && items?.some((p) => p.id === focusId)) document.getElementById(`product-${focusId}`)?.scrollIntoView({ block: 'center' });
+  }, [focusId, items]);
 
   if (flags.COMMERCE === false) return <EmptyState title={t('m.shop.tab')} body={t('shop.unavailable')} />;
   if (items === null) return <Skeleton height={160} />;
@@ -99,7 +112,7 @@ export function Shop({ userId, name, isSelf }: { userId: string; name: string; i
   return (
     <div className="stack-sm shop">
       {items.map((p) => (
-        <article key={p.id} className="yp-card shop__item">
+        <article key={p.id} id={`product-${p.id}`} className={p.id === focusId ? 'yp-card shop__item shop__item--focus' : 'yp-card shop__item'}>
           <div className="shop__main">
             <div className="row" style={{ gap: 8 }}>
               <strong>{p.title}</strong>
