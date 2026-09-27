@@ -391,6 +391,8 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
       ) : null}
       {post.music ? <PostMusicChip music={post.music} /> : null}
 
+      {post.format === 'reel' && !post.locked && post.media.some((m) => m.kind === 'video') ? <ReelPreview post={post} saver={saver} /> : null}
+
       {imageUri ? (
         <View
           style={{ borderRadius: radius.md, overflow: 'hidden' }}
@@ -604,5 +606,53 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
       ) : null}
       {history ? <HistorySheet postId={post.id} onClose={() => setHistory(false)} /> : null}
     </Card>
+  );
+}
+
+/**
+ * A reel in a feed, on a profile or a tag page: its poster frame with a play sign and "Watch reel";
+ * a tap opens it full screen in Reels, at this reel (Back returns here).
+ */
+function ReelPreview({ post, saver }: { post: Post; saver: boolean }) {
+  const c = useColors();
+  const { t } = useT();
+  const m = post.media.find((x) => x.kind === 'video')!;
+  const poster = saver ? (m.variants?.thumb ?? m.posterUrl) : m.posterUrl;
+  const ratio = m.width && m.height ? m.width / m.height : 9 / 16;
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={t('reel.card.label', { name: post.author.displayName })}
+      onPress={() => router.push({ pathname: '/reels', params: { start: post.id } })}
+      style={({ pressed }) => ({
+        alignSelf: ratio > 1.2 ? 'stretch' : 'flex-start',
+        width: ratio > 1.2 ? undefined : '72%',
+        aspectRatio: ratio > 1.2 ? 16 / 9 : ratio > 0.85 ? 1 : 9 / 16,
+        maxHeight: 460,
+        borderRadius: radius.md,
+        overflow: 'hidden',
+        backgroundColor: '#0B0C14',
+        opacity: pressed ? 0.85 : 1,
+      })}
+    >
+      {poster ? (
+        <Image source={{ uri: mediaUrl(poster) }} blurRadius={m.sensitive ? 40 : 0} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+      ) : null}
+      <View style={{ position: 'absolute', top: 0, bottom: 0, start: 0, end: 0, alignItems: 'center', justifyContent: 'center' }} pointerEvents="none">
+        <View style={{ width: 56, height: 56, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(5,6,11,0.5)' }}>
+          <Icon name="play" size={26} color="#FFFFFF" />
+        </View>
+      </View>
+      <View style={{ position: 'absolute', bottom: space[2], start: space[3], flexDirection: 'row', alignItems: 'center', gap: 6 }} pointerEvents="none">
+        <Icon name="sparkles-outline" size={14} color="#FFFFFF" />
+        <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 4 }}>
+          {t('reel.card.watch')}
+        </Text>
+      </View>
+      <View
+        style={{ position: 'absolute', top: 0, start: 0, end: 0, bottom: 0, borderRadius: radius.md, borderWidth: 1, borderColor: c.line }}
+        pointerEvents="none"
+      />
+    </Pressable>
   );
 }

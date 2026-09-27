@@ -65,6 +65,7 @@ const APP_PAGES: [string, (d: SeedData) => string][] = [
   ['chapter', (d) => `/chapters/${d.chapterId}`],
   ['archive', () => '/archive'],
   ['sound', (d) => `/sounds/${d.soundId}`],
+  ['reel with highlights', (d) => `/reels?start=${d.reel2Id}`],
 ];
 
 /** Wait for content, then for finite animations (so contrast isn't measured mid-fade). */
@@ -402,6 +403,55 @@ const STATES: [string, (page: Page, d: SeedData) => Promise<void>][] = [
       test.skip(!d.recapReady, 'the recap video was not ready');
       await open(page, `/recaps?open=${d.recapId}`);
       await page.getByRole('button', { name: /^Post as (a )?reel$/ }).click();
+    },
+  ],
+  [
+    'reels: details',
+    async (page, d) => {
+      await open(page, `/reels?start=${d.reel2Id}`);
+      // Reels off screen are inert: only the one on screen can be reached.
+      const reel = page.locator('.reel--active');
+      await reel.getByRole('button', { name: 'More about this reel' }).click();
+      await expect(reel.getByRole('region', { name: 'About this reel' }).getByRole('button', { name: /^Go to Crumb/ })).toBeVisible();
+    },
+  ],
+  [
+    'reels: options sheet',
+    async (page, d) => {
+      await open(page, `/reels?start=${d.reel2Id}`);
+      await page.locator('.reel--active').getByRole('button', { name: 'Reel options' }).click();
+      await expect(page.getByRole('dialog', { name: 'Reel options' }).getByRole('group', { name: 'Speed' })).toBeVisible();
+    },
+  ],
+  [
+    'reels: share sheet',
+    async (page, d) => {
+      await open(page, `/reels?start=${d.reel2Id}`);
+      await page
+        .locator('.reel--active')
+        .getByRole('button', { name: /^Share/ })
+        .click();
+      await expect(page.getByRole('dialog', { name: 'More ways to share' }).getByRole('button', { name: 'Copy link' })).toBeVisible();
+    },
+  ],
+  [
+    'reels: comments with a moment',
+    async (page, d) => {
+      await open(page, `/reels?start=${d.reel2Id}`);
+      await page
+        .locator('.reel--active')
+        .getByRole('button', { name: /^Comments/ })
+        .click();
+      await expect(page.getByRole('dialog', { name: 'Comments' }).getByRole('button', { name: 'Go to 0:04 in the reel' })).toBeVisible();
+    },
+  ],
+  [
+    'reels: clear view',
+    async (page, d) => {
+      await open(page, `/reels?start=${d.reel2Id}`);
+      const clear = page.locator('.reel--active').getByRole('button', { name: 'Clear view', exact: true });
+      await clear.click();
+      await expect(clear).toHaveAttribute('aria-pressed', 'true');
     },
   ],
   [

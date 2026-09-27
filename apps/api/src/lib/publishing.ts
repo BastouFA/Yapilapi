@@ -222,6 +222,17 @@ export async function writePost(
       }
     }
   }
+  // Reels: the creator's highlights, each within the video (when its length is known yet).
+  if (input.format === 'reel') {
+    const highlights = input.highlights ?? [];
+    if (highlights.length) {
+      const len = (
+        await c.query(`SELECT m.duration_ms FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = $1 ORDER BY pm.position LIMIT 1`, [id])
+      ).rows[0]?.duration_ms as number | null | undefined;
+      if (len && highlights.some((h) => h.atMs >= len)) throw badRequest('Each highlight has to be within the video.');
+    }
+    await c.query(`UPDATE posts SET highlights = $2 WHERE id = $1`, [id, highlights.length ? JSON.stringify(highlights) : null]);
+  }
   // A reel playing a catalogue song has no sound of its own to offer others (its audio isn't heard).
   if (input.format === 'reel' && !soundId && !music) {
     const mediaId = (await c.query(`SELECT media_id FROM post_media WHERE post_id = $1 ORDER BY position LIMIT 1`, [id])).rows[0]?.media_id;

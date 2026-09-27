@@ -8,7 +8,7 @@ import { commentAllowedSql } from './comments.ts';
 import { langOf } from './translation.ts';
 import { soundVisibleSql } from './sounds.ts';
 import { trackMusic, viewerCountries, type StoredPart, type TrackRow } from './music/view.ts';
-import type { PostMusic } from '@yapilapi/shared';
+import type { PostMusic, ReelHighlight } from '@yapilapi/shared';
 
 type Q = Pool | PoolClient;
 
@@ -39,7 +39,8 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
                FROM poll_options o WHERE o.post_id = p.id) AS poll_options,
             (SELECT option_id FROM poll_votes v WHERE v.post_id = p.id AND v.user_id = $2) AS my_vote,
             (SELECT array_agg(DISTINCT w.country ORDER BY w.country) FROM post_withholdings w WHERE w.post_id = p.id AND p.author_id = $2) AS withheld_in,
-            p.allow_remix, p.remix_mode, p.remix_of_post_id,
+            p.allow_remix, p.remix_mode, p.remix_of_post_id, p.highlights,
+            CASE WHEN p.format = 'reel' THEN (SELECT rr.position_ms FROM reel_resume rr WHERE rr.user_id = $2 AND rr.post_id = p.id) END AS resume_ms,
             -- Which circle a post went to is for its author only; members never see a circle's name.
             (p.visibility = 'circle' AND p.author_id IS NOT DISTINCT FROM $2) AS own_circle_post,
             CASE WHEN p.visibility = 'circle' AND p.author_id IS NOT DISTINCT FROM $2
@@ -117,7 +118,13 @@ function toPost(r: Record<string, any>, originals: Map<string, NonNullable<Remix
       ...(r.remix_count === null ? {} : { remixes: r.remix_count }),
     },
     commentPolicy: r.comment_policy,
-    viewer: { liked: r.liked, saved: r.saved, reposted: r.reposted, canComment: r.can_comment },
+    viewer: {
+      liked: r.liked,
+      saved: r.saved,
+      reposted: r.reposted,
+      canComment: r.can_comment,
+      ...(r.resume_ms === null || r.resume_ms === undefined ? {} : { resumeMs: r.resume_ms }),
+    },
     aiAssisted: !!r.ai_provenance?.assisted,
     real: r.real ?? null,
     createdAt: r.created_at.toISOString(),
@@ -128,6 +135,7 @@ function toPost(r: Record<string, any>, originals: Map<string, NonNullable<Remix
           allowRemix: r.allow_remix,
           remixOf: r.remix_mode ? { mode: r.remix_mode, post: (r.remix_of_post_id && originals.get(r.remix_of_post_id)) || null } : null,
           sound: r.s_id ? { id: r.s_id, title: r.s_title, durationMs: r.s_duration ?? null, audioUrl: r.s_audio ?? null, original: r.s_source === r.id } : null,
+          ...(Array.isArray(r.highlights) && r.highlights.length ? { highlights: r.highlights as ReelHighlight[] } : {}),
         }
       : {}),
     reason: reasons?.get(r.id),

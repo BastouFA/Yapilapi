@@ -1,23 +1,47 @@
+import { useEventListener } from 'expo';
 import { useAudioPlayer } from 'expo-audio';
 import { File, Paths } from 'expo-file-system';
+import * as SecureStore from 'expo-secure-store';
 import * as Sharing from 'expo-sharing';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Platform, Pressable, Share, StyleSheet, Text, View, type ViewToken } from 'react-native';
+import {
+  AccessibilityInfo,
+  ActivityIndicator,
+  Animated,
+  Easing,
+  FlatList,
+  I18nManager,
+  Image,
+  Modal,
+  PanResponder,
+  Platform,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+  type GestureResponderEvent,
+  type ViewToken,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MediaItem, Post } from '../../../packages/shared/src/types';
 import { hls360 } from '../../../packages/shared/src/data-saver';
+import { formatReelTime, REEL_SPEEDS, resumeWorthKeeping, type ReelMoment, type ReelSpeed } from '../../../packages/shared/src/reels';
+import { REPORT_REASONS } from '../../../packages/shared/src/constants';
 import { client, errorMessage, mediaUrl, webUrl } from '../lib/api';
 import { useDataSaver } from '../lib/data-saver';
 import { useSession } from '../lib/session';
 import { useT } from '../lib/i18n';
 import { radius, space } from '../lib/theme';
-import { Avatar, Button, EmptyState, Icon, Loading, Notice, useColors, userText, type IconName } from '../lib/ui';
+import { Avatar, Button, EmptyState, Icon, Loading, Notice, Segmented, SwitchRow, useColors, userText, type IconName } from '../lib/ui';
 import { LockedPanel } from '../lib/money';
 import { useBoards, type SaveChange } from '../lib/boards';
 import { AuthorNames, RichText } from '../lib/post';
 import { SensitiveCover } from '../lib/safety';
+import { TranslatableText } from '../lib/translation';
 import { openMusic, useMusicCredit, useMusicLoop } from '../lib/music';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 
@@ -26,30 +50,77 @@ const reelSource = (m: MediaItem, saver: boolean) =>
   mediaUrl(saver ? (m.variants?.mp4_360 ?? hls360(m) ?? m.variants?.mp4 ?? m.url) : (m.variants?.mp4 ?? m.url));
 
 const WHITE = '#FFFFFF';
-const SCRIM = 'rgba(0,0,0,0.35)';
+const SCRIM = 'rgba(5,6,11,0.42)';
+const ACCENT = '#FF5C7A';
+const SUN = '#FFBE3D';
+const MINT = '#3DDBC2';
 const VIEWABILITY = { itemVisiblePercentThreshold: 60 };
+const TAP_MS = 260;
+const FADE_MS = 3000;
+const SOUND_HINT_KEY = 'yp.reels.soundHint';
+const REASON_KEYS: Record<(typeof REPORT_REASONS)[number], MessageKey> = {
+  spam: 'postList.reason.spam',
+  harassment: 'postList.reason.harassment',
+  hate: 'postList.reason.hate',
+  violence: 'postList.reason.violence',
+  nudity: 'postList.reason.nudity',
+  self_harm: 'postList.reason.selfHarm',
+  impersonation: 'postList.reason.impersonation',
+  fraud: 'postList.reason.fraud',
+  minor_safety: 'postList.reason.minorSafety',
+  other: 'postList.reason.other',
+};
+
+function useReducedMotion() {
+  const [reduce, setReduce] = useState(false);
+  useEffect(() => {
+    void AccessibilityInfo.isReduceMotionEnabled().then(setReduce);
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduce);
+    return () => sub.remove();
+  }, []);
+  return reduce;
+}
 
 /**
  * Reels: short vertical videos, one per screen. The one on screen plays (muted until you turn
- * sound on) and loops; swipe up for the next. Like, comment and share from the side; tap the
- * video to pause. `?start=<post id>` opens a particular reel first. Duets play beside their
- * original; reels that use another sound play that sound; the sound's name opens its page.
+ * sound on) and loops; swipe up for the next. Tap to pause, double tap to like, press and hold
+ * for clear view (the video alone), hold the right edge for 2×. The info stays low and fades while
+ * it plays; "more" shows everything. `?start=<post id>` opens a reel first and `&at=<ms>` a moment in it.
  */
 export default function Reels() {
   const c = useColors();
   const { t } = useT();
   const insets = useSafeAreaInsets();
   const focused = useIsFocused();
-  const { start } = useLocalSearchParams<{ start?: string }>();
+  const { start, at } = useLocalSearchParams<{ start?: string; at?: string }>();
   const [items, setItems] = useState<Post[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
   const { me } = useSession();
   const [muted, setMuted] = useState(true);
+  const [clear, setClear] = useState(false);
+  const [speed, setSpeed] = useState<ReelSpeed>(1);
+  const [big, setBig] = useState(false);
+  const [soundHint, setSoundHint] = useState(false);
   const [active, setActive] = useState(0);
   const [height, setHeight] = useState(0);
+  const [moments, setMoments] = useState<Record<string, ReelMoment[]>>({});
+  const [sheet, setSheet] = useState<{ kind: 'share' | 'options'; post: Post } | null>(null);
   const loading = useRef(false);
+  const list = useRef<FlatList<Post>>(null);
   const [preparing, setPreparing] = useState<string | null>(null);
+
+  useEffect(() => {
+    void SecureStore.getItemAsync(SOUND_HINT_KEY).then(
+      (v) => setSoundHint(v !== 'seen'),
+      () => setSoundHint(true),
+    );
+  }, []);
+  const hintSeen = useCallback(() => {
+    setSoundHint(false);
+    void SecureStore.setItemAsync(SOUND_HINT_KEY, 'seen').catch(() => {});
+  }, []);
 
   const more = useCallback(async (next?: string | null) => {
     if (loading.current) return;
@@ -69,7 +140,7 @@ export default function Reels() {
 
   useEffect(() => {
     void (async () => {
-      // Opening a particular reel (from Create or a shared link) puts it first.
+      // Opening a particular reel (from a post, a grid or a shared link) puts it first.
       const first = start
         ? await client()
             .then((api) => api.posts.get(start))
@@ -84,10 +155,20 @@ export default function Reels() {
     })();
   }, [start, more]);
 
-  // Load the next page when the second-to-last reel comes on screen.
+  const current = items?.[active];
+  // Load the next page near the end; fetch the moment comments of the reel on screen.
   useEffect(() => {
     if (items && cursor && active >= items.length - 2) void more(cursor);
   }, [active, items, cursor, more]);
+  useEffect(() => {
+    if (!current || !current.counts.comments || moments[current.id]) return;
+    void client()
+      .then((api) => api.posts.momentComments(current.id))
+      .then(
+        (r) => setMoments((m) => ({ ...m, [current.id]: r.items })),
+        () => setMoments((m) => ({ ...m, [current.id]: [] })),
+      );
+  }, [current, moments]);
 
   const onViewable = useRef(({ viewableItems }: { viewableItems: ViewToken<Post>[] }) => {
     const first = viewableItems.find((v) => v.isViewable);
@@ -98,8 +179,9 @@ export default function Reels() {
   const boards = useBoards();
   const syncSaved = (id: string) => (ch: SaveChange) => patch(id, (x) => ({ ...x, viewer: { ...x.viewer, saved: ch.saved } }));
 
-  async function like(p: Post) {
-    const liked = !p.viewer.liked;
+  async function like(p: Post, force?: boolean) {
+    const liked = force ?? !p.viewer.liked;
+    if (liked === p.viewer.liked) return;
     patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, liked }, counts: { ...x.counts, likes: x.counts.likes + (liked ? 1 : -1) } }));
     try {
       const api = await client();
@@ -121,6 +203,7 @@ export default function Reels() {
       const api = await client();
       const r = reposted ? await api.posts.repost(p.id) : await api.posts.unrepost(p.id);
       patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, reposted: r.reposted }, counts: { ...x.counts, reposts: r.reposts } }));
+      setStatus(t(reposted ? 'reel.share.reposted' : 'reel.share.repostRemoved'));
     } catch (e) {
       patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, reposted: !reposted }, counts: { ...x.counts, reposts: p.counts.reposts } }));
       setError(errorMessage(e));
@@ -140,7 +223,18 @@ export default function Reels() {
     }
   }
 
-  async function share(p: Post) {
+  async function follow(p: Post) {
+    try {
+      await (await client()).users.follow(p.author.id);
+      setFollowed((f) => ({ ...f, [p.author.id]: true }));
+      setStatus(t('reel.followed', { name: p.author.displayName }));
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  }
+  const [followed, setFollowed] = useState<Record<string, boolean>>({});
+
+  async function shareLink(p: Post) {
     const url = `${webUrl}/reels?start=${p.id}`;
     const title = t('m.reels.shareTitle', { name: p.author.displayName });
     try {
@@ -178,15 +272,53 @@ export default function Reels() {
     }
   }
 
-  const back = (
+  async function notInterested(p: Post) {
+    await (await client()).feedback({ signal: 'not_interested', postId: p.id }).catch(() => {});
+    setItems((cur) => cur?.filter((x) => x.id !== p.id) ?? cur);
+    setStatus(t('reel.notInterested.done'));
+  }
+
+  async function report(p: Post, reason: string) {
+    try {
+      const r = await (await client()).reports.create({ targetType: 'post', targetId: p.id, reason });
+      setStatus(r.message);
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  }
+
+  async function setAllowRemix(p: Post, allowRemix: boolean) {
+    patch(p.id, (x) => ({ ...x, allowRemix }));
+    try {
+      await (await client()).posts.setAllowRemix(p.id, allowRemix);
+      setStatus(t(allowRemix ? 'reel.remixes.on' : 'reel.remixes.off'));
+    } catch (e) {
+      patch(p.id, (x) => ({ ...x, allowRemix: !allowRemix }));
+      setError(errorMessage(e));
+    }
+  }
+
+  useEffect(() => {
+    if (!status) return;
+    const id = setTimeout(() => setStatus(null), 3500);
+    return () => clearTimeout(id);
+  }, [status]);
+
+  const go = (i: number) => {
+    if (!items) return;
+    const to = Math.max(0, Math.min(items.length - 1, i));
+    list.current?.scrollToIndex({ index: to, animated: true });
+  };
+
+  const back = (color: string) => (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={t('m.common.back')}
-      hitSlop={10}
+      hitSlop={6}
       onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
       style={[s.back, { top: insets.top + space[2] }]}
     >
-      <Icon name="chevron-back" size={26} color={WHITE} directional />
+      <Icon name="chevron-back" size={26} color={color} directional />
     </Pressable>
   );
 
@@ -194,15 +326,7 @@ export default function Reels() {
   if (!items.length)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground, paddingTop: insets.top + 56, padding: space[4], gap: space[3] }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('m.common.back')}
-          hitSlop={10}
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-          style={[s.back, { top: insets.top + space[2] }]}
-        >
-          <Icon name="chevron-back" size={26} color={c.ink} directional />
-        </Pressable>
+        {back(c.ink)}
         <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 28, fontWeight: '800', letterSpacing: -0.5 }}>
           {t('m.title.reels')}
         </Text>
@@ -217,10 +341,12 @@ export default function Reels() {
       </View>
     );
 
+  const sheetPost = sheet ? (items.find((p) => p.id === sheet.post.id) ?? sheet.post) : null;
   return (
-    <View style={{ flex: 1, backgroundColor: '#000' }} onLayout={(e) => setHeight(e.nativeEvent.layout.height)}>
+    <View style={{ flex: 1, backgroundColor: '#05060B' }} onLayout={(e) => setHeight(e.nativeEvent.layout.height)}>
       {height ? (
         <FlatList
+          ref={list}
           data={items}
           keyExtractor={(p) => p.id}
           pagingEnabled
@@ -239,15 +365,30 @@ export default function Reels() {
               visible={index === active}
               focused={focused}
               muted={muted}
-              onToggleMute={() => setMuted((m) => !m)}
-              onLike={() => void like(item)}
-              onComments={() => router.push(`/p/${item.id}`)}
-              onShare={() => void share(item)}
-              onShareVideo={item.downloadable ? () => void shareVideo(item) : undefined}
-              preparing={preparing === item.id}
-              onRepost={item.author.id !== me?.id && item.visibility === 'public' ? () => void repost(item) : undefined}
+              clear={clear}
+              speed={speed}
+              big={big}
+              moments={moments[item.id] ?? []}
+              startAt={index === 0 && item.id === start && at ? Number(at) : undefined}
+              showSoundHint={soundHint}
+              following={!!followed[item.author.id]}
+              mine={item.author.id === me?.id}
+              onToggleMute={() => {
+                setMuted((m) => !m);
+                hintSeen();
+              }}
+              onSoundHintSeen={hintSeen}
+              onToggleClear={() => setClear((v) => !v)}
+              onLike={(force) => void like(item, force)}
+              onFollow={() => void follow(item)}
+              onComments={(atMs) => router.push({ pathname: '/p/[id]', params: { id: item.id, ...(atMs !== null ? { atMs: String(atMs) } : {}) } })}
+              onShare={() => setSheet({ kind: 'share', post: item })}
+              onOptions={() => setSheet({ kind: 'options', post: item })}
               onSave={() => void save(item)}
               onSaveTo={me ? () => boards.openSaveSheet(item, syncSaved(item.id)) : undefined}
+              onNext={() => go(index + 1)}
+              onPrevious={() => go(index - 1)}
+              onResumeSaved={(ms) => patch(item.id, (x) => ({ ...x, viewer: { ...x.viewer, resumeMs: ms ?? undefined } }))}
             />
           )}
           ListFooterComponent={
@@ -260,18 +401,62 @@ export default function Reels() {
           }
         />
       ) : null}
-      {error ? (
-        <View style={{ position: 'absolute', top: insets.top + 56, start: space[4], end: space[4] }}>
-          <Notice tone="danger">{error}</Notice>
+      {error || status ? (
+        <View style={{ position: 'absolute', top: insets.top + 60, start: space[4], end: space[4] }} accessibilityLiveRegion="polite">
+          <Notice tone={error ? 'danger' : 'info'}>{error ?? status}</Notice>
         </View>
       ) : null}
       {preparing ? (
-        <View accessibilityLiveRegion="polite" style={[s.preparing, { top: insets.top + (error ? 120 : 56), backgroundColor: c.surface }]}>
+        <View accessibilityLiveRegion="polite" style={[s.preparing, { top: insets.top + (error ? 124 : 60), backgroundColor: c.surface }]}>
           <ActivityIndicator color={c.yapi} />
           <Text style={{ color: c.ink, fontWeight: '600' }}>{t('share.video.preparing')}</Text>
         </View>
       ) : null}
-      {back}
+      <ReelSheet visible={sheet?.kind === 'share'} title={t('reel.share.title')} onClose={() => setSheet(null)}>
+        {sheetPost ? (
+          <>
+            <SheetItem icon="share-outline" label={t('reel.share.link')} onPress={() => (setSheet(null), void shareLink(sheetPost))} />
+            {sheetPost.author.id !== me?.id && sheetPost.visibility === 'public' ? (
+              <SheetItem
+                icon="repeat"
+                label={sheetPost.viewer.reposted ? t('reel.share.undoRepost') : t('reel.share.repost')}
+                selected={sheetPost.viewer.reposted}
+                onPress={() => (setSheet(null), void repost(sheetPost))}
+              />
+            ) : null}
+            {sheetPost.allowRemix && sheetPost.visibility === 'public' && sheetPost.sound ? (
+              <SheetItem
+                icon="musical-notes-outline"
+                label={t('reel.share.remix')}
+                onPress={() => (setSheet(null), router.navigate({ pathname: '/create', params: { mode: 'reel', sound: sheetPost.sound!.id } }))}
+              />
+            ) : null}
+            {sheetPost.downloadable ? (
+              <SheetItem icon="download-outline" label={t('share.video.download')} onPress={() => (setSheet(null), void shareVideo(sheetPost))} />
+            ) : null}
+            {me ? (
+              <SheetItem
+                icon="bookmark-outline"
+                label={t('m.boards.saveTo')}
+                onPress={() => (setSheet(null), boards.openSaveSheet(sheetPost, syncSaved(sheetPost.id)))}
+              />
+            ) : null}
+          </>
+        ) : null}
+      </ReelSheet>
+      <OptionsSheet
+        post={sheet?.kind === 'options' ? sheetPost : null}
+        mine={sheetPost?.author.id === me?.id}
+        speed={speed}
+        big={big}
+        onSpeed={setSpeed}
+        onBig={setBig}
+        onClose={() => setSheet(null)}
+        onNotInterested={(p) => void notInterested(p)}
+        onReport={(p, r) => void report(p, r)}
+        onDownload={(p) => void shareVideo(p)}
+        onAllowRemix={(p, v) => void setAllowRemix(p, v)}
+      />
     </View>
   );
 }
@@ -282,15 +467,27 @@ function Reel({
   visible,
   focused,
   muted,
+  clear,
+  speed,
+  big,
+  moments,
+  startAt,
+  showSoundHint,
+  following,
+  mine,
   onToggleMute,
+  onSoundHintSeen,
+  onToggleClear,
   onLike,
+  onFollow,
   onComments,
   onShare,
-  onRepost,
+  onOptions,
   onSave,
   onSaveTo,
-  onShareVideo,
-  preparing,
+  onNext,
+  onPrevious,
+  onResumeSaved,
 }: {
   post: Post;
   height: number;
@@ -299,23 +496,35 @@ function Reel({
   /** False while another screen (the comments) is on top. */
   focused: boolean;
   muted: boolean;
+  clear: boolean;
+  speed: ReelSpeed;
+  big: boolean;
+  moments: ReelMoment[];
+  /** Open at this moment (a moment comment tapped in the comments). */
+  startAt?: number;
+  showSoundHint: boolean;
+  following: boolean;
+  mine: boolean;
   onToggleMute: () => void;
-  onLike: () => void;
-  onComments: () => void;
+  onSoundHintSeen: () => void;
+  onToggleClear: () => void;
+  onLike: (force?: boolean) => void;
+  onFollow: () => void;
+  onComments: (atMs: number | null) => void;
   onShare: () => void;
-  /** Absent for your own reels and ones that aren't public. */
-  onRepost?: () => void;
+  onOptions: () => void;
   onSave: () => void;
   /** "Save to…" (press and hold the bookmark); absent when signed out. */
   onSaveTo?: () => void;
-  /** Absent when the creator doesn't allow downloads. */
-  onShareVideo?: () => void;
-  preparing?: boolean;
+  onNext: () => void;
+  onPrevious: () => void;
+  onResumeSaved: (ms: number | null) => void;
 }) {
   const c = useColors();
   const { t, tp, number } = useT();
   const credit = useMusicCredit();
   const insets = useSafeAreaInsets();
+  const reduce = useReducedMotion();
   const media = post.media.find((m) => m.kind === 'video') ?? post.media[0];
   // Data saver: nothing loads or plays until the reel is tapped; then the smallest version plays.
   const saver = useDataSaver().active;
@@ -323,12 +532,21 @@ function Reel({
   const waiting = saver && !started && !post.locked;
   const src = media && !waiting ? reelSource(media, saver) : null;
   const [paused, setPaused] = useState(false);
+  const [fast, setFast] = useState(false);
+  const [details, setDetails] = useState(false);
+  const [time, setTime] = useState({ current: 0, duration: 0 });
+  const [natural, setNatural] = useState<number | null>(null);
+  const [width, setWidth] = useState(0);
+  const [sign, setSign] = useState<'play' | 'pause' | null>(null);
+  const [pop, setPop] = useState<ReelMoment | null>(null);
+  const [resumed, setResumed] = useState<number | null>(null);
   // A sensitive reel shows a blurred still until the viewer chooses to watch it.
   const [revealed, setRevealed] = useState(false);
   const covered = !!media?.sensitive && !revealed;
   const player = useVideoPlayer(src, (p) => {
     p.loop = true;
     p.muted = true;
+    p.timeUpdateEventInterval = 0.25;
   });
   // A duet plays beside the original (on the left); a reel using another sound plays that sound.
   const original = post.remixOf?.mode === 'duet' ? (post.remixOf.post?.media ?? null) : null;
@@ -341,8 +559,9 @@ function Reel({
   const sound = useAudioPlayer(visible && !waiting ? borrowed : null);
   // A catalogue song plays its part in a loop instead of the reel's own sound (only with sound on, so nothing loads before).
   const song = !original && !borrowed && post.music?.audioUrl ? post.music : null;
+  const highlights = post.highlights ?? [];
 
-  // Only the reel on screen plays; scrolling away rewinds it and clears a tap-to-pause.
+  // Only the reel on screen plays; scrolling away clears a tap-to-pause (it continues from where it was next time).
   const playing = visible && focused && !paused && !covered && !waiting;
   useEffect(() => {
     for (const p of [player, originalSrc ? originalPlayer : null]) {
@@ -356,39 +575,229 @@ function Reel({
     }
   }, [playing, player, originalPlayer, originalSrc, borrowed, sound]);
   useEffect(() => {
-    if (visible) return;
-    player.currentTime = 0;
-    if (originalSrc) originalPlayer.currentTime = 0;
-    setPaused(false);
-  }, [visible, player, originalPlayer, originalSrc]);
+    player.playbackRate = fast ? 2 : speed;
+    if (originalSrc) originalPlayer.playbackRate = fast ? 2 : speed;
+  }, [speed, fast, player, originalPlayer, originalSrc]);
   useEffect(() => {
     // With a borrowed sound the reel's own audio stays off.
-    player.muted = muted || !!borrowed;
+    player.muted = muted || !!borrowed || !!song;
     if (originalSrc) originalPlayer.muted = muted;
     if (borrowed) {
       sound.muted = muted;
       sound.loop = true;
     }
-  }, [muted, player, originalPlayer, originalSrc, borrowed, sound]);
+  }, [muted, player, originalPlayer, originalSrc, borrowed, sound, song]);
   useMusicLoop(song ? { sound: { audioUrl: song.audioUrl }, startMs: song.startMs, durationMs: song.durationMs } : null, playing && !muted);
+
+  // Where the viewer stopped: sent when they leave the reel and every 10 seconds while it plays.
+  const lastSent = useRef<number | null>(post.viewer.resumeMs ?? null);
+  const sendResume = useCallback(() => {
+    const dur = player.duration;
+    if (!dur || !Number.isFinite(dur)) return;
+    const ms = Math.round(player.currentTime * 1000);
+    if (lastSent.current !== null && Math.abs(lastSent.current - ms) < 1000) return;
+    if (lastSent.current === null && !resumeWorthKeeping(ms, dur * 1000)) return;
+    lastSent.current = ms;
+    void client()
+      .then((api) => api.posts.resume(post.id, ms, Math.round(dur * 1000)))
+      .then(
+        (r) => onResumeSaved(r.resumeMs),
+        () => {},
+      );
+  }, [player, post.id, onResumeSaved]);
+  const wasVisible = useRef(visible);
   useEffect(() => {
-    if (song) player.muted = true;
-  }, [song, muted, player]);
+    if (wasVisible.current && !visible) {
+      sendResume();
+      setPaused(false);
+      setDetails(false);
+      setFast(false);
+    }
+    wasVisible.current = visible;
+  }, [visible, sendResume]);
+  // A ref, so the reel re-rendering with its time doesn't restart the 10-second timer.
+  const sendResumeRef = useRef(sendResume);
+  sendResumeRef.current = sendResume;
+  useEffect(() => {
+    if (!playing) return;
+    const id = setInterval(() => sendResumeRef.current(), 10_000);
+    return () => clearInterval(id);
+  }, [playing]);
+
+  // Continue where I left off (or the moment asked for): once, when the video is ready.
+  const resumeApplied = useRef(false);
+  useEventListener(player, 'statusChange', ({ status }) => {
+    if (status !== 'readyToPlay') return;
+    const size = player.videoTrack?.size;
+    if (size?.width && size.height) setNatural(size.width / size.height);
+    if (resumeApplied.current) return;
+    resumeApplied.current = true;
+    const target = startAt ?? post.viewer.resumeMs;
+    if (target && target / 1000 < player.duration - 1) {
+      player.currentTime = target / 1000;
+      if (startAt === undefined) setResumed(target);
+    }
+  });
+  useEffect(() => {
+    if (resumed === null) return;
+    const id = setTimeout(() => setResumed(null), 6000);
+    return () => clearTimeout(id);
+  }, [resumed]);
+
+  // Time, and moment comments popping up as the video passes them.
+  const prevTime = useRef(0);
+  useEventListener(player, 'timeUpdate', ({ currentTime }) => {
+    const dur = Number.isFinite(player.duration) ? player.duration : 0;
+    setTime({ current: currentTime, duration: dur });
+    if (visible && !clear && moments.length) {
+      const prev = prevTime.current;
+      const hit = moments.find((m) => m.atMs / 1000 > prev && m.atMs / 1000 <= currentTime && currentTime - prev < 1.5);
+      if (hit) setPop(hit);
+    }
+    prevTime.current = currentTime;
+  });
+  useEffect(() => {
+    if (!pop) return;
+    const id = setTimeout(() => setPop(null), 3200);
+    return () => clearTimeout(id);
+  }, [pop]);
+
+  // The UI fades to a faint strip while it plays untouched; a tap, a pause or the details wake it.
+  const fade = useRef(new Animated.Value(1)).current;
+  const [awake, setAwake] = useState(true);
+  const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wake = useCallback(() => {
+    setAwake(true);
+    if (fadeTimer.current) clearTimeout(fadeTimer.current);
+    fadeTimer.current = setTimeout(() => setAwake(false), FADE_MS);
+  }, []);
+  useEffect(() => {
+    if (visible) wake();
+    return () => {
+      if (fadeTimer.current) clearTimeout(fadeTimer.current);
+    };
+  }, [visible, wake]);
+  const faint = !awake && playing && !details;
+  useEffect(() => {
+    const to = clear ? 0 : faint ? 0.32 : 1;
+    if (reduce) fade.setValue(to);
+    else Animated.timing(fade, { toValue: to, duration: 350, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+  }, [faint, clear, reduce, fade]);
+
+  // "Tap for sound" shows once, for a few seconds.
+  const hint = showSoundHint && visible && muted && playing && !clear;
+  useEffect(() => {
+    if (!hint) return;
+    const id = setTimeout(onSoundHintSeen, 8000);
+    return () => clearTimeout(id);
+  }, [hint, onSoundHintSeen]);
+
+  const flash = (kind: 'play' | 'pause') => {
+    setSign(kind);
+    AccessibilityInfo.announceForAccessibility(t(kind === 'pause' ? 'reel.paused' : 'reel.playing'));
+  };
+  useEffect(() => {
+    if (!sign) return;
+    const id = setTimeout(() => setSign(null), 700);
+    return () => clearTimeout(id);
+  }, [sign]);
+
+  const togglePlay = () => {
+    if (covered) return;
+    if (waiting) return setStarted(true);
+    const pausing = !paused;
+    setPaused(pausing);
+    flash(pausing ? 'pause' : 'play');
+    if (pausing) sendResume();
+    wake();
+  };
+
+  // Double tap: the three YAPILAPI blocks come together where it was tapped, then rise apart.
+  const [burst, setBurst] = useState<{ x: number; y: number; key: number } | null>(null);
+  const burstAnim = useRef(new Animated.Value(0)).current;
+  const doBurst = (x: number, y: number) => {
+    if (reduce) return;
+    setBurst({ x, y, key: Date.now() });
+    burstAnim.setValue(0);
+    Animated.timing(burstAnim, { toValue: 1, duration: 760, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(() => setBurst(null));
+  };
+
+  const lastTap = useRef(0);
+  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (tapTimer.current) clearTimeout(tapTimer.current);
+    },
+    [],
+  );
+  const onTap = (e: GestureResponderEvent) => {
+    if (clear) return onToggleClear();
+    const now = Date.now();
+    const { locationX, locationY } = e.nativeEvent;
+    if (now - lastTap.current < TAP_MS + 60) {
+      if (tapTimer.current) clearTimeout(tapTimer.current);
+      lastTap.current = 0;
+      doBurst(locationX, locationY);
+      if (!post.viewer.liked) AccessibilityInfo.announceForAccessibility(t('reel.liked'));
+      onLike(true);
+      wake();
+      return;
+    }
+    lastTap.current = now;
+    tapTimer.current = setTimeout(togglePlay, TAP_MS);
+  };
+  // Press and hold: 2× on the far edge (the end side), clear view anywhere else.
+  const onHold = (e: GestureResponderEvent) => {
+    const x = e.nativeEvent.locationX;
+    const edge = I18nManager.isRTL ? x < width * 0.22 : x > width * 0.78;
+    if (edge && playing) setFast(true);
+    else onToggleClear();
+  };
+
+  const seek = (seconds: number) => {
+    player.currentTime = Math.max(0, seconds);
+    prevTime.current = seconds;
+    setTime((x) => ({ ...x, current: seconds }));
+    wake();
+  };
+
+  const ratio = media?.width && media?.height ? media.width / media.height : natural;
+  const frameRatio = width && height ? width / height : 9 / 16;
+  const fit: 'cover' | 'contain' = !originalSrc && ratio && ratio > frameRatio * 1.25 ? 'contain' : 'cover';
+  const poster = media ? (saver ? (media.variants?.thumb ?? media.posterUrl) : media.posterUrl) : null;
+  const canFollow = !mine && !following;
+  const bottom = insets.bottom + space[1];
 
   return (
-    <View style={{ height, backgroundColor: '#000' }} accessibilityLabel={t('m.reels.by', { name: post.author.displayName })}>
+    <View
+      style={{ height, backgroundColor: '#05060B', overflow: 'hidden' }}
+      accessibilityLabel={t('m.reels.by', { name: post.author.displayName })}
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+    >
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={waiting ? t('dataSaver.play') : paused ? t('m.common.play') : t('m.common.pause')}
-        accessibilityHint={media?.altText || post.body || undefined}
-        onPress={() => (waiting ? setStarted(true) : setPaused((p) => !p))}
+        accessibilityHint={t('reel.gestures')}
+        accessibilityActions={[{ name: 'activate' }, { name: 'like', label: t('post.like') }, { name: 'clearView', label: t('reel.clearView') }]}
+        onAccessibilityAction={(e) => {
+          if (e.nativeEvent.actionName === 'activate') togglePlay();
+          else if (e.nativeEvent.actionName === 'like') onLike(true);
+          else if (e.nativeEvent.actionName === 'clearView') onToggleClear();
+        }}
+        onPress={onTap}
+        onLongPress={onHold}
+        delayLongPress={380}
+        onPressOut={() => fast && setFast(false)}
         style={StyleSheet.absoluteFill}
       >
+        {fit === 'contain' && poster && !covered ? (
+          <Image source={{ uri: mediaUrl(poster) }} blurRadius={40} style={[StyleSheet.absoluteFill, { opacity: 0.6 }]} resizeMode="cover" />
+        ) : null}
         {waiting && !covered && media && (media.variants?.thumb || media.posterUrl) ? (
           <Image
             source={{ uri: mediaUrl(media.variants?.thumb ?? media.posterUrl!) }}
             style={StyleSheet.absoluteFill}
-            resizeMode="cover"
+            resizeMode={fit}
             accessibilityIgnoresInvertColors
           />
         ) : null}
@@ -398,7 +807,7 @@ function Reel({
             {src ? <VideoView player={player} style={{ flex: 1 }} contentFit="cover" nativeControls={false} /> : <View style={{ flex: 1 }} />}
           </View>
         ) : src && !covered ? (
-          <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} pointerEvents="none" />
+          <VideoView player={player} style={StyleSheet.absoluteFill} contentFit={fit} nativeControls={false} pointerEvents="none" />
         ) : null}
         {covered && media?.posterUrl ? (
           <Image source={{ uri: mediaUrl(media.posterUrl) }} blurRadius={50} style={StyleSheet.absoluteFill} resizeMode="cover" />
@@ -409,132 +818,480 @@ function Reel({
             <LockedPanel post={post} dark />
           </View>
         ) : null}
-        {(paused || waiting) && !covered && !post.locked ? (
+        {waiting && !covered && !post.locked ? (
           <View style={s.center} pointerEvents="none">
-            <View style={s.playBadge}>
-              <Icon name="play" size={40} color={WHITE} />
+            <View style={s.bigSign}>
+              <Icon name="play" size={36} color={WHITE} />
+            </View>
+          </View>
+        ) : sign ? (
+          <View style={s.center} pointerEvents="none">
+            <View style={s.sign}>
+              <Icon name={sign} size={30} color={WHITE} />
+            </View>
+          </View>
+        ) : paused && !covered ? (
+          <View style={s.center} pointerEvents="none">
+            <View style={[s.sign, { width: 52, height: 52, borderRadius: 18, opacity: 0.85 }]}>
+              <Icon name="play" size={24} color={WHITE} />
             </View>
           </View>
         ) : null}
+        {burst ? <Burst x={burst.x} y={burst.y} progress={burstAnim} /> : null}
       </Pressable>
 
-      <View style={[s.info, { bottom: insets.bottom + space[6] }]} pointerEvents="box-none">
-        {post.collaborators?.length ? (
-          // Co-authored: each name opens that person's profile.
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], alignSelf: 'flex-start' }}>
-            <Pressable accessibilityRole="link" accessibilityLabel={t('m.title.post')} onPress={() => router.push(`/p/${post.id}`)}>
-              <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={36} />
-            </Pressable>
-            <AuthorNames author={post.author} collaborators={post.collaborators} numberOfLines={2} style={s.author} />
-          </View>
-        ) : (
+      {/* Top: back, sound and clear view. The rail starts well below. */}
+      <Animated.View
+        style={[s.top, { top: insets.top + space[2], opacity: clear ? 0 : fade.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] }) }]}
+        pointerEvents={clear ? 'none' : 'box-none'}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('m.common.back')}
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+          style={s.iconButton}
+        >
+          <Icon name="chevron-back" size={26} color={WHITE} directional />
+        </Pressable>
+        <Text style={s.title} accessibilityRole="header" numberOfLines={1}>
+          {t('m.title.reels')}
+        </Text>
+        <TopButton icon={muted ? 'volume-mute' : 'volume-high'} label={t('m.reels.sound')} selected={!muted} onPress={onToggleMute} />
+        <TopButton icon={clear ? 'eye-off-outline' : 'scan-outline'} label={t('reel.clearView')} selected={clear} onPress={onToggleClear} />
+      </Animated.View>
+      {hint ? (
+        <Pressable accessibilityRole="button" onPress={onToggleMute} style={[s.pill, { top: insets.top + 60, backgroundColor: WHITE }]}>
+          <Icon name="volume-mute" size={16} color="#0B0C14" />
+          <Text style={{ color: '#0B0C14', fontWeight: '700', fontSize: 13 }}>{t('reel.tapForSound')}</Text>
+        </Pressable>
+      ) : null}
+      {resumed !== null && visible && !clear ? (
+        <View style={[s.pill, { top: insets.top + 104, backgroundColor: 'rgba(5,6,11,0.8)' }]} accessibilityLiveRegion="polite">
+          <Text style={{ color: WHITE, fontWeight: '700', fontSize: 13 }}>{t('reel.resume.from', { time: formatReelTime(resumed) })}</Text>
           <Pressable
-            accessibilityRole="link"
-            onPress={() => router.push(`/p/${post.id}`)}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], alignSelf: 'flex-start' }}
+            accessibilityRole="button"
+            hitSlop={12}
+            onPress={() => {
+              seek(0);
+              setResumed(null);
+              lastSent.current = null;
+              void client()
+                .then((api) => api.posts.clearResume(post.id))
+                .catch(() => {});
+            }}
           >
-            <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={36} />
-            <Text style={[s.author, userText]} numberOfLines={1}>
-              {post.author.displayName}
-            </Text>
+            <Text style={{ color: SUN, fontWeight: '700', fontSize: 13, textDecorationLine: 'underline' }}>{t('reel.resume.startOver')}</Text>
           </Pressable>
-        )}
-        {post.remixOf ? (
-          post.remixOf.post ? (
-            <Pressable
-              accessibilityRole="link"
-              hitSlop={6}
-              onPress={() => router.push({ pathname: '/reels', params: { start: post.remixOf!.post!.id } })}
-              style={s.chip}
-            >
-              <Icon name="copy-outline" size={14} color={WHITE} />
-              <Text style={[s.chipText, userText]} numberOfLines={1}>
-                {t(post.remixOf.mode === 'duet' ? 'm.reels.duetWith' : 'm.reels.remixOf', { name: post.remixOf.post.author.username })}
-              </Text>
-            </Pressable>
-          ) : (
-            <View style={s.chip}>
-              <Icon name="copy-outline" size={14} color={WHITE} />
-              <Text style={s.chipText} numberOfLines={1}>
-                {t('m.reels.remixUnavailable')}
-              </Text>
-            </View>
-          )
-        ) : null}
-        {post.body ? <RichText text={post.body} style={s.caption} linkStyle={s.captionLink} numberOfLines={3} /> : null}
-        {post.sound ? (
-          <Pressable accessibilityRole="link" hitSlop={6} onPress={() => router.push(`/sounds/${post.sound!.id}`)} style={s.chip}>
-            <Icon name="musical-notes" size={14} color={WHITE} />
-            <Text style={[s.chipText, userText]} numberOfLines={1}>
-              {post.sound.title}
-            </Text>
-          </Pressable>
-        ) : null}
-        {post.music ? (
-          <>
-            <Pressable
-              accessibilityRole="link"
-              accessibilityLabel={t('music.open', { title: post.music.title })}
-              hitSlop={6}
-              onPress={() => openMusic(post.music!)}
-              style={s.chip}
-            >
-              <Icon name="musical-notes" size={14} color={WHITE} />
-              <Text style={[s.chipText, userText]} numberOfLines={1}>
-                {post.music.title} · {post.music.artist}
-              </Text>
-            </Pressable>
-            <Text style={{ color: WHITE, opacity: 0.85, fontSize: 11 }} numberOfLines={2}>
-              {post.music.unavailable ? t(`music.unavailable.${post.music.unavailable}` as MessageKey) : credit(post.music)}
-            </Text>
-          </>
-        ) : null}
-      </View>
+        </View>
+      ) : null}
+      {fast ? (
+        <View style={[s.pill, { top: insets.top + 60, backgroundColor: 'rgba(5,6,11,0.8)' }]} pointerEvents="none">
+          <Text style={{ color: WHITE, fontWeight: '700', fontSize: 13 }}>{t('reel.speed.hold')}</Text>
+        </View>
+      ) : null}
 
-      <View style={[s.actions, { bottom: insets.bottom + space[6] }]}>
-        <Action
-          icon={post.viewer.liked ? 'heart' : 'heart-outline'}
-          color={post.viewer.liked ? c.yapi : WHITE}
-          label={post.viewer.liked ? t('post.unlike') : t('post.like')}
-          count={post.counts.likes ? number(post.counts.likes) : ''}
-          selected={post.viewer.liked}
-          onPress={onLike}
-        />
-        <Action
-          icon="chatbubble-outline"
-          label={tp('m.post.commentCount', post.counts.comments)}
-          count={post.counts.comments ? number(post.counts.comments) : ''}
-          onPress={onComments}
-        />
-        {onRepost ? (
+      {/* The info strip: name, Follow, one caption line with "more", the sound. */}
+      {!details ? (
+        <Animated.View style={[s.info, { bottom: bottom + 48, opacity: fade }]} pointerEvents={clear ? 'none' : 'box-none'}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+            <Pressable accessibilityRole="link" onPress={() => router.push(`/u/${post.author.username}`)} hitSlop={8} style={{ flexShrink: 1 }}>
+              <AuthorNames author={post.author} collaborators={post.collaborators} numberOfLines={1} style={s.author} />
+            </Pressable>
+            {canFollow ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('reel.followName', { name: post.author.displayName })}
+                onPress={onFollow}
+                hitSlop={10}
+                style={s.follow}
+              >
+                <Text style={{ color: WHITE, fontWeight: '700', fontSize: 12 }}>{t('reel.follow')}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space[2] }}>
+            {post.body ? (
+              <View style={{ flex: 1 }}>
+                <RichText text={post.body} style={[s.caption, big && s.captionBig]} linkStyle={s.captionLink} numberOfLines={1} />
+              </View>
+            ) : (
+              <View style={{ flex: 1 }} />
+            )}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('reel.moreLabel')}
+              accessibilityState={{ expanded: false }}
+              hitSlop={12}
+              onPress={() => {
+                setDetails(true);
+                wake();
+              }}
+            >
+              <Text style={s.more}>{t('reel.more')}</Text>
+            </Pressable>
+          </View>
+          {post.sound || post.music ? (
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={post.music ? t('music.open', { title: post.music.title }) : undefined}
+              hitSlop={6}
+              onPress={() => (post.music ? openMusic(post.music) : router.push(`/sounds/${post.sound!.id}`))}
+              style={s.chip}
+            >
+              <Icon name="musical-notes" size={13} color={WHITE} />
+              <Text style={[s.chipText, userText]} numberOfLines={1}>
+                {post.music ? `${post.music.title} · ${post.music.artist}` : post.sound!.title}
+              </Text>
+            </Pressable>
+          ) : null}
+        </Animated.View>
+      ) : (
+        <View style={[s.details, { bottom: bottom + 44, maxHeight: height * 0.62 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+            <Pressable
+              accessibilityRole="link"
+              onPress={() => router.push(`/u/${post.author.username}`)}
+              style={{ flex: 1, flexDirection: 'row', gap: space[2], alignItems: 'center' }}
+            >
+              <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={32} />
+              <View style={{ flexShrink: 1 }}>
+                <Text style={[s.author, userText]} numberOfLines={1}>
+                  {post.author.displayName}
+                </Text>
+                <Text style={{ color: '#C9CDE0', fontSize: 12 }} numberOfLines={1}>
+                  @{post.author.username}
+                  {post.counts.views ? ` · ${tp('reel.views', post.counts.views, { count: number(post.counts.views) })}` : ''}
+                </Text>
+              </View>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('reel.details.close')}
+              hitSlop={6}
+              onPress={() => {
+                setDetails(false);
+                wake();
+              }}
+              style={s.iconButton}
+            >
+              <Icon name="close" size={22} color={WHITE} />
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={{ gap: space[3], paddingTop: space[2] }}>
+            {post.body ? (
+              <TranslatableText
+                kind="post"
+                id={post.id}
+                text={post.body}
+                lang={post.lang}
+                own={mine}
+                tint={WHITE}
+                linkTint={WHITE}
+                style={[s.caption, { fontSize: big ? 17 : 15, lineHeight: big ? 25 : 22 }]}
+              />
+            ) : null}
+            {post.remixOf?.post ? (
+              <Pressable accessibilityRole="link" onPress={() => router.push({ pathname: '/reels', params: { start: post.remixOf!.post!.id } })} style={s.chip}>
+                <Icon name="copy-outline" size={14} color={WHITE} />
+                <Text style={[s.chipText, userText]} numberOfLines={1}>
+                  {t(post.remixOf.mode === 'duet' ? 'm.reels.duetWith' : 'm.reels.remixOf', { name: post.remixOf.post.author.username })}
+                </Text>
+              </Pressable>
+            ) : post.remixOf ? (
+              <Text style={{ color: '#C9CDE0', fontSize: 12 }}>{t('m.reels.remixUnavailable')}</Text>
+            ) : null}
+            {post.topics.length ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+                {post.topics.map((tag) => (
+                  <Pressable key={tag} accessibilityRole="link" hitSlop={6} onPress={() => router.push(`/t/${encodeURIComponent(tag)}`)}>
+                    <Text style={{ color: WHITE, fontWeight: '700', fontSize: 13 }}>#{tag}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+            {post.music ? (
+              <Text style={{ color: '#C9CDE0', fontSize: 12 }}>
+                {post.music.unavailable ? t(`music.unavailable.${post.music.unavailable}` as MessageKey) : credit(post.music)}
+              </Text>
+            ) : null}
+            {highlights.length ? (
+              <View style={{ gap: space[1] }}>
+                <Text accessibilityRole="header" style={{ color: '#C9CDE0', fontWeight: '700', fontSize: 13 }}>
+                  {t('reel.highlights')}
+                </Text>
+                {highlights.map((h) => (
+                  <Pressable
+                    key={h.atMs}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('reel.highlights.jump', { label: h.label, time: formatReelTime(h.atMs) })}
+                    onPress={() => {
+                      seek(h.atMs / 1000);
+                      setPaused(false);
+                    }}
+                    style={s.mark}
+                  >
+                    <Text style={{ color: SUN, fontWeight: '700', fontSize: 13, minWidth: 40, fontVariant: ['tabular-nums'] }}>{formatReelTime(h.atMs)}</Text>
+                    <Text style={[{ color: WHITE, fontWeight: '600', fontSize: 14, flexShrink: 1 }, userText]}>{h.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+            {moments.length ? (
+              <Pressable accessibilityRole="button" onPress={() => onComments(null)} style={[s.chip, { backgroundColor: 'rgba(61,219,194,0.18)' }]}>
+                <Icon name="chatbubble-outline" size={14} color={MINT} />
+                <Text style={{ color: MINT, fontWeight: '700', fontSize: 13 }}>{tp('reel.moments', moments.length)}</Text>
+              </Pressable>
+            ) : null}
+          </ScrollView>
+        </View>
+      )}
+
+      {pop && !details && !clear ? (
+        <Pressable
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          onPress={() => onComments(null)}
+          style={[s.pop, { bottom: bottom + 50 }]}
+        >
+          <Avatar name={pop.author.displayName} url={pop.author.avatarUrl} size={22} />
+          <Text numberOfLines={2} style={[{ color: '#0B0C14', fontSize: 12, flexShrink: 1 }, userText]}>
+            <Text style={{ fontWeight: '800' }}>{pop.author.displayName}</Text> {pop.body}
+          </Text>
+        </Pressable>
+      ) : null}
+
+      {/* The rail: the author (with a follow badge), like, comments, share, save, more. */}
+      {!details ? (
+        <Animated.View
+          style={[s.actions, { bottom: bottom + 52, opacity: clear ? 0 : Animated.add(Animated.multiply(fade, 0.5), 0.5) }]}
+          pointerEvents={clear ? 'none' : 'box-none'}
+        >
+          <View style={{ marginBottom: space[2] }}>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={t('reel.profile', { name: post.author.displayName })}
+              onPress={() => router.push(`/u/${post.author.username}`)}
+              style={{ borderRadius: 24, borderWidth: 2, borderColor: WHITE }}
+            >
+              <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={42} />
+            </Pressable>
+            {canFollow ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('reel.followName', { name: post.author.displayName })}
+                hitSlop={14}
+                onPress={onFollow}
+                style={s.badge}
+              >
+                <Icon name="add" size={14} color={WHITE} />
+              </Pressable>
+            ) : null}
+          </View>
           <Action
-            icon="repeat"
-            color={post.viewer.reposted ? '#2dd4bf' : WHITE}
-            label={post.viewer.reposted ? t('m.reels.undoRepost') : t('m.reels.repost')}
-            count={post.counts.reposts ? number(post.counts.reposts) : ''}
-            selected={post.viewer.reposted}
-            onPress={onRepost}
+            icon={post.viewer.liked ? 'heart' : 'heart-outline'}
+            tint={post.viewer.liked ? ACCENT : undefined}
+            label={post.viewer.liked ? t('post.unlike') : t('post.like')}
+            count={post.counts.likes ? number(post.counts.likes) : ''}
+            selected={post.viewer.liked}
+            onPress={() => onLike()}
           />
-        ) : null}
-        <Action
-          icon={post.viewer.saved ? 'bookmark' : 'bookmark-outline'}
-          color={post.viewer.saved ? '#facc15' : WHITE}
-          label={post.viewer.saved ? t('m.reels.unsave') : t('post.save')}
-          selected={post.viewer.saved}
-          onPress={onSave}
-          onLongPress={onSaveTo}
-          longPressLabel={t('m.boards.saveTo')}
+          <Action
+            icon="chatbubble-outline"
+            label={tp('m.post.commentCount', post.counts.comments)}
+            count={post.counts.comments ? number(post.counts.comments) : ''}
+            onPress={() => onComments(Math.round(time.current * 1000))}
+          />
+          <Action icon="paper-plane-outline" label={t('m.common.share')} count={post.counts.reposts ? number(post.counts.reposts) : ''} onPress={onShare} />
+          <Action
+            icon={post.viewer.saved ? 'bookmark' : 'bookmark-outline'}
+            tint={post.viewer.saved ? SUN : undefined}
+            dark={post.viewer.saved}
+            label={post.viewer.saved ? t('m.reels.unsave') : t('post.save')}
+            selected={post.viewer.saved}
+            onPress={onSave}
+            onLongPress={onSaveTo}
+            longPressLabel={t('m.boards.saveTo')}
+          />
+          <Action icon="ellipsis-horizontal" label={t('reel.options')} onPress={onOptions} />
+          {/* Previous and next, for screen readers (people swipe). */}
+          <Pressable accessibilityRole="button" accessibilityLabel={t('reel.previous')} onPress={onPrevious} style={s.srOnly} />
+          <Pressable accessibilityRole="button" accessibilityLabel={t('reel.next')} onPress={onNext} style={s.srOnly} />
+        </Animated.View>
+      ) : null}
+
+      {/* Bottom: play or pause, the scrubber, the time. */}
+      <View style={[s.controls, { bottom }]}>
+        <Animated.View style={{ opacity: clear ? 0 : fade }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={paused || !playing ? t('m.common.play') : t('m.common.pause')}
+            onPress={togglePlay}
+            style={s.iconButton}
+          >
+            <Icon name={paused || !playing ? 'play' : 'pause'} size={18} color={WHITE} />
+          </Pressable>
+        </Animated.View>
+        <Scrubber
+          current={time.current}
+          duration={time.duration}
+          highlights={highlights}
+          moments={moments}
+          dim={clear}
+          onSeek={seek}
+          onScrubbing={(on) => {
+            if (on) {
+              player.pause();
+              wake();
+            } else if (playing) player.play();
+          }}
         />
-        <Action icon="paper-plane-outline" label={t('m.common.share')} onPress={onShare} />
-        {onShareVideo ? <Action icon="download-outline" label={t('share.video')} selected={preparing} onPress={onShareVideo} /> : null}
-        <Action
-          icon={muted ? 'volume-mute' : 'volume-high'}
-          label={muted ? t('m.reels.soundOn') : t('m.reels.soundOff')}
-          selected={!muted}
-          onPress={onToggleMute}
-        />
+        <Animated.Text style={[s.time, { opacity: clear ? 0 : fade }]} accessibilityElementsHidden importantForAccessibility="no">
+          {formatReelTime(time.current * 1000)} / {formatReelTime(time.duration * 1000)}
+        </Animated.Text>
       </View>
     </View>
+  );
+}
+
+/** The progress bar: drag to scrub (with the time above your finger), ticks for highlights, bubbles for moment comments. */
+function Scrubber({
+  current,
+  duration,
+  highlights,
+  moments,
+  dim,
+  onSeek,
+  onScrubbing,
+}: {
+  current: number;
+  duration: number;
+  highlights: { atMs: number; label: string }[];
+  moments: ReelMoment[];
+  dim: boolean;
+  onSeek: (seconds: number) => void;
+  onScrubbing: (on: boolean) => void;
+}) {
+  const { t } = useT();
+  const [width, setWidth] = useState(0);
+  const [drag, setDrag] = useState<number | null>(null);
+  const state = useRef({ width: 0, duration: 0 });
+  state.current = { width, duration };
+  const at = (x: number) => {
+    const w = state.current.width || 1;
+    const f = Math.max(0, Math.min(1, x / w));
+    return I18nManager.isRTL ? 1 - f : f;
+  };
+  const pan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: (e) => {
+        onScrubbing(true);
+        setDrag(at(e.nativeEvent.locationX));
+      },
+      onPanResponderMove: (e) => setDrag(at(e.nativeEvent.locationX)),
+      onPanResponderRelease: (e) => {
+        const f = at(e.nativeEvent.locationX);
+        setDrag(null);
+        onSeek(f * state.current.duration);
+        onScrubbing(false);
+      },
+      onPanResponderTerminate: () => {
+        setDrag(null);
+        onScrubbing(false);
+      },
+    }),
+  ).current;
+  const p = drag ?? (duration ? current / duration : 0);
+  const pos = (ms: number) => `${duration ? Math.min(100, (ms / 1000 / duration) * 100) : 0}%` as const;
+  return (
+    <View
+      style={[s.scrub, dim && { opacity: 0.55 }]}
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      accessible
+      accessibilityRole="adjustable"
+      accessibilityLabel={t('reel.seek')}
+      accessibilityValue={{
+        min: 0,
+        max: Math.round(duration),
+        now: Math.round(current),
+        text: t('reel.seek.value', { current: formatReelTime(current * 1000), total: formatReelTime(duration * 1000) }),
+      }}
+      accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+      onAccessibilityAction={(e) => {
+        if (!duration) return;
+        const step = e.nativeEvent.actionName === 'increment' ? 5 : -5;
+        onSeek(Math.max(0, Math.min(duration - 0.1, current + step)));
+      }}
+      {...pan.panHandlers}
+    >
+      <View style={[s.track, drag !== null && { height: 6 }]}>
+        <View style={[s.fill, { width: `${p * 100}%` }]} />
+      </View>
+      {highlights.map((h) => (
+        <View key={h.atMs} style={[s.tick, { start: pos(h.atMs) }]} pointerEvents="none" />
+      ))}
+      {moments.map((m) => (
+        <View key={m.id} style={[s.bubble, { start: pos(m.atMs) }]} pointerEvents="none" />
+      ))}
+      {drag !== null ? (
+        <>
+          <View style={[s.thumb, { start: `${drag * 100}%` }]} pointerEvents="none" />
+          <View style={[s.tip, { start: `${drag * 100}%` }]} pointerEvents="none">
+            <Text style={{ color: WHITE, fontWeight: '700', fontSize: 12, fontVariant: ['tabular-nums'] }}>{formatReelTime(drag * duration * 1000)}</Text>
+          </View>
+        </>
+      ) : null}
+    </View>
+  );
+}
+
+function Burst({ x, y, progress }: { x: number; y: number; progress: Animated.Value }) {
+  const block = (dx: number, dy: number, fx: number, fy: number, rot: number, color: string, h = 40) => {
+    const tx = progress.interpolate({ inputRange: [0, 0.3, 0.55, 1], outputRange: [0, dx, dx, fx] });
+    const ty = progress.interpolate({ inputRange: [0, 0.3, 0.55, 1], outputRange: [0, dy, dy, fy] });
+    const scale = progress.interpolate({ inputRange: [0, 0.3, 0.55, 1], outputRange: [0.2, 1.12, 1, 0.6] });
+    const opacity = progress.interpolate({ inputRange: [0, 0.2, 0.7, 1], outputRange: [0, 1, 1, 0] });
+    const rotate = progress.interpolate({ inputRange: [0, 0.3, 1], outputRange: ['0deg', `${rot}deg`, `${rot * 3}deg`] });
+    return (
+      <Animated.View
+        style={{
+          position: 'absolute',
+          left: x - 20,
+          top: y - h / 2,
+          width: 40,
+          height: h,
+          borderRadius: 13,
+          borderWidth: 2,
+          borderColor: WHITE,
+          backgroundColor: color,
+          opacity,
+          transform: [{ translateX: tx }, { translateY: ty }, { scale }, { rotate }],
+        }}
+      />
+    );
+  };
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {block(-23, -24, -62, -118, -12, ACCENT)}
+      {block(23, -24, 62, -118, 12, SUN)}
+      {block(0, 26, 0, -150, 0, MINT, 46)}
+    </View>
+  );
+}
+
+function TopButton({ icon, label, selected, onPress }: { icon: IconName; label: string; selected: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={[s.iconButton, { backgroundColor: selected ? WHITE : SCRIM }]}
+    >
+      <Icon name={icon} size={22} color={selected ? '#0B0C14' : WHITE} />
+    </Pressable>
   );
 }
 
@@ -542,7 +1299,8 @@ function Action({
   icon,
   label,
   count,
-  color = WHITE,
+  tint,
+  dark,
   selected,
   onPress,
   onLongPress,
@@ -551,7 +1309,10 @@ function Action({
   icon: IconName;
   label: string;
   count?: string;
-  color?: string;
+  /** Filled background when on (like, save). */
+  tint?: string;
+  /** Dark icon on a light tint. */
+  dark?: boolean;
   selected?: boolean;
   onPress: () => void;
   /** Press and hold; screen readers get it as a named action (`longPressLabel`). */
@@ -567,16 +1328,140 @@ function Action({
       onAccessibilityAction={(e) => {
         if (e.nativeEvent.actionName === 'longAction') onLongPress?.();
       }}
-      hitSlop={6}
+      hitSlop={4}
       onPress={onPress}
       onLongPress={onLongPress}
       style={({ pressed }) => [{ alignItems: 'center', gap: 2, opacity: pressed ? 0.7 : 1 }]}
     >
-      <View style={s.actionIcon}>
-        <Icon name={icon} size={28} color={color} />
+      <View style={[s.actionIcon, tint ? { backgroundColor: tint, borderColor: 'transparent' } : null]}>
+        <Icon name={icon} size={24} color={tint ? (dark ? '#0B0C14' : WHITE) : WHITE} />
       </View>
-      {count ? <Text style={s.count}>{count}</Text> : null}
+      <Text style={s.count}>{count ?? ''}</Text>
     </Pressable>
+  );
+}
+
+function ReelSheet({ visible, title, onClose, children }: { visible: boolean; title: string; onClose: () => void; children: React.ReactNode }) {
+  const c = useColors();
+  const { t } = useT();
+  const insets = useSafeAreaInsets();
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: c.overlay, justifyContent: 'flex-end' }}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} style={{ flex: 1 }} onPress={onClose} />
+        <View
+          accessibilityViewIsModal
+          style={{
+            backgroundColor: c.surface,
+            borderTopLeftRadius: radius.lg,
+            borderTopRightRadius: radius.lg,
+            padding: space[4],
+            paddingBottom: Math.max(insets.bottom, space[4]),
+            maxHeight: '85%',
+            gap: space[2],
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text accessibilityRole="header" style={{ flex: 1, color: c.ink, fontSize: 17, fontWeight: '800' }}>
+              {title}
+            </Text>
+            <Button label={t('m.common.done')} size="sm" variant="ghost" onPress={onClose} />
+          </View>
+          <ScrollView contentContainerStyle={{ gap: space[1] }}>{children}</ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function SheetItem({ icon, label, onPress, danger, selected }: { icon: IconName; label: string; onPress: () => void; danger?: boolean; selected?: boolean }) {
+  const c = useColors();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={selected === undefined ? undefined : { selected }}
+      onPress={onPress}
+      style={({ pressed }) => [s.sheetItem, pressed && { backgroundColor: c.surfaceSunken }]}
+    >
+      <View style={[s.sheetIcon, { backgroundColor: selected ? c.yapiSoft : c.surfaceSunken }]}>
+        <Icon name={icon} size={20} color={danger ? c.danger : selected ? c.yapi : c.ink} />
+      </View>
+      <Text style={{ color: danger ? c.danger : c.ink, fontSize: 15, fontWeight: '600', flexShrink: 1 }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** The "…" sheet: speed, bigger captions, and what to do with the reel. */
+function OptionsSheet({
+  post,
+  mine,
+  speed,
+  big,
+  onSpeed,
+  onBig,
+  onClose,
+  onNotInterested,
+  onReport,
+  onDownload,
+  onAllowRemix,
+}: {
+  post: Post | null;
+  mine: boolean;
+  speed: ReelSpeed;
+  big: boolean;
+  onSpeed: (s: ReelSpeed) => void;
+  onBig: (v: boolean) => void;
+  onClose: () => void;
+  onNotInterested: (p: Post) => void;
+  onReport: (p: Post, reason: string) => void;
+  onDownload: (p: Post) => void;
+  onAllowRemix: (p: Post, allow: boolean) => void;
+}) {
+  const c = useColors();
+  const { t, number } = useT();
+  const [reporting, setReporting] = useState(false);
+  useEffect(() => {
+    if (!post) setReporting(false);
+  }, [post]);
+  const done = (fn: () => void) => () => {
+    onClose();
+    fn();
+  };
+  return (
+    <ReelSheet visible={!!post} title={t('reel.options')} onClose={onClose}>
+      {post && reporting ? (
+        <>
+          <Text style={{ color: c.inkMuted, fontWeight: '700', fontSize: 13 }}>{t('postList.reportWhat')}</Text>
+          {REPORT_REASONS.map((r) => (
+            <SheetItem key={r} icon="flag-outline" label={t(REASON_KEYS[r])} onPress={done(() => onReport(post, r))} />
+          ))}
+        </>
+      ) : post ? (
+        <>
+          <Text style={{ color: c.inkMuted, fontWeight: '700', fontSize: 13 }}>{t('reel.speed')}</Text>
+          <Segmented
+            label={t('reel.speed')}
+            value={String(speed)}
+            onChange={(v) => onSpeed(Number(v) as ReelSpeed)}
+            options={REEL_SPEEDS.map((sp) => ({ id: String(sp), label: sp === 1 ? t('reel.speed.normal') : `${number(sp)}×` }))}
+          />
+          <SwitchRow label={t('reel.captions.bigger')} value={big} onValueChange={onBig} />
+          {post.downloadable ? <SheetItem icon="download-outline" label={t('share.video.download')} onPress={done(() => onDownload(post))} /> : null}
+          {mine ? (
+            <SheetItem
+              icon="copy-outline"
+              label={post.allowRemix ? t('reel.remixes.stop') : t('reel.remixes.allow')}
+              onPress={done(() => onAllowRemix(post, !post.allowRemix))}
+            />
+          ) : (
+            <>
+              <SheetItem icon="eye-off-outline" label={t('reel.notInterested')} onPress={done(() => onNotInterested(post))} />
+              {post.viewer.collab === 'accepted' ? null : <SheetItem icon="flag-outline" label={t('reel.report')} danger onPress={() => setReporting(true)} />}
+            </>
+          )}
+        </>
+      ) : null}
+    </ReelSheet>
   );
 }
 
@@ -584,24 +1469,136 @@ const s = StyleSheet.create({
   back: {
     position: 'absolute',
     start: space[3],
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: SCRIM,
   },
   center: { position: 'absolute', top: 0, bottom: 0, start: 0, end: 0, alignItems: 'center', justifyContent: 'center' },
-  playBadge: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center', backgroundColor: SCRIM },
-  info: { position: 'absolute', start: space[4], end: 84, gap: space[2] },
+  sign: { width: 64, height: 64, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: SCRIM },
+  bigSign: { width: 76, height: 76, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: SCRIM },
+  top: { position: 'absolute', start: space[3], end: space[3], flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  title: { flex: 1, color: WHITE, fontSize: 18, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 6 },
+  iconButton: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: SCRIM },
+  pill: {
+    position: 'absolute',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    minHeight: 40,
+    paddingHorizontal: space[4],
+    borderRadius: 12,
+  },
+  info: { position: 'absolute', start: space[4], end: 76, gap: 6 },
   author: { color: WHITE, fontWeight: '800', fontSize: 15, flexShrink: 1, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 4 },
+  follow: {
+    minHeight: 26,
+    paddingHorizontal: 11,
+    justifyContent: 'center',
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.7)',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
   caption: { color: WHITE, fontSize: 14, lineHeight: 20, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 4 },
+  captionBig: { fontSize: 16, lineHeight: 22 },
   captionLink: { color: WHITE, fontWeight: '800', textDecorationLine: 'underline' },
-  actions: { position: 'absolute', end: space[3], alignItems: 'center', gap: space[4] },
-  actionIcon: { width: 48, height: 48, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center', backgroundColor: SCRIM },
-  count: { color: WHITE, fontSize: 12, fontWeight: '700' },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', maxWidth: '100%' },
-  chipText: { color: WHITE, fontSize: 13, fontWeight: '700', flexShrink: 1, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 4 },
+  more: { color: WHITE, fontWeight: '700', fontSize: 14, textDecorationLine: 'underline', opacity: 0.9 },
+  details: {
+    position: 'absolute',
+    start: 0,
+    end: 0,
+    paddingHorizontal: space[4],
+    paddingTop: space[3],
+    paddingBottom: space[2],
+    backgroundColor: 'rgba(5,6,11,0.9)',
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+  },
+  mark: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[3],
+    minHeight: 44,
+    paddingHorizontal: space[3],
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  pop: {
+    position: 'absolute',
+    start: space[4],
+    maxWidth: 240,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingStart: 4,
+    paddingEnd: 10,
+    borderRadius: 12,
+    borderBottomStartRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.93)',
+  },
+  actions: { position: 'absolute', end: space[2], alignItems: 'center', gap: space[2] },
+  badge: {
+    position: 'absolute',
+    bottom: -9,
+    alignSelf: 'center',
+    width: 22,
+    height: 22,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#05060B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: ACCENT,
+  },
+  actionIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: SCRIM,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  count: { color: WHITE, fontSize: 12, fontWeight: '700', minHeight: 14, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 3 },
+  srOnly: { position: 'absolute', width: 1, height: 1, opacity: 0 },
+  controls: { position: 'absolute', start: space[2], end: space[2], height: 44, flexDirection: 'row', alignItems: 'center', gap: space[1] },
+  time: { color: WHITE, fontSize: 11, fontWeight: '600', minWidth: 72, textAlign: 'right', fontVariant: ['tabular-nums'] },
+  scrub: { flex: 1, height: 44, justifyContent: 'center' },
+  track: { height: 3, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.28)', overflow: 'hidden' },
+  fill: { height: '100%', backgroundColor: ACCENT },
+  tick: { position: 'absolute', top: 16.5, width: 3, height: 11, marginStart: -1.5, borderRadius: 2, backgroundColor: SUN },
+  bubble: { position: 'absolute', top: 12, width: 8, height: 7, marginStart: -4, borderRadius: 4, borderBottomStartRadius: 1, backgroundColor: MINT },
+  thumb: { position: 'absolute', top: 15, width: 14, height: 14, marginStart: -7, borderRadius: 5, backgroundColor: WHITE },
+  tip: {
+    position: 'absolute',
+    bottom: 40,
+    marginStart: -24,
+    width: 48,
+    alignItems: 'center',
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: 'rgba(5,6,11,0.9)',
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    minHeight: 28,
+    paddingHorizontal: 10,
+    borderRadius: 9,
+    backgroundColor: 'rgba(5,6,11,0.42)',
+  },
+  chipText: { color: WHITE, fontSize: 12, fontWeight: '700', flexShrink: 1 },
+  sheetItem: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 52, paddingHorizontal: space[2], borderRadius: radius.md },
+  sheetIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   preparing: {
     position: 'absolute',
     alignSelf: 'center',

@@ -11,6 +11,9 @@ import {
   usernameSchema,
   extractHashtags,
   MAX_EDITS_PER_DAY,
+  reelHighlightsSchema,
+  reelResumeSchema,
+  resumeWorthKeeping,
   type PostVersion,
 } from '@yapilapi/shared';
 import { z } from 'zod';
@@ -388,6 +391,67 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       [id, u.id],
     );
     return { views: r.rows[0]?.view_count ?? 0 };
+  });
+
+  // ── Reels plus: highlights and continue where you left off ────────────
+  /** A reel the viewer can see and open, with its author and its video's length (null while unknown). */
+  async function openReel(postId: string, viewer: string) {
+    const { rows } = await db.query(
+      `SELECT p.author_id, p.format, coalesce(${UNLOCKED}, false) AS unlocked,
+              (SELECT m.duration_ms FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id ORDER BY pm.position LIMIT 1) AS duration_ms
+       ${POST_FROM} WHERE p.id = $2 AND ${VISIBLE}`,
+      [viewer, postId],
+    );
+    const r = rows[0];
+    if (!r || r.format !== 'reel') throw notFound('That reel');
+    if (!r.unlocked) throw new AppError(403, 'subscribers_only', 'This post is for subscribers. Subscribe to see it.');
+    return { authorId: r.author_id as string, durationMs: (r.duration_ms as number | null) ?? null };
+  }
+
+  /**
+   * The creator's highlights: up to five named points in their reel, shown as ticks on the
+   * scrubber and in a list. Replaces the list; an empty list removes them.
+   */
+  app.put('/v1/posts/:id/highlights', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const { highlights } = parse(z.object({ highlights: reelHighlightsSchema }), req.body);
+    const reel = await openReel(id, u.id);
+    if (reel.authorId !== u.id) throw forbidden('Only the creator can mark highlights in a reel.');
+    if (reel.durationMs && highlights.some((h) => h.atMs >= reel.durationMs!)) throw badRequest('Each highlight has to be within the video.');
+    await db.query(`UPDATE posts SET highlights = $2 WHERE id = $1`, [id, highlights.length ? JSON.stringify(highlights) : null]);
+    return { highlights };
+  });
+
+  /**
+   * Continue where you left off: where you are in a reel, sent while watching and when you
+   * leave it. Positions in the first few seconds or the last stretch clear it instead.
+   */
+  app.put('/v1/posts/:id/resume', { preHandler: requireAuth, config: { rateLimit: { max: 240, timeWindow: '1 minute' } } }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const input = parse(reelResumeSchema, req.body);
+    const reel = await openReel(id, u.id);
+    const length = reel.durationMs ?? input.durationMs ?? null;
+    if (length && input.positionMs > length) throw badRequest('That time is past the end of the reel.');
+    if (!resumeWorthKeeping(input.positionMs, length)) {
+      await db.query(`DELETE FROM reel_resume WHERE user_id = $1 AND post_id = $2`, [u.id, id]);
+      return { resumeMs: null };
+    }
+    await db.query(
+      `INSERT INTO reel_resume (user_id, post_id, position_ms) VALUES ($1,$2,$3)
+       ON CONFLICT (user_id, post_id) DO UPDATE SET position_ms = EXCLUDED.position_ms, updated_at = now()`,
+      [u.id, id, input.positionMs],
+    );
+    return { resumeMs: input.positionMs };
+  });
+
+  /** Start the reel from the top next time. */
+  app.delete('/v1/posts/:id/resume', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    await db.query(`DELETE FROM reel_resume WHERE user_id = $1 AND post_id = $2`, [u.id, id]);
+    return { resumeMs: null };
   });
 
   // ── Remixes ───────────────────────────────────────────────────────────

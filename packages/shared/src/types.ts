@@ -2,6 +2,7 @@ import type { StoryCard } from './stories.ts';
 import type { PostMusic } from './music.ts';
 import type { DataSaverMode } from './data-saver.ts';
 import type { TranslationSettings } from './translation.ts';
+import type { ReelHighlight } from './reels.ts';
 import type {
   BoardVisibility,
   CircleKind,
@@ -160,6 +161,8 @@ export interface Post {
   remixOf?: RemixRef | null;
   /** Reels: the sound it uses (its own, or one it borrowed). */
   sound?: SoundRef | null;
+  /** Reels: named points the creator marked in the video (up to five, in time order), shown on the scrubber. */
+  highlights?: ReelHighlight[];
   /**
    * Music playing with it: part of a sound or a catalogue song on a photo, carousel or text post, or a
    * catalogue song a reel plays instead of its own audio. Muted until the viewer taps it.
@@ -179,6 +182,8 @@ export interface Post {
     collab?: CollabStatus;
     /** Only in your Saved list and boards: your private note on your save of this post. */
     note?: string;
+    /** Reels: where you stopped watching it last time (continue where you left off). Absent when there's nothing to resume. */
+    resumeMs?: number;
   };
   /**
    * Co-authors who accepted, in the order they were invited. The post shows as by
@@ -303,6 +308,8 @@ export interface Comment {
   likedByAuthor: boolean;
   /** Only in the post author's hidden comments: hidden because it contains one of their hidden words. */
   hidden?: boolean;
+  /** Reels: a moment comment, anchored to this time in the video. */
+  atMs?: number | null;
   viewer: {
     liked: boolean;
     /** The writer, until COMMENT_EDIT_MINUTES after posting. */

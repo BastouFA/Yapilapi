@@ -10,9 +10,11 @@ import {
   hiddenWordsSchema,
   pageQuerySchema,
   pinCommentSchema,
+  REEL_MOMENTS_MAX,
   type CommentPage,
   type CommentPolicy,
   type PublicUser,
+  type ReelMoment,
 } from '@yapilapi/shared';
 import type { PoolClient } from 'pg';
 import { z } from 'zod';
@@ -50,6 +52,9 @@ interface PostInfo {
   comment_policy: CommentPolicy;
   pinned_comment_id: string | null;
   can_comment: boolean;
+  format: 'post' | 'reel';
+  /** Reels: the video's length, once known. */
+  duration_ms: number | null;
 }
 
 /**
@@ -64,8 +69,9 @@ export default async function commentsModule(app: FastifyInstance, ctx: AppConte
   /** The post, if the viewer can see and open it, with what its comment controls allow them. */
   async function openPost(postId: string, viewer: string | null): Promise<PostInfo> {
     const { rows } = await db.query(
-      `SELECT p.author_id, p.comment_policy, p.pinned_comment_id, coalesce(${postUnlockedSql('$1')}, false) AS unlocked,
-              coalesce(${commentAllowedSql('$1')}, false) AS can_comment
+      `SELECT p.author_id, p.comment_policy, p.pinned_comment_id, p.format, coalesce(${postUnlockedSql('$1')}, false) AS unlocked,
+              coalesce(${commentAllowedSql('$1')}, false) AS can_comment,
+              CASE WHEN p.format = 'reel' THEN (SELECT m.duration_ms FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id ORDER BY pm.position LIMIT 1) END AS duration_ms
        ${POST_FROM} WHERE p.id = $2 AND ${postVisibleSql('$1')}`,
       [viewer, postId],
     );
@@ -175,6 +181,35 @@ export default async function commentsModule(app: FastifyInstance, ctx: AppConte
     };
   });
 
+  /**
+   * Moment comments on a reel: top-level comments anchored to a time, for the bubbles on the
+   * scrubber. The most liked (then newest) up to REEL_MOMENTS_MAX, returned in time order,
+   * with the same visibility as the comment list.
+   */
+  app.get('/v1/posts/:id/moment-comments', async (req): Promise<{ items: ReelMoment[] }> => {
+    const viewer = req.user?.id ?? null;
+    const { id } = parse(idParam, req.params);
+    const post = await openPost(id, viewer);
+    if (post.format !== 'reel') throw notFound('That reel');
+    const { rows } = await db.query(
+      `SELECT cm.id, cm.at_ms, cm.body, cm.like_count, pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url
+       ${COMMENT_FROM} WHERE cm.post_id = $2 AND cm.parent_id IS NULL AND cm.at_ms IS NOT NULL AND ${commentVisibleSql('$1')}
+       ORDER BY cm.like_count DESC, cm.created_at DESC, cm.id DESC LIMIT $3`,
+      [viewer, id, REEL_MOMENTS_MAX],
+    );
+    return {
+      items: rows
+        .map((r) => ({
+          id: r.id as string,
+          atMs: r.at_ms as number,
+          body: r.body as string,
+          likes: r.like_count as number,
+          author: { id: r.a_id, username: r.a_username, displayName: r.a_display_name, avatarUrl: r.a_avatar_url ?? null },
+        }))
+        .sort((a, b) => a.atMs - b.atMs),
+    };
+  });
+
   /** The replies in a thread, oldest first. */
   app.get('/v1/comments/:id/replies', async (req) => {
     const viewer = req.user?.id ?? null;
@@ -213,6 +248,12 @@ export default async function commentsModule(app: FastifyInstance, ctx: AppConte
     const input = parse(commentSchema, req.body);
     const post = await openPost(id, u.id);
     assertCanComment(post);
+    // Moment comments: only on reels, only top-level, and within the video.
+    if (input.atMs !== undefined) {
+      if (post.format !== 'reel') throw badRequest('Only comments on reels can point to a moment.');
+      if (input.parentId) throw badRequest('Replies stay with their comment. Point to a moment in a new comment.');
+      if (post.duration_ms && input.atMs >= post.duration_ms) throw badRequest('That moment is past the end of the reel.');
+    }
     let parentId: string | null = null;
     let replyTo: { id: string; author_id: string } | null = null;
     if (input.parentId) {
@@ -236,10 +277,21 @@ export default async function commentsModule(app: FastifyInstance, ctx: AppConte
     const screening = await screenComment(db, ctx.config, { userId: u.id, postId: id, postAuthorId: post.author_id, body: input.body });
     const commentId = await tx(db, async (c) => {
       const { rows } = await c.query(
-        `INSERT INTO comments (post_id, author_id, parent_id, reply_to_id, body, moderation_status, topics, hidden_at, lang)
-         VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $8 THEN now() END, $9) RETURNING id`,
+        `INSERT INTO comments (post_id, author_id, parent_id, reply_to_id, body, moderation_status, topics, hidden_at, lang, at_ms)
+         VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $8 THEN now() END, $9, $10) RETURNING id`,
         // #tags in a comment count on the tag's page; its language drives "See translation".
-        [id, u.id, parentId, replyTo?.id ?? null, input.body, screening.status, extractHashtags(input.body), screening.hidden, langOf(input.body)],
+        [
+          id,
+          u.id,
+          parentId,
+          replyTo?.id ?? null,
+          input.body,
+          screening.status,
+          extractHashtags(input.body),
+          screening.hidden,
+          langOf(input.body),
+          input.atMs ?? null,
+        ],
       );
       await syncCommentCounts(c, id);
       await recordCommentFlags(c, u.id, rows[0].id, screening);
