@@ -54,7 +54,9 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         await q(`SELECT id, email, email_verified_at, phone_e164, phone_verified_at, role, status, birth_date, created_at FROM users WHERE id = $1`)
       )[0],
       profile: (
-        await q(`SELECT username, display_name, bio, avatar_url, cover_url, cover_alt, links, mode, locale, is_private FROM profiles WHERE user_id = $1`)
+        await q(
+          `SELECT username, display_name, bio, avatar_url, cover_url, cover_alt, links, mode, locale, is_private, pronouns, city, accent, header_style, tabs, featured_post_ids, song_sound_id, song_track_id, song_part FROM profiles WHERE user_id = $1`,
+        )
       )[0],
       nowStatus: (await q(`SELECT text, icon, audience, created_at, expires_at FROM profile_statuses WHERE user_id = $1`))[0] ?? null,
       interests: await q(`SELECT t.slug FROM user_interests ui JOIN topics t ON t.id = ui.topic_id WHERE ui.user_id = $1`),

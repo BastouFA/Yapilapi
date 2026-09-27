@@ -51,6 +51,9 @@ export function Icon({ name, size = 22, color, directional }: { name: IconName; 
  */
 export const userText = { writingDirection: 'auto' } as const satisfies TextStyle;
 
+/** A profile's accent colours, as profileAccentColors gives them (text on each is AA). */
+export type Tint = { accent: string; accentStrong: string; onAccent: string; soft: string; gradEnd: string };
+
 export function useColors() {
   return palette(useColorScheme() === 'dark' ? 'dark' : 'light');
 }
@@ -89,6 +92,7 @@ export function Button({
   icon,
   disabled: disabledProp,
   style,
+  tint,
 }: {
   label: string;
   onPress: () => unknown;
@@ -97,6 +101,8 @@ export function Button({
   icon?: IconName;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
+  /** A profile's accent (profileAccentColors, already checked for contrast) in place of the brand colours. */
+  tint?: Tint;
 }) {
   const c = useColors();
   const [pending, setPending] = useState(false);
@@ -122,7 +128,7 @@ export function Button({
     };
     (result as Promise<unknown>).then(done, done);
   };
-  const fg = variant === 'primary' ? c.onYapi : variant === 'danger' ? c.onDanger : variant === 'ghost' ? c.yapi : c.ink;
+  const fg = variant === 'primary' ? (tint?.onAccent ?? c.onYapi) : variant === 'danger' ? c.onDanger : variant === 'ghost' ? (tint?.accent ?? c.yapi) : c.ink;
   const height = size === 'sm' ? 36 : 44;
   const content = (
     <>
@@ -142,7 +148,7 @@ export function Button({
       style={({ pressed }) => [{ borderRadius: radius.full, opacity: disabled ? 0.45 : pressed ? 0.85 : 1, overflow: 'hidden' }, style]}
     >
       {variant === 'primary' ? (
-        <LinearGradient {...gradient(c)} style={[s.button, { height }]}>
+        <LinearGradient {...gradient(c)} {...(tint ? { colors: [tint.accent, tint.accentStrong, tint.gradEnd] as const } : {})} style={[s.button, { height }]}>
           {content}
         </LinearGradient>
       ) : (
@@ -247,6 +253,7 @@ export function Segmented<T extends string>({
   label,
   onDoublePress,
   doublePressLabel,
+  tint,
 }: {
   options: readonly { id: T; label: string; count?: number }[];
   value: T;
@@ -254,6 +261,8 @@ export function Segmented<T extends string>({
   label?: string;
   onDoublePress?: (id: T) => void;
   doublePressLabel?: string;
+  /** A profile's accent: the selected segment takes it. */
+  tint?: Tint;
 }) {
   const c = useColors();
   const lastTap = useRef<{ id: T; at: number } | null>(null);
@@ -281,17 +290,17 @@ export function Segmented<T extends string>({
               if (e.nativeEvent.actionName === 'doublePress') onDoublePress?.(o.id);
             }}
             onPress={() => press(o.id)}
-            style={[s.segment, on && [{ backgroundColor: c.surface }, elevation(c)]]}
+            style={[s.segment, on && [{ backgroundColor: tint?.accent ?? c.surface }, elevation(c)]]}
           >
             <Text
-              style={{ color: on ? c.ink : c.inkMuted, fontWeight: on ? '700' : '600', fontSize: 14 }}
+              style={{ color: on ? (tint?.onAccent ?? c.ink) : c.inkMuted, fontWeight: on ? '700' : '600', fontSize: 14 }}
               numberOfLines={1}
               // Many tabs on a narrow phone: shrink a little rather than cut words off ("Mem…").
               adjustsFontSizeToFit
               minimumFontScale={0.75}
             >
               {o.label}
-              {o.count !== undefined ? <Text style={{ color: c.inkMuted, fontWeight: '500' }}> {o.count}</Text> : null}
+              {o.count !== undefined ? <Text style={{ color: on && tint ? tint.onAccent : c.inkMuted, fontWeight: '500' }}> {o.count}</Text> : null}
             </Text>
           </Pressable>
         );

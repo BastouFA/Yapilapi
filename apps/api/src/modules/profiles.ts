@@ -14,7 +14,11 @@ import {
   setInterestsSchema,
   updateProfileSchema,
   usernameSchema,
+  profileAccent,
+  profileTabs,
+  type PostMusic,
   type Profile,
+  type ProfileLink,
 } from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
@@ -23,7 +27,11 @@ import { decodeCursor, encodeCursor } from '../lib/cursor.ts';
 import { notify, personalizationAllowed, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
 import { ageOf, areFriends, isBlockedEitherWay, PUBLIC_USER_COLS, toPublicUser, type PublicUserRow } from '../lib/users.ts';
-import { notBlockedSql } from '../lib/visibility.ts';
+import { notBlockedSql, postVisibleSql } from '../lib/visibility.ts';
+import { hostsWithIcons, iconHost, queueLinkIcons } from '../lib/link-icons.ts';
+import { hydratePosts } from '../lib/posts.ts';
+import { soundVisibleSql } from '../lib/sounds.ts';
+import { trackMusic, tracksByIds, viewerCountries, type StoredPart } from '../lib/music/view.ts';
 import { messagesAllowedSql } from '../lib/interactions.ts';
 import { byOrWithSql, canInviteSql, canTagSql } from '../lib/collabs.ts';
 import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
@@ -113,9 +121,80 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     return rows[0].user_id;
   }
 
+  /** A profile's links, each with its site icon when the server has one. */
+  async function linksOut(raw: unknown): Promise<ProfileLink[]> {
+    // Web links only: anything saved before links had to be http(s) is left out rather than shown as a link.
+    const links = ((raw ?? []) as { label: string; url: string }[]).filter((l) => typeof l?.url === 'string' && /^https?:\/\//i.test(l.url));
+    const withIcon = await hostsWithIcons(
+      db,
+      links.map((l) => iconHost(l.url)).filter((h): h is string => !!h),
+    );
+    return links.map((l) => {
+      const host = iconHost(l.url);
+      return {
+        label: l.label,
+        url: l.url,
+        iconUrl: host && withIcon.has(host) ? `${ctx.config.PUBLIC_API_URL}/v1/link-icons/${encodeURIComponent(host)}` : null,
+      };
+    });
+  }
+
+  /** Featured posts in the order chosen, only those this viewer can see (and never from a community). */
+  async function featuredOut(userId: string, ids: string[], viewer: string | null) {
+    if (!ids.length) return [];
+    const { rows } = await db.query<{ id: string }>(
+      `SELECT p.id FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
+       WHERE p.id = ANY($2::uuid[]) AND p.author_id = $3 AND p.community_id IS NULL AND ${postVisibleSql('$1')}`,
+      [viewer, ids, userId],
+    );
+    const visible = new Set(rows.map((r) => r.id));
+    return hydratePosts(
+      db,
+      ids.filter((id) => visible.has(id)),
+      viewer,
+    );
+  }
+
+  /** The profile song for this viewer: a sound they can see, or a catalogue song checked against its licence where they are. */
+  async function songOut(r: Record<string, any>, viewer: string | null): Promise<PostMusic | null> {
+    const part = r.song_part as StoredPart | null;
+    if (!part) return null;
+    if (r.song_track_id) {
+      const row = (await tracksByIds(db, [r.song_track_id])).get(r.song_track_id);
+      if (!row) return null;
+      return trackMusic(row, part, { countries: await viewerCountries(db, viewer), commercial: r.mode === 'business' });
+    }
+    if (!r.song_sound_id) return null;
+    const { rows } = await db.query(
+      `SELECT s.id, s.title, coalesce(sm.variants->>'mp4', sm.url) AS audio, so.display_name AS artist, sm.poster_url AS cover,
+              (s.owner_id IS NOT DISTINCT FROM $2 OR ${soundVisibleSql('$2')}) AS visible
+       FROM sounds s LEFT JOIN media sm ON sm.id = s.media_id LEFT JOIN profiles so ON so.user_id = s.owner_id WHERE s.id = $1`,
+      [r.song_sound_id, viewer],
+    );
+    const s = rows[0];
+    if (!s?.visible) return null;
+    return {
+      source: 'library',
+      id: s.id,
+      title: s.title,
+      artist: s.artist ?? '',
+      coverUrl: s.cover ?? null,
+      audioUrl: s.audio ?? null,
+      startMs: part.startMs,
+      durationMs: part.durationMs,
+      style: 'compact',
+      licenceName: null,
+      licenceUrl: null,
+      attribution: null,
+    };
+  }
+
   async function loadProfile(userId: string, viewer: string | null): Promise<Profile> {
     const { rows } = await db.query(
       `SELECT ${PUBLIC_USER_COLS}, pr.bio, pr.cover_url, pr.cover_alt, pr.links, pr.is_private,
+        pr.accent, pr.header_style, pr.pronouns, pr.city, pr.tabs, pr.featured_post_ids, pr.song_sound_id, pr.song_track_id, pr.song_part,
+        coalesce(u.created_at, pr.created_at) AS joined_at,
+        coalesce(u.birth_date > current_date - interval '18 years', false) AS is_minor,
         (SELECT count(*) FROM follows WHERE followee_id = pr.user_id) AS followers,
         (SELECT count(*) FROM follows WHERE follower_id = pr.user_id) AS following,
         (SELECT count(*) FROM friendships WHERE user_a = pr.user_id OR user_b = pr.user_id) AS friends,
@@ -128,23 +207,31 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
           WHERE status = 'pending' AND ((from_user_id = $2 AND to_user_id = pr.user_id) OR (from_user_id = pr.user_id AND to_user_id = $2)) LIMIT 1) AS friend_request,
         EXISTS (SELECT 1 FROM blocks WHERE blocker_id = $2 AND blocked_id = pr.user_id) AS blocked,
         EXISTS (SELECT 1 FROM mutes WHERE muter_id = $2 AND muted_id = pr.user_id) AS muted
-       FROM profiles pr WHERE pr.user_id = $1`,
+       FROM profiles pr JOIN users u ON u.id = pr.user_id WHERE pr.user_id = $1`,
       [userId, viewer],
     );
     const r = rows[0];
     if (!r) throw notFound('That profile');
     const status = (await nowStatusesFor(db, [userId], viewer)).get(userId) ?? null;
+    const isSelf = viewer === userId;
     return {
       ...toPublicUser(r as PublicUserRow),
       bio: r.bio,
       coverUrl: r.cover_url,
       coverAlt: r.cover_url ? (r.cover_alt ?? null) : null,
       nowStatus: status,
-      // Web links only: anything saved before links had to be http(s) is left out rather than shown as a link.
-      links: ((r.links ?? []) as { label: string; url: string }[]).filter((l) => typeof l?.url === 'string' && /^https?:\/\//i.test(l.url)),
+      links: await linksOut(r.links),
       isPrivate: r.is_private,
       interests: r.interests,
       counts: { followers: r.followers, following: r.following, friends: r.friends, posts: r.posts },
+      style: { accent: profileAccent(r.accent), header: r.header_style },
+      pronouns: r.pronouns || null,
+      // A city on an under-18's account is only ever shown to them.
+      city: r.city && (isSelf || !r.is_minor) ? r.city : null,
+      joinedAt: new Date(r.joined_at).toISOString(),
+      tabs: profileTabs(r.tabs),
+      featured: await featuredOut(userId, r.featured_post_ids ?? [], viewer),
+      song: await songOut(r, viewer),
       relationship: {
         isSelf: viewer === userId,
         following: r.following_them,
@@ -168,7 +255,22 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       if (minor.rowCount) throw notFound('That person');
     }
     const profile = await loadProfile(id, viewer);
-    if (!viewer && profile.isPrivate) return { profile: { ...profile, bio: '', links: [], interests: [], coverUrl: null, coverAlt: null, nowStatus: null } };
+    if (!viewer && profile.isPrivate)
+      return {
+        profile: {
+          ...profile,
+          bio: '',
+          links: [],
+          interests: [],
+          coverUrl: null,
+          coverAlt: null,
+          nowStatus: null,
+          pronouns: null,
+          city: null,
+          featured: [],
+          song: null,
+        },
+      };
     return { profile };
   });
 
@@ -185,6 +287,12 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       locale: 'locale',
       isPrivate: 'is_private',
       country: 'country',
+      pronouns: 'pronouns',
+      city: 'city',
+      accent: 'accent',
+      headerStyle: 'header_style',
+      tabs: 'tabs',
+      featuredPostIds: 'featured_post_ids',
     };
     const sets: string[] = [];
     const vals: unknown[] = [u.id];
@@ -193,6 +301,25 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       if (v === undefined || (k === 'coverAlt' && input.coverUrl === null)) continue;
       vals.push(k === 'links' ? JSON.stringify(v) : v);
       sets.push(`${col} = $${vals.length}`);
+    }
+    // Featured: only your own published posts and reels that other people can see (not in a community, not held by moderation).
+    if (input.featuredPostIds?.length) {
+      const own = await db.query(
+        `SELECT id FROM posts WHERE id = ANY($1::uuid[]) AND author_id = $2 AND deleted_at IS NULL AND status = 'published'
+           AND community_id IS NULL AND moderation_status = 'normal' AND visibility <> 'private'`,
+        [input.featuredPostIds, u.id],
+      );
+      if (own.rowCount !== input.featuredPostIds.length)
+        throw new AppError(400, 'validation_failed', 'Check the highlighted fields.', {
+          fields: { featuredPostIds: 'Choose from your own posts and reels that people can see.' },
+        });
+    }
+    // The song is checked like music on a post: a sound you may use, or a catalogue song its licence lets you use here.
+    if (input.song === null) sets.push(`song_sound_id = NULL, song_track_id = NULL, song_part = NULL`);
+    else if (input.song) {
+      const prepared = await ctx.music.prepareUse(u.id, input.song, 'posts');
+      vals.push(prepared.soundId, prepared.trackId, JSON.stringify(prepared.stored));
+      sets.push(`song_sound_id = $${vals.length - 2}, song_track_id = $${vals.length - 1}, song_part = $${vals.length}`);
     }
     // Minors can't make their account public.
     if (input.isPrivate === false) {
@@ -204,7 +331,37 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     if (input.coverUrl) throw badRequest('Choose a cover photo from your own uploads.', { fields: { coverUrl: 'Upload a photo first.' } });
     if (input.coverUrl === null) sets.push(`cover_url = NULL, cover_media_id = NULL, cover_alt = NULL`);
     if (sets.length) await db.query(`UPDATE profiles SET ${sets.join(', ')} WHERE user_id = $1`, vals);
+    // Site icons for the links are fetched in the background, never while you wait.
+    if (input.links?.length)
+      await queueLinkIcons(
+        db,
+        input.links.map((l) => l.url),
+      );
     return { profile: await loadProfile(u.id, u.id) };
+  });
+
+  /**
+   * A profile link's site icon, as fetched and checked by the server (lib/link-icons.ts). Only
+   * recognised image types are served, with a type taken from the bytes and nothing that runs.
+   */
+  app.get('/v1/link-icons/:host', async (req, reply) => {
+    const { host } = parse(
+      z.object({
+        host: z
+          .string()
+          .max(253)
+          .regex(/^[a-z0-9.-]+$/),
+      }),
+      req.params,
+    );
+    const { rows } = await db.query(`SELECT image, mime FROM link_icons WHERE host = $1 AND image IS NOT NULL`, [host]);
+    if (!rows[0]) throw notFound('That icon');
+    return reply
+      .header('content-type', rows[0].mime)
+      .header('cache-control', 'public, max-age=86400')
+      .header('x-content-type-options', 'nosniff')
+      .header('content-security-policy', "default-src 'none'; sandbox")
+      .send(rows[0].image);
   });
 
   // ── Cover photo ───────────────────────────────────────────────────────

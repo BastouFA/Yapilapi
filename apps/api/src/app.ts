@@ -84,6 +84,7 @@ import { recapJobHandlers } from './lib/recaps.ts';
 import { sweepViewOnce, viewOnceJobHandlers } from './lib/view-once.ts';
 import { chatJobHandlers, expireMessages } from './lib/chat.ts';
 import { scheduledPostJobHandlers } from './lib/publishing.ts';
+import { linkIconJobHandlers } from './lib/link-icons.ts';
 import { fastifyTracingPlugin, traceLogMixin } from './lib/tracing.ts';
 import { endExpiredCampaigns } from './lib/boosts.ts';
 import { sendCountdownReminders } from './lib/stories.ts';
@@ -433,6 +434,8 @@ export async function buildApp(
     ...chatJobHandlers(viewOnceDeps),
     // Scheduled posts go out at their time.
     ...scheduledPostJobHandlers(ctx),
+    // Site icons for profile links, fetched through the SSRF guard.
+    ...linkIconJobHandlers(db),
   };
   if (opts.webhookWorker ?? config.JOB_WORKER) {
     let busy = false;

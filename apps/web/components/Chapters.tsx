@@ -127,7 +127,15 @@ export function chapterMeta(c: Chapter, { t, tp, locale }: Translate) {
  * a sealed time capsule opens its page (cover, date and count only). On your own profile it
  * starts a new chapter and links to your archive.
  */
-export function ChaptersRow({ userId, isSelf }: { userId: string; isSelf: boolean }) {
+export function ChaptersRow({
+  userId,
+  isSelf,
+  emptyText,
+}: {
+  userId: string;
+  isSelf: boolean;
+  /** Shown to visitors when there are none (as a profile tab). */ emptyText?: string;
+}) {
   const session = useSession();
   const { toast, locale, t } = session;
   const router = useRouter();
@@ -147,6 +155,7 @@ export function ChaptersRow({ userId, isSelf }: { userId: string; isSelf: boolea
     void load();
   }, [load]);
 
+  if (items && !items.length && !isSelf && emptyText) return <p className="muted">{emptyText}</p>;
   if (!items || (!items.length && !isSelf)) return null;
 
   return (

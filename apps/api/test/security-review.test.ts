@@ -51,7 +51,7 @@ describe('links people open', () => {
     expect((await as(t.app, u).post('/v1/posts', { body: 'look', linkUrl: 'javascript:alert(1)' })).status).toBe(400);
     const ok = await as(t.app, u).patch('/v1/me/profile', { links: [{ label: 'Site', url: 'https://example.test/me' }] });
     expect(ok.status).toBe(200);
-    expect(ok.body.profile.links).toEqual([{ label: 'Site', url: 'https://example.test/me' }]);
+    expect(ok.body.profile.links).toEqual([{ label: 'Site', url: 'https://example.test/me', iconUrl: null }]);
 
     // Rows saved before the rule are filtered on the way out.
     await db().query(`UPDATE profiles SET links = $2 WHERE user_id = $1`, [
@@ -62,7 +62,7 @@ describe('links people open', () => {
       ]),
     ]);
     const other = await adult();
-    expect((await as(t.app, other).get(`/v1/users/${u.username}`)).body.profile.links).toEqual([{ label: 'Good', url: 'https://example.test' }]);
+    expect((await as(t.app, other).get(`/v1/users/${u.username}`)).body.profile.links).toEqual([{ label: 'Good', url: 'https://example.test', iconUrl: null }]);
     const post = (await as(t.app, u).post('/v1/posts', { body: 'a link', linkUrl: 'https://example.test/a' })).body.post;
     await db().query(`UPDATE posts SET link_url = 'javascript:alert(1)' WHERE id = $1`, [post.id]);
     expect((await as(t.app, other).get(`/v1/posts/${post.id}`)).body.post.linkUrl).toBeNull();

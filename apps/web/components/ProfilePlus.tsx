@@ -7,6 +7,7 @@ import {
   IMAGE_ACCEPT,
   NOW_STATUS_ICONS,
   NOW_STATUS_MAX,
+  profileQrInk,
   type MessageKey,
   type NowStatus,
   type NowStatusAudience,
@@ -24,14 +25,18 @@ import { useSession } from '@/app/providers';
  */
 export function ProfileCover({ profile, onEdit }: { profile: Profile; onEdit?: () => void }) {
   const { t } = useSession();
+  // The header style: 'cover' shows the photo (or the accent gradient without one), 'gradient' always the gradient, 'clean' no band.
+  const header = profile.style?.header ?? 'cover';
+  if (header === 'clean') return null;
+  const photo = header === 'cover' && profile.coverUrl ? profile.coverUrl : null;
   return (
-    <div className={profile.coverUrl ? 'profile__cover profile__cover--photo' : 'profile__cover'}>
-      {profile.coverUrl ? (
+    <div className={photo ? 'profile__cover profile__cover--photo' : 'profile__cover'}>
+      {photo ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img className="profile__cover-img" src={profile.coverUrl} alt={profile.coverAlt || t('m.cover.alt', { name: profile.displayName })} />
+        <img className="profile__cover-img" src={photo} alt={profile.coverAlt || t('m.cover.alt', { name: profile.displayName })} />
       ) : null}
       <span className="profile__cover-fade" aria-hidden />
-      {onEdit ? (
+      {onEdit && header === 'cover' ? (
         <Button size="sm" variant="secondary" icon="image" className="profile__cover-edit" onClick={onEdit}>
           {profile.coverUrl ? t('profilePlus.changeCover') : t('profilePlus.addCover')}
         </Button>
@@ -312,8 +317,11 @@ export function NowStatusSheet({
 }
 
 // ── Share ───────────────────────────────────────────────────────────────
-/** A QR code for `value`, drawn as SVG in the browser. Always dark on light so phone cameras can read it. */
-export function QrCode({ value, label, size = 208 }: { value: string; label: string; size?: number }) {
+/**
+ * A QR code for `value`, drawn as SVG in the browser. Always dark on light so phone cameras can read
+ * it: `ink` is the profile's accent, deepened to at least 7:1 against the white card (profileQrInk).
+ */
+export function QrCode({ value, label, size = 208, ink = '#0E1020' }: { value: string; label: string; size?: number; ink?: string }) {
   const { path, count } = useMemo(() => {
     const qr = qrcode(0, 'M');
     qr.addData(value);
@@ -326,7 +334,7 @@ export function QrCode({ value, label, size = 208 }: { value: string; label: str
   return (
     <svg className="qr-code" width={size} height={size} viewBox={`0 0 ${count} ${count}`} role="img" aria-label={label} shapeRendering="crispEdges">
       <rect width={count} height={count} fill="#FFFFFF" />
-      <path d={path} fill="#0E1020" />
+      <path d={path} fill={ink} />
     </svg>
   );
 }
@@ -341,8 +349,8 @@ export function ShareProfileSheet({ open, onClose, profile }: { open: boolean; o
   return (
     <BottomSheet open={open} onClose={onClose} title={t('m.profile.share')}>
       <div className="stack share-profile">
-        <div className="share-profile__card">
-          {url ? <QrCode value={url} label={t('profilePlus.qrLabel', { name: profile.displayName })} /> : null}
+        <div className="share-profile__card" style={{ borderTopColor: profileQrInk(profile.style?.accent) }}>
+          {url ? <QrCode value={url} ink={profileQrInk(profile.style?.accent)} label={t('profilePlus.qrLabel', { name: profile.displayName })} /> : null}
           <strong>{profile.displayName}</strong>
           <span className="muted">@{profile.username}</span>
         </div>
