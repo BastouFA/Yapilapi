@@ -15,6 +15,12 @@ export async function enqueue(db: Q, kind: string, payload: object, delaySeconds
   return String(rows[0].id);
 }
 
+/** Queue a job to run at a given moment (compared with the database's clock, like every due job). */
+export async function enqueueAt(db: Q, kind: string, payload: object, runAt: Date): Promise<string> {
+  const { rows } = await db.query(`INSERT INTO jobs (kind, payload, run_at) VALUES ($1, $2, $3) RETURNING id`, [kind, payload, runAt]);
+  return String(rows[0].id);
+}
+
 /**
  * Run due jobs. Each job is claimed with SKIP LOCKED so several workers can run
  * side by side; failures retry with backoff and give up after 5 attempts.

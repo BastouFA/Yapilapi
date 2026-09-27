@@ -3,6 +3,7 @@ import { tx } from '@yapilapi/database';
 import {
   commentSchema,
   createPostSchema,
+  editPostSchema,
   feedbackSchema,
   feedQuerySchema,
   pageQuerySchema,
@@ -10,7 +11,9 @@ import {
   SAVED_FILTERS,
   usernameSchema,
   extractHashtags,
+  MAX_EDITS_PER_DAY,
   type Comment,
+  type PostVersion,
 } from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
@@ -20,17 +23,24 @@ import { analyzeText, statusForRisk } from '../lib/moderation.ts';
 import { hydratePosts } from '../lib/posts.ts';
 import { attachSaveNotes, savedFilterSql } from '../lib/saves.ts';
 import { notifyMentions } from '../lib/mentions.ts';
-import { assertCanInvite, assertCanTag, coAuthoredSql, notifyCollabInvites, notifyPhotoTags } from '../lib/collabs.ts';
+import { coAuthoredSql } from '../lib/collabs.ts';
 import { topicsFor } from './tags.ts';
-import { isPlus, PLUS_REEL_MAX_MS, REEL_MAX_MS } from '../lib/plus.ts';
 import { notify, track } from '../lib/services.ts';
-import { emitWebhook } from '../lib/webhooks.ts';
 import { isAdultViewer, plusCol, publicUserFrom } from '../lib/users.ts';
 import { notBlockedSql, postUnlockedSql, postVisibleSql } from '../lib/visibility.ts';
-import { assertRemixable, assertSoundUsable, registerOwnSound } from '../lib/sounds.ts';
-import { assertPostPace, assessPost, flagContent, recordSignals } from '../lib/spam.ts';
+import { assessPost } from '../lib/spam.ts';
 import { requireVerified } from '../lib/verification.ts';
-import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
+import {
+  announcePost,
+  assertDraftRoom,
+  moderationNotice,
+  recordFlags,
+  schedulePost,
+  scheduleTime,
+  screenPost,
+  writePost,
+  type Screening,
+} from '../lib/publishing.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -41,6 +51,12 @@ const RECENT_CANDIDATES = 1000;
 /** …and up to this many of the newest posts on the viewer's interests. */
 const INTEREST_CANDIDATES = 300;
 const POST_FROM = `FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id`;
+
+/** The stricter of two moderation states. */
+function worseStatus(a: string, b: string): string {
+  const order = ['normal', 'review', 'restricted', 'removed'];
+  return order.indexOf(a) >= order.indexOf(b) ? a : b;
+}
 
 export default async function postsModule(app: FastifyInstance, ctx: AppContext) {
   const db = ctx.db;
@@ -105,218 +121,58 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     };
   });
 
+  /**
+   * Share a post, or keep it for later: `draft: true` saves a draft and
+   * `scheduledAt` publishes it at that time. Drafts and scheduled posts are
+   * only the author's until they're published (see lib/publishing.ts).
+   */
   app.post('/v1/posts', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => {
     const u = me(req);
     const input = parse(createPostSchema, req.body);
-    const analysis = analyzeText(`${input.body} ${input.poll?.options.join(' ') ?? ''}`);
-    if (analysis.risk === 'escalate')
-      throw new AppError(
-        422,
-        'content_blocked',
-        "This post can't be published because it may put someone at risk. If you or someone else is in danger, contact local emergency services.",
-      );
-    // Reaching everyone needs a confirmed email or phone (when REQUIRE_VERIFICATION is on).
-    const reachesEveryone = input.visibility === 'public' || !!input.communityId;
-    if (reachesEveryone) await requireVerified(db, ctx.config, u.id, 'post');
-    await assertPostPace(db, ctx.config, u.id);
-    const spam = await assessPost(db, ctx.config, u.id, input.body);
-    const heldForAccount = spam.risky && reachesEveryone;
-    const status = spam.restricted
-      ? 'restricted'
-      : analysis.risk !== 'normal'
-        ? statusForRisk(analysis.risk)
-        : spam.flags.length || heldForAccount
-          ? 'review'
-          : 'normal';
-    let limitedNow = false;
-
-    const kind = input.poll
-      ? 'poll'
-      : input.media.length > 1
-        ? 'carousel'
-        : input.media[0]?.kind === 'video'
-          ? 'video'
-          : input.media[0]?.kind === 'audio'
-            ? 'audio'
-            : input.media[0]
-              ? 'photo'
-              : input.linkUrl
-                ? 'link'
-                : input.kind;
-
-    if (input.visibility === 'subscribers') {
-      if (input.communityId) throw badRequest('Posts in a community are for its members, not for subscribers.');
-      const plan = await db.query(`SELECT 1 FROM creator_plans WHERE creator_id = $1 AND active LIMIT 1`, [u.id]);
-      if (!plan.rowCount) throw badRequest('Add a subscription plan in Studio before posting for subscribers.');
+    if (input.draft || input.scheduledAt) {
+      const at = input.scheduledAt ? scheduleTime(input.scheduledAt) : null;
+      // Scheduling says now, not at the time, if the account can't reach everyone yet.
+      if (at && (input.visibility === 'public' || input.communityId)) await requireVerified(db, ctx.config, u.id, 'post');
+      await assertDraftRoom(db, u.id);
+      const { id } = await tx(db, async (c) => {
+        const w = await writePost(c, u.id, input, { state: 'draft' });
+        if (at) await schedulePost(c, w.id, u.id, at);
+        return w;
+      });
+      track(db, u.id, at ? 'post_scheduled' : 'post_drafted', { visibility: input.visibility });
+      reply.code(201);
+      const [post] = await hydratePosts(db, [id], u.id);
+      return { post };
     }
-
-    let remixAuthor = null as string | null;
-    let taggedIds: string[] = [];
-    const postId = await tx(db, async (c) => {
-      // Reels: a duet or remix borrows the original's sound; otherwise a chosen sound, or the reel's own audio.
-      let soundId: string | null = null;
-      if (input.format === 'reel' && input.remixOf) {
-        const o = await assertRemixable(c, input.remixOf, u.id);
-        remixAuthor = o.authorId;
-        soundId = o.soundId;
-      } else if (input.format === 'reel' && input.soundId) {
-        await assertSoundUsable(c, input.soundId, u.id);
-        soundId = input.soundId;
-      }
-      if (input.communityId) {
-        const m = await c.query(`SELECT role FROM community_members WHERE community_id = $1 AND user_id = $2 AND status = 'active'`, [input.communityId, u.id]);
-        if (!m.rows[0] || m.rows[0].role === 'guest') throw forbidden('Join the community to post in it.');
-      }
-      if (input.circleId) {
-        const owns = await c.query(`SELECT 1 FROM circles WHERE id = $1 AND owner_id = $2`, [input.circleId, u.id]);
-        if (!owns.rowCount) throw notFound('Circle');
-      }
-      if (input.productId) {
-        const own = await c.query(`SELECT 1 FROM products WHERE id = $1 AND seller_id = $2 AND deleted_at IS NULL`, [input.productId, u.id]);
-        if (!own.rowCount) throw forbidden('You can only link products you sell.');
-      }
-      const { rows } = await c.query<{ id: string }>(
-        `INSERT INTO posts (author_id, kind, body, visibility, circle_id, community_id, event_id, product_id, link_url, topics, moderation_status, ai_provenance, rights, format,
-                            allow_remix, remix_of_post_id, remix_mode, sound_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id`,
-        [
-          u.id,
-          kind,
-          input.body,
-          input.communityId ? 'public' : input.visibility,
-          input.circleId ?? null,
-          input.communityId ?? null,
-          input.eventId ?? null,
-          input.productId ?? null,
-          input.linkUrl ?? null,
-          topicsFor(input.topics, input.body),
-          status,
-          input.aiAssisted ? { assisted: true, at: new Date().toISOString() } : {},
-          { owner: u.id, license: 'all_rights_reserved' },
-          input.format,
-          input.allowRemix,
-          input.format === 'reel' ? (input.remixOf ?? null) : null,
-          input.format === 'reel' && input.remixOf ? input.remixMode : null,
-          soundId,
-        ],
-      );
-      const id = rows[0]!.id;
-      const mediaIds: string[] = [];
-      for (const [i, m] of input.media.entries()) {
-        let mediaId = m.id;
-        if (mediaId) {
-          // Reuse the uploaded item (only your own), updating its alt text.
-          const own = await c.query(
-            `UPDATE media SET alt_text = coalesce($3, alt_text) WHERE id = $1 AND owner_id = $2 AND NOT private RETURNING id, moderation`,
-            [mediaId, u.id, m.altText ?? null],
-          );
-          if (!own.rowCount) throw notFound('One of the photos or videos');
-          if (own.rows[0].moderation === 'blocked') throw new AppError(422, 'media_blocked', MEDIA_BLOCKED_MESSAGE);
-        } else {
-          const media = await c.query<{ id: string }>(
-            `INSERT INTO media (owner_id, kind, url, alt_text, width, height) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-            [u.id, m.kind, m.url, m.altText ?? null, m.width ?? null, m.height ?? null],
-          );
-          mediaId = media.rows[0]!.id;
-        }
-        await c.query(`INSERT INTO post_media (post_id, media_id, position) VALUES ($1,$2,$3)`, [id, mediaId, i]);
-        mediaIds.push(mediaId);
-        if (input.format === 'reel') {
-          // Reels are short. Uploads still processing have no length yet; those are checked by the player, not refused here.
-          const len = (await c.query(`SELECT duration_ms FROM media WHERE id = $1`, [mediaId])).rows[0]?.duration_ms;
-          if (len && len > REEL_MAX_MS) {
-            // Plus members can post reels up to 10 minutes.
-            const plus = await isPlus(c, u.id);
-            if (!plus) throw new AppError(400, 'validation_failed', 'Reels can be up to 3 minutes, or 10 minutes with YAPILAPI Plus. Trim it in Studio first.');
-            if (len > PLUS_REEL_MAX_MS) throw new AppError(400, 'validation_failed', 'Reels can be up to 10 minutes. Trim it in Studio first.');
-          }
-        }
-      }
-      if (input.format === 'reel' && !soundId) {
-        const mediaId = (await c.query(`SELECT media_id FROM post_media WHERE post_id = $1 ORDER BY position LIMIT 1`, [id])).rows[0]?.media_id;
-        if (mediaId) await registerOwnSound(c, { postId: id, ownerId: u.id, mediaId, title: input.soundTitle });
-      }
-      if (input.poll)
-        for (const [i, label] of input.poll.options.entries())
-          await c.query(`INSERT INTO poll_options (post_id, label, position) VALUES ($1,$2,$3)`, [id, label, i]);
-      if (input.visibility === 'selected' && input.audience)
-        await c.query(`INSERT INTO post_audience (post_id, user_id) SELECT $1, unnest($2::uuid[]) ON CONFLICT DO NOTHING`, [id, input.audience]);
-      // People tagged in the photos: each must allow tags from you (their setting, blocks, minor protection).
-      const tags = input.media.flatMap((m, i) => (m.tags ?? []).map((t) => ({ ...t, mediaId: mediaIds[i]! })));
-      if (tags.length) {
-        await assertCanTag(
-          c,
-          u.id,
-          tags.map((t) => t.userId),
-        );
-        for (const t of tags)
-          await c.query(
-            `INSERT INTO photo_tags (post_id, media_id, user_id, tagged_by, x, y) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (post_id, media_id, user_id) DO NOTHING`,
-            [id, t.mediaId, t.userId, u.id, t.x, t.y],
-          );
-        taggedIds = [...new Set(tags.map((t) => t.userId))];
-      }
-      // Co-authors: invited now, each accepts or declines.
-      if (input.collaborators.length) {
-        await assertCanInvite(c, u.id, input.collaborators, { visibility: input.communityId ? 'public' : input.visibility, communityId: input.communityId });
-        await c.query(`INSERT INTO post_collaborators (post_id, user_id, invited_by) SELECT $1, unnest($2::uuid[]), $3`, [id, input.collaborators, u.id]);
-      }
-      // Flagged posts go to a moderator with the signals that flagged them.
-      if (analysis.risk !== 'normal' || spam.flags.length || heldForAccount)
-        await c.query(
-          `INSERT INTO moderation_cases (target_type, target_id, subject_user_id, source, risk, signals) VALUES ('post', $1, $2, 'automated', $3, $4)`,
-          [
-            id,
-            u.id,
-            analysis.risk !== 'normal' ? analysis.risk : 'review',
-            {
-              signals: [...analysis.signals, ...spam.flags.map((f) => f.kind), ...(heldForAccount ? ['risky_account'] : [])],
-              ...(spam.flags.length ? { spam: spam.flags } : {}),
-            },
-          ],
-        );
-      limitedNow = await flagContent(c, ctx.realtime, u.id, { type: 'post', id }, spam.flags);
-      // Posts from a limited account wait with the account's review; clearing it publishes them.
-      if (spam.restricted) await recordSignals(c, u.id, [{ kind: 'held_while_limited', weight: 0 }], { type: 'post', id });
-      return id;
+    const screening = await screenPost(db, ctx.config, u.id, {
+      body: input.body,
+      pollText: input.poll?.options.join(' ') ?? '',
+      visibility: input.visibility,
+      communityId: input.communityId,
     });
-    track(db, u.id, 'post_created', { kind, visibility: input.visibility, community: !!input.communityId });
-    await emitWebhook(db, u.id, 'post.created', { postId, kind, visibility: input.visibility });
-    if (status === 'normal') {
-      // Mentions in the text (posts and reel captions alike), photo tags and co-author invites.
-      await notifyMentions(db, ctx.realtime, { text: input.body, actorId: u.id, postId, skip: [...taggedIds, ...input.collaborators] });
-      await notifyPhotoTags(db, ctx.realtime, { postId, actorId: u.id, userIds: taggedIds });
-      await notifyCollabInvites(db, ctx.realtime, { postId, actorId: u.id, userIds: input.collaborators });
-    }
-    // Tell the original's creator about a duet or remix, when they can see it.
-    if (remixAuthor && status === 'normal') {
-      const seen = await db.query(`SELECT 1 ${POST_FROM} WHERE p.id = $2 AND ${VISIBLE}`, [remixAuthor, postId]);
-      if (seen.rowCount)
-        await notify(db, ctx.realtime, {
-          userId: remixAuthor,
-          category: 'creators',
-          type: input.remixMode === 'duet' ? 'reel_duet' : 'reel_remix',
-          actorId: u.id,
-          entityType: 'post',
-          entityId: postId,
-          data: { originalId: input.remixOf },
-        });
-      track(db, u.id, 'reel_remixed', { mode: input.remixMode });
-    }
+    let limitedNow = false;
+    const written = await tx(db, async (c) => {
+      const w = await writePost(c, u.id, input, { state: 'published', moderationStatus: screening.status });
+      limitedNow = await recordFlags(c, ctx.realtime, u.id, w.id, screening);
+      return w;
+    });
+    await announcePost(ctx, {
+      postId: written.id,
+      authorId: u.id,
+      kind: written.kind,
+      visibility: input.visibility,
+      communityId: input.communityId,
+      body: input.body,
+      status: screening.status,
+      taggedIds: written.taggedIds,
+      collaborators: input.collaborators,
+      remixAuthor: written.remixAuthor,
+      remixOf: input.remixOf,
+      remixMode: input.remixMode,
+    });
     reply.code(201);
-    const [post] = await hydratePosts(db, [postId], u.id);
-    return {
-      post,
-      moderation:
-        status === 'normal'
-          ? undefined
-          : spam.restricted || limitedNow
-            ? {
-                status,
-                message: 'Your account is limited while our team reviews some recent activity, so new posts are visible only to you for now.',
-              }
-            : { status, message: 'Your post is published to you only until it has been reviewed.' },
-    };
+    const [post] = await hydratePosts(db, [written.id], u.id);
+    return { post, moderation: moderationNotice(screening, limitedNow) };
   });
 
   app.get('/v1/posts/:id', async (req) => {
@@ -332,6 +188,125 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     const r = await db.query(`UPDATE posts SET deleted_at = now() WHERE id = $1 AND author_id = $2 AND deleted_at IS NULL`, [id, u.id]);
     if (!r.rowCount) throw notFound('That post');
     return { ok: true };
+  });
+
+  /**
+   * Change a post you shared: its text, who can see it, and how its photos and
+   * videos are described. Media, polls and links stay as they are. A new text
+   * keeps the old one in the post's history (anyone who can see the post can
+   * read it), shows "Edited", updates its hashtags and tells only the people it
+   * newly mentions. Reposts and quotes keep pointing at the same post.
+   */
+  app.patch('/v1/posts/:id', { preHandler: requireAuth, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const input = parse(editPostSchema, req.body);
+    const post = (
+      await db.query(
+        `SELECT p.author_id, p.visibility, p.community_id, p.link_url, p.moderation_status,
+                EXISTS (SELECT 1 FROM post_media pm WHERE pm.post_id = p.id) AS has_media,
+                EXISTS (SELECT 1 FROM poll_options o WHERE o.post_id = p.id) AS has_poll,
+                EXISTS (SELECT 1 FROM post_collaborators pc WHERE pc.post_id = p.id AND pc.status IN ('pending', 'accepted')) AS has_collabs,
+                (SELECT count(*)::int FROM post_edits e WHERE e.post_id = p.id AND e.edited_at > now() - interval '1 day') AS edits_today
+         ${POST_FROM} WHERE p.id = $2 AND ${VISIBLE}`,
+        [u.id, id],
+      )
+    ).rows[0];
+    if (!post) throw notFound('That post');
+    if (post.author_id !== u.id) throw forbidden('Only the person who shared this post can change it.');
+    if (post.moderation_status === 'removed') throw forbidden("This post was removed, so it can't be changed.");
+
+    const visibility: string = input.visibility ?? post.visibility;
+    if (visibility !== post.visibility) {
+      if (post.community_id) throw badRequest('Posts in a community are shared with its members.');
+      if (post.has_collabs && !['public', 'followers', 'friends'].includes(visibility))
+        throw badRequest('Posts with co-authors can be shared publicly, with followers or with friends.');
+      if (visibility === 'subscribers') {
+        const plan = await db.query(`SELECT 1 FROM creator_plans WHERE creator_id = $1 AND active LIMIT 1`, [u.id]);
+        if (!plan.rowCount) throw badRequest('Add a subscription plan in Studio before posting for subscribers.');
+      }
+      if (visibility === 'public') await requireVerified(db, ctx.config, u.id, 'post');
+    }
+
+    // A new text is checked like a new post: harmful text is refused, anything flagged waits for a moderator.
+    let screening: Screening | null = null;
+    if (input.body !== undefined) {
+      if (!input.body && !post.has_media && !post.link_url && !post.has_poll)
+        throw new AppError(400, 'validation_failed', 'A post needs text, media, a link or a poll.', { fields: { body: 'Add some text.' } });
+      const analysis = analyzeText(input.body);
+      if (analysis.risk === 'escalate')
+        throw new AppError(
+          422,
+          'content_blocked',
+          "This change can't be saved because it may put someone at risk. If you or someone else is in danger, contact local emergency services.",
+        );
+      const spam = await assessPost(db, ctx.config, u.id, input.body);
+      const status = spam.restricted ? 'restricted' : analysis.risk !== 'normal' ? statusForRisk(analysis.risk) : spam.flags.length ? 'review' : 'normal';
+      screening = { analysis, spam, heldForAccount: false, status };
+    }
+
+    let limitedNow = false;
+    const edit = await tx(db, async (c) => {
+      const cur = (await c.query(`SELECT body, topics, moderation_status FROM posts WHERE id = $1 FOR UPDATE`, [id])).rows[0];
+      const changed = input.body !== undefined && input.body !== cur.body;
+      if (changed && post.edits_today >= MAX_EDITS_PER_DAY)
+        throw new AppError(429, 'slow_down', `You can change a post's text up to ${MAX_EDITS_PER_DAY} times a day. Try again later.`);
+      // Topics chosen when posting stay; hashtags follow the text.
+      const topics = changed
+        ? topicsFor(
+            cur.topics.filter((t: string) => !extractHashtags(cur.body).includes(t)),
+            input.body,
+          )
+        : cur.topics;
+      // An edit can put a post on hold, never take it off hold.
+      const status = changed && screening ? worseStatus(cur.moderation_status, screening.status) : cur.moderation_status;
+      if (changed) await c.query(`INSERT INTO post_edits (post_id, body) VALUES ($1, $2)`, [id, cur.body]);
+      await c.query(
+        `UPDATE posts SET body = $2, visibility = $3, topics = $4, moderation_status = $5, edited_at = CASE WHEN $6 THEN now() ELSE edited_at END, updated_at = now()
+         WHERE id = $1`,
+        [id, changed ? input.body : cur.body, visibility, topics, status, changed],
+      );
+      // Descriptions of the post's own photos and videos (an empty one clears it).
+      for (const m of input.media ?? []) {
+        const r = await c.query(
+          `UPDATE media SET alt_text = nullif($3, '') WHERE id = $1 AND owner_id = $2 AND EXISTS (SELECT 1 FROM post_media pm WHERE pm.post_id = $4 AND pm.media_id = media.id)`,
+          [m.id, u.id, m.altText, id],
+        );
+        if (!r.rowCount) throw notFound('One of the photos or videos');
+      }
+      if (changed && screening) limitedNow = await recordFlags(c, ctx.realtime, u.id, id, screening);
+      return { changed, before: cur.body as string, status };
+    });
+    if (edit.changed && edit.status === 'normal') {
+      // Only people the post didn't mention before hear about it.
+      const earlier = await db.query<{ body: string }>(`SELECT body FROM post_edits WHERE post_id = $1`, [id]);
+      await notifyMentions(db, ctx.realtime, { text: input.body, actorId: u.id, postId: id, previously: [edit.before, ...earlier.rows.map((r) => r.body)] });
+    }
+    if (edit.changed) track(db, u.id, 'post_edited');
+    const [updated] = await hydratePosts(db, [id], u.id);
+    return { post: updated, moderation: edit.changed && screening ? moderationNotice({ ...screening, status: edit.status }, limitedNow) : undefined };
+  });
+
+  /** Every version of a post's text, newest first, for anyone who can see and open the post. */
+  app.get('/v1/posts/:id/history', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req) => {
+    const { id } = parse(idParam, req.params);
+    await assertUnlocked(id, req.user?.id ?? null);
+    const { rows } = await db.query(
+      `SELECT p.body, p.created_at,
+              (SELECT coalesce(json_agg(json_build_object('body', e.body, 'editedAt', e.edited_at) ORDER BY e.edited_at, e.id), '[]')
+               FROM post_edits e WHERE e.post_id = p.id) AS edits
+       FROM posts p WHERE p.id = $1`,
+      [id],
+    );
+    const r = rows[0];
+    const edits = r.edits as { body: string; editedAt: string }[];
+    // Each text was written when the one before it was replaced; the first one when the post was shared.
+    const writtenAt = (i: number) => (i === 0 ? (r.created_at as Date).toISOString() : new Date(edits[i - 1]!.editedAt).toISOString());
+    const items: PostVersion[] = [
+      ...edits.map((e, i) => ({ body: e.body, at: writtenAt(i), current: false })),
+      { body: r.body, at: writtenAt(edits.length), current: true },
+    ];
+    return { items: items.reverse() };
   });
 
   /**
@@ -371,7 +346,10 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     const u = me(req);
     const { postId } = parse(z.object({ postId: z.string().uuid().nullable() }), req.body);
     if (postId) {
-      const own = await db.query(`SELECT 1 FROM posts WHERE id = $1 AND author_id = $2 AND deleted_at IS NULL AND community_id IS NULL`, [postId, u.id]);
+      const own = await db.query(
+        `SELECT 1 FROM posts WHERE id = $1 AND author_id = $2 AND deleted_at IS NULL AND status = 'published' AND community_id IS NULL`,
+        [postId, u.id],
+      );
       if (!own.rowCount) throw notFound('That post');
     }
     await db.query(`UPDATE profiles SET pinned_post_id = $2 WHERE user_id = $1`, [u.id, postId]);
@@ -555,26 +533,26 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
        candidates AS (
          SELECT p.id FROM (SELECT $1::uuid AS id UNION SELECT id FROM followed UNION SELECT id FROM friends) a
          JOIN posts p ON p.author_id = a.id
-         WHERE p.deleted_at IS NULL AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '14 days'
+         WHERE p.deleted_at IS NULL AND p.status = 'published' AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '14 days'
          UNION
          SELECT pc.post_id FROM (SELECT $1::uuid AS id UNION SELECT id FROM followed UNION SELECT id FROM friends) a
          JOIN post_collaborators pc ON pc.user_id = a.id AND pc.status = 'accepted'
          JOIN posts p ON p.id = pc.post_id
-         WHERE p.deleted_at IS NULL AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '14 days'
+         WHERE p.deleted_at IS NULL AND p.status = 'published' AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '14 days'
          UNION
          SELECT p.id FROM community_members cm JOIN posts p ON p.community_id = cm.community_id
          WHERE cm.user_id = $1 AND cm.status = 'active'
-           AND p.deleted_at IS NULL AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '14 days'
+           AND p.deleted_at IS NULL AND p.status = 'published' AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '14 days'
          UNION
          (SELECT id FROM posts
-          WHERE deleted_at IS NULL AND created_at <= $2::timestamptz AND created_at > $2::timestamptz - interval '14 days'
+          WHERE deleted_at IS NULL AND status = 'published' AND created_at <= $2::timestamptz AND created_at > $2::timestamptz - interval '14 days'
           ORDER BY created_at DESC, id DESC LIMIT ${RECENT_CANDIDATES})
          UNION
          -- Posts about your interests, even when they're older than the newest window: someone who
          -- just picked interests in onboarding sees them in For you straight away (topics GIN index).
          (SELECT p.id FROM posts p CROSS JOIN me
           WHERE cardinality(me.interests) > 0 AND p.topics && me.interests
-            AND p.deleted_at IS NULL AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '14 days'
+            AND p.deleted_at IS NULL AND p.status = 'published' AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '14 days'
           ORDER BY p.created_at DESC, p.id DESC LIMIT ${INTEREST_CANDIDATES})
        ),
        scored AS (

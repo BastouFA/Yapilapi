@@ -1,11 +1,11 @@
 'use client';
 
-import { isVideoFile, MEDIA_ACCEPT, VIDEO_ACCEPT } from '@yapilapi/shared';
+import { extractHashtags, isVideoFile, MEDIA_ACCEPT, VIDEO_ACCEPT } from '@yapilapi/shared';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AutocompleteText } from '@/components/Autocomplete';
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { AIPanel, Alert, BottomSheet, Button, Checkbox, Segments, Select, TextField } from '@yapilapi/design-system';
+import { AIPanel, Alert, BottomSheet, Button, Checkbox, formatScheduled, Segments, Select, TextField } from '@yapilapi/design-system';
 import {
   MAX_COLLABORATORS,
   POST_VISIBILITIES,
@@ -33,6 +33,7 @@ import { SoundPicker, SoundPlayButton } from '@/components/SoundPicker';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { PhotoTagger, type DraftTag } from '@/components/PhotoTags';
 import { StoryStickerEditor, type DraftSticker } from '@/components/StoryStickerEditor';
+import { localInput, nextHour, SCHEDULE_HINT, scheduleBounds } from '@/lib/schedule';
 import { useSession } from '../../providers';
 
 type Uploaded = { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string; tags: DraftTag[] };
@@ -107,8 +108,53 @@ function Create() {
   const [error, setError] = useState<string | null>(null);
   const [needsVerify, setNeedsVerify] = useState(false);
   const [fields, setFields] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<'publish' | 'draft' | 'schedule' | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // A draft opened from Drafts: saving, scheduling or publishing works on it instead of starting a new post.
+  const draftId = params.get('draft');
+  const [draftLoaded, setDraftLoaded] = useState(!draftId);
+  // People a draft was for, when it was for chosen people (kept as they are; there's no picker for them here).
+  const [audience, setAudience] = useState<string[]>([]);
+  const [scheduling, setScheduling] = useState(false);
+  const [when, setWhen] = useState(nextHour);
+
+  useEffect(() => {
+    if (!draftId) return;
+    api.drafts.get(draftId).then(
+      ({ post, circleId: circle, audience: people }) => {
+        setKind(post.format === 'reel' ? 'reel' : 'post');
+        setBody(post.body);
+        setVisibility(post.visibility);
+        setCommunityId(post.community?.id ?? '');
+        setCircleId(circle ?? '');
+        setAudience(people);
+        setMedia(
+          post.media.map((m) => ({
+            id: m.id,
+            kind: m.kind,
+            url: m.url,
+            altText: m.altText ?? '',
+            tags: (m.tags ?? []).map((tag) => ({ user: tag.user, x: tag.x, y: tag.y })),
+          })),
+        );
+        setCollaborators(post.pendingCollaborators ?? []);
+        setPoll(post.poll ? post.poll.options.map((o) => o.label) : null);
+        // Topics that aren't #tags in the text were chosen by hand.
+        const inText = extractHashtags(post.body, 50);
+        setTopics(post.topics.filter((tp) => !inText.includes(tp)).join(', '));
+        if (post.allowRemix !== undefined) setAllowRemix(post.allowRemix);
+        if (post.sound?.original) setSoundTitle(post.sound.title);
+        setAiUsed(post.aiAssisted);
+        if (post.scheduledAt) setWhen(localInput(new Date(post.scheduledAt)));
+        setDraftLoaded(true);
+      },
+      (e) => {
+        toast(errorMessage(e));
+        router.replace('/drafts');
+      },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftId]);
 
   useEffect(() => {
     if (remixOf)
@@ -234,9 +280,78 @@ function Create() {
     }
   }
 
+  const topicList = () =>
+    topics
+      .split(/[,\s#]+/)
+      .filter(Boolean)
+      .slice(0, 5);
+
+  /** What the post says and shows, for publishing it now, saving it as a draft or scheduling it. */
+  function postContent(): Record<string, unknown> {
+    if (kind === 'reel') {
+      const v = media[0]!;
+      return {
+        format: 'reel',
+        body,
+        visibility,
+        circleId: visibility === 'circle' ? circleId || undefined : undefined,
+        allowRemix,
+        ...(remixOf && original ? { remixOf, remixMode } : sound ? { soundId: sound.id } : soundTitle.trim() ? { soundTitle: soundTitle.trim() } : {}),
+        media: [{ id: v.id, url: new URL(v.url, location.origin).toString(), kind: 'video', altText: v.altText || undefined }],
+        collaborators: collaborators.map((u) => u.id),
+        topics: topicList(),
+        aiAssisted: aiUsed,
+      };
+    }
+    return {
+      body,
+      visibility,
+      communityId: communityId || undefined,
+      circleId: visibility === 'circle' ? circleId || undefined : undefined,
+      audience: visibility === 'selected' && audience.length ? audience : undefined,
+      media: media.map((m) => ({
+        id: m.id,
+        url: new URL(m.url, location.origin).toString(),
+        kind: m.kind,
+        altText: m.altText || undefined,
+        tags: m.kind === 'image' && m.tags.length ? m.tags.map((t) => ({ userId: t.user.id, x: t.x, y: t.y })) : undefined,
+      })),
+      collaborators: collaborators.map((u) => u.id),
+      poll: poll ? { options: poll.filter((o) => o.trim()) } : undefined,
+      topics: topicList(),
+      aiAssisted: aiUsed,
+    };
+  }
+
+  /** Keep the post for later: as a draft, or to publish at the chosen time. */
+  async function keep(mode: 'draft' | 'schedule') {
+    setBusy(mode);
+    setError(null);
+    setNeedsVerify(false);
+    setFields({});
+    try {
+      const at = mode === 'schedule' ? new Date(when) : null;
+      if (at && Number.isNaN(at.getTime())) {
+        setFields({ scheduledAt: 'Choose a date and time.' });
+        return;
+      }
+      const extra = at ? { scheduledAt: at.toISOString() } : { draft: true };
+      if (draftId) await api.drafts.save(draftId, { ...postContent(), ...(at ? { scheduledAt: at.toISOString() } : {}) });
+      else await api.posts.create({ ...postContent(), ...extra });
+      toast(at ? `Scheduled for ${formatScheduled(at.toISOString())}` : 'Saved to your drafts');
+      router.push('/drafts');
+    } catch (err) {
+      if (isVerificationError(err)) setNeedsVerify(true);
+      else setError(errorMessage(err));
+      setFields(fieldErrors(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function publish(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
+    setBusy('publish');
     setError(null);
     setNeedsVerify(false);
     setFields({});
@@ -254,47 +369,13 @@ function Create() {
         router.push('/home');
         return;
       }
+      // A draft is saved with what's here now, then published through the same checks as a new post.
+      const r = draftId ? (await api.drafts.save(draftId, postContent()), await api.drafts.publish(draftId)) : await api.posts.create(postContent());
       if (kind === 'reel') {
-        const v = media[0]!;
-        const r = await api.posts.create({
-          format: 'reel',
-          body,
-          visibility,
-          circleId: visibility === 'circle' ? circleId || undefined : undefined,
-          allowRemix,
-          ...(remixOf && original ? { remixOf, remixMode } : sound ? { soundId: sound.id } : soundTitle.trim() ? { soundTitle: soundTitle.trim() } : {}),
-          media: [{ id: v.id, url: new URL(v.url, location.origin).toString(), kind: 'video', altText: v.altText || undefined }],
-          collaborators: collaborators.map((u) => u.id),
-          topics: topics
-            .split(/[,\s#]+/)
-            .filter(Boolean)
-            .slice(0, 5),
-          aiAssisted: aiUsed,
-        });
         toast(r.moderation ? r.moderation.message : 'Reel published');
         router.push(`/reels?start=${r.post.id}`);
         return;
       }
-      const r = await api.posts.create({
-        body,
-        visibility,
-        communityId: communityId || undefined,
-        circleId: visibility === 'circle' ? circleId || undefined : undefined,
-        media: media.map((m) => ({
-          id: m.id,
-          url: new URL(m.url, location.origin).toString(),
-          kind: m.kind,
-          altText: m.altText || undefined,
-          tags: m.kind === 'image' && m.tags.length ? m.tags.map((t) => ({ userId: t.user.id, x: t.x, y: t.y })) : undefined,
-        })),
-        collaborators: collaborators.map((u) => u.id),
-        poll: poll ? { options: poll.filter((o) => o.trim()) } : undefined,
-        topics: topics
-          .split(/[,\s#]+/)
-          .filter(Boolean)
-          .slice(0, 5),
-        aiAssisted: aiUsed,
-      });
       toast(r.moderation ? r.moderation.message : t('create.published'));
       router.push(communityId ? `/c/${communities.find((c) => c.id === communityId)?.slug ?? ''}` : '/home');
     } catch (err) {
@@ -302,15 +383,24 @@ function Create() {
       else setError(errorMessage(err));
       setFields(fieldErrors(err));
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
+
+  const empty =
+    kind === 'reel'
+      ? media.length !== 1 || media[0]!.kind !== 'video' || (!!remixOf && !original)
+      : !body.trim() && !media.length && !poll && !(kind === 'story' && stickers.length);
+  const blocked = uploading || !draftLoaded || empty;
 
   return (
     <>
       <form className="yp-shell__inner" onSubmit={publish}>
         <div className="yp-topbar">
-          <h1>{t('create.title')}</h1>
+          <h1>{draftId ? 'Continue your draft' : t('create.title')}</h1>
+          <Link href="/drafts" className="yp-btn yp-btn--ghost yp-btn--sm">
+            Drafts
+          </Link>
         </div>
         {/* Double-tap Post, Reel or Story to open the camera in that mode. */}
         <div
@@ -679,18 +769,7 @@ function Create() {
           {aiUsed ? <Checkbox label="Label this post as made with AI assistance" checked readOnly disabled /> : null}
         </div>
 
-        <Button
-          type="submit"
-          size="lg"
-          block
-          loading={busy}
-          disabled={
-            uploading ||
-            (kind === 'reel'
-              ? media.length !== 1 || media[0]!.kind !== 'video' || (!!remixOf && !original)
-              : !body.trim() && !media.length && !poll && !(kind === 'story' && stickers.length))
-          }
-        >
+        <Button type="submit" size="lg" block loading={busy === 'publish'} disabled={blocked || !!busy}>
           {kind === 'story'
             ? visibility === 'close_friends'
               ? 'Share with close friends'
@@ -703,6 +782,34 @@ function Create() {
                 : 'Publish reel'
               : t('create.publish')}
         </Button>
+        {kind !== 'story' ? (
+          <div className="stack-sm">
+            <div className="row">
+              <Button variant="secondary" loading={busy === 'draft'} disabled={blocked || !!busy} onClick={() => keep('draft')}>
+                Save draft
+              </Button>
+              <Button variant="ghost" icon="calendar" aria-expanded={scheduling} onClick={() => setScheduling((v) => !v)}>
+                Schedule
+              </Button>
+            </div>
+            {scheduling ? (
+              <div className="stack-sm">
+                <TextField
+                  label="Publish on"
+                  type="datetime-local"
+                  value={when}
+                  {...scheduleBounds()}
+                  hint={SCHEDULE_HINT}
+                  error={fields.scheduledAt}
+                  onChange={(e) => setWhen(e.currentTarget.value)}
+                />
+                <Button loading={busy === 'schedule'} disabled={blocked || !!busy || !when} onClick={() => keep('schedule')}>
+                  Schedule post
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </form>
       {queue[0] ? (
         queue[0].type.startsWith('video/') ? (

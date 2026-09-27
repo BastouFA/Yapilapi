@@ -206,7 +206,7 @@ export async function notifyCollabInvites(db: Q, realtime: RealtimeHub, m: { pos
 export async function notifyReleasedPosts(db: Q, realtime: RealtimeHub, postIds: string[]): Promise<void> {
   if (!postIds.length) return;
   const { rows } = await db.query<{ id: string; author_id: string }>(
-    `SELECT id, author_id FROM posts WHERE id = ANY($1::uuid[]) AND moderation_status = 'normal' AND deleted_at IS NULL`,
+    `SELECT id, author_id FROM posts WHERE id = ANY($1::uuid[]) AND moderation_status = 'normal' AND deleted_at IS NULL AND status = 'published'`,
     [[...new Set(postIds)]],
   );
   const notTold = (type: string, col: string) =>

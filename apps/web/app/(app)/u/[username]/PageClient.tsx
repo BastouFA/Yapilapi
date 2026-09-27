@@ -128,6 +128,9 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
               <Link href="/studio" className="yp-btn yp-btn--ghost yp-btn--sm">
                 Studio
               </Link>
+              <Link href="/drafts" className="yp-btn yp-btn--ghost yp-btn--sm">
+                Drafts
+              </Link>
               {flags.MEMORY ? (
                 <Link href="/memories" className="yp-btn yp-btn--ghost yp-btn--sm">
                   Memories

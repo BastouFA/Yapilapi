@@ -55,6 +55,7 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
   media_restored: () => 'We checked your photo or video and it’s back up. Sorry for the trouble.',
   yap_received: () => 'sent you a Yap',
   view_once_screenshot: () => 'took a screenshot of your view-once photo or video',
+  scheduled_post_failed: (n) => `A scheduled post couldn't be published, so it's back in your drafts. ${String(n.data.reason ?? '')}`.trim(),
   account_limited: () =>
     'Some of your recent posts or messages were flagged, so your account is limited while our team takes a look. You can still post for yourself and message friends.',
   chapter_invite: (n) => `invited you to add your stories to the chapter "${String(n.data.title ?? '')}"`,
@@ -74,6 +75,7 @@ function hrefFor(n: NotificationItem): string | undefined {
   if (n.type === 'reel_duet' || n.type === 'reel_remix') return `/reels?start=${n.entityId}`;
   if (n.entityType === 'chapter') return `/chapters/${n.entityId}`;
   if (n.entityType === 'board') return `/boards/${n.entityId}`;
+  if (n.entityType === 'draft') return `/create?draft=${n.entityId}`;
   if (n.entityType === 'post') return `/p/${n.entityId}`;
   if (n.entityType === 'moment') return `/s/${n.entityId}`;
   if (n.entityType === 'live') return `/live/${n.entityId}`;

@@ -358,8 +358,8 @@ export default async function moneyModule(app: FastifyInstance, ctx: AppContext)
     const u = me(req);
     const { id } = parse(idParam, req.params);
     const input = parse(boostInput, req.body);
-    const post = (await db.query(`SELECT author_id, body, visibility, moderation_status, deleted_at FROM posts WHERE id = $1`, [id])).rows[0];
-    if (!post || post.deleted_at) throw notFound('Post');
+    const post = (await db.query(`SELECT author_id, body, visibility, moderation_status, deleted_at, status FROM posts WHERE id = $1`, [id])).rows[0];
+    if (!post || post.deleted_at || post.status !== 'published') throw notFound('Post');
     if (post.author_id !== u.id) throw forbidden('You can only boost your own posts.');
     if (post.visibility !== 'public') throw badRequest('Only public posts can be boosted.');
     if (post.moderation_status !== 'normal') throw new AppError(422, 'content_blocked', "This post can't be boosted.");

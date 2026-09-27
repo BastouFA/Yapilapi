@@ -24,6 +24,11 @@ const TEXT: Record<string, MessageKey> = {
   photo_tag: 'm.notif.photoTag',
 };
 
+/** Kinds about your own account or content, with no one else in them. */
+const OWN_TEXT: Record<string, MessageKey> = {
+  scheduled_post_failed: 'm.notif.scheduledFailed',
+};
+
 type Answer = 'accepted' | 'declined';
 
 /** Notifications, newest first. A co-author or board invite can be accepted or declined right here. */
@@ -107,8 +112,10 @@ export default function Notifications() {
         const name = n.actor?.displayName ?? '';
         const key = TEXT[n.type];
         const board = typeof n.data.name === 'string' ? n.data.name : '';
-        const text =
-          n.type === 'board_invite' && n.actor
+        const own = OWN_TEXT[n.type];
+        const text = own
+          ? t(own)
+          : n.type === 'board_invite' && n.actor
             ? t('m.notif.boardInvite', { name, board })
             : n.type === 'board_item_added' && n.actor
               ? tp('m.notif.boardItemAdded', Math.max(1, Number(n.data.count) || 1), { name, board })
@@ -122,6 +129,8 @@ export default function Notifications() {
             ? `/p/${n.entityId}`
             : n.entityType === 'board' && n.entityId
               ? `/board/${n.entityId}`
+              : n.entityType === 'draft'
+                ? '/drafts'
               : n.actor
                 ? `/u/${n.actor.username}`
                 : null;

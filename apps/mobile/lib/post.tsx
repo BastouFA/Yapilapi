@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Alert, Image, Platform, Pressable, Share, Text, View, type StyleProp, type TextStyle } from 'react-native';
 import { splitRichText } from '../../../packages/shared/src/hashtags';
 import type { Conversation, PhotoTag, Post, PublicUser } from '../../../packages/shared/src/types';
@@ -11,6 +11,7 @@ import { radius, space } from './theme';
 import { Avatar, Button, Card, Icon, Notice, PlusBadge, useColors, userText } from './ui';
 import { LockedPanel } from './money';
 import { SensitiveCover } from './safety';
+import { EditPostSheet, HistorySheet } from './post-edit';
 
 export const conversationTitle = (c: Conversation, meId: string | undefined, t: Translate) =>
   c.title ??
@@ -158,10 +159,18 @@ function TagBubbles({
   );
 }
 
-/** A post as a rounded card. Tapping it opens the post; like and save update in place. */
-export function PostCard({ post, open = true }: { post: Post; open?: boolean }) {
+/**
+ * A post as a rounded card. Tapping it opens the post; like and save update in
+ * place. Your own posts can be edited from More; "Edited" opens the history.
+ */
+export function PostCard({ post: given, open = true }: { post: Post; open?: boolean }) {
   const c = useColors();
-  const { t, tp, number, timeAgo } = useT();
+  const { t, tp, number, timeAgo, dateTime } = useT();
+  // The post as shown: the one given, or the version you just saved.
+  const [post, setPost] = useState(given);
+  useEffect(() => setPost(given), [given]);
+  const [editing, setEditing] = useState(false);
+  const [history, setHistory] = useState(false);
   const [liked, setLiked] = useState(post.viewer.liked);
   const [likes, setLikes] = useState(post.counts.likes);
   const [saved, setSaved] = useState(post.viewer.saved);
@@ -232,9 +241,13 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
     }
   }
 
-  /** More: save to a board, leave as co-author, remove your photo tag. */
+  // Drafts and scheduled posts are changed from Drafts, not here.
+  const canEdit = isAuthor && !post.status;
+
+  /** More: edit your post, save to a board, leave as co-author, remove your photo tag. */
   function more() {
     const options: { text: string; style?: 'destructive' | 'cancel'; onPress?: () => void }[] = [];
+    if (canEdit) options.push({ text: t('m.post.edit'), onPress: () => setEditing(true) });
     if (me) options.push({ text: t('m.boards.saveTo'), onPress: saveTo });
     if (collab === 'accepted') options.push({ text: t('m.collab.leave'), style: 'destructive', onPress: () => void leave() });
     if (myTag) options.push({ text: t('m.tags.removeMine'), onPress: () => void removeTag(myTag) });
@@ -294,6 +307,24 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
           </View>
         </Pressable>
       )}
+
+      {post.status ? (
+        <Text style={{ color: c.ink, fontSize: 13, fontWeight: '700' }}>
+          {post.status === 'scheduled' && post.scheduledAt ? t('m.drafts.scheduledFor', { time: dateTime(post.scheduledAt) }) : t('m.drafts.draft')}
+        </Text>
+      ) : null}
+      {post.editedAt ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('m.post.edited')}
+          accessibilityHint={t('m.post.editedHint')}
+          hitSlop={8}
+          onPress={() => setHistory(true)}
+          style={{ alignSelf: 'flex-start' }}
+        >
+          <Text style={{ color: c.inkMuted, fontSize: 12, fontWeight: '600', textDecorationLine: 'underline' }}>{t('m.post.edited')}</Text>
+        </Pressable>
+      ) : null}
 
       {pending.length ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -419,112 +450,126 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
         </View>
       ) : null}
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[4] }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={liked ? t('post.unlike') : t('post.like')}
-          accessibilityState={{ selected: liked }}
-          hitSlop={8}
-          onPress={async () => {
-            const next = !liked;
-            setLiked(next);
-            setLikes((n) => n + (next ? 1 : -1));
-            try {
-              const api = await client();
-              const r = next ? await api.posts.like(post.id) : await api.posts.unlike(post.id);
-              setLiked(r.liked);
-              setLikes(r.likes);
-            } catch {
-              setLiked(!next);
-              setLikes((n) => n + (next ? -1 : 1));
-            }
-          }}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
-        >
-          <Icon name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? c.yapi : c.inkMuted} />
-          <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>{number(likes)}</Text>
-        </Pressable>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} accessible accessibilityLabel={tp('m.post.commentCount', post.counts.comments)}>
-          <Icon name="chatbubble-outline" size={19} color={c.inkMuted} />
-          <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>{number(post.counts.comments)}</Text>
-        </View>
-        {canRepost ? (
+      {/* Drafts and scheduled posts can't be liked, shared or saved yet. */}
+      {post.status ? null : (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[4] }}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={reposted ? t('m.reels.undoRepost') : t('m.reels.repost')}
-            accessibilityState={{ selected: reposted }}
+            accessibilityLabel={liked ? t('post.unlike') : t('post.like')}
+            accessibilityState={{ selected: liked }}
             hitSlop={8}
             onPress={async () => {
-              const next = !reposted;
-              setReposted(next);
-              setReposts((n) => Math.max(0, n + (next ? 1 : -1)));
+              const next = !liked;
+              setLiked(next);
+              setLikes((n) => n + (next ? 1 : -1));
               try {
                 const api = await client();
-                const r = next ? await api.posts.repost(post.id) : await api.posts.unrepost(post.id);
-                setReposted(r.reposted);
-                setReposts(r.reposts);
+                const r = next ? await api.posts.like(post.id) : await api.posts.unlike(post.id);
+                setLiked(r.liked);
+                setLikes(r.likes);
               } catch {
-                setReposted(!next);
-                setReposts((n) => Math.max(0, n + (next ? -1 : 1)));
+                setLiked(!next);
+                setLikes((n) => n + (next ? -1 : 1));
               }
             }}
             style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
           >
-            <Icon name="repeat" size={20} color={reposted ? c.success : c.inkMuted} />
-            <Text style={{ color: reposted ? c.success : c.inkMuted, fontSize: 13, fontWeight: '600' }}>{number(reposts)}</Text>
+            <Icon name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? c.yapi : c.inkMuted} />
+            <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>{number(likes)}</Text>
           </Pressable>
-        ) : null}
-        {post.visibility !== 'private' ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} accessible accessibilityLabel={tp('m.post.commentCount', post.counts.comments)}>
+            <Icon name="chatbubble-outline" size={19} color={c.inkMuted} />
+            <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>{number(post.counts.comments)}</Text>
+          </View>
+          {canRepost ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={reposted ? t('m.reels.undoRepost') : t('m.reels.repost')}
+              accessibilityState={{ selected: reposted }}
+              hitSlop={8}
+              onPress={async () => {
+                const next = !reposted;
+                setReposted(next);
+                setReposts((n) => Math.max(0, n + (next ? 1 : -1)));
+                try {
+                  const api = await client();
+                  const r = next ? await api.posts.repost(post.id) : await api.posts.unrepost(post.id);
+                  setReposted(r.reposted);
+                  setReposts(r.reposts);
+                } catch {
+                  setReposted(!next);
+                  setReposts((n) => Math.max(0, n + (next ? -1 : 1)));
+                }
+              }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+            >
+              <Icon name="repeat" size={20} color={reposted ? c.success : c.inkMuted} />
+              <Text style={{ color: reposted ? c.success : c.inkMuted, fontSize: 13, fontWeight: '600' }}>{number(reposts)}</Text>
+            </Pressable>
+          ) : null}
+          {post.visibility !== 'private' ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('m.common.share')}
+              hitSlop={8}
+              onPress={async () => {
+                const url = `${webUrl}${post.format === 'reel' ? `/reels?start=${post.id}` : `/p/${post.id}`}`;
+                const title = t('m.reels.shareTitle', { name: post.author.displayName });
+                try {
+                  // iOS shares the link as a link; Android only takes a message.
+                  await Share.share(Platform.OS === 'ios' ? { url, message: title } : { message: `${title}\n${url}`, title });
+                } catch {
+                  // The person closed the share sheet.
+                }
+              }}
+            >
+              <Icon name="paper-plane-outline" size={19} color={c.inkMuted} />
+            </Pressable>
+          ) : null}
+          <View style={{ flex: 1 }} />
+          {collab === 'accepted' || myTag || canEdit ? (
+            <Pressable accessibilityRole="button" accessibilityLabel={t('m.post.more')} hitSlop={8} onPress={more}>
+              <Icon name="ellipsis-horizontal" size={20} color={c.inkMuted} />
+            </Pressable>
+          ) : null}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={t('m.common.share')}
+            accessibilityLabel={saved ? t('m.post.unsave') : t('post.save')}
+            accessibilityState={{ selected: saved }}
+            // Press and hold for "Save to…"; screen readers get it as a named action.
+            accessibilityActions={me ? [{ name: 'saveTo', label: t('m.boards.saveTo') }] : undefined}
+            onAccessibilityAction={(e) => {
+              if (e.nativeEvent.actionName === 'saveTo') saveTo();
+            }}
             hitSlop={8}
+            onLongPress={me ? saveTo : undefined}
             onPress={async () => {
-              const url = `${webUrl}${post.format === 'reel' ? `/reels?start=${post.id}` : `/p/${post.id}`}`;
-              const title = t('m.reels.shareTitle', { name: post.author.displayName });
+              const next = !saved;
+              setSaved(next);
               try {
-                // iOS shares the link as a link; Android only takes a message.
-                await Share.share(Platform.OS === 'ios' ? { url, message: title } : { message: `${title}\n${url}`, title });
+                const api = await client();
+                await (next ? api.posts.save(post.id) : api.posts.unsave(post.id));
+                if (next) boards.confirmSaved(post, onSaveChange);
               } catch {
-                // The person closed the share sheet.
+                setSaved(!next);
               }
             }}
           >
-            <Icon name="paper-plane-outline" size={19} color={c.inkMuted} />
+            <Icon name={saved ? 'bookmark' : 'bookmark-outline'} size={19} color={saved ? c.yapi : c.inkMuted} />
           </Pressable>
-        ) : null}
-        <View style={{ flex: 1 }} />
-        {collab === 'accepted' || myTag ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={t('m.post.more')} hitSlop={8} onPress={more}>
-            <Icon name="ellipsis-horizontal" size={20} color={c.inkMuted} />
-          </Pressable>
-        ) : null}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={saved ? t('m.post.unsave') : t('post.save')}
-          accessibilityState={{ selected: saved }}
-          // Press and hold for "Save to…"; screen readers get it as a named action.
-          accessibilityActions={me ? [{ name: 'saveTo', label: t('m.boards.saveTo') }] : undefined}
-          onAccessibilityAction={(e) => {
-            if (e.nativeEvent.actionName === 'saveTo') saveTo();
+        </View>
+      )}
+      {editing ? (
+        <EditPostSheet
+          post={post}
+          onClose={() => setEditing(false)}
+          onSaved={(p) => {
+            setPost(p);
+            if (p.media.find((m) => m.kind === 'image')) setTags(p.media.find((m) => m.kind === 'image')!.tags ?? []);
           }}
-          hitSlop={8}
-          onLongPress={me ? saveTo : undefined}
-          onPress={async () => {
-            const next = !saved;
-            setSaved(next);
-            try {
-              const api = await client();
-              await (next ? api.posts.save(post.id) : api.posts.unsave(post.id));
-              if (next) boards.confirmSaved(post, onSaveChange);
-            } catch {
-              setSaved(!next);
-            }
-          }}
-        >
-          <Icon name={saved ? 'bookmark' : 'bookmark-outline'} size={19} color={saved ? c.yapi : c.inkMuted} />
-        </Pressable>
-      </View>
+        />
+      ) : null}
+      {history ? <HistorySheet postId={post.id} onClose={() => setHistory(false)} /> : null}
     </Card>
   );
 }

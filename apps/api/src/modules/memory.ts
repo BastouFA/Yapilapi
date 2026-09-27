@@ -200,7 +200,7 @@ export default async function memoryModule(app: FastifyInstance, ctx: AppContext
       [u.id],
     );
     const onThisDay = await db.query(
-      `SELECT id FROM posts WHERE author_id = $1 AND deleted_at IS NULL AND extract(month FROM created_at) = extract(month FROM now())
+      `SELECT id FROM posts WHERE author_id = $1 AND deleted_at IS NULL AND status = 'published' AND extract(month FROM created_at) = extract(month FROM now())
          AND extract(day FROM created_at) = extract(day FROM now()) AND created_at < date_trunc('year', now()) ORDER BY created_at DESC LIMIT 10`,
       [u.id],
     );

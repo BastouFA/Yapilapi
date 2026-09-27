@@ -13,7 +13,7 @@ import { me, requireAuth } from '../plugins/auth.ts';
 const VISIBLE = `${postVisibleSql('$1')} AND ${postUnlockedSql('$1')}`;
 const FROM = `FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id`;
 /** Public, unflagged posts only: what trending counts. */
-const PUBLIC_POST = `p.visibility = 'public' AND p.deleted_at IS NULL AND p.moderation_status = 'normal' AND au.status = 'active' AND NOT ap.is_private`;
+const PUBLIC_POST = `p.visibility = 'public' AND p.deleted_at IS NULL AND p.status = 'published' AND p.moderation_status = 'normal' AND au.status = 'active' AND NOT ap.is_private`;
 
 const tagParam = z.object({
   tag: z

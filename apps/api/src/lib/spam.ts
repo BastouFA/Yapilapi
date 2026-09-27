@@ -150,7 +150,7 @@ export async function assertPostPace(db: Q, config: Config, userId: string): Pro
   if (!config.SPAM_CHECKS) return;
   const { rows } = await db.query(
     `SELECT u.created_at > now() - make_interval(hours => $2) AS new_account,
-            (SELECT count(*) FROM posts p WHERE p.author_id = u.id AND p.created_at > now() - interval '1 hour')::int AS n
+            (SELECT count(*) FROM posts p WHERE p.author_id = u.id AND p.status = 'published' AND p.created_at > now() - interval '1 hour')::int AS n
      FROM users u WHERE u.id = $1`,
     [userId, SPAM_RULES.newAccountHours],
   );
@@ -196,7 +196,7 @@ export async function assessPost(db: Q, config: Config, userId: string, text: st
   if (text.length >= SPAM_RULES.minDuplicateLength) {
     const { rows } = await db.query(
       `SELECT count(*) FILTER (WHERE author_id = $1)::int AS mine, count(*)::int AS everyone
-       FROM posts WHERE ${FINGERPRINT('body')} = ${FINGERPRINT('$2::text')} AND body <> '' AND deleted_at IS NULL AND created_at > now() - interval '1 hour'`,
+       FROM posts WHERE ${FINGERPRINT('body')} = ${FINGERPRINT('$2::text')} AND body <> '' AND deleted_at IS NULL AND status = 'published' AND created_at > now() - interval '1 hour'`,
       [userId, text],
     );
     const mine = (rows[0]?.mine ?? 0) + 1;

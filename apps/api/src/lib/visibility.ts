@@ -32,11 +32,13 @@ export function collabNotBlockedSql(v: string): string {
  * from anyone whose age isn't known (no birth date, or not signed in). Posts withheld by a regional rule are hidden
  * from viewers in that country: the one they chose, the one the CDN reports for their account, and the one the CDN
  * reports for this request (which also covers people who aren't signed in). Posts with a co-author the viewer
- * blocked (or who blocked them) are hidden too.
+ * blocked (or who blocked them) are hidden too. Drafts and scheduled posts are hidden from everyone, their author
+ * included: they're listed only by the author's own drafts endpoints, never where published posts are.
  */
 export function postVisibleSql(v: string): string {
   return `(
     p.deleted_at IS NULL
+    AND p.status = 'published'
     AND au.status = 'active'
     AND (p.moderation_status IN ('normal', 'review') OR p.author_id = ${v})
     AND (p.moderation_status <> 'review' OR p.author_id = ${v}

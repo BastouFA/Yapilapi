@@ -26,7 +26,7 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
   async function subjectOf(type: string, id: string): Promise<string | null> {
     const q: Record<string, string> = {
       user: `SELECT id AS uid FROM users WHERE id = $1`,
-      post: `SELECT author_id AS uid FROM posts WHERE id = $1`,
+      post: `SELECT author_id AS uid FROM posts WHERE id = $1 AND status = 'published'`,
       comment: `SELECT author_id AS uid FROM comments WHERE id = $1`,
       message: `SELECT sender_id AS uid FROM messages WHERE id = $1`,
       community: `SELECT owner_id AS uid FROM communities WHERE id = $1`,

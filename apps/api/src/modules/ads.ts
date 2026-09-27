@@ -91,8 +91,8 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
     const u = me(req);
     const input = parse(campaignInput, req.body);
     if (input.startsAt && input.endsAt && input.endsAt <= input.startsAt) throw badRequest('The end must be after the start.');
-    const post = (await db.query(`SELECT author_id, visibility, moderation_status, deleted_at FROM posts WHERE id = $1`, [input.postId])).rows[0];
-    if (!post || post.deleted_at) throw notFound('Post');
+    const post = (await db.query(`SELECT author_id, visibility, moderation_status, deleted_at, status FROM posts WHERE id = $1`, [input.postId])).rows[0];
+    if (!post || post.deleted_at || post.status !== 'published') throw notFound('Post');
     if (post.author_id !== u.id) throw forbidden('You can only promote your own posts.');
     if (post.visibility !== 'public') throw badRequest('Only public posts can be promoted.');
     if (post.moderation_status !== 'normal') throw new AppError(422, 'content_blocked', "This post can't be promoted.");
