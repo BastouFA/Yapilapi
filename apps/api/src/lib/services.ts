@@ -56,11 +56,16 @@ export function track(db: Q, userId: string | null, name: string, properties: ob
   );
 }
 
-/** Create a notification unless the recipient disabled the category or paused notifications. */
+/**
+ * Create a notification unless the recipient disabled the category or paused notifications.
+ * With `group`, it joins an unread notification of the same type and group from the last day
+ * instead ("Ada and 3 others liked your comment"): the newest person becomes its actor,
+ * `data.count` says how many people, and it isn't pushed again. The same person counts once.
+ */
 export async function notify(
   db: Q,
   realtime: RealtimeHub,
-  n: { userId: string; category: string; type: string; actorId?: string; entityType?: string; entityId?: string; data?: object },
+  n: { userId: string; category: string; type: string; actorId?: string; entityType?: string; entityId?: string; data?: object; group?: string },
 ): Promise<void> {
   if (n.actorId && n.actorId === n.userId) return;
   const prefs = await db.query<{ notification_categories: Record<string, boolean>; notifications_paused_until: Date | null; focus_mode: boolean }>(
@@ -77,10 +82,32 @@ export async function notify(
     );
     if (blocked.rowCount) return;
   }
+  if (n.group && n.actorId) {
+    const open = await db.query<{ id: string; actors: string[] }>(
+      `SELECT id, coalesce(data->'actors', '[]'::jsonb) AS actors FROM notifications
+       WHERE user_id = $1 AND type = $2 AND data->>'group' = $3 AND read_at IS NULL AND created_at > now() - interval '1 day'
+       ORDER BY created_at DESC LIMIT 1`,
+      [n.userId, n.type, n.group],
+    );
+    const row = open.rows[0];
+    if (row) {
+      if (row.actors.includes(n.actorId)) return;
+      await db.query(
+        `UPDATE notifications SET actor_id = $2, created_at = now(),
+                data = data || jsonb_build_object('count', $3::int, 'actors', $4::jsonb)
+         WHERE id = $1`,
+        [row.id, n.actorId, row.actors.length + 1, JSON.stringify([...row.actors, n.actorId].slice(-50))],
+      );
+      const pausedNow = p?.notifications_paused_until && p.notifications_paused_until > new Date();
+      if (!pausedNow) await realtime.publish([n.userId], { type: 'notification.created', data: { id: row.id, category: n.category, type: n.type } });
+      return;
+    }
+  }
+  const data = n.group && n.actorId ? { ...(n.data ?? {}), group: n.group, count: 1, actors: [n.actorId] } : (n.data ?? {});
   const { rows } = await db.query<{ id: string; created_at: Date }>(
     `INSERT INTO notifications (user_id, category, type, actor_id, entity_type, entity_id, data)
      VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, created_at`,
-    [n.userId, n.category, n.type, n.actorId ?? null, n.entityType ?? null, n.entityId ?? null, n.data ?? {}],
+    [n.userId, n.category, n.type, n.actorId ?? null, n.entityType ?? null, n.entityId ?? null, data],
   );
   // Security notifications always go out; others respect a pause.
   const paused = p?.notifications_paused_until && p.notifications_paused_until > new Date() && n.category !== 'security';

@@ -27,7 +27,7 @@ import {
 
 type Listener = (event: { type: string; data: any }) => void;
 
-interface Session {
+export interface Session {
   me: Me | null;
   loading: boolean;
   refresh: () => Promise<Me | null>;

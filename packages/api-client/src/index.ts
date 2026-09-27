@@ -13,6 +13,9 @@ import type {
   ChapterGradient,
   ChapterSymbol,
   Comment,
+  CommentPage,
+  CommentPolicy,
+  CommentSort,
   Community,
   Conversation,
   EventItem,
@@ -182,6 +185,10 @@ export function createClient(opts: ClientOptions) {
       /** Who may tag you in photos. */
       tagging: () => get<{ allowFrom: TagPermission }>('/v1/me/tagging'),
       setTagging: (allowFrom: TagPermission) => put<{ allowFrom: TagPermission }>('/v1/me/tagging', { allowFrom }),
+      /** Words and phrases hidden from comments on your posts. */
+      hiddenWords: () => get<{ words: string[] }>('/v1/me/hidden-words'),
+      /** Replace your hidden words; comments already on your posts are checked again. */
+      setHiddenWords: (words: string[]) => put<{ words: string[] }>('/v1/me/hidden-words', { words }),
       /** Data saver as saved on the account (also Me.dataSaver). Each device may override it locally. */
       dataSaver: () => get<{ mode: DataSaverMode }>('/v1/me/data-saver'),
       setDataSaver: (mode: DataSaverMode) => put<{ mode: DataSaverMode }>('/v1/me/data-saver', { mode }),
@@ -257,8 +264,19 @@ export function createClient(opts: ClientOptions) {
       setSaveNote: (id: string, note: string) => put<{ saved: true; note: string }>(`/v1/posts/${id}/save/note`, { note }),
       vote: (id: string, optionId: string) => post<{ poll: Post['poll'] }>(`/v1/posts/${id}/vote`, { optionId }),
       why: (id: string) => get<{ reasons: string[] }>(`/v1/posts/${id}/why`),
-      comments: (id: string, cursor?: string) => get<Page<Comment>>(`/v1/posts/${id}/comments${qs({ cursor })}`),
+      /** Top-level comments, Top (default) or Newest; the pinned one first. Replies: comments.replies. */
+      comments: (id: string, cursor?: string, sort?: CommentSort) => get<CommentPage>(`/v1/posts/${id}/comments${qs({ sort, cursor })}`),
+      /** Comment, or reply with `parentId` (a reply to a reply joins the top-level thread). */
       comment: (id: string, body: string, parentId?: string) => post<{ comment: Comment }>(`/v1/posts/${id}/comments`, { body, parentId }),
+      /** Author: who can comment. */
+      setCommentPolicy: (id: string, policy: CommentPolicy) => put<{ commentPolicy: CommentPolicy }>(`/v1/posts/${id}/comment-settings`, { policy }),
+      /** Author: pin one top-level comment to the top, or unpin with null. */
+      pinComment: (id: string, commentId: string | null) =>
+        commentId
+          ? put<{ pinnedCommentId: string | null }>(`/v1/posts/${id}/pinned-comment`, { commentId })
+          : del<{ pinnedCommentId: string | null }>(`/v1/posts/${id}/pinned-comment`),
+      /** Author: comments hidden by your hidden words. */
+      hiddenComments: (id: string, cursor?: string) => get<Page<Comment>>(`/v1/posts/${id}/comments/hidden${qs({ cursor })}`),
       /** Duets and remixes of a reel, newest first. */
       remixes: (id: string, mode?: 'duet' | 'remix', cursor?: string) => get<Page<Post>>(`/v1/posts/${id}/remixes${qs({ mode, cursor })}`),
       /** Allow or stop duets and remixes of your reel. */
@@ -281,6 +299,18 @@ export function createClient(opts: ClientOptions) {
       removeTag: (id: string, tagId: string) => del<{ ok: true }>(`/v1/posts/${id}/tags/${tagId}`),
     },
     /** Your drafts and scheduled posts (create them with posts.create and `draft: true` or `scheduledAt`). */
+    comments: {
+      replies: (id: string, cursor?: string) => get<Page<Comment>>(`/v1/comments/${id}/replies${qs({ cursor })}`),
+      /** Within COMMENT_EDIT_MINUTES of posting it. */
+      edit: (id: string, body: string) => patch<{ comment: Comment }>(`/v1/comments/${id}`, { body }),
+      remove: (id: string) => del<{ ok: true; comments: number }>(`/v1/comments/${id}`),
+      like: (id: string) => put<{ liked: boolean; likes: number }>(`/v1/comments/${id}/like`),
+      unlike: (id: string) => del<{ liked: boolean; likes: number }>(`/v1/comments/${id}/like`),
+      /** Only the comment's writer can see who liked it. */
+      likers: (id: string, cursor?: string) => get<Page<PublicUser>>(`/v1/comments/${id}/likes${qs({ cursor })}`),
+      /** Post author: let a hidden comment through. */
+      unhide: (id: string) => post<{ comment: Comment }>(`/v1/comments/${id}/unhide`),
+    },
     drafts: {
       list: () => get<{ items: Post[] }>('/v1/me/drafts'),
       get: (id: string) => get<DraftDetail>(`/v1/drafts/${id}`),

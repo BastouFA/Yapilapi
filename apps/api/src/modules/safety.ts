@@ -9,6 +9,7 @@ import type { AppContext } from '../lib/context.ts';
 import { audit, getFlags, notify } from '../lib/services.ts';
 import { applyMediaDecision } from '../lib/media-moderation.ts';
 import { notifyReleasedPosts } from '../lib/collabs.ts';
+import { syncCommentCounts } from '../lib/comments.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -197,6 +198,12 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       if (mc.target_type === 'community') await c.query(`UPDATE communities SET deleted_at = now() WHERE id = $1`, [mc.target_id]);
       if (mc.target_type === 'event') await c.query(`UPDATE events SET deleted_at = now() WHERE id = $1`, [mc.target_id]);
       if (mc.target_type === 'product') await c.query(`UPDATE products SET deleted_at = now() WHERE id = $1`, [mc.target_id]);
+    }
+    // Removed or restricted comments leave the post's counts; cleared ones come back.
+    if (mc.target_type === 'comment') {
+      const post = await c.query(`SELECT post_id FROM comments WHERE id = $1`, [mc.target_id]);
+      if (decision !== 'no_action') await c.query(`UPDATE posts SET pinned_comment_id = NULL WHERE pinned_comment_id = $1`, [mc.target_id]);
+      if (post.rows[0]) await syncCommentCounts(c as PoolClient, post.rows[0].post_id);
     }
     if (decision === 'suspend_user' && mc.subject_user_id) {
       await c.query(`UPDATE users SET status = 'suspended' WHERE id = $1 AND role = 'user'`, [mc.subject_user_id]);

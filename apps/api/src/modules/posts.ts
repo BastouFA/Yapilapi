@@ -1,7 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
 import {
-  commentSchema,
   createPostSchema,
   editPostSchema,
   feedbackSchema,
@@ -12,7 +11,6 @@ import {
   usernameSchema,
   extractHashtags,
   MAX_EDITS_PER_DAY,
-  type Comment,
   type PostVersion,
 } from '@yapilapi/shared';
 import { z } from 'zod';
@@ -858,107 +856,6 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     );
     const [post] = await hydratePosts(db, [id], u.id);
     return { poll: post!.poll };
-  });
-
-  // ── Comments ──────────────────────────────────────────────────────────
-  app.get('/v1/posts/:id/comments', async (req) => {
-    const viewer = req.user?.id ?? null;
-    const { id } = parse(idParam, req.params);
-    const q = parse(pageQuerySchema, req.query);
-    await assertUnlocked(id, viewer);
-    const c = decodeCursor<KeyCursor>(q.cursor);
-    const { rows } = await db.query(
-      `SELECT cm.id, cm.post_id, cm.parent_id, cm.body, cm.created_at,
-              pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode, ${plusCol('a_')}
-       FROM comments cm JOIN profiles pr ON pr.user_id = cm.author_id
-       WHERE cm.post_id = $2 AND cm.deleted_at IS NULL AND (cm.moderation_status IN ('normal','review') OR cm.author_id = $1)
-         AND ${notBlockedSql('cm.author_id', '$1')}
-         AND NOT EXISTS (SELECT 1 FROM restrictions r JOIN posts p ON p.id = cm.post_id WHERE r.restrictor_id = p.author_id AND r.restricted_id = cm.author_id AND cm.author_id <> $1 AND p.author_id <> $1)
-         ${c ? 'AND (cm.created_at, cm.id) > ($4::timestamptz, $5::uuid)' : ''}
-       ORDER BY cm.created_at, cm.id LIMIT $3`,
-      c ? [viewer, id, q.limit + 1, c.t, c.id] : [viewer, id, q.limit + 1],
-    );
-    const page = rows.slice(0, q.limit);
-    const items: Comment[] = page.map((r) => ({
-      id: r.id,
-      postId: r.post_id,
-      parentId: r.parent_id,
-      body: r.body,
-      author: publicUserFrom(r, 'a_'),
-      createdAt: r.created_at.toISOString(),
-    }));
-    return { items, nextCursor: rows.length > q.limit ? keyCursorOf(page.at(-1)!) : null };
-  });
-
-  app.post('/v1/posts/:id/comments', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req, reply) => {
-    const u = me(req);
-    const { id } = parse(idParam, req.params);
-    const input = parse(commentSchema, req.body);
-    await assertUnlocked(id, u.id);
-    const analysis = analyzeText(input.body);
-    if (analysis.risk === 'escalate') throw new AppError(422, 'content_blocked', "This comment can't be posted because it may put someone at risk.");
-    const comment = await tx(db, async (c) => {
-      if (input.parentId) {
-        const parent = await c.query(`SELECT 1 FROM comments WHERE id = $1 AND post_id = $2 AND deleted_at IS NULL`, [input.parentId, id]);
-        if (!parent.rowCount) throw notFound('The comment you replied to');
-      }
-      const { rows } = await c.query(
-        `INSERT INTO comments (post_id, author_id, parent_id, body, moderation_status, topics) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, created_at`,
-        // #tags in a comment count on the tag's page.
-        [id, u.id, input.parentId ?? null, input.body, statusForRisk(analysis.risk), extractHashtags(input.body)],
-      );
-      await c.query(`UPDATE posts SET comment_count = comment_count + 1 WHERE id = $1`, [id]);
-      if (analysis.risk !== 'normal')
-        await c.query(
-          `INSERT INTO moderation_cases (target_type, target_id, subject_user_id, source, risk, signals) VALUES ('comment',$1,$2,'automated',$3,$4) ON CONFLICT DO NOTHING`,
-          [rows[0].id, u.id, analysis.risk, { signals: analysis.signals }],
-        );
-      return rows[0];
-    });
-    const post = (await db.query(`SELECT author_id FROM posts WHERE id = $1`, [id])).rows[0];
-    await notify(db, ctx.realtime, {
-      userId: post.author_id,
-      category: 'creators',
-      type: 'post_comment',
-      actorId: u.id,
-      entityType: 'post',
-      entityId: id,
-      data: { commentId: comment.id },
-    });
-    if (analysis.risk === 'normal')
-      await notifyMentions(db, ctx.realtime, { text: input.body, actorId: u.id, postId: id, commentId: comment.id, skip: [post.author_id] });
-    track(db, u.id, 'comment_created');
-    const author = (
-      await db.query(
-        `SELECT user_id AS a_id, username AS a_username, display_name AS a_display_name, avatar_url AS a_avatar_url, mode AS a_mode FROM profiles WHERE user_id = $1`,
-        [u.id],
-      )
-    ).rows[0];
-    reply.code(201);
-    return {
-      comment: {
-        id: comment.id,
-        postId: id,
-        parentId: input.parentId ?? null,
-        body: input.body,
-        author: publicUserFrom(author, 'a_'),
-        createdAt: comment.created_at.toISOString(),
-      } satisfies Comment,
-    };
-  });
-
-  app.delete('/v1/comments/:id', { preHandler: requireAuth }, async (req) => {
-    const u = me(req);
-    const { id } = parse(idParam, req.params);
-    // The comment author or the post author can remove a comment.
-    const r = await db.query(
-      `UPDATE comments cm SET deleted_at = now() FROM posts p
-       WHERE cm.id = $1 AND p.id = cm.post_id AND cm.deleted_at IS NULL AND (cm.author_id = $2 OR p.author_id = $2) RETURNING cm.post_id`,
-      [id, u.id],
-    );
-    if (!r.rowCount) throw notFound('Comment');
-    await db.query(`UPDATE posts SET comment_count = greatest(comment_count - 1, 0) WHERE id = $1`, [r.rows[0].post_id]);
-    return { ok: true };
   });
 
   void encodeCursor;

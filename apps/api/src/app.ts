@@ -28,6 +28,7 @@ import authModule from './modules/auth.ts';
 import { registerDataSaver } from './lib/data-saver.ts';
 import profilesModule from './modules/profiles.ts';
 import postsModule from './modules/posts.ts';
+import commentsModule from './modules/comments.ts';
 import draftsModule from './modules/drafts.ts';
 import messagingModule from './modules/messaging.ts';
 import communitiesModule from './modules/communities.ts';
@@ -345,6 +346,7 @@ export async function buildApp(
     authModule,
     profilesModule,
     postsModule,
+    commentsModule,
     draftsModule,
     messagingModule,
     communitiesModule,

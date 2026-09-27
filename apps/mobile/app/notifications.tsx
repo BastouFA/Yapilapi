@@ -116,17 +116,27 @@ export default function Notifications() {
         const key = TEXT[n.type];
         const board = typeof n.data.name === 'string' ? n.data.name : '';
         const own = OWN_TEXT[n.type];
+        // Likes on a comment and replies to it arrive batched: the newest person, and how many in all.
+        const others = Math.max(0, Number(n.data.count ?? 1) - 1);
         const text = own
           ? t(own, { title: typeof n.data.title === 'string' ? n.data.title : '' })
-          : n.type === 'board_invite' && n.actor
-            ? t('m.notif.boardInvite', { name, board })
-            : n.type === 'board_item_added' && n.actor
-              ? tp('m.notif.boardItemAdded', Math.max(1, Number(n.data.count) || 1), { name, board })
-              : key && n.actor
-                ? t(key, { name })
-                : n.actor
-                  ? t('m.notif.other', { name })
-                  : t('m.notif.otherNoActor');
+          : n.type === 'comment_like' && n.actor
+            ? others
+              ? tp('comments.notif.likeOthers', others, { name })
+              : t('comments.notif.like', { name })
+            : n.type === 'comment_reply' && n.actor
+              ? others
+                ? tp('comments.notif.replyOthers', others, { name })
+                : t('comments.notif.reply', { name })
+              : n.type === 'board_invite' && n.actor
+                ? t('m.notif.boardInvite', { name, board })
+                : n.type === 'board_item_added' && n.actor
+                  ? tp('m.notif.boardItemAdded', Math.max(1, Number(n.data.count) || 1), { name, board })
+                  : key && n.actor
+                    ? t(key, { name })
+                    : n.actor
+                      ? t('m.notif.other', { name })
+                      : t('m.notif.otherNoActor');
         const href =
           n.entityType === 'post' && n.entityId
             ? `/p/${n.entityId}`

@@ -131,13 +131,14 @@ export async function writePost(
     input.format === 'reel' ? (input.remixOf ?? null) : null,
     input.format === 'reel' && input.remixOf ? input.remixMode : null,
     soundId,
+    input.commentPolicy ?? 'everyone',
   ];
   let id: string;
   if (opts.id) {
     // A draft or scheduled post saved again: new content, same state and time. Its attachments are written afresh below.
     const r = await c.query(
       `UPDATE posts SET kind = $3, body = $4, visibility = $5, circle_id = $6, community_id = $7, event_id = $8, product_id = $9, link_url = $10, topics = $11,
-                        ai_provenance = $12, format = $13, allow_remix = $14, remix_of_post_id = $15, remix_mode = $16, sound_id = $17, updated_at = now()
+                        ai_provenance = $12, format = $13, allow_remix = $14, remix_of_post_id = $15, remix_mode = $16, sound_id = $17, comment_policy = $18, updated_at = now()
        WHERE id = $1 AND author_id = $2 AND status <> 'published' AND deleted_at IS NULL`,
       [opts.id, userId, ...content],
     );
@@ -150,8 +151,8 @@ export async function writePost(
   } else {
     const { rows } = await c.query<{ id: string }>(
       `INSERT INTO posts (author_id, kind, body, visibility, circle_id, community_id, event_id, product_id, link_url, topics, ai_provenance, format,
-                          allow_remix, remix_of_post_id, remix_mode, sound_id, moderation_status, rights, status, scheduled_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING id`,
+                          allow_remix, remix_of_post_id, remix_mode, sound_id, comment_policy, moderation_status, rights, status, scheduled_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) RETURNING id`,
       [
         userId,
         ...content,

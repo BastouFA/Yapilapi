@@ -1,6 +1,6 @@
 'use client';
 
-import { extractHashtags, formatBytes, isVideoFile, MEDIA_ACCEPT, VIDEO_ACCEPT } from '@yapilapi/shared';
+import { COMMENT_POLICIES, extractHashtags, formatBytes, isVideoFile, MEDIA_ACCEPT, VIDEO_ACCEPT, type CommentPolicy } from '@yapilapi/shared';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AutocompleteText } from '@/components/Autocomplete';
@@ -96,6 +96,7 @@ function Create() {
   const [soundTitle, setSoundTitle] = useState('');
   const [picking, setPicking] = useState(false);
   const [allowRemix, setAllowRemix] = useState(true);
+  const [commentPolicy, setCommentPolicy] = useState<CommentPolicy>('everyone');
   const [communityId, setCommunityId] = useState(params.get('community') ?? '');
   const [communities, setCommunities] = useState<Community[]>([]);
   const [circles, setCircles] = useState<{ id: string; name: string }[]>([]);
@@ -159,6 +160,7 @@ function Create() {
         const inText = extractHashtags(post.body, 50);
         setTopics(post.topics.filter((tp) => !inText.includes(tp)).join(', '));
         if (post.allowRemix !== undefined) setAllowRemix(post.allowRemix);
+        if (post.commentPolicy) setCommentPolicy(post.commentPolicy);
         if (post.sound?.original) setSoundTitle(post.sound.title);
         setAiUsed(post.aiAssisted);
         if (post.scheduledAt) setWhen(localInput(new Date(post.scheduledAt)));
@@ -316,6 +318,7 @@ function Create() {
         visibility,
         circleId: visibility === 'circle' ? circleId || undefined : undefined,
         allowRemix,
+        commentPolicy,
         ...(remixOf && original ? { remixOf, remixMode } : sound ? { soundId: sound.id } : soundTitle.trim() ? { soundTitle: soundTitle.trim() } : {}),
         media: [{ id: v.id, url: new URL(v.url, location.origin).toString(), kind: 'video', altText: v.altText || undefined }],
         collaborators: collaborators.map((u) => u.id),
@@ -340,6 +343,7 @@ function Create() {
       poll: poll ? { options: poll.filter((o) => o.trim()) } : undefined,
       topics: topicList(),
       aiAssisted: aiUsed,
+      commentPolicy,
     };
   }
 
@@ -740,6 +744,15 @@ function Create() {
                         </option>,
                       ],
                 )}
+            </Select>
+          ) : null}
+          {kind !== 'story' ? (
+            <Select label={t('comments.settings.title')} value={commentPolicy} onChange={(e) => setCommentPolicy(e.currentTarget.value as CommentPolicy)}>
+              {COMMENT_POLICIES.map((p) => (
+                <option key={p} value={p}>
+                  {t(`comments.policy.${p}`)}
+                </option>
+              ))}
             </Select>
           ) : null}
           {kind === 'story' ? (

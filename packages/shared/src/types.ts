@@ -3,6 +3,7 @@ import type { DataSaverMode } from './data-saver.ts';
 import type {
   BoardVisibility,
   CircleKind,
+  CommentPolicy,
   CommunityRole,
   NowStatusAudience,
   NowStatusIcon,
@@ -157,10 +158,14 @@ export interface Post {
   sound?: SoundRef | null;
   /** Pinned to the top of its author's profile (only set in profile listings). */
   pinned?: boolean;
+  /** Who can comment, as the author chose. */
+  commentPolicy?: CommentPolicy;
   viewer: {
     liked: boolean;
     saved: boolean;
     reposted: boolean;
+    /** Whether the viewer may comment (their account, the author's comment controls, blocks). */
+    canComment?: boolean;
     /** Set when the viewer was invited to co-author this post: waiting for their answer, or accepted. */
     collab?: CollabStatus;
     /** Only in your Saved list and boards: your private note on your save of this post. */
@@ -263,10 +268,42 @@ export interface Sound {
 export interface Comment {
   id: string;
   postId: string;
+  /** The top-level comment of the thread; null for a top-level comment. */
   parentId: string | null;
+  /** The comment this one answers: its top-level comment, or a reply in the same thread. */
+  replyToId: string | null;
   body: string;
   author: PublicUser;
   createdAt: string;
+  /** Set once the text was changed (shown as "Edited"). */
+  editedAt: string | null;
+  likes: number;
+  /** Top-level comments: how many replies are in the thread. */
+  replies: number;
+  /** Pinned by the post's author to the top. */
+  pinned: boolean;
+  /** The post's author liked it. */
+  likedByAuthor: boolean;
+  /** Only in the post author's hidden comments: hidden because it contains one of their hidden words. */
+  hidden?: boolean;
+  viewer: {
+    liked: boolean;
+    /** The writer, until COMMENT_EDIT_MINUTES after posting. */
+    canEdit: boolean;
+    /** The writer, or the post's author. */
+    canDelete: boolean;
+  };
+}
+
+/** A page of top-level comments (or replies), with what the viewer can do on the post. */
+export interface CommentPage extends Page<Comment> {
+  commentPolicy: CommentPolicy;
+  /** Whether the viewer may comment now (signed in, and allowed by the post's comment controls). */
+  canComment: boolean;
+  /** The viewer is the post's author: they can pin, change who can comment, and review hidden comments. */
+  isPostAuthor: boolean;
+  /** Post author only: comments hidden by their hidden words, waiting for review. */
+  hiddenCount?: number;
 }
 
 export interface Page<T> {

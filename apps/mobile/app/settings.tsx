@@ -12,6 +12,7 @@ import { VerificationCard } from '../lib/safety';
 import { registerForPush } from '../lib/push';
 import { CAN_DETECT_CELLULAR, useDataSaver, type DeviceDataSaver } from '../lib/data-saver';
 import type { DataSaverMode } from '../../../packages/shared/src/data-saver';
+import { HIDDEN_WORD_MAX, HIDDEN_WORDS_MAX } from '../../../packages/shared/src/constants';
 
 /** Settings: email and phone confirmation, family supervision and advertising consent (same endpoints as the web settings page). */
 export default function Settings() {
@@ -62,6 +63,7 @@ export default function Settings() {
       <DataSaver />
       <Sharing />
       <Tagging />
+      <HiddenWords />
       <VerificationCard />
       <Family />
       <Advertising />
@@ -172,6 +174,100 @@ function Tagging() {
             );
           })}
         </View>
+      ) : !error ? (
+        <Loading />
+      ) : null}
+    </Card>
+  );
+}
+
+/** Hidden words: comments on your posts containing one are hidden from everyone but their writer. */
+function HiddenWords() {
+  const c = useColors();
+  const { t } = useT();
+  const [words, setWords] = useState<string[] | null>(null);
+  const [draft, setDraft] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    client()
+      .then((api) => api.me.hiddenWords())
+      .then((r) => setWords(r.words))
+      .catch((e) => setError(errorMessage(e)));
+  }, []);
+  const save = async (next: string[]) => {
+    const before = words;
+    setWords(next);
+    setBusy(true);
+    setError(null);
+    try {
+      setWords((await (await client()).me.setHiddenWords(next)).words);
+    } catch (e) {
+      setWords(before);
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const full = (words?.length ?? 0) >= HIDDEN_WORDS_MAX;
+  const add = () => {
+    const w = draft.trim().toLowerCase().replace(/\s+/g, ' ');
+    setDraft('');
+    if (w && words && !words.includes(w)) void save([...words, w]);
+  };
+  return (
+    <Card style={{ gap: space[3] }}>
+      <Title sub={t('hiddenWords.body')}>{t('hiddenWords.title')}</Title>
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {words ? (
+        <>
+          <View style={{ flexDirection: 'row', gap: space[2], alignItems: 'flex-end' }}>
+            <View style={{ flex: 1 }}>
+              <Field
+                label={t('hiddenWords.label')}
+                placeholder={t('hiddenWords.placeholder')}
+                value={draft}
+                onChangeText={setDraft}
+                maxLength={HIDDEN_WORD_MAX}
+                editable={!full}
+                autoCapitalize="none"
+                returnKeyType="done"
+                onSubmitEditing={add}
+              />
+            </View>
+            <Button label={t('hiddenWords.add')} variant="secondary" disabled={!draft.trim() || full || busy} onPress={add} />
+          </View>
+          {full ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('hiddenWords.max', { count: HIDDEN_WORDS_MAX })}</Text> : null}
+          {words.length ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+              {words.map((w) => (
+                <Pressable
+                  key={w}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('hiddenWords.remove', { word: w })}
+                  disabled={busy}
+                  onPress={() => void save(words.filter((x) => x !== w))}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    minHeight: 36,
+                    paddingHorizontal: space[3],
+                    borderRadius: radius.full,
+                    borderWidth: 1,
+                    borderColor: c.line,
+                    backgroundColor: c.surface,
+                  }}
+                >
+                  <Text style={[{ color: c.ink, fontSize: 13 }, userText]}>{w}</Text>
+                  <Icon name="close" size={14} color={c.inkMuted} />
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('hiddenWords.none')}</Text>
+          )}
+        </>
       ) : !error ? (
         <Loading />
       ) : null}

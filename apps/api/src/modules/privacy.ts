@@ -67,7 +67,11 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       // Earlier versions of your posts' text.
       postEdits: await q(`SELECT e.post_id, e.body, e.edited_at FROM post_edits e JOIN posts p ON p.id = e.post_id WHERE p.author_id = $1`),
       sounds: await q(`SELECT id, title, source_post_id, duration_ms, created_at FROM sounds WHERE owner_id = $1`),
-      comments: await q(`SELECT id, post_id, body, created_at FROM comments WHERE author_id = $1`),
+      comments: await q(`SELECT id, post_id, parent_id, reply_to_id, body, created_at, edited_at FROM comments WHERE author_id = $1`),
+      // Earlier versions of your comments' text, the comments you liked, and your hidden words.
+      commentEdits: await q(`SELECT e.comment_id, e.body, e.created_at FROM comment_edits e JOIN comments c ON c.id = e.comment_id WHERE c.author_id = $1`),
+      commentLikes: await q(`SELECT comment_id, created_at FROM comment_likes WHERE user_id = $1`),
+      hiddenWords: await q(`SELECT word, created_at FROM hidden_words WHERE user_id = $1`),
       reactions: await q(`SELECT post_id, kind, created_at FROM reactions WHERE user_id = $1`),
       messagesSent: await q(`SELECT conversation_id, body, attachments, created_at FROM messages WHERE sender_id = $1 AND deleted_at IS NULL`),
       communities: await q(`SELECT c.slug, cm.role, cm.joined_at FROM community_members cm JOIN communities c ON c.id = cm.community_id WHERE cm.user_id = $1`),
@@ -106,6 +110,13 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       // Earlier versions of the text go too.
       await c.query(`DELETE FROM post_edits e USING posts p WHERE p.id = e.post_id AND p.author_id = $1`, [u.id]);
       await c.query(`UPDATE comments SET deleted_at = now(), body = '' WHERE author_id = $1 AND deleted_at IS NULL`, [u.id]);
+      await c.query(`DELETE FROM comment_edits e USING comments cm WHERE cm.id = e.comment_id AND cm.author_id = $1`, [u.id]);
+      // Their likes come off other people's comments.
+      await c.query(
+        `WITH gone AS (DELETE FROM comment_likes WHERE user_id = $1 RETURNING comment_id)
+         UPDATE comments SET like_count = greatest(like_count - 1, 0) WHERE id IN (SELECT comment_id FROM gone)`,
+        [u.id],
+      );
       await c.query(`UPDATE messages SET deleted_at = now(), body = '', attachments = '[]' WHERE sender_id = $1 AND deleted_at IS NULL`, [u.id]);
       await c.query(`UPDATE moments SET deleted_at = now() WHERE author_id = $1`, [u.id]);
       for (const sql of [

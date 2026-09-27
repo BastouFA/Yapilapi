@@ -388,7 +388,7 @@ function Reels() {
         <CommentsSheet
           post={commentsFor}
           onClose={() => setCommentsFor(null)}
-          onAdded={() => patch(commentsFor.id, (x) => ({ ...x, counts: { ...x.counts, comments: x.counts.comments + 1 } }))}
+          onCountChange={(d) => patch(commentsFor.id, (x) => ({ ...x, counts: { ...x.counts, comments: Math.max(0, x.counts.comments + d) } }))}
         />
       ) : null}
       <ReportSheet target={reporting ? { type: 'post', id: reporting.id } : null} onClose={() => setReporting(null)} />

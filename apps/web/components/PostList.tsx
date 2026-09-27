@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -15,30 +14,21 @@ import {
   PostHistory,
   Select,
   Skeleton,
-  TaggedText,
   TextField,
 } from '@yapilapi/design-system';
 import type { SponsoredAd } from '@yapilapi/api-client';
-import {
-  formatRelativeTime,
-  MAX_COLLABORATORS,
-  REPORT_REASONS,
-  type Comment,
-  type MessageKey,
-  type Page,
-  type PhotoTag,
-  type Post,
-  type PostVersion,
-  type PublicUser,
-} from '@yapilapi/shared';
+import { MAX_COLLABORATORS, REPORT_REASONS, type MessageKey, type Page, type PhotoTag, type Post, type PostVersion, type PublicUser } from '@yapilapi/shared';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { AutocompleteText } from '@/components/Autocomplete';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { useSession } from '@/app/providers';
-import { signInHref, useSignIn } from './SignedOut';
+import { useSignIn } from './SignedOut';
 import { BoostSheet } from './Boost';
 import { SaveToSheet } from './Boards';
+import { CommentsSheet } from './Comments';
+
+export { CommentsSheet };
 
 /**
  * A paginated list of posts with every post interaction wired to the API:
@@ -393,7 +383,7 @@ export function PostList({
         <CommentsSheet
           post={commentsFor}
           onClose={() => setCommentsFor(null)}
-          onAdded={() => patch(commentsFor.id, (x) => ({ ...x, counts: { ...x.counts, comments: x.counts.comments + 1 } }))}
+          onCountChange={(d) => patch(commentsFor.id, (x) => ({ ...x, counts: { ...x.counts, comments: Math.max(0, x.counts.comments + d) } }))}
         />
       ) : null}
 
@@ -695,86 +685,6 @@ function CoauthorsSheet({ post, onClose, onChanged }: { post: Post; onClose: () 
           <p className="muted" style={{ margin: 0, fontSize: 13 }}>
             {t('postList.coauthorMax', { count: MAX_COLLABORATORS })}
           </p>
-        )}
-      </div>
-    </BottomSheet>
-  );
-}
-
-export function CommentsSheet({ post, onClose, onAdded }: { post: Post; onClose: () => void; onAdded: () => void }) {
-  const { toast, t, locale, me } = useSession();
-  const [items, setItems] = useState<Comment[] | null>(null);
-  const [body, setBody] = useState('');
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    api.posts.comments(post.id).then(
-      (r) => setItems(r.items),
-      (e) => toast(errorMessage(e)),
-    );
-  }, [post.id, toast]);
-  return (
-    <BottomSheet open onClose={onClose} title={t('post.comments')}>
-      <div className="stack">
-        {items === null ? (
-          <Skeleton height={60} />
-        ) : items.length ? (
-          items.map((c) => (
-            <div key={c.id} className="comment">
-              <Avatar name={c.author.displayName} src={c.author.avatarUrl} size="sm" />
-              <div className="comment__bubble">
-                <strong>
-                  {c.author.displayName} <span className="muted">· {formatRelativeTime(c.createdAt, locale)}</span>
-                </strong>
-                <TaggedText text={c.body} linkAs={NextLink} />
-              </div>
-            </div>
-          ))
-        ) : (
-          <p className="muted">{t('postList.noComments')}</p>
-        )}
-        {!me ? (
-          <div className="row">
-            <span className="muted">{t('postList.signInToComment')}</span>
-            <Link href={signInHref()} className="yp-btn yp-btn--primary yp-btn--sm">
-              {t('postList.signIn')}
-            </Link>
-          </div>
-        ) : (
-          <form
-            className="stack-sm"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (!body.trim()) return;
-              setBusy(true);
-              try {
-                const { comment } = await api.posts.comment(post.id, body.trim());
-                setItems((cur) => [...(cur ?? []), comment]);
-                setBody('');
-                onAdded();
-              } catch (err) {
-                toast(errorMessage(err));
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            <label className="yp-visually-hidden" htmlFor={`comment-${post.id}`}>
-              {t('comment.placeholder')}
-            </label>
-            <AutocompleteText
-              as="input"
-              id={`comment-${post.id}`}
-              className="yp-input"
-              placeholder={t('comment.placeholder')}
-              value={body}
-              onValueChange={setBody}
-              maxLength={2000}
-              autoComplete="off"
-            />
-            <Button type="submit" loading={busy} disabled={!body.trim()}>
-              {t('comment.submit')}
-            </Button>
-          </form>
         )}
       </div>
     </BottomSheet>

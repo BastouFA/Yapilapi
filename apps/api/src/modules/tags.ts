@@ -82,7 +82,7 @@ export default async function tagsModule(app: FastifyInstance, ctx: AppContext) 
       // Comments using the tag, on posts you can see and open, by people you haven't blocked.
       db.query(
         `SELECT count(*) AS n FROM (SELECT 1 FROM comments cm JOIN posts p ON p.id = cm.post_id JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
-         WHERE cm.topics @> ARRAY[$2::text] AND cm.deleted_at IS NULL AND cm.moderation_status = 'normal' AND ${VISIBLE} AND ${notBlockedSql('cm.author_id', '$1')}
+         WHERE cm.topics @> ARRAY[$2::text] AND cm.deleted_at IS NULL AND cm.hidden_at IS NULL AND cm.moderation_status = 'normal' AND ${VISIBLE} AND ${notBlockedSql('cm.author_id', '$1')}
          LIMIT 10000) x`,
         [viewer, tag],
       ),

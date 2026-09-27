@@ -28,6 +28,8 @@ export const SPAM_RULES = {
   duplicateLinkPostsAcrossAccounts: 5,
   /** The same message sent into a 5th conversation within an hour is held for review. */
   duplicateMessageConversations: 5,
+  /** The same comment left on a 5th post within an hour is held for review. */
+  duplicateCommentPosts: 5,
   /** More links than this in one post or message from a new account is held for review. */
   newAccountMaxLinks: 2,
   /** Shorter texts ("ok", "thanks") are never treated as repeated spam. */
@@ -228,6 +230,26 @@ export async function assessMessage(db: Q, config: Config, userId: string, conve
   return { flags, risky: st.score >= SPAM_RULES.riskyAccountScore, restricted: st.restricted };
 }
 
+/** Check a comment before it's saved: links from a new account, and the same text left on many posts. */
+export async function assessComment(db: Q, config: Config, userId: string, postId: string, text: string): Promise<Assessment> {
+  const st = await standing(db, userId);
+  if (!config.SPAM_CHECKS) return { flags: [], risky: false, restricted: st.restricted };
+  const flags: Signal[] = [];
+  const links = countLinks(text);
+  if (st.linkWatch && links > SPAM_RULES.newAccountMaxLinks) flags.push(signal('link_spam', { links }));
+  if (text.length >= SPAM_RULES.minDuplicateLength) {
+    const { rows } = await db.query(
+      `SELECT count(DISTINCT post_id)::int AS n FROM comments
+       WHERE author_id = $1 AND post_id <> $2 AND deleted_at IS NULL AND created_at > now() - interval '1 hour'
+         AND ${FINGERPRINT('body')} = ${FINGERPRINT('$3::text')}`,
+      [userId, postId, text],
+    );
+    const posts = (rows[0]?.n ?? 0) + 1;
+    if (posts >= SPAM_RULES.duplicateCommentPosts) flags.push(signal('duplicate_text', { scope: 'comments', posts }));
+  }
+  return { flags, risky: st.score >= SPAM_RULES.riskyAccountScore, restricted: st.restricted };
+}
+
 /**
  * Record flags against the content they came from, then limit the account when
  * it has collected enough flagged items this week. Limiting is reversible and
@@ -237,7 +259,7 @@ export async function flagContent(
   c: Q,
   realtime: RealtimeHub,
   userId: string,
-  target: { type: 'post' | 'message'; id: string },
+  target: { type: 'post' | 'message' | 'comment'; id: string },
   flags: Signal[],
 ): Promise<boolean> {
   if (!flags.length) return false;

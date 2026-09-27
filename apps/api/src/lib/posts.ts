@@ -4,6 +4,7 @@ import { isAdultViewer, plusCol, publicUserFrom } from './users.ts';
 import { allowDownloadSql, postUnlockedSql, postVisibleSql } from './visibility.ts';
 import { attachCollabsAndTags } from './collabs.ts';
 import { mediaSizesSql, withSmallVariants } from './data-saver.ts';
+import { commentAllowedSql } from './comments.ts';
 
 type Q = Pool | PoolClient;
 
@@ -44,6 +45,7 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
             coalesce(sm.variants->>'mp4', sm.url) AS s_audio,
             CASE WHEN p.format = 'reel' THEN (p.author_id IS NOT DISTINCT FROM $2 OR ${allowDownloadSql('pr', 'au')}) END AS downloadable,
             coalesce(${postUnlockedSql('$2')}, false) AS unlocked,
+            p.comment_policy, coalesce(${postUnlockedSql('$2')} AND ${commentAllowedSql('$2')}, false) AS can_comment,
             (SELECT count(*)::int FROM post_media pm WHERE pm.post_id = p.id) AS media_count,
             (SELECT m.blurhash FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id ORDER BY pm.position LIMIT 1) AS cover_placeholder,
             (SELECT json_build_object('campaignId', ac.id, 'status', ac.status, 'impressions', ac.impressions, 'clicks', ac.clicks,
@@ -98,7 +100,8 @@ function toPost(r: Record<string, any>, originals: Map<string, NonNullable<Remix
       views: r.view_count ?? 0,
       ...(r.remix_count === null ? {} : { remixes: r.remix_count }),
     },
-    viewer: { liked: r.liked, saved: r.saved, reposted: r.reposted },
+    commentPolicy: r.comment_policy,
+    viewer: { liked: r.liked, saved: r.saved, reposted: r.reposted, canComment: r.can_comment },
     aiAssisted: !!r.ai_provenance?.assisted,
     real: r.real ?? null,
     createdAt: r.created_at.toISOString(),

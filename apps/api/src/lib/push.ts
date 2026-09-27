@@ -72,6 +72,8 @@ const TEXT: Record<string, (actor: string) => string> = {
   reel_remix: (a) => `${a} remixed your reel`,
   post_mention: (a) => `${a} mentioned you in a post`,
   comment_mention: (a) => `${a} mentioned you in a comment`,
+  comment_like: (a) => `${a} liked your comment`,
+  comment_reply: (a) => `${a} replied to your comment`,
   collab_invite: (a) => `${a} invited you to co-author a post`,
   collab_accepted: (a) => `${a} accepted your invite to co-author your post`,
   photo_tag: (a) => `${a} tagged you in a photo`,

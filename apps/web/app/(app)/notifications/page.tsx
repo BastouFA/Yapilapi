@@ -6,7 +6,7 @@ import { Avatar, Button, EmptyState, List, ListItem, Skeleton } from '@yapilapi/
 import { formatRelativeTime, type NotificationItem } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
-import { useRealtime, useSession } from '../../providers';
+import { useRealtime, useSession, type Session } from '../../providers';
 
 const TEXT: Record<string, (n: NotificationItem) => string> = {
   follow: () => 'started following you',
@@ -98,6 +98,18 @@ function hrefFor(n: NotificationItem): string | undefined {
   return undefined;
 }
 
+/**
+ * Likes on a comment and replies to it are batched on the server into one notification:
+ * the newest person is its actor and `data.count` says how many people.
+ */
+function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): string | null {
+  if (n.type !== 'comment_like' && n.type !== 'comment_reply') return null;
+  const name = n.actor?.displayName ?? '';
+  const others = Math.max(0, Number(n.data.count ?? 1) - 1);
+  if (n.type === 'comment_like') return others ? tp('comments.notif.likeOthers', others, { name }) : t('comments.notif.like', { name });
+  return others ? tp('comments.notif.replyOthers', others, { name }) : t('comments.notif.reply', { name });
+}
+
 /** Likes, comments, reposts and follows on the same thing collapse into one row ("Ada and 2 others liked your post"). */
 const GROUPED = new Set(['post_reaction', 'post_comment', 'post_repost', 'follow']);
 
@@ -131,7 +143,7 @@ function names(g: Group): string {
 }
 
 export default function Notifications() {
-  const { t, locale, toast, setUnread } = useSession();
+  const { t, tp, locale, toast, setUnread } = useSession();
   const [items, setItems] = useState<NotificationItem[] | null>(null);
   const [followed, setFollowed] = useState<Set<string>>(new Set());
   // Co-author invites answered here, by post id.
@@ -203,10 +215,15 @@ export default function Notifications() {
                   const unread = g.items.some((x) => !x.readAt);
                   const actors = [...new Map(g.items.filter((x) => x.actor).map((x) => [x.actor!.id, x.actor!])).values()];
                   const followBack = n.type === 'follow' && actors.length === 1 && !n.followsActor && !followed.has(actors[0]!.id);
+                  const batched = batchedText(n, t, tp);
                   const text = (
                     <span style={{ fontWeight: unread ? 600 : 400, whiteSpace: 'normal' }}>
-                      {n.actor && n.type !== 'enforcement' && n.type !== 'story_countdown' ? `${names(g)} ` : ''}
-                      {(TEXT[n.type] ?? (() => n.type.replace(/_/g, ' ')))(n)}
+                      {batched ?? (
+                        <>
+                          {n.actor && n.type !== 'enforcement' && n.type !== 'story_countdown' ? `${names(g)} ` : ''}
+                          {(TEXT[n.type] ?? (() => n.type.replace(/_/g, ' ')))(n)}
+                        </>
+                      )}
                     </span>
                   );
                   const start = actors.length ? (

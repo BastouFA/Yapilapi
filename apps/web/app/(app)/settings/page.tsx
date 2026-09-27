@@ -15,6 +15,7 @@ import { CloseFriendsCard } from '@/components/CloseFriends';
 import { PurchasesCard } from '@/components/Shop';
 import { VerificationCard } from '@/components/Verification';
 import { DataSaverCard } from '@/components/DataSaver';
+import { HiddenWordsCard } from '@/components/HiddenWords';
 import { useSession } from '../../providers';
 
 export default function Settings() {
@@ -681,6 +682,7 @@ function SafetySettings() {
           <p className="muted">{t('settings.blocked.none')}</p>
         )}
       </Card>
+      <HiddenWordsCard />
       <Dialog
         open={!!appealFor}
         onClose={() => setAppealFor(null)}

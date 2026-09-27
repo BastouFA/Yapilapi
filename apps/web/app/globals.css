@@ -678,6 +678,76 @@ h3 {
   display: block;
   font-size: 13px;
 }
+.comment__main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+.comment__name {
+  color: inherit;
+}
+.comment__label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+.comment__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  padding-inline-start: var(--space-3);
+  font-size: 13px;
+}
+.comment__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--ink-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.comment__action:hover {
+  color: var(--ink);
+}
+.comment__like[aria-pressed='true'] {
+  color: var(--yapi);
+}
+.comment__like[aria-pressed='true'] svg {
+  fill: currentColor;
+}
+.comment__author-like {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+.comment__author-like svg {
+  fill: var(--yapi);
+  stroke: var(--yapi);
+}
+.comment__thread-toggle {
+  justify-self: start;
+  padding-inline-start: var(--space-3);
+}
+.comment__replies {
+  padding-inline-start: var(--space-2);
+  border-inline-start: 2px solid var(--line);
+}
+.comments__hidden,
+.comments__likers {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
 .stats {
   display: grid;
   gap: var(--space-3);

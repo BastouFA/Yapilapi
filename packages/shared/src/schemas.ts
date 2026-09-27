@@ -2,6 +2,10 @@ import { z } from 'zod';
 import { DATA_SAVER_MODES } from './data-saver.ts';
 import {
   CIRCLE_KINDS,
+  COMMENT_POLICIES,
+  COMMENT_SORTS,
+  HIDDEN_WORD_MAX,
+  HIDDEN_WORDS_MAX,
   COMMUNITY_ROLES,
   FEED_MODES,
   FEEDBACK_SIGNALS,
@@ -160,6 +164,8 @@ export const createPostSchema = z
     draft: z.boolean().default(false),
     /** Publish it later, at this time (SCHEDULE_MIN_MINUTES to SCHEDULE_MAX_DAYS ahead). Until then it's only yours. */
     scheduledAt: scheduleTime.optional(),
+    /** Who can comment: everyone who can see it, people you follow, your followers, or no one. */
+    commentPolicy: z.enum(COMMENT_POLICIES).default('everyone'),
   })
   .superRefine((v, ctx) => {
     if (v.draft && v.scheduledAt) ctx.addIssue({ code: 'custom', message: 'Save a draft or schedule it, not both.', path: ['scheduledAt'] });
@@ -225,7 +231,23 @@ export const pageQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(30),
 });
 
+/** A comment, or a reply: `parentId` is the comment answered. A reply to a reply joins its top-level thread. */
 export const commentSchema = z.object({ body: trimmed(2000), parentId: uuid.optional() });
+/** Change your comment's text, within COMMENT_EDIT_MINUTES of posting it. */
+export const editCommentSchema = z.object({ body: trimmed(2000) });
+export const commentsQuerySchema = z.object({
+  sort: z.enum(COMMENT_SORTS).default('top'),
+  cursor: z.string().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+/** Who can comment on your post. */
+export const commentPolicySchema = z.object({ policy: z.enum(COMMENT_POLICIES) });
+/** Pin one comment to the top of your post. */
+export const pinCommentSchema = z.object({ commentId: uuid });
+/** Your hidden words, replacing the list: comments on your posts containing one are hidden. */
+export const hiddenWordsSchema = z.object({
+  words: z.array(z.string().trim().min(1).max(HIDDEN_WORD_MAX)).max(HIDDEN_WORDS_MAX, `Keep it to ${HIDDEN_WORDS_MAX} words or phrases.`),
+});
 export const reactionSchema = z.object({ kind: z.enum(['like', 'love', 'celebrate', 'insightful', 'funny']).default('like') });
 export const feedbackSchema = z.object({
   signal: z.enum(FEEDBACK_SIGNALS),

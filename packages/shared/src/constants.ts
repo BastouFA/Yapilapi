@@ -63,6 +63,21 @@ export const RSVP_STATUSES = ['going', 'interested', 'not_going'] as const;
 export const NOTIFICATION_CATEGORIES = ['messages', 'friends', 'creators', 'communities', 'events', 'commerce', 'security', 'moderation', 'system'] as const;
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
 
+/**
+ * Comments. The post's author chooses who can comment: everyone who can see the post,
+ * people they follow, their followers, or no one. Existing posts are open to everyone.
+ */
+export const COMMENT_POLICIES = ['everyone', 'following', 'followers', 'off'] as const;
+export type CommentPolicy = (typeof COMMENT_POLICIES)[number];
+/** Top: likes, a like from the post's author, replies and freshness. Newest: most recent first. */
+export const COMMENT_SORTS = ['top', 'newest'] as const;
+export type CommentSort = (typeof COMMENT_SORTS)[number];
+/** A comment can be edited this many minutes after it was posted. */
+export const COMMENT_EDIT_MINUTES = 15;
+/** Hidden words: at most this many words or phrases, each at most HIDDEN_WORD_MAX characters. */
+export const HIDDEN_WORDS_MAX = 100;
+export const HIDDEN_WORD_MAX = 60;
+
 export const REPORT_REASONS = ['spam', 'harassment', 'hate', 'violence', 'nudity', 'self_harm', 'impersonation', 'fraud', 'minor_safety', 'other'] as const;
 
 export const REPORT_TARGETS = ['user', 'post', 'comment', 'message', 'community', 'event', 'product'] as const;
