@@ -250,7 +250,6 @@ const CHECK_TEXT: Record<NonNullable<UsernameCheck['reason']>, MessageKey> = {
  * change again for 14 days. The old one stays yours for 14 days and old links still lead to you.
  */
 function ChangeUsername({ visible, onClose, onChanged }: { visible: boolean; onClose: () => void; onChanged: (s: UsernameStatus) => void }) {
-  const c = useColors();
   const { t } = useT();
   const { refresh } = useSession();
   const [value, setValue] = useState('');
@@ -299,6 +298,7 @@ function ChangeUsername({ visible, onClose, onChanged }: { visible: boolean; onC
         autoCapitalize="none"
         autoCorrect={false}
         autoComplete="off"
+        autoFocus
         maxLength={30}
         hint={check.ok === false ? undefined : message}
         error={check.ok === false && check.name === name ? message : null}
@@ -331,7 +331,6 @@ function ChangeUsername({ visible, onClose, onChanged }: { visible: boolean; onC
       ) : (
         <Button label={t('st.username.change')} disabled={!ready} onPress={() => setConfirming(true)} />
       )}
-      <Text style={{ color: c.inkMuted, fontSize: 12, lineHeight: 16 }}>{t('st.username.rule')}</Text>
     </BottomSheet>
   );
 }
