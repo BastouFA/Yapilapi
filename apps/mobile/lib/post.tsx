@@ -15,6 +15,7 @@ import { SensitiveCover } from './safety';
 import { EditPostSheet, HistorySheet } from './post-edit';
 import { RichText } from './rich-text';
 import { TranslatableText } from './translation';
+import { PostMusicChip } from './music';
 
 export { RichText };
 
@@ -388,6 +389,7 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
           </Text>
         </Pressable>
       ) : null}
+      {post.music ? <PostMusicChip music={post.music} /> : null}
 
       {imageUri ? (
         <View

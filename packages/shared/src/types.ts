@@ -1,4 +1,5 @@
 import type { StoryCard } from './stories.ts';
+import type { PostMusic } from './music.ts';
 import type { DataSaverMode } from './data-saver.ts';
 import type { TranslationSettings } from './translation.ts';
 import type {
@@ -158,6 +159,11 @@ export interface Post {
   remixOf?: RemixRef | null;
   /** Reels: the sound it uses (its own, or one it borrowed). */
   sound?: SoundRef | null;
+  /**
+   * Music playing with it: part of a sound or a catalogue song on a photo, carousel or text post, or a
+   * catalogue song a reel plays instead of its own audio. Muted until the viewer taps it.
+   */
+  music?: PostMusic | null;
   /** Pinned to the top of its author's profile (only set in profile listings). */
   pinned?: boolean;
   viewer: {
@@ -260,6 +266,10 @@ export interface Sound {
   reels: number;
   /** Stories you can see that use it. */
   stories: number;
+  /** Photo and text posts you can see that play it. */
+  posts: number;
+  /** Whether you saved it in the music picker. */
+  saved?: boolean;
   /** Whether you can make a reel with it (its source reel is public and allows remixes). */
   canUse: boolean;
   createdAt: string;

@@ -19,9 +19,15 @@ import { requireVerified } from './verification.ts';
 import { MEDIA_BLOCKED_MESSAGE } from './media-moderation.ts';
 import { topicsFor } from '../modules/tags.ts';
 import { langOf } from './translation.ts';
+import type { PreparedMusic } from './music/index.ts';
 
 type Q = Pool | PoolClient;
-type Deps = Pick<AppContext, 'db' | 'config' | 'realtime'>;
+type Deps = Pick<AppContext, 'db' | 'config' | 'realtime' | 'music'>;
+
+/** Check the music a new post, reel or draft asks for (outside a transaction: it may ask the song's provider). */
+export async function prepareMusic(deps: Pick<AppContext, 'music'>, userId: string, input: CreatePostInput): Promise<PreparedMusic | null> {
+  return input.music ? deps.music.prepareUse(userId, input.music, input.format === 'reel' ? 'reels' : 'posts') : null;
+}
 
 /**
  * Writing and publishing posts: now, as a draft, or at a scheduled time.
@@ -66,9 +72,13 @@ export async function writePost(
   c: PoolClient,
   userId: string,
   input: CreatePostInput,
-  opts: { id?: string; state: PostState; scheduledAt?: Date | null; moderationStatus?: string },
+  opts: { id?: string; state: PostState; scheduledAt?: Date | null; moderationStatus?: string; music?: PreparedMusic | null },
 ): Promise<{ id: string; kind: string; taggedIds: string[]; remixAuthor: string | null }> {
   const kind = postKind(input);
+  // Music was checked by prepareMusic; photo, carousel and text posts, or a reel with a catalogue song.
+  if (input.music && !opts.music) throw new Error('writePost: check the music with prepareMusic first');
+  const music = input.music ? opts.music! : null;
+  if (music && input.format !== 'reel' && !['photo', 'carousel', 'text'].includes(kind)) throw badRequest('Music can be added to photo and text posts.');
   if (input.visibility === 'subscribers') {
     if (input.communityId) throw badRequest('Posts in a community are for its members, not for subscribers.');
     const plan = await c.query(`SELECT 1 FROM creator_plans WHERE creator_id = $1 AND active LIMIT 1`, [userId]);
@@ -97,7 +107,11 @@ export async function writePost(
   } else if (input.format === 'reel' && chosenSound) {
     await assertSoundUsable(c, chosenSound, userId);
     soundId = chosenSound;
+  } else if (input.format !== 'reel' && music?.soundId) {
+    // A photo or text post playing part of a sound: counted on the sound's page like reels and stories.
+    soundId = music.soundId;
   }
+  if (recap && music) throw badRequest('A recap is posted with the sound it was made with.');
   if (input.communityId) {
     const m = await c.query(`SELECT role FROM community_members WHERE community_id = $1 AND user_id = $2 AND status = 'active'`, [input.communityId, userId]);
     if (!m.rows[0] || m.rows[0].role === 'guest') throw forbidden('Join the community to post in it.');
@@ -134,13 +148,16 @@ export async function writePost(
     soundId,
     // The text's language, for "See translation".
     langOf(input.body),
+    music?.trackId ?? null,
+    music ? { ...music.stored, style: 'compact' } : null,
   ];
   let id: string;
   if (opts.id) {
     // A draft or scheduled post saved again: new content, same state and time. Its attachments are written afresh below.
     const r = await c.query(
       `UPDATE posts SET kind = $3, body = $4, visibility = $5, circle_id = $6, community_id = $7, event_id = $8, product_id = $9, link_url = $10, topics = $11,
-                        ai_provenance = $12, format = $13, allow_remix = $14, remix_of_post_id = $15, remix_mode = $16, sound_id = $17, lang = $18, updated_at = now()
+                        ai_provenance = $12, format = $13, allow_remix = $14, remix_of_post_id = $15, remix_mode = $16, sound_id = $17, lang = $18,
+                        music_track_id = $19, music = $20, updated_at = now()
        WHERE id = $1 AND author_id = $2 AND status <> 'published' AND deleted_at IS NULL`,
       [opts.id, userId, ...content],
     );
@@ -153,8 +170,8 @@ export async function writePost(
   } else {
     const { rows } = await c.query<{ id: string }>(
       `INSERT INTO posts (author_id, kind, body, visibility, circle_id, community_id, event_id, product_id, link_url, topics, ai_provenance, format,
-                          allow_remix, remix_of_post_id, remix_mode, sound_id, lang, moderation_status, rights, status, scheduled_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) RETURNING id`,
+                          allow_remix, remix_of_post_id, remix_mode, sound_id, lang, music_track_id, music, moderation_status, rights, status, scheduled_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) RETURNING id`,
       [
         userId,
         ...content,
@@ -204,7 +221,8 @@ export async function writePost(
       }
     }
   }
-  if (input.format === 'reel' && !soundId) {
+  // A reel playing a catalogue song has no sound of its own to offer others (its audio isn't heard).
+  if (input.format === 'reel' && !soundId && !music) {
     const mediaId = (await c.query(`SELECT media_id FROM post_media WHERE post_id = $1 ORDER BY position LIMIT 1`, [id])).rows[0]?.media_id;
     if (mediaId) await registerOwnSound(c, { postId: id, ownerId: userId, mediaId, title: input.soundTitle });
   }
@@ -367,6 +385,7 @@ export async function publishDraft(deps: Deps, postId: string, authorId: string)
   const d = (
     await db.query(
       `SELECT p.id, p.kind, p.body, p.visibility, p.community_id, p.format, p.moderation_status, p.remix_of_post_id, p.remix_mode,
+              p.sound_id, p.music_track_id, p.music,
               (SELECT string_agg(o.label, ' ' ORDER BY o.position) FROM poll_options o WHERE o.post_id = p.id) AS poll_text,
               EXISTS (SELECT 1 FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id AND m.moderation = 'blocked') AS blocked_media
        FROM posts p WHERE p.id = $1 AND p.author_id = $2 AND p.status <> 'published' AND p.deleted_at IS NULL`,
@@ -384,6 +403,9 @@ export async function publishDraft(deps: Deps, postId: string, authorId: string)
     if (!plan.rowCount) throw badRequest('Add a subscription plan in Studio before posting for subscribers.');
   }
   const remixAuthor = d.format === 'reel' && d.remix_of_post_id ? (await assertRemixable(db, d.remix_of_post_id, authorId)).authorId : null;
+  // Music: the song's licence (and the author's account type and country) or the sound are checked again as it goes out.
+  if (d.music && d.music_track_id) await deps.music.checkTrack(authorId, d.music_track_id, d.music.durationMs);
+  else if (d.music && d.sound_id && d.format !== 'reel') await assertSoundUsable(db, d.sound_id, authorId, 'posts');
   // A recap in it: everything in the recap must still be the author's own.
   const mediaIds = (await db.query<{ media_id: string }>(`SELECT media_id FROM post_media WHERE post_id = $1`, [postId])).rows.map((r) => r.media_id);
   await assertRecapUse(db, authorId, mediaIds, 'post');

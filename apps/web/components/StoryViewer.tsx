@@ -24,7 +24,7 @@ import { useSession } from '@/app/providers';
 import { AddToChapter } from '@/components/Chapters';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { StickerLayer, StoryCardView, StoryText } from '@/components/StoryStickers';
-import { MusicSticker, useMusicLoop, useStoryMusicOn } from '@/components/StoryMusic';
+import { MusicSticker, musicHref, useMusicLoop, useStoryMusicOn } from '@/components/StoryMusic';
 
 const PHOTO_MS = 5000;
 /** Who a reshare goes to. */
@@ -320,7 +320,7 @@ export function StoryViewer({
                 playing={musicOn && !stopped}
                 onOpen={() => {
                   onClose();
-                  router.push(`/sounds/${music.sound.id}`);
+                  router.push(musicHref(music.sound));
                 }}
               />
             </div>

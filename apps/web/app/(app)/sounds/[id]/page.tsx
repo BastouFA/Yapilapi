@@ -13,7 +13,7 @@ import { useSession } from '../../../providers';
 /** A sound: play it, see who made it and the reels that use it (most recent or top), and make your own reel or story with it. */
 export default function SoundPage() {
   const { id } = useParams<{ id: string }>();
-  const { me, locale } = useSession();
+  const { me, locale, t, tp } = useSession();
   const [sound, setSound] = useState<Sound | null>(null);
   const [missing, setMissing] = useState<string | null>(null);
   const [sort, setSort] = useState<'recent' | 'top'>('recent');
@@ -55,6 +55,7 @@ export default function SoundPage() {
                 <strong>{n.format(sound.stories)}</strong> {sound.stories === 1 ? 'story' : 'stories'}
               </>
             ) : null}
+            {sound.posts ? ` · ${tp('m.sound.postCount', sound.posts)}` : ''}
             {soundLength(sound.durationMs) ? ` · ${soundLength(sound.durationMs)}` : ''}
             {sound.sourcePostId ? (
               <>
@@ -70,6 +71,9 @@ export default function SoundPage() {
               </Link>
               <Link href={`/create?mode=story&sound=${sound.id}`} className="yp-btn yp-btn--secondary yp-btn--sm">
                 Add to your story
+              </Link>
+              <Link href={`/create?mode=post&sound=${sound.id}`} className="yp-btn yp-btn--secondary yp-btn--sm">
+                {t('music.track.inPost')}
               </Link>
             </div>
           ) : me ? (

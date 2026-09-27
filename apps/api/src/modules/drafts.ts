@@ -7,7 +7,7 @@ import type { AppContext } from '../lib/context.ts';
 import { hydratePosts } from '../lib/posts.ts';
 import { track } from '../lib/services.ts';
 import { requireVerified } from '../lib/verification.ts';
-import { publishDraft, schedulePost, scheduleTime, writePost } from '../lib/publishing.ts';
+import { prepareMusic, publishDraft, schedulePost, scheduleTime, writePost } from '../lib/publishing.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -73,8 +73,9 @@ export default async function draftsModule(app: FastifyInstance, ctx: AppContext
     const input = parse(createPostSchema, req.body);
     const at = input.scheduledAt ? scheduleTime(input.scheduledAt) : null;
     if (at && (input.visibility === 'public' || input.communityId)) await requireVerified(db, ctx.config, u.id, 'post');
+    const music = await prepareMusic(ctx, u.id, input);
     await tx(db, async (c) => {
-      await writePost(c, u.id, input, { id, state: 'draft' });
+      await writePost(c, u.id, input, { id, state: 'draft', music });
       if (at) await schedulePost(c, id, u.id, at);
     });
     return { post: await hydrated(id, u.id) };

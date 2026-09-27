@@ -7,6 +7,7 @@ export * from './hashtags.ts';
 export * from './contacts.ts';
 export * from './filters.ts';
 export * from './stories.ts';
+export * from './music.ts';
 export * from './dual.ts';
 export * from './data-saver.ts';
 export * from './rooms.ts';

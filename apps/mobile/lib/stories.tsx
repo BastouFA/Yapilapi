@@ -38,7 +38,7 @@ import { Avatar, Icon, Segmented, SwitchRow, useColors, userText } from './ui';
 import { SensitiveCover } from './safety';
 import { AddToChapterSheet } from './chapters';
 import { StickerLayer, StoryCardView } from './story-stickers';
-import { MusicSticker, useMusicLoop, useMusicOn } from './story-music';
+import { MusicSticker, openMusic, useMusicLoop, useMusicOn } from './music';
 import { TranslationBar, useTranslatable } from './translation';
 
 const PHOTO_MS = 5000;
@@ -453,7 +453,7 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
               music={music}
               onOpen={() => {
                 onClose();
-                router.push(`/sounds/${music.sound.id}`);
+                openMusic(music.sound);
               }}
             />
           ) : null}

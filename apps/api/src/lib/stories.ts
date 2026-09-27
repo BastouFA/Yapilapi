@@ -7,6 +7,7 @@ import {
   linkDomain,
   normalizeTag,
   pollPercents,
+  type PostMusic,
   type PublicUser,
   type StickerResults,
   type StoryCard,
@@ -26,6 +27,7 @@ import { soundVisibleSql } from './sounds.ts';
 import { publicUserFrom, usersByIds } from './users.ts';
 import { notBlockedSql } from './visibility.ts';
 import { mediaSizesSql, withSmallVariants } from './data-saver.ts';
+import { trackMusic, tracksByIds, viewerCountries, type TrackRow } from './music/view.ts';
 
 type Q = Pool | PoolClient;
 
@@ -62,7 +64,7 @@ export const PUBLIC_STORY = `m.visibility = 'public' AND m.deleted_at IS NULL AN
 
 /** Columns for hydrateStories; the viewer is $1. Use with STORY_FROM. */
 export const STORY_SELECT = `m.id, m.author_id, m.body, m.lang, m.media_url, m.media_kind, m.location_text, m.expires_at, m.created_at, m.visibility,
-  m.stickers, m.tags, m.mentions, m.reshare_of, m.allow_reshare, m.sound_id, m.music,
+  m.stickers, m.tags, m.mentions, m.reshare_of, m.allow_reshare, m.sound_id, m.music, m.music_track_id,
   md.poster_url, md.hls_url, md.variants, md.duration_ms, md.moderation, ${mediaSizesSql('md')} AS sizes,
   v.viewer_id IS NOT NULL AS seen, coalesce(v.liked, false) AS liked,
   CASE WHEN m.author_id = $1 THEN (SELECT count(*) FROM moment_views mv WHERE mv.moment_id = m.id AND mv.viewer_id <> $1) END AS views,
@@ -298,6 +300,24 @@ async function storySounds(db: Q, ids: string[], viewer: string | null): Promise
   );
 }
 
+/** A catalogue song as a story's music. */
+function storyTrackSound(row: TrackRow, m: PostMusic): StoryMusic['sound'] {
+  return {
+    id: row.id,
+    title: row.title,
+    artist: row.artist,
+    username: '',
+    durationMs: null,
+    audioUrl: m.audioUrl,
+    coverUrl: row.cover_url,
+    source: m.source,
+    licenceName: m.licenceName,
+    licenceUrl: m.licenceUrl,
+    attribution: m.attribution,
+    ...(m.unavailable ? { unavailable: m.unavailable } : {}),
+  };
+}
+
 /** Turn story rows (STORY_SELECT) into what a viewer sees: stickers with their state, reshare cards, mentions. */
 export async function hydrateStories(db: Q, rows: Record<string, any>[], viewer: string | null): Promise<StoryOut[]> {
   if (!rows.length) return [];
@@ -308,7 +328,8 @@ export async function hydrateStories(db: Q, rows: Record<string, any>[], viewer:
   const placeIds = [...new Set(all.flatMap((s) => (s.type === 'place' ? [s.placeId] : [])))];
   const interactive = all.some((s) => s.type === 'poll' || s.type === 'question' || s.type === 'slider' || s.type === 'countdown');
   const soundIds = [...new Set(rows.flatMap((r) => (r.sound_id && r.music ? [r.sound_id as string] : [])))];
-  const [users, places, mine, totals, cards, sounds] = await Promise.all([
+  const trackIds = [...new Set(rows.flatMap((r) => (r.music_track_id && r.music ? [r.music_track_id as string] : [])))];
+  const [users, places, mine, totals, cards, sounds, tracks, countries] = await Promise.all([
     usersByIds(db, userIds),
     placeIds.length
       ? db.query<{ id: string; name: string; city: string | null }>(`SELECT id, name, city FROM places WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL`, [
@@ -335,6 +356,8 @@ export async function hydrateStories(db: Q, rows: Record<string, any>[], viewer:
       viewer,
     ),
     storySounds(db, soundIds, viewer),
+    tracksByIds(db, trackIds),
+    trackIds.length ? viewerCountries(db, viewer) : Promise.resolve([] as string[]),
   ]);
   const placeById = new Map((places?.rows ?? []).map((p) => [p.id, p]));
   const key = (m: string, s: string) => `${m}:${s}`;
@@ -409,8 +432,15 @@ export async function hydrateStories(db: Q, rows: Record<string, any>[], viewer:
     }
     const mentions = (r.mentions ?? []) as string[];
     const mentionsYou = !!viewer && mentions.includes(viewer);
-    const sound = r.sound_id ? sounds.get(r.sound_id) : undefined;
     const stored = r.music as StoredMusic | null;
+    const track = r.music_track_id ? tracks.get(r.music_track_id) : undefined;
+    // A catalogue song: checked for where the viewer is and whether it's still offered (it then stays silent, with a note).
+    const sound =
+      track && stored
+        ? storyTrackSound(track, trackMusic(track, stored, { countries, commercial: r.a_mode === 'business' }))
+        : r.sound_id
+          ? sounds.get(r.sound_id)
+          : undefined;
     return {
       id: r.id,
       body: r.body,

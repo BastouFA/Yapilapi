@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { MusicSource, MusicUnavailable } from './music.ts';
 import type { PublicUser } from './types.ts';
 
 /**
@@ -151,21 +152,25 @@ export type StoryMusicStyle = (typeof STORY_MUSIC_STYLES)[number];
 export const STORY_MUSIC_MAX_MS = 15_000;
 export const STORY_MUSIC_MIN_MS = 5_000;
 
-/** Music the author adds to a photo, text or video story: a sound from the library, the part to play, and its sticker. */
-export const storyMusicInputSchema = z.object({
-  soundId: z.string().uuid(),
-  /** Where the part starts in the sound. */
-  startMs: z
-    .number()
-    .int()
-    .min(0)
-    .max(60 * 60 * 1000),
-  durationMs: z.number().int().min(STORY_MUSIC_MIN_MS).max(STORY_MUSIC_MAX_MS).default(STORY_MUSIC_MAX_MS),
-  style: z.enum(STORY_MUSIC_STYLES).default('compact'),
-  /** Where the sticker sits on the frame (0–1, like other stickers). */
-  x: z.number().min(0).max(1).default(0.5),
-  y: z.number().min(0).max(1).default(0.78),
-});
+/** Music the author adds to a photo, text or video story: a sound or a catalogue song, the part to play, and its sticker. */
+export const storyMusicInputSchema = z
+  .object({
+    soundId: z.string().uuid().optional(),
+    /** A song from the music catalogue instead of a sound (see music.ts). */
+    trackId: z.string().uuid().optional(),
+    /** Where the part starts in the sound. */
+    startMs: z
+      .number()
+      .int()
+      .min(0)
+      .max(60 * 60 * 1000),
+    durationMs: z.number().int().min(STORY_MUSIC_MIN_MS).max(STORY_MUSIC_MAX_MS).default(STORY_MUSIC_MAX_MS),
+    style: z.enum(STORY_MUSIC_STYLES).default('compact'),
+    /** Where the sticker sits on the frame (0–1, like other stickers). */
+    x: z.number().min(0).max(1).default(0.5),
+    y: z.number().min(0).max(1).default(0.78),
+  })
+  .refine((m) => !!m.soundId !== !!m.trackId, { message: 'Choose a sound or a song.', path: ['trackId'] });
 export type StoryMusicInput = z.input<typeof storyMusicInputSchema>;
 
 /**
@@ -183,6 +188,14 @@ export interface StoryMusic {
     /** Plays the sound: the source reel's video, whose audio track is the sound. */
     audioUrl: string | null;
     coverUrl: string | null;
+    /** Where it comes from: a sound ('library', the default) or a catalogue song, whose page is /music/:id. */
+    source?: MusicSource;
+    /** Catalogue songs: the licence and the credit it asks for ("Title by Artist · CC BY 4.0"). */
+    licenceName?: string | null;
+    licenceUrl?: string | null;
+    attribution?: string | null;
+    /** Set when it doesn't play for this viewer (audioUrl is then null). */
+    unavailable?: MusicUnavailable;
   };
   startMs: number;
   durationMs: number;

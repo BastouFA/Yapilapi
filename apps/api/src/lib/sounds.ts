@@ -78,7 +78,7 @@ export async function assertRemixable(db: Q, postId: string, viewer: string): Pr
 }
 
 /** Check that the viewer may use a sound in a new reel (or story: the same rules). */
-export async function assertSoundUsable(db: Q, soundId: string, viewer: string, what: 'reels' | 'stories' = 'reels'): Promise<void> {
+export async function assertSoundUsable(db: Q, soundId: string, viewer: string, what: 'reels' | 'stories' | 'posts' = 'reels'): Promise<void> {
   const { rows } = await db.query(`SELECT ${soundUsableSql('$1')} AS usable, ${soundVisibleSql('$1')} AS visible FROM sounds s WHERE s.id = $2`, [
     viewer,
     soundId,

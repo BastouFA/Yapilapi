@@ -44,6 +44,10 @@ import type {
   RoomReaction,
   RoomSummary,
   Sound,
+  MusicSource,
+  MusicSourceInfo,
+  MusicTab,
+  MusicTrack,
   EditorParamsInput,
   TagPermission,
   ConversationYaps,
@@ -307,6 +311,22 @@ export function createClient(opts: ClientOptions) {
       get: (id: string) => get<{ sound: Sound }>(`/v1/sounds/${id}`),
       rename: (id: string, title: string) => patch<{ sound: Sound }>(`/v1/sounds/${id}`, { title }),
       reels: (id: string, sort: 'recent' | 'top' = 'recent', cursor?: string) => get<Page<Post>>(`/v1/sounds/${id}/reels${qs({ sort, cursor })}`),
+    },
+    /**
+     * Music for reels, posts and stories: in-app sounds and songs from the catalogue providers that are
+     * on. Each song carries its licence; business accounts only get songs cleared for commercial use.
+     */
+    music: {
+      sources: () => get<{ items: MusicSourceInfo[] }>('/v1/music/sources'),
+      list: (p: { q?: string; tab?: MusicTab; source?: MusicSource; limit?: number } = {}) =>
+        get<{ items: MusicTrack[]; sources: MusicSourceInfo[] }>(`/v1/music${qs(p)}`),
+      track: (id: string) => get<{ track: MusicTrack }>(`/v1/music/tracks/${id}`),
+      posts: (id: string, cursor?: string) => get<Page<Post>>(`/v1/music/tracks/${id}/posts${qs({ cursor })}`),
+      /** Save a song or a sound for later (the picker's Saved tab), or take it off. */
+      save: (track: Pick<MusicTrack, 'id' | 'source'>, on: boolean) => {
+        const path = track.source === 'library' ? `/v1/sounds/${track.id}/save` : `/v1/music/tracks/${track.id}/save`;
+        return on ? put<{ saved: boolean }>(path) : del<{ saved: boolean }>(path);
+      },
     },
     /** Your circles. Only you see them; nobody is told which circles they're in. */
     circles: {

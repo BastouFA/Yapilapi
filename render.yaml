@@ -70,6 +70,16 @@ envVarGroups:
         sync: false
       - key: PAYSTACK_PUBLIC_KEY
         sync: false
+      # Optional: music catalogue sources (docs/operations/music.md). Each is off until set.
+      - key: JAMENDO_CLIENT_ID
+        sync: false
+      # A licensing partner's catalogue, once a deal is signed: both or neither.
+      - key: MUSIC_LICENSED_API_URL
+        sync: false
+      - key: MUSIC_LICENSED_API_KEY
+        sync: false
+      - key: MUSIC_LICENSED_NAME
+        sync: false
       # Optional: confirming phone numbers by text (Twilio Verify). Without it, people confirm by email.
       - key: SMS_PROVIDER
         value: dev
