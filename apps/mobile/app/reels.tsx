@@ -1584,7 +1584,7 @@ function OptionsSheet({
             label={t('reel.speed')}
             value={String(speed)}
             onChange={(v) => onSpeed(Number(v) as ReelSpeed)}
-            options={REEL_SPEEDS.map((sp) => ({ id: String(sp), label: sp === 1 ? t('reel.speed.normal') : `${number(sp)}×` }))}
+            options={REEL_SPEEDS.map((sp) => ({ id: String(sp), label: `${number(sp)}×` }))}
           />
           <Text style={{ color: c.inkMuted, fontWeight: '700', fontSize: 13, marginTop: space[2] }}>{t('reel.captions')}</Text>
           {post.media.find((m) => m.kind === 'video')?.captions?.length ? (
