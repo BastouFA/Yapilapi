@@ -5,6 +5,7 @@ import type { FaqEntry } from '../../../../packages/api-client/src/index';
 import { ROOM_TITLE_MAX } from '../../../../packages/shared/src/constants';
 import type { Community, Post, PublicUser, RoomSummary } from '../../../../packages/shared/src/types';
 import { client, errorMessage } from '../../lib/api';
+import { DateField } from '../../lib/date-time';
 import { useT, type Translate } from '../../lib/i18n';
 import { PostCard } from '../../lib/post';
 import { roomDuration, roomStatusLabel } from '../../lib/rooms';
@@ -196,7 +197,14 @@ export default function CommunityScreen() {
         tab === 'faq' && faq?.canEdit && !locked ? (
           <AddFaq slug={slug} onAdded={loadFaq} />
         ) : tab === 'rooms' && rooms?.canStart && !locked ? (
-          <StartRoom slug={slug} />
+          <StartRoom
+            slug={slug}
+            onScheduled={() =>
+              void client()
+                .then((api) => api.communities.rooms(slug))
+                .then(setRooms, () => {})
+            }
+          />
         ) : null
       }
       onEndReached={async () => {
@@ -325,28 +333,71 @@ function RoomCard({ room }: { room: RoomSummary }) {
   );
 }
 
-/** Moderators and owners start a room now; scheduling is on the web. */
-function StartRoom({ slug }: { slug: string }) {
-  const { t } = useT();
+/** The API takes a scheduled start in the future and within 60 days (apps/api/src/modules/rooms.ts). */
+const ROOM_SCHEDULE_MIN_MS = 5 * 60_000;
+const ROOM_SCHEDULE_MAX_MS = 60 * 86_400_000;
+
+/** Moderators and owners start a room now, or schedule it for later (members can ask to be reminded). */
+function StartRoom({ slug, onScheduled }: { slug: string; onScheduled: () => void }) {
+  const { t, dateTime } = useT();
   const c = useColors();
   const [title, setTitle] = useState('');
+  const [when, setWhen] = useState<'now' | 'later'>('now');
+  const [at, setAt] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+  const later = when === 'later';
   return (
     <Card style={{ gap: space[3], marginTop: space[3] }}>
       <Title>{t('m.rooms.new')}</Title>
       {error ? <Notice tone="danger">{error}</Notice> : null}
+      {done ? <Notice>{done}</Notice> : null}
       <Field label={t('m.rooms.titleLabel')} value={title} onChangeText={setTitle} maxLength={ROOM_TITLE_MAX} />
+      <Segmented
+        label={t('m.rooms.when')}
+        options={[
+          { id: 'now', label: t('m.rooms.startNow') },
+          { id: 'later', label: t('m.rooms.later') },
+        ]}
+        value={when}
+        onChange={(v) => {
+          setWhen(v);
+          setDone(null);
+        }}
+      />
+      {later ? (
+        <DateField
+          label={t('m.rooms.startsAt')}
+          sheetTitle={t('m.rooms.whenTitle')}
+          value={at}
+          onChange={setAt}
+          min={new Date(Date.now() + ROOM_SCHEDULE_MIN_MS)}
+          max={new Date(Date.now() + ROOM_SCHEDULE_MAX_MS)}
+          quick
+          hint={t('m.rooms.laterHint')}
+        />
+      ) : null}
       <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('m.rooms.startNote')}</Text>
       <Button
-        label={t('m.rooms.start')}
-        icon="mic"
-        disabled={!title.trim() || saving}
+        label={later ? t('m.rooms.scheduleRoom') : t('m.rooms.start')}
+        icon={later ? 'calendar-outline' : 'mic'}
+        disabled={!title.trim() || saving || (later && !at)}
         onPress={async () => {
           setSaving(true);
           setError(null);
+          setDone(null);
           try {
-            const { room } = await (await client()).communities.startRoom(slug, { title: title.trim() });
+            const api = await client();
+            if (later && at) {
+              await api.communities.startRoom(slug, { title: title.trim(), scheduledFor: at.toISOString() });
+              setTitle('');
+              setAt(null);
+              setDone(t('m.rooms.scheduledFor', { time: dateTime(at) }));
+              onScheduled();
+              return;
+            }
+            const { room } = await api.communities.startRoom(slug, { title: title.trim() });
             setTitle('');
             router.push(`/room/${room.id}`);
           } catch (e) {

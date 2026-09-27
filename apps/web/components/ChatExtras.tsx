@@ -2,46 +2,55 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { BottomSheet, Button, Icon } from '@yapilapi/design-system';
-import { DISAPPEARING_SECONDS, type Message, type MessagePreview, type PinnedMessage } from '@yapilapi/shared';
+import { DISAPPEARING_SECONDS, type Message, type MessageKey, type MessagePreview, type PinnedMessage } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
+import { useSession } from '@/app/providers';
+
+type T = (key: MessageKey, vars?: Record<string, string | number>) => string;
 
 /** Quick reactions offered on every message. */
 export const QUICK_REACTIONS = ['❤️', '😂', '😮', '😢', '👍', '🙏'] as const;
 
-const DISAPPEARING_LABEL: Record<number, string> = { 86400: '24 hours', 604800: '7 days', 7776000: '90 days' };
-export const disappearingLabel = (seconds: number | null | undefined) => (seconds ? (DISAPPEARING_LABEL[seconds] ?? `${seconds} seconds`) : 'Off');
+const DISAPPEARING_LABEL: Record<number, MessageKey> = { 86400: 'm.chat.hours24', 604800: 'm.chat.days7', 7776000: 'm.chat.days90' };
+export const disappearingLabel = (t: T, seconds: number | null | undefined) => {
+  if (!seconds) return t('m.chat.off');
+  const key = DISAPPEARING_LABEL[seconds];
+  return key ? t(key) : t('m.unit.seconds', { count: seconds });
+};
 
 /** A one-line description of a quoted message. */
-export function previewText(p: MessagePreview): string {
-  if (!p.available) return 'This message isn’t available.';
-  if (p.unsent) return 'Message unsent';
+export function previewText(t: T, p: MessagePreview): string {
+  if (!p.available) return t('m.chat.quoteUnavailable');
+  if (p.unsent) return t('m.chat.unsent');
   if (p.body) return p.body;
   switch (p.attachmentKind) {
     case 'image':
-      return 'Photo';
+      return t('m.post.photo');
     case 'video':
-      return 'Video';
+      return t('m.chat.video');
     case 'audio':
-      return 'Voice message';
+      return t('m.chat.voiceMessage');
     default:
-      return p.attachmentKind ? 'Attachment' : 'Message';
+      return p.attachmentKind ? t('m.chat.attachment') : t('chat.message');
   }
 }
 
 /** The quoted original inside a reply bubble. Selecting it scrolls to the original. */
 export function MessageQuote({ preview, mine, meId, onJump }: { preview: MessagePreview; mine: boolean; meId?: string; onJump: (id: string) => void }) {
-  const who = !preview.available ? null : preview.sender?.id === meId ? 'You' : preview.sender?.displayName;
+  const { t } = useSession();
+  const who = !preview.available ? null : preview.sender?.id === meId ? t('m.chat.you') : preview.sender?.displayName;
+  const text = previewText(t, preview);
   return (
     <button
       type="button"
       className={`chat-quote${mine ? ' chat-quote--mine' : ''}`}
       disabled={!preview.available}
       onClick={() => onJump(preview.id)}
-      aria-label={preview.available ? `Go to the message from ${who}: ${previewText(preview)}` : previewText(preview)}
+      aria-label={preview.available ? t('chat.goToWithText', { name: who ?? '', text }) : text}
     >
       {who ? <bdi className="chat-quote__who">{who}</bdi> : null}
       <span className="chat-quote__text" dir="auto">
-        {previewText(preview)}
+        {text}
       </span>
     </button>
   );
@@ -49,6 +58,7 @@ export function MessageQuote({ preview, mine, meId, onJump }: { preview: Message
 
 /** Reaction counts under a bubble; selecting one adds or removes yours. */
 export function ReactionRow({ message, mine, onToggle }: { message: Message; mine: boolean; onToggle: (emoji: string, on: boolean) => void }) {
+  const { tp } = useSession();
   if (!message.reactions?.length) return null;
   return (
     <div className={`chat-reactions${mine ? ' chat-reactions--mine' : ''}`}>
@@ -59,7 +69,7 @@ export function ReactionRow({ message, mine, onToggle }: { message: Message; min
           className={`chat-reaction${r.mine ? ' chat-reaction--mine' : ''}`}
           // A toggle: the name stays the same and aria-pressed says whether you reacted.
           aria-pressed={r.mine}
-          aria-label={`${r.emoji} ${r.count === 1 ? '1 reaction' : `${r.count} reactions`}`}
+          aria-label={tp('m.chat.reactionCount', r.count, { emoji: r.emoji })}
           onClick={() => onToggle(r.emoji, !r.mine)}
         >
           <span aria-hidden>{r.emoji}</span>
@@ -76,6 +86,7 @@ export function ReactionRow({ message, mine, onToggle }: { message: Message; min
  * React button or the message menu), as does picking one.
  */
 export function ReactionPicker({ onPick, onClose }: { onPick: (emoji: string) => void; onClose: () => void }) {
+  const { t } = useSession();
   const ref = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   const close = useRef(onClose);
@@ -100,7 +111,7 @@ export function ReactionPicker({ onPick, onClose }: { onPick: (emoji: string) =>
       ref={ref}
       className="chat-picker"
       role="group"
-      aria-label="React"
+      aria-label={t('chat.react')}
       onKeyDown={(e) => {
         const items = [...(ref.current?.querySelectorAll<HTMLButtonElement>('button') ?? [])];
         const i = items.indexOf(document.activeElement as HTMLButtonElement);
@@ -120,7 +131,7 @@ export function ReactionPicker({ onPick, onClose }: { onPick: (emoji: string) =>
       }}
     >
       {QUICK_REACTIONS.map((e) => (
-        <button key={e} type="button" className="chat-picker__item" aria-label={`React with ${e}`} onClick={() => onPick(e)}>
+        <button key={e} type="button" className="chat-picker__item" aria-label={t('m.chat.reactWith', { emoji: e })} onClick={() => onPick(e)}>
           {e}
         </button>
       ))}
@@ -144,13 +155,14 @@ export function applyReaction(m: Message, emoji: string, byMe: boolean, removed:
 
 /** The line in the chat that tells everyone who changed disappearing messages. */
 export function SystemLine({ message, meId }: { message: Message; meId?: string }) {
-  const who = message.sender.id === meId ? 'You' : message.sender.displayName;
+  const { t } = useSession();
+  const who = message.sender.id === meId ? t('m.chat.you') : message.sender.displayName;
   const s = message.system;
   const text =
     s?.type === 'disappearing'
       ? s.seconds
-        ? `${who} turned on disappearing messages. New messages will disappear ${disappearingLabel(s.seconds)} after they’re sent.`
-        : `${who} turned off disappearing messages.`
+        ? t('m.chat.systemOn', { name: who, time: disappearingLabel(t, s.seconds) })
+        : t('m.chat.systemOff', { name: who })
       : '';
   return (
     <p className="chat-system" role="note">
@@ -171,12 +183,13 @@ export function PinnedBar({
   onJump: (id: string) => void;
   onUnpin: (id: string) => void;
 }) {
+  const { t } = useSession();
   const [i, setI] = useState(0);
   if (!pins.length) return null;
   const at = Math.min(i, pins.length - 1);
   const pin = pins[at]!;
   return (
-    <div className="chat-pinned" role="region" aria-label="Pinned messages">
+    <div className="chat-pinned" role="region" aria-label={t('chat.pinnedMessages')}>
       <Icon name="map-pin" size={16} />
       <button
         type="button"
@@ -186,14 +199,14 @@ export function PinnedBar({
           setI((at + 1) % pins.length);
         }}
       >
-        <span className="chat-pinned__label">{pins.length > 1 ? `Pinned ${at + 1} of ${pins.length}` : 'Pinned'}</span>
+        <span className="chat-pinned__label">{pins.length > 1 ? t('m.chat.pinnedOf', { n: at + 1, total: pins.length }) : t('m.chat.pinned')}</span>
         <span className="chat-pinned__text" dir="auto">
           {pin.message.sender ? <bdi>{pin.message.sender.displayName}: </bdi> : null}
-          {previewText(pin.message)}
+          {previewText(t, pin.message)}
         </span>
       </button>
       {canManage ? (
-        <button type="button" className="yp-action" aria-label="Unpin this message" onClick={() => onUnpin(pin.message.id)}>
+        <button type="button" className="yp-action" aria-label={t('m.chat.unpinA11y')} onClick={() => onUnpin(pin.message.id)}>
           <Icon name="x" size={16} />
         </button>
       ) : null}
@@ -203,6 +216,7 @@ export function PinnedBar({
 
 /** Search the messages of this chat. Selecting a result goes to it. */
 export function ChatSearch({ conversationId, onJump, onClose }: { conversationId: string; onJump: (id: string) => void; onClose: () => void }) {
+  const { t, tp, locale } = useSession();
   const [q, setQ] = useState('');
   const [results, setResults] = useState<Message[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -243,14 +257,14 @@ export function ChatSearch({ conversationId, onJump, onClose }: { conversationId
     <div className="chat-search" role="search">
       <div className="row" style={{ gap: 8 }}>
         <label htmlFor="chat-search" className="yp-visually-hidden">
-          Search this chat
+          {t('m.chat.search')}
         </label>
         <input
           ref={input}
           id="chat-search"
           type="search"
           className="chat-search__input"
-          placeholder="Search this chat"
+          placeholder={t('m.chat.search')}
           value={q}
           maxLength={100}
           onChange={(e) => setQ(e.currentTarget.value)}
@@ -261,7 +275,7 @@ export function ChatSearch({ conversationId, onJump, onClose }: { conversationId
             }
           }}
         />
-        <button type="button" className="yp-action" aria-label="Close search" onClick={onClose}>
+        <button type="button" className="yp-action" aria-label={t('chat.closeSearch')} onClick={onClose}>
           <Icon name="x" />
         </button>
       </div>
@@ -270,19 +284,21 @@ export function ChatSearch({ conversationId, onJump, onClose }: { conversationId
         {error ??
           (results
             ? results.length
-              ? `${results.length}${cursor ? '+' : ''} ${results.length === 1 ? 'message' : 'messages'} found`
-              : 'No messages match.'
+              ? cursor
+                ? t('m.chat.searchFoundMore', { count: results.length })
+                : tp('m.chat.searchFound', results.length)
+              : t('m.chat.searchNone')
             : '')}
       </p>
       {error ? <p className="muted">{error}</p> : null}
       {results ? (
         results.length ? (
-          <ul className="chat-search__results" aria-label="Search results">
+          <ul className="chat-search__results" aria-label={t('chat.searchResults')}>
             {results.map((m) => (
               <li key={m.id}>
                 <button type="button" className="chat-search__result" onClick={() => onJump(m.id)}>
                   <span className="chat-search__meta">
-                    <bdi>{m.sender.displayName}</bdi> · {new Date(m.createdAt).toLocaleDateString()}
+                    <bdi>{m.sender.displayName}</bdi> · {new Date(m.createdAt).toLocaleDateString(locale)}
                   </span>
                   <span dir="auto">{m.body}</span>
                 </button>
@@ -299,13 +315,13 @@ export function ChatSearch({ conversationId, onJump, onClose }: { conversationId
                     setCursor(r.nextCursor);
                   }}
                 >
-                  Show more
+                  {t('chat.showMore')}
                 </Button>
               </li>
             ) : null}
           </ul>
         ) : (
-          <p className="muted">No messages match.</p>
+          <p className="muted">{t('m.chat.searchNone')}</p>
         )
       ) : null}
     </div>
@@ -326,22 +342,22 @@ export function DisappearingSheet({
   canChange: boolean;
   onChange: (seconds: number | null) => Promise<void>;
 }) {
+  const { t } = useSession();
   const [busy, setBusy] = useState(false);
   const options: (number | null)[] = [null, ...DISAPPEARING_SECONDS];
   return (
-    <BottomSheet open={open} onClose={onClose} title="Disappearing messages">
+    <BottomSheet open={open} onClose={onClose} title={t('m.chat.disappearing')}>
       <div className="stack" style={{ gap: 12 }}>
         <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-          When this is on, new messages in this chat are deleted for everyone after the time you choose. Messages sent before you change it aren’t affected.
-          Everyone here sees who changed it.
+          {t('m.chat.disappearingHint')}
         </p>
         {!canChange ? (
           <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-            Only group admins can change this.
+            {t('m.chat.disappearingAdmins')}
           </p>
         ) : null}
         <fieldset className="chat-radio" disabled={!canChange || busy}>
-          <legend className="yp-visually-hidden">Delete new messages after</legend>
+          <legend className="yp-visually-hidden">{t('chat.deleteAfter')}</legend>
           {options.map((s) => (
             <label key={String(s)} className="chat-radio__option">
               <input
@@ -357,7 +373,7 @@ export function DisappearingSheet({
                   }
                 }}
               />
-              {disappearingLabel(s)}
+              {disappearingLabel(t, s)}
             </label>
           ))}
         </fieldset>

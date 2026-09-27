@@ -10,7 +10,7 @@ import {
   type RefObject,
   type TextareaHTMLAttributes,
 } from 'react';
-import { smallAvatarUrl } from '@yapilapi/shared';
+import { smallAvatarUrl, t } from '@yapilapi/shared';
 import { Icon, type IconName } from './icons.tsx';
 import { useDataSaver } from './data-saver.tsx';
 
@@ -268,12 +268,15 @@ export function Alert({
   onDismiss,
   children,
   className,
+  locale = 'en',
 }: {
   tone?: 'info' | 'success' | 'warning' | 'danger';
   title?: string;
   onDismiss?: () => void;
   children?: ReactNode;
   className?: string;
+  /** Language of the dismiss button's label. */
+  locale?: string;
 }) {
   return (
     <div className={cx('yp-alert', `yp-alert--${tone}`, className)} role={tone === 'danger' ? 'alert' : 'status'}>
@@ -283,7 +286,7 @@ export function Alert({
         {children}
       </div>
       {onDismiss ? (
-        <button type="button" className="yp-alert__close" onClick={onDismiss} aria-label="Dismiss">
+        <button type="button" className="yp-alert__close" onClick={onDismiss} aria-label={t('ds.dismiss', locale)}>
           <Icon name="x" size={18} />
         </button>
       ) : null}

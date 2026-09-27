@@ -14,7 +14,7 @@ type Entry = { user: PublicUser; followsYou: boolean };
  * uses the people suggestions, narrowed to your followers.
  */
 export function CloseFriendsCard() {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const id = useId();
   const [list, setList] = useState<Entry[] | null>(null);
   const [q, setQ] = useState('');
@@ -74,16 +74,13 @@ export function CloseFriendsCard() {
 
   return (
     <div id="close-friends">
-      <Card
-        title="Close friends"
-        subtitle="Share a story with close friends only when you post it. They see a green ring. Nobody is told when you add or remove them."
-      >
+      <Card title={t('m.closeFriends.title')} subtitle={t('m.closeFriends.hint')}>
         <div className="stack">
           <h3 className="yp-field__label" style={{ margin: 0 }}>
-            On your list{list ? ` (${list.length})` : ''}
+            {list ? t('circles.closeFriendsCount', { count: list.length }) : t('m.closeFriends.onList')}
           </h3>
           {list === null ? (
-            <p className="muted">Loading</p>
+            <p className="muted">{t('common.loading')}</p>
           ) : list.length ? (
             <ul className="close-friends__list">
               {list.map((x) => (
@@ -94,36 +91,36 @@ export function CloseFriendsCard() {
                     <bdi className="sound-row__title">{x.user.displayName}</bdi>
                     <span className="sound-row__meta">
                       <bdi>@{x.user.username}</bdi>
-                      {x.followsYou ? '' : " · Doesn't follow you now, so doesn't see these stories"}
+                      {x.followsYou ? '' : ` · ${t('m.closeFriends.notFollowing')}`}
                     </span>
                   </span>
                   <Button size="sm" variant="ghost" loading={busy === x.user.id} onClick={() => remove(x.user)}>
-                    Remove
+                    {t('m.closeFriends.remove')}
                   </Button>
                 </li>
               ))}
             </ul>
           ) : (
             <p className="muted" style={{ margin: 0 }}>
-              Nobody yet. Add people who follow you below.
+              {t('m.closeFriends.empty')}
             </p>
           )}
 
           <label htmlFor={`${id}-q`} className="yp-field__label">
-            Add people who follow you
+            {t('m.closeFriends.addHeading')}
           </label>
           <input
             id={`${id}-q`}
             className="yp-input"
             type="search"
             autoComplete="off"
-            placeholder="Type a name or username"
+            placeholder={t('m.closeFriends.search')}
             value={q}
             maxLength={60}
             onChange={(e) => setQ(e.currentTarget.value)}
           />
           {addable.length ? (
-            <ul className="close-friends__list" aria-label="Followers you can add">
+            <ul className="close-friends__list" aria-label={t('circles.closeFriendsAddable')}>
               {addable.map((u) => (
                 <li key={u.id} className="close-friends__row">
                   <Avatar name={u.displayName} src={u.avatarUrl} size="sm" />
@@ -134,14 +131,14 @@ export function CloseFriendsCard() {
                     </span>
                   </span>
                   <Button size="sm" variant="secondary" loading={busy === u.id} onClick={() => add(u)}>
-                    Add
+                    {t('m.closeFriends.add')}
                   </Button>
                 </li>
               ))}
             </ul>
           ) : (
             <p className="muted" role="status" style={{ margin: 0, fontSize: 14 }}>
-              {q.trim() ? `None of your followers match "${q.trim()}".` : 'No more followers to add.'}
+              {q.trim() ? t('circles.closeFriendsNoMatch', { query: q.trim() }) : t('m.closeFriends.none')}
             </p>
           )}
         </div>

@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type InputHTMLAttributes, type KeyboardEvent, type TextareaHTMLAttributes } from 'react';
 import { Avatar } from '@yapilapi/design-system';
 import { api } from '@/lib/api';
+import { useSession } from '@/app/providers';
 
 type Suggestion = { key: string; insert: string; primary: string; secondary?: string; avatar?: { name: string; src: string | null } };
 
@@ -35,6 +36,7 @@ export function AutocompleteText(props: Props) {
     className,
     ...rest
   } = props as Common & { as?: 'textarea' | 'input' } & TextareaHTMLAttributes<HTMLTextAreaElement>;
+  const { t } = useSession();
   const ref = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
   const listId = useId();
   const [token, setToken] = useState<{ kind: '@' | '#'; q: string; start: number } | null>(null);
@@ -131,7 +133,7 @@ export function AutocompleteText(props: Props) {
     <div className="ac">
       {as === 'input' ? <input {...(shared as InputHTMLAttributes<HTMLInputElement>)} ref={ref} /> : <textarea {...shared} ref={ref} />}
       {open ? (
-        <ul id={listId} role="listbox" className="ac__list" aria-label={token!.kind === '@' ? 'People' : 'Tags'}>
+        <ul id={listId} role="listbox" className="ac__list" aria-label={token!.kind === '@' ? t('m.ac.people') : t('m.ac.tags')}>
           {items.map((s, i) => (
             <li
               key={s.key}

@@ -167,6 +167,7 @@ export default function Drafts() {
       />
       <SchedulePicker
         visible={!!timing}
+        value={timing?.scheduledAt ? new Date(timing.scheduledAt) : null}
         onClose={() => setTiming(null)}
         onPick={(at) => {
           const post = timing;

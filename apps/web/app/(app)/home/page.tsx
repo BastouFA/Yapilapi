@@ -14,7 +14,7 @@ import { SuggestedPeople } from '@/components/SuggestedPeople';
 import { useSession } from '../../providers';
 
 export default function Home() {
-  const { t, unread, flags } = useSession();
+  const { t, unread, flags, locale } = useSession();
   const router = useRouter();
   const [mode, setMode] = useState<FeedMode>('for_you');
   const [moments, setMoments] = useState<StoryGroup[]>([]);
@@ -57,7 +57,7 @@ export default function Home() {
         </Link>
       </div>
 
-      <MomentsStrip groups={moments} onOpen={setViewing} onCreate={() => router.push('/camera?mode=story')} />
+      <MomentsStrip groups={moments} onOpen={setViewing} onCreate={() => router.push('/camera?mode=story')} locale={locale} />
 
       <Segments
         label="Feed"

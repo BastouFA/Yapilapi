@@ -23,7 +23,7 @@ export function FollowList({
   onClose: () => void;
   onFollowChange?: () => void;
 }) {
-  const { me, toast } = useSession();
+  const { me, toast, t } = useSession();
   const [tab, setTab] = useState(initial);
   const [items, setItems] = useState<PublicUser[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -61,15 +61,15 @@ export function FollowList({
   };
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={`${name}: ${tab === 'followers' ? 'followers' : 'following'}`}>
+    <BottomSheet open={open} onClose={onClose} title={t(tab === 'followers' ? 'follow.titleFollowers' : 'follow.titleFollowing', { name })}>
       <div className="stack">
         <Segments
-          label="List"
+          label={t('follow.list')}
           value={tab}
           onChange={setTab}
           options={[
-            { id: 'followers', label: 'Followers' },
-            { id: 'following', label: 'Following' },
+            { id: 'followers', label: t('profile.followers') },
+            { id: 'following', label: t('profile.following') },
           ]}
         />
         {error ? (
@@ -91,17 +91,23 @@ export function FollowList({
                   secondary={`@${u.username}`}
                   end={
                     u.id === me?.id ? null : justFollowed.has(u.id) && follows.has(u.id) ? (
-                      <Button size="sm" variant="secondary" aria-disabled="true" aria-label={`Following ${u.displayName}`} onClick={() => {}}>
-                        Following
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        aria-disabled="true"
+                        aria-label={t('follow.followingName', { name: u.displayName })}
+                        onClick={() => {}}
+                      >
+                        {t('profile.unfollow')}
                       </Button>
                     ) : follows.has(u.id) ? (
                       <span className="muted" style={{ fontSize: 13 }}>
-                        Following
+                        {t('profile.unfollow')}
                       </span>
                     ) : (
                       <Button
                         size="sm"
-                        aria-label={`Follow ${u.displayName}`}
+                        aria-label={t('follow.followName', { name: u.displayName })}
                         onClick={async () => {
                           setJustFollowed((f) => new Set(f).add(u.id));
                           setFollows((f) => new Set(f).add(u.id));
@@ -118,7 +124,7 @@ export function FollowList({
                           }
                         }}
                       >
-                        Follow
+                        {t('profile.follow')}
                       </Button>
                     )
                   }
@@ -127,7 +133,7 @@ export function FollowList({
             </List>
             {cursor ? (
               <Button variant="secondary" size="sm" onClick={more}>
-                Show more
+                {t('follow.showMore')}
               </Button>
             ) : null}
           </>
@@ -135,11 +141,11 @@ export function FollowList({
           <p className="muted">
             {userId === me?.id
               ? tab === 'followers'
-                ? 'Nobody follows you yet. Share your profile to get started.'
-                : "You aren't following anyone yet. Discover has people to start with."
+                ? t('follow.emptyFollowersSelf')
+                : t('follow.emptyFollowingSelf')
               : tab === 'followers'
-                ? `Nobody follows ${name} yet.`
-                : `${name} isn't following anyone yet.`}
+                ? t('follow.emptyFollowers', { name })
+                : t('follow.emptyFollowing', { name })}
           </p>
         )}
       </div>

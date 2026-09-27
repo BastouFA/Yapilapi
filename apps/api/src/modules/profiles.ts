@@ -138,7 +138,8 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       coverUrl: r.cover_url,
       coverAlt: r.cover_url ? (r.cover_alt ?? null) : null,
       nowStatus: status,
-      links: r.links,
+      // Web links only: anything saved before links had to be http(s) is left out rather than shown as a link.
+      links: ((r.links ?? []) as { label: string; url: string }[]).filter((l) => typeof l?.url === 'string' && /^https?:\/\//i.test(l.url)),
       isPrivate: r.is_private,
       interests: r.interests,
       counts: { followers: r.followers, following: r.following, friends: r.friends, posts: r.posts },

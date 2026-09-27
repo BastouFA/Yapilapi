@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboard
 import { Avatar, Button, Icon, tagBubbleClass } from '@yapilapi/design-system';
 import { MAX_PHOTO_TAGS, type PublicUser } from '@yapilapi/shared';
 import { api } from '@/lib/api';
+import { useSession } from '@/app/providers';
 import type { PersonSuggestion } from './PeoplePicker';
 
 /** Someone tagged in a photo that isn't posted yet, at a spot given as fractions of the width and height. */
@@ -33,6 +34,8 @@ export function TagLayer({
   onRemove: (index: number) => void;
   surfaceRef?: RefObject<HTMLButtonElement | null>;
 }) {
+  const { t, locale } = useSession();
+  const percent = new Intl.NumberFormat(locale, { style: 'percent' });
   const layer = useRef<HTMLDivElement>(null);
   const drag = useRef<{ index: number; moved: boolean } | null>(null);
   const full = tags.length >= MAX_PHOTO_TAGS;
@@ -74,11 +77,7 @@ export function TagLayer({
         type="button"
         className="ptag-layer__surface"
         disabled={full}
-        aria-label={
-          full
-            ? `You've tagged ${MAX_PHOTO_TAGS} people, the most for one photo`
-            : 'Tag someone in this photo. Click where they are, or press Enter to tag someone in the middle.'
-        }
+        aria-label={full ? t('photoTags.full', { count: MAX_PHOTO_TAGS }) : t('photoTags.surface')}
         onClick={(e) => {
           // A click from the keyboard has no position: use the middle of the photo.
           const spot = e.detail === 0 ? { x: 0.5, y: 0.5 } : spotAt(e.clientX, e.clientY);
@@ -87,23 +86,32 @@ export function TagLayer({
       />
       {pending ? <span className="ptag-layer__spot" style={{ left: pct(pending.x), top: pct(pending.y) }} aria-hidden /> : null}
       {tags.length ? (
-        <ul className="yp-phototags" aria-label="People tagged">
-          {tags.map((t, i) => (
-            <li key={t.user.id} className={tagBubbleClass(t.x, t.y)} style={{ left: `${t.x * 100}%`, top: `${t.y * 100}%` }}>
+        <ul className="yp-phototags" aria-label={t('photoTags.list')}>
+          {tags.map((tag, i) => (
+            <li key={tag.user.id} className={tagBubbleClass(tag.x, tag.y)} style={{ left: `${tag.x * 100}%`, top: `${tag.y * 100}%` }}>
               <span className="yp-phototag__bubble">
                 <button
                   type="button"
                   className="yp-phototag__name ptag-layer__name"
-                  aria-label={`${t.user.displayName}, tagged ${pct(t.x)} across and ${pct(t.y)} down. Arrow keys move the tag; Delete removes it.`}
+                  aria-label={t('photoTags.tagA11y', {
+                    name: tag.user.displayName,
+                    x: percent.format(Math.round(tag.x * 100) / 100),
+                    y: percent.format(Math.round(tag.y * 100) / 100),
+                  })}
                   onKeyDown={keys(i)}
                   onPointerDown={startDrag(i)}
                   onPointerMove={moveDrag}
                   onPointerUp={endDrag}
                   onPointerCancel={endDrag}
                 >
-                  <bdi>{t.user.displayName}</bdi>
+                  <bdi>{tag.user.displayName}</bdi>
                 </button>
-                <button type="button" className="yp-phototag__remove" onClick={() => onRemove(i)} aria-label={`Remove tag for ${t.user.displayName}`}>
+                <button
+                  type="button"
+                  className="yp-phototag__remove"
+                  onClick={() => onRemove(i)}
+                  aria-label={t('photoTags.remove', { name: tag.user.displayName })}
+                >
                   <Icon name="x" size={12} />
                 </button>
               </span>
@@ -120,6 +128,7 @@ export function TagLayer({
  * allow tags from you are shown but can't be chosen. Escape cancels.
  */
 export function TagPersonSearch({ exclude, onPick, onCancel }: { exclude: string[]; onPick: (u: PublicUser) => void; onCancel: () => void }) {
+  const { t } = useSession();
   const id = useId();
   const [q, setQ] = useState('');
   const [items, setItems] = useState<PersonSuggestion[] | null>(null);
@@ -151,7 +160,7 @@ export function TagPersonSearch({ exclude, onPick, onCancel }: { exclude: string
   return (
     <div className="ptag-search">
       <label htmlFor={`${id}-q`} className="yp-field__label">
-        Who&apos;s in the photo?
+        {t('photoTags.who')}
       </label>
       <div className="row" style={{ flexWrap: 'nowrap' }}>
         <input
@@ -164,7 +173,7 @@ export function TagPersonSearch({ exclude, onPick, onCancel }: { exclude: string
           aria-autocomplete="list"
           aria-activedescendant={shown[active] ? `${id}-opt-${active}` : undefined}
           autoComplete="off"
-          placeholder="Type a name or username"
+          placeholder={t('m.group.placeholder')}
           value={q}
           onChange={(e) => setQ(e.currentTarget.value)}
           onKeyDown={(e) => {
@@ -183,11 +192,11 @@ export function TagPersonSearch({ exclude, onPick, onCancel }: { exclude: string
           }}
         />
         <Button size="sm" variant="ghost" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
       </div>
       {shown.length ? (
-        <ul id={`${id}-list`} role="listbox" className="picker__list" aria-label="People">
+        <ul id={`${id}-list`} role="listbox" className="picker__list" aria-label={t('m.ac.people')}>
           {shown.map((s, i) => (
             <li
               key={s.user.id}
@@ -207,7 +216,7 @@ export function TagPersonSearch({ exclude, onPick, onCancel }: { exclude: string
                 <bdi className="picker__name">{s.user.displayName}</bdi>
                 <span className="picker__meta">
                   <bdi>@{s.user.username}</bdi>
-                  {!s.canTag ? " · Doesn't allow tags from you" : ''}
+                  {!s.canTag ? ` · ${t('photoTags.cantTag')}` : ''}
                 </span>
               </span>
             </li>
@@ -215,7 +224,7 @@ export function TagPersonSearch({ exclude, onPick, onCancel }: { exclude: string
         </ul>
       ) : items !== null ? (
         <p className="muted" role="status" style={{ margin: 0, fontSize: 13 }}>
-          {q.trim() ? <>Nobody matches &ldquo;{q.trim()}&rdquo;.</> : 'Type a name to find someone.'}
+          {q.trim() ? t('people.noMatch', { query: q.trim() }) : t('photoTags.typeToFind')}
         </p>
       ) : null}
     </div>
@@ -270,12 +279,11 @@ export function PhotoTagger({ src, alt, tags, onChange }: { src: string; alt: st
 }
 
 export function TagHint({ count }: { count: number }) {
+  const { t, tp } = useSession();
   return (
     <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-      {count >= MAX_PHOTO_TAGS
-        ? `You've tagged ${MAX_PHOTO_TAGS} people, the most for one photo.`
-        : 'Click or tap where someone is in the photo, then choose who it is. Drag a name to move it.'}
-      {count > 0 && count < MAX_PHOTO_TAGS ? ` ${count} tagged.` : ''}
+      {count >= MAX_PHOTO_TAGS ? t('photoTags.full', { count: MAX_PHOTO_TAGS }) : t('photoTags.hint')}
+      {count > 0 && count < MAX_PHOTO_TAGS ? ` ${tp('photoTags.tagged', count)}` : ''}
     </p>
   );
 }

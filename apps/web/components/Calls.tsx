@@ -19,7 +19,7 @@ export const useCalls = () => useContext(Ctx);
  * The caller sends an offer to each person when they answer.
  */
 export function CallsProvider({ children }: { children: React.ReactNode }) {
-  const { me, toast } = useSession();
+  const { me, toast, t } = useSession();
   const [call, setCall] = useState<CallInfo | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
   const [remotes, setRemotes] = useState<Record<string, MediaStream>>({});
@@ -64,12 +64,12 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
       pc.onicecandidate = (e) => e.candidate && void api.calls.signal(callId, userId, 'candidate', e.candidate.toJSON()).catch(() => {});
       pc.ontrack = (e) => setRemotes((r) => ({ ...r, [userId]: e.streams[0]! }));
       pc.onconnectionstatechange = () => {
-        if (pc!.connectionState === 'failed') toast('The connection dropped. Try calling again.');
+        if (pc!.connectionState === 'failed') toast(t('m.calls.dropped'));
       };
       peers.current.set(userId, pc);
       return pc;
     },
-    [toast],
+    [toast, t],
   );
 
   const start = useCallback(
@@ -81,11 +81,11 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
         setPhase('outgoing');
         await getMedia(kind);
       } catch (e) {
-        toast(e instanceof DOMException ? 'Allow camera and microphone access to call.' : errorMessage(e));
+        toast(e instanceof DOMException ? t('calls.allowToCall') : errorMessage(e));
         cleanup();
       }
     },
-    [cleanup, toast],
+    [cleanup, toast, t],
   );
 
   async function answer() {
@@ -98,7 +98,7 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
       ice.current = r.iceServers;
       setPhase('active');
     } catch (e) {
-      toast(e instanceof DOMException ? 'Allow camera and microphone access to answer.' : errorMessage(e));
+      toast(e instanceof DOMException ? t('calls.allowToAnswer') : errorMessage(e));
       await api.calls.decline(call.id).catch(() => {});
       cleanup();
     }
@@ -154,7 +154,7 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
         return n;
       });
       if (cur.participants.length === 2) {
-        toast(e.type === 'call.declined' ? 'Call declined' : 'Call ended');
+        toast(e.type === 'call.declined' ? t('m.calls.declined') : t('m.calls.ended'));
         cleanup();
       }
     }
@@ -164,7 +164,7 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (phase !== 'incoming' && phase !== 'outgoing') return;
     const id = setTimeout(() => {
-      toast(phase === 'incoming' ? 'Missed call' : 'No answer');
+      toast(phase === 'incoming' ? t('m.calls.missed') : t('m.calls.noAnswer'));
       void hangUp();
     }, 45_000);
     return () => clearTimeout(id);
@@ -175,15 +175,15 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
     <Ctx.Provider value={{ start }}>
       {children}
       {phase !== 'idle' && call ? (
-        <div className="call" role="dialog" aria-modal aria-label={phase === 'incoming' ? 'Incoming call' : 'Call'} ref={overlay} tabIndex={-1}>
+        <div className="call" role="dialog" aria-modal aria-label={phase === 'incoming' ? t('calls.incoming') : t('m.calls.call')} ref={overlay} tabIndex={-1}>
           {phase === 'incoming' ? (
             <div className="call__ring">
               <Icon name={call.kind === 'video' ? 'eye' : 'bell'} size={40} />
-              <p>Incoming {call.kind} call</p>
+              <p>{t(call.kind === 'video' ? 'm.calls.incoming.video' : 'm.calls.incoming.audio')}</p>
               <div className="row">
-                <Button onClick={answer}>Answer</Button>
+                <Button onClick={answer}>{t('m.calls.answer')}</Button>
                 <Button variant="danger" onClick={async () => (await api.calls.decline(call.id).catch(() => {}), cleanup())}>
-                  Decline
+                  {t('m.common.decline')}
                 </Button>
               </div>
             </div>
@@ -193,9 +193,9 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
                 {Object.entries(remotes).map(([uid, stream]) => (
                   <RemoteVideo key={uid} stream={stream} audioOnly={call.kind === 'audio'} />
                 ))}
-                {!Object.keys(remotes).length ? <p className="call__status">{phase === 'outgoing' ? 'Calling…' : 'Connecting…'}</p> : null}
+                {!Object.keys(remotes).length ? <p className="call__status">{phase === 'outgoing' ? t('m.calls.calling') : t('m.calls.connecting')}</p> : null}
               </div>
-              {call.kind === 'video' ? <video ref={localVideo} className="call__self" autoPlay muted playsInline aria-label="Your camera" /> : null}
+              {call.kind === 'video' ? <video ref={localVideo} className="call__self" autoPlay muted playsInline aria-label={t('m.calls.yourCamera')} /> : null}
               <div className="call__controls">
                 <Button
                   variant="secondary"
@@ -204,7 +204,7 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
                     setMuted(!muted);
                   }}
                 >
-                  {muted ? 'Unmute' : 'Mute'}
+                  {muted ? t('m.calls.unmute') : t('m.calls.mute')}
                 </Button>
                 {call.kind === 'video' ? (
                   <Button
@@ -214,11 +214,11 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
                       setCameraOff(!cameraOff);
                     }}
                   >
-                    {cameraOff ? 'Camera on' : 'Camera off'}
+                    {cameraOff ? t('m.calls.cameraOn') : t('m.calls.cameraOff')}
                   </Button>
                 ) : null}
                 <Button variant="danger" onClick={hangUp}>
-                  Hang up
+                  {t('m.calls.hangUp')}
                 </Button>
               </div>
             </>
@@ -230,9 +230,10 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
 }
 
 function RemoteVideo({ stream, audioOnly }: { stream: MediaStream; audioOnly: boolean }) {
+  const { t } = useSession();
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     if (ref.current) ref.current.srcObject = stream;
   }, [stream]);
-  return <video ref={ref} autoPlay playsInline className={audioOnly ? 'call__audio' : 'call__remote'} aria-label="Participant" />;
+  return <video ref={ref} autoPlay playsInline className={audioOnly ? 'call__audio' : 'call__remote'} aria-label={t('calls.participant')} />;
 }

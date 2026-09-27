@@ -9,6 +9,8 @@ import { AIPanel, Alert, BottomSheet, Button, Checkbox, formatScheduled, Segment
 import {
   MAX_COLLABORATORS,
   POST_VISIBILITIES,
+  SCHEDULE_MAX_DAYS,
+  SCHEDULE_MIN_MINUTES,
   STORY_VISIBILITIES,
   VISIBILITIES,
   type Community,
@@ -34,7 +36,7 @@ import { PeoplePicker } from '@/components/PeoplePicker';
 import { PhotoTagger, type DraftTag } from '@/components/PhotoTags';
 import { StoryStickerEditor, type DraftSticker } from '@/components/StoryStickerEditor';
 import { draftMusic, musicInput, StoryMusicField, type DraftMusic } from '@/components/StoryMusic';
-import { localInput, nextHour, SCHEDULE_HINT, scheduleBounds } from '@/lib/schedule';
+import { localInput, nextHour, scheduleBounds } from '@/lib/schedule';
 import { useSession } from '../../providers';
 
 type Uploaded = { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string; tags: DraftTag[] };
@@ -42,6 +44,9 @@ type Uploaded = { id: string; kind: 'image' | 'video' | 'audio'; url: string; al
 /** Reels: 3 minutes, or 10 minutes with YAPILAPI Plus (the API enforces the same limits). */
 const REEL_MAX_SECONDS = 180;
 const PLUS_REEL_MAX_SECONDS = 600;
+
+/** What Create makes, in the order of the buttons at the top. */
+const KINDS = ['post', 'reel', 'story'] as const;
 
 /** Photos and videos that open in the editor before uploading (GIFs keep their animation, so they skip it). */
 const EDITABLE = new Set(['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm']);
@@ -65,7 +70,7 @@ function videoSeconds(file: File): Promise<number> {
 }
 
 function Create() {
-  const { t, toast, me, dataSaver } = useSession();
+  const { t, tp, toast, me, dataSaver, locale } = useSession();
   // Data saver: what the videos just picked will cost to upload (photos are made smaller on their own).
   const [videoCost, setVideoCost] = useState<number | null>(null);
   const reelMax = me?.plus ? PLUS_REEL_MAX_SECONDS : REEL_MAX_SECONDS;
@@ -177,7 +182,7 @@ function Create() {
     if (soundId && !remixOf)
       api.sounds.get(soundId).then(
         (r) => (initialMode === 'story' ? setMusic(draftMusic(r.sound)) : setSound(r.sound)),
-        () => toast("That sound isn't available."),
+        () => toast(t('m.sound.missing')),
       );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remixOf]);
@@ -213,7 +218,7 @@ function Create() {
     if (fileRef.current) fileRef.current.value = '';
     const videoBytes = picked.filter(isVideoFile).reduce((n, f) => n + f.size, 0);
     setVideoCost(dataSaver.active && videoBytes ? videoBytes : null);
-    if (kind === 'reel' && picked.some((f) => !isVideoFile(f))) return toast('A reel is a video.');
+    if (kind === 'reel' && picked.some((f) => !isVideoFile(f))) return toast(t('compose.reelIsVideo'));
     // Photos (not GIFs) and videos open in the editor first; anything else uploads as it is.
     const editable = picked.filter((f) => EDITABLE.has(f.type));
     for (const f of picked.filter((f) => !EDITABLE.has(f.type))) enqueueUpload(f, null);
@@ -258,7 +263,9 @@ function Create() {
           const seconds = await videoSeconds(f);
           if (seconds > reelMax + 0.5)
             return toast(
-              `Reels can be up to ${reelMax / 60} minutes${me?.plus ? '' : ', or 10 minutes with YAPILAPI Plus'}. This one is ${Math.round(seconds / 60)} minutes; trim it in the editor.`,
+              me?.plus
+                ? t('compose.reelTooLong', { max: reelMax / 60, length: Math.round(seconds / 60) })
+                : t('compose.reelTooLongPlus', { max: reelMax / 60, plus: PLUS_REEL_MAX_SECONDS / 60, length: Math.round(seconds / 60) }),
             );
         }
         // Large files (mostly video) go through resumable, chunked uploads.
@@ -345,13 +352,13 @@ function Create() {
     try {
       const at = mode === 'schedule' ? new Date(when) : null;
       if (at && Number.isNaN(at.getTime())) {
-        setFields({ scheduledAt: 'Choose a date and time.' });
+        setFields({ scheduledAt: t('compose.chooseDateTime') });
         return;
       }
       const extra = at ? { scheduledAt: at.toISOString() } : { draft: true };
       if (draftId) await api.drafts.save(draftId, { ...postContent(), ...(at ? { scheduledAt: at.toISOString() } : {}) });
       else await api.posts.create({ ...postContent(), ...extra });
-      toast(at ? `Scheduled for ${formatScheduled(at.toISOString())}` : 'Saved to your drafts');
+      toast(at ? t('m.create.scheduled', { time: formatScheduled(at.toISOString(), locale) }) : t('m.create.draftSaved'));
       router.push('/drafts');
     } catch (err) {
       if (isVerificationError(err)) setNeedsVerify(true);
@@ -379,14 +386,14 @@ function Create() {
           stickers: stickers.map(({ key: _key, label: _label, ...s }) => s),
           music: music ? musicInput(music) : undefined,
         });
-        toast('Added to your story');
+        toast(t('m.create.storyShared'));
         router.push('/home');
         return;
       }
       // A draft is saved with what's here now, then published through the same checks as a new post.
       const r = draftId ? (await api.drafts.save(draftId, postContent()), await api.drafts.publish(draftId)) : await api.posts.create(postContent());
       if (kind === 'reel') {
-        toast(r.moderation ? r.moderation.message : 'Reel published');
+        toast(r.moderation ? r.moderation.message : t('compose.reelPublished'));
         router.push(`/reels?start=${r.post.id}`);
         return;
       }
@@ -411,21 +418,23 @@ function Create() {
     <>
       <form className="yp-shell__inner" onSubmit={publish}>
         <div className="yp-topbar">
-          <h1>{draftId ? 'Continue your draft' : t('create.title')}</h1>
+          <h1>{draftId ? t('m.create.continueDraft') : t('create.title')}</h1>
           <Link href="/drafts" className="yp-btn yp-btn--ghost yp-btn--sm">
-            Drafts
+            {t('m.create.drafts')}
           </Link>
         </div>
         {/* Double-tap Post, Reel or Story to open the camera in that mode. */}
         <div
           className="create-kinds"
           onDoubleClick={(e) => {
-            const label = (e.target as HTMLElement).closest('button')?.textContent?.trim().toLowerCase();
-            if (label === 'post' || label === 'reel' || label === 'story') router.push(label === 'post' ? '/camera' : `/camera?mode=${label}`);
+            // The buttons are in the same order as the kinds; their labels are translated.
+            const button = (e.target as HTMLElement).closest('button');
+            const picked = button ? KINDS[Array.from(e.currentTarget.querySelectorAll('button')).indexOf(button)] : undefined;
+            if (picked) router.push(picked === 'post' ? '/camera' : `/camera?mode=${picked}`);
           }}
         >
           <Segments
-            label="What to create"
+            label={t('m.create.mode')}
             value={kind}
             onChange={(k) => {
               setKind(k);
@@ -437,16 +446,12 @@ function Create() {
               if (k === 'story' && (visibility === 'selected' || visibility === 'subscribers' || visibility === 'circle')) setVisibility('friends');
               if (k !== 'story' && visibility === 'close_friends') setVisibility('friends');
             }}
-            options={[
-              { id: 'post', label: 'Post' },
-              { id: 'reel', label: 'Reel' },
-              { id: 'story', label: 'Story' },
-            ]}
+            options={KINDS.map((id) => ({ id, label: t(`m.create.mode.${id}`) }))}
           />
         </div>
         {kind === 'reel' && remixOf ? (
           originalMissing ? (
-            <Alert tone="danger">That reel isn&apos;t available to {remixMode === 'duet' ? 'duet' : 'remix'}.</Alert>
+            <Alert tone="danger">{t(remixMode === 'duet' ? 'compose.duetUnavailable' : 'compose.remixUnavailable')}</Alert>
           ) : original ? (
             <div className="remix-source">
               {original.media[0] ? (
@@ -461,31 +466,17 @@ function Create() {
                 />
               ) : null}
               <div className="remix-source__text">
-                <strong>
-                  {remixMode === 'duet' ? 'Duet with' : 'Remix of'} <bdi>@{original.author.username}</bdi>
-                </strong>
-                <span className="muted">
-                  {remixMode === 'duet'
-                    ? 'Add your own video. It plays beside the original, which stays on the left.'
-                    : 'Add your own video. It plays with the sound from the original.'}
-                </span>
-                {original.sound ? (
-                  <span className="muted">
-                    Sound: <bdi>{original.sound.title}</bdi>
-                  </span>
-                ) : null}
+                <strong>{t(remixMode === 'duet' ? 'm.reels.duetWith' : 'm.reels.remixOf', { name: original.author.username })}</strong>
+                <span className="muted">{t(remixMode === 'duet' ? 'compose.duetHint' : 'compose.remixHint')}</span>
+                {original.sound ? <span className="muted">{t('m.create.sound', { title: original.sound.title })}</span> : null}
               </div>
             </div>
           ) : (
-            <p className="muted">Loading the original reel</p>
+            <p className="muted">{t('compose.loadingOriginal')}</p>
           )
         ) : null}
         <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-          {kind === 'post'
-            ? 'Text, photos, videos, a link or a poll, on your profile or in a community.'
-            : kind === 'reel'
-              ? `One vertical video up to ${reelMax / 60} minutes, shown full screen in Reels and on your profile.`
-              : 'A photo, video or a few words for your people, with stickers if you like. It disappears when you choose. Use @ to mention people and # for tags.'}
+          {kind === 'post' ? t('compose.hint.post') : kind === 'reel' ? t('compose.hint.reel', { minutes: reelMax / 60 }) : t('compose.hint.story')}
         </p>
         {error ? <Alert tone="danger">{error}</Alert> : null}
         {needsVerify || (me?.needsVerification && kind !== 'story' && (visibility === 'public' || !!communityId)) ? <VerifyPrompt action="post" /> : null}
@@ -498,7 +489,7 @@ function Create() {
             id="body"
             value={body}
             onValueChange={setBody}
-            placeholder={kind === 'reel' ? 'Write a caption' : kind === 'story' ? 'Add a few words (optional)' : t('create.placeholder')}
+            placeholder={t(kind === 'reel' ? 'm.create.reel.caption' : kind === 'story' ? 'm.create.story.body' : 'create.placeholder')}
             maxLength={kind === 'story' ? 500 : kind === 'reel' ? 2200 : 5000}
             aria-invalid={!!fields.body}
           />
@@ -513,15 +504,15 @@ function Create() {
                 <div key={m.id} className="stack-sm" style={{ width: 96 }}>
                   <figure>
                     {m.kind === 'video' ? <video src={m.url} muted /> : <img src={m.url} alt={m.altText} />}
-                    <button type="button" aria-label="Remove" onClick={() => setMedia((cur) => cur.filter((x) => x.id !== m.id))}>
+                    <button type="button" aria-label={t('m.common.remove')} onClick={() => setMedia((cur) => cur.filter((x) => x.id !== m.id))}>
                       ×
                     </button>
                   </figure>
                   <input
                     className="yp-input"
                     style={{ height: 32, fontSize: 12 }}
-                    placeholder="Alt text"
-                    aria-label={`Describe image ${i + 1} for people using screen readers`}
+                    placeholder={t('compose.altText')}
+                    aria-label={t('compose.altTextLabel', { number: i + 1 })}
                     value={m.altText}
                     onChange={(e) => {
                       const v = e.currentTarget.value;
@@ -533,9 +524,9 @@ function Create() {
                       type="button"
                       className="thumb-tag"
                       onClick={() => setTaggingId(m.id)}
-                      aria-label={m.tags.length ? `Edit people tagged in image ${i + 1}, ${m.tags.length} tagged` : `Tag people in image ${i + 1}`}
+                      aria-label={m.tags.length ? tp('compose.editTags', m.tags.length, { number: i + 1 }) : t('compose.tagImage', { number: i + 1 })}
                     >
-                      {m.tags.length ? `Tagged (${m.tags.length})` : 'Tag people'}
+                      {m.tags.length ? t('compose.tagged', { count: m.tags.length }) : t('m.tags.add')}
                     </button>
                   ) : null}
                 </div>
@@ -549,8 +540,8 @@ function Create() {
                 <input
                   key={i}
                   className="yp-input"
-                  placeholder={`Option ${i + 1}`}
-                  aria-label={`Poll option ${i + 1}`}
+                  placeholder={t('m.sticker.option', { number: i + 1 })}
+                  aria-label={t('compose.pollOption', { number: i + 1 })}
                   value={o}
                   maxLength={80}
                   onChange={(e) => {
@@ -562,18 +553,18 @@ function Create() {
               <div className="row">
                 {poll.length < 6 ? (
                   <Button size="sm" variant="ghost" onClick={() => setPoll((p) => [...p!, ''])}>
-                    Add option
+                    {t('compose.addOption')}
                   </Button>
                 ) : null}
                 <Button size="sm" variant="ghost" onClick={() => setPoll(null)}>
-                  Remove poll
+                  {t('compose.removePoll')}
                 </Button>
               </div>
             </div>
           ) : null}
 
           {videoCost ? (
-            <Alert tone="warning" title={t('dataSaver.title')} onDismiss={() => setVideoCost(null)}>
+            <Alert tone="warning" title={t('dataSaver.title')} onDismiss={() => setVideoCost(null)} locale={locale}>
               {t('dataSaver.videoSize', { size: formatBytes(videoCost) })} {t('dataSaver.videoWifi')}
             </Alert>
           ) : null}
@@ -588,18 +579,14 @@ function Create() {
             />
             <Button size="sm" variant="secondary" icon="image" loading={uploading} onClick={() => fileRef.current?.click()}>
               {editing
-                ? 'Applying your edits…'
+                ? t('m.editor.applying')
                 : progress !== null
-                  ? `Uploading ${progress}%`
-                  : kind === 'reel'
-                    ? media.length
-                      ? 'Replace video'
-                      : 'Choose a video'
-                    : 'Photo or video'}
+                  ? t('m.cover.uploading', { progress: new Intl.NumberFormat(locale, { style: 'percent' }).format(progress / 100) })
+                  : t(kind === 'reel' ? (media.length ? 'm.create.replaceVideo' : 'm.create.chooseVideo') : 'm.create.choosePhotoVideo')}
             </Button>
             {kind === 'post' && !poll ? (
               <Button size="sm" variant="secondary" icon="poll" onClick={() => setPoll(['', ''])}>
-                Poll
+                {t('m.sticker.kind.poll')}
               </Button>
             ) : null}
             <Button size="sm" variant="ghost" icon="sparkle" loading={aiLoading} onClick={suggestCaption}>
@@ -610,7 +597,7 @@ function Create() {
 
         {ai ? (
           <AIPanel
-            title="Suggested caption"
+            title={t('compose.suggestedCaption')}
             notice={ai.notice}
             actions={
               <>
@@ -622,22 +609,22 @@ function Create() {
                     setAi(null);
                   }}
                 >
-                  Use this
+                  {t('compose.useThis')}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setAi(null)}>
-                  Dismiss
+                  {t('compose.dismiss')}
                 </Button>
               </>
             }
           >
-            {ai.text || 'No suggestion this time.'}
+            {ai.text || t('compose.noSuggestion')}
           </AIPanel>
         ) : null}
 
         {kind !== 'story' ? (
           <PeoplePicker
-            label="Invite co-authors (optional)"
-            hint="They can accept or decline. Once they accept, it shows on their profile too."
+            label={t('compose.coAuthors')}
+            hint={t('compose.coAuthorsHint')}
             scope="mutuals"
             max={MAX_COLLABORATORS}
             canPick={() => true}
@@ -661,7 +648,7 @@ function Create() {
         {kind === 'reel' && !remixOf ? (
           <section className="stack-sm" aria-labelledby="sound-heading">
             <h2 id="sound-heading" className="yp-field__label" style={{ margin: 0 }}>
-              Sound
+              {t('m.sound.title')}
             </h2>
             {sound ? (
               <div className="sound-row sound-row--picked">
@@ -669,17 +656,17 @@ function Create() {
                 <span className="sound-row__text">
                   <bdi className="sound-row__title">{sound.title}</bdi>
                   <span className="sound-row__meta">
-                    Plays instead of your video&apos;s own sound · <bdi>@{sound.owner.username}</bdi>
+                    {t('compose.soundReplaces')} · <bdi>@{sound.owner.username}</bdi>
                   </span>
                 </span>
                 <Button size="sm" variant="ghost" onClick={() => setSound(null)}>
-                  Remove
+                  {t('m.common.remove')}
                 </Button>
               </div>
             ) : (
               <TextField
-                label="Name your sound (optional)"
-                hint="Your video's own sound becomes a sound other people can use."
+                label={t('compose.soundName')}
+                hint={t('compose.soundNameHint')}
                 value={soundTitle}
                 maxLength={100}
                 onChange={(e) => setSoundTitle(e.currentTarget.value)}
@@ -687,7 +674,7 @@ function Create() {
             )}
             <div className="row">
               <Button size="sm" variant="secondary" icon="music" onClick={() => setPicking(true)}>
-                {sound ? 'Choose another sound' : 'Choose a sound'}
+                {t(sound ? 'm.music.another' : 'm.music.choose')}
               </Button>
             </div>
             <SoundPicker
@@ -703,8 +690,8 @@ function Create() {
 
         <div className="stack">
           {kind === 'reel' ? null : kind === 'post' ? (
-            <Select label="Post in" value={communityId} onChange={(e) => setCommunityId(e.currentTarget.value)}>
-              <option value="">My profile</option>
+            <Select label={t('compose.postIn')} value={communityId} onChange={(e) => setCommunityId(e.currentTarget.value)}>
+              <option value="">{t('compose.myProfile')}</option>
               {communities.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -712,10 +699,10 @@ function Create() {
               ))}
             </Select>
           ) : (
-            <Select label="Disappears after" value={expiresIn} onChange={(e) => setExpiresIn(e.currentTarget.value as typeof expiresIn)}>
-              <option value="1h">1 hour</option>
-              <option value="24h">24 hours</option>
-              <option value="permanent">Keep it</option>
+            <Select label={t('m.create.expires')} value={expiresIn} onChange={(e) => setExpiresIn(e.currentTarget.value as typeof expiresIn)}>
+              <option value="1h">{t('m.create.expires.1h')}</option>
+              <option value="24h">{t('m.create.expires.24h')}</option>
+              <option value="permanent">{t('m.create.expires.permanent')}</option>
             </Select>
           )}
           {!communityId ? (
@@ -739,12 +726,12 @@ function Create() {
                     ? circles.length
                       ? circles.map((c) => (
                           <option key={`circle:${c.id}`} value={`circle:${c.id}`}>
-                            {`Circle: ${c.name}`}
+                            {t('m.create.circle', { name: c.name })}
                           </option>
                         ))
                       : [
                           <option key="circle" value="circle:" disabled>
-                            Circle (make one first)
+                            {t('compose.circleMakeFirst')}
                           </option>,
                         ]
                     : [
@@ -757,82 +744,84 @@ function Create() {
           ) : null}
           {kind === 'story' ? (
             <Checkbox
-              label="Let people add this story to theirs"
-              description="People can reshare public stories, and stories that mention them. Your story shows as a card credited to you."
+              label={t('m.stories.allowReshare')}
+              description={t('compose.allowReshareHint')}
               checked={allowReshare}
               onChange={(e) => setAllowReshare(e.currentTarget.checked)}
             />
           ) : null}
           {kind === 'story' && visibility === 'close_friends' ? (
             <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-              Only people on your close friends list see this story, with a green ring. <Link href="/settings#close-friends">Edit your list</Link>
+              {t('compose.closeFriendsHint')} <Link href="/settings#close-friends">{t('compose.editList')}</Link>
             </p>
           ) : null}
           {kind === 'reel' ? (
             <Checkbox
-              label="Allow duets and remixes"
-              description="People can post their own reel beside yours, or use your sound. You can change this later."
+              label={t('compose.allowRemix')}
+              description={t('compose.allowRemixHint')}
               checked={allowRemix}
               onChange={(e) => setAllowRemix(e.currentTarget.checked)}
             />
           ) : null}
           {visibility === 'subscribers' && !communityId && kind !== 'story' ? (
             <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-              Only people with a paid subscription see this. Everyone else sees a locked preview with a link to subscribe.
+              {t('compose.subscribersHint')}
             </p>
           ) : null}
           {kind !== 'story' && !communityId ? (
             <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-              {visibility === 'circle' && circles.some((c) => c.id === circleId)
-                ? `Only the people in ${circles.find((c) => c.id === circleId)!.name} see this. They aren't told which circle it was shared with. `
-                : circles.length
-                  ? ''
-                  : 'Share with a small group, like Family or Work, by making a circle. '}
-              <Link href="/circles">{circles.length ? 'Manage circles' : 'Make a circle'}</Link>
+              {visibility === 'circle' && circles.some((c) => c.id === circleId) ? (
+                <>{t('compose.circleOnly', { name: circles.find((c) => c.id === circleId)!.name })} </>
+              ) : circles.length ? null : (
+                <>{t('compose.circleIntro')} </>
+              )}
+              <Link href="/circles">{t(circles.length ? 'compose.manageCircles' : 'compose.makeCircle')}</Link>
             </p>
           ) : null}
           {kind !== 'story' ? (
-            <TextField label="Topics (optional)" hint="Up to 5, separated by commas." value={topics} onChange={(e) => setTopics(e.currentTarget.value)} />
+            <TextField label={t('compose.topics')} hint={t('compose.topicsHint')} value={topics} onChange={(e) => setTopics(e.currentTarget.value)} />
           ) : null}
-          {aiUsed ? <Checkbox label="Label this post as made with AI assistance" checked readOnly disabled /> : null}
+          {aiUsed ? <Checkbox label={t('compose.aiLabel')} checked readOnly disabled /> : null}
         </div>
 
         <Button type="submit" size="lg" block loading={busy === 'publish'} disabled={blocked || !!busy}>
-          {kind === 'story'
-            ? visibility === 'close_friends'
-              ? 'Share with close friends'
-              : 'Share to your story'
-            : kind === 'reel'
-              ? remixOf
-                ? remixMode === 'duet'
-                  ? 'Publish duet'
-                  : 'Publish remix'
-                : 'Publish reel'
-              : t('create.publish')}
+          {t(
+            kind === 'story'
+              ? visibility === 'close_friends'
+                ? 'compose.shareCloseFriends'
+                : 'm.create.shareStory'
+              : kind === 'reel'
+                ? remixOf
+                  ? remixMode === 'duet'
+                    ? 'compose.publishDuet'
+                    : 'compose.publishRemix'
+                  : 'm.create.publishReel'
+                : 'create.publish',
+          )}
         </Button>
         {kind !== 'story' ? (
           <div className="stack-sm">
             <div className="row">
               <Button variant="secondary" loading={busy === 'draft'} disabled={blocked || !!busy} onClick={() => keep('draft')}>
-                Save draft
+                {t('m.create.saveDraft')}
               </Button>
               <Button variant="ghost" icon="calendar" aria-expanded={scheduling} onClick={() => setScheduling((v) => !v)}>
-                Schedule
+                {t('m.create.schedule')}
               </Button>
             </div>
             {scheduling ? (
               <div className="stack-sm">
                 <TextField
-                  label="Publish on"
+                  label={t('compose.publishOn')}
                   type="datetime-local"
                   value={when}
                   {...scheduleBounds()}
-                  hint={SCHEDULE_HINT}
+                  hint={t('compose.scheduleHint', { minutes: SCHEDULE_MIN_MINUTES, days: SCHEDULE_MAX_DAYS })}
                   error={fields.scheduledAt}
                   onChange={(e) => setWhen(e.currentTarget.value)}
                 />
                 <Button loading={busy === 'schedule'} disabled={blocked || !!busy || !when} onClick={() => keep('schedule')}>
-                  Schedule post
+                  {t('compose.schedulePost')}
                 </Button>
               </div>
             ) : null}
@@ -846,7 +835,7 @@ function Create() {
             file={queue[0]}
             maxSeconds={reelMax}
             mustFit={kind === 'reel'}
-            title={queued > 1 ? `Edit video ${queued - queue.length + 1} of ${queued}` : 'Edit video'}
+            title={queued > 1 ? t('compose.editVideoN', { index: queued - queue.length + 1, total: queued }) : t('m.editor.videoTitle')}
             onDone={(edits) => {
               enqueueUpload(queue[0]!, edits);
               nextInQueue();
@@ -857,7 +846,7 @@ function Create() {
           <PhotoEditor
             key={`${queue[0].name}-${queue[0].lastModified}-${queued - queue.length}`}
             file={queue[0]}
-            title={queued > 1 ? `Edit photo ${queued - queue.length + 1} of ${queued}` : 'Edit photo'}
+            title={queued > 1 ? t('compose.editPhotoN', { index: queued - queue.length + 1, total: queued }) : t('m.editor.photoTitle')}
             onDone={(edited, tags) => {
               enqueueUpload(edited, null, tags);
               nextInQueue();
@@ -866,7 +855,7 @@ function Create() {
           />
         )
       ) : null}
-      <BottomSheet open={!!tagging} onClose={() => setTaggingId(null)} title="Tag people">
+      <BottomSheet open={!!tagging} onClose={() => setTaggingId(null)} title={t('m.tags.add')}>
         {tagging ? (
           <div className="stack">
             <PhotoTagger
@@ -875,7 +864,7 @@ function Create() {
               tags={tagging.tags}
               onChange={(tags) => setMedia((cur) => cur.map((x) => (x.id === tagging.id ? { ...x, tags } : x)))}
             />
-            <Button onClick={() => setTaggingId(null)}>Done</Button>
+            <Button onClick={() => setTaggingId(null)}>{t('m.common.done')}</Button>
           </div>
         ) : null}
       </BottomSheet>

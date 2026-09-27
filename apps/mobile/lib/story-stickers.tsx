@@ -4,9 +4,10 @@ import { I18nManager, Image, Linking, PanResponder, Pressable, Text, TextInput, 
 import type { Story } from '../../../packages/api-client/src/index';
 import type { StoryCard, StorySticker, StoryStickerInput } from '../../../packages/shared/src/stories';
 import { client, errorMessage, mediaUrl, webUrl } from './api';
+import { DateField } from './date-time';
 import { useT, type Translator } from './i18n';
 import { radius, space } from './theme';
-import { Avatar, Button, Field, Icon, Segmented, useColors, userText, type IconName } from './ui';
+import { Avatar, Button, Field, Icon, useColors, userText, type IconName } from './ui';
 
 const INK = '#14151F';
 const MUTED = '#4B4F63';
@@ -438,12 +439,16 @@ const KINDS: { type: Kind; icon: IconName }[] = [
   { type: 'link', icon: 'link' },
   { type: 'place', icon: 'location-outline' },
 ];
+/** Shortcuts for when a countdown ends, shown in the date sheet. */
 const ENDS = [
   { id: '1h', ms: 3_600_000, label: 'm.sticker.in.1h' },
   { id: '1d', ms: 86_400_000, label: 'm.sticker.in.1d' },
   { id: '3d', ms: 3 * 86_400_000, label: 'm.sticker.in.3d' },
   { id: '1w', ms: 7 * 86_400_000, label: 'm.sticker.in.1w' },
 ] as const;
+/** The API takes a countdown end in the future and within 366 days (apps/api/src/lib/stories.ts). */
+const COUNTDOWN_MIN_MS = 5 * 60_000;
+const COUNTDOWN_MAX_MS = 365 * 86_400_000;
 const clamp = (n: number) => Math.min(0.95, Math.max(0.05, n));
 
 /**
@@ -628,7 +633,7 @@ function StickerForm({ kind, onAdd, onCancel }: { kind: Kind; onAdd: (s: NewStic
   const [a, setA] = useState(kind === 'question' ? t('m.sticker.askMe') : '');
   const [b, setB] = useState('');
   const [d, setD] = useState('');
-  const [ends, setEnds] = useState<(typeof ENDS)[number]['id']>('1d');
+  const [endsAt, setEndsAt] = useState<Date>(() => new Date(Date.now() + 86_400_000));
   const [error, setError] = useState<string | null>(null);
   const [places, setPlaces] = useState<{ id: string; name: string; city: string | null }[]>([]);
 
@@ -671,8 +676,8 @@ function StickerForm({ kind, onAdd, onCancel }: { kind: Kind; onAdd: (s: NewStic
         return onAdd({ type: 'slider', ...base, prompt: a.trim(), emoji: b.trim(), label: `${b.trim()} ${a.trim()}` });
       case 'countdown': {
         if (!a.trim()) return fail();
-        const endsAt = new Date(Date.now() + ENDS.find((e) => e.id === ends)!.ms).toISOString();
-        return onAdd({ type: 'countdown', ...base, title: a.trim(), endsAt, label: a.trim() });
+        if (endsAt.getTime() <= Date.now()) return fail();
+        return onAdd({ type: 'countdown', ...base, title: a.trim(), endsAt: endsAt.toISOString(), label: a.trim() });
       }
       case 'link': {
         const url = /^https?:\/\//i.test(a.trim()) ? a.trim() : `https://${a.trim()}`;
@@ -715,8 +720,16 @@ function StickerForm({ kind, onAdd, onCancel }: { kind: Kind; onAdd: (s: NewStic
       {kind === 'countdown' ? (
         <>
           <Field label={t('m.sticker.countdownTitle')} value={a} onChangeText={setA} maxLength={60} />
-          <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.sticker.endsIn')}</Text>
-          <Segmented label={t('m.sticker.endsIn')} options={ENDS.map((e) => ({ id: e.id, label: t(e.label) }))} value={ends} onChange={setEnds} />
+          <DateField
+            label={t('m.sticker.endsAt')}
+            sheetTitle={t('m.sticker.endsTitle')}
+            value={endsAt}
+            onChange={setEndsAt}
+            min={new Date(Date.now() + COUNTDOWN_MIN_MS)}
+            max={new Date(Date.now() + COUNTDOWN_MAX_MS)}
+            presets={ENDS.map((e) => ({ id: e.id, label: t(e.label), at: new Date(Date.now() + e.ms) }))}
+            hint={t('m.sticker.endsHint')}
+          />
         </>
       ) : null}
       {kind === 'link' ? (

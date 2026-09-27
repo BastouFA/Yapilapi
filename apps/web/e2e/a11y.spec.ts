@@ -381,7 +381,7 @@ const STATES: [string, (page: Page, d: SeedData) => Promise<void>][] = [
     async (page, d) => {
       test.skip(!d.recapReady, 'the recap video was not ready');
       await open(page, `/recaps?open=${d.recapId}`);
-      await page.getByRole('button', { name: 'Post as reel' }).click();
+      await page.getByRole('button', { name: /^Post as (a )?reel$/ }).click();
     },
   ],
   [

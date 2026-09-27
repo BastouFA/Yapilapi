@@ -70,12 +70,14 @@ type ParticipantRow = PublicUserRow & {
   muted: boolean;
   hand_raised_at: Date | null;
   invited_at: Date | null;
+  minor: boolean;
 };
 
 async function presentParticipants(db: Q, roomIds: string[]): Promise<ParticipantRow[]> {
   if (!roomIds.length) return [];
   const { rows } = await db.query<ParticipantRow>(
-    `SELECT p.room_id, p.role, p.is_host, p.muted, p.hand_raised_at, p.invited_at, ${PUBLIC_USER_COLS}
+    `SELECT p.room_id, p.role, p.is_host, p.muted, p.hand_raised_at, p.invited_at, ${PUBLIC_USER_COLS},
+            coalesce((SELECT u.birth_date > current_date - interval '18 years' FROM users u WHERE u.id = p.user_id), false) AS minor
      FROM room_participants p JOIN profiles pr ON pr.user_id = p.user_id
      WHERE p.room_id = ANY($1::uuid[]) AND p.left_at IS NULL
      ORDER BY p.is_host DESC, p.hand_raised_at ASC NULLS LAST, p.joined_at ASC`,
@@ -107,12 +109,24 @@ export async function communityRooms(deps: RoomsDeps, communityId: string, viewe
     deps.db,
     rows.filter((r) => r.status === 'live').map((r) => r.id),
   );
+  // The list is public for public communities: people without an account never see anyone under 18
+  // (as on profiles), and nobody sees people they blocked or who blocked them.
+  const blocked = viewer
+    ? new Set(
+        (
+          await deps.db.query<{ id: string }>(
+            `SELECT CASE WHEN blocker_id = $1 THEN blocked_id ELSE blocker_id END AS id FROM blocks WHERE blocker_id = $1 OR blocked_id = $1`,
+            [viewer],
+          )
+        ).rows.map((b) => b.id),
+      )
+    : new Set<string>();
   return rows.map((r) =>
     toSummary(
       r,
       deps.media.limits,
       people
-        .filter((p) => p.room_id === r.id && p.role === 'speaker')
+        .filter((p) => p.room_id === r.id && p.role === 'speaker' && (viewer ? !blocked.has(p.id) : !p.minor))
         .slice(0, 3)
         .map(toPublicUser),
     ),

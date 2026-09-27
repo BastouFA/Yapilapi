@@ -119,7 +119,7 @@ export default function TagPage() {
           <h2 id="stories-now" className="tag-stories__title">
             Stories now
           </h2>
-          <MomentsStrip groups={stories} onOpen={setViewing} />
+          <MomentsStrip groups={stories} onOpen={setViewing} locale={locale} />
         </section>
       ) : null}
       {viewing !== null && stories[viewing] ? <StoryViewer groups={stories} start={viewing} onClose={() => setViewing(null)} onChange={setStories} /> : null}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState, type ComponentType, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useId, useRef, useState, type ComponentType, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import {
   extractHashtags,
   formatBytes,
@@ -7,6 +7,7 @@ import {
   videoPoster,
   videoSrc,
   formatRelativeTime,
+  isRtl,
   safeTimeZone,
   splitRichText,
   t,
@@ -15,6 +16,7 @@ import {
   type MediaItem,
   type MessageKey,
   type PhotoTag,
+  type PluralKey,
   type Post,
   type PostVersion,
   type PublicUser,
@@ -22,6 +24,47 @@ import {
 import { Icon, type IconName } from './icons.tsx';
 import { Avatar, Badge, Button, cx, PlusBadge, useModalFocus } from './primitives.tsx';
 import { useDataSaver } from './data-saver.tsx';
+
+// ── Translation helpers ─────────────────────────────────────────────────
+type Vars = Record<string, string | number>;
+
+/**
+ * t() for design-system components. In a right-to-left language each text value
+ * put into the sentence is wrapped in first-strong isolates (as the web app's
+ * t() does), so an English name inside Arabic text keeps its own direction.
+ */
+function tr(key: MessageKey, locale: string, vars?: Vars): string {
+  if (!vars || !isRtl(locale)) return t(key, locale, vars);
+  const out: Vars = {};
+  for (const [k, v] of Object.entries(vars)) out[k] = typeof v === 'string' && v ? `⁨${v}⁩` : v;
+  return t(key, locale, out);
+}
+
+/** Plural-aware tr(): picks `<key>.one` or `<key>.other` and passes {count}, formatted for the locale. */
+function trp(key: PluralKey, count: number, locale: string): string {
+  let one = count === 1;
+  try {
+    one = new Intl.PluralRules(locale).select(count) === 'one';
+  } catch {
+    // An unknown locale tag: English rules.
+  }
+  return t(`${key}.${one ? 'one' : 'other'}` as MessageKey, locale, { count: new Intl.NumberFormat(locale).format(count) });
+}
+
+/** "a, b and c" in the reader's language. */
+function joinList(items: string[], locale: string): string {
+  if (items.length <= 1) return items[0] ?? '';
+  return items.slice(0, -1).join(t('m.collab.joinSep', locale)) + t('m.collab.joinLast', locale) + items.at(-1);
+}
+
+/**
+ * Puts an element (a link, a <time>) where `{name}` sits in a translated sentence, so the
+ * sentence keeps its word order in every language. A "@" right before the placeholder is
+ * passed to `render`, to keep it inside the same isolated run as the name.
+ */
+function fill(text: string, name: string, render: (at: string) => ReactNode): ReactNode[] {
+  return text.split(new RegExp(`(@?\\{${name}\\})`)).map((part, i) => (i % 2 ? <Fragment key={i}>{render(part.startsWith('@') ? '@' : '')}</Fragment> : part));
+}
 
 /** A link component (e.g. next/link). Defaults to a plain anchor. */
 export type LinkLike = ComponentType<{ href: string; className?: string; children?: ReactNode; 'aria-current'?: 'page' | undefined; 'aria-label'?: string }>;
@@ -59,15 +102,15 @@ export function NavBar({
   searchHref?: string;
 }) {
   return (
-    <nav className="yp-nav" aria-label="Primary">
-      <L href={brandHref} className="yp-nav__brand" aria-label="YAPILAPI home">
+    <nav className="yp-nav" aria-label={t('ds.nav.primary', locale)}>
+      <L href={brandHref} className="yp-nav__brand" aria-label={t('ds.nav.home', locale)}>
         {logoSrc ? <img src={logoSrc} alt="" /> : null}
         YAPILAPI
       </L>
       {searchHref ? (
         <L href={searchHref} className="yp-nav__search">
           <Icon name="search" size={20} />
-          Search
+          {t('m.discover.search', locale)}
         </L>
       ) : null}
       {items.map((it) => (
@@ -86,7 +129,10 @@ export function NavBar({
               <span className="yp-nav__badge" aria-hidden>
                 {it.badge > 99 ? '99+' : it.badge}
               </span>
-              <span className="yp-visually-hidden">, {it.badge} unread</span>
+              <span className="yp-visually-hidden">
+                {t('m.collab.joinSep', locale)}
+                {t('m.inbox.unread', locale, { count: new Intl.NumberFormat(locale).format(it.badge) })}
+              </span>
             </>
           ) : null}
         </L>
@@ -123,21 +169,21 @@ export function Segments<T extends string>({
  * positioned box over the (blurred) media; only the button takes clicks, so
  * controls around it keep working.
  */
-export function SensitiveCover({ onReveal, compact }: { onReveal: () => void; compact?: boolean }) {
+export function SensitiveCover({ onReveal, compact, locale = 'en' }: { onReveal: () => void; compact?: boolean; locale?: string }) {
   return (
     <div className={cx('yp-sensitive', compact && 'yp-sensitive--compact')}>
       <Icon name="eye" size={compact ? 18 : 24} />
-      <span>Sensitive content.</span>
+      <span>{t('m.sensitive.label', locale)}</span>
       <button
         type="button"
         className="yp-sensitive__view"
-        aria-label="View sensitive content"
+        aria-label={t('m.sensitive.viewA11y', locale)}
         onClick={(e) => {
           e.stopPropagation();
           onReveal();
         }}
       >
-        View
+        {t('m.sensitive.view', locale)}
       </button>
     </div>
   );
@@ -152,7 +198,7 @@ export interface MediaTagOptions {
   onRemoveTag?: (mediaId: string, tag: PhotoTag) => void;
 }
 
-export function MediaGrid({ media, tagOptions }: { media: MediaItem[]; tagOptions?: MediaTagOptions }) {
+export function MediaGrid({ media, tagOptions, locale = 'en' }: { media: MediaItem[]; tagOptions?: MediaTagOptions; locale?: string }) {
   const [open, setOpen] = useState<number | null>(null);
   // One choice per post: viewing one sensitive item shows the others too.
   const [revealed, setRevealed] = useState(false);
@@ -171,6 +217,8 @@ export function MediaGrid({ media, tagOptions }: { media: MediaItem[]; tagOption
     saver && !full.has(m.id) && photoSrc(m) !== imageSrc(m, { saver, full: true, grid: shown.length > 1 })
       ? () => setFull((f) => new Set(f).add(m.id))
       : undefined;
+  const pos = (i: number) => ({ index: new Intl.NumberFormat(locale).format(i + 1), total: new Intl.NumberFormat(locale).format(media.length) });
+  const openLabel = (m: MediaItem, i: number) => (m.altText ? tr('ds.media.open', locale, { alt: m.altText }) : t('ds.media.openOf', locale, pos(i)));
   return (
     <>
       <div className={cx('yp-media', `yp-media--${Math.min(shown.length, 4)}`)}>
@@ -180,14 +228,15 @@ export function MediaGrid({ media, tagOptions }: { media: MediaItem[]; tagOption
               {m.placeholder || m.posterUrl || m.variants?.thumb ? (
                 <img src={m.placeholder ?? m.posterUrl ?? m.variants?.thumb} alt="" aria-hidden className="yp-blurred" />
               ) : null}
-              <SensitiveCover onReveal={() => setRevealed(true)} />
+              <SensitiveCover onReveal={() => setRevealed(true)} locale={locale} />
             </div>
           ) : m.kind === 'image' && m.tags?.length ? (
             <TaggedPhoto
               key={m.id}
               media={m}
               src={photoSrc(m)}
-              label={m.altText ? m.altText : `Photo ${i + 1} of ${media.length}`}
+              locale={locale}
+              label={m.altText ? m.altText : t('ds.media.photoOf', locale, pos(i))}
               showTags={showTags}
               onToggle={() => setShowTags((v) => !v)}
               onOpen={() => setOpen(i)}
@@ -197,12 +246,7 @@ export function MediaGrid({ media, tagOptions }: { media: MediaItem[]; tagOption
             />
           ) : m.kind === 'image' && loadFull(m) ? (
             <div key={m.id} className="yp-media__item yp-media__item--saver">
-              <button
-                type="button"
-                className="yp-media__hit"
-                onClick={() => setOpen(i)}
-                aria-label={m.altText ? `Open: ${m.altText}` : `Open media ${i + 1} of ${media.length}`}
-              >
+              <button type="button" className="yp-media__hit" onClick={() => setOpen(i)} aria-label={openLabel(m, i)}>
                 <img
                   src={photoSrc(m)}
                   alt={m.altText ?? ''}
@@ -210,19 +254,13 @@ export function MediaGrid({ media, tagOptions }: { media: MediaItem[]; tagOption
                   decoding="async"
                   style={m.placeholder ? { backgroundImage: `url(${m.placeholder})`, backgroundSize: 'cover' } : undefined}
                 />
-                {m.altText ? <AltBadge /> : null}
+                {m.altText ? <AltBadge locale={locale} /> : null}
                 {i === 3 && media.length > 4 ? <span className="yp-media__more">+{media.length - 4}</span> : null}
               </button>
-              <LoadFullPhoto media={m} onLoad={loadFull(m)!} />
+              <LoadFullPhoto media={m} onLoad={loadFull(m)!} locale={locale} />
             </div>
           ) : (
-            <button
-              key={m.id}
-              type="button"
-              className="yp-media__item"
-              onClick={() => setOpen(i)}
-              aria-label={m.altText ? `Open: ${m.altText}` : `Open media ${i + 1} of ${media.length}`}
-            >
+            <button key={m.id} type="button" className="yp-media__item" onClick={() => setOpen(i)} aria-label={openLabel(m, i)}>
               {m.kind === 'video' ? (
                 <>
                   <video src={videoSrc(m, saver)} poster={videoPoster(m, saver)} muted playsInline preload={saver ? 'none' : 'metadata'} />
@@ -243,35 +281,35 @@ export function MediaGrid({ media, tagOptions }: { media: MediaItem[]; tagOption
                   style={m.placeholder ? { backgroundImage: `url(${m.placeholder})`, backgroundSize: 'cover' } : undefined}
                 />
               )}
-              {m.altText && m.kind !== 'audio' ? <AltBadge /> : null}
+              {m.altText && m.kind !== 'audio' ? <AltBadge locale={locale} /> : null}
               {i === 3 && media.length > 4 ? <span className="yp-media__more">+{media.length - 4}</span> : null}
             </button>
           ),
         )}
       </div>
       {open !== null && viewable.length ? (
-        <MediaViewer media={viewable} index={Math.max(0, viewable.indexOf(media[open]!))} onClose={() => setOpen(null)} />
+        <MediaViewer media={viewable} index={Math.max(0, viewable.indexOf(media[open]!))} onClose={() => setOpen(null)} locale={locale} />
       ) : null}
     </>
   );
 }
 
 /** Data saver: the button that loads a photo's full size, with what it costs when the size is known. */
-function LoadFullPhoto({ media: m, onLoad }: { media: MediaItem; onLoad: () => void }) {
+function LoadFullPhoto({ media: m, onLoad, locale }: { media: MediaItem; onLoad: () => void; locale: string }) {
   const bytes = m.sizes?.large ?? m.sizes?.medium ?? m.sizes?.original;
   return (
     <button type="button" className="yp-media__full" onClick={onLoad}>
       <Icon name="image" size={14} />
-      {bytes ? `Load full photo (${formatBytes(bytes)})` : 'Load full photo'}
+      {bytes ? tr('dataSaver.loadFullSize', locale, { size: formatBytes(bytes) }) : t('dataSaver.loadFull', locale)}
     </button>
   );
 }
 
 /** "ALT" on a photo or video that has a description: opening it shows the description under it. Screen readers get the description itself. */
-function AltBadge() {
+function AltBadge({ locale }: { locale: string }) {
   return (
     <span className="yp-media__alt" aria-hidden>
-      ALT
+      {t('ds.media.alt', locale)}
     </span>
   );
 }
@@ -305,10 +343,12 @@ function TaggedPhoto({
   more,
   options = {},
   onLoadFull,
+  locale,
 }: {
   media: MediaItem;
   src: string;
   label: string;
+  locale: string;
   showTags: boolean;
   onToggle: () => void;
   onOpen: () => void;
@@ -339,10 +379,16 @@ function TaggedPhoto({
     const within = (v: number, max: number) => Math.min(max, Math.max(0, v));
     return { left: within(box.left + t.x * box.width, box.bw), top: within(box.top + t.y * box.height, box.bh) };
   };
-  const count = tags.length === 1 ? '1 person tagged' : `${tags.length} people tagged`;
+  const count = trp('m.tags.count', tags.length, locale);
   return (
     <div className="yp-media__item yp-media__item--tagged">
-      <button type="button" className="yp-media__hit" aria-pressed={showTags} onClick={onToggle} aria-label={`Show people tagged in ${label}, ${count}`}>
+      <button
+        type="button"
+        className="yp-media__hit"
+        aria-pressed={showTags}
+        onClick={onToggle}
+        aria-label={tr('ds.media.showTags', locale, { label, tagged: count })}
+      >
         <img
           ref={img}
           src={src}
@@ -356,29 +402,29 @@ function TaggedPhoto({
       <span className="yp-media__people" aria-hidden>
         <Icon name="user" size={14} />
       </span>
-      <button type="button" className="yp-media__open" onClick={onOpen} aria-label={`Open ${label} full screen`}>
+      <button type="button" className="yp-media__open" onClick={onOpen} aria-label={tr('ds.media.openFull', locale, { label })}>
         <Icon name="image" size={16} />
       </button>
-      {onLoadFull ? <LoadFullPhoto media={m} onLoad={onLoadFull} /> : null}
+      {onLoadFull ? <LoadFullPhoto media={m} onLoad={onLoadFull} locale={locale} /> : null}
       {showTags ? (
-        <ul className="yp-phototags" aria-label={`People tagged in ${label}`}>
-          {tags.map((t) => {
-            const self = !!viewerId && t.user.id === viewerId;
+        <ul className="yp-phototags" aria-label={tr('ds.media.peopleTagged', locale, { label })}>
+          {tags.map((tag) => {
+            const self = !!viewerId && tag.user.id === viewerId;
             const removable = !!onRemoveTag && (self || !!canRemoveAny);
             return (
-              <li key={t.id} className={tagBubbleClass(t.x, t.y)} style={place(t)}>
+              <li key={tag.id} className={tagBubbleClass(tag.x, tag.y)} style={place(tag)}>
                 <span className="yp-phototag__bubble">
-                  <L href={`/u/${t.user.username}`} className="yp-phototag__name" aria-label={`${t.user.displayName}, @${t.user.username}`}>
-                    <bdi>{t.user.displayName}</bdi>
+                  <L href={`/u/${tag.user.username}`} className="yp-phototag__name" aria-label={`${tag.user.displayName}, @${tag.user.username}`}>
+                    <bdi>{tag.user.displayName}</bdi>
                   </L>
                   {removable ? (
                     <button
                       type="button"
                       className="yp-phototag__remove"
-                      onClick={() => onRemoveTag!(m.id, t)}
-                      aria-label={self ? 'Remove me from this photo' : `Remove tag for ${t.user.displayName}`}
+                      onClick={() => onRemoveTag!(m.id, tag)}
+                      aria-label={self ? t('ds.media.removeMeA11y', locale) : tr('ds.media.removeTag', locale, { name: tag.user.displayName })}
                     >
-                      {self ? 'Remove me' : <Icon name="x" size={12} />}
+                      {self ? t('ds.media.removeMe', locale) : <Icon name="x" size={12} />}
                     </button>
                   ) : null}
                 </span>
@@ -410,7 +456,7 @@ export function CaptionTracks({ captions }: { captions?: CaptionTrackRef[] | nul
 export const videoCrossOrigin = (captions?: CaptionTrackRef[] | null) => (captions?.length ? ('anonymous' as const) : undefined);
 
 /** Full-screen media viewer: arrow keys to move, Escape to close, alt text shown. */
-export function MediaViewer({ media, index, onClose }: { media: MediaItem[]; index: number; onClose: () => void }) {
+export function MediaViewer({ media, index, onClose, locale = 'en' }: { media: MediaItem[]; index: number; onClose: () => void; locale?: string }) {
   const [i, setI] = useState(index);
   // Data saver: videos wait for play and use the lowest MP4; photos open at the medium size.
   const saver = useDataSaver();
@@ -432,12 +478,12 @@ export function MediaViewer({ media, index, onClose }: { media: MediaItem[]; ind
     };
   }, [go, onClose]);
   return (
-    <div className="yp-viewer" role="dialog" aria-modal aria-label="Media viewer" ref={ref} tabIndex={-1}>
+    <div className="yp-viewer" role="dialog" aria-modal aria-label={t('ds.media.viewer', locale)} ref={ref} tabIndex={-1}>
       <div className="yp-viewer__bar">
         <span>
-          {i + 1} / {media.length}
+          {t('m.boards.position', locale, { index: new Intl.NumberFormat(locale).format(i + 1), total: new Intl.NumberFormat(locale).format(media.length) })}
         </span>
-        <button type="button" onClick={onClose} aria-label="Close">
+        <button type="button" onClick={onClose} aria-label={t('m.common.close', locale)}>
           <Icon name="x" />
         </button>
       </div>
@@ -467,10 +513,10 @@ export function MediaViewer({ media, index, onClose }: { media: MediaItem[]; ind
       </div>
       {media.length > 1 ? (
         <>
-          <button type="button" className="yp-viewer__nav yp-viewer__nav--prev" onClick={() => go(-1)} aria-label="Previous">
+          <button type="button" className="yp-viewer__nav yp-viewer__nav--prev" onClick={() => go(-1)} aria-label={t('ds.previous', locale)}>
             <Icon name="chevron-left" />
           </button>
-          <button type="button" className="yp-viewer__nav yp-viewer__nav--next" onClick={() => go(1)} aria-label="Next">
+          <button type="button" className="yp-viewer__nav yp-viewer__nav--next" onClick={() => go(1)} aria-label={t('ds.next', locale)}>
             <Icon name="chevron-right" />
           </button>
         </>
@@ -660,19 +706,31 @@ export interface PostCardProps {
 
 type Person = Pick<PublicUser, 'id' | 'username' | 'displayName'>;
 
-/** "Ada", "Ada and Bola" or "Ada, Bola and Chi" as plain text. */
-export function joinNames(people: Person[]): string {
-  const names = people.map((p) => p.displayName);
-  return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+/** "Ada", "Ada and Bola" or "Ada, Bola and Chi" as plain text, in the reader's language. */
+export function joinNames(people: Person[], locale = 'en'): string {
+  return joinList(
+    people.map((p) => p.displayName),
+    locale,
+  );
 }
 
 /** "Ada and Bola" (or "Ada, Bola and Chi"), each name linking to that profile. */
-export function AuthorNames({ people, linkAs: L = A, linkClassName }: { people: Person[]; linkAs?: LinkLike; linkClassName?: string }) {
+export function AuthorNames({
+  people,
+  linkAs: L = A,
+  linkClassName,
+  locale = 'en',
+}: {
+  people: Person[];
+  linkAs?: LinkLike;
+  linkClassName?: string;
+  locale?: string;
+}) {
   return (
     <>
       {people.map((p, i) => (
         <span key={p.id}>
-          {i === 0 ? '' : i === people.length - 1 ? ' and ' : ', '}
+          {i === 0 ? '' : i === people.length - 1 ? t('m.collab.joinLast', locale) : t('m.collab.joinSep', locale)}
           <L href={`/u/${p.username}`} className={linkClassName}>
             <bdi>{p.displayName}</bdi>
           </L>
@@ -694,10 +752,10 @@ export function PostHistory({ versions, locale = 'en', linkAs }: { versions: Pos
       {versions.map((v, i) => (
         <li key={`${v.at}-${i}`} className="yp-history__item">
           <p className="yp-history__when">
-            {v.current ? 'Now' : 'Earlier'} · <time dateTime={v.at}>{formatRelativeTime(v.at, locale)}</time>
+            {t(v.current ? 'm.post.historyNow' : 'm.post.historyEarlier', locale)} · <time dateTime={v.at}>{formatRelativeTime(v.at, locale)}</time>
           </p>
           <div className="yp-history__body" dir="auto">
-            {v.body ? <TaggedText text={v.body} linkAs={linkAs} /> : <span className="yp-history__empty">No text</span>}
+            {v.body ? <TaggedText text={v.body} linkAs={linkAs} /> : <span className="yp-history__empty">{t('m.post.noText', locale)}</span>}
           </div>
         </li>
       ))}
@@ -744,6 +802,8 @@ export function PostCard({
   onHistory,
 }: PostCardProps) {
   const tt = (k: MessageKey) => t(k, locale);
+  /** "Like, 12": an action's name and its count, for screen readers. */
+  const counted = (label: string, n: number) => `${label}${tt('m.collab.joinSep')}${new Intl.NumberFormat(locale).format(n)}`;
   const coauthors = post.collaborators ?? [];
   const pendingCoauthors = isOwn ? (post.pendingCollaborators ?? []) : [];
   // A co-author shares the post but only the original author can change or delete it.
@@ -752,9 +812,9 @@ export function PostCard({
   const menu: MenuAction[] = [];
   const saveHold = useLongPress(onSaveTo ? () => onSaveTo(post) : undefined);
   if (onWhy) menu.push({ label: tt('post.why'), icon: 'info', onSelect: () => onWhy(post) });
-  if (onSaveTo) menu.push({ label: 'Save to a board', icon: 'bookmark', onSelect: () => onSaveTo(post) });
-  if (onAddToMemory) menu.push({ label: 'Add to a memory', icon: 'bookmark', onSelect: () => onAddToMemory(post) });
-  if (onLeaveCollab && coauthor && !isOwn) menu.push({ label: 'Leave as co-author', icon: 'logout', onSelect: () => onLeaveCollab(post) });
+  if (onSaveTo) menu.push({ label: tt('m.boards.saveTo'), icon: 'bookmark', onSelect: () => onSaveTo(post) });
+  if (onAddToMemory) menu.push({ label: tt('post.addToMemory'), icon: 'bookmark', onSelect: () => onAddToMemory(post) });
+  if (onLeaveCollab && coauthor && !isOwn) menu.push({ label: tt('m.collab.leave'), icon: 'logout', onSelect: () => onLeaveCollab(post) });
   if (onFeedback && !isOwn && !coauthor) {
     menu.push({ label: tt('post.moreLikeThis'), icon: 'plus', onSelect: () => onFeedback(post, 'more_like_this') });
     menu.push({ label: tt('post.lessLikeThis'), icon: 'eye', onSelect: () => onFeedback(post, 'less_like_this') });
@@ -762,12 +822,11 @@ export function PostCard({
     menu.push({ label: tt('post.muteCreator'), icon: 'bell', onSelect: () => onFeedback(post, 'mute_creator') });
   }
   if (onReport && !isOwn && !coauthor) menu.push({ label: tt('post.report'), icon: 'flag', danger: true, onSelect: () => onReport(post) });
-  if (onEdit && isOwn && !post.status) menu.push({ label: 'Edit', icon: 'edit', onSelect: () => onEdit(post) });
-  if (onPin && isOwn && !post.community)
-    menu.push({ label: post.pinned ? 'Unpin from profile' : 'Pin to profile', icon: 'bookmark', onSelect: () => onPin(post) });
+  if (onEdit && isOwn && !post.status) menu.push({ label: tt('m.post.edit'), icon: 'edit', onSelect: () => onEdit(post) });
+  if (onPin && isOwn && !post.community) menu.push({ label: tt(post.pinned ? 'post.unpin' : 'post.pin'), icon: 'bookmark', onSelect: () => onPin(post) });
   if (onManageCollaborators && isOwn && !post.community)
     menu.push({
-      label: coauthors.length || pendingCoauthors.length ? 'Co-authors' : 'Invite co-authors',
+      label: tt(coauthors.length || pendingCoauthors.length ? 'post.coauthors' : 'm.collab.inviteTitle'),
       icon: 'users',
       onSelect: () => onManageCollaborators(post),
     });
@@ -784,7 +843,7 @@ export function PostCard({
       {post.pinned ? (
         <p className="yp-post__pinned">
           <Icon name="bookmark" size={12} filled />
-          Pinned
+          {tt('m.post.pinned')}
         </p>
       ) : null}
       <header className="yp-post__head">
@@ -795,7 +854,7 @@ export function PostCard({
           <span className="yp-post__nameline">
             {coauthors.length ? (
               <span className="yp-post__names" id={`post-${post.id}-author`}>
-                <AuthorNames people={[post.author, ...coauthors]} linkAs={L} linkClassName="yp-post__name" />
+                <AuthorNames people={[post.author, ...coauthors]} linkAs={L} linkClassName="yp-post__name" locale={locale} />
               </span>
             ) : (
               <>
@@ -810,10 +869,12 @@ export function PostCard({
             <bdi>@{post.author.username}</bdi> ·{' '}
             {post.status === 'scheduled' && post.scheduledAt ? (
               <span className="yp-post__state">
-                Scheduled for <time dateTime={post.scheduledAt}>{formatScheduled(post.scheduledAt, locale)}</time>
+                {fill(tt('m.drafts.scheduledFor'), 'time', () => (
+                  <time dateTime={post.scheduledAt!}>{formatScheduled(post.scheduledAt!, locale)}</time>
+                ))}
               </span>
             ) : post.status === 'draft' ? (
-              <span className="yp-post__state">Draft</span>
+              <span className="yp-post__state">{tt('m.drafts.draft')}</span>
             ) : (
               <bdi>
                 <time dateTime={post.createdAt}>{formatRelativeTime(post.createdAt, locale)}</time>
@@ -823,11 +884,11 @@ export function PostCard({
               <>
                 {' · '}
                 {onHistory ? (
-                  <button type="button" className="yp-post__edited" onClick={() => onHistory(post)} aria-label="Edited. See earlier versions">
-                    Edited
+                  <button type="button" className="yp-post__edited" onClick={() => onHistory(post)} aria-label={tt('post.editedA11y')}>
+                    {tt('m.post.edited')}
                   </button>
                 ) : (
-                  <span>Edited</span>
+                  <span>{tt('m.post.edited')}</span>
                 )}
               </>
             ) : null}
@@ -842,20 +903,22 @@ export function PostCard({
             {post.circle ? <bdi className="yp-post__circle">{post.circle.name}</bdi> : null}
           </span>
         </div>
-        {menu.length ? <Menu label="Post options" actions={menu} /> : null}
+        {menu.length ? <Menu label={tt('post.options')} actions={menu} /> : null}
       </header>
 
       {invited && onAcceptCollab && onDeclineCollab ? (
-        <div className="yp-post__invite" role="group" aria-label="Invite to co-author">
+        <div className="yp-post__invite" role="group" aria-label={tt('post.collabInviteGroup')}>
           <span>
-            <bdi>{post.author.displayName}</bdi> invited you to co-author this post
+            {fill(tt('post.collabInvited'), 'name', () => (
+              <bdi>{post.author.displayName}</bdi>
+            ))}
           </span>
           <span className="yp-post__invite-actions">
             <Button size="sm" onClick={() => onAcceptCollab(post)}>
-              Accept
+              {tt('m.common.accept')}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => onDeclineCollab(post)}>
-              Decline
+              {tt('m.common.decline')}
             </Button>
           </span>
         </div>
@@ -863,7 +926,7 @@ export function PostCard({
       {pendingCoauthors.length ? (
         <p className="yp-post__reason yp-post__pending">
           <Icon name="users" size={14} />
-          <span>Waiting for {joinNames(pendingCoauthors)} to accept</span>
+          <span>{tr('m.collab.waiting', locale, { names: joinNames(pendingCoauthors, locale) })}</span>
         </p>
       ) : null}
 
@@ -880,12 +943,19 @@ export function PostCard({
             post.remixOf.post ? (
               <L href={`/reels?start=${post.remixOf.post.id}`} className="yp-post__reel-link">
                 <Icon name="duet" size={14} />
-                {post.remixOf.mode === 'duet' ? 'Duet with' : 'Remix of'} <bdi>@{post.remixOf.post.author.username}</bdi>
+                <span>
+                  {fill(tt(post.remixOf.mode === 'duet' ? 'm.reels.duetWith' : 'm.reels.remixOf'), 'name', (at) => (
+                    <bdi>
+                      {at}
+                      {post.remixOf!.post!.author.username}
+                    </bdi>
+                  ))}
+                </span>
               </L>
             ) : (
               <span className="yp-post__reel-link">
                 <Icon name="duet" size={14} />
-                {post.remixOf.mode === 'duet' ? 'Duet with a reel that is no longer available' : 'Remix of a reel that is no longer available'}
+                {tt(post.remixOf.mode === 'duet' ? 'post.duetUnavailable' : 'post.remixUnavailable')}
               </span>
             )
           ) : null}
@@ -899,18 +969,18 @@ export function PostCard({
       ) : null}
 
       {post.poll ? (
-        <div className="yp-poll" role="group" aria-label="Poll">
+        <div className="yp-poll" role="group" aria-label={tt('m.sticker.kind.poll')}>
           {post.poll.options.map((o) => {
             const pct = totalVotes ? Math.round((o.votes / totalVotes) * 100) : 0;
             return (
               <button key={o.id} type="button" aria-pressed={post.poll!.myVote === o.id} onClick={() => onVote?.(post, o.id)}>
                 <span className="yp-poll__bar" style={{ width: post.poll!.myVote ? `${pct}%` : 0 }} aria-hidden />
                 <span>{o.label}</span>
-                {post.poll!.myVote ? <span>{pct}%</span> : null}
+                {post.poll!.myVote ? <span>{new Intl.NumberFormat(locale, { style: 'percent' }).format(pct / 100)}</span> : null}
               </button>
             );
           })}
-          <span className="yp-post__meta">{totalVotes} votes</span>
+          <span className="yp-post__meta">{trp('m.poll.votes', totalVotes, locale)}</span>
         </div>
       ) : null}
 
@@ -924,6 +994,7 @@ export function PostCard({
               canRemoveAny: isOwn,
               onRemoveTag: onRemoveTag ? (mediaId, tag) => onRemoveTag(post, mediaId, tag) : undefined,
             }}
+            locale={locale}
           />
         </div>
       ) : null}
@@ -933,7 +1004,7 @@ export function PostCard({
           {post.format === 'reel' ? (
             <L href={`/reels?start=${post.id}`} className="yp-chip">
               <Icon name="sparkle" />
-              Reel · watch full screen
+              {tt('post.reelWatch')}
             </L>
           ) : null}
           {post.linkUrl ? (
@@ -965,7 +1036,12 @@ export function PostCard({
       {post.withheldIn?.length ? (
         <div className="yp-post__reason" role="note">
           <Icon name="info" size={14} />
-          Withheld in {post.withheldIn.map((c) => regionName(c, locale)).join(', ')} for legal reasons.
+          {t('post.withheld', locale, {
+            regions: joinList(
+              post.withheldIn.map((c) => regionName(c, locale)),
+              locale,
+            ),
+          })}
         </div>
       ) : null}
 
@@ -995,7 +1071,9 @@ export function PostCard({
           ) : null}
           {post.aiAssisted ? <Badge tone="neutral">{tt('post.aiAssisted')}</Badge> : null}
           {post.real ? (
-            <Badge tone="success">Real · captured {new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(post.real.capturedAt))}</Badge>
+            <Badge tone="success">
+              {t('post.realCaptured', locale, { time: new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(post.real.capturedAt)) })}
+            </Badge>
           ) : null}
         </div>
       ) : null}
@@ -1008,12 +1086,12 @@ export function PostCard({
             className="yp-action"
             aria-pressed={post.viewer.liked}
             onClick={() => onLike?.(post)}
-            aria-label={`${post.viewer.liked ? tt('post.unlike') : tt('post.like')}, ${post.counts.likes}`}
+            aria-label={counted(post.viewer.liked ? tt('post.unlike') : tt('post.like'), post.counts.likes)}
           >
             <Icon name="heart" filled={post.viewer.liked} />
             {post.counts.likes || ''}
           </button>
-          <button type="button" className="yp-action" onClick={() => onComment?.(post)} aria-label={`${tt('post.comments')}, ${post.counts.comments}`}>
+          <button type="button" className="yp-action" onClick={() => onComment?.(post)} aria-label={counted(tt('post.comments'), post.counts.comments)}>
             <Icon name="message" />
             {post.counts.comments || ''}
           </button>
@@ -1024,19 +1102,19 @@ export function PostCard({
               aria-pressed={post.viewer.reposted}
               onClick={() => onRepost(post)}
               // A toggle: aria-pressed says whether you reposted it, so the name stays the same.
-              aria-label={`Repost, ${post.counts.reposts}`}
+              aria-label={counted(tt('m.reels.repost'), post.counts.reposts)}
             >
               <Icon name="repost" />
               {post.counts.reposts || ''}
             </button>
           ) : post.counts.reposts ? (
-            <span className="yp-action yp-action--static" aria-label={`Reposts, ${post.counts.reposts}`}>
+            <span className="yp-action yp-action--static" aria-label={counted(tt('post.reposts'), post.counts.reposts)}>
               <Icon name="repost" />
               {post.counts.reposts}
             </span>
           ) : null}
           {onShare && post.visibility !== 'private' ? (
-            <button type="button" className="yp-action" onClick={() => onShare(post)} aria-label="Share">
+            <button type="button" className="yp-action" onClick={() => onShare(post)} aria-label={tt('m.common.share')}>
               <Icon name="send" />
             </button>
           ) : null}
@@ -1189,12 +1267,26 @@ export function ListItem({
   );
 }
 
-export function ChatBubble({ mine, sender, body, time, pending }: { mine: boolean; sender?: string; body: ReactNode; time?: string; pending?: boolean }) {
+export function ChatBubble({
+  mine,
+  sender,
+  body,
+  time,
+  pending,
+  locale = 'en',
+}: {
+  mine: boolean;
+  sender?: string;
+  body: ReactNode;
+  time?: string;
+  pending?: boolean;
+  locale?: string;
+}) {
   return (
     <div className={cx('yp-bubble', mine ? 'yp-bubble--me' : 'yp-bubble--them', pending && 'yp-bubble--pending')}>
       {sender && !mine ? <bdi className="yp-bubble__sender">{sender}</bdi> : null}
       <span dir="auto">{body}</span>
-      {time ? <span className="yp-bubble__time">{pending ? 'Sending…' : time}</span> : null}
+      {time ? <span className="yp-bubble__time">{pending ? t('ds.sending', locale) : time}</span> : null}
     </div>
   );
 }
@@ -1204,11 +1296,13 @@ export function CommunityCard({
   href,
   linkAs: L = A,
   action,
+  locale = 'en',
 }: {
   community: { name: string; description: string; memberCount: number; visibility?: string; topics?: string[] };
   href: string;
   linkAs?: LinkLike;
   action?: ReactNode;
+  locale?: string;
 }) {
   return (
     <div className="yp-ccard">
@@ -1220,7 +1314,8 @@ export function CommunityCard({
       </L>
       {community.description ? <p className="yp-ccard__desc">{community.description}</p> : null}
       <span className="yp-ccard__meta">
-        {community.memberCount.toLocaleString()} members{community.visibility === 'private' ? ' · Private' : ''}
+        {trp('m.community.members', community.memberCount, locale)}
+        {community.visibility === 'private' ? ` · ${t('m.community.private', locale)}` : ''}
       </span>
       {action}
     </div>
@@ -1251,7 +1346,8 @@ export function EventCard({
         <span className="yp-ecard__title">{event.title}</span>
         <span className="yp-ecard__meta">{time}</span>
         <span className="yp-ecard__meta">
-          {event.online ? 'Online' : (event.place?.name ?? event.locationText ?? 'Location to be announced')} · {event.counts.going} going
+          {event.online ? t('ds.online', locale) : (event.place?.name ?? event.locationText ?? t('ds.locationTba', locale))} ·{' '}
+          {trp('ds.event.going', event.counts.going, locale)}
         </span>
       </span>
     </L>
@@ -1273,7 +1369,9 @@ export function ProductCard({
       <h3 className="yp-pcard__title">{product.title}</h3>
       {product.description ? <p className="yp-ccard__desc">{product.description}</p> : null}
       <span className="yp-pcard__price">{formatMoney(product.priceCents, product.currency, locale)}</span>
-      {product.inventory !== null ? <span className="yp-pcard__stock">{product.inventory > 0 ? `${product.inventory} left` : 'Sold out'}</span> : null}
+      {product.inventory !== null ? (
+        <span className="yp-pcard__stock">{product.inventory > 0 ? trp('ds.product.left', product.inventory, locale) : t('ds.product.soldOut', locale)}</span>
+      ) : null}
       {action}
     </div>
   );
@@ -1293,7 +1391,9 @@ export function MomentsStrip({
   groups,
   onOpen,
   onCreate,
+  locale = 'en',
 }: {
+  locale?: string;
   groups: {
     author: { id: string; displayName: string; avatarUrl: string | null };
     moments: { closeFriends?: boolean; seen?: boolean }[];
@@ -1304,15 +1404,16 @@ export function MomentsStrip({
   onCreate?: () => void;
 }) {
   const hasOwn = groups.some((g) => g.mine);
+  const yours = t('m.stories.yours', locale);
   return (
-    <ul className="yp-moments" aria-label="Stories">
+    <ul className="yp-moments" aria-label={t('m.stories.label', locale)}>
       {onCreate && !hasOwn ? (
         <li>
           <button type="button" className="yp-moment" onClick={onCreate}>
             <span className="yp-avatar yp-avatar--lg" style={{ background: 'var(--surface-sunken)', color: 'var(--yapi)' }} aria-hidden>
               <Icon name="plus" />
             </span>
-            <span className="yp-moment__name">Your story</span>
+            <span className="yp-moment__name">{yours}</span>
           </button>
         </li>
       ) : null}
@@ -1325,17 +1426,22 @@ export function MomentsStrip({
               type="button"
               className="yp-moment"
               onClick={() => onOpen(i)}
-              aria-label={`${g.mine ? 'Your story' : g.author.displayName}, ${g.moments.length} ${g.moments.length === 1 ? 'story' : 'stories'}${g.allSeen ? ', seen' : ', new'}${close ? ', close friends' : ''}`}
+              aria-label={[
+                g.mine ? yours : g.author.displayName,
+                trp('ds.stories.count', g.moments.length, locale),
+                t(g.allSeen ? 'ds.stories.seen' : 'ds.stories.new', locale),
+                ...(close ? [t('ds.stories.closeFriends', locale)] : []),
+              ].join(t('m.collab.joinSep', locale))}
             >
               <span className={close ? 'yp-moment__ring yp-moment__ring--close' : g.allSeen ? 'yp-moment__ring yp-moment__ring--seen' : 'yp-moment__ring'}>
                 <Avatar name={g.author.displayName} src={g.author.avatarUrl} size="lg" />
               </span>
               <span className="yp-moment__name">
-                <bdi>{g.mine ? 'Your story' : g.author.displayName}</bdi>
+                <bdi>{g.mine ? yours : g.author.displayName}</bdi>
               </span>
             </button>
             {g.mine && onCreate ? (
-              <button type="button" className="yp-moment__add" onClick={onCreate} aria-label="Add to your story">
+              <button type="button" className="yp-moment__add" onClick={onCreate} aria-label={t('m.stories.add', locale)}>
                 <Icon name="plus" size={14} />
               </button>
             ) : null}

@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SCHEDULE_MAX_DAYS, SCHEDULE_MIN_MINUTES } from '../../../packages/shared/src/constants';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import type { Post, PostVersion } from '../../../packages/shared/src/types';
 import { client, errorMessage } from './api';
+import { DateTimeSheet } from './date-time';
 import { useT } from './i18n';
 import { RichText } from './rich-text';
 import { radius, space } from './theme';
@@ -164,87 +165,35 @@ export function HistorySheet({ postId, onClose }: { postId: string; onClose: () 
   );
 }
 
-/** The quick choices for when a scheduled post goes out; ones already too close are left out. */
-export function schedulePresets(now = new Date()): { id: string; label: MessageKey; at: Date }[] {
-  const inHour = new Date(now.getTime() + 60 * 60_000);
-  const tonight = new Date(now);
-  tonight.setHours(20, 0, 0, 0);
-  const tomorrow = new Date(now);
-  tomorrow.setDate(now.getDate() + 1);
-  tomorrow.setHours(9, 0, 0, 0);
-  const soonest = now.getTime() + SCHEDULE_MIN_MINUTES * 60_000;
-  return [
-    { id: 'hour', label: 'm.schedule.inHour' as const, at: inHour },
-    { id: 'tonight', label: 'm.schedule.tonight' as const, at: tonight },
-    { id: 'tomorrow', label: 'm.schedule.tomorrow' as const, at: tomorrow },
-  ].filter((p) => p.at.getTime() >= soonest);
-}
-
-/** "2026-10-06 20:00" (or with a T) as a time on this phone's clock, or null when it isn't one. */
-export function parseLocalTime(text: string): Date | null {
-  const m = /^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})$/.exec(text.trim());
-  if (!m) return null;
-  const [y, mo, d, h, mi] = m.slice(1).map(Number) as [number, number, number, number, number];
-  const at = new Date(y, mo - 1, d, h, mi);
-  return at.getFullYear() === y && at.getMonth() === mo - 1 && at.getDate() === d && at.getHours() === h && at.getMinutes() === mi ? at : null;
-}
-
-/** Whether a time is in the window a post can be scheduled for. */
-export const schedulable = (at: Date, now = Date.now()) =>
-  at.getTime() >= now + SCHEDULE_MIN_MINUTES * 60_000 && at.getTime() <= now + SCHEDULE_MAX_DAYS * 86_400_000;
-
 /**
- * Pick when a post goes out: in an hour, tonight at 8 pm, tomorrow at 9 am, or
- * a typed date and time (there's no date picker in the app).
+ * Pick when a post or reel goes out: between SCHEDULE_MIN_MINUTES and SCHEDULE_MAX_DAYS from now,
+ * on the calendar and clock, with In 1 hour, Tonight and Tomorrow morning as shortcuts.
  */
-export function SchedulePicker({ visible, onClose, onPick }: { visible: boolean; onClose: () => void; onPick: (at: Date) => void }) {
-  const c = useColors();
+export function SchedulePicker({
+  visible,
+  value,
+  onClose,
+  onPick,
+}: {
+  visible: boolean;
+  value?: Date | null;
+  onClose: () => void;
+  onPick: (at: Date) => void;
+}) {
   const { t, dateTime } = useT();
-  const [custom, setCustom] = useState(false);
-  const [text, setText] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const opened = useRef(Date.now());
-  useEffect(() => {
-    if (!visible) return;
-    opened.current = Date.now();
-    setCustom(false);
-    setError(null);
-  }, [visible]);
-  const typed = parseLocalTime(text);
+  const now = Date.now();
   return (
-    <Sheet visible={visible} title={t('m.schedule.title')} onClose={onClose}>
-      {schedulePresets(new Date(opened.current)).map((p) => (
-        <Button key={p.id} label={`${t(p.label)} · ${dateTime(p.at)}`} variant="secondary" onPress={() => onPick(p.at)} />
-      ))}
-      {custom ? (
-        <>
-          <Field
-            label={t('m.schedule.customLabel')}
-            value={text}
-            onChangeText={(v) => {
-              setText(v);
-              setError(null);
-            }}
-            placeholder="2026-10-06 20:00"
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="numbers-and-punctuation"
-          />
-          <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('m.schedule.customHint')}</Text>
-          {error ? <Notice tone="danger">{error}</Notice> : null}
-          <Button
-            label={typed ? t('m.schedule.confirm', { time: dateTime(typed) }) : t('m.create.schedule')}
-            disabled={!text.trim()}
-            onPress={() => {
-              if (!typed) return setError(t('m.schedule.invalid'));
-              if (!schedulable(typed)) return setError(t('m.schedule.customHint'));
-              onPick(typed);
-            }}
-          />
-        </>
-      ) : (
-        <Button label={t('m.schedule.custom')} variant="ghost" onPress={() => setCustom(true)} />
-      )}
-    </Sheet>
+    <DateTimeSheet
+      visible={visible}
+      title={t('m.schedule.title')}
+      value={value ?? new Date(now + 60 * 60_000)}
+      min={new Date(now + SCHEDULE_MIN_MINUTES * 60_000)}
+      max={new Date(now + SCHEDULE_MAX_DAYS * 86_400_000)}
+      quick
+      hint={t('m.schedule.customHint')}
+      confirmLabel={(at) => t('m.schedule.confirm', { time: dateTime(at) })}
+      onClose={onClose}
+      onPick={onPick}
+    />
   );
 }

@@ -8,6 +8,7 @@ import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
 import { assertRecapUse } from '../lib/recap-sharing.ts';
 import { notify, track } from '../lib/services.ts';
 import { assertSoundUsable } from '../lib/sounds.ts';
+import { isStoredMediaUrl } from '../lib/storage.ts';
 import { plusCol, publicUserFrom } from '../lib/users.ts';
 import { notBlockedSql } from '../lib/visibility.ts';
 import {
@@ -153,6 +154,9 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
       await assertRecapUse(db, u.id, [input.mediaId], 'story');
       mediaUrl = m.url;
       mediaKind = m.kind;
+    } else if (mediaUrl && isStoredMediaUrl(mediaUrl)) {
+      // A file stored here goes in by its id, so who owns it and where it may go are checked (a recap, someone else's photo).
+      throw new AppError(400, 'validation_failed', 'Add photos and videos uploaded here by their id.');
     }
     if (!input.body && !mediaUrl && !input.stickers.length && !input.music)
       throw new AppError(400, 'validation_failed', 'Add text, a photo or a video to your story.');

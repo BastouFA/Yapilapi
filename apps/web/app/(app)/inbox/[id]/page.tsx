@@ -116,7 +116,7 @@ export default function ChatPage() {
       setCursor(c);
     }
     if (earlier.some((m) => m.id === target)) setJump(target);
-    else toast('That message isn’t in this chat anymore.');
+    else toast(t('m.chat.notFound'));
   }
 
   useRealtime((e) => {
@@ -168,7 +168,7 @@ export default function ChatPage() {
         () => {},
       );
     if (e.type === 'typing' && e.data.conversationId === id) {
-      const who = conv?.members.find((m) => m.id === e.data.userId)?.displayName ?? 'Someone';
+      const who = conv?.members.find((m) => m.id === e.data.userId)?.displayName ?? t('m.calls.someone');
       setTyping(who);
       setTimeout(() => setTyping(null), 3000);
     }
@@ -182,7 +182,7 @@ export default function ChatPage() {
   /** Upload a photo, video or voice recording, then send it as a message (a yap, or view once). */
   async function sendFile(file: File, label: string, o: { kind?: 'yap'; viewOnce?: boolean } = {}) {
     if (!me) return;
-    if (file.size > 50 * 1024 * 1024) return toast('Files in chats can be up to 50 MB.');
+    if (file.size > 50 * 1024 * 1024) return toast(t('chat.fileTooBig'));
     setUploading(label);
     try {
       const { media } = await api.media.upload(file, undefined, { viewOnce: o.viewOnce });
@@ -199,7 +199,7 @@ export default function ChatPage() {
 
   async function saveEdit(m: Message) {
     const text = body.trim();
-    if (!text) return toast('Write a message. To remove it, unsend it instead.');
+    if (!text) return toast(t('m.chat.editEmpty'));
     if (text === m.body) return cancelCompose();
     try {
       const { message } = await api.messages.edit(m.id, text);
@@ -263,18 +263,18 @@ export default function ChatPage() {
     try {
       if (task === 'summarize_conversation') {
         const r = await api.ai.assist({ task, conversationId: id });
-        setAi({ title: 'Summary', text: String(r.output ?? ''), notice: r.notice });
+        setAi({ title: t('chat.ai.summary'), text: String(r.output ?? ''), notice: r.notice });
       } else {
         const last = [...(messages ?? [])].reverse().find((m) => m.body)?.body ?? '';
         const r = await api.ai.assist({ task, input: last });
         const plan = r.output as Record<string, unknown>;
         setAi({
-          title: 'Plan draft',
+          title: t('chat.ai.planDraft'),
           text:
             Object.entries(plan)
               .filter(([, v]) => v && (!Array.isArray(v) || v.length))
               .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
-              .join('\n') || 'Not enough detail to draft a plan yet.',
+              .join('\n') || t('chat.ai.planEmpty'),
           notice: r.notice,
           plan,
         });
@@ -329,19 +329,19 @@ export default function ChatPage() {
     const pinned = pinnedIds.has(m.id);
     const actions: MenuAction[] = [];
     if (!m.unsent) {
-      actions.push({ label: 'Reply', icon: 'message', onSelect: () => startReply(m) });
-      actions.push({ label: 'React', icon: 'heart', onSelect: () => setPickerFor(m.id) });
+      actions.push({ label: t('m.chat.reply'), icon: 'message', onSelect: () => startReply(m) });
+      actions.push({ label: t('chat.react'), icon: 'heart', onSelect: () => setPickerFor(m.id) });
     }
-    if (editable) actions.push({ label: 'Edit', icon: 'create', onSelect: () => startEdit(m) });
+    if (editable) actions.push({ label: t('m.chat.edit'), icon: 'create', onSelect: () => startEdit(m) });
     if (canManage && !m.unsent && !m.moderation)
       actions.push(
         pinned
-          ? { label: 'Unpin', icon: 'map-pin', onSelect: () => void run(async () => setPins((await api.messages.unpin(m.id)).items)) }
-          : { label: 'Pin', icon: 'map-pin', onSelect: () => void run(async () => setPins((await api.messages.pin(m.id)).items)) },
+          ? { label: t('m.chat.unpin'), icon: 'map-pin', onSelect: () => void run(async () => setPins((await api.messages.unpin(m.id)).items)) }
+          : { label: t('m.chat.pin'), icon: 'map-pin', onSelect: () => void run(async () => setPins((await api.messages.pin(m.id)).items)) },
       );
-    if (!mine && !m.unsent) actions.push({ label: 'Report', icon: 'flag', onSelect: () => setReportId(m.id) });
+    if (!mine && !m.unsent) actions.push({ label: t('post.report'), icon: 'flag', onSelect: () => setReportId(m.id) });
     actions.push({
-      label: 'Delete for me',
+      label: t('m.chat.deleteForMe'),
       icon: 'trash',
       onSelect: () =>
         void run(async () => {
@@ -351,11 +351,11 @@ export default function ChatPage() {
     });
     if (mine && !m.unsent)
       actions.push({
-        label: 'Unsend',
+        label: t('m.chat.unsend'),
         icon: 'x-circle',
         danger: true,
         onSelect: () => {
-          if (!confirm('Unsend this message? It will be removed for everyone in this chat, and anything attached stops working.')) return;
+          if (!confirm(t('m.chat.unsendConfirm'))) return;
           void run(async () => {
             const { message } = await api.messages.unsend(m.id);
             if (message) patchMessage(m.id, () => message);
@@ -373,7 +373,7 @@ export default function ChatPage() {
     <div className="yp-shell__inner chat-page">
       <div className="yp-topbar">
         <div className="row" style={{ minWidth: 0 }}>
-          <Link href="/inbox" className="yp-action" aria-label="Back to inbox">
+          <Link href="/inbox" className="yp-action" aria-label={t('chat.backToInbox')}>
             <Icon name="arrow-left" />
           </Link>
           <div className="chat-title">
@@ -384,26 +384,32 @@ export default function ChatPage() {
           </div>
         </div>
         <Menu
-          label="Conversation options"
+          label={t('chat.options')}
           actions={[
-            { label: 'Video call', icon: 'eye', onSelect: () => void calls.start(id, 'video') },
-            { label: 'Apps', icon: 'create', onSelect: () => setAppsOpen(true) },
-            { label: 'Audio call', icon: 'bell', onSelect: () => void calls.start(id, 'audio') },
+            { label: t('chat.videoCall'), icon: 'eye', onSelect: () => void calls.start(id, 'video') },
+            { label: t('chat.apps'), icon: 'create', onSelect: () => setAppsOpen(true) },
+            { label: t('chat.audioCall'), icon: 'bell', onSelect: () => void calls.start(id, 'audio') },
             { label: t('inbox.summarize'), icon: 'sparkle', onSelect: () => assist('summarize_conversation') },
-            { label: 'Draft a plan from the last message', icon: 'calendar', onSelect: () => assist('plan_from_message') },
-            { label: 'Search this chat', icon: 'search', onSelect: () => setSearchOpen(true) },
-            { label: 'Disappearing messages', icon: 'info', onSelect: () => setDisappearingOpen(true) },
+            { label: t('chat.ai.draftPlan'), icon: 'calendar', onSelect: () => assist('plan_from_message') },
+            { label: t('m.chat.search'), icon: 'search', onSelect: () => setSearchOpen(true) },
+            { label: t('m.chat.disappearing'), icon: 'info', onSelect: () => setDisappearingOpen(true) },
             ...(others.length === 1
-              ? [{ label: `View ${others[0]!.displayName}'s profile`, icon: 'user' as const, onSelect: () => (location.href = `/u/${others[0]!.username}`) }]
+              ? [
+                  {
+                    label: t('chat.viewProfile', { name: others[0]!.displayName }),
+                    icon: 'user' as const,
+                    onSelect: () => (location.href = `/u/${others[0]!.username}`),
+                  },
+                ]
               : []),
-            ...(conv?.yaps?.available ? [{ label: 'Yap settings', icon: 'volume' as const, onSelect: () => setYapSettings(true) }] : []),
+            ...(conv?.yaps?.available ? [{ label: t('m.yap.settings'), icon: 'volume' as const, onSelect: () => setYapSettings(true) }] : []),
           ]}
         />
       </div>
 
       {conv?.disappearingSeconds ? (
         <button type="button" className="chat-disappearing" onClick={() => setDisappearingOpen(true)}>
-          <Icon name="info" size={14} /> Disappearing messages: {disappearingLabel(conv.disappearingSeconds)}
+          <Icon name="info" size={14} /> {t('m.chat.disappearingOn', { time: disappearingLabel(t, conv.disappearingSeconds) })}
         </button>
       ) : null}
       <PinnedBar
@@ -416,7 +422,7 @@ export default function ChatPage() {
 
       {ai || aiLoading ? (
         <AIPanel
-          title={ai?.title ?? 'Working…'}
+          title={ai?.title ?? t('chat.ai.working')}
           loading={aiLoading}
           notice={ai?.notice}
           actions={
@@ -427,15 +433,15 @@ export default function ChatPage() {
                     size="sm"
                     onClick={async () => {
                       await api.conversations.createPlan(id, String(ai.plan!.destination ?? 'New plan'), ai.plan!);
-                      toast('Plan saved to this conversation');
+                      toast(t('chat.ai.planSaved'));
                       setAi(null);
                     }}
                   >
-                    Save plan
+                    {t('chat.ai.savePlan')}
                   </Button>
                 ) : null}
                 <Button size="sm" variant="ghost" onClick={() => setAi(null)}>
-                  Close
+                  {t('m.common.close')}
                 </Button>
               </>
             ) : null
@@ -448,7 +454,7 @@ export default function ChatPage() {
       {messages === null ? (
         <Skeleton height={300} />
       ) : (
-        <div className="yp-chat" role="log" aria-live="polite" aria-relevant="additions" aria-label="Messages">
+        <div className="yp-chat" role="log" aria-live="polite" aria-relevant="additions" aria-label={t('chat.messages')}>
           {cursor ? (
             <Button
               size="sm"
@@ -459,7 +465,7 @@ export default function ChatPage() {
                 setCursor(r.nextCursor);
               }}
             >
-              Load earlier messages
+              {t('chat.loadEarlier')}
             </Button>
           ) : null}
           {messages.map((m) => {
@@ -476,7 +482,7 @@ export default function ChatPage() {
               );
             const time = new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(m.createdAt));
             const content = m.unsent ? (
-              <span className="chat-unsent">{mine ? 'You unsent a message' : 'Message unsent'}</span>
+              <span className="chat-unsent">{mine ? t('m.chat.unsentMine') : t('m.chat.unsent')}</span>
             ) : m.viewOnce ? (
               <>
                 <ViewOnceMessage message={m} mine={mine} onChange={(next) => setMessages((cur) => cur?.map((x) => (x.id === next.id ? next : x)) ?? cur)} />
@@ -484,7 +490,7 @@ export default function ChatPage() {
               </>
             ) : m.attachments.length || m.story ? (
               <>
-                {m.kind === 'yap' ? <span className="chat-yap-label">Yap</span> : null}
+                {m.kind === 'yap' ? <span className="chat-yap-label">{t('m.yap.label')}</span> : null}
                 {m.story ? <StoryCardView card={m.story} /> : null}
                 {m.attachments.length ? <MessageAttachments items={m.attachments} /> : null}
                 {m.body ? <div>{m.body}</div> : null}
@@ -506,6 +512,7 @@ export default function ChatPage() {
                 >
                   <div className="chat-msg__line">
                     <ChatBubble
+                      locale={locale}
                       mine={mine}
                       sender={others.length > 1 ? m.sender.displayName : undefined}
                       body={
@@ -515,21 +522,33 @@ export default function ChatPage() {
                         </>
                       }
                       pending={m.pending}
-                      time={m.editedAt && !m.unsent ? `Edited · ${time}` : time}
+                      time={m.editedAt && !m.unsent ? t('chat.editedAt', { time }) : time}
                     />
                     {!m.pending ? (
                       <div className="chat-msg__tools">
                         {!m.unsent ? (
                           <>
-                            <button type="button" className="yp-action chat-msg__quick" aria-label="Reply" title="Reply" onClick={() => startReply(m)}>
+                            <button
+                              type="button"
+                              className="yp-action chat-msg__quick"
+                              aria-label={t('m.chat.reply')}
+                              title={t('m.chat.reply')}
+                              onClick={() => startReply(m)}
+                            >
                               <Icon name="message" size={18} />
                             </button>
-                            <button type="button" className="yp-action chat-msg__quick" aria-label="React" title="React" onClick={() => setPickerFor(m.id)}>
+                            <button
+                              type="button"
+                              className="yp-action chat-msg__quick"
+                              aria-label={t('chat.react')}
+                              title={t('chat.react')}
+                              onClick={() => setPickerFor(m.id)}
+                            >
                               <Icon name="heart" size={18} />
                             </button>
                           </>
                         ) : null}
-                        <Menu label="Message options" actions={actionsFor(m, mine)} />
+                        <Menu label={t('m.chat.messageOptions')} actions={actionsFor(m, mine)} />
                       </div>
                     ) : null}
                   </div>
@@ -540,14 +559,14 @@ export default function ChatPage() {
                     />
                   ) : null}
                   <ReactionRow message={m} mine={mine} onToggle={(emoji, on) => void react(m, emoji, on)} />
-                  {m.moderation === 'review' ? <span className="chat-held">Waiting for a quick check before it’s delivered</span> : null}
+                  {m.moderation === 'review' ? <span className="chat-held">{t('m.chat.held')}</span> : null}
                 </div>
               </div>
             );
           })}
           {typing ? (
             <span className="muted" style={{ fontSize: 12 }}>
-              {typing} is typing…
+              {t('chat.typing', { name: typing })}
             </span>
           ) : null}
           <div ref={endRef} />
@@ -557,7 +576,7 @@ export default function ChatPage() {
       {conv?.yaps?.available ? (
         <div className="yap-row">
           <TurnOnYapsPrompt />
-          <YapButton disabled={!!uploading} onError={toast} onRecorded={(f) => void sendFile(f, 'Sending Yap…', { kind: 'yap' })} />
+          <YapButton disabled={!!uploading} onError={toast} onRecorded={(f) => void sendFile(f, t('chat.sendingYap'), { kind: 'yap' })} />
         </div>
       ) : null}
       <form
@@ -572,11 +591,15 @@ export default function ChatPage() {
             {/* The message box is described by this, so "Replying to …" is read when it gets focus. */}
             <div style={{ minWidth: 0 }} id="compose-context">
               <span className="chat-compose-context__label">
-                {editing ? 'Editing message' : `Replying to ${replyTo!.sender.id === me?.id ? 'yourself' : replyTo!.sender.displayName}`}
+                {editing
+                  ? t('m.chat.editing')
+                  : replyTo!.sender.id === me?.id
+                    ? t('m.chat.replyingToSelf')
+                    : t('m.chat.replyingTo', { name: replyTo!.sender.displayName })}
               </span>
               {replyTo ? (
                 <span className="chat-compose-context__text" dir="auto">
-                  {previewText({
+                  {previewText(t, {
                     id: replyTo.id,
                     available: true,
                     sender: replyTo.sender,
@@ -590,7 +613,7 @@ export default function ChatPage() {
             <button
               type="button"
               className="yp-action"
-              aria-label={editing ? 'Cancel editing' : 'Cancel reply'}
+              aria-label={editing ? t('m.chat.cancelEdit') : t('m.chat.cancelReply')}
               onClick={() => {
                 cancelCompose();
                 // This button goes away; keep focus in the message box.
@@ -609,7 +632,7 @@ export default function ChatPage() {
           onChange={(e) => {
             const f = e.currentTarget.files?.[0];
             e.currentTarget.value = '';
-            if (f) void sendFile(f, isVideoFile(f) ? 'Sending video…' : 'Sending photo…');
+            if (f) void sendFile(f, isVideoFile(f) ? t('chat.sendingVideo') : t('chat.sendingPhoto'));
           }}
         />
         <input
@@ -620,23 +643,23 @@ export default function ChatPage() {
           onChange={(e) => {
             const f = e.currentTarget.files?.[0];
             e.currentTarget.value = '';
-            if (f) void sendFile(f, 'Sending to view once…', { viewOnce: true });
+            if (f) void sendFile(f, t('chat.sendingViewOnce'), { viewOnce: true });
           }}
         />
-        <button type="button" className="yp-action" aria-label="Send a photo or video" disabled={!!uploading} onClick={() => fileInput.current?.click()}>
+        <button type="button" className="yp-action" aria-label={t('m.chat.sendPhoto')} disabled={!!uploading} onClick={() => fileInput.current?.click()}>
           <Icon name="image" />
         </button>
         <button
           type="button"
           className="yp-action"
-          aria-label="Send a photo or video to view once. Each person can open it one time."
-          title="View once"
+          aria-label={t('chat.viewOnceA11y')}
+          title={t('chat.viewOnceTitle')}
           disabled={!!uploading}
           onClick={() => viewOnceInput.current?.click()}
         >
           <Icon name="eye" />
         </button>
-        <VoiceRecorder disabled={!!uploading} onError={toast} onRecorded={(f) => void sendFile(f, 'Sending voice message…')} />
+        <VoiceRecorder disabled={!!uploading} onError={toast} onRecorded={(f) => void sendFile(f, t('chat.sendingVoice'))} />
         {uploading ? (
           <span className="muted" role="status" style={{ fontSize: 13 }}>
             {uploading}
@@ -662,8 +685,8 @@ export default function ChatPage() {
             if (e.key === 'Escape' && (replyTo || editing)) cancelCompose();
           }}
         />
-        <Button type="submit" icon={editing ? 'check' : 'send'} disabled={!body.trim()} aria-label={editing ? 'Save edit' : t('inbox.send')}>
-          <span className="chat-send__label">{editing ? 'Save' : t('inbox.send')}</span>
+        <Button type="submit" icon={editing ? 'check' : 'send'} disabled={!body.trim()} aria-label={editing ? t('m.chat.saveEdit') : t('inbox.send')}>
+          <span className="chat-send__label">{editing ? t('common.save') : t('inbox.send')}</span>
         </Button>
       </form>
       <ReportSheet target={reportId ? { type: 'message', id: reportId } : null} onClose={() => setReportId(null)} />
@@ -684,10 +707,10 @@ export default function ChatPage() {
         }}
       />
       {conv?.yaps ? (
-        <BottomSheet open={yapSettings} onClose={() => setYapSettings(false)} title="Yaps">
+        <BottomSheet open={yapSettings} onClose={() => setYapSettings(false)} title={t('yap.title')}>
           <div className="stack" style={{ gap: 16 }}>
             <Switch
-              label="Let Yaps play out loud in this chat"
+              label={t('m.yap.outLoud')}
               checked={conv.yaps.playOutLoud ?? conv.yaps.defaultOutLoud}
               onChange={async (on) => {
                 try {
@@ -699,14 +722,10 @@ export default function ChatPage() {
               }}
             />
             <p className="muted" style={{ fontSize: 13, margin: 0 }}>
-              {conv.yaps.playOutLoud === null
-                ? conv.kind === 'direct'
-                  ? 'Right now this follows the default: Yaps play out loud from friends.'
-                  : 'Right now this follows the default: Yaps from friends play out loud.'
-                : 'Yaps always arrive in the chat. This only decides whether they play by themselves.'}
+              {conv.yaps.playOutLoud === null ? (conv.kind === 'direct' ? t('yap.defaultDirect') : t('m.yap.defaultGroup')) : t('m.yap.outLoudHint')}
             </p>
             <Switch
-              label="Pause Yaps in every chat"
+              label={t('m.yap.pause')}
               checked={conv.yaps.paused}
               onChange={async (paused) => {
                 try {
@@ -718,7 +737,7 @@ export default function ChatPage() {
               }}
             />
             <p className="muted" style={{ fontSize: 13, margin: 0 }}>
-              Yaps also stay quiet in focus mode and during quiet hours set in family settings.
+              {t('m.yap.quietNote')}
             </p>
           </div>
         </BottomSheet>

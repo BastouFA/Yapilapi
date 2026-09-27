@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Avatar, BottomSheet, Button, Checkbox, Icon, List, ListItem, Select, SensitiveCover, useDataSaver, useModalFocus } from '@yapilapi/design-system';
 import type { Story, StoryGroup } from '@yapilapi/api-client';
-import { formatRelativeTime, type MessageKey, type PublicUser, type StickerResults, type StorySticker } from '@yapilapi/shared';
+import { formatRelativeTime, isRtl, type MessageKey, type PublicUser, type StickerResults, type StorySticker } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 import { AddToChapter } from '@/components/Chapters';
@@ -41,7 +41,7 @@ export function StoryViewer({
   /** Called after local changes (seen, liked, deleted, answered) so the strip can update. */
   onChange: (groups: StoryGroup[]) => void;
 }) {
-  const { toast, locale, t } = useSession();
+  const { toast, locale, t, tp } = useSession();
   const router = useRouter();
   const [musicOn, setMusicOn] = useStoryMusicOn();
   const [g, setG] = useState(start);
@@ -146,7 +146,7 @@ export function StoryViewer({
   const addToStory = async (visibility: string) => {
     try {
       await api.moments.reshare(story.id, { visibility });
-      toast('Added to your story');
+      toast(t('m.stories.added'));
       setSharing(false);
     } catch (e) {
       toast(errorMessage(e));
@@ -159,13 +159,16 @@ export function StoryViewer({
       className="story"
       role="dialog"
       aria-modal="true"
-      aria-label={`${group.author.displayName}'s story, ${i + 1} of ${group.moments.length}`}
+      aria-label={t('story.dialog', { name: group.author.displayName, index: i + 1, total: group.moments.length })}
       tabIndex={-1}
       onKeyDown={(e) => {
         const tag = (e.target as HTMLElement).tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-        if (e.key === 'ArrowRight') next();
-        else if (e.key === 'ArrowLeft') prev();
+        // Arrows follow reading direction: in right-to-left languages the left arrow goes forward.
+        const forward = isRtl(locale) ? 'ArrowLeft' : 'ArrowRight';
+        const back = isRtl(locale) ? 'ArrowRight' : 'ArrowLeft';
+        if (e.key === forward) next();
+        else if (e.key === back) prev();
         else if (e.key === ' ') {
           e.preventDefault();
           setPaused((p) => !p);
@@ -183,13 +186,13 @@ export function StoryViewer({
         <div className="story__head">
           <Avatar name={group.author.displayName} src={group.author.avatarUrl} size="sm" />
           <span className="story__who">
-            <bdi>{group.mine ? 'Your story' : group.author.displayName}</bdi>
+            <bdi>{group.mine ? t('m.stories.yours') : group.author.displayName}</bdi>
             <span>{formatRelativeTime(story.createdAt, locale)}</span>
           </span>
           {story.closeFriends ? (
             <span className="story__close-friends">
               <Icon name="users" size={14} />
-              Close friends
+              {t('visibility.close_friends')}
             </span>
           ) : null}
           {story.music ? (
@@ -197,19 +200,19 @@ export function StoryViewer({
               type="button"
               className="story__icon"
               onClick={() => setMusicOn(!musicOn)}
-              aria-label={musicOn ? 'Turn music off' : 'Turn music on'}
-              title={musicOn ? 'Turn music off' : 'Turn music on'}
+              aria-label={musicOn ? t('m.music.off') : t('m.music.on')}
+              title={musicOn ? t('m.music.off') : t('m.music.on')}
             >
               <Icon name={musicOn ? 'volume' : 'volume-off'} />
             </button>
           ) : null}
-          <button type="button" className="story__icon" onClick={() => setSharing(true)} aria-label="Share story">
+          <button type="button" className="story__icon" onClick={() => setSharing(true)} aria-label={t('m.stories.share')}>
             <Icon name="send" />
           </button>
-          <button type="button" className="story__icon" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Play' : 'Pause'}>
+          <button type="button" className="story__icon" onClick={() => setPaused((p) => !p)} aria-label={paused ? t('m.common.play') : t('m.common.pause')}>
             <Icon name={paused ? 'play' : 'pause'} filled />
           </button>
-          <button type="button" className="story__icon" onClick={onClose} aria-label="Close">
+          <button type="button" className="story__icon" onClick={onClose} aria-label={t('m.common.close')}>
             <Icon name="x" />
           </button>
         </div>
@@ -237,15 +240,15 @@ export function StoryViewer({
             <img
               key={story.id}
               src={saver ? (story.variants?.medium ?? story.mediaUrl) : story.mediaUrl}
-              alt={covered ? '' : story.body || `Story from ${group.author.displayName}`}
+              alt={covered ? '' : story.body || t('m.stories.photo', { name: group.author.displayName })}
               className={covered ? 'yp-blurred' : undefined}
             />
           ) : story.reshareOf ? (
             <div className="story__reshare">
               <StoryCardView
                 card={story.reshareOf}
-                label={story.reshareOf.available ? `From @${story.reshareOf.author.username}` : undefined}
-                action="Open the original"
+                label={story.reshareOf.available ? t('m.stories.from', { username: story.reshareOf.author.username }) : undefined}
+                action={t('m.stories.openOriginal')}
               />
             </div>
           ) : (
@@ -260,6 +263,7 @@ export function StoryViewer({
           ) : null}
           {covered ? (
             <SensitiveCover
+              locale={locale}
               onReveal={() => {
                 setRevealed((r) => [...r, story.id]);
                 setPaused(false);
@@ -272,8 +276,8 @@ export function StoryViewer({
               <Icon name="play" filled size={40} />
             </button>
           ) : null}
-          <button type="button" className="story__tap story__tap--prev" onClick={prev} aria-label="Previous" />
-          <button type="button" className="story__tap story__tap--next" onClick={next} aria-label="Next" />
+          <button type="button" className="story__tap story__tap--prev" onClick={prev} aria-label={t('story.previous')} />
+          <button type="button" className="story__tap story__tap--next" onClick={next} aria-label={t('story.next')} />
           {music ? (
             <div className="story-stickers">
               <MusicSticker
@@ -306,10 +310,10 @@ export function StoryViewer({
                 setViewers(await api.moments.viewers(story.id).catch(() => ({ items: [], results: [], reshares: 0, allowReshare: !!story.allowReshare })))
               }
             >
-              Seen by {story.views ?? 0}
+              {t('m.stories.seenBy', { count: story.views ?? 0 })}
             </Button>
             <Button size="sm" variant="secondary" onClick={() => (setPaused(true), setAddingToChapter(true))}>
-              Add to a chapter
+              {t('m.chapters.add')}
             </Button>
             <Button
               size="sm"
@@ -320,7 +324,7 @@ export function StoryViewer({
                   const rest = group.moments.filter((m) => m.id !== story.id);
                   const updated = rest.length ? groups.map((x, gi) => (gi === g ? { ...x, moments: rest } : x)) : groups.filter((_, gi) => gi !== g);
                   onChange(updated);
-                  toast('Story deleted');
+                  toast(t('story.deleted'));
                   if (!rest.length) onClose();
                   else setI(Math.min(i, rest.length - 1));
                 } catch (e) {
@@ -328,7 +332,7 @@ export function StoryViewer({
                 }
               }}
             >
-              Delete
+              {t('m.common.delete')}
             </Button>
           </div>
         ) : (
@@ -340,7 +344,7 @@ export function StoryViewer({
               try {
                 await api.moments.reply(story.id, reply.trim());
                 setReply('');
-                toast(`Sent to ${group.author.displayName}`);
+                toast(t('m.stories.sent', { name: group.author.displayName }));
               } catch (err) {
                 toast(errorMessage(err));
               }
@@ -348,18 +352,18 @@ export function StoryViewer({
           >
             {story.mentionsYou && story.canReshare ? (
               <Button size="sm" variant="secondary" icon="plus" onClick={() => void addToStory('followers')}>
-                Add to your story
+                {t('m.stories.add')}
               </Button>
             ) : null}
             <label htmlFor="story-reply" className="yp-visually-hidden">
-              Reply to {group.author.displayName}
+              {t('m.stories.replyTo', { name: group.author.displayName })}
             </label>
             <input
               id="story-reply"
               className="story__reply"
               value={reply}
               maxLength={1000}
-              placeholder={`Reply to ${group.author.displayName}`}
+              placeholder={t('m.stories.replyTo', { name: group.author.displayName })}
               onChange={(e) => setReply(e.currentTarget.value)}
             />
             <button
@@ -367,7 +371,7 @@ export function StoryViewer({
               className="story__icon"
               // A toggle: aria-pressed says whether you like it, so the name stays "Like".
               aria-pressed={story.liked}
-              aria-label="Like"
+              aria-label={t('post.like')}
               onClick={async () => {
                 const liked = !story.liked;
                 patchStory({ liked });
@@ -377,7 +381,7 @@ export function StoryViewer({
               <Icon name="heart" filled={story.liked} />
             </button>
             {reply.trim() ? (
-              <button type="submit" className="story__icon" aria-label="Send reply">
+              <button type="submit" className="story__icon" aria-label={t('m.stories.sendReply')}>
                 <Icon name="send" />
               </button>
             ) : null}
@@ -404,13 +408,9 @@ export function StoryViewer({
         audienceLabel={(v) => t(`visibility.${v}` as MessageKey)}
       />
 
-      <BottomSheet open={viewers !== null} onClose={() => setViewers(null)} title="Seen by">
+      <BottomSheet open={viewers !== null} onClose={() => setViewers(null)} title={t('m.stories.seenByTitle')}>
         {viewers?.results.length ? <StickerResultList results={viewers.results} /> : null}
-        {viewers && viewers.reshares > 0 ? (
-          <p className="muted">
-            Added to {viewers.reshares} {viewers.reshares === 1 ? 'story' : 'stories'}
-          </p>
-        ) : null}
+        {viewers && viewers.reshares > 0 ? <p className="muted">{tp('m.stories.reshares', viewers.reshares)}</p> : null}
         {viewers?.items.length ? (
           <List>
             {viewers.items.map((v) => (
@@ -419,12 +419,12 @@ export function StoryViewer({
                 start={<Avatar name={v.user.displayName} src={v.user.avatarUrl} size="sm" />}
                 primary={v.user.displayName}
                 secondary={`@${v.user.username}`}
-                end={v.liked ? <Icon name="heart" filled label="Liked" /> : null}
+                end={v.liked ? <Icon name="heart" filled label={t('m.stories.liked')} /> : null}
               />
             ))}
           </List>
         ) : (
-          <p className="muted">Nobody has seen this story yet.</p>
+          <p className="muted">{t('m.stories.noViewers')}</p>
         )}
       </BottomSheet>
     </div>
@@ -451,7 +451,7 @@ function ShareSheet({
   onAllowReshare: (allow: boolean) => Promise<void>;
   audienceLabel: (v: string) => string;
 }) {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const [to, setTo] = useState<PublicUser[]>([]);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
@@ -463,20 +463,20 @@ function ShareSheet({
     }
   }, [open]);
   return (
-    <BottomSheet open={open} onClose={onClose} title="Share story">
+    <BottomSheet open={open} onClose={onClose} title={t('m.stories.share')}>
       <div className="stack">
-        <PeoplePicker picked={to} onChange={setTo} label="Send to" />
+        <PeoplePicker picked={to} onChange={setTo} label={t('m.stories.sendTo')} />
         {to.length ? (
           <>
             <label className="yp-visually-hidden" htmlFor="story-share-note">
-              Add a message
+              {t('story.addMessage')}
             </label>
             <input
               id="story-share-note"
               className="yp-input"
               value={note}
               maxLength={1000}
-              placeholder="Add a message (optional)"
+              placeholder={t('story.addMessageOptional')}
               onChange={(e) => setNote(e.currentTarget.value)}
             />
             <Button
@@ -485,7 +485,13 @@ function ShareSheet({
                 setBusy(true);
                 try {
                   const r = await api.moments.send(story.id, { userIds: to.map((p) => p.id), body: note.trim() });
-                  toast(r.failed.length ? `Sent. ${r.failed[0]!.message}` : to.length === 1 ? `Sent to ${to[0]!.displayName}` : `Sent to ${to.length} people`);
+                  toast(
+                    r.failed.length
+                      ? t('story.sentWithError', { message: r.failed[0]!.message })
+                      : to.length === 1
+                        ? t('m.stories.sent', { name: to[0]!.displayName })
+                        : t('m.stories.sentMany', { count: to.length }),
+                  );
                   onClose();
                 } catch (e) {
                   toast(errorMessage(e));
@@ -494,7 +500,7 @@ function ShareSheet({
                 }
               }}
             >
-              Send
+              {t('m.stories.send')}
             </Button>
           </>
         ) : null}
@@ -504,17 +510,17 @@ function ShareSheet({
           onClick={async () => {
             try {
               await navigator.clipboard.writeText(`${location.origin}/s/${story.id}`);
-              toast(story.closeFriends || !story.public ? 'Link copied. Only people who can see this story can open it.' : 'Link copied');
+              toast(story.closeFriends || !story.public ? t('story.linkCopiedLimited') : t('invite.copied'));
             } catch {
-              toast("Couldn't copy. Copy the address from your browser instead.");
+              toast(t('story.copyFailed'));
             }
           }}
         >
-          Copy link
+          {t('invite.copy')}
         </Button>
         {!mine && story.canReshare ? (
           <div className="stack-sm">
-            <Select label="Add to your story for" value={audience} onChange={(e) => setAudience(e.currentTarget.value)}>
+            <Select label={t('story.reshareAudience')} value={audience} onChange={(e) => setAudience(e.currentTarget.value)}>
               {RESHARE_AUDIENCES.map((v) => (
                 <option key={v} value={v}>
                   {audienceLabel(v)}
@@ -522,17 +528,17 @@ function ShareSheet({
               ))}
             </Select>
             <Button variant="secondary" icon="plus" onClick={() => void onAddToStory(audience)}>
-              Add to your story
+              {t('m.stories.add')}
             </Button>
             <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-              Your story shows {authorName}&apos;s story as a card, credited to them.
+              {t('story.reshareHint', { name: authorName })}
             </p>
           </div>
         ) : null}
         {mine && !story.reshareOf ? (
           <Checkbox
-            label="Let people add this story to theirs"
-            description="Only for public stories, and for people you mention."
+            label={t('m.stories.allowReshare')}
+            description={t('m.stories.allowReshareHint')}
             checked={!!story.allowReshare}
             onChange={(e) => void onAllowReshare(e.currentTarget.checked)}
           />
@@ -544,13 +550,14 @@ function ShareSheet({
 
 /** Poll results, slider averages, question answers and countdown reminders, for the author. */
 function StickerResultList({ results }: { results: StickerResults[] }) {
+  const { t, tp } = useSession();
   return (
     <div className="stack story-results">
       {results.map((r) => (
-        <section key={r.stickerId} className="story-results__item" aria-label={r.type === 'question' ? r.prompt : r.type}>
+        <section key={r.stickerId} className="story-results__item" aria-label={r.type === 'question' ? r.prompt : t(`m.sticker.kind.${r.type}`)}>
           {r.type === 'poll' ? (
             <>
-              <h3>Poll · {r.votes === 1 ? '1 vote' : `${r.votes} votes`}</h3>
+              <h3>{t('story.results.poll', { votes: tp('m.sticker.votes', r.votes) })}</h3>
               {r.options.map((o, k) => (
                 <div key={k} className="story-results__bar">
                   <span className="story-results__fill" style={{ width: `${r.percents[k]}%` }} aria-hidden />
@@ -567,13 +574,13 @@ function StickerResultList({ results }: { results: StickerResults[] }) {
                 {r.emoji} {r.prompt}
               </h3>
               <p className="muted">
-                {r.count ? `Average ${Math.round((r.average ?? 0) * 100)}% from ${r.count} ${r.count === 1 ? 'person' : 'people'}` : 'No answers yet'}
+                {r.count ? tp('stickers.view.average', r.count, { percent: `${Math.round((r.average ?? 0) * 100)}%` }) : t('m.sticker.noAnswers')}
               </p>
             </>
           ) : r.type === 'countdown' ? (
             <>
               <h3>{r.title}</h3>
-              <p className="muted">{r.reminders === 1 ? '1 person asked to be reminded' : `${r.reminders} people asked to be reminded`}</p>
+              <p className="muted">{tp('story.results.reminders', r.reminders)}</p>
             </>
           ) : (
             <>
@@ -590,7 +597,7 @@ function StickerResultList({ results }: { results: StickerResults[] }) {
                   ))}
                 </List>
               ) : (
-                <p className="muted">No answers yet</p>
+                <p className="muted">{t('m.sticker.noAnswers')}</p>
               )}
             </>
           )}

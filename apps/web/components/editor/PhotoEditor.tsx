@@ -20,8 +20,10 @@ import {
   vignetteAlpha,
   type Adjustments,
   type FilterId,
+  type MessageKey,
   type TextOverlay,
 } from '@yapilapi/shared';
+import { useSession } from '@/app/providers';
 import {
   AdjustPanel,
   drawText,
@@ -41,13 +43,14 @@ import { TagHint, TagLayer, TagPersonSearch, useTagEditing, type DraftTag } from
 
 type Turn = 0 | 90 | 180 | 270;
 type Crop = { x: number; y: number; w: number; h: number };
-const ASPECTS = [
-  { id: 'free', label: 'Free', ratio: null },
-  { id: '1:1', label: 'Square', ratio: 1 },
-  { id: '4:5', label: '4:5', ratio: 4 / 5 },
-  { id: '9:16', label: '9:16', ratio: 9 / 16 },
-  { id: '16:9', label: '16:9', ratio: 16 / 9 },
-] as const;
+/** Shapes with a word for a name carry its message key; the others show their ratio as it is. */
+const ASPECTS: readonly { id: 'free' | '1:1' | '4:5' | '9:16' | '16:9'; label: MessageKey | null; ratio: number | null }[] = [
+  { id: 'free', label: 'photoEditor.free', ratio: null },
+  { id: '1:1', label: 'm.editor.shape.square', ratio: 1 },
+  { id: '4:5', label: null, ratio: 4 / 5 },
+  { id: '9:16', label: null, ratio: 9 / 16 },
+  { id: '16:9', label: null, ratio: 16 / 9 },
+];
 type Aspect = (typeof ASPECTS)[number]['id'];
 
 interface PhotoState {
@@ -145,7 +148,7 @@ async function renderPhoto(img: HTMLImageElement, s: PhotoState, name: string): 
  */
 export function PhotoEditor({
   file,
-  title = 'Edit photo',
+  title,
   onDone,
   onCancel,
 }: {
@@ -155,6 +158,7 @@ export function PhotoEditor({
   onDone: (f: File, tags: DraftTag[]) => void;
   onCancel: () => void;
 }) {
+  const { t } = useSession();
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [failed, setFailed] = useState(false);
   const [tab, setTab] = useState('crop');
@@ -233,7 +237,7 @@ export function PhotoEditor({
     try {
       onDone(await renderPhoto(img, s, file.name), tags);
     } catch {
-      setError("We couldn't save your edits. Try again, or cancel to use the photo as it is.");
+      setError(t('photoEditor.saveFailed'));
       setBusy(false);
     }
   }
@@ -248,46 +252,53 @@ export function PhotoEditor({
         tabs={[
           {
             id: 'crop',
-            label: 'Crop',
+            label: t('m.editor.tab.crop'),
             content: (
               <div className="stack-sm">
-                <Segments label="Crop shape" value={s.aspect} onChange={setAspect} options={ASPECTS.map((a) => ({ id: a.id, label: a.label }))} />
+                <Segments
+                  label={t('photoEditor.cropShape')}
+                  value={s.aspect}
+                  onChange={setAspect}
+                  options={ASPECTS.map((a) => ({ id: a.id, label: a.label ? t(a.label) : a.id }))}
+                />
                 <div className="row">
                   <Button variant="secondary" size="sm" onClick={() => turn(-1)}>
-                    Turn left
+                    {t('m.editor.turnLeft')}
                   </Button>
                   <Button variant="secondary" size="sm" onClick={() => turn(1)}>
-                    Turn right
+                    {t('m.editor.turnRight')}
                   </Button>
                   <Button variant="secondary" size="sm" aria-pressed={s.flipH} onClick={() => flip('h')}>
-                    Flip across
+                    {t('photoEditor.flipAcross')}
                   </Button>
                   <Button variant="secondary" size="sm" aria-pressed={s.flipV} onClick={() => flip('v')}>
-                    Flip upside down
+                    {t('photoEditor.flipUpsideDown')}
                   </Button>
                 </div>
-                <p className="muted ed__hint">
-                  Drag the frame or its corners. With the frame or a corner focused, the arrow keys move it; hold Shift for bigger steps.
-                </p>
+                <p className="muted ed__hint">{t('photoEditor.cropHint')}</p>
               </div>
             ),
           },
           {
             id: 'filters',
-            label: 'Filters',
+            label: t('m.editor.tab.filters'),
             content: <FilterStrip thumb={thumb} value={s.filter} onChange={(filter) => h.set((cur) => ({ ...cur, filter }))} />,
           },
           {
             id: 'adjust',
-            label: 'Adjust',
+            label: t('m.editor.tab.adjust'),
             content: (
               <AdjustPanel value={s.adjustments} onChange={(k, v) => h.set((cur) => ({ ...cur, adjustments: { ...cur.adjustments, [k]: v } }), `adj-${k}`)} />
             ),
           },
-          { id: 'text', label: 'Text', content: <TextPanel text={s.text} onChange={(text, group) => h.set((cur) => ({ ...cur, text }), group ?? null)} /> },
+          {
+            id: 'text',
+            label: t('m.post.text'),
+            content: <TextPanel text={s.text} onChange={(text, group) => h.set((cur) => ({ ...cur, text }), group ?? null)} />,
+          },
           {
             id: 'tag',
-            label: 'Tag people',
+            label: t('m.tags.add'),
             content: tagging.pending ? <TagPersonSearch {...tagging.searchProps} /> : <TagHint count={tags.length} />,
           },
         ]}
@@ -297,10 +308,10 @@ export function PhotoEditor({
 
   return (
     <EditorShell
-      title={title}
+      title={title ?? t('m.editor.photoTitle')}
       onCancel={onCancel}
       onDone={done}
-      doneLabel={h.changed ? 'Done' : 'Use photo'}
+      doneLabel={t(h.changed ? 'm.common.done' : 'm.camera.dualUse')}
       canUndo={h.canUndo}
       onUndo={h.undo}
       onReset={h.reset}
@@ -308,10 +319,10 @@ export function PhotoEditor({
       tools={tools}
       stage={
         failed ? (
-          <p className="ed__notice">This photo can&apos;t be opened here. Cancel to use it as it is.</p>
+          <p className="ed__notice">{t('photoEditor.cantOpen')}</p>
         ) : !img ? (
           <p className="ed__notice" role="status">
-            Opening your photo…
+            {t('photoEditor.opening')}
           </p>
         ) : (
           <>
@@ -370,6 +381,7 @@ function PhotoPreview({
   /** Drawn over the picture, the same size (the photo tags). */
   overlay?: ReactNode;
 }) {
+  const { t } = useSession();
   const { W, H } = turnedSize(img, s.rotate);
   const fit = useFit(s.crop.w * W, s.crop.h * H);
   const canvas = usePreviewCanvas(
@@ -385,7 +397,7 @@ function PhotoPreview({
   return (
     <div ref={fit.ref} className="ed__fit">
       <div className="ed__frame" style={{ width: fit.width, height: fit.height }}>
-        <canvas ref={canvas} role="img" aria-label="Preview of your edited photo" style={{ width: '100%', height: '100%', filter: filterCss }} />
+        <canvas ref={canvas} role="img" aria-label={t('photoEditor.preview')} style={{ width: '100%', height: '100%', filter: filterCss }} />
         <VignetteOverlay filter={s.filter} adjustments={s.adjustments} />
         {s.text?.value.trim() ? <TextOnStage text={s.text} width={fit.width} onMove={onMoveText} /> : null}
         {overlay}
@@ -395,11 +407,11 @@ function PhotoPreview({
 }
 
 type Handle = 'move' | 'nw' | 'ne' | 'sw' | 'se';
-const HANDLE_LABELS: Record<Exclude<Handle, 'move'>, string> = {
-  nw: 'Top left corner of the crop',
-  ne: 'Top right corner of the crop',
-  sw: 'Bottom left corner of the crop',
-  se: 'Bottom right corner of the crop',
+const HANDLE_LABELS: Record<Exclude<Handle, 'move'>, MessageKey> = {
+  nw: 'photoEditor.handle.nw',
+  ne: 'photoEditor.handle.ne',
+  sw: 'photoEditor.handle.sw',
+  se: 'photoEditor.handle.se',
 };
 
 /** Resize or move the crop frame from one corner, keeping a fixed shape when one is chosen. */
@@ -427,6 +439,7 @@ function adjustCrop(c: Crop, handle: Handle, dx: number, dy: number, ratio: numb
 
 /** The whole turned picture with the crop frame on top. */
 function CropStage({ img, state: s, filterCss, onCrop }: { img: HTMLImageElement; state: PhotoState; filterCss: string; onCrop: (c: Crop) => void }) {
+  const { t, locale } = useSession();
   const { W, H } = turnedSize(img, s.rotate);
   const fit = useFit(W, H);
   const ratio = ASPECTS.find((a) => a.id === s.aspect)!.ratio;
@@ -459,17 +472,17 @@ function CropStage({ img, state: s, filterCss, onCrop }: { img: HTMLImageElement
     onCrop(adjustCrop(s.crop, handle, d[0]!, d[1]!, ratio, W, H));
   };
   const c = s.crop;
-  const pct = (v: number) => `${Math.round(v * 100)}%`;
+  const pct = (v: number) => new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 0 }).format(v);
   return (
     <div ref={fit.ref} className="ed__fit">
       <div className="ed__frame ed__frame--crop" style={{ width: fit.width, height: fit.height }}>
-        <canvas ref={canvas} role="img" aria-label="Your photo, with the crop frame" style={{ width: '100%', height: '100%', filter: filterCss }} />
+        <canvas ref={canvas} role="img" aria-label={t('photoEditor.cropCanvas')} style={{ width: '100%', height: '100%', filter: filterCss }} />
         <div
           className="ed__crop"
           style={{ left: `${c.x * 100}%`, top: `${c.y * 100}%`, width: `${c.w * 100}%`, height: `${c.h * 100}%` }}
           role="button"
           tabIndex={0}
-          aria-label={`Crop frame, ${pct(c.w)} wide and ${pct(c.h)} high, from ${pct(c.x)} across and ${pct(c.y)} down. Use the arrow keys to move it.`}
+          aria-label={t('photoEditor.cropFrame', { width: pct(c.w), height: pct(c.h), x: pct(c.x), y: pct(c.y) })}
           onPointerDown={start('move')}
           onPointerMove={onMove}
           onPointerUp={end}
@@ -485,7 +498,7 @@ function CropStage({ img, state: s, filterCss, onCrop }: { img: HTMLImageElement
             style={{ left: `${(k === 'nw' || k === 'sw' ? c.x : c.x + c.w) * 100}%`, top: `${(k === 'nw' || k === 'ne' ? c.y : c.y + c.h) * 100}%` }}
             role="button"
             tabIndex={0}
-            aria-label={`${HANDLE_LABELS[k]}. Use the arrow keys to resize.`}
+            aria-label={t(HANDLE_LABELS[k])}
             onPointerDown={start(k)}
             onPointerMove={onMove}
             onPointerUp={end}

@@ -10,3 +10,4 @@ export * from './stories.ts';
 export * from './dual.ts';
 export * from './data-saver.ts';
 export * from './rooms.ts';
+export * from './date-picker.ts';

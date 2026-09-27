@@ -16,6 +16,7 @@ import {
   type storyStickerInputSchema,
 } from '@yapilapi/shared';
 import type { z } from 'zod';
+import { minorRuleSql } from './collabs.ts';
 import { AppError, notFound } from './errors.ts';
 import { analyzeText } from './moderation.ts';
 import type { RealtimeHub } from './realtime.ts';
@@ -171,10 +172,17 @@ export async function prepareStory(
   return { stickers, mentionIds, tags };
 }
 
-/** Tell people mentioned in a story, but only those who can see it. Blocks, mutes and settings apply as usual. */
+/**
+ * Tell people mentioned in a story, but only those who can see it, and not across the minor line between people
+ * who aren't friends (as for photo tags). Blocks, mutes and settings apply as usual.
+ */
 export async function notifyStoryMentions(db: Q, realtime: RealtimeHub, m: { storyId: string; actorId: string; userIds: string[] }): Promise<number> {
+  if (!m.userIds.length) return 0;
+  const allowed = (
+    await db.query<{ id: string }>(`SELECT x.id FROM unnest($2::uuid[]) AS x(id) WHERE ${minorRuleSql('$1::uuid', 'x.id')}`, [m.actorId, m.userIds])
+  ).rows.map((r) => r.id);
   let sent = 0;
-  for (const userId of m.userIds) {
+  for (const userId of allowed) {
     if (userId === m.actorId || !(await canSeeStory(db, m.storyId, userId))) continue;
     await notify(db, realtime, { userId, category: 'friends', type: 'story_mention', actorId: m.actorId, entityType: 'moment', entityId: m.storyId });
     sent++;

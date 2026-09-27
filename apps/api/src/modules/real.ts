@@ -7,6 +7,7 @@ import { hydratePosts } from '../lib/posts.ts';
 import { isEnabled, notify, track } from '../lib/services.ts';
 import { areFriends, isAdultViewer, publicUserFrom } from '../lib/users.ts';
 import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
+import { assertRecapUse } from '../lib/recap-sharing.ts';
 import { requireVerified } from '../lib/verification.ts';
 import { eventVisibleSql, postVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
@@ -235,8 +236,13 @@ export default async function realModule(app: FastifyInstance, ctx: AppContext) 
       const t = await loadTogether(id, u.id);
       if (t.status !== 'open') throw badRequest('This Together is closed.');
       await tx(db, async (c) => {
-        const r = await c.query(`UPDATE media SET used_at = now() WHERE id = $1 AND owner_id = $2 AND used_at IS NULL RETURNING id`, [input.mediaId, u.id]);
+        // Your own upload, not a view-once one; a recap only when it could be sent in a chat (members see it).
+        const r = await c.query(`UPDATE media SET used_at = now() WHERE id = $1 AND owner_id = $2 AND used_at IS NULL AND NOT private RETURNING id`, [
+          input.mediaId,
+          u.id,
+        ]);
         if (!r.rowCount) throw notFound('Media');
+        await assertRecapUse(c, u.id, [input.mediaId], 'chat');
         await c.query(`INSERT INTO together_contributions (together_id, user_id, media_id, caption) VALUES ($1,$2,$3,$4)`, [
           id,
           u.id,

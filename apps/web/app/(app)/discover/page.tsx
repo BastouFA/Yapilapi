@@ -142,7 +142,7 @@ function Discover() {
                 <h2 className="section-title">{t('discover.communities')}</h2>
                 <div className="yp-grid">
                   {foundCommunities.map((c) => (
-                    <CommunityCard key={c.id} community={c} href={`/c/${c.slug}`} linkAs={NextLink} />
+                    <CommunityCard key={c.id} community={c} href={`/c/${c.slug}`} linkAs={NextLink} locale={locale} />
                   ))}
                 </div>
               </section>
@@ -223,7 +223,7 @@ function Discover() {
             <h2 className="section-title">{t('discover.communities')}</h2>
             <div className="yp-grid">
               {communities.map((c) => (
-                <CommunityCard key={c.id} community={c} href={`/c/${c.slug}`} linkAs={NextLink} />
+                <CommunityCard key={c.id} community={c} href={`/c/${c.slug}`} linkAs={NextLink} locale={locale} />
               ))}
             </div>
           </section>

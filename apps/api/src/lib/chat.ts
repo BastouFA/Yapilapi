@@ -29,7 +29,7 @@ export async function messagePreviews(db: Q, ids: string[], readerId: string): P
   if (!unique.length) return out;
   const { rows } = await db.query(
     `SELECT m.id, m.sender_id, left(m.body, 200) AS body, m.attachments->0->>'kind' AS attachment_kind, m.created_at, m.deleted_at, m.unsent_at,
-            m.moderation_status, m.kind,
+            m.moderation_status, m.kind, (m.expires_at IS NOT NULL AND m.expires_at <= now()) AS expired,
             EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $2 AND b.blocked_id = m.sender_id) AS blocked
      FROM messages m WHERE m.id = ANY($1::uuid[])`,
     [unique, readerId],
@@ -41,7 +41,8 @@ export async function messagePreviews(db: Q, ids: string[], readerId: string): P
   const gone = (id: string): MessagePreview => ({ id, available: false, sender: null, body: '', attachmentKind: null, createdAt: null });
   for (const id of unique) out.set(id, gone(id));
   for (const r of rows) {
-    const visible = !r.blocked && (r.moderation_status === 'normal' || r.sender_id === readerId) && r.kind !== 'system';
+    // A disappearing message past its time is gone from quotes and pins too, even before the job deletes it.
+    const visible = !r.blocked && !r.expired && (r.moderation_status === 'normal' || r.sender_id === readerId) && r.kind !== 'system';
     if (!visible || (r.deleted_at && !r.unsent_at)) continue;
     const base = { id: r.id, available: true, sender: users.get(r.sender_id) ?? null, createdAt: r.created_at.toISOString() };
     out.set(

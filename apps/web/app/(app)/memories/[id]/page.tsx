@@ -11,7 +11,7 @@ import { useSession } from '../../../providers';
 
 export default function MemoryPage() {
   const { id } = useParams<{ id: string }>();
-  const { me, toast, locale, flags } = useSession();
+  const { me, toast, locale, flags, t, tp } = useSession();
   const router = useRouter();
   const [data, setData] = useState<Awaited<ReturnType<typeof api.memories.get>> | null>(null);
   const [missing, setMissing] = useState(false);
@@ -26,7 +26,7 @@ export default function MemoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  if (missing) return <EmptyState title="Memory not found" />;
+  if (missing) return <EmptyState title={t('memories.notFound')} />;
   if (!data) return <Skeleton height={240} />;
   const m = data.memory;
 
@@ -45,7 +45,7 @@ export default function MemoryPage() {
                   setSharing(true);
                 }}
               >
-                {m.visibility === 'private' ? 'Share' : 'Sharing'}
+                {m.visibility === 'private' ? t('m.common.share') : t('memories.sharing')}
               </Button>
               <Button
                 size="sm"
@@ -55,7 +55,7 @@ export default function MemoryPage() {
                   router.push('/memories');
                 }}
               >
-                Delete
+                {t('m.common.delete')}
               </Button>
             </>
           ) : null}
@@ -65,21 +65,21 @@ export default function MemoryPage() {
       {flags.MEMORY !== false ? (
         <div className="recap-cta">
           <span className="stack-sm" style={{ gap: 2, minWidth: 0 }}>
-            <strong>Make a recap video</strong>
-            <span className="muted">A short video from the photos and videos here. Only you see it until you share it.</span>
+            <strong>{t('m.recap.make')}</strong>
+            <span className="muted">{t('memories.recapHint')}</span>
           </span>
           <Link href={`/recaps/new?source=memory&sourceId=${id}`} className="yp-btn yp-btn--secondary yp-btn--sm">
             <Icon name="play" size={16} />
-            Make one
+            {t('memories.makeOne')}
           </Link>
         </div>
       ) : null}
 
       {m.recap || m.mine ? (
         <AIPanel
-          title="Recap"
+          title={t('memories.recapTitle')}
           loading={recapping}
-          notice="Written from the posts in this memory that you can see. You decide whether to share it."
+          notice={t('memories.recapNotice')}
           actions={
             m.mine ? (
               <Button
@@ -97,12 +97,12 @@ export default function MemoryPage() {
                   }
                 }}
               >
-                {m.recap ? 'Write a new recap' : 'Write a recap'}
+                {m.recap ? t('memories.recapRewrite') : t('memories.recapWrite')}
               </Button>
             ) : null
           }
         >
-          {m.recap ?? 'No recap yet.'}
+          {m.recap ?? t('memories.recapNone')}
         </AIPanel>
       ) : null}
 
@@ -118,12 +118,12 @@ export default function MemoryPage() {
       {data.posts.map((p) => (
         <PostCard key={p.id} post={p} locale={locale} linkAs={NextLink} />
       ))}
-      {data.hiddenItems ? <p className="muted">{data.hiddenItems} items aren't visible to you anymore.</p> : null}
+      {data.hiddenItems ? <p className="muted">{tp('memories.hiddenItems', data.hiddenItems)}</p> : null}
       {!data.posts.length && !data.events.length && !data.moments.length ? (
-        <EmptyState title="Nothing here yet" body="Add posts to this memory from the post menu, or create a memory from an event." />
+        <EmptyState title={t('m.feed.empty.title')} body={t('memories.emptyItems')} />
       ) : null}
 
-      <BottomSheet open={sharing} onClose={() => setSharing(false)} title="Share with friends">
+      <BottomSheet open={sharing} onClose={() => setSharing(false)} title={t('memories.shareTitle')}>
         <div className="stack-sm">
           {friends.length ? (
             friends.map((f) => (
@@ -147,13 +147,13 @@ export default function MemoryPage() {
               />
             ))
           ) : (
-            <p className="muted">You can share memories with friends. Add friends from their profiles.</p>
+            <p className="muted">{t('memories.noFriends')}</p>
           )}
           <Button
             onClick={async () => {
               try {
                 const r = await api.memories.share(id, [...picked]);
-                toast(r.visibility === 'private' ? 'Memory is private' : 'Memory shared');
+                toast(r.visibility === 'private' ? t('memories.nowPrivate') : t('memories.nowShared'));
                 setSharing(false);
                 await load();
               } catch (e) {
@@ -161,7 +161,7 @@ export default function MemoryPage() {
               }
             }}
           >
-            {picked.size ? `Share with ${picked.size}` : 'Keep private'}
+            {picked.size ? tp('memories.shareWith', picked.size) : t('memories.keepPrivate')}
           </Button>
         </div>
       </BottomSheet>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, Avatar, Badge, Button, Card, List, ListItem, Select, TextField } from '@yapilapi/design-system';
 import type { FamilyLink, TeenControls } from '@yapilapi/api-client';
+import type { MessageKey } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
@@ -14,7 +15,7 @@ const LIMITS = [null, 30, 60, 90, 120, 180];
  * and see daily minutes. They never see messages or activity.
  */
 export function FamilyCard() {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const [items, setItems] = useState<FamilyLink[] | null>(null);
   const [username, setUsername] = useState('');
   const load = () =>
@@ -38,7 +39,7 @@ export function FamilyCard() {
   };
 
   return (
-    <Card title="Family" subtitle="Supervise a teen's account together. Guardians never see messages, posts in private spaces or searches.">
+    <Card title={t('m.family.title')} subtitle={t('m.family.body')}>
       <div className="stack">
         {items.length ? (
           <List>
@@ -48,29 +49,29 @@ export function FamilyCard() {
                 <ListItem
                   key={l.id}
                   start={<Avatar name={other?.displayName ?? '?'} src={other?.avatarUrl ?? null} size="sm" />}
-                  primary={other?.displayName ?? 'Account'}
+                  primary={other?.displayName ?? t('m.family.account')}
                   secondary={
                     l.status === 'pending'
                       ? l.role === 'teen'
-                        ? 'Wants to supervise your account'
-                        : 'Invitation sent'
+                        ? t('m.family.status.wants')
+                        : t('m.family.status.invited')
                       : l.role === 'guardian'
-                        ? 'You supervise this account'
-                        : 'Supervises your account'
+                        ? t('m.family.status.guardian')
+                        : t('m.family.status.teen')
                   }
                   end={
                     <>
                       {l.status === 'pending' && l.role === 'teen' ? (
-                        <Button size="sm" onClick={() => act(() => api.family.accept(l.id), 'Family link accepted')}>
-                          Accept
+                        <Button size="sm" onClick={() => act(() => api.family.accept(l.id), t('family.accepted'))}>
+                          {t('m.common.accept')}
                         </Button>
                       ) : null}
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => act(() => api.family.end(l.id), l.status === 'pending' ? 'Declined' : 'Family link ended')}
+                        onClick={() => act(() => api.family.end(l.id), l.status === 'pending' ? t('family.declined') : t('family.ended'))}
                       >
-                        {l.status === 'pending' && l.role === 'teen' ? 'Decline' : l.status === 'pending' ? 'Cancel' : 'End'}
+                        {l.status === 'pending' && l.role === 'teen' ? t('m.common.decline') : l.status === 'pending' ? t('common.cancel') : t('m.family.end')}
                       </Button>
                     </>
                   }
@@ -86,8 +87,8 @@ export function FamilyCard() {
             l.role === 'guardian' ? (
               <GuardianControls key={l.id} link={l} onSaved={load} />
             ) : (
-              <Alert key={l.id} tone="info" title={`${l.guardian?.displayName ?? 'Your guardian'} set these for you`}>
-                {describe(l.controls!)}
+              <Alert key={l.id} tone="info" title={t('m.family.setForYou', { name: l.guardian?.displayName ?? t('m.family.yourGuardian') })}>
+                {describe(l.controls!, t)}
               </Alert>
             ),
           )}
@@ -97,19 +98,19 @@ export function FamilyCard() {
           style={{ alignItems: 'flex-end' }}
           onSubmit={(e) => {
             e.preventDefault();
-            void act(() => api.family.invite(username.trim().replace(/^@/, '')), 'Invitation sent. They need to accept it.').then(() => setUsername(''));
+            void act(() => api.family.invite(username.trim().replace(/^@/, '')), t('m.family.invite.sent')).then(() => setUsername(''));
           }}
         >
           <div style={{ flex: 1, minWidth: 200 }}>
             <TextField
-              label="Supervise a teen (their username)"
+              label={t('m.family.invite.label')}
               value={username}
               onChange={(e) => setUsername(e.currentTarget.value)}
-              placeholder="@username"
+              placeholder={t('m.family.invite.placeholder')}
             />
           </div>
           <Button type="submit" variant="secondary" disabled={!username.trim()}>
-            Invite
+            {t('m.family.invite')}
           </Button>
         </form>
       </div>
@@ -117,15 +118,15 @@ export function FamilyCard() {
   );
 }
 
-function describe(c: TeenControls): string {
-  const parts = [c.messagesFrom === 'nobody' ? 'Only family can message you.' : 'Only friends and family can message you.'];
-  if (c.dailyLimitMinutes) parts.push(`A reminder after ${c.dailyLimitMinutes} minutes a day.`);
-  if (c.quietStart && c.quietEnd) parts.push(`Quiet hours ${c.quietStart} to ${c.quietEnd} (${c.timezone}): notifications wait until morning.`);
+function describe(c: TeenControls, t: (key: MessageKey, vars?: Record<string, string | number>) => string): string {
+  const parts = [c.messagesFrom === 'nobody' ? t('m.family.rule.familyOnly') : t('m.family.rule.friends')];
+  if (c.dailyLimitMinutes) parts.push(t('m.family.rule.limit', { minutes: c.dailyLimitMinutes }));
+  if (c.quietStart && c.quietEnd) parts.push(t('m.family.rule.quiet', { start: c.quietStart, end: c.quietEnd, timezone: c.timezone }));
   return parts.join(' ');
 }
 
 function GuardianControls({ link, onSaved }: { link: FamilyLink; onSaved: () => void }) {
-  const { toast } = useSession();
+  const { toast, t, tp, locale } = useSession();
   const [c, setC] = useState<TeenControls>(link.controls!);
   const [saving, setSaving] = useState(false);
   const week = link.usage ?? [];
@@ -134,44 +135,49 @@ function GuardianControls({ link, onSaved }: { link: FamilyLink; onSaved: () => 
     <div className="family-controls">
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <strong>{link.teen?.displayName}</strong>
-        <Badge tone="success">Supervised</Badge>
+        <Badge tone="success">{t('family.supervised')}</Badge>
       </div>
       {week.length ? (
-        <div className="usage" aria-label="Minutes per day, last 7 days">
+        <div className="usage" aria-label={t('family.week')}>
           {week.map((d) => (
-            <div key={d.day} className="usage__day" title={`${d.minutes} min`}>
+            <div key={d.day} className="usage__day" title={t('m.unit.minutes', { count: d.minutes })}>
               <span className="usage__bar" style={{ height: `${Math.max(4, (d.minutes / max) * 64)}px` }} />
-              <span className="usage__label">{new Date(d.day).toLocaleDateString(undefined, { weekday: 'narrow' })}</span>
+              <span className="usage__label">{new Date(d.day).toLocaleDateString(locale, { weekday: 'narrow' })}</span>
             </div>
           ))}
         </div>
       ) : (
         <p className="muted" style={{ margin: 0 }}>
-          No time recorded this week yet.
+          {t('m.family.noUsage')}
         </p>
       )}
       <Select
-        label="Who can message them"
+        label={t('m.family.whoCanMessage')}
         value={c.messagesFrom}
         onChange={(e) => setC({ ...c, messagesFrom: e.currentTarget.value as TeenControls['messagesFrom'] })}
       >
-        <option value="friends">Friends and family</option>
-        <option value="nobody">Family only</option>
+        <option value="friends">{t('m.family.friendsAndFamily')}</option>
+        <option value="nobody">{t('m.family.familyOnly')}</option>
       </Select>
       <Select
-        label="Daily reminder"
+        label={t('m.family.dailyReminder')}
         value={String(c.dailyLimitMinutes ?? '')}
         onChange={(e) => setC({ ...c, dailyLimitMinutes: e.currentTarget.value ? Number(e.currentTarget.value) : null })}
       >
         {LIMITS.map((m) => (
           <option key={String(m)} value={m ?? ''}>
-            {m ? `After ${m >= 60 ? `${m / 60} hour${m > 60 ? 's' : ''}` : `${m} minutes`}` : 'Off'}
+            {m ? (m >= 60 ? tp('family.limit.hours', m / 60, { hours: m / 60 }) : t('family.limit.minutes', { count: m })) : t('m.family.limit.off')}
           </option>
         ))}
       </Select>
       <div className="row">
-        <TextField label="Quiet from" type="time" value={c.quietStart ?? ''} onChange={(e) => setC({ ...c, quietStart: e.currentTarget.value || null })} />
-        <TextField label="Until" type="time" value={c.quietEnd ?? ''} onChange={(e) => setC({ ...c, quietEnd: e.currentTarget.value || null })} />
+        <TextField
+          label={t('m.family.quietFrom')}
+          type="time"
+          value={c.quietStart ?? ''}
+          onChange={(e) => setC({ ...c, quietStart: e.currentTarget.value || null })}
+        />
+        <TextField label={t('m.family.until')} type="time" value={c.quietEnd ?? ''} onChange={(e) => setC({ ...c, quietEnd: e.currentTarget.value || null })} />
       </div>
       <Button
         size="sm"
@@ -180,7 +186,7 @@ function GuardianControls({ link, onSaved }: { link: FamilyLink; onSaved: () => 
           setSaving(true);
           try {
             await api.family.setControls(link.id, { ...c, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' });
-            toast(`Saved. ${link.teen?.displayName ?? 'They'} will be told.`);
+            toast(link.teen?.displayName ? t('m.family.savedTold', { name: link.teen.displayName }) : t('m.family.savedToldThem'));
             onSaved();
           } catch (e) {
             toast(errorMessage(e));
@@ -189,7 +195,7 @@ function GuardianControls({ link, onSaved }: { link: FamilyLink; onSaved: () => 
           }
         }}
       >
-        Save settings
+        {t('m.family.save')}
       </Button>
     </div>
   );

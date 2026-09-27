@@ -14,14 +14,18 @@ import {
   type ChapterGradient,
   type ChapterSymbol,
 } from '../../../packages/shared/src/constants';
+import { addDays, startOfDay } from '../../../packages/shared/src/date-picker';
 import { client, errorMessage } from '../lib/api';
 import { SYMBOL_ICON } from '../lib/chapters';
+import { DateField } from '../lib/date-time';
 import { useT } from '../lib/i18n';
 import { radius, space } from '../lib/theme';
 import { Button, Field, Icon, Loading, Notice, SwitchRow, useColors } from '../lib/ui';
 
 const DAY = 86_400_000;
-const toDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+/** The API's window for a time capsule's opening: an hour to 25 years from now (apps/api/src/modules/chapters.ts). */
+const CAPSULE_MIN_MS = 60 * 60 * 1000;
+const CAPSULE_MAX_MS = 25 * 365 * DAY;
 
 /**
  * Start or edit a chapter (`?id=` to edit): title, description, audience, cover (one of its
@@ -40,7 +44,8 @@ export default function ChapterEdit() {
   const [symbol, setSymbol] = useState<ChapterSymbol>('star');
   const [coverStoryId, setCoverStoryId] = useState<string | null>(null);
   const [capsule, setCapsule] = useState(false);
-  const [until, setUntil] = useState('');
+  // The opening day, at midnight on this phone's clock.
+  const [until, setUntil] = useState<Date | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,7 +64,7 @@ export default function ChapterEdit() {
           setSymbol(ch.coverSymbol);
           setCoverStoryId(ch.coverStoryId ?? null);
           setCapsule(!!ch.capsule);
-          setUntil(ch.capsule ? toDay(new Date(ch.capsule.opensAt)) : '');
+          setUntil(ch.capsule ? new Date(ch.capsule.opensAt) : null);
         },
         (e) => {
           setChapter(null);
@@ -70,14 +75,14 @@ export default function ChapterEdit() {
 
   if (chapter === undefined) return <Loading />;
   const dateLocked = !!chapter?.capsule && (chapter.capsule.sealed || chapter.capsule.open);
-  const validDay = /^\d{4}-\d{2}-\d{2}$/.test(until) && !Number.isNaN(new Date(`${until}T00:00:00`).getTime());
+  const validDay = !!until;
 
   async function save() {
     setBusy(true);
     setError(null);
     try {
       const api = await client();
-      const opensAt = dateLocked ? undefined : capsule && validDay ? new Date(`${until}T00:00:00`).toISOString() : null;
+      const opensAt = dateLocked ? undefined : capsule && until ? until.toISOString() : null;
       const base = { title: title.trim(), description: description.trim(), audience, coverGradient: gradient, coverSymbol: symbol };
       const r = chapter
         ? await api.chapters.update(chapter.id, { ...base, ...(opensAt !== undefined ? { opensAt } : {}), coverStoryId })
@@ -206,25 +211,22 @@ export default function ChapterEdit() {
       <SwitchRow label={t('m.chapters.capsule')} hint={t('m.chapters.capsuleHint')} value={capsule} disabled={dateLocked} onValueChange={setCapsule} />
       {capsule ? (
         <View style={{ gap: space[2] }}>
-          <Field
+          <DateField
             label={t('m.chapters.sealUntil')}
+            sheetTitle={t('m.chapters.sealTitle')}
+            mode="date"
             value={until}
-            editable={!dateLocked}
-            onChangeText={setUntil}
-            placeholder={toDay(new Date(Date.now() + 365 * DAY))}
-            keyboardType="numbers-and-punctuation"
-            autoCapitalize="none"
+            onChange={setUntil}
+            disabled={dateLocked}
+            min={new Date(Date.now() + CAPSULE_MIN_MS)}
+            max={new Date(Date.now() + CAPSULE_MAX_MS)}
+            presets={[30, 182, 365, 365 * 5].map((days) => {
+              const at = startOfDay(addDays(new Date(), days));
+              return { id: String(days), label: date(at, { dateStyle: 'medium' }), at };
+            })}
+            hint={t('m.chapters.sealHint')}
           />
-          {dateLocked ? (
-            <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('m.chapters.dateFixed')}</Text>
-          ) : (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-              {[30, 182, 365, 365 * 5].map((days) => {
-                const d = toDay(new Date(Date.now() + days * DAY));
-                return chip(String(days), until === d, date(`${d}T12:00:00`, { dateStyle: 'medium' }), () => setUntil(d));
-              })}
-            </View>
-          )}
+          {dateLocked ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('m.chapters.dateFixed')}</Text> : null}
         </View>
       ) : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}

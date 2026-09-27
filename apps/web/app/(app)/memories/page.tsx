@@ -12,7 +12,7 @@ import { NextLink } from '@/lib/link';
 import { useSession } from '../../providers';
 
 export default function Memories() {
-  const { toast, locale, flags } = useSession();
+  const { toast, locale, flags, t, tp } = useSession();
   const router = useRouter();
   const [items, setItems] = useState<MemorySummary[] | null>(null);
   const [sugg, setSugg] = useState<{ events: EventItem[]; onThisDay: Post[] } | null>(null);
@@ -30,18 +30,18 @@ export default function Memories() {
       .catch(() => {});
   }, [flags.MEMORY, toast]);
 
-  if (flags.MEMORY === false) return <FeatureOff name="Memory" />;
+  if (flags.MEMORY === false) return <FeatureOff name={t('memories.title')} />;
 
   return (
     <div className="yp-shell__inner">
       <div className="yp-topbar">
-        <h1>Memories</h1>
+        <h1>{t('memories.title')}</h1>
         <Link href="/recaps" className="yp-btn yp-btn--ghost yp-btn--sm">
-          Your recaps
+          {t('m.recap.yours')}
         </Link>
       </div>
       <p className="muted" style={{ margin: 0 }}>
-        Private unless you share them with friends. Only you can add to your memories.
+        {t('memories.intro')}
       </p>
       <form
         className="row"
@@ -51,15 +51,21 @@ export default function Memories() {
           router.push(`/memories/${memory.id}`);
         }}
       >
-        <TextField label="New memory" placeholder="Summer in Lisbon" value={title} onChange={(e) => setTitle(e.currentTarget.value)} maxLength={120} />
+        <TextField
+          label={t('memories.new')}
+          placeholder={t('memories.newPlaceholder')}
+          value={title}
+          onChange={(e) => setTitle(e.currentTarget.value)}
+          maxLength={120}
+        />
         <Button type="submit" disabled={!title.trim()} style={{ alignSelf: 'flex-end' }}>
-          Create
+          {t('m.chapters.create')}
         </Button>
       </form>
 
       {sugg?.events.length ? (
         <section className="stack-sm">
-          <h2 className="section-title">From events you went to</h2>
+          <h2 className="section-title">{t('memories.fromEvents')}</h2>
           {sugg.events.map((ev) => (
             <div key={ev.id} className="stack-sm">
               <EventCard event={ev} linkAs={NextLink} locale={locale} />
@@ -76,7 +82,7 @@ export default function Memories() {
                   }
                 }}
               >
-                Make a memory
+                {t('memories.makeMemory')}
               </Button>
             </div>
           ))}
@@ -85,16 +91,16 @@ export default function Memories() {
 
       <section className="stack-sm" aria-labelledby="on-this-day">
         <h2 id="on-this-day" className="section-title">
-          On this day
+          {t('m.recap.onThisDay')}
         </h2>
         <div className="recap-cta">
           <span className="stack-sm" style={{ gap: 2, minWidth: 0 }}>
-            <strong>Make a recap video</strong>
-            <span className="muted">From photos and videos you shared on this day in earlier years. Only you see it until you share it.</span>
+            <strong>{t('m.recap.make')}</strong>
+            <span className="muted">{t('memories.onThisDayHint')}</span>
           </span>
           <Link href="/recaps/new?source=on_this_day" className="yp-btn yp-btn--secondary yp-btn--sm">
             <Icon name="play" size={16} />
-            Make one
+            {t('memories.makeOne')}
           </Link>
         </div>
         {sugg?.onThisDay.map((p) => (
@@ -103,7 +109,7 @@ export default function Memories() {
       </section>
 
       <section className="stack-sm">
-        <h2 className="section-title">Your memories</h2>
+        <h2 className="section-title">{t('m.recap.memories')}</h2>
         {items === null ? (
           <Skeleton height={120} />
         ) : items.length ? (
@@ -113,16 +119,17 @@ export default function Memories() {
                 <h3 className="yp-ccard__title">{m.title}</h3>
                 {m.recap ? <p className="yp-ccard__desc">{m.recap}</p> : null}
                 <span className="yp-ccard__meta">
-                  {m.itemCount} items · {m.mine ? (m.visibility === 'private' ? 'Private' : 'Shared') : 'Shared with you'}
+                  {tp('memories.items', m.itemCount)} ·{' '}
+                  {m.mine ? (m.visibility === 'private' ? t('memories.private') : t('memories.shared')) : t('memories.sharedWithYou')}
                 </span>
               </Link>
             ))}
           </div>
         ) : (
-          <EmptyState title="No memories yet" body="Create one, or turn an event you went to into a memory." />
+          <EmptyState title={t('memories.emptyTitle')} body={t('memories.emptyBody')} />
         )}
       </section>
-      <Badge tone="neutral">Memory is in early access</Badge>
+      <Badge tone="neutral">{t('memories.earlyAccess')}</Badge>
     </div>
   );
 }
