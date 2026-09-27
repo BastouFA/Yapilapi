@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Avatar } from '@yapilapi/design-system';
 import type { PublicUser } from '@yapilapi/shared';
 import { api } from '@/lib/api';
+import { useSession } from '@/app/providers';
 
 export type PersonSuggestion = { user: PublicUser; relation: 'friend' | 'following' | null; canMessage: boolean; canTag: boolean };
 
@@ -17,18 +18,19 @@ export type PersonSuggestion = { user: PublicUser; relation: 'friend' | 'followi
 export function PeoplePicker({
   picked,
   onChange,
-  label = 'Add people',
+  label,
   hint,
   scope,
   max,
   canPick = (s) => s.canMessage,
-  unavailable = 'You can message them once you are friends',
+  unavailable,
   exclude,
 }: {
   /** People not to suggest (already added elsewhere). */
   exclude?: string[];
   picked: PublicUser[];
   onChange: (p: PublicUser[]) => void;
+  /** Defaults to "Add people". */
   label?: string;
   hint?: string;
   /** Which people to suggest (see api.people.suggest). */
@@ -36,9 +38,10 @@ export function PeoplePicker({
   /** At most this many people. */
   max?: number;
   canPick?: (s: PersonSuggestion) => boolean;
-  /** Shown after a person who can't be picked. */
+  /** Shown after a person who can't be picked. Defaults to "You can message them once you are friends". */
   unavailable?: string;
 }) {
+  const { t } = useSession();
   const id = useId();
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
@@ -71,7 +74,7 @@ export function PeoplePicker({
   return (
     <div className="picker">
       <label htmlFor={`${id}-input`} className="yp-field__label">
-        {label}
+        {label ?? t('m.group.addPeople')}
       </label>
       <div className="picker__box" onClick={() => document.getElementById(`${id}-input`)?.focus()}>
         {picked.map((p) => (
@@ -83,7 +86,7 @@ export function PeoplePicker({
               e.stopPropagation();
               onChange(picked.filter((x) => x.id !== p.id));
             }}
-            aria-label={`Remove ${p.displayName}`}
+            aria-label={t('m.group.removePerson', { name: p.displayName })}
           >
             <bdi>{p.displayName}</bdi> ×
           </button>
@@ -99,7 +102,7 @@ export function PeoplePicker({
           autoComplete="off"
           value={q}
           readOnly={full}
-          placeholder={full ? '' : picked.length ? '' : 'Type a name or username'}
+          placeholder={full ? '' : picked.length ? '' : t('m.group.placeholder')}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           onChange={(e) => {
@@ -129,12 +132,12 @@ export function PeoplePicker({
       </div>
       {hint || full ? (
         <span id={`${id}-hint`} className="yp-field__hint">
-          {full ? `That's the most you can add (${max}). ` : ''}
+          {full ? `${t('people.max', { count: max ?? 0 })} ` : ''}
           {hint}
         </span>
       ) : null}
       {open && shown.length ? (
-        <ul id={`${id}-list`} role="listbox" className="picker__list" aria-label="Suggestions">
+        <ul id={`${id}-list`} role="listbox" className="picker__list" aria-label={t('people.suggestions')}>
           {shown.map((s, i) => (
             <li
               key={s.user.id}
@@ -154,8 +157,8 @@ export function PeoplePicker({
                 <bdi className="picker__name">{s.user.displayName}</bdi>
                 <span className="picker__meta">
                   <bdi>@{s.user.username}</bdi>
-                  {s.relation === 'friend' ? ' · Friend' : s.relation === 'following' ? ' · You follow' : ''}
-                  {!canPick(s) ? ` · ${unavailable}` : ''}
+                  {s.relation === 'friend' ? ` · ${t('m.group.friend')}` : s.relation === 'following' ? ` · ${t('m.group.following')}` : ''}
+                  {!canPick(s) ? ` · ${unavailable ?? t('m.group.cantMessage')}` : ''}
                 </span>
               </span>
             </li>
@@ -163,7 +166,7 @@ export function PeoplePicker({
         </ul>
       ) : open && q.trim() && !full ? (
         <p className="muted" role="status" style={{ margin: 0, fontSize: 13 }}>
-          Nobody matches &ldquo;{q.trim()}&rdquo;.
+          {t('people.noMatch', { query: q.trim() })}
         </p>
       ) : null}
     </div>

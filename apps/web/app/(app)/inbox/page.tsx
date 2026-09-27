@@ -4,16 +4,18 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Avatar, AvatarGroup, BottomSheet, Button, EmptyState, List, ListItem, Skeleton, TextField } from '@yapilapi/design-system';
-import { formatRelativeTime, type Conversation, type PublicUser } from '@yapilapi/shared';
+import { formatRelativeTime, type Conversation, type MessageKey, type PublicUser } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { useRealtime, useSession } from '../../providers';
 
-function conversationTitle(c: Conversation, meId: string): string {
+const ATTACHMENT_LABEL: Record<string, MessageKey> = { image: 'm.post.photo', video: 'm.chat.video', audio: 'm.chat.voiceMessage' };
+
+function conversationTitle(c: Conversation, meId: string, justYou: string): string {
   if (c.title) return c.title;
   const others = c.members.filter((m) => m.id !== meId);
-  return others.map((m) => m.displayName).join(', ') || 'Just you';
+  return others.map((m) => m.displayName).join(', ') || justYou;
 }
 
 export default function Inbox() {
@@ -56,7 +58,7 @@ export default function Inbox() {
 
       {requests.length ? (
         <section className="stack-sm">
-          <h2 className="section-title">Friend requests</h2>
+          <h2 className="section-title">{t('chat.friendRequests')}</h2>
           <List>
             {requests.map((r) => (
               <ListItem
@@ -71,10 +73,10 @@ export default function Inbox() {
                       onClick={async () => {
                         await api.me.acceptFriend(r.id);
                         setRequests((x) => x.filter((y) => y.id !== r.id));
-                        toast(`You and ${r.from.displayName} are now friends`);
+                        toast(t('chat.nowFriends', { name: r.from.displayName }));
                       }}
                     >
-                      Accept
+                      {t('m.common.accept')}
                     </Button>
                     <Button
                       size="sm"
@@ -84,7 +86,7 @@ export default function Inbox() {
                         setRequests((x) => x.filter((y) => y.id !== r.id));
                       }}
                     >
-                      Decline
+                      {t('m.common.decline')}
                     </Button>
                   </>
                 }
@@ -97,9 +99,12 @@ export default function Inbox() {
       {items === null ? (
         <Skeleton height={240} />
       ) : items.length ? (
-        <List label="Conversations">
+        <List label={t('chat.conversations')}>
           {items.map((c) => {
             const others = c.members.filter((m) => m.id !== me?.id);
+            const last = c.lastMessage;
+            const kind = last?.attachments[0]?.kind ?? '';
+            const lastText = last ? last.body || t(ATTACHMENT_LABEL[kind] ?? 'm.chat.attachment') : '';
             return (
               <ListItem
                 key={c.id}
@@ -116,12 +121,8 @@ export default function Inbox() {
                     <Avatar name={others[0]?.displayName ?? '?'} src={others[0]?.avatarUrl} />
                   )
                 }
-                primary={conversationTitle(c, me!.id)}
-                secondary={
-                  c.lastMessage
-                    ? `${c.lastMessage.sender.id === me?.id ? 'You: ' : ''}${c.lastMessage.body || ({ image: 'Photo', video: 'Video', audio: 'Voice message' } as Record<string, string>)[c.lastMessage.attachments[0]?.kind ?? ''] || 'Attachment'}`
-                    : 'No messages yet'
-                }
+                primary={conversationTitle(c, me!.id, t('m.chat.justYou'))}
+                secondary={last ? (last.sender.id === me?.id ? t('chat.lastFromYou', { text: lastText }) : lastText) : t('m.inbox.noMessages')}
                 end={
                   <>
                     {formatRelativeTime(c.updatedAt, locale)}
@@ -133,7 +134,7 @@ export default function Inbox() {
           })}
         </List>
       ) : (
-        <EmptyState title="No conversations yet" body={t('inbox.empty')} />
+        <EmptyState title={t('m.inbox.empty.title')} body={t('inbox.empty')} />
       )}
 
       <NewGroupSheet open={newGroup} onClose={() => setNewGroup(false)} onCreated={(id) => router.push(`/inbox/${id}`)} />
@@ -142,14 +143,14 @@ export default function Inbox() {
 }
 
 function NewGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (id: string) => void }) {
-  const { toast } = useSession();
+  const { t, toast } = useSession();
   const [title, setTitle] = useState('');
   const [picked, setPicked] = useState<PublicUser[]>([]);
   const [busy, setBusy] = useState(false);
   return (
-    <BottomSheet open={open} onClose={onClose} title="New group">
+    <BottomSheet open={open} onClose={onClose} title={t('inbox.newGroup')}>
       <div className="stack">
-        <TextField label="Group name" value={title} onChange={(e) => setTitle(e.currentTarget.value)} maxLength={80} />
+        <TextField label={t('chat.groupName')} value={title} onChange={(e) => setTitle(e.currentTarget.value)} maxLength={80} />
         <PeoplePicker picked={picked} onChange={setPicked} />
         <Button
           disabled={!picked.length}
@@ -169,7 +170,7 @@ function NewGroupSheet({ open, onClose, onCreated }: { open: boolean; onClose: (
             }
           }}
         >
-          Start conversation
+          {t('m.group.start')}
         </Button>
       </div>
     </BottomSheet>

@@ -231,7 +231,7 @@ function Reels() {
               <div className="reel__byline">
                 {p.collaborators?.length ? (
                   <span className="reel__authors">
-                    <AuthorNames people={[p.author, ...p.collaborators]} linkAs={NextLink} linkClassName="reel__author" />
+                    <AuthorNames people={[p.author, ...p.collaborators]} linkAs={NextLink} linkClassName="reel__author" locale={locale} />
                   </span>
                 ) : (
                   <Link href={`/u/${p.author.username}`} className="reel__author">
@@ -509,7 +509,7 @@ function ReelVideo({
   const media = post.media[0];
   // Data saver: nothing plays until tapped, from the small poster, and the 360p file plays.
   const saver = useDataSaver();
-  const { t } = useSession();
+  const { t, locale } = useSession();
   const src = media ? videoSrc(media, saver) : undefined;
   // Duets play beside the original (left); reels using another sound play that sound instead of their own.
   const original = post.remixOf?.mode === 'duet' ? (post.remixOf.post?.media ?? null) : null;
@@ -627,7 +627,7 @@ function ReelVideo({
           }}
         />
       ) : null}
-      {covered ? <SensitiveCover onReveal={() => setRevealed(true)} /> : null}
+      {covered ? <SensitiveCover onReveal={() => setRevealed(true)} locale={locale} /> : null}
       {!playing && !covered && saver ? (
         <button type="button" className="reel__paused reel__paused--button" onClick={togglePlay} aria-label={t('dataSaver.play')}>
           <svg viewBox="0 0 24 24" width="64" height="64" aria-hidden>

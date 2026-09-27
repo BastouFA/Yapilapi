@@ -2,21 +2,8 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Avatar,
-  AvatarGroup,
-  Badge,
-  BottomSheet,
-  Button,
-  EmptyState,
-  joinNames,
-  List,
-  ListItem,
-  Segments,
-  Skeleton,
-  type MenuAction,
-} from '@yapilapi/design-system';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Avatar, AvatarGroup, Badge, BottomSheet, Button, EmptyState, List, ListItem, Segments, Skeleton, type MenuAction } from '@yapilapi/design-system';
 import { BOARD_COLLABORATORS_MAX, type BoardDetail, type Post, type PublicUser, type SavedFilter } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { PeoplePicker } from '@/components/PeoplePicker';
@@ -26,16 +13,36 @@ import {
   BoardEditor,
   MoreButton,
   NoteSheet,
-  SAVED_FILTER_OPTIONS,
   SaveGrid,
   SaveOptionsSheet,
   SaveToSheet,
+  savedFilterOptions,
   visibilityText,
   countPosts,
   tileShortLabel,
   usePaged,
 } from '@/components/Boards';
 import { useSession } from '../../../providers';
+
+type T = ReturnType<typeof useSession>['t'];
+
+/** "Ada", "Ada and Bola", "Ada, Bola and Chi", with the words of the reader's language. */
+function joinNames(names: string[], t: T): string {
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(t('m.collab.joinSep'))}${t('m.collab.joinLast')}${names.at(-1)}`;
+}
+
+/** Fills a sentence around a link: the text before `{name}`, the link, then the text after. */
+function around(template: string, node: ReactNode) {
+  const [before = '', after = ''] = template.split('{name}');
+  return (
+    <>
+      {before}
+      {node}
+      {after}
+    </>
+  );
+}
 
 /**
  * A board: its cover, name, description, who can see it, the owner and collaborators, and its
@@ -45,7 +52,8 @@ import { useSession } from '../../../providers';
  */
 export default function BoardPage() {
   const { id } = useParams<{ id: string }>();
-  const { me, toast } = useSession();
+  const session = useSession();
+  const { me, toast, t, tp } = session;
   const router = useRouter();
   const [detail, setDetail] = useState<BoardDetail | null>(null);
   const [missing, setMissing] = useState(false);
@@ -105,17 +113,17 @@ export default function BoardPage() {
     return me ? (
       <div className="yp-shell__inner">
         <EmptyState
-          title="This board isn't available"
-          body="It may have been deleted, or it may be private."
+          title={t('boards.unavailableTitle')}
+          body={t('boards.unavailableBody')}
           action={
             <Link href="/saved" className="yp-btn yp-btn--secondary">
-              Go to Saved
+              {t('boards.goToSaved')}
             </Link>
           }
         />
       </div>
     ) : (
-      <NeedsAccount title="Sign in to see this board" body="Private and shared boards are only visible to the people on them." />
+      <NeedsAccount title={t('boards.signInTitle')} body={t('boards.signInBody')} />
     );
   if (!detail)
     return (
@@ -169,7 +177,7 @@ export default function BoardPage() {
     [next[i], next[j]] = [next[j]!, next[i]!];
     refocus.current = `${order[i]!.id}:${by}`;
     setOrder(next);
-    setMoved(`${tileShortLabel(order[i]!)} moved to position ${j + 1} of ${next.length}`);
+    setMoved(t('boards.movedTo', { title: tileShortLabel(order[i]!, t), index: j + 1, total: next.length }));
   }
 
   async function saveOrder() {
@@ -180,7 +188,7 @@ export default function BoardPage() {
         id,
         order.map((p) => p.id),
       );
-      toast('Order saved');
+      toast(t('boards.orderSaved'));
       setOrder(null);
       setMoved('');
       items.reload();
@@ -196,9 +204,9 @@ export default function BoardPage() {
     ? [
         ...(me
           ? [
-              { label: 'Save to a board', icon: 'bookmark' as const, onSelect: () => (setOptions(null), setSaveTo(options)) },
+              { label: t('m.boards.saveTo'), icon: 'bookmark' as const, onSelect: () => (setOptions(null), setSaveTo(options)) },
               {
-                label: options.viewer.note ? 'Edit note' : 'Add a note',
+                label: t(options.viewer.note ? 'm.saved.editNote' : 'm.saved.addNote'),
                 icon: 'message' as const,
                 onSelect: () => (setOptions(null), setNoteFor(options)),
               },
@@ -207,11 +215,11 @@ export default function BoardPage() {
         ...(owner && board.coverPostId !== options.id
           ? [
               {
-                label: 'Use as cover',
+                label: t('m.boards.useAsCover'),
                 icon: 'image' as const,
                 onSelect: () => {
                   setOptions(null);
-                  void act(() => api.boards.update(board.id, { coverPostId: options.id }), 'Cover changed')();
+                  void act(() => api.boards.update(board.id, { coverPostId: options.id }), t('boards.coverChanged'))();
                 },
               },
             ]
@@ -219,7 +227,7 @@ export default function BoardPage() {
         ...(member && removable.has(options.id)
           ? [
               {
-                label: 'Remove from board',
+                label: t('m.boards.removeItem'),
                 icon: 'trash' as const,
                 danger: true,
                 onSelect: () => {
@@ -227,7 +235,7 @@ export default function BoardPage() {
                   setOptions(null);
                   void act(
                     () => api.boards.removeItem(board.id, p.id),
-                    'Removed from the board. It stays in your saves.',
+                    t('boards.itemRemoved'),
                     () => {
                       items.setItems((cur) => cur?.filter((x) => x.id !== p.id) ?? cur);
                       void loadDetail();
@@ -249,10 +257,16 @@ export default function BoardPage() {
         <div className="stack-sm" style={{ gap: 4, minWidth: 0 }}>
           <h1 dir="auto">{board.name}</h1>
           <span className="muted">
-            By <Link href={`/u/${board.owner.username}`}>{board.owner.displayName}</Link> · {countPosts(board.itemCount)}
+            {around(
+              t('m.boards.by'),
+              <bdi>
+                <Link href={`/u/${board.owner.username}`}>{board.owner.displayName}</Link>
+              </bdi>,
+            )}{' '}
+            · {countPosts(board.itemCount, session)}
           </span>
           <span className="row">
-            <Badge tone="neutral">{visibilityText(board)}</Badge>
+            <Badge tone="neutral">{visibilityText(board, t)}</Badge>
           </span>
         </div>
       </div>
@@ -263,24 +277,22 @@ export default function BoardPage() {
       ) : null}
 
       {board.role === 'invited' ? (
-        <div className="board-banner" role="group" aria-label="Invitation">
-          <span>
-            <bdi>{board.owner.displayName}</bdi> invited you to add to this board.
-          </span>
+        <div className="board-banner" role="group" aria-label={t('boards.invitation')}>
+          <span>{t('boards.invitedYou', { name: board.owner.displayName })}</span>
           <span className="row">
-            <Button size="sm" onClick={act(() => api.boards.join(board.id), 'You can add to this board now')}>
-              Accept
+            <Button size="sm" onClick={act(() => api.boards.join(board.id), t('boards.joined'))}>
+              {t('m.common.accept')}
             </Button>
             <Button
               size="sm"
               variant="ghost"
               onClick={act(
                 () => api.boards.leave(board.id),
-                'Invitation declined',
+                t('boards.inviteDeclined'),
                 () => router.push('/saved'),
               )}
             >
-              Decline
+              {t('m.common.decline')}
             </Button>
           </span>
         </div>
@@ -296,27 +308,39 @@ export default function BoardPage() {
                 ))}
               </AvatarGroup>
               <span className="muted">
-                With {joinNames(accepted.slice(0, 3).map((c) => (c.user.id === me?.id ? { ...c.user, displayName: 'you' } : c.user)))}
-                {accepted.length > 3 ? ` and ${accepted.length - 3} more` : ''}
+                {(() => {
+                  const names = joinNames(
+                    accepted.slice(0, 3).map((c) => (c.user.id === me?.id ? t('boards.you') : c.user.displayName)),
+                    t,
+                  );
+                  return accepted.length > 3 ? tp('boards.withMore', accepted.length - 3, { names }) : t('boards.with', { names });
+                })()}
               </span>
             </>
           ) : collaborators.length ? (
-            <span className="muted">Waiting for {joinNames(collaborators.map((c) => c.user))} to accept.</span>
+            <span className="muted">
+              {t('boards.waiting', {
+                names: joinNames(
+                  collaborators.map((c) => c.user.displayName),
+                  t,
+                ),
+              })}
+            </span>
           ) : (
-            <span className="muted">Just you so far.</span>
+            <span className="muted">{t('boards.justYou')}</span>
           )}
         </div>
       ) : null}
 
       {order ? (
-        <div className="board-banner" role="group" aria-label="Arrange">
-          <span>Move posts earlier or later, then save the order.</span>
+        <div className="board-banner" role="group" aria-label={t('m.boards.arrange')}>
+          <span>{t('boards.arrangeHint')}</span>
           <span className="row">
             <Button size="sm" loading={arranging === 'saving'} onClick={saveOrder}>
-              Save order
+              {t('boards.saveOrder')}
             </Button>
             <Button size="sm" variant="ghost" disabled={arranging === 'saving'} onClick={() => (setOrder(null), setMoved(''))}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           </span>
         </div>
@@ -325,21 +349,21 @@ export default function BoardPage() {
           {owner ? (
             <>
               <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
-                Edit
+                {t('m.post.edit')}
               </Button>
               <Button variant="secondary" size="sm" icon="users" onClick={() => setPeople(true)}>
-                {collaborators.length ? 'Collaborators' : 'Invite'}
+                {t(collaborators.length ? 'boards.collaborators' : 'm.boards.inviteOne')}
               </Button>
             </>
           ) : null}
           {board.itemCount > 1 ? (
             <Button variant="secondary" size="sm" loading={arranging === 'loading'} onClick={startArrange}>
-              Arrange
+              {t('m.boards.arrange')}
             </Button>
           ) : null}
           {owner && board.coverPostId ? (
-            <Button variant="ghost" size="sm" onClick={act(() => api.boards.update(board.id, { coverPostId: null }), 'The first post is the cover now')}>
-              Use first post as cover
+            <Button variant="ghost" size="sm" onClick={act(() => api.boards.update(board.id, { coverPostId: null }), t('boards.firstIsCover'))}>
+              {t('boards.useFirstAsCover')}
             </Button>
           ) : null}
           {owner ? (
@@ -347,17 +371,17 @@ export default function BoardPage() {
               variant="ghost"
               size="sm"
               onClick={async () => {
-                if (!confirm('Delete this board? The posts stay in your Saved.')) return;
+                if (!confirm(t('boards.deleteConfirm'))) return;
                 try {
                   await api.boards.remove(board.id);
-                  toast('Board deleted. The posts are still in your Saved.');
+                  toast(t('boards.deleted'));
                   router.push('/saved');
                 } catch (e) {
                   toast(errorMessage(e));
                 }
               }}
             >
-              Delete
+              {t('m.common.delete')}
             </Button>
           ) : (
             <Button
@@ -365,11 +389,11 @@ export default function BoardPage() {
               size="sm"
               onClick={act(
                 () => api.boards.leave(board.id),
-                'You left the board',
+                t('boards.left'),
                 () => router.push('/saved'),
               )}
             >
-              Leave
+              {t('communities.leave')}
             </Button>
           )}
         </div>
@@ -380,33 +404,27 @@ export default function BoardPage() {
       </p>
 
       {order ? (
-        <SaveGrid posts={order} label="Posts on this board, arranging" arrange={{ onMove: move }} />
+        <SaveGrid posts={order} label={t('boards.postsArranging')} arrange={{ onMove: move }} />
       ) : (
         <>
-          <Segments label="Show" value={filter} onChange={setFilter} options={SAVED_FILTER_OPTIONS} />
+          <Segments label={t('m.saved.filter')} value={filter} onChange={setFilter} options={savedFilterOptions(t)} />
           {items.items === null ? (
             <Skeleton height={320} />
           ) : items.items.length ? (
             <>
-              <SaveGrid posts={items.items} label="Posts on this board" onOptions={me ? setOptions : undefined} />
+              <SaveGrid posts={items.items} label={t('boards.posts')} onOptions={me ? setOptions : undefined} />
               <MoreButton cursor={items.cursor} loading={items.loadingMore} onMore={items.more} />
             </>
           ) : (
             <EmptyState
-              title={filter === 'all' ? 'No posts on this board yet' : 'Nothing like that here'}
-              body={
-                filter !== 'all'
-                  ? 'Try another filter.'
-                  : board.canAdd
-                    ? 'Add posts with "Save to a board" in any post\'s menu, or press and hold its save button.'
-                    : undefined
-              }
+              title={t(filter === 'all' ? 'm.boards.empty' : 'boards.emptyFilter')}
+              body={filter !== 'all' ? t('boards.tryAnotherFilter') : board.canAdd ? t('boards.emptyBody') : undefined}
             />
           )}
         </>
       )}
 
-      {!me ? <JoinNote text="Join YAPILAPI to save posts and make boards of your own." /> : null}
+      {!me ? <JoinNote text={t('boards.joinNote')} /> : null}
 
       <SaveOptionsSheet post={options} actions={actions} onClose={() => setOptions(null)} />
       <NoteSheet post={noteFor} onClose={() => setNoteFor(null)} onSaved={(pid, note) => patch(pid, (x) => ({ ...x, viewer: { ...x.viewer, note } }))} />
@@ -426,7 +444,7 @@ export default function BoardPage() {
             onClose={() => setEditing(false)}
             onSaved={() => {
               setEditing(false);
-              toast('Saved');
+              toast(t('common.saved'));
               void loadDetail();
             }}
           />
@@ -457,7 +475,7 @@ function CollaboratorsSheet({
   onClose: () => void;
   onChanged: (d?: BoardDetail) => void;
 }) {
-  const { toast } = useSession();
+  const { toast, t, tp } = useSession();
   const [picked, setPicked] = useState<PublicUser[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const room = BOARD_COLLABORATORS_MAX - detail.collaborators.length;
@@ -466,16 +484,16 @@ function CollaboratorsSheet({
   }, [open]);
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Collaborators">
+    <BottomSheet open={open} onClose={onClose} title={t('boards.collaborators')}>
       <div className="stack">
         {detail.collaborators.length ? (
-          <List label="Collaborators">
+          <List label={t('boards.collaborators')}>
             {detail.collaborators.map(({ user, status }) => (
               <ListItem
                 key={user.id}
                 start={<Avatar name={user.displayName} src={user.avatarUrl} size="sm" />}
                 primary={user.displayName}
-                secondary={status === 'invited' ? 'Invited, not answered yet' : 'Can add and arrange posts'}
+                secondary={t(status === 'invited' ? 'boards.pending' : 'boards.canArrange')}
                 end={
                   <Button
                     size="sm"
@@ -486,7 +504,7 @@ function CollaboratorsSheet({
                       setBusy(user.id);
                       try {
                         await api.boards.removeCollaborator(boardId, user.id);
-                        toast(status === 'invited' ? 'Invite cancelled' : `${user.displayName} is off the board`);
+                        toast(status === 'invited' ? t('boards.inviteCancelled') : t('boards.personRemoved', { name: user.displayName }));
                         onChanged();
                       } catch (e) {
                         toast(errorMessage(e));
@@ -495,7 +513,7 @@ function CollaboratorsSheet({
                       }
                     }}
                   >
-                    {status === 'invited' ? 'Cancel invite' : 'Remove'}
+                    {t(status === 'invited' ? 'boards.cancelInvite' : 'm.common.remove')}
                   </Button>
                 }
               />
@@ -503,14 +521,14 @@ function CollaboratorsSheet({
           </List>
         ) : (
           <p className="muted" style={{ margin: 0 }}>
-            No collaborators yet. They can add posts to the board and arrange them.
+            {t('boards.noCollaborators')}
           </p>
         )}
         {room > 0 ? (
           <>
             <PeoplePicker
-              label="Invite people"
-              hint={`Friends, and people you follow who follow you back. ${detail.board.visibility === 'private' ? 'Inviting someone makes this board shared.' : ''}`}
+              label={t('m.boards.invite')}
+              hint={t(detail.board.visibility === 'private' ? 'boards.inviteHintPrivate' : 'boards.inviteHint')}
               scope="mutuals"
               max={room}
               canPick={() => true}
@@ -536,17 +554,17 @@ function CollaboratorsSheet({
                 setPicked(failed);
                 if (last) {
                   onChanged(last);
-                  if (!failed.length) toast(picked.length === 1 ? 'Invite sent' : 'Invites sent');
+                  if (!failed.length) toast(tp('boards.invitesSent', picked.length));
                 }
                 setBusy(null);
               }}
             >
-              Send {picked.length === 1 ? 'invite' : 'invites'}
+              {tp('boards.sendInvites', picked.length)}
             </Button>
           </>
         ) : (
           <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-            A board can have up to {BOARD_COLLABORATORS_MAX} collaborators.
+            {t('m.boards.max', { count: BOARD_COLLABORATORS_MAX })}
           </p>
         )}
       </div>

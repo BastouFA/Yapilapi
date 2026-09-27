@@ -1,11 +1,11 @@
 'use client';
 
-import { IMAGE_ACCEPT } from '@yapilapi/shared';
+import { IMAGE_ACCEPT, t as translate } from '@yapilapi/shared';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Alert, Button, Card, Dialog, List, ListItem, Select, Switch, Tabs, TextField } from '@yapilapi/design-system';
-import { NOTIFICATION_CATEGORIES, PROFILE_MODES, SUPPORTED_LOCALES, formatRelativeTime, type TagPermission } from '@yapilapi/shared';
+import { NOTIFICATION_CATEGORIES, PROFILE_MODES, SUPPORTED_LOCALES, formatRelativeTime, type MessageKey, type TagPermission } from '@yapilapi/shared';
 import { startRegistration } from '@simplewebauthn/browser';
 import type { SharingSettings as SharingSettingsState } from '@yapilapi/api-client';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
@@ -18,6 +18,7 @@ import { DataSaverCard } from '@/components/DataSaver';
 import { useSession } from '../../providers';
 
 export default function Settings() {
+  const { t } = useSession();
   const [tab, setTab] = useState(() =>
     typeof location === 'undefined'
       ? 'profile'
@@ -32,7 +33,7 @@ export default function Settings() {
   return (
     <div className="yp-shell__inner">
       <div className="yp-topbar">
-        <h1>Settings</h1>
+        <h1>{t('settings.title')}</h1>
       </div>
       <Tabs
         id="settings-tabs"
@@ -40,11 +41,11 @@ export default function Settings() {
         value={tab}
         onChange={setTab}
         tabs={[
-          { id: 'profile', label: 'Profile' },
-          { id: 'attention', label: 'Attention' },
-          { id: 'privacy', label: 'Privacy' },
-          { id: 'security', label: 'Security' },
-          { id: 'safety', label: 'Safety' },
+          { id: 'profile', label: t('nav.profile') },
+          { id: 'attention', label: t('settings.tab.attention') },
+          { id: 'privacy', label: t('settings.tab.privacy') },
+          { id: 'security', label: t('settings.tab.security') },
+          { id: 'safety', label: t('settings.tab.safety') },
         ]}
       />
       <div role="tabpanel" id="settings-panel" aria-labelledby={`settings-tabs-${tab}`}>
@@ -92,7 +93,7 @@ function PlusAndInvites() {
 }
 
 function ProfileSettings() {
-  const { me, refresh, toast, locale } = useSession();
+  const { me, refresh, toast, locale, t } = useSession();
   const [profile, setProfile] = useState<Record<string, any> | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -122,8 +123,9 @@ function ProfileSettings() {
             isPrivate: f.get('isPrivate') === 'on',
             avatarUrl: profile.avatarUrl ?? null,
           });
-          await refresh();
-          toast('Profile saved');
+          const saved = await refresh();
+          // In the language just chosen, not the one the page was showing.
+          toast(translate('settings.profileSaved', saved?.locale ?? locale));
         } catch (err) {
           toast(errorMessage(err));
           setFields(fieldErrors(err));
@@ -134,7 +136,7 @@ function ProfileSettings() {
     >
       <div className="row">
         <label className="yp-btn yp-btn--secondary yp-btn--sm" style={{ cursor: 'pointer' }}>
-          {uploading ? 'Uploading…' : 'Change photo'}
+          {uploading ? t('settings.uploading') : t('settings.changePhoto')}
           <input
             type="file"
             accept={IMAGE_ACCEPT}
@@ -158,24 +160,24 @@ function ProfileSettings() {
           />
         </label>
       </div>
-      <TextField label="Name" name="displayName" defaultValue={profile.displayName} maxLength={60} error={fields.displayName} />
-      <TextField label="Bio" name="bio" multiline defaultValue={profile.bio} maxLength={300} error={fields.bio} />
-      <Select label="Profile type" name="mode" defaultValue={profile.mode}>
+      <TextField label={t('auth.displayName')} name="displayName" defaultValue={profile.displayName} maxLength={60} error={fields.displayName} />
+      <TextField label={t('settings.bio')} name="bio" multiline defaultValue={profile.bio} maxLength={300} error={fields.bio} />
+      <Select label={t('settings.profileType')} name="mode" defaultValue={profile.mode}>
         {PROFILE_MODES.map((m) => (
           <option key={m} value={m}>
-            {m[0]!.toUpperCase() + m.slice(1)}
+            {t(`settings.mode.${m}` as MessageKey)}
           </option>
         ))}
       </Select>
-      <Select label="Language" name="locale" defaultValue={me?.locale ?? 'en'}>
+      <Select label={t('settings.language')} name="locale" defaultValue={me?.locale ?? 'en'}>
         {SUPPORTED_LOCALES.map((l) => (
           <option key={l} value={l}>
             {new Intl.DisplayNames([l], { type: 'language' }).of(l)}
           </option>
         ))}
       </Select>
-      <Select label="Country" name="country" defaultValue={me?.country ?? ''} hint="Some content can be unavailable in some countries for legal reasons.">
-        <option value="">Not set</option>
+      <Select label={t('settings.country')} name="country" defaultValue={me?.country ?? ''} hint={t('settings.countryHint')}>
+        <option value="">{t('settings.notSet')}</option>
         {countries(locale).map(([code, name]) => (
           <option key={code} value={code}>
             {name}
@@ -185,19 +187,19 @@ function ProfileSettings() {
       <label className="yp-check">
         <input type="checkbox" name="isPrivate" defaultChecked={profile.isPrivate} />
         <span>
-          Private account
-          <span className="yp-check__desc">Only approved followers see your posts.</span>
+          {t('settings.private')}
+          <span className="yp-check__desc">{t('settings.privateHint')}</span>
         </span>
       </label>
       <Button type="submit" loading={busy}>
-        Save profile
+        {t('settings.saveProfile')}
       </Button>
     </form>
   );
 }
 
 function AttentionSettings() {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const [prefs, setPrefs] = useState<{ notifications: Record<string, boolean>; attention: Record<string, any> } | null>(null);
   useEffect(() => {
     api.me.preferences().then(setPrefs);
@@ -214,46 +216,42 @@ function AttentionSettings() {
   const a = prefs.attention;
   return (
     <div className="stack">
-      <Card title="Your feed, your rules" subtitle="YAPILAPI doesn't optimize for time spent. These controls apply immediately.">
+      <Card title={t('settings.feed.title')} subtitle={t('settings.feed.subtitle')}>
         <div className="stack">
-          <Switch label="Friends only (For You shows only friends)" checked={!!a.friendsOnly} onChange={(v) => setA('friendsOnly', v)} />
-          <Switch
-            label="Reduced recommendations (only people and communities you chose)"
-            checked={!!a.reducedRecommendations}
-            onChange={(v) => setA('reducedRecommendations', v)}
-          />
-          <Switch label="Focus mode (hide counts and non-essential badges)" checked={!!a.focusMode} onChange={(v) => setA('focusMode', v)} />
-          <Switch label="Quiet mode (no sounds or vibrations)" checked={!!a.quietMode} onChange={(v) => setA('quietMode', v)} />
+          <Switch label={t('settings.friendsOnly')} checked={!!a.friendsOnly} onChange={(v) => setA('friendsOnly', v)} />
+          <Switch label={t('settings.reducedRecs')} checked={!!a.reducedRecommendations} onChange={(v) => setA('reducedRecommendations', v)} />
+          <Switch label={t('settings.focusMode')} checked={!!a.focusMode} onChange={(v) => setA('focusMode', v)} />
+          <Switch label={t('settings.quietMode')} checked={!!a.quietMode} onChange={(v) => setA('quietMode', v)} />
           <Select
-            label="Daily time budget"
+            label={t('settings.budget')}
             value={String(a.dailyTimeBudgetMinutes ?? '')}
             onChange={(e) => setA('dailyTimeBudgetMinutes', e.currentTarget.value ? Number(e.currentTarget.value) : null)}
           >
-            <option value="">No limit</option>
+            <option value="">{t('settings.noLimit')}</option>
             {[15, 30, 45, 60, 90, 120].map((m) => (
               <option key={m} value={m}>
-                {m} minutes
+                {t('settings.minutes', { count: m })}
               </option>
             ))}
           </Select>
           <div className="row">
             <Button size="sm" variant="secondary" onClick={() => setA('notificationsPausedUntil', new Date(Date.now() + 8 * 3600_000).toISOString())}>
-              Pause notifications for 8 hours
+              {t('settings.pause8h')}
             </Button>
             {a.notificationsPausedUntil && new Date(a.notificationsPausedUntil) > new Date() ? (
               <Button size="sm" variant="ghost" onClick={() => setA('notificationsPausedUntil', null)}>
-                Resume now
+                {t('settings.resumeNow')}
               </Button>
             ) : null}
           </div>
         </div>
       </Card>
-      <Card title="Notifications" subtitle="Security notifications are always on.">
+      <Card title={t('notifications.title')} subtitle={t('settings.notificationsHint')}>
         <div className="stack-sm">
           {NOTIFICATION_CATEGORIES.map((c) => (
             <Switch
               key={c}
-              label={c[0]!.toUpperCase() + c.slice(1)}
+              label={t(`settings.cat.${c}` as MessageKey)}
               checked={prefs.notifications[c] !== false}
               disabled={c === 'security'}
               onChange={async (v) => {
@@ -268,11 +266,21 @@ function AttentionSettings() {
   );
 }
 
-const PURPOSES: Record<string, string> = {
-  personalization: 'Personalize my feed and suggestions',
-  ai_processing: 'Let the assistant remember things I tell it',
-  advertising: 'Show me sponsored posts based on my interests (adults only)',
-  analytics: 'Help improve YAPILAPI with usage analytics',
+const PURPOSES: Record<string, MessageKey> = {
+  personalization: 'settings.purpose.personalization',
+  ai_processing: 'settings.purpose.ai_processing',
+  advertising: 'settings.purpose.advertising',
+  analytics: 'settings.purpose.analytics',
+};
+
+/** Rows of "What we hold about you", named by the API's column names. */
+const HELD: Record<string, MessageKey> = {
+  posts: 'settings.held.posts',
+  comments: 'settings.held.comments',
+  messages: 'settings.held.messages',
+  media: 'settings.held.media',
+  ai_memories: 'settings.held.ai_memories',
+  active_sessions: 'settings.held.active_sessions',
 };
 
 /** Who can find you from their contacts, and whether others can save your reels as a video. */
@@ -317,15 +325,15 @@ function SharingSettings() {
   );
 }
 
-const TAG_CHOICES: { id: TagPermission; label: string }[] = [
-  { id: 'everyone', label: 'Everyone' },
-  { id: 'following', label: 'People you follow' },
-  { id: 'nobody', label: 'No one' },
+const TAG_CHOICES: { id: TagPermission; label: MessageKey }[] = [
+  { id: 'everyone', label: 'visibility.public' },
+  { id: 'following', label: 'settings.tags.following' },
+  { id: 'nobody', label: 'settings.tags.nobody' },
 ];
 
 /** Who may tag you in photos. */
 function TaggingSettings() {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const [allowFrom, setAllowFrom] = useState<TagPermission | null>(null);
   useEffect(() => {
     api.me.tagging().then(
@@ -345,23 +353,23 @@ function TaggingSettings() {
     }
   };
   return (
-    <Card title="Photo tags">
+    <Card title={t('settings.tags.title')}>
       <fieldset className="stack-sm" style={{ border: 0, margin: 0, padding: 0 }}>
-        <legend className="yp-field__label">Who can tag you in photos</legend>
+        <legend className="yp-field__label">{t('settings.tags.who')}</legend>
         {TAG_CHOICES.map((c) => (
           <label key={c.id} className="row" style={{ gap: 8 }}>
             <input type="radio" name="tag-permission" value={c.id} checked={allowFrom === c.id} onChange={() => set(c.id)} />
-            {c.label}
+            {t(c.label)}
           </label>
         ))}
-        <p className="muted setting-hint">Tags you&apos;re in show on your profile under Tagged. You can remove yourself from any photo.</p>
+        <p className="muted setting-hint">{t('settings.tags.hint')}</p>
       </fieldset>
     </Card>
   );
 }
 
 function PrivacyCenter() {
-  const { toast, setMe } = useSession();
+  const { toast, setMe, t } = useSession();
   const router = useRouter();
   const [data, setData] = useState<Awaited<ReturnType<typeof api.me.privacy>> | null>(null);
   const [memories, setMemories] = useState<{ id: string; content: string }[]>([]);
@@ -383,40 +391,40 @@ function PrivacyCenter() {
   return (
     <div className="stack">
       <CloseFriendsCard />
-      <Card title="Circles">
+      <Card title={t('settings.circles.title')}>
         <p className="muted" style={{ marginTop: 0 }}>
-          Small groups you share posts with, like Family or Work. Only you see your circles, and people aren&rsquo;t told which ones they&rsquo;re in.
+          {t('settings.circles.body')}
         </p>
         <Link href="/circles" className="yp-btn yp-btn--secondary yp-btn--sm">
-          Manage circles
+          {t('settings.circles.manage')}
         </Link>
       </Card>
-      <Card title="Your archive">
+      <Card title={t('settings.archive.title')}>
         <p className="muted" style={{ marginTop: 0 }}>
-          Your stories stay in your archive after they expire. Only you can see it. From there you can put them into chapters on your profile.
+          {t('settings.archive.body')}
         </p>
         <Link href="/archive" className="yp-btn yp-btn--secondary yp-btn--sm">
-          Open your archive
+          {t('settings.archive.open')}
         </Link>
       </Card>
       <SharingSettings />
       <TaggingSettings />
-      <Card title="What we hold about you">
+      <Card title={t('settings.held.title')}>
         <div className="stats">
           {Object.entries(data.dataSummary).map(([k, v]) => (
             <div key={k} className="yp-stat">
-              <span className="yp-stat__label">{k.replace(/_/g, ' ')}</span>
+              <span className="yp-stat__label">{HELD[k] ? t(HELD[k]) : k.replace(/_/g, ' ')}</span>
               <span className="yp-stat__value">{v}</span>
             </div>
           ))}
         </div>
       </Card>
-      <Card title="How your data is used">
+      <Card title={t('settings.dataUse.title')}>
         <div className="stack-sm">
           {Object.entries(PURPOSES).map(([p, label]) => (
             <Switch
               key={p}
-              label={label}
+              label={t(label)}
               checked={granted(p)}
               onChange={async (v) => {
                 await api.me.setConsent(p, v).catch((e) => toast(errorMessage(e)));
@@ -426,7 +434,7 @@ function PrivacyCenter() {
           ))}
         </div>
       </Card>
-      <Card title="Assistant memory" subtitle="Nothing is added automatically. You can delete any item.">
+      <Card title={t('settings.memory.title')} subtitle={t('settings.memory.subtitle')}>
         <div className="stack-sm">
           {memories.length ? (
             <List>
@@ -443,14 +451,14 @@ function PrivacyCenter() {
                         setMemories((x) => x.filter((y) => y.id !== m.id));
                       }}
                     >
-                      Delete
+                      {t('settings.delete')}
                     </Button>
                   }
                 />
               ))}
             </List>
           ) : (
-            <p className="muted">The assistant doesn't remember anything about you.</p>
+            <p className="muted">{t('settings.memory.none')}</p>
           )}
           <form
             className="row"
@@ -466,20 +474,20 @@ function PrivacyCenter() {
             }}
           >
             <TextField
-              label="Add something to remember"
+              label={t('settings.memory.add')}
               value={memory}
               onChange={(e) => setMemory(e.currentTarget.value)}
               maxLength={1000}
               style={{ flex: 1 }}
             />
             <Button type="submit" size="sm" disabled={!memory.trim()}>
-              Add
+              {t('settings.add')}
             </Button>
           </form>
         </div>
       </Card>
       <ConnectedApps />
-      <Card title="Your data">
+      <Card title={t('settings.data.title')}>
         <div className="row">
           <Button
             variant="secondary"
@@ -497,21 +505,21 @@ function PrivacyCenter() {
               }
             }}
           >
-            Download my data
+            {t('privacy.export')}
           </Button>
           <Button variant="danger" icon="trash" onClick={() => setDeleting(true)}>
-            Delete my account
+            {t('privacy.delete')}
           </Button>
         </div>
       </Card>
       <Dialog
         open={deleting}
         onClose={() => setDeleting(false)}
-        title="Delete your account?"
+        title={t('settings.deleteAccount.title')}
         footer={
           <>
             <Button variant="secondary" onClick={() => setDeleting(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               variant="danger"
@@ -526,18 +534,16 @@ function PrivacyCenter() {
                 }
               }}
             >
-              Delete account
+              {t('settings.deleteAccount.confirm')}
             </Button>
           </>
         }
       >
         <div className="stack-sm">
-          <p style={{ margin: 0 }}>
-            Your posts, messages, connections and assistant memory are removed and you're signed out everywhere. This can't be undone.
-          </p>
+          <p style={{ margin: 0 }}>{t('settings.deleteAccount.body')}</p>
           {err ? <Alert tone="danger">{err}</Alert> : null}
           <TextField
-            label="Enter your password to confirm"
+            label={t('settings.deleteAccount.password')}
             type="password"
             autoComplete="current-password"
             value={password}
@@ -550,7 +556,7 @@ function PrivacyCenter() {
 }
 
 function SecuritySettings() {
-  const { toast, setMe, locale } = useSession();
+  const { toast, setMe, locale, t } = useSession();
   const router = useRouter();
   const [sessions, setSessions] = useState<Awaited<ReturnType<typeof api.auth.sessions>>['items']>([]);
   const load = () => api.auth.sessions().then((r) => setSessions(r.items));
@@ -560,13 +566,13 @@ function SecuritySettings() {
   return (
     <div className="stack">
       <VerificationCard />
-      <Card title="Where you're signed in">
+      <Card title={t('settings.sessions.title')}>
         <List>
           {sessions.map((s) => (
             <ListItem
               key={s.id}
-              primary={`${s.device}${s.current ? ' (this device)' : ''}`}
-              secondary={`${s.ip ?? 'Unknown IP'} · active ${formatRelativeTime(s.last_seen_at, locale)}`}
+              primary={s.current ? t('settings.sessions.thisDevice', { device: s.device }) : s.device}
+              secondary={t('settings.sessions.meta', { ip: s.ip ?? t('settings.sessions.unknownIp'), time: formatRelativeTime(s.last_seen_at, locale) })}
               end={
                 s.current ? null : (
                   <Button
@@ -577,7 +583,7 @@ function SecuritySettings() {
                       await load();
                     }}
                   >
-                    Sign out
+                    {t('settings.signOut')}
                   </Button>
                 )
               }
@@ -589,9 +595,9 @@ function SecuritySettings() {
       <PasskeysCard />
       <BrowserPushCard />
       <FamilyCard />
-      <Card title="Developers" subtitle="Build integrations with API keys and webhooks.">
+      <Card title={t('settings.dev.title')} subtitle={t('settings.dev.subtitle')}>
         <a href="/developers" className="yp-btn yp-btn--secondary yp-btn--sm">
-          Open developer settings
+          {t('settings.dev.open')}
         </a>
       </Card>
       <Button
@@ -603,14 +609,14 @@ function SecuritySettings() {
           router.replace('/');
         }}
       >
-        Log out
+        {t('auth.logout')}
       </Button>
     </div>
   );
 }
 
 function SafetySettings() {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const [items, setItems] = useState<Awaited<ReturnType<typeof api.me.moderation>>['items']>([]);
   const [blocked, setBlocked] = useState<{ id: string; displayName: string }[]>([]);
   const [appealFor, setAppealFor] = useState<string | null>(null);
@@ -621,18 +627,24 @@ function SafetySettings() {
   }, []);
   return (
     <div className="stack" id="moderation">
-      <Card title="Decisions about your content">
+      <Card title={t('settings.moderation.title')}>
         {items.length ? (
           <List>
             {items.map((c) => (
               <ListItem
                 key={c.id}
                 primary={`${c.target_type}: ${c.decision.replace('_', ' ')}`}
-                secondary={c.appeal_status ? `Appeal ${c.appeal_status}` : c.status === 'decided' ? 'You can appeal this decision.' : 'Final'}
+                secondary={
+                  c.appeal_status
+                    ? t('settings.appeal.status', { status: c.appeal_status })
+                    : c.status === 'decided'
+                      ? t('settings.appeal.can')
+                      : t('settings.appeal.final')
+                }
                 end={
                   c.status === 'decided' && !c.appeal_status ? (
                     <Button size="sm" variant="secondary" onClick={() => setAppealFor(c.id)}>
-                      Appeal
+                      {t('settings.appeal')}
                     </Button>
                   ) : null
                 }
@@ -640,10 +652,10 @@ function SafetySettings() {
             ))}
           </List>
         ) : (
-          <p className="muted">No actions have been taken on your content.</p>
+          <p className="muted">{t('settings.moderation.none')}</p>
         )}
       </Card>
-      <Card title="Blocked accounts">
+      <Card title={t('settings.blocked.title')}>
         {blocked.length ? (
           <List>
             {blocked.map((u) => (
@@ -659,27 +671,27 @@ function SafetySettings() {
                       setBlocked((x) => x.filter((y) => y.id !== u.id));
                     }}
                   >
-                    Unblock
+                    {t('profile.unblock')}
                   </Button>
                 }
               />
             ))}
           </List>
         ) : (
-          <p className="muted">You haven't blocked anyone.</p>
+          <p className="muted">{t('settings.blocked.none')}</p>
         )}
       </Card>
       <Dialog
         open={!!appealFor}
         onClose={() => setAppealFor(null)}
-        title="Appeal this decision"
+        title={t('settings.appeal.title')}
         footer={
           <Button
             disabled={!statement.trim()}
             onClick={async () => {
               try {
                 await api.raw.post('/v1/appeals', { caseId: appealFor, statement });
-                toast('Appeal sent. A different reviewer will look at it.');
+                toast(t('settings.appeal.sent'));
                 setAppealFor(null);
                 setItems((await api.me.moderation()).items);
               } catch (e) {
@@ -687,24 +699,18 @@ function SafetySettings() {
               }
             }}
           >
-            Send appeal
+            {t('settings.appeal.send')}
           </Button>
         }
       >
-        <TextField
-          label="Tell us why this decision is wrong"
-          multiline
-          value={statement}
-          onChange={(e) => setStatement(e.currentTarget.value)}
-          maxLength={2000}
-        />
+        <TextField label={t('settings.appeal.why')} multiline value={statement} onChange={(e) => setStatement(e.currentTarget.value)} maxLength={2000} />
       </Dialog>
     </div>
   );
 }
 
 function TwoStepCard() {
-  const { toast } = useSession();
+  const { toast, t, tp } = useSession();
   const [status, setStatus] = useState<{ enabled: boolean; recoveryCodesLeft: number } | null>(null);
   const [setup, setSetup] = useState<{ secret: string; otpauthUri: string } | null>(null);
   const [codes, setCodes] = useState<string[] | null>(null);
@@ -719,22 +725,21 @@ function TwoStepCard() {
   if (!status) return null;
 
   return (
-    <Card
-      title="Two-step verification"
-      subtitle={
-        status.enabled ? `On. ${status.recoveryCodesLeft} recovery codes left.` : 'Protect your account with a code from an authenticator app when you sign in.'
-      }
-    >
+    <Card title={t('settings.twoStep.title')} subtitle={status.enabled ? tp('settings.twoStep.on', status.recoveryCodesLeft) : t('settings.twoStep.offHint')}>
       <div className="stack-sm">
         {err ? <Alert tone="danger">{err}</Alert> : null}
         {codes ? (
-          <Alert tone="warning" title="Save your recovery codes">
-            Each code works once if you lose your phone. They won't be shown again.
+          <Alert tone="warning" title={t('settings.twoStep.saveCodes')}>
+            {t('settings.twoStep.codesHint')}
             <pre style={{ fontFamily: 'var(--font-mono)', fontSize: 14, lineHeight: '22px', margin: '8px 0 0', whiteSpace: 'pre-wrap' }}>
               {codes.join('\n')}
             </pre>
-            <Button size="sm" variant="secondary" onClick={() => navigator.clipboard?.writeText(codes.join('\n')).then(() => toast('Codes copied'))}>
-              Copy codes
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => navigator.clipboard?.writeText(codes.join('\n')).then(() => toast(t('settings.twoStep.copied')))}
+            >
+              {t('settings.twoStep.copy')}
             </Button>
           </Alert>
         ) : null}
@@ -750,7 +755,7 @@ function TwoStepCard() {
               }
             }}
           >
-            Turn on two-step verification
+            {t('settings.twoStep.turnOn')}
           </Button>
         ) : null}
         {setup ? (
@@ -769,13 +774,13 @@ function TwoStepCard() {
               }
             }}
           >
-            <p style={{ margin: 0 }}>In your authenticator app, add an account with this key, or open the setup link on this device:</p>
+            <p style={{ margin: 0 }}>{t('settings.twoStep.addKey')}</p>
             <code style={{ fontFamily: 'var(--font-mono)', fontSize: 15, letterSpacing: '.08em', wordBreak: 'break-all' }}>
               {setup.secret.match(/.{1,4}/g)?.join(' ')}
             </code>
-            <a href={setup.otpauthUri}>Open in authenticator app</a>
+            <a href={setup.otpauthUri}>{t('settings.twoStep.openApp')}</a>
             <TextField
-              label="6-digit code from the app"
+              label={t('settings.twoStep.code')}
               value={code}
               onChange={(e) => setCode(e.currentTarget.value)}
               autoComplete="one-time-code"
@@ -784,17 +789,17 @@ function TwoStepCard() {
             />
             <div className="row">
               <Button type="submit" disabled={code.length !== 6}>
-                Verify and turn on
+                {t('settings.twoStep.verify')}
               </Button>
               <Button variant="ghost" onClick={() => setSetup(null)}>
-                Cancel
+                {t('common.cancel')}
               </Button>
             </div>
           </form>
         ) : null}
         {status.enabled && !disabling ? (
           <Button variant="secondary" onClick={() => setDisabling(true)}>
-            Turn off
+            {t('settings.twoStep.turnOff')}
           </Button>
         ) : null}
         {disabling ? (
@@ -809,16 +814,22 @@ function TwoStepCard() {
                 setPassword('');
                 setCode('');
                 setCodes(null);
-                toast('Two-step verification is off');
+                toast(t('settings.twoStep.isOff'));
                 await load();
               } catch (e2) {
                 setErr(errorMessage(e2));
               }
             }}
           >
-            <TextField label="Password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.currentTarget.value)} />
             <TextField
-              label="Code or recovery code"
+              label={t('auth.password')}
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.currentTarget.value)}
+            />
+            <TextField
+              label={t('settings.twoStep.codeOrRecovery')}
               value={code}
               onChange={(e) => setCode(e.currentTarget.value)}
               autoComplete="one-time-code"
@@ -826,10 +837,10 @@ function TwoStepCard() {
             />
             <div className="row">
               <Button type="submit" variant="danger" disabled={!password || code.length < 6}>
-                Turn off two-step verification
+                {t('settings.twoStep.turnOffFull')}
               </Button>
               <Button variant="ghost" onClick={() => setDisabling(false)}>
-                Cancel
+                {t('common.cancel')}
               </Button>
             </div>
           </form>
@@ -840,45 +851,49 @@ function TwoStepCard() {
 }
 
 function ConnectedApps() {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const [items, setItems] = useState<Awaited<ReturnType<typeof api.oauth.connectedApps>>['items']>([]);
   const load = () => api.oauth.connectedApps().then((r) => setItems(r.items));
   useEffect(() => {
     void load();
   }, []);
   return (
-    <Card title="Connected apps" subtitle="Apps you allowed to use your account with Sign in with YAPILAPI.">
+    <Card title={t('settings.apps.title')} subtitle={t('settings.apps.subtitle')}>
       {items.length ? (
         <List>
           {items.map((a) => (
             <ListItem
               key={a.id}
               primary={a.name}
-              secondary={`Can ${a.scopes.includes('write') ? 'read and post' : 'read'}`}
+              secondary={a.scopes.includes('write') ? t('settings.apps.readPost') : t('settings.apps.read')}
               end={
-                <Button size="sm" variant="ghost" onClick={async () => (await api.oauth.disconnect(a.id), toast(`Disconnected ${a.name}`), await load())}>
-                  Disconnect
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={async () => (await api.oauth.disconnect(a.id), toast(t('settings.apps.disconnected', { name: a.name })), await load())}
+                >
+                  {t('settings.apps.disconnect')}
                 </Button>
               }
             />
           ))}
         </List>
       ) : (
-        <p className="muted">No apps are connected.</p>
+        <p className="muted">{t('settings.apps.none')}</p>
       )}
     </Card>
   );
 }
 
 function PasskeysCard() {
-  const { toast, locale } = useSession();
+  const { toast, locale, t } = useSession();
   const [items, setItems] = useState<Awaited<ReturnType<typeof api.passkeys.list>>['items']>([]);
   const load = () => api.passkeys.list().then((r) => setItems(r.items));
   useEffect(() => {
     void load();
   }, []);
   return (
-    <Card title="Passkeys" subtitle="Sign in with your fingerprint, face or device PIN. Passkeys can't be phished and replace both your password and code.">
+    <Card title={t('settings.passkeys.title')} subtitle={t('settings.passkeys.subtitle')}>
       <div className="stack-sm">
         {items.length ? (
           <List>
@@ -886,10 +901,10 @@ function PasskeysCard() {
               <ListItem
                 key={p.id}
                 primary={p.label}
-                secondary={p.last_used_at ? `Used ${formatRelativeTime(p.last_used_at, locale)}` : 'Not used yet'}
+                secondary={p.last_used_at ? t('settings.passkeys.used', { time: formatRelativeTime(p.last_used_at, locale) }) : t('settings.passkeys.notUsed')}
                 end={
                   <Button size="sm" variant="ghost" onClick={async () => (await api.passkeys.remove(p.id), await load())}>
-                    Remove
+                    {t('dataSaver.remove')}
                   </Button>
                 }
               />
@@ -903,14 +918,14 @@ function PasskeysCard() {
               const { options, challengeId } = await api.passkeys.registerOptions();
               const response = await startRegistration({ optionsJSON: options });
               await api.passkeys.registerVerify(challengeId, response, navigator.platform ? `Passkey on ${navigator.platform}` : 'Passkey');
-              toast('Passkey added');
+              toast(t('settings.passkeys.added'));
               await load();
             } catch (e) {
               if ((e as Error).name !== 'NotAllowedError') toast(errorMessage(e));
             }
           }}
         >
-          Add a passkey
+          {t('settings.passkeys.add')}
         </Button>
       </div>
     </Card>
@@ -918,7 +933,7 @@ function PasskeysCard() {
 }
 
 function BrowserPushCard() {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const [on, setOn] = useState<boolean | null>(null);
   useEffect(() => {
     if (!pushSupported()) return setOn(null);
@@ -926,9 +941,9 @@ function BrowserPushCard() {
   }, []);
   if (on === null) return null;
   return (
-    <Card title="Browser notifications" subtitle="Get notified on this device even when YAPILAPI isn't open. Focus mode and paused notifications still apply.">
+    <Card title={t('settings.push.title')} subtitle={t('settings.push.subtitle')}>
       <Switch
-        label="Notifications on this browser"
+        label={t('settings.push.label')}
         checked={on}
         onChange={async (v) => {
           if (!v) {
@@ -938,7 +953,7 @@ function BrowserPushCard() {
           }
           const r = await enableBrowserPush();
           if (r === 'enabled') setOn(true);
-          else toast(r === 'denied' ? 'Notifications are blocked in your browser settings.' : "This browser or server doesn't support push notifications.");
+          else toast(r === 'denied' ? t('settings.push.denied') : t('settings.push.unsupported'));
         }}
       />
     </Card>

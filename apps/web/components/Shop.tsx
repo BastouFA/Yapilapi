@@ -4,13 +4,18 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Badge, BottomSheet, Button, EmptyState, Skeleton, TextField } from '@yapilapi/design-system';
 import type { ShopItem } from '@yapilapi/api-client';
-import { formatMoney } from '@yapilapi/shared';
+import { formatMoney, type MessageKey } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 import { useSignIn } from './SignedOut';
 import { useCheckout } from './Checkout';
 
-const KIND_LABEL: Record<ShopItem['kind'], string> = { product: 'Product', digital: 'Download', service: 'Service', booking: 'Booking' };
+const KIND_LABEL: Record<ShopItem['kind'], MessageKey> = {
+  product: 'shop.kind.product',
+  digital: 'shop.kind.digital',
+  service: 'm.shop.service',
+  booking: 'shop.kind.booking',
+};
 
 function fileSize(bytes: number) {
   return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -28,7 +33,7 @@ export async function startDownload(productId: string) {
  * services are booked for a time and confirmed by the seller.
  */
 export function Shop({ userId, name, isSelf }: { userId: string; name: string; isSelf: boolean }) {
-  const { me, toast, locale, flags } = useSession();
+  const { me, toast, locale, flags, t } = useSession();
   const signIn = useSignIn();
   const checkout = useCheckout();
   const [items, setItems] = useState<ShopItem[] | null>(null);
@@ -47,17 +52,17 @@ export function Shop({ userId, name, isSelf }: { userId: string; name: string; i
     void load();
   }, [load]);
 
-  if (flags.COMMERCE === false) return <EmptyState title="Shop" body="Buying and selling isn't available right now." />;
+  if (flags.COMMERCE === false) return <EmptyState title={t('m.shop.tab')} body={t('shop.unavailable')} />;
   if (items === null) return <Skeleton height={160} />;
   if (!items.length)
     return (
       <EmptyState
-        title="Nothing for sale yet"
-        body={isSelf ? 'Add products, downloads and services in Studio. They show up here.' : `${name} isn't selling anything right now.`}
+        title={t('shop.empty')}
+        body={isSelf ? t('shop.emptySelf') : t('shop.emptyOther', { name })}
         action={
           isSelf ? (
             <Link href="/studio#shop" className="yp-btn yp-btn--secondary yp-btn--sm">
-              Open Studio
+              {t('shop.openStudio')}
             </Link>
           ) : undefined
         }
@@ -70,7 +75,7 @@ export function Shop({ userId, name, isSelf }: { userId: string; name: string; i
     try {
       const r = await api.orders.create([{ productId: p.id, quantity: 1 }], crypto.randomUUID());
       if (!r.payment) {
-        toast('Order confirmed');
+        toast(t('shop.orderConfirmed'));
         await load();
         return;
       }
@@ -78,10 +83,10 @@ export function Shop({ userId, name, isSelf }: { userId: string; name: string; i
         orderId: r.payment.orderId,
         clientSecret: r.payment.clientSecret,
         provider: r.payment.provider,
-        label: `${p.title}, ${formatMoney(p.priceCents, p.currency, locale)}`,
+        label: t('shop.checkoutLabel', { title: p.title, price: formatMoney(p.priceCents, p.currency, locale) }),
         onPaid: async () => {
           await load();
-          if (p.kind === 'digital') toast('Paid. Your download is ready in the Shop tab and in your purchases.');
+          if (p.kind === 'digital') toast(t('shop.paidDownload'));
         },
       });
     } catch (e) {
@@ -98,7 +103,7 @@ export function Shop({ userId, name, isSelf }: { userId: string; name: string; i
           <div className="shop__main">
             <div className="row" style={{ gap: 8 }}>
               <strong>{p.title}</strong>
-              <Badge tone="neutral">{KIND_LABEL[p.kind]}</Badge>
+              <Badge tone="neutral">{t(KIND_LABEL[p.kind])}</Badge>
             </div>
             {p.description ? <p className="muted shop__desc">{p.description}</p> : null}
             <span className="shop__price">
@@ -110,7 +115,7 @@ export function Shop({ userId, name, isSelf }: { userId: string; name: string; i
             {isSelf ? (
               p.kind === 'digital' && !p.file ? (
                 <Link href="/studio#shop" className="yp-btn yp-btn--secondary yp-btn--sm">
-                  Add the file
+                  {t('shop.addFile')}
                 </Link>
               ) : null
             ) : p.kind === 'digital' && p.owned ? (
@@ -124,17 +129,17 @@ export function Shop({ userId, name, isSelf }: { userId: string; name: string; i
                   setBusy(null);
                 }}
               >
-                Download
+                {t('m.shop.download')}
               </Button>
             ) : p.kind === 'service' ? (
               <Button size="sm" onClick={() => (me ? setBooking(p) : signIn())}>
-                Book
+                {t('m.shop.book')}
               </Button>
             ) : p.inventory === 0 ? (
-              <span className="muted">Sold out</span>
+              <span className="muted">{t('shop.soldOut')}</span>
             ) : (
               <Button size="sm" loading={busy === p.id} onClick={() => buy(p)}>
-                Buy
+                {t('m.shop.buy')}
               </Button>
             )}
           </div>
@@ -147,13 +152,13 @@ export function Shop({ userId, name, isSelf }: { userId: string; name: string; i
 
 /** Ask for a time for a service. Paid services go through checkout; the seller then confirms or declines (declining refunds you). */
 function BookSheet({ item, onClose, seller }: { item: ShopItem | null; onClose: () => void; seller: string }) {
-  const { toast, locale } = useSession();
+  const { toast, locale, t } = useSession();
   const checkout = useCheckout();
   const [when, setWhen] = useState('');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   return (
-    <BottomSheet open={!!item} onClose={onClose} title={item ? `Book ${item.title}` : 'Book'}>
+    <BottomSheet open={!!item} onClose={onClose} title={item ? t('shop.bookTitle', { title: item.title }) : t('m.shop.book')}>
       {item ? (
         <form
           className="stack-sm"
@@ -170,10 +175,10 @@ function BookSheet({ item, onClose, seller }: { item: ShopItem | null; onClose: 
                   orderId: r.payment.orderId,
                   clientSecret: r.payment.clientSecret,
                   provider: r.payment.provider,
-                  label: `${item.title}, ${formatMoney(item.priceCents, item.currency, locale)}`,
-                  onPaid: () => toast(`Paid. ${seller} will confirm your booking.`),
+                  label: t('shop.checkoutLabel', { title: item.title, price: formatMoney(item.priceCents, item.currency, locale) }),
+                  onPaid: () => toast(t('shop.paidBooking', { name: seller })),
                 });
-              else toast(`Request sent. ${seller} will confirm your booking.`);
+              else toast(t('shop.requestSent', { name: seller }));
             } catch (err) {
               toast(errorMessage(err));
             } finally {
@@ -181,15 +186,15 @@ function BookSheet({ item, onClose, seller }: { item: ShopItem | null; onClose: 
             }
           }}
         >
-          <TextField label="When" type="datetime-local" value={when} onChange={(e) => setWhen(e.currentTarget.value)} required />
-          <TextField label="Note for the seller (optional)" multiline value={note} onChange={(e) => setNote(e.currentTarget.value)} maxLength={500} />
+          <TextField label={t('shop.when')} type="datetime-local" value={when} onChange={(e) => setWhen(e.currentTarget.value)} required />
+          <TextField label={t('shop.note')} multiline value={note} onChange={(e) => setNote(e.currentTarget.value)} maxLength={500} />
           <p className="muted" style={{ margin: 0, fontSize: 13 }}>
             {item.priceCents
-              ? `You pay ${formatMoney(item.priceCents, item.currency, locale)} now. If ${seller} can't make that time, you get your money back.`
-              : `${seller} will confirm the time with you.`}
+              ? t('shop.payNow', { price: formatMoney(item.priceCents, item.currency, locale), name: seller })
+              : t('shop.confirmTime', { name: seller })}
           </p>
           <Button type="submit" loading={busy} disabled={!when}>
-            {item.priceCents ? 'Continue to payment' : 'Send request'}
+            {item.priceCents ? t('shop.continuePayment') : t('shop.sendRequest')}
           </Button>
         </form>
       ) : null}
@@ -199,7 +204,7 @@ function BookSheet({ item, onClose, seller }: { item: ShopItem | null; onClose: 
 
 /** Downloads you bought, each with a fresh download link on demand. */
 export function PurchasesCard() {
-  const { toast, locale } = useSession();
+  const { toast, locale, t } = useSession();
   const [items, setItems] = useState<Awaited<ReturnType<typeof api.shop.purchases>>['items'] | null>(null);
   useEffect(() => {
     api.shop.purchases().then(
@@ -211,7 +216,7 @@ export function PurchasesCard() {
   return (
     <section className="yp-card stack-sm" style={{ padding: 16 }}>
       <h2 className="section-title" style={{ margin: 0 }}>
-        Your downloads
+        {t('shop.purchases.title')}
       </h2>
       {items.map((p) => (
         <div key={p.productId} className="row" style={{ justifyContent: 'space-between' }}>
@@ -223,7 +228,7 @@ export function PurchasesCard() {
             </span>
           </span>
           <Button size="sm" variant="secondary" disabled={!p.file} onClick={() => startDownload(p.productId).catch((e) => toast(errorMessage(e)))}>
-            Download
+            {t('m.shop.download')}
           </Button>
         </div>
       ))}

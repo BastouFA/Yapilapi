@@ -23,6 +23,7 @@ import {
   SAVE_NOTE_MAX,
   type Board,
   type BoardVisibility,
+  type MessageKey,
   type Page,
   type Post,
   type SavedFilter,
@@ -30,41 +31,47 @@ import {
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
+/** The session's translators, for helpers used outside a component. */
+type Tr = Pick<ReturnType<typeof useSession>, 't' | 'tp'>;
+type T = Tr['t'];
+
 /** Who can see a board, as the person choosing it reads it. */
-export const VISIBILITY_LABEL: Record<BoardVisibility, string> = {
-  private: 'Only you',
-  shared: 'You and collaborators',
-  public: 'Public on your profile',
+export const VISIBILITY_LABEL: Record<BoardVisibility, MessageKey> = {
+  private: 'm.boards.visibility.private',
+  shared: 'm.boards.visibility.shared',
+  public: 'm.boards.visibility.public',
 };
 
 /** Who can see a board, from where the viewer stands: the owner reads "Only you", others "Shared board". */
-export function visibilityText(b: Board): string {
-  if (b.role === 'owner') return VISIBILITY_LABEL[b.visibility];
-  return b.visibility === 'public' ? 'Public board' : b.visibility === 'shared' ? 'Shared board' : 'Private board';
+export function visibilityText(b: Board, t: T): string {
+  if (b.role === 'owner') return t(VISIBILITY_LABEL[b.visibility]);
+  return t(b.visibility === 'public' ? 'boards.publicBoard' : b.visibility === 'shared' ? 'boards.sharedBoard' : 'boards.privateBoard');
 }
 
 /** The small marker on a board card. Private boards don't need one. */
-const VISIBILITY_MARK: Record<BoardVisibility, string | null> = { private: null, shared: 'Shared', public: 'Public' };
+const VISIBILITY_MARK: Record<BoardVisibility, MessageKey | null> = { private: null, shared: 'm.boards.marker.shared', public: 'm.boards.marker.public' };
 
-export const SAVED_FILTER_OPTIONS: { id: SavedFilter; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'photos', label: 'Photos' },
-  { id: 'videos', label: 'Videos' },
-  { id: 'text', label: 'Text' },
-];
+const SAVED_FILTER_LABEL: Record<SavedFilter, MessageKey> = {
+  all: 'm.saved.filter.all',
+  photos: 'm.saved.filter.photos',
+  videos: 'm.saved.filter.videos',
+  text: 'm.saved.filter.text',
+};
+export const savedFilterOptions = (t: T): { id: SavedFilter; label: string }[] =>
+  (Object.keys(SAVED_FILTER_LABEL) as SavedFilter[]).map((id) => ({ id, label: t(SAVED_FILTER_LABEL[id]) }));
 
 export const boardHref = (b: Pick<Board, 'id'>) => `/boards/${b.id}`;
 export const postHref = (p: Post) => (p.format === 'reel' ? `/reels?start=${p.id}` : `/p/${p.id}`);
-export const countPosts = (n: number) => (n === 1 ? '1 post' : `${n} posts`);
+export const countPosts = (n: number, { tp }: Tr) => tp('m.boards.items', n);
 
 // The server rejects emoji in descriptions; say so before sending.
 const EMOJI = /[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}]/u;
 
 /** "12 posts · Shared", "3 posts · Invited". */
-export function boardMeta(b: Board): string {
-  const parts = [countPosts(b.itemCount)];
-  if (b.role === 'invited') parts.push('Invited');
-  else if (VISIBILITY_MARK[b.visibility]) parts.push(VISIBILITY_MARK[b.visibility]!);
+export function boardMeta(b: Board, tr: Tr): string {
+  const parts = [countPosts(b.itemCount, tr)];
+  const mark = b.role === 'invited' ? 'm.boards.marker.invited' : VISIBILITY_MARK[b.visibility];
+  if (mark) parts.push(tr.t(mark));
   return parts.join(' · ');
 }
 
@@ -97,20 +104,26 @@ export function BoardCover({ board }: { board: Board }) {
 
 /** A board in a grid: cover, name, how many posts, a Shared or Public marker, and who is on it. */
 export function BoardCard({ board }: { board: Board }) {
+  const tr = useSession();
+  const { t } = tr;
   const others = board.role !== 'owner' && board.role !== null;
   const people = board.collaboratorCount;
+  const mark = board.role === 'invited' ? 'm.boards.marker.invited' : VISIBILITY_MARK[board.visibility];
+  const meta = boardMeta(board, tr);
   return (
     <Link
       href={boardHref(board)}
       className="board-card"
-      aria-label={`${board.name}, ${boardMeta(board)}${others ? `, ${board.owner.displayName}'s board` : ''}`}
+      aria-label={
+        others ? t('boards.cardLabelOwner', { name: board.name, meta, owner: board.owner.displayName }) : t('boards.cardLabel', { name: board.name, meta })
+      }
     >
       <span className="board-card__cover">
         <BoardCover board={board} />
-        {board.visibility !== 'private' || board.role === 'invited' ? (
+        {mark ? (
           <span className="board-card__mark">
             <Icon name={board.role === 'invited' ? 'bell' : board.visibility === 'public' ? 'globe' : 'users'} size={12} />
-            {board.role === 'invited' ? 'Invited' : VISIBILITY_MARK[board.visibility]}
+            {t(mark)}
           </span>
         ) : null}
       </span>
@@ -128,7 +141,7 @@ export function BoardCard({ board }: { board: Board }) {
             ) : null}
           </AvatarGroup>
         ) : null}
-        <span>{countPosts(board.itemCount)}</span>
+        <span>{countPosts(board.itemCount, tr)}</span>
       </span>
     </Link>
   );
@@ -136,6 +149,7 @@ export function BoardCard({ board }: { board: Board }) {
 
 /** Boards as a grid of cards, with a "New board" card first when `onNew` is given. */
 export function BoardGrid({ boards, onNew, label }: { boards: Board[]; onNew?: () => void; label: string }) {
+  const { t } = useSession();
   return (
     <ul className="board-grid" aria-label={label}>
       {onNew ? (
@@ -146,8 +160,8 @@ export function BoardGrid({ boards, onNew, label }: { boards: Board[]; onNew?: (
                 <Icon name="plus" size={28} />
               </span>
             </span>
-            <span className="board-card__name">New board</span>
-            <span className="board-card__meta">Group your saves</span>
+            <span className="board-card__name">{t('m.boards.new')}</span>
+            <span className="board-card__meta">{t('boards.groupSaves')}</span>
           </button>
         </li>
       ) : null}
@@ -162,6 +176,7 @@ export function BoardGrid({ boards, onNew, label }: { boards: Board[]; onNew?: (
 
 /** The public boards on a profile's Boards tab. */
 export function ProfileBoards({ username, name, isSelf }: { username: string; name: string; isSelf: boolean }) {
+  const { t } = useSession();
   const [boards, setBoards] = useState<Board[] | null>(null);
   useEffect(() => {
     setBoards(null);
@@ -174,18 +189,18 @@ export function ProfileBoards({ username, name, isSelf }: { username: string; na
   if (!boards.length)
     return (
       <EmptyState
-        title="No public boards yet"
-        body={isSelf ? 'Boards you make public show here. Your other boards stay in Saved.' : `${name} hasn't made any boards public.`}
+        title={t('boards.publicNone')}
+        body={isSelf ? t('boards.publicNoneSelf') : t('boards.publicNoneOther', { name })}
         action={
           isSelf ? (
             <Link href="/saved" className="yp-btn yp-btn--secondary">
-              Go to Saved
+              {t('boards.goToSaved')}
             </Link>
           ) : undefined
         }
       />
     );
-  return <BoardGrid boards={boards} label={`${name}'s public boards`} />;
+  return <BoardGrid boards={boards} label={t('boards.publicBoardsOf', { name })} />;
 }
 
 /**
@@ -205,7 +220,7 @@ export function BoardEditor({
   board?: Board;
   postIds?: string[];
 }) {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState<BoardVisibility>('private');
@@ -220,7 +235,7 @@ export function BoardEditor({
 
   const emoji = EMOJI.test(description);
   return (
-    <BottomSheet open={open} onClose={onClose} title={board ? 'Edit board' : 'New board'}>
+    <BottomSheet open={open} onClose={onClose} title={t(board ? 'm.boards.edit' : 'm.boards.new')}>
       <form
         className="stack-sm"
         onSubmit={async (e) => {
@@ -239,40 +254,36 @@ export function BoardEditor({
         }}
       >
         <TextField
-          label="Name"
+          label={t('m.boards.nameLabel')}
           value={name}
           maxLength={BOARD_NAME_MAX}
           required
-          placeholder="Recipes to try"
+          placeholder={t('boards.namePlaceholder')}
           onChange={(e) => setName(e.currentTarget.value)}
           hint={`${name.length}/${BOARD_NAME_MAX}`}
         />
         <TextField
-          label="Description (optional)"
+          label={t('boards.descriptionOptional')}
           multiline
           rows={2}
           value={description}
           maxLength={BOARD_DESCRIPTION_MAX}
           onChange={(e) => setDescription(e.currentTarget.value)}
-          error={emoji ? 'Use words here, without emoji.' : undefined}
+          error={emoji ? t('m.boards.noEmoji') : undefined}
           hint={`${description.length}/${BOARD_DESCRIPTION_MAX}`}
         />
-        <Select label="Who can see it" value={visibility} onChange={(e) => setVisibility(e.currentTarget.value as BoardVisibility)}>
+        <Select label={t('m.boards.visibilityLabel')} value={visibility} onChange={(e) => setVisibility(e.currentTarget.value as BoardVisibility)}>
           {BOARD_VISIBILITIES.map((v) => (
             <option key={v} value={v}>
-              {VISIBILITY_LABEL[v]}
+              {t(VISIBILITY_LABEL[v])}
             </option>
           ))}
         </Select>
         <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-          {visibility === 'private'
-            ? 'Only you can see this board. Inviting someone makes it shared.'
-            : visibility === 'shared'
-              ? 'You and the people you invite can see it and add to it.'
-              : 'Anyone who can see your profile can see it, in the Boards tab. Collaborators can still add to it.'}
+          {t(visibility === 'private' ? 'boards.privateHint' : visibility === 'shared' ? 'boards.sharedHint' : 'boards.publicHint')}
         </p>
         <Button type="submit" loading={busy} disabled={!name.trim() || emoji}>
-          {board ? 'Save' : 'Create board'}
+          {t(board ? 'common.save' : 'm.boards.create')}
         </Button>
       </form>
     </BottomSheet>
@@ -296,7 +307,8 @@ export function SaveToSheet({
   /** The note was changed here. */
   onNote?: (postId: string, note: string) => void;
 }) {
-  const { toast } = useSession();
+  const tr = useSession();
+  const { toast, t } = tr;
   const [boards, setBoards] = useState<Board[] | null>(null);
   const [saved, setSaved] = useState(false);
   const [note, setNote] = useState('');
@@ -344,7 +356,7 @@ export function SaveToSheet({
       else await api.boards.removeItem(b.id, postId);
       setBoards((cur) => cur?.map((x) => (x.id === b.id ? { ...x, contains: on, itemCount: Math.max(0, x.itemCount + (on ? 1 : -1)) } : x)) ?? cur);
       if (on) markSaved();
-      toast(on ? `Added to ${b.name}` : `Removed from ${b.name}`);
+      toast(t(on ? 'boards.addedTo' : 'boards.removedFrom', { name: b.name }));
     } catch (e) {
       toast(errorMessage(e));
     } finally {
@@ -353,12 +365,12 @@ export function SaveToSheet({
   }
 
   return (
-    <BottomSheet open={!!postId} onClose={onClose} title="Save to a board">
+    <BottomSheet open={!!postId} onClose={onClose} title={t('m.boards.saveTo')}>
       <div className="stack">
         {boards === null ? (
           <Skeleton height={120} />
         ) : boards.length ? (
-          <ul className="save-pick" aria-label="Your boards">
+          <ul className="save-pick" aria-label={t('boards.yourBoards')}>
             {boards.map((b) => (
               <li key={b.id}>
                 <button type="button" aria-pressed={!!b.contains} disabled={!!busy} onClick={() => toggle(b)}>
@@ -368,8 +380,8 @@ export function SaveToSheet({
                   <span className="save-pick__text">
                     <strong dir="auto">{b.name}</strong>
                     <span className="muted">
-                      {b.role === 'collaborator' ? `${b.owner.displayName}'s board · ` : ''}
-                      {boardMeta(b)}
+                      {b.role === 'collaborator' ? `${t('boards.ownersBoard', { name: b.owner.displayName })} · ` : ''}
+                      {boardMeta(b, tr)}
                     </span>
                   </span>
                   <span className="save-pick__check" aria-hidden>
@@ -381,7 +393,7 @@ export function SaveToSheet({
           </ul>
         ) : (
           <p className="muted" style={{ margin: 0 }}>
-            No boards yet. Start one with this post.
+            {t('boards.noneStartOne')}
           </p>
         )}
 
@@ -397,7 +409,7 @@ export function SaveToSheet({
               setBoards((cur) => [{ ...board, contains: true }, ...(cur ?? [])]);
               setName('');
               markSaved();
-              toast(`Added to ${board.name}`);
+              toast(t('boards.addedTo', { name: board.name }));
             } catch (err) {
               toast(errorMessage(err));
             } finally {
@@ -406,15 +418,15 @@ export function SaveToSheet({
           }}
         >
           <TextField
-            label="New board"
-            placeholder="Name it"
+            label={t('m.boards.newLabel')}
+            placeholder={t('boards.nameIt')}
             value={name}
             maxLength={BOARD_NAME_MAX}
             className="save-pick__new"
             onChange={(e) => setName(e.currentTarget.value)}
           />
           <Button type="submit" variant="secondary" loading={busy === 'new'} disabled={!name.trim() || !!busy}>
-            Create
+            {t('m.chapters.create')}
           </Button>
         </form>
 
@@ -430,7 +442,7 @@ export function SaveToSheet({
               setSavedNote(r.note);
               markSaved();
               onNote?.(postId, r.note);
-              toast(r.note ? 'Note saved' : 'Note removed');
+              toast(t(r.note ? 'boards.noteSaved' : 'boards.noteRemoved'));
             } catch (err) {
               toast(errorMessage(err));
             } finally {
@@ -439,25 +451,25 @@ export function SaveToSheet({
           }}
         >
           <TextField
-            label="Private note"
+            label={t('m.saved.noteLabel')}
             multiline
             rows={2}
             value={note}
             maxLength={SAVE_NOTE_MAX}
-            placeholder="Why you saved it"
-            hint={`Only you see this note. ${note.length}/${SAVE_NOTE_MAX}`}
+            placeholder={t('boards.notePlaceholder')}
+            hint={t('boards.noteHint', { length: note.length, max: SAVE_NOTE_MAX })}
             onChange={(e) => setNote(e.currentTarget.value)}
           />
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <span className="muted" style={{ fontSize: 13 }}>
-              {saved ? 'Saved' : 'Adding it to a board or writing a note saves it too.'}
+              {t(saved ? 'common.saved' : 'boards.savesToo')}
             </span>
             <span className="row">
               <Button type="submit" size="sm" variant="secondary" loading={busy === 'note'} disabled={!!busy || note.trim() === savedNote}>
-                Save note
+                {t('m.saved.saveNote')}
               </Button>
               <Button size="sm" onClick={onClose}>
-                Done
+                {t('m.common.done')}
               </Button>
             </span>
           </div>
@@ -469,7 +481,7 @@ export function SaveToSheet({
 
 /** Write, change or clear your private note on a save. */
 export function NoteSheet({ post, onClose, onSaved }: { post: Post | null; onClose: () => void; onSaved: (postId: string, note: string) => void }) {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -481,7 +493,7 @@ export function NoteSheet({ post, onClose, onSaved }: { post: Post | null; onClo
     try {
       const r = await api.posts.setSaveNote(post.id, value.trim());
       onSaved(post.id, r.note);
-      toast(r.note ? 'Note saved' : 'Note removed');
+      toast(t(r.note ? 'boards.noteSaved' : 'boards.noteRemoved'));
       onClose();
     } catch (e) {
       toast(errorMessage(e));
@@ -490,7 +502,7 @@ export function NoteSheet({ post, onClose, onSaved }: { post: Post | null; onClo
     }
   };
   return (
-    <BottomSheet open={!!post} onClose={onClose} title={post?.viewer.note ? 'Edit note' : 'Add a note'}>
+    <BottomSheet open={!!post} onClose={onClose} title={t(post?.viewer.note ? 'm.saved.editNote' : 'm.saved.addNote')}>
       <form
         className="stack-sm"
         onSubmit={(e) => {
@@ -499,22 +511,22 @@ export function NoteSheet({ post, onClose, onSaved }: { post: Post | null; onClo
         }}
       >
         <TextField
-          label="Private note"
+          label={t('m.saved.noteLabel')}
           multiline
           rows={3}
           value={note}
           maxLength={SAVE_NOTE_MAX}
-          placeholder="Why you saved it"
-          hint={`Only you see this note. ${note.length}/${SAVE_NOTE_MAX}`}
+          placeholder={t('boards.notePlaceholder')}
+          hint={t('boards.noteHint', { length: note.length, max: SAVE_NOTE_MAX })}
           onChange={(e) => setNote(e.currentTarget.value)}
         />
         <div className="row">
           <Button type="submit" loading={busy}>
-            Save note
+            {t('m.saved.saveNote')}
           </Button>
           {post?.viewer.note ? (
             <Button variant="ghost" disabled={busy} onClick={() => submit('')}>
-              Remove note
+              {t('boards.removeNote')}
             </Button>
           ) : null}
         </div>
@@ -525,9 +537,10 @@ export function NoteSheet({ post, onClose, onSaved }: { post: Post | null; onClo
 
 /** A list of actions for one save, as a sheet (tiles are too small for a dropdown menu). */
 export function SaveOptionsSheet({ post, actions, onClose }: { post: Post | null; actions: MenuAction[]; onClose: () => void }) {
+  const { t } = useSession();
   return (
-    <BottomSheet open={!!post} onClose={onClose} title={post ? tileTitle(post) : 'Options'}>
-      <List label="Options">
+    <BottomSheet open={!!post} onClose={onClose} title={post ? tileTitle(post, t) : t('boards.options')}>
+      <List label={t('boards.options')}>
         {actions.map((a) => (
           <ListItem
             key={a.label}
@@ -542,24 +555,34 @@ export function SaveOptionsSheet({ post, actions, onClose }: { post: Post | null
 }
 
 /** "Photo by Ada", "Reel by Ada", "Post by Ada". */
-export function tileTitle(p: Post): string {
+export function tileTitle(p: Post, t: T): string {
   const m = p.media.find((x) => x.kind !== 'audio');
-  const kind = p.locked ? 'Post for subscribers' : p.format === 'reel' ? 'Reel' : m?.kind === 'video' ? 'Video' : m ? 'Photo' : 'Post';
-  return `${kind} by ${p.author.displayName}`;
+  const key: MessageKey = p.locked
+    ? 'boards.tile.locked'
+    : p.format === 'reel'
+      ? 'boards.tile.reel'
+      : m?.kind === 'video'
+        ? 'boards.tile.video'
+        : m
+          ? 'boards.tile.photo'
+          : 'm.post.by';
+  return t(key, { name: p.author.displayName });
 }
 
-const tileLabel = (p: Post, n = 80) => `${tileTitle(p)}${p.body && !p.locked ? `: ${p.body.slice(0, n)}` : ''}`;
+const tileLabel = (p: Post, t: T, n = 80) =>
+  p.body && !p.locked ? t('boards.tile.withText', { title: tileTitle(p, t), text: p.body.slice(0, n) }) : tileTitle(p, t);
 /** Short enough to repeat on every button of a tile, long enough to tell two posts by one person apart. */
-export const tileShortLabel = (p: Post) => tileLabel(p, 32);
+export const tileShortLabel = (p: Post, t: T) => tileLabel(p, t, 32);
 
 function TileMedia({ post }: { post: Post }) {
+  const { t } = useSession();
   if (post.locked) {
     const ph = post.locked.placeholder;
     const bg = ph && /^data:image\/[a-z+]+;base64,[A-Za-z0-9+/=]+$/.test(ph) ? { backgroundImage: `url(${ph})` } : undefined;
     return (
       <span className="save-tile__lock" style={bg}>
         <Icon name="lock" size={22} />
-        <span>For subscribers</span>
+        <span>{t('post.locked.title')}</span>
       </span>
     );
   }
@@ -577,13 +600,13 @@ function TileMedia({ post }: { post: Post }) {
         {m.sensitive ? (
           <span className="save-tile__badge save-tile__badge--start">
             <Icon name="eye" size={12} />
-            Sensitive
+            {t('boards.sensitive')}
           </span>
         ) : null}
         {m.kind === 'video' || post.format === 'reel' ? (
           <span className="save-tile__badge">
             <Icon name="play" size={12} filled />
-            {post.format === 'reel' ? 'Reel' : 'Video'}
+            {t(post.format === 'reel' ? 'm.create.mode.reel' : 'm.create.video')}
           </span>
         ) : visual.length > 1 ? (
           <span className="save-tile__badge">
@@ -596,7 +619,7 @@ function TileMedia({ post }: { post: Post }) {
   }
   return (
     <span className="save-tile__text" dir="auto">
-      {post.body ? post.body.slice(0, 160) : post.poll ? 'Poll' : 'Post'}
+      {post.body ? post.body.slice(0, 160) : t(post.poll ? 'm.sticker.kind.poll' : 'm.create.mode.post')}
     </span>
   );
 }
@@ -617,48 +640,58 @@ export function SaveGrid({
   onOptions?: (p: Post) => void;
   arrange?: { onMove: (index: number, by: -1 | 1) => void };
 }) {
+  const { t } = useSession();
   return (
     <ul className="save-grid" aria-label={label}>
       {posts.map((p, i) => (
         <li key={p.id} className="save-tile">
-          <Link href={postHref(p)} className="save-tile__media" aria-label={tileLabel(p)}>
+          <Link href={postHref(p)} className="save-tile__media" aria-label={tileLabel(p, t)}>
             <TileMedia post={p} />
           </Link>
           {arrange ? (
-            <span className="save-tile__arrange" role="group" aria-label={`${tileShortLabel(p)}, position ${i + 1} of ${posts.length}`}>
+            <span
+              className="save-tile__arrange"
+              role="group"
+              aria-label={t('boards.tilePosition', { title: tileShortLabel(p, t), index: i + 1, total: posts.length })}
+            >
               <Button
                 size="sm"
                 variant="secondary"
                 data-move={`${p.id}:-1`}
                 disabled={i === 0}
-                aria-label={`Move ${tileShortLabel(p)} earlier`}
+                aria-label={t('boards.moveEarlierLabel', { title: tileShortLabel(p, t) })}
                 onClick={() => arrange.onMove(i, -1)}
               >
-                Earlier
+                {t('boards.earlier')}
               </Button>
               <Button
                 size="sm"
                 variant="secondary"
                 data-move={`${p.id}:1`}
                 disabled={i === posts.length - 1}
-                aria-label={`Move ${tileShortLabel(p)} later`}
+                aria-label={t('boards.moveLaterLabel', { title: tileShortLabel(p, t) })}
                 onClick={() => arrange.onMove(i, 1)}
               >
-                Later
+                {t('boards.later')}
               </Button>
             </span>
           ) : p.viewer.note || onOptions ? (
             <span className="save-tile__foot">
               {p.viewer.note ? (
                 <p className="save-tile__note" dir="auto">
-                  <span className="yp-visually-hidden">Your note: </span>
+                  <span className="yp-visually-hidden">{t('boards.yourNote')} </span>
                   {p.viewer.note}
                 </p>
               ) : (
                 <span />
               )}
               {onOptions ? (
-                <button type="button" className="yp-action save-tile__more" aria-label={`Options for ${tileShortLabel(p)}`} onClick={() => onOptions(p)}>
+                <button
+                  type="button"
+                  className="yp-action save-tile__more"
+                  aria-label={t('boards.optionsFor', { title: tileShortLabel(p, t) })}
+                  onClick={() => onOptions(p)}
+                >
                   <Icon name="more" />
                 </button>
               ) : null}
@@ -724,6 +757,7 @@ export function usePaged(load: (cursor?: string) => Promise<Page<Post>>, key: st
 
 /** "Show more" under a grid, which also loads by itself as the reader nears it. */
 export function MoreButton({ cursor, loading, onMore }: { cursor: string | null; loading: boolean; onMore: () => void }) {
+  const { t } = useSession();
   const sentinel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = sentinel.current;
@@ -737,7 +771,7 @@ export function MoreButton({ cursor, loading, onMore }: { cursor: string | null;
     <>
       <div ref={sentinel} />
       <Button variant="secondary" loading={loading} onClick={onMore}>
-        Show more
+        {t('boards.showMore')}
       </Button>
     </>
   );

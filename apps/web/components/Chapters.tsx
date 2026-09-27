@@ -16,41 +16,51 @@ import {
   type ChapterAudience,
   type ChapterGradient,
   type ChapterSymbol,
+  type MessageKey,
+  type PluralKey,
 } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
 const PHOTO_MS = 5000;
 
-export const AUDIENCE_LABEL: Record<ChapterAudience, string> = {
-  public: 'Everyone',
-  followers: 'Followers',
-  friends: 'Friends',
-  close_friends: 'Close friends',
-  only_me: 'Only me',
+/** Message keys; translate with t() at render. */
+export const AUDIENCE_LABEL: Record<ChapterAudience, MessageKey> = {
+  public: 'm.chapters.audience.public',
+  followers: 'm.chapters.audience.followers',
+  friends: 'm.chapters.audience.friends',
+  close_friends: 'm.chapters.audience.close_friends',
+  only_me: 'm.chapters.audience.only_me',
 };
 
-const GRADIENT_LABEL: Record<ChapterGradient, string> = {
-  yapi: 'YAPILAPI red',
-  sunrise: 'Sunrise',
-  saffron: 'Saffron',
-  dusk: 'Dusk',
-  lagoon: 'Lagoon',
-  ink: 'Ink',
+const GRADIENT_LABEL: Record<ChapterGradient, MessageKey> = {
+  yapi: 'chapters.gradient.yapi',
+  sunrise: 'chapters.gradient.sunrise',
+  saffron: 'chapters.gradient.saffron',
+  dusk: 'chapters.gradient.dusk',
+  lagoon: 'chapters.gradient.lagoon',
+  ink: 'chapters.gradient.ink',
 };
 
-const SYMBOL_LABEL: Record<ChapterSymbol, string> = {
-  star: 'Star',
-  sparkle: 'Sparkle',
-  heart: 'Heart',
-  music: 'Music',
-  globe: 'Globe',
-  calendar: 'Calendar',
-  compass: 'Compass',
-  home: 'Home',
-  bookmark: 'Bookmark',
-  image: 'Picture',
+const SYMBOL_LABEL: Record<ChapterSymbol, MessageKey> = {
+  star: 'chapters.symbol.star',
+  sparkle: 'chapters.symbol.sparkle',
+  heart: 'chapters.symbol.heart',
+  music: 'chapters.symbol.music',
+  globe: 'chapters.symbol.globe',
+  calendar: 'chapters.symbol.calendar',
+  compass: 'chapters.symbol.compass',
+  home: 'chapters.symbol.home',
+  bookmark: 'chapters.symbol.bookmark',
+  image: 'chapters.symbol.image',
 };
+
+/** What chapterMeta needs from the session: pass useSession()'s result. */
+export interface Translate {
+  t: (key: MessageKey, vars?: Record<string, string | number>) => string;
+  tp: (key: PluralKey, count: number, vars?: Record<string, string | number>) => string;
+  locale: string;
+}
 
 export const gradientCss = (g: ChapterGradient) => `linear-gradient(135deg, ${CHAPTER_GRADIENTS[g][0]}, ${CHAPTER_GRADIENTS[g][1]})`;
 export const formatDay = (d: string, locale: string) => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(d));
@@ -78,11 +88,11 @@ export function ChapterCover({ chapter, size = 72 }: { chapter: Chapter; size?: 
 }
 
 /** "Opens 12 Mar 2027 · 4 stories" or "6 stories · Shared". */
-export function chapterMeta(c: Chapter, locale: string) {
+export function chapterMeta(c: Chapter, { t, tp, locale }: Translate) {
   const parts: string[] = [];
-  if (isSealed(c)) parts.push(`Opens ${formatDay(c.capsule!.opensAt, locale)}`);
-  parts.push(c.storyCount === 1 ? '1 story' : `${c.storyCount} stories`);
-  if (c.shared) parts.push('Shared');
+  if (isSealed(c)) parts.push(t('m.chapters.opens', { date: formatDay(c.capsule!.opensAt, locale) }));
+  parts.push(tp('m.chapters.stories', c.storyCount));
+  if (c.shared) parts.push(t('m.chapters.shared'));
   return parts.join(' · ');
 }
 
@@ -92,7 +102,8 @@ export function chapterMeta(c: Chapter, locale: string) {
  * starts a new chapter and links to your archive.
  */
 export function ChaptersRow({ userId, isSelf }: { userId: string; isSelf: boolean }) {
-  const { toast, locale } = useSession();
+  const session = useSession();
+  const { toast, locale, t } = session;
   const router = useRouter();
   const [items, setItems] = useState<Chapter[] | null>(null);
   const [playing, setPlaying] = useState<ChapterDetail | null>(null);
@@ -116,11 +127,11 @@ export function ChaptersRow({ userId, isSelf }: { userId: string; isSelf: boolea
     <section className="chapters" aria-labelledby="chapters-title">
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <h2 id="chapters-title" className="section-title" style={{ margin: 0 }}>
-          Chapters
+          {t('m.chapters.title')}
         </h2>
         {isSelf ? (
           <Link href="/archive" className="yp-btn yp-btn--ghost yp-btn--sm">
-            Your archive
+            {t('m.archive.title')}
           </Link>
         ) : null}
       </div>
@@ -131,7 +142,7 @@ export function ChaptersRow({ userId, isSelf }: { userId: string; isSelf: boolea
               <span className="chapter-cover chapter-cover--new" style={{ width: 72, height: 72 }} aria-hidden>
                 <Icon name="plus" size={28} />
               </span>
-              <span className="chapters__title">New chapter</span>
+              <span className="chapters__title">{t('m.chapters.new')}</span>
             </button>
           </li>
         ) : null}
@@ -140,7 +151,7 @@ export function ChaptersRow({ userId, isSelf }: { userId: string; isSelf: boolea
             <button
               type="button"
               className="chapters__item"
-              aria-label={`${c.title}, ${chapterMeta(c, locale)}`}
+              aria-label={t('chapters.itemLabel', { title: c.title, meta: chapterMeta(c, session) })}
               onClick={async () => {
                 if (isSealed(c) || !c.storyCount) return router.push(`/chapters/${c.id}`);
                 try {
@@ -154,7 +165,7 @@ export function ChaptersRow({ userId, isSelf }: { userId: string; isSelf: boolea
               <span className="chapters__title" dir="auto">
                 {c.title}
               </span>
-              {isSealed(c) ? <span className="chapters__meta">Opens {formatDay(c.capsule!.opensAt, locale)}</span> : null}
+              {isSealed(c) ? <span className="chapters__meta">{t('m.chapters.opens', { date: formatDay(c.capsule!.opensAt, locale) })}</span> : null}
             </button>
           </li>
         ))}
@@ -177,7 +188,7 @@ export function ChaptersRow({ userId, isSelf }: { userId: string; isSelf: boolea
  * shared it. When it finishes, viewers can leave one short line in the guestbook.
  */
 export function ChapterPlayer({ detail, start = 0, onClose }: { detail: ChapterDetail; start?: number; onClose: () => void }) {
-  const { me, toast, locale } = useSession();
+  const { me, toast, locale, t } = useSession();
   const { chapter, stories } = detail;
   const [i, setI] = useState(start);
   const [paused, setPaused] = useState(false);
@@ -238,7 +249,9 @@ export function ChapterPlayer({ detail, start = 0, onClose }: { detail: ChapterD
       className="story"
       role="dialog"
       aria-modal="true"
-      aria-label={done ? `${chapter.title}, the end` : `${chapter.title}, story ${i + 1} of ${stories.length}`}
+      aria-label={
+        done ? t('chapters.playerEnd', { title: chapter.title }) : t('m.chapters.viewer', { title: chapter.title, index: i + 1, total: stories.length })
+      }
       tabIndex={-1}
       onKeyDown={(e) => {
         if ((e.target as HTMLElement).tagName === 'INPUT') return;
@@ -271,11 +284,11 @@ export function ChapterPlayer({ detail, start = 0, onClose }: { detail: ChapterD
             )}
           </span>
           {!done ? (
-            <button type="button" className="story__icon" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Play' : 'Pause'}>
+            <button type="button" className="story__icon" onClick={() => setPaused((p) => !p)} aria-label={t(paused ? 'm.common.play' : 'm.common.pause')}>
               <Icon name={paused ? 'play' : 'pause'} filled />
             </button>
           ) : null}
-          <button type="button" className="story__icon" onClick={onClose} aria-label="Close">
+          <button type="button" className="story__icon" onClick={onClose} aria-label={t('m.common.close')}>
             <Icon name="x" />
           </button>
         </div>
@@ -301,24 +314,24 @@ export function ChapterPlayer({ detail, start = 0, onClose }: { detail: ChapterD
                     if (!body) return;
                     try {
                       const { entry } = await api.chapters.sign(chapter.id, body);
-                      setSigned(entry.pending ? 'Thanks. Your line shows to others after a quick check.' : 'Your line is in the guestbook.');
+                      setSigned(t(entry.pending ? 'm.chapters.signedPending' : 'm.chapters.signed'));
                     } catch (err) {
                       toast(errorMessage(err));
                     }
                   }}
                 >
                   <label htmlFor="chapter-line" className="yp-visually-hidden">
-                    A line for the guestbook
+                    {t('chapters.guestbookLabel')}
                   </label>
                   <input
                     id="chapter-line"
                     className="story__reply"
                     value={line}
                     maxLength={CHAPTER_GUESTBOOK_MAX}
-                    placeholder="Leave a line in the guestbook"
+                    placeholder={t('m.chapters.guestbookPlaceholder')}
                     onChange={(e) => setLine(e.currentTarget.value)}
                   />
-                  <button type="submit" className="story__icon" aria-label="Sign the guestbook" disabled={!line.trim()}>
+                  <button type="submit" className="story__icon" aria-label={t('chapters.signGuestbook')} disabled={!line.trim()}>
                     <Icon name="send" />
                   </button>
                 </form>
@@ -334,12 +347,12 @@ export function ChapterPlayer({ detail, start = 0, onClose }: { detail: ChapterD
                     setI(0);
                   }}
                 >
-                  Play again
+                  {t('m.chapters.playAgain')}
                 </Button>
               ) : null}
               {me ? (
                 <Link href={`/chapters/${chapter.id}`} className="yp-btn yp-btn--ghost yp-btn--sm" onClick={onClose}>
-                  See the guestbook
+                  {t('chapters.seeGuestbook')}
                 </Link>
               ) : null}
             </div>
@@ -365,7 +378,7 @@ export function ChapterPlayer({ detail, start = 0, onClose }: { detail: ChapterD
               <img
                 key={story.id}
                 src={story.mediaUrl}
-                alt={covered ? '' : story.body || `Story from ${story.author.displayName}`}
+                alt={covered ? '' : story.body || t('m.stories.photo', { name: story.author.displayName })}
                 className={covered ? 'yp-blurred' : undefined}
               />
             ) : (
@@ -380,6 +393,7 @@ export function ChapterPlayer({ detail, start = 0, onClose }: { detail: ChapterD
             ) : null}
             {covered ? (
               <SensitiveCover
+                locale={locale}
                 onReveal={() => {
                   setRevealed((r) => [...r, story.id]);
                   setPaused(false);
@@ -387,8 +401,8 @@ export function ChapterPlayer({ detail, start = 0, onClose }: { detail: ChapterD
                 }}
               />
             ) : null}
-            <button type="button" className="story__tap story__tap--prev" onClick={prev} aria-label="Previous" />
-            <button type="button" className="story__tap story__tap--next" onClick={next} aria-label="Next" />
+            <button type="button" className="story__tap story__tap--prev" onClick={prev} aria-label={t('chapters.previous')} />
+            <button type="button" className="story__tap story__tap--next" onClick={next} aria-label={t('chapters.next')} />
           </div>
         ) : null}
         <div className="story__foot" />
@@ -401,7 +415,7 @@ export function ChapterPlayer({ detail, start = 0, onClose }: { detail: ChapterD
  * Add one of your stories to a chapter you own or contribute to, or start a new chapter with it.
  */
 export function AddToChapter({ momentId, open, onClose, onAdded }: { momentId: string | null; open: boolean; onClose: () => void; onAdded?: () => void }) {
-  const { toast } = useSession();
+  const { toast, t, tp } = useSession();
   const [items, setItems] = useState<Chapter[] | null>(null);
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
@@ -430,21 +444,25 @@ export function AddToChapter({ momentId, open, onClose, onAdded }: { momentId: s
   }
 
   return (
-    <BottomSheet open={open && !!momentId} onClose={onClose} title="Add to a chapter">
+    <BottomSheet open={open && !!momentId} onClose={onClose} title={t('m.chapters.add')}>
       <div className="stack-sm">
         {items === null ? (
-          <p className="muted">Loading your chapters</p>
+          <p className="muted">{t('chapters.loading')}</p>
         ) : items.length ? (
           <ul className="chapter-pick">
             {items.map((c) => (
               <li key={c.id}>
-                <button type="button" disabled={busy} onClick={() => run(async () => (await api.chapters.addStory(c.id, momentId!), `Added to ${c.title}`))}>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => run(async () => (await api.chapters.addStory(c.id, momentId!), t('m.chapters.added', { title: c.title })))}
+                >
                   <ChapterCover chapter={c} size={44} />
                   <span>
                     <strong dir="auto">{c.title}</strong>
                     <span className="muted">
-                      {c.role === 'contributor' ? `${c.owner.displayName}'s chapter · ` : ''}
-                      {c.storyCount === 1 ? '1 story' : `${c.storyCount} stories`}
+                      {c.role === 'contributor' ? `${t('m.chapters.by', { name: c.owner.displayName })} · ` : ''}
+                      {tp('m.chapters.stories', c.storyCount)}
                     </span>
                   </span>
                 </button>
@@ -452,25 +470,28 @@ export function AddToChapter({ momentId, open, onClose, onAdded }: { momentId: s
             ))}
           </ul>
         ) : (
-          <p className="muted">No chapters yet. Start one with this story.</p>
+          <p className="muted">{t('m.chapters.none')}</p>
         )}
         <form
           className="row"
           style={{ alignItems: 'flex-end' }}
           onSubmit={(e) => {
             e.preventDefault();
-            if (title.trim()) void run(async () => (await api.chapters.create({ title: title.trim(), momentIds: [momentId!] }), `Started ${title.trim()}`));
+            if (title.trim())
+              void run(
+                async () => (await api.chapters.create({ title: title.trim(), momentIds: [momentId!] }), t('m.chapters.started', { title: title.trim() })),
+              );
           }}
         >
           <TextField
-            label="New chapter"
-            placeholder="Summer in Accra"
+            label={t('m.chapters.new')}
+            placeholder={t('m.chapters.newPlaceholder')}
             value={title}
             maxLength={CHAPTER_TITLE_MAX}
             onChange={(e) => setTitle(e.currentTarget.value)}
           />
           <Button type="submit" disabled={!title.trim() || busy}>
-            Create
+            {t('m.chapters.create')}
           </Button>
         </form>
       </div>
@@ -500,7 +521,7 @@ export function ChapterEditor({
   chapter?: Chapter;
   stories?: ChapterStory[];
 }) {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [audience, setAudience] = useState<ChapterAudience>('followers');
@@ -527,7 +548,7 @@ export function ChapterEditor({
   const tomorrow = localDay(new Date(Date.now() + 86_400_000).toISOString());
 
   return (
-    <BottomSheet open={open} onClose={onClose} title={chapter ? 'Edit chapter' : 'New chapter'}>
+    <BottomSheet open={open} onClose={onClose} title={t(chapter ? 'chapters.editTitle' : 'm.chapters.new')}>
       <form
         className="stack-sm"
         onSubmit={async (e) => {
@@ -548,7 +569,7 @@ export function ChapterEditor({
         }}
       >
         <TextField
-          label="Title"
+          label={t('m.chapters.titleLabel')}
           value={title}
           maxLength={CHAPTER_TITLE_MAX}
           required
@@ -556,71 +577,70 @@ export function ChapterEditor({
           hint={`${title.length}/${CHAPTER_TITLE_MAX}`}
         />
         <TextField
-          label="Description (optional)"
+          label={t('m.chapters.descriptionLabel')}
           multiline
           rows={2}
           value={description}
           maxLength={CHAPTER_DESCRIPTION_MAX}
           onChange={(e) => setDescription(e.currentTarget.value)}
         />
-        <Select label="Who can see it" value={audience} onChange={(e) => setAudience(e.currentTarget.value as ChapterAudience)}>
+        <Select label={t('m.chapters.audience')} value={audience} onChange={(e) => setAudience(e.currentTarget.value as ChapterAudience)}>
           {CHAPTER_AUDIENCES.map((a) => (
             <option key={a} value={a}>
-              {AUDIENCE_LABEL[a]}
+              {t(AUDIENCE_LABEL[a])}
             </option>
           ))}
         </Select>
         {stories.length ? (
-          <Select label="Cover" value={coverStoryId} onChange={(e) => setCoverStoryId(e.currentTarget.value)}>
-            <option value="">Colour and symbol</option>
+          <Select label={t('m.chapters.cover')} value={coverStoryId} onChange={(e) => setCoverStoryId(e.currentTarget.value)}>
+            <option value="">{t('m.chapters.coverColour')}</option>
             {stories.map((s, n) => (
               <option key={s.id} value={s.id}>
-                Story {n + 1}
-                {s.body ? `: ${s.body.slice(0, 40)}` : ''}
+                {s.body ? t('chapters.coverStoryText', { index: n + 1, text: s.body.slice(0, 40) }) : t('chapters.coverStory', { index: n + 1 })}
               </option>
             ))}
           </Select>
         ) : null}
         <fieldset className="chapter-swatches">
-          <legend className="yp-field__label">Colour</legend>
+          <legend className="yp-field__label">{t('m.chapters.colour')}</legend>
           {CHAPTER_GRADIENT_NAMES.map((g) => (
-            <label key={g} className="chapter-swatch" style={{ background: gradientCss(g) }} title={GRADIENT_LABEL[g]}>
+            <label key={g} className="chapter-swatch" style={{ background: gradientCss(g) }} title={t(GRADIENT_LABEL[g])}>
               <input type="radio" name="chapter-gradient" value={g} checked={gradient === g} onChange={() => setGradient(g)} />
-              <span className="yp-visually-hidden">{GRADIENT_LABEL[g]}</span>
+              <span className="yp-visually-hidden">{t(GRADIENT_LABEL[g])}</span>
             </label>
           ))}
         </fieldset>
         <fieldset className="chapter-swatches">
-          <legend className="yp-field__label">Symbol</legend>
+          <legend className="yp-field__label">{t('m.chapters.symbol')}</legend>
           {CHAPTER_SYMBOLS.map((s) => (
-            <label key={s} className="chapter-symbol" title={SYMBOL_LABEL[s]}>
+            <label key={s} className="chapter-symbol" title={t(SYMBOL_LABEL[s])}>
               <input type="radio" name="chapter-symbol" value={s} checked={symbol === s} onChange={() => setSymbol(s)} />
               <Icon name={s as IconName} />
-              <span className="yp-visually-hidden">{SYMBOL_LABEL[s]}</span>
+              <span className="yp-visually-hidden">{t(SYMBOL_LABEL[s])}</span>
             </label>
           ))}
         </fieldset>
         <Checkbox
-          label="Time capsule"
-          description="Seal it until a date. Until then people see the cover, the date and how many stories are inside, nothing more."
+          label={t('m.chapters.capsule')}
+          description={t('m.chapters.capsuleHint')}
           checked={capsule}
           disabled={dateLocked}
           onChange={(e) => setCapsule(e.currentTarget.checked)}
         />
         {capsule ? (
           <TextField
-            label="Seal until"
+            label={t('chapters.sealUntil')}
             type="date"
             min={tomorrow}
             required
             value={until}
             disabled={dateLocked}
-            hint={dateLocked ? 'The date is fixed once a capsule is sealed.' : undefined}
+            hint={dateLocked ? t('m.chapters.dateFixed') : undefined}
             onChange={(e) => setUntil(e.currentTarget.value)}
           />
         ) : null}
         <Button type="submit" loading={busy} disabled={!title.trim()}>
-          {chapter ? 'Save' : 'Create chapter'}
+          {t(chapter ? 'common.save' : 'chapters.createChapter')}
         </Button>
       </form>
     </BottomSheet>

@@ -3,7 +3,16 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import qrcode from 'qrcode-generator';
 import { BottomSheet, Button, Icon, Segments, TextField } from '@yapilapi/design-system';
-import { IMAGE_ACCEPT, NOW_STATUS_ICONS, NOW_STATUS_MAX, type NowStatus, type NowStatusAudience, type NowStatusIcon, type Profile } from '@yapilapi/shared';
+import {
+  IMAGE_ACCEPT,
+  NOW_STATUS_ICONS,
+  NOW_STATUS_MAX,
+  type MessageKey,
+  type NowStatus,
+  type NowStatusAudience,
+  type NowStatusIcon,
+  type Profile,
+} from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
@@ -14,16 +23,17 @@ import { useSession } from '@/app/providers';
  * avatar in both themes. Your own profile gets a button to change it.
  */
 export function ProfileCover({ profile, onEdit }: { profile: Profile; onEdit?: () => void }) {
+  const { t } = useSession();
   return (
     <div className={profile.coverUrl ? 'profile__cover profile__cover--photo' : 'profile__cover'}>
       {profile.coverUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img className="profile__cover-img" src={profile.coverUrl} alt={profile.coverAlt || `Cover photo of ${profile.displayName}`} />
+        <img className="profile__cover-img" src={profile.coverUrl} alt={profile.coverAlt || t('m.cover.alt', { name: profile.displayName })} />
       ) : null}
       <span className="profile__cover-fade" aria-hidden />
       {onEdit ? (
         <Button size="sm" variant="secondary" icon="image" className="profile__cover-edit" onClick={onEdit}>
-          {profile.coverUrl ? 'Change cover' : 'Add a cover'}
+          {profile.coverUrl ? t('profilePlus.changeCover') : t('profilePlus.addCover')}
         </Button>
       ) : null}
     </div>
@@ -32,7 +42,7 @@ export function ProfileCover({ profile, onEdit }: { profile: Profile; onEdit?: (
 
 /** Choose, describe or remove your cover photo. Photos go through the usual upload and processing. */
 export function CoverSheet({ open, onClose, profile, onSaved }: { open: boolean; onClose: () => void; profile: Profile; onSaved: (p: Profile) => void }) {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -58,16 +68,16 @@ export function CoverSheet({ open, onClose, profile, onSaved }: { open: boolean;
     try {
       let saved: Profile;
       if (file) {
-        setStage('Uploading your photo');
+        setStage(t('profilePlus.uploading'));
         const { media } = await api.media.upload(file, alt.trim() || undefined);
-        if (media.kind !== 'image') throw new Error('Choose a photo for your cover.');
-        setStage('Preparing your photo');
+        if (media.kind !== 'image') throw new Error(t('profilePlus.photoOnly'));
+        setStage(t('m.cover.preparing'));
         saved = (await api.me.setCoverWhenReady(media.id, alt.trim() || undefined)).profile;
       } else {
         saved = (await api.me.updateProfile({ coverAlt: alt.trim() || null })).profile;
       }
       onSaved(saved);
-      toast(file ? 'Cover updated' : 'Description saved');
+      toast(file ? t('profilePlus.coverUpdated') : t('profilePlus.descriptionSaved'));
       onClose();
     } catch (e) {
       toast(e instanceof Error && !('status' in e) ? e.message : errorMessage(e));
@@ -81,7 +91,7 @@ export function CoverSheet({ open, onClose, profile, onSaved }: { open: boolean;
     setBusy('remove');
     try {
       onSaved((await api.me.removeCover()).profile);
-      toast('Cover removed');
+      toast(t('profilePlus.coverRemoved'));
       onClose();
     } catch (e) {
       toast(errorMessage(e));
@@ -92,14 +102,14 @@ export function CoverSheet({ open, onClose, profile, onSaved }: { open: boolean;
 
   const shown = preview ?? profile.coverUrl;
   return (
-    <BottomSheet open={open} onClose={onClose} title="Cover photo">
+    <BottomSheet open={open} onClose={onClose} title={t('profilePlus.coverTitle')}>
       <div className="stack">
         <div className="cover-sheet__preview">
           {shown ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={shown} alt="" />
           ) : (
-            <span className="muted">No cover yet</span>
+            <span className="muted">{t('profilePlus.noCover')}</span>
           )}
         </div>
         <input
@@ -114,11 +124,11 @@ export function CoverSheet({ open, onClose, profile, onSaved }: { open: boolean;
           }}
         />
         <Button variant="secondary" icon="image" onClick={() => fileRef.current?.click()} disabled={!!busy}>
-          {shown ? 'Choose a different photo' : 'Choose a photo'}
+          {shown ? t('profilePlus.chooseDifferent') : t('m.cover.choose')}
         </Button>
         <TextField
-          label="Describe your cover"
-          hint="For people using screen readers. For example: The beach at Elmina at sunset."
+          label={t('profilePlus.describe')}
+          hint={t('profilePlus.describeHint')}
           value={alt}
           maxLength={300}
           onChange={(e) => setAlt(e.currentTarget.value)}
@@ -131,13 +141,13 @@ export function CoverSheet({ open, onClose, profile, onSaved }: { open: boolean;
         <div className="row" style={{ justifyContent: 'space-between' }}>
           {profile.coverUrl ? (
             <Button variant="ghost" icon="trash" loading={busy === 'remove'} disabled={!!busy} onClick={remove}>
-              Remove cover
+              {t('profilePlus.removeCover')}
             </Button>
           ) : (
             <span />
           )}
           <Button loading={busy === 'save'} disabled={!!busy || (!file && !profile.coverUrl)} onClick={save}>
-            Save
+            {t('common.save')}
           </Button>
         </div>
       </div>
@@ -146,23 +156,28 @@ export function CoverSheet({ open, onClose, profile, onSaved }: { open: boolean;
 }
 
 // ── "Now" status ────────────────────────────────────────────────────────
-const ICON_LABELS: Record<NowStatusIcon, string> = {
-  sparkle: 'Sparkle',
-  music: 'Music',
-  'map-pin': 'Place',
-  calendar: 'Calendar',
-  heart: 'Heart',
-  globe: 'Travel',
-  star: 'Star',
-  mic: 'Microphone',
+const ICON_LABELS: Record<NowStatusIcon, MessageKey> = {
+  sparkle: 'm.now.icon.sparkle',
+  music: 'm.now.icon.music',
+  'map-pin': 'm.now.icon.map-pin',
+  calendar: 'm.now.icon.calendar',
+  heart: 'm.now.icon.heart',
+  globe: 'profilePlus.iconTravel',
+  star: 'm.now.icon.star',
+  mic: 'm.now.icon.mic',
 };
-const AUDIENCE_LABELS: Record<NowStatusAudience, string> = { everyone: 'Everyone', followers: 'Followers', close_friends: 'Close friends' };
+const AUDIENCE_LABELS: Record<NowStatusAudience, MessageKey> = {
+  everyone: 'm.now.audience.everyone',
+  followers: 'm.now.audience.followers',
+  close_friends: 'm.now.audience.close_friends',
+};
 
 /** A status line: its icon (if any) and text. `compact` for chat headers. */
 export function NowStatusLine({ status, compact }: { status: NowStatus; compact?: boolean }) {
+  const { t } = useSession();
   return (
     <p className={compact ? 'now-status now-status--compact' : 'now-status'}>
-      <span className="yp-visually-hidden">Now: </span>
+      <span className="yp-visually-hidden">{`${t('profilePlus.nowLabel')} `}</span>
       {status.icon ? <Icon name={status.icon} size={compact ? 14 : 16} /> : null}
       <bdi className="now-status__text">{status.text}</bdi>
     </p>
@@ -181,7 +196,7 @@ export function NowStatusSheet({
   current: NowStatus | null;
   onSaved: (s: NowStatus | null) => void;
 }) {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const groupId = useId();
   const [text, setText] = useState('');
   const [icon, setIcon] = useState<NowStatusIcon | null>(null);
@@ -200,7 +215,7 @@ export function NowStatusSheet({
     try {
       const { status } = await api.me.setStatus({ text: text.trim(), icon, audience });
       onSaved(status);
-      toast('Status set for 24 hours');
+      toast(t('profilePlus.statusSet'));
       onClose();
     } catch (e) {
       toast(errorMessage(e));
@@ -213,7 +228,7 @@ export function NowStatusSheet({
     try {
       await api.me.clearStatus();
       onSaved(null);
-      toast('Status cleared');
+      toast(t('profilePlus.statusCleared'));
       onClose();
     } catch (e) {
       toast(errorMessage(e));
@@ -223,24 +238,31 @@ export function NowStatusSheet({
   }
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Your status">
+    <BottomSheet open={open} onClose={onClose} title={t('m.now.title')}>
       <div className="stack">
         <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-          A short line on your profile and in your chats, like &ldquo;Studying for exams&rdquo;. It disappears after 24 hours.
+          {t('profilePlus.statusIntro')}
         </p>
         <TextField
-          label="What's happening"
+          label={t('profilePlus.statusLabel')}
           value={text}
           maxLength={NOW_STATUS_MAX}
-          placeholder="Studying for exams"
-          hint={`${text.length} of ${NOW_STATUS_MAX} characters`}
+          placeholder={t('profilePlus.statusPlaceholder')}
+          hint={t('m.now.counterLabel', { count: text.length, max: NOW_STATUS_MAX })}
           onChange={(e) => setText(e.currentTarget.value)}
         />
         <fieldset className="now-status__icons">
-          <legend className="yp-field__label">Icon (optional)</legend>
+          <legend className="yp-field__label">{t('profilePlus.iconOptional')}</legend>
           <label className="now-status__icon">
-            <input type="radio" className="yp-visually-hidden" name={groupId} aria-label="No icon" checked={icon === null} onChange={() => setIcon(null)} />
-            <span aria-hidden>None</span>
+            <input
+              type="radio"
+              className="yp-visually-hidden"
+              name={groupId}
+              aria-label={t('m.now.noIcon')}
+              checked={icon === null}
+              onChange={() => setIcon(null)}
+            />
+            <span aria-hidden>{t('profilePlus.noIconShort')}</span>
           </label>
           {NOW_STATUS_ICONS.map((name) => (
             <label key={name} className="now-status__icon">
@@ -248,7 +270,7 @@ export function NowStatusSheet({
                 type="radio"
                 className="yp-visually-hidden"
                 name={groupId}
-                aria-label={ICON_LABELS[name]}
+                aria-label={t(ICON_LABELS[name])}
                 checked={icon === name}
                 onChange={() => setIcon(name)}
               />
@@ -257,31 +279,31 @@ export function NowStatusSheet({
           ))}
         </fieldset>
         <div className="stack-sm">
-          <span className="yp-field__label">Who can see it</span>
+          <span className="yp-field__label">{t('m.now.audience')}</span>
           <Segments
-            label="Who can see it"
+            label={t('m.now.audience')}
             value={audience}
             onChange={setAudience}
-            options={(Object.keys(AUDIENCE_LABELS) as NowStatusAudience[]).map((id) => ({ id, label: AUDIENCE_LABELS[id] }))}
+            options={(Object.keys(AUDIENCE_LABELS) as NowStatusAudience[]).map((id) => ({ id, label: t(AUDIENCE_LABELS[id]) }))}
           />
           <span className="muted" style={{ fontSize: 13 }}>
             {audience === 'everyone'
-              ? 'Anyone who can see your profile.'
+              ? t('profilePlus.audienceEveryone')
               : audience === 'followers'
-                ? 'Only people who follow you.'
-                : 'Only people on your close friends list.'}
+                ? t('profilePlus.audienceFollowers')
+                : t('profilePlus.audienceCloseFriends')}
           </span>
         </div>
         <div className="row" style={{ justifyContent: 'space-between' }}>
           {current ? (
             <Button variant="ghost" loading={busy === 'clear'} disabled={!!busy} onClick={clear}>
-              Clear status
+              {t('m.now.clear')}
             </Button>
           ) : (
             <span />
           )}
           <Button loading={busy === 'save'} disabled={!!busy || !text.trim()} onClick={save}>
-            Save
+            {t('common.save')}
           </Button>
         </div>
       </div>
@@ -311,40 +333,44 @@ export function QrCode({ value, label, size = 208 }: { value: string; label: str
 
 /** "Share profile": a QR code for the public profile address, and a button to copy it. */
 export function ShareProfileSheet({ open, onClose, profile }: { open: boolean; onClose: () => void; profile: Profile }) {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const [url, setUrl] = useState('');
   useEffect(() => setUrl(`${location.origin}/u/${profile.username}`), [profile.username]);
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Share profile">
+    <BottomSheet open={open} onClose={onClose} title={t('m.profile.share')}>
       <div className="stack share-profile">
         <div className="share-profile__card">
-          {url ? <QrCode value={url} label={`QR code for ${profile.displayName}'s profile`} /> : null}
+          {url ? <QrCode value={url} label={t('profilePlus.qrLabel', { name: profile.displayName })} /> : null}
           <strong>{profile.displayName}</strong>
           <span className="muted">@{profile.username}</span>
         </div>
         <p className="muted" style={{ margin: 0, fontSize: 14, textAlign: 'center' }}>
-          Scan with a phone camera to open this profile.
+          {t('profilePlus.scanHint')}
         </p>
-        <input className="yp-input" readOnly value={url} aria-label="Profile link" onFocus={(e) => e.currentTarget.select()} />
+        <input className="yp-input" readOnly value={url} aria-label={t('profilePlus.profileLink')} onFocus={(e) => e.currentTarget.select()} />
         <div className="row" style={{ justifyContent: 'center' }}>
           <Button
             icon="link"
             onClick={async () => {
               try {
                 await navigator.clipboard.writeText(url);
-                toast('Link copied');
+                toast(t('invite.copied'));
               } catch {
-                toast("Couldn't copy. Select the link and copy it.");
+                toast(t('profilePlus.copyFailed'));
               }
             }}
           >
-            Copy link
+            {t('invite.copy')}
           </Button>
           {canShare ? (
-            <Button variant="secondary" icon="send" onClick={() => navigator.share({ title: `${profile.displayName} on YAPILAPI`, url }).catch(() => {})}>
-              Share
+            <Button
+              variant="secondary"
+              icon="send"
+              onClick={() => navigator.share({ title: t('profilePlus.shareTitle', { name: profile.displayName }), url }).catch(() => {})}
+            >
+              {t('m.common.share')}
             </Button>
           ) : null}
         </div>

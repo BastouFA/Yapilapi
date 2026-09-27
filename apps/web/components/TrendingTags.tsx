@@ -9,7 +9,7 @@ import { useSession } from '@/app/providers';
 
 /** Tags the most different people used this week, with the ones picking up today marked. */
 export function TrendingTags({ limit = 8 }: { limit?: number }) {
-  const { locale } = useSession();
+  const { locale, t, tp } = useSession();
   const [items, setItems] = useState<TrendingTag[] | null>(null);
   useEffect(() => {
     api.trending(limit).then(
@@ -20,7 +20,7 @@ export function TrendingTags({ limit = 8 }: { limit?: number }) {
   const n = new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 });
 
   if (items === null) return <Skeleton height={120} />;
-  if (!items.length) return <p className="muted">No tags are trending yet. Add a #tag to your next post to start one.</p>;
+  if (!items.length) return <p className="muted">{t('trending.empty')}</p>;
   return (
     <ol className="trending">
       {items.map((it, i) => (
@@ -32,13 +32,16 @@ export function TrendingTags({ limit = 8 }: { limit?: number }) {
             <span className="trending__text">
               <bdi className="trending__tag">#{it.tag}</bdi>
               <span className="trending__meta">
-                {n.format(it.posts)} {it.posts === 1 ? 'post' : 'posts'} · {n.format(it.people)} {it.people === 1 ? 'person' : 'people'}
+                {t('trending.meta', {
+                  posts: tp('trending.posts', it.posts, { number: n.format(it.posts) }),
+                  people: tp('trending.people', it.people, { number: n.format(it.people) }),
+                })}
               </span>
             </span>
             {it.rising ? (
               <span className="trending__rising">
                 <Icon name="sparkle" size={14} />
-                Rising
+                {t('trending.rising')}
               </span>
             ) : null}
           </Link>

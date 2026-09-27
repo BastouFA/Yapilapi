@@ -2,7 +2,16 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { DataSaverProvider, Toast, type ToastAction } from '@yapilapi/design-system';
-import { t as translate, type ConnectionHints, type DataSaverMode, type Me, type MessageKey } from '@yapilapi/shared';
+import {
+  isRtl,
+  t as translate,
+  tp as translatePlural,
+  type ConnectionHints,
+  type DataSaverMode,
+  type Me,
+  type MessageKey,
+  type PluralKey,
+} from '@yapilapi/shared';
 import { api, WS_URL } from '@/lib/api';
 import {
   connectionHints,
@@ -30,6 +39,8 @@ interface Session {
   toast: (message: string, action?: ToastAction) => void;
   subscribe: (fn: Listener) => () => void;
   t: (key: MessageKey, vars?: Record<string, string | number>) => string;
+  /** Plural-aware: picks `<key>.one` or `<key>.other` for `count`, which is also passed as {count}. */
+  tp: (key: PluralKey, count: number, vars?: Record<string, string | number>) => string;
   locale: string;
   dataSaver: DataSaverState;
 }
@@ -59,6 +70,17 @@ export function useRealtime(fn: Listener) {
   const ref = useRef(fn);
   ref.current = fn;
   useEffect(() => subscribe((e) => ref.current(e)), [subscribe]);
+}
+
+// First strong isolate / pop directional isolate. In a right-to-left language, a name or title put
+// into a sentence keeps its own direction, so an English name inside Arabic text reads correctly.
+const FSI = '\u2068';
+const PDI = '\u2069';
+function isolate(locale: string, vars?: Record<string, string | number>): Record<string, string | number> | undefined {
+  if (!vars || !isRtl(locale)) return vars;
+  const out: Record<string, string | number> = {};
+  for (const [k, v] of Object.entries(vars)) out[k] = typeof v === 'string' && v ? `${FSI}${v}${PDI}` : v;
+  return out;
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -179,7 +201,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }, []);
   const setUnread = useCallback((u: Partial<{ notifications: number; messages: number }>) => setUnreadState((s) => ({ ...s, ...u })), []);
   const locale = me?.locale ?? 'en';
-  const t = useCallback((key: MessageKey, vars?: Record<string, string | number>) => translate(key, locale, vars), [locale]);
+  const t = useCallback((key: MessageKey, vars?: Record<string, string | number>) => translate(key, locale, isolate(locale, vars)), [locale]);
+  const tp = useCallback(
+    (key: PluralKey, count: number, vars?: Record<string, string | number>) => translatePlural(key, count, locale, isolate(locale, vars)),
+    [locale],
+  );
 
   return (
     <Ctx.Provider
@@ -194,6 +220,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         toast,
         subscribe,
         t,
+        tp,
         locale,
         dataSaver: { account: accountSaver, device: deviceSaver, mode: saverMode, active: saverOn, hints, setDevice },
       }}

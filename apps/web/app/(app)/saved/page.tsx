@@ -3,27 +3,27 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { EmptyState, Segments, Skeleton, type MenuAction } from '@yapilapi/design-system';
-import type { Board, Post, SavedFilter } from '@yapilapi/shared';
+import type { Board, MessageKey, Post, SavedFilter } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import {
   BoardEditor,
   BoardGrid,
   MoreButton,
   NoteSheet,
-  SAVED_FILTER_OPTIONS,
   SaveGrid,
   SaveOptionsSheet,
   SaveToSheet,
   boardHref,
+  savedFilterOptions,
   usePaged,
 } from '@/components/Boards';
 import { useSession } from '../../providers';
 
-const EMPTY: Record<SavedFilter, { title: string; body: string }> = {
-  all: { title: 'Nothing saved yet', body: 'Tap the bookmark on any post or reel to keep it here. Only you can see what you save.' },
-  photos: { title: 'No saved photos', body: 'Photos you save show up here.' },
-  videos: { title: 'No saved videos', body: 'Videos and reels you save show up here.' },
-  text: { title: 'No saved text posts', body: 'Posts without photos or videos that you save show up here.' },
+const EMPTY: Record<SavedFilter, { title: MessageKey; body: MessageKey }> = {
+  all: { title: 'm.saved.empty', body: 'saved.emptyBody' },
+  photos: { title: 'saved.emptyPhotos', body: 'saved.emptyPhotosBody' },
+  videos: { title: 'saved.emptyVideos', body: 'saved.emptyVideosBody' },
+  text: { title: 'saved.emptyText', body: 'saved.emptyTextBody' },
 };
 
 /**
@@ -31,7 +31,7 @@ const EMPTY: Record<SavedFilter, { title: string; body: string }> = {
  * first, with a filter. Only you see your saves and your notes on them.
  */
 export default function SavedPage() {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const router = useRouter();
   const [boards, setBoards] = useState<Board[] | null>(null);
   const [filter, setFilter] = useState<SavedFilter>('all');
@@ -61,10 +61,14 @@ export default function SavedPage() {
 
   const actions: MenuAction[] = options
     ? [
-        { label: 'Save to a board', icon: 'bookmark', onSelect: () => (setOptions(null), setSaveTo(options)) },
-        { label: options.viewer.note ? 'Edit note' : 'Add a note', icon: 'message', onSelect: () => (setOptions(null), setNoteFor(options)) },
+        { label: t('m.boards.saveTo'), icon: 'bookmark', onSelect: () => (setOptions(null), setSaveTo(options)) },
         {
-          label: 'Remove from saved',
+          label: t(options.viewer.note ? 'm.saved.editNote' : 'm.saved.addNote'),
+          icon: 'message',
+          onSelect: () => (setOptions(null), setNoteFor(options)),
+        },
+        {
+          label: t('m.post.unsave'),
           icon: 'trash',
           danger: true,
           onSelect: async () => {
@@ -73,7 +77,7 @@ export default function SavedPage() {
             try {
               await api.posts.unsave(p.id);
               saves.setItems((cur) => cur?.filter((x) => x.id !== p.id) ?? cur);
-              toast('Removed from saved and from your boards');
+              toast(t('saved.removedEverywhere'));
               void loadBoards();
             } catch (e) {
               toast(errorMessage(e));
@@ -86,33 +90,33 @@ export default function SavedPage() {
   return (
     <div className="yp-shell__inner">
       <div className="yp-topbar">
-        <h1>Saved</h1>
+        <h1>{t('m.saved.title')}</h1>
       </div>
       <p className="muted" style={{ margin: 0 }}>
-        Only you can see what you save and your notes. Group saves into boards, and share a board with friends or on your profile if you like.
+        {t('saved.intro')}
       </p>
 
       <section className="stack-sm" aria-labelledby="boards-title">
         <h2 id="boards-title" className="section-title">
-          Boards
+          {t('m.boards.title')}
         </h2>
-        {boards === null ? <Skeleton height={180} /> : <BoardGrid boards={boards} label="Your boards" onNew={() => setCreating(true)} />}
+        {boards === null ? <Skeleton height={180} /> : <BoardGrid boards={boards} label={t('boards.yourBoards')} onNew={() => setCreating(true)} />}
       </section>
 
       <section className="stack-sm" aria-labelledby="saves-title">
         <h2 id="saves-title" className="section-title">
-          All saves
+          {t('saved.allSaves')}
         </h2>
-        <Segments label="Show" value={filter} onChange={setFilter} options={SAVED_FILTER_OPTIONS} />
+        <Segments label={t('m.saved.filter')} value={filter} onChange={setFilter} options={savedFilterOptions(t)} />
         {saves.items === null ? (
           <Skeleton height={320} />
         ) : saves.items.length ? (
           <>
-            <SaveGrid posts={saves.items} label="Saved posts" onOptions={setOptions} />
+            <SaveGrid posts={saves.items} label={t('saved.savedPosts')} onOptions={setOptions} />
             <MoreButton cursor={saves.cursor} loading={saves.loadingMore} onMore={saves.more} />
           </>
         ) : (
-          <EmptyState title={EMPTY[filter].title} body={EMPTY[filter].body} />
+          <EmptyState title={t(EMPTY[filter].title)} body={t(EMPTY[filter].body)} />
         )}
       </section>
 

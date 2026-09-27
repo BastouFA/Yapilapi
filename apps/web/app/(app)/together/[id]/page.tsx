@@ -11,6 +11,7 @@ import { useRealtime, useSession } from '../../../providers';
 /** A contribution's photo; sensitive ones stay blurred until the viewer chooses to see them. */
 function ContributionPhoto({ media, author }: { media: NonNullable<TogetherDetail['contributions'][number]['media']>; author: string }) {
   const [shown, setShown] = useState(!media.sensitive);
+  const { locale } = useSession();
   return (
     <div style={{ position: 'relative', overflow: 'hidden' }}>
       <img
@@ -19,7 +20,7 @@ function ContributionPhoto({ media, author }: { media: NonNullable<TogetherDetai
         className={shown ? undefined : 'yp-blurred'}
         style={{ display: 'block', width: '100%', aspectRatio: '4 / 5', objectFit: 'cover' }}
       />
-      {shown ? null : <SensitiveCover onReveal={() => setShown(true)} />}
+      {shown ? null : <SensitiveCover onReveal={() => setShown(true)} locale={locale} />}
     </div>
   );
 }

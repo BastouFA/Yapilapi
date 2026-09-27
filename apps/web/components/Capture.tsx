@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button } from '@yapilapi/design-system';
+import { useSession } from '@/app/providers';
 
 /**
  * In-app camera capture. Returns JPEG files taken right now, never picked from
@@ -9,6 +10,7 @@ import { Alert, Button } from '@yapilapi/design-system';
  * Where the device has two cameras, it can take front and back in one go.
  */
 export function Capture({ dual, onCaptured }: { dual?: boolean; onCaptured: (files: File[]) => void }) {
+  const { t } = useSession();
   const video = useRef<HTMLVideoElement>(null);
   const [facing, setFacing] = useState<'user' | 'environment'>('environment');
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -24,7 +26,7 @@ export function Capture({ dual, onCaptured }: { dual?: boolean; onCaptured: (fil
         setStream(m);
         if (video.current) video.current.srcObject = m;
       })
-      .catch(() => setError('Allow camera access to capture a moment.'));
+      .catch(() => setError(t('camera.captureAllow')));
     return () => s?.getTracks().forEach((t) => t.stop());
   }, [facing]);
 
@@ -57,18 +59,18 @@ export function Capture({ dual, onCaptured }: { dual?: boolean; onCaptured: (fil
         playsInline
         muted
         style={{ width: '100%', borderRadius: 8, background: '#0b100e', transform: facing === 'user' ? 'scaleX(-1)' : undefined }}
-        aria-label="Camera preview"
+        aria-label={t('camera.preview')}
       />
       <div className="row">
         <Button icon="image" onClick={snap} disabled={!stream}>
-          {dual && shots.length === 0 ? 'Capture (then the other camera)' : 'Capture'}
+          {t(dual && shots.length === 0 ? 'camera.captureDual' : 'camera.capture')}
         </Button>
         <Button variant="ghost" onClick={() => setFacing((f) => (f === 'user' ? 'environment' : 'user'))}>
-          Switch camera
+          {t('m.camera.flip')}
         </Button>
         {dual && shots.length === 1 ? (
           <Button variant="ghost" onClick={() => (onCaptured(shots), setShots([]))}>
-            Use one photo
+            {t('camera.useOne')}
           </Button>
         ) : null}
       </div>

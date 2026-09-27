@@ -98,7 +98,7 @@ function AppDetail({ appId, initialRedirects, onDeleted }: { appId: string; init
   return (
     <div className="stack">
       {secret ? (
-        <Alert tone="warning" title={secret.label} onDismiss={() => setSecret(null)}>
+        <Alert tone="warning" title={secret.label} onDismiss={() => setSecret(null)} locale={locale}>
           Copy it now. It won't be shown again.
           <pre style={{ fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: '8px 0' }}>{secret.value}</pre>
           <Button size="sm" variant="secondary" onClick={() => navigator.clipboard?.writeText(secret.value).then(() => toast('Copied'))}>

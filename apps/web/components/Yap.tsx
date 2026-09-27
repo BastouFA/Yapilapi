@@ -86,6 +86,7 @@ export function YapButton({
   onError: (message: string) => void;
   disabled?: boolean;
 }) {
+  const { t } = useSession();
   const [talking, setTalking] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const rec = useRef<MediaRecorder | null>(null);
@@ -107,7 +108,7 @@ export function YapButton({
     if (readOn()) void context()?.resume();
     if (typeof MediaRecorder === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       holding.current = false;
-      onError("This browser can't record audio.");
+      onError(t('chat.noRecording'));
       return;
     }
     let stream: MediaStream;
@@ -115,7 +116,7 @@ export function YapButton({
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
       holding.current = false;
-      onError('Microphone access is off. Allow it in your browser to send Yaps.');
+      onError(t('yap.micOff'));
       return;
     }
     // Let go while the browser was still asking for the microphone.
@@ -139,17 +140,17 @@ export function YapButton({
     setElapsed(0);
     r.start(250);
     setTalking(true);
-  }, [disabled, onError, onRecorded]);
+  }, [disabled, onError, onRecorded, t]);
 
   // The clock, and the 60-second limit.
   useEffect(() => {
     if (!talking) return;
-    const t = setInterval(() => {
+    const timer = setInterval(() => {
       const ms = Date.now() - started.current;
       setElapsed(ms);
       if (ms >= YAP_MAX_MS) stop();
     }, 200);
-    return () => clearInterval(t);
+    return () => clearInterval(timer);
   }, [talking, stop]);
 
   // Hold Space to talk, unless you're typing somewhere.
@@ -184,7 +185,7 @@ export function YapButton({
       type="button"
       className={`yap-btn${talking ? ' yap-btn--live' : ''}`}
       disabled={disabled}
-      aria-label="Yap: hold to talk, release to send. You can also hold the Space bar."
+      aria-label={t('yap.a11y')}
       aria-pressed={talking}
       onPointerDown={(e) => {
         if (e.button !== 0) return;
@@ -208,21 +209,22 @@ export function YapButton({
       }}
     >
       <Icon name="mic" size={20} filled={talking} />
-      <span>{talking ? `Release to send · 0:${String(secs).padStart(2, '0')}` : 'Hold to Yap'}</span>
+      <span>{talking ? t('m.yap.release', { time: `0:${String(secs).padStart(2, '0')}` }) : t('m.yap.hold')}</span>
     </button>
   );
 }
 
 /** Shown in a chat the first time: sound can only start by itself after one click. */
 export function TurnOnYapsPrompt() {
+  const { t } = useSession();
   const state = useYapAudio();
   if (state !== 'off') return null;
   return (
     <div className="yap-prompt" role="note">
       <Icon name="volume" size={18} />
-      <span>Yaps are voice clips that play as soon as they arrive, like a walkie-talkie. Your browser needs one click to allow sound.</span>
+      <span>{t('yap.prompt')}</span>
       <Button size="sm" onClick={() => void turnOnYaps()}>
-        Turn on Yaps
+        {t('yap.turnOn')}
       </Button>
     </div>
   );
@@ -238,7 +240,7 @@ type Playing = { from: string; message: Message; stop: () => void; analyser: Ana
  * waveform. Yaps that don't autoplay arrive silently in the chat like voice messages.
  */
 export function YapPlayer() {
-  const { me } = useSession();
+  const { me, t } = useSession();
   const state = useYapAudio();
   const queue = useRef<YapEvent[]>([]);
   const [now, setNow] = useState<Playing | null>(null);
@@ -335,9 +337,9 @@ export function YapPlayer() {
     return (
       <div className="yap-banner" role="status" aria-live="polite">
         <Icon name="volume" size={18} />
-        <span className="yap-banner__from">Yap from {now.from}</span>
+        <span className="yap-banner__from">{t('m.yap.from', { name: now.from })}</span>
         <Waveform analyser={now.analyser} />
-        <button type="button" className="yap-banner__stop" onClick={now.stop} aria-label="Stop this Yap">
+        <button type="button" className="yap-banner__stop" onClick={now.stop} aria-label={t('m.yap.stop')}>
           <Icon name="stop" size={16} filled />
         </button>
       </div>
@@ -346,11 +348,11 @@ export function YapPlayer() {
     return (
       <div className="yap-banner" role="status" aria-live="polite">
         <Icon name="volume-off" size={18} />
-        <span className="yap-banner__from">Yap from {waiting.message.sender.displayName}</span>
+        <span className="yap-banner__from">{t('m.yap.from', { name: waiting.message.sender.displayName })}</span>
         <Button size="sm" onClick={() => void turnOnYaps()}>
-          {state === 'off' ? 'Turn on Yaps' : 'Play'}
+          {state === 'off' ? t('yap.turnOn') : t('m.common.play')}
         </Button>
-        <button type="button" className="yap-banner__stop" onClick={() => setWaiting(null)} aria-label="Dismiss">
+        <button type="button" className="yap-banner__stop" onClick={() => setWaiting(null)} aria-label={t('yap.dismiss')}>
           <Icon name="x" size={16} />
         </button>
       </div>

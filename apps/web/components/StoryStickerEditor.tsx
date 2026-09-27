@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { Button, Icon, TextField, type IconName } from '@yapilapi/design-system';
-import { INTERACTIVE_STICKERS, linkDomain, type StoryStickerInput } from '@yapilapi/shared';
+import { INTERACTIVE_STICKERS, linkDomain, type MessageKey, type StoryStickerInput } from '@yapilapi/shared';
 import { api } from '@/lib/api';
 import { stickerStyle, timeLeft } from '@/components/StoryStickers';
+import { useSession } from '@/app/providers';
 
 /** The music sticker's key while dragging it. */
 const MUSIC = 'music';
@@ -13,15 +14,15 @@ const MUSIC = 'music';
 export type DraftSticker = StoryStickerInput & { key: string; label: string };
 type Kind = StoryStickerInput['type'];
 
-const KINDS: { type: Kind; label: string; icon: IconName }[] = [
-  { type: 'mention', label: 'Mention', icon: 'user' },
-  { type: 'hashtag', label: 'Hashtag', icon: 'compass' },
-  { type: 'poll', label: 'Poll', icon: 'poll' },
-  { type: 'question', label: 'Question', icon: 'message' },
-  { type: 'slider', label: 'Slider', icon: 'heart' },
-  { type: 'countdown', label: 'Countdown', icon: 'calendar' },
-  { type: 'link', label: 'Link', icon: 'link' },
-  { type: 'place', label: 'Place', icon: 'map-pin' },
+const KINDS: { type: Kind; label: MessageKey; icon: IconName }[] = [
+  { type: 'mention', label: 'm.sticker.kind.mention', icon: 'user' },
+  { type: 'hashtag', label: 'm.sticker.kind.hashtag', icon: 'compass' },
+  { type: 'poll', label: 'm.sticker.kind.poll', icon: 'poll' },
+  { type: 'question', label: 'm.sticker.kind.question', icon: 'message' },
+  { type: 'slider', label: 'm.sticker.kind.slider', icon: 'heart' },
+  { type: 'countdown', label: 'm.sticker.kind.countdown', icon: 'calendar' },
+  { type: 'link', label: 'm.sticker.kind.link', icon: 'link' },
+  { type: 'place', label: 'm.sticker.kind.place', icon: 'map-pin' },
 ];
 
 const clamp = (n: number) => Math.min(0.95, Math.max(0.05, n));
@@ -47,6 +48,7 @@ export function StoryStickerEditor({
   music?: { title: string; artist: string; style: 'compact' | 'card'; x: number; y: number } | null;
   onMoveMusic?: (x: number, y: number) => void;
 }) {
+  const { t } = useSession();
   const frame = useRef<HTMLDivElement>(null);
   const [adding, setAdding] = useState<Kind | null>(null);
   const drag = useRef<{ key: string; pointer: number } | null>(null);
@@ -80,7 +82,7 @@ export function StoryStickerEditor({
   return (
     <section className="stack-sm" aria-labelledby="stickers-heading">
       <h2 id="stickers-heading" className="yp-field__label" style={{ margin: 0 }}>
-        Stickers
+        {t('m.sticker.title')}
       </h2>
       <div className="sticker-editor">
         <div
@@ -105,7 +107,7 @@ export function StoryStickerEditor({
               type="button"
               className="sticker-editor__sticker"
               style={stickerStyle({ x: s.x, y: s.y })}
-              aria-label={`${s.label}. Drag or use the arrow keys to move it, Delete to remove it.`}
+              aria-label={t('stickers.dragLabel', { label: s.label })}
               onKeyDown={(e) => onKey(s, e)}
               onPointerDown={(e) => {
                 e.currentTarget.setPointerCapture(e.pointerId);
@@ -122,7 +124,7 @@ export function StoryStickerEditor({
               type="button"
               className={`sticker-editor__sticker sticker-editor__sticker--music${music.style === 'card' ? ' sticker-editor__sticker--card' : ''}`}
               style={stickerStyle({ x: music.x, y: music.y })}
-              aria-label={`Music: ${music.title}, by ${music.artist}. Drag or use the arrow keys to move it.`}
+              aria-label={t('stickers.musicLabel', { title: music.title, artist: music.artist })}
               onKeyDown={(e) => onKey({ key: MUSIC, x: music.x, y: music.y }, e)}
               onPointerDown={(e) => {
                 e.currentTarget.setPointerCapture(e.pointerId);
@@ -136,7 +138,7 @@ export function StoryStickerEditor({
           ) : null}
         </div>
         <div className="stack-sm">
-          <div className="sticker-editor__kinds" role="group" aria-label="Add a sticker">
+          <div className="sticker-editor__kinds" role="group" aria-label={t('stickers.addGroup')}>
             {KINDS.map((k) => (
               <Button
                 key={k.type}
@@ -147,7 +149,7 @@ export function StoryStickerEditor({
                 aria-pressed={adding === k.type}
                 onClick={() => setAdding(adding === k.type ? null : k.type)}
               >
-                {k.label}
+                {t(k.label)}
               </Button>
             ))}
           </div>
@@ -170,14 +172,14 @@ export function StoryStickerEditor({
                 <li key={s.key}>
                   <bdi>{s.label}</bdi>
                   <Button size="sm" variant="ghost" onClick={() => onChange(stickers.filter((x) => x.key !== s.key))}>
-                    Remove
+                    {t('m.common.remove')}
                   </Button>
                 </li>
               ))}
             </ul>
           ) : (
             <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-              Add a sticker, then drag it into place on the preview.
+              {t('m.sticker.hint')}
             </p>
           )}
         </div>
@@ -189,7 +191,8 @@ export function StoryStickerEditor({
 type NewSticker = StoryStickerInput & { label: string };
 
 function StickerForm({ kind, onAdd, onCancel }: { kind: Kind; onAdd: (s: NewSticker) => void; onCancel: () => void }) {
-  const [a, setA] = useState(kind === 'question' ? 'Ask me a question' : '');
+  const { t } = useSession();
+  const [a, setA] = useState(() => (kind === 'question' ? t('m.sticker.askMe') : ''));
   const [b, setB] = useState('');
   const [c, setC] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -215,38 +218,50 @@ function StickerForm({ kind, onAdd, onCancel }: { kind: Kind; onAdd: (s: NewStic
     switch (kind) {
       case 'mention': {
         const username = a.trim().replace(/^@/, '');
-        if (!/^[a-z0-9_.]{3,30}$/i.test(username)) return setError('Enter a username.');
+        if (!/^[a-z0-9_.]{3,30}$/i.test(username)) return setError(t('stickers.error.username'));
         return onAdd({ type: 'mention', ...base, username, label: `@${username}` });
       }
       case 'hashtag': {
         const tag = a.trim().replace(/^#/, '');
-        if (!/^[\p{L}\p{M}\p{N}_]{2,40}$/u.test(tag)) return setError('Tags are 2 to 40 letters, numbers or underscores.');
+        if (!/^[\p{L}\p{M}\p{N}_]{2,40}$/u.test(tag)) return setError(t('m.sticker.error.tag'));
         return onAdd({ type: 'hashtag', ...base, tag, label: `#${tag}` });
       }
       case 'poll':
-        if (!b.trim() || !c.trim()) return setError('Add both options.');
-        return onAdd({ type: 'poll', ...base, question: a.trim(), options: [b.trim(), c.trim()], label: `${a.trim() || 'Poll'}: ${b.trim()} or ${c.trim()}` });
+        if (!b.trim() || !c.trim()) return setError(t('stickers.error.options'));
+        return onAdd({
+          type: 'poll',
+          ...base,
+          question: a.trim(),
+          options: [b.trim(), c.trim()],
+          label: t('stickers.pollLabel', { question: a.trim() || t('m.sticker.kind.poll'), first: b.trim(), second: c.trim() }),
+        });
       case 'question':
-        if (!a.trim()) return setError('Write a prompt.');
+        if (!a.trim()) return setError(t('stickers.error.prompt'));
         return onAdd({ type: 'question', ...base, prompt: a.trim(), label: a.trim() });
       case 'slider':
-        if (!a.trim()) return setError('Write a prompt.');
-        if (!b.trim()) return setError('Add an emoji.');
+        if (!a.trim()) return setError(t('stickers.error.prompt'));
+        if (!b.trim()) return setError(t('stickers.error.emoji'));
         return onAdd({ type: 'slider', ...base, prompt: a.trim(), emoji: b.trim(), label: `${b.trim()} ${a.trim()}` });
       case 'countdown': {
         const ends = b ? new Date(b) : null;
-        if (!a.trim()) return setError('Give it a title.');
-        if (!ends || !(ends.getTime() > Date.now())) return setError('Choose a time in the future.');
-        return onAdd({ type: 'countdown', ...base, title: a.trim(), endsAt: ends.toISOString(), label: `${a.trim()}, ${timeLeft(ends.toISOString())}` });
+        if (!a.trim()) return setError(t('stickers.error.title'));
+        if (!ends || !(ends.getTime() > Date.now())) return setError(t('stickers.error.future'));
+        return onAdd({
+          type: 'countdown',
+          ...base,
+          title: a.trim(),
+          endsAt: ends.toISOString(),
+          label: `${a.trim()}, ${timeLeft(ends.toISOString(), Date.now(), t)}`,
+        });
       }
       case 'link': {
         const url = /^https?:\/\//i.test(a.trim()) ? a.trim() : `https://${a.trim()}`;
         const domain = linkDomain(url);
-        if (!domain || !domain.includes('.')) return setError('Enter a web address.');
+        if (!domain || !domain.includes('.')) return setError(t('stickers.error.url'));
         return onAdd({ type: 'link', ...base, url, label: b.trim() || domain });
       }
       case 'place':
-        return setError('Choose a place from the list.');
+        return setError(t('stickers.error.place'));
     }
   };
 
@@ -262,47 +277,49 @@ function StickerForm({ kind, onAdd, onCancel }: { kind: Kind; onAdd: (s: NewStic
       }}
     >
       {kind === 'mention' ? (
-        <TextField label="Username" value={a} maxLength={31} placeholder="@username" onChange={(e) => setA(e.currentTarget.value)} />
+        <TextField label={t('m.sticker.username')} value={a} maxLength={31} placeholder="@username" onChange={(e) => setA(e.currentTarget.value)} />
       ) : null}
-      {kind === 'hashtag' ? <TextField label="Hashtag" value={a} maxLength={41} placeholder="#tag" onChange={(e) => setA(e.currentTarget.value)} /> : null}
+      {kind === 'hashtag' ? (
+        <TextField label={t('m.sticker.kind.hashtag')} value={a} maxLength={41} placeholder="#tag" onChange={(e) => setA(e.currentTarget.value)} />
+      ) : null}
       {kind === 'poll' ? (
         <>
-          <TextField label="Question (optional)" value={a} maxLength={80} onChange={(e) => setA(e.currentTarget.value)} />
-          <TextField label="Option 1" value={b} maxLength={30} onChange={(e) => setB(e.currentTarget.value)} />
-          <TextField label="Option 2" value={c} maxLength={30} onChange={(e) => setC(e.currentTarget.value)} />
+          <TextField label={t('m.sticker.pollQuestion')} value={a} maxLength={80} onChange={(e) => setA(e.currentTarget.value)} />
+          <TextField label={t('m.sticker.option', { number: 1 })} value={b} maxLength={30} onChange={(e) => setB(e.currentTarget.value)} />
+          <TextField label={t('m.sticker.option', { number: 2 })} value={c} maxLength={30} onChange={(e) => setC(e.currentTarget.value)} />
         </>
       ) : null}
-      {kind === 'question' ? <TextField label="Prompt" value={a} maxLength={80} onChange={(e) => setA(e.currentTarget.value)} /> : null}
+      {kind === 'question' ? <TextField label={t('m.sticker.prompt')} value={a} maxLength={80} onChange={(e) => setA(e.currentTarget.value)} /> : null}
       {kind === 'slider' ? (
         <>
-          <TextField label="Prompt" value={a} maxLength={80} onChange={(e) => setA(e.currentTarget.value)} />
-          <TextField label="Emoji" hint="One emoji for the slider handle." value={b} maxLength={8} onChange={(e) => setB(e.currentTarget.value)} />
+          <TextField label={t('m.sticker.prompt')} value={a} maxLength={80} onChange={(e) => setA(e.currentTarget.value)} />
+          <TextField label={t('m.sticker.emoji')} hint={t('stickers.emojiHint')} value={b} maxLength={8} onChange={(e) => setB(e.currentTarget.value)} />
         </>
       ) : null}
       {kind === 'countdown' ? (
         <>
-          <TextField label="Title" value={a} maxLength={60} onChange={(e) => setA(e.currentTarget.value)} />
-          <TextField label="Ends" type="datetime-local" value={b} onChange={(e) => setB(e.currentTarget.value)} />
+          <TextField label={t('m.sticker.countdownTitle')} value={a} maxLength={60} onChange={(e) => setA(e.currentTarget.value)} />
+          <TextField label={t('stickers.ends')} type="datetime-local" value={b} onChange={(e) => setB(e.currentTarget.value)} />
         </>
       ) : null}
       {kind === 'link' ? (
         <>
           <TextField
-            label="Web address"
-            hint="Link stickers are available once your account is 7 days old."
+            label={t('m.sticker.url')}
+            hint={t('m.sticker.linkHint')}
             value={a}
             inputMode="url"
             maxLength={2000}
             onChange={(e) => setA(e.currentTarget.value)}
           />
-          <TextField label="Label (optional)" value={b} maxLength={40} onChange={(e) => setB(e.currentTarget.value)} />
+          <TextField label={t('m.sticker.label')} value={b} maxLength={40} onChange={(e) => setB(e.currentTarget.value)} />
         </>
       ) : null}
       {kind === 'place' ? (
         <>
-          <TextField label="Find a place" value={a} maxLength={100} onChange={(e) => setA(e.currentTarget.value)} />
+          <TextField label={t('m.sticker.findPlace')} value={a} maxLength={100} onChange={(e) => setA(e.currentTarget.value)} />
           {places.length ? (
-            <ul className="sticker-editor__list" aria-label="Places">
+            <ul className="sticker-editor__list" aria-label={t('discover.places')}>
               {places.map((p) => (
                 <li key={p.id}>
                   <span>
@@ -310,14 +327,14 @@ function StickerForm({ kind, onAdd, onCancel }: { kind: Kind; onAdd: (s: NewStic
                     {p.city ? <span className="muted"> · {p.city}</span> : null}
                   </span>
                   <Button size="sm" variant="secondary" onClick={() => onAdd({ type: 'place', x: 0.5, y: 0.5, placeId: p.id, label: p.name })}>
-                    Add
+                    {t('m.closeFriends.add')}
                   </Button>
                 </li>
               ))}
             </ul>
           ) : a.trim().length >= 2 ? (
             <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-              No places found with that name.
+              {t('m.sticker.noPlaces')}
             </p>
           ) : null}
         </>
@@ -330,11 +347,11 @@ function StickerForm({ kind, onAdd, onCancel }: { kind: Kind; onAdd: (s: NewStic
       <div className="row">
         {kind !== 'place' ? (
           <Button size="sm" onClick={submit}>
-            Add sticker
+            {t('m.sticker.add')}
           </Button>
         ) : null}
         <Button size="sm" variant="ghost" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
       </div>
     </div>

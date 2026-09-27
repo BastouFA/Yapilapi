@@ -18,6 +18,8 @@ import {
   type RoomParticipant,
   type RoomReaction,
   type RoomSignalData,
+  type MessageKey,
+  type PluralKey,
   type RoomSummary,
 } from '@yapilapi/shared';
 import type { RoomEnvelope } from '@yapilapi/api-client';
@@ -26,7 +28,19 @@ import { localInput } from '@/lib/schedule';
 import { useRealtime, useSession } from '@/app/providers';
 
 /** Labels for the reaction icons (screen readers and tooltips). */
-export const REACTION_LABEL: Record<RoomReaction, string> = { heart: 'Love', star: 'Star', sparkle: 'Spark', check: 'Agree', music: 'Music' };
+export const REACTION_LABEL: Record<RoomReaction, MessageKey> = {
+  heart: 'm.rooms.react.heart',
+  star: 'm.rooms.react.star',
+  sparkle: 'm.rooms.react.sparkle',
+  check: 'm.rooms.react.check',
+  music: 'm.rooms.react.music',
+};
+
+type T = (key: MessageKey, vars?: Record<string, string | number>) => string;
+type TP = (key: PluralKey, count: number, vars?: Record<string, string | number>) => string;
+
+/** "Ama, Kofi and Lea" in the reader's language. */
+const nameList = (names: string[], locale: string) => new Intl.ListFormat(locale, { type: 'conjunction' }).format(names);
 
 interface Floating {
   id: number;
@@ -78,7 +92,7 @@ export const everyone = (r: RoomDetail) => [...r.speakers, ...r.listeners];
  * own connections from that state.
  */
 export function RoomsProvider({ children }: { children: React.ReactNode }) {
-  const { me, toast } = useSession();
+  const { me, toast, t } = useSession();
   const [room, setRoomState] = useState<RoomDetail | null>(null);
   const [canHost, setCanHost] = useState(false);
   const [streams, setStreams] = useState<Record<string, MediaStream>>({});
@@ -175,7 +189,7 @@ export function RoomsProvider({ children }: { children: React.ReactNode }) {
         local.current = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
         setLocalStream(local.current);
       } catch {
-        toast('Allow microphone access to speak. For now you are back with the listeners.');
+        toast(t('m.rooms.micBlocked'));
         await api.rooms.toListener(r.id, meId).catch(() => {});
         return;
       }
@@ -289,7 +303,7 @@ export function RoomsProvider({ children }: { children: React.ReactNode }) {
       const next = e.data as RoomDetail;
       if (next.status !== 'live') {
         teardown();
-        toast('The room has ended.');
+        toast(t('m.rooms.endedNotice'));
         return;
       }
       setRoom(next);
@@ -303,10 +317,10 @@ export function RoomsProvider({ children }: { children: React.ReactNode }) {
       setReactions((list) => [...list.slice(-11), { id, kind: e.data.kind }]);
       setTimeout(() => setReactions((list) => list.filter((x) => x.id !== id)), 2600);
     }
-    if (e.type === 'room.invited') toast('A host invited you to speak.');
+    if (e.type === 'room.invited') toast(t('m.rooms.invited'));
     if (e.type === 'room.removed') {
       teardown();
-      toast('A host removed you from this room.');
+      toast(t('m.rooms.removed'));
     }
   });
 
@@ -410,18 +424,27 @@ function RoomAudio({ stream }: { stream: MediaStream }) {
 /** Keeps the room you're in within reach while you browse. */
 function RoomMiniBar() {
   const { room, speaking, act, leave } = useRooms();
-  const { me } = useSession();
+  const { me, t, tp, locale } = useSession();
   const path = usePathname();
   if (!room || !me || path === `/rooms/${room.id}`) return null;
   const mine = everyone(room).find((p) => p.user.id === me.id);
   const talking = room.speakers.filter((p) => speaking.has(p.user.id));
   return (
-    <aside className="room-mini" aria-label="Audio room">
+    <aside className="room-mini" aria-label={t('rooms.audioRoom')}>
       <Link href={`/rooms/${room.id}`} className="room-mini__main">
         <span className={`room-mini__live${talking.length ? ' is-speaking' : ''}`} aria-hidden />
         <span className="room-mini__text">
           <strong>{room.title}</strong>
-          <span className="muted">{talking.length ? `${talking.map((p) => p.user.displayName).join(', ')} speaking` : `${room.listenerCount} listening`}</span>
+          <span className="muted">
+            {talking.length
+              ? t('rooms.speakingNames', {
+                  names: nameList(
+                    talking.map((p) => p.user.displayName),
+                    locale,
+                  ),
+                })
+              : tp('m.rooms.listening', room.listenerCount)}
+          </span>
         </span>
       </Link>
       {mine?.role === 'speaker' ? (
@@ -429,39 +452,39 @@ function RoomMiniBar() {
           size="sm"
           variant="secondary"
           icon={mine.muted ? 'mic-off' : 'mic'}
-          aria-label={mine.muted ? 'Unmute' : 'Mute'}
+          aria-label={mine.muted ? t('m.calls.unmute') : t('m.calls.mute')}
           onClick={() => void act((id) => api.rooms.mute(id, !mine.muted))}
         />
       ) : null}
       <Button size="sm" variant="ghost" onClick={() => void leave()}>
-        Leave
+        {t('communities.leave')}
       </Button>
     </aside>
   );
 }
 
 // ── Formatting ──────────────────────────────────────────────────────────
-export function roomDuration(seconds: number | null): string {
+export function roomDuration(seconds: number | null, t: T): string {
   if (seconds === null) return '';
-  if (seconds < 60) return 'under a minute';
+  if (seconds < 60) return t('m.rooms.underMinute');
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
-  return h ? `${h} h ${m} min` : `${m} min`;
+  return h ? t('m.rooms.hours', { hours: h, minutes: m }) : t('m.rooms.minutes', { count: m });
 }
 
 function when(iso: string, locale: string) {
   return new Date(iso).toLocaleString(locale, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 }
 
-function endedLine(r: RoomSummary) {
-  if (r.status === 'cancelled') return 'Cancelled';
-  return `Ended · ${roomDuration(r.durationSeconds)} · ${r.peakListeners === 1 ? '1 person' : `${r.peakListeners} people`} at most`;
+function endedLine(r: RoomSummary, t: T, tp: TP) {
+  if (r.status === 'cancelled') return t('m.rooms.cancelled');
+  return tp('rooms.endedLine', r.peakListeners, { duration: roomDuration(r.durationSeconds, t) });
 }
 
 // ── The room screen ─────────────────────────────────────────────────────
 export function RoomView({ id }: { id: string }) {
   const rooms = useRooms();
-  const { me, locale } = useSession();
+  const { me, locale, t, tp } = useSession();
   const router = useRouter();
   const [env, setEnv] = useState<RoomEnvelope | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -483,7 +506,7 @@ export function RoomView({ id }: { id: string }) {
     if (e.type === 'room.removed' && e.data?.roomId === id) setEnv((v) => (v ? { ...v, removed: true } : v));
   });
 
-  if (error && !env) return <EmptyState title="This room isn't open to you" body={error} />;
+  if (error && !env) return <EmptyState title={t('rooms.notOpen')} body={error} />;
   if (!env || !me) return <Skeleton height={240} />;
 
   const joined = rooms.room?.id === id;
@@ -502,16 +525,16 @@ export function RoomView({ id }: { id: string }) {
           {room.title}
         </h1>
         {room.status === 'live' ? (
-          <Badge tone="danger">Live</Badge>
+          <Badge tone="danger">{t('m.rooms.live')}</Badge>
         ) : room.status === 'scheduled' ? (
-          <Badge tone="warning">Scheduled</Badge>
+          <Badge tone="warning">{t('m.rooms.scheduled')}</Badge>
         ) : (
-          <Badge tone="neutral">{room.status === 'cancelled' ? 'Cancelled' : 'Ended'}</Badge>
+          <Badge tone="neutral">{room.status === 'cancelled' ? t('m.rooms.cancelled') : t('m.rooms.ended')}</Badge>
         )}
       </div>
       <span className="muted">
-        {room.status === 'scheduled' ? 'Hosted by' : 'Started by'} {room.createdBy.displayName}
-        {room.status === 'live' ? ` · ${room.listenerCount} listening` : ''}
+        {room.status === 'scheduled' ? t('rooms.hostedBy', { name: room.createdBy.displayName }) : t('m.rooms.startedBy', { name: room.createdBy.displayName })}
+        {room.status === 'live' ? ` · ${tp('m.rooms.listening', room.listenerCount)}` : ''}
       </span>
     </div>
   );
@@ -522,8 +545,8 @@ export function RoomView({ id }: { id: string }) {
         {header}
         <div className="room-ended">
           <Icon name="volume-off" size={28} />
-          <p>{endedLine(room)}</p>
-          <p className="muted">Rooms are not recorded.</p>
+          <p>{endedLine(room, t, tp)}</p>
+          <p className="muted">{t('m.rooms.notRecorded')}</p>
         </div>
       </div>
     );
@@ -549,9 +572,9 @@ export function RoomView({ id }: { id: string }) {
     return (
       <div className="yp-shell__inner">
         {header}
-        {env.removed ? <Alert tone="warning">A host removed you from this room.</Alert> : null}
+        {env.removed ? <Alert tone="warning">{t('m.rooms.removed')}</Alert> : null}
         {room.speakers.length ? (
-          <div className="room-stage" aria-label="Speakers">
+          <div className="room-stage" aria-label={t('m.rooms.speakers')}>
             {room.speakers.map((p) => (
               <SpeakerTile key={p.user.id} p={p} speaking={false} />
             ))}
@@ -559,13 +582,13 @@ export function RoomView({ id }: { id: string }) {
         ) : null}
         {!env.removed ? (
           full ? (
-            <Alert tone="info" title="Room is full">
-              Rooms hold {room.limits.speakers} speakers and {room.limits.listeners} listeners for now. Try again when someone leaves.
+            <Alert tone="info" title={t('m.rooms.full')}>
+              {t('m.rooms.fullBody', { speakers: room.limits.speakers, listeners: room.limits.listeners })}
             </Alert>
           ) : (
             <div className="row">
               <Button icon="volume" loading={rooms.joining === id} onClick={() => void rooms.join(id)}>
-                {everyone(room).some((p) => p.user.id === me.id) ? 'Rejoin' : 'Join as a listener'}
+                {everyone(room).some((p) => p.user.id === me.id) ? t('rooms.rejoin') : t('m.rooms.join')}
               </Button>
             </div>
           )
@@ -577,10 +600,10 @@ export function RoomView({ id }: { id: string }) {
     if (!canHost || p.host || p.user.id === me.id) return [];
     const list: MenuAction[] = [];
     if (p.role === 'speaker') {
-      if (!p.muted) list.push({ label: 'Mute', icon: 'mic-off', onSelect: () => void rooms.act((rid) => api.rooms.muteSpeaker(rid, p.user.id)) });
-      list.push({ label: 'Move to listeners', icon: 'users', onSelect: () => void rooms.act((rid) => api.rooms.toListener(rid, p.user.id)) });
-    } else if (!p.invited) list.push({ label: 'Invite to speak', icon: 'mic', onSelect: () => void rooms.act((rid) => api.rooms.invite(rid, p.user.id)) });
-    list.push({ label: 'Remove from room', icon: 'x-circle', danger: true, onSelect: () => void rooms.act((rid) => api.rooms.remove(rid, p.user.id)) });
+      if (!p.muted) list.push({ label: t('m.calls.mute'), icon: 'mic-off', onSelect: () => void rooms.act((rid) => api.rooms.muteSpeaker(rid, p.user.id)) });
+      list.push({ label: t('m.rooms.toListeners'), icon: 'users', onSelect: () => void rooms.act((rid) => api.rooms.toListener(rid, p.user.id)) });
+    } else if (!p.invited) list.push({ label: t('m.rooms.invite'), icon: 'mic', onSelect: () => void rooms.act((rid) => api.rooms.invite(rid, p.user.id)) });
+    list.push({ label: t('m.rooms.remove'), icon: 'x-circle', danger: true, onSelect: () => void rooms.act((rid) => api.rooms.remove(rid, p.user.id)) });
     return list;
   };
 
@@ -589,13 +612,13 @@ export function RoomView({ id }: { id: string }) {
     <div className="yp-shell__inner room">
       {header}
       {mine?.invited ? (
-        <Alert tone="info" title="A host invited you to speak">
+        <Alert tone="info" title={t('m.rooms.invited')}>
           <div className="row" style={{ marginTop: 'var(--space-2)' }}>
             <Button size="sm" icon="mic" onClick={() => void rooms.act((rid) => api.rooms.speak(rid, true))}>
-              Join the speakers
+              {t('m.rooms.accept')}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => void rooms.act((rid) => api.rooms.speak(rid, false))}>
-              Not now
+              {t('m.common.notNow')}
             </Button>
           </div>
         </Alert>
@@ -603,9 +626,9 @@ export function RoomView({ id }: { id: string }) {
 
       <section aria-labelledby="room-speakers">
         <h2 id="room-speakers" className="room__heading">
-          Speakers <span className="muted">{`${room.speakerCount} of ${room.limits.speakers}`}</span>
+          {t('m.rooms.speakers')} <span className="muted">{t('rooms.seats', { count: room.speakerCount, max: room.limits.speakers })}</span>
         </h2>
-        {!room.speakers.length ? <p className="muted">Nobody is on stage right now.</p> : null}
+        {!room.speakers.length ? <p className="muted">{t('rooms.nobodyOnStage')}</p> : null}
         <div className="room-stage">
           {room.speakers.map((p) => (
             <SpeakerTile key={p.user.id} p={p} speaking={rooms.speaking.has(p.user.id) && !p.muted} actions={hostActions(p)} you={p.user.id === me.id} />
@@ -623,9 +646,9 @@ export function RoomView({ id }: { id: string }) {
 
       <section aria-labelledby="room-listeners">
         <h2 id="room-listeners" className="room__heading">
-          Listeners <span className="muted">{room.listeners.length}</span>
+          {t('m.rooms.listeners')} <span className="muted">{room.listeners.length}</span>
         </h2>
-        {canHost && hands.length ? <p className="muted">{hands.length === 1 ? '1 hand raised' : `${hands.length} hands raised`}</p> : null}
+        {canHost && hands.length ? <p className="muted">{tp('rooms.handsRaised', hands.length)}</p> : null}
         {room.listeners.length ? (
           <ul className="room-listeners">
             {room.listeners.map((p) => {
@@ -633,24 +656,21 @@ export function RoomView({ id }: { id: string }) {
               return (
                 <li key={p.user.id}>
                   <Avatar name={p.user.displayName} src={p.user.avatarUrl} size="sm" />
-                  <span className="room-listeners__name">
-                    {p.user.displayName}
-                    {p.user.id === me.id ? ' (you)' : ''}
-                  </span>
-                  {p.host ? <Badge tone="neutral">Host</Badge> : null}
-                  {p.handRaised ? <Icon name="hand" size={18} label="Hand raised" /> : null}
-                  {p.invited ? <span className="muted">Invited</span> : null}
-                  {actions.length ? <Menu label={`Manage ${p.user.displayName}`} actions={actions} /> : null}
+                  <span className="room-listeners__name">{p.user.id === me.id ? t('m.rooms.you', { name: p.user.displayName }) : p.user.displayName}</span>
+                  {p.host ? <Badge tone="neutral">{t('m.rooms.host')}</Badge> : null}
+                  {p.handRaised ? <Icon name="hand" size={18} label={t('m.rooms.handRaised')} /> : null}
+                  {p.invited ? <span className="muted">{t('m.rooms.invitedLabel')}</span> : null}
+                  {actions.length ? <Menu label={t('m.rooms.manage', { name: p.user.displayName })} actions={actions} /> : null}
                 </li>
               );
             })}
           </ul>
         ) : (
-          <p className="muted">Nobody is only listening right now.</p>
+          <p className="muted">{t('m.rooms.nobodyListening')}</p>
         )}
       </section>
 
-      <div className="room-controls" role="toolbar" aria-label="Room controls">
+      <div className="room-controls" role="toolbar" aria-label={t('rooms.controls')}>
         {mine?.role === 'speaker' ? (
           <>
             <Button
@@ -658,15 +678,15 @@ export function RoomView({ id }: { id: string }) {
               icon={mine.muted ? 'mic-off' : 'mic'}
               onClick={() => void rooms.act((rid) => api.rooms.mute(rid, !mine.muted))}
             >
-              {mine.muted ? 'Unmute' : 'Mute'}
+              {mine.muted ? t('m.calls.unmute') : t('m.calls.mute')}
             </Button>
             <Button variant="ghost" onClick={() => void rooms.act((rid) => api.rooms.toListener(rid, me.id))}>
-              Move to listeners
+              {t('m.rooms.toListeners')}
             </Button>
           </>
         ) : canHost ? (
           <Button icon="mic" variant="secondary" onClick={() => void rooms.act((rid) => api.rooms.speak(rid, true))}>
-            Speak
+            {t('m.rooms.speak')}
           </Button>
         ) : (
           <Button
@@ -675,17 +695,17 @@ export function RoomView({ id }: { id: string }) {
             aria-pressed={!!mine?.handRaised}
             onClick={() => void rooms.act((rid) => api.rooms.hand(rid, !mine?.handRaised))}
           >
-            {mine?.handRaised ? 'Lower hand' : 'Raise hand'}
+            {mine?.handRaised ? t('m.rooms.lowerHand') : t('m.rooms.raiseHand')}
           </Button>
         )}
-        <span className="room-controls__reactions" role="group" aria-label="Reactions">
+        <span className="room-controls__reactions" role="group" aria-label={t('m.rooms.reactions')}>
           {ROOM_REACTIONS.map((k) => (
             <button
               key={k}
               type="button"
               className="room-react"
-              aria-label={REACTION_LABEL[k]}
-              title={REACTION_LABEL[k]}
+              aria-label={t(REACTION_LABEL[k])}
+              title={t(REACTION_LABEL[k])}
               onClick={() => void rooms.act((rid) => api.rooms.react(rid, k))}
             >
               <Icon name={k} size={20} />
@@ -700,11 +720,11 @@ export function RoomView({ id }: { id: string }) {
             router.push(`/c/${room.community.slug}`);
           }}
         >
-          Leave quietly
+          {t('m.rooms.leave')}
         </Button>
         {canHost ? (
           <Button variant="danger" onClick={() => setConfirmEnd(true)}>
-            End room
+            {t('m.rooms.end')}
           </Button>
         ) : null}
       </div>
@@ -712,11 +732,11 @@ export function RoomView({ id }: { id: string }) {
       <Dialog
         open={confirmEnd}
         onClose={() => setConfirmEnd(false)}
-        title="End this room for everyone?"
+        title={t('m.rooms.endConfirm')}
         footer={
           <>
             <Button variant="ghost" onClick={() => setConfirmEnd(false)}>
-              Keep it going
+              {t('m.rooms.keep')}
             </Button>
             <Button
               variant="danger"
@@ -725,34 +745,32 @@ export function RoomView({ id }: { id: string }) {
                 await rooms.act((rid) => api.rooms.end(rid));
               }}
             >
-              End room
+              {t('m.rooms.end')}
             </Button>
           </>
         }
       >
-        <p>Everyone leaves the room. Nothing was recorded.</p>
+        <p>{t('m.rooms.endBody')}</p>
       </Dialog>
     </div>
   );
 }
 
 function SpeakerTile({ p, speaking, actions = [], you }: { p: RoomParticipant; speaking: boolean; actions?: MenuAction[]; you?: boolean }) {
+  const { t } = useSession();
   return (
     <div className={`room-speaker${speaking ? ' is-speaking' : ''}`}>
       <span className="room-speaker__avatar">
         <Avatar name={p.user.displayName} src={p.user.avatarUrl} size="lg" />
         {p.muted ? (
           <span className="room-speaker__muted">
-            <Icon name="mic-off" size={14} label="Muted" />
+            <Icon name="mic-off" size={14} label={t('m.rooms.muted')} />
           </span>
         ) : null}
       </span>
-      <span className="room-speaker__name">
-        {p.user.displayName}
-        {you ? ' (you)' : ''}
-      </span>
-      <span className="muted room-speaker__meta">{speaking ? 'Speaking' : p.host ? 'Host' : 'Speaker'}</span>
-      {actions.length ? <Menu label={`Manage ${p.user.displayName}`} actions={actions} /> : null}
+      <span className="room-speaker__name">{you ? t('m.rooms.you', { name: p.user.displayName }) : p.user.displayName}</span>
+      <span className="muted room-speaker__meta">{speaking ? t('m.rooms.speaking') : p.host ? t('m.rooms.host') : t('m.rooms.speaker')}</span>
+      {actions.length ? <Menu label={t('m.rooms.manage', { name: p.user.displayName })} actions={actions} /> : null}
     </div>
   );
 }
@@ -770,12 +788,12 @@ function ScheduledRoom({
   onChange: (r: Partial<RoomSummary>) => void;
   onStarted: () => Promise<void>;
 }) {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const [busy, setBusy] = useState(false);
   return (
     <div className="stack-sm">
       <p>
-        <Icon name="calendar" size={18} /> {room.scheduledFor ? when(room.scheduledFor, locale) : 'Soon'}
+        <Icon name="calendar" size={18} /> {room.scheduledFor ? when(room.scheduledFor, locale) : t('rooms.soon')}
       </p>
       <div className="row">
         <Button
@@ -790,7 +808,7 @@ function ScheduledRoom({
             }
           }}
         >
-          {room.remindMe ? "We'll tell you when it starts" : 'Tell me when it starts'}
+          {room.remindMe ? t('m.rooms.reminding') : t('m.rooms.remind')}
         </Button>
         {canHost ? (
           <>
@@ -809,7 +827,7 @@ function ScheduledRoom({
                 }
               }}
             >
-              Start now
+              {t('m.rooms.startNow')}
             </Button>
             <Button
               variant="ghost"
@@ -821,7 +839,7 @@ function ScheduledRoom({
                 }
               }}
             >
-              Cancel room
+              {t('m.rooms.cancel')}
             </Button>
           </>
         ) : null}
@@ -832,7 +850,7 @@ function ScheduledRoom({
 
 // ── On the community page ───────────────────────────────────────────────
 export function CommunityRooms({ slug, isMember }: { slug: string; isMember: boolean }) {
-  const { locale, toast } = useSession();
+  const { locale, toast, t, tp } = useSession();
   const rooms = useRooms();
   const router = useRouter();
   const [data, setData] = useState<{ items: RoomSummary[]; canStart: boolean; locked?: boolean } | null>(null);
@@ -854,7 +872,7 @@ export function CommunityRooms({ slug, isMember }: { slug: string; isMember: boo
   }, [load]);
 
   if (!data) return <Skeleton height={120} />;
-  if (data.locked) return <Alert tone="info">Join this private community to see its rooms.</Alert>;
+  if (data.locked) return <Alert tone="info">{t('rooms.locked')}</Alert>;
   const live = data.items.filter((r) => r.status === 'live');
   const scheduled = data.items.filter((r) => r.status === 'scheduled');
   const ended = data.items.filter((r) => r.status === 'ended');
@@ -883,46 +901,44 @@ export function CommunityRooms({ slug, isMember }: { slug: string; isMember: boo
           }}
         >
           <TextField
-            label="Start a room"
-            placeholder="What will you talk about?"
+            label={t('m.rooms.new')}
+            placeholder={t('m.rooms.titleLabel')}
             value={title}
             maxLength={ROOM_TITLE_MAX}
             onChange={(e) => setTitle(e.target.value)}
           />
           <label className="row" style={{ gap: 'var(--space-2)' }}>
-            <input type="checkbox" checked={later} onChange={(e) => setLater(e.target.checked)} /> Schedule for later
+            <input type="checkbox" checked={later} onChange={(e) => setLater(e.target.checked)} /> {t('rooms.scheduleLater')}
           </label>
           {later ? (
             <TextField
-              label="Starts at"
+              label={t('rooms.startsAt')}
               type="datetime-local"
               value={at}
               min={localInput(new Date())}
               onChange={(e) => setAt(e.target.value)}
-              hint="In your time zone. Members can ask to be told when it starts."
+              hint={t('rooms.startsAtHint')}
             />
           ) : null}
           <div className="row">
             <Button type="submit" icon="mic" loading={busy} disabled={!title.trim() || (later && !at)}>
-              {later ? 'Schedule room' : 'Start room'}
+              {later ? t('rooms.schedule') : t('m.rooms.start')}
             </Button>
           </div>
-          <p className="muted">
-            Audio only, not recorded. Up to {ROOM_MAX_SPEAKERS} speakers and {ROOM_MAX_LISTENERS} listeners.
-          </p>
+          <p className="muted">{t('rooms.startNote', { speakers: ROOM_MAX_SPEAKERS, listeners: ROOM_MAX_LISTENERS })}</p>
         </form>
       ) : null}
 
-      {!data.items.length ? <p className="muted">No rooms yet. Moderators can start one here.</p> : null}
+      {!data.items.length ? <p className="muted">{t('rooms.empty')}</p> : null}
       {[...live, ...scheduled, ...ended].map((r) => (
         <article key={r.id} className="room-card">
           <div className="room-card__head">
             {r.status === 'live' ? (
-              <Badge tone="danger">Live</Badge>
+              <Badge tone="danger">{t('m.rooms.live')}</Badge>
             ) : r.status === 'scheduled' ? (
-              <Badge tone="warning">Scheduled</Badge>
+              <Badge tone="warning">{t('m.rooms.scheduled')}</Badge>
             ) : (
-              <Badge>Ended</Badge>
+              <Badge>{t('m.rooms.ended')}</Badge>
             )}
             <Link href={`/rooms/${r.id}`} className="room-card__title">
               {r.title}
@@ -930,10 +946,19 @@ export function CommunityRooms({ slug, isMember }: { slug: string; isMember: boo
           </div>
           <p className="muted room-card__meta">
             {r.status === 'live'
-              ? `${r.listenerCount} listening${r.speakerPreview.length ? ` · ${r.speakerPreview.map((u) => u.displayName).join(', ')} on stage` : ''}`
+              ? `${tp('m.rooms.listening', r.listenerCount)}${
+                  r.speakerPreview.length
+                    ? ` · ${t('rooms.onStage', {
+                        names: nameList(
+                          r.speakerPreview.map((u) => u.displayName),
+                          locale,
+                        ),
+                      })}`
+                    : ''
+                }`
               : r.status === 'scheduled'
-                ? `${r.scheduledFor ? when(r.scheduledFor, locale) : ''} · with ${r.createdBy.displayName}`
-                : endedLine(r)}
+                ? `${r.scheduledFor ? `${when(r.scheduledFor, locale)} · ` : ''}${t('rooms.withHost', { name: r.createdBy.displayName })}`
+                : endedLine(r, t, tp)}
           </p>
           {r.status === 'live' && isMember ? (
             <div className="row">
@@ -946,7 +971,7 @@ export function CommunityRooms({ slug, isMember }: { slug: string; isMember: boo
                   if (await rooms.join(r.id)) router.push(`/rooms/${r.id}`);
                 }}
               >
-                {rooms.room?.id === r.id ? 'Open' : r.listenerCount - r.speakerCount >= r.limits.listeners ? 'Room is full' : 'Join'}
+                {rooms.room?.id === r.id ? t('rooms.open') : r.listenerCount - r.speakerCount >= r.limits.listeners ? t('m.rooms.full') : t('communities.join')}
               </Button>
             </div>
           ) : r.status === 'scheduled' && isMember ? (
@@ -965,7 +990,7 @@ export function CommunityRooms({ slug, isMember }: { slug: string; isMember: boo
                   }
                 }}
               >
-                {r.remindMe ? "We'll tell you" : 'Tell me when it starts'}
+                {r.remindMe ? t('rooms.remindingShort') : t('m.rooms.remind')}
               </Button>
             </div>
           ) : null}
