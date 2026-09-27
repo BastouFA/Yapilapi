@@ -153,7 +153,7 @@ The "before" run used the development server; the "after" run a production build
 | `MediaViewer` | Escape and arrows; no trap, no focus return | `useModalFocus` (arrows unchanged) |
 | `Menu` | Escape closed it but focus stayed nowhere; no arrow keys; Tab left it open; Escape inside a sheet also closed the sheet | Full menu-button pattern: arrows/Home/End, ArrowUp/Down open, Escape returns focus to the button without closing an enclosing sheet, Tab closes; choosing an item returns focus to the button so a sheet it opens can hand focus back |
 | `Tabs` | Left/Right only | Also Home/End |
-| `NavBar` | Unread badge read as a bare number ("Inbox 3") | "Inbox, 3 unread" (badge hidden from screen readers, text visually hidden) |
+| `NavBar` | Unread badge read as a bare number ("Yap 3") | "Yap, 3 unread" (badge hidden from screen readers, text visually hidden) |
 | Menu items, moments | Focus shown only as a faint background change / browser default | Focus ring (`--focus-ring`) |
 | Post composer, message composer | Textarea outline removed with no replacement | The surrounding box shows the focus ring while the textarea has focus |
 | Call and Mini App overlays (`role="dialog"` in the web app) | No focus handling | `useModalFocus` (the call overlay deliberately has no Escape: it must not hang up by accident) |

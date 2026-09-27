@@ -228,7 +228,7 @@ function Create() {
     setQueued((n) => (queue.length ? n : 0) + editable.length);
   }
 
-  // Files picked straight from "+" (in the navigation or the story strip) arrive here, possibly for another kind.
+  // Files picked straight from Spark or the story strip's "+" arrive here, possibly for another kind.
   const [incoming, setIncoming] = useState<{ files: File[]; mode: 'post' | 'reel' | 'story' } | null>(null);
   useEffect(() => {
     const take = () => {

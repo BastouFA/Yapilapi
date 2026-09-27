@@ -53,7 +53,7 @@ describe('t and tp', () => {
   it('interpolates and falls back to English', () => {
     expect(t('post.locked.body', 'fr', { name: 'Ada' })).toContain('Ada');
     expect(t('nav.home', 'fr-CA')).toBe(CATALOGS.fr!['nav.home']);
-    expect(t('nav.home', 'xx')).toBe('Home');
+    expect(t('nav.home', 'xx')).toBe('Pulse');
   });
 
   it('picks the plural form for the count', () => {

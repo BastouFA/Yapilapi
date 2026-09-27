@@ -43,7 +43,7 @@ export default function Settings() {
         value={tab}
         onChange={setTab}
         tabs={[
-          { id: 'profile', label: t('nav.profile') },
+          { id: 'profile', label: t('settings.tab.profile') },
           { id: 'attention', label: t('settings.tab.attention') },
           { id: 'privacy', label: t('settings.tab.privacy') },
           { id: 'security', label: t('settings.tab.security') },

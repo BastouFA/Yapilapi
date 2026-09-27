@@ -23,7 +23,7 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60))
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
- * The camera that "+" opens. Choose Post, Reel or Story at the bottom, then:
+ * The camera that Spark (the navigation's centre button) opens. Choose Post, Reel or Story at the bottom, then:
  * - Post and Story: tap the shutter for a photo, hold it to record a video.
  * - Reel: tap to start recording, tap again to stop (up to the reel limit).
  * - Both sides (Post and Story, on devices with two cameras): a back camera photo, then the

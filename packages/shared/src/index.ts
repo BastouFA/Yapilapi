@@ -13,3 +13,4 @@ export * from './rooms.ts';
 export * from './date-picker.ts';
 export * from './translation.ts';
 export * from './language-detect.ts';
+export * from './nav-glyphs.ts';

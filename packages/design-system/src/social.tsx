@@ -1,4 +1,15 @@
-import { Fragment, useCallback, useEffect, useId, useRef, useState, type ComponentType, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ComponentType,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from 'react';
 import {
   extractHashtags,
   formatBytes,
@@ -9,6 +20,7 @@ import {
   formatRelativeTime,
   isRtl,
   safeTimeZone,
+  smallAvatarUrl,
   splitRichText,
   t,
   type CaptionTrackRef,
@@ -68,7 +80,14 @@ function fill(text: string, name: string, render: (at: string) => ReactNode): Re
 }
 
 /** A link component (e.g. next/link). Defaults to a plain anchor. */
-export type LinkLike = ComponentType<{ href: string; className?: string; children?: ReactNode; 'aria-current'?: 'page' | undefined; 'aria-label'?: string }>;
+export type LinkLike = ComponentType<{
+  href: string;
+  className?: string;
+  children?: ReactNode;
+  'aria-current'?: 'page' | undefined;
+  'aria-label'?: string;
+  'aria-describedby'?: string;
+}>;
 const A: LinkLike = ({ href, children, ...rest }) => (
   <a href={href} {...rest}>
     {children}
@@ -77,13 +96,36 @@ const A: LinkLike = ({ href, children, ...rest }) => (
 
 // ── Navigation ──────────────────────────────────────────────────────────
 export interface NavEntry {
+  /** Pulse, Wander, Spark, Yap and You; the ids (and URLs) keep their original names. */
   id: 'home' | 'discover' | 'create' | 'inbox' | 'profile';
   href: string;
   badge?: number;
+  /** "You" shows the signed-in person's own avatar (their initials when there is no photo). */
+  avatar?: { name: string; src?: string | null };
 }
-const NAV_ICON: Record<NavEntry['id'], IconName> = { home: 'home', discover: 'compass', create: 'create', inbox: 'inbox', profile: 'user' };
+const NAV_GLYPH: Record<Exclude<NavEntry['id'], 'profile'>, IconName> = { home: 'pulse', discover: 'wander', create: 'spark', inbox: 'yap' };
 
-/** Primary navigation: Home | Discover | Create | Inbox | Profile. Bottom bar on phones, side rail on desktop. */
+/** The person's avatar in a soft squircle; a thin brand-gradient ring when "You" is the current page. */
+function NavAvatar({ name, src }: { name: string; src?: string | null }) {
+  const small = smallAvatarUrl(src);
+  const [failed, setFailed] = useState<string | null>(null);
+  const parts = name.trim().split(/\s+/);
+  const initials = ((parts[0]?.[0] ?? '') + (parts.length > 1 ? (parts.at(-1)?.[0] ?? '') : '')).toUpperCase() || '?';
+  // Initials come from CSS (data-initials) so they stay out of the link's text: its name is "You".
+  return (
+    <span className="yp-nav__you" data-initials={src ? undefined : initials}>
+      {src ? <img src={small && failed !== small ? small : src} alt="" onError={small && small !== src ? () => setFailed(small) : undefined} /> : null}
+    </span>
+  );
+}
+
+/**
+ * Primary navigation: Pulse | Wander | Spark | Yap | You (ids home, discover, create, inbox, profile).
+ * Phones: a floating dock. Icons only, except the current page, whose label sits with its icon
+ * in a squircle highlight that slides between tabs; other labels show on hover and keyboard focus
+ * and are always in the links' accessible names. Spark is a raised, slightly tilted brand-gradient
+ * squircle that straightens when pressed. Wide screens: a side rail with every label visible.
+ */
 export function NavBar({
   items,
   current,
@@ -102,6 +144,15 @@ export function NavBar({
   /** Adds a Search button under the logo on wide screens (phones get one in the page header). */
   searchHref?: string;
 }) {
+  const hints = useId();
+  // Where the highlight sits: the current tab, unless that is Spark (which has its own look).
+  const at = items.findIndex((it) => it.id === current && it.id !== 'create');
+  const sparkAt = items.findIndex((it) => it.id === 'create');
+  const place = {
+    '--yp-nav-n': items.length,
+    '--yp-nav-i': Math.max(at, 0),
+    '--yp-nav-past-spark': sparkAt >= 0 && at > sparkAt ? 1 : 0,
+  } as CSSProperties;
   return (
     <nav className="yp-nav" aria-label={t('ds.nav.primary', locale)}>
       <L href={brandHref} className="yp-nav__brand" aria-label={t('ds.nav.home', locale)}>
@@ -114,29 +165,46 @@ export function NavBar({
           {t('m.discover.search', locale)}
         </L>
       ) : null}
+      <div className={cx('yp-nav__list', at >= 0 && 'yp-nav__list--placed')} style={place}>
+        <span className="yp-nav__glow" aria-hidden />
+        {items.map((it) => {
+          const on = it.id === current;
+          return (
+            <L
+              key={it.id}
+              href={it.href}
+              className={cx('yp-nav__item', `yp-nav__item--${it.id}`)}
+              aria-current={on ? 'page' : undefined}
+              aria-describedby={`${hints}-${it.id}`}
+            >
+              <span className="yp-nav__icon">
+                {it.id === 'profile' ? (
+                  <NavAvatar name={it.avatar?.name ?? ''} src={it.avatar?.src} />
+                ) : (
+                  <Icon name={NAV_GLYPH[it.id]} size={24} filled={on || it.id === 'create'} />
+                )}
+              </span>
+              <span className="yp-nav__label">{t(`nav.${it.id}` as MessageKey, locale)}</span>
+              {it.badge ? (
+                <>
+                  <span className="yp-nav__badge" aria-hidden>
+                    {it.badge > 99 ? '99+' : new Intl.NumberFormat(locale).format(it.badge)}
+                  </span>
+                  <span className="yp-visually-hidden">
+                    {t('m.collab.joinSep', locale)}
+                    {t('m.inbox.unread', locale, { count: new Intl.NumberFormat(locale).format(it.badge) })}
+                  </span>
+                </>
+              ) : null}
+            </L>
+          );
+        })}
+      </div>
+      {/* What each place is for, read after its name ("Pulse, link, What your people are up to"). */}
       {items.map((it) => (
-        <L
-          key={it.id}
-          href={it.href}
-          className={cx('yp-nav__item', it.id === 'create' && 'yp-nav__item--create')}
-          aria-current={it.id === current ? 'page' : undefined}
-        >
-          <span className="yp-nav__icon">
-            <Icon name={NAV_ICON[it.id]} size={24} />
-          </span>
-          <span>{t(`nav.${it.id}` as MessageKey, locale)}</span>
-          {it.badge ? (
-            <>
-              <span className="yp-nav__badge" aria-hidden>
-                {it.badge > 99 ? '99+' : it.badge}
-              </span>
-              <span className="yp-visually-hidden">
-                {t('m.collab.joinSep', locale)}
-                {t('m.inbox.unread', locale, { count: new Intl.NumberFormat(locale).format(it.badge) })}
-              </span>
-            </>
-          ) : null}
-        </L>
+        <span key={it.id} id={`${hints}-${it.id}`} hidden>
+          {t(`nav.hint.${it.id}` as MessageKey, locale)}
+        </span>
       ))}
     </nav>
   );
