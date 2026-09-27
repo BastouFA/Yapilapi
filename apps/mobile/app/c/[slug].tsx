@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 import type { FaqEntry } from '../../../../packages/api-client/src/index';
 import { ROOM_TITLE_MAX } from '../../../../packages/shared/src/constants';
-import type { Community, Post, PublicUser, RoomSummary } from '../../../../packages/shared/src/types';
+import type { Community, EventItem, Post, PublicUser, RoomSummary } from '../../../../packages/shared/src/types';
 import { client, errorMessage } from '../../lib/api';
 import { DateField } from '../../lib/date-time';
 import { useT, type Translate } from '../../lib/i18n';
@@ -13,24 +13,25 @@ import { useSession } from '../../lib/session';
 import { space } from '../../lib/theme';
 import { Avatar, Button, Card, EmptyState, Field, Icon, Loading, Notice, Row, Segmented, Title, useColors, userText } from '../../lib/ui';
 
-type Tab = 'posts' | 'faq' | 'rooms' | 'members';
-type Item = { key: string; post?: Post; faq?: FaqEntry; room?: RoomSummary; member?: { user: PublicUser; role: string } };
+type Tab = 'posts' | 'faq' | 'rooms' | 'events' | 'members';
+type Item = { key: string; post?: Post; faq?: FaqEntry; room?: RoomSummary; event?: EventItem; member?: { user: PublicUser; role: string } };
 
 const LOCKED = {
   posts: 'm.community.locked.posts',
   faq: 'm.community.locked.faq',
   rooms: 'm.rooms.locked',
+  events: 'm.community.locked.events',
   members: 'm.community.locked.members',
 } as const;
 
 /** Owner and moderator are labelled; other roles (plain members) are not. */
 const roleLabel = (role: string, t: Translate) => (role === 'owner' ? t('m.role.owner') : role === 'moderator' ? t('m.role.moderator') : role);
 
-/** A community: posts, its FAQ, audio rooms and members, with join and leave. */
+/** A community: posts, its FAQ, audio rooms, events and members, with join and leave, and its group chat for members. */
 export default function CommunityScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const c = useColors();
-  const { t, tp } = useT();
+  const { t, tp, dateTime } = useT();
   const navigation = useNavigation();
   const { me } = useSession();
   const [community, setCommunity] = useState<(Community & { membershipStatus: string | null }) | null | undefined>(undefined);
@@ -40,12 +41,16 @@ export default function CommunityScreen() {
   const [faq, setFaq] = useState<{ items: FaqEntry[]; canEdit: boolean } | null>(null);
   const [members, setMembers] = useState<{ user: PublicUser; role: string }[] | null>(null);
   const [rooms, setRooms] = useState<{ items: RoomSummary[]; canStart: boolean } | null>(null);
+  const [events, setEvents] = useState<EventItem[] | null>(null);
+  const [chatId, setChatId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     try {
-      setCommunity((await (await client()).communities.get(slug)).community);
+      const r = await (await client()).communities.get(slug);
+      setCommunity(r.community);
+      setChatId(r.chatConversationId);
     } catch {
       setCommunity(null);
     }
@@ -82,14 +87,17 @@ export default function CommunityScreen() {
         if (tab === 'faq' && !faq) await loadFaq();
         if (tab === 'members' && !members) setMembers((await api.communities.members(slug)).items);
         if (tab === 'rooms' && !rooms) setRooms(await api.communities.rooms(slug));
+        if (tab === 'events' && !events)
+          setEvents((await api.raw.get<{ items: EventItem[] }>(`/v1/events?communityId=${encodeURIComponent(community.id)}`)).items);
       } catch (e) {
         setError(errorMessage(e));
         if (tab === 'posts') setPosts([]);
         if (tab === 'members') setMembers([]);
         if (tab === 'rooms') setRooms({ items: [], canStart: false });
+        if (tab === 'events') setEvents([]);
       }
     })();
-  }, [tab, community, locked, slug, posts, faq, members, rooms, loadFaq]);
+  }, [tab, community, locked, slug, posts, faq, members, rooms, events, loadFaq]);
 
   if (community === undefined) return <Loading />;
   if (community === null)
@@ -106,8 +114,12 @@ export default function CommunityScreen() {
         ? (faq?.items ?? []).map((f) => ({ key: f.id, faq: f }))
         : tab === 'rooms'
           ? (rooms?.items ?? []).map((r) => ({ key: r.id, room: r }))
-          : (members ?? []).map((m) => ({ key: m.user.id, member: m }));
-  const loadingTab = !locked && ((tab === 'posts' && !posts) || (tab === 'faq' && !faq) || (tab === 'rooms' && !rooms) || (tab === 'members' && !members));
+          : tab === 'events'
+            ? (events ?? []).map((e) => ({ key: e.id, event: e }))
+            : (members ?? []).map((m) => ({ key: m.user.id, member: m }));
+  const loadingTab =
+    !locked &&
+    ((tab === 'posts' && !posts) || (tab === 'faq' && !faq) || (tab === 'rooms' && !rooms) || (tab === 'events' && !events) || (tab === 'members' && !members));
 
   const header = (
     <View style={{ gap: space[3], marginBottom: space[1] }}>
@@ -118,6 +130,16 @@ export default function CommunityScreen() {
           {community.name}
         </Title>
         {community.description ? <Text style={[{ color: c.ink, lineHeight: 21 }, userText]}>{community.description}</Text> : null}
+        {community.myRole && chatId ? (
+          <Button
+            label={t('m.community.chat')}
+            icon="chatbubbles-outline"
+            size="sm"
+            variant="secondary"
+            style={{ alignSelf: 'flex-start' }}
+            onPress={() => router.push(`/chat/${chatId}`)}
+          />
+        ) : null}
         {me ? (
           community.myRole ? (
             community.myRole !== 'owner' ? (
@@ -147,6 +169,7 @@ export default function CommunityScreen() {
                   setFaq(null);
                   setMembers(null);
                   setRooms(null);
+                  setEvents(null);
                   await reload();
                 } catch (e) {
                   setError(errorMessage(e));
@@ -162,7 +185,8 @@ export default function CommunityScreen() {
           { id: 'posts', label: t('profile.posts') },
           { id: 'faq', label: t('m.community.faq') },
           { id: 'rooms', label: t('m.rooms.tab') },
-          { id: 'members', label: t('m.community.membersTab'), count: community.memberCount },
+          { id: 'events', label: t('events.title') },
+          { id: 'members', label: t('m.community.membersTab') },
         ]}
         value={tab}
         onChange={setTab}
@@ -189,6 +213,8 @@ export default function CommunityScreen() {
           <EmptyState title={t('m.community.noFaq.title')} body={faq?.canEdit ? t('m.community.noFaq.editor') : t('m.community.noFaq.body')} />
         ) : tab === 'rooms' ? (
           <EmptyState title={t('m.rooms.none')} body={t('m.rooms.noneBody')} />
+        ) : tab === 'events' ? (
+          <EmptyState title={t('m.events.none')} body={t('m.community.noEvents')} />
         ) : (
           <EmptyState title={t('m.community.noMembers')} />
         )
@@ -233,11 +259,19 @@ export default function CommunityScreen() {
           />
         ) : item.room ? (
           <RoomCard room={item.room} />
+        ) : item.event ? (
+          <Row
+            title={item.event.title}
+            subtitle={[dateTime(item.event.startsAt), item.event.place?.name ?? item.event.locationText].filter(Boolean).join(' · ')}
+            start={<Icon name="calendar-outline" size={22} color={c.yapi} />}
+            onPress={() => router.push(`/event/${item.event!.id}`)}
+          />
         ) : item.member ? (
           <Row
             title={item.member.user.displayName}
             subtitle={`@${item.member.user.username}${item.member.role !== 'member' ? ` · ${roleLabel(item.member.role, t)}` : ''}`}
             start={<Avatar name={item.member.user.displayName} url={item.member.user.avatarUrl} size={36} />}
+            onPress={() => router.push(`/u/${encodeURIComponent(item.member!.user.username)}`)}
           />
         ) : null
       }

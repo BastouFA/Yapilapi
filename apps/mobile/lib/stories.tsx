@@ -1,6 +1,4 @@
 import { useEventListener } from 'expo';
-import * as Notifications from 'expo-notifications';
-import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -32,7 +30,6 @@ import { client, errorMessage, mediaUrl, webUrl } from './api';
 import { useDataSaver } from './data-saver';
 import { useT } from './i18n';
 import { RichText } from './post';
-import { useSession } from './session';
 import { gradient, radius, space } from './theme';
 import { Avatar, Icon, Segmented, SwitchRow, useColors, userText } from './ui';
 import { SensitiveCover } from './safety';
@@ -1063,18 +1060,4 @@ function StickerResultList({ results }: { results: StickerResults[] }) {
       ))}
     </>
   );
-}
-
-/** Taps on story notifications (mentions, reshares, countdowns) open the story. */
-export function useStoryPushLinks() {
-  const { me } = useSession();
-  useEffect(() => {
-    if (!me) return;
-    const handle = (resp: Notifications.NotificationResponse | null) => {
-      const data = resp?.notification.request.content.data as { entityType?: string; entityId?: string } | undefined;
-      if (data?.entityType === 'moment' && data.entityId) router.push(`/s/${data.entityId}`);
-    };
-    const sub = Notifications.addNotificationResponseReceivedListener(handle);
-    return () => sub.remove();
-  }, [me]);
 }

@@ -14,6 +14,7 @@ import { ShopList } from './money';
 import { isVerificationError, VerifyPrompt } from './safety';
 import { ChaptersRow } from './chapters';
 import { ProfileBoards } from './boards';
+import { ProfileMenu } from './profile-menu';
 
 /**
  * A profile: name, bio, counts, Follow and Message for other people, and
@@ -29,6 +30,8 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
   const [locked, setLocked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [menu, setMenu] = useState(false);
   const [needsVerify, setNeedsVerify] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState<'posts' | 'tagged' | 'boards' | 'shop'>('posts');
@@ -187,15 +190,44 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
               ['profile.following', profile.counts.following],
               ['profile.friends', profile.counts.friends],
             ] as const
-          ).map(([key, n]) => (
-            <View key={key} style={{ alignItems: 'center' }} accessible accessibilityLabel={t('m.common.stat', { label: t(key), count: n })}>
-              <Text style={{ color: c.ink, fontWeight: '800', fontSize: 17 }}>{number(n)}</Text>
-              <Text style={{ color: c.inkMuted, fontSize: 12 }}>{t(key)}</Text>
-            </View>
-          ))}
+          ).map(([key, n]) => {
+            const list = key === 'profile.followers' ? 'followers' : key === 'profile.following' ? 'following' : null;
+            const stat = (
+              <>
+                <Text style={{ color: c.ink, fontWeight: '800', fontSize: 17 }}>{number(n)}</Text>
+                <Text style={{ color: c.inkMuted, fontSize: 12 }}>{t(key)}</Text>
+              </>
+            );
+            // Followers and following open the list of people, as on the web.
+            return list ? (
+              <Pressable
+                key={key}
+                accessibilityRole="button"
+                accessibilityLabel={t('m.common.stat', { label: t(key), count: n })}
+                accessibilityHint={t('m.follows.hint')}
+                hitSlop={8}
+                onPress={() =>
+                  router.push({ pathname: '/follows', params: { id: profile.id, kind: list, name: profile.displayName, self: rel.isSelf ? '1' : '' } })
+                }
+                style={({ pressed }) => ({ alignItems: 'center', minWidth: 44, minHeight: 44, justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
+              >
+                {stat}
+              </Pressable>
+            ) : (
+              <View
+                key={key}
+                style={{ alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
+                accessible
+                accessibilityLabel={t('m.common.stat', { label: t(key), count: n })}
+              >
+                {stat}
+              </View>
+            );
+          })}
         </View>
         {rel.isSelf ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: space[2], marginTop: space[2] }}>
+            <Button label={t('profile.edit')} variant="secondary" size="sm" icon="person-circle-outline" onPress={() => router.push('/profile-edit')} />
             <Button
               label={status ? t('m.now.edit') : t('m.now.set')}
               variant="secondary"
@@ -260,11 +292,44 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
             >
               <Icon name="share-outline" size={18} color={c.ink} />
             </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('m.profile.more')}
+              hitSlop={4}
+              onPress={() => setMenu(true)}
+              style={({ pressed }) => ({
+                width: 44,
+                height: 44,
+                borderRadius: radius.full,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: c.surface,
+                borderWidth: 1,
+                borderColor: c.line,
+                opacity: pressed ? 0.85 : 1,
+              })}
+            >
+              <Icon name="ellipsis-horizontal" size={18} color={c.ink} />
+            </Pressable>
           </View>
         )}
       </Card>
       {actions}
       {error ? <Notice tone="danger">{error}</Notice> : null}
+      {note ? (
+        <View accessibilityLiveRegion="polite">
+          <Notice>{note}</Notice>
+        </View>
+      ) : null}
+      {rel.isSelf ? null : (
+        <ProfileMenu
+          profile={profile}
+          open={menu}
+          onClose={() => setMenu(false)}
+          onChanged={load}
+          onMessage={(text, tone) => (tone === 'danger' ? (setError(text), setNote(null)) : (setNote(text), setError(null)))}
+        />
+      )}
       <ChaptersRow userId={profile.id} isSelf={rel.isSelf} />
       <Segmented
         label={t('m.title.profile')}

@@ -1,91 +1,444 @@
-import { router } from 'expo-router';
-import { useState } from 'react';
-import { FlatList, Text, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import type { MessageKey } from '../../../../packages/shared/src/i18n';
+import { normalizeTag } from '../../../../packages/shared/src/hashtags';
+import type { Community, EventItem, Post, PublicUser } from '../../../../packages/shared/src/types';
+import type { TrendingTag } from '../../../../packages/api-client/src/index';
 import { client, errorMessage } from '../../lib/api';
+import { Chip, ChipRow, SectionHeader } from '../../lib/chips';
 import { useT } from '../../lib/i18n';
-import { space } from '../../lib/theme';
-import { Avatar, Button, EmptyState, Field, Notice, Row, Screen, useColors, useTabBarSpace } from '../../lib/ui';
+import { PostCard } from '../../lib/post';
+import { clearRecent, forgetSearch, readRecent, rememberSearch } from '../../lib/recent-searches';
+import { radius, space } from '../../lib/theme';
+import { Avatar, EmptyState, Icon, Notice, Row, useColors, userText, useTabBarSpace, type IconName } from '../../lib/ui';
 
-type Result = { key: string; title: string; subtitle: string; href?: string; avatar?: { name: string; url: string | null } };
+type Tab = 'all' | 'people' | 'topics' | 'posts' | 'communities' | 'events' | 'places';
+const TABS: { id: Tab; label: MessageKey }[] = [
+  { id: 'all', label: 'm.wander.all' },
+  { id: 'people', label: 'discover.people' },
+  { id: 'topics', label: 'm.wander.tags' },
+  { id: 'posts', label: 'discover.posts' },
+  { id: 'communities', label: 'discover.communities' },
+  { id: 'events', label: 'discover.events' },
+  { id: 'places', label: 'discover.places' },
+];
 
-/** Discover: universal search with natural-language intent. */
-export default function Discover() {
+type Place = { id: string; name: string; category: string | null; city: string | null };
+type Found = {
+  people: PublicUser[];
+  topics: { slug: string; name: string; posts: number }[];
+  posts: Post[];
+  communities: Pick<Community, 'id' | 'slug' | 'name' | 'description' | 'memberCount'>[];
+  events: EventItem[];
+  places: Place[];
+};
+
+/** A single #tag typed on its own goes straight to its page, as on the web. */
+const TAG_ONLY = /^#[\p{L}\p{M}\p{N}_]{2,40}$/u;
+/** In "All", each kind shows this many before "See all". */
+const PREVIEW = 4;
+
+/**
+ * Wander: search everything as you type (people, tags, posts, communities, events, places), with
+ * filters, recent searches kept on this phone, and, before you type, trending tags, communities
+ * to join and what's coming up. `?q=` (from a shared search link) starts a search.
+ */
+export default function Wander() {
   const c = useColors();
-  const { t, tp, dateTime } = useT();
+  const { t, tp, number, dateTime } = useT();
   const bottom = useTabBarSpace();
-  const [q, setQ] = useState('');
-  const [results, setResults] = useState<Result[] | null>(null);
+  const params = useLocalSearchParams<{ q?: string }>();
+  const input = useRef<TextInput>(null);
+  const [q, setQ] = useState(params.q ?? '');
+  const [tab, setTab] = useState<Tab>('all');
+  const [found, setFound] = useState<Found | null>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [recent, setRecent] = useState<string[]>([]);
+  const [trending, setTrending] = useState<TrendingTag[] | null>(null);
+  const [communities, setCommunities] = useState<Community[]>([]);
+  const [events, setEvents] = useState<EventItem[]>([]);
 
-  async function search() {
-    if (!q.trim()) return;
-    setError(null);
-    setBusy(true);
-    try {
-      const r = (await (await client()).search(q.trim())).results as Record<string, any[]>;
-      setResults([
-        ...(r.people ?? []).map((u) => ({
-          key: `u${u.id}`,
-          title: u.displayName,
-          subtitle: `@${u.username}`,
-          avatar: { name: u.displayName, url: u.avatarUrl },
-        })),
-        ...(r.communities ?? []).map((x) => ({ key: `c${x.id}`, title: x.name, subtitle: tp('m.community.members', x.memberCount), href: `/c/${x.slug}` })),
-        ...(r.events ?? []).map((e) => ({ key: `e${e.id}`, title: e.title, subtitle: dateTime(e.startsAt) })),
-        ...(r.places ?? []).map((p) => ({ key: `p${p.id}`, title: p.name, subtitle: [p.category, p.city].filter(Boolean).join(' · ') })),
-        ...(r.posts ?? []).map((p) => ({ key: `po${p.id}`, title: p.author.displayName, subtitle: p.body, href: `/p/${p.id}` })),
-      ]);
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setBusy(false);
+  useEffect(() => {
+    if (params.q) setQ(params.q);
+  }, [params.q]);
+
+  useEffect(() => {
+    void readRecent().then(setRecent);
+    void client().then((api) => {
+      api.trending(10).then(
+        (r) => setTrending(r.items),
+        () => setTrending([]),
+      );
+      api.communities.list('discover').then(
+        (r) => setCommunities(r.items.filter((x) => !x.myRole).slice(0, 5)),
+        () => {},
+      );
+      api.events.list('upcoming').then(
+        (r) => setEvents(r.items.slice(0, 5)),
+        () => {},
+      );
+    });
+  }, []);
+
+  // Results a moment after typing stops; a newer search replaces an older one still on its way.
+  const term = q.trim();
+  useEffect(() => {
+    if (!term) {
+      setFound(null);
+      setLoading(false);
+      setError(null);
+      return;
     }
-  }
+    let current = true;
+    setLoading(true);
+    const timer = setTimeout(() => {
+      void client()
+        .then((api) => api.search(term, tab))
+        .then(
+          (r) => {
+            if (!current) return;
+            const x = r.results as Record<string, unknown[] | undefined>;
+            setFound({
+              people: (x.people ?? []) as Found['people'],
+              topics: (x.topics ?? []) as Found['topics'],
+              posts: (x.posts ?? []) as Found['posts'],
+              communities: (x.communities ?? []) as Found['communities'],
+              events: (x.events ?? []) as Found['events'],
+              places: (x.places ?? []) as Found['places'],
+            });
+            setError(null);
+            setLoading(false);
+          },
+          (e) => current && (setError(errorMessage(e)), setLoading(false)),
+        );
+    }, 250);
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [term, tab]);
+
+  const remember = useCallback(
+    (value = term) => {
+      if (value) void rememberSearch(value).then(setRecent);
+    },
+    [term],
+  );
+
+  const submit = (value = term) => {
+    if (!value) return;
+    remember(value);
+    if (TAG_ONLY.test(value)) router.push(`/t/${encodeURIComponent(normalizeTag(value))}`);
+  };
+
+  const open = (href: string) => {
+    remember();
+    router.push(href as never);
+  };
+
+  const show = (k: Tab) => tab === 'all' || tab === k;
+  const cut = <T,>(list: T[]) => (tab === 'all' ? list.slice(0, PREVIEW) : list);
+  const seeAll = (k: Tab, count: number) =>
+    tab === 'all' && count > PREVIEW
+      ? { label: t('m.wander.seeAll'), a11yLabel: t('m.wander.seeAllOf', { kind: t(TABS.find((x) => x.id === k)!.label) }), onPress: () => setTab(k) }
+      : undefined;
+  const nothing = found && !Object.values(found).some((list) => list.length);
+  const shortcuts: { label: string; icon: IconName; href: string }[] = [
+    { label: t('m.title.reels'), icon: 'film-outline', href: '/reels' },
+    { label: t('events.title'), icon: 'calendar-outline', href: '/events' },
+    { label: t('communities.title'), icon: 'people-circle-outline', href: '/communities' },
+    { label: t('m.title.assistant'), icon: 'sparkles-outline', href: '/assistant' },
+  ];
 
   return (
-    <Screen style={{ paddingBottom: 0 }}>
-      <View style={{ flexDirection: 'row', gap: space[2], alignItems: 'flex-end' }}>
-        <View style={{ flex: 1 }}>
-          <Field
-            label={t('m.discover.search')}
-            hideLabel
-            placeholder={t('m.discover.placeholder')}
+    <View style={{ flex: 1, backgroundColor: c.ground }}>
+      <View style={{ paddingHorizontal: space[4], paddingTop: space[3], gap: space[2] }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: space[2],
+            minHeight: 48,
+            borderRadius: radius.full,
+            borderWidth: 1,
+            borderColor: c.line,
+            backgroundColor: c.surface,
+            paddingStart: space[4],
+            paddingEnd: space[1],
+          }}
+        >
+          <Icon name="search" size={18} color={c.inkMuted} />
+          <TextInput
+            ref={input}
+            accessibilityLabel={t('m.wander.label')}
+            accessibilityRole="search"
+            placeholder={t('discover.search')}
+            placeholderTextColor={c.inkMuted}
             value={q}
             onChangeText={setQ}
-            onSubmitEditing={search}
+            onSubmitEditing={() => submit()}
             returnKeyType="search"
-            style={{ borderRadius: 9999, paddingHorizontal: space[4] }}
+            autoCorrect={false}
+            autoCapitalize="none"
+            maxLength={200}
+            style={[{ flex: 1, color: c.ink, fontSize: 16, paddingVertical: space[2] }, userText]}
           />
+          {loading ? <ActivityIndicator size="small" color={c.yapi} accessibilityLabel={t('m.discover.searching')} /> : null}
+          {q ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('m.wander.clear')}
+              onPress={() => {
+                setQ('');
+                input.current?.focus();
+              }}
+              style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Icon name="close-circle" size={20} color={c.inkMuted} />
+            </Pressable>
+          ) : null}
         </View>
-        <Button label={busy ? t('m.discover.searching') : t('m.discover.search')} onPress={search} disabled={!q.trim() || busy} />
+        {term ? (
+          <ChipRow scroll tabs label={t('m.wander.show')}>
+            {TABS.map((x) => (
+              <Chip key={x.id} label={t(x.label)} selected={tab === x.id} onPress={() => setTab(x.id)} />
+            ))}
+          </ChipRow>
+        ) : null}
       </View>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-        <Button label={t('m.title.reels')} icon="film-outline" variant="secondary" size="sm" onPress={() => router.push('/reels')} />
-        <Button label={t('m.title.assistant')} variant="secondary" size="sm" onPress={() => router.push('/assistant')} />
-        <Button label={t('events.title')} variant="secondary" size="sm" onPress={() => router.push('/events')} />
-      </View>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
-      <FlatList
-        data={results ?? []}
-        keyExtractor={(r) => r.key}
-        contentContainerStyle={{ gap: space[2], paddingBottom: bottom }}
-        renderItem={({ item }) => (
-          <Row
-            title={item.title}
-            subtitle={item.subtitle}
-            start={item.avatar ? <Avatar name={item.avatar.name} url={item.avatar.url} size={36} /> : undefined}
-            onPress={item.href ? () => router.push(item.href as never) : undefined}
-          />
-        )}
-        ListEmptyComponent={
-          results ? (
-            <EmptyState title={t('m.discover.noResults.title')} body={t('m.discover.noResults.body')} />
-          ) : (
-            <Text style={{ color: c.inkMuted, textAlign: 'center', padding: space[4] }}>{t('m.discover.hint')}</Text>
-          )
-        }
-      />
-    </Screen>
+
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: bottom }}
+      >
+        {error ? <Notice tone="danger">{error}</Notice> : null}
+
+        {!term ? (
+          <>
+            <ChipRow scroll>
+              {shortcuts.map((s) => (
+                <Chip key={s.href} label={s.label} icon={s.icon} onPress={() => router.push(s.href as never)} />
+              ))}
+            </ChipRow>
+
+            {recent.length ? (
+              <View style={{ gap: space[2] }}>
+                <SectionHeader
+                  title={t('m.wander.recent')}
+                  action={{
+                    label: t('m.wander.clearRecent'),
+                    a11yLabel: t('m.wander.clearRecentLabel'),
+                    onPress: () => {
+                      setRecent([]);
+                      void clearRecent();
+                    },
+                  }}
+                />
+                <ChipRow>
+                  {recent.map((r) => (
+                    <Chip
+                      key={r}
+                      label={r}
+                      icon="time-outline"
+                      a11yHint={t('m.wander.recentHint')}
+                      onPress={() => {
+                        setQ(r);
+                        submit(r);
+                      }}
+                      onLongPress={() => void forgetSearch(r).then(setRecent)}
+                    />
+                  ))}
+                </ChipRow>
+              </View>
+            ) : null}
+
+            <View style={{ gap: space[2] }}>
+              <SectionHeader title={t('m.wander.trending')} />
+              {trending === null ? (
+                <ActivityIndicator color={c.yapi} accessibilityLabel={t('common.loading')} />
+              ) : trending.length ? (
+                <View style={{ gap: space[1] }}>
+                  {trending.map((it, i) => {
+                    const meta = t('trending.meta', {
+                      posts: tp('trending.posts', it.posts, { number: number(it.posts, { notation: 'compact' }) }),
+                      people: tp('trending.people', it.people, { number: number(it.people, { notation: 'compact' }) }),
+                    });
+                    return (
+                      <Pressable
+                        key={it.tag}
+                        accessibilityRole="link"
+                        accessibilityLabel={`#${it.tag}. ${meta}${it.rising ? `. ${t('trending.rising')}` : ''}`}
+                        onPress={() => router.push(`/t/${encodeURIComponent(it.tag)}`)}
+                        style={({ pressed }) => ({
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: space[3],
+                          minHeight: 52,
+                          paddingHorizontal: space[3],
+                          borderRadius: radius.md,
+                          backgroundColor: c.surface,
+                          opacity: pressed ? 0.85 : 1,
+                        })}
+                      >
+                        <Text style={{ color: c.inkMuted, fontWeight: '800', width: 20, textAlign: 'center' }}>{number(i + 1)}</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 15 }, userText]} numberOfLines={1}>
+                            #{it.tag}
+                          </Text>
+                          <Text style={{ color: c.inkMuted, fontSize: 13 }} numberOfLines={1}>
+                            {meta}
+                          </Text>
+                        </View>
+                        {it.rising ? (
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 4,
+                              backgroundColor: c.saffronSoft,
+                              borderRadius: radius.full,
+                              paddingHorizontal: 8,
+                              paddingVertical: 2,
+                            }}
+                          >
+                            <Icon name="trending-up" size={14} color={c.ink} />
+                            <Text style={{ color: c.ink, fontSize: 12, fontWeight: '700' }}>{t('trending.rising')}</Text>
+                          </View>
+                        ) : null}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : (
+                <Text style={{ color: c.inkMuted }}>{t('trending.empty')}</Text>
+              )}
+            </View>
+
+            {communities.length ? (
+              <View style={{ gap: space[2] }}>
+                <SectionHeader title={t('m.wander.communitiesToJoin')} action={{ label: t('m.wander.seeAll'), onPress: () => router.push('/communities') }} />
+                {communities.map((x) => (
+                  <Row
+                    key={x.id}
+                    title={x.name}
+                    subtitle={tp('m.community.members', x.memberCount)}
+                    start={<Avatar name={x.name} size={36} />}
+                    onPress={() => router.push(`/c/${x.slug}`)}
+                  />
+                ))}
+              </View>
+            ) : null}
+
+            {events.length ? (
+              <View style={{ gap: space[2] }}>
+                <SectionHeader title={t('m.wander.comingUp')} action={{ label: t('m.wander.seeAll'), onPress: () => router.push('/events') }} />
+                {events.map((e) => (
+                  <Row
+                    key={e.id}
+                    title={e.title}
+                    subtitle={[dateTime(e.startsAt), e.place?.name ?? e.locationText].filter(Boolean).join(' · ')}
+                    start={<Icon name="calendar-outline" size={22} color={c.yapi} />}
+                    onPress={() => router.push(`/event/${e.id}`)}
+                  />
+                ))}
+              </View>
+            ) : null}
+          </>
+        ) : nothing ? (
+          <EmptyState title={t('m.wander.noResults', { query: term })} body={t('m.wander.noResultsBody')} />
+        ) : found ? (
+          <>
+            {show('people') && found.people.length ? (
+              <View style={{ gap: space[2] }}>
+                <SectionHeader title={t('discover.people')} action={seeAll('people', found.people.length)} />
+                {cut(found.people).map((u) => (
+                  <Row
+                    key={u.id}
+                    title={u.displayName}
+                    subtitle={`@${u.username}`}
+                    start={<Avatar name={u.displayName} url={u.avatarUrl} size={40} />}
+                    onPress={() => open(`/u/${encodeURIComponent(u.username)}`)}
+                  />
+                ))}
+              </View>
+            ) : null}
+
+            {show('topics') && found.topics.length ? (
+              <View style={{ gap: space[2] }}>
+                <SectionHeader title={t('m.wander.tags')} />
+                <ChipRow>
+                  {found.topics.map((x) => (
+                    <Chip
+                      key={x.slug}
+                      label={`#${x.slug}`}
+                      meta={x.posts ? number(x.posts, { notation: 'compact' }) : undefined}
+                      a11yLabel={x.posts ? `#${x.slug}. ${tp('trending.posts', x.posts, { number: number(x.posts) })}` : `#${x.slug}`}
+                      onPress={() => open(`/t/${encodeURIComponent(x.slug)}`)}
+                    />
+                  ))}
+                </ChipRow>
+              </View>
+            ) : null}
+
+            {show('communities') && found.communities.length ? (
+              <View style={{ gap: space[2] }}>
+                <SectionHeader title={t('discover.communities')} action={seeAll('communities', found.communities.length)} />
+                {cut(found.communities).map((x) => (
+                  <Row
+                    key={x.id}
+                    title={x.name}
+                    subtitle={tp('m.community.members', x.memberCount)}
+                    start={<Avatar name={x.name} size={36} />}
+                    onPress={() => open(`/c/${x.slug}`)}
+                  />
+                ))}
+              </View>
+            ) : null}
+
+            {show('events') && found.events.length ? (
+              <View style={{ gap: space[2] }}>
+                <SectionHeader title={t('discover.events')} action={seeAll('events', found.events.length)} />
+                {cut(found.events).map((e) => (
+                  <Row
+                    key={e.id}
+                    title={e.title}
+                    subtitle={[dateTime(e.startsAt), e.place?.name ?? e.locationText].filter(Boolean).join(' · ')}
+                    start={<Icon name="calendar-outline" size={22} color={c.yapi} />}
+                    onPress={() => open(`/event/${e.id}`)}
+                  />
+                ))}
+              </View>
+            ) : null}
+
+            {show('places') && found.places.length ? (
+              <View style={{ gap: space[2] }}>
+                <SectionHeader title={t('discover.places')} action={seeAll('places', found.places.length)} />
+                {cut(found.places).map((p) => (
+                  <Row
+                    key={p.id}
+                    title={p.name}
+                    subtitle={[p.category, p.city].filter(Boolean).join(' · ')}
+                    start={<Icon name="location-outline" size={22} color={c.yapi} />}
+                    onPress={() => open(`/place/${p.id}`)}
+                  />
+                ))}
+              </View>
+            ) : null}
+
+            {show('posts') && found.posts.length ? (
+              <View style={{ gap: space[3] }}>
+                <SectionHeader title={t('discover.posts')} action={seeAll('posts', found.posts.length)} />
+                {cut(found.posts).map((p) => (
+                  <PostCard key={p.id} post={p} />
+                ))}
+              </View>
+            ) : null}
+          </>
+        ) : null}
+      </ScrollView>
+    </View>
   );
 }

@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList } from 'react-native';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
@@ -15,7 +16,7 @@ const SCOPES: { id: Scope; label: MessageKey; empty: MessageKey }[] = [
   { id: 'hosting', label: 'm.events.hosting', empty: 'm.events.empty.hosting' },
 ];
 
-/** Events you can see: upcoming, happening now, ones you're going to and ones you host. */
+/** Events you can see: upcoming, happening now, ones you're going to and ones you host. Each opens its page, where you answer. */
 export default function Events() {
   const { t, dateTime } = useT();
   const [scope, setScope] = useState<Scope>('upcoming');
@@ -47,7 +48,11 @@ export default function Events() {
           keyExtractor={(e) => e.id}
           contentContainerStyle={{ gap: space[2], paddingBottom: space[8] }}
           renderItem={({ item }) => (
-            <Row title={item.title} subtitle={[dateTime(item.startsAt), item.place?.name ?? item.locationText].filter(Boolean).join(' · ')} />
+            <Row
+              title={item.title}
+              subtitle={[dateTime(item.startsAt), item.place?.name ?? item.locationText].filter(Boolean).join(' · ')}
+              onPress={() => router.push(`/event/${item.id}`)}
+            />
           )}
           ListEmptyComponent={<EmptyState title={t('m.events.none')} body={t(SCOPES.find((x) => x.id === scope)!.empty)} />}
         />

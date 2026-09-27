@@ -1,0 +1,219 @@
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { Platform, Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
+import { formatEventWhen, safeTimeZone } from '../../../../packages/shared/src/i18n';
+import type { EventItem, PublicUser } from '../../../../packages/shared/src/types';
+import { client, errorMessage, webUrl } from '../../lib/api';
+import { useT } from '../../lib/i18n';
+import { RichText } from '../../lib/post';
+import { useSession } from '../../lib/session';
+import { radius, space } from '../../lib/theme';
+import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, Segmented, useColors, userText } from '../../lib/ui';
+
+type Rsvp = 'going' | 'interested' | 'not_going';
+
+/**
+ * An event: when and where, who hosts it, your answer (going, interested, can't go), who is
+ * going, and sharing it. Opened from Wander, Events, a community and notifications.
+ */
+export default function EventScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const c = useColors();
+  const { t, tp, locale } = useT();
+  const { me } = useSession();
+  const [event, setEvent] = useState<EventItem | null | undefined>(undefined);
+  const [going, setGoing] = useState<PublicUser[]>([]);
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const api = await client();
+      setEvent((await api.events.get(id)).event);
+      api.events.attendees(id).then(
+        (r) => setGoing(r.items.filter((a) => a.status === 'going').map((a) => a.user)),
+        () => {},
+      );
+    } catch {
+      setEvent(null);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (event === undefined) return <Loading />;
+  if (event === null)
+    return (
+      <View style={{ flex: 1, backgroundColor: c.ground }}>
+        <EmptyState title={t('m.event.notFound')} body={t('m.event.notFoundBody')} />
+      </View>
+    );
+
+  let when = '';
+  let until = '';
+  try {
+    const tz = safeTimeZone(event.timezone);
+    when = formatEventWhen(event.startsAt, locale, tz);
+    until = event.endsAt ? new Intl.DateTimeFormat(locale, { timeStyle: 'short', timeZone: tz }).format(new Date(event.endsAt)) : '';
+  } catch {
+    when = new Date(event.startsAt).toLocaleString();
+  }
+  const hosting = event.host.id === me?.id;
+  const full = !!event.capacity && event.counts.going >= event.capacity;
+  const where = event.online ? t('m.event.online') : (event.place?.name ?? event.locationText ?? t('m.event.tba'));
+
+  async function rsvp(status: Rsvp) {
+    setBusy(true);
+    setError(null);
+    setNote(null);
+    try {
+      const r = await (await client()).events.rsvp(id, status);
+      setEvent(r.event);
+      setNote(r.status === 'waitlist' ? t('m.event.waitlist') : t('m.event.saved'));
+      void load();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function share() {
+    if (!event) return;
+    const url = `${webUrl}/events/${encodeURIComponent(event.id)}`;
+    try {
+      await Share.share(Platform.OS === 'ios' ? { url, message: event.title } : { message: `${event.title}\n${url}`, title: event.title });
+    } catch {
+      // The person closed the share sheet.
+    }
+  }
+
+  return (
+    <ScrollView
+      style={{ backgroundColor: c.ground }}
+      contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={async () => {
+            setRefreshing(true);
+            await load();
+            setRefreshing(false);
+          }}
+        />
+      }
+    >
+      <Card style={{ gap: space[3] }}>
+        {event.community ? (
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => router.push(`/c/${event.community!.slug}`)}
+            hitSlop={8}
+            style={{ alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center' }}
+          >
+            <Text style={[{ color: c.yapi, fontWeight: '700' }, userText]}>{event.community.name}</Text>
+          </Pressable>
+        ) : null}
+        <Text accessibilityRole="header" style={[{ color: c.ink, fontSize: 24, fontWeight: '800', letterSpacing: -0.4 }, userText]}>
+          {event.title}
+        </Text>
+        <Line icon="calendar-outline" text={until ? t('m.event.range', { start: when, end: until }) : when} />
+        {event.place && !event.online ? (
+          <Pressable accessibilityRole="link" onPress={() => router.push(`/place/${event.place!.id}`)} style={{ minHeight: 32, justifyContent: 'center' }}>
+            <Line icon="location-outline" text={where} link />
+          </Pressable>
+        ) : (
+          <Line icon={event.online ? 'videocam-outline' : 'location-outline'} text={where} />
+        )}
+        <Line
+          icon="people-outline"
+          text={[
+            event.capacity ? t('m.event.spots', { going: event.counts.going, capacity: event.capacity }) : tp('m.event.going', event.counts.going),
+            tp('m.event.interested', event.counts.interested),
+          ].join(' · ')}
+        />
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={t('m.event.hostedBy', { name: event.host.displayName })}
+          onPress={() => router.push(`/u/${encodeURIComponent(event.host.username)}`)}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: 44 }}
+        >
+          <Avatar name={event.host.displayName} url={event.host.avatarUrl} size={32} />
+          <Text style={[{ color: c.ink, fontSize: 14 }, userText]}>{t('m.event.hostedBy', { name: event.host.displayName })}</Text>
+        </Pressable>
+      </Card>
+
+      {hosting ? (
+        <Notice>{t('m.event.hosting')}</Notice>
+      ) : (
+        <View style={{ gap: space[2] }}>
+          <Segmented<Rsvp | 'none'>
+            label={t('m.event.yourAnswer')}
+            value={event.myRsvp ?? 'none'}
+            onChange={(v) => v !== 'none' && !busy && void rsvp(v)}
+            options={[
+              { id: 'going', label: t('events.going') },
+              { id: 'interested', label: t('events.interested') },
+              { id: 'not_going', label: t('events.notGoing') },
+            ]}
+          />
+          {full && event.myRsvp !== 'going' ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('m.event.full')}</Text> : null}
+        </View>
+      )}
+      {note ? (
+        <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted, fontSize: 13 }}>
+          {note}
+        </Text>
+      ) : null}
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+
+      {event.description ? (
+        <Card>
+          <RichText text={event.description} style={{ color: c.ink, fontSize: 15, lineHeight: 22 }} />
+        </Card>
+      ) : null}
+
+      {going.length ? (
+        <View style={{ gap: space[2] }}>
+          <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 17, fontWeight: '800' }}>
+            {t('events.going')}
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+            {going.slice(0, 12).map((u) => (
+              <Pressable
+                key={u.id}
+                accessibilityRole="link"
+                accessibilityLabel={u.displayName}
+                onPress={() => router.push(`/u/${encodeURIComponent(u.username)}`)}
+                style={{ alignItems: 'center', width: 64, gap: 4 }}
+              >
+                <Avatar name={u.displayName} url={u.avatarUrl} size={44} />
+                <Text style={[{ color: c.ink, fontSize: 12 }, userText]} numberOfLines={1}>
+                  {u.displayName.split(' ')[0]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      <Button label={t('m.common.share')} variant="secondary" icon="share-outline" onPress={() => void share()} />
+    </ScrollView>
+  );
+}
+
+function Line({ icon, text, link }: { icon: 'calendar-outline' | 'location-outline' | 'people-outline' | 'videocam-outline'; text: string; link?: boolean }) {
+  const c = useColors();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+      <View style={{ width: 28, height: 28, borderRadius: radius.sm, backgroundColor: c.yapiSoft, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name={icon} size={16} color={c.yapi} />
+      </View>
+      <Text style={[{ color: link ? c.yapi : c.ink, fontSize: 15, flex: 1, fontWeight: link ? '600' : '400' }, userText]}>{text}</Text>
+    </View>
+  );
+}
