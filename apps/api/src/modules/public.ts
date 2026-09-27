@@ -33,6 +33,24 @@ function publicAccountSql(pr: string, u: string): string {
            AND NOT coalesce(${u}.birth_date > current_date - interval '18 years', false))`;
 }
 
+/** At most this many links of each kind in the sitemap (one file holds 50,000). */
+const SITEMAP_LIMITS = { profiles: 10000, posts: 25000, tags: 2000, communities: 2000, events: 2000 };
+
+/**
+ * Posts a sitemap may list, from `FROM` on: public posts with a public preview
+ * that no country withholds and whose media isn't sensitive or blocked.
+ * (Visible to an anonymous viewer with no country, so REQUEST_COUNTRY is null.)
+ */
+const SITEMAP_POSTS = `FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
+  LEFT JOIN communities c ON c.id = p.community_id
+  WHERE ${postVisibleSql('NULL::uuid')}
+    AND p.visibility = 'public' AND p.moderation_status = 'normal' AND p.deleted_at IS NULL
+    AND (p.community_id IS NULL OR (c.visibility = 'public' AND c.deleted_at IS NULL))
+    AND ${publicAccountSql('ap', 'au')}
+    AND NOT EXISTS (SELECT 1 FROM post_withholdings w WHERE w.post_id = p.id)
+    AND NOT EXISTS (SELECT 1 FROM post_media pm JOIN media m ON m.id = pm.media_id
+                    WHERE pm.post_id = p.id AND m.moderation IN ('sensitive', 'blocked'))`;
+
 /** Collapse whitespace and trim to about 200 characters, on a word boundary where there is one. */
 export function excerpt(text: string | null | undefined, max = EXCERPT_CHARS): string {
   const s = (text ?? '').replace(/\s+/g, ' ').trim();
@@ -167,6 +185,60 @@ export default async function publicModule(app: FastifyInstance, ctx: AppContext
     };
     cacheable(reply);
     return { event };
+  });
+
+  /**
+   * What the web sitemap lists: links a search engine may index. Stricter than
+   * a preview, since a sitemap invites crawling rather than answering a shared
+   * link: everything here also has a public preview, and on top of that posts
+   * must be public (not subscriber-only), withheld nowhere, and carry no media
+   * marked sensitive or blocked; tags must be used by at least three public
+   * posts in the last 90 days. Answers never depend on the viewer or country.
+   */
+  app.get('/v1/public/sitemap', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (_req, reply) => {
+    const [profiles, posts, tags, communities, events] = await Promise.all([
+      db.query(
+        `SELECT pr.username, pr.updated_at FROM profiles pr JOIN users u ON u.id = pr.user_id
+         WHERE ${publicAccountSql('pr', 'u')} ORDER BY pr.updated_at DESC LIMIT $1`,
+        [SITEMAP_LIMITS.profiles],
+      ),
+      db.query(
+        `SELECT p.id, coalesce(p.edited_at, p.created_at) AS modified ${SITEMAP_POSTS}
+         ORDER BY p.created_at DESC LIMIT $1`,
+        [SITEMAP_LIMITS.posts],
+      ),
+      db.query(
+        `SELECT t AS tag, max(x.created_at) AS modified
+         FROM (SELECT p.topics, p.created_at ${SITEMAP_POSTS} AND p.created_at > now() - interval '90 days') x, unnest(x.topics) t
+         WHERE char_length(t) BETWEEN 2 AND 40 AND t !~ '^[0-9]+$'
+         GROUP BY t HAVING count(*) >= 3 ORDER BY count(*) DESC, t LIMIT $1`,
+        [SITEMAP_LIMITS.tags],
+      ),
+      db.query(
+        `SELECT c.slug, c.updated_at FROM communities c WHERE c.visibility = 'public' AND c.deleted_at IS NULL
+         ORDER BY c.member_count DESC, c.slug LIMIT $1`,
+        [SITEMAP_LIMITS.communities],
+      ),
+      db.query(
+        `SELECT e.id, e.updated_at FROM events e JOIN profiles pr ON pr.user_id = e.host_id JOIN users u ON u.id = e.host_id
+         LEFT JOIN communities c ON c.id = e.community_id
+         WHERE ${eventVisibleSql('NULL::uuid')} AND e.visibility = 'public' AND e.deleted_at IS NULL
+           AND coalesce(e.ends_at, e.starts_at) > now() - interval '30 days'
+           AND (e.community_id IS NULL OR (c.visibility = 'public' AND c.deleted_at IS NULL))
+           AND ${publicAccountSql('pr', 'u')}
+         ORDER BY e.starts_at DESC LIMIT $1`,
+        [SITEMAP_LIMITS.events],
+      ),
+    ]);
+    const iso = (d: Date) => d.toISOString();
+    reply.header('cache-control', 'public, max-age=3600');
+    return {
+      profiles: profiles.rows.map((r) => ({ username: r.username as string, modified: iso(r.updated_at) })),
+      posts: posts.rows.map((r) => ({ id: r.id as string, modified: iso(r.modified) })),
+      tags: tags.rows.map((r) => ({ tag: r.tag as string, modified: iso(r.modified) })),
+      communities: communities.rows.map((r) => ({ slug: r.slug as string, modified: iso(r.updated_at) })),
+      events: events.rows.map((r) => ({ id: r.id as string, modified: iso(r.updated_at) })),
+    };
   });
 
   app.get('/v1/public/communities/:slug', { config: { rateLimit: RATE } }, async (req, reply) => {

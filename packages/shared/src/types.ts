@@ -669,6 +669,15 @@ export interface PublicCommunityPreview {
   topics: string[];
 }
 
+/** Links the web sitemap lists (GET /v1/public/sitemap): only public content from public adult accounts. */
+export interface PublicSitemap {
+  profiles: { username: string; modified: string }[];
+  posts: { id: string; modified: string }[];
+  tags: { tag: string; modified: string }[];
+  communities: { slug: string; modified: string }[];
+  events: { id: string; modified: string }[];
+}
+
 /** A board: a named collection of saved posts. Counts and covers only include posts the viewer can see. */
 export interface Board {
   id: string;

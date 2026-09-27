@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { Alert, Button, TextField } from '@yapilapi/design-system';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
+import { SignupConsent } from '@/components/Legal';
 import { useSession } from '../../providers';
 
 function SignupForm() {
@@ -112,6 +113,7 @@ function SignupForm() {
         <label htmlFor="signup-website">Website</label>
         <input id="signup-website" name="website" type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
       </div>
+      <SignupConsent />
       <Button type="submit" block loading={busy}>
         {t('auth.signup.submit')}
       </Button>

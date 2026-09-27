@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LegalLinks } from '@/components/Legal';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -9,6 +10,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           YAPILAPI
         </Link>
         {children}
+        <LegalLinks className="site-legal" />
       </div>
     </main>
   );

@@ -184,6 +184,10 @@ export function Sidebar() {
         <Link href="/developers" className="muted">
           {t('sidebar.developers')}
         </Link>{' '}
+        ·{' '}
+        <Link href="/legal" className="muted">
+          {t('legal.title')}
+        </Link>{' '}
         · © {new Date().getFullYear()} YAPILAPI
       </p>
     </aside>

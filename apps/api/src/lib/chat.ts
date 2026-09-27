@@ -93,7 +93,7 @@ export async function reactionSummaries(db: Q, ids: string[], readerId: string):
 // ─── Files ──────────────────────────────────────────────────────────────
 
 /** The storage keys behind a media row's public addresses (…/media/<key>). */
-function storedKeys(row: {
+export function storedKeys(row: {
   url: string | null;
   poster_url: string | null;
   hls_url: string | null;

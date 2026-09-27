@@ -5,6 +5,7 @@ import { client, register, usernameAvailable } from '../lib/api';
 import { AuthPage, authProblem, enterApp, isoDay, PasswordField, USERNAME_RE, usernameFrom } from '../lib/auth-ui';
 import { DateField } from '../lib/date-time';
 import { useT } from '../lib/i18n';
+import { openLegal } from '../lib/legal';
 import { useSession } from '../lib/session';
 import { space } from '../lib/theme';
 import { Button, Field, Icon, Notice, Title, useColors } from '../lib/ui';
@@ -204,6 +205,7 @@ export default function Signup() {
           <Text style={{ color: c.yapi, fontWeight: '700' }}>{t('m.auth.haveInvite')}</Text>
         </Pressable>
       )}
+      <Consent />
       <Button label={busy ? t('m.auth.creating') : t('auth.signup.submit')} disabled={busy} onPress={() => submit()} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: space[1] }}>
         <Text style={{ color: c.inkMuted }}>{t('auth.haveAccount')}</Text>
@@ -216,5 +218,30 @@ export default function Signup() {
         </Pressable>
       </View>
     </AuthPage>
+  );
+}
+
+/** "By creating an account, you accept the Terms of service and confirm you have read the Privacy policy." The links open in the browser. */
+function Consent() {
+  const c = useColors();
+  const { t } = useT();
+  const parts = t('auth.signup.consent').split(/(\{terms\}|\{privacy\})/);
+  return (
+    <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 19 }}>
+      {parts.map((p, i) =>
+        p === '{terms}' || p === '{privacy}' ? (
+          <Text
+            key={i}
+            accessibilityRole="link"
+            onPress={() => void openLegal(p === '{terms}' ? 'terms' : 'privacy')}
+            style={{ color: c.yapi, fontWeight: '700' }}
+          >
+            {t(p === '{terms}' ? 'legal.terms' : 'legal.privacy')}
+          </Text>
+        ) : (
+          p
+        ),
+      )}
+    </Text>
   );
 }

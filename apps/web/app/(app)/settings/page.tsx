@@ -17,6 +17,7 @@ import { VerificationCard } from '@/components/Verification';
 import { DataSaverCard } from '@/components/DataSaver';
 import { HiddenWordsCard } from '@/components/HiddenWords';
 import { TranslationCard } from '@/components/TranslationSettings';
+import { LegalCard } from '@/components/Legal';
 import { useSession } from '../../providers';
 
 export default function Settings() {
@@ -492,7 +493,8 @@ function PrivacyCenter() {
         </div>
       </Card>
       <ConnectedApps />
-      <Card title={t('settings.data.title')}>
+      <LegalCard />
+      <Card title={t('settings.data.title')} subtitle={t('account.download.hint')}>
         <div className="row">
           <Button
             variant="secondary"
@@ -546,6 +548,7 @@ function PrivacyCenter() {
       >
         <div className="stack-sm">
           <p style={{ margin: 0 }}>{t('settings.deleteAccount.body')}</p>
+          <DeletionDetails />
           {err ? <Alert tone="danger">{err}</Alert> : null}
           <TextField
             label={t('settings.deleteAccount.password')}
@@ -556,6 +559,29 @@ function PrivacyCenter() {
           />
         </div>
       </Dialog>
+    </div>
+  );
+}
+
+/** What deleting an account removes right away, what is kept and for how long (the phone app shows the same). */
+function DeletionDetails() {
+  const { t } = useSession();
+  return (
+    <div className="stack-sm" style={{ fontSize: 14 }}>
+      {(
+        [
+          ['account.delete.now', 'account.delete.now.body'],
+          ['account.delete.kept', 'account.delete.kept.body'],
+          ['account.delete.before', 'account.delete.before.body'],
+        ] as const
+      ).map(([title, body]) => (
+        <div key={title}>
+          <strong>{t(title)}</strong>
+          <p className="muted" style={{ margin: 0 }}>
+            {t(body)}
+          </p>
+        </div>
+      ))}
     </div>
   );
 }

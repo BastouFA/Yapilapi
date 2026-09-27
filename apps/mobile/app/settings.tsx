@@ -46,6 +46,13 @@ export default function Settings() {
         end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
         onPress={() => router.push('/profile-edit')}
       />
+      <Row
+        title={t('settings.data.title')}
+        subtitle={t('m.account.hint')}
+        start={<Icon name="download-outline" size={18} color={c.yapi} />}
+        end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
+        onPress={() => router.push('/your-data')}
+      />
       <VerificationCard />
 
       <SettingsHeading>{t('m.you.space')}</SettingsHeading>
@@ -120,6 +127,14 @@ export default function Settings() {
 
       <SettingsHeading>{t('m.settings.section.security')}</SettingsHeading>
       <SessionsCard />
+
+      <Row
+        title={t('legal.title')}
+        subtitle={t('m.legal.hint')}
+        start={<Icon name="document-text-outline" size={18} color={c.inkMuted} />}
+        end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
+        onPress={() => router.push('/legal')}
+      />
       <PushAndSignOut />
     </ScrollView>
   );

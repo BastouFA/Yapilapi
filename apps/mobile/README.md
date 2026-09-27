@@ -12,6 +12,8 @@ React Native + Expo Router app for iOS and Android. It shares the API client, ty
 - **Community** (`/c/[slug]`): join or leave, and Posts, FAQ and Members tabs. Moderators can add and remove FAQ entries.
 - **Chat** (`/chat/[id]`): messages arrive over the realtime socket; audio and video call buttons in the header.
 - **Settings**: family supervision (accept or decline a link, invite a teen, and for guardians the message, daily reminder and quiet-hours controls with a week of minutes) and the advertising consent switch.
+- **Your data** (`/your-data`, from Settings): "Download my data" (the export as a JSON file, through the share sheet) and "Delete account" (explains what is deleted and kept, then asks for the password; `DELETE /v1/me`). App Store guideline 5.1.1(v) requires in-app deletion.
+- **Legal and policies** (`/legal`, from Settings, and the links on sign-up): the policies live on the web at `/legal/*` and open in the browser (`lib/legal.ts`).
 - **Usage heartbeat**: while the app is in the foreground it calls `POST /v1/me/usage/heartbeat` once a minute. A supervised teen past the daily reminder their family set sees a break prompt once a day.
 - **Calls**: see below.
 
@@ -30,6 +32,10 @@ Every string on screen goes through `t()` from `useT()` (`lib/i18n.tsx`), backed
 - **Not translated:** text from the API (error messages, moderation notes, feed reasons, assistant answers and action labels) and the iOS permission prompts in `app.json`.
 
 To try Arabic: set the phone (or simulator) language to Arabic while signed out, or set your language to Arabic on the web and sign in. Right-to-left needs a development build to check properly; it has not been run on a device yet.
+
+## Store builds
+
+`eas.json` has development, preview and production profiles, and `app.config.js` takes the API and web addresses from EAS environment variables (a production build refuses local addresses). Accounts, credentials, TestFlight, the Play internal track and the store forms are in `docs/operations/app-store.md`.
 
 ## Running it
 

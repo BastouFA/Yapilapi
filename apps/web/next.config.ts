@@ -14,7 +14,12 @@ const config: NextConfig = {
   },
   // Share videos print yapilapi.com/@username on their end card.
   async redirects() {
-    return [{ source: '/@:username', destination: '/u/:username', permanent: false }];
+    return [
+      { source: '/@:username', destination: '/u/:username', permanent: false },
+      // Short links to the policies, for app store listings, emails and printed material.
+      ...['terms', 'privacy', 'guidelines', 'cookies', 'copyright'].map((slug) => ({ source: `/${slug}`, destination: `/legal/${slug}`, permanent: false })),
+      { source: '/dmca', destination: '/legal/copyright', permanent: false },
+    ];
   },
   async headers() {
     return [

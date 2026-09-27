@@ -21,6 +21,9 @@ const PUBLIC_PAGES: [string, string][] = [
   ['login', '/login'],
   ['signup', '/signup'],
   ['forgot password', '/forgot-password'],
+  ['legal', '/legal'],
+  ['privacy policy', '/legal/privacy'],
+  ['cookie notice', '/legal/cookies'],
 ];
 
 const APP_PAGES: [string, (d: SeedData) => string][] = [
