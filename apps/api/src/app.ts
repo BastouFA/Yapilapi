@@ -47,6 +47,7 @@ import creatorModule from './modules/creator.ts';
 import developerModule from './modules/developer.ts';
 import memoryModule from './modules/memory.ts';
 import recapsModule from './modules/recaps.ts';
+import wrapsModule from './modules/wraps.ts';
 import liveModule from './modules/live.ts';
 import uploadsModule from './modules/uploads.ts';
 import callsModule from './modules/calls.ts';
@@ -89,6 +90,8 @@ import { endExpiredCampaigns } from './lib/boosts.ts';
 import { sendCountdownReminders } from './lib/stories.ts';
 import { meshRoomMedia } from './lib/room-media.ts';
 import { sweepRooms } from './lib/rooms.ts';
+import { sweepWatch } from './lib/watch.ts';
+import { sweepWeeklyWraps } from './lib/wrap.ts';
 import { maybeRunRetention } from './lib/retention.ts';
 
 export interface BuiltApp {
@@ -376,6 +379,7 @@ export async function buildApp(
     developerModule,
     memoryModule,
     recapsModule,
+    wrapsModule,
     tagsModule,
     collabsModule,
     soundsModule,
@@ -419,6 +423,7 @@ export async function buildApp(
   const viewOnceDeps = { db, config, storage, realtime: ctx.realtime, moderator: ctx.mediaModerator };
   let lastViewOnceSweep = 0;
   let lastRoomSweep = 0;
+  let lastWrapSweep = 0;
   let lastMusicRefresh = 0;
   let lastRetentionCheck = 0;
   const jobHandlers = {
@@ -455,6 +460,13 @@ export async function buildApp(
       if (Date.now() - lastRoomSweep > 10_000) {
         lastRoomSweep = Date.now();
         await sweepRooms({ db, realtime: ctx.realtime, media: ctx.roomMedia }).catch((e) => app.log.warn({ err: e.message }, 'room sweep'));
+        // Watch together: people whose player went quiet leave, the host passes on, and sessions nobody watches end.
+        await sweepWatch({ db, realtime: ctx.realtime }).catch((e) => app.log.warn({ err: e.message }, 'watch sweep'));
+      }
+      // Once a minute: weekly wraps (up to 200 at a time) for people whose Sunday evening has come (lib/wrap.ts).
+      if (Date.now() - lastWrapSweep > 60_000) {
+        lastWrapSweep = Date.now();
+        await sweepWeeklyWraps({ db, realtime: ctx.realtime }).catch((e) => app.log.warn({ err: e.message }, 'weekly wraps'));
       }
       // Every 10 minutes: songs in use are read again from their providers (withdrawn ones play silently with a note).
       if (Date.now() - lastMusicRefresh > 10 * 60_000) {

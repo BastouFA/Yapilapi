@@ -71,6 +71,16 @@ import type {
   StorySticker,
   StoryStickerInput,
   DualComposeInput,
+  PulseCards,
+  WatchPlayback,
+  WatchQueueResult,
+  WatchReaction,
+  WatchSession,
+  WatchSkipReason,
+  WatchSummary,
+  WeeklyWrap,
+  WeeklyWrapCard,
+  WeeklyWrapSettings,
 } from '@yapilapi/shared';
 
 export class ApiError extends Error {
@@ -714,6 +724,69 @@ export function createClient(opts: ClientOptions) {
       startRoom: (slug: string, b: { title: string; scheduledFor?: string }) => post<{ room: RoomSummary }>(`/v1/communities/${slug}/rooms`, b),
     },
     /** Live audio rooms. Audio is WebRTC (see RoomMediaSession); these calls manage who is in the room and relay signaling. */
+    /**
+     * Watch together: people in a one-to-one chat or a group of up to 8 watch reels and video
+     * posts at the same time. Realtime events go only to people watching: `watch.playback`
+     * ({ sessionId, playback, serverTime, skipped? }), `watch.updated` ({ sessionId, reason }: read
+     * the session again), `watch.reaction` ({ sessionId, userId, kind }); and to everyone in the
+     * chat: `watch.started` and `watch.ended` ({ sessionId, conversationId }). The side chat is the
+     * conversation (conversations.send).
+     */
+    watch: {
+      /** Start in a chat, or join the session already running there. `postIds` go in the queue (only ones everyone in the chat can see). */
+      start: (conversationId: string, postIds: string[] = []) => post<WatchQueueResult & { created: boolean }>('/v1/watch', { conversationId, postIds }),
+      /** The session running in a chat, if any. */
+      forChat: (conversationId: string) => get<{ session: WatchSummary | null }>(`/v1/conversations/${conversationId}/watch`),
+      get: (id: string) => get<{ session: WatchSession }>(`/v1/watch/${id}`),
+      join: (id: string) => post<{ session: WatchSession }>(`/v1/watch/${id}/join`),
+      leave: (id: string) => post<{ ok: true }>(`/v1/watch/${id}/leave`),
+      /** The host ends it for everyone. */
+      end: (id: string) => post<{ ok: true }>(`/v1/watch/${id}/end`),
+      add: (id: string, postIds: string[]) => post<WatchQueueResult>(`/v1/watch/${id}/queue`, { postIds }),
+      remove: (id: string, itemId: string) => del<{ session: WatchSession }>(`/v1/watch/${id}/queue/${itemId}`),
+      /**
+       * Play, pause, seek, next or jump. `atServerMs` is your estimate of the server's clock when
+       * you read `positionMs` (Date.now() plus the clock offset from `clockSample`).
+       */
+      control: (
+        id: string,
+        c:
+          | { action: 'play' | 'pause'; positionMs?: number; atServerMs?: number }
+          | { action: 'seek'; positionMs: number; atServerMs?: number }
+          | { action: 'next'; fromItemId?: string }
+          | { action: 'jump'; itemId: string },
+      ) => post<{ playback: WatchPlayback; skipped: WatchSkipReason[]; serverTime: number }>(`/v1/watch/${id}/control`, c),
+      /** Every WATCH_HEARTBEAT_MS while watching. The host also sends its player's position, item and the playback `seq` it follows. */
+      heartbeat: (id: string, b: { positionMs?: number; itemId?: string | null; seq?: number; atServerMs?: number } = {}) =>
+        post<{ ok: true; serverTime: number }>(`/v1/watch/${id}/heartbeat`, b),
+      react: (id: string, kind: WatchReaction) => post<{ ok: true }>(`/v1/watch/${id}/reactions`, { kind }),
+    },
+    /** The weekly wrap (private to you) and the cards on Pulse. */
+    wraps: {
+      settings: () => get<{ settings: WeeklyWrapSettings }>('/v1/me/weekly-wrap'),
+      updateSettings: (b: { enabled?: boolean; notify?: boolean; timezone?: string }) => put<{ settings: WeeklyWrapSettings }>('/v1/me/weekly-wrap', b),
+      /** This week's wrap card and "On this day". Pass the device's time zone (Intl.DateTimeFormat().resolvedOptions().timeZone). */
+      pulseCards: (tz?: string) => get<PulseCards>(`/v1/me/pulse-cards${qs({ tz })}`),
+      list: () => get<{ items: WeeklyWrapCard[] }>('/v1/wraps'),
+      get: (id: string) => get<{ wrap: WeeklyWrap }>(`/v1/wraps/${id}`),
+      dismiss: (id: string) => post<{ ok: true }>(`/v1/wraps/${id}/dismiss`),
+      remove: (id: string) => del<{ ok: true }>(`/v1/wraps/${id}`),
+      /** The card image's address (on the web the session cookie goes with it; elsewhere use `cardImage`). */
+      cardUrl: (id: string) => `${opts.baseUrl}/v1/wraps/${id}/card.png`,
+      /** The card image as a PNG, signed in. */
+      cardImage: async (id: string): Promise<Blob> => {
+        const headers: Record<string, string> = {};
+        if (opts.token) headers.authorization = `Bearer ${opts.token}`;
+        let res: Response;
+        try {
+          res = await f(`${opts.baseUrl}/v1/wraps/${id}/card.png`, { headers, credentials: 'include' });
+        } catch {
+          throw new ApiError(0, 'network', "Can't reach YAPILAPI. Check your connection and try again.");
+        }
+        if (!res.ok) throw new ApiError(res.status, 'error', 'This wrap is no longer available.');
+        return res.blob();
+      },
+    },
     rooms: {
       get: (id: string) => get<RoomEnvelope>(`/v1/rooms/${id}`),
       join: (id: string) => post<RoomEnvelope>(`/v1/rooms/${id}/join`),

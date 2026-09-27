@@ -105,6 +105,8 @@ const TEXT: Record<string, (actor: string) => string> = {
   scheduled_post_failed: () => "A scheduled post couldn't be published. It's back in your drafts",
   recap_ready: () => 'Your recap video is ready',
   recap_failed: () => "We couldn't make your recap video",
+  watch_invite: (a) => `${a} wants to watch together`,
+  weekly_wrap: () => 'Your week in YAPILAPI is ready to look back on',
 };
 
 /** Human text for a notification type, or null for types that shouldn't push. */

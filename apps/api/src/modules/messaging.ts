@@ -41,6 +41,7 @@ import { mediaIdsOf, messagePreviews, messageVisibleSql, reactionSummaries, revo
 import { langOf } from '../lib/translation.ts';
 import { listsFor, myReminders, pollsFor } from '../lib/chat-polls.ts';
 import { registerChatPollsLists } from './chat-polls-lists.ts';
+import { registerWatch } from './watch.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 
@@ -1069,16 +1070,18 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     return { items: rows };
   });
 
-  // Polls, shared lists and reminders (modules/chat-polls-lists.ts).
-  registerChatPollsLists(app, ctx, {
+  // Polls, shared lists and reminders (modules/chat-polls-lists.ts), and watch together (modules/watch.ts).
+  const chatHelpers = {
     assertMember,
     memberIds,
     notBlocking,
     assertCanMessage,
     assertGroupSafe,
-    messageFor: (messageId, userId) => messageFor(messageId, userId),
+    messageFor: (messageId: string, userId: string) => messageFor(messageId, userId),
     loadMessage,
-  });
+  };
+  registerChatPollsLists(app, ctx, chatHelpers);
+  registerWatch(app, ctx, chatHelpers);
 
   // ── Realtime socket ───────────────────────────────────────────────────
   /** A 60-second ticket for opening the realtime socket from another origin (see lib/realtime-ticket.ts). */
