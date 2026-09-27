@@ -27,6 +27,13 @@ function Heartbeat() {
 function Screens() {
   const c = useColors();
   const { t } = useT();
+  // A screen opened straight from a link or a notification has nothing behind it: give it a way home.
+  const homeWhenAlone = ({ canGoBack }: { canGoBack?: boolean }) =>
+    canGoBack ? null : (
+      <Pressable accessibilityRole="button" accessibilityLabel={t('nav.home')} hitSlop={12} onPress={() => router.replace('/')}>
+        <Text style={{ color: c.yapi, fontSize: 17, fontWeight: '600' }}>{t('nav.home')}</Text>
+      </Pressable>
+    );
   // Sheets (modal screens) get a Cancel at the top, so there's always a way out besides swiping down.
   const closeButton = () => (
     <Pressable accessibilityRole="button" hitSlop={12} onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}>
@@ -44,6 +51,7 @@ function Screens() {
           headerShadowVisible: false,
           headerBackButtonDisplayMode: 'minimal',
           contentStyle: { backgroundColor: c.ground },
+          headerLeft: homeWhenAlone,
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false, title: t('nav.home') }} />
