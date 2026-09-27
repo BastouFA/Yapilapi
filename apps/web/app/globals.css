@@ -6057,3 +6057,26 @@ button.yp-chip[aria-pressed='true'] {
   gap: var(--space-2) var(--space-4);
   margin-top: var(--space-3);
 }
+
+/* Pulse header: search, Reels and the notifications bell sit together on the right. */
+.home__actions {
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+}
+.home__bell {
+  position: relative;
+}
+.home__bell-count {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 7px;
+  background: var(--grad);
+  color: var(--on-yapi);
+  font: 700 10px/18px var(--font-sans);
+  text-align: center;
+  pointer-events: none;
+}

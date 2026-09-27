@@ -2395,6 +2395,8 @@ const en = {
   'm.chat.systemReminder': 'Reminder from {name}: {text}',
   'm.chat.systemReminderGone': 'Reminder from {name} about a message that is no longer here',
   'm.notif.chatReminder': 'You asked to be reminded about a message in a chat.',
+  'home.search': 'Search',
+  'home.notificationsUnread': 'Notifications, {count} unread',
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -4811,6 +4813,8 @@ const fr: Catalog = {
   'm.chat.systemReminder': 'Rappel de {name} : {text}',
   'm.chat.systemReminderGone': 'Rappel de {name} à propos d’un message qui n’est plus là',
   'm.notif.chatReminder': 'Vous avez demandé un rappel à propos d’un message dans une discussion.',
+  'home.search': 'Rechercher',
+  'home.notificationsUnread': 'Notifications, {count} non lues',
 };
 
 const ar: Catalog = {
@@ -7188,6 +7192,8 @@ const ar: Catalog = {
   'm.chat.systemReminder': 'تذكير من {name}: {text}',
   'm.chat.systemReminderGone': 'تذكير من {name} بشأن رسالة لم تعد موجودة',
   'm.notif.chatReminder': 'طلبت تذكيرك برسالة في إحدى المحادثات.',
+  'home.search': 'بحث',
+  'home.notificationsUnread': 'الإشعارات، {count} غير مقروءة',
 };
 
 const es: Catalog = {
@@ -9584,6 +9590,8 @@ const es: Catalog = {
   'm.chat.systemReminder': 'Recordatorio de {name}: {text}',
   'm.chat.systemReminderGone': 'Recordatorio de {name} sobre un mensaje que ya no está',
   'm.notif.chatReminder': 'Pediste que te recordáramos un mensaje de un chat.',
+  'home.search': 'Buscar',
+  'home.notificationsUnread': 'Notificaciones, {count} sin leer',
 };
 
 const pt: Catalog = {
@@ -11977,6 +11985,8 @@ const pt: Catalog = {
   'm.chat.systemReminder': 'Lembrete de {name}: {text}',
   'm.chat.systemReminderGone': 'Lembrete de {name} sobre uma mensagem que não está mais aqui',
   'm.notif.chatReminder': 'Você pediu um lembrete sobre uma mensagem em uma conversa.',
+  'home.search': 'Pesquisar',
+  'home.notificationsUnread': 'Notificações, {count} não lidas',
 };
 
 const sw: Catalog = {
@@ -14373,6 +14383,8 @@ const sw: Catalog = {
   'm.chat.systemReminder': 'Kikumbusho kutoka kwa {name}: {text}',
   'm.chat.systemReminderGone': 'Kikumbusho kutoka kwa {name} kuhusu ujumbe ambao haupo tena',
   'm.notif.chatReminder': 'Uliomba ukumbushwe kuhusu ujumbe kwenye mazungumzo.',
+  'home.search': 'Tafuta',
+  'home.notificationsUnread': 'Arifa, {count} hazijasomwa',
 };
 
 const yo: Catalog = {
@@ -16763,6 +16775,8 @@ const yo: Catalog = {
   'm.chat.systemReminder': 'Ìránnilétí láti ọ̀dọ̀ {name}: {text}',
   'm.chat.systemReminderGone': 'Ìránnilétí láti ọ̀dọ̀ {name} nípa ọ̀rọ̀ kan tí kò sí mọ́',
   'm.notif.chatReminder': 'O béèrè pé kí a rán ọ létí nípa ọ̀rọ̀ kan nínú ìjíròrò.',
+  'home.search': 'Wá',
+  'home.notificationsUnread': 'Ìfitónilétí, {count} tí a kò tíì kà',
 };
 
 const ha: Catalog = {
@@ -19160,6 +19174,8 @@ const ha: Catalog = {
   'm.chat.systemReminder': 'Tunatarwa daga {name}: {text}',
   'm.chat.systemReminderGone': 'Tunatarwa daga {name} game da saƙon da babu shi yanzu',
   'm.notif.chatReminder': 'Ka nemi a tuna maka game da wani saƙo a cikin hira.',
+  'home.search': 'Nema',
+  'home.notificationsUnread': 'Sanarwa, {count} ba a karanta ba',
 };
 
 export const CATALOGS: Record<string, Catalog> = { en, fr, ar, es, pt, sw, yo, ha };

@@ -33,12 +33,13 @@ export default function Home() {
     <div className="yp-shell__inner">
       <div className="yp-topbar">
         <h1>{t('nav.home')}</h1>
-        <div className="row">
-          <Link href="/search" className="yp-action home__search" aria-label="Search">
+        {/* Icons on the right keep the title on one line at phone widths. */}
+        <div className="row home__actions">
+          <Link href="/search" className="yp-action home__search" aria-label={t('home.search')}>
             <Icon name="search" />
           </Link>
           <Link href="/reels" className="yp-btn yp-btn--secondary yp-btn--sm">
-            Reels
+            {t('m.title.reels')}
           </Link>
           {flags.REAL ? (
             <Link href="/real" className="yp-btn yp-btn--ghost yp-btn--sm">
@@ -50,11 +51,19 @@ export default function Home() {
               Together
             </Link>
           ) : null}
+          <Link
+            href="/notifications"
+            className="yp-action home__bell"
+            aria-label={unread.notifications ? t('home.notificationsUnread', { count: unread.notifications }) : t('notifications.title')}
+          >
+            <Icon name="bell" />
+            {unread.notifications ? (
+              <span className="home__bell-count" aria-hidden>
+                {unread.notifications > 99 ? '99+' : unread.notifications}
+              </span>
+            ) : null}
+          </Link>
         </div>
-        <Link href="/notifications" className="yp-btn yp-btn--ghost" aria-label={`${t('notifications.title')}, ${unread.notifications} unread`}>
-          {t('notifications.title')}
-          {unread.notifications ? <span className="yp-unread">{unread.notifications}</span> : null}
-        </Link>
       </div>
 
       <MomentsStrip groups={moments} onOpen={setViewing} onCreate={() => router.push('/camera?mode=story')} locale={locale} />
