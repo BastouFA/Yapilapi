@@ -49,13 +49,13 @@ test('skip link and primary navigation', async ({ page, isMobile }) => {
   expect(await focusInside(page, 'main#main'), `after the skip link, Tab should land in main: ${await focused(page)}`).toBe(true);
 
   const nav = page.getByRole('navigation', { name: 'Primary' });
-  await expect(nav.getByRole('link', { name: 'Home', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(nav.getByRole('link', { name: 'Pulse', exact: true })).toHaveAttribute('aria-current', 'page');
   // Every destination is a real link, reachable with Tab in visual order.
   await page.goto('/home');
   await page.waitForLoadState('networkidle');
   // On phones the wordmark is hidden and the bar sits at the bottom, but it still comes first in tab order.
   // Search sits under the wordmark on wide screens; phones have it in the page header instead.
-  const expected = ['Skip to content', ...(isMobile ? [] : ['YAPILAPI', 'Search']), 'Home', 'Discover', 'Create', 'Inbox', 'Profile'];
+  const expected = ['Skip to content', ...(isMobile ? [] : ['YAPILAPI', 'Search']), 'Pulse', 'Wander', 'Spark', 'Yap', 'You'];
   const order: string[] = [];
   for (const _ of expected) {
     await page.keyboard.press('Tab');

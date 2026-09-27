@@ -9,7 +9,7 @@ let pending: Pending | null = null;
 const EVENT = 'yp:pending-media';
 
 /**
- * Open the system photo and video chooser right away, from the tap on "+" itself (browsers only open it
+ * Open the system photo and video chooser right away, from the tap on Spark or "+" itself (browsers only open it
  * during a tap). On phones that chooser also offers the camera. What's picked is handed to the Create
  * page, which is opened at the same time, so it arrives with the files ready to edit. Cancelling just
  * leaves you on Create to write a text post.
@@ -41,14 +41,14 @@ export function deliverPendingMedia(files: File[], mode: CreateMode) {
   window.dispatchEvent(new Event(EVENT));
 }
 
-/** Files picked from "+", once. */
+/** Files picked from Spark or "+", once. */
 export function takePendingMedia(): Pending | null {
   const p = pending;
   pending = null;
   return p;
 }
 
-/** Call `fn` whenever files are picked from "+" (the Create page may already be open). */
+/** Call `fn` whenever files are picked from Spark or "+" (the Create page may already be open). */
 export function onPendingMedia(fn: () => void): () => void {
   window.addEventListener(EVENT, fn);
   return () => window.removeEventListener(EVENT, fn);

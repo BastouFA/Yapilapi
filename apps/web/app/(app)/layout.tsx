@@ -64,10 +64,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const items: NavEntry[] = [
     { id: 'home', href: '/home' },
     { id: 'discover', href: '/discover' },
-    // "+" opens the camera, where you choose Post, Reel or Story (or the gallery, or writing).
+    // Spark opens the camera, where you choose Post, Reel or Story (or the gallery, or writing).
     { id: 'create', href: '/camera' },
     { id: 'inbox', href: '/inbox', badge: unread.messages + unread.notifications },
-    { id: 'profile', href: `/u/${me.username}` },
+    { id: 'profile', href: `/u/${me.username}`, avatar: { name: me.displayName, src: me.avatarUrl } },
   ];
 
   return (

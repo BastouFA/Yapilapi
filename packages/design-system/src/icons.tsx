@@ -1,3 +1,5 @@
+import { glyphPath, NAV_GLYPH_DIRECTIONAL, NAV_GLYPH_STROKE, NAV_GLYPHS, type NavGlyphName } from '@yapilapi/shared';
+
 /** 24px outline icons, 1.5px stroke, drawn in currentColor. */
 const PATHS = {
   plus: ['M12 5v14', 'M5 12h14'],
@@ -69,31 +71,49 @@ const PATHS = {
   eye: ['M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z', 'M12 14.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z'],
 } as const;
 
-export type IconName = keyof typeof PATHS;
-export const ICON_NAMES = Object.keys(PATHS) as IconName[];
+export type IconName = keyof typeof PATHS | NavGlyphName;
+export const ICON_NAMES = [...Object.keys(PATHS), ...Object.keys(NAV_GLYPHS)] as IconName[];
 
 /** Icons that point along the reading direction; they mirror in right-to-left layouts. */
-const DIRECTIONAL = new Set<IconName>(['chevron-right', 'chevron-left', 'arrow-left', 'send', 'logout']);
+const DIRECTIONAL = new Set<IconName>(['chevron-right', 'chevron-left', 'arrow-left', 'send', 'logout', ...NAV_GLYPH_DIRECTIONAL]);
+
+const isGlyph = (name: IconName): name is NavGlyphName => name in NAV_GLYPHS;
+
+/**
+ * The navigation's own symbols (pulse, wander, spark, yap), from geometry shared with the mobile
+ * app. 1.75px stroke; `filled` is the duotone active state (a soft fill behind the line). The
+ * `yp-glyph__fill` parts can be made solid from CSS (`fill-opacity: 1`), as the Spark button does.
+ */
+function Glyph({ name, filled }: { name: NavGlyphName; filled?: boolean }) {
+  return NAV_GLYPHS[name].map((s, i) =>
+    s.kind === 'dot' ? (
+      <circle key={i} cx={s.cx} cy={s.cy} r={s.d / 2} fill="currentColor" stroke="none" />
+    ) : s.fill === 'solid' ? (
+      <path key={i} d={glyphPath(s)} fill="currentColor" stroke="none" />
+    ) : (
+      <path key={i} className="yp-glyph__fill" d={glyphPath(s)} fill="currentColor" fillOpacity={filled ? 0.22 : 0} />
+    ),
+  );
+}
 
 export function Icon({ name, size = 20, label, className, filled }: { name: IconName; size?: number; label?: string; className?: string; filled?: boolean }) {
+  const glyph = isGlyph(name);
   return (
     <svg
       className={DIRECTIONAL.has(name) ? [className, 'yp-icon--directional'].filter(Boolean).join(' ') : className}
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill={filled ? 'currentColor' : 'none'}
+      fill={filled && !glyph ? 'currentColor' : 'none'}
       stroke="currentColor"
-      strokeWidth={1.5}
+      strokeWidth={glyph ? NAV_GLYPH_STROKE : 1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden={label ? undefined : true}
       role={label ? 'img' : undefined}
       aria-label={label}
     >
-      {PATHS[name].map((d, i) => (
-        <path key={i} d={d} />
-      ))}
+      {glyph ? <Glyph name={name} filled={filled} /> : PATHS[name].map((d, i) => <path key={i} d={d} />)}
     </svg>
   );
 }

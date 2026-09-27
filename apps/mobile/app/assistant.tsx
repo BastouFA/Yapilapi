@@ -9,7 +9,7 @@ import { space } from '../lib/theme';
 import { Button, Card, Field, Notice, Row, Screen, Segmented, useColors, userText } from '../lib/ui';
 
 const KINDS: { id: AgentKind; label: MessageKey; placeholder: MessageKey }[] = [
-  { id: 'discover', label: 'nav.discover', placeholder: 'm.assistant.placeholder.discover' },
+  { id: 'discover', label: 'm.assistant.kind.discover', placeholder: 'm.assistant.placeholder.discover' },
   { id: 'travel', label: 'm.assistant.kind.travel', placeholder: 'm.assistant.placeholder.travel' },
   { id: 'shopping', label: 'm.assistant.kind.shopping', placeholder: 'm.assistant.placeholder.shopping' },
   { id: 'business', label: 'm.assistant.kind.business', placeholder: 'm.assistant.placeholder.business' },
