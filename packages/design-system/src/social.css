@@ -152,7 +152,8 @@ a.yp-aside-row:hover {
   }
 }
 .yp-nav__brand,
-.yp-nav__search {
+.yp-nav__search,
+.yp-nav__foot {
   display: none;
 }
 .yp-nav__list {
@@ -568,6 +569,13 @@ a.yp-aside-row:hover {
     position: static;
     margin-inline-start: auto;
     box-shadow: none;
+  }
+  /* The account button sits at the bottom of the rail. */
+  .yp-nav__foot {
+    display: block;
+    position: relative;
+    margin-top: auto;
+    padding-top: var(--space-4);
   }
   @supports (corner-shape: squircle) {
     .yp-nav {

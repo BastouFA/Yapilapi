@@ -94,8 +94,8 @@ function hrefFor(n: NotificationItem): string | undefined {
   if (n.entityType === 'event') return `/events/${n.entityId}`;
   if (n.entityType === 'friend_request') return '/inbox';
   if (n.entityType === 'conversation') return `/inbox/${n.entityId}`;
-  if (n.entityType === 'moderation_case') return '/settings#moderation';
-  if (n.type === 'account_limited' || n.type === 'account_review') return '/settings#moderation';
+  if (n.entityType === 'moderation_case') return '/settings/safety#moderation';
+  if (n.type === 'account_limited' || n.type === 'account_review') return '/settings/safety#moderation';
   if (n.actor) return `/u/${n.actor.username}`;
   return undefined;
 }

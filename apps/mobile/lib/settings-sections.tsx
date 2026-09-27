@@ -1,147 +1,23 @@
+/**
+ * Settings sections moved from the old single Settings screen: sharing, photo tags, hidden words,
+ * data saver, translation, sponsored posts and family supervision (same endpoints as the web).
+ */
 import { useCallback, useEffect, useState } from 'react';
-import { router } from 'expo-router';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import type { FamilyLink, SharingSettings, TeenControls } from '../../../packages/api-client/src/index';
 import type { TagPermission } from '../../../packages/shared/src/types';
-import { client, errorMessage } from '../lib/api';
-import { useT, type Translator } from '../lib/i18n';
-import { useSession } from '../lib/session';
-import { radius, space } from '../lib/theme';
-import { Avatar, Button, Card, Field, Icon, Loading, Notice, Row, Segmented, SwitchRow, Title, useColors, userText } from '../lib/ui';
-import { VerificationCard } from '../lib/safety';
-import { registerForPush } from '../lib/push';
-import { CAN_DETECT_CELLULAR, useDataSaver, type DeviceDataSaver } from '../lib/data-saver';
+import { client, errorMessage } from './api';
+import { useT, type Translator } from './i18n';
+import { radius, space } from './theme';
+import { Avatar, Button, Card, Field, Icon, Loading, Notice, Segmented, SwitchRow, Title, useColors, userText } from './ui';
+import { CAN_DETECT_CELLULAR, useDataSaver, type DeviceDataSaver } from './data-saver';
 import type { DataSaverMode } from '../../../packages/shared/src/data-saver';
 import { HIDDEN_WORD_MAX, HIDDEN_WORDS_MAX } from '../../../packages/shared/src/constants';
 import { baseLanguage, languageName, MAX_UNDERSTOOD_LANGUAGES, TRANSLATION_LANGUAGES } from '../../../packages/shared/src/translation';
-import { useTranslationSettings } from '../lib/translation';
-import { BlockedAccounts, DataUseSettings, FeedSettings, NotificationSettings, SessionsCard, SettingsHeading } from '../lib/settings-more';
-
-/**
- * Settings, in groups: your account, your space, notifications and feed, privacy and safety, data
- * and language, family, and security (same endpoints as the web settings page).
- */
-export default function Settings() {
-  const c = useColors();
-  const { t } = useT();
-  const { me } = useSession();
-  if (me === undefined) return <Loading />;
-  if (!me)
-    return (
-      <View style={{ flex: 1, backgroundColor: c.ground, padding: space[4] }}>
-        <Notice>{t('m.common.signedOut')}</Notice>
-      </View>
-    );
-  return (
-    <ScrollView
-      style={{ backgroundColor: c.ground }}
-      contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <SettingsHeading>{t('m.settings.section.account')}</SettingsHeading>
-      <Row
-        title={t('profile.edit')}
-        subtitle={t('m.settings.editProfileHint')}
-        start={<Icon name="person-circle-outline" size={18} color={c.yapi} />}
-        end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
-        onPress={() => router.push('/profile-edit')}
-      />
-      <Row
-        title={t('settings.data.title')}
-        subtitle={t('m.account.hint')}
-        start={<Icon name="download-outline" size={18} color={c.yapi} />}
-        end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
-        onPress={() => router.push('/your-data')}
-      />
-      <VerificationCard />
-
-      <SettingsHeading>{t('m.you.space')}</SettingsHeading>
-      <Row
-        title={t('m.closeFriends.title')}
-        subtitle={t('m.closeFriends.manage')}
-        start={<View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: c.closeFriends }} />}
-        end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
-        onPress={() => router.push('/close-friends')}
-      />
-      <Row
-        title={t('m.circles.title')}
-        subtitle={t('m.circles.manage')}
-        start={<Icon name="ellipse-outline" size={18} color={c.yapi} />}
-        end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
-        onPress={() => router.push('/circles')}
-      />
-      <Row
-        title={t('m.saved.title')}
-        subtitle={t('m.settings.savedHint')}
-        start={<Icon name="bookmark-outline" size={18} color={c.inkMuted} />}
-        end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
-        onPress={() => router.push('/saved')}
-      />
-      <Row
-        title={t('m.drafts.title')}
-        subtitle={t('m.settings.draftsHint')}
-        start={<Icon name="document-text-outline" size={18} color={c.inkMuted} />}
-        end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
-        onPress={() => router.push('/drafts')}
-      />
-      <Row
-        title={t('m.archive.title')}
-        subtitle={t('m.archive.manage')}
-        start={<Icon name="archive-outline" size={18} color={c.inkMuted} />}
-        end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
-        onPress={() => router.push('/archive')}
-      />
-      <Row
-        title={t('m.recap.title')}
-        subtitle={t('m.recap.manage')}
-        start={<Icon name="film-outline" size={18} color={c.inkMuted} />}
-        end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
-        onPress={() => router.push('/recaps')}
-      />
-      <Row
-        title={t('plus.title')}
-        subtitle={t('m.plus.settingsHint')}
-        start={<Icon name="sparkles-outline" size={18} color={c.inkMuted} />}
-        end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
-        onPress={() => router.push('/plus')}
-      />
-
-      <SettingsHeading>{t('m.settings.section.attention')}</SettingsHeading>
-      <NotificationSettings />
-      <FeedSettings />
-
-      <SettingsHeading>{t('m.settings.section.privacy')}</SettingsHeading>
-      <Sharing />
-      <Tagging />
-      <HiddenWords />
-      <DataUseSettings />
-      <Advertising />
-      <BlockedAccounts />
-
-      <SettingsHeading>{t('m.settings.section.data')}</SettingsHeading>
-      <DataSaver />
-      <Translation />
-
-      <SettingsHeading>{t('m.family.title')}</SettingsHeading>
-      <Family />
-
-      <SettingsHeading>{t('m.settings.section.security')}</SettingsHeading>
-      <SessionsCard />
-
-      <Row
-        title={t('legal.title')}
-        subtitle={t('m.legal.hint')}
-        start={<Icon name="document-text-outline" size={18} color={c.inkMuted} />}
-        end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
-        onPress={() => router.push('/legal')}
-      />
-      <PushAndSignOut />
-    </ScrollView>
-  );
-}
+import { useTranslationSettings } from './translation';
 
 /** "Let people who have my email or phone number find me" and "Allow downloads of my reels". Both stay off under 18. */
-function Sharing() {
+export function Sharing() {
   const { t } = useT();
   const [settings, setSettings] = useState<SharingSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -192,7 +68,7 @@ function Sharing() {
 }
 
 /** Who can tag you in photos: everyone, people you follow, or no one. */
-function Tagging() {
+export function Tagging() {
   const c = useColors();
   const { t } = useT();
   const [allowFrom, setAllowFrom] = useState<TagPermission | null>(null);
@@ -250,7 +126,7 @@ function Tagging() {
 }
 
 /** Hidden words: comments on your posts containing one are hidden from everyone but their writer. */
-function HiddenWords() {
+export function HiddenWords() {
   const c = useColors();
   const { t } = useT();
   const [words, setWords] = useState<string[] | null>(null);
@@ -348,7 +224,7 @@ function HiddenWords() {
  * and this phone's own choice. Automatic needs to know Wi-Fi from mobile data, which this
  * app can't tell yet, so on the phone it works like Off and the card says so.
  */
-function DataSaver() {
+export function DataSaver() {
   const c = useColors();
   const { t } = useT();
   const ds = useDataSaver();
@@ -403,7 +279,7 @@ function DataSaver() {
  * "Languages I understand" (the app's language always counts, so it's ticked and fixed)
  * and "Translate automatically" (off by default). Saved on the account.
  */
-function Translation() {
+export function Translation() {
   const c = useColors();
   const { t, lang, locale } = useT();
   const { enabled, settings, save } = useTranslationSettings();
@@ -461,7 +337,7 @@ function Translation() {
   );
 }
 
-function Advertising() {
+export function Advertising() {
   const { t } = useT();
   const [granted, setGranted] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -509,7 +385,7 @@ function describe(ctl: TeenControls, { t }: Translator): string {
  * who the teen can message, a daily reminder and quiet hours, and see daily minutes. They
  * never see messages or activity.
  */
-function Family() {
+export function Family() {
   const c = useColors();
   const i18n = useT();
   const { t } = i18n;
@@ -711,28 +587,6 @@ function GuardianControls({ link, onSaved }: { link: FamilyLink; onSaved: () => 
           }
         }}
       />
-    </View>
-  );
-}
-
-/** Phone notifications and signing out (moved here from the profile so the profile shows your posts first). */
-function PushAndSignOut() {
-  const { t } = useT();
-  const { signOut } = useSession();
-  const [note, setNote] = useState<string | null>(null);
-  return (
-    <View style={{ gap: space[3] }}>
-      <Button
-        label={t('m.push.enable')}
-        icon="notifications-outline"
-        variant="secondary"
-        onPress={async () => {
-          const r = await registerForPush().catch(() => 'unavailable' as const);
-          setNote(r === 'registered' ? t('m.push.on') : r === 'denied' ? t('m.push.blocked') : t('m.push.unavailable'));
-        }}
-      />
-      {note ? <Notice>{note}</Notice> : null}
-      <Button label={t('auth.logout')} variant="ghost" onPress={signOut} />
     </View>
   );
 }

@@ -83,7 +83,88 @@ export async function usernameAvailable(username: string): Promise<boolean | nul
   }
 }
 
+/** Ends this session on the API (when reachable) and forgets its token on the phone. */
 export async function signOut() {
-  (await client()).auth.logout().catch(() => {});
+  await (
+    await client()
+  ).auth
+    .logout()
+    .then(() => {})
+    .catch(() => {});
   await SecureStore.deleteItemAsync(TOKEN_KEY);
 }
+
+// ── Accounts on this phone ──────────────────────────────────────────────
+// Up to MAX_ACCOUNTS signed-in accounts. Each keeps its own session token in the keychain
+// (`ypl_session_<id>`); the one in use is also under TOKEN_KEY, which every request reads. The
+// list itself (names and photos, no tokens) is in `ypl_accounts`.
+
+export const MAX_ACCOUNTS = 5;
+const ACCOUNTS_KEY = 'ypl_accounts';
+const tokenKey = (id: string) => `ypl_session_${id}`;
+
+export type StoredAccount = { id: string; username: string; displayName: string; avatarUrl: string | null };
+
+export async function storedAccounts(): Promise<StoredAccount[]> {
+  try {
+    const list = JSON.parse((await SecureStore.getItemAsync(ACCOUNTS_KEY)) ?? '[]');
+    return Array.isArray(list) ? list.filter((a) => a && typeof a.id === 'string').slice(0, MAX_ACCOUNTS) : [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveAccounts(list: StoredAccount[]) {
+  await SecureStore.setItemAsync(ACCOUNTS_KEY, JSON.stringify(list.slice(0, MAX_ACCOUNTS)));
+}
+
+/** The account in use joins the list (or its name and photo are updated), with its own copy of the token. */
+export async function rememberAccount(me: Me): Promise<StoredAccount[]> {
+  const token = await getToken();
+  const list = await storedAccounts();
+  if (!token) return list;
+  await SecureStore.setItemAsync(tokenKey(me.id), token);
+  const entry: StoredAccount = { id: me.id, username: me.username, displayName: me.displayName, avatarUrl: me.avatarUrl ?? null };
+  const at = list.findIndex((a) => a.id === me.id);
+  const next = at >= 0 ? list.map((a, i) => (i === at ? entry : a)) : [...list, entry];
+  // A new account past the limit (made from the add-account screens): the oldest one leaves this phone.
+  while (next.length > MAX_ACCOUNTS) await SecureStore.deleteItemAsync(tokenKey(next.shift()!.id)).catch(() => {});
+  await saveAccounts(next);
+  return next;
+}
+
+/** Makes a saved account the one in use (its token under TOKEN_KEY). False when its token is gone. */
+export async function activateAccount(id: string): Promise<boolean> {
+  const token = await SecureStore.getItemAsync(tokenKey(id));
+  if (!token) return false;
+  await SecureStore.setItemAsync(TOKEN_KEY, token);
+  return true;
+}
+
+/** Removes an account from this phone: its token and its place in the list. */
+export async function forgetAccount(id: string): Promise<StoredAccount[]> {
+  await SecureStore.deleteItemAsync(tokenKey(id)).catch(() => {});
+  const next = (await storedAccounts()).filter((a) => a.id !== id);
+  await saveAccounts(next);
+  return next;
+}
+
+/** The saved account whose token this is (when the session in use has ended, to forget the right one). */
+export async function accountWithToken(token: string): Promise<string | null> {
+  for (const a of await storedAccounts()) if ((await SecureStore.getItemAsync(tokenKey(a.id))) === token) return a.id;
+  return null;
+}
+
+/** Logs out an account that isn't the one in use (its session ends on the API too). */
+export async function signOutStoredAccount(id: string) {
+  const token = await SecureStore.getItemAsync(tokenKey(id));
+  if (token)
+    await createClient({ baseUrl, token, fetch: trackedFetch })
+      .auth.logout()
+      .then(() => {})
+      .catch(() => {});
+  return forgetAccount(id);
+}
+
+/** The token in use, to put back if switching to another account fails. */
+export const restoreToken = async (token: string | undefined) => (token ? SecureStore.setItemAsync(TOKEN_KEY, token) : SecureStore.deleteItemAsync(TOKEN_KEY));

@@ -788,7 +788,7 @@ function Create() {
           ) : null}
           {kind === 'story' && visibility === 'close_friends' ? (
             <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-              {t('compose.closeFriendsHint')} <Link href="/settings#close-friends">{t('compose.editList')}</Link>
+              {t('compose.closeFriendsHint')} <Link href="/settings/privacy#close-friends">{t('compose.editList')}</Link>
             </p>
           ) : null}
           {kind === 'reel' ? (

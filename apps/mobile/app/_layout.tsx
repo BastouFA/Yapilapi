@@ -14,6 +14,11 @@ import { useUsageHeartbeat } from '../lib/usage';
 import { YapPlayer } from '../lib/yaps';
 import { useNotificationLinks } from '../lib/links';
 import { OfflineBanner } from '../lib/offline';
+import { AccountMenuProvider } from '../lib/account-menu';
+import { loadAppearance } from '../lib/appearance';
+
+// A chosen Light or Dark appearance applies before the first screen draws.
+void loadAppearance();
 
 function Heartbeat() {
   const { me } = useSession();
@@ -101,7 +106,8 @@ function Screens() {
         <Stack.Screen name="forgot-password" options={{ title: '' }} />
         <Stack.Screen name="c/[slug]" options={{ title: t('m.title.community') }} />
         <Stack.Screen name="room/[id]" options={{ title: t('m.rooms.title') }} />
-        <Stack.Screen name="settings" options={{ title: t('m.title.settings') }} />
+        <Stack.Screen name="settings/index" options={{ title: t('m.title.settings') }} />
+        <Stack.Screen name="settings/[section]" options={{ title: '' }} />
         <Stack.Screen name="your-data" options={{ title: t('settings.data.title') }} />
         <Stack.Screen name="legal" options={{ title: t('legal.title') }} />
         <Stack.Screen name="notifications" options={{ title: t('notifications.title') }} />
@@ -156,11 +162,13 @@ export default function Root() {
           <TranslationProvider>
             <CallsProvider>
               <BoardsProvider>
-                <Heartbeat />
-                <Screens />
-                <BirthDateGate />
-                <YapPlayer />
-                <OfflineBanner />
+                <AccountMenuProvider>
+                  <Heartbeat />
+                  <Screens />
+                  <BirthDateGate />
+                  <YapPlayer />
+                  <OfflineBanner />
+                </AccountMenuProvider>
               </BoardsProvider>
             </CallsProvider>
           </TranslationProvider>

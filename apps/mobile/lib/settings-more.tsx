@@ -271,7 +271,7 @@ export function SessionsCard() {
             end={
               s.current ? null : (
                 <Button
-                  label={t('settings.signOut')}
+                  label={t('st.sessions.logout')}
                   size="sm"
                   variant="secondary"
                   onPress={async () => {

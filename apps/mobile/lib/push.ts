@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
+import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { client } from './api';
 import { tr } from './locale';
@@ -55,5 +56,37 @@ export async function registerForPush(): Promise<'registered' | 'denied' | 'unav
   if (!projectId) return 'unavailable';
   const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
   await (await client()).push.subscribe({ kind: 'expo', endpoint: token });
+  await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token).catch(() => {});
   return 'registered';
+}
+
+const PUSH_TOKEN_KEY = 'ypl_push_token';
+
+/**
+ * Notifications follow the account in use: after switching accounts (or logging in to another),
+ * this phone's push address moves to that account (the API moves an address to whoever registers
+ * it last). Only when notifications were already allowed; this never asks.
+ */
+export async function followActiveAccount() {
+  try {
+    if (!Device.isDevice) return;
+    if ((await Notifications.getPermissionsAsync()).status !== 'granted') return;
+    const projectId = (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId;
+    const token = (await SecureStore.getItemAsync(PUSH_TOKEN_KEY)) ?? (projectId ? (await Notifications.getExpoPushTokenAsync({ projectId })).data : null);
+    if (!token) return;
+    await (await client()).push.subscribe({ kind: 'expo', endpoint: token });
+    await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token);
+  } catch {
+    // Offline or no push service: tried again at the next switch or sign-in.
+  }
+}
+
+/** Before logging out of an account on this phone: it stops sending notifications here. */
+export async function stopPushForThisAccount() {
+  try {
+    const token = await SecureStore.getItemAsync(PUSH_TOKEN_KEY);
+    if (token) await (await client()).push.unsubscribe(token);
+  } catch {
+    // The API also forgets addresses that stop working.
+  }
 }

@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Pressable, Text, View, type TextInput } from 'react-native';
-import { signIn, verifyTwoStep } from '../lib/api';
+import { MAX_ACCOUNTS, signIn, verifyTwoStep } from '../lib/api';
 import { AuthPage, authProblem, enterApp, PasswordField } from '../lib/auth-ui';
 import { useT } from '../lib/i18n';
 import { useSession } from '../lib/session';
@@ -15,8 +15,11 @@ import { Button, Field, Notice, Title, useColors } from '../lib/ui';
 export default function Login() {
   const c = useColors();
   const { t } = useT();
-  const { refresh } = useSession();
-  const params = useLocalSearchParams<{ email?: string }>();
+  const { refresh, me, accounts } = useSession();
+  const params = useLocalSearchParams<{ email?: string; add?: string }>();
+  // From the account menu: log in to another account, kept alongside the ones already here.
+  const adding = params.add === '1' && !!me;
+  const full = adding && accounts.length >= MAX_ACCOUNTS;
   const [email, setEmail] = useState(params.email ?? '');
   const [password, setPassword] = useState('');
   const [challenge, setChallenge] = useState<string | null>(null);
@@ -93,7 +96,8 @@ export default function Login() {
 
   return (
     <AuthPage>
-      <Title sub={t('m.auth.login.body')}>{t('auth.login.title')}</Title>
+      <Title sub={adding ? t('acct.addHint') : t('m.auth.login.body')}>{adding ? t('acct.addTitle') : t('auth.login.title')}</Title>
+      {full ? <Notice tone="warn">{t('acct.max', { count: MAX_ACCOUNTS })}</Notice> : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}
       <Field
         label={t('auth.email')}
@@ -126,7 +130,7 @@ export default function Login() {
       >
         <Text style={{ color: c.yapi, fontWeight: '700' }}>{t('auth.forgot')}</Text>
       </Pressable>
-      <Button label={busy ? t('m.auth.loggingIn') : t('auth.login.submit')} disabled={busy || !ready} onPress={() => submit()} />
+      <Button label={busy ? t('m.auth.loggingIn') : t('auth.login.submit')} disabled={busy || !ready || full} onPress={() => submit()} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: space[1], marginTop: space[2] }}>
         <Text style={{ color: c.inkMuted }}>{t('auth.noAccount')}</Text>
         <Pressable

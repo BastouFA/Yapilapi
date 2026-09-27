@@ -2,24 +2,53 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useState } from 'react';
-import { Alert, Button, TextField } from '@yapilapi/design-system';
-import type { Me } from '@yapilapi/shared';
-import { startAuthentication } from '@simplewebauthn/browser';
+import { Suspense, useEffect, useState } from 'react';
+import { Alert, Button, Checkbox, TextField } from '@yapilapi/design-system';
+import type { Me, MessageKey } from '@yapilapi/shared';
+import { browserSupportsWebAuthn, startAuthentication } from '@simplewebauthn/browser';
+import { ApiError } from '@yapilapi/api-client';
 import { api, errorMessage } from '@/lib/api';
+import { PasswordField } from '@/components/PasswordField';
 import { useSession } from '../../providers';
 
+/** What went wrong, in the reader's language where we know the case. */
+function problem(e: unknown, t: (k: MessageKey) => string): string {
+  if (e instanceof ApiError) {
+    if (e.code === 'network') return t('error.network');
+    if (e.status === 429) return t('m.auth.tooMany');
+    if (e.status === 401) return /expired/i.test(e.message) ? t('m.auth.challengeExpired') : t('m.auth.wrongPassword');
+    if (e.status === 400 && e.fields?.code) return t('m.auth.codeWrong');
+  }
+  return errorMessage(e);
+}
+
+/**
+ * Log in: email and password (show or hide it), "Stay signed in" (on unless you turn it off, for a
+ * shared computer), a passkey where the browser has them, and the two-step code for accounts that
+ * use it. After logging in you go back to where you were (a same-site `next` only). After logging
+ * out, it says so.
+ */
 function LoginForm() {
-  const { setMe, t } = useSession();
+  const { me, loading, setMe, t } = useSession();
   const router = useRouter();
-  const next = useSearchParams().get('next');
+  const params = useSearchParams();
+  const next = safeNext(params.get('next'));
+  const loggedOut = params.get('loggedOut') === '1';
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [challenge, setChallenge] = useState<string | null>(null);
+  const [remember, setRemember] = useState(true);
+  const [passkeys, setPasskeys] = useState(false);
+  useEffect(() => setPasskeys(browserSupportsWebAuthn()), []);
+
+  // Already signed in (another tab logged in): carry on to where you were going.
+  useEffect(() => {
+    if (!loading && me && !busy) router.replace(!me.onboarded ? '/onboarding' : (next ?? '/home'));
+  }, [loading, me, busy, next, router]);
 
   function done(user: Me) {
     setMe(user);
-    router.replace(!user.onboarded ? '/onboarding' : (safeNext(next) ?? '/home'));
+    router.replace(!user.onboarded ? '/onboarding' : (next ?? '/home'));
   }
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -29,16 +58,19 @@ function LoginForm() {
     setError(null);
     try {
       if (challenge) {
-        done((await api.mfa.verify(challenge, String(f.get('code')).trim())).user);
+        done((await api.mfa.verify(challenge, String(f.get('code')).replace(/\s+/g, ''), remember)).user);
         return;
       }
-      const r = await api.auth.login({ email: String(f.get('email')), password: String(f.get('password')) });
-      if (r.mfaRequired && r.challengeToken) setChallenge(r.challengeToken);
-      else if (r.user) done(r.user);
+      const r = await api.auth.login({ email: String(f.get('email')).trim(), password: String(f.get('password')), ...(remember ? {} : { remember: false }) });
+      if (r.mfaRequired && r.challengeToken) {
+        setChallenge(r.challengeToken);
+        setBusy(false);
+      } else if (r.user) done(r.user);
     } catch (err) {
-      setError(errorMessage(err));
-      if (challenge && /expired|Sign in again/.test(errorMessage(err))) setChallenge(null);
-    } finally {
+      const message = problem(err, t);
+      setError(message);
+      // An expired two-step sign-in starts again from the password.
+      if (challenge && message === t('m.auth.challengeExpired')) setChallenge(null);
       setBusy(false);
     }
   }
@@ -46,53 +78,88 @@ function LoginForm() {
   if (challenge)
     return (
       <form className="stack" onSubmit={submit} noValidate>
-        <h1>Two-step verification</h1>
+        <h1>{t('m.auth.twoStep.title')}</h1>
         <p className="muted" style={{ margin: 0 }}>
-          Enter the 6-digit code from your authenticator app, or one of your recovery codes.
+          {t('m.auth.twoStep.body')}
         </p>
         {error ? <Alert tone="danger">{error}</Alert> : null}
-        <TextField label="Code" name="code" autoComplete="one-time-code" inputMode="text" autoFocus required maxLength={12} />
+        <TextField
+          label={t('m.auth.twoStep.code')}
+          name="code"
+          autoComplete="one-time-code"
+          inputMode="text"
+          autoCapitalize="none"
+          spellCheck={false}
+          autoFocus
+          required
+          maxLength={14}
+        />
         <Button type="submit" block loading={busy}>
-          Verify
+          {t('m.auth.twoStep.submit')}
         </Button>
-        <Button variant="ghost" onClick={() => (setChallenge(null), setError(null))}>
-          Use a different account
+        <Button variant="ghost" block onClick={() => (setChallenge(null), setError(null))}>
+          {t('auth.otherAccount')}
         </Button>
       </form>
     );
 
   return (
     <form className="stack" onSubmit={submit} noValidate>
-      <h1>{t('auth.login.title')}</h1>
+      <div className="stack-sm" style={{ gap: 4 }}>
+        <h1>{t('auth.login.title')}</h1>
+        <p className="muted" style={{ margin: 0 }}>
+          {t('m.auth.login.body')}
+        </p>
+      </div>
+      {loggedOut && !error ? <Alert tone="success">{t('acct.loggedOut')}</Alert> : null}
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      <TextField label={t('auth.email')} name="email" type="email" autoComplete="email" required />
-      <TextField label={t('auth.password')} name="password" type="password" autoComplete="current-password" required />
+      <TextField
+        label={t('auth.email')}
+        name="email"
+        type="email"
+        autoComplete="username email"
+        inputMode="email"
+        autoCapitalize="none"
+        spellCheck={false}
+        required
+      />
+      <div className="stack-sm" style={{ gap: 6 }}>
+        <PasswordField label={t('auth.password')} name="password" autoComplete="current-password" required />
+        <Link href="/forgot-password" className="auth__forgot">
+          {t('auth.forgot')}
+        </Link>
+      </div>
+      <Checkbox label={t('auth.remember')} description={t('auth.rememberHint')} checked={remember} onChange={(e) => setRemember(e.currentTarget.checked)} />
       <Button type="submit" block loading={busy}>
         {t('auth.login.submit')}
       </Button>
-      <Button
-        variant="secondary"
-        block
-        icon="shield"
-        onClick={async () => {
-          setError(null);
-          try {
-            const { options, challengeId } = await api.passkeys.loginOptions();
-            const response = await startAuthentication({ optionsJSON: options });
-            done((await api.passkeys.loginVerify(challengeId, response)).user);
-          } catch (err) {
-            if ((err as Error).name !== 'NotAllowedError') setError(errorMessage(err));
-          }
-        }}
-      >
-        Sign in with a passkey
-      </Button>
-      <div className="auth__foot row" style={{ justifyContent: 'space-between' }}>
-        <Link href="/forgot-password">{t('auth.forgot')}</Link>
-        <span>
-          {t('auth.noAccount')} <Link href="/signup">{t('auth.signup.submit')}</Link>
-        </span>
-      </div>
+      {passkeys ? (
+        <>
+          <div className="auth__or" role="separator">
+            <span>{t('auth.or')}</span>
+          </div>
+          <Button
+            variant="secondary"
+            block
+            icon="key"
+            onClick={async () => {
+              setError(null);
+              try {
+                const { options, challengeId } = await api.passkeys.loginOptions();
+                const response = await startAuthentication({ optionsJSON: options });
+                done((await api.passkeys.loginVerify(challengeId, response, remember)).user);
+              } catch (err) {
+                if ((err as Error).name !== 'NotAllowedError') setError(problem(err, t));
+              }
+            }}
+          >
+            {t('auth.passkey')}
+          </Button>
+        </>
+      ) : null}
+      <p className="auth__foot" style={{ textAlign: 'center' }}>
+        {t('auth.noAccount')} <Link href={next ? `/signup?next=${encodeURIComponent(next)}` : '/signup'}>{t('auth.signup.submit')}</Link>
+      </p>
     </form>
   );
 }
@@ -110,7 +177,10 @@ function safeNext(next: string | null): string | null {
   if (!next || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')) return null;
   try {
     const u = new URL(next, 'https://yapilapi.invalid');
-    return u.origin === 'https://yapilapi.invalid' ? `${u.pathname}${u.search}${u.hash}` : null;
+    if (u.origin !== 'https://yapilapi.invalid') return null;
+    // Never back to the login or sign-up pages themselves.
+    if (/^\/(login|signup)(\/|$)/.test(u.pathname)) return null;
+    return `${u.pathname}${u.search}${u.hash}`;
   } catch {
     return null;
   }

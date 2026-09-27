@@ -6,13 +6,17 @@ import { Suspense, useEffect, useState } from 'react';
 import { Alert, Button, TextField } from '@yapilapi/design-system';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { SignupConsent } from '@/components/Legal';
+import { PasswordField } from '@/components/PasswordField';
 import { useSession } from '../../providers';
 
 function SignupForm() {
   const { setMe, t } = useSession();
   const router = useRouter();
   // From an invite link (/join/<code>): the code comes along, and we show who invited you.
-  const invite = useSearchParams().get('invite') ?? '';
+  const params = useSearchParams();
+  const invite = params.get('invite') ?? '';
+  // Passed along to Log in, so moving between the two keeps where you were going (Log in checks it).
+  const next = params.get('next');
   const [invitedBy, setInvitedBy] = useState<string | null>(null);
   useEffect(() => {
     if (invite)
@@ -80,14 +84,13 @@ function SignupForm() {
         maxLength={30}
         pattern="[A-Za-z0-9_.]+"
         onBlur={(e) => checkUsername(e.currentTarget.value)}
-        error={fields.username ?? (usernameState === 'taken' ? 'That username is taken.' : undefined)}
-        hint={usernameState === 'ok' ? 'Available.' : 'Letters, numbers, dots and underscores.'}
+        error={fields.username ?? (usernameState === 'taken' ? t('m.auth.usernameTaken') : undefined)}
+        hint={usernameState === 'ok' ? t('auth.usernameAvailable') : t('m.auth.usernameRule')}
       />
       <TextField label={t('auth.email')} name="email" type="email" autoComplete="email" required error={fields.email} />
-      <TextField
+      <PasswordField
         label={t('auth.password')}
         name="password"
-        type="password"
         autoComplete="new-password"
         required
         minLength={10}
@@ -123,8 +126,8 @@ function SignupForm() {
       <Button type="submit" block loading={busy}>
         {t('auth.signup.submit')}
       </Button>
-      <p className="auth__foot">
-        {t('auth.haveAccount')} <Link href="/login">{t('auth.login.submit')}</Link>
+      <p className="auth__foot" style={{ textAlign: 'center' }}>
+        {t('auth.haveAccount')} <Link href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'}>{t('auth.login.submit')}</Link>
       </p>
     </form>
   );

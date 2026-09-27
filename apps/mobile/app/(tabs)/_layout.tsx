@@ -14,6 +14,7 @@ import { useRealtime, useSession } from '../../lib/session';
 import { elevation, gradient, type Palette } from '../../lib/theme';
 import { DOCK, NavTour } from '../../lib/tour';
 import { useColors } from '../../lib/ui';
+import { useAccountMenu, YouHeaderActions, YouHeaderTitle } from '../../lib/account-menu';
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
 
@@ -202,6 +203,11 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
                 accessibilityState={{ selected: focused }}
                 onPress={onPress}
                 onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
+                // Screen readers reach the long press on You (the account menu) as a named action.
+                accessibilityActions={tab?.id === 'profile' ? [{ name: 'longpress', label: t('acct.menu') }] : undefined}
+                onAccessibilityAction={(e) => {
+                  if (e.nativeEvent.actionName === 'longpress') navigation.emit({ type: 'tabLongPress', target: route.key });
+                }}
                 style={s.item}
               >
                 <View style={focused ? s.lifted : undefined}>
@@ -235,8 +241,12 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
 export default function TabsLayout() {
   const c = useColors();
   const { t } = useT();
+  const { me } = useSession();
+  const accountMenu = useAccountMenu();
   return (
     <Tabs
+      // Another account in use: every tab starts over with that account's feed, chats and profile.
+      key={me?.id ?? 'signed-out'}
       tabBar={(props) => <FloatingTabBar {...props} />}
       screenOptions={{
         headerStyle: { backgroundColor: c.ground },
@@ -250,7 +260,12 @@ export default function TabsLayout() {
       <Tabs.Screen name="discover" options={{ title: t('nav.discover') }} />
       <Tabs.Screen name="create" options={{ title: t('nav.create') }} />
       <Tabs.Screen name="inbox" options={{ title: t('nav.inbox') }} />
-      <Tabs.Screen name="profile" options={{ title: t('nav.profile') }} />
+      <Tabs.Screen
+        name="profile"
+        options={{ title: t('nav.profile'), headerTitle: () => <YouHeaderTitle />, headerRight: () => <YouHeaderActions /> }}
+        // Long-press You to switch accounts, as in other apps.
+        listeners={{ tabLongPress: () => accountMenu.open() }}
+      />
     </Tabs>
   );
 }

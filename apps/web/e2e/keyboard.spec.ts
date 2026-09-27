@@ -106,17 +106,17 @@ test('bottom sheet (comments)', async ({ page }) => {
   await expect(opener).toBeFocused();
 });
 
-test('dialog (delete account) and tabs', async ({ page }) => {
+test('settings search and dialog (delete account)', async ({ page }) => {
   await page.goto('/settings');
-  const tabs = page.getByRole('tab');
-  await tabs.first().focus();
-  await page.keyboard.press('ArrowRight');
-  await expect(page.getByRole('tab', { name: 'Attention' })).toBeFocused();
-  await expect(page.getByRole('tab', { name: 'Attention' })).toHaveAttribute('aria-selected', 'true');
-  await page.keyboard.press('End');
-  await expect(page.getByRole('tab', { name: 'Safety' })).toHaveAttribute('aria-selected', 'true');
-  await page.getByRole('tab', { name: 'Privacy' }).click();
-  await expect(page.getByRole('tabpanel')).toBeVisible();
+  // The search box finds a setting inside a section and opens that section at it.
+  const search = page.getByRole('searchbox', { name: 'Search settings' });
+  await search.focus();
+  await page.keyboard.type('delete');
+  const result = page.getByRole('link', { name: /Delete my account/ });
+  await expect(result).toBeVisible();
+  await result.focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/settings\/your-data#delete$/);
 
   const opener = page.getByRole('button', { name: 'Delete my account' });
   await opener.focus();

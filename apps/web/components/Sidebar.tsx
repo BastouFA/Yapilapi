@@ -174,7 +174,7 @@ export function Sidebar() {
         </Link>{' '}
         ·{' '}
         <Link href="/settings" className="muted">
-          {t('sidebar.privacySettings')}
+          {t('settings.title')}
         </Link>{' '}
         ·{' '}
         <Link href="/assistant" className="muted">

@@ -135,6 +135,7 @@ export function NavBar({
   brandHref = '/home',
   logoSrc,
   searchHref,
+  footer,
 }: {
   items: NavEntry[];
   current?: NavEntry['id'];
@@ -144,6 +145,8 @@ export function NavBar({
   logoSrc?: string;
   /** Adds a Search button under the logo on wide screens (phones get one in the page header). */
   searchHref?: string;
+  /** Pinned to the bottom of the side rail on wide screens (the account button); hidden in the phone dock. */
+  footer?: ReactNode;
 }) {
   const hints = useId();
   // Where the highlight sits: the current tab, unless that is Spark (which has its own look).
@@ -201,6 +204,7 @@ export function NavBar({
           );
         })}
       </div>
+      {footer ? <div className="yp-nav__foot">{footer}</div> : null}
       {/* What each place is for, read after its name ("Pulse, link, What your people are up to"). */}
       {items.map((it) => (
         <span key={it.id} id={`${hints}-${it.id}`} hidden>

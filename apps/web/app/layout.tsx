@@ -4,7 +4,9 @@ import '@yapilapi/design-system/tokens.css';
 import '@yapilapi/design-system/components.css';
 import '@yapilapi/design-system/social.css';
 import './globals.css';
+import './settings.css';
 import { Providers } from './providers';
+import { THEME_SCRIPT } from '@/lib/theme-script';
 
 // Fonts are downloaded when the app is built and served from our own domain: visitors' browsers never contact Google.
 const sans = Figtree({ subsets: ['latin', 'latin-ext'], variable: '--font-figtree', display: 'swap' });
@@ -35,6 +37,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning className={`${sans.variable} ${display.variable} ${mono.variable}`}>
+      <head>
+        {/* A chosen Light or Dark appearance applies before the first paint (lib/theme.ts). */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="yp-root">
         <a href="#main" className="skip-link">
           Skip to content

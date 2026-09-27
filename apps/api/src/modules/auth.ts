@@ -229,6 +229,8 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
   app.post('/v1/auth/logout-all', { preHandler: requireAuth }, async (req, reply) => {
     const u = me(req);
     const r = await ctx.db.query(`UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`, [u.id]);
+    // Devices that are logged out stop getting this account's notifications too.
+    await ctx.db.query(`DELETE FROM push_subscriptions WHERE user_id = $1`, [u.id]);
     await securityEvent(ctx.db, u.id, 'sessions_revoked', req.ip, req.headers['user-agent'], { count: r.rowCount, everywhere: true });
     reply.clearCookie(SESSION_COOKIE, { path: '/' });
     return { ok: true, revoked: r.rowCount };

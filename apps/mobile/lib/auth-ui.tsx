@@ -7,6 +7,7 @@ import type { Me } from '../../../packages/shared/src/types';
 import type { Translate } from './locale';
 import { space } from './theme';
 import { Field, Icon, KeyboardAvoid, useColors } from './ui';
+import { followActiveAccount } from './push';
 
 /** The scrolling, keyboard-aware page the sign-up, log-in and reset screens share. */
 export function AuthPage({ children }: { children: ReactNode }) {
@@ -59,6 +60,8 @@ export function PasswordField({
  */
 export async function enterApp(user: Me, refresh: () => Promise<void>) {
   await refresh();
+  // This phone's notifications now go to the account just logged in to.
+  void followActiveAccount();
   if (router.canDismiss()) router.dismissAll();
   router.replace(user.onboarded ? '/' : '/onboarding');
 }

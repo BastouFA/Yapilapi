@@ -14,6 +14,7 @@ import { ChaptersRow } from '@/components/Chapters';
 import { ProfileBoards } from '@/components/Boards';
 import { JoinNote, NeedsAccount, useSignIn } from '@/components/SignedOut';
 import { CoverSheet, NowStatusLine, NowStatusSheet, ProfileCover, ShareProfileSheet } from '@/components/ProfilePlus';
+import { ProfileAccountActions } from '@/components/AccountMenu';
 import { useSession } from '../../../providers';
 
 /**
@@ -107,6 +108,12 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
 
   return (
     <div className="yp-shell__inner">
+      {rel.isSelf ? (
+        <div className="profile__bar">
+          <span className="profile__bar-handle">@{profile.username}</span>
+          <ProfileAccountActions />
+        </div>
+      ) : null}
       <ProfileCover profile={profile} onEdit={rel.isSelf ? () => setSheet('cover') : undefined} />
       <div className="profile__head">
         <Avatar name={profile.displayName} src={profile.avatarUrl} size="xl" />
@@ -129,7 +136,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
           </div>
           {rel.isSelf ? (
             <div className="row">
-              <Link href="/settings" className="yp-btn yp-btn--secondary yp-btn--sm">
+              <Link href="/settings/account" className="yp-btn yp-btn--secondary yp-btn--sm">
                 {t('profile.edit')}
               </Link>
               <Link href="/saved" className="yp-btn yp-btn--ghost yp-btn--sm">

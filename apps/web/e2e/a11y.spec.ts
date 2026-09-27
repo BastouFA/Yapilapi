@@ -38,6 +38,13 @@ const APP_PAGES: [string, (d: SeedData) => string][] = [
   ['event', (d) => `/events/${d.eventId}`],
   ['place', (d) => `/places/${d.placeId}`],
   ['settings', () => '/settings'],
+  ['settings: account', () => '/settings/account'],
+  ['settings: notifications', () => '/settings/notifications'],
+  ['settings: privacy', () => '/settings/privacy'],
+  ['settings: security', () => '/settings/security'],
+  ['settings: safety', () => '/settings/safety'],
+  ['settings: appearance', () => '/settings/appearance'],
+  ['settings: help', () => '/settings/help'],
   ['studio', () => '/studio'],
   ['notifications', () => '/notifications'],
   ['post', (d) => `/p/${d.postId}`],
@@ -460,7 +467,7 @@ const STATES: [string, (page: Page, d: SeedData) => Promise<void>][] = [
   [
     'settings: data saver',
     async (page) => {
-      await open(page, '/settings#data-saver');
+      await open(page, '/settings/data-saver');
       await page.locator('#data-saver').scrollIntoViewIfNeeded();
       await expect(page.locator('#data-saver').getByRole('heading')).toBeVisible();
     },

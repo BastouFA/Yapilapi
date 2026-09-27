@@ -23,7 +23,7 @@ export function VerifyPrompt({ action }: { action: keyof typeof WHY }) {
   return (
     <Alert tone="info" title={t('m.verify.prompt.title')} locale={locale}>
       <p style={{ margin: '0 0 8px' }}>{t(WHY[action])}</p>
-      <Link href="/settings#verification" className="yp-btn yp-btn--secondary yp-btn--sm">
+      <Link href="/settings/account#verification" className="yp-btn yp-btn--secondary yp-btn--sm">
         {t('m.verify.prompt.action')}
       </Link>
     </Alert>
