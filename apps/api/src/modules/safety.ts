@@ -10,6 +10,7 @@ import { audit, getFlags, notify } from '../lib/services.ts';
 import { applyMediaDecision } from '../lib/media-moderation.ts';
 import { notifyReleasedPosts } from '../lib/collabs.ts';
 import { syncCommentCounts } from '../lib/comments.ts';
+import { answerCards } from '../lib/ask.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -36,6 +37,9 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       story: `SELECT author_id AS uid FROM moments WHERE id = $1 AND deleted_at IS NULL`,
       room: `SELECT created_by AS uid FROM rooms WHERE id = $1`,
       live: `SELECT host_id AS uid FROM live_sessions WHERE id = $1`,
+      // A question is its asker's, even one asked without a name (moderators see who asked; the reporter isn't told).
+      question: `SELECT asker_id AS uid FROM ask_questions WHERE id = $1 AND deleted_at IS NULL`,
+      answer: `SELECT recipient_id AS uid FROM ask_questions WHERE id = $1 AND answered_at IS NOT NULL AND deleted_at IS NULL`,
     };
     const r = await db.query(q[type]!, [id]);
     return r.rows[0]?.uid ?? null;
@@ -55,6 +59,12 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       );
       if (!ok.rowCount) throw notFound('The item you reported');
     }
+    // Questions reach only the person asked; answers, whoever may see the card.
+    if (input.targetType === 'question') {
+      const ok = await db.query(`SELECT 1 FROM ask_questions WHERE id = $1 AND recipient_id = $2 AND deleted_at IS NULL`, [input.targetId, u.id]);
+      if (!ok.rowCount) throw notFound('The item you reported');
+    }
+    if (input.targetType === 'answer' && !(await answerCards(db, [input.targetId], u.id)).length) throw notFound('The item you reported');
     const report = await tx(db, async (c) => {
       const r = await c.query(
         `INSERT INTO reports (reporter_id, target_type, target_id, reason, details) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING id`,
@@ -105,6 +115,8 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
          CASE mc.target_type WHEN 'post' THEN (SELECT body FROM posts WHERE id = mc.target_id)
                              WHEN 'comment' THEN (SELECT body FROM comments WHERE id = mc.target_id)
                              WHEN 'message' THEN (SELECT body FROM messages WHERE id = mc.target_id)
+                             WHEN 'question' THEN (SELECT body FROM ask_questions WHERE id = mc.target_id)
+                             WHEN 'answer' THEN (SELECT 'Q: ' || body || E'\nA: ' || coalesce(answer, '') FROM ask_questions WHERE id = mc.target_id)
                              WHEN 'ad_campaign' THEN (SELECT p.body FROM ad_campaigns a JOIN posts p ON p.id = a.post_id WHERE a.id = mc.target_id) END AS excerpt,
          CASE WHEN mc.target_type = 'media' THEN (SELECT json_build_object('kind', m.kind, 'url', coalesce(m.variants->>'medium', m.poster_url, m.url), 'moderation', m.moderation)
                                                     FROM media m WHERE m.id = mc.target_id) END AS media
@@ -207,11 +219,15 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     mc: { target_type: string; target_id: string; subject_user_id: string | null },
     decision: string,
   ) {
-    const table: Record<string, string> = { post: 'posts', comment: 'comments' };
+    // A question and its answer are one row: a decision on either applies to the card.
+    const table: Record<string, string> = { post: 'posts', comment: 'comments', question: 'ask_questions', answer: 'ask_questions' };
     const t = table[mc.target_type];
     if (decision === 'no_action' && t) await c.query(`UPDATE ${t} SET moderation_status = 'normal' WHERE id = $1`, [mc.target_id]);
     // A held message is delivered once a moderator lets it through.
     if (decision === 'no_action' && mc.target_type === 'message') await releaseMessages(c, [mc.target_id]);
+    // A held question reaches the person asked, and a held answer its asker, once a moderator lets it through.
+    if (decision === 'no_action' && (mc.target_type === 'question' || mc.target_type === 'answer'))
+      await releaseQuestion(c as PoolClient, mc.target_type, mc.target_id);
     if (decision === 'restrict' && t) await c.query(`UPDATE ${t} SET moderation_status = 'restricted' WHERE id = $1`, [mc.target_id]);
     if (decision === 'remove') {
       if (t) await c.query(`UPDATE ${t} SET moderation_status = 'removed', deleted_at = coalesce(deleted_at, now()) WHERE id = $1`, [mc.target_id]);
@@ -239,6 +255,34 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       await c.query(`UPDATE users SET status = 'suspended' WHERE id = $1 AND role = 'user'`, [mc.subject_user_id]);
       await c.query(`UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`, [mc.subject_user_id]);
     }
+  }
+
+  /** Tell the person a released question or answer was meant for. A question without a name has no actor. */
+  async function releaseQuestion(c: PoolClient, kind: 'question' | 'answer', id: string) {
+    const { rows } = await c.query(
+      `SELECT recipient_id, asker_id, hide_name, hidden_at, answered_at FROM ask_questions WHERE id = $1 AND deleted_at IS NULL AND moderation_status = 'normal'`,
+      [id],
+    );
+    const q = rows[0];
+    if (!q || q.hidden_at) return;
+    if (kind === 'question' && !q.answered_at)
+      await notify(c, ctx.realtime, {
+        userId: q.recipient_id,
+        category: 'friends',
+        type: 'question_received',
+        ...(q.hide_name ? {} : { actorId: q.asker_id }),
+        entityType: 'question',
+        entityId: id,
+      });
+    if (kind === 'answer' && q.answered_at)
+      await notify(c, ctx.realtime, {
+        userId: q.asker_id,
+        category: 'friends',
+        type: 'question_answered',
+        actorId: q.recipient_id,
+        entityType: 'question',
+        entityId: id,
+      });
   }
 
   /** Let held messages through and tell the conversation, so they show up without a reload. */
@@ -275,7 +319,8 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
                   'id', s.id, 'kind', s.kind, 'weight', s.weight, 'detail', s.detail, 'status', s.status, 'createdAt', s.created_at,
                   'targetType', s.target_type, 'targetId', s.target_id,
                   'excerpt', CASE s.target_type WHEN 'post' THEN (SELECT left(p.body, 200) FROM posts p WHERE p.id = s.target_id)
-                                                WHEN 'message' THEN (SELECT left(m.body, 200) FROM messages m WHERE m.id = s.target_id) END)
+                                                WHEN 'message' THEN (SELECT left(m.body, 200) FROM messages m WHERE m.id = s.target_id)
+                                                WHEN 'question' THEN (SELECT left(q.body, 200) FROM ask_questions q WHERE q.id = s.target_id) END)
                 ORDER BY s.created_at DESC), '[]')
                FROM (SELECT * FROM risk_signals x WHERE x.user_id = u.id ORDER BY x.created_at DESC LIMIT 50) s) AS signals
        FROM users u JOIN profiles pr ON pr.user_id = u.id

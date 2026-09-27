@@ -9,6 +9,7 @@ import { commentAllowedSql } from './comments.ts';
 import { langOf } from './translation.ts';
 import { soundVisibleSql } from './sounds.ts';
 import { trackMusic, viewerCountries, type StoredPart, type TrackRow } from './music/view.ts';
+import { quotedQuestions } from './ask.ts';
 import type { PostMusic, ReelHighlight } from '@yapilapi/shared';
 
 type Q = Pool | PoolClient;
@@ -40,7 +41,7 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
                FROM poll_options o WHERE o.post_id = p.id) AS poll_options,
             (SELECT option_id FROM poll_votes v WHERE v.post_id = p.id AND v.user_id = $2) AS my_vote,
             (SELECT array_agg(DISTINCT w.country ORDER BY w.country) FROM post_withholdings w WHERE w.post_id = p.id AND p.author_id = $2) AS withheld_in,
-            p.allow_remix, p.remix_mode, p.remix_of_post_id, p.highlights,
+            p.allow_remix, p.remix_mode, p.remix_of_post_id, p.highlights, p.question_id,
             CASE WHEN p.format = 'reel' THEN (SELECT rr.position_ms FROM reel_resume rr WHERE rr.user_id = $2 AND rr.post_id = p.id) END AS resume_ms,
             -- Which circle a post went to is for its author only; members never see a circle's name.
             (p.visibility = 'circle' AND p.author_id IS NOT DISTINCT FROM $2) AS own_circle_post,
@@ -91,6 +92,16 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
     rows.map((r) => [r.id as string, r.unlocked ? { ...toPost(r, originals, reasons), ...musicOf(r, countries) } : lockedPost(r, reasons)]),
   );
   const posts = ids.map((id) => byId.get(id)).filter((p): p is Post => !!p);
+  // Answers shared from a question box quote their question, while the viewer may see it (never with a hidden asker's name).
+  const asking = rows.filter((r) => r.question_id && r.unlocked);
+  if (asking.length) {
+    const quoted = await quotedQuestions(
+      db,
+      asking.map((r) => r.question_id as string),
+      viewer,
+    );
+    for (const r of asking) byId.get(r.id)!.question = quoted.get(r.question_id) ?? null;
+  }
   // Co-authors ("Ada and Bola") and people tagged in photos (none on locked posts, which carry no media).
   await attachCollabsAndTags(db, [...new Set(posts)], viewer);
   return posts;

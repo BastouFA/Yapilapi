@@ -2493,3 +2493,41 @@ p.yp-post__pending {
   color: var(--danger);
   font-weight: 400;
 }
+
+/* ── Ask me: a quoted question (on the Answers tab and on posts that share an answer) ── */
+.yp-ask-quote {
+  margin: var(--space-3) var(--space-4) 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-inline-start: 3px solid var(--yapi);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.yp-ask-quote__text {
+  margin: 0;
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  font-weight: 600;
+  line-height: 22px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+.yp-ask-quote__text svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--yapi);
+}
+.yp-ask-quote__by {
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+.yp-ask-quote__by a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

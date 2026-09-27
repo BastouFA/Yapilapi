@@ -53,6 +53,8 @@ export const SETTINGS: { label: MessageKey; section: SectionId; anchor?: string 
   { label: 'ps.song.title', section: 'account', anchor: 'customise' },
   { label: 'ps.tabs.title', section: 'account', anchor: 'customise' },
   { label: 'ps.featured.title', section: 'account', anchor: 'customise' },
+  { label: 'ask.box.title', section: 'account', anchor: 'ask' },
+  { label: 'ask.box.hiddenNames', section: 'account', anchor: 'ask' },
   { label: 'auth.username', section: 'account', anchor: 'sign-in' },
   { label: 'st.username.change', section: 'account', anchor: 'sign-in' },
   { label: 'auth.email', section: 'account', anchor: 'verification' },

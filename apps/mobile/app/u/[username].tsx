@@ -7,7 +7,7 @@ import { ProfileView } from '../../lib/profile';
  * changed in the last 14 days still finds the person; the screen then moves to the new one.
  */
 export default function UserScreen() {
-  const { username } = useLocalSearchParams<{ username: string }>();
+  const { username, tab } = useLocalSearchParams<{ username: string; tab?: string }>();
   const onMoved = useCallback((next: string) => router.setParams({ username: next }), []);
-  return <ProfileView username={username} onMoved={onMoved} />;
+  return <ProfileView username={username} onMoved={onMoved} initialTab={tab === 'answers' ? 'answers' : undefined} />;
 }

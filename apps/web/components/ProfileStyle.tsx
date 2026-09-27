@@ -70,6 +70,7 @@ const TAB_LABELS: Record<ProfileTab, MessageKey> = {
   boards: 'm.boards.title',
   chapters: 'm.chapters.title',
   shop: 'm.shop.tab',
+  answers: 'ask.tab',
 };
 export const tabLabel = (tab: ProfileTab): MessageKey => TAB_LABELS[tab];
 

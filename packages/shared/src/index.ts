@@ -19,6 +19,7 @@ export * from './reels.ts';
 export * from './scheduling.ts';
 export * from './legal.ts';
 export * from './profile-style.ts';
+export * from './ask.ts';
 export * from './usernames.ts';
 export * from './chat-theme.ts';
 export * from './accounts.ts';

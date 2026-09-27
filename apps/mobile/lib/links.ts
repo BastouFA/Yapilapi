@@ -25,6 +25,9 @@ export function notificationHref(n: NotificationTarget): string | null {
   if (n.type === 'new_sign_in') return '/settings/security';
   // Money: a tip you got opens your tips and gifts; a new subscriber, a sale or a booking to confirm opens Studio.
   if (n.type === 'tip_received') return '/gifts';
+  // A question for your box opens your questions; an answer to yours opens their Answers tab.
+  if (n.type === 'question_received') return '/questions';
+  if (n.type === 'question_answered') return n.actor ? `/u/${encodeURIComponent(n.actor.username)}?tab=answers` : '/notifications';
   if (n.type === 'subscription_started' || n.type === 'order_paid' || n.type === 'booking_request') return '/studio';
   switch (n.entityType) {
     case 'chapter':

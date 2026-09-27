@@ -34,6 +34,7 @@ import { BlockedAccounts, DataUseSettings, FeedSettings, NotificationSettings, S
 import { Advertising, DataSaver, Family, HiddenWords, Sharing, Tagging, Translation } from '../../lib/settings-sections';
 import { space } from '../../lib/theme';
 import { AiHelpersSettings } from '../../lib/ai-helpers';
+import { AskBoxSettings } from '../../lib/ask';
 import { Loading, Notice, useColors } from '../../lib/ui';
 
 /** Each section's settings, in the order they appear. */
@@ -44,6 +45,7 @@ function Content({ section }: { section: SectionId }): ReactNode {
       return (
         <>
           <ProfileSummary />
+          <AskBoxSettings />
           <VerificationCard />
           <AccountDetails />
           <SettingsGroup>

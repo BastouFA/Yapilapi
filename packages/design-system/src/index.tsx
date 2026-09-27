@@ -51,6 +51,7 @@ export {
   PostHistory,
   PostMusicChip,
   ProductCard,
+  QuestionQuote,
   Segments,
   Skeleton,
   Stat,

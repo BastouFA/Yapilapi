@@ -51,6 +51,7 @@ export const GROUPS: { title: MessageKey; sections: SectionId[] }[] = [
 /** Settings inside the sections, for search. */
 export const SETTINGS: { label: MessageKey; section: SectionId }[] = [
   { label: 'profile.edit', section: 'account' },
+  { label: 'ask.box.title', section: 'account' },
   { label: 'auth.username', section: 'account' },
   { label: 'st.username.change', section: 'account' },
   { label: 'auth.email', section: 'account' },

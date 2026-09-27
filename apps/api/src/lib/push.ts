@@ -107,6 +107,9 @@ const TEXT: Record<string, (actor: string) => string> = {
   new_sign_in: () => 'New sign-in to your account from a device we haven’t seen before',
   recap_ready: () => 'Your recap video is ready',
   recap_failed: () => "We couldn't make your recap video",
+  // Questions asked without a name have no actor, so they read "Someone asked you a question".
+  question_received: (a) => `${a} asked you a question`,
+  question_answered: (a) => `${a} answered your question`,
 };
 
 /** Human text for a notification type, or null for types that shouldn't push. */

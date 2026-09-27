@@ -49,6 +49,8 @@ const TITLE_KEYS: Record<ReportTargetType, MessageKey> = {
   story: 'm.report.title.story',
   room: 'm.report.title.room',
   live: 'm.report.title.live',
+  question: 'm.report.title.question',
+  answer: 'm.report.title.answer',
 };
 
 type Done = { already: boolean; blocked: boolean; blockError?: string };

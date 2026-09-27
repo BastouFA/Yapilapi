@@ -234,6 +234,14 @@ export async function runRetention(deps: RetentionDeps): Promise<{ counts: Recor
       `deleted_at IS NOT NULL AND ((deleted_at < ${days(RETENTION.deletedContentDays)} AND moderation_status <> 'removed') OR deleted_at < ${days(RETENTION.removedByModerationDays)})`,
     ),
   );
+  // Questions people deleted from their box, like comments (removed ones are kept longer for appeals).
+  await step('deletedQuestions', () =>
+    deleteInBatches(
+      db,
+      'ask_questions',
+      `deleted_at IS NOT NULL AND ((deleted_at < ${days(RETENTION.deletedContentDays)} AND moderation_status <> 'removed') OR deleted_at < ${days(RETENTION.removedByModerationDays)})`,
+    ),
+  );
   await step('deletedLiveChat', () => deleteInBatches(db, 'live_chat', `deleted_at < ${days(RETENTION.deletedContentDays)}`));
   // Recaps people deleted: their video goes with them (unless it was shared somewhere).
   await step('deletedRecaps', async () => {

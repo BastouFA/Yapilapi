@@ -8080,3 +8080,53 @@ button.profile-song__play::after {
   border-radius: 50%;
   background: linear-gradient(135deg, var(--ca-from), var(--ca-to));
 }
+
+/* ── Ask me: the question box on a profile, answers and your questions ── */
+.ask-card .yp-card__sub {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ask-card__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+.ask-answer,
+.ask-question {
+  padding: 0 0 var(--space-3);
+  list-style: none;
+}
+.ask-answer .yp-ask-quote,
+.ask-question .yp-ask-quote {
+  margin-top: var(--space-4);
+}
+.ask-answer__text {
+  margin: var(--space-2) 0 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+  font-size: 16px;
+  line-height: 24px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+.ask-answer__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4) 0;
+  font-size: 13px;
+}
+.ask-answer__foot .yp-spacer {
+  flex: 1;
+}
+.ask-inbox {
+  margin: 0;
+  padding: 0;
+}
+.ask-answer-form {
+  padding: var(--space-3) var(--space-4) 0;
+}
