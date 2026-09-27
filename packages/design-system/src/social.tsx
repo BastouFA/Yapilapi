@@ -1036,6 +1036,8 @@ export function PostCard({
   // Tags already linked in the text don't need a chip too.
   const inText = extractHashtags(post.body, 50);
   const chipTopics = post.topics.filter((tp) => !inText.includes(tp));
+  // Signed in, a reel is its poster frame: a tap opens it full screen in Reels, at this reel.
+  const showReelCard = post.format === 'reel' && !!viewerId && !post.locked && post.media.length > 0;
 
   return (
     <article className="yp-post" aria-labelledby={`post-${post.id}-author`}>
@@ -1192,7 +1194,9 @@ export function PostCard({
         </div>
       ) : null}
 
-      {post.media.length ? (
+      {showReelCard ? (
+        <ReelCard post={post} locale={locale} linkAs={L} />
+      ) : post.media.length ? (
         <div className="yp-post__media">
           <MediaGrid
             media={post.media}
@@ -1207,9 +1211,9 @@ export function PostCard({
         </div>
       ) : null}
 
-      {post.format === 'reel' || post.linkUrl || post.event || post.product || chipTopics.length ? (
+      {(post.format === 'reel' && !showReelCard) || post.linkUrl || post.event || post.product || chipTopics.length ? (
         <div className="yp-post__chips">
-          {post.format === 'reel' ? (
+          {post.format === 'reel' && !showReelCard ? (
             <L href={`/reels?start=${post.id}`} className="yp-chip">
               <Icon name="sparkle" />
               {tt('post.reelWatch')}
@@ -1390,6 +1394,33 @@ export function useLongPress(onHold?: () => void, ms = 500) {
     },
   };
   return { handlers, wasHeld };
+}
+
+/**
+ * A reel in a feed, a profile or a tag page: its poster frame with a play sign and "Watch reel",
+ * one link that opens the full-screen viewer at this reel (Back returns here).
+ */
+function ReelCard({ post, locale, linkAs: L }: { post: Post; locale: string; linkAs: LinkLike }) {
+  const saver = useDataSaver();
+  const m = post.media.find((x) => x.kind === 'video') ?? post.media[0]!;
+  const poster = videoPoster(m, saver) ?? m.placeholder ?? undefined;
+  const ratio = m.width && m.height ? m.width / m.height : 9 / 16;
+  return (
+    <L
+      href={`/reels?start=${post.id}`}
+      className={cx('yp-post__reel-card', ratio > 1.2 ? 'yp-post__reel-card--wide' : ratio > 0.85 && 'yp-post__reel-card--square')}
+      aria-label={t('reel.card.label', locale, { name: post.author.displayName })}
+    >
+      {poster ? <img src={poster} alt="" loading="lazy" className={m.sensitive ? 'yp-blurred' : undefined} /> : null}
+      <span className="yp-post__reel-play" aria-hidden>
+        <Icon name="play" size={24} filled />
+      </span>
+      <span className="yp-post__reel-watch" aria-hidden>
+        <Icon name="sparkle" size={14} />
+        {t('reel.card.watch', locale)}
+      </span>
+    </L>
+  );
 }
 
 /**

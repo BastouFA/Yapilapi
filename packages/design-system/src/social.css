@@ -719,6 +719,77 @@ a.yp-aside-row:hover {
   border-radius: calc(var(--radius-lg) - 6px);
   overflow: hidden;
 }
+/* A reel in a feed: its poster, a play sign and "Watch reel"; the whole card opens the viewer. */
+.yp-post__reel-card {
+  position: relative;
+  display: block;
+  width: min(100% - 2 * var(--space-3), 340px);
+  aspect-ratio: 9 / 16;
+  max-height: 520px;
+  margin: var(--space-3) var(--space-3) 0;
+  overflow: hidden;
+  border-radius: calc(var(--radius-lg) - 6px);
+  background: #0b0c14;
+  color: #fff;
+  text-decoration: none;
+}
+.yp-post__reel-card--wide {
+  width: calc(100% - 2 * var(--space-3));
+  aspect-ratio: 16 / 9;
+}
+.yp-post__reel-card--square {
+  aspect-ratio: 1;
+}
+.yp-post__reel-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--duration-base) var(--ease-out);
+}
+.yp-post__reel-card:hover img {
+  transform: scale(1.02);
+}
+.yp-post__reel-card::after {
+  content: '';
+  position: absolute;
+  inset: 55% 0 0;
+  background: linear-gradient(transparent, #05060bb3);
+  pointer-events: none;
+}
+.yp-post__reel-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  margin: -30px 0 0 -30px;
+  border-radius: 20px;
+  background: #05060b80;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.yp-post__reel-watch {
+  position: absolute;
+  z-index: 1;
+  bottom: 12px;
+  inset-inline-start: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 700 14px/18px var(--font-sans);
+  text-shadow: 0 1px 4px #000a;
+}
+.yp-post__reel-card:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+@media (prefers-reduced-motion: reduce) {
+  .yp-post__reel-card img {
+    transition: none;
+  }
+}
 .yp-post__chips {
   display: flex;
   flex-wrap: wrap;

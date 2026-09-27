@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Avatar, BottomSheet, Button, Icon, Segments, Select, Skeleton, TaggedText, TranslatableText } from '@yapilapi/design-system';
+import { Avatar, BottomSheet, Button, Checkbox, Icon, Segments, Select, Skeleton, TaggedText, TranslatableText } from '@yapilapi/design-system';
 import {
   COMMENT_POLICIES,
   formatRelativeTime,
+  formatReelTime,
   type Comment,
   type CommentPage,
   type CommentPolicy,
@@ -35,12 +36,32 @@ const CLOSED: Record<CommentPolicy, MessageKey> = {
 
 type Thread = { open: boolean; items: Comment[]; cursor: string | null; loading: boolean };
 
+/**
+ * Moment comments on a reel: where the viewer was when they opened the comments (a new comment
+ * can point to it), how to go to a comment's moment, and what to do with a new one.
+ */
+export interface CommentMoment {
+  atMs: number | null;
+  seek: (ms: number) => void;
+  onMoment?: (c: Comment) => void;
+}
+
 /** The comments of a post in a bottom sheet. `onCountChange` gets +1 or minus the comments removed. */
-export function CommentsSheet({ post, onClose, onCountChange }: { post: Post; onClose: () => void; onCountChange: (delta: number) => void }) {
+export function CommentsSheet({
+  post,
+  onClose,
+  onCountChange,
+  moment,
+}: {
+  post: Post;
+  onClose: () => void;
+  onCountChange: (delta: number) => void;
+  moment?: CommentMoment;
+}) {
   const { t } = useSession();
   return (
     <BottomSheet open onClose={onClose} title={t('post.comments')}>
-      <Comments post={post} onCountChange={onCountChange} />
+      <Comments post={post} onCountChange={onCountChange} moment={moment} />
     </BottomSheet>
   );
 }
@@ -50,7 +71,7 @@ export function CommentsSheet({ post, onClose, onCountChange }: { post: Post; on
  * edits within 15 minutes, and the post author's tools (who can comment, pin,
  * hidden comments). Replying to a reply stays in the thread and starts with an @mention.
  */
-export function Comments({ post, onCountChange }: { post: Post; onCountChange: (delta: number) => void }) {
+export function Comments({ post, onCountChange, moment }: { post: Post; onCountChange: (delta: number) => void; moment?: CommentMoment }) {
   const { toast, t, tp, locale, me } = useSession();
   const signIn = useSignIn();
   const [sort, setSort] = useState<CommentSort>('top');
@@ -62,6 +83,9 @@ export function Comments({ post, onCountChange }: { post: Post; onCountChange: (
   const [body, setBody] = useState('');
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [busy, setBusy] = useState(false);
+  // Reels: point a new comment to the moment the viewer was at.
+  const [pointAt, setPointAt] = useState(false);
+  const momentMs = post.format === 'reel' && moment && moment.atMs !== null ? moment.atMs : null;
   const [editing, setEditing] = useState<{ id: string; body: string; busy: boolean } | null>(null);
   const [likers, setLikers] = useState<{ comment: Comment; items: PublicUser[] | null } | null>(null);
   const [hidden, setHidden] = useState<Comment[] | null>(null);
@@ -156,7 +180,10 @@ export function Comments({ post, onCountChange }: { post: Post; onCountChange: (
     if (!text) return;
     setBusy(true);
     try {
-      const { comment } = await api.posts.comment(post.id, text, replyTo?.id);
+      const atMs = pointAt && !replyTo && momentMs !== null ? momentMs : undefined;
+      const { comment } = await api.posts.comment(post.id, text, replyTo?.id, atMs);
+      if (comment.atMs !== null && comment.atMs !== undefined) moment?.onMoment?.(comment);
+      setPointAt(false);
       if (comment.parentId) {
         const parentId = comment.parentId;
         setThreads((cur) => {
@@ -334,6 +361,21 @@ export function Comments({ post, onCountChange }: { post: Post; onCountChange: (
                 {c.editedAt ? ` · ${t('comments.edited')}` : ''}
               </span>
             </strong>
+            {c.atMs !== null && c.atMs !== undefined ? (
+              moment ? (
+                <button
+                  type="button"
+                  className="comment__moment"
+                  onClick={() => moment.seek(c.atMs!)}
+                  aria-label={t('reel.moment.seek', { time: formatReelTime(c.atMs) })}
+                >
+                  <Icon name="play" size={10} filled />
+                  {t('reel.moment.at', { time: formatReelTime(c.atMs) })}
+                </button>
+              ) : (
+                <span className="comment__moment comment__moment--static">{t('reel.moment.at', { time: formatReelTime(c.atMs) })}</span>
+              )
+            ) : null}
             {editing?.id === c.id ? (
               <form
                 className="stack-sm"
@@ -635,6 +677,13 @@ export function Comments({ post, onCountChange }: { post: Post; onCountChange: (
               }
             }}
           />
+          {momentMs !== null && !replyTo ? (
+            <Checkbox
+              label={t('reel.moment.attach', { time: formatReelTime(momentMs) })}
+              checked={pointAt}
+              onChange={(e) => setPointAt(e.currentTarget.checked)}
+            />
+          ) : null}
           <Button type="submit" loading={busy} disabled={!body.trim()}>
             {replyTo ? t('comments.postReply') : t('comment.submit')}
           </Button>

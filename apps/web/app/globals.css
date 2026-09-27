@@ -1675,54 +1675,7 @@ h3 {
   }
 }
 
-/* Reels */
-.reels {
-  height: calc(100dvh - 2 * var(--space-4));
-  overflow-y: auto;
-  scroll-snap-type: y mandatory;
-  scrollbar-width: none;
-  border-radius: var(--radius-lg);
-  background: #05060b;
-  max-width: 480px;
-  margin: 0 auto;
-  width: 100%;
-}
-.reels::-webkit-scrollbar {
-  display: none;
-}
-@media (min-width: 900px) {
-  .reels {
-    height: calc(100dvh - 2 * var(--space-6));
-  }
-}
-.reel {
-  position: relative;
-  height: 100%;
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
-  display: grid;
-  place-items: center;
-  color: #f2f3fa;
-  overflow: hidden;
-}
-.reel__video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  background: #05060b;
-  cursor: pointer;
-}
-.reel__paused {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-size: 48px;
-  color: #ffffffcc;
-  pointer-events: none;
-  text-shadow: 0 2px 12px #000;
-}
-/* Data saver: reels wait for a tap; the play button takes it. */
+/* Reels: see the Reels viewer section near the end of this file. */
 /* Data saver: a story video waits on its poster until tapped. */
 .story__play {
   position: absolute;
@@ -1743,354 +1696,6 @@ h3 {
 .story__play:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 2px;
-}
-.reel__paused--button {
-  inset: auto;
-  top: 50%;
-  left: 50%;
-  width: 96px;
-  height: 96px;
-  transform: translate(-50%, -50%);
-  border: 0;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.35);
-  pointer-events: auto;
-  cursor: pointer;
-}
-.reel__paused--button:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 2px;
-}
-.reel__info {
-  position: absolute;
-  inset-inline: 12px 72px;
-  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  text-shadow: 0 1px 6px #000;
-}
-@media (min-width: 900px) {
-  .reel__info {
-    bottom: 20px;
-  }
-}
-.reel__author {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: inherit;
-  font-weight: 700;
-  text-decoration: none;
-  width: fit-content;
-}
-.reel__caption {
-  margin: 0;
-  font-size: 14px;
-  line-height: 20px;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.reel__actions {
-  position: absolute;
-  inset-inline-end: 8px;
-  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-@media (min-width: 900px) {
-  .reel__actions {
-    bottom: 20px;
-  }
-}
-.reel__actions button {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  min-width: 48px;
-  min-height: 48px;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: 700 12px/16px var(--font-sans);
-  cursor: pointer;
-  filter: drop-shadow(0 1px 4px #000);
-}
-.reel__actions button[aria-pressed='true'] svg {
-  color: #ff5c7a;
-}
-.reel__actions button:focus-visible,
-.reel__author:focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 2px #05060b,
-    0 0 0 4px #ff5c7a;
-  border-radius: 12px;
-}
-.reel__sound {
-  padding: 4px 8px;
-  border-radius: var(--radius-full);
-  background: #00000099;
-  font-size: 11px;
-}
-.reels__end {
-  margin: 0;
-  padding: var(--space-8);
-  text-align: center;
-  color: #c9cde0;
-  scroll-snap-align: end;
-}
-
-/* Reels: stage, rail and overlays */
-.reels {
-  position: relative;
-}
-.reel__stage {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-}
-.reel::after {
-  /* Legibility for the text over the video. */
-  content: '';
-  position: absolute;
-  inset: 45% 0 0;
-  background: linear-gradient(to bottom, transparent, #000000b3);
-  pointer-events: none;
-}
-.reels__sound {
-  position: sticky;
-  top: 12px;
-  z-index: 5;
-  float: inline-end;
-  margin: 12px 12px -56px 0;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: #00000066;
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  color: #fff;
-  cursor: pointer;
-}
-.reel__info {
-  z-index: 2;
-  inset-inline: 14px 84px;
-  gap: 4px;
-}
-.reel__byline {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.reel__author {
-  font: 800 16px/20px var(--font-display);
-}
-.reel__follow {
-  height: 28px;
-  padding: 0 12px;
-  border: 1.5px solid #ffffffcc;
-  border-radius: var(--radius-full);
-  background: #ffffff1a;
-  color: #fff;
-  font: 700 13px/1 var(--font-sans);
-  cursor: pointer;
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-}
-.reel__follow:hover {
-  background: #fff;
-  color: #0b0c14;
-}
-.reel__stats {
-  font: 600 12px/16px var(--font-sans);
-  opacity: 0.85;
-}
-.reel__caption--open {
-  -webkit-line-clamp: unset;
-}
-.reel__more-text {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: #fff;
-  font: 700 14px/20px var(--font-sans);
-  opacity: 0.8;
-  cursor: pointer;
-}
-.reel__tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  font: 700 13px/18px var(--font-sans);
-}
-.reel__tags a {
-  color: #fff;
-  text-decoration: none;
-  opacity: 0.9;
-}
-.reel__rail {
-  position: absolute;
-  z-index: 2;
-  inset-inline-end: 10px;
-  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-@media (min-width: 900px) {
-  .reel__rail {
-    bottom: 22px;
-  }
-}
-.reel__avatar {
-  display: block;
-  border-radius: var(--radius-full);
-  box-shadow: 0 0 0 2px #fff;
-  margin-bottom: 4px;
-}
-.reel__btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: #fff;
-  font: 700 12px/14px var(--font-sans);
-  cursor: pointer;
-}
-.reel__disc {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-full);
-  background: #00000059;
-  -webkit-backdrop-filter: blur(14px) saturate(1.4);
-  backdrop-filter: blur(14px) saturate(1.4);
-  border: 1px solid #ffffff26;
-  transition:
-    transform var(--duration-fast) var(--ease-out),
-    background-color var(--duration-fast);
-}
-.reel__btn:hover .reel__disc {
-  background: #ffffff33;
-}
-.reel__btn:active .reel__disc {
-  transform: scale(0.9);
-}
-.reel__btn[aria-pressed='true'] .reel__disc svg {
-  animation: yp-pop 320ms var(--ease-out);
-}
-.reel__btn--like[aria-pressed='true'] .reel__disc {
-  background: #ff5c7a;
-  border-color: transparent;
-}
-.reel__btn--repost[aria-pressed='true'] .reel__disc {
-  background: #3ddbc2;
-  color: #0b0c14;
-  border-color: transparent;
-}
-.reel__btn--save[aria-pressed='true'] .reel__disc {
-  background: #ffbe3d;
-  color: #0b0c14;
-  border-color: transparent;
-}
-.reel__count {
-  min-height: 14px;
-  text-shadow: 0 1px 4px #000;
-  font-variant-numeric: tabular-nums;
-}
-.reel__btn:focus-visible .reel__disc,
-.reels__sound:focus-visible,
-.reel__follow:focus-visible,
-.reel__avatar:focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 2px #05060b,
-    0 0 0 4px #ff5c7a;
-}
-.reel__more .yp-menu > button,
-.reel__more button[aria-haspopup] {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-full);
-  background: #00000059;
-  color: #fff;
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-}
-.reel__more .yp-menu__list {
-  bottom: 100%;
-  top: auto;
-  color: var(--ink);
-}
-.reel__burst {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: #ff5c7a;
-  pointer-events: none;
-  filter: drop-shadow(0 6px 24px #ff5c7a99);
-  animation: reel-burst 800ms var(--ease-out) forwards;
-}
-@keyframes reel-burst {
-  0% {
-    transform: scale(0.3);
-    opacity: 0;
-  }
-  25% {
-    transform: scale(1.15);
-    opacity: 1;
-  }
-  60% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1.1) translateY(-40px);
-    opacity: 0;
-  }
-}
-.reel__progress {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  z-index: 3;
-  height: 3px;
-  background: #ffffff33;
-}
-.reel__progress > span {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, #ff5c7a, #ffbe3d);
-}
-.reels__end {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-}
-.reels__end p {
-  margin: 0;
-}
-@media (prefers-reduced-motion: reduce) {
-  .reel__burst {
-    animation: none;
-    opacity: 0;
-  }
 }
 .profile__count {
   padding: 4px 6px;
@@ -2587,71 +2192,6 @@ video.chat-att__media {
 }
 
 /* ── Retention: duets, remixes, sounds, close friends ───────────────── */
-/* Duets: the original on the left, the new reel on the right. */
-.reel__stage--duet {
-  grid-template-columns: 1fr 1fr;
-  gap: 2px;
-  background: #05060b;
-}
-.reel__stage--duet .reel__video {
-  object-fit: cover;
-}
-.reel__credit,
-.reel__soundlink {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 100%;
-  color: #fff;
-  font: 700 13px/18px var(--font-sans);
-  text-decoration: none;
-  text-shadow: 0 1px 4px #000;
-}
-.reel__soundlink bdi {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.reel__credit:hover,
-.reel__soundlink:hover {
-  text-decoration: underline;
-}
-.reel__credit:focus-visible,
-.reel__soundlink:focus-visible {
-  outline: 2px solid #ff5c7a;
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-.reel__remix {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  font: 700 12px/14px var(--font-sans);
-}
-.reel__remix .yp-menu > button,
-.reel__remix button[aria-haspopup] {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-full);
-  background: #00000059;
-  color: #fff;
-  border: 1px solid #ffffff26;
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-}
-.reel__remix .yp-menu__list {
-  bottom: 100%;
-  top: auto;
-  color: var(--ink);
-}
-.reel__remix button[aria-haspopup]:focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 2px #05060b,
-    0 0 0 4px #ff5c7a;
-}
-
 /* Stories shared with close friends only. */
 .story__close-friends {
   display: inline-flex;
@@ -3095,35 +2635,6 @@ video.chat-att__media {
 .profile__subscribe--focus > * {
   box-shadow: 0 0 0 2px var(--yapi);
   border-radius: var(--radius-lg);
-}
-
-/* A reel for subscribers, seen by someone who isn't one */
-.reel__locked {
-  background-color: #10121e;
-  background-size: cover;
-  background-position: center;
-}
-.reel__locked::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  backdrop-filter: blur(24px);
-  background: #00000080;
-}
-.reel__locked-inner {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  max-width: 320px;
-  padding: var(--space-4);
-  text-align: center;
-  color: #fff;
-}
-.reel__locked-inner span {
-  color: #c9cde0;
 }
 
 /* Launch safety: honeypot, verification, held messages, sensitive chat media */
@@ -4245,15 +3756,6 @@ span.cam__icon {
 }
 .create-kinds {
   display: contents;
-}
-
-/* Co-authors on a reel */
-.reel__authors {
-  min-width: 0;
-  font: 800 16px/20px var(--font-display);
-}
-.reel__authors .reel__author {
-  display: inline;
 }
 
 /* Tagging people in a photo (Create and the photo editor) */
@@ -5683,11 +5185,6 @@ button.yp-chip[aria-pressed='true'] {
   margin: 0;
   font-size: 13px;
 }
-.reel__credit {
-  display: block;
-  font-size: 12px;
-  opacity: 0.85;
-}
 .music-sticker__credit {
   font-weight: 500;
   font-size: 11px;
@@ -6175,4 +5672,1388 @@ button.yp-chip[aria-pressed='true'] {
   font: 700 10px/18px var(--font-sans);
   text-align: center;
   pointer-events: none;
+}
+
+/* ── Reels viewer ─────────────────────────────────────────────────────── */
+/* Phones: the frame is exactly the space between the top of the screen and the floating dock
+   (12px above the safe area, 66px tall, then 8px of air), so nothing hides behind the dock.
+   Larger screens: a centred 9:16 column with the actions beside it. The video area is always
+   dark, whatever the theme; what sits outside it (the rail on large screens) follows the theme. */
+.reels {
+  --reel-ink: #f2f3fa;
+  --reel-scrim: #05060b;
+  --reel-accent: #ff5c7a;
+  --reel-sun: #ffbe3d;
+  --reel-mint: #3ddbc2;
+  position: fixed;
+  z-index: 10;
+  inset-inline: 0;
+  top: env(safe-area-inset-top, 0px);
+  bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  background: var(--reel-scrim);
+  border-radius: 0 0 24px 24px;
+  color: var(--reel-ink);
+}
+.reels::-webkit-scrollbar {
+  display: none;
+}
+.reels--loading {
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+}
+.reel {
+  position: relative;
+  height: 100%;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  overflow: hidden;
+}
+.reel__frame {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--reel-scrim);
+  color: var(--reel-ink);
+  isolation: isolate;
+}
+/* Scrims keep text legible at the top and bottom without darkening the whole video. */
+.reel__frame::before,
+.reel__frame::after {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  inset-inline: 0;
+  pointer-events: none;
+  transition: opacity 400ms ease;
+}
+.reel__frame::before {
+  top: 0;
+  height: 96px;
+  background: linear-gradient(#05060b8c, transparent);
+}
+.reel__frame::after {
+  bottom: 0;
+  height: 38%;
+  background: linear-gradient(transparent, #05060bb8);
+}
+.reel--faint .reel__frame::after {
+  opacity: 0.45;
+}
+.reel--clear .reel__frame::before,
+.reel--clear .reel__frame::after {
+  opacity: 0;
+}
+.reel__stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.reel__stage--duet {
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+}
+.reel__video {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: transparent;
+}
+/* Landscape and square videos: whole, over a soft blurred copy of their poster. */
+.reel__video--contain {
+  object-fit: contain;
+}
+.reel__backdrop {
+  position: absolute;
+  inset: -10%;
+  width: 120%;
+  height: 120%;
+  object-fit: cover;
+  filter: blur(34px) saturate(1.25) brightness(0.55);
+}
+.reel__video::cue {
+  background: #05060bb8;
+  font-family: var(--font-sans);
+}
+.reel__video--big-captions::cue {
+  font-size: 150%;
+  line-height: 1.35;
+}
+
+/* The gesture layer sits over the video and under every control. */
+.reel__tap {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  cursor: pointer;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Buttons on the video: rounded blocks, like the YAPILAPI mark. */
+.reel__icon-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 15px;
+  background: #05060b59;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  color: #fff;
+  cursor: pointer;
+  transition: background-color var(--duration-fast);
+}
+.reel__icon-btn:hover {
+  background: #ffffff33;
+}
+.reel__icon-btn[aria-pressed='true'] {
+  background: #fff;
+  color: #0b0c14;
+}
+.reel__icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.reel__icon-btn--quiet {
+  background: transparent;
+}
+.reel button:focus-visible,
+.reel a:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--reel-scrim),
+    0 0 0 4px var(--reel-accent);
+}
+.reel .reel__btn:focus-visible {
+  box-shadow: none;
+}
+.reel__btn:focus-visible .reel__disc {
+  box-shadow:
+    0 0 0 2px var(--reel-scrim),
+    0 0 0 4px var(--reel-accent);
+}
+
+/* Top: back, the title, sound and clear view. The action rail starts well below it. */
+.reel__top {
+  position: absolute;
+  z-index: 4;
+  top: 10px;
+  inset-inline: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: opacity 400ms ease;
+}
+.reel__top-title {
+  flex: 1;
+  min-width: 0;
+  padding-inline-start: 4px;
+  font: 800 18px/1 var(--font-display);
+  letter-spacing: -0.01em;
+  text-shadow: 0 1px 6px #0009;
+}
+.reel--faint .reel__top {
+  opacity: 0.55;
+}
+
+/* The info strip: name, Follow, one line of caption with "more", the sound as a chip. */
+.reel__info {
+  position: absolute;
+  z-index: 3;
+  inset-inline: 14px 74px;
+  bottom: 46px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  text-shadow: 0 1px 4px #0009;
+  transition: opacity 400ms ease;
+}
+.reel--faint .reel__info {
+  opacity: 0.3;
+}
+.reel--faint .reel__info:hover,
+.reel--faint .reel__info:has(:focus-visible),
+.reel--faint .reel__top:has(:focus-visible) {
+  opacity: 1;
+}
+.reel--details .reel__info {
+  opacity: 0;
+  pointer-events: none;
+}
+/* On phones the details panel takes the full width: the rail steps aside meanwhile. */
+@media (max-width: 899px) {
+  .reel--details .reel__rail {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+.reel__byline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.reel__author {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font: 800 15px/20px var(--font-display);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reel__author:hover {
+  text-decoration: underline;
+}
+.reel__with {
+  flex: none;
+  font: 700 12px/1 var(--font-sans);
+  opacity: 0.85;
+}
+.reel__follow {
+  flex: none;
+  min-height: 26px;
+  padding: 0 11px;
+  border: 1px solid #ffffffb3;
+  border-radius: 9px;
+  background: #ffffff1a;
+  color: #fff;
+  font: 700 12px/1 var(--font-sans);
+  cursor: pointer;
+}
+.reel__follow:hover {
+  background: #fff;
+  color: #0b0c14;
+}
+.reel__caption-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.reel__caption {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font: 500 14px/20px var(--font-sans);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reel__caption--empty {
+  flex: 0;
+}
+.reel__caption a {
+  color: inherit;
+  font-weight: 700;
+}
+.reel--big .reel__caption {
+  font-size: 16px;
+  line-height: 22px;
+}
+.reel__more-btn {
+  flex: none;
+  min-height: 24px;
+  margin: -2px -4px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: #fff;
+  font: 700 14px/20px var(--font-sans);
+  opacity: 0.85;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.reel__chips {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+.reel__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 26px;
+  padding: 3px 10px;
+  border-radius: 9px;
+  background: #05060b66;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  font: 700 12px/16px var(--font-sans);
+  text-decoration: none;
+  text-shadow: none;
+}
+.reel__chip svg {
+  flex: none;
+}
+.reel__chip bdi {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reel__chip:hover {
+  background: #ffffff33;
+}
+
+/* The details panel ("more"): the full caption, tags, sound, highlights, over a scrim. */
+.reel__details {
+  position: absolute;
+  z-index: 5;
+  inset-inline: 0;
+  bottom: 44px;
+  max-height: calc(100% - 110px);
+  display: flex;
+  flex-direction: column;
+  padding: 36px 14px 8px;
+  background: linear-gradient(to bottom, #05060b00, #05060bd9 40px, #05060bf0);
+  color: var(--reel-ink);
+  --ink: #f2f3fa;
+  --ink-muted: #c9cde0;
+  --line: #ffffff2b;
+  --yapi: #ff5c7a;
+  animation: reel-rise var(--duration-base) var(--ease-out);
+}
+@keyframes reel-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+.reel__details-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.reel__details-who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+.reel__details-who strong {
+  display: block;
+  font: 800 15px/20px var(--font-display);
+}
+.reel__details-meta {
+  display: block;
+  font: 500 12px/16px var(--font-sans);
+  opacity: 0.8;
+}
+.reel__details-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.reel__details-caption {
+  font: 500 15px/22px var(--font-sans);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.reel--big .reel__details-caption {
+  font-size: 17px;
+  line-height: 25px;
+}
+.reel__details-caption a {
+  color: #fff;
+  font-weight: 700;
+}
+.reel__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font: 700 13px/18px var(--font-sans);
+}
+.reel__tags a {
+  color: #fff;
+  text-decoration: none;
+}
+.reel__tags a:hover {
+  text-decoration: underline;
+}
+.reel__soundlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  color: #fff;
+  font: 700 13px/18px var(--font-sans);
+  text-decoration: none;
+}
+.reel__soundlink bdi {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reel__soundlink:hover {
+  text-decoration: underline;
+}
+.reel__credit {
+  margin: 0;
+  font: 500 12px/16px var(--font-sans);
+  opacity: 0.85;
+}
+.reel__marks h3 {
+  margin: 0 0 6px;
+  font: 700 13px/18px var(--font-sans);
+  opacity: 0.85;
+}
+.reel__marks ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.reel__marks button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: #ffffff14;
+  color: #fff;
+  font: 600 14px/18px var(--font-sans);
+  text-align: start;
+  cursor: pointer;
+}
+.reel__marks button:hover {
+  background: #ffffff26;
+}
+.reel__mark-time {
+  min-width: 36px;
+  color: var(--reel-sun);
+  font: 700 12px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.reel__moments-link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: #3ddbc226;
+  color: var(--reel-mint);
+  font: 700 13px/18px var(--font-sans);
+  cursor: pointer;
+}
+
+/* The action rail: the author (with a follow badge), like, comments, share, save, more. */
+.reel__rail {
+  position: absolute;
+  z-index: 3;
+  inset-inline-end: 8px;
+  bottom: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transition: opacity 400ms ease;
+}
+.reel--faint .reel__rail {
+  opacity: 0.6;
+}
+.reel--faint .reel__rail:hover,
+.reel--faint .reel__rail:has(:focus-visible) {
+  opacity: 1;
+}
+.reel__who {
+  position: relative;
+  margin-bottom: 8px;
+}
+.reel__avatar {
+  display: block;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 2px #fff;
+}
+.reel__follow-badge {
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid var(--reel-scrim);
+  border-radius: 8px;
+  background: var(--reel-accent);
+  color: #fff;
+  transform: translateX(-50%);
+  cursor: pointer;
+}
+/* A small badge with a finger-sized target. */
+.reel__follow-badge::before {
+  content: '';
+  position: absolute;
+  inset: -11px;
+}
+.reel__btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  font: 700 12px/14px var(--font-sans);
+  cursor: pointer;
+}
+.reel__disc {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #ffffff24;
+  border-radius: 15px;
+  background: #05060b52;
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast);
+}
+.reel__btn:hover .reel__disc {
+  background: #ffffff33;
+}
+.reel__btn:active .reel__disc {
+  transform: scale(0.9);
+}
+.reel__btn[aria-pressed='true'] .reel__disc svg {
+  animation: yp-pop 320ms var(--ease-out);
+}
+.reel__btn--like[aria-pressed='true'] .reel__disc {
+  border-color: transparent;
+  background: var(--reel-accent);
+  color: #fff;
+}
+.reel__btn--save[aria-pressed='true'] .reel__disc {
+  border-color: transparent;
+  background: var(--reel-sun);
+  color: #0b0c14;
+}
+.reel__count {
+  min-height: 14px;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 3px #000a;
+}
+.reel__skip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+/* Previous and next: for keyboards and screen readers on phones (people swipe), shown on focus. */
+.reel__skip:not(:focus-within) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.reel__up {
+  transform: rotate(180deg);
+}
+
+/* Bottom: play or pause, the scrubber (always there, above the dock), the time. */
+.reel__controls {
+  position: absolute;
+  z-index: 4;
+  inset-inline: 6px;
+  bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 38px;
+}
+.reel__play {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 400ms ease;
+}
+.reel__play:hover {
+  background: #ffffff26;
+}
+.reel__time {
+  flex: none;
+  min-width: 70px;
+  font: 600 11px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  opacity: 0.85;
+  transition: opacity 400ms ease;
+}
+.reel--faint .reel__play,
+.reel--faint .reel__time {
+  opacity: 0;
+}
+.reel--faint .reel__controls:hover .reel__play,
+.reel--faint .reel__controls:hover .reel__time,
+.reel--faint .reel__controls:has(:focus-visible) .reel__play,
+.reel--faint .reel__controls:has(:focus-visible) .reel__time {
+  opacity: 0.85;
+}
+.reel-scrub {
+  --p: 0;
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+}
+.reel-scrub:focus-visible {
+  outline: none;
+}
+.reel-scrub__track {
+  position: relative;
+  width: 100%;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #ffffff45;
+  transition: height 150ms ease;
+}
+.reel-scrub__fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: calc(var(--p) * 100%);
+  background: linear-gradient(to right, var(--reel-accent), var(--reel-sun));
+}
+[dir='rtl'] .reel-scrub__fill {
+  background: linear-gradient(to left, var(--reel-accent), var(--reel-sun));
+}
+.reel-scrub:hover .reel-scrub__track,
+.reel-scrub--drag .reel-scrub__track,
+.reel-scrub:focus-visible .reel-scrub__track {
+  height: 6px;
+}
+.reel-scrub:focus-visible .reel-scrub__track {
+  overflow: visible;
+  box-shadow:
+    0 0 0 2px var(--reel-scrim),
+    0 0 0 4px var(--reel-accent);
+}
+.reel-scrub__thumb {
+  position: absolute;
+  top: 50%;
+  inset-inline-start: calc(var(--p) * 100%);
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  margin-inline-start: -7px;
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: 0 1px 6px #0009;
+  transform: scale(0);
+  transition: transform 150ms ease;
+  pointer-events: none;
+}
+.reel-scrub:hover .reel-scrub__thumb,
+.reel-scrub--drag .reel-scrub__thumb,
+.reel-scrub:focus-visible .reel-scrub__thumb {
+  transform: scale(1);
+}
+/* The creator's highlights: small upright ticks. */
+.reel-scrub__tick {
+  position: absolute;
+  top: 50%;
+  width: 3px;
+  height: 11px;
+  margin-top: -5.5px;
+  margin-inline-start: -1.5px;
+  border-radius: 2px;
+  background: var(--reel-sun);
+  box-shadow: 0 0 0 1px #05060bb3;
+  pointer-events: none;
+}
+/* Moment comments: tiny speech shapes riding above the line. */
+.reel-scrub__bubble {
+  position: absolute;
+  top: 1px;
+  width: 8px;
+  height: 7px;
+  margin-inline-start: -4px;
+  border-radius: 4px 4px 4px 1px;
+  background: var(--reel-mint);
+  opacity: 0.9;
+  pointer-events: none;
+}
+.reel-scrub__tip {
+  position: absolute;
+  bottom: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 8px;
+  border-radius: 9px;
+  background: #05060be6;
+  color: #fff;
+  font: 700 12px/1 var(--font-mono);
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+[dir='rtl'] .reel-scrub__tip {
+  transform: translateX(50%);
+}
+.reel-scrub__tip-label {
+  color: var(--reel-sun);
+  font: 700 12px/1.2 var(--font-sans);
+}
+
+/* Clear view: only the video (and a faint progress line); a tap brings everything back. */
+.reel--clear .reel__top,
+.reel--clear .reel__info,
+.reel--clear .reel__rail,
+.reel--clear .reel__play,
+.reel--clear .reel__time {
+  opacity: 0;
+  pointer-events: none;
+}
+.reel--clear .reel__top:has(:focus-visible),
+.reel--clear .reel__rail:has(:focus-visible) {
+  opacity: 1;
+  pointer-events: auto;
+}
+.reel--clear .reel-scrub {
+  opacity: 0.55;
+}
+.reel__clear-hint {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: 56px;
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: #05060bb3;
+  font: 600 13px/18px var(--font-sans);
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: reel-hint 2800ms ease forwards;
+}
+@keyframes reel-hint {
+  0%,
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Brief signs in the middle: play or pause after a tap, then a small still play sign while paused. */
+.reel__sign {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin: -32px 0 0 -32px;
+  border-radius: 22px;
+  background: #05060b73;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  pointer-events: none;
+  animation: reel-sign 700ms var(--ease-out) forwards;
+}
+.reel__sign--still {
+  width: 52px;
+  height: 52px;
+  margin: -26px 0 0 -26px;
+  border-radius: 18px;
+  opacity: 0.85;
+  animation: none;
+}
+@keyframes reel-sign {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+}
+/* Data saver, or a browser that didn't allow autoplay: a tap starts it. */
+.reel__start {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  margin: -38px 0 0 -38px;
+  border: 0;
+  border-radius: 26px;
+  background: #05060b80;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  cursor: pointer;
+}
+.reel__badge {
+  position: absolute;
+  z-index: 4;
+  top: 64px;
+  left: 50%;
+  padding: 5px 12px;
+  border-radius: 10px;
+  background: #05060bb3;
+  font: 700 13px/18px var(--font-sans);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.reel__sound-hint,
+.reel__resume {
+  position: absolute;
+  z-index: 4;
+  top: 64px;
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 32px);
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: #fff;
+  color: #0b0c14;
+  font: 700 13px/18px var(--font-sans);
+  white-space: nowrap;
+  box-shadow: 0 6px 20px #0006;
+  transform: translateX(-50%);
+}
+.reel__sound-hint {
+  cursor: pointer;
+}
+.reel__resume {
+  top: 108px;
+  background: #05060bcc;
+  color: #fff;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.reel__resume button {
+  min-height: 24px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--reel-sun);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* A moment comment passing by, near the bottom above its spot on the scrubber. */
+.reel__pop {
+  position: absolute;
+  z-index: 4;
+  bottom: 44px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  padding: 4px 10px 4px 4px;
+  border: 0;
+  border-radius: 12px 12px 12px 4px;
+  background: #ffffffeb;
+  color: #0b0c14;
+  font: 500 12px/16px var(--font-sans);
+  text-align: start;
+  box-shadow: 0 6px 20px #0006;
+  cursor: pointer;
+  animation: reel-pop 3200ms ease forwards;
+}
+.reel__pop > span {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.reel__pop .yp-avatar {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  font-size: 10px;
+}
+.reel__pop-name {
+  font-weight: 800;
+}
+@keyframes reel-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  10%,
+  85% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Double tap: the three blocks of the YAPILAPI mark come together where you tapped, then rise apart. */
+.reel-burst {
+  position: absolute;
+  z-index: 4;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.reel-burst > span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  animation: reel-block 760ms cubic-bezier(0.2, 0.9, 0.3, 1.15) forwards;
+}
+.reel-burst__a,
+.reel-burst__b,
+.reel-burst__c {
+  width: 40px;
+  height: 40px;
+  border: 2px solid #fff;
+  border-radius: 13px;
+  box-shadow: 0 8px 24px #0008;
+}
+.reel-burst__a {
+  --x: -23px;
+  --y: -24px;
+  --r: -12deg;
+  --fx: -62px;
+  --fy: -118px;
+  background: var(--reel-accent);
+}
+.reel-burst__b {
+  --x: 23px;
+  --y: -24px;
+  --r: 12deg;
+  --fx: 62px;
+  --fy: -118px;
+  background: var(--reel-sun);
+}
+.reel-burst__c {
+  --x: 0px;
+  --y: 26px;
+  --r: 0deg;
+  --fx: 0px;
+  --fy: -150px;
+  height: 46px;
+  background: var(--reel-mint);
+}
+.reel-burst > .reel-burst__ring {
+  width: 132px;
+  height: 132px;
+  border: 3px solid #ffffffcc;
+  border-radius: 44px;
+  animation-name: reel-ring;
+}
+@keyframes reel-block {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2);
+  }
+  30% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) rotate(var(--r)) scale(1.12);
+  }
+  55% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y))) rotate(var(--r)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--fx)), calc(-50% + var(--fy))) rotate(calc(var(--r) * 3)) scale(0.6);
+  }
+}
+@keyframes reel-ring {
+  0% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.15);
+  }
+}
+
+.reels__end {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  height: 100%;
+  padding: var(--space-8);
+  color: #c9cde0;
+  text-align: center;
+  scroll-snap-align: start;
+}
+.reels__end p {
+  margin: 0;
+}
+
+/* A reel for subscribers, seen by someone who isn't one */
+.reel__locked {
+  display: grid;
+  place-items: center;
+  background-color: #10121e;
+  background-position: center;
+  background-size: cover;
+}
+.reel__locked::before {
+  height: auto;
+  inset: 0;
+  background: #00000080;
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+}
+.reel__locked::after {
+  display: none;
+}
+.reel__locked-inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 320px;
+  padding: var(--space-4);
+  color: #fff;
+  text-align: center;
+}
+.reel__locked-inner span {
+  color: #c9cde0;
+}
+
+/* Larger screens: a centred 9:16 column, the actions beside it (not over it), in the theme's colours. */
+@media (min-width: 900px) {
+  .reels {
+    position: relative;
+    z-index: auto;
+    inset: auto;
+    height: calc(100dvh - 72px);
+    max-width: 760px;
+    margin: 0 auto;
+    background: transparent;
+    border-radius: 0;
+    color: var(--ink);
+  }
+  .reel {
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    gap: var(--space-4);
+    padding-block: 8px;
+  }
+  .reel__frame {
+    position: relative;
+    inset: auto;
+    height: 100%;
+    aspect-ratio: 9 / 16;
+    max-width: calc(100% - 84px);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+  }
+  .reel__rail {
+    position: static;
+    align-self: flex-end;
+    padding-bottom: 36px;
+    color: var(--ink);
+  }
+  .reel--faint .reel__rail {
+    opacity: 1;
+  }
+  .reel__icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+  }
+  .reel__rail .reel__icon-btn,
+  .reel__disc {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: var(--shadow-sm);
+  }
+  .reel__rail .reel__icon-btn:hover,
+  .reel__btn:hover .reel__disc {
+    background: var(--surface-sunken);
+  }
+  .reel__btn {
+    color: var(--ink);
+  }
+  .reel__count {
+    color: var(--ink-muted);
+    text-shadow: none;
+  }
+  .reel__avatar {
+    box-shadow: 0 0 0 2px var(--surface);
+  }
+  .reel__follow-badge {
+    border-color: var(--ground);
+  }
+  .reel__rail button:focus-visible,
+  .reel__rail a:focus-visible,
+  .reel__btn:focus-visible .reel__disc {
+    box-shadow: var(--focus-ring);
+  }
+  .reel__skip:not(:focus-within) {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+  }
+  .reels__end {
+    color: var(--ink-muted);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reel-burst,
+  .reel__pop,
+  .reel__details,
+  .reel__btn[aria-pressed='true'] .reel__disc svg {
+    animation: none;
+  }
+  .reel__sign {
+    animation-name: reel-sign-still;
+  }
+  .reel__frame::before,
+  .reel__frame::after,
+  .reel__info,
+  .reel__rail,
+  .reel__top,
+  .reel__play,
+  .reel__time,
+  .reel-scrub__track,
+  .reel-scrub__thumb {
+    transition: none;
+  }
+}
+@keyframes reel-sign-still {
+  0%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Reel sheets: share, options, highlights. */
+.reel-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.reel-sheet__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.reel-sheet__group .yp-segments {
+  display: flex;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.reel-sheet__group .yp-segments button {
+  flex: 1 0 auto;
+  padding-inline: 10px;
+}
+.reel-sheet__label {
+  color: var(--ink-muted);
+  font: 700 13px/18px var(--font-sans);
+}
+.reel-sheet__note {
+  margin: 0;
+  font-size: 14px;
+}
+.reel-sheet__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.reel-sheet__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 48px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--ink);
+  font: 600 15px/20px var(--font-sans);
+  text-align: start;
+  cursor: pointer;
+}
+.reel-sheet__item:hover {
+  background: var(--surface-sunken);
+}
+.reel-sheet__item:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.reel-sheet__item--danger {
+  color: var(--danger);
+}
+.reel-sheet__item[aria-pressed='true'] .reel-sheet__icon {
+  background: var(--yapi-soft);
+  color: var(--yapi);
+}
+.reel-sheet__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: var(--surface-sunken);
+}
+.reel-marks-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.reel-marks-edit li,
+.reel-marks-edit__add {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.reel-marks-edit .yp-input,
+.reel-marks-edit__add .yp-input {
+  flex: 1;
+  min-width: 0;
+}
+.reel-marks-edit__time {
+  flex: none;
+  min-width: 52px;
+  min-height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--saffron-soft);
+  color: var(--ink);
+  font: 700 13px/1 var(--font-mono);
+  cursor: pointer;
+}
+.reel-marks-edit__remove {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.reel-marks-edit__remove:hover {
+  background: var(--surface-sunken);
+  color: var(--ink);
+}
+
+/* A moment comment: "at 0:12", which plays the reel from there. */
+.comment__moment {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  min-height: 24px;
+  margin-block: 2px;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--yapi-soft);
+  color: var(--ink);
+  font: 700 12px/16px var(--font-mono);
+  cursor: pointer;
+}
+.comment__moment:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.comment__moment--static {
+  cursor: default;
 }
