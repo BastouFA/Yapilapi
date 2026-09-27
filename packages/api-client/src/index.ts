@@ -269,6 +269,8 @@ export function createClient(opts: ClientOptions) {
       pin: (postId: string | null) => put<{ pinnedPostId: string | null }>('/v1/me/pinned-post', { postId }),
       repost: (id: string) => put<{ reposted: boolean; reposts: number }>(`/v1/posts/${id}/repost`),
       unrepost: (id: string) => del<{ reposted: boolean; reposts: number }>(`/v1/posts/${id}/repost`),
+      /** Who reposted a post, newest first (private accounts only for their followers). */
+      reposters: (id: string, cursor?: string) => get<Page<PublicUser>>(`/v1/posts/${id}/reposters${qs({ cursor })}`),
       /** Unsave; the post also comes off the boards you own. */
       unsave: (id: string) => del(`/v1/posts/${id}/save`),
       /** Whether you saved it, your private note, and which of your boards it's on. */

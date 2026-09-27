@@ -653,8 +653,13 @@ a.yp-aside-row:hover {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
-  animation: yp-in var(--duration-base) var(--ease-out) both;
+  animation: yp-in var(--duration-base) var(--ease-out) backwards;
 }
+/*
+ * "backwards", not "both": once the entrance ends the element keeps no transform. A leftover
+ * transform would make it the containing block for position: fixed children, trapping the
+ * full-screen media viewer and menus inside a post instead of covering the screen.
+ */
 @keyframes yp-in {
   from {
     opacity: 0;
@@ -985,17 +990,27 @@ button.yp-chip:focus-visible {
   font: 600 13px/1 var(--font-sans);
 }
 .yp-viewer__stage {
-  display: grid;
-  place-items: center;
+  position: relative;
   min-height: 0;
-  padding: 0 var(--space-4);
+  margin: 0 var(--space-4);
+  overflow: hidden;
 }
+/* Centred in the space between the bar and the caption, whole, whatever its shape. */
 .yp-viewer__stage img,
 .yp-viewer__stage video {
+  position: absolute;
+  inset: 0;
+  margin: auto;
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
   border-radius: var(--radius-md);
+}
+.yp-viewer__stage audio {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: min(100%, 480px);
 }
 .yp-viewer__alt {
   padding: var(--space-3) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
@@ -1225,7 +1240,7 @@ button.yp-list__item {
   line-height: 21px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  animation: yp-in var(--duration-fast) var(--ease-out) both;
+  animation: yp-in var(--duration-fast) var(--ease-out) backwards;
 }
 .yp-bubble--them {
   align-self: flex-start;

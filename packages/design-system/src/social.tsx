@@ -745,6 +745,8 @@ export interface PostCardProps {
   onSaveTo?: (post: Post) => void;
   /** Share someone else's public post with your followers. */
   onRepost?: (post: Post) => void;
+  /** Show who reposted (where reposting isn't offered, e.g. on your own post, the count opens this). */
+  onReposters?: (post: Post) => void;
   /** Share a link to the post (the system share sheet, or copy the link). */
   onShare?: (post: Post) => void;
   onVote?: (post: Post, optionId: string) => void;
@@ -982,6 +984,7 @@ export function PostCard({
   onSave,
   onSaveTo,
   onRepost,
+  onReposters,
   onShare,
   onVote,
   onFeedback,
@@ -1314,6 +1317,17 @@ export function PostCard({
             >
               <Icon name="repost" />
               {post.counts.reposts || ''}
+            </button>
+          ) : post.counts.reposts && onReposters ? (
+            <button
+              type="button"
+              className="yp-action"
+              onClick={() => onReposters(post)}
+              aria-label={counted(tt('post.reposts'), post.counts.reposts)}
+              aria-haspopup="dialog"
+            >
+              <Icon name="repost" />
+              {post.counts.reposts}
             </button>
           ) : post.counts.reposts ? (
             <span className="yp-action yp-action--static" aria-label={counted(tt('post.reposts'), post.counts.reposts)}>

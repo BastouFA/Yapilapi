@@ -1,5 +1,6 @@
 'use client';
 
+import { Reposters } from '@/components/Reposters';
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -61,6 +62,7 @@ export function PostList({
   const [reporting, setReporting] = useState<Post | null>(null);
   const [boosting, setBoosting] = useState<Post | null>(null);
   const [coauthorsFor, setCoauthorsFor] = useState<string | null>(null);
+  const [repostersOf, setRepostersOf] = useState<string | null>(null);
   const [saveTo, setSaveTo] = useState<Post | null>(null);
   const [editing, setEditing] = useState<Post | null>(null);
   const [historyFor, setHistoryFor] = useState<Post | null>(null);
@@ -346,6 +348,7 @@ export function PostList({
             onSave={guard(save)}
             onSaveTo={me ? setSaveTo : undefined}
             onRepost={guard(repost)}
+            onReposters={(p) => setRepostersOf(p.id)}
             onShare={share}
             onVote={guard(vote)}
             onComment={setCommentsFor}
@@ -387,6 +390,7 @@ export function PostList({
         />
       ) : null}
 
+      <Reposters postId={repostersOf} onClose={() => setRepostersOf(null)} />
       <BottomSheet open={!!why} onClose={() => setWhy(null)} title={t('post.why')}>
         <ul className="stack-sm" style={{ paddingInlineStart: 20, margin: 0 }}>
           {why?.reasons.map((r) => (

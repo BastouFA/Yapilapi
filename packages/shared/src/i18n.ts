@@ -2450,6 +2450,8 @@ const en = {
   'music.track.devNote': 'Generated for development and tests. Not a real song.',
   'm.sound.postCount.one': '{count} post',
   'm.sound.postCount.other': '{count} posts',
+  'reposters.title': 'Reposted by',
+  'reposters.empty': 'Nobody you can see has reposted this yet.',
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -4921,6 +4923,8 @@ const fr: Catalog = {
   'music.track.devNote': 'Générée pour le développement et les tests. Ce n’est pas une vraie chanson.',
   'm.sound.postCount.one': '{count} publication',
   'm.sound.postCount.other': '{count} publications',
+  'reposters.title': 'Republié par',
+  'reposters.empty': "Personne que vous pouvez voir n'a encore republié ceci.",
 };
 
 const ar: Catalog = {
@@ -7353,6 +7357,8 @@ const ar: Catalog = {
   'music.track.devNote': 'أُنشئت للتطوير والاختبار. ليست أغنية حقيقية.',
   'm.sound.postCount.one': 'منشور واحد',
   'm.sound.postCount.other': '{count} منشور',
+  'reposters.title': 'أعاد نشره',
+  'reposters.empty': 'لم يُعِد أحد ممن يمكنك رؤيتهم نشر هذا بعد.',
 };
 
 const es: Catalog = {
@@ -9804,6 +9810,8 @@ const es: Catalog = {
   'music.track.devNote': 'Generada para desarrollo y pruebas. No es una canción real.',
   'm.sound.postCount.one': '{count} publicación',
   'm.sound.postCount.other': '{count} publicaciones',
+  'reposters.title': 'Compartido por',
+  'reposters.empty': 'Nadie que puedas ver lo ha compartido todavía.',
 };
 
 const pt: Catalog = {
@@ -12252,6 +12260,8 @@ const pt: Catalog = {
   'music.track.devNote': 'Gerada para desenvolvimento e testes. Não é uma música real.',
   'm.sound.postCount.one': '{count} publicação',
   'm.sound.postCount.other': '{count} publicações',
+  'reposters.title': 'Repostado por',
+  'reposters.empty': 'Ninguém que você pode ver repostou isso ainda.',
 };
 
 const sw: Catalog = {
@@ -14703,6 +14713,8 @@ const sw: Catalog = {
   'music.track.devNote': 'Imetengenezwa kwa ajili ya majaribio. Si wimbo halisi.',
   'm.sound.postCount.one': 'Chapisho {count}',
   'm.sound.postCount.other': 'Machapisho {count}',
+  'reposters.title': 'Imeshirikishwa na',
+  'reposters.empty': 'Hakuna unayeweza kumwona aliyeshirikisha hii bado.',
 };
 
 const yo: Catalog = {
@@ -17148,6 +17160,8 @@ const yo: Catalog = {
   'music.track.devNote': 'A ṣe é fún ìdàgbàsókè àti ìdánwò. Kì í ṣe orin gidi.',
   'm.sound.postCount.one': 'Ìfìwéránṣẹ́ {count}',
   'm.sound.postCount.other': 'Àwọn ìfìwéránṣẹ́ {count}',
+  'reposters.title': 'Ẹni tó tún un pín',
+  'reposters.empty': 'Kò sí ẹni tí o lè rí tó tíì tún èyí pín.',
 };
 
 const ha: Catalog = {
@@ -19600,6 +19614,8 @@ const ha: Catalog = {
   'music.track.devNote': 'An yi ta don gini da gwaji. Ba waƙa ta gaske ba ce.',
   'm.sound.postCount.one': 'Rubutu {count}',
   'm.sound.postCount.other': 'Rubutu {count}',
+  'reposters.title': 'Waɗanda suka sake rabawa',
+  'reposters.empty': 'Babu wanda za ka iya gani da ya sake raba wannan tukuna.',
 };
 
 export const CATALOGS: Record<string, Catalog> = { en, fr, ar, es, pt, sw, yo, ha };

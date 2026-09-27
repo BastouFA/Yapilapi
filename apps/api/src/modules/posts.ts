@@ -778,6 +778,32 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     return { reposted: false, reposts };
   });
 
+  /**
+   * Who reposted a post, newest first, for anyone who can see it. Private accounts appear only to
+   * people who follow them (and to themselves); blocked people never appear.
+   */
+  app.get('/v1/posts/:id/reposters', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req) => {
+    const viewer = req.user?.id ?? null;
+    const { id } = parse(idParam, req.params);
+    const q = parse(pageQuerySchema, req.query);
+    await assertVisible(id, viewer);
+    const c = decodeCursor<KeyCursor>(q.cursor);
+    const { rows } = await db.query(
+      `SELECT r.user_id AS uid, r.created_at, pr.username, pr.display_name, pr.avatar_url, pr.mode, ${plusCol('')}
+       FROM post_reposts r JOIN profiles pr ON pr.user_id = r.user_id JOIN users u ON u.id = r.user_id
+       WHERE r.post_id = $2 AND u.status = 'active' AND ${notBlockedSql('r.user_id', '$1')}
+         AND (NOT pr.is_private OR r.user_id = $1 OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = r.user_id))
+         ${c ? 'AND (r.created_at, r.user_id) < ($4::timestamptz, $5::uuid)' : ''}
+       ORDER BY r.created_at DESC, r.user_id DESC LIMIT $3`,
+      c ? [viewer, id, q.limit + 1, c.t, c.id] : [viewer, id, q.limit + 1],
+    );
+    const page = rows.slice(0, q.limit);
+    return {
+      items: page.map((r) => publicUserFrom({ ...r, id: r.uid }, '')),
+      nextCursor: rows.length > q.limit ? keyCursorOf({ created_at: page.at(-1)!.created_at, id: page.at(-1)!.uid }) : null,
+    };
+  });
+
   /** A person's reposts, newest first (what they chose to share). */
   app.get('/v1/users/:id/reposts', async (req) => {
     const viewer = req.user?.id ?? null;
