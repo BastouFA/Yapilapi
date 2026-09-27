@@ -74,6 +74,8 @@ const schema = z.object({
   TRANSCRIBE_API_KEY: z.string().optional().default(''),
   TRANSCRIBE_MODEL: z.string().default('whisper-1'),
   RATE_LIMIT_MAX: z.coerce.number().default(300),
+  /** "See translation": how many translations one person can ask for in an hour (answers from the cache count too). */
+  TRANSLATE_PER_HOUR: z.coerce.number().int().positive().default(300),
   /**
    * Run the background workers (media processing, recap videos, scheduled posts, webhooks, room
    * housekeeping) in this process. Unset: on everywhere except tests, which drive them directly.

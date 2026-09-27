@@ -6,7 +6,8 @@ import type { Comment, Post } from '../../../../packages/shared/src/types';
 import { client, errorMessage } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { useAutocomplete } from '../../lib/autocomplete';
-import { PostCard, RichText } from '../../lib/post';
+import { PostCard } from '../../lib/post';
+import { TranslatableText } from '../../lib/translation';
 import { useSession } from '../../lib/session';
 import { elevation, radius, space } from '../../lib/theme';
 import { Avatar, Button, EmptyState, Loading, Notice, useColors, userText } from '../../lib/ui';
@@ -89,7 +90,14 @@ export default function PostScreen() {
                   {item.author.displayName} <Text style={{ color: c.inkMuted, fontWeight: '400' }}>· {timeAgo(item.createdAt)}</Text>
                 </Text>
                 {parent ? <Text style={{ color: c.inkMuted, fontSize: 12 }}>{t('m.comment.replyingTo', { name: parent.author.displayName })}</Text> : null}
-                <RichText text={item.body} style={{ color: c.ink, fontSize: 15, lineHeight: 21 }} />
+                <TranslatableText
+                  kind="comment"
+                  id={item.id}
+                  text={item.body}
+                  lang={item.lang}
+                  own={item.author.id === me?.id}
+                  style={{ color: c.ink, fontSize: 15, lineHeight: 21 }}
+                />
                 {me ? (
                   <Pressable accessibilityRole="button" onPress={() => setReplyTo(item)} hitSlop={6} style={{ alignSelf: 'flex-start', marginTop: 2 }}>
                     <Text style={{ color: c.yapi, fontWeight: '700', fontSize: 12 }}>{t('m.comment.reply')}</Text>

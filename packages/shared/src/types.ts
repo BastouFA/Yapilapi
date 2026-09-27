@@ -1,5 +1,6 @@
 import type { StoryCard } from './stories.ts';
 import type { DataSaverMode } from './data-saver.ts';
+import type { TranslationSettings } from './translation.ts';
 import type {
   BoardVisibility,
   CircleKind,
@@ -42,6 +43,8 @@ export interface Me extends PublicUser {
   plusUntil: string | null;
   /** Data saver, as saved on the account (PUT /v1/me/data-saver). A device may override it locally. */
   dataSaver: DataSaverMode;
+  /** "Languages I understand" and "Translate automatically" (PUT /v1/me/translation). */
+  translation: TranslationSettings;
 }
 
 /** A short "Now" line, for 24 hours. `audience` is only included for its owner. */
@@ -180,6 +183,8 @@ export interface Post {
   /** Set on Real posts: captured in-app moments before posting, unedited. */
   real?: { capturedAt: string; dual: boolean; locationText: string | null } | null;
   createdAt: string;
+  /** Detected language of the text (ISO 639-1), or null when it couldn't be told. Drives "See translation". */
+  lang?: string | null;
   /** Set once the text was changed after publishing: shown as "Edited", which opens the history (GET /v1/posts/:id/history). */
   editedAt?: string;
   /** Only on your own drafts and scheduled posts, which nobody else sees. Published posts leave it out. */
@@ -265,6 +270,8 @@ export interface Comment {
   postId: string;
   parentId: string | null;
   body: string;
+  /** Detected language of the text (ISO 639-1), or null when it couldn't be told. Drives "See translation". */
+  lang?: string | null;
   author: PublicUser;
   createdAt: string;
 }
@@ -365,6 +372,8 @@ export interface Message {
   conversationId: string;
   sender: PublicUser;
   body: string;
+  /** Detected language of the text (ISO 639-1), or null when it couldn't be told. Drives "See translation". */
+  lang?: string | null;
   replyToId: string | null;
   attachments: {
     url: string;

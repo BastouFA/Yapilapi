@@ -42,6 +42,7 @@ import {
   type Screening,
 } from '../lib/publishing.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
+import { langOf } from '../lib/translation.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 const VISIBLE = postVisibleSql('$1');
@@ -279,9 +280,10 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       const status = screened ? worseStatus(cur.moderation_status, screening!.status) : cur.moderation_status;
       if (changed) await c.query(`INSERT INTO post_edits (post_id, body) VALUES ($1, $2)`, [id, cur.body]);
       await c.query(
-        `UPDATE posts SET body = $2, visibility = $3, topics = $4, moderation_status = $5, edited_at = CASE WHEN $6 THEN now() ELSE edited_at END, updated_at = now()
+        `UPDATE posts SET body = $2, visibility = $3, topics = $4, moderation_status = $5, edited_at = CASE WHEN $6 THEN now() ELSE edited_at END, updated_at = now(),
+                          lang = CASE WHEN $6 THEN $7 ELSE lang END
          WHERE id = $1`,
-        [id, changed ? input.body : cur.body, visibility, topics, status, changed],
+        [id, changed ? input.body : cur.body, visibility, topics, status, changed, changed ? langOf(input.body!) : null],
       );
       // Descriptions of the post's own photos and videos (an empty one clears it).
       for (const m of input.media ?? []) {
@@ -868,7 +870,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     await assertUnlocked(id, viewer);
     const c = decodeCursor<KeyCursor>(q.cursor);
     const { rows } = await db.query(
-      `SELECT cm.id, cm.post_id, cm.parent_id, cm.body, cm.created_at,
+      `SELECT cm.id, cm.post_id, cm.parent_id, cm.body, cm.lang, cm.created_at,
               pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode, ${plusCol('a_')}
        FROM comments cm JOIN profiles pr ON pr.user_id = cm.author_id
        WHERE cm.post_id = $2 AND cm.deleted_at IS NULL AND (cm.moderation_status IN ('normal','review') OR cm.author_id = $1)
@@ -884,6 +886,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       postId: r.post_id,
       parentId: r.parent_id,
       body: r.body,
+      lang: r.lang ?? langOf(r.body),
       author: publicUserFrom(r, 'a_'),
       createdAt: r.created_at.toISOString(),
     }));
@@ -903,9 +906,9 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
         if (!parent.rowCount) throw notFound('The comment you replied to');
       }
       const { rows } = await c.query(
-        `INSERT INTO comments (post_id, author_id, parent_id, body, moderation_status, topics) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, created_at`,
+        `INSERT INTO comments (post_id, author_id, parent_id, body, moderation_status, topics, lang) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, created_at, lang`,
         // #tags in a comment count on the tag's page.
-        [id, u.id, input.parentId ?? null, input.body, statusForRisk(analysis.risk), extractHashtags(input.body)],
+        [id, u.id, input.parentId ?? null, input.body, statusForRisk(analysis.risk), extractHashtags(input.body), langOf(input.body)],
       );
       await c.query(`UPDATE posts SET comment_count = comment_count + 1 WHERE id = $1`, [id]);
       if (analysis.risk !== 'normal')
@@ -941,6 +944,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
         postId: id,
         parentId: input.parentId ?? null,
         body: input.body,
+        lang: comment.lang,
         author: publicUserFrom(author, 'a_'),
         createdAt: comment.created_at.toISOString(),
       } satisfies Comment,

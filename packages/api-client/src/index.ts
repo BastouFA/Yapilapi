@@ -2,6 +2,9 @@ import type {
   Circle,
   CircleKind,
   DataSaverMode,
+  TranslatableKind,
+  Translation,
+  TranslationSettings,
   NowStatus,
   NowStatusAudience,
   NowStatusIcon,
@@ -185,6 +188,9 @@ export function createClient(opts: ClientOptions) {
       /** Data saver as saved on the account (also Me.dataSaver). Each device may override it locally. */
       dataSaver: () => get<{ mode: DataSaverMode }>('/v1/me/data-saver'),
       setDataSaver: (mode: DataSaverMode) => put<{ mode: DataSaverMode }>('/v1/me/data-saver', { mode }),
+      /** "Languages I understand" and "Translate automatically" (also Me.translation). */
+      translation: () => get<TranslationSettings>('/v1/me/translation'),
+      setTranslation: (b: TranslationSettings) => put<TranslationSettings>('/v1/me/translation', b),
       /** Posts and reels you've been invited to co-author and haven't answered yet, newest first. */
       collabInvites: () => get<{ items: Post[] }>('/v1/me/collab-invites'),
       friendRequests: () => get<{ items: { id: string; from: PublicUser; createdAt: string }[] }>('/v1/me/friend-requests'),
@@ -655,6 +661,11 @@ export function createClient(opts: ClientOptions) {
       markRead: (ids?: string[]) => post('/v1/notifications/read', ids ? { ids } : {}),
     },
     reports: { create: (b: { targetType: string; targetId: string; reason: string; details?: string }) => post<{ message: string }>('/v1/reports', b) },
+    /**
+     * "See translation": a post, comment, story or message machine-translated into `target`.
+     * Errors: 503 translation_off (turned off) or translation_unavailable (not working right now), 429 translation_limit, 404 when not visible.
+     */
+    translate: (b: { kind: TranslatableKind; id: string; target: string }) => post<{ translation: Translation }>('/v1/translate', b),
     ai: {
       assist: (b: { task: string; input?: string; conversationId?: string; communityId?: string; targetLanguage?: string }) =>
         post<{ output: unknown; provider: string; model: string; notice?: string; contextScopes: string[] }>('/v1/ai/assist', b),
@@ -1424,6 +1435,8 @@ export interface CaptionCue {
 export interface Story {
   id: string;
   body: string;
+  /** Detected language of the text, for "See translation". */
+  lang?: string | null;
   mediaUrl: string | null;
   mediaKind: 'image' | 'video' | 'audio' | null;
   posterUrl: string | null;

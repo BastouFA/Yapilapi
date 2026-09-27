@@ -4,6 +4,7 @@ import { isAdultViewer, plusCol, publicUserFrom } from './users.ts';
 import { allowDownloadSql, postUnlockedSql, postVisibleSql } from './visibility.ts';
 import { attachCollabsAndTags } from './collabs.ts';
 import { mediaSizesSql, withSmallVariants } from './data-saver.ts';
+import { langOf } from './translation.ts';
 
 type Q = Pool | PoolClient;
 
@@ -17,7 +18,7 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
   // Media the automated check marked sensitive is never sent to people under 18 (or whose age we don't know); blocked media to nobody.
   const adult = await isAdultViewer(db, viewer);
   const { rows } = await db.query(
-    `SELECT p.id, p.kind, p.format, p.body, p.visibility, p.link_url, p.topics, p.like_count, p.comment_count, p.view_count, p.created_at, p.edited_at, p.status, p.scheduled_at, p.ai_provenance, p.metadata->'real' AS real,
+    `SELECT p.id, p.kind, p.format, p.body, p.lang, p.visibility, p.link_url, p.topics, p.like_count, p.comment_count, p.view_count, p.created_at, p.edited_at, p.status, p.scheduled_at, p.ai_provenance, p.metadata->'real' AS real,
             pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode, ${plusCol('a_')},
             c.id AS c_id, c.slug AS c_slug, c.name AS c_name,
             e.id AS e_id, e.title AS e_title, e.starts_at AS e_starts_at,
@@ -82,6 +83,7 @@ function toPost(r: Record<string, any>, originals: Map<string, NonNullable<Remix
     id: r.id,
     kind: r.kind,
     body: r.body,
+    lang: r.lang ?? langOf(r.body),
     visibility: r.visibility,
     author: publicUserFrom(r, 'a_'),
     media: (r.media as (MediaItem & { sensitive: boolean })[]).map(({ sensitive, ...m }) => withSmallVariants(sensitive ? { ...m, sensitive: true } : m)),

@@ -6,6 +6,7 @@
  */
 export { Icon, ICON_NAMES, type IconName } from './icons.tsx';
 export { DataSaverProvider, useDataSaver } from './data-saver.tsx';
+export { TranslatableText, TranslationBar, TranslationProvider, useTranslatable, type Translatable, type TranslationContextValue } from './translation.tsx';
 export {
   Alert,
   Avatar,

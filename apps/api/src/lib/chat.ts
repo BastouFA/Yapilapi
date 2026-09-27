@@ -20,6 +20,19 @@ export interface ChatDeps {
   realtime?: RealtimeHub;
 }
 
+/**
+ * The messages reader `r` sees (message alias m): not deleted (unsent ones stay as a
+ * placeholder), not past their disappearing time, not held for a check unless their own,
+ * not from someone they blocked, and not deleted just for them. Membership is checked separately.
+ */
+export function messageVisibleSql(r: string): string {
+  return `(m.deleted_at IS NULL OR m.unsent_at IS NOT NULL)
+  AND (m.expires_at IS NULL OR m.expires_at > now())
+  AND (m.moderation_status = 'normal' OR (m.moderation_status = 'review' AND m.sender_id = ${r}))
+  AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = ${r} AND b.blocked_id = m.sender_id)
+  AND NOT EXISTS (SELECT 1 FROM message_hides h WHERE h.user_id = ${r} AND h.message_id = m.id)`;
+}
+
 // ─── Previews and reactions ─────────────────────────────────────────────
 
 /** How each message looks as a quote (a reply's original, or a pinned message) to one reader. */

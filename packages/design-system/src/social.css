@@ -1942,3 +1942,46 @@ p.yp-post__pending {
   color: #fff;
   pointer-events: none;
 }
+
+/* "See translation" under a post, comment, story or message. */
+.yp-translate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--space-2);
+  margin-top: var(--space-1);
+  font: 500 13px/18px var(--font-sans);
+  color: var(--ink-muted);
+}
+.yp-post > .yp-translate {
+  padding: 0 var(--space-4);
+}
+.yp-translate__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.yp-translate__link:disabled {
+  color: var(--ink-muted);
+  text-decoration: none;
+  cursor: default;
+}
+.yp-translate__link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: 2px;
+}
+.yp-translate__note {
+  flex-basis: 100%;
+  font-weight: 400;
+}
+.yp-translate__error {
+  color: var(--danger);
+  font-weight: 400;
+}

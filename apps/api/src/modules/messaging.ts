@@ -36,25 +36,18 @@ import { me, requireAuth, resolveSession, sessionTokenOf } from '../plugins/auth
 import { issueTicket, readTicket } from '../lib/realtime-ticket.ts';
 import { canSeeStory, storyCards } from '../lib/stories.ts';
 import { nowStatusesFor } from '../lib/now-status.ts';
-import { mediaIdsOf, messagePreviews, reactionSummaries, revokeChatMedia } from '../lib/chat.ts';
+import { mediaIdsOf, messagePreviews, messageVisibleSql, reactionSummaries, revokeChatMedia } from '../lib/chat.ts';
+import { langOf } from '../lib/translation.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 
-const MESSAGE_COLS = `m.id, m.conversation_id, m.body, m.reply_to_id, m.attachments, m.created_at, m.client_id, m.moderation_status, m.kind, m.story_id,
+const MESSAGE_COLS = `m.id, m.conversation_id, m.body, m.lang, m.reply_to_id, m.attachments, m.created_at, m.client_id, m.moderation_status, m.kind, m.story_id,
   m.edited_at, m.unsent_at, m.expires_at, m.meta,
   EXISTS (SELECT 1 FROM conversation_pins p WHERE p.message_id = m.id) AS pinned,
   pr.user_id AS s_id, pr.username AS s_username, pr.display_name AS s_display_name, pr.avatar_url AS s_avatar_url, pr.mode AS s_mode`;
 
-/**
- * The messages reader $2 sees (message alias m): not deleted (unsent ones stay as a
- * placeholder), not past their disappearing time, not held for a check unless their own,
- * not from someone they blocked, and not deleted just for them.
- */
-const VISIBLE_TO_READER = `(m.deleted_at IS NULL OR m.unsent_at IS NOT NULL)
-  AND (m.expires_at IS NULL OR m.expires_at > now())
-  AND (m.moderation_status = 'normal' OR (m.moderation_status = 'review' AND m.sender_id = $2))
-  AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $2 AND b.blocked_id = m.sender_id)
-  AND NOT EXISTS (SELECT 1 FROM message_hides h WHERE h.user_id = $2 AND h.message_id = m.id)`;
+/** The messages reader $2 sees (see messageVisibleSql). */
+const VISIBLE_TO_READER = messageVisibleSql('$2');
 
 export default async function messagingModule(app: FastifyInstance, ctx: AppContext) {
   const db = ctx.db;
@@ -505,10 +498,10 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       }
       const { rows } = await c
         .query(
-          `INSERT INTO messages (conversation_id, sender_id, body, reply_to_id, attachments, client_id, moderation_status, kind, view_once, view_once_media_id, story_id, expires_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now() + make_interval(secs => $12::int))
+          `INSERT INTO messages (conversation_id, sender_id, body, reply_to_id, attachments, client_id, moderation_status, kind, view_once, view_once_media_id, story_id, expires_at, lang)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now() + make_interval(secs => $12::int), $13)
            ON CONFLICT (sender_id, client_id) WHERE client_id IS NOT NULL DO UPDATE SET client_id = EXCLUDED.client_id
-           RETURNING id, conversation_id, body, reply_to_id, attachments, created_at, client_id, moderation_status, kind, view_once, story_id, expires_at, (xmax = 0) AS inserted`,
+           RETURNING id, conversation_id, body, lang, reply_to_id, attachments, created_at, client_id, moderation_status, kind, view_once, story_id, expires_at, (xmax = 0) AS inserted`,
           [
             id,
             u.id,
@@ -523,6 +516,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
             input.storyId ?? null,
             // Disappearing messages: deleted this long after sending (NULL when off).
             conv.disappearing_seconds ?? null,
+            langOf(input.body),
           ],
         )
         .catch((e: { code?: string; constraint?: string }) => {
@@ -555,6 +549,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       conversationId: id,
       sender,
       body: row.body,
+      lang: row.lang ?? null,
       replyToId: row.reply_to_id,
       attachments: row.attachments,
       createdAt: row.created_at.toISOString(),
@@ -673,14 +668,14 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       await tx(db, async (c) => {
         // The earlier text is kept for safety reports, and removed if the message is unsent.
         await c.query(`INSERT INTO message_edits (message_id, body) SELECT id, body FROM messages WHERE id = $1`, [id]);
-        await c.query(`UPDATE messages SET body = $2, edited_at = now() WHERE id = $1`, [id, body]);
+        await c.query(`UPDATE messages SET body = $2, lang = $3, edited_at = now() WHERE id = $1`, [id, body, langOf(body)]);
       });
-      const edited = (await db.query(`SELECT body, edited_at FROM messages WHERE id = $1`, [id])).rows[0];
+      const edited = (await db.query(`SELECT body, lang, edited_at FROM messages WHERE id = $1`, [id])).rows[0];
       // A message held for a check is still only the sender's.
       const to = m.moderation_status === 'normal' ? await notBlocking(u.id, await memberIds(m.conversation_id)) : [u.id];
       await ctx.realtime.publish(to, {
         type: 'message.edited',
-        data: { id, conversationId: m.conversation_id, body: edited.body, editedAt: edited.edited_at.toISOString() },
+        data: { id, conversationId: m.conversation_id, body: edited.body, lang: edited.lang, editedAt: edited.edited_at.toISOString() },
       });
     }
     return { message: await loadMessage(id, u.id) };
@@ -1106,6 +1101,7 @@ function toMessage(r: Record<string, any>): Message {
     conversationId: r.conversation_id,
     sender: publicUserFrom(r, 's_'),
     body: r.body,
+    lang: r.lang ?? langOf(r.body),
     replyToId: r.reply_to_id,
     attachments: r.attachments,
     createdAt: r.created_at.toISOString(),

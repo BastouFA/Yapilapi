@@ -39,6 +39,7 @@ import { SensitiveCover } from './safety';
 import { AddToChapterSheet } from './chapters';
 import { StickerLayer, StoryCardView } from './story-stickers';
 import { MusicSticker, useMusicLoop, useMusicOn } from './story-music';
+import { TranslationBar, useTranslatable } from './translation';
 
 const PHOTO_MS = 5000;
 const WHITE = '#FFFFFF';
@@ -186,6 +187,13 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
   const [musicOn, setMusicOn] = useMusicOn();
   const music = !covered ? (story?.music ?? null) : null;
   useMusicLoop(music, !!music && musicOn && !stopped);
+  // "See translation" for the story's text. Asking for it pauses the story so there's time to read.
+  const translation = useTranslatable({ kind: 'story', id: story?.id ?? '', text: story?.body ?? '', lang: story?.lang, own: !!group?.mine });
+  const seeTranslation = () => {
+    setPaused(true);
+    translation.see();
+  };
+  const translationBar = <TranslationBar state={{ ...translation, see: seeTranslation }} tint="rgba(255,255,255,0.8)" linkTint={WHITE} />;
 
   const next = useCallback(() => {
     if (!group) return onClose();
@@ -341,12 +349,23 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
           style={StyleSheet.absoluteFill}
           accessible
           accessibilityRole="adjustable"
-          accessibilityLabel={story.body || t('m.stories.photo', { name })}
+          accessibilityLabel={translation.text || t('m.stories.photo', { name })}
+          accessibilityLanguage={translation.lang}
           accessibilityHint={t('m.stories.hint')}
-          accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }, { name: 'activate' }]}
+          accessibilityActions={[
+            { name: 'increment' },
+            { name: 'decrement' },
+            { name: 'activate' },
+            // The story is one element for screen readers, so "See translation" is one of its actions.
+            ...(translation.offered
+              ? [translation.status === 'shown' ? { name: 'original', label: t('translate.seeOriginal') } : { name: 'translate', label: t('translate.see') }]
+              : []),
+          ]}
           onAccessibilityAction={(e) => {
             if (e.nativeEvent.actionName === 'increment') next();
             else if (e.nativeEvent.actionName === 'decrement') prev();
+            else if (e.nativeEvent.actionName === 'translate') seeTranslation();
+            else if (e.nativeEvent.actionName === 'original') translation.showOriginal();
             else setPaused((p) => !p);
           }}
           {...pan.panHandlers}
@@ -401,7 +420,12 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
           ) : null}
           {!uri && !story.reshareOf && !covered ? (
             <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', padding: space[6] }]} pointerEvents="box-none">
-              <RichText text={story.body} style={{ color: WHITE, fontSize: 28, fontWeight: '800', textAlign: 'center', lineHeight: 36 }} />
+              <RichText
+                text={translation.text}
+                language={translation.lang}
+                style={{ color: WHITE, fontSize: 28, fontWeight: '800', textAlign: 'center', lineHeight: 36 }}
+              />
+              {translationBar}
             </View>
           ) : null}
           {story.reshareOf && !uri ? (
@@ -419,7 +443,8 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
           {story.body && (uri || story.reshareOf) ? (
             <View style={{ position: 'absolute', start: space[4], end: space[4], bottom: 110 + insets.bottom }} pointerEvents="box-none">
               <View style={st.captionBox}>
-                <RichText text={story.body} style={st.caption} />
+                <RichText text={translation.text} language={translation.lang} style={st.caption} />
+                {translationBar}
               </View>
             </View>
           ) : null}

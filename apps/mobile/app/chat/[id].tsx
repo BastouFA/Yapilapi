@@ -44,6 +44,7 @@ import {
   SystemLine,
   type SheetAction,
 } from '../../lib/chat-extras';
+import { TranslatableText } from '../../lib/translation';
 
 /** Voice messages shorter than this are treated as a slip of the finger and not sent. */
 const MIN_VOICE_MS = 1000;
@@ -118,7 +119,7 @@ export default function Chat() {
     if ((e.type === 'message.deleted' || e.type === 'message.released') && e.data?.conversationId === id) void load();
     if (e.type === 'message.hidden' && e.data?.conversationId === id) setMessages((cur) => cur.filter((x) => x.id !== e.data.id));
     if (e.type === 'message.edited' && e.data?.conversationId === id) {
-      patchMessage(e.data.id, (x) => ({ ...x, body: e.data.body, editedAt: e.data.editedAt }));
+      patchMessage(e.data.id, (x) => ({ ...x, body: e.data.body, lang: e.data.lang ?? null, editedAt: e.data.editedAt }));
       setMessages((cur) =>
         cur.map((x) => (x.replyTo && x.replyTo.id === e.data.id ? { ...x, replyTo: { ...x.replyTo, body: String(e.data.body).slice(0, 200) } } : x)),
       );
@@ -636,7 +637,19 @@ export default function Chat() {
                 ) : null}
                 {quote}
                 {media}
-                {text ? <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 21 }, userText, textStyle]}>{text}</Text> : null}
+                {item.body && !item.unsent ? (
+                  // Their text, with "See translation" when it's in a language you don't understand.
+                  <TranslatableText
+                    kind="message"
+                    id={item.id}
+                    text={item.body}
+                    lang={item.lang}
+                    rich={false}
+                    style={{ color: c.ink, fontSize: 15, lineHeight: 21 }}
+                  />
+                ) : text ? (
+                  <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 21 }, userText, textStyle]}>{text}</Text>
+                ) : null}
                 {meta}
               </Pressable>
               <ReactionRow message={item} mine={false} onToggle={(emoji, on) => void react(item, emoji, on)} />

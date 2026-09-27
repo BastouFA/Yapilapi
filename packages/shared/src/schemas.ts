@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { DATA_SAVER_MODES } from './data-saver.ts';
+import { MAX_UNDERSTOOD_LANGUAGES, TRANSLATABLE_KINDS, TRANSLATION_LANGUAGE_CODES } from './translation.ts';
 import {
   CIRCLE_KINDS,
   COMMUNITY_ROLES,
@@ -213,6 +214,25 @@ export const photoTagSchema = photoTagSpot.extend({ mediaId: uuid });
 export const tagSettingsSchema = z.object({ allowFrom: z.enum(['everyone', 'following', 'nobody']) });
 /** PUT /v1/me/data-saver. */
 export const dataSaverSchema = z.object({ mode: z.enum(DATA_SAVER_MODES) });
+
+const translationLanguage = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .refine((c) => TRANSLATION_LANGUAGE_CODES.includes(c), 'Choose a language from the list.');
+
+/** POST /v1/translate: a post, comment, story or message, into one language. */
+export const translateSchema = z.object({
+  kind: z.enum(TRANSLATABLE_KINDS),
+  id: z.string().uuid(),
+  target: translationLanguage,
+});
+
+/** PUT /v1/me/translation: "Languages I understand" and "Translate automatically". */
+export const translationSettingsSchema = z.object({
+  languages: z.array(translationLanguage).max(MAX_UNDERSTOOD_LANGUAGES),
+  auto: z.boolean(),
+});
 
 export const feedQuerySchema = z.object({
   mode: z.enum(FEED_MODES).default('for_you'),
