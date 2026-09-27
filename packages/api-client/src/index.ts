@@ -17,6 +17,8 @@ import type {
   ChapterSymbol,
   Comment,
   CommentPage,
+  ReelHighlight,
+  ReelMoment,
   CommentPolicy,
   CommentSort,
   Community,
@@ -280,7 +282,16 @@ export function createClient(opts: ClientOptions) {
       /** Top-level comments, Top (default) or Newest; the pinned one first. Replies: comments.replies. */
       comments: (id: string, cursor?: string, sort?: CommentSort) => get<CommentPage>(`/v1/posts/${id}/comments${qs({ sort, cursor })}`),
       /** Comment, or reply with `parentId` (a reply to a reply joins the top-level thread). */
-      comment: (id: string, body: string, parentId?: string) => post<{ comment: Comment }>(`/v1/posts/${id}/comments`, { body, parentId }),
+      comment: (id: string, body: string, parentId?: string, atMs?: number) =>
+        post<{ comment: Comment }>(`/v1/posts/${id}/comments`, { body, parentId, ...(atMs === undefined ? {} : { atMs }) }),
+      /** Reels: comments anchored to a time in the video, in time order, for the bubbles on the scrubber. */
+      momentComments: (id: string) => get<{ items: ReelMoment[] }>(`/v1/posts/${id}/moment-comments`),
+      /** Reels, creator only: replace the named highlights in the video (an empty list removes them). */
+      setHighlights: (id: string, highlights: ReelHighlight[]) => put<{ highlights: ReelHighlight[] }>(`/v1/posts/${id}/highlights`, { highlights }),
+      /** Reels: where you are, to continue from there next time (early or final positions clear it). */
+      resume: (id: string, positionMs: number, durationMs?: number) =>
+        put<{ resumeMs: number | null }>(`/v1/posts/${id}/resume`, { positionMs, ...(durationMs ? { durationMs } : {}) }),
+      clearResume: (id: string) => del<{ resumeMs: null }>(`/v1/posts/${id}/resume`),
       /** Author: who can comment. */
       setCommentPolicy: (id: string, policy: CommentPolicy) => put<{ commentPolicy: CommentPolicy }>(`/v1/posts/${id}/comment-settings`, { policy }),
       /** Author: pin one top-level comment to the top, or unpin with null. */

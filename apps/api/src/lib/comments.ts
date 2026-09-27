@@ -51,7 +51,7 @@ export function commentVisibleSql(v: string): string {
 
 /** Columns for toComment(): comment `cm`, its writer's profile `pr`, the post `p`, viewer `v`. */
 export function commentCols(v: string): string {
-  return `cm.id, cm.post_id, cm.parent_id, cm.reply_to_id, cm.body, cm.lang, cm.created_at, cm.edited_at, cm.like_count, cm.reply_count, cm.hidden_at,
+  return `cm.id, cm.post_id, cm.parent_id, cm.reply_to_id, cm.body, cm.lang, cm.at_ms, cm.created_at, cm.edited_at, cm.like_count, cm.reply_count, cm.hidden_at,
           pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode, ${plusCol('a_')},
           coalesce(p.pinned_comment_id = cm.id, false) AS pinned,
           (cm.author_id <> p.author_id AND EXISTS (SELECT 1 FROM comment_likes cl WHERE cl.comment_id = cm.id AND cl.user_id = p.author_id)) AS author_liked,
@@ -91,6 +91,7 @@ export function toComment(r: Record<string, any>, opts: { hidden?: boolean } = {
     pinned: !!r.pinned,
     likedByAuthor: !!r.author_liked,
     ...(opts.hidden ? { hidden: true } : {}),
+    ...(r.at_ms === null || r.at_ms === undefined ? {} : { atMs: r.at_ms }),
     viewer: { liked: !!r.liked, canEdit: !!r.can_edit, canDelete: !!r.can_delete },
   };
 }

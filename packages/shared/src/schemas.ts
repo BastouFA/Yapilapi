@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { DATA_SAVER_MODES } from './data-saver.ts';
+import { REEL_LONGEST_MS, reelHighlightsSchema } from './reels.ts';
 import { MAX_UNDERSTOOD_LANGUAGES, TRANSLATABLE_KINDS, TRANSLATION_LANGUAGE_CODES } from './translation.ts';
 import {
   CIRCLE_KINDS,
@@ -180,8 +181,11 @@ export const createPostSchema = z
     scheduledAt: scheduleTime.optional(),
     /** Who can comment: everyone who can see it, people you follow, your followers, or no one. */
     commentPolicy: z.enum(COMMENT_POLICIES).default('everyone'),
+    /** Reels: up to five named points in the video, shown on the scrubber (the creator can change them later). */
+    highlights: reelHighlightsSchema.optional(),
   })
   .superRefine((v, ctx) => {
+    if (v.highlights?.length && v.format !== 'reel') ctx.addIssue({ code: 'custom', message: 'Only reels have highlights.', path: ['highlights'] });
     if (v.draft && v.scheduledAt) ctx.addIssue({ code: 'custom', message: 'Save a draft or schedule it, not both.', path: ['scheduledAt'] });
     if (!v.body && v.media.length === 0 && !v.linkUrl && !v.poll)
       ctx.addIssue({ code: 'custom', message: 'A post needs text, media, a link or a poll.', path: ['body'] });
@@ -269,7 +273,8 @@ export const pageQuerySchema = z.object({
 });
 
 /** A comment, or a reply: `parentId` is the comment answered. A reply to a reply joins its top-level thread. */
-export const commentSchema = z.object({ body: trimmed(2000), parentId: uuid.optional() });
+/** `atMs`: reels only, a moment comment anchored to that time in the video (top-level comments). */
+export const commentSchema = z.object({ body: trimmed(2000), parentId: uuid.optional(), atMs: z.number().int().min(0).max(REEL_LONGEST_MS).optional() });
 /** Change your comment's text, within COMMENT_EDIT_MINUTES of posting it. */
 export const editCommentSchema = z.object({ body: trimmed(2000) });
 export const commentsQuerySchema = z.object({
