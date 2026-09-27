@@ -58,7 +58,8 @@ export function NavTour({ tabCount, active }: { tabCount: number; active: boolea
   }, [me?.onboarded, active, step]);
 
   useEffect(() => {
-    if (step === null) return;
+    // Finished or skipped (step past the last mark): nothing left to show or announce.
+    if (step === null || step >= MARKS.length) return;
     const mark = MARKS[step]!;
     AccessibilityInfo.announceForAccessibility(`${t('m.tour.count', { step: step + 1, total: MARKS.length })}. ${t(mark.title)}. ${t(mark.body)}`);
     if (reduce) return fade.setValue(1);
