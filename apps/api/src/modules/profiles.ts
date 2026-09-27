@@ -109,7 +109,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
         (SELECT count(*) FROM follows WHERE followee_id = pr.user_id) AS followers,
         (SELECT count(*) FROM follows WHERE follower_id = pr.user_id) AS following,
         (SELECT count(*) FROM friendships WHERE user_a = pr.user_id OR user_b = pr.user_id) AS friends,
-        (SELECT count(*) FROM posts p WHERE ${byOrWithSql('pr.user_id')} AND p.deleted_at IS NULL AND p.community_id IS NULL) AS posts,
+        (SELECT count(*) FROM posts p WHERE ${byOrWithSql('pr.user_id')} AND p.deleted_at IS NULL AND p.status = 'published' AND p.community_id IS NULL) AS posts,
         (SELECT coalesce(array_agg(t.slug ORDER BY t.slug), '{}') FROM user_interests ui JOIN topics t ON t.id = ui.topic_id WHERE ui.user_id = pr.user_id) AS interests,
         EXISTS (SELECT 1 FROM follows WHERE follower_id = $2 AND followee_id = pr.user_id) AS following_them,
         EXISTS (SELECT 1 FROM follows WHERE follower_id = pr.user_id AND followee_id = $2) AS followed_by,
@@ -236,12 +236,12 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     const u = me(req);
     const q = parse(z.object({ kind: z.enum(['people', 'creators']).default('people'), limit: z.coerce.number().int().min(1).max(30).default(12) }), req.query);
     const creators = q.kind === 'creators';
-    const recent = `(SELECT count(*) FROM posts rp WHERE rp.author_id = pr.user_id AND rp.deleted_at IS NULL AND rp.visibility = 'public'
+    const recent = `(SELECT count(*) FROM posts rp WHERE rp.author_id = pr.user_id AND rp.deleted_at IS NULL AND rp.status = 'published' AND rp.visibility = 'public'
                        AND rp.moderation_status = 'normal' AND rp.created_at > now() - interval '30 days')`;
-    const recentReels = `(SELECT count(*) FROM posts rp WHERE rp.author_id = pr.user_id AND rp.deleted_at IS NULL AND rp.visibility = 'public'
+    const recentReels = `(SELECT count(*) FROM posts rp WHERE rp.author_id = pr.user_id AND rp.deleted_at IS NULL AND rp.status = 'published' AND rp.visibility = 'public'
                        AND rp.moderation_status = 'normal' AND rp.format = 'reel' AND rp.created_at > now() - interval '30 days')`;
     // Recent public posts on the topics the person picked (onboarding saves interests first).
-    const topical = `(SELECT count(*) FROM posts rp WHERE rp.author_id = pr.user_id AND rp.deleted_at IS NULL AND rp.visibility = 'public'
+    const topical = `(SELECT count(*) FROM posts rp WHERE rp.author_id = pr.user_id AND rp.deleted_at IS NULL AND rp.status = 'published' AND rp.visibility = 'public'
                        AND rp.moderation_status = 'normal' AND rp.created_at > now() - interval '30 days'
                        AND rp.topics && coalesce((SELECT array_agg(t.slug) FROM user_interests ui JOIN topics t ON t.id = ui.topic_id WHERE ui.user_id = $1), '{}'))`;
     const { rows } = await db.query(

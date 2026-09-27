@@ -16,7 +16,7 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
   // Media the automated check marked sensitive is never sent to people under 18 (or whose age we don't know); blocked media to nobody.
   const adult = await isAdultViewer(db, viewer);
   const { rows } = await db.query(
-    `SELECT p.id, p.kind, p.format, p.body, p.visibility, p.link_url, p.topics, p.like_count, p.comment_count, p.view_count, p.created_at, p.ai_provenance, p.metadata->'real' AS real,
+    `SELECT p.id, p.kind, p.format, p.body, p.visibility, p.link_url, p.topics, p.like_count, p.comment_count, p.view_count, p.created_at, p.edited_at, p.status, p.scheduled_at, p.ai_provenance, p.metadata->'real' AS real,
             pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode, ${plusCol('a_')},
             c.id AS c_id, c.slug AS c_slug, c.name AS c_name,
             e.id AS e_id, e.title AS e_title, e.starts_at AS e_starts_at,
@@ -34,7 +34,7 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
             (SELECT option_id FROM poll_votes v WHERE v.post_id = p.id AND v.user_id = $2) AS my_vote,
             (SELECT array_agg(DISTINCT w.country ORDER BY w.country) FROM post_withholdings w WHERE w.post_id = p.id AND p.author_id = $2) AS withheld_in,
             p.allow_remix, p.remix_mode, p.remix_of_post_id,
-            CASE WHEN p.format = 'reel' THEN (SELECT count(*) FROM posts rx WHERE rx.remix_of_post_id = p.id AND rx.deleted_at IS NULL)::int END AS remix_count,
+            CASE WHEN p.format = 'reel' THEN (SELECT count(*) FROM posts rx WHERE rx.remix_of_post_id = p.id AND rx.deleted_at IS NULL AND rx.status = 'published')::int END AS remix_count,
             s.id AS s_id, s.title AS s_title, s.source_post_id AS s_source, coalesce(s.duration_ms, sm.duration_ms) AS s_duration,
             coalesce(sm.variants->>'mp4', sm.url) AS s_audio,
             CASE WHEN p.format = 'reel' THEN (p.author_id IS NOT DISTINCT FROM $2 OR ${allowDownloadSql('pr', 'au')}) END AS downloadable,
@@ -97,6 +97,7 @@ function toPost(r: Record<string, any>, originals: Map<string, NonNullable<Remix
     aiAssisted: !!r.ai_provenance?.assisted,
     real: r.real ?? null,
     createdAt: r.created_at.toISOString(),
+    ...draftFields(r),
     format: r.format ?? 'post',
     ...(r.format === 'reel'
       ? {
@@ -110,6 +111,14 @@ function toPost(r: Record<string, any>, originals: Map<string, NonNullable<Remix
     ...(r.downloadable === null ? {} : { downloadable: !!r.downloadable }),
     ...(r.boost ? { boost: r.boost } : {}),
   } satisfies Post;
+}
+
+/** "Edited" on published posts; the state and time of the author's own drafts and scheduled posts (only they are ever given those). */
+function draftFields(r: Record<string, any>): Pick<Post, 'editedAt' | 'status' | 'scheduledAt'> {
+  return {
+    ...(r.edited_at ? { editedAt: r.edited_at.toISOString() } : {}),
+    ...(r.status !== 'published' ? { status: r.status, scheduledAt: r.scheduled_at?.toISOString() ?? null } : {}),
+  };
 }
 
 /** What someone who isn't subscribed sees of a subscriber-only post: who posted it and when, never what it says or shows. */
@@ -132,6 +141,7 @@ function lockedPost(r: Record<string, any>, reasons?: Map<string, string>): Post
     aiAssisted: false,
     real: null,
     createdAt: r.created_at.toISOString(),
+    ...draftFields(r),
     format: r.format ?? 'post',
     reason: reasons?.get(r.id),
     locked: { placeholder: r.cover_placeholder ?? null, mediaCount: r.media_count ?? 0 },

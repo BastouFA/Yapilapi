@@ -10,13 +10,16 @@ type Q = Pool | PoolClient;
  * Tell people they were @mentioned in a post or comment, but only people who
  * can see that post (a friends-only post doesn't reach a stranger by
  * mentioning them). Blocks, mutes and notification settings apply as usual.
+ * After an edit, `previously` holds the post's earlier texts: people already
+ * mentioned in one of them aren't told again.
  */
 export async function notifyMentions(
   db: Q,
   realtime: RealtimeHub,
-  m: { text: string | null | undefined; actorId: string; postId: string; commentId?: string; skip?: string[] },
+  m: { text: string | null | undefined; actorId: string; postId: string; commentId?: string; skip?: string[]; previously?: string[] },
 ): Promise<number> {
-  const names = extractMentions(m.text);
+  const before = new Set((m.previously ?? []).flatMap((t) => extractMentions(t)));
+  const names = extractMentions(m.text).filter((n) => !before.has(n));
   if (!names.length) return 0;
   const { rows } = await db.query(
     `SELECT pr.user_id FROM profiles pr WHERE lower(pr.username) = ANY($2::text[]) AND pr.user_id <> $3

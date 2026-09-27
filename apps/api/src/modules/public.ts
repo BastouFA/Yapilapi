@@ -113,7 +113,7 @@ export default async function publicModule(app: FastifyInstance, ctx: AppContext
       `SELECT pr.username, pr.display_name, pr.avatar_url, pr.cover_url, pr.mode, pr.bio,
               (SELECT count(*) FROM follows WHERE followee_id = pr.user_id)::int AS followers,
               (SELECT count(*) FROM follows WHERE follower_id = pr.user_id)::int AS following,
-              (SELECT count(*) FROM posts WHERE author_id = pr.user_id AND deleted_at IS NULL AND community_id IS NULL)::int AS posts
+              (SELECT count(*) FROM posts WHERE author_id = pr.user_id AND deleted_at IS NULL AND status = 'published' AND community_id IS NULL)::int AS posts
        FROM profiles pr JOIN users u ON u.id = pr.user_id
        WHERE lower(pr.username) = lower($1) AND ${publicAccountSql('pr', 'u')}`,
       [username],

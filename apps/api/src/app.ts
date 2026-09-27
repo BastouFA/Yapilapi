@@ -27,6 +27,7 @@ import { MAX_UPLOAD_BYTES } from './modules/media.ts';
 import authModule from './modules/auth.ts';
 import profilesModule from './modules/profiles.ts';
 import postsModule from './modules/posts.ts';
+import draftsModule from './modules/drafts.ts';
 import messagingModule from './modules/messaging.ts';
 import communitiesModule from './modules/communities.ts';
 import eventsModule from './modules/events.ts';
@@ -73,6 +74,7 @@ import { editorJobHandlers } from './lib/media-edit.ts';
 import { liveRecordingJobHandlers } from './lib/live-recording.ts';
 import { shareVideoJobHandlers } from './lib/share-video.ts';
 import { sweepViewOnce, viewOnceJobHandlers } from './lib/view-once.ts';
+import { scheduledPostJobHandlers } from './lib/publishing.ts';
 import { fastifyTracingPlugin, traceLogMixin } from './lib/tracing.ts';
 import { endExpiredCampaigns } from './lib/boosts.ts';
 import { sendCountdownReminders } from './lib/stories.ts';
@@ -323,6 +325,7 @@ export async function buildApp(
     authModule,
     profilesModule,
     postsModule,
+    draftsModule,
     messagingModule,
     communitiesModule,
     eventsModule,
@@ -382,6 +385,8 @@ export async function buildApp(
     ...liveRecordingJobHandlers({ db, storage, recordingsDir: config.LIVE_RECORDINGS_DIR }),
     ...shareVideoJobHandlers({ db, storage }),
     ...viewOnceJobHandlers(viewOnceDeps),
+    // Scheduled posts go out at their time.
+    ...scheduledPostJobHandlers(ctx),
   };
   if (opts.webhookWorker ?? config.APP_ENV !== 'test') {
     let busy = false;

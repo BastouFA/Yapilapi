@@ -58,8 +58,11 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       ),
       closeFriends: await q(`SELECT friend_id, created_at FROM close_friends WHERE owner_id = $1`),
       posts: await q(
-        `SELECT id, kind, format, body, visibility, topics, allow_remix, remix_of_post_id, remix_mode, sound_id, created_at, deleted_at FROM posts WHERE author_id = $1`,
+        `SELECT id, kind, format, body, visibility, topics, allow_remix, remix_of_post_id, remix_mode, sound_id, status, scheduled_at, created_at, edited_at, deleted_at
+         FROM posts WHERE author_id = $1`,
       ),
+      // Earlier versions of your posts' text.
+      postEdits: await q(`SELECT e.post_id, e.body, e.edited_at FROM post_edits e JOIN posts p ON p.id = e.post_id WHERE p.author_id = $1`),
       sounds: await q(`SELECT id, title, source_post_id, duration_ms, created_at FROM sounds WHERE owner_id = $1`),
       comments: await q(`SELECT id, post_id, body, created_at FROM comments WHERE author_id = $1`),
       reactions: await q(`SELECT post_id, kind, created_at FROM reactions WHERE user_id = $1`),
@@ -97,6 +100,8 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         [u.id],
       );
       await c.query(`UPDATE posts SET deleted_at = now(), body = '' WHERE author_id = $1 AND deleted_at IS NULL`, [u.id]);
+      // Earlier versions of the text go too.
+      await c.query(`DELETE FROM post_edits e USING posts p WHERE p.id = e.post_id AND p.author_id = $1`, [u.id]);
       await c.query(`UPDATE comments SET deleted_at = now(), body = '' WHERE author_id = $1 AND deleted_at IS NULL`, [u.id]);
       await c.query(`UPDATE messages SET deleted_at = now(), body = '', attachments = '[]' WHERE sender_id = $1 AND deleted_at IS NULL`, [u.id]);
       await c.query(`UPDATE moments SET deleted_at = now() WHERE author_id = $1`, [u.id]);

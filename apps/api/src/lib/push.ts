@@ -94,6 +94,7 @@ const TEXT: Record<string, (actor: string) => string> = {
   chapter_opened: () => 'A time capsule you are part of has opened',
   yap_received: (a) => `${a} sent you a Yap`,
   view_once_screenshot: (a) => `${a} took a screenshot of your view-once photo or video`,
+  scheduled_post_failed: () => "A scheduled post couldn't be published. It's back in your drafts",
 };
 
 /** Human text for a notification type, or null for types that shouldn't push. */

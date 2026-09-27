@@ -2,10 +2,36 @@
 
 import Link from 'next/link';
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
-import { Avatar, Badge, BottomSheet, Button, EmptyState, List, ListItem, PostCard, Select, Skeleton, TaggedText, TextField } from '@yapilapi/design-system';
+import {
+  Alert,
+  Avatar,
+  Badge,
+  BottomSheet,
+  Button,
+  EmptyState,
+  List,
+  ListItem,
+  PostCard,
+  PostHistory,
+  Select,
+  Skeleton,
+  TaggedText,
+  TextField,
+} from '@yapilapi/design-system';
 import type { SponsoredAd } from '@yapilapi/api-client';
-import { formatRelativeTime, MAX_COLLABORATORS, REPORT_REASONS, type Comment, type Page, type PhotoTag, type Post, type PublicUser } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import {
+  formatRelativeTime,
+  MAX_COLLABORATORS,
+  REPORT_REASONS,
+  type Comment,
+  type MessageKey,
+  type Page,
+  type PhotoTag,
+  type Post,
+  type PostVersion,
+  type PublicUser,
+} from '@yapilapi/shared';
+import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { AutocompleteText } from '@/components/Autocomplete';
 import { PeoplePicker } from '@/components/PeoplePicker';
@@ -15,7 +41,7 @@ import { BoostSheet } from './Boost';
 
 /**
  * A paginated list of posts with every post interaction wired to the API:
- * like, comment, save, poll vote, feed controls, "why am I seeing this", report, delete.
+ * like, comment, save, poll vote, feed controls, "why am I seeing this", report, edit, delete.
  */
 export function PostList({
   load,
@@ -44,6 +70,8 @@ export function PostList({
   const [reporting, setReporting] = useState<Post | null>(null);
   const [boosting, setBoosting] = useState<Post | null>(null);
   const [coauthorsFor, setCoauthorsFor] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Post | null>(null);
+  const [historyFor, setHistoryFor] = useState<Post | null>(null);
   const sentinel = useRef<HTMLDivElement>(null);
   const [ad, setAd] = useState<SponsoredAd | null>(null);
   const [adWhy, setAdWhy] = useState(false);
@@ -340,6 +368,8 @@ export function PostList({
             onLeaveCollab={me ? leaveCollab : undefined}
             onRemoveTag={me ? removeTag : undefined}
             onManageCollaborators={me ? (post) => setCoauthorsFor(post.id) : undefined}
+            onEdit={me ? setEditing : undefined}
+            onHistory={setHistoryFor}
           />
           {ad && i === Math.min(2, posts.length - 1) ? renderAd(ad) : null}
         </Fragment>
@@ -406,6 +436,8 @@ export function PostList({
         }}
       />
       {memoryFor ? <AddToMemorySheet post={memoryFor} onClose={() => setMemoryFor(null)} /> : null}
+      {editing ? <EditPostSheet post={editing} onClose={() => setEditing(null)} onSaved={(post) => patch(post.id, () => post)} /> : null}
+      {historyFor ? <HistorySheet post={historyFor} onClose={() => setHistoryFor(null)} /> : null}
       {coauthorsFor && posts.some((x) => x.id === coauthorsFor) ? (
         <CoauthorsSheet
           post={posts.find((x) => x.id === coauthorsFor)!}
@@ -414,6 +446,156 @@ export function PostList({
         />
       ) : null}
     </div>
+  );
+}
+
+/** Who an edited post can be for: the audiences that need no extra choice (circles and chosen people are set when posting). */
+const EDIT_AUDIENCES = ['public', 'followers', 'friends', 'private', 'subscribers'] as const;
+
+/**
+ * Change your post: its text, who can see it, and the description of each photo
+ * or video. Photos, polls and links stay as they are. Earlier text stays in the
+ * post's history, which anyone who can see the post can open.
+ */
+export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose: () => void; onSaved: (p: Post) => void }) {
+  const { toast, t, me } = useSession();
+  const [body, setBody] = useState(post.body);
+  const [visibility, setVisibility] = useState(post.visibility);
+  const [alts, setAlts] = useState<Record<string, string>>(() => Object.fromEntries(post.media.map((m) => [m.id, m.altText ?? ''])));
+  const [hasPlans, setHasPlans] = useState(post.visibility === 'subscribers');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [fields, setFields] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (me && post.visibility !== 'subscribers')
+      api.economy.plans(me.id).then(
+        (r) => setHasPlans(r.items.length > 0),
+        () => {},
+      );
+  }, [me, post.visibility]);
+  const describable = post.media.filter((m) => m.kind !== 'audio');
+  const changedAlts = describable.filter((m) => (alts[m.id] ?? '') !== (m.altText ?? ''));
+  const changed = body.trim() !== post.body || visibility !== post.visibility || changedAlts.length > 0;
+  const audiences = EDIT_AUDIENCES.filter((v) => v !== 'subscribers' || hasPlans);
+  return (
+    <BottomSheet open onClose={onClose} title="Edit post">
+      <form
+        className="stack"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          setError(null);
+          setFields({});
+          try {
+            const r = await api.posts.edit(post.id, {
+              ...(body.trim() !== post.body ? { body: body.trim() } : {}),
+              ...(visibility !== post.visibility ? { visibility: visibility as (typeof EDIT_AUDIENCES)[number] } : {}),
+              ...(changedAlts.length ? { media: changedAlts.map((m) => ({ id: m.id, altText: (alts[m.id] ?? '').trim() })) } : {}),
+            });
+            onSaved(r.post);
+            toast(r.moderation ? r.moderation.message : 'Post updated');
+            onClose();
+          } catch (err) {
+            setError(errorMessage(err));
+            setFields(fieldErrors(err));
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {error ? <Alert tone="danger">{error}</Alert> : null}
+        <label className="yp-field__label" htmlFor={`edit-${post.id}`}>
+          Text
+        </label>
+        <AutocompleteText
+          id={`edit-${post.id}`}
+          className="yp-input"
+          value={body}
+          onValueChange={setBody}
+          maxLength={post.format === 'reel' ? 2200 : 5000}
+          rows={5}
+          aria-invalid={!!fields.body}
+        />
+        {fields.body ? <span className="yp-field__error">{fields.body}</span> : null}
+        {describable.length ? (
+          <div className="stack-sm">
+            <span className="yp-field__label">Describe your photos and videos</span>
+            {describable.map((m, i) => (
+              <div key={m.id} className="row" style={{ alignItems: 'center', flexWrap: 'nowrap' }}>
+                {m.kind === 'video' ? (
+                  <video
+                    src={m.variants?.mp4 ?? m.url}
+                    poster={m.posterUrl ?? undefined}
+                    muted
+                    style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8 }}
+                  />
+                ) : (
+                  <img src={m.variants?.thumb ?? m.url} alt="" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8 }} />
+                )}
+                <input
+                  className="yp-input"
+                  style={{ flex: 1 }}
+                  placeholder="What's in it, for people who can't see it"
+                  aria-label={`Describe ${m.kind === 'video' ? 'video' : 'photo'} ${i + 1}`}
+                  maxLength={500}
+                  value={alts[m.id] ?? ''}
+                  onChange={(e) => {
+                    const v = e.currentTarget.value;
+                    setAlts((cur) => ({ ...cur, [m.id]: v }));
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {post.community ? (
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+            Posts in a community are shared with its members.
+          </p>
+        ) : (
+          <Select label={t('create.visibility')} value={visibility} onChange={(e) => setVisibility(e.currentTarget.value as Post['visibility'])}>
+            {!(EDIT_AUDIENCES as readonly string[]).includes(post.visibility) ? (
+              <option value={post.visibility}>{t(`visibility.${post.visibility}` as MessageKey)}</option>
+            ) : null}
+            {audiences.map((v) => (
+              <option key={v} value={v}>
+                {t(`visibility.${v}` as MessageKey)}
+              </option>
+            ))}
+          </Select>
+        )}
+        <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+          Photos, polls and links stay as they are. If you change the text, people can see earlier versions.
+        </p>
+        <Button type="submit" loading={busy} disabled={!changed}>
+          Save changes
+        </Button>
+      </form>
+    </BottomSheet>
+  );
+}
+
+/** The versions of an edited post's text, newest first. */
+export function HistorySheet({ post, onClose }: { post: Post; onClose: () => void }) {
+  const { toast, locale } = useSession();
+  const [items, setItems] = useState<PostVersion[] | null>(null);
+  const close = useRef(onClose);
+  useEffect(() => {
+    close.current = onClose;
+  });
+  useEffect(() => {
+    api.posts.history(post.id).then(
+      (r) => setItems(r.items),
+      (e) => {
+        toast(errorMessage(e));
+        close.current();
+      },
+    );
+  }, [post.id, toast]);
+  return (
+    <BottomSheet open onClose={onClose} title="Edit history">
+      {items === null ? <Skeleton height={80} /> : <PostHistory versions={items} locale={locale} linkAs={NextLink} />}
+    </BottomSheet>
   );
 }
 

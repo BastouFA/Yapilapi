@@ -12,6 +12,9 @@ import type {
   NotificationItem,
   Page,
   Post,
+  PostVersion,
+  DraftDetail,
+  EditPostInput,
   Profile,
   PublicCommunityPreview,
   PublicEventPreview,
@@ -179,6 +182,10 @@ export function createClient(opts: ClientOptions) {
       create: (b: Record<string, unknown>) => post<{ post: Post; moderation?: { status: string; message: string } }>('/v1/posts', b),
       get: (id: string) => get<{ post: Post }>(`/v1/posts/${id}`),
       remove: (id: string) => del(`/v1/posts/${id}`),
+      /** Change your post's text, who can see it, or its photo descriptions. */
+      edit: (id: string, b: EditPostInput) => patch<{ post: Post; moderation?: { status: string; message: string } }>(`/v1/posts/${id}`, b),
+      /** Every version of an edited post's text, newest first. */
+      history: (id: string) => get<{ items: PostVersion[] }>(`/v1/posts/${id}/history`),
       like: (id: string) => put<{ liked: boolean; likes: number }>(`/v1/posts/${id}/reaction`, { kind: 'like' }),
       unlike: (id: string) => del<{ liked: boolean; likes: number }>(`/v1/posts/${id}/reaction`),
       save: (id: string) => put(`/v1/posts/${id}/save`),
@@ -211,6 +218,18 @@ export function createClient(opts: ClientOptions) {
       addTag: (id: string, b: { mediaId: string; userId: string; x: number; y: number }) => post<{ tag: PhotoTag }>(`/v1/posts/${id}/tags`, b),
       /** The original author, or the person tagged, removes a photo tag. */
       removeTag: (id: string, tagId: string) => del<{ ok: true }>(`/v1/posts/${id}/tags/${tagId}`),
+    },
+    /** Your drafts and scheduled posts (create them with posts.create and `draft: true` or `scheduledAt`). */
+    drafts: {
+      list: () => get<{ items: Post[] }>('/v1/me/drafts'),
+      get: (id: string) => get<DraftDetail>(`/v1/drafts/${id}`),
+      /** Save what the composer has now; `scheduledAt` also moves it to that time. */
+      save: (id: string, b: Record<string, unknown>) => put<{ post: Post }>(`/v1/drafts/${id}`, b),
+      publish: (id: string) => post<{ post: Post; moderation?: { status: string; message: string } }>(`/v1/drafts/${id}/publish`),
+      schedule: (id: string, scheduledAt: string) => put<{ post: Post }>(`/v1/drafts/${id}/schedule`, { scheduledAt }),
+      /** Cancel a scheduled post: it goes back to your drafts. */
+      unschedule: (id: string) => del<{ post: Post }>(`/v1/drafts/${id}/schedule`),
+      remove: (id: string) => del<{ ok: true }>(`/v1/drafts/${id}`),
     },
     sounds: {
       /** Sounds you can use in a reel, most used first; `q` matches the name or its owner. */

@@ -12,6 +12,13 @@ export type StoryVisibility = (typeof STORY_VISIBILITIES)[number];
 export const REMIX_MODES = ['duet', 'remix'] as const;
 export type RemixMode = (typeof REMIX_MODES)[number];
 
+/** A scheduled post goes out at least this many minutes ahead… */
+export const SCHEDULE_MIN_MINUTES = 5;
+/** …and at most this many days ahead. */
+export const SCHEDULE_MAX_DAYS = 60;
+/** A post's text can be changed at most this many times a day. */
+export const MAX_EDITS_PER_DAY = 20;
+
 export const POST_KINDS = ['text', 'photo', 'video', 'carousel', 'audio', 'poll', 'link'] as const;
 export type PostKind = (typeof POST_KINDS)[number];
 

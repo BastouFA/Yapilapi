@@ -151,7 +151,7 @@ export async function searchAll(db: Pool, viewer: string | null, q: SearchInput)
         .query(
           `WITH used AS (
              SELECT t AS slug, count(*) AS posts FROM posts p, unnest(p.topics) t
-             WHERE p.visibility = 'public' AND p.deleted_at IS NULL AND p.moderation_status = 'normal' AND p.created_at > now() - interval '90 days'
+             WHERE p.visibility = 'public' AND p.deleted_at IS NULL AND p.status = 'published' AND p.moderation_status = 'normal' AND p.created_at > now() - interval '90 days'
                AND t LIKE $3 ESCAPE '\\'
              GROUP BY t ORDER BY count(*) DESC LIMIT $2)
            SELECT slug, slug AS name, posts FROM used
@@ -192,12 +192,12 @@ export default async function searchModule(app: FastifyInstance, ctx: AppContext
       ),
       db.query(
         `SELECT t AS topic, count(*) AS posts FROM posts p, unnest(p.topics) t
-         WHERE p.created_at > now() - interval '24 hours' AND p.visibility = 'public' AND p.deleted_at IS NULL AND p.moderation_status = 'normal'
+         WHERE p.created_at > now() - interval '24 hours' AND p.visibility = 'public' AND p.deleted_at IS NULL AND p.status = 'published' AND p.moderation_status = 'normal'
          GROUP BY t ORDER BY count(*) DESC LIMIT 10`,
       ),
       db.query(
         `SELECT c.slug, c.name, count(p.id) AS posts FROM communities c JOIN posts p ON p.community_id = c.id
-         WHERE c.visibility = 'public' AND p.created_at > now() - interval '24 hours' AND p.deleted_at IS NULL
+         WHERE c.visibility = 'public' AND p.created_at > now() - interval '24 hours' AND p.deleted_at IS NULL AND p.status = 'published'
          GROUP BY c.id ORDER BY count(p.id) DESC LIMIT 5`,
       ),
     ]);

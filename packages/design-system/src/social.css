@@ -1805,3 +1805,60 @@ p.yp-post__pending {
   outline: 2px solid #fff;
   outline-offset: 2px;
 }
+
+/* ── Edited posts, drafts and scheduled posts ─────────────────────────── */
+.yp-post__edited {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.yp-post__edited:hover {
+  color: var(--ink);
+}
+.yp-post__state {
+  font-weight: 600;
+  color: var(--ink);
+}
+.yp-media__alt {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(14, 16, 32, 0.72);
+  color: #fff;
+  font: 700 11px/14px var(--font-sans);
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+.yp-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.yp-history__item {
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+.yp-history__item:last-child {
+  border-bottom: 0;
+}
+.yp-history__when {
+  margin: 0 0 4px;
+  font: 500 13px/17px var(--font-sans);
+  color: var(--ink-muted);
+}
+.yp-history__body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.yp-history__empty {
+  color: var(--ink-muted);
+}

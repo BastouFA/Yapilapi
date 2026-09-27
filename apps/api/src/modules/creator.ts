@@ -10,14 +10,14 @@ export default async function creatorModule(app: FastifyInstance, ctx: AppContex
     const [totals, top, growth] = await Promise.all([
       ctx.db.query(
         `SELECT count(*) AS posts, coalesce(sum(like_count), 0) AS likes, coalesce(sum(comment_count), 0) AS comments,
-                (SELECT count(*) FROM saves s JOIN posts p2 ON p2.id = s.post_id WHERE ${byOrWithSql('$1', 'p2')}) AS saves,
+                (SELECT count(*) FROM saves s JOIN posts p2 ON p2.id = s.post_id WHERE ${byOrWithSql('$1', 'p2')} AND p2.status = 'published') AS saves,
                 (SELECT count(*) FROM follows WHERE followee_id = $1) AS followers
-         FROM posts p WHERE ${byOrWithSql('$1')} AND deleted_at IS NULL AND created_at > now() - interval '28 days'`,
+         FROM posts p WHERE ${byOrWithSql('$1')} AND deleted_at IS NULL AND status = 'published' AND created_at > now() - interval '28 days'`,
         [u.id],
       ),
       ctx.db.query(
         `SELECT id, left(body, 120) AS excerpt, kind, like_count, comment_count, created_at FROM posts p
-         WHERE ${byOrWithSql('$1')} AND deleted_at IS NULL ORDER BY like_count + 2 * comment_count DESC, created_at DESC LIMIT 5`,
+         WHERE ${byOrWithSql('$1')} AND deleted_at IS NULL AND status = 'published' ORDER BY like_count + 2 * comment_count DESC, created_at DESC LIMIT 5`,
         [u.id],
       ),
       ctx.db.query(

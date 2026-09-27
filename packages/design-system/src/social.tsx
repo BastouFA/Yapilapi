@@ -12,6 +12,7 @@ import {
   type MessageKey,
   type PhotoTag,
   type Post,
+  type PostVersion,
   type PublicUser,
 } from '@yapilapi/shared';
 import { Icon, type IconName } from './icons.tsx';
@@ -201,6 +202,7 @@ export function MediaGrid({ media, tagOptions }: { media: MediaItem[]; tagOption
                   style={m.placeholder ? { backgroundImage: `url(${m.placeholder})`, backgroundSize: 'cover' } : undefined}
                 />
               )}
+              {m.altText && m.kind !== 'audio' ? <AltBadge /> : null}
               {i === 3 && media.length > 4 ? <span className="yp-media__more">+{media.length - 4}</span> : null}
             </button>
           ),
@@ -210,6 +212,15 @@ export function MediaGrid({ media, tagOptions }: { media: MediaItem[]; tagOption
         <MediaViewer media={viewable} index={Math.max(0, viewable.indexOf(media[open]!))} onClose={() => setOpen(null)} />
       ) : null}
     </>
+  );
+}
+
+/** "ALT" on a photo or video that has a description: opening it shows the description under it. Screen readers get the description itself. */
+function AltBadge() {
+  return (
+    <span className="yp-media__alt" aria-hidden>
+      ALT
+    </span>
   );
 }
 
@@ -573,6 +584,10 @@ export interface PostCardProps {
   onRemoveTag?: (post: Post, mediaId: string, tag: PhotoTag) => void;
   /** Original author: invite co-authors or take them off (own posts only). */
   onManageCollaborators?: (post: Post) => void;
+  /** Change the text, audience or photo descriptions of your own post. */
+  onEdit?: (post: Post) => void;
+  /** Open the versions of an edited post's text (the "Edited" label). */
+  onHistory?: (post: Post) => void;
 }
 
 type Person = Pick<PublicUser, 'id' | 'username' | 'displayName'>;
@@ -596,6 +611,29 @@ export function AuthorNames({ people, linkAs: L = A, linkClassName }: { people: 
         </span>
       ))}
     </>
+  );
+}
+
+/** "Mon 6 Oct, 20:00": when a scheduled post goes out, in the reader's language and time zone. */
+export function formatScheduled(iso: string, locale = 'en'): string {
+  return new Date(iso).toLocaleString(locale, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+/** The versions of an edited post's text, newest first. */
+export function PostHistory({ versions, locale = 'en', linkAs }: { versions: PostVersion[]; locale?: string; linkAs?: LinkLike }) {
+  return (
+    <ol className="yp-history">
+      {versions.map((v, i) => (
+        <li key={`${v.at}-${i}`} className="yp-history__item">
+          <p className="yp-history__when">
+            {v.current ? 'Now' : 'Earlier'} · <time dateTime={v.at}>{formatRelativeTime(v.at, locale)}</time>
+          </p>
+          <div className="yp-history__body" dir="auto">
+            {v.body ? <TaggedText text={v.body} linkAs={linkAs} /> : <span className="yp-history__empty">No text</span>}
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -633,6 +671,8 @@ export function PostCard({
   onLeaveCollab,
   onRemoveTag,
   onManageCollaborators,
+  onEdit,
+  onHistory,
 }: PostCardProps) {
   const tt = (k: MessageKey) => t(k, locale);
   const coauthors = post.collaborators ?? [];
@@ -651,6 +691,7 @@ export function PostCard({
     menu.push({ label: tt('post.muteCreator'), icon: 'bell', onSelect: () => onFeedback(post, 'mute_creator') });
   }
   if (onReport && !isOwn && !coauthor) menu.push({ label: tt('post.report'), icon: 'flag', danger: true, onSelect: () => onReport(post) });
+  if (onEdit && isOwn && !post.status) menu.push({ label: 'Edit', icon: 'edit', onSelect: () => onEdit(post) });
   if (onPin && isOwn && !post.community)
     menu.push({ label: post.pinned ? 'Unpin from profile' : 'Pin to profile', icon: 'bookmark', onSelect: () => onPin(post) });
   if (onManageCollaborators && isOwn && !post.community)
@@ -696,9 +737,29 @@ export function PostCard({
           </span>
           <span className="yp-post__meta">
             <bdi>@{post.author.username}</bdi> ·{' '}
-            <bdi>
-              <time dateTime={post.createdAt}>{formatRelativeTime(post.createdAt, locale)}</time>
-            </bdi>
+            {post.status === 'scheduled' && post.scheduledAt ? (
+              <span className="yp-post__state">
+                Scheduled for <time dateTime={post.scheduledAt}>{formatScheduled(post.scheduledAt, locale)}</time>
+              </span>
+            ) : post.status === 'draft' ? (
+              <span className="yp-post__state">Draft</span>
+            ) : (
+              <bdi>
+                <time dateTime={post.createdAt}>{formatRelativeTime(post.createdAt, locale)}</time>
+              </bdi>
+            )}
+            {post.editedAt ? (
+              <>
+                {' · '}
+                {onHistory ? (
+                  <button type="button" className="yp-post__edited" onClick={() => onHistory(post)} aria-label="Edited. See earlier versions">
+                    Edited
+                  </button>
+                ) : (
+                  <span>Edited</span>
+                )}
+              </>
+            ) : null}
             {post.community ? (
               <>
                 {' · '}
@@ -866,48 +927,51 @@ export function PostCard({
         </div>
       ) : null}
 
-      <div className="yp-post__actions">
-        <button
-          type="button"
-          className="yp-action"
-          aria-pressed={post.viewer.liked}
-          onClick={() => onLike?.(post)}
-          aria-label={`${post.viewer.liked ? tt('post.unlike') : tt('post.like')}, ${post.counts.likes}`}
-        >
-          <Icon name="heart" filled={post.viewer.liked} />
-          {post.counts.likes || ''}
-        </button>
-        <button type="button" className="yp-action" onClick={() => onComment?.(post)} aria-label={`${tt('post.comments')}, ${post.counts.comments}`}>
-          <Icon name="message" />
-          {post.counts.comments || ''}
-        </button>
-        {onRepost && !isOwn && !coauthor && post.visibility === 'public' ? (
+      {/* Drafts and scheduled posts can't be liked, commented on or shared yet. */}
+      {post.status ? null : (
+        <div className="yp-post__actions">
           <button
             type="button"
-            className={cx('yp-action', post.viewer.reposted && 'yp-action--reposted')}
-            aria-pressed={post.viewer.reposted}
-            onClick={() => onRepost(post)}
-            aria-label={`${post.viewer.reposted ? 'Undo repost' : 'Repost'}, ${post.counts.reposts}`}
+            className="yp-action"
+            aria-pressed={post.viewer.liked}
+            onClick={() => onLike?.(post)}
+            aria-label={`${post.viewer.liked ? tt('post.unlike') : tt('post.like')}, ${post.counts.likes}`}
           >
-            <Icon name="repost" />
-            {post.counts.reposts || ''}
+            <Icon name="heart" filled={post.viewer.liked} />
+            {post.counts.likes || ''}
           </button>
-        ) : post.counts.reposts ? (
-          <span className="yp-action yp-action--static" aria-label={`Reposts, ${post.counts.reposts}`}>
-            <Icon name="repost" />
-            {post.counts.reposts}
-          </span>
-        ) : null}
-        {onShare && post.visibility !== 'private' ? (
-          <button type="button" className="yp-action" onClick={() => onShare(post)} aria-label="Share">
-            <Icon name="send" />
+          <button type="button" className="yp-action" onClick={() => onComment?.(post)} aria-label={`${tt('post.comments')}, ${post.counts.comments}`}>
+            <Icon name="message" />
+            {post.counts.comments || ''}
           </button>
-        ) : null}
-        <span className="yp-spacer" />
-        <button type="button" className="yp-action" aria-pressed={post.viewer.saved} onClick={() => onSave?.(post)} aria-label={tt('post.save')}>
-          <Icon name="bookmark" filled={post.viewer.saved} />
-        </button>
-      </div>
+          {onRepost && !isOwn && !coauthor && post.visibility === 'public' ? (
+            <button
+              type="button"
+              className={cx('yp-action', post.viewer.reposted && 'yp-action--reposted')}
+              aria-pressed={post.viewer.reposted}
+              onClick={() => onRepost(post)}
+              aria-label={`${post.viewer.reposted ? 'Undo repost' : 'Repost'}, ${post.counts.reposts}`}
+            >
+              <Icon name="repost" />
+              {post.counts.reposts || ''}
+            </button>
+          ) : post.counts.reposts ? (
+            <span className="yp-action yp-action--static" aria-label={`Reposts, ${post.counts.reposts}`}>
+              <Icon name="repost" />
+              {post.counts.reposts}
+            </span>
+          ) : null}
+          {onShare && post.visibility !== 'private' ? (
+            <button type="button" className="yp-action" onClick={() => onShare(post)} aria-label="Share">
+              <Icon name="send" />
+            </button>
+          ) : null}
+          <span className="yp-spacer" />
+          <button type="button" className="yp-action" aria-pressed={post.viewer.saved} onClick={() => onSave?.(post)} aria-label={tt('post.save')}>
+            <Icon name="bookmark" filled={post.viewer.saved} />
+          </button>
+        </div>
+      )}
     </article>
   );
 }

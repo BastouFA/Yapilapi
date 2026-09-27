@@ -24,6 +24,11 @@ const TEXT: Record<string, MessageKey> = {
   photo_tag: 'm.notif.photoTag',
 };
 
+/** Kinds about your own account or content, with no one else in them. */
+const OWN_TEXT: Record<string, MessageKey> = {
+  scheduled_post_failed: 'm.notif.scheduledFailed',
+};
+
 type Answer = 'accepted' | 'declined';
 
 /** Notifications, newest first. A co-author invite can be accepted or declined right here. */
@@ -105,8 +110,10 @@ export default function Notifications() {
       renderItem={({ item: n }) => {
         const name = n.actor?.displayName ?? '';
         const key = TEXT[n.type];
-        const text = key && n.actor ? t(key, { name }) : n.actor ? t('m.notif.other', { name }) : t('m.notif.otherNoActor');
-        const href = n.entityType === 'post' && n.entityId ? `/p/${n.entityId}` : n.actor ? `/u/${n.actor.username}` : null;
+        const own = OWN_TEXT[n.type];
+        const text = own ? t(own) : key && n.actor ? t(key, { name }) : n.actor ? t('m.notif.other', { name }) : t('m.notif.otherNoActor');
+        const href =
+          n.entityType === 'post' && n.entityId ? `/p/${n.entityId}` : n.entityType === 'draft' ? '/drafts' : n.actor ? `/u/${n.actor.username}` : null;
         const answered = answers[n.id];
         const invite = n.type === 'collab_invite' && !!n.entityId;
         return (

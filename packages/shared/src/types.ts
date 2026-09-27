@@ -135,6 +135,12 @@ export interface Post {
   /** Set on Real posts: captured in-app moments before posting, unedited. */
   real?: { capturedAt: string; dual: boolean; locationText: string | null } | null;
   createdAt: string;
+  /** Set once the text was changed after publishing: shown as "Edited", which opens the history (GET /v1/posts/:id/history). */
+  editedAt?: string;
+  /** Only on your own drafts and scheduled posts, which nobody else sees. Published posts leave it out. */
+  status?: 'draft' | 'scheduled';
+  /** Scheduled posts: when it will be published. */
+  scheduledAt?: string | null;
   /** Why this post is in the viewer's feed (recommendation explanation). */
   reason?: string;
   /** Only on the author's own posts: countries where regional rules withhold it. */
@@ -168,6 +174,20 @@ export interface SoundRef {
   audioUrl: string | null;
   /** True when this reel is where the sound comes from (so its own audio plays). */
   original: boolean;
+}
+
+/** One version of a post's text, newest first in a history: `at` is when it was written (the post's time for the first one). */
+export interface PostVersion {
+  body: string;
+  at: string;
+  current: boolean;
+}
+
+/** A draft or scheduled post opened to continue: the post, plus who it's for when that's a circle or chosen people. */
+export interface DraftDetail {
+  post: Post;
+  circleId: string | null;
+  audience: string[];
 }
 
 export interface RemixRef {

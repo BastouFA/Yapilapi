@@ -83,6 +83,8 @@ export const MAX_COLLABORATORS = 3;
 /** At most this many people tagged in one photo. */
 export const MAX_PHOTO_TAGS = 20;
 const photoTagSpot = z.object({ userId: uuid, x: z.number().min(0).max(1), y: z.number().min(0).max(1) });
+/** A moment to publish a post, with its UTC offset (as toISOString gives). */
+const scheduleTime = z.string().datetime({ offset: true, message: 'Choose a date and time.' });
 
 export const createPostSchema = z
   .object({
@@ -127,8 +129,13 @@ export const createPostSchema = z
     soundTitle: z.string().trim().min(1).max(100).optional(),
     /** People to invite as co-authors (people you follow who follow you back). They each accept or decline. */
     collaborators: z.array(uuid).max(MAX_COLLABORATORS).default([]),
+    /** Save it as a draft only you can see, instead of publishing. */
+    draft: z.boolean().default(false),
+    /** Publish it later, at this time (SCHEDULE_MIN_MINUTES to SCHEDULE_MAX_DAYS ahead). Until then it's only yours. */
+    scheduledAt: scheduleTime.optional(),
   })
   .superRefine((v, ctx) => {
+    if (v.draft && v.scheduledAt) ctx.addIssue({ code: 'custom', message: 'Save a draft or schedule it, not both.', path: ['scheduledAt'] });
     if (!v.body && v.media.length === 0 && !v.linkUrl && !v.poll)
       ctx.addIssue({ code: 'custom', message: 'A post needs text, media, a link or a poll.', path: ['body'] });
     if (v.visibility === 'circle' && !v.circleId) ctx.addIssue({ code: 'custom', message: 'Choose a circle.', path: ['circleId'] });
@@ -149,6 +156,25 @@ export const createPostSchema = z
         ctx.addIssue({ code: 'custom', message: 'Tag each person once in a photo.', path: ['media', i, 'tags'] });
     }
   });
+
+/**
+ * Change a post you shared: its text, who can see it, and the description of
+ * each photo or video (by media id). Photos, polls and links stay as they are.
+ */
+export const editPostSchema = z
+  .object({
+    body: z.string().trim().max(5000).optional(),
+    visibility: z.enum(['public', 'followers', 'friends', 'private', 'subscribers']).optional(),
+    media: z
+      .array(z.object({ id: uuid, altText: z.string().trim().max(500) }))
+      .max(10)
+      .optional(),
+  })
+  .refine((v) => v.body !== undefined || v.visibility !== undefined || v.media !== undefined, { message: 'Nothing to change.', path: ['body'] })
+  .refine((v) => !v.media || new Set(v.media.map((m) => m.id)).size === v.media.length, { message: 'Describe each photo once.', path: ['media'] });
+
+/** Publish a draft later, or move a scheduled post to another time. */
+export const schedulePostSchema = z.object({ scheduledAt: scheduleTime });
 
 /** Invite people to co-author a post you already shared. */
 export const collabInviteSchema = z.object({ userIds: z.array(uuid).min(1).max(MAX_COLLABORATORS) });
@@ -406,4 +432,5 @@ export const onboardingCompleteSchema = z.object({
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type CreatePostInput = z.infer<typeof createPostSchema>;
+export type EditPostInput = z.infer<typeof editPostSchema>;
 export type CreateEventInput = z.infer<typeof createEventSchema>;

@@ -65,7 +65,7 @@ export default async function soundsModule(app: FastifyInstance, ctx: AppContext
     const term = q.q.replace(/[\\%_]/g, (c) => `\\${c}`);
     const { rows } = await db.query(
       `SELECT s.id,
-              (SELECT count(*) FROM posts p WHERE p.sound_id = s.id AND p.deleted_at IS NULL AND p.created_at > now() - interval '30 days') AS recent_uses
+              (SELECT count(*) FROM posts p WHERE p.sound_id = s.id AND p.deleted_at IS NULL AND p.status = 'published' AND p.created_at > now() - interval '30 days') AS recent_uses
        FROM sounds s JOIN profiles pr ON pr.user_id = s.owner_id
        WHERE ($2 = '' OR s.title ILIKE '%' || $2 || '%' OR pr.display_name ILIKE $2 || '%' OR pr.username ILIKE $2 || '%')
          AND ${soundUsableSql('$1')}

@@ -1,7 +1,7 @@
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { onPendingAsset, takePendingAsset } from '../../lib/create-sheet';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Image, Linking, ScrollView, Text, View } from 'react-native';
 import type { EditorParamsInput } from '../../../../packages/shared/src/filters';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
@@ -27,6 +27,7 @@ import { radius, space } from '../../lib/theme';
 import { Button, Card, Field, Icon, Notice, Screen, Segmented, SwitchRow, useColors, useTabBarSpace, userText } from '../../lib/ui';
 import { isVerificationError, VerifyPrompt } from '../../lib/safety';
 import { StickerEditor, type DraftSticker } from '../../lib/story-stickers';
+import { SchedulePicker } from '../../lib/post-edit';
 
 const VISIBILITY = [
   { id: 'public', label: 'visibility.public' },
@@ -56,19 +57,28 @@ const kindFrom = (mode: string | undefined): Kind | null => (mode === 'reel' || 
 
 /**
  * Create: a text post, a reel (one video up to 3 minutes, optionally with a sound from the
- * sound page) or a story (optionally for close friends only), like the web composer.
+ * sound page) or a story (optionally for close friends only), like the web composer. Posts
+ * and reels can be saved as a draft or scheduled instead; Drafts opens one here to continue.
  */
 export default function Create() {
   const c = useColors();
-  const { t, number } = useT();
+  const { t, number, dateTime } = useT();
   const { me } = useSession();
   const bottom = useTabBarSpace();
-  const params = useLocalSearchParams<{ mode?: string; sound?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; sound?: string; draft?: string }>();
   const [kind, setKind] = useState<Kind>(kindFrom(params.mode) ?? 'post');
   const [body, setBody] = useState('');
   const [visibility, setVisibility] = useState<Visibility>(kind === 'story' ? 'friends' : 'public');
   const [expiresIn, setExpiresIn] = useState<(typeof EXPIRES)[number]['id']>('24h');
   const [media, setMedia] = useState<Attached | null>(null);
+  // A description of the photo or video, for people using a screen reader.
+  const [altText, setAltText] = useState('');
+  // The draft being continued, if any: saving, scheduling or publishing works on it.
+  const [draftId, setDraftId] = useState<string | null>(null);
+  // A draft's audience that the choices here don't cover (a circle or chosen people): kept unless another is picked.
+  const [keptAudience, setKeptAudience] = useState<{ visibility: string; circleId: string | null; audience: string[] } | null>(null);
+  const [scheduling, setScheduling] = useState(false);
+  const [keeping, setKeeping] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [denied, setDenied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,8 +91,15 @@ export default function Create() {
   const [coauthors, setCoauthors] = useState<PublicUser[]>([]);
   const [photoTags, setPhotoTags] = useState<DraftTag[]>([]);
   const ac = useAutocomplete(body, setBody);
-  // Tags belong to the photo they were placed on.
-  useEffect(() => setPhotoTags([]), [media?.id]);
+  // Tags and the description belong to the photo they were written for (a draft brings its photo's along).
+  const restoredTags = useRef<DraftTag[] | null>(null);
+  const restoredAlt = useRef(false);
+  useEffect(() => {
+    setPhotoTags(restoredTags.current ?? []);
+    restoredTags.current = null;
+    if (!restoredAlt.current) setAltText('');
+    restoredAlt.current = false;
+  }, [media?.id]);
   // Stories: stickers placed on the preview, and whether people may add it to their own story.
   const [stickers, setStickers] = useState<DraftSticker[]>([]);
   const [allowReshare, setAllowReshare] = useState(true);
@@ -120,6 +137,35 @@ export default function Create() {
         (e) => setError(errorMessage(e)),
       );
   }, [params.sound]);
+
+  // Drafts ("Continue") opens a draft here.
+  useEffect(() => {
+    if (!params.draft) return;
+    const id = params.draft;
+    router.setParams({ draft: '' });
+    client()
+      .then((api) => api.drafts.get(id))
+      .then(
+        ({ post, circleId, audience }) => {
+          setDraftId(id);
+          setKind(post.format === 'reel' ? 'reel' : 'post');
+          setBody(post.body);
+          if (VISIBILITY.some((v) => v.id === post.visibility)) {
+            setVisibility(post.visibility as Visibility);
+            setKeptAudience(null);
+          } else setKeptAudience({ visibility: post.visibility, circleId, audience });
+          const m = post.media[0];
+          restoredTags.current = (m?.tags ?? []).map((x) => ({ user: x.user, x: x.x, y: x.y }));
+          restoredAlt.current = true;
+          setAltText(m?.altText ?? '');
+          setMedia(m ? { id: m.id, kind: m.kind, url: m.url, local: mediaUrl(m.variants?.medium ?? m.url), seconds: null } : null);
+          setCoauthors(post.pendingCollaborators ?? []);
+          setError(null);
+          setNote(null);
+        },
+        (e) => setError(errorMessage(e)),
+      );
+  }, [params.draft]);
 
   // Home ("Your story") and Reels ("Make a reel") open this tab in a given mode.
   useEffect(() => {
@@ -225,6 +271,79 @@ export default function Create() {
     return null;
   }
 
+  /** What the post or reel says and shows. */
+  function content(): Record<string, unknown> {
+    const audience = keptAudience
+      ? {
+          visibility: keptAudience.visibility,
+          circleId: keptAudience.circleId ?? undefined,
+          audience: keptAudience.audience.length ? keptAudience.audience : undefined,
+        }
+      : { visibility };
+    const described = altText.trim() ? { altText: altText.trim() } : {};
+    if (kind === 'reel') {
+      const v = media!;
+      return {
+        format: 'reel',
+        body,
+        ...audience,
+        media: [{ id: v.id, url: mediaUrl(v.url), kind: 'video', ...described }],
+        ...(sound ? { soundId: sound.id } : {}),
+        ...(coauthors.length ? { collaborators: coauthors.map((u) => u.id) } : {}),
+      };
+    }
+    return {
+      body,
+      ...audience,
+      ...(media
+        ? {
+            media: [
+              {
+                id: media.id,
+                url: mediaUrl(media.url),
+                kind: media.kind,
+                ...described,
+                ...(media.kind === 'image' && photoTags.length ? { tags: photoTags.map((x) => ({ userId: x.user.id, x: x.x, y: x.y })) } : {}),
+              },
+            ],
+          }
+        : {}),
+      ...(coauthors.length ? { collaborators: coauthors.map((u) => u.id) } : {}),
+    };
+  }
+
+  function clear() {
+    setBody('');
+    setCoauthors([]);
+    setMedia(null);
+    setSound(null);
+    setAltText('');
+    setDraftId(null);
+    setKeptAudience(null);
+  }
+
+  /** Keep it for later: a draft, or scheduled for `at`. */
+  async function keep(at: Date | null) {
+    setScheduling(false);
+    setKeeping(true);
+    setError(null);
+    setNote(null);
+    setNeedsVerify(false);
+    try {
+      const api = await client();
+      if (draftId) await api.drafts.save(draftId, { ...content(), ...(at ? { scheduledAt: at.toISOString() } : {}) });
+      else await api.posts.create({ ...content(), ...(at ? { scheduledAt: at.toISOString() } : { draft: true }) });
+      clear();
+      Alert.alert(at ? t('m.create.scheduled', { time: dateTime(at) }) : t('m.create.draftSaved'));
+      router.push('/drafts');
+    } catch (e) {
+      if (isVerificationError(e)) setNeedsVerify(true);
+      else setError(errorMessage(e));
+    } finally {
+      setKeeping(false);
+    }
+  }
+
   async function publish() {
     setBusy(true);
     setError(null);
@@ -248,44 +367,14 @@ export default function Create() {
         router.navigate('/');
         return;
       }
+      // A draft is saved with what's here now, then published through the same checks as a new post.
+      const r = draftId ? (await api.drafts.save(draftId, content()), await api.drafts.publish(draftId)) : await api.posts.create(content());
+      clear();
       if (kind === 'reel') {
-        const v = media!;
-        const r = await api.posts.create({
-          format: 'reel',
-          body,
-          visibility,
-          media: [{ id: v.id, url: mediaUrl(v.url), kind: 'video' }],
-          ...(sound ? { soundId: sound.id } : {}),
-          ...(coauthors.length ? { collaborators: coauthors.map((u) => u.id) } : {}),
-        });
-        setBody('');
-        setCoauthors([]);
-        setMedia(null);
-        setSound(null);
         if (r.moderation) Alert.alert(r.moderation.message);
         router.push({ pathname: '/reels', params: { start: r.post.id } });
         return;
       }
-      const r = await api.posts.create({
-        body,
-        visibility,
-        ...(media
-          ? {
-              media: [
-                {
-                  id: media.id,
-                  url: mediaUrl(media.url),
-                  kind: media.kind,
-                  ...(media.kind === 'image' && photoTags.length ? { tags: photoTags.map((x) => ({ userId: x.user.id, x: x.x, y: x.y })) } : {}),
-                },
-              ],
-            }
-          : {}),
-        ...(coauthors.length ? { collaborators: coauthors.map((u) => u.id) } : {}),
-      });
-      setBody('');
-      setCoauthors([]);
-      setMedia(null);
       if (r.moderation) setNote(r.moderation.message);
       // Home shows the new post at the top, whatever the feed's ranking.
       else router.navigate({ pathname: '/', params: { posted: r.post.id } });
@@ -298,7 +387,8 @@ export default function Create() {
   }
 
   const hint = KINDS.find((k) => k.id === kind)!.hint;
-  const canPublish = !busy && !uploading && (kind === 'reel' ? media?.kind === 'video' : !!body.trim() || !!media || (kind === 'story' && stickers.length > 0));
+  const canPublish =
+    !busy && !keeping && !uploading && (kind === 'reel' ? media?.kind === 'video' : !!body.trim() || !!media || (kind === 'story' && stickers.length > 0));
 
   return (
     <ScrollView
@@ -306,6 +396,16 @@ export default function Create() {
       contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: bottom }}
       keyboardShouldPersistTaps="handled"
     >
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[2] }}>
+        {draftId ? (
+          <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 17, fontWeight: '800', flexShrink: 1 }}>
+            {t('m.create.continueDraft')}
+          </Text>
+        ) : (
+          <View />
+        )}
+        <Button label={t('m.create.drafts')} icon="document-text-outline" variant="ghost" size="sm" onPress={() => router.push('/drafts')} />
+      </View>
       <Segmented
         label={t('m.create.mode')}
         options={KINDS.map((k) => ({ id: k.id, label: t(k.label) }))}
@@ -363,6 +463,9 @@ export default function Create() {
           ) : null}
         </View>
 
+        {media && media.kind !== 'audio' && kind !== 'story' ? (
+          <Field label={t('m.create.altText')} placeholder={t('m.create.altTextPlaceholder')} value={altText} onChangeText={setAltText} maxLength={500} />
+        ) : null}
         {kind === 'post' && media?.kind === 'image' ? <PhotoTagger uri={media.local} value={photoTags} onChange={setPhotoTags} /> : null}
         {kind !== 'story' ? <CoauthorPicker value={coauthors} onChange={setCoauthors} /> : null}
 
@@ -404,9 +507,16 @@ export default function Create() {
             <Text style={{ color: c.ink, fontWeight: '600' }}>{t('create.visibility')}</Text>
             <Segmented
               label={t('create.visibility')}
-              options={VISIBILITY.filter((v) => v.id !== 'subscribers' || (hasPlans && kind !== 'story')).map((v) => ({ id: v.id, label: t(v.label) }))}
-              value={visibility}
-              onChange={setVisibility}
+              options={[
+                ...VISIBILITY.filter((v) => v.id !== 'subscribers' || (hasPlans && kind !== 'story')).map((v) => ({ id: v.id as string, label: t(v.label) })),
+                ...(keptAudience && kind !== 'story' ? [{ id: keptAudience.visibility, label: t(`visibility.${keptAudience.visibility}` as MessageKey) }] : []),
+              ]}
+              value={keptAudience && kind !== 'story' ? keptAudience.visibility : visibility}
+              onChange={(v) => {
+                if (keptAudience && v === keptAudience.visibility) return;
+                setKeptAudience(null);
+                setVisibility(v as Visibility);
+              }}
             />
           </>
         )}
@@ -420,7 +530,22 @@ export default function Create() {
           disabled={!canPublish}
           onPress={() => void publish()}
         />
+        {kind !== 'story' ? (
+          <View style={{ flexDirection: 'row', gap: space[2] }}>
+            <Button label={t('m.create.saveDraft')} variant="secondary" size="sm" disabled={!canPublish} onPress={() => void keep(null)} style={{ flex: 1 }} />
+            <Button
+              label={t('m.create.schedule')}
+              icon="calendar-outline"
+              variant="secondary"
+              size="sm"
+              disabled={!canPublish}
+              onPress={() => setScheduling(true)}
+              style={{ flex: 1 }}
+            />
+          </View>
+        ) : null}
       </Card>
+      <SchedulePicker visible={scheduling} onClose={() => setScheduling(false)} onPick={(at) => void keep(at)} />
       {kind === 'post' ? <Button label={t('m.real.capture')} icon="camera-outline" variant="secondary" onPress={() => router.push('/real')} /> : null}
       {editing?.type === 'video' ? (
         <VideoEditor

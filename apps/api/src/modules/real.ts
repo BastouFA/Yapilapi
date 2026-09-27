@@ -52,7 +52,7 @@ export default async function realModule(app: FastifyInstance, ctx: AppContext) 
       req.body,
     );
     const today = await db.query(
-      `SELECT count(*) AS n FROM posts WHERE author_id = $1 AND metadata ? 'real' AND created_at > now() - interval '24 hours' AND deleted_at IS NULL`,
+      `SELECT count(*) AS n FROM posts WHERE author_id = $1 AND metadata ? 'real' AND created_at > now() - interval '24 hours' AND deleted_at IS NULL AND status = 'published'`,
       [u.id],
     );
     if (Number(today.rows[0].n) >= REALS_PER_DAY) throw new AppError(429, 'real_limit', `You can share ${REALS_PER_DAY} Reals a day.`);
