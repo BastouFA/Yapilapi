@@ -21,6 +21,7 @@ import { RepostersSheet } from './reposters';
 import { useFlag } from './flags';
 import { AddToMemorySheet } from './memories';
 import { useReport } from './report';
+import { canWatch, useWatchStart } from './watch';
 
 export { RichText };
 
@@ -247,6 +248,7 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
    * co-author, remove your photo tag, report someone else's post.
    */
   const menu = useActionSheet();
+  const watchTogether = useWatchStart();
   function more() {
     const actions: ActionSheetAction[] = [];
     if (canSeeInsights) actions.push({ label: t('m.post.insights'), icon: 'stats-chart-outline', onPress: () => router.push(`/insights/${post.id}`) });
@@ -254,6 +256,9 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
       actions.push({ label: t('m.boost.cta'), icon: 'rocket-outline', onPress: () => router.push({ pathname: '/boost', params: { id: post.id } }) });
     if (canEdit) actions.push({ label: t('m.post.edit'), icon: 'create-outline', onPress: () => setEditing(true) });
     if (me) actions.push({ label: t('m.boards.saveTo'), icon: 'bookmarks-outline', onPress: saveTo });
+    // Watch together: a reel or video post, with people in a chat at the same time.
+    if (me && canWatch(post))
+      actions.push({ label: t('watch.start'), icon: 'tv-outline', hint: t('watch.startHint'), onPress: () => watchTogether.open([post.id]) });
     if (canRemember) actions.push({ label: t('m.mem.addToMemory'), icon: 'albums-outline', onPress: () => setRemembering(true) });
     if (collab === 'accepted') actions.push({ label: t('m.collab.leave'), icon: 'exit-outline', destructive: true, onPress: () => void leave() });
     if (myTag) actions.push({ label: t('m.tags.removeMine'), icon: 'pricetag-outline', onPress: () => void removeTag(myTag) });
@@ -593,6 +598,7 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
       {repostersOpen ? <RepostersSheet postId={post.id} onClose={() => setRepostersOpen(false)} /> : null}
       {remembering ? <AddToMemorySheet postId={post.id} onClose={() => setRemembering(false)} /> : null}
       {menu.sheet}
+      {watchTogether.sheet}
       {report.sheet}
     </Card>
   );

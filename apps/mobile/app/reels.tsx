@@ -53,6 +53,7 @@ import { SensitiveCover } from '../lib/safety';
 import { TranslatableText } from '../lib/translation';
 import { openMusic, useMusicCredit, useMusicLoop } from '../lib/music';
 import { CaptionOverlay, useCaptionCues } from '../lib/captions';
+import { canWatch, useWatchStart } from '../lib/watch';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 
 /** What a reel plays: on Data saver the lowest MP4, or the 360p stream for videos processed before it existed. */
@@ -346,6 +347,8 @@ export default function Reels() {
   }
 
   // Report a reel from the options sheet; blocking its creator from there too hides their reels.
+  // Watch together: pick a chat, then watch this reel there at the same time.
+  const watchTogether = useWatchStart();
   const reporter = useReport({ onBlocked: (userId) => setItems((cur) => cur?.filter((x) => x.author.id !== userId) ?? cur) });
   const report = (p: Post) => {
     setSheet(null);
@@ -486,6 +489,18 @@ export default function Reels() {
         {sheetPost ? (
           <>
             <SheetItem icon="share-outline" label={t('reel.share.link')} onPress={() => (setSheet(null), void shareLink(sheetPost))} />
+            {me && canWatch(sheetPost) ? (
+              <SheetItem
+                icon="tv-outline"
+                label={t('watch.start')}
+                onPress={() => {
+                  const postId = sheetPost.id;
+                  setSheet(null);
+                  // iOS can't show the chat picker while this sheet is still sliding away.
+                  setTimeout(() => watchTogether.open([postId]), SHEET_SWAP_MS);
+                }}
+              />
+            ) : null}
             {sheetPost.author.id !== me?.id && sheetPost.visibility === 'public' ? (
               <SheetItem
                 icon="repeat"
@@ -542,6 +557,7 @@ export default function Reels() {
         onAllowRemix={(p, v) => void setAllowRemix(p, v)}
       />
       {reporter.sheet}
+      {watchTogether.sheet}
       {sheet?.kind === 'highlights' && sheetPost ? (
         <HighlightsSheet
           post={sheetPost}

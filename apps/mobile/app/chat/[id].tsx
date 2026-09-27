@@ -46,6 +46,7 @@ import {
 import { TranslatableText } from '../../lib/translation';
 import { useReport } from '../../lib/report';
 import { ListCard, ListComposer, PollCard, PollComposer, ReminderNote, ReminderPicker } from '../../lib/chat-polls';
+import { chatTooBig, openWatch, startWatch, useChatWatch, WatchBanner, watchableChat } from '../../lib/watch';
 
 /** Voice messages shorter than this are treated as a slip of the finger and not sent. */
 const MIN_VOICE_MS = 1000;
@@ -87,6 +88,9 @@ export default function Chat() {
   const [listOpen, setListOpen] = useState(false);
   const [remindFor, setRemindFor] = useState<{ message: Message; scope: 'me' | 'group' } | null>(null);
   const input = useRef<TextInput>(null);
+  // Watch together: the session running here (a banner and a Join on its line), or a way to start one.
+  const { summary: watching } = useChatWatch(id);
+  const canWatch = !!conversation && watchableChat(conversation) && !chatTooBig(conversation) && conversation.members.length > 1;
   const patchMessage = (messageId: string, fn: (m: Message) => Message) => setMessages((cur) => cur.map((x) => (x.id === messageId ? fn(x) : x)));
   const loadPins = useCallback(async () => {
     try {
@@ -651,6 +655,7 @@ export default function Chat() {
           <VerifyPrompt action="message" />
         </View>
       ) : null}
+      {watching ? <WatchBanner summary={watching} /> : null}
       <PinnedBar
         pins={pins}
         canManage={canManage}
@@ -701,6 +706,7 @@ export default function Chat() {
             meId={me?.id}
             showSender={!!conversation && conversation.members.length > 2}
             highlighted={highlight === item.id}
+            watchLive={!!watching && item.system?.type === 'watch' && item.system.sessionId === watching.id}
             h={rowHandlers}
           />
         )}
@@ -946,6 +952,11 @@ export default function Chat() {
         onClose={() => setOptionsOpen(false)}
         title={t('m.chat.options')}
         actions={[
+          ...(watching
+            ? [{ label: t('watch.join'), icon: 'tv-outline' as const, onPress: () => openWatch(watching.id) }]
+            : canWatch
+              ? [{ label: t('watch.start'), icon: 'tv-outline' as const, hint: t('watch.startEmpty'), onPress: () => void startWatch(id).catch(fail) }]
+              : []),
           { label: t('m.chat.search'), icon: 'search-outline', onPress: () => setSearchOpen(true) },
           {
             label: `${t('m.chat.disappearing')} · ${disappearingText(t, conversation?.disappearingSeconds)}`,
@@ -1028,6 +1039,7 @@ const MessageRow = memo(function MessageRow({
   meId,
   showSender,
   highlighted,
+  watchLive,
   h,
 }: {
   item: Message;
@@ -1035,11 +1047,12 @@ const MessageRow = memo(function MessageRow({
   meId: string | undefined;
   showSender: boolean;
   highlighted: boolean;
+  watchLive: boolean;
   h: RowHandlers;
 }) {
   const c = useColors();
   const { t } = useT();
-  if (item.kind === 'system') return <SystemLine message={item} meId={meId} onJump={h.jumpTo} />;
+  if (item.kind === 'system') return <SystemLine message={item} meId={meId} onJump={h.jumpTo} watchLive={watchLive} />;
   const rich = !item.unsent && (item.poll || item.list);
   const text = item.unsent
     ? t(mine ? 'm.chat.unsentMine' : 'm.chat.unsent')

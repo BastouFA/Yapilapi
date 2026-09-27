@@ -6,7 +6,8 @@ import type { MessageKey } from '../../../packages/shared/src/i18n';
 import { client, errorMessage } from './api';
 import { useT } from './i18n';
 import { radius, space } from './theme';
-import { ActionSheet, BottomSheet, Icon, useColors, userText } from './ui';
+import { ActionSheet, BottomSheet, Button, Icon, useColors, userText } from './ui';
+import { openWatch } from './watch';
 
 /**
  * Chat extras: quoted replies, reactions, pinned messages, search, disappearing
@@ -151,11 +152,34 @@ export function SwipeToReply({ onReply, children, enabled }: { onReply: () => vo
  * A line in the chat that tells everyone who changed disappearing messages, or a group reminder at
  * its time (tapping it goes to the message it's about).
  */
-export function SystemLine({ message, meId, onJump }: { message: Message; meId?: string; onJump?: (id: string) => void }) {
+export function SystemLine({
+  message,
+  meId,
+  onJump,
+  watchLive,
+}: {
+  message: Message;
+  meId?: string;
+  onJump?: (id: string) => void;
+  /** A "started watching together" line whose session still runs: it gets a Join button. */
+  watchLive?: boolean;
+}) {
   const c = useColors();
   const { t } = useT();
   const name = message.sender.id === meId ? t('m.chat.you') : message.sender.displayName;
   const s = message.system;
+  if (s?.type === 'watch') {
+    const text = message.sender.id === meId ? t('watch.system.startedYou') : t('watch.system.started', { name: message.sender.displayName });
+    return (
+      <View style={{ alignSelf: 'center', alignItems: 'center', gap: space[1], maxWidth: '90%', paddingVertical: space[1] }}>
+        <View style={{ flexDirection: 'row', gap: space[1], alignItems: 'center' }}>
+          <Icon name="tv-outline" size={14} color={c.inkMuted} />
+          <Text style={[{ color: c.inkMuted, fontSize: 13, textAlign: 'center', lineHeight: 18 }, userText]}>{text}</Text>
+        </View>
+        {watchLive ? <Button label={t('watch.join')} size="sm" variant="secondary" icon="play" onPress={() => openWatch(s.sessionId)} /> : null}
+      </View>
+    );
+  }
   if (s?.type === 'reminder') {
     const about = s.message;
     const text = about?.available ? t('m.chat.systemReminder', { name, text: previewText(t, about) }) : t('m.chat.systemReminderGone', { name });

@@ -106,6 +106,9 @@ function Screens() {
         <Stack.Screen name="forgot-password" options={{ title: '' }} />
         <Stack.Screen name="c/[slug]" options={{ title: t('m.title.community') }} />
         <Stack.Screen name="room/[id]" options={{ title: t('m.rooms.title') }} />
+        <Stack.Screen name="watch/[id]" options={{ title: t('watch.title') }} />
+        <Stack.Screen name="wraps/index" options={{ title: t('wrap.past') }} />
+        <Stack.Screen name="wraps/[id]" options={{ title: t('wrap.title') }} />
         <Stack.Screen name="settings/index" options={{ title: t('m.title.settings') }} />
         <Stack.Screen name="settings/[section]" options={{ title: '' }} />
         <Stack.Screen name="your-data" options={{ title: t('settings.data.title') }} />

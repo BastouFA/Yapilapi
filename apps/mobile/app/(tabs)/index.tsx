@@ -13,6 +13,7 @@ import { PostCard } from '../../lib/post';
 import { orderStories, StoriesStrip, StoryViewer } from '../../lib/stories';
 import { useSession } from '../../lib/session';
 import { StarterRow } from '../../lib/starter';
+import { PulseCards } from '../../lib/wrap';
 import { space } from '../../lib/theme';
 import { ErrorState, feedListProps, Icon, Loading, Segmented, SkeletonList, useColors, useTabBarSpace } from '../../lib/ui';
 
@@ -130,6 +131,8 @@ function Feed() {
         ListHeaderComponent={
           <View style={{ gap: space[3] }}>
             <StoriesStrip groups={stories} onOpen={setViewing} onCreate={() => router.push({ pathname: '/camera', params: { mode: 'story' } })} />
+            {/* Your weekly wrap and "On this day", when there are any: quiet, and easy to put away. */}
+            <PulseCards />
             {/* With nothing in the feed, the empty state below does the starter row's job. */}
             {posts?.length ? <StarterRow /> : null}
             <Segmented label={t('m.feed.label')} options={MODES.map((m) => ({ id: m.id, label: t(m.label) }))} value={mode} onChange={setMode} />
