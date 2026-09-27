@@ -1,11 +1,20 @@
 'use client';
 
-import { COMMENT_POLICIES, extractHashtags, formatBytes, isVideoFile, MEDIA_ACCEPT, VIDEO_ACCEPT, type CommentPolicy } from '@yapilapi/shared';
+import {
+  COMMENT_POLICIES,
+  extractHashtags,
+  formatBytes,
+  isVideoFile,
+  MEDIA_ACCEPT,
+  VIDEO_ACCEPT,
+  type CaptionIdeas,
+  type CommentPolicy,
+} from '@yapilapi/shared';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AutocompleteText } from '@/components/Autocomplete';
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { AIPanel, Alert, BottomSheet, Button, Checkbox, formatScheduled, Segments, Select, TextField } from '@yapilapi/design-system';
+import { Alert, BottomSheet, Button, Checkbox, formatScheduled, Segments, Select, TextField } from '@yapilapi/design-system';
 import {
   MAX_COLLABORATORS,
   POST_VISIBILITIES,
@@ -27,6 +36,7 @@ type Audience = Visibility | StoryVisibility;
 import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { isVerificationError, VerifyPrompt } from '@/components/Verification';
 import { SimilarQuestions } from '@/components/CommunityExtras';
+import { CaptionIdeasPanel, SuggestAltText } from '@/components/AiHelpers';
 import { PhotoEditor } from '@/components/editor/PhotoEditor';
 import { VideoEditor } from '@/components/editor/VideoEditor';
 import { onPendingMedia, takePendingMedia } from '@/lib/pending-media';
@@ -68,7 +78,7 @@ function videoSeconds(file: File): Promise<number> {
 }
 
 function Create() {
-  const { t, tp, toast, me, dataSaver, locale } = useSession();
+  const { t, tp, toast, me, dataSaver, locale, flags } = useSession();
   // Data saver: what the videos just picked will cost to upload (photos are made smaller on their own).
   const [videoCost, setVideoCost] = useState<number | null>(null);
   const reelMax = me?.plus ? PLUS_REEL_MAX_SECONDS : REEL_MAX_SECONDS;
@@ -115,7 +125,7 @@ function Create() {
   const [allowReshare, setAllowReshare] = useState(true);
   // Music: a song or a sound, the part that plays (the whole sound on a reel) and, on stories, its sticker.
   const [music, setMusic] = useState<DraftMusic | null>(null);
-  const [ai, setAi] = useState<{ text: string; notice?: string } | null>(null);
+  const [ai, setAi] = useState<CaptionIdeas | null>(null);
   const [aiUsed, setAiUsed] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -311,11 +321,19 @@ function Create() {
     });
   }
 
+  /** Caption ideas from what's written and the photos (and hashtags people use); nothing changes until one is picked. */
   async function suggestCaption() {
     setAiLoading(true);
     try {
-      const r = await api.ai.assist({ task: 'caption', input: body || media.map((m) => m.altText).join(' ') || 'a new post' });
-      setAi({ text: String(r.output ?? ''), notice: r.notice });
+      const r = await api.ai.captions({
+        text: body,
+        mediaIds: media
+          .filter((m) => m.kind === 'image')
+          .map((m) => m.id)
+          .slice(0, 4),
+        format: kind === 'reel' ? 'reel' : 'post',
+      });
+      setAi(r.ideas);
     } catch (e) {
       toast(errorMessage(e));
     } finally {
@@ -559,6 +577,14 @@ function Create() {
                       setMedia((cur) => cur.map((x) => (x.id === m.id ? { ...x, altText: v } : x)));
                     }}
                   />
+                  {m.kind === 'image' ? (
+                    <SuggestAltText
+                      mediaId={m.id}
+                      index={i}
+                      compact
+                      onSuggested={(text) => setMedia((cur) => cur.map((x) => (x.id === m.id ? { ...x, altText: text.slice(0, 500) } : x)))}
+                    />
+                  ) : null}
                   {m.kind === 'image' && kind !== 'story' ? (
                     <button
                       type="button"
@@ -629,36 +655,26 @@ function Create() {
                 {t('m.sticker.kind.poll')}
               </Button>
             ) : null}
-            <Button size="sm" variant="ghost" icon="sparkle" loading={aiLoading} onClick={suggestCaption}>
-              {t('create.aiCaption')}
-            </Button>
+            {flags.AI_CAPTIONS && (body.trim() || media.some((m) => m.kind === 'image')) ? (
+              <Button size="sm" variant="ghost" icon="sparkle" loading={aiLoading} onClick={suggestCaption}>
+                {t('create.aiCaption')}
+              </Button>
+            ) : null}
           </div>
         </div>
 
         {ai ? (
-          <AIPanel
-            title={t('compose.suggestedCaption')}
-            notice={ai.notice}
-            actions={
-              <>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setBody(ai.text);
-                    setAiUsed(true);
-                    setAi(null);
-                  }}
-                >
-                  {t('compose.useThis')}
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setAi(null)}>
-                  {t('compose.dismiss')}
-                </Button>
-              </>
-            }
-          >
-            {ai.text || t('compose.noSuggestion')}
-          </AIPanel>
+          <CaptionIdeasPanel
+            ideas={ai}
+            onUse={(caption) => {
+              // Keep the hashtags already written; the idea replaces the rest.
+              const tags = body.match(/(^|\s)#[\p{L}\p{M}\p{N}_]+/gu)?.join('') ?? '';
+              setBody(`${caption}${tags}`.slice(0, 5000));
+              setAiUsed(true);
+            }}
+            onAddTag={(tag) => setBody((b) => `${b.trimEnd()} #${tag}`.trimStart())}
+            onClose={() => setAi(null)}
+          />
         ) : null}
 
         {kind !== 'story' ? (

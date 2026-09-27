@@ -594,6 +594,24 @@ export const aiAssistSchema = z.object({
   targetLanguage: z.string().min(2).max(10).optional(),
 });
 
+/** Settings > AI helpers: suggested replies in chats and the Catch me up card on Pulse. */
+export const aiSettingsSchema = z.object({ smartReplies: z.boolean().optional(), catchUp: z.boolean().optional() });
+
+/** Suggested replies in one chat: true or false, or null for the default (on in one-to-one chats, off in groups). */
+export const conversationSmartRepliesSchema = z.object({ enabled: z.boolean().nullable() });
+
+/** "Suggest a description" for one of your photos. */
+export const altTextSuggestSchema = z.object({ mediaId: uuid });
+
+/** "Suggest a caption": from what you've written so far and your photos (your own uploads). */
+export const captionIdeasSchema = z
+  .object({
+    text: z.string().max(5000).default(''),
+    mediaIds: z.array(uuid).max(4).default([]),
+    format: z.enum(['post', 'reel']).default('post'),
+  })
+  .refine((v) => v.text.trim().length > 0 || v.mediaIds.length > 0, { message: 'Write something or add a photo first.', path: ['text'] });
+
 export const notificationPrefsSchema = z.object({
   categories: z.record(z.string(), z.boolean()),
 });

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Button, Card, List, ListItem, Switch, TextField } from '@yapilapi/design-system';
-import type { InteractionSettings, MessageKey, TagPermission } from '@yapilapi/shared';
+import type { AiSettings, InteractionSettings, MessageKey, TagPermission } from '@yapilapi/shared';
 import type { SharingSettings as SharingSettingsState } from '@yapilapi/api-client';
 import { api, errorMessage } from '@/lib/api';
 import { CloseFriendsCard } from '@/components/CloseFriends';
@@ -340,6 +340,40 @@ export function MemoryCard() {
               {t('settings.add')}
             </Button>
           </form>
+        </div>
+      </Card>
+    </Anchor>
+  );
+}
+
+/** AI helpers: suggested replies in chats (off by default under 18) and the Catch me up card on Pulse. */
+export function AiHelpersCard() {
+  const { t, toast } = useSession();
+  const [s, setS] = useState<AiSettings | null>(null);
+  useEffect(() => {
+    api.ai.settings().then(setS, () => {});
+  }, []);
+  if (!s) return null;
+  const save = async (next: Partial<AiSettings>) => {
+    setS((cur) => (cur ? { ...cur, ...next } : cur));
+    try {
+      setS(await api.ai.setSettings(next));
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  };
+  return (
+    <Anchor id="ai">
+      <Card title={t('st.ai.title')} subtitle={t('st.ai.desc')}>
+        <div className="stack-sm">
+          <Switch label={t('st.ai.smartReplies')} checked={s.smartReplies} onChange={(v) => void save({ smartReplies: v })} />
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+            {t('st.ai.smartRepliesHint')}
+          </p>
+          <Switch label={t('st.ai.catchUp')} checked={s.catchUp} onChange={(v) => void save({ catchUp: v })} />
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+            {t('st.ai.catchUpHint')}
+          </p>
         </div>
       </Card>
     </Anchor>

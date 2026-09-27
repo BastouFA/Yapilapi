@@ -28,6 +28,7 @@ import {
   ReactionRow,
   SystemLine,
 } from '@/components/ChatExtras';
+import { SmartReplyChips } from '@/components/AiHelpers';
 import { ListSheet, ListView, PollSheet, PollView, ReminderNote, ReminderSheet } from '@/components/ChatPolls';
 
 type Pending = Message & { pending?: boolean };
@@ -212,6 +213,9 @@ export default function ChatPage() {
   };
   const [uploading, setUploading] = useState<string | null>(null);
   const [yapSettings, setYapSettings] = useState(false);
+  const [smartSettings, setSmartSettings] = useState(false);
+  // Suggested replies follow the newest message that has arrived (not one of yours still sending).
+  const lastArrived = messages?.filter((m) => !m.pending).at(-1)?.id ?? null;
 
   /** Upload a photo, video or voice recording, then send it as a message (a yap, or view once). */
   async function sendFile(file: File, label: string, o: { kind?: 'yap'; viewOnce?: boolean } = {}) {
@@ -465,6 +469,7 @@ export default function ChatPage() {
                   ]
                 : []),
               ...(conv?.yaps?.available ? [{ label: t('m.yap.settings'), icon: 'volume' as const, onSelect: () => setYapSettings(true) }] : []),
+              ...(conv?.smartReplies ? [{ label: t('smartReplies.label'), icon: 'sparkle' as const, onSelect: () => setSmartSettings(true) }] : []),
             ]}
           />
         </div>
@@ -661,6 +666,17 @@ export default function ChatPage() {
           <YapButton disabled={!!uploading} onError={toast} onRecorded={(f) => void sendFile(f, t('chat.sendingYap'), { kind: 'yap' })} />
         </div>
       ) : null}
+      {!editing ? (
+        <SmartReplyChips
+          conversationId={id}
+          lastMessageId={lastArrived}
+          enabled={!!conv?.smartReplies?.on}
+          onPick={(text) => {
+            setBody(text);
+            composer.current?.focus();
+          }}
+        />
+      ) : null}
       <form
         className={`yp-composer${replyTo || editing ? ' yp-composer--context' : ''}`}
         onSubmit={(e) => {
@@ -850,6 +866,33 @@ export default function ChatPage() {
             />
             <p className="muted" style={{ fontSize: 13, margin: 0 }}>
               {t('m.yap.quietNote')}
+            </p>
+          </div>
+        </BottomSheet>
+      ) : null}
+      {conv?.smartReplies ? (
+        <BottomSheet open={smartSettings} onClose={() => setSmartSettings(false)} title={t('smartReplies.label')}>
+          <div className="stack" style={{ gap: 16 }}>
+            <Switch
+              label={t('smartReplies.label')}
+              checked={conv.smartReplies.setting ?? conv.smartReplies.defaultOn}
+              disabled={!conv.smartReplies.everywhere}
+              onChange={async (on) => {
+                try {
+                  const { smartReplies } = await api.conversations.setSmartReplies(id, on);
+                  setConv((c) => (c ? { ...c, smartReplies } : c));
+                } catch (e) {
+                  toast(errorMessage(e));
+                }
+              }}
+            />
+            <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+              {t('smartReplies.chatHint')}{' '}
+              {!conv.smartReplies.everywhere
+                ? t('smartReplies.offEverywhere')
+                : conv.smartReplies.setting === null
+                  ? t(conv.smartReplies.defaultOn ? 'smartReplies.defaultDirect' : 'smartReplies.defaultGroup')
+                  : null}
             </p>
           </div>
         </BottomSheet>

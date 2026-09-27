@@ -1,4 +1,11 @@
 import type {
+  AiSettings,
+  AltTextSuggestion,
+  CaptionIdeas,
+  CatchUp,
+  CatchUpOffer,
+  ConversationSmartReplies,
+  SmartReplies,
   AccountInfo,
   InteractionSettings,
   Circle,
@@ -605,6 +612,11 @@ export function createClient(opts: ClientOptions) {
         put<{ disappearingSeconds: number | null; message: Message | null }>(`/v1/conversations/${id}/disappearing`, { seconds }),
       /** "Let Yaps play out loud" here; null goes back to the default (on for yaps from friends). */
       setYaps: (id: string, playOutLoud: boolean | null) => put<{ yaps: ConversationYaps }>(`/v1/conversations/${id}/yaps`, { playOutLoud }),
+      /** Up to three suggested replies to the last message you received (AI-generated; tapping one only fills the message box). */
+      smartReplies: (id: string) => post<SmartReplies>(`/v1/conversations/${id}/smart-replies`),
+      /** Suggested replies in this chat: on, off, or null for the default (on in one-to-one chats, off in groups). */
+      setSmartReplies: (id: string, enabled: boolean | null) =>
+        put<{ smartReplies: ConversationSmartReplies }>(`/v1/conversations/${id}/smart-replies`, { enabled }),
       read: (id: string) => post(`/v1/conversations/${id}/read`),
       /** A poll: 2 to 10 options; one choice unless `multiple`; `endsAt` from 5 minutes to 30 days ahead. */
       createPoll: (
@@ -818,6 +830,17 @@ export function createClient(opts: ClientOptions) {
       memories: () => get<{ items: { id: string; content: string; created_at: string }[] }>('/v1/ai/memories'),
       addMemory: (content: string) => post('/v1/ai/memories', { content }),
       deleteMemory: (id: string) => del(`/v1/ai/memories/${id}`),
+      /** Opening Pulse: records the visit and says whether to offer Catch me up. */
+      pulseVisit: () => post<CatchUpOffer>('/v1/pulse/visit'),
+      /** The Catch me up summary for this visit (AI-generated, built only from posts you can see). */
+      catchUp: () => post<{ catchUp: CatchUp }>('/v1/ai/catch-up'),
+      dismissCatchUp: () => post('/v1/ai/catch-up/dismiss'),
+      /** A suggested description for one of your photos, for you to edit. */
+      altText: (mediaId: string) => post<{ suggestion: AltTextSuggestion }>('/v1/ai/alt-text', { mediaId }),
+      /** Three caption ideas and hashtags already used on YAPILAPI. */
+      captions: (b: { text?: string; mediaIds?: string[]; format?: 'post' | 'reel' }) => post<{ ideas: CaptionIdeas }>('/v1/ai/captions', b),
+      settings: () => get<AiSettings>('/v1/me/ai-settings'),
+      setSettings: (b: Partial<AiSettings>) => put<AiSettings>('/v1/me/ai-settings', b),
     },
     creator: {
       /** The last 28 days: totals (views count each person once per post, reach once overall), top posts and reels, new followers per day. */

@@ -7,6 +7,8 @@ import { parseSearchIntent } from './intent.ts';
 import { postUnlockedSql, postVisibleSql } from '../visibility.ts';
 import type { AiProvider } from './providers.ts';
 import { runAgent, type AgentKind } from './agents.ts';
+import { AiAssists } from './assists.ts';
+import type { MediaStorage } from '../storage.ts';
 
 export type AiTask = 'caption' | 'summarize_conversation' | 'summarize_community' | 'search_intent' | 'plan_from_message' | 'translate' | 'memory_recap';
 
@@ -42,10 +44,16 @@ export interface AiResponse {
  * ai_tool_calls (task, scopes, provider, status) without storing content.
  */
 export class AiGateway {
+  /** Catch me up, suggested replies, photo descriptions and caption ideas (see assists.ts). */
+  readonly assists: AiAssists;
+
   constructor(
     private db: Pool,
     private provider: AiProvider,
-  ) {}
+    storage: MediaStorage | null = null,
+  ) {
+    this.assists = new AiAssists(db, provider, storage);
+  }
 
   get providerName() {
     return this.provider.name;

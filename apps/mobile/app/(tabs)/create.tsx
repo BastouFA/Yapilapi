@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Image, Linking, ScrollView, Text, View } from 'react-native';
 import type { EditorParamsInput } from '../../../../packages/shared/src/filters';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
-import type { Circle, MediaItem, PublicUser } from '../../../../packages/shared/src/types';
+import type { CaptionIdeas, Circle, MediaItem, PublicUser } from '../../../../packages/shared/src/types';
 import { COMMENT_POLICIES, type CommentPolicy } from '../../../../packages/shared/src/constants';
 import { useAutocomplete } from '../../lib/autocomplete';
 import { Chips } from '../../lib/circles';
@@ -33,6 +33,8 @@ import { isVerificationError, VerifyPrompt } from '../../lib/safety';
 import { StickerEditor, type DraftSticker } from '../../lib/story-stickers';
 import { clipMax, draftMusic, MusicField, musicInput, soundAsTrack, type DraftMusic } from '../../lib/music';
 import { SchedulePicker } from '../../lib/post-edit';
+import { CaptionIdeasPanel, SuggestAltText } from '../../lib/ai-helpers';
+import { useFlag } from '../../lib/flags';
 
 const VISIBILITY = [
   { id: 'public', label: 'visibility.public' },
@@ -81,6 +83,10 @@ export default function Create() {
   const [media, setMedia] = useState<Attached | null>(null);
   // A description of the photo or video, for people using a screen reader.
   const [altText, setAltText] = useState('');
+  // Caption ideas on screen, and whether one was used (the post is then marked as made with AI assistance).
+  const [ideas, setIdeas] = useState<CaptionIdeas | null>(null);
+  const [aiUsed, setAiUsed] = useState(false);
+  const captionsOn = useFlag('AI_CAPTIONS');
   // The draft being continued, if any: saving, scheduling or publishing works on it.
   const [draftId, setDraftId] = useState<string | null>(null);
   // A draft's audience that the choices here don't cover (a circle or chosen people): kept unless another is picked.
@@ -228,6 +234,7 @@ export default function Create() {
           setDraftId(id);
           setKind(post.format === 'reel' ? 'reel' : 'post');
           setBody(post.body);
+          setAiUsed(!!post.aiAssisted);
           if (VISIBILITY.some((v) => v.id === post.visibility) || (post.visibility === 'circle' && circleId)) {
             setVisibility(post.visibility as Visibility);
             if (circleId) setCircleId(circleId);
@@ -413,11 +420,13 @@ export default function Create() {
         }
       : { visibility, ...(visibility === 'circle' && circleId ? { circleId } : {}) };
     const described = altText.trim() ? { altText: altText.trim() } : {};
+    const assisted = aiUsed ? { aiAssisted: true } : {};
     if (kind === 'reel') {
       const v = media!;
       return {
         format: 'reel',
         body,
+        ...assisted,
         ...audience,
         media: [{ id: v.id, url: mediaUrl(v.url), kind: 'video', ...described }],
         allowRemix,
@@ -435,6 +444,7 @@ export default function Create() {
     }
     return {
       body,
+      ...assisted,
       ...audience,
       ...(media
         ? {
@@ -465,6 +475,8 @@ export default function Create() {
 
   function clear() {
     setBody('');
+    setIdeas(null);
+    setAiUsed(false);
     setCoauthors([]);
     setMedia(null);
     setMusic(null);
@@ -613,6 +625,40 @@ export default function Create() {
             style={{ minHeight: kind === 'post' ? 140 : 96, textAlignVertical: 'top', paddingTop: 12 }}
           />
           {ac.list}
+          {captionsOn && kind !== 'story' ? (
+            <Button
+              label={t('create.aiCaption')}
+              icon="sparkles-outline"
+              size="sm"
+              variant="ghost"
+              disabled={!body.trim() && media?.kind !== 'image'}
+              style={{ alignSelf: 'flex-start' }}
+              onPress={async () => {
+                setError(null);
+                try {
+                  const r = await (
+                    await client()
+                  ).ai.captions({ text: body, mediaIds: media?.kind === 'image' ? [media.id] : [], format: kind === 'reel' ? 'reel' : 'post' });
+                  setIdeas(r.ideas);
+                } catch (e) {
+                  setError(errorMessage(e));
+                }
+              }}
+            />
+          ) : null}
+          {ideas ? (
+            <CaptionIdeasPanel
+              ideas={ideas}
+              onUse={(caption) => {
+                // Keep the hashtags already written; the idea replaces the rest.
+                const tags = body.match(/(^|\s)#[\p{L}\p{M}\p{N}_]+/gu)?.join('') ?? '';
+                setBody(`${caption}${tags}`.slice(0, 5000));
+                setAiUsed(true);
+              }}
+              onAddTag={(tag) => setBody((b) => `${b.trimEnd()} #${tag}`.trimStart())}
+              onClose={() => setIdeas(null)}
+            />
+          ) : null}
 
           <View style={{ gap: space[2] }}>
             {media ? <Preview media={media} onRemove={() => setMedia(null)} /> : null}
@@ -720,7 +766,10 @@ export default function Create() {
           </View>
 
           {media && media.kind !== 'audio' && kind !== 'story' ? (
-            <Field label={t('m.create.altText')} placeholder={t('m.create.altTextPlaceholder')} value={altText} onChangeText={setAltText} maxLength={500} />
+            <>
+              <Field label={t('m.create.altText')} placeholder={t('m.create.altTextPlaceholder')} value={altText} onChangeText={setAltText} maxLength={500} />
+              {media.kind === 'image' ? <SuggestAltText mediaId={media.id} onSuggested={setAltText} onError={setError} /> : null}
+            </>
           ) : null}
           {kind === 'post' && media?.kind === 'image' ? <PhotoTagger uri={media.local} value={photoTags} onChange={setPhotoTags} /> : null}
           {kind !== 'story' ? <CoauthorPicker value={coauthors} onChange={setCoauthors} /> : null}

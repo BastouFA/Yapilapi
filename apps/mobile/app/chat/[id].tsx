@@ -28,6 +28,7 @@ import { elevation, gradient, radius, space } from '../../lib/theme';
 import { ActionSheet, BottomSheet, Icon, KeyboardAvoid, Notice, SwitchRow, useColors, userText } from '../../lib/ui';
 import { ViewOnceBubble } from '../../lib/view-once';
 import { Waveform, YAP_MAX_MS, YAP_MIN_MS } from '../../lib/yaps';
+import { SmartRepliesSwitch, SmartReplyChips } from '../../lib/ai-helpers';
 import {
   applyReaction,
   disappearingText,
@@ -174,6 +175,7 @@ export default function Chat() {
   const replaceMessage = (m: Message) => setMessages((cur) => cur.map((x) => (x.id === m.id ? m : x)));
   const yaps = conversation?.yaps;
   const [yapSettings, setYapSettings] = useState(false);
+  const [smartSettings, setSmartSettings] = useState(false);
 
   const canCall = !!conversation && conversation.kind !== 'community' && conversation.members.length <= 8 && conversation.members.length > 1;
   // One-to-one chats: the other person's "Now" status, small and muted under their name.
@@ -741,6 +743,17 @@ export default function Chat() {
           </Pressable>
         </View>
       ) : null}
+      {!editing && !recordingOn ? (
+        <SmartReplyChips
+          conversationId={id}
+          lastMessageId={messages.at(-1)?.id ?? null}
+          enabled={!!conversation?.smartReplies?.on}
+          onPick={(text) => {
+            setBody(text);
+            input.current?.focus();
+          }}
+        />
+      ) : null}
       {replyTo || editing ? (
         <View
           accessibilityLiveRegion="polite"
@@ -931,6 +944,21 @@ export default function Chat() {
           />
         </BottomSheet>
       ) : null}
+      {conversation?.smartReplies ? (
+        <BottomSheet visible={smartSettings} title={t('smartReplies.label')} onClose={() => setSmartSettings(false)} done gap={space[4]}>
+          <SmartRepliesSwitch
+            state={conversation.smartReplies}
+            onChange={async (on) => {
+              try {
+                const r = await (await client()).conversations.setSmartReplies(id, on);
+                setConversation((cur) => (cur ? { ...cur, smartReplies: r.smartReplies } : cur));
+              } catch (e) {
+                setError(errorMessage(e));
+              }
+            }}
+          />
+        </BottomSheet>
+      ) : null}
       <MessageActions
         open={!!actionsFor}
         onClose={() => setActionsFor(null)}
@@ -952,6 +980,7 @@ export default function Chat() {
             icon: 'timer-outline',
             onPress: () => setDisappearingOpen(true),
           },
+          ...(conversation?.smartReplies ? [{ label: t('smartReplies.label'), icon: 'sparkles-outline' as const, onPress: () => setSmartSettings(true) }] : []),
         ]}
       />
       <ActionSheet

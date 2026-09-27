@@ -10,6 +10,7 @@ import type { FeedMode } from '@yapilapi/shared';
 import { api } from '@/lib/api';
 import { PostList } from '@/components/PostList';
 import { StarterRow } from '@/components/StarterRow';
+import { CatchUpCard } from '@/components/AiHelpers';
 import { SuggestedPeople } from '@/components/SuggestedPeople';
 import { useSession } from '../../providers';
 
@@ -67,6 +68,9 @@ export default function Home() {
       </div>
 
       <MomentsStrip groups={moments} onOpen={setViewing} onCreate={() => router.push('/camera?mode=story')} locale={locale} />
+
+      {/* After 12 hours or more away: a summary of what your people shared, on request. */}
+      <CatchUpCard />
 
       <Segments
         label="Feed"

@@ -32,6 +32,7 @@ import {
 import { BlockedAccounts, DataUseSettings, FeedSettings, NotificationSettings, SessionsCard } from '../../lib/settings-more';
 import { Advertising, DataSaver, Family, HiddenWords, Sharing, Tagging, Translation } from '../../lib/settings-sections';
 import { space } from '../../lib/theme';
+import { AiHelpersSettings } from '../../lib/ai-helpers';
 import { Loading, Notice, useColors } from '../../lib/ui';
 
 /** Each section's settings, in the order they appear. */
@@ -80,6 +81,7 @@ function Content({ section }: { section: SectionId }): ReactNode {
           <HiddenWords />
           <Sharing />
           <DataUseSettings />
+          <AiHelpersSettings />
           <Advertising />
         </>
       );

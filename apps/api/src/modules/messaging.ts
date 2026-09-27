@@ -27,7 +27,8 @@ import { AppError, badRequest, forbidden, notFound, parse } from '../lib/errors.
 import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
 import { analyzeText } from '../lib/moderation.ts';
-import { notify, track } from '../lib/services.ts';
+import { isEnabled, notify, track } from '../lib/services.ts';
+import { smartRepliesEverywhereSql, smartRepliesState } from '../lib/ai/assists.ts';
 import { ageOf, areFriends, isBlockedEitherWay, publicUserFrom, usersByIds } from '../lib/users.ts';
 import { messagesAllowed, seesSensitiveMedia, seesSensitiveSql } from '../lib/interactions.ts';
 import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
@@ -187,7 +188,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
 
   async function loadConversations(userId: string, ids?: string[]): Promise<Conversation[]> {
     const { rows } = await db.query(
-      `SELECT c.id, c.kind, c.title, c.last_message_at, c.disappearing_seconds, cm.last_read_at, cm.yaps_out_loud, cm.role,
+      `SELECT c.id, c.kind, c.title, c.last_message_at, c.disappearing_seconds, cm.last_read_at, cm.yaps_out_loud, cm.role, cm.smart_replies,
          EXISTS (SELECT 1 FROM conversation_members o JOIN friendships f ON f.user_a = LEAST(o.user_id, $1::uuid) AND f.user_b = GREATEST(o.user_id, $1::uuid)
                  WHERE o.conversation_id = c.id AND o.user_id <> $1 AND o.left_at IS NULL) AS has_friend,
          (SELECT count(*) FROM messages m WHERE m.conversation_id = c.id AND m.created_at > cm.last_read_at AND m.sender_id <> $1 AND m.deleted_at IS NULL
@@ -216,6 +217,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     );
     const adult = await seesSensitiveMedia(db, userId);
     const paused = !!(await db.query(`SELECT yaps_paused FROM user_preferences WHERE user_id = $1`, [userId])).rows[0]?.yaps_paused;
+    const smartEverywhere = !!(await db.query(`SELECT ${smartRepliesEverywhereSql('$1')} AS on`, [userId])).rows[0]?.on;
+    const smartFlag = await isEnabled(db, 'AI_SMART_REPLIES');
     const withLast = await withStories(
       await withVerdicts(
         rows.map((r) => ({ ...r, attachments: r.lm_attachments as Attachment[] | null })),
@@ -252,6 +255,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       ...(r.kind === 'direct' ? { nowStatus: statuses.get(otherOf(r) ?? '') ?? null } : {}),
       disappearingSeconds: r.disappearing_seconds ?? null,
       myRole: r.role,
+      smartReplies: smartRepliesState(r.kind, r.smart_replies ?? null, smartEverywhere, smartFlag),
     }));
   }
 

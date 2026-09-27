@@ -28,6 +28,7 @@ import { useSignIn } from './SignedOut';
 import { BoostSheet, type BoostChoices } from './Boost';
 import { SaveToSheet } from './Boards';
 import { CommentsSheet } from './Comments';
+import { SuggestAltText } from './AiHelpers';
 
 export { CommentsSheet };
 
@@ -554,6 +555,9 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
                     setAlts((cur) => ({ ...cur, [m.id]: v }));
                   }}
                 />
+                {m.kind === 'image' && post.author.id === me?.id ? (
+                  <SuggestAltText mediaId={m.id} index={i} compact onSuggested={(text) => setAlts((cur) => ({ ...cur, [m.id]: text.slice(0, 500) }))} />
+                ) : null}
               </div>
             ))}
           </div>

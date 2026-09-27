@@ -24,7 +24,7 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
   const [missing, setMissing] = useState(false);
   const [members, setMembers] = useState<{ user: PublicUser; role: string }[] | null>(null);
   const [events, setEvents] = useState<EventItem[] | null>(null);
-  const [summary, setSummary] = useState<{ text: string; notice?: string } | null>(null);
+  const [summary, setSummary] = useState<{ text: string; dev: boolean } | null>(null);
   const [summarizing, setSummarizing] = useState(false);
   const [tab, setTab] = useState('posts');
   const [liveRoom, setLiveRoom] = useState<RoomSummary | null>(null);
@@ -145,7 +145,7 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
                 setSummarizing(true);
                 try {
                   const r = await api.ai.assist({ task: 'summarize_community', communityId: c.id });
-                  setSummary({ text: String(r.output ?? ''), notice: r.notice });
+                  setSummary({ text: String(r.output ?? ''), dev: r.provider === 'dev' });
                 } catch (e) {
                   toast(errorMessage(e));
                 } finally {
@@ -153,7 +153,7 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
                 }
               }}
             >
-              Catch me up
+              {t('community.catchUp')}
             </Button>
           )}
         </div>
@@ -173,11 +173,12 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
 
       {summary ? (
         <AIPanel
-          title="What's been happening"
-          notice={`${summary.notice ?? ''} Summaries report what members said; they never make decisions for the community.`.trim()}
+          title={t('community.catchUp.title')}
+          label={t('ai.label')}
+          notice={[summary.dev ? t('ai.devNotice') : null, t('community.catchUp.note')].filter(Boolean).join(' ')}
           actions={
             <Button size="sm" variant="ghost" onClick={() => setSummary(null)}>
-              Close
+              {t('m.common.close')}
             </Button>
           }
         >

@@ -5,6 +5,10 @@ export interface CompletionRequest {
   system: string;
   prompt: string;
   maxTokens?: number;
+  /** Photos the model looks at (vision), sent before the prompt. Base64, without a data: prefix. */
+  images?: { mime: 'image/jpeg' | 'image/png' | 'image/webp'; base64: string }[];
+  /** A JSON schema the reply must follow (structured output). The reply text is then that JSON. */
+  schema?: Record<string, unknown>;
 }
 
 export interface CompletionResult {
@@ -44,16 +48,22 @@ export function anthropicProvider(apiKey: string, model: string): AiProvider {
   return {
     name: 'anthropic',
     model,
-    async complete({ system, prompt, maxTokens = 2000 }) {
+    async complete({ system, prompt, maxTokens = 2000, images, schema }) {
+      const content = images?.length
+        ? [
+            ...images.map((i) => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: i.mime, data: i.base64 } })),
+            { type: 'text' as const, text: prompt },
+          ]
+        : prompt;
       // Server-side refusal fallback (routes a declined request to another model in the same call).
       const params = {
         model,
         max_tokens: maxTokens,
         betas: ['server-side-fallback-2026-07-01'],
         fallbacks: 'default',
-        output_config: { effort: 'low' },
+        output_config: schema ? { effort: 'low', format: { type: 'json_schema', schema } } : { effort: 'low' },
         system,
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: 'user', content }],
       } as unknown as Anthropic.Beta.MessageCreateParamsNonStreaming;
       const res = await client.beta.messages.create(params);
       if (res.stop_reason === 'refusal') return { text: '', provider: 'anthropic', model: res.model, refused: true };

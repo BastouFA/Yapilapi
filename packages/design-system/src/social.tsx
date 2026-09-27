@@ -1712,12 +1712,15 @@ export function MomentsStrip({
 /** Shows AI output with its source, so people always know what the assistant produced. */
 export function AIPanel({
   title,
+  label,
   children,
   notice,
   actions,
   loading,
 }: {
   title: string;
+  /** A mark such as "AI-generated", shown next to the title. */
+  label?: string;
   children?: ReactNode;
   notice?: string;
   actions?: ReactNode;
@@ -1728,6 +1731,7 @@ export function AIPanel({
       <div className="yp-ai__head">
         <Icon name="sparkle" />
         {title}
+        {label ? <span className="yp-ai__label">{label}</span> : null}
       </div>
       {loading ? <div className="yp-skeleton" style={{ height: 40 }} /> : <div className="yp-ai__body">{children}</div>}
       {notice ? <div className="yp-ai__notice">{notice}</div> : null}

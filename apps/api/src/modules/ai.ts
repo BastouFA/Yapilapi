@@ -1,11 +1,23 @@
 import type { FastifyInstance } from 'fastify';
-import { aiAssistSchema, translateSchema, translationSettingsSchema, type TranslationSettings } from '@yapilapi/shared';
+import {
+  aiAssistSchema,
+  aiSettingsSchema,
+  altTextSuggestSchema,
+  captionIdeasSchema,
+  conversationSmartRepliesSchema,
+  translateSchema,
+  translationSettingsSchema,
+  type AiSettings,
+  type CatchUpOffer,
+  type TranslationSettings,
+} from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, featureDisabled, notFound, parse } from '../lib/errors.ts';
 import { translationSettings, translationsLastHour } from '../lib/translation.ts';
 import type { AppContext } from '../lib/context.ts';
 import { isEnabled } from '../lib/services.ts';
 import { AGENT_KINDS } from '../lib/ai/agents.ts';
+import { smartRepliesEverywhereSql, smartRepliesState } from '../lib/ai/assists.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 export default async function aiModule(app: FastifyInstance, ctx: AppContext) {
@@ -90,5 +102,91 @@ export default async function aiModule(app: FastifyInstance, ctx: AppContext) {
     const { kind } = parse(z.object({ kind: z.enum(AGENT_KINDS) }), req.params);
     const input = parse(z.object({ prompt: z.string().trim().min(2).max(1000), businessId: z.string().uuid().optional() }), req.body);
     return ctx.ai.agent(me(req).id, kind, input.prompt, { businessId: input.businessId });
+  });
+
+  // ── AI helpers ────────────────────────────────────────────────────────
+  const idParam = z.object({ id: z.string().uuid() });
+
+  async function aiSettings(userId: string): Promise<AiSettings> {
+    const { rows } = await db.query<{ smart: boolean; catch_up: boolean }>(
+      `SELECT ${smartRepliesEverywhereSql('$1')} AS smart, coalesce((SELECT catch_up FROM user_preferences WHERE user_id = $1), true) AS catch_up`,
+      [userId],
+    );
+    return { smartReplies: !!rows[0]?.smart, catchUp: rows[0]?.catch_up ?? true };
+  }
+
+  /** Settings > Privacy > AI helpers: suggested replies in chats (off by default under 18) and the Catch me up card. */
+  app.get('/v1/me/ai-settings', { preHandler: requireAuth }, async (req): Promise<AiSettings> => aiSettings(me(req).id));
+
+  app.put('/v1/me/ai-settings', { preHandler: requireAuth }, async (req): Promise<AiSettings> => {
+    const u = me(req);
+    const input = parse(aiSettingsSchema, req.body);
+    await db.query(
+      `INSERT INTO user_preferences (user_id, smart_replies, catch_up) VALUES ($1, $2, coalesce($3, true))
+       ON CONFLICT (user_id) DO UPDATE SET smart_replies = coalesce($2, user_preferences.smart_replies),
+         catch_up = coalesce($3, user_preferences.catch_up), updated_at = now()`,
+      [u.id, input.smartReplies ?? null, input.catchUp ?? null],
+    );
+    // Turning the card off forgets the visits it was based on.
+    if (input.catchUp === false) await db.query(`DELETE FROM pulse_visits WHERE user_id = $1`, [u.id]);
+    return aiSettings(u.id);
+  });
+
+  /**
+   * Opening Pulse. Remembers the visit (only while Catch me up is on) and says whether to
+   * offer the catch-up: after 12 hours or more away, with posts from your people since.
+   */
+  app.post('/v1/pulse/visit', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req): Promise<CatchUpOffer> => {
+    const u = me(req);
+    if (!(await isEnabled(db, 'AI_CATCH_UP')) || !(await aiSettings(u.id)).catchUp) return { offer: false };
+    return ctx.ai.assists.visit(u.id);
+  });
+
+  /** "Catch me up": the summary for this visit window (made once, then cached). Nothing but posts you can see goes in. */
+  app.post('/v1/ai/catch-up', { preHandler: requireAuth, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req) => {
+    if (!(await isEnabled(db, 'AI_CATCH_UP'))) throw featureDisabled('Catch me up');
+    return { catchUp: await ctx.ai.assists.catchUp(me(req).id) };
+  });
+
+  app.post('/v1/ai/catch-up/dismiss', { preHandler: requireAuth }, async (req) => {
+    await ctx.ai.assists.dismissCatchUp(me(req).id);
+    return { ok: true };
+  });
+
+  /** Up to three suggested replies to the last message you received here. Tapping one only puts it in the message box. */
+  app.post('/v1/conversations/:id/smart-replies', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req) => {
+    const { id } = parse(idParam, req.params);
+    const flag = await isEnabled(db, 'AI_SMART_REPLIES');
+    if (!flag) throw featureDisabled('Suggested replies');
+    return ctx.ai.assists.smartReplies(me(req).id, id, flag);
+  });
+
+  /** Suggested replies in one chat: on, off, or back to the default (null). */
+  app.put('/v1/conversations/:id/smart-replies', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const { enabled } = parse(conversationSmartRepliesSchema, req.body);
+    const { rows } = await db.query<{ kind: string; everywhere: boolean }>(
+      `UPDATE conversation_members cm SET smart_replies = $3 FROM conversations c
+       WHERE c.id = cm.conversation_id AND cm.conversation_id = $1 AND cm.user_id = $2 AND cm.left_at IS NULL
+       RETURNING c.kind, ${smartRepliesEverywhereSql('$2')} AS everywhere`,
+      [id, u.id, enabled],
+    );
+    if (!rows[0]) throw notFound('Conversation');
+    return { smartReplies: smartRepliesState(rows[0].kind, enabled, rows[0].everywhere, await isEnabled(db, 'AI_SMART_REPLIES')) };
+  });
+
+  /** "Suggest a description" for one of your photos. The suggestion is only shown; you edit it and save it with the post. */
+  app.post('/v1/ai/alt-text', { preHandler: requireAuth, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req) => {
+    if (!(await isEnabled(db, 'AI_ALT_TEXT'))) throw featureDisabled('Photo descriptions');
+    const { mediaId } = parse(altTextSuggestSchema, req.body);
+    return { suggestion: await ctx.ai.assists.altText(me(req).id, mediaId) };
+  });
+
+  /** "Suggest a caption": three caption ideas and hashtags already used on YAPILAPI. */
+  app.post('/v1/ai/captions', { preHandler: requireAuth, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req) => {
+    if (!(await isEnabled(db, 'AI_CAPTIONS'))) throw featureDisabled('Caption ideas');
+    const input = parse(captionIdeasSchema, req.body);
+    return { ideas: await ctx.ai.assists.captionIdeas(me(req).id, input) };
   });
 }

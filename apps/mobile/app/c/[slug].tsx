@@ -10,6 +10,7 @@ import { canManage, canOrganize, roleName } from '../../lib/community-roles';
 import { useT } from '../../lib/i18n';
 import { useReport } from '../../lib/report';
 import { PostCard } from '../../lib/post';
+import { CommunityCatchUp } from '../../lib/ai-helpers';
 import { roomDuration, roomStatusLabel } from '../../lib/rooms';
 import { useSession } from '../../lib/session';
 import { space } from '../../lib/theme';
@@ -260,6 +261,7 @@ export default function CommunityScreen() {
             />
           )
         ) : null}
+        {me && (community.visibility !== 'private' || community.myRole) ? <CommunityCatchUp communityId={community.id} /> : null}
       </Card>
       <Segmented
         label={t('m.community.sections')}

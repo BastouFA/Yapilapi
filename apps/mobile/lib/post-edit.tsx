@@ -7,6 +7,7 @@ import { client, errorMessage } from './api';
 import { DateTimeSheet } from './date-time';
 import { useT } from './i18n';
 import { RichText } from './rich-text';
+import { SuggestAltText } from './ai-helpers';
 import { space } from './theme';
 import { BottomSheet, Button, Field, Notice, Segmented, useColors, userText } from './ui';
 
@@ -68,14 +69,18 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
         style={{ minHeight: 120, textAlignVertical: 'top', paddingTop: 12 }}
       />
       {described.map((m) => (
-        <Field
-          key={m.id}
-          label={t('m.create.altText')}
-          placeholder={t('m.create.altTextPlaceholder')}
-          value={alts[m.id] ?? ''}
-          onChangeText={(v) => setAlts((cur) => ({ ...cur, [m.id]: v }))}
-          maxLength={500}
-        />
+        <View key={m.id} style={{ gap: space[1] }}>
+          <Field
+            label={t('m.create.altText')}
+            placeholder={t('m.create.altTextPlaceholder')}
+            value={alts[m.id] ?? ''}
+            onChangeText={(v) => setAlts((cur) => ({ ...cur, [m.id]: v }))}
+            maxLength={500}
+          />
+          {m.kind === 'image' ? (
+            <SuggestAltText mediaId={m.id} onSuggested={(text) => setAlts((cur) => ({ ...cur, [m.id]: text }))} onError={setError} />
+          ) : null}
+        </View>
       ))}
       {post.community ? null : (
         <>

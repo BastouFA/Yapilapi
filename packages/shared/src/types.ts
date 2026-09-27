@@ -376,6 +376,20 @@ export interface Conversation {
   disappearingSeconds?: number | null;
   /** Your role here. In groups, admins pin messages and change disappearing messages. */
   myRole?: 'admin' | 'member';
+  /** Suggested replies in this chat, for you. */
+  smartReplies?: ConversationSmartReplies;
+}
+
+/**
+ * Suggested replies in one chat. `setting` is your choice for this chat (null: the default, on in
+ * one-to-one chats and off in groups); `on` also takes the switch in Settings and the feature flag into account.
+ */
+export interface ConversationSmartReplies {
+  on: boolean;
+  setting: boolean | null;
+  defaultOn: boolean;
+  /** The switch in Settings (all chats). */
+  everywhere: boolean;
 }
 
 /** The message a reply quotes, or a pinned message, as a short preview. */
@@ -853,4 +867,83 @@ export interface RoomReactionEvent {
   roomId: string;
   userId: string;
   kind: RoomReaction;
+}
+
+// ─── AI helpers ─────────────────────────────────────────────────────────
+// Everything here is produced by a model (or, in development, by marked rule-based
+// stand-ins), is labelled "AI-generated" in the apps, and is never posted or sent
+// without the person confirming it.
+
+/** Whether Pulse offers "Catch me up": after being away 12 hours or more, while the posts shared since can be summarized. */
+export interface CatchUpOffer {
+  offer: boolean;
+  /** The visit window: from when you were last on Pulse to when you came back. */
+  since?: string;
+  until?: string;
+  /** How many posts from your people you can see in it. */
+  postCount?: number;
+}
+
+export interface CatchUpPostLink {
+  id: string;
+  authorName: string;
+  authorUsername: string;
+}
+
+export interface CatchUpLine {
+  text: string;
+  /** The posts this line is about. Every one is a post you can see. */
+  posts: CatchUpPostLink[];
+}
+
+export interface CatchUpSection {
+  kind: 'moments' | 'plans' | 'popular';
+  lines: CatchUpLine[];
+}
+
+export interface CatchUp {
+  since: string;
+  until: string;
+  sections: CatchUpSection[];
+  postCount: number;
+  peopleCount: number;
+  provider: string;
+  cached: boolean;
+  /** Set when a development stand-in made it, or something was held back. */
+  notice?: string;
+}
+
+export interface SmartReplies {
+  /** The message the replies answer, or null when there is none to answer. */
+  messageId: string | null;
+  suggestions: string[];
+  /** The language they're written in. */
+  language: string | null;
+  /** Why there are none: turned off, nothing to answer, or a message that shouldn't get quick replies. */
+  reason?: 'off' | 'none' | 'view_once' | 'voice' | 'no_text' | 'sensitive';
+  provider?: string;
+  notice?: string;
+}
+
+export interface AltTextSuggestion {
+  mediaId: string;
+  text: string;
+  provider: string;
+  notice?: string;
+}
+
+export interface CaptionIdeas {
+  captions: string[];
+  /** Hashtags people already use on YAPILAPI (without "#"), the most relevant first. */
+  hashtags: string[];
+  provider: string;
+  notice?: string;
+}
+
+/** AI helpers you can turn off in Settings. */
+export interface AiSettings {
+  /** Suggested replies in chats. Off by default under 18. */
+  smartReplies: boolean;
+  /** The Catch me up card on Pulse. */
+  catchUp: boolean;
 }

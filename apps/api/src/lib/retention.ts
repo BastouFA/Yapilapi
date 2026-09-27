@@ -22,6 +22,8 @@ export const RETENTION = {
   usageDays: 395,
   /** The log of assistant and translation calls (no content). */
   aiCallLogDays: 90,
+  /** Catch me up summaries and suggested chat replies, kept only to show them again. */
+  aiSuggestionsDays: 7,
   /** Notifications in the inbox. */
   notificationsDays: 365,
   /** Phone number checks (the number, IP address and time). */
@@ -154,6 +156,8 @@ export async function runRetention(deps: RetentionDeps): Promise<{ counts: Recor
   await step('analyticsEvents', () => deleteInBatches(db, 'analytics_events', `created_at < ${days(RETENTION.analyticsEventsDays)}`));
   await step('usageDays', () => deleteInBatches(db, 'usage_days', `day < (current_date - ${RETENTION.usageDays})`));
   await step('aiCallLog', () => deleteInBatches(db, 'ai_tool_calls', `created_at < ${days(RETENTION.aiCallLogDays)}`));
+  await step('aiCatchups', () => deleteInBatches(db, 'ai_catchups', `created_at < ${days(RETENTION.aiSuggestionsDays)}`));
+  await step('aiReplySuggestions', () => deleteInBatches(db, 'ai_reply_suggestions', `created_at < ${days(RETENTION.aiSuggestionsDays)}`));
   await step('notifications', () => deleteInBatches(db, 'notifications', `created_at < ${days(RETENTION.notificationsDays)}`));
   await step('phoneVerifications', () => deleteInBatches(db, 'phone_verifications', `created_at < ${days(RETENTION.phoneVerificationsDays)}`));
 

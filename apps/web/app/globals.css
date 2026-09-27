@@ -7253,3 +7253,81 @@ button.yp-chip[aria-pressed='true'] {
   gap: var(--space-1) var(--space-2);
   font-size: 13px;
 }
+
+/* ── AI helpers: Catch me up, suggested replies, caption ideas ───────────── */
+.catchup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  white-space: normal;
+}
+.catchup__title {
+  margin: 0 0 var(--space-1);
+  font: 700 13px/18px var(--font-sans);
+  color: var(--ink-muted);
+}
+.catchup__lines {
+  margin: 0;
+  padding-inline-start: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.catchup__link {
+  display: inline-block;
+  margin-inline-end: var(--space-2);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--yapi);
+}
+.smart-replies {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+.smart-replies__label {
+  font: 600 11px/16px var(--font-sans);
+  color: var(--ink-muted);
+}
+.smart-replies__chip {
+  min-height: 36px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: 500 14px/20px var(--font-sans);
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.smart-replies__chip:hover:not(:disabled) {
+  border-color: var(--yapi);
+}
+.smart-replies__chip:focus-visible {
+  outline: 2px solid var(--yapi);
+  outline-offset: 2px;
+}
+.smart-replies__chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.caption-ideas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  white-space: normal;
+}
+.caption-ideas li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}

@@ -191,7 +191,7 @@ export async function buildApp(
     db,
     redis,
     realtime,
-    ai: new AiGateway(db, provider),
+    ai: new AiGateway(db, provider, storage),
     email:
       config.EMAIL_TRANSPORT === 'smtp'
         ? smtpEmailSender({ url: config.SMTP_URL, from: config.EMAIL_FROM, transport: opts.mailTransport })

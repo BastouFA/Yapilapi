@@ -1,7 +1,17 @@
 'use client';
 
 import { HiddenWordsCard } from '@/components/HiddenWords';
-import { AudiencesCard, BlockedCard, DataUseCard, MemoryCard, MutedCard, PrivateAccountCard, ReachCard, SharingCard } from '@/components/settings/Privacy';
+import {
+  AiHelpersCard,
+  AudiencesCard,
+  BlockedCard,
+  DataUseCard,
+  MemoryCard,
+  MutedCard,
+  PrivateAccountCard,
+  ReachCard,
+  SharingCard,
+} from '@/components/settings/Privacy';
 import { Anchor, SettingsPage } from '@/components/settings/Shell';
 
 /**
@@ -21,6 +31,7 @@ export default function PrivacySettings() {
       </Anchor>
       <SharingCard />
       <DataUseCard />
+      <AiHelpersCard />
       <MemoryCard />
     </SettingsPage>
   );
