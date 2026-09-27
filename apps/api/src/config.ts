@@ -142,13 +142,18 @@ const resolved = schema.transform((c) => ({
 
 export type Config = z.infer<typeof resolved>;
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+/** The settings as given, with defaults, before the checks that stop the server from starting (the launch check reads these). */
+export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = resolved.safeParse(env);
   if (!parsed.success) {
     const msg = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
     throw new Error(`Invalid configuration:\n${msg}`);
   }
-  const cfg = parsed.data;
+  return parsed.data;
+}
+
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+  const cfg = readConfig(env);
   if (cfg.PAYMENTS_PROVIDER === 'stripe' && (!cfg.STRIPE_SECRET_KEY || !cfg.STRIPE_WEBHOOK_SECRET || !cfg.STRIPE_PUBLISHABLE_KEY))
     throw new Error('PAYMENTS_PROVIDER=stripe needs STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and STRIPE_PUBLISHABLE_KEY.');
   if (!!cfg.PAYSTACK_SECRET_KEY !== !!cfg.PAYSTACK_PUBLIC_KEY) throw new Error('Paystack needs both PAYSTACK_SECRET_KEY and PAYSTACK_PUBLIC_KEY.');

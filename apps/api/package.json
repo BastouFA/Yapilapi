@@ -11,7 +11,8 @@
     "test": "vitest run",
     "docs:routes": "tsx --env-file-if-exists=../../.env scripts/gen-routes.ts",
     "load": "tsx load/run.ts",
-    "load:explain": "tsx load/explain.ts"
+    "load:explain": "tsx load/explain.ts",
+    "launch:check": "tsx --env-file-if-exists=../../.env scripts/launch-check.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.128.0",
