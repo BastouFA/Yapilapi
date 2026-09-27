@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AuthorNames, Avatar, EmptyState, Icon, Menu, SensitiveCover, Skeleton, TaggedText } from '@yapilapi/design-system';
+import { AuthorNames, Avatar, EmptyState, Icon, Menu, SensitiveCover, Skeleton, TaggedText, useLongPress } from '@yapilapi/design-system';
 import type { Post } from '@yapilapi/shared';
 import { NextLink } from '@/lib/link';
 import { api, errorMessage } from '@/lib/api';
 import { CommentsSheet, PostList, ReportSheet } from '@/components/PostList';
 import { JoinNote, NeedsAccount } from '@/components/SignedOut';
+import { SaveToSheet } from '@/components/Boards';
 import { useSession } from '../../providers';
 
 type AuthorStats = Record<string, { followers: number; following: boolean }>;
@@ -30,6 +31,7 @@ function Reels() {
   const [muted, setMuted] = useState(true);
   const [commentsFor, setCommentsFor] = useState<Post | null>(null);
   const [reporting, setReporting] = useState<Post | null>(null);
+  const [saveTo, setSaveTo] = useState<Post | null>(null);
   const loading = useRef(false);
   const list = useRef<HTMLDivElement>(null);
   const compact = new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 });
@@ -88,7 +90,8 @@ function Reels() {
         toast(on ? 'Reposted to your followers' : 'Repost removed');
       } else {
         await (on ? api.posts.save(p.id) : api.posts.unsave(p.id));
-        toast(on ? 'Saved' : 'Removed from saved');
+        if (on) toast('Saved.', { label: 'Add to a board', onClick: () => setSaveTo(p) });
+        else toast('Removed from saved');
       }
     } catch (e) {
       patch(p.id, () => p);
@@ -297,7 +300,13 @@ function Reels() {
                   <Icon name="repost" size={26} />
                 </RailButton>
               ) : null}
-              <RailButton label={p.viewer.saved ? 'Remove from saved' : 'Save'} pressed={p.viewer.saved} onClick={() => toggle(p, 'save')} tone="save">
+              <RailButton
+                label={p.viewer.saved ? 'Remove from saved' : 'Save'}
+                pressed={p.viewer.saved}
+                onClick={() => toggle(p, 'save')}
+                onHold={me ? () => setSaveTo(p) : undefined}
+                tone="save"
+              >
                 <Icon name="bookmark" filled={p.viewer.saved} size={26} />
               </RailButton>
               {p.allowRemix && p.visibility === 'public' ? (
@@ -338,6 +347,7 @@ function Reels() {
                         toast("We'll show fewer like this.");
                       },
                     },
+                    ...(me ? [{ label: 'Save to a board', icon: 'bookmark' as const, onSelect: () => setSaveTo(p) }] : []),
                     {
                       label: 'Copy link',
                       icon: 'link',
@@ -388,6 +398,7 @@ function Reels() {
         />
       ) : null}
       <ReportSheet target={reporting ? { type: 'post', id: reporting.id } : null} onClose={() => setReporting(null)} />
+      <SaveToSheet post={saveTo} onClose={() => setSaveTo(null)} onSaved={(id) => patch(id, (x) => ({ ...x, viewer: { ...x.viewer, saved: true } }))} />
     </div>
   );
 }
@@ -398,6 +409,7 @@ function RailButton({
   count,
   fmt,
   onClick,
+  onHold,
   tone,
   children,
 }: {
@@ -406,14 +418,21 @@ function RailButton({
   count?: number;
   fmt?: Intl.NumberFormat;
   onClick: () => void;
+  /** A long press or right-click (the save button opens "Save to a board"). */
+  onHold?: () => void;
   tone?: 'like' | 'repost' | 'save';
   children: React.ReactNode;
 }) {
+  const hold = useLongPress(onHold);
   return (
     <button
       type="button"
-      className={`reel__btn${tone ? ` reel__btn--${tone}` : ''}`}
-      onClick={onClick}
+      className={`reel__btn${tone ? ` reel__btn--${tone}` : ''}${onHold ? ' yp-action--hold' : ''}`}
+      {...hold.handlers}
+      onClick={() => {
+        if (hold.wasHeld()) return;
+        onClick();
+      }}
       aria-pressed={pressed}
       aria-label={count !== undefined ? `${label}, ${count}` : label}
     >

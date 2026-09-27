@@ -4,6 +4,7 @@ import { Alert, Image, Platform, Pressable, Share, Text, View, type StyleProp, t
 import { splitRichText } from '../../../packages/shared/src/hashtags';
 import type { Conversation, PhotoTag, Post, PublicUser } from '../../../packages/shared/src/types';
 import { client, errorMessage, mediaUrl, webUrl } from './api';
+import { useBoards, type SaveChange } from './boards';
 import { useSession } from './session';
 import { useT, type Translate } from './i18n';
 import { radius, space } from './theme';
@@ -164,6 +165,9 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
   const [liked, setLiked] = useState(post.viewer.liked);
   const [likes, setLikes] = useState(post.counts.likes);
   const [saved, setSaved] = useState(post.viewer.saved);
+  const boards = useBoards();
+  const onSaveChange = (ch: SaveChange) => setSaved(ch.saved);
+  const saveTo = () => boards.openSaveSheet(post, onSaveChange);
   const [reposted, setReposted] = useState(post.viewer.reposted);
   const [reposts, setReposts] = useState(post.counts.reposts);
   const { me } = useSession();
@@ -228,9 +232,10 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
     }
   }
 
-  /** More: leave as co-author, remove your photo tag. */
+  /** More: save to a board, leave as co-author, remove your photo tag. */
   function more() {
     const options: { text: string; style?: 'destructive' | 'cancel'; onPress?: () => void }[] = [];
+    if (me) options.push({ text: t('m.boards.saveTo'), onPress: saveTo });
     if (collab === 'accepted') options.push({ text: t('m.collab.leave'), style: 'destructive', onPress: () => void leave() });
     if (myTag) options.push({ text: t('m.tags.removeMine'), onPress: () => void removeTag(myTag) });
     options.push({ text: t('common.cancel'), style: 'cancel' });
@@ -498,13 +503,20 @@ export function PostCard({ post, open = true }: { post: Post; open?: boolean }) 
           accessibilityRole="button"
           accessibilityLabel={saved ? t('m.post.unsave') : t('post.save')}
           accessibilityState={{ selected: saved }}
+          // Press and hold for "Save to…"; screen readers get it as a named action.
+          accessibilityActions={me ? [{ name: 'saveTo', label: t('m.boards.saveTo') }] : undefined}
+          onAccessibilityAction={(e) => {
+            if (e.nativeEvent.actionName === 'saveTo') saveTo();
+          }}
           hitSlop={8}
+          onLongPress={me ? saveTo : undefined}
           onPress={async () => {
             const next = !saved;
             setSaved(next);
             try {
               const api = await client();
               await (next ? api.posts.save(post.id) : api.posts.unsave(post.id));
+              if (next) boards.confirmSaved(post, onSaveChange);
             } catch {
               setSaved(!next);
             }

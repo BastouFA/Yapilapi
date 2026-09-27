@@ -26,7 +26,7 @@ function currentTab(path: string, username?: string): NavEntry['id'] | undefined
   if (path.startsWith('/create') || path.startsWith('/camera')) return 'create';
   if (path.startsWith('/inbox') || path.startsWith('/notifications')) return 'inbox';
   if (username && path.startsWith(`/u/${username}`)) return 'profile';
-  if (path.startsWith('/settings') || path.startsWith('/studio')) return 'profile';
+  if (path.startsWith('/settings') || path.startsWith('/studio') || path.startsWith('/saved')) return 'profile';
   return undefined;
 }
 

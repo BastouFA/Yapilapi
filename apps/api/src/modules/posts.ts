@@ -7,6 +7,7 @@ import {
   feedQuerySchema,
   pageQuerySchema,
   reactionSchema,
+  SAVED_FILTERS,
   usernameSchema,
   extractHashtags,
   type Comment,
@@ -17,6 +18,7 @@ import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, encodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
 import { analyzeText, statusForRisk } from '../lib/moderation.ts';
 import { hydratePosts } from '../lib/posts.ts';
+import { attachSaveNotes, savedFilterSql } from '../lib/saves.ts';
 import { notifyMentions } from '../lib/mentions.ts';
 import { assertCanInvite, assertCanTag, coAuthoredSql, notifyCollabInvites, notifyPhotoTags } from '../lib/collabs.ts';
 import { topicsFor } from './tags.ts';
@@ -809,25 +811,43 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     return { saved: true };
   });
 
+  /** Unsave: the post also comes off the boards you own (boards are made of your saves). Other people's shared boards keep it. */
   app.delete('/v1/posts/:id/save', { preHandler: requireAuth }, async (req) => {
     const { id } = parse(idParam, req.params);
-    await db.query(`DELETE FROM saves WHERE post_id = $1 AND user_id = $2`, [id, me(req).id]);
+    const u = me(req);
+    await tx(db, async (c) => {
+      await c.query(`DELETE FROM saves WHERE post_id = $1 AND user_id = $2`, [id, u.id]);
+      await c.query(`DELETE FROM board_items bi USING boards bd WHERE bi.board_id = bd.id AND bd.owner_id = $2 AND bi.post_id = $1`, [id, u.id]);
+    });
     return { saved: false };
   });
 
+  /**
+   * Everything you saved, posts and reels, newest save first, with your private notes. `filter`
+   * narrows to photos, videos (reels and posts with a video) or text. Only posts you can still
+   * see; subscriber-only posts you can no longer open come back locked.
+   */
   app.get('/v1/me/saved', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
+    const q = parse(pageQuerySchema.extend({ filter: z.enum(SAVED_FILTERS).default('all') }), req.query);
+    const c = decodeCursor<KeyCursor>(q.cursor);
+    const params: unknown[] = [u.id, q.limit + 1];
+    if (c) params.push(c.t, c.id);
     const { rows } = await db.query(
-      `SELECT s.post_id AS id ${POST_FROM} JOIN saves s ON s.post_id = p.id AND s.user_id = $1 WHERE ${VISIBLE} ORDER BY s.created_at DESC LIMIT 100`,
-      [u.id],
+      `SELECT p.id, s.created_at ${POST_FROM} JOIN saves s ON s.post_id = p.id AND s.user_id = $1
+       WHERE ${VISIBLE} AND ${savedFilterSql(q.filter)}
+         ${c ? 'AND (s.created_at, p.id) < ($3::timestamptz, $4::uuid)' : ''}
+       ORDER BY s.created_at DESC, p.id DESC LIMIT $2`,
+      params,
     );
-    return {
-      items: await hydratePosts(
-        db,
-        rows.map((r) => r.id),
-        u.id,
-      ),
-    };
+    const page = rows.slice(0, q.limit);
+    const items = await hydratePosts(
+      db,
+      page.map((r) => r.id),
+      u.id,
+    );
+    await attachSaveNotes(db, items, u.id);
+    return { items, nextCursor: rows.length > q.limit ? keyCursorOf(page.at(-1)!) : null };
   });
 
   app.post('/v1/posts/:id/vote', { preHandler: requireAuth }, async (req) => {

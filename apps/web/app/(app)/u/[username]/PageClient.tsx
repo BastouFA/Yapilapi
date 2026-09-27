@@ -11,6 +11,7 @@ import { PostList, ReportSheet } from '@/components/PostList';
 import { SupportCreator } from '@/components/SupportCreator';
 import { Shop } from '@/components/Shop';
 import { ChaptersRow } from '@/components/Chapters';
+import { ProfileBoards } from '@/components/Boards';
 import { JoinNote, NeedsAccount, useSignIn } from '@/components/SignedOut';
 import { useSession } from '../../../providers';
 
@@ -28,7 +29,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
   const [missing, setMissing] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [list, setList] = useState<'followers' | 'following' | null>(null);
-  const [tab, setTab] = useState<'posts' | 'reposts' | 'tagged' | 'shop'>('posts');
+  const [tab, setTab] = useState<'posts' | 'reposts' | 'tagged' | 'boards' | 'shop'>('posts');
   // Tagged posts of a private profile you don't follow stay hidden.
   const [taggedHidden, setTaggedHidden] = useState(false);
   // Bumped when you subscribe, so posts for subscribers reload unlocked.
@@ -112,6 +113,9 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
             <div className="row">
               <Link href="/settings" className="yp-btn yp-btn--secondary yp-btn--sm">
                 {t('profile.edit')}
+              </Link>
+              <Link href="/saved" className="yp-btn yp-btn--ghost yp-btn--sm">
+                Saved
               </Link>
               <Link href="/studio" className="yp-btn yp-btn--ghost yp-btn--sm">
                 Studio
@@ -269,6 +273,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
           { id: 'posts', label: 'Posts' },
           { id: 'reposts', label: 'Reposts' },
           { id: 'tagged', label: 'Tagged' },
+          { id: 'boards', label: 'Boards' },
           { id: 'shop', label: 'Shop' },
         ]}
       />
@@ -287,6 +292,8 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
                 : `Photos ${profile.displayName} is tagged in show up here.`
           }
         />
+      ) : tab === 'boards' ? (
+        <ProfileBoards username={profile.username} name={profile.displayName} isSelf={rel.isSelf} />
       ) : tab === 'shop' ? (
         <Shop userId={profile.id} name={profile.displayName} isSelf={rel.isSelf} />
       ) : (

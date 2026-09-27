@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Toast } from '@yapilapi/design-system';
+import { Toast, type ToastAction } from '@yapilapi/design-system';
 import { t as translate, type Me, type MessageKey } from '@yapilapi/shared';
 import { api, WS_URL } from '@/lib/api';
 
@@ -15,7 +15,8 @@ interface Session {
   flags: Record<string, boolean>;
   unread: { notifications: number; messages: number };
   setUnread: (u: Partial<{ notifications: number; messages: number }>) => void;
-  toast: (message: string) => void;
+  /** A short message; with an `action` (like "Add to a board") it shows a button and stays longer. */
+  toast: (message: string, action?: ToastAction) => void;
   subscribe: (fn: Listener) => () => void;
   t: (key: MessageKey, vars?: Record<string, string | number>) => string;
   locale: string;
@@ -42,7 +43,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [flags, setFlags] = useState<Record<string, boolean>>({});
   const [unread, setUnreadState] = useState({ notifications: 0, messages: 0 });
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [toastState, setToastState] = useState<{ id: number; message: string; action?: ToastAction } | null>(null);
+  const toastId = useRef(0);
+  const toast = useCallback((message: string, action?: ToastAction) => setToastState({ id: ++toastId.current, message, action }), []);
+  const clearToast = useCallback(() => setToastState(null), []);
   const listeners = useRef(new Set<Listener>());
 
   const refresh = useCallback(async () => {
@@ -136,9 +140,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const t = useCallback((key: MessageKey, vars?: Record<string, string | number>) => translate(key, locale, vars), [locale]);
 
   return (
-    <Ctx.Provider value={{ me, loading, refresh, setMe, flags, unread, setUnread, toast: setToastMsg, subscribe, t, locale }}>
+    <Ctx.Provider value={{ me, loading, refresh, setMe, flags, unread, setUnread, toast, subscribe, t, locale }}>
       {children}
-      <Toast message={toastMsg} onDone={() => setToastMsg(null)} />
+      <Toast key={toastState?.id} message={toastState?.message ?? null} action={toastState?.action} onDone={clearToast} />
     </Ctx.Provider>
   );
 }

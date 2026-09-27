@@ -51,9 +51,11 @@ export {
   Stat,
   TaggedText,
   Toast,
+  useLongPress,
   videoCrossOrigin,
   type LinkLike,
   type MenuAction,
   type NavEntry,
   type PostCardProps,
+  type ToastAction,
 } from './social.tsx';

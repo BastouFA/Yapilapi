@@ -38,6 +38,7 @@ import privacyModule from './modules/privacy.ts';
 import aiModule from './modules/ai.ts';
 import momentsModule from './modules/moments.ts';
 import chaptersModule, { openDueChapters } from './modules/chapters.ts';
+import boardsModule from './modules/boards.ts';
 import mediaModule from './modules/media.ts';
 import creatorModule from './modules/creator.ts';
 import developerModule from './modules/developer.ts';
@@ -334,6 +335,7 @@ export async function buildApp(
     aiModule,
     momentsModule,
     chaptersModule,
+    boardsModule,
     mediaModule,
     creatorModule,
     developerModule,

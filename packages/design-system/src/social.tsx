@@ -548,6 +548,11 @@ export interface PostCardProps {
   onLike?: (post: Post) => void;
   onComment?: (post: Post) => void;
   onSave?: (post: Post) => void;
+  /**
+   * Open "Save to a board": a "Save to a board" item in the post menu, and a long press
+   * (about half a second) or right-click on the save button. A normal click still saves.
+   */
+  onSaveTo?: (post: Post) => void;
   /** Share someone else's public post with your followers. */
   onRepost?: (post: Post) => void;
   /** Share a link to the post (the system share sheet, or copy the link). */
@@ -617,6 +622,7 @@ export function PostCard({
   onLike,
   onComment,
   onSave,
+  onSaveTo,
   onRepost,
   onShare,
   onVote,
@@ -641,7 +647,9 @@ export function PostCard({
   const coauthor = post.viewer.collab === 'accepted';
   const invited = post.viewer.collab === 'pending';
   const menu: MenuAction[] = [];
+  const saveHold = useLongPress(onSaveTo ? () => onSaveTo(post) : undefined);
   if (onWhy) menu.push({ label: tt('post.why'), icon: 'info', onSelect: () => onWhy(post) });
+  if (onSaveTo) menu.push({ label: 'Save to a board', icon: 'bookmark', onSelect: () => onSaveTo(post) });
   if (onAddToMemory) menu.push({ label: 'Add to a memory', icon: 'bookmark', onSelect: () => onAddToMemory(post) });
   if (onLeaveCollab && coauthor && !isOwn) menu.push({ label: 'Leave as co-author', icon: 'logout', onSelect: () => onLeaveCollab(post) });
   if (onFeedback && !isOwn && !coauthor) {
@@ -904,12 +912,68 @@ export function PostCard({
           </button>
         ) : null}
         <span className="yp-spacer" />
-        <button type="button" className="yp-action" aria-pressed={post.viewer.saved} onClick={() => onSave?.(post)} aria-label={tt('post.save')}>
+        <button
+          type="button"
+          className={cx('yp-action', onSaveTo && 'yp-action--hold')}
+          aria-pressed={post.viewer.saved}
+          aria-label={tt('post.save')}
+          {...saveHold.handlers}
+          onClick={() => {
+            if (saveHold.wasHeld()) return;
+            onSave?.(post);
+          }}
+        >
           <Icon name="bookmark" filled={post.viewer.saved} />
         </button>
       </div>
     </article>
   );
+}
+
+/**
+ * A long press (about 500 ms) or a right-click (contextmenu) runs `onHold`. Spread `handlers`
+ * on a button and check `wasHeld()` first thing in its click handler, so the click that ends a
+ * long press doesn't also count as a click. Without `onHold` it does nothing.
+ */
+export function useLongPress(onHold?: () => void, ms = 500) {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const held = useRef(false);
+  const cancel = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+  };
+  useEffect(() => cancel, []);
+  const wasHeld = () => {
+    const was = held.current;
+    held.current = false;
+    return was;
+  };
+  if (!onHold) return { handlers: {}, wasHeld };
+  const handlers = {
+    onPointerDown: (e: { button: number }) => {
+      held.current = false;
+      cancel();
+      if (e.button !== 0) return;
+      timer.current = setTimeout(() => {
+        timer.current = null;
+        held.current = true;
+        onHold();
+      }, ms);
+    },
+    onPointerUp: cancel,
+    onPointerLeave: cancel,
+    onPointerCancel: cancel,
+    onContextMenu: (e: { preventDefault: () => void }) => {
+      e.preventDefault();
+      // Touch browsers fire contextmenu during a long press too: open once.
+      if (held.current && !timer.current) return;
+      const pressing = !!timer.current;
+      cancel();
+      if (pressing) held.current = true;
+      onHold();
+    },
+  };
+  return { handlers, wasHeld };
 }
 
 /**
@@ -1193,15 +1257,51 @@ export function Skeleton({ height = 16, width = '100%' }: { height?: number; wid
   return <div className="yp-skeleton" style={{ height, width }} aria-hidden />;
 }
 
-export function Toast({ message, onDone, ms = 3000 }: { message: string | null; onDone: () => void; ms?: number }) {
+/** An optional button in a toast, such as "Add to a board" after saving. */
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
+/**
+ * A short message at the bottom of the screen. With an `action`, it stays longer (6 seconds by
+ * default) and the action is a real button; the timer pauses while the pointer or focus is on it.
+ */
+export function Toast({ message, onDone, ms, action }: { message: string | null; onDone: () => void; ms?: number; action?: ToastAction | null }) {
+  const [held, setHeld] = useState(false);
+  const wait = ms ?? (action ? 6000 : 3000);
   useEffect(() => {
-    if (!message) return;
-    const id = setTimeout(onDone, ms);
+    if (!message || held) return;
+    const id = setTimeout(onDone, wait);
     return () => clearTimeout(id);
-  }, [message, ms, onDone]);
+  }, [message, wait, onDone, held, action]);
+  useEffect(() => {
+    if (!message) setHeld(false);
+  }, [message]);
   return message ? (
-    <div className="yp-toast" role="status">
-      {message}
+    <div
+      className={cx('yp-toast', action && 'yp-toast--action')}
+      role="status"
+      onPointerEnter={() => setHeld(true)}
+      onPointerLeave={() => setHeld(false)}
+      onFocus={() => setHeld(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHeld(false);
+      }}
+    >
+      <span>{message}</span>
+      {action ? (
+        <button
+          type="button"
+          className="yp-toast__action"
+          onClick={() => {
+            action.onClick();
+            onDone();
+          }}
+        >
+          {action.label}
+        </button>
+      ) : null}
     </div>
   ) : null;
 }

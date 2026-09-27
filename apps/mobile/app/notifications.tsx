@@ -26,10 +26,10 @@ const TEXT: Record<string, MessageKey> = {
 
 type Answer = 'accepted' | 'declined';
 
-/** Notifications, newest first. A co-author invite can be accepted or declined right here. */
+/** Notifications, newest first. A co-author or board invite can be accepted or declined right here. */
 export default function Notifications() {
   const c = useColors();
-  const { t, timeAgo } = useT();
+  const { t, tp, timeAgo } = useT();
   const { me } = useSession();
   const [items, setItems] = useState<NotificationItem[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -65,7 +65,8 @@ export default function Notifications() {
     setError(null);
     try {
       const api = await client();
-      await (accept ? api.posts.acceptCollab(n.entityId) : api.posts.declineCollab(n.entityId));
+      if (n.type === 'board_invite') await (accept ? api.boards.join(n.entityId) : api.boards.leave(n.entityId));
+      else await (accept ? api.posts.acceptCollab(n.entityId) : api.posts.declineCollab(n.entityId));
       setAnswers((a) => ({ ...a, [n.id]: accept ? 'accepted' : 'declined' }));
     } catch (e) {
       setError(errorMessage(e));
@@ -105,10 +106,28 @@ export default function Notifications() {
       renderItem={({ item: n }) => {
         const name = n.actor?.displayName ?? '';
         const key = TEXT[n.type];
-        const text = key && n.actor ? t(key, { name }) : n.actor ? t('m.notif.other', { name }) : t('m.notif.otherNoActor');
-        const href = n.entityType === 'post' && n.entityId ? `/p/${n.entityId}` : n.actor ? `/u/${n.actor.username}` : null;
+        const board = typeof n.data.name === 'string' ? n.data.name : '';
+        const text =
+          n.type === 'board_invite' && n.actor
+            ? t('m.notif.boardInvite', { name, board })
+            : n.type === 'board_item_added' && n.actor
+              ? tp('m.notif.boardItemAdded', Math.max(1, Number(n.data.count) || 1), { name, board })
+              : key && n.actor
+                ? t(key, { name })
+                : n.actor
+                  ? t('m.notif.other', { name })
+                  : t('m.notif.otherNoActor');
+        const href =
+          n.entityType === 'post' && n.entityId
+            ? `/p/${n.entityId}`
+            : n.entityType === 'board' && n.entityId
+              ? `/board/${n.entityId}`
+              : n.actor
+                ? `/u/${n.actor.username}`
+                : null;
         const answered = answers[n.id];
-        const invite = n.type === 'collab_invite' && !!n.entityId;
+        const boardInvite = n.type === 'board_invite';
+        const invite = (n.type === 'collab_invite' || boardInvite) && !!n.entityId;
         return (
           <View style={{ backgroundColor: c.surface, borderRadius: radius.md, padding: space[3], gap: space[2] }}>
             <Pressable
@@ -129,7 +148,7 @@ export default function Notifications() {
             {invite ? (
               answered ? (
                 <Text style={{ color: c.inkMuted, fontSize: 13 }} accessibilityLiveRegion="polite">
-                  {answered === 'accepted' ? t('m.collab.acceptedNote') : t('m.collab.declinedNote')}
+                  {answered === 'accepted' ? (boardInvite ? t('m.boards.joined') : t('m.collab.acceptedNote')) : t('m.collab.declinedNote')}
                 </Text>
               ) : (
                 <View style={{ flexDirection: 'row', gap: space[2] }}>
