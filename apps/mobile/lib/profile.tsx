@@ -1,12 +1,15 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { FlatList, RefreshControl, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, Platform, Pressable, RefreshControl, Share, StyleSheet, Text, View } from 'react-native';
 import type { Post, Profile } from '../../../packages/shared/src/types';
-import { client, errorMessage } from './api';
+import { client, errorMessage, mediaUrl, webUrl } from './api';
 import { useT } from './i18n';
+import { pickOne, uploadPicked } from './media';
+import { liveStatus, NowStatusLine, onStatusChanged } from './now-status';
 import { PostCard, RichText } from './post';
-import { space } from './theme';
-import { Avatar, Button, Card, EmptyState, Loading, Notice, PlusBadge, Segmented, useColors, userText } from './ui';
+import { radius, space } from './theme';
+import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, PlusBadge, Segmented, useColors, userText } from './ui';
 import { ShopList } from './money';
 import { isVerificationError, VerifyPrompt } from './safety';
 import { ChaptersRow } from './chapters';
@@ -30,6 +33,11 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
   const [tab, setTab] = useState<'posts' | 'tagged' | 'shop'>('posts');
   // Photos this person is tagged in, loaded the first time the tab opens.
   const [tagged, setTagged] = useState<{ items: Post[]; cursor: string | null; hidden: boolean } | null>(null);
+  // A new cover photo on its way: the phone's copy shows while it uploads and is prepared.
+  const [coverUpload, setCoverUpload] = useState<{ local: string; progress: number | null } | null>(null);
+
+  // Your status, set or cleared in the status sheet, shows here as soon as you come back.
+  useEffect(() => onStatusChanged((nowStatus) => setProfile((p) => (p && p.relationship.isSelf ? { ...p, nowStatus } : p))), []);
 
   const load = useCallback(async () => {
     const api = await client();
@@ -91,9 +99,74 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
     );
 
   const rel = profile.relationship;
+  const status = liveStatus(profile.nowStatus);
+
+  async function shareProfile() {
+    if (!profile) return;
+    const url = `${webUrl}/u/${encodeURIComponent(profile.username)}`;
+    const title = t('m.reels.shareTitle', { name: profile.displayName });
+    try {
+      // iOS shares the link as a link; Android only takes a message.
+      await Share.share(Platform.OS === 'ios' ? { url, message: title } : { message: `${title}\n${url}`, title });
+    } catch {
+      // The person closed the share sheet.
+    }
+  }
+
+  async function changeCover() {
+    setError(null);
+    const asset = await pickOne(['images']).catch((e: unknown) => {
+      setError(errorMessage(e));
+      return null;
+    });
+    if (asset === 'denied') return setError(t('m.create.photosPermission'));
+    if (!asset) return;
+    setCoverUpload({ local: asset.uri, progress: 0 });
+    try {
+      const m = await uploadPicked(asset, (progress) => setCoverUpload({ local: asset.uri, progress }));
+      // Uploaded: the server now prepares the sizes, and the cover is set once they're ready.
+      setCoverUpload({ local: asset.uri, progress: null });
+      const r = await (await client()).me.setCoverWhenReady(m.id);
+      setProfile((p) => (p ? { ...p, coverUrl: r.profile.coverUrl, coverAlt: r.profile.coverAlt } : p));
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setCoverUpload(null);
+    }
+  }
+
+  function removeCover() {
+    Alert.alert(t('m.cover.removeTitle'), t('m.cover.removeBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('m.common.remove'),
+        style: 'destructive',
+        onPress: async () => {
+          setError(null);
+          try {
+            const r = await (await client()).me.removeCover();
+            setProfile((p) => (p ? { ...p, coverUrl: r.profile.coverUrl, coverAlt: r.profile.coverAlt } : p));
+          } catch (e) {
+            setError(errorMessage(e));
+          }
+        },
+      },
+    ]);
+  }
+
+  function editCover() {
+    if (!profile?.coverUrl) return void changeCover();
+    Alert.alert(t('m.cover.edit'), undefined, [
+      { text: t('m.cover.choose'), onPress: () => void changeCover() },
+      { text: t('m.cover.remove'), style: 'destructive', onPress: removeCover },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  }
+
   const header = (
     <View style={{ gap: space[3], marginBottom: space[3] }}>
-      <Card style={{ alignItems: 'center', gap: space[2], paddingVertical: space[6] }}>
+      <Cover profile={profile} upload={coverUpload} onEdit={rel.isSelf ? editCover : undefined} />
+      <Card style={{ alignItems: 'center', gap: space[2], paddingVertical: space[6], marginTop: -56 }}>
         <Avatar name={profile.displayName} url={profile.avatarUrl} size={84} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
           <Text style={[{ color: c.ink, fontSize: 24, fontWeight: '800', letterSpacing: -0.4 }, userText]}>{profile.displayName}</Text>
@@ -103,6 +176,7 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
           @{profile.username}
           {rel.followedBy && !rel.isSelf ? ` · ${t('m.profile.followsYou')}` : ''}
         </Text>
+        {status ? <NowStatusLine status={status} center /> : null}
         {profile.bio ? <RichText text={profile.bio} style={{ color: c.ink, fontSize: 15, lineHeight: 22, textAlign: 'center' }} /> : null}
         <View style={{ flexDirection: 'row', gap: space[4], marginTop: space[2] }}>
           {(
@@ -119,8 +193,19 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
             </View>
           ))}
         </View>
-        {!rel.isSelf ? (
-          <View style={{ flexDirection: 'row', gap: space[2], marginTop: space[2] }}>
+        {rel.isSelf ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: space[2], marginTop: space[2] }}>
+            <Button
+              label={status ? t('m.now.edit') : t('m.now.set')}
+              variant="secondary"
+              size="sm"
+              icon={status ? 'create-outline' : 'add-circle-outline'}
+              onPress={() => router.push('/now-status')}
+            />
+            <Button label={t('m.profile.share')} variant="secondary" size="sm" icon="share-outline" onPress={() => void shareProfile()} />
+          </View>
+        ) : (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: space[2], marginTop: space[2] }}>
             <Button
               label={rel.following ? t('profile.unfollow') : t('profile.follow')}
               variant={rel.following ? 'secondary' : 'primary'}
@@ -155,8 +240,27 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
                 }
               }}
             />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('m.profile.share')}
+              hitSlop={4}
+              onPress={() => void shareProfile()}
+              style={({ pressed }) => ({
+                width: 44,
+                height: 44,
+                borderRadius: radius.full,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: c.surface,
+                borderWidth: 1,
+                borderColor: c.line,
+                opacity: pressed ? 0.85 : 1,
+              })}
+            >
+              <Icon name="share-outline" size={18} color={c.ink} />
+            </Pressable>
           </View>
-        ) : null}
+        )}
       </Card>
       {actions}
       {error ? <Notice tone="danger">{error}</Notice> : null}
@@ -212,5 +316,76 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
         )
       }
     />
+  );
+}
+
+/**
+ * The cover photo across the top, fading into the page under the profile card, or a plain band
+ * when there is none. On your own profile, `onEdit` adds a button to change or remove it.
+ */
+function Cover({ profile, upload, onEdit }: { profile: Profile; upload: { local: string; progress: number | null } | null; onEdit?: () => void }) {
+  const c = useColors();
+  const { t, number } = useT();
+  const uri = upload?.local ?? (profile.coverUrl ? mediaUrl(profile.coverUrl) : null);
+  return (
+    <View style={{ height: uri ? 176 : 104, marginHorizontal: -space[4], marginTop: -space[4], backgroundColor: c.surfaceSunken, overflow: 'hidden' }}>
+      {uri ? (
+        <Image
+          source={{ uri }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel={profile.coverAlt || t('m.cover.alt', { name: profile.displayName })}
+          accessibilityIgnoresInvertColors
+        />
+      ) : null}
+      <LinearGradient pointerEvents="none" colors={[`${c.ground}00`, `${c.ground}00`, c.ground]} locations={[0, 0.45, 1]} style={StyleSheet.absoluteFill} />
+      {upload ? (
+        <View
+          accessibilityLiveRegion="polite"
+          style={{
+            position: 'absolute',
+            alignSelf: 'center',
+            top: space[4],
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: space[2],
+            backgroundColor: c.surface,
+            borderRadius: radius.full,
+            paddingHorizontal: space[3],
+            paddingVertical: 6,
+          }}
+        >
+          <ActivityIndicator size="small" color={c.yapi} />
+          <Text style={{ color: c.ink, fontSize: 13, fontWeight: '600' }}>
+            {upload.progress === null ? t('m.cover.preparing') : t('m.cover.uploading', { progress: number(upload.progress, { style: 'percent' }) })}
+          </Text>
+        </View>
+      ) : onEdit ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={profile.coverUrl ? t('m.cover.edit') : t('m.cover.add')}
+          onPress={onEdit}
+          hitSlop={6}
+          style={({ pressed }) => ({
+            position: 'absolute',
+            top: space[3],
+            end: space[4],
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            backgroundColor: c.surface,
+            borderRadius: radius.full,
+            paddingHorizontal: space[3],
+            paddingVertical: 6,
+            opacity: pressed ? 0.85 : 1,
+          })}
+        >
+          <Icon name="camera-outline" size={16} color={c.ink} />
+          <Text style={{ color: c.ink, fontSize: 13, fontWeight: '600' }}>{profile.coverUrl ? t('m.cover.edit') : t('m.cover.add')}</Text>
+        </Pressable>
+      ) : null}
+    </View>
   );
 }

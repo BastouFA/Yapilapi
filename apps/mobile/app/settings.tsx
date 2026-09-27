@@ -37,6 +37,13 @@ export default function Settings() {
         onPress={() => router.push('/close-friends')}
       />
       <Row
+        title={t('m.circles.title')}
+        subtitle={t('m.circles.manage')}
+        start={<Icon name="ellipse-outline" size={18} color={c.yapi} />}
+        end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
+        onPress={() => router.push('/circles')}
+      />
+      <Row
         title={t('m.archive.title')}
         subtitle={t('m.archive.manage')}
         start={<Icon name="archive-outline" size={18} color={c.inkMuted} />}

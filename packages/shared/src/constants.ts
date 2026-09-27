@@ -22,6 +22,22 @@ export const FEED_MODES = ['for_you', 'following', 'friends', 'communities', 'lo
 export type FeedMode = (typeof FEED_MODES)[number];
 
 export const CIRCLE_KINDS = ['family', 'close_friends', 'work', 'business', 'travel', 'custom'] as const;
+export type CircleKind = (typeof CIRCLE_KINDS)[number];
+/** At most this many circles per person, and people in one circle. */
+export const MAX_CIRCLES = 50;
+export const MAX_CIRCLE_MEMBERS = 500;
+
+/**
+ * "Now" statuses: a short line on your profile and in chat headers for 24 hours.
+ * The icons are names from the design system's icon set (never emoji).
+ */
+export const NOW_STATUS_MAX = 60;
+export const NOW_STATUS_HOURS = 24;
+export const NOW_STATUS_ICONS = ['sparkle', 'music', 'map-pin', 'calendar', 'heart', 'globe', 'star', 'mic'] as const;
+export type NowStatusIcon = (typeof NOW_STATUS_ICONS)[number];
+/** 'everyone': anyone who can see your profile. 'close_friends': people on your close friends list who follow you. */
+export const NOW_STATUS_AUDIENCES = ['everyone', 'followers', 'close_friends'] as const;
+export type NowStatusAudience = (typeof NOW_STATUS_AUDIENCES)[number];
 
 export const COMMUNITY_ROLES = ['owner', 'admin', 'moderator', 'organizer', 'member', 'guest'] as const;
 export type CommunityRole = (typeof COMMUNITY_ROLES)[number];

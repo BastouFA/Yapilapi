@@ -195,3 +195,33 @@ export async function notifyCollabInvites(db: Q, realtime: RealtimeHub, m: { pos
   for (const userId of m.userIds)
     await notify(db, realtime, { userId, category: 'friends', type: 'collab_invite', actorId: m.actorId, entityType: 'post', entityId: m.postId });
 }
+
+/**
+ * Posts that were waiting for review (or held while their author's account was
+ * limited) and are now visible: send the co-author invites and photo-tag
+ * notifications that were held back when they were posted. Each person is told
+ * once per post, so a post that was visible before and comes back isn't
+ * announced again.
+ */
+export async function notifyReleasedPosts(db: Q, realtime: RealtimeHub, postIds: string[]): Promise<void> {
+  if (!postIds.length) return;
+  const { rows } = await db.query<{ id: string; author_id: string }>(
+    `SELECT id, author_id FROM posts WHERE id = ANY($1::uuid[]) AND moderation_status = 'normal' AND deleted_at IS NULL`,
+    [[...new Set(postIds)]],
+  );
+  const notTold = (type: string, col: string) =>
+    `NOT EXISTS (SELECT 1 FROM notifications n WHERE n.user_id = ${col} AND n.type = '${type}' AND n.entity_type = 'post' AND n.entity_id = $1)`;
+  for (const post of rows) {
+    const invited = await db.query<{ user_id: string }>(
+      `SELECT pc.user_id FROM post_collaborators pc WHERE pc.post_id = $1 AND pc.status = 'pending' AND ${notTold('collab_invite', 'pc.user_id')}
+       ORDER BY pc.created_at, pc.user_id`,
+      [post.id],
+    );
+    await notifyCollabInvites(db, realtime, { postId: post.id, actorId: post.author_id, userIds: invited.rows.map((r) => r.user_id) });
+    const tagged = await db.query<{ user_id: string }>(
+      `SELECT DISTINCT t.user_id FROM photo_tags t WHERE t.post_id = $1 AND ${notTold('photo_tag', 't.user_id')}`,
+      [post.id],
+    );
+    await notifyPhotoTags(db, realtime, { postId: post.id, actorId: post.author_id, userIds: tagged.rows.map((r) => r.user_id) });
+  }
+}

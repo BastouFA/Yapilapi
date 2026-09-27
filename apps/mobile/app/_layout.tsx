@@ -40,6 +40,9 @@ function Screens() {
         <Stack.Screen name="s/[id]" options={{ title: t('m.stories.label') }} />
         <Stack.Screen name="sounds/[id]" options={{ title: t('m.sound.title') }} />
         <Stack.Screen name="close-friends" options={{ title: t('m.closeFriends.title') }} />
+        <Stack.Screen name="circles" options={{ title: t('m.circles.title') }} />
+        <Stack.Screen name="circle/[id]" options={{ title: t('m.circles.title') }} />
+        <Stack.Screen name="now-status" options={{ title: t('m.now.title'), presentation: 'modal' }} />
         <Stack.Screen name="archive" options={{ title: t('m.archive.title') }} />
         <Stack.Screen name="chapter/[id]" options={{ title: t('m.chapters.title') }} />
         <Stack.Screen name="chapter-edit" options={{ title: t('m.chapters.new'), presentation: 'modal' }} />

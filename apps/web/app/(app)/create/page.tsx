@@ -260,6 +260,7 @@ function Create() {
           format: 'reel',
           body,
           visibility,
+          circleId: visibility === 'circle' ? circleId || undefined : undefined,
           allowRemix,
           ...(remixOf && original ? { remixOf, remixMode } : sound ? { soundId: sound.id } : soundTitle.trim() ? { soundTitle: soundTitle.trim() } : {}),
           media: [{ id: v.id, url: new URL(v.url, location.origin).toString(), kind: 'video', altText: v.altText || undefined }],
@@ -329,7 +330,7 @@ function Create() {
                 setPoll(null);
                 setMedia((m) => m.filter((x) => k !== 'reel' || x.kind === 'video').slice(0, 1));
               }
-              if (k === 'story' && (visibility === 'selected' || visibility === 'subscribers')) setVisibility('friends');
+              if (k === 'story' && (visibility === 'selected' || visibility === 'subscribers' || visibility === 'circle')) setVisibility('friends');
               if (k !== 'story' && visibility === 'close_friends') setVisibility('friends');
             }}
             options={[
@@ -600,14 +601,40 @@ function Create() {
             </Select>
           )}
           {!communityId ? (
-            <Select label={t('create.visibility')} value={visibility} onChange={(e) => setVisibility(e.currentTarget.value as Audience)}>
+            <Select
+              label={t('create.visibility')}
+              // Each circle is its own choice ("Circle: Family"), so the picker shows which one.
+              value={visibility === 'circle' ? `circle:${circleId}` : visibility}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                if (v.startsWith('circle:')) {
+                  setVisibility('circle');
+                  setCircleId(v.slice('circle:'.length));
+                } else setVisibility(v as Audience);
+              }}
+            >
               {(kind === 'story' ? STORY_VISIBILITIES : POST_VISIBILITIES)
-                .filter((v) => (kind !== 'story' || (v !== 'selected' && v !== 'subscribers')) && (v !== 'subscribers' || hasPlans))
-                .map((v) => (
-                  <option key={v} value={v} disabled={v === 'circle' && !circles.length}>
-                    {t(`visibility.${v}` as MessageKey)}
-                  </option>
-                ))}
+                // Stories can't go to a circle; they have close friends instead.
+                .filter((v) => (kind !== 'story' || (v !== 'selected' && v !== 'subscribers' && v !== 'circle')) && (v !== 'subscribers' || hasPlans))
+                .flatMap((v) =>
+                  v === 'circle'
+                    ? circles.length
+                      ? circles.map((c) => (
+                          <option key={`circle:${c.id}`} value={`circle:${c.id}`}>
+                            {`Circle: ${c.name}`}
+                          </option>
+                        ))
+                      : [
+                          <option key="circle" value="circle:" disabled>
+                            Circle (make one first)
+                          </option>,
+                        ]
+                    : [
+                        <option key={v} value={v}>
+                          {t(`visibility.${v}` as MessageKey)}
+                        </option>,
+                      ],
+                )}
             </Select>
           ) : null}
           {kind === 'story' ? (
@@ -636,15 +663,15 @@ function Create() {
               Only people with a paid subscription see this. Everyone else sees a locked preview with a link to subscribe.
             </p>
           ) : null}
-          {visibility === 'circle' && !communityId ? (
-            <Select label="Circle" value={circleId} onChange={(e) => setCircleId(e.currentTarget.value)}>
-              <option value="">Choose a circle</option>
-              {circles.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
+          {kind !== 'story' && !communityId ? (
+            <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+              {visibility === 'circle' && circles.some((c) => c.id === circleId)
+                ? `Only the people in ${circles.find((c) => c.id === circleId)!.name} see this. They aren't told which circle it was shared with. `
+                : circles.length
+                  ? ''
+                  : 'Share with a small group, like Family or Work, by making a circle. '}
+              <Link href="/circles">{circles.length ? 'Manage circles' : 'Make a circle'}</Link>
+            </p>
           ) : null}
           {kind !== 'story' ? (
             <TextField label="Topics (optional)" hint="Up to 5, separated by commas." value={topics} onChange={(e) => setTopics(e.currentTarget.value)} />

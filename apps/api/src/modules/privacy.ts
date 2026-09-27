@@ -49,7 +49,10 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       account: (
         await q(`SELECT id, email, email_verified_at, phone_e164, phone_verified_at, role, status, birth_date, created_at FROM users WHERE id = $1`)
       )[0],
-      profile: (await q(`SELECT username, display_name, bio, avatar_url, cover_url, links, mode, locale, is_private FROM profiles WHERE user_id = $1`))[0],
+      profile: (
+        await q(`SELECT username, display_name, bio, avatar_url, cover_url, cover_alt, links, mode, locale, is_private FROM profiles WHERE user_id = $1`)
+      )[0],
+      nowStatus: (await q(`SELECT text, icon, audience, created_at, expires_at FROM profile_statuses WHERE user_id = $1`))[0] ?? null,
       interests: await q(`SELECT t.slug FROM user_interests ui JOIN topics t ON t.id = ui.topic_id WHERE ui.user_id = $1`),
       following: await q(`SELECT followee_id, created_at FROM follows WHERE follower_id = $1`),
       followers: await q(`SELECT follower_id, created_at FROM follows WHERE followee_id = $1`),
@@ -93,7 +96,7 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         [u.id],
       );
       await c.query(
-        `UPDATE profiles SET username = 'deleted_' || substr(replace(user_id::text, '-', ''), 1, 12), display_name = 'Deleted account', bio = '', avatar_url = NULL, cover_url = NULL, links = '[]', is_private = true WHERE user_id = $1`,
+        `UPDATE profiles SET username = 'deleted_' || substr(replace(user_id::text, '-', ''), 1, 12), display_name = 'Deleted account', bio = '', avatar_url = NULL, cover_url = NULL, cover_media_id = NULL, cover_alt = NULL, links = '[]', is_private = true WHERE user_id = $1`,
         [u.id],
       );
       await c.query(`UPDATE posts SET deleted_at = now(), body = '' WHERE author_id = $1 AND deleted_at IS NULL`, [u.id]);
@@ -104,6 +107,7 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         `DELETE FROM follows WHERE follower_id = $1 OR followee_id = $1`,
         `DELETE FROM friendships WHERE user_a = $1 OR user_b = $1`,
         `DELETE FROM close_friends WHERE owner_id = $1 OR friend_id = $1`,
+        `DELETE FROM profile_statuses WHERE user_id = $1`,
         `DELETE FROM sounds WHERE owner_id = $1`,
         `DELETE FROM circles WHERE owner_id = $1`,
         `DELETE FROM circle_members WHERE user_id = $1`,

@@ -706,6 +706,8 @@ export function PostCard({
               </>
             ) : null}{' '}
             <Icon name={VIS_ICON[post.visibility] ?? 'globe'} size={12} label={t(`visibility.${post.visibility}` as MessageKey, locale)} />
+            {/* Only the author gets the circle's name; people in it never see which circle. */}
+            {post.circle ? <bdi className="yp-post__circle">{post.circle.name}</bdi> : null}
           </span>
         </div>
         {menu.length ? <Menu label="Post options" actions={menu} /> : null}

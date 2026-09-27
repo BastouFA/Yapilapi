@@ -5,8 +5,9 @@ import { useEffect, useState } from 'react';
 import { Alert, Image, Linking, ScrollView, Text, View } from 'react-native';
 import type { EditorParamsInput } from '../../../../packages/shared/src/filters';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
-import type { PublicUser, Sound } from '../../../../packages/shared/src/types';
+import type { Circle, PublicUser, Sound } from '../../../../packages/shared/src/types';
 import { useAutocomplete } from '../../lib/autocomplete';
+import { Chips } from '../../lib/circles';
 import { CoauthorPicker, PhotoTagger, type DraftTag } from '../../lib/collab';
 import { client, errorMessage, mediaUrl } from '../../lib/api';
 import { useT } from '../../lib/i18n';
@@ -49,7 +50,8 @@ const EXPIRES = [
 ] as const satisfies readonly { id: string; label: MessageKey }[];
 
 type Kind = (typeof KINDS)[number]['id'];
-type Visibility = (typeof VISIBILITY)[number]['id'];
+/** 'circle' is offered for posts and reels once you have a circle; the post goes to the one chosen. */
+type Visibility = (typeof VISIBILITY)[number]['id'] | 'circle';
 type Attached = Uploaded & { local: string; seconds: number | null };
 
 const kindFrom = (mode: string | undefined): Kind | null => (mode === 'reel' || mode === 'story' || mode === 'post' ? mode : null);
@@ -98,6 +100,9 @@ export default function Create() {
       .then((r) => setHasPlans(r.items.length > 0))
       .catch(() => {});
   }, [me]);
+  // Your circles, for sharing a post or reel with one of them. null until loaded.
+  const [circles, setCircles] = useState<Circle[] | null>(null);
+  const [circleId, setCircleId] = useState<string | null>(null);
 
   function switchTo(k: Kind) {
     setKind(k);
@@ -105,7 +110,7 @@ export default function Create() {
     setNote(null);
     // Keep only what the new kind can hold: a reel is a video.
     setMedia((m) => (k === 'reel' && m?.kind !== 'video' ? null : m));
-    if (k === 'story' && (visibility === 'public' || visibility === 'subscribers')) setVisibility('friends');
+    if (k === 'story' && (visibility === 'public' || visibility === 'subscribers' || visibility === 'circle')) setVisibility('friends');
   }
 
   // "Use this sound" on a sound page opens this tab as a reel with that sound.
@@ -135,6 +140,18 @@ export default function Create() {
   // It is taken once this tab is showing and the camera has slid away: the editor is a modal, and
   // iOS can't present one while the camera is still being dismissed.
   const focused = useIsFocused();
+  // Loaded each time this tab shows, so a circle made (or deleted) meanwhile is there.
+  useEffect(() => {
+    if (!me || !focused) return;
+    void client()
+      .then((api) => api.circles.list())
+      .then((r) => {
+        setCircles(r.items);
+        setCircleId((cur) => (cur && r.items.some((x) => x.id === cur) ? cur : null));
+        if (!r.items.length) setVisibility((v) => (v === 'circle' ? 'public' : v));
+      })
+      .catch(() => setCircles((cur) => cur ?? []));
+  }, [me, focused]);
   const [incoming, setIncoming] = useState<ReturnType<typeof takePendingAsset>>(null);
   useEffect(() => {
     if (!focused) return;
@@ -237,7 +254,7 @@ export default function Create() {
           body: body.trim() || undefined,
           mediaId: media?.id,
           expiresIn,
-          visibility: closeFriends ? 'close_friends' : visibility === 'subscribers' ? 'friends' : visibility,
+          visibility: closeFriends ? 'close_friends' : visibility === 'subscribers' || visibility === 'circle' ? 'friends' : visibility,
           allowReshare,
           stickers: stickers.map(({ key: _key, label: _label, ...s }) => s),
         });
@@ -254,6 +271,7 @@ export default function Create() {
           format: 'reel',
           body,
           visibility,
+          ...(visibility === 'circle' && circleId ? { circleId } : {}),
           media: [{ id: v.id, url: mediaUrl(v.url), kind: 'video' }],
           ...(sound ? { soundId: sound.id } : {}),
           ...(coauthors.length ? { collaborators: coauthors.map((u) => u.id) } : {}),
@@ -269,6 +287,7 @@ export default function Create() {
       const r = await api.posts.create({
         body,
         visibility,
+        ...(visibility === 'circle' && circleId ? { circleId } : {}),
         ...(media
           ? {
               media: [
@@ -298,7 +317,19 @@ export default function Create() {
   }
 
   const hint = KINDS.find((k) => k.id === kind)!.hint;
-  const canPublish = !busy && !uploading && (kind === 'reel' ? media?.kind === 'video' : !!body.trim() || !!media || (kind === 'story' && stickers.length > 0));
+  const forCircle = kind !== 'story' && visibility === 'circle';
+  const chosenCircle = circles?.find((x) => x.id === circleId) ?? null;
+  const canPublish =
+    !busy &&
+    !uploading &&
+    (!forCircle || !!chosenCircle) &&
+    (kind === 'reel' ? media?.kind === 'video' : !!body.trim() || !!media || (kind === 'story' && stickers.length > 0));
+  const audienceOptions: { id: Visibility; label: string }[] = [
+    ...VISIBILITY.filter((v) => v.id !== 'subscribers' || (hasPlans && kind !== 'story')).map((v) => ({ id: v.id, label: t(v.label) })),
+    ...(kind !== 'story' && circles?.length
+      ? [{ id: 'circle' as const, label: forCircle && chosenCircle ? t('m.create.circle', { name: chosenCircle.name }) : t('visibility.circle') }]
+      : []),
+  ];
 
   return (
     <ScrollView
@@ -402,12 +433,47 @@ export default function Create() {
         {kind === 'story' && closeFriends ? null : (
           <>
             <Text style={{ color: c.ink, fontWeight: '600' }}>{t('create.visibility')}</Text>
-            <Segmented
+            <Chips
               label={t('create.visibility')}
-              options={VISIBILITY.filter((v) => v.id !== 'subscribers' || (hasPlans && kind !== 'story')).map((v) => ({ id: v.id, label: t(v.label) }))}
+              options={audienceOptions}
               value={visibility}
-              onChange={setVisibility}
+              onChange={(v) => {
+                if (!v) return;
+                setVisibility(v);
+                // With a single circle there is nothing to choose.
+                if (v === 'circle' && !circleId && circles?.length === 1) setCircleId(circles[0]!.id);
+              }}
             />
+            {forCircle && circles?.length ? (
+              <View style={{ gap: space[2] }}>
+                <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.create.chooseCircle')}</Text>
+                <Chips
+                  label={t('m.create.chooseCircle')}
+                  options={circles.map((x) => ({ id: x.id, label: x.name, icon: 'ellipse-outline' as const }))}
+                  value={circleId}
+                  onChange={setCircleId}
+                />
+                <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('m.create.circleHint')}</Text>
+                <Button
+                  label={t('m.create.editCircles')}
+                  variant="ghost"
+                  size="sm"
+                  icon="people-outline"
+                  onPress={() => router.push('/circles')}
+                  style={{ alignSelf: 'flex-start' }}
+                />
+              </View>
+            ) : null}
+            {kind !== 'story' && circles && !circles.length ? (
+              <Button
+                label={t('m.create.makeCircle')}
+                variant="ghost"
+                size="sm"
+                icon="add-circle-outline"
+                onPress={() => router.push('/circles')}
+                style={{ alignSelf: 'flex-start' }}
+              />
+            ) : null}
           </>
         )}
         {error ? <Notice tone="danger">{error}</Notice> : null}

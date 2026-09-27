@@ -3,7 +3,13 @@ import { tx } from '@yapilapi/database';
 import {
   circleMembersSchema,
   circleSchema,
+  circleUpdateSchema,
+  MAX_CIRCLE_MEMBERS,
+  MAX_CIRCLES,
+  NOW_STATUS_HOURS,
+  nowStatusSchema,
   onboardingCompleteSchema,
+  setCoverSchema,
   pageQuerySchema,
   setInterestsSchema,
   updateProfileSchema,
@@ -11,7 +17,7 @@ import {
   type Profile,
 } from '@yapilapi/shared';
 import { z } from 'zod';
-import { badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
+import { AppError, badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, encodeCursor } from '../lib/cursor.ts';
 import { notify, track } from '../lib/services.ts';
@@ -19,6 +25,8 @@ import { emitWebhook } from '../lib/webhooks.ts';
 import { ageOf, areFriends, isBlockedEitherWay, PUBLIC_USER_COLS, toPublicUser, type PublicUserRow } from '../lib/users.ts';
 import { notBlockedSql } from '../lib/visibility.ts';
 import { byOrWithSql, canInviteSql, canTagSql } from '../lib/collabs.ts';
+import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
+import { nowStatusesFor, ownNowStatus } from '../lib/now-status.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -105,7 +113,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
 
   async function loadProfile(userId: string, viewer: string | null): Promise<Profile> {
     const { rows } = await db.query(
-      `SELECT ${PUBLIC_USER_COLS}, pr.bio, pr.cover_url, pr.links, pr.is_private,
+      `SELECT ${PUBLIC_USER_COLS}, pr.bio, pr.cover_url, pr.cover_alt, pr.links, pr.is_private,
         (SELECT count(*) FROM follows WHERE followee_id = pr.user_id) AS followers,
         (SELECT count(*) FROM follows WHERE follower_id = pr.user_id) AS following,
         (SELECT count(*) FROM friendships WHERE user_a = pr.user_id OR user_b = pr.user_id) AS friends,
@@ -123,10 +131,13 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     );
     const r = rows[0];
     if (!r) throw notFound('That profile');
+    const status = (await nowStatusesFor(db, [userId], viewer)).get(userId) ?? null;
     return {
       ...toPublicUser(r as PublicUserRow),
       bio: r.bio,
       coverUrl: r.cover_url,
+      coverAlt: r.cover_url ? (r.cover_alt ?? null) : null,
+      nowStatus: status,
       links: r.links,
       isPrivate: r.is_private,
       interests: r.interests,
@@ -154,7 +165,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       if (minor.rowCount) throw notFound('That person');
     }
     const profile = await loadProfile(id, viewer);
-    if (!viewer && profile.isPrivate) return { profile: { ...profile, bio: '', links: [], interests: [], coverUrl: null } };
+    if (!viewer && profile.isPrivate) return { profile: { ...profile, bio: '', links: [], interests: [], coverUrl: null, coverAlt: null, nowStatus: null } };
     return { profile };
   });
 
@@ -165,7 +176,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       displayName: 'display_name',
       bio: 'bio',
       avatarUrl: 'avatar_url',
-      coverUrl: 'cover_url',
+      coverAlt: 'cover_alt',
       links: 'links',
       mode: 'mode',
       locale: 'locale',
@@ -176,7 +187,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     const vals: unknown[] = [u.id];
     for (const [k, col] of Object.entries(map)) {
       const v = (input as Record<string, unknown>)[k];
-      if (v === undefined) continue;
+      if (v === undefined || (k === 'coverAlt' && input.coverUrl === null)) continue;
       vals.push(k === 'links' ? JSON.stringify(v) : v);
       sets.push(`${col} = $${vals.length}`);
     }
@@ -186,8 +197,68 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       if (age !== null && age < 18) throw forbidden('Accounts for people under 18 stay private.');
     }
     if (input.country !== undefined) sets.push(input.country === null ? `country_source = NULL` : `country_source = 'user'`);
+    // A cover photo is set from your own uploads (PUT /v1/me/cover); here it can only be removed.
+    if (input.coverUrl) throw badRequest('Choose a cover photo from your own uploads.', { fields: { coverUrl: 'Upload a photo first.' } });
+    if (input.coverUrl === null) sets.push(`cover_url = NULL, cover_media_id = NULL, cover_alt = NULL`);
     if (sets.length) await db.query(`UPDATE profiles SET ${sets.join(', ')} WHERE user_id = $1`, vals);
     return { profile: await loadProfile(u.id, u.id) };
+  });
+
+  // ── Cover photo ───────────────────────────────────────────────────────
+  /**
+   * Set your cover photo from one of your own uploads (POST /v1/media or
+   * /v1/uploads). It must be a photo that finished processing, not marked
+   * sensitive or blocked by the automated check. The profile shows a
+   * processed size, never the original file.
+   */
+  app.put('/v1/me/cover', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (req) => {
+    const u = me(req);
+    const input = parse(setCoverSchema, req.body);
+    const { rows } = await db.query(
+      `SELECT kind, status, moderation, variants, url, alt_text FROM media
+       WHERE id = $1 AND owner_id = $2 AND NOT private AND deleted_at IS NULL`,
+      [input.mediaId, u.id],
+    );
+    const m = rows[0];
+    if (!m) throw notFound('That photo');
+    if (m.kind !== 'image') throw badRequest('Choose a photo for your cover.');
+    if (m.moderation === 'blocked') throw new AppError(422, 'media_blocked', MEDIA_BLOCKED_MESSAGE);
+    if (m.moderation === 'sensitive') throw new AppError(422, 'media_sensitive', 'This photo may be sensitive, so it can’t be a cover. Choose another one.');
+    const variants = (m.variants ?? {}) as Record<string, string>;
+    const url = variants.large ?? variants.medium;
+    if (m.status !== 'ready' || !url) throw new AppError(409, 'media_processing', 'Your photo is still being prepared. Try again in a moment.');
+    const alt = input.altText || m.alt_text || null;
+    await db.query(`UPDATE profiles SET cover_url = $2, cover_media_id = $3, cover_alt = $4 WHERE user_id = $1`, [u.id, url, input.mediaId, alt]);
+    await db.query(`UPDATE media SET used_at = coalesce(used_at, now()) WHERE id = $1`, [input.mediaId]);
+    return { profile: await loadProfile(u.id, u.id) };
+  });
+
+  app.delete('/v1/me/cover', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    await db.query(`UPDATE profiles SET cover_url = NULL, cover_media_id = NULL, cover_alt = NULL WHERE user_id = $1`, [u.id]);
+    return { profile: await loadProfile(u.id, u.id) };
+  });
+
+  // ── "Now" status ──────────────────────────────────────────────────────
+  /** Your status, if you have one that hasn't ended, with who it's for. */
+  app.get('/v1/me/status', { preHandler: requireAuth }, async (req) => ({ status: await ownNowStatus(db, me(req).id) }));
+
+  /** Set your status. It ends 24 hours from now; setting it again starts a new 24 hours. */
+  app.put('/v1/me/status', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (req) => {
+    const u = me(req);
+    const input = parse(nowStatusSchema, req.body);
+    await db.query(
+      `INSERT INTO profile_statuses (user_id, text, icon, audience, expires_at) VALUES ($1,$2,$3,$4, now() + make_interval(hours => $5))
+       ON CONFLICT (user_id) DO UPDATE SET text = EXCLUDED.text, icon = EXCLUDED.icon, audience = EXCLUDED.audience,
+         created_at = now(), expires_at = EXCLUDED.expires_at`,
+      [u.id, input.text, input.icon, input.audience, NOW_STATUS_HOURS],
+    );
+    return { status: await ownNowStatus(db, u.id) };
+  });
+
+  app.delete('/v1/me/status', { preHandler: requireAuth }, async (req) => {
+    await db.query(`DELETE FROM profile_statuses WHERE user_id = $1`, [me(req).id]);
+    return { status: null };
   });
 
   app.get('/v1/topics', async () => {
@@ -512,62 +583,112 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
   }
 
   // ── Circles ───────────────────────────────────────────────────────────
+  // Circles are private to their owner: nobody is told they were added or
+  // removed, and nothing tells a member which circles they're in or what they're
+  // called. Posts shared with a circle show its name to the author only.
+  const circleOut = (r: Record<string, any>) => ({ id: r.id, name: r.name, kind: r.kind, memberCount: r.member_count ?? 0, createdAt: r.created_at });
+  const CIRCLE_COLS = `c.id, c.name, c.kind, c.created_at,
+    (SELECT count(*) FROM circle_members cm JOIN users mu ON mu.id = cm.user_id AND mu.status = 'active' WHERE cm.circle_id = c.id) AS member_count`;
+
   app.get('/v1/me/circles', { preHandler: requireAuth }, async (req) => {
-    const { rows } = await db.query(
-      `SELECT c.id, c.name, c.kind, c.created_at, (SELECT count(*) FROM circle_members WHERE circle_id = c.id) AS member_count
-       FROM circles c WHERE c.owner_id = $1 ORDER BY c.created_at`,
-      [me(req).id],
-    );
-    return { items: rows.map((r) => ({ id: r.id, name: r.name, kind: r.kind, memberCount: r.member_count, createdAt: r.created_at })) };
+    const { rows } = await db.query(`SELECT ${CIRCLE_COLS} FROM circles c WHERE c.owner_id = $1 ORDER BY c.created_at`, [me(req).id]);
+    return { items: rows.map(circleOut) };
   });
 
-  app.post('/v1/me/circles', { preHandler: requireAuth }, async (req, reply) => {
+  async function assertNameFree(ownerId: string, name: string, except: string | null) {
+    const taken = await db.query(`SELECT 1 FROM circles WHERE owner_id = $1 AND lower(name) = lower($2) AND id IS DISTINCT FROM $3`, [ownerId, name, except]);
+    if (taken.rowCount) throw conflict(`You already have a circle called "${name}".`);
+  }
+
+  app.post('/v1/me/circles', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (req, reply) => {
+    const u = me(req);
     const input = parse(circleSchema, req.body);
-    const count = await db.query(`SELECT count(*) AS n FROM circles WHERE owner_id = $1`, [me(req).id]);
-    if (count.rows[0].n >= 50) throw conflict('You can have up to 50 circles.');
-    const { rows } = await db.query(`INSERT INTO circles (owner_id, name, kind) VALUES ($1,$2,$3) RETURNING id, name, kind`, [
-      me(req).id,
+    const count = await db.query(`SELECT count(*) AS n FROM circles WHERE owner_id = $1`, [u.id]);
+    if (count.rows[0].n >= MAX_CIRCLES) throw conflict(`You can have up to ${MAX_CIRCLES} circles.`);
+    await assertNameFree(u.id, input.name, null);
+    const { rows } = await db.query(`INSERT INTO circles (owner_id, name, kind) VALUES ($1,$2,$3) RETURNING id, name, kind, created_at`, [
+      u.id,
       input.name,
       input.kind,
     ]);
     reply.code(201);
-    return { circle: { ...rows[0], memberCount: 0 } };
+    return { circle: circleOut(rows[0]) };
   });
 
   async function ownCircle(circleId: string, userId: string) {
-    const r = await db.query(`SELECT 1 FROM circles WHERE id = $1 AND owner_id = $2`, [circleId, userId]);
-    if (!r.rowCount) throw notFound('Circle');
+    const r = await db.query(`SELECT ${CIRCLE_COLS} FROM circles c WHERE c.id = $1 AND c.owner_id = $2`, [circleId, userId]);
+    if (!r.rows[0]) throw notFound('Circle');
+    return r.rows[0];
   }
 
-  app.get('/v1/me/circles/:id/members', { preHandler: requireAuth }, async (req) => {
+  app.get('/v1/me/circles/:id', { preHandler: requireAuth }, async (req) => {
     const { id } = parse(idParam, req.params);
-    await ownCircle(id, me(req).id);
+    return { circle: circleOut(await ownCircle(id, me(req).id)) };
+  });
+
+  /** Rename a circle (or change its kind). Posts already shared with it stay with the same people. */
+  app.patch('/v1/me/circles/:id', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const input = parse(circleUpdateSchema, req.body);
+    await ownCircle(id, u.id);
+    if (input.name !== undefined) await assertNameFree(u.id, input.name, id);
+    await db.query(`UPDATE circles SET name = coalesce($3, name), kind = coalesce($4, kind) WHERE id = $1 AND owner_id = $2`, [
+      id,
+      u.id,
+      input.name ?? null,
+      input.kind ?? null,
+    ]);
+    return { circle: circleOut(await ownCircle(id, u.id)) };
+  });
+
+  app.get('/v1/me/circles/:id/members', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    await ownCircle(id, u.id);
     const { rows } = await db.query<PublicUserRow>(
-      `SELECT ${PUBLIC_USER_COLS} FROM circle_members cm JOIN profiles pr ON pr.user_id = cm.user_id WHERE cm.circle_id = $1`,
-      [id],
+      `SELECT ${PUBLIC_USER_COLS} FROM circle_members cm JOIN profiles pr ON pr.user_id = cm.user_id JOIN users mu ON mu.id = cm.user_id
+       WHERE cm.circle_id = $1 AND mu.status = 'active' AND ${notBlockedSql('cm.user_id', '$2')}
+       ORDER BY cm.added_at DESC`,
+      [id, u.id],
     );
     return { items: rows.map(toPublicUser) };
   });
 
+  /**
+   * Add people to a circle. Anyone active you haven't blocked (and who hasn't
+   * blocked you) can be added; the apps suggest people you follow and friends.
+   * People who can't be added are skipped. Nobody is told.
+   */
   app.post('/v1/me/circles/:id/members', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
     const { id } = parse(idParam, req.params);
     const { userIds } = parse(circleMembersSchema, req.body);
-    await ownCircle(id, me(req).id);
-    await db.query(`INSERT INTO circle_members (circle_id, user_id) SELECT $1, u.id FROM users u WHERE u.id = ANY($2) AND u.id <> $3 ON CONFLICT DO NOTHING`, [
-      id,
-      userIds,
-      me(req).id,
-    ]);
-    return { ok: true };
+    await ownCircle(id, u.id);
+    const added = await tx(db, async (c) => {
+      await c.query(`SELECT 1 FROM circles WHERE id = $1 FOR UPDATE`, [id]);
+      const r = await c.query(
+        `INSERT INTO circle_members (circle_id, user_id)
+         SELECT $1, x.id FROM users x WHERE x.id = ANY($2::uuid[]) AND x.id <> $3 AND x.status = 'active' AND ${notBlockedSql('x.id', '$3')}
+         ON CONFLICT DO NOTHING`,
+        [id, userIds, u.id],
+      );
+      const n = (await c.query(`SELECT count(*) AS n FROM circle_members WHERE circle_id = $1`, [id])).rows[0].n as number;
+      if (n > MAX_CIRCLE_MEMBERS) throw badRequest(`A circle can have up to ${MAX_CIRCLE_MEMBERS} people.`);
+      return r.rowCount ?? 0;
+    });
+    return { ok: true, added, circle: circleOut(await ownCircle(id, u.id)) };
   });
 
   app.delete('/v1/me/circles/:id/members/:userId', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
     const { id, userId } = parse(z.object({ id: z.string().uuid(), userId: z.string().uuid() }), req.params);
-    await ownCircle(id, me(req).id);
+    await ownCircle(id, u.id);
     await db.query(`DELETE FROM circle_members WHERE circle_id = $1 AND user_id = $2`, [id, userId]);
-    return { ok: true };
+    return { ok: true, circle: circleOut(await ownCircle(id, u.id)) };
   });
 
+  /** Delete a circle. Posts shared with it stay, visible only to you. */
   app.delete('/v1/me/circles/:id', { preHandler: requireAuth }, async (req) => {
     const { id } = parse(idParam, req.params);
     await ownCircle(id, me(req).id);

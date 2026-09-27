@@ -28,6 +28,7 @@ import { requireVerified } from '../lib/verification.ts';
 import { me, requireAuth, resolveSession, sessionTokenOf } from '../plugins/auth.ts';
 import { issueTicket, readTicket } from '../lib/realtime-ticket.ts';
 import { canSeeStory, storyCards } from '../lib/stories.ts';
+import { nowStatusesFor } from '../lib/now-status.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 
@@ -144,6 +145,13 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       ids ? [userId, ids] : [userId],
     );
     const users = await usersByIds(db, [...new Set(rows.flatMap((r) => r.member_ids ?? []))]);
+    // One-to-one chats show the other person's "Now" status in the header, when you're in its audience.
+    const otherOf = (r: { kind: string; member_ids: string[] | null }) => (r.kind === 'direct' ? (r.member_ids ?? []).find((id) => id !== userId) : undefined);
+    const statuses = await nowStatusesFor(
+      db,
+      rows.map(otherOf).filter((id): id is string => !!id),
+      userId,
+    );
     const adult = await isAdultViewer(db, userId);
     const paused = !!(await db.query(`SELECT yaps_paused FROM user_preferences WHERE user_id = $1`, [userId])).rows[0]?.yaps_paused;
     const withLast = await withStories(
@@ -179,6 +187,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
         defaultOutLoud: r.kind === 'direct' ? r.has_friend : true,
         paused,
       },
+      ...(r.kind === 'direct' ? { nowStatus: statuses.get(otherOf(r) ?? '') ?? null } : {}),
     }));
   }
 

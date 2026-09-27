@@ -12,6 +12,7 @@ import { SupportCreator } from '@/components/SupportCreator';
 import { Shop } from '@/components/Shop';
 import { ChaptersRow } from '@/components/Chapters';
 import { JoinNote, NeedsAccount, useSignIn } from '@/components/SignedOut';
+import { CoverSheet, NowStatusLine, NowStatusSheet, ProfileCover, ShareProfileSheet } from '@/components/ProfilePlus';
 import { useSession } from '../../../providers';
 
 /**
@@ -27,6 +28,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [missing, setMissing] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const [sheet, setSheet] = useState<'cover' | 'status' | 'share' | null>(null);
   const [list, setList] = useState<'followers' | 'following' | null>(null);
   const [tab, setTab] = useState<'posts' | 'reposts' | 'tagged' | 'shop'>('posts');
   // Tagged posts of a private profile you don't follow stay hidden.
@@ -94,7 +96,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
 
   return (
     <div className="yp-shell__inner">
-      <div className="profile__cover" style={profile.coverUrl ? { backgroundImage: `url(${profile.coverUrl})` } : undefined} />
+      <ProfileCover profile={profile} onEdit={rel.isSelf ? () => setSheet('cover') : undefined} />
       <div className="profile__head">
         <Avatar name={profile.displayName} src={profile.avatarUrl} size="xl" />
         <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -107,6 +109,12 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
               @{profile.username} {profile.mode !== 'personal' ? <Badge tone="neutral">{profile.mode}</Badge> : null}{' '}
               {profile.isPrivate ? <Badge tone="neutral">Private</Badge> : null}
             </span>
+            {profile.nowStatus ? <NowStatusLine status={profile.nowStatus} /> : null}
+            {rel.isSelf ? (
+              <Button size="sm" variant="ghost" icon={profile.nowStatus ? undefined : 'plus'} className="now-status__edit" onClick={() => setSheet('status')}>
+                {profile.nowStatus ? 'Edit status' : 'Set a status'}
+              </Button>
+            ) : null}
           </div>
           {rel.isSelf ? (
             <div className="row">
@@ -130,6 +138,12 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
               <Link href="/plus" className="yp-btn yp-btn--ghost yp-btn--sm">
                 {t('plus.short')}
               </Link>
+              <Link href="/circles" className="yp-btn yp-btn--ghost yp-btn--sm">
+                Circles
+              </Link>
+              <Button size="sm" variant="ghost" icon="link" onClick={() => setSheet('share')}>
+                Share profile
+              </Button>
             </div>
           ) : signedOut ? (
             <div className="row">
@@ -138,6 +152,9 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
               </Button>
               <Button size="sm" variant="secondary" icon="message" onClick={signIn}>
                 {t('profile.message')}
+              </Button>
+              <Button size="sm" variant="ghost" icon="link" onClick={() => setSheet('share')}>
+                Share profile
               </Button>
             </div>
           ) : (
@@ -170,6 +187,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
               <Menu
                 label="More"
                 actions={[
+                  { label: 'Share profile', icon: 'link', onSelect: () => setSheet('share') },
                   rel.friends
                     ? { label: 'Remove friend', icon: 'users', onSelect: act(() => api.users.unfriend(profile.id), 'Removed from friends') }
                     : rel.friendRequest === 'sent'
@@ -305,6 +323,18 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
         onFollowChange={reload}
       />
       <ReportSheet target={reporting ? { type: 'user', id: profile.id } : null} onClose={() => setReporting(false)} />
+      <ShareProfileSheet open={sheet === 'share'} onClose={() => setSheet(null)} profile={profile} />
+      {rel.isSelf ? (
+        <>
+          <CoverSheet open={sheet === 'cover'} onClose={() => setSheet(null)} profile={profile} onSaved={setProfile} />
+          <NowStatusSheet
+            open={sheet === 'status'}
+            onClose={() => setSheet(null)}
+            current={profile.nowStatus}
+            onSaved={(nowStatus) => setProfile({ ...profile, nowStatus })}
+          />
+        </>
+      ) : null}
     </div>
   );
 }

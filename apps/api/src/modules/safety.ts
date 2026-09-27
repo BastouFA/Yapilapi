@@ -8,6 +8,7 @@ import { badRequest, conflict, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { audit, getFlags, notify } from '../lib/services.ts';
 import { applyMediaDecision } from '../lib/media-moderation.ts';
+import { notifyReleasedPosts } from '../lib/collabs.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -109,6 +110,8 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
         await applyMediaDecision(c, ctx.realtime, mc, input.decision);
         if (input.decision === 'suspend_user') await applyDecision(c, mc, input.decision);
       } else await applyDecision(c, mc, input.decision);
+      // A post cleared from review goes out now: tell the people invited to co-author it or tagged in it.
+      if (input.decision === 'no_action' && mc.target_type === 'post') await notifyReleasedPosts(c, ctx.realtime, [mc.target_id]);
       // Spam signals attached to this item follow the decision.
       if (!isAd)
         await c.query(
@@ -289,6 +292,7 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
         // Posts made while the account was limited were only visible to their author.
         await c.query(`UPDATE posts SET moderation_status = 'normal' WHERE id = ANY($1::uuid[]) AND moderation_status = 'restricted'`, [heldPosts]);
         await releaseMessages(c, flaggedMessages);
+        await notifyReleasedPosts(c, ctx.realtime, [...flaggedPosts, ...heldPosts]);
       } else {
         await c.query(`UPDATE users SET restricted_at = coalesce(restricted_at, now()) WHERE id = $1 AND role = 'user'`, [id]);
         await c.query(`UPDATE posts SET moderation_status = 'removed' WHERE id = ANY($1::uuid[]) AND moderation_status IN ('review', 'restricted')`, [
