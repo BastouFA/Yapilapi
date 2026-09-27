@@ -349,3 +349,61 @@ test('room: join and raise a hand', async ({ page }, info) => {
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/c\//);
 });
+
+test('reels: keys, toggles, the scrubber and the options sheet', async ({ page }) => {
+  const d = seed();
+  await page.goto(`/reels?start=${d.reel2Id}`);
+  const reel = page.locator('.reel--active');
+  const slider = reel.getByRole('slider', { name: 'Position in the reel' });
+  await expect(slider).toBeVisible();
+  // The reel's length is known once its video has loaded.
+  await expect.poll(async () => Number(await slider.getAttribute('aria-valuemax')), { timeout: 15_000 }).toBeGreaterThan(0);
+
+  // M and C switch sound and clear view; both are toggles with aria-pressed.
+  const sound = reel.getByRole('button', { name: 'Sound', exact: true });
+  await expect(sound).toHaveAttribute('aria-pressed', 'false');
+  await page.keyboard.press('m');
+  await expect(sound).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('m');
+  await expect(sound).toHaveAttribute('aria-pressed', 'false');
+  const clear = reel.getByRole('button', { name: 'Clear view', exact: true });
+  await page.keyboard.press('c');
+  await expect(clear).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('c');
+  await expect(clear).toHaveAttribute('aria-pressed', 'false');
+
+  // Space plays or pauses (the play button's name follows).
+  const play = reel.locator('.reel__play');
+  const before = await play.getAttribute('aria-label');
+  await page.keyboard.press(' ');
+  await expect(play).not.toHaveAttribute('aria-label', before!);
+
+  // The scrubber is a slider: Home to the start, arrows a second at a time.
+  await slider.focus();
+  await page.keyboard.press('Home');
+  await expect(slider).toHaveAttribute('aria-valuenow', '0');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect(slider).toHaveAttribute('aria-valuenow', '2');
+  await expect(slider).toHaveAttribute('aria-valuetext', /^0:02 of 0:0\d$/);
+
+  // The options sheet: focus moves in, Tab stays in, Escape closes it and returns focus.
+  const options = reel.getByRole('button', { name: 'Reel options' });
+  await options.focus();
+  await page.keyboard.press('Enter');
+  const sheet = page.getByRole('dialog', { name: 'Reel options' });
+  await expect(sheet).toBeVisible();
+  expect(await focusInside(page, '[role="dialog"]')).toBe(true);
+  await auditOpen(page, '[role="dialog"]');
+  await tabStaysInside(page, '[role="dialog"]');
+  await page.keyboard.press('Escape');
+  await expect(sheet).toBeHidden();
+  await expect(options).toBeFocused();
+
+  // J moves to another reel, and the address follows it.
+  await page.keyboard.press('j');
+  await expect(page).not.toHaveURL(new RegExp(d.reel2Id));
+  await expect(page).toHaveURL(/\/reels\?start=/);
+  await page.keyboard.press('k');
+  await expect(page).toHaveURL(new RegExp(d.reel2Id));
+});

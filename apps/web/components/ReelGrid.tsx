@@ -12,7 +12,7 @@ import { useSession } from '@/app/providers';
  * Reels player. Loads a page at a time with a "Show more" button.
  */
 export function ReelGrid({ load, reloadKey, empty }: { load: (cursor?: string) => Promise<Page<Post>>; reloadKey: string; empty: string }) {
-  const { locale, toast, dataSaver } = useSession();
+  const { locale, toast, dataSaver, t } = useSession();
   const [items, setItems] = useState<Post[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -52,7 +52,7 @@ export function ReelGrid({ load, reloadKey, empty }: { load: (cursor?: string) =
               <Link
                 href={`/reels?start=${p.id}`}
                 className="reel-grid__item"
-                aria-label={`Reel by ${p.author.displayName}${p.body ? `: ${p.body.slice(0, 80)}` : ''}`}
+                aria-label={`${t('reel.card.label', { name: p.author.displayName })}${p.body ? ` ${p.body.slice(0, 80)}` : ''}`}
               >
                 {m && videoPoster(m, dataSaver.active) ? (
                   <img src={videoPoster(m, dataSaver.active)} alt="" loading="lazy" />

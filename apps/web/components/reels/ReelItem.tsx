@@ -725,7 +725,7 @@ export function ReelItem({
               ) : null}
               {highlights.length ? (
                 <div className="reel__marks">
-                  <h3>{t('reel.highlights')}</h3>
+                  <h2>{t('reel.highlights')}</h2>
                   <ul>
                     {highlights.map((h) => (
                       <li key={h.atMs}>

@@ -29,6 +29,9 @@ export interface SeedData {
   /** Whether the recap video finished rendering before the tests started. */
   recapReady: boolean;
   soundId: string;
+  /** Ben's reels: the first plain, the second with highlights and a moment comment. */
+  reelId: string;
+  reel2Id: string;
   /** The message Ben sent that the keyboard test replies to. */
   replyTargetId: string;
 }
@@ -218,6 +221,22 @@ export default async function globalSetup(config: FullConfig) {
     }),
   );
   const soundId = reel.post.sound.id as string;
+  // A second reel by Ben, with highlights and a moment comment from the main user, for the Reels viewer checks.
+  const clip2 = await upload(friend.ctx, 'clip.mp4', 'video/mp4', 'The yellow square again, slower');
+  const reel2 = await must(
+    friend.ctx.post('/api/v1/posts', {
+      data: {
+        format: 'reel',
+        body: 'Second batch: the crust at 1 minute, the crumb at 4. #baking',
+        media: [{ id: clip2.id, url: clip2.url, kind: 'video' }],
+        highlights: [
+          { atMs: 1000, label: 'Crust' },
+          { atMs: 4000, label: 'Crumb' },
+        ],
+      },
+    }),
+  );
+  await must(main.ctx.post(`/api/v1/posts/${reel2.post.id}/comments`, { data: { body: 'That crumb looks perfect', atMs: 4200 } }));
 
   // Ben's story, with music and stickers, for the story viewer checks.
   await must(
@@ -292,6 +311,8 @@ export default async function globalSetup(config: FullConfig) {
     recapId: recap.recap.id,
     recapReady,
     soundId,
+    reelId: reel.post.id,
+    reel2Id: reel2.post.id,
     replyTargetId: reminder.message.id,
   };
   await writeFile(DATA, JSON.stringify(data, null, 2));

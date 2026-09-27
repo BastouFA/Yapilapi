@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
 import type { Comment, CommentPage, Post, PublicUser } from '../../../../packages/shared/src/types';
 import type { CommentPolicy, CommentSort } from '../../../../packages/shared/src/constants';
+import { formatReelTime } from '../../../../packages/shared/src/reels';
 import { client, errorMessage } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { useAutocomplete } from '../../lib/autocomplete';
@@ -36,7 +37,10 @@ type Controls = Omit<CommentPage, 'items' | 'nextCursor'>;
  * edits within 15 minutes, and the post author's tools (who can comment, pin, hidden comments).
  */
 export default function PostScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // From Reels, `atMs` is where the viewer was: a new comment on the reel can point to that moment.
+  const { id, atMs: atParam } = useLocalSearchParams<{ id: string; atMs?: string }>();
+  const momentMs = atParam !== undefined && /^\d+$/.test(atParam) ? Number(atParam) : null;
+  const [pointAt, setPointAt] = useState(false);
   const c = useColors();
   const { t, tp, timeAgo } = useT();
   const insets = useSafeAreaInsets();
@@ -149,7 +153,9 @@ export default function PostScreen() {
     run(async () => {
       setBusy(true);
       try {
-        const { comment } = await (await client()).posts.comment(post.id, body.trim(), replyTo?.id);
+        const atMs = pointAt && !replyTo && momentMs !== null && post.format === 'reel' ? momentMs : undefined;
+        const { comment } = await (await client()).posts.comment(post.id, body.trim(), replyTo?.id, atMs);
+        setPointAt(false);
         if (comment.parentId) {
           const parentId = comment.parentId;
           setThreads((cur) => {
@@ -304,6 +310,30 @@ export default function PostScreen() {
                   {x.editedAt ? ` · ${t('comments.edited')}` : ''}
                 </Text>
               </Text>
+              {x.atMs !== null && x.atMs !== undefined ? (
+                // A moment comment: plays the reel from that moment.
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('reel.moment.seek', { time: formatReelTime(x.atMs) })}
+                  hitSlop={10}
+                  onPress={() => router.push({ pathname: '/reels', params: { start: x.postId, at: String(x.atMs) } })}
+                  style={{
+                    alignSelf: 'flex-start',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    minHeight: 28,
+                    paddingHorizontal: 8,
+                    borderRadius: 8,
+                    backgroundColor: c.yapiSoft,
+                  }}
+                >
+                  <Icon name="play" size={11} color={c.ink} />
+                  <Text style={{ color: c.ink, fontWeight: '700', fontSize: 12, fontVariant: ['tabular-nums'] }}>
+                    {t('reel.moment.at', { time: formatReelTime(x.atMs) })}
+                  </Text>
+                </Pressable>
+              ) : null}
               {editing?.id === x.id ? (
                 <View style={{ gap: space[2] }}>
                   <TextInput
@@ -567,6 +597,17 @@ export default function PostScreen() {
                 </View>
               ) : null}
               {ac.list}
+              {momentMs !== null && post.format === 'reel' && !replyTo ? (
+                <Pressable
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: pointAt }}
+                  onPress={() => setPointAt((v) => !v)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: 44 }}
+                >
+                  <Icon name={pointAt ? 'checkbox' : 'square-outline'} size={22} color={pointAt ? c.yapi : c.inkMuted} />
+                  <Text style={{ color: c.ink, fontSize: 14 }}>{t('reel.moment.attach', { time: formatReelTime(momentMs) })}</Text>
+                </Pressable>
+              ) : null}
               <View style={{ flexDirection: 'row', gap: space[2], alignItems: 'flex-end' }}>
                 <TextInput
                   {...ac.inputProps}
