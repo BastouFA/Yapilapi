@@ -88,21 +88,25 @@ async function processImage(deps: ProcessDeps, m: MediaRow) {
   const base = key.replace(/\.[^.]+$/, '');
   const meta = await sharp(original).metadata();
   const variants: Record<string, string> = {};
+  // Bytes of each size, so clients on Data saver can pick one and say what loading the full photo costs.
+  const bytes: Record<string, number> = { original: original.length };
   for (const [name, width] of Object.entries(IMAGE_SIZES)) {
     if (meta.width && meta.width < width && name !== 'thumb') continue;
     const out = await sharp(original).rotate().resize({ width, withoutEnlargement: true }).webp({ quality: 80 }).toBuffer();
     variants[name] = (await deps.storage.putKey(`${base}_${name}.webp`, out, 'image/webp')).url;
+    bytes[name] = out.length;
   }
   // A tiny blurred preview shown while the real image loads (low-bandwidth friendly).
   const tiny = await sharp(original).rotate().resize({ width: 16 }).webp({ quality: 40 }).toBuffer();
   await deps.db.query(
-    `UPDATE media SET variants = $2, width = coalesce(width, $3), height = coalesce(height, $4), blurhash = $5, status = 'ready' WHERE id = $1`,
+    `UPDATE media SET variants = $2, width = coalesce(width, $3), height = coalesce(height, $4), blurhash = $5, variant_bytes = $6, status = 'ready' WHERE id = $1`,
     [
       id,
       variants,
       meta.autoOrient?.width ?? meta.width ?? null,
       meta.autoOrient?.height ?? meta.height ?? null,
       `data:image/webp;base64,${tiny.toString('base64')}`,
+      bytes,
     ],
   );
   if (deps.moderator && deps.moderator.name !== 'none') {
@@ -235,6 +239,11 @@ async function processVideo(deps: ProcessDeps, m: MediaRow) {
         dir,
       );
     });
+    // The 360p rung as a plain MP4 too (copied from the HLS segments, not encoded again): browsers without HLS play it on Data saver.
+    const low = await run(['-i', 'v0.m3u8', '-c', 'copy', '-movflags', '+faststart', 'low.mp4'], dir).then(
+      () => true,
+      () => false,
+    );
     const posterJpg = await readFile(path.join(dir, 'poster.jpg'));
     const poster = await deps.storage.putKey(`${base}_poster.jpg`, posterJpg, 'image/jpeg');
     // A tiny blurred preview of the poster frame, like photos have: shown while loading, and as the locked preview of a reel for subscribers.
@@ -243,22 +252,46 @@ async function processVideo(deps: ProcessDeps, m: MediaRow) {
       .webp({ quality: 40 })
       .toBuffer()
       .catch(() => null);
+    // A small poster for feeds on Data saver.
+    const thumbWebp = await sharp(posterJpg)
+      .resize({ width: IMAGE_SIZES.thumb, withoutEnlargement: true })
+      .webp({ quality: 70 })
+      .toBuffer()
+      .catch(() => null);
     const mp4 = await deps.storage.putFile(path.join(dir, 'web.mp4'), 'mp4', 'video/mp4', `${base}_web.mp4`);
+    const variants: Record<string, string> = { mp4: mp4.url };
+    const bytes: Record<string, number> = {
+      original: (await stat(input)).size,
+      mp4: (await stat(path.join(dir, 'web.mp4'))).size,
+      poster: posterJpg.length,
+    };
+    if (thumbWebp) {
+      variants.thumb = (await deps.storage.putKey(`${base}_thumb.webp`, thumbWebp, 'image/webp')).url;
+      bytes.thumb = thumbWebp.length;
+    }
+    if (low) {
+      variants.mp4_360 = (await deps.storage.putFile(path.join(dir, 'low.mp4'), 'mp4', 'video/mp4', `${base}_360.mp4`)).url;
+      bytes.mp4_360 = (await stat(path.join(dir, 'low.mp4'))).size;
+    }
     let hls: string | null = null;
     for (const f of await readdir(dir)) {
       if (!/\.(m3u8|ts)$/.test(f)) continue;
-      const stored = await deps.storage.putKey(
-        `${base}_hls/${f}`,
-        await readFile(path.join(dir, f)),
-        f.endsWith('.m3u8') ? 'application/vnd.apple.mpegurl' : 'video/mp2t',
-      );
+      const data = await readFile(path.join(dir, f));
+      const stored = await deps.storage.putKey(`${base}_hls/${f}`, data, f.endsWith('.m3u8') ? 'application/vnd.apple.mpegurl' : 'video/mp2t');
       if (f === 'index.m3u8') hls = stored.url;
+      // v0 is the 360p rendition, v1 the 720p one: count what each costs to watch through.
+      const rung = /^v([01])[._]/.exec(f)?.[1];
+      if (rung) {
+        const k = rung === '0' ? 'hls_360' : 'hls_720';
+        bytes[k] = (bytes[k] ?? 0) + data.length;
+      }
+      if (f === 'v0.m3u8') variants.hls_360 = stored.url;
     }
     await deps.db.query(
-      `UPDATE media SET poster_url = $2, hls_url = $3, variants = jsonb_build_object('mp4', $4::text), status = 'ready',
+      `UPDATE media SET poster_url = $2, hls_url = $3, variants = $4, status = 'ready',
                         duration_ms = coalesce($5, duration_ms), width = coalesce(width, $6), height = coalesce(height, $7),
-                        blurhash = coalesce($8, blurhash) WHERE id = $1`,
-      [id, poster.url, hls, mp4.url, info.durationMs, info.width, info.height, tiny ? `data:image/webp;base64,${tiny.toString('base64')}` : null],
+                        blurhash = coalesce($8, blurhash), variant_bytes = $9 WHERE id = $1`,
+      [id, poster.url, hls, variants, info.durationMs, info.width, info.height, tiny ? `data:image/webp;base64,${tiny.toString('base64')}` : null, bytes],
     );
     if (deps.moderator && deps.moderator.name !== 'none') {
       // The poster plus a few frames sampled across the video.

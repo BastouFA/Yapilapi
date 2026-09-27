@@ -10,6 +10,8 @@ import { radius, space } from '../lib/theme';
 import { Avatar, Button, Card, Field, Icon, Loading, Notice, Row, Segmented, SwitchRow, Title, useColors, userText } from '../lib/ui';
 import { VerificationCard } from '../lib/safety';
 import { registerForPush } from '../lib/push';
+import { CAN_DETECT_CELLULAR, useDataSaver, type DeviceDataSaver } from '../lib/data-saver';
+import type { DataSaverMode } from '../../../packages/shared/src/data-saver';
 
 /** Settings: email and phone confirmation, family supervision and advertising consent (same endpoints as the web settings page). */
 export default function Settings() {
@@ -57,6 +59,7 @@ export default function Settings() {
         end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
         onPress={() => router.push('/recaps')}
       />
+      <DataSaver />
       <Sharing />
       <Tagging />
       <VerificationCard />
@@ -172,6 +175,62 @@ function Tagging() {
       ) : !error ? (
         <Loading />
       ) : null}
+    </Card>
+  );
+}
+
+/**
+ * Data saver: Off / On / Automatic on the account (it follows the person to other devices),
+ * and this phone's own choice. Automatic needs to know Wi-Fi from mobile data, which this
+ * app can't tell yet, so on the phone it works like Off and the card says so.
+ */
+function DataSaver() {
+  const c = useColors();
+  const { t } = useT();
+  const ds = useDataSaver();
+  const [error, setError] = useState<string | null>(null);
+  const modes: { id: DataSaverMode; label: string }[] = [
+    { id: 'off', label: t('dataSaver.off') },
+    { id: 'on', label: t('dataSaver.on') },
+    { id: 'auto', label: t('dataSaver.auto') },
+  ];
+  const deviceChoices: { id: DeviceDataSaver; label: string }[] = [{ id: 'account', label: t('dataSaver.deviceAccount') }, ...modes];
+  return (
+    <Card style={{ gap: space[3] }}>
+      <Title sub={t('dataSaver.hint')}>{t('dataSaver.title')}</Title>
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      <Segmented
+        options={modes}
+        value={ds.account}
+        label={t('dataSaver.title')}
+        onChange={(v) => {
+          setError(null);
+          ds.setAccount(v).catch((e) => setError(errorMessage(e)));
+        }}
+      />
+      <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('dataSaver.account')}</Text>
+      {!CAN_DETECT_CELLULAR && (ds.mode === 'auto' || ds.account === 'auto') ? <Notice>{t('dataSaver.autoMobile')}</Notice> : null}
+      <View accessibilityRole="radiogroup" accessibilityLabel={t('dataSaver.device')} style={{ gap: space[1] }}>
+        <Text style={{ color: c.ink, fontSize: 15, fontWeight: '700' }}>{t('dataSaver.device')}</Text>
+        {deviceChoices.map(({ id, label }) => {
+          const on = ds.device === id;
+          return (
+            <Pressable
+              key={id}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: on }}
+              onPress={() => ds.setDevice(id)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44 }}
+            >
+              <Icon name={on ? 'radio-button-on' : 'radio-button-off'} size={22} color={on ? c.yapi : c.inkMuted} />
+              <Text style={{ color: c.ink, fontSize: 15, fontWeight: on ? '700' : '500' }}>{label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <Text accessibilityLiveRegion="polite" style={{ color: c.ink, fontSize: 14, fontWeight: '600' }}>
+        {ds.active ? t('dataSaver.nowOn') : t('dataSaver.nowOff')}
+      </Text>
     </Card>
   );
 }

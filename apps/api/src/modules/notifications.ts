@@ -1,5 +1,13 @@
 import type { FastifyInstance } from 'fastify';
-import { attentionSchema, NOTIFICATION_CATEGORIES, notificationPrefsSchema, pageQuerySchema, type NotificationItem } from '@yapilapi/shared';
+import {
+  attentionSchema,
+  dataSaverSchema,
+  NOTIFICATION_CATEGORIES,
+  notificationPrefsSchema,
+  pageQuerySchema,
+  type DataSaverMode,
+  type NotificationItem,
+} from '@yapilapi/shared';
 import { parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
@@ -60,7 +68,27 @@ export default async function notificationsModule(app: FastifyInstance, ctx: App
         dailyTimeBudgetMinutes: p.daily_time_budget_minutes ?? null,
         notificationsPausedUntil: p.notifications_paused_until ?? null,
       },
+      dataSaver: (p.data_saver ?? 'auto') as DataSaverMode,
     };
+  });
+
+  /**
+   * Data saver, saved on the account so it follows the person to every device: 'off', 'on',
+   * or 'auto' (apps turn it on by themselves on slow or metered connections). Also in /v1/auth/me.
+   */
+  app.get('/v1/me/data-saver', { preHandler: requireAuth }, async (req) => {
+    const { rows } = await db.query(`SELECT data_saver FROM user_preferences WHERE user_id = $1`, [me(req).id]);
+    return { mode: (rows[0]?.data_saver ?? 'auto') as DataSaverMode };
+  });
+
+  app.put('/v1/me/data-saver', { preHandler: requireAuth }, async (req) => {
+    const { mode } = parse(dataSaverSchema, req.body);
+    await db.query(
+      `INSERT INTO user_preferences (user_id, data_saver) VALUES ($1,$2)
+       ON CONFLICT (user_id) DO UPDATE SET data_saver = EXCLUDED.data_saver, updated_at = now()`,
+      [me(req).id, mode],
+    );
+    return { mode };
   });
 
   app.put('/v1/me/preferences/notifications', { preHandler: requireAuth }, async (req) => {

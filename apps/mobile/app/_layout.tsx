@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { BoardsProvider } from '../lib/boards';
 import { CallsProvider } from '../lib/calls';
+import { DataSaverProvider } from '../lib/data-saver';
 import { LocaleProvider, useT } from '../lib/i18n';
 import { SessionProvider, useSession } from '../lib/session';
 import { useColors } from '../lib/ui';
@@ -83,15 +84,17 @@ function Screens() {
 export default function Root() {
   return (
     <SessionProvider>
-      <LocaleProvider>
-        <CallsProvider>
-          <BoardsProvider>
-            <Heartbeat />
-            <Screens />
-            <YapPlayer />
-          </BoardsProvider>
-        </CallsProvider>
-      </LocaleProvider>
+      <DataSaverProvider>
+        <LocaleProvider>
+          <CallsProvider>
+            <BoardsProvider>
+              <Heartbeat />
+              <Screens />
+              <YapPlayer />
+            </BoardsProvider>
+          </CallsProvider>
+        </LocaleProvider>
+      </DataSaverProvider>
     </SessionProvider>
   );
 }

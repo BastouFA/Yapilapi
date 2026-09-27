@@ -1,4 +1,5 @@
 import type { StoryCard } from './stories.ts';
+import type { DataSaverMode } from './data-saver.ts';
 import type { BoardVisibility, CircleKind, CommunityRole, NowStatusAudience, NowStatusIcon, PostKind, ProfileMode, Visibility } from './constants.ts';
 
 export interface PublicUser {
@@ -28,6 +29,8 @@ export interface Me extends PublicUser {
   country: string | null;
   /** When YAPILAPI Plus ends (it never renews on its own), or null without Plus. */
   plusUntil: string | null;
+  /** Data saver, as saved on the account (PUT /v1/me/data-saver). A device may override it locally. */
+  dataSaver: DataSaverMode;
 }
 
 /** A short "Now" line, for 24 hours. `audience` is only included for its owner. */
@@ -76,8 +79,14 @@ export interface MediaItem {
   altText: string | null;
   width: number | null;
   height: number | null;
-  /** Processed sizes (thumb/medium/large webp for images; mp4 for video). Empty until processing finishes. */
+  /**
+   * Processed sizes. Photos: thumb/medium/large webp. Videos: mp4 (web MP4), mp4_360 (the
+   * lowest MP4), hls_360 (the 360p HLS rung) and thumb (a small poster). Empty until
+   * processing finishes. On lite responses (?lite=1 or Save-Data: on) `large` is left out.
+   */
   variants?: Record<string, string>;
+  /** Bytes of the original ("original") and of each processed size, keyed like `variants` (plus "poster", "hls_720"). */
+  sizes?: Record<string, number>;
   posterUrl?: string | null;
   /** Adaptive HLS stream for videos. */
   hlsUrl?: string | null;

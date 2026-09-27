@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRef, type ComponentProps, type ReactNode, type Ref } from 'react';
+import { useRef, useState, type ComponentProps, type ReactNode, type Ref } from 'react';
 import {
   ActivityIndicator,
   I18nManager,
@@ -18,7 +18,9 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { smallAvatarUrl } from '../../../packages/shared/src/data-saver';
 import { mediaUrl } from './api';
+import { useDataSaver } from './data-saver';
 import { useT } from './i18n';
 import { elevation, gradient, palette, radius, space } from './theme';
 
@@ -219,7 +221,19 @@ export function Segmented<T extends string>({
 
 export function Avatar({ name, url, size = 40 }: { name: string; url?: string | null; size?: number }) {
   const c = useColors();
-  if (url) return <Image source={{ uri: mediaUrl(url) }} accessibilityIgnoresInvertColors style={{ width: size, height: size, borderRadius: size / 2 }} />;
+  // Data saver: the smallest processed size, or the original if there isn't one.
+  const saver = useDataSaver().active;
+  const [smallFailed, setSmallFailed] = useState<string | null>(null);
+  const small = saver && url && smallFailed !== url ? smallAvatarUrl(mediaUrl(url)) : null;
+  if (url)
+    return (
+      <Image
+        source={{ uri: small ?? mediaUrl(url) }}
+        onError={small && small !== mediaUrl(url) ? () => setSmallFailed(url) : undefined}
+        accessibilityIgnoresInvertColors
+        style={{ width: size, height: size, borderRadius: size / 2 }}
+      />
+    );
   const initials =
     name
       .split(/\s+/)

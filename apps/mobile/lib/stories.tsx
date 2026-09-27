@@ -29,6 +29,7 @@ import type { Story, StoryGroup } from '../../../packages/api-client/src/index';
 import type { StickerResults, StorySticker } from '../../../packages/shared/src/stories';
 import type { PublicUser } from '../../../packages/shared/src/types';
 import { client, errorMessage, mediaUrl, webUrl } from './api';
+import { useDataSaver } from './data-saver';
 import { useT } from './i18n';
 import { RichText } from './post';
 import { useSession } from './session';
@@ -176,7 +177,11 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
   // Sensitive stories wait, blurred and paused, until the viewer chooses to see them.
   const [revealed, setRevealed] = useState<string[]>([]);
   const covered = !!story?.sensitive && !revealed.includes(story.id);
-  const stopped = held || paused || typing || viewers !== null || covered || sharing || answering || chapterFor !== null;
+  // Data saver: a video shows its poster until tapped, then plays its 360p file; photos use the medium size.
+  const saver = useDataSaver().active;
+  const [tapped, setTapped] = useState<string[]>([]);
+  const waiting = saver && story?.mediaKind === 'video' && !tapped.includes(story.id);
+  const stopped = held || paused || typing || viewers !== null || covered || sharing || answering || chapterFor !== null || waiting;
   // The story's music, in a loop while it's on screen and playing (instead of a video's own sound).
   const [musicOn, setMusicOn] = useMusicOn();
   const music = !covered ? (story?.music ?? null) : null;
@@ -296,7 +301,8 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
 
   if (!group || !story) return null;
   const name = group.author.displayName;
-  const uri = story.mediaUrl ? mediaUrl(story.mediaUrl) : null;
+  const small = !saver ? null : story.mediaKind === 'video' ? story.variants?.mp4_360 : story.variants?.medium;
+  const uri = story.mediaUrl ? mediaUrl(small ?? story.mediaUrl) : null;
   const patchStory = (patch: Partial<Story>) =>
     onChange(groups.map((x, gi) => (gi !== g ? x : { ...x, moments: x.moments.map((m, mi) => (mi === i ? { ...m, ...patch } : m)) })));
   const addToStory = async (visibility: string) => {
@@ -358,6 +364,10 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
               ) : null}
               <SensitiveCover onReveal={() => setRevealed((r) => [...r, story.id])} />
             </>
+          ) : story.mediaKind === 'video' && uri && waiting ? (
+            story.posterUrl ? (
+              <Image key={story.id} source={{ uri: mediaUrl(story.posterUrl) }} style={StyleSheet.absoluteFill} resizeMode="contain" />
+            ) : null
           ) : story.mediaKind === 'video' && uri ? (
             <StoryVideo key={story.id} uri={uri} paused={stopped} muted={!!story.music} onProgress={setProgress} onEnd={next} />
           ) : story.mediaKind === 'image' && uri ? (
@@ -377,6 +387,18 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
 
         {/* Text, reshare cards and stickers sit above the tap area; only their own controls take touches. */}
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+          {waiting && !covered ? (
+            <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]} pointerEvents="box-none">
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('dataSaver.play')}
+                onPress={() => setTapped((x) => [...x, story.id])}
+                style={{ width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.45)' }}
+              >
+                <Icon name="play" size={40} color={WHITE} />
+              </Pressable>
+            </View>
+          ) : null}
           {!uri && !story.reshareOf && !covered ? (
             <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', padding: space[6] }]} pointerEvents="box-none">
               <RichText text={story.body} style={{ color: WHITE, fontSize: 28, fontWeight: '800', textAlign: 'center', lineHeight: 36 }} />

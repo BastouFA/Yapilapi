@@ -1360,6 +1360,45 @@ h3 {
   pointer-events: none;
   text-shadow: 0 2px 12px #000;
 }
+/* Data saver: reels wait for a tap; the play button takes it. */
+/* Data saver: a story video waits on its poster until tapped. */
+.story__play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 3;
+  width: 80px;
+  height: 80px;
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  cursor: pointer;
+}
+.story__play:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.reel__paused--button {
+  inset: auto;
+  top: 50%;
+  left: 50%;
+  width: 96px;
+  height: 96px;
+  transform: translate(-50%, -50%);
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+  cursor: pointer;
+}
+.reel__paused--button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
 .reel__info {
   position: absolute;
   inset-inline: 12px 72px;

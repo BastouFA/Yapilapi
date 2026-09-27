@@ -14,6 +14,7 @@ import { FamilyCard } from '@/components/Family';
 import { CloseFriendsCard } from '@/components/CloseFriends';
 import { PurchasesCard } from '@/components/Shop';
 import { VerificationCard } from '@/components/Verification';
+import { DataSaverCard } from '@/components/DataSaver';
 import { useSession } from '../../providers';
 
 export default function Settings() {
@@ -52,6 +53,9 @@ export default function Settings() {
             <PlusAndInvites />
             <PurchasesCard />
             <ProfileSettings />
+            <div id="data-saver">
+              <DataSaverCard />
+            </div>
           </div>
         ) : tab === 'attention' ? (
           <AttentionSettings />

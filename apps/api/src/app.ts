@@ -25,6 +25,7 @@ import { mediaModeratorFromConfig } from './lib/media-moderation.ts';
 import { registerAuth } from './plugins/auth.ts';
 import { MAX_UPLOAD_BYTES } from './modules/media.ts';
 import authModule from './modules/auth.ts';
+import { registerDataSaver } from './lib/data-saver.ts';
 import profilesModule from './modules/profiles.ts';
 import postsModule from './modules/posts.ts';
 import draftsModule from './modules/drafts.ts';
@@ -228,7 +229,15 @@ export async function buildApp(
   await app.register(multipart, { limits: { fileSize: MAX_UPLOAD_BYTES } });
   await app.register(websocket);
   if (storage.driver === 'local')
-    await app.register(fastifyStatic, { root: path.resolve(config.UPLOAD_DIR), prefix: '/media/', decorateReply: false, maxAge: '365d', immutable: true });
+    await app.register(fastifyStatic, {
+      root: path.resolve(config.UPLOAD_DIR),
+      prefix: '/media/',
+      decorateReply: false,
+      maxAge: '365d',
+      immutable: true,
+      // Lets the web app count the bytes of media it loads (Settings, "Data used this session").
+      setHeaders: (res) => void res.header('timing-allow-origin', '*'),
+    });
   else
     app.get('/media/*', { config: { rateLimit: false } }, async (req, reply) => {
       const key = (req.params as { '*': string })['*'];
@@ -236,7 +245,7 @@ export async function buildApp(
       if (!/^[\w/.-]+$/.test(key) || key.includes('..') || key.startsWith('private/')) return reply.code(404).send();
       const obj = await storage.get!(key, req.headers.range);
       if (!obj) return reply.code(404).send({ error: { code: 'not_found', message: 'Media not found.' } });
-      reply.code(obj.status).header('cache-control', 'public, max-age=31536000, immutable').header('accept-ranges', 'bytes');
+      reply.code(obj.status).header('cache-control', 'public, max-age=31536000, immutable').header('accept-ranges', 'bytes').header('timing-allow-origin', '*');
       if (obj.contentType) reply.type(obj.contentType);
       if (obj.contentLength !== undefined) reply.header('content-length', obj.contentLength);
       if (obj.contentRange) reply.header('content-range', obj.contentRange);
@@ -253,6 +262,8 @@ export async function buildApp(
   });
 
   registerAuth(app, ctx);
+  // Lite responses for Data saver (?lite=1 or Save-Data: on).
+  registerDataSaver(app);
 
   // Metrics: request counts and latency by route, exposed in Prometheus text format.
   const metrics = new Map<string, { count: number; errors: number; totalMs: number }>();

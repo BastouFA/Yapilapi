@@ -2,7 +2,9 @@ import { router } from 'expo-router';
 import { Fragment, useEffect, useState } from 'react';
 import { Alert, Image, Platform, Pressable, Share, Text, View, type StyleProp, type TextStyle } from 'react-native';
 import type { Conversation, PhotoTag, Post, PublicUser } from '../../../packages/shared/src/types';
+import { formatBytes } from '../../../packages/shared/src/data-saver';
 import { client, errorMessage, mediaUrl, webUrl } from './api';
+import { useDataSaver } from './data-saver';
 import { useBoards, type SaveChange } from './boards';
 import { useSession } from './session';
 import { useT, type Translate } from './i18n';
@@ -152,7 +154,13 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
   const [revealed, setRevealed] = useState(false);
   const image = post.media.find((m) => m.kind === 'image');
   const covered = !!image?.sensitive && !revealed;
-  const imageUri = image ? (image.variants?.medium ?? image.url) : null;
+  // Data saver: the small size first, over its blurred preview, with "Load full photo" for the usual size.
+  const saver = useDataSaver().active;
+  const [fullPhoto, setFullPhoto] = useState(false);
+  const usualUri = image ? (image.variants?.medium ?? image.url) : null;
+  const smallUri = image && saver && !fullPhoto ? (image.variants?.thumb ?? null) : null;
+  const imageUri = smallUri ?? usualUri;
+  const fullBytes = image?.sizes?.medium ?? image?.sizes?.original;
   const isAuthor = !!me && post.author.id === me.id;
   // Co-authoring: your invite to this post (if any), who accepted, and (on your own posts) who hasn't answered yet.
   const [collab, setCollab] = useState(post.viewer.collab);
@@ -385,17 +393,49 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
             accessibilityElementsHidden={covered}
             onPress={() => setShowTags((v) => !v)}
           >
+            {saver && image?.placeholder ? (
+              <Image
+                source={{ uri: image.placeholder }}
+                blurRadius={20}
+                style={{ position: 'absolute', top: 0, bottom: 0, start: 0, end: 0 }}
+                resizeMode="cover"
+                accessibilityIgnoresInvertColors
+              />
+            ) : null}
             <Image
               source={{ uri: mediaUrl(imageUri) }}
               blurRadius={covered ? 40 : 0}
               style={{
                 width: '100%',
                 aspectRatio: image?.width && image?.height ? Math.max(0.75, Math.min(1.9, image.width / image.height)) : 4 / 3,
-                backgroundColor: c.surfaceSunken,
+                backgroundColor: saver && image?.placeholder ? 'transparent' : c.surfaceSunken,
               }}
               resizeMode="cover"
             />
           </Pressable>
+          {smallUri && smallUri !== usualUri && !covered ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setFullPhoto(true)}
+              style={{
+                position: 'absolute',
+                bottom: space[2],
+                alignSelf: 'center',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: space[3],
+                paddingVertical: 6,
+                borderRadius: 999,
+                backgroundColor: 'rgba(0,0,0,0.65)',
+              }}
+            >
+              <Icon name="image-outline" size={14} color="#FFFFFF" />
+              <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '600' }}>
+                {fullBytes ? t('dataSaver.loadFullSize', { size: formatBytes(fullBytes) }) : t('dataSaver.loadFull')}
+              </Text>
+            </Pressable>
+          ) : null}
           {tags.length && !covered ? (
             <View
               pointerEvents="none"

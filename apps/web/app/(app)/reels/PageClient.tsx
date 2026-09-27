@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AuthorNames, Avatar, EmptyState, Icon, Menu, SensitiveCover, Skeleton, TaggedText, useLongPress } from '@yapilapi/design-system';
-import type { Post } from '@yapilapi/shared';
+import { AuthorNames, Avatar, EmptyState, Icon, Menu, SensitiveCover, Skeleton, TaggedText, useDataSaver, useLongPress } from '@yapilapi/design-system';
+import { videoPoster, videoSrc, type Post } from '@yapilapi/shared';
 import { NextLink } from '@/lib/link';
 import { api, errorMessage } from '@/lib/api';
 import { CommentsSheet, PostList, ReportSheet } from '@/components/PostList';
@@ -507,17 +507,22 @@ function ReelVideo({
   const lastTap = useRef(0);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const media = post.media[0];
-  const src = (media?.variants as Record<string, string> | undefined)?.mp4 ?? media?.url;
+  // Data saver: nothing plays until tapped, from the small poster, and the 360p file plays.
+  const saver = useDataSaver();
+  const { t } = useSession();
+  const src = media ? videoSrc(media, saver) : undefined;
   // Duets play beside the original (left); reels using another sound play that sound instead of their own.
   const original = post.remixOf?.mode === 'duet' ? (post.remixOf.post?.media ?? null) : null;
-  const originalSrc = original ? ((original.variants as Record<string, string> | undefined)?.mp4 ?? original.url) : null;
+  const originalSrc = original ? videoSrc(original, saver) : null;
   const borrowed = !original && post.sound && !post.sound.original ? post.sound.audioUrl : null;
   const companion = useRef<HTMLVideoElement & HTMLAudioElement>(null);
   // A sensitive reel plays blurred until the viewer chooses to see it.
   const [revealed, setRevealed] = useState(false);
   const covered = !!media?.sensitive && !revealed;
 
-  // Play only the reel that is mostly on screen.
+  const saverRef = useRef(saver);
+  saverRef.current = saver;
+  // Play only the reel that is mostly on screen (on Data saver, only when tapped).
   useEffect(() => {
     const el = box.current;
     if (!el) return;
@@ -527,6 +532,7 @@ function ReelVideo({
         if (!v) return;
         if (entry!.intersectionRatio >= 0.6) {
           onVisible();
+          if (saverRef.current) return;
           void v.play().then(
             () => setPlaying(true),
             () => setPlaying(false),
@@ -546,7 +552,11 @@ function ReelVideo({
   const togglePlay = () => {
     const v = video.current;
     if (!v) return;
-    if (v.paused) void v.play().then(() => setPlaying(true));
+    if (v.paused)
+      void v.play().then(
+        () => setPlaying(true),
+        () => setPlaying(false),
+      );
     else {
       v.pause();
       setPlaying(false);
@@ -563,26 +573,26 @@ function ReelVideo({
           ref={companion}
           className="reel__video reel__video--original"
           src={originalSrc}
-          poster={original?.posterUrl ?? undefined}
+          poster={original ? videoPoster(original, saver) : undefined}
           muted={muted}
           loop
           playsInline
-          preload="metadata"
+          preload={saver ? 'none' : 'metadata'}
           aria-label={`Original reel by ${post.remixOf?.post?.author.displayName ?? ''}`}
           onClick={togglePlay}
         />
       ) : null}
-      {borrowed ? <audio ref={companion} src={borrowed} muted={muted} loop preload="metadata" /> : null}
+      {borrowed ? <audio ref={companion} src={borrowed} muted={muted} loop preload={saver ? 'none' : 'metadata'} /> : null}
       {src ? (
         <video
           ref={video}
           className={covered ? 'reel__video yp-blurred' : 'reel__video'}
           src={src}
-          poster={media?.posterUrl ?? undefined}
+          poster={media ? videoPoster(media, saver) : undefined}
           muted={muted || !!borrowed}
           loop
           playsInline
-          preload="metadata"
+          preload={saver ? 'none' : 'metadata'}
           aria-label={media?.altText || post.body || `Video by ${post.author.displayName}`}
           onPlay={(e) => follow(e.currentTarget, companion.current, 'play')}
           onPause={(e) => follow(e.currentTarget, companion.current, 'pause')}
@@ -618,7 +628,13 @@ function ReelVideo({
         />
       ) : null}
       {covered ? <SensitiveCover onReveal={() => setRevealed(true)} /> : null}
-      {!playing && !covered ? (
+      {!playing && !covered && saver ? (
+        <button type="button" className="reel__paused reel__paused--button" onClick={togglePlay} aria-label={t('dataSaver.play')}>
+          <svg viewBox="0 0 24 24" width="64" height="64" aria-hidden>
+            <path d="M8 5v14l11-7z" fill="currentColor" />
+          </svg>
+        </button>
+      ) : !playing && !covered ? (
         <span className="reel__paused" aria-hidden>
           <svg viewBox="0 0 24 24" width="64" height="64">
             <path d="M8 5v14l11-7z" fill="currentColor" />

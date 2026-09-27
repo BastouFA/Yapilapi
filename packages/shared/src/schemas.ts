@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DATA_SAVER_MODES } from './data-saver.ts';
 import {
   CIRCLE_KINDS,
   COMMUNITY_ROLES,
@@ -198,6 +199,8 @@ export const photoTagSchema = photoTagSpot.extend({ mediaId: uuid });
 
 /** Who may tag you in photos. */
 export const tagSettingsSchema = z.object({ allowFrom: z.enum(['everyone', 'following', 'nobody']) });
+/** PUT /v1/me/data-saver. */
+export const dataSaverSchema = z.object({ mode: z.enum(DATA_SAVER_MODES) });
 
 export const feedQuerySchema = z.object({
   mode: z.enum(FEED_MODES).default('for_you'),

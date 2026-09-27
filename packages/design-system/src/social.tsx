@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useId, useRef, useState, type ComponentType, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import {
   extractHashtags,
+  formatBytes,
   formatMoney,
+  imageSrc,
+  videoPoster,
+  videoSrc,
   formatRelativeTime,
   safeTimeZone,
   splitRichText,
@@ -17,6 +21,7 @@ import {
 } from '@yapilapi/shared';
 import { Icon, type IconName } from './icons.tsx';
 import { Avatar, Badge, Button, cx, PlusBadge, useModalFocus } from './primitives.tsx';
+import { useDataSaver } from './data-saver.tsx';
 
 /** A link component (e.g. next/link). Defaults to a plain anchor. */
 export type LinkLike = ComponentType<{ href: string; className?: string; children?: ReactNode; 'aria-current'?: 'page' | undefined; 'aria-label'?: string }>;
@@ -153,11 +158,19 @@ export function MediaGrid({ media, tagOptions }: { media: MediaItem[]; tagOption
   const [revealed, setRevealed] = useState(false);
   // Tapping a photo with people tagged in it shows or hides their names on every photo of the post.
   const [showTags, setShowTags] = useState(false);
+  // Data saver: photos load small first; "Load full photo" swaps in the full size, one photo at a time.
+  const saver = useDataSaver();
+  const [full, setFull] = useState<ReadonlySet<string>>(() => new Set());
   if (!media.length) return null;
   const shown = media.slice(0, 4);
   const hidden = (m: MediaItem) => !!m.sensitive && !revealed;
   // The full-screen viewer only steps through what isn't covered.
   const viewable = media.filter((m) => !hidden(m));
+  const photoSrc = (m: MediaItem) => imageSrc(m, { saver, full: full.has(m.id), grid: shown.length > 1 });
+  const loadFull = (m: MediaItem) =>
+    saver && !full.has(m.id) && photoSrc(m) !== imageSrc(m, { saver, full: true, grid: shown.length > 1 })
+      ? () => setFull((f) => new Set(f).add(m.id))
+      : undefined;
   return (
     <>
       <div className={cx('yp-media', `yp-media--${Math.min(shown.length, 4)}`)}>
@@ -173,14 +186,35 @@ export function MediaGrid({ media, tagOptions }: { media: MediaItem[]; tagOption
             <TaggedPhoto
               key={m.id}
               media={m}
-              src={(shown.length > 1 ? m.variants?.medium : (m.variants?.large ?? m.variants?.medium)) ?? m.url}
+              src={photoSrc(m)}
               label={m.altText ? m.altText : `Photo ${i + 1} of ${media.length}`}
               showTags={showTags}
               onToggle={() => setShowTags((v) => !v)}
               onOpen={() => setOpen(i)}
               more={i === 3 && media.length > 4 ? media.length - 4 : 0}
               options={tagOptions}
+              onLoadFull={loadFull(m)}
             />
+          ) : m.kind === 'image' && loadFull(m) ? (
+            <div key={m.id} className="yp-media__item yp-media__item--saver">
+              <button
+                type="button"
+                className="yp-media__hit"
+                onClick={() => setOpen(i)}
+                aria-label={m.altText ? `Open: ${m.altText}` : `Open media ${i + 1} of ${media.length}`}
+              >
+                <img
+                  src={photoSrc(m)}
+                  alt={m.altText ?? ''}
+                  loading="lazy"
+                  decoding="async"
+                  style={m.placeholder ? { backgroundImage: `url(${m.placeholder})`, backgroundSize: 'cover' } : undefined}
+                />
+                {m.altText ? <AltBadge /> : null}
+                {i === 3 && media.length > 4 ? <span className="yp-media__more">+{media.length - 4}</span> : null}
+              </button>
+              <LoadFullPhoto media={m} onLoad={loadFull(m)!} />
+            </div>
           ) : (
             <button
               key={m.id}
@@ -190,12 +224,19 @@ export function MediaGrid({ media, tagOptions }: { media: MediaItem[]; tagOption
               aria-label={m.altText ? `Open: ${m.altText}` : `Open media ${i + 1} of ${media.length}`}
             >
               {m.kind === 'video' ? (
-                <video src={m.variants?.mp4 ?? m.url} poster={m.posterUrl ?? undefined} muted playsInline preload="metadata" />
+                <>
+                  <video src={videoSrc(m, saver)} poster={videoPoster(m, saver)} muted playsInline preload={saver ? 'none' : 'metadata'} />
+                  {saver ? (
+                    <span className="yp-media__play" aria-hidden>
+                      <Icon name="play" size={22} />
+                    </span>
+                  ) : null}
+                </>
               ) : m.kind === 'audio' ? (
                 <span className="yp-media__more">♪</span>
               ) : (
                 <img
-                  src={(shown.length > 1 ? m.variants?.medium : (m.variants?.large ?? m.variants?.medium)) ?? m.url}
+                  src={photoSrc(m)}
                   alt={m.altText ?? ''}
                   loading="lazy"
                   decoding="async"
@@ -212,6 +253,17 @@ export function MediaGrid({ media, tagOptions }: { media: MediaItem[]; tagOption
         <MediaViewer media={viewable} index={Math.max(0, viewable.indexOf(media[open]!))} onClose={() => setOpen(null)} />
       ) : null}
     </>
+  );
+}
+
+/** Data saver: the button that loads a photo's full size, with what it costs when the size is known. */
+function LoadFullPhoto({ media: m, onLoad }: { media: MediaItem; onLoad: () => void }) {
+  const bytes = m.sizes?.large ?? m.sizes?.medium ?? m.sizes?.original;
+  return (
+    <button type="button" className="yp-media__full" onClick={onLoad}>
+      <Icon name="image" size={14} />
+      {bytes ? `Load full photo (${formatBytes(bytes)})` : 'Load full photo'}
+    </button>
   );
 }
 
@@ -252,6 +304,7 @@ function TaggedPhoto({
   onOpen,
   more,
   options = {},
+  onLoadFull,
 }: {
   media: MediaItem;
   src: string;
@@ -261,6 +314,8 @@ function TaggedPhoto({
   onOpen: () => void;
   more: number;
   options?: MediaTagOptions;
+  /** Data saver: shown while the small size is on screen. */
+  onLoadFull?: () => void;
 }) {
   const { linkAs: L = A, viewerId, canRemoveAny, onRemoveTag } = options;
   const img = useRef<HTMLImageElement>(null);
@@ -304,6 +359,7 @@ function TaggedPhoto({
       <button type="button" className="yp-media__open" onClick={onOpen} aria-label={`Open ${label} full screen`}>
         <Icon name="image" size={16} />
       </button>
+      {onLoadFull ? <LoadFullPhoto media={m} onLoad={onLoadFull} /> : null}
       {showTags ? (
         <ul className="yp-phototags" aria-label={`People tagged in ${label}`}>
           {tags.map((t) => {
@@ -356,6 +412,8 @@ export const videoCrossOrigin = (captions?: CaptionTrackRef[] | null) => (captio
 /** Full-screen media viewer: arrow keys to move, Escape to close, alt text shown. */
 export function MediaViewer({ media, index, onClose }: { media: MediaItem[]; index: number; onClose: () => void }) {
   const [i, setI] = useState(index);
+  // Data saver: videos wait for play and use the lowest MP4; photos open at the medium size.
+  const saver = useDataSaver();
   const ref = useRef<HTMLDivElement>(null);
   const m = media[i]!;
   const go = useCallback((d: number) => setI((x) => (x + d + media.length) % media.length), [media.length]);
@@ -387,11 +445,12 @@ export function MediaViewer({ media, index, onClose }: { media: MediaItem[]; ind
         {m.kind === 'video' ? (
           <video
             key={m.id}
-            src={m.variants?.mp4 ?? m.url}
-            poster={m.posterUrl ?? undefined}
+            src={videoSrc(m, saver)}
+            poster={videoPoster(m, saver)}
             crossOrigin={videoCrossOrigin(m.captions)}
             controls
-            autoPlay
+            autoPlay={!saver}
+            preload={saver ? 'none' : undefined}
             playsInline
           >
             <CaptionTracks captions={m.captions} />
@@ -399,7 +458,11 @@ export function MediaViewer({ media, index, onClose }: { media: MediaItem[]; ind
         ) : m.kind === 'audio' ? (
           <audio src={m.url} controls />
         ) : (
-          <img src={m.variants?.large ?? m.url} alt={m.altText ?? ''} />
+          <img
+            src={saver ? (m.variants?.medium ?? imageSrc(m)) : imageSrc(m)}
+            alt={m.altText ?? ''}
+            style={m.placeholder ? { backgroundImage: `url(${m.placeholder})`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat' } : undefined}
+          />
         )}
       </div>
       {media.length > 1 ? (

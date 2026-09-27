@@ -18,8 +18,9 @@ const authLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } };
 
 export async function loadMe(ctx: AppContext, userId: string): Promise<Me> {
   const { rows } = await ctx.db.query(
-    `SELECT u.id, u.email, u.email_verified_at, u.phone_e164, u.phone_verified_at, u.restricted_at, u.role, u.onboarded_at, pr.username, pr.display_name, pr.avatar_url, pr.mode, pr.locale, pr.country, pr.plus_until
-     FROM users u JOIN profiles pr ON pr.user_id = u.id WHERE u.id = $1`,
+    `SELECT u.id, u.email, u.email_verified_at, u.phone_e164, u.phone_verified_at, u.restricted_at, u.role, u.onboarded_at, pr.username, pr.display_name, pr.avatar_url, pr.mode, pr.locale, pr.country, pr.plus_until,
+            coalesce(up.data_saver, 'auto') AS data_saver
+     FROM users u JOIN profiles pr ON pr.user_id = u.id LEFT JOIN user_preferences up ON up.user_id = u.id WHERE u.id = $1`,
     [userId],
   );
   const r = rows[0];
@@ -42,6 +43,7 @@ export async function loadMe(ctx: AppContext, userId: string): Promise<Me> {
     country: r.country?.trim() ?? null,
     ...(r.plus_until && r.plus_until > new Date() ? { plus: true } : {}),
     plusUntil: r.plus_until && r.plus_until > new Date() ? r.plus_until.toISOString() : null,
+    dataSaver: r.data_saver,
   };
 }
 

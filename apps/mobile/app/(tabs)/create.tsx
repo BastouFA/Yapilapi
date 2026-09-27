@@ -24,6 +24,8 @@ import {
 } from '../../lib/media';
 import { PhotoEditor, VideoEditor } from '../../lib/editor';
 import { useSession } from '../../lib/session';
+import { formatBytes } from '../../../../packages/shared/src/data-saver';
+import { listQueuedVideos, queuedAsAsset, queueVideo, removeQueuedVideo, useDataSaver, type QueuedVideo } from '../../lib/data-saver';
 import { radius, space } from '../../lib/theme';
 import { Button, Card, Field, Icon, Notice, Screen, Segmented, SwitchRow, useColors, useTabBarSpace, userText } from '../../lib/ui';
 import { isVerificationError, VerifyPrompt } from '../../lib/safety';
@@ -112,6 +114,15 @@ export default function Create() {
   const [hasPlans, setHasPlans] = useState(false);
   const [editing, setEditing] = useState<Picked | null>(null);
   const [applying, setApplying] = useState(false);
+  // Data saver: a video picked on Data saver waits here, with what it costs to upload, until the
+  // person chooses Upload now or Upload later on Wi-Fi. Videos saved for later are listed below.
+  const saver = useDataSaver().active;
+  const [confirmVideo, setConfirmVideo] = useState<Picked | null>(null);
+  const [later, setLater] = useState<QueuedVideo[]>([]);
+  const fromQueue = useRef<string | null>(null);
+  useEffect(() => {
+    void listQueuedVideos().then(setLater);
+  }, []);
   const uploading = progress !== null;
   useEffect(() => {
     if (!me) return;
@@ -256,9 +267,14 @@ export default function Create() {
   }
 
   /** A photo or video from the library, the camera or the "+" button: check it, then edit or upload it. */
-  function handlePicked(asset: Picked) {
+  function handlePicked(asset: Picked, o: { confirmed?: boolean } = {}) {
     const check = validate(asset);
-    if (check) return setError(check);
+    if (check) {
+      fromQueue.current = null;
+      return setError(check);
+    }
+    // On Data saver, say what a video costs to upload and offer to keep it for Wi-Fi.
+    if (saver && asset.type === 'video' && !o.confirmed) return setConfirmVideo(asset);
     // Photos (not GIFs) and videos open in the editor first.
     if (asset.type === 'video' || (asset.type === 'image' && asset.mimeType !== 'image/gif')) setEditing(asset);
     else void upload(asset, null);
@@ -269,6 +285,12 @@ export default function Create() {
     setProgress(0);
     try {
       const m = await uploadPicked(asset, setProgress);
+      // A video saved for Wi-Fi is done once it is uploaded.
+      if (fromQueue.current) {
+        await removeQueuedVideo(fromQueue.current);
+        fromQueue.current = null;
+        setLater(await listQueuedVideos());
+      }
       const seconds = asset.duration ? asset.duration / 1000 : null;
       if (!edits) return setMedia({ ...m, local: asset.uri, seconds });
       setApplying(true);
@@ -278,6 +300,8 @@ export default function Create() {
       const url = done.kind === 'video' ? (done.variants.mp4 ?? done.url) : (done.variants.large ?? done.variants.medium ?? done.url);
       setMedia({ id: done.id, kind: m.kind, url, local: mediaUrl(url), seconds: done.durationMs ? done.durationMs / 1000 : seconds });
     } catch (e) {
+      // A video saved for Wi-Fi that failed to upload stays saved.
+      fromQueue.current = null;
       setError(errorMessage(e));
     } finally {
       setApplying(false);
@@ -490,6 +514,74 @@ export default function Create() {
             onPress={() => void choose()}
             style={{ alignSelf: 'flex-start' }}
           />
+          {confirmVideo ? (
+            <Notice tone="warn" title={t('dataSaver.title')}>
+              <Text style={{ color: c.ink, lineHeight: 20 }}>
+                {confirmVideo.fileSize ? `${t('dataSaver.videoSize', { size: formatBytes(confirmVideo.fileSize) })} ` : ''}
+                {t('dataSaver.videoWifi')}
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+                <Button
+                  label={t('dataSaver.uploadNow')}
+                  size="sm"
+                  onPress={() => {
+                    const a = confirmVideo;
+                    setConfirmVideo(null);
+                    handlePicked(a, { confirmed: true });
+                  }}
+                />
+                <Button
+                  label={t('dataSaver.uploadLater')}
+                  size="sm"
+                  variant="secondary"
+                  onPress={async () => {
+                    const a = confirmVideo;
+                    setConfirmVideo(null);
+                    try {
+                      await queueVideo(a);
+                      setLater(await listQueuedVideos());
+                      setNote(t('dataSaver.queued'));
+                    } catch (e) {
+                      setError(errorMessage(e));
+                    }
+                  }}
+                />
+              </View>
+            </Notice>
+          ) : null}
+          {later.length ? (
+            <View style={{ gap: space[2] }}>
+              <Text style={{ color: c.ink, fontWeight: '700', fontSize: 14 }}>{t('dataSaver.queueTitle')}</Text>
+              <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('dataSaver.queueHint')}</Text>
+              {later.map((q) => (
+                <View key={q.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+                  <Icon name="videocam-outline" size={18} color={c.inkMuted} />
+                  <Text style={{ color: c.ink, flex: 1, fontSize: 14 }} numberOfLines={1}>
+                    {[q.duration ? clock(q.duration / 1000) : null, q.fileSize ? formatBytes(q.fileSize) : null].filter(Boolean).join(' · ') || q.fileName}
+                  </Text>
+                  <Button
+                    label={t('dataSaver.uploadNow')}
+                    size="sm"
+                    variant="secondary"
+                    disabled={uploading || busy}
+                    onPress={() => {
+                      fromQueue.current = q.id;
+                      handlePicked(queuedAsAsset(q), { confirmed: true });
+                    }}
+                  />
+                  <Button
+                    label={t('dataSaver.remove')}
+                    size="sm"
+                    variant="ghost"
+                    onPress={async () => {
+                      await removeQueuedVideo(q.id);
+                      setLater(await listQueuedVideos());
+                    }}
+                  />
+                </View>
+              ))}
+            </View>
+          ) : null}
           {denied ? (
             <Notice tone="warn">
               <Text style={{ color: c.ink, lineHeight: 20 }}>{t('m.create.photosPermission')}</Text>
@@ -630,7 +722,10 @@ export default function Create() {
           asset={editing}
           maxSeconds={me.plus ? PLUS_REEL_MAX_SECONDS : REEL_MAX_SECONDS}
           mustFit={kind === 'reel'}
-          onCancel={() => setEditing(null)}
+          onCancel={() => {
+            fromQueue.current = null;
+            setEditing(null);
+          }}
           onDone={(edits) => {
             setEditing(null);
             void upload(editing, edits);
@@ -639,7 +734,10 @@ export default function Create() {
       ) : editing ? (
         <PhotoEditor
           asset={editing}
-          onCancel={() => setEditing(null)}
+          onCancel={() => {
+            fromQueue.current = null;
+            setEditing(null);
+          }}
           onDone={(p) => {
             setEditing(null);
             const edited =
