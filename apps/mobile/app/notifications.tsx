@@ -9,7 +9,7 @@ import { useT, type Translator } from '../lib/i18n';
 import { notificationHref } from '../lib/links';
 import { useRealtime, useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
-import { Avatar, Button, EmptyState, Loading, Notice, useColors, userText } from '../lib/ui';
+import { Avatar, Button, EmptyState, Notice, SkeletonList, useColors, userText } from '../lib/ui';
 
 /** What each kind of notification says; {name} is the person (or the people, for grouped ones). */
 const TEXT: Record<string, MessageKey> = {
@@ -215,7 +215,12 @@ export default function Notifications() {
         <Notice>{t('m.common.signedOut')}</Notice>
       </View>
     );
-  if (!items) return <Loading />;
+  if (!items)
+    return (
+      <View style={{ flex: 1, backgroundColor: c.ground, padding: space[4] }}>
+        <SkeletonList />
+      </View>
+    );
 
   return (
     <SectionList

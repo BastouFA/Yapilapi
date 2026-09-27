@@ -1,4 +1,5 @@
 import { router, Stack } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { Pressable, Text } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { BoardsProvider } from '../lib/boards';
@@ -11,12 +12,27 @@ import { useColors } from '../lib/ui';
 import { useUsageHeartbeat } from '../lib/usage';
 import { YapPlayer } from '../lib/yaps';
 import { useNotificationLinks } from '../lib/links';
+import { OfflineBanner } from '../lib/offline';
 
 function Heartbeat() {
   const { me } = useSession();
   useUsageHeartbeat(!!me);
   useNotificationLinks();
+  useWelcomeAfterSignOut();
   return null;
+}
+
+/** Signing out (from Settings, or a session that ended) goes back to the welcome screen. */
+function useWelcomeAfterSignOut() {
+  const { me } = useSession();
+  const was = useRef(me);
+  useEffect(() => {
+    const before = was.current;
+    was.current = me;
+    if (!before || me !== null) return;
+    if (router.canDismiss()) router.dismissAll();
+    router.replace('/welcome');
+  }, [me]);
 }
 
 /**
@@ -78,6 +94,10 @@ function Screens() {
         <Stack.Screen name="invite" options={{ title: t('invite.title') }} />
         <Stack.Screen name="find-friends" options={{ title: t('friends.title') }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="welcome" options={{ headerShown: false, gestureEnabled: false, animation: 'fade' }} />
+        <Stack.Screen name="signup" options={{ title: '' }} />
+        <Stack.Screen name="login" options={{ title: '' }} />
+        <Stack.Screen name="forgot-password" options={{ title: '' }} />
         <Stack.Screen name="c/[slug]" options={{ title: t('m.title.community') }} />
         <Stack.Screen name="room/[id]" options={{ title: t('m.rooms.title') }} />
         <Stack.Screen name="settings" options={{ title: t('m.title.settings') }} />
@@ -129,6 +149,7 @@ export default function Root() {
                 <Heartbeat />
                 <Screens />
                 <YapPlayer />
+                <OfflineBanner />
               </BoardsProvider>
             </CallsProvider>
           </TranslationProvider>

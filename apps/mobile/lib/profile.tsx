@@ -9,7 +9,7 @@ import { pickOne, uploadPicked } from './media';
 import { liveStatus, NowStatusLine, onStatusChanged } from './now-status';
 import { PostCard, RichText } from './post';
 import { radius, space } from './theme';
-import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, PlusBadge, Segmented, useColors, userText } from './ui';
+import { Avatar, Button, Card, EmptyState, Icon, Notice, PlusBadge, Segmented, Skeleton, SkeletonList, useColors, userText } from './ui';
 import { ShopList } from './money';
 import { isVerificationError, VerifyPrompt } from './safety';
 import { ChaptersRow } from './chapters';
@@ -94,7 +94,7 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
     setCursor(page.nextCursor);
   };
 
-  if (profile === undefined) return <Loading />;
+  if (profile === undefined) return <ProfileSkeleton bottom={bottom} />;
   if (profile === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>
@@ -374,17 +374,52 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
           <ProfileBoards username={profile.username} isSelf={rel.isSelf} />
         ) : tab === 'tagged' ? (
           !tagged ? (
-            <Loading />
+            <SkeletonList kind="post" count={2} />
           ) : tagged.hidden ? (
             <EmptyState title={t('m.profile.private')} />
           ) : (
             <EmptyState title={t('m.tagged.empty')} body={rel.isSelf ? t('m.tagged.emptySelf') : undefined} />
           )
+        ) : rel.isSelf && !locked ? (
+          // Your own profile with nothing on it yet: the way to your first post.
+          <EmptyState
+            icon="camera-outline"
+            title={t('m.empty.you.title')}
+            body={t('m.empty.you.body')}
+            action={{ label: t('m.empty.you.action'), icon: 'add', onPress: () => router.push('/camera') }}
+          />
         ) : (
           <EmptyState title={locked ? t('m.profile.private') : t('m.profile.noPosts')} />
         )
       }
     />
+  );
+}
+
+/** The shape of a profile while it loads: cover, photo, name, counts, then a couple of posts. */
+function ProfileSkeleton({ bottom }: { bottom: number }) {
+  const c = useColors();
+  const { t } = useT();
+  return (
+    <View
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={t('common.loading')}
+      style={{ flex: 1, backgroundColor: c.ground, paddingBottom: bottom }}
+    >
+      <Skeleton height={120} radius={0} />
+      <View style={{ padding: space[4], gap: space[3], marginTop: -36 }}>
+        <Skeleton width={84} height={84} radius={42} style={{ borderWidth: 3, borderColor: c.ground }} />
+        <Skeleton width="50%" height={18} />
+        <Skeleton width="30%" height={12} />
+        <View style={{ flexDirection: 'row', gap: space[4] }}>
+          <Skeleton width={64} height={28} />
+          <Skeleton width={64} height={28} />
+          <Skeleton width={64} height={28} />
+        </View>
+        <SkeletonList kind="post" count={2} />
+      </View>
+    </View>
   );
 }
 

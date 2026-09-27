@@ -1,5 +1,5 @@
-import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { PublicUser } from '../../../packages/shared/src/types';
@@ -26,6 +26,12 @@ export default function NewGroup() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const req = useRef(0);
+  // Opened from "Start a chat" (Yap with no chats yet): the same picker, one person or more.
+  const { chat } = useLocalSearchParams<{ chat?: string }>();
+  const navigation = useNavigation();
+  useLayoutEffect(() => {
+    if (chat) navigation.setOptions({ title: t('m.empty.yap.start') });
+  }, [chat, navigation, t]);
 
   useEffect(() => {
     const n = ++req.current;

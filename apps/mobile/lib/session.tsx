@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
+import { ApiError } from '../../../packages/api-client/src/index';
 import type { Me } from '../../../packages/shared/src/types';
 import { client, getToken, realtimeUrl, signOut as apiSignOut } from './api';
+import { onBackOnline } from './network';
 
 export type RealtimeEvent = { type: string; data?: any };
 type Listener = (e: RealtimeEvent) => void;
@@ -57,9 +59,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
+      if (!(await getToken())) return setMe(null);
       const api = await client();
       setMe((await api.auth.me()).user);
-    } catch {
+    } catch (e) {
+      // Offline with a saved session: stay signed in (and keep loading) rather than showing the
+      // welcome screen; the check runs again when the connection is back.
+      if (e instanceof ApiError && e.code === 'network') return setMe((cur) => cur);
       setMe(null);
     }
   }, []);
@@ -67,6 +73,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Started offline: find out who is signed in as soon as the connection is back.
+  const meRef = useRef(me);
+  meRef.current = me;
+  useEffect(
+    () =>
+      onBackOnline(() => {
+        if (meRef.current === undefined) void refresh();
+      }),
+    [refresh],
+  );
 
   const signOut = useCallback(async () => {
     await apiSignOut();

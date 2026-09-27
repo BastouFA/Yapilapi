@@ -92,6 +92,10 @@ export function FriendsFinder({ onChecked }: { onChecked?: (r: { checked: number
       <Text style={{ color: c.inkMuted, fontSize: 15, lineHeight: 21 }}>{t('friends.body')}</Text>
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {state === 'idle' ? <Button label={t('friends.allow')} icon="people-outline" onPress={() => void check()} /> : null}
+      {/* Rather not share contacts (or can't): the invite link works without them. */}
+      {link && (state === 'idle' || state === 'denied') ? (
+        <Button label={t('m.friends.shareLink')} icon="share-outline" variant="secondary" onPress={() => void invite()} />
+      ) : null}
       {state === 'checking' ? (
         <View style={{ gap: space[2], alignItems: 'center', paddingVertical: space[4] }}>
           <Loading />

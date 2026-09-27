@@ -1,8 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRef, useState, type ComponentProps, type ReactNode, type Ref } from 'react';
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode, type Ref } from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
+  Animated,
   I18nManager,
   Image,
   Pressable,
@@ -125,17 +127,54 @@ export function Button({
   );
 }
 
-export function Field(props: TextInputProps & { label: string; hideLabel?: boolean; ref?: Ref<TextInput> }) {
+/**
+ * A labelled text field. `hint` is a line under it (read out as the field's hint); `error` replaces
+ * the hint in the danger colour and outlines the field. `end` puts a control inside the field at the
+ * end (a show-password button, for example).
+ */
+export function Field({
+  hint,
+  error,
+  end,
+  ...props
+}: TextInputProps & { label: string; hideLabel?: boolean; ref?: Ref<TextInput>; hint?: string; error?: string | null; end?: ReactNode }) {
   const c = useColors();
+  const below = error || hint;
+  const input = (
+    <TextInput
+      accessibilityLabel={props.label}
+      accessibilityHint={below || undefined}
+      placeholderTextColor={c.inkMuted}
+      {...props}
+      style={[
+        s.input,
+        userText,
+        { borderColor: error ? c.danger : c.line, color: c.ink, backgroundColor: c.surface },
+        end ? { paddingEnd: 48 } : null,
+        props.style,
+      ]}
+    />
+  );
   return (
     <View style={{ gap: space[1] }}>
       {props.hideLabel ? null : <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{props.label}</Text>}
-      <TextInput
-        accessibilityLabel={props.label}
-        placeholderTextColor={c.inkMuted}
-        {...props}
-        style={[s.input, userText, { borderColor: c.line, color: c.ink, backgroundColor: c.surface }, props.style]}
-      />
+      {end ? (
+        <View style={{ justifyContent: 'center' }}>
+          {input}
+          <View style={{ position: 'absolute', end: 0, top: 0, bottom: 0, justifyContent: 'center' }}>{end}</View>
+        </View>
+      ) : (
+        input
+      )}
+      {below ? (
+        <Text
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+          style={{ color: error ? c.danger : c.inkMuted, fontSize: 12, lineHeight: 16, fontWeight: error ? '600' : '400' }}
+        >
+          {below}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -325,12 +364,147 @@ export function Title({ children, sub }: { children: ReactNode; sub?: string }) 
   );
 }
 
-export function EmptyState({ title, body }: { title: string; body?: string }) {
+/**
+ * What a screen shows when it has nothing yet. With `action`, it points to the next useful thing
+ * to do (a button); `secondary` adds a quieter second choice; `icon` sits in a soft circle on top.
+ */
+export function EmptyState({
+  title,
+  body,
+  icon,
+  action,
+  secondary,
+  children,
+}: {
+  title: string;
+  body?: string;
+  icon?: IconName;
+  action?: { label: string; onPress: () => void; icon?: IconName };
+  secondary?: { label: string; onPress: () => void; icon?: IconName };
+  children?: ReactNode;
+}) {
   const c = useColors();
   return (
     <View style={{ alignItems: 'center', padding: space[6], gap: space[2] }}>
-      <Text style={{ color: c.ink, fontSize: 17, fontWeight: '700', textAlign: 'center' }}>{title}</Text>
-      {body ? <Text style={{ color: c.inkMuted, textAlign: 'center', lineHeight: 20 }}>{body}</Text> : null}
+      {icon ? (
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: 22,
+            backgroundColor: c.yapiSoft,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: space[1],
+          }}
+        >
+          <Icon name={icon} size={30} color={c.yapi} />
+        </View>
+      ) : null}
+      <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 17, fontWeight: '700', textAlign: 'center' }}>
+        {title}
+      </Text>
+      {body ? <Text style={{ color: c.inkMuted, textAlign: 'center', lineHeight: 20, maxWidth: 340 }}>{body}</Text> : null}
+      {action || secondary ? (
+        <View style={{ gap: space[2], marginTop: space[2], alignSelf: 'stretch', alignItems: 'center' }}>
+          {action ? <Button label={action.label} icon={action.icon} onPress={action.onPress} style={{ minWidth: 220 }} /> : null}
+          {secondary ? <Button label={secondary.label} icon={secondary.icon} variant="ghost" onPress={secondary.onPress} /> : null}
+        </View>
+      ) : null}
+      {children}
+    </View>
+  );
+}
+
+/**
+ * A grey placeholder the shape of what is loading, softly pulsing (still, with Reduce Motion).
+ * Hidden from screen readers: the list around it says "Loading" once.
+ */
+export function Skeleton({
+  width,
+  height,
+  radius: r = radius.sm,
+  style,
+}: {
+  width?: number | `${number}%`;
+  height: number;
+  radius?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const c = useColors();
+  const pulse = useSkeletonPulse();
+  return (
+    <Animated.View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={[{ width: width ?? '100%', height, borderRadius: r, backgroundColor: c.surfaceSunken, opacity: pulse }, style]}
+    />
+  );
+}
+
+// One shared animation for every placeholder on screen, so they pulse together.
+let sharedPulse: Animated.Value | null = null;
+let pulseUsers = 0;
+let pulseLoop: Animated.CompositeAnimation | null = null;
+function useSkeletonPulse() {
+  const [value] = useState(() => (sharedPulse ??= new Animated.Value(1)));
+  useEffect(() => {
+    let cancelled = false;
+    pulseUsers++;
+    void AccessibilityInfo.isReduceMotionEnabled().then((reduce) => {
+      if (cancelled || reduce || pulseLoop) return;
+      pulseLoop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(value, { toValue: 0.45, duration: 700, useNativeDriver: true }),
+          Animated.timing(value, { toValue: 1, duration: 700, useNativeDriver: true }),
+        ]),
+      );
+      pulseLoop.start();
+    });
+    return () => {
+      cancelled = true;
+      if (--pulseUsers === 0) {
+        pulseLoop?.stop();
+        pulseLoop = null;
+        value.setValue(1);
+      }
+    };
+  }, [value]);
+  return value;
+}
+
+/** Placeholders for a list while it loads: posts (Pulse, profiles) or rows (chats, notifications). */
+export function SkeletonList({ kind = 'row', count = kind === 'post' ? 3 : 6 }: { kind?: 'post' | 'row'; count?: number }) {
+  const c = useColors();
+  const { t } = useT();
+  return (
+    <View accessible accessibilityRole="progressbar" accessibilityLabel={t('common.loading')} style={{ gap: space[3] }}>
+      {Array.from({ length: count }, (_, i) =>
+        kind === 'post' ? (
+          <View key={i} style={[s.card, { backgroundColor: c.surface, gap: space[3] }, elevation(c)]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
+              <Skeleton width={40} height={40} radius={20} />
+              <View style={{ flex: 1, gap: 6 }}>
+                <Skeleton width="45%" height={12} />
+                <Skeleton width="25%" height={10} />
+              </View>
+            </View>
+            <Skeleton width="92%" height={12} />
+            <Skeleton width="70%" height={12} />
+            {i % 2 === 0 ? <Skeleton height={180} radius={radius.md} /> : null}
+          </View>
+        ) : (
+          <View key={i} style={[s.row, { backgroundColor: c.surface }, elevation(c)]}>
+            <Skeleton width={44} height={44} radius={22} />
+            <View style={{ flex: 1, gap: 6 }}>
+              <Skeleton width={`${50 + ((i * 17) % 30)}%`} height={12} />
+              <Skeleton width={`${30 + ((i * 23) % 40)}%`} height={10} />
+            </View>
+          </View>
+        ),
+      )}
     </View>
   );
 }

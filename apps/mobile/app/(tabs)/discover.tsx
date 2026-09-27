@@ -11,7 +11,7 @@ import { useT } from '../../lib/i18n';
 import { PostCard } from '../../lib/post';
 import { clearRecent, forgetSearch, readRecent, rememberSearch } from '../../lib/recent-searches';
 import { radius, space } from '../../lib/theme';
-import { Avatar, EmptyState, Icon, Notice, Row, useColors, userText, useTabBarSpace, type IconName } from '../../lib/ui';
+import { Avatar, EmptyState, Icon, Notice, Row, SkeletonList, useColors, userText, useTabBarSpace, type IconName } from '../../lib/ui';
 
 type Tab = 'all' | 'people' | 'topics' | 'posts' | 'communities' | 'events' | 'places';
 const TABS: { id: Tab; label: MessageKey }[] = [
@@ -258,7 +258,7 @@ export default function Wander() {
             <View style={{ gap: space[2] }}>
               <SectionHeader title={t('m.wander.trending')} />
               {trending === null ? (
-                <ActivityIndicator color={c.yapi} accessibilityLabel={t('common.loading')} />
+                <SkeletonList count={4} />
               ) : trending.length ? (
                 <View style={{ gap: space[1] }}>
                   {trending.map((it, i) => {

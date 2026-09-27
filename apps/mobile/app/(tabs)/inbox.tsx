@@ -1,13 +1,15 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, Text, View } from 'react-native';
 import type { Conversation, PublicUser } from '../../../../packages/shared/src/types';
 import { client, errorMessage } from '../../lib/api';
+import { YapEmpty } from '../../lib/empty';
+import { onBackOnline } from '../../lib/network';
 import { useT } from '../../lib/i18n';
 import { conversationTitle } from '../../lib/post';
 import { useRealtime, useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
-import { Avatar, Button, EmptyState, Icon, Loading, Notice, Row, Screen, useColors, useTabBarSpace } from '../../lib/ui';
+import { Avatar, Button, Icon, Notice, Row, Screen, SkeletonList, useColors, useTabBarSpace } from '../../lib/ui';
 
 type FriendRequest = { id: string; from: PublicUser; createdAt: string };
 
@@ -51,6 +53,7 @@ export default function Inbox() {
   }, []);
   useFocusEffect(load);
   useFocusEffect(loadExtras);
+  useEffect(() => onBackOnline(() => (load(), loadExtras())), [load, loadExtras]);
   useRealtime((e) => {
     if (e.type === 'message.created' || e.type === 'conversation.created') load();
     if (e.type === 'notification.created') loadExtras();
@@ -75,7 +78,12 @@ export default function Inbox() {
         <Notice>{t('m.inbox.signedOut')}</Notice>
       </Screen>
     );
-  if (!items) return <Loading />;
+  if (!items)
+    return (
+      <Screen>
+        <SkeletonList />
+      </Screen>
+    );
   return (
     <Screen style={{ paddingBottom: 0 }}>
       <Button
@@ -161,7 +169,7 @@ export default function Inbox() {
             ) : null}
           </View>
         }
-        ListEmptyComponent={<EmptyState title={t('m.inbox.empty.title')} body={t('m.inbox.empty.body')} />}
+        ListEmptyComponent={<YapEmpty />}
         renderItem={({ item }) => {
           const title = conversationTitle(item, me?.id, t);
           const other = item.members.find((m) => m.id !== me?.id);

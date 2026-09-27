@@ -1,16 +1,18 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, Tabs } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react';
-import { AccessibilityInfo, Animated, I18nManager, Image, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, I18nManager, Image, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { smallAvatarUrl } from '../../../../packages/shared/src/data-saver';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
 import type { NavGlyphName } from '../../../../packages/shared/src/nav-glyphs';
 import { client, mediaUrl } from '../../lib/api';
 import { useT } from '../../lib/i18n';
+import { useReducedMotion } from '../../lib/motion';
 import { NavGlyph } from '../../lib/nav-glyphs';
 import { useRealtime, useSession } from '../../lib/session';
 import { elevation, gradient, type Palette } from '../../lib/theme';
+import { DOCK, NavTour } from '../../lib/tour';
 import { useColors } from '../../lib/ui';
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
@@ -24,18 +26,8 @@ const TABS: Record<string, { id: 'home' | 'discover' | 'create' | 'inbox' | 'pro
   profile: { id: 'profile' },
 };
 
-const PAD = 5;
-const ROW = 54;
-
-function useReducedMotion() {
-  const [reduce, setReduce] = useState(false);
-  useEffect(() => {
-    void AccessibilityInfo.isReduceMotionEnabled().then(setReduce);
-    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduce);
-    return () => sub.remove();
-  }, []);
-  return reduce;
-}
+const PAD = DOCK.pad;
+const ROW = DOCK.row;
 
 /** Unread messages across your chats, for the dot-number on Yap. Refreshed when tabs change and on new messages. */
 function useUnreadChats(signedIn: boolean, tab: number) {
@@ -137,99 +129,105 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
   if (keyboard) return null;
 
   return (
-    <View pointerEvents="box-none" style={[s.wrap, { bottom: Math.max(insets.bottom, 12) }]}>
-      <View
-        accessibilityRole="tablist"
-        onLayout={(e) => setWidth(e.nativeEvent.layout.width - PAD * 2 - 2)}
-        style={[s.bar, { backgroundColor: c.surface, borderColor: c.line }, elevation(c, 'lg')]}
-      >
-        {width && current !== 'create' ? (
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              s.glow,
-              { width: slot - 6, start: PAD + 3, backgroundColor: c.yapiSoft, borderColor: c.theme === 'dark' ? '#FF5C7A33' : '#D21D4A26' },
-              { transform: [{ translateX: slide }] },
-            ]}
-          />
-        ) : null}
-        {state.routes.map((route, i) => {
-          const focused = state.index === i;
-          const tab = TABS[route.name];
-          const label = descriptors[route.key]?.options.title ?? route.name;
-          const hint = tab ? t(`nav.hint.${tab.id}` as MessageKey) : undefined;
+    <>
+      <View pointerEvents="box-none" style={[s.wrap, { bottom: Math.max(insets.bottom, 12) }]}>
+        <View
+          accessibilityRole="tablist"
+          onLayout={(e) => setWidth(e.nativeEvent.layout.width - PAD * 2 - 2)}
+          style={[s.bar, { backgroundColor: c.surface, borderColor: c.line }, elevation(c, 'lg')]}
+        >
+          {width && current !== 'create' ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                s.glow,
+                { width: slot - 6, start: PAD + 3, backgroundColor: c.yapiSoft, borderColor: c.theme === 'dark' ? '#FF5C7A33' : '#D21D4A26' },
+                { transform: [{ translateX: slide }] },
+              ]}
+            />
+          ) : null}
+          {state.routes.map((route, i) => {
+            const focused = state.index === i;
+            const tab = TABS[route.name];
+            const label = descriptors[route.key]?.options.title ?? route.name;
+            const hint = tab ? t(`nav.hint.${tab.id}` as MessageKey) : undefined;
 
-          if (route.name === 'create')
+            if (route.name === 'create')
+              return (
+                <Pressable
+                  key={route.key}
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
+                  accessibilityHint={hint}
+                  // Straight to the camera; what is taken there opens in Create.
+                  onPress={() => router.push('/camera')}
+                  onPressIn={() => press(1)}
+                  onPressOut={() => press(0)}
+                  style={s.sparkHit}
+                >
+                  <Animated.View
+                    style={[
+                      s.sparkLift,
+                      // A coral glow under it in light mode; dark mode has no shadows (and no border here).
+                      c.theme === 'light' && { ...elevation(c, 'lg'), shadowColor: c.yapi, shadowOpacity: 0.35 },
+                      {
+                        transform: [
+                          { rotate: spark.interpolate({ inputRange: [0, 1], outputRange: ['-8deg', '0deg'] }) },
+                          { scale: spark.interpolate({ inputRange: [0, 1], outputRange: [1, 0.93] }) },
+                        ],
+                      },
+                    ]}
+                  >
+                    <LinearGradient {...gradient(c)} style={s.spark}>
+                      <NavGlyph name="spark" size={27} color={c.onYapi} tone="solid" />
+                    </LinearGradient>
+                  </Animated.View>
+                </Pressable>
+              );
+
+            const onPress = () => {
+              const e = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+              if (!focused && !e.defaultPrevented) navigation.navigate(route.name, route.params);
+            };
+            const badge = tab?.id === 'inbox' && unread > 0 ? unread : 0;
+            const color = focused ? c.yapi : c.inkMuted;
             return (
               <Pressable
                 key={route.key}
-                accessibilityRole="button"
-                accessibilityLabel={label}
+                accessibilityRole="tab"
+                accessibilityLabel={
+                  badge ? `${label}${t('m.collab.joinSep')}${t('m.inbox.unread', { count: new Intl.NumberFormat(locale).format(badge) })}` : label
+                }
                 accessibilityHint={hint}
-                // Straight to the camera; what is taken there opens in Create.
-                onPress={() => router.push('/camera')}
-                onPressIn={() => press(1)}
-                onPressOut={() => press(0)}
-                style={s.sparkHit}
+                accessibilityState={{ selected: focused }}
+                onPress={onPress}
+                onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
+                style={s.item}
               >
-                <Animated.View
-                  style={[
-                    s.sparkLift,
-                    // A coral glow under it in light mode; dark mode has no shadows (and no border here).
-                    c.theme === 'light' && { ...elevation(c, 'lg'), shadowColor: c.yapi, shadowOpacity: 0.35 },
-                    {
-                      transform: [
-                        { rotate: spark.interpolate({ inputRange: [0, 1], outputRange: ['-8deg', '0deg'] }) },
-                        { scale: spark.interpolate({ inputRange: [0, 1], outputRange: [1, 0.93] }) },
-                      ],
-                    },
-                  ]}
-                >
-                  <LinearGradient {...gradient(c)} style={s.spark}>
-                    <NavGlyph name="spark" size={27} color={c.onYapi} tone="solid" />
-                  </LinearGradient>
-                </Animated.View>
+                <View style={focused ? s.lifted : undefined}>
+                  {tab?.glyph ? <NavGlyph name={tab.glyph} color={color} tone={focused ? 'duo' : 'line'} /> : <YouAvatar c={c} focused={focused} />}
+                  {badge ? (
+                    <View style={[s.badge, { borderColor: c.surface }]}>
+                      <LinearGradient {...gradient(c)} style={StyleSheet.absoluteFill} />
+                      <Text style={{ color: c.onYapi, fontSize: 10, fontWeight: '800' }}>
+                        {badge > 99 ? '99+' : new Intl.NumberFormat(locale).format(badge)}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+                {focused ? (
+                  <Text style={[s.label, { color: c.ink }]} numberOfLines={1}>
+                    {label}
+                  </Text>
+                ) : null}
               </Pressable>
             );
-
-          const onPress = () => {
-            const e = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-            if (!focused && !e.defaultPrevented) navigation.navigate(route.name, route.params);
-          };
-          const badge = tab?.id === 'inbox' && unread > 0 ? unread : 0;
-          const color = focused ? c.yapi : c.inkMuted;
-          return (
-            <Pressable
-              key={route.key}
-              accessibilityRole="tab"
-              accessibilityLabel={
-                badge ? `${label}${t('m.collab.joinSep')}${t('m.inbox.unread', { count: new Intl.NumberFormat(locale).format(badge) })}` : label
-              }
-              accessibilityHint={hint}
-              accessibilityState={{ selected: focused }}
-              onPress={onPress}
-              onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
-              style={s.item}
-            >
-              <View style={focused ? s.lifted : undefined}>
-                {tab?.glyph ? <NavGlyph name={tab.glyph} color={color} tone={focused ? 'duo' : 'line'} /> : <YouAvatar c={c} focused={focused} />}
-                {badge ? (
-                  <View style={[s.badge, { borderColor: c.surface }]}>
-                    <LinearGradient {...gradient(c)} style={StyleSheet.absoluteFill} />
-                    <Text style={{ color: c.onYapi, fontSize: 10, fontWeight: '800' }}>{badge > 99 ? '99+' : new Intl.NumberFormat(locale).format(badge)}</Text>
-                  </View>
-                ) : null}
-              </View>
-              {focused ? (
-                <Text style={[s.label, { color: c.ink }]} numberOfLines={1}>
-                  {label}
-                </Text>
-              ) : null}
-            </Pressable>
-          );
-        })}
+          })}
+        </View>
       </View>
-    </View>
+      {/* First launch: four small marks pointing at the tabs (shown once). */}
+      <NavTour tabCount={count} active={current === 'index'} />
+    </>
   );
 }
 
@@ -258,7 +256,7 @@ export default function TabsLayout() {
 }
 
 const s = StyleSheet.create({
-  wrap: { position: 'absolute', start: 12, end: 12, alignItems: 'center' },
+  wrap: { position: 'absolute', start: DOCK.side, end: DOCK.side, alignItems: 'center' },
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -267,7 +265,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: PAD,
     width: '100%',
-    maxWidth: 460,
+    maxWidth: DOCK.maxWidth,
   },
   glow: { position: 'absolute', top: PAD, height: ROW, borderRadius: 18, borderWidth: 1 },
   // At least 44x44 everywhere: each tab is a full slot, 54 high.

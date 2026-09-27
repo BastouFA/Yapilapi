@@ -4,7 +4,10 @@ Every signed-in page of the web app (`apps/web/app/(app)/`) and where it lives i
 (`apps/mobile/app/`). Status: **Yes** (same features), **Partial** (the everyday parts; the rest
 on the web for now), **No** (not in the phone app yet), **Web only** (on purpose).
 
-Last reviewed: September 2026, after the parity passes that added creating communities and events,
+Last reviewed: September 2026, after the first-run pass (welcome, sign up, log in with two-step
+codes, forgot password, a six-step onboarding, the tour of the dock, empty states that point to
+the next thing to do, loading placeholders and the offline bar; see "First run" below) and the
+parity passes that added creating communities and events,
 community settings, editing and cancelling events, place reviews and bookings, the Plus screen,
 memories, Together and watching lives (before them: the Wander search, grouped notifications,
 event and place pages, follow lists, the profile menu, profile editing and the remaining settings).
@@ -57,10 +60,31 @@ event and place pages, follow lists, the profile menu, profile editing and the r
 | `/developers`                                | API keys and webhooks                                                                       | -                                                                 | Web only |                                                                                                                                                                                                              |
 | `/admin`                                     | Moderation and admin                                                                        | -                                                                 | Web only |                                                                                                                                                                                                              |
 
-Phone-only screens: `close-friends`, `now-status`, `new-group`, `onboarding`, `board-edit`,
+Phone-only screens: `close-friends`, `now-status`, `new-group`, `onboarding`, `welcome`, `board-edit`,
 `chapter-edit`, `communities` (yours and to discover), `follows`, `community-settings` (details,
 members and roles, join requests, bans and the FAQ, for owners, admins and moderators; the web
 has no such page yet).
+
+## First run
+
+What a new person sees, in order, and what it rests on.
+
+| Screen or piece                  | Phone app                                              | Notes                                                                                                                                                                                                                                                                  |
+| -------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Welcome                          | `welcome`                                              | The logo, the tagline, Pulse, Wander and Yap in a line each with their own symbols, then Create account or Log in. Pulse opens it for anyone signed out, and signing out comes back to it.                                                                               |
+| Sign up                          | `signup`                                               | Name, username (suggested from the name, checked as you type with `POST /v1/auth/check-username`), email, password with show and hide, date of birth (optional, the pure-JS date picker), invite code (filled in from `/join/<code>`). Errors show next to their field. |
+| Log in                           | `login`                                                | Email and password, then the two-step code (authenticator or recovery code, `POST /v1/auth/mfa/verify`) for accounts that use it. The session is registered as a phone.                                                                                                  |
+| Forgot password                  | `forgot-password`                                      | Sends the reset email (`POST /v1/auth/password/forgot`). The link in it opens the web page to choose the new password; then you log in on the phone.                                                                                                                |
+| Onboarding                       | `onboarding`                                           | Six steps with progress and Back, each skippable: language, interests, people and communities to follow, find friends (contacts, or share your invite link), photo and name, notifications with what they are for. Where you got to is saved on the phone.             |
+| Tour of the dock                 | `lib/tour.tsx`                                         | Four small marks on first launch (Pulse, Wander, Spark, then Yap and You). Nothing is dimmed or blocked, Skip ends it, shown once per phone, read out to screen readers, no fading with Reduce Motion.                                                                 |
+| Empty states                     | `lib/empty.tsx`, `EmptyState` in `lib/ui.tsx`          | Pulse with nothing: people to follow (the feed reloads as you follow), trending tags, Find friends. Yap with no chats: Start a chat and people you can message. You with no posts: Make your first post (opens Spark).                                                   |
+| Loading                          | `Skeleton`, `SkeletonList` in `lib/ui.tsx`             | Placeholders shaped like posts or rows on Pulse, Yap, Wander's trending list, profiles, notifications and communities. Still with Reduce Motion; screen readers hear "Loading" once.                                                                                   |
+| Offline                          | `lib/network.ts`, `lib/offline.tsx`                    | No network-status module is installed, so a request that can't reach the API shows a bar with Try again; it checks `/health/live` now and then and goes away once the API answers. Pulse and Yap reload when the connection is back.                                    |
+
+Not on the phone yet: signing up with a phone number (the API signs up with email only; a phone
+number is added and confirmed later in Settings), passkeys (no passkey native module is installed),
+choosing a new password inside the app (the email link opens the web), and long-press quick
+actions on the app icon (`expo-quick-actions` is not installed, and no native module may be added).
 
 ## Settings
 
@@ -85,7 +109,7 @@ has no such page yet).
 | Family supervision                           | Settings, Family                           | Yes     |
 | Email and phone verification                 | Settings, Account                          | Yes     |
 | Where you're signed in                       | Settings, Security                         | Yes     |
-| Two-step verification, passkeys              | -                                          | No      |
+| Two-step verification, passkeys              | Logging in with a two-step code (`login`)  | Partial |
 | Connected apps                               | -                                          | No      |
 | Export data, delete account, assistant memory | -                                         | No      |
 | Decisions about your content and appeals     | -                                          | No      |
@@ -119,6 +143,8 @@ Taps on push notifications open the screen the notification is about (`lib/links
 | `yapilapi://memories/<id>`, `/memories/<id>`  | Memory                  |
 | `yapilapi://together/<id>`, `/together/<id>`  | Together                |
 | `yapilapi://live/<id>`, `/live/<id>`          | Live                    |
+| `/join/<code>`                                | Sign up, code filled in |
+| `/signup`, `/login`, `/forgot-password`       | The same screens        |
 
 Universal links (https links opening the app) need `associatedDomains` and an Android intent
 filter with a verified host, which are native configuration changes and not set up yet; the
@@ -131,9 +157,9 @@ mapping above already handles those paths once they are.
 - **Buying live tickets and sending gifts**: checkout isn't in the phone app, so these open the
   live's page on the web.
 - **Covers for communities and events, messaging an event's attendees**: not in the API yet.
-- **Two-step verification, passkeys, connected apps, data export, account deletion, appeals**:
-  security and account flows that need care on a phone (authenticator setup, passkey native
-  modules we don't ship); on the web.
+- **Setting up two-step verification, passkeys, connected apps, data export, account deletion,
+  appeals**: security and account flows that need care on a phone (authenticator setup, passkey
+  native modules we don't ship); on the web. Logging in with a two-step code works on the phone.
 - **Profile QR code**: the QR generator the web uses (`qrcode-generator`) doesn't resolve from
   the phone app, and no native dependency may be added, so the profile is shared as a link.
 - **Buying at places**, **business pages**: commerce flows on the web. Plus is paid in the web

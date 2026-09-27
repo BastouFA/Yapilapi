@@ -131,6 +131,8 @@ export function appPath(link: string): string {
   if (first === 'events' && second && parts[2] === 'edit') return `/event-edit?id=${encodeURIComponent(second)}`;
   if (first === 'c' && second && parts[2] === 'settings') return `/community-settings?slug=${encodeURIComponent(second)}`;
   if (first === 'plus') return '/plus';
+  // A friend's invite link opens sign-up with their code filled in.
+  if (first === 'join' && second) return `/signup?invite=${encodeURIComponent(second)}`;
   // A reel's remixes open the reel itself; the phone app has no remixes page yet.
   if ((first === 'reels' || first === 'reel') && second) return `/reels?start=${encodeURIComponent(second)}`;
   if (first.startsWith('@') && first.length > 1) return `/u/${first.slice(1)}`;

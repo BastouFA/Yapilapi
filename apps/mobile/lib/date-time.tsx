@@ -596,10 +596,14 @@ export interface DateFieldProps extends Omit<DateTimeSheetProps, 'visible' | 'on
   sheetTitle?: string;
   placeholder?: string;
   disabled?: boolean;
+  /** Where the sheet opens while nothing is chosen (a birth date opens years back, not on the earliest day allowed). */
+  openAt?: Date | null;
+  /** A line under the field (`hint` is the line in the sheet). */
+  note?: string;
 }
 
 /** A field that shows the chosen date (or a placeholder) and opens the DateTimeSheet. */
-export function DateField({ label, value, onChange, sheetTitle, placeholder, disabled, mode = 'datetime', ...sheet }: DateFieldProps) {
+export function DateField({ label, value, onChange, sheetTitle, placeholder, disabled, mode = 'datetime', openAt, note, ...sheet }: DateFieldProps) {
   const c = useColors();
   const { t } = useT();
   const when = useWhenText();
@@ -611,7 +615,7 @@ export function DateField({ label, value, onChange, sheetTitle, placeholder, dis
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${label}, ${shown}`}
-        accessibilityHint={t('m.picker.openHint')}
+        accessibilityHint={note ? `${note} ${t('m.picker.openHint')}` : t('m.picker.openHint')}
         accessibilityState={{ disabled }}
         disabled={disabled}
         onPress={() => setOpen(true)}
@@ -634,12 +638,17 @@ export function DateField({ label, value, onChange, sheetTitle, placeholder, dis
         </Text>
         <Icon name="chevron-down" size={16} color={c.inkMuted} />
       </Pressable>
+      {note ? (
+        <Text accessibilityElementsHidden importantForAccessibility="no" style={{ color: c.inkMuted, fontSize: 12, lineHeight: 16 }}>
+          {note}
+        </Text>
+      ) : null}
       <DateTimeSheet
         {...sheet}
         mode={mode}
         visible={open}
         title={sheetTitle ?? label}
-        value={value}
+        value={value ?? openAt}
         onClose={() => setOpen(false)}
         onPick={(at) => {
           setOpen(false);

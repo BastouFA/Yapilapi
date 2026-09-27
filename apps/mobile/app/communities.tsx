@@ -6,7 +6,7 @@ import { client, errorMessage } from '../lib/api';
 import { HeaderAction } from '../lib/forms';
 import { useT } from '../lib/i18n';
 import { space } from '../lib/theme';
-import { Avatar, EmptyState, Icon, Loading, Notice, Row, Screen, Segmented, useColors } from '../lib/ui';
+import { Avatar, EmptyState, Icon, Notice, Row, Screen, Segmented, SkeletonList, useColors } from '../lib/ui';
 
 type Scope = 'mine' | 'discover';
 
@@ -51,7 +51,7 @@ export default function Communities() {
       />
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {items === null ? (
-        <Loading />
+        <SkeletonList />
       ) : (
         <FlatList
           data={items}
