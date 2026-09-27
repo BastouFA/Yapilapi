@@ -6,7 +6,7 @@ import type { MessageKey } from '../../../packages/shared/src/i18n';
 import type { Post, PostVersion } from '../../../packages/shared/src/types';
 import { client, errorMessage } from './api';
 import { useT } from './i18n';
-import { RichText } from './post';
+import { RichText } from './rich-text';
 import { radius, space } from './theme';
 import { Button, Field, Notice, Segmented, useColors, userText } from './ui';
 

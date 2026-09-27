@@ -1,7 +1,6 @@
 import { router } from 'expo-router';
 import { Fragment, useEffect, useState } from 'react';
 import { Alert, Image, Platform, Pressable, Share, Text, View, type StyleProp, type TextStyle } from 'react-native';
-import { splitRichText } from '../../../packages/shared/src/hashtags';
 import type { Conversation, PhotoTag, Post, PublicUser } from '../../../packages/shared/src/types';
 import { client, errorMessage, mediaUrl, webUrl } from './api';
 import { useBoards, type SaveChange } from './boards';
@@ -12,6 +11,9 @@ import { Avatar, Button, Card, Icon, Notice, PlusBadge, useColors, userText } fr
 import { LockedPanel } from './money';
 import { SensitiveCover } from './safety';
 import { EditPostSheet, HistorySheet } from './post-edit';
+import { RichText } from './rich-text';
+
+export { RichText };
 
 export const conversationTitle = (c: Conversation, meId: string | undefined, t: Translate) =>
   c.title ??
@@ -20,41 +22,6 @@ export const conversationTitle = (c: Conversation, meId: string | undefined, t: 
     .map((m) => m.displayName)
     .join(', ') ||
     t('m.chat.justYou'));
-
-/** Text with #tags and @mentions that open the tag or the person's profile. */
-export function RichText({
-  text,
-  style,
-  numberOfLines,
-  linkStyle,
-}: {
-  text: string;
-  style?: StyleProp<TextStyle>;
-  numberOfLines?: number;
-  /** Overrides the link look (Reels show white links over the video). */
-  linkStyle?: StyleProp<TextStyle>;
-}) {
-  const c = useColors();
-  return (
-    <Text style={[style, userText]} numberOfLines={numberOfLines}>
-      {splitRichText(text).map((part, i) =>
-        'tag' in part || 'mention' in part ? (
-          <Text
-            key={i}
-            accessibilityRole="link"
-            suppressHighlighting={false}
-            onPress={() => router.push('tag' in part ? `/t/${encodeURIComponent(part.tag)}` : `/u/${part.mention}`)}
-            style={[{ color: c.yapi, fontWeight: '600' }, linkStyle]}
-          >
-            {part.text}
-          </Text>
-        ) : (
-          part.text
-        ),
-      )}
-    </Text>
-  );
-}
 
 /** "Ada", "Ada and Bola", "Ada, Bola and Chi" in the app's language. */
 export const joinNames = (names: string[], t: Translate) =>
@@ -281,6 +248,19 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
             <AuthorNames author={post.author} collaborators={coauthors} numberOfLines={2} style={{ color: c.ink, fontWeight: '700', fontSize: 15 }} />
             <Text style={[{ color: c.inkMuted, fontSize: 12 }, userText]} numberOfLines={1}>
               {timeAgo(post.createdAt)}
+              {post.editedAt ? (
+                <>
+                  {' · '}
+                  <Text
+                    accessibilityRole="button"
+                    accessibilityHint={t('m.post.editedHint')}
+                    onPress={() => setHistory(true)}
+                    style={{ textDecorationLine: 'underline', fontWeight: '600' }}
+                  >
+                    {t('m.post.edited')}
+                  </Text>
+                </>
+              ) : null}
               {post.reason ? ` · ${post.reason}` : ''}
             </Text>
           </View>
@@ -302,6 +282,19 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
             </View>
             <Text style={[{ color: c.inkMuted, fontSize: 12 }, userText]} numberOfLines={1}>
               @{post.author.username} · {timeAgo(post.createdAt)}
+              {post.editedAt ? (
+                <>
+                  {' · '}
+                  <Text
+                    accessibilityRole="button"
+                    accessibilityHint={t('m.post.editedHint')}
+                    onPress={() => setHistory(true)}
+                    style={{ textDecorationLine: 'underline', fontWeight: '600' }}
+                  >
+                    {t('m.post.edited')}
+                  </Text>
+                </>
+              ) : null}
               {post.reason ? ` · ${post.reason}` : ''}
             </Text>
           </View>
@@ -312,18 +305,6 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
         <Text style={{ color: c.ink, fontSize: 13, fontWeight: '700' }}>
           {post.status === 'scheduled' && post.scheduledAt ? t('m.drafts.scheduledFor', { time: dateTime(post.scheduledAt) }) : t('m.drafts.draft')}
         </Text>
-      ) : null}
-      {post.editedAt ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('m.post.edited')}
-          accessibilityHint={t('m.post.editedHint')}
-          hitSlop={8}
-          onPress={() => setHistory(true)}
-          style={{ alignSelf: 'flex-start' }}
-        >
-          <Text style={{ color: c.inkMuted, fontSize: 12, fontWeight: '600', textDecorationLine: 'underline' }}>{t('m.post.edited')}</Text>
-        </Pressable>
       ) : null}
 
       {pending.length ? (
