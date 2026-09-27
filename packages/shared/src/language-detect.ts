@@ -60,8 +60,7 @@ const LATIN_WORDS: Record<string, string> = {
 
 const WORDS: Map<string, string[]> = (() => {
   const m = new Map<string, string[]>();
-  for (const [lang, list] of Object.entries(LATIN_WORDS))
-    for (const w of new Set(list.split(/\s+/).filter(Boolean))) m.set(w, [...(m.get(w) ?? []), lang]);
+  for (const [lang, list] of Object.entries(LATIN_WORDS)) for (const w of new Set(list.split(/\s+/).filter(Boolean))) m.set(w, [...(m.get(w) ?? []), lang]);
   return m;
 })();
 

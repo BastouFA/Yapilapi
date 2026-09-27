@@ -4,7 +4,7 @@ import { isVideoFile, MEDIA_ACCEPT, MESSAGE_EDIT_MINUTES, type PinnedMessage } f
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { AIPanel, BottomSheet, Button, ChatBubble, Icon, Menu, Skeleton, Switch, type MenuAction } from '@yapilapi/design-system';
+import { AIPanel, BottomSheet, Button, ChatBubble, Icon, Menu, Skeleton, Switch, TranslatableText, type MenuAction } from '@yapilapi/design-system';
 import type { Conversation, Message } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { ReportSheet } from '@/components/PostList';
@@ -137,7 +137,7 @@ export default function ChatPage() {
       if (pins.some((p) => p.message.id === e.data.id)) void loadPins();
     }
     if (e.type === 'message.edited' && e.data.conversationId === id) {
-      patchMessage(e.data.id, (x) => ({ ...x, body: e.data.body, editedAt: e.data.editedAt }));
+      patchMessage(e.data.id, (x) => ({ ...x, body: e.data.body, lang: e.data.lang ?? null, editedAt: e.data.editedAt }));
       setMessages(
         (cur) =>
           cur?.map((x) => (x.replyTo && x.replyTo.id === e.data.id ? { ...x, replyTo: { ...x.replyTo, body: String(e.data.body).slice(0, 200) } } : x)) ?? cur,
@@ -481,22 +481,24 @@ export default function ChatPage() {
                 </div>
               );
             const time = new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(m.createdAt));
+            // The text, with "See translation" when it's in a language the reader doesn't understand.
+            const text = m.body ? <TranslatableText kind="message" id={m.id} text={m.body} lang={m.lang} own={mine || !!m.pending} locale={locale} /> : null;
             const content = m.unsent ? (
               <span className="chat-unsent">{mine ? t('m.chat.unsentMine') : t('m.chat.unsent')}</span>
             ) : m.viewOnce ? (
               <>
                 <ViewOnceMessage message={m} mine={mine} onChange={(next) => setMessages((cur) => cur?.map((x) => (x.id === next.id ? next : x)) ?? cur)} />
-                {m.body ? <div>{m.body}</div> : null}
+                {text}
               </>
             ) : m.attachments.length || m.story ? (
               <>
                 {m.kind === 'yap' ? <span className="chat-yap-label">{t('m.yap.label')}</span> : null}
                 {m.story ? <StoryCardView card={m.story} /> : null}
                 {m.attachments.length ? <MessageAttachments items={m.attachments} /> : null}
-                {m.body ? <div>{m.body}</div> : null}
+                {text}
               </>
             ) : (
-              m.body
+              text
             );
             return (
               <div key={m.id} style={{ display: 'contents' }}>

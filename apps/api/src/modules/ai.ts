@@ -27,7 +27,7 @@ export default async function aiModule(app: FastifyInstance, ctx: AppContext) {
   app.post('/v1/translate', { preHandler: requireAuth, config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (req) => {
     const u = me(req);
     const input = parse(translateSchema, req.body);
-    if (!(await isEnabled(db, 'AI_TRANSLATION'))) throw new AppError(503, 'translation_unavailable', 'Translation is turned off right now.');
+    if (!(await isEnabled(db, 'AI_TRANSLATION'))) throw new AppError(503, 'translation_off', 'Translation is turned off right now.');
     if ((await translationsLastHour(db, u.id)) >= ctx.config.TRANSLATE_PER_HOUR)
       throw new AppError(429, 'translation_limit', 'You’ve translated a lot in the last hour. Try again later.');
     return { translation: await ctx.ai.translateItem({ userId: u.id, kind: input.kind, id: input.id, target: input.target }) };

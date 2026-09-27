@@ -127,7 +127,16 @@ export class AiGateway {
     const hit = await cachedTranslation(this.db, item, req.target);
     if (hit) {
       await this.log(logReq, [...scopes, 'cache'], 'ok', started, hit);
-      return { kind: req.kind, id: req.id, sourceLanguage: hit.sourceLanguage, targetLanguage: req.target, text: hit.body, machine: true, provider: hit.provider, cached: true };
+      return {
+        kind: req.kind,
+        id: req.id,
+        sourceLanguage: hit.sourceLanguage,
+        targetLanguage: req.target,
+        text: hit.body,
+        machine: true,
+        provider: hit.provider,
+        cached: true,
+      };
     }
     let res: AiResponse;
     try {
@@ -138,8 +147,7 @@ export class AiGateway {
       throw new AppError(503, 'translation_unavailable', 'Translation isn’t available right now. Try again later.');
     }
     const out = res.output as { original?: string; translated?: string | null } | null;
-    if (!out?.translated)
-      throw new AppError(503, 'translation_unavailable', res.notice ?? 'This couldn’t be translated right now. Try again later.');
+    if (!out?.translated) throw new AppError(503, 'translation_unavailable', res.notice ?? 'This couldn’t be translated right now. Try again later.');
     const sourceLanguage = item.lang ?? 'und';
     // Cached against the text that was actually translated.
     await storeTranslation(this.db, {
@@ -152,7 +160,16 @@ export class AiGateway {
       provider: res.provider,
       model: res.model,
     });
-    return { kind: req.kind, id: req.id, sourceLanguage, targetLanguage: req.target, text: out.translated, machine: true, provider: res.provider, cached: false };
+    return {
+      kind: req.kind,
+      id: req.id,
+      sourceLanguage,
+      targetLanguage: req.target,
+      text: out.translated,
+      machine: true,
+      provider: res.provider,
+      cached: false,
+    };
   }
 
   private async loadContext(req: AiRequest): Promise<{ text: string; scopes: string[] }> {

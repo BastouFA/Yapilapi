@@ -663,7 +663,7 @@ export function createClient(opts: ClientOptions) {
     reports: { create: (b: { targetType: string; targetId: string; reason: string; details?: string }) => post<{ message: string }>('/v1/reports', b) },
     /**
      * "See translation": a post, comment, story or message machine-translated into `target`.
-     * Errors: 503 translation_unavailable (turned off or not working), 429 translation_limit, 404 when not visible.
+     * Errors: 503 translation_off (turned off) or translation_unavailable (not working right now), 429 translation_limit, 404 when not visible.
      */
     translate: (b: { kind: TranslatableKind; id: string; target: string }) => post<{ translation: Translation }>('/v1/translate', b),
     ai: {

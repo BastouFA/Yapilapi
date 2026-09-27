@@ -80,7 +80,15 @@ describe('translation', () => {
     const post = await newPost('Merci à tous pour cette belle soirée, à bientôt');
     const first = await translate(bola, 'post', post.id);
     expect(first.status).toBe(200);
-    expect(first.body.translation).toMatchObject({ kind: 'post', id: post.id, sourceLanguage: 'fr', targetLanguage: 'en', machine: true, cached: false, provider: 'dev' });
+    expect(first.body.translation).toMatchObject({
+      kind: 'post',
+      id: post.id,
+      sourceLanguage: 'fr',
+      targetLanguage: 'en',
+      machine: true,
+      cached: false,
+      provider: 'dev',
+    });
     // The offline provider's pseudo-translation is marked as such.
     expect(first.body.translation.text).toMatch(/^\[fr→en\] Merci à tous/);
 
@@ -190,7 +198,7 @@ describe('translation', () => {
     try {
       const r = await translate(bola, 'post', post.id);
       expect(r.status).toBe(503);
-      expect(r.body.error).toMatchObject({ code: 'translation_unavailable', message: 'Translation is turned off right now.' });
+      expect(r.body.error).toMatchObject({ code: 'translation_off', message: 'Translation is turned off right now.' });
     } finally {
       await t.ctx.db.query(`DELETE FROM feature_flags WHERE key = 'AI_TRANSLATION'`);
     }
@@ -204,7 +212,9 @@ describe('translation', () => {
       const reader = await signUp(limited.app);
       const ids: string[] = [];
       for (let i = 0; i < 4; i++)
-        ids.push((await as(limited.app, writer).post('/v1/posts', { body: `Bonjour à tous, quelle belle journée numéro ${i}`, visibility: 'public' })).body.post.id);
+        ids.push(
+          (await as(limited.app, writer).post('/v1/posts', { body: `Bonjour à tous, quelle belle journée numéro ${i}`, visibility: 'public' })).body.post.id,
+        );
       for (const id of ids.slice(0, 3)) expect((await as(limited.app, reader).post('/v1/translate', { kind: 'post', id, target: 'en' })).status).toBe(200);
       const over = await as(limited.app, reader).post('/v1/translate', { kind: 'post', id: ids[3], target: 'en' });
       expect(over.status).toBe(429);

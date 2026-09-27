@@ -24,6 +24,7 @@ import {
 import { Icon, type IconName } from './icons.tsx';
 import { Avatar, Badge, Button, cx, PlusBadge, useModalFocus } from './primitives.tsx';
 import { useDataSaver } from './data-saver.tsx';
+import { TranslatableText } from './translation.tsx';
 
 // ── Translation helpers ─────────────────────────────────────────────────
 type Vars = Record<string, string | number>;
@@ -931,9 +932,16 @@ export function PostCard({
       ) : null}
 
       {post.body ? (
-        <div className="yp-post__body" dir="auto">
-          <TaggedText text={post.body} linkAs={L} />
-        </div>
+        <TranslatableText
+          kind="post"
+          id={post.id}
+          text={post.body}
+          lang={post.lang}
+          own={isOwn || !!post.status}
+          locale={locale}
+          className="yp-post__body"
+          render={(text) => <TaggedText text={text} linkAs={L} />}
+        />
       ) : null}
 
       {post.locked ? <LockedPanel post={post} locale={locale} linkAs={L} /> : null}

@@ -2,7 +2,21 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Avatar, BottomSheet, Button, Checkbox, Icon, List, ListItem, Select, SensitiveCover, useDataSaver, useModalFocus } from '@yapilapi/design-system';
+import {
+  Avatar,
+  BottomSheet,
+  Button,
+  Checkbox,
+  Icon,
+  List,
+  ListItem,
+  Select,
+  SensitiveCover,
+  TranslationBar,
+  useDataSaver,
+  useModalFocus,
+  useTranslatable,
+} from '@yapilapi/design-system';
 import type { Story, StoryGroup } from '@yapilapi/api-client';
 import { formatRelativeTime, isRtl, type MessageKey, type PublicUser, type StickerResults, type StorySticker } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
@@ -70,6 +84,21 @@ export function StoryViewer({
   const [tapped, setTapped] = useState<string[]>([]);
   const waiting = saver && story?.mediaKind === 'video' && !tapped.includes(story.id);
   useModalFocus(root, true, onClose);
+  // "See translation" for the story's text. Asking for it pauses the story so there's time to read.
+  const translation = useTranslatable({ kind: 'story', id: story?.id ?? '', text: story?.body ?? '', lang: story?.lang, own: !!group?.mine });
+  const translationBar = (
+    <TranslationBar
+      className="story__translate"
+      locale={locale}
+      state={{
+        ...translation,
+        see: () => {
+          setPaused(true);
+          translation.see();
+        },
+      }}
+    />
+  );
 
   const next = useCallback(() => {
     if (!group) return onClose();
@@ -252,14 +281,20 @@ export function StoryViewer({
               />
             </div>
           ) : (
-            <p className="story__text" dir="auto">
-              {story.body ? <StoryText text={story.body} /> : null}
-            </p>
+            <div className="story__text">
+              <p dir="auto" lang={translation.lang}>
+                {story.body ? <StoryText text={translation.text} /> : null}
+              </p>
+              {translationBar}
+            </div>
           )}
           {story.body && (story.mediaUrl || story.reshareOf) ? (
-            <p className="story__caption" dir="auto">
-              <StoryText text={story.body} />
-            </p>
+            <div className="story__caption">
+              <p dir="auto" lang={translation.lang}>
+                <StoryText text={translation.text} />
+              </p>
+              {translationBar}
+            </div>
           ) : null}
           {covered ? (
             <SensitiveCover

@@ -4845,6 +4845,29 @@ button.yp-chip[aria-pressed='true'] {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+.story__text p,
+.story__caption p {
+  margin: 0;
+}
+.story__text {
+  align-content: center;
+  gap: var(--space-3);
+}
+/* Above the previous/next tap areas, so "See translation" can be pressed. */
+.story__translate {
+  position: relative;
+  z-index: 2;
+  justify-content: center;
+  color: #ffffffcc;
+}
+.story__caption .story__translate {
+  justify-content: flex-start;
+}
+.story__translate .yp-translate__link,
+.story__translate .yp-translate__link:disabled,
+.story__translate .yp-translate__error {
+  color: #fff;
+}
 
 /* ── Saved and boards ───────────────────────────────────────────────── */
 .board-grid {
@@ -5713,4 +5736,22 @@ button.yp-chip[aria-pressed='true'] {
 /* Empty but still in the accessibility tree, so the first raised hand is announced. */
 .room__hands:empty {
   margin: 0;
+}
+
+/* ── Settings: translation ──────────────────────────────────────────── */
+.translation-langs {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.translation-langs legend {
+  padding: 0;
+  font-weight: 600;
+}
+.translation-langs__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-3);
 }

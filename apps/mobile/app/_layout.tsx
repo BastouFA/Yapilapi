@@ -4,6 +4,7 @@ import { BoardsProvider } from '../lib/boards';
 import { CallsProvider } from '../lib/calls';
 import { DataSaverProvider } from '../lib/data-saver';
 import { LocaleProvider, useT } from '../lib/i18n';
+import { TranslationProvider } from '../lib/translation';
 import { SessionProvider, useSession } from '../lib/session';
 import { useColors } from '../lib/ui';
 import { useUsageHeartbeat } from '../lib/usage';
@@ -87,13 +88,15 @@ export default function Root() {
     <SessionProvider>
       <DataSaverProvider>
         <LocaleProvider>
-          <CallsProvider>
-            <BoardsProvider>
-              <Heartbeat />
-              <Screens />
-              <YapPlayer />
-            </BoardsProvider>
-          </CallsProvider>
+          <TranslationProvider>
+            <CallsProvider>
+              <BoardsProvider>
+                <Heartbeat />
+                <Screens />
+                <YapPlayer />
+              </BoardsProvider>
+            </CallsProvider>
+          </TranslationProvider>
         </LocaleProvider>
       </DataSaverProvider>
     </SessionProvider>

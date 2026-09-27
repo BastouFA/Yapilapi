@@ -2252,7 +2252,8 @@ const en = {
   'translate.failed': 'This couldn’t be translated. Try again later.',
   'translate.settingsTitle': 'Translation',
   'translate.languages': 'Languages I understand',
-  'translate.languagesHint': 'We won’t offer to translate posts, comments, stories and messages in these languages. {language}, the app’s language, is always included.',
+  'translate.languagesHint':
+    'We won’t offer to translate posts, comments, stories and messages in these languages. {language}, the app’s language, is always included.',
   'translate.appLanguage': 'App language',
   'translate.auto': 'Translate automatically',
   'translate.autoHint': 'Show the translation straight away, with a link back to the original. Off by default.',
@@ -4531,7 +4532,8 @@ const fr: Catalog = {
   'translate.failed': 'Impossible de traduire ce texte. Réessaie plus tard.',
   'translate.settingsTitle': 'Traduction',
   'translate.languages': 'Langues que je comprends',
-  'translate.languagesHint': 'On ne te proposera pas de traduire les publications, commentaires, stories et messages dans ces langues. {language}, la langue de l’app, est toujours incluse.',
+  'translate.languagesHint':
+    'On ne te proposera pas de traduire les publications, commentaires, stories et messages dans ces langues. {language}, la langue de l’app, est toujours incluse.',
   'translate.appLanguage': 'Langue de l’app',
   'translate.auto': 'Traduire automatiquement',
   'translate.autoHint': 'Affiche directement la traduction, avec un lien vers l’original. Désactivé par défaut.',
@@ -9032,7 +9034,8 @@ const es: Catalog = {
   'translate.failed': 'No se pudo traducir. Inténtalo más tarde.',
   'translate.settingsTitle': 'Traducción',
   'translate.languages': 'Idiomas que entiendo',
-  'translate.languagesHint': 'No te ofreceremos traducir publicaciones, comentarios, historias ni mensajes en estos idiomas. {language}, el idioma de la app, siempre está incluido.',
+  'translate.languagesHint':
+    'No te ofreceremos traducir publicaciones, comentarios, historias ni mensajes en estos idiomas. {language}, el idioma de la app, siempre está incluido.',
   'translate.appLanguage': 'Idioma de la app',
   'translate.auto': 'Traducir automáticamente',
   'translate.autoHint': 'Muestra la traducción directamente, con un enlace al original. Desactivado de forma predeterminada.',
@@ -11288,7 +11291,8 @@ const pt: Catalog = {
   'translate.failed': 'Não foi possível traduzir. Tente mais tarde.',
   'translate.settingsTitle': 'Tradução',
   'translate.languages': 'Idiomas que eu entendo',
-  'translate.languagesHint': 'Não vamos oferecer tradução de posts, comentários, stories e mensagens nesses idiomas. {language}, o idioma do app, está sempre incluído.',
+  'translate.languagesHint':
+    'Não vamos oferecer tradução de posts, comentários, stories e mensagens nesses idiomas. {language}, o idioma do app, está sempre incluído.',
   'translate.appLanguage': 'Idioma do app',
   'translate.auto': 'Traduzir automaticamente',
   'translate.autoHint': 'Mostra a tradução direto, com um link para o original. Desativado por padrão.',
@@ -13547,7 +13551,8 @@ const sw: Catalog = {
   'translate.failed': 'Imeshindwa kutafsiri. Jaribu tena baadaye.',
   'translate.settingsTitle': 'Tafsiri',
   'translate.languages': 'Lugha ninazoelewa',
-  'translate.languagesHint': 'Hatutakupa chaguo la kutafsiri machapisho, maoni, hadithi na ujumbe katika lugha hizi. {language}, lugha ya programu, imejumuishwa kila wakati.',
+  'translate.languagesHint':
+    'Hatutakupa chaguo la kutafsiri machapisho, maoni, hadithi na ujumbe katika lugha hizi. {language}, lugha ya programu, imejumuishwa kila wakati.',
   'translate.appLanguage': 'Lugha ya programu',
   'translate.auto': 'Tafsiri kiotomatiki',
   'translate.autoHint': 'Onyesha tafsiri moja kwa moja, pamoja na kiungo cha maandishi asili. Imezimwa kwa chaguo-msingi.',
@@ -15800,7 +15805,8 @@ const yo: Catalog = {
   'translate.failed': 'A kò lè túmọ̀ èyí. Gbìyànjú lẹ́ẹ̀kan sí i nígbà míì.',
   'translate.settingsTitle': 'Ìtumọ̀',
   'translate.languages': 'Àwọn èdè tí mo gbọ́',
-  'translate.languagesHint': 'A kò ní fún ọ láti túmọ̀ àwọn ìfìwéránṣẹ́, ọ̀rọ̀ ìwòye, ìtàn àti ìfiránṣẹ́ ní àwọn èdè wọ̀nyí. {language}, èdè áàpù, wà nínú rẹ̀ nígbà gbogbo.',
+  'translate.languagesHint':
+    'A kò ní fún ọ láti túmọ̀ àwọn ìfìwéránṣẹ́, ọ̀rọ̀ ìwòye, ìtàn àti ìfiránṣẹ́ ní àwọn èdè wọ̀nyí. {language}, èdè áàpù, wà nínú rẹ̀ nígbà gbogbo.',
   'translate.appLanguage': 'Èdè áàpù',
   'translate.auto': 'Túmọ̀ láìfọwọ́yí',
   'translate.autoHint': 'Fi ìtumọ̀ hàn lẹ́sẹ̀kẹsẹ̀, pẹ̀lú ìjápọ̀ sí ojúlówó. Ó wà ní pípa ní àkọ́kọ́.',
@@ -18060,7 +18066,8 @@ const ha: Catalog = {
   'translate.failed': 'Ba a iya fassara wannan ba. Sake gwadawa daga baya.',
   'translate.settingsTitle': 'Fassara',
   'translate.languages': 'Harsunan da nake fahimta',
-  'translate.languagesHint': 'Ba za mu ba ka damar fassara rubuce-rubuce, sharhi, labarai da saƙonni a waɗannan harsunan ba. {language}, harshen manhajar, yana ciki koyaushe.',
+  'translate.languagesHint':
+    'Ba za mu ba ka damar fassara rubuce-rubuce, sharhi, labarai da saƙonni a waɗannan harsunan ba. {language}, harshen manhajar, yana ciki koyaushe.',
   'translate.appLanguage': 'Harshen manhajar',
   'translate.auto': 'Fassara kai tsaye',
   'translate.autoHint': 'Nuna fassarar nan take, tare da hanyar komawa ga asali. A kashe yake da farko.',

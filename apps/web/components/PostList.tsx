@@ -16,6 +16,7 @@ import {
   Select,
   Skeleton,
   TaggedText,
+  TranslatableText,
   TextField,
 } from '@yapilapi/design-system';
 import type { SponsoredAd } from '@yapilapi/api-client';
@@ -725,7 +726,15 @@ export function CommentsSheet({ post, onClose, onAdded }: { post: Post; onClose:
                 <strong>
                   {c.author.displayName} <span className="muted">· {formatRelativeTime(c.createdAt, locale)}</span>
                 </strong>
-                <TaggedText text={c.body} linkAs={NextLink} />
+                <TranslatableText
+                  kind="comment"
+                  id={c.id}
+                  text={c.body}
+                  lang={c.lang}
+                  own={c.author.id === me?.id}
+                  locale={locale}
+                  render={(text) => <TaggedText text={text} linkAs={NextLink} />}
+                />
               </div>
             </div>
           ))

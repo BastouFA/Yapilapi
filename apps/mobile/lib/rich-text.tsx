@@ -9,16 +9,19 @@ export function RichText({
   style,
   numberOfLines,
   linkStyle,
+  language,
 }: {
   text: string;
   style?: StyleProp<TextStyle>;
   numberOfLines?: number;
+  /** The text's language when it differs from the app's (a translation), so screen readers read it with the right voice. */
+  language?: string;
   /** Overrides the link look (Reels show white links over the video). */
   linkStyle?: StyleProp<TextStyle>;
 }) {
   const c = useColors();
   return (
-    <Text style={[style, userText]} numberOfLines={numberOfLines}>
+    <Text style={[style, userText]} numberOfLines={numberOfLines} accessibilityLanguage={language}>
       {splitRichText(text).map((part, i) =>
         'tag' in part || 'mention' in part ? (
           <Text
