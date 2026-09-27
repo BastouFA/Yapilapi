@@ -587,6 +587,19 @@ h3 {
 .chat-page .yp-chat {
   flex: 1;
 }
+/*
+ * The composer (and on phones the navigation) stays at the bottom over the messages.
+ * Scrolling to the newest message, or to a message's buttons with Tab, stops above
+ * them so nothing focused or tappable sits underneath (WCAG 2.4.11, 2.5.8).
+ */
+:root:has(.chat-page) {
+  scroll-padding-bottom: calc(160px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 900px) {
+  :root:has(.chat-page) {
+    scroll-padding-bottom: 96px;
+  }
+}
 .composer-box {
   display: flex;
   flex-direction: column;
@@ -3730,6 +3743,10 @@ video.chat-att__media {
   color: #fff;
   overscroll-behavior: contain;
 }
+/* Focus lands on the camera itself when it opens; its controls show their own focus. */
+.cam:focus {
+  outline: none;
+}
 .cam__view {
   position: absolute;
   inset: 0;
@@ -5663,4 +5680,8 @@ button.yp-chip[aria-pressed='true'] {
   padding: var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
+}
+/* Empty but still in the accessibility tree, so the first raised hand is announced. */
+.room__hands:empty {
+  margin: 0;
 }

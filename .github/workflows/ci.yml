@@ -95,13 +95,17 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm db:migrate
+      # Memories, chapters and recap videos are behind the MEMORY flag; the audit covers them.
+      - name: Turn on audited features
+        run: psql "$DATABASE_URL" -c "INSERT INTO feature_flags (key, enabled) VALUES ('MEMORY', true) ON CONFLICT (key) DO UPDATE SET enabled = true"
       - name: Install Chromium
         run: pnpm --filter @yapilapi/web exec playwright install --with-deps chromium
       - name: Build web
         run: pnpm --filter @yapilapi/web build
       - name: Start API and web
         run: |
-          APP_ENV=test API_HOST=127.0.0.1 RATE_LIMIT_MAX=100000 WEB_ORIGIN=http://localhost:3000 \
+          # JOB_WORKER: process uploads and render the seeded recap video (off by default with APP_ENV=test).
+          APP_ENV=test JOB_WORKER=true API_HOST=127.0.0.1 RATE_LIMIT_MAX=100000 WEB_ORIGIN=http://localhost:3000 \
             pnpm --filter @yapilapi/api start > api.log 2>&1 &
           pnpm --filter @yapilapi/web start > web.log 2>&1 &
           for url in http://127.0.0.1:4000/health/ready http://localhost:3000/login; do

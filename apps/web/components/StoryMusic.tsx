@@ -179,6 +179,12 @@ export function MusicSticker({ music, playing, onOpen }: { music: StoryMusic; pl
 export function StoryMusicField({ value, onChange, video }: { value: DraftMusic | null; onChange: (m: DraftMusic | null) => void; video: boolean }) {
   const [picking, setPicking] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+  // After a sound is picked the "Add music" button is gone: focus goes to "Choose another sound".
+  const another = useRef<HTMLButtonElement>(null);
+  const [picked, setPicked] = useState(0);
+  useEffect(() => {
+    if (picked) another.current?.focus();
+  }, [picked]);
   const preview = value ? draftAsStoryMusic(value) : null;
   useMusicLoop(preview, previewing);
   useEffect(() => {
@@ -197,7 +203,6 @@ export function StoryMusicField({ value, onChange, video }: { value: DraftMusic 
             <button
               type="button"
               className="sound-play"
-              aria-pressed={previewing}
               aria-label={previewing ? 'Stop the part' : 'Play the part'}
               disabled={!value.sound.audioUrl}
               onClick={() => setPreviewing((p) => !p)}
@@ -248,7 +253,7 @@ export function StoryMusicField({ value, onChange, video }: { value: DraftMusic 
               : 'Drag the music sticker on the preview to move it.'}
           </p>
           <div className="row">
-            <Button size="sm" variant="secondary" icon="music" onClick={() => (setPreviewing(false), setPicking(true))}>
+            <Button ref={another} size="sm" variant="secondary" icon="music" onClick={() => (setPreviewing(false), setPicking(true))}>
               Choose another sound
             </Button>
           </div>
@@ -266,6 +271,7 @@ export function StoryMusicField({ value, onChange, video }: { value: DraftMusic 
         onPick={(s) => {
           onChange(value ? { ...value, sound: s, startMs: 0 } : draftMusic(s));
           setPicking(false);
+          setPicked((n) => n + 1);
         }}
       />
     </section>

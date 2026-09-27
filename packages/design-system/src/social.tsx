@@ -1023,7 +1023,8 @@ export function PostCard({
               className={cx('yp-action', post.viewer.reposted && 'yp-action--reposted')}
               aria-pressed={post.viewer.reposted}
               onClick={() => onRepost(post)}
-              aria-label={`${post.viewer.reposted ? 'Undo repost' : 'Repost'}, ${post.counts.reposts}`}
+              // A toggle: aria-pressed says whether you reposted it, so the name stays the same.
+              aria-label={`Repost, ${post.counts.reposts}`}
             >
               <Icon name="repost" />
               {post.counts.reposts || ''}
@@ -1395,44 +1396,63 @@ export interface ToastAction {
 /**
  * A short message at the bottom of the screen. With an `action`, it stays longer (6 seconds by
  * default) and the action is a real button; the timer pauses while the pointer or focus is on it.
+ * The live region is always on the page and only its content changes, so screen readers announce
+ * each message (a region added together with its text is often missed). Pass a new `id` for each
+ * toast, so the same text twice is shown (and timed) twice.
  */
-export function Toast({ message, onDone, ms, action }: { message: string | null; onDone: () => void; ms?: number; action?: ToastAction | null }) {
+export function Toast({
+  message,
+  onDone,
+  ms,
+  action,
+  id,
+}: {
+  message: string | null;
+  onDone: () => void;
+  ms?: number;
+  action?: ToastAction | null;
+  id?: number | string;
+}) {
   const [held, setHeld] = useState(false);
   const wait = ms ?? (action ? 6000 : 3000);
   useEffect(() => {
     if (!message || held) return;
-    const id = setTimeout(onDone, wait);
-    return () => clearTimeout(id);
-  }, [message, wait, onDone, held, action]);
+    const timer = setTimeout(onDone, wait);
+    return () => clearTimeout(timer);
+  }, [message, wait, onDone, held, action, id]);
   useEffect(() => {
-    if (!message) setHeld(false);
-  }, [message]);
-  return message ? (
-    <div
-      className={cx('yp-toast', action && 'yp-toast--action')}
-      role="status"
-      onPointerEnter={() => setHeld(true)}
-      onPointerLeave={() => setHeld(false)}
-      onFocus={() => setHeld(true)}
-      onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHeld(false);
-      }}
-    >
-      <span>{message}</span>
-      {action ? (
-        <button
-          type="button"
-          className="yp-toast__action"
-          onClick={() => {
-            action.onClick();
-            onDone();
+    setHeld(false);
+  }, [message, id]);
+  return (
+    <div className="yp-toast-region" role="status" aria-live="polite" aria-atomic="true">
+      {message ? (
+        <div
+          key={id}
+          className={cx('yp-toast', action && 'yp-toast--action')}
+          onPointerEnter={() => setHeld(true)}
+          onPointerLeave={() => setHeld(false)}
+          onFocus={() => setHeld(true)}
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHeld(false);
           }}
         >
-          {action.label}
-        </button>
+          <span>{message}</span>
+          {action ? (
+            <button
+              type="button"
+              className="yp-toast__action"
+              onClick={() => {
+                action.onClick();
+                onDone();
+              }}
+            >
+              {action.label}
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </div>
-  ) : null;
+  );
 }
 
 export { Button };

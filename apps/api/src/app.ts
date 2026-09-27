@@ -392,7 +392,7 @@ export async function buildApp(
 
   // Webhook delivery worker. Tests drive processWebhooks directly instead.
   let webhookTimer: NodeJS.Timeout | undefined;
-  if (opts.webhookWorker ?? config.APP_ENV !== 'test') {
+  if (opts.webhookWorker ?? config.JOB_WORKER) {
     const allowLocal = config.APP_ENV === 'development';
     webhookTimer = setInterval(() => void processWebhooks(db, { allowLocal }).catch((e) => app.log.warn({ err: e.message }, 'webhook worker')), 5_000);
     webhookTimer.unref();
@@ -415,7 +415,7 @@ export async function buildApp(
     // Scheduled posts go out at their time.
     ...scheduledPostJobHandlers(ctx),
   };
-  if (opts.webhookWorker ?? config.APP_ENV !== 'test') {
+  if (opts.webhookWorker ?? config.JOB_WORKER) {
     let busy = false;
     jobTimer = setInterval(async () => {
       if (busy) return;

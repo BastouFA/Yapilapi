@@ -199,7 +199,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }}
     >
       <DataSaverProvider on={saverOn}>{children}</DataSaverProvider>
-      <Toast key={toastState?.id} message={toastState?.message ?? null} action={toastState?.action} onDone={clearToast} />
+      <Toast id={toastState?.id} message={toastState?.message ?? null} action={toastState?.action} onDone={clearToast} />
     </Ctx.Provider>
   );
 }

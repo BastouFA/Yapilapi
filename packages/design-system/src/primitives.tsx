@@ -6,6 +6,7 @@ import {
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
+  type Ref,
   type RefObject,
   type TextareaHTMLAttributes,
 } from 'react';
@@ -23,10 +24,32 @@ const FOCUSABLE =
 /** Open modals, innermost last: only the top one handles Tab and Escape. */
 const modalStack: HTMLElement[] = [];
 
+/** Live regions stay announced while a modal is open (a toast about what you just did in it). */
+const LIVE = '[role="status"], [role="alert"]';
+
+/**
+ * Makes everything outside `node` inert (not focusable, not clickable, hidden from assistive
+ * technology), like the page behind a native modal dialog: the siblings of `node` and of each
+ * of its ancestors. Returns a function that undoes it. Elements that were already inert (behind
+ * an outer modal) are left alone.
+ */
+function inertOutside(node: HTMLElement): () => void {
+  const changed: HTMLElement[] = [];
+  for (let el: HTMLElement | null = node; el && el !== document.body; el = el.parentElement) {
+    for (const sib of el.parentElement?.children ?? []) {
+      if (sib === el || !(sib instanceof HTMLElement) || sib.inert || sib.matches(LIVE) || sib.tagName === 'SCRIPT') continue;
+      sib.inert = true;
+      changed.push(sib);
+    }
+  }
+  return () => changed.forEach((sib) => (sib.inert = false));
+}
+
 /**
  * Modal focus handling for dialogs, sheets and overlays: moves focus into the
  * container (give it tabIndex={-1}), keeps Tab and Shift+Tab inside it, closes
- * on Escape and returns focus to whatever had it before when it closes.
+ * on Escape, makes the rest of the page inert while it's open, and returns focus
+ * to whatever had it before when it closes.
  */
 export function useModalFocus(ref: RefObject<HTMLElement | null>, active: boolean, onEscape?: () => void) {
   const escape = useRef(onEscape);
@@ -36,6 +59,7 @@ export function useModalFocus(ref: RefObject<HTMLElement | null>, active: boolea
     if (!active || !node) return;
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     modalStack.push(node);
+    const restore = inertOutside(node);
     if (!node.contains(document.activeElement)) node.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => {
       if (modalStack.at(-1) !== node) return;
@@ -66,6 +90,7 @@ export function useModalFocus(ref: RefObject<HTMLElement | null>, active: boolea
     return () => {
       document.removeEventListener('keydown', onKey);
       modalStack.splice(modalStack.indexOf(node), 1);
+      restore();
       if (previous?.isConnected) previous.focus({ preventScroll: true });
     };
   }, [active, ref]);
@@ -78,6 +103,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   iconRight?: IconName;
   loading?: boolean;
   block?: boolean;
+  /** To move focus to the button (React 19 passes refs as a prop). */
+  ref?: Ref<HTMLButtonElement>;
 }
 
 export function Button({

@@ -5,7 +5,8 @@
   /* --grad carries text (use --on-yapi on it); --grad-fx is decorative only (rings, logo, glows). */
   --grad: linear-gradient(135deg, var(--yapi) 0%, var(--grad-end) 100%);
   --grad-fx: linear-gradient(135deg, var(--yapi) 0%, color-mix(in oklab, var(--yapi) 55%, var(--saffron)) 60%, var(--saffron) 100%);
-  --glass: color-mix(in oklab, var(--ground) 78%, transparent);
+  /* Opaque enough that nav labels keep 4.5:1 over anything behind them (reels, photos). */
+  --glass: color-mix(in oklab, var(--ground) 90%, transparent);
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 

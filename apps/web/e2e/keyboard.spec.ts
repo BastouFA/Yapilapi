@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { DATA, STATE, type SeedData } from './global-setup';
+import { DATA, liveRoom, STATE, type SeedData } from './global-setup';
 
 /**
  * Keyboard-only use of the shell and the overlay components: the skip link and
@@ -169,4 +169,183 @@ test('story viewer', async ({ page }) => {
   await expect(viewer).toBeHidden();
   // Once seen, the ring says so.
   await expect(page.getByRole('button', { name: /Ben Keyboard, 1 story, seen/ })).toBeVisible();
+});
+
+const seed = () => JSON.parse(readFileSync(DATA, 'utf8')) as SeedData;
+const isFocused = (loc: import('@playwright/test').Locator) => () => loc.evaluate((el) => el === document.activeElement).catch(() => false);
+
+/** Press `key` (at most `max` times) until `done` says focus is where we want it. */
+async function tabUntil(page: Page, done: () => Promise<boolean>, max = 80, key = 'Tab') {
+  for (let i = 0; i < max; i++) {
+    if (await done()) return;
+    await page.keyboard.press(key);
+  }
+  expect(await done(), `never reached the target with ${key}; focus is on ${await focused(page)}`).toBe(true);
+}
+
+test('chat: reply to a message with the keyboard only', async ({ page }) => {
+  const { conversationId, replyTargetId } = seed();
+  await page.goto(`/inbox/${conversationId}`);
+  await page.waitForLoadState('networkidle');
+  // From the top of the page, Tab to the options of Ben's message.
+  const options = page.locator(`#msg-${replyTargetId}`).getByRole('button', { name: 'Message options' });
+  await expect(options).toBeAttached();
+  await tabUntil(page, isFocused(options), 150);
+  await expect(options).toBeInViewport();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('menuitem', { name: 'Reply', exact: true })).toBeFocused();
+  await page.keyboard.press('Enter');
+  // Focus is in the message box, which says what it replies to.
+  const box = page.getByRole('textbox', { name: /message/i });
+  await expect(box).toBeFocused();
+  await expect(box).toHaveAccessibleDescription(/Replying to Ben Keyboard/);
+  // Escape cancels the reply and keeps focus in the box; then back to the message and start again.
+  await page.keyboard.press('Escape');
+  await expect(page.getByText(/^Replying to/)).toBeHidden();
+  await expect(box).toBeFocused();
+  await tabUntil(page, isFocused(options), 150, 'Shift+Tab');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await expect(box).toBeFocused();
+  const text = `See you at 7 (${Date.now().toString(36)})`;
+  await page.keyboard.type(text);
+  await page.keyboard.press('Enter');
+  const sent = page.locator('.chat-msg--mine', { hasText: text });
+  await expect(sent.getByRole('button', { name: /Go to the message from Ben Keyboard: Great\. It starts at 7/ })).toBeVisible();
+  await expect(sent.getByRole('button', { name: 'Message options' })).toBeAttached();
+  await expect(box).toBeFocused();
+  await expect(box).toHaveValue('');
+});
+
+test('chat: reaction picker and search return focus', async ({ page }) => {
+  const { conversationId, replyTargetId } = seed();
+  await page.goto(`/inbox/${conversationId}`);
+  await page.waitForLoadState('networkidle');
+  const options = page.locator(`#msg-${replyTargetId}`).getByRole('button', { name: 'Message options' });
+  await options.focus();
+  await page.keyboard.press('Enter');
+  await tabUntil(page, isFocused(page.getByRole('menuitem', { name: 'React', exact: true })), 10, 'ArrowDown');
+  await page.keyboard.press('Enter');
+  const picker = page.getByRole('group', { name: 'React' });
+  await expect(picker.getByRole('button').first()).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(picker.getByRole('button').nth(1)).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(picker).toBeHidden();
+  await expect(options).toBeFocused();
+
+  // Search: from the chat's menu, focus goes into the box; Escape closes it and focus returns.
+  const chatMenu = page.getByRole('button', { name: 'Conversation options' });
+  await chatMenu.focus();
+  await page.keyboard.press('Enter');
+  await tabUntil(page, isFocused(page.getByRole('menuitem', { name: 'Search this chat' })), 12, 'ArrowDown');
+  await page.keyboard.press('Enter');
+  const search = page.getByRole('searchbox', { name: 'Search this chat' });
+  await expect(search).toBeFocused();
+  await page.keyboard.type('soup');
+  await expect(page.getByRole('status').filter({ hasText: /found/ })).toBeAttached();
+  await page.keyboard.press('Escape');
+  await expect(search).toBeHidden();
+  await expect(chatMenu).toBeFocused();
+});
+
+test('profile: open and close the status sheet', async ({ page }) => {
+  const { username } = seed();
+  await page.goto(`/u/${username}`);
+  await page.waitForLoadState('networkidle');
+  const opener = page.getByRole('button', { name: /^(Edit status|Set a status)$/ });
+  await opener.focus();
+  await page.keyboard.press('Enter');
+  const sheet = page.getByRole('dialog', { name: 'Your status' });
+  await expect(sheet).toBeVisible();
+  expect(await focusInside(page, '[role="dialog"]'), `focus should move into the sheet: ${await focused(page)}`).toBe(true);
+  await tabStaysInside(page, '[role="dialog"]');
+  // The page behind can't be reached or clicked while it's open.
+  expect(await page.getByRole('navigation', { name: 'Primary', includeHidden: true }).evaluate((el) => !!el.closest('[inert]'))).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(sheet).toBeHidden();
+  await expect(opener).toBeFocused();
+  expect(await page.getByRole('navigation', { name: 'Primary' }).evaluate((el) => !!el.closest('[inert]'))).toBe(false);
+
+  // Again, and save a new status with the keyboard.
+  await page.keyboard.press('Enter');
+  await expect(sheet).toBeVisible();
+  const field = sheet.getByRole('textbox', { name: "What's happening" });
+  await tabUntil(page, isFocused(field), 10);
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('Reading on the train');
+  await tabUntil(page, isFocused(sheet.getByRole('button', { name: 'Save' })), 30);
+  await page.keyboard.press('Enter');
+  await expect(sheet).toBeHidden();
+  // The toast is announced by a live region that was already on the page.
+  await expect(page.getByRole('status').filter({ hasText: 'Status set for 24 hours' })).toBeAttached();
+  await expect(page.locator('.now-status').getByText('Reading on the train')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit status' })).toBeFocused();
+});
+
+test('camera: mode tabs with arrow keys', async ({ page }) => {
+  await page.goto('/home');
+  await page.waitForLoadState('networkidle');
+  await page.goto('/camera');
+  const camera = page.getByRole('dialog', { name: 'Camera' });
+  await expect(camera).toBeVisible();
+  await expect.poll(() => focusInside(page, '.cam'), { message: 'focus should move into the camera' }).toBe(true);
+  const tab = (name: string) => camera.getByRole('tab', { name });
+  await expect(camera.getByRole('tab')).toHaveCount(3);
+  // One tab stop for the tabs: the selected one.
+  expect(await camera.locator('[role="tab"][tabindex="0"]').count()).toBe(1);
+  await tabUntil(page, () => page.evaluate(() => document.activeElement?.getAttribute('role') === 'tab'), 20);
+  await expect(tab('Post')).toBeFocused();
+  await expect(tab('Post')).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('ArrowRight');
+  await expect(tab('Reel')).toBeFocused();
+  await expect(tab('Reel')).toHaveAttribute('aria-selected', 'true');
+  await expect(tab('Post')).toHaveAttribute('aria-selected', 'false');
+  await expect(tab('Post')).toHaveAttribute('tabindex', '-1');
+  await expect(camera.getByRole('button', { name: 'Start recording' })).toBeAttached();
+  await page.keyboard.press('ArrowRight');
+  await expect(tab('Story')).toBeFocused();
+  // Arrows wrap around on the tabs.
+  await page.keyboard.press('ArrowRight');
+  await expect(tab('Post')).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await expect(tab('Story')).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(tab('Post')).toHaveAttribute('aria-selected', 'true');
+  await expect(tab('Post')).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(tab('Story')).toHaveAttribute('aria-selected', 'true');
+  await expect(tab('Story')).toBeFocused();
+  // Tab stays in the camera; Escape closes it.
+  await tabStaysInside(page, '.cam', 8);
+  await page.keyboard.press('Escape');
+  await expect(page).toHaveURL(/\/home$/);
+});
+
+test('room: join and raise a hand', async ({ page }, info) => {
+  const id = await liveRoom(info.project.use.baseURL!);
+  await page.goto(`/rooms/${id}`);
+  await page.waitForLoadState('networkidle');
+  const join = page.getByRole('button', { name: 'Join as a listener' });
+  await tabUntil(page, isFocused(join), 60);
+  await page.keyboard.press('Enter');
+  // Joining replaces the button; focus goes to the room's title.
+  await expect(page.getByRole('heading', { level: 1, name: 'Sunday night radio' })).toBeFocused();
+  const hand = page.getByRole('button', { name: 'Raise hand' });
+  await tabUntil(page, isFocused(hand), 40);
+  await expect(hand).toHaveAttribute('aria-pressed', 'false');
+  await page.keyboard.press('Space');
+  // A toggle: the name stays, the pressed state changes, focus stays on it.
+  await expect(hand).toHaveAttribute('aria-pressed', 'true');
+  await expect(hand).toBeFocused();
+  await expect(page.getByRole('listitem').filter({ hasText: 'Ada Access (you)' }).getByRole('img', { name: 'Hand raised' })).toBeVisible();
+  await page.keyboard.press('Enter');
+  await expect(hand).toHaveAttribute('aria-pressed', 'false');
+  await page.keyboard.press('Enter');
+  await expect(hand).toHaveAttribute('aria-pressed', 'true');
+  await auditOpen(page, 'main');
+  // Leave, so the room isn't left with a listener.
+  await page.getByRole('button', { name: 'Leave quietly' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/c\//);
 });

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BottomSheet, Button, EmptyState, formatScheduled, PostCard, Skeleton, TextField } from '@yapilapi/design-system';
 import type { Post } from '@yapilapi/shared';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
@@ -19,6 +19,7 @@ export default function DraftsPage() {
   const [items, setItems] = useState<Post[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [timing, setTiming] = useState<Post | null>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     api.drafts.list().then(
@@ -31,7 +32,11 @@ export default function DraftsPage() {
   }, [toast]);
 
   const replace = (post: Post) => setItems((cur) => cur?.map((x) => (x.id === post.id ? post : x)) ?? cur);
-  const drop = (id: string) => setItems((cur) => cur?.filter((x) => x.id !== id) ?? cur);
+  const drop = (id: string) => {
+    setItems((cur) => cur?.filter((x) => x.id !== id) ?? cur);
+    // Its buttons go with it: focus goes to the page title rather than nowhere.
+    requestAnimationFrame(() => heading.current?.focus());
+  };
 
   async function run(key: string, fn: () => Promise<void>) {
     setBusy(key);
@@ -111,7 +116,9 @@ export default function DraftsPage() {
   return (
     <div className="yp-shell__inner">
       <div className="yp-topbar">
-        <h1>Drafts</h1>
+        <h1 ref={heading} tabIndex={-1}>
+          Drafts
+        </h1>
         <Link href="/create" className="yp-btn yp-btn--secondary yp-btn--sm">
           New post
         </Link>

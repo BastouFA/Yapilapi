@@ -202,8 +202,9 @@ function Reels() {
         type="button"
         className="reels__sound"
         onClick={() => setMuted((m) => !m)}
+        // A toggle: "Sound" is on (pressed) or off.
         aria-pressed={!muted}
-        aria-label={muted ? 'Turn sound on' : 'Turn sound off'}
+        aria-label="Sound"
       >
         <Icon name={muted ? 'volume-off' : 'volume'} size={20} />
       </button>
@@ -275,28 +276,14 @@ function Reels() {
               <Link href={`/u/${p.author.username}`} className="reel__avatar" aria-label={`${p.author.displayName}'s profile`}>
                 <Avatar name={p.author.displayName} src={p.author.avatarUrl} size="md" />
               </Link>
-              <RailButton
-                label={p.viewer.liked ? 'Unlike' : 'Like'}
-                pressed={p.viewer.liked}
-                count={p.counts.likes}
-                fmt={compact}
-                onClick={() => toggle(p, 'like')}
-                tone="like"
-              >
+              <RailButton label="Like" pressed={p.viewer.liked} count={p.counts.likes} fmt={compact} onClick={() => toggle(p, 'like')} tone="like">
                 <Icon name="heart" filled={p.viewer.liked} size={26} />
               </RailButton>
               <RailButton label="Comments" count={p.counts.comments} fmt={compact} onClick={() => setCommentsFor(p)}>
                 <Icon name="message" size={26} />
               </RailButton>
               {!mine && p.visibility === 'public' ? (
-                <RailButton
-                  label={p.viewer.reposted ? 'Undo repost' : 'Repost'}
-                  pressed={p.viewer.reposted}
-                  count={p.counts.reposts}
-                  fmt={compact}
-                  onClick={() => toggle(p, 'repost')}
-                  tone="repost"
-                >
+                <RailButton label="Repost" pressed={p.viewer.reposted} count={p.counts.reposts} fmt={compact} onClick={() => toggle(p, 'repost')} tone="repost">
                   <Icon name="repost" size={26} />
                 </RailButton>
               ) : null}

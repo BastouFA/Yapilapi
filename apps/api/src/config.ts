@@ -75,6 +75,15 @@ const schema = z.object({
   TRANSCRIBE_MODEL: z.string().default('whisper-1'),
   RATE_LIMIT_MAX: z.coerce.number().default(300),
   /**
+   * Run the background workers (media processing, recap videos, scheduled posts, webhooks, room
+   * housekeeping) in this process. Unset: on everywhere except tests, which drive them directly.
+   * The accessibility audit turns them on with APP_ENV=test so recaps get made.
+   */
+  JOB_WORKER: z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined || v === '' ? undefined : v === 'true' || v === '1')),
+  /**
    * Posting publicly, messaging people who aren't friends and going live need a confirmed email or phone number.
    * Unset: on in production, off elsewhere (tests and local development sign up without confirming).
    */
@@ -105,6 +114,7 @@ const resolved = schema.transform((c) => ({
   ...c,
   REQUIRE_VERIFICATION: c.REQUIRE_VERIFICATION ?? c.APP_ENV === 'production',
   SPAM_CHECKS: c.SPAM_CHECKS ?? c.APP_ENV !== 'test',
+  JOB_WORKER: c.JOB_WORKER ?? c.APP_ENV !== 'test',
   MEDIA_MODERATION_PROVIDER: c.MEDIA_MODERATION_PROVIDER ?? (c.APP_ENV === 'production' ? ('none' as const) : ('dev' as const)),
 }));
 

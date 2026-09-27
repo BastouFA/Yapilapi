@@ -365,8 +365,9 @@ export function StoryViewer({
             <button
               type="button"
               className="story__icon"
+              // A toggle: aria-pressed says whether you like it, so the name stays "Like".
               aria-pressed={story.liked}
-              aria-label={story.liked ? 'Unlike' : 'Like'}
+              aria-label="Like"
               onClick={async () => {
                 const liked = !story.liked;
                 patchStory({ liked });

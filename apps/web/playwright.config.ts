@@ -2,10 +2,11 @@ import { defineConfig, devices } from '@playwright/test';
 
 /**
  * Accessibility and keyboard checks (e2e/). They need a running web app and API:
- * point A11Y_BASE_URL at the web app (default http://localhost:3100); the API is
- * reached through the web app's /api proxy. See docs/accessibility.md.
+ * point A11Y_BASE_URL at the web app (default http://127.0.0.1:3100: a host other than
+ * localhost keeps its cookies apart from a development session); the API is reached
+ * through the web app's /api proxy. See docs/accessibility.md.
  */
-const baseURL = process.env.A11Y_BASE_URL ?? 'http://localhost:3100';
+const baseURL = process.env.A11Y_BASE_URL ?? 'http://127.0.0.1:3100';
 
 const desktop = { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } };
 const mobile = { ...devices['Pixel 7'], browserName: 'chromium' as const };
