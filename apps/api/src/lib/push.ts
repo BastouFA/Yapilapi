@@ -103,6 +103,8 @@ const TEXT: Record<string, (actor: string) => string> = {
   // A reminder you set yourself on a chat message (there is no one else in it).
   chat_reminder: () => 'You asked to be reminded about a message',
   scheduled_post_failed: () => "A scheduled post couldn't be published. It's back in your drafts",
+  scheduled_message_failed: () => "A message you scheduled couldn't be sent",
+  new_sign_in: () => 'New sign-in to your account from a device we haven’t seen before',
   recap_ready: () => 'Your recap video is ready',
   recap_failed: () => "We couldn't make your recap video",
 };

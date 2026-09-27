@@ -24,7 +24,7 @@ import { analyzeText } from './moderation.ts';
 import type { RealtimeHub } from './realtime.ts';
 import { notify } from './services.ts';
 import { soundVisibleSql } from './sounds.ts';
-import { publicUserFrom, usersByIds } from './users.ts';
+import { publicUserFrom, usernameMatchSql, usersByIds } from './users.ts';
 import { notBlockedSql } from './visibility.ts';
 import { mentionAllowedSql, seesSensitiveSql } from './interactions.ts';
 import { mediaSizesSql, withSmallVariants } from './data-saver.ts';
@@ -121,8 +121,10 @@ export async function prepareStory(
   const people = names.length
     ? (
         await db.query<{ user_id: string; username: string }>(
-          `SELECT pr.user_id, lower(pr.username) AS username FROM profiles pr JOIN users u ON u.id = pr.user_id
-           WHERE lower(pr.username) = ANY($1::text[]) AND u.status = 'active' AND ${notBlockedSql('pr.user_id', '$2')}`,
+          // Each name as written, so a username changed in the last 14 days still finds its person.
+          `SELECT pr.user_id, n.name AS username FROM unnest($1::text[]) AS n(name)
+           JOIN profiles pr ON ${usernameMatchSql('pr', 'n.name')} JOIN users u ON u.id = pr.user_id
+           WHERE u.status = 'active' AND ${notBlockedSql('pr.user_id', '$2')}`,
           [names, authorId],
         )
       ).rows

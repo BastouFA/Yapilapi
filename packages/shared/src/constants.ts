@@ -252,6 +252,10 @@ export const CHAT_LIST_ITEM_MAX = 200;
 /** Reminders on chat messages: at least a minute and at most a year ahead, up to 100 waiting per person. */
 export const CHAT_REMINDER_MAX_DAYS = 365;
 export const CHAT_REMINDER_MAX_PENDING = 100;
+/** Send later: at least a minute and at most a year ahead, up to 100 waiting per person. */
+export const SCHEDULED_MESSAGE_MIN_SECONDS = 60;
+export const SCHEDULED_MESSAGE_MAX_DAYS = 365;
+export const SCHEDULED_MESSAGE_MAX_PENDING = 100;
 /**
  * Saved posts and boards. A board is private (only you), shared (you and the
  * collaborators you invite) or public (also on your profile). People under 18

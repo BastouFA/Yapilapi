@@ -98,6 +98,8 @@ const PATHS = {
   'user-plus': ['M10 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', 'M3 20a7 7 0 0 1 12.5-4.3', 'M19 14v6', 'M16 17h6'],
   /** Two arrows: switch between things. */
   switch: ['M4 8h14', 'M15 5l3 3-3 3', 'M20 16H6', 'M9 13l-3 3 3 3'],
+  /** A clock face: send later, times. */
+  clock: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'M12 7v5l3.5 2'],
 } as const;
 
 export type IconName = keyof typeof PATHS | NavGlyphName;

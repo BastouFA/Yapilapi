@@ -2,6 +2,7 @@ import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { ApiError, createClient } from '../../../packages/api-client/src/index';
 import type { Me } from '../../../packages/shared/src/types';
+import { MAX_DEVICE_ACCOUNTS, parseDeviceAccounts, upsertDeviceAccount, withoutDeviceAccount, type DeviceAccount } from '../../../packages/shared/src/accounts';
 import { dataSaverHeaders } from './data-saver-state';
 import { tr } from './locale';
 import { setProbeUrl, trackedFetch } from './network';
@@ -83,6 +84,18 @@ export async function usernameAvailable(username: string): Promise<boolean | nul
   }
 }
 
+/**
+ * For changing your username: whether this one can be yours, and why not (taken, reserved, not
+ * following the rules, already yours). Null when that can't be checked right now.
+ */
+export async function checkNewUsername(username: string) {
+  try {
+    return await (await client()).auth.checkUsername(username, 'change');
+  } catch {
+    return null;
+  }
+}
+
 /** Ends this session on the API (when reachable) and forgets its token on the phone. */
 export async function signOut() {
   await (
@@ -99,16 +112,17 @@ export async function signOut() {
 // (`ypl_session_<id>`); the one in use is also under TOKEN_KEY, which every request reads. The
 // list itself (names and photos, no tokens) is in `ypl_accounts`.
 
-export const MAX_ACCOUNTS = 5;
+// The list's rules (what's kept, who leaves past the limit, who takes over) are in
+// packages/shared/src/accounts.ts, where they are unit tested.
+export const MAX_ACCOUNTS = MAX_DEVICE_ACCOUNTS;
 const ACCOUNTS_KEY = 'ypl_accounts';
 const tokenKey = (id: string) => `ypl_session_${id}`;
 
-export type StoredAccount = { id: string; username: string; displayName: string; avatarUrl: string | null };
+export type StoredAccount = DeviceAccount;
 
 export async function storedAccounts(): Promise<StoredAccount[]> {
   try {
-    const list = JSON.parse((await SecureStore.getItemAsync(ACCOUNTS_KEY)) ?? '[]');
-    return Array.isArray(list) ? list.filter((a) => a && typeof a.id === 'string').slice(0, MAX_ACCOUNTS) : [];
+    return parseDeviceAccounts(await SecureStore.getItemAsync(ACCOUNTS_KEY), MAX_ACCOUNTS);
   } catch {
     return [];
   }
@@ -125,10 +139,9 @@ export async function rememberAccount(me: Me): Promise<StoredAccount[]> {
   if (!token) return list;
   await SecureStore.setItemAsync(tokenKey(me.id), token);
   const entry: StoredAccount = { id: me.id, username: me.username, displayName: me.displayName, avatarUrl: me.avatarUrl ?? null };
-  const at = list.findIndex((a) => a.id === me.id);
-  const next = at >= 0 ? list.map((a, i) => (i === at ? entry : a)) : [...list, entry];
-  // A new account past the limit (made from the add-account screens): the oldest one leaves this phone.
-  while (next.length > MAX_ACCOUNTS) await SecureStore.deleteItemAsync(tokenKey(next.shift()!.id)).catch(() => {});
+  // A new account past the limit (made from the add-account screens): the oldest other one leaves this phone.
+  const { list: next, evicted } = upsertDeviceAccount(list, entry, MAX_ACCOUNTS);
+  for (const id of evicted) await SecureStore.deleteItemAsync(tokenKey(id)).catch(() => {});
   await saveAccounts(next);
   return next;
 }
@@ -144,7 +157,7 @@ export async function activateAccount(id: string): Promise<boolean> {
 /** Removes an account from this phone: its token and its place in the list. */
 export async function forgetAccount(id: string): Promise<StoredAccount[]> {
   await SecureStore.deleteItemAsync(tokenKey(id)).catch(() => {});
-  const next = (await storedAccounts()).filter((a) => a.id !== id);
+  const next = withoutDeviceAccount(await storedAccounts(), id);
   await saveAccounts(next);
   return next;
 }

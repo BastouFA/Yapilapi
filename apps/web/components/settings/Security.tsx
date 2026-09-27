@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { startRegistration } from '@simplewebauthn/browser';
-import { Alert, Button, Card, Dialog, Icon, List, ListItem, TextField } from '@yapilapi/design-system';
+import { Alert, Button, Card, Dialog, Icon, List, ListItem, Switch, TextField } from '@yapilapi/design-system';
 import { formatRelativeTime, type MessageKey } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { disableBrowserPush } from '@/lib/push';
@@ -112,7 +112,69 @@ const EVENTS: Record<string, MessageKey> = {
   session_revoked: 'st.event.session_revoked',
   account_created: 'st.event.account_created',
   email_verified: 'st.event.email_verified',
+  username_changed: 'st.event.username_changed',
+  sign_in_alerts_on: 'st.event.sign_in_alerts_on',
+  sign_in_alerts_off: 'st.event.sign_in_alerts_off',
 };
+
+/**
+ * Opened from "This wasn't me" in a sign-in alert (?review=sign-in): what to do, right above the
+ * devices signed in to the account.
+ */
+export function SignInReview() {
+  const { t } = useSession();
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    setShow(new URLSearchParams(window.location.search).get('review') === 'sign-in');
+  }, []);
+  if (!show) return null;
+  return (
+    <Alert tone="warning" title={t('st.review.title')}>
+      <p style={{ margin: '0 0 8px' }}>{t('st.review.body')}</p>
+      <a href="#password" className="yp-btn yp-btn--secondary yp-btn--sm">
+        {t('st.review.password')}
+      </a>
+    </Alert>
+  );
+}
+
+/** Sign-in alerts: always a notification in the app for a new device; the email can be turned off. */
+export function SignInAlertsCard() {
+  const { t, toast } = useSession();
+  const [email, setEmail] = useState<boolean | null>(null);
+  useEffect(() => {
+    api.me.signInAlerts().then(
+      (r) => setEmail(r.email),
+      () => setEmail(true),
+    );
+  }, []);
+  return (
+    <Anchor id="alerts">
+      <Card title={t('st.alerts.title')} subtitle={t('st.alerts.desc')}>
+        <div className="stack-sm">
+          <Switch
+            label={t('st.alerts.email')}
+            checked={email ?? true}
+            disabled={email === null}
+            onChange={async (on) => {
+              const before = email;
+              setEmail(on);
+              try {
+                setEmail((await api.me.setSignInAlerts(on)).email);
+              } catch (e) {
+                setEmail(before);
+                toast(errorMessage(e));
+              }
+            }}
+          />
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+            {t('st.alerts.emailHint')}
+          </p>
+        </div>
+      </Card>
+    </Anchor>
+  );
+}
 
 /** Login alerts and activity: recent sign-ins and changes to the account, newest first. */
 export function ActivityCard() {

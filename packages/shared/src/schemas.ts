@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { DATA_SAVER_MODES } from './data-saver.ts';
+import { CHAT_ACCENTS, CHAT_WALLPAPERS } from './chat-theme.ts';
+import { USERNAME_PROBLEM_MESSAGES, usernameProblem } from './usernames.ts';
 import { REEL_LONGEST_MS, reelHighlightsSchema } from './reels.ts';
 import { MAX_UNDERSTOOD_LANGUAGES, TRANSLATABLE_KINDS, TRANSLATION_LANGUAGE_CODES } from './translation.ts';
 import {
@@ -70,6 +72,17 @@ export const usernameSchema = z
   .min(3)
   .max(30)
   .regex(/^[a-z0-9_.]+$/i, 'Use letters, numbers, dots and underscores only.');
+
+/** A username being chosen now (changing it in Settings): 3 to 30 letters, numbers or underscores, not reserved. */
+export const newUsernameSchema = z
+  .string()
+  .trim()
+  .superRefine((v, ctx) => {
+    const p = usernameProblem(v);
+    if (p) ctx.addIssue({ code: z.ZodIssueCode.custom, message: USERNAME_PROBLEM_MESSAGES[p] });
+  });
+
+export const changeUsernameSchema = z.object({ username: newUsernameSchema });
 
 export const passwordSchema = z.string().min(10, 'Use at least 10 characters.').max(200);
 
@@ -426,6 +439,25 @@ export const chatReminderSchema = z.object({
   at: z.string().datetime({ offset: true }),
   scope: z.enum(['me', 'group']).default('me'),
 });
+/** Send later: a text message (optionally a reply), sent at `sendAt` (a minute to a year ahead, checked by the server). */
+export const scheduleMessageSchema = z.object({
+  body: z.string().trim().min(1, 'Write a message.').max(4000),
+  sendAt: z.string().datetime({ offset: true }),
+  replyToId: uuid.optional(),
+});
+/** Change a message waiting to be sent: its text, its time, or both. */
+export const editScheduledMessageSchema = z
+  .object({
+    body: z.string().trim().min(1, 'Write a message.').max(4000).optional(),
+    sendAt: z.string().datetime({ offset: true }).optional(),
+  })
+  .refine((v) => v.body !== undefined || v.sendAt !== undefined, { message: 'Change the text or the time.' });
+/** A chat's wallpaper and bubble colour. Either can be left out to keep it. */
+export const chatThemeSchema = z
+  .object({ wallpaper: z.enum(CHAT_WALLPAPERS).optional(), accent: z.enum(CHAT_ACCENTS).optional() })
+  .refine((v) => v.wallpaper !== undefined || v.accent !== undefined, { message: 'Choose a wallpaper or a colour.' });
+/** Settings > Security: email me about sign-ins from new devices (the notification in the app always comes). */
+export const signInAlertsSchema = z.object({ email: z.boolean() });
 /** Search the messages of one chat. */
 export const messageSearchSchema = z.object({
   q: z.string().trim().min(1).max(100),

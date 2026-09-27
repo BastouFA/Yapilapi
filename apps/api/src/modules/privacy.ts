@@ -85,6 +85,9 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       aiMemories: await q(`SELECT content, source, created_at FROM ai_memories WHERE user_id = $1`),
       securityEvents: await q(`SELECT type, created_at FROM security_events WHERE user_id = $1 ORDER BY created_at DESC LIMIT 500`),
       problemReports: await q(`SELECT body, platform, app_version, page, status, created_at FROM problem_reports WHERE user_id = $1 ORDER BY created_at DESC`),
+      usernameChanges: await q(`SELECT old_username, new_username, changed_at, held_until FROM username_history WHERE user_id = $1 ORDER BY changed_at DESC`),
+      signInDevices: await q(`SELECT fingerprint, first_seen_at, last_seen_at FROM known_sign_ins WHERE user_id = $1 ORDER BY last_seen_at DESC`),
+      scheduledMessages: await q(`SELECT conversation_id, body, send_at, status, created_at FROM scheduled_messages WHERE sender_id = $1 ORDER BY send_at`),
     };
     await db.query(`INSERT INTO privacy_requests (user_id, kind, status, completed_at) VALUES ($1,'export','completed',now())`, [u.id]);
     reply.header('content-disposition', `attachment; filename="yapilapi-export-${u.id}.json"`);
@@ -146,6 +149,10 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         // Nothing can reach this phone or browser any more, and nobody can sign in with these.
         `DELETE FROM push_subscriptions WHERE user_id = $1`,
         `DELETE FROM passkeys WHERE user_id = $1`,
+        // Earlier usernames stop leading here, the devices seen for sign-in alerts are forgotten, and nothing scheduled goes out.
+        `DELETE FROM username_history WHERE user_id = $1`,
+        `DELETE FROM known_sign_ins WHERE user_id = $1`,
+        `DELETE FROM scheduled_messages WHERE sender_id = $1`,
         `DELETE FROM media WHERE owner_id = $1`,
         `DELETE FROM share_videos sv USING posts p WHERE p.id = sv.post_id AND p.author_id = $1`,
         `UPDATE recaps SET deleted_at = coalesce(deleted_at, now()) WHERE owner_id = $1`,

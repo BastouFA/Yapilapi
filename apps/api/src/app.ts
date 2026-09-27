@@ -207,6 +207,7 @@ export async function buildApp(
     mediaModerator: mediaModeratorFromConfig(config),
     roomMedia: meshRoomMedia(config, realtime),
     music: musicCatalogFromConfig(config, db, { fetch: opts.musicFetch, log: (msg, err) => app.log.warn({ err: (err as Error)?.message }, msg) }),
+    jobs: {},
   };
   if (config.APP_ENV === 'production' && config.SMS_PROVIDER === 'dev')
     app.log.warn('SMS_PROVIDER=dev in production: phone codes are only written to the log. Configure Twilio Verify.');
@@ -433,6 +434,8 @@ export async function buildApp(
     ...chatJobHandlers(viewOnceDeps),
     // Scheduled posts go out at their time.
     ...scheduledPostJobHandlers(ctx),
+    // Jobs the modules added (messages sent later).
+    ...ctx.jobs,
   };
   if (opts.webhookWorker ?? config.JOB_WORKER) {
     let busy = false;

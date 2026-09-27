@@ -77,6 +77,7 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
 };
 
 function hrefFor(n: NotificationItem): string | undefined {
+  if (n.type === 'new_sign_in') return '/settings/security?review=sign-in';
   if (n.type === 'reel_duet' || n.type === 'reel_remix') return `/reels?start=${n.entityId}`;
   if (n.entityType === 'chapter') return `/chapters/${n.entityId}`;
   if (n.entityType === 'recap' || n.type === 'recap_ready' || n.type === 'recap_failed') return n.entityId ? `/recaps?open=${n.entityId}` : '/recaps';
@@ -105,6 +106,12 @@ function hrefFor(n: NotificationItem): string | undefined {
  * the newest person is its actor and `data.count` says how many people.
  */
 function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): string | null {
+  // About your own account, in your language: a sign-in from a new device, a scheduled message that couldn't go out.
+  if (n.type === 'new_sign_in') {
+    const device = String(n.data.device ?? '');
+    return typeof n.data.place === 'string' && n.data.place ? t('m.notif.newSignInPlace', { device, place: n.data.place }) : t('m.notif.newSignIn', { device });
+  }
+  if (n.type === 'scheduled_message_failed') return t('m.notif.scheduledMessageFailed');
   if (n.type !== 'comment_like' && n.type !== 'comment_reply') return null;
   const name = n.actor?.displayName ?? '';
   const others = Math.max(0, Number(n.data.count ?? 1) - 1);

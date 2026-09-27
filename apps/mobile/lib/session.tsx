@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
-import { ApiError } from '../../../packages/api-client/src/index';
 import type { Me } from '../../../packages/shared/src/types';
+import { sessionCheckFailure, takeOver, takeOverCandidates } from '../../../packages/shared/src/accounts';
 import {
   accountWithToken,
   activateAccount,
@@ -88,49 +88,83 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     for (let i = 0; i < 50 && !ready.current; i++) await new Promise((r) => setTimeout(r, 100));
   }, []);
 
-  /** The next saved account that still has a working session, made the one in use; null when there is none. */
-  const takeOver = useCallback(async (): Promise<Me | null> => {
-    for (const a of await storedAccounts()) {
-      if (!(await activateAccount(a.id))) {
-        await forgetAccount(a.id);
-        continue;
-      }
-      try {
-        const user = (await (await client()).auth.me()).user;
-        setAccounts(await rememberAccount(user));
-        return user;
-      } catch (e) {
-        if (e instanceof ApiError && e.code === 'network') return null;
-        await forgetAccount(a.id);
-      }
-    }
-    await restoreToken(undefined);
-    setAccounts(await storedAccounts());
-    return null;
+  const meRef = useRef(me);
+  meRef.current = me;
+
+  // A check that couldn't be answered (offline, or a problem on our side) is tried again soon.
+  const refreshRef = useRef<() => Promise<void>>(async () => {});
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const retrySoon = useCallback(() => {
+    clearTimeout(retryTimer.current);
+    retryTimer.current = setTimeout(() => void refreshRef.current(), 15_000);
   }, []);
+  useEffect(() => () => clearTimeout(retryTimer.current), []);
+
+  /**
+   * The next account on this phone with a working session becomes the one in use (the rules are in
+   * packages/shared/src/accounts.ts). 'pending': one is in use but the API couldn't confirm it yet
+   * (offline): keep loading rather than show the welcome screen, and check again. 'signedOut':
+   * nobody is left.
+   */
+  const takeOverNext = useCallback(
+    async (leavingId?: string | null): Promise<'switched' | 'pending' | 'signedOut'> => {
+      const r = await takeOver(takeOverCandidates(await storedAccounts(), leavingId), {
+        activate: activateAccount,
+        whoAmI: async () => (await (await client()).auth.me()).user,
+        forget: forgetAccount,
+      });
+      if (r.kind === 'switched') {
+        setMe(r.user);
+        setAccounts(await rememberAccount(r.user));
+        void followActiveAccount();
+        return 'switched';
+      }
+      setAccounts(await storedAccounts());
+      if (r.kind === 'pending') {
+        setMe(undefined);
+        retrySoon();
+        return 'pending';
+      }
+      await restoreToken(undefined);
+      setMe(null);
+      return 'signedOut';
+    },
+    [retrySoon],
+  );
 
   const refresh = useCallback(async () => {
+    // No account in use (it was logged out elsewhere on this phone): another saved one takes over.
+    if (!(await getToken())) {
+      await takeOverNext();
+      return;
+    }
     try {
-      // No account in use (it was logged out elsewhere on this phone): another saved one takes over.
-      if (!(await getToken())) return setMe(await takeOver());
       const api = await client();
       const user = (await api.auth.me()).user;
       setMe(user);
       // Kept with its own token, so it can be switched back to after adding another account.
       setAccounts(await rememberAccount(user).catch(() => storedAccounts()));
     } catch (e) {
-      // Offline with a saved session: stay signed in (and keep loading) rather than showing the
-      // welcome screen; the check runs again when the connection is back.
-      if (e instanceof ApiError && e.code === 'network') return setMe((cur) => cur);
+      const failure = sessionCheckFailure(e);
+      // Offline, or the API had a problem: stay signed in (and keep loading if nothing showed
+      // yet) rather than showing the welcome screen. Only a session the API says has ended is
+      // forgotten; a server error or a rate limit never signs anyone out.
+      if (failure !== 'ended') {
+        setMe((cur) => cur);
+        // Offline is checked again when the connection is back; a problem on our side, in a moment.
+        if (failure === 'unavailable' && meRef.current === undefined) retrySoon();
+        return;
+      }
       // The session in use ended (logged out elsewhere, password changed): forget it, and let
       // another account signed in on this phone take over when there is one.
       const token = await getToken();
       const ended = token ? await accountWithToken(token) : null;
       if (ended) await forgetAccount(ended);
       await restoreToken(undefined);
-      setMe(await takeOver());
+      await takeOverNext(ended);
     }
-  }, [takeOver]);
+  }, [takeOverNext, retrySoon]);
+  refreshRef.current = refresh;
 
   useEffect(() => {
     void refresh();
@@ -138,8 +172,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   // Started offline: find out who is signed in as soon as the connection is back.
-  const meRef = useRef(me);
-  meRef.current = me;
   useEffect(
     () =>
       onBackOnline(() => {
@@ -153,11 +185,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     await stopPushForThisAccount();
     await apiSignOut();
     if (current) setAccounts(await forgetAccount(current.id));
-    const next = await takeOver();
-    setMe(next);
-    if (next) void followActiveAccount();
-    return next ? ('switched' as const) : ('signedOut' as const);
-  }, [takeOver]);
+    // Another account on this phone takes over; offline, it stays in use and is checked again.
+    return (await takeOverNext(current?.id)) === 'signedOut' ? ('signedOut' as const) : ('switched' as const);
+  }, [takeOverNext]);
 
   const signOutEverywhere = useCallback(async () => {
     const current = meRef.current;
@@ -165,16 +195,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     await (await client()).auth.logoutAll();
     await restoreToken(undefined);
     if (current) setAccounts(await forgetAccount(current.id));
-    const next = await takeOver();
-    setMe(next);
-    if (next) void followActiveAccount();
-    return next ? ('switched' as const) : ('signedOut' as const);
-  }, [takeOver]);
+    return (await takeOverNext(current?.id)) === 'signedOut' ? ('signedOut' as const) : ('switched' as const);
+  }, [takeOverNext]);
 
   const switchAccount = useCallback(async (id: string) => {
     if (meRef.current?.id === id) return true;
     const before = await getToken();
-    if (!(await activateAccount(id))) return false;
+    // Its token is gone from the keychain: nothing to switch to, so it leaves the list (it needs a new log in).
+    if (!(await activateAccount(id))) {
+      setAccounts(await forgetAccount(id));
+      return false;
+    }
     try {
       const user = (await (await client()).auth.me()).user;
       setMe(user);
@@ -184,7 +215,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       await restoreToken(before);
       // Its session ended (logged out elsewhere, or the password changed): it needs a new log in.
-      if (!(e instanceof ApiError && e.code === 'network')) setAccounts(await forgetAccount(id));
+      // Offline or a problem on our side: it stays on the phone, to try again.
+      if (sessionCheckFailure(e) === 'ended') setAccounts(await forgetAccount(id));
       return false;
     }
   }, []);

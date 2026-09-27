@@ -46,6 +46,9 @@ import {
 import { TranslatableText } from '../../lib/translation';
 import { useReport } from '../../lib/report';
 import { ListCard, ListComposer, PollCard, PollComposer, ReminderNote, ReminderPicker } from '../../lib/chat-polls';
+import { accentFor, ChatLookSheet, ChatWallpaperView, laterLimits, ScheduledList, useScheduled } from '../../lib/chat-later';
+import { DateTimeSheet } from '../../lib/date-time';
+import { chatTheme, type AccentColors } from '../../../../packages/shared/src/chat-theme';
 
 /** Voice messages shorter than this are treated as a slip of the finger and not sent. */
 const MIN_VOICE_MS = 1000;
@@ -86,6 +89,12 @@ export default function Chat() {
   const [pollOpen, setPollOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const [remindFor, setRemindFor] = useState<{ message: Message; scope: 'me' | 'group' } | null>(null);
+  // Send later (touch and hold Send), your messages waiting here, and the chat's wallpaper and colour.
+  const scheduled = useScheduled(id);
+  const [laterOpen, setLaterOpen] = useState(false);
+  const [lookOpen, setLookOpen] = useState(false);
+  const theme = chatTheme(conversation?.theme);
+  const accent = useMemo(() => accentFor({ wallpaper: 'plain', accent: theme.accent }, c), [theme.accent, c]);
   const input = useRef<TextInput>(null);
   const patchMessage = (messageId: string, fn: (m: Message) => Message) => setMessages((cur) => cur.map((x) => (x.id === messageId ? fn(x) : x)));
   const loadPins = useCallback(async () => {
@@ -165,6 +174,8 @@ export default function Chat() {
     if (e.type === 'message.reminder' && e.data?.conversationId === id) patchMessage(e.data.id, (x) => ({ ...x, reminder: e.data.reminder ?? undefined }));
     if (e.type === 'conversation.updated' && e.data?.id === id)
       setConversation((cur) => (cur ? { ...cur, disappearingSeconds: e.data.disappearingSeconds } : cur));
+    // Someone changed the wallpaper or bubble colour: everyone sees the same.
+    if (e.type === 'conversation.theme' && e.data?.id === id) setConversation((cur) => (cur ? { ...cur, theme: e.data.theme } : cur));
     if (e.type === 'app.foreground') void load();
     // Someone opened a view-once photo you sent, or its file was deleted.
     if (e.type === 'view_once.updated' && e.data?.conversationId === id)
@@ -669,45 +680,64 @@ export default function Chat() {
           </Text>
         </Pressable>
       ) : null}
-      <FlatList
-        keyboardShouldPersistTaps="handled"
-        // Scrolling tucks the keyboard away, so the whole conversation is readable again.
-        keyboardDismissMode="on-drag"
-        ref={list}
-        data={messages}
-        keyExtractor={(m) => m.id}
-        contentContainerStyle={{ padding: space[4], gap: space[2] }}
-        onContentSizeChange={() => {
-          const last = messages.at(-1)?.id ?? null;
-          // A new message, or the newest one growing (a poll's results, a vote, a photo loading)
-          // while you're reading the bottom: stay at the bottom so nothing ends up cut off.
-          if (last === followed.current && !atBottom.current) return;
-          followed.current = last;
-          list.current?.scrollToEnd({ animated: false });
-        }}
-        onScroll={(e) => {
-          const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-          atBottom.current = contentSize.height - (contentOffset.y + layoutMeasurement.height) < 120;
-        }}
-        scrollEventThrottle={100}
-        onScrollToIndexFailed={(info) => {
-          list.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
-          setTimeout(() => list.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: true }), 100);
-        }}
-        renderItem={({ item }) => (
-          <MessageRow
-            item={item}
-            mine={item.sender.id === me?.id}
-            meId={me?.id}
-            showSender={!!conversation && conversation.members.length > 2}
-            highlighted={highlight === item.id}
-            h={rowHandlers}
-          />
-        )}
-        initialNumToRender={20}
-        maxToRenderPerBatch={12}
-        windowSize={11}
-      />
+      <View style={{ flex: 1 }}>
+        <ChatWallpaperView wallpaper={theme.wallpaper} />
+        <FlatList
+          style={{ flex: 1 }}
+          keyboardShouldPersistTaps="handled"
+          // Scrolling tucks the keyboard away, so the whole conversation is readable again.
+          keyboardDismissMode="on-drag"
+          ref={list}
+          data={messages}
+          keyExtractor={(m) => m.id}
+          contentContainerStyle={{ padding: space[4], gap: space[2] }}
+          onContentSizeChange={() => {
+            const last = messages.at(-1)?.id ?? null;
+            // A new message, or the newest one growing (a poll's results, a vote, a photo loading)
+            // while you're reading the bottom: stay at the bottom so nothing ends up cut off.
+            if (last === followed.current && !atBottom.current) return;
+            followed.current = last;
+            list.current?.scrollToEnd({ animated: false });
+          }}
+          onScroll={(e) => {
+            const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+            atBottom.current = contentSize.height - (contentOffset.y + layoutMeasurement.height) < 120;
+          }}
+          scrollEventThrottle={100}
+          onScrollToIndexFailed={(info) => {
+            list.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+            setTimeout(() => list.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: true }), 100);
+          }}
+          renderItem={({ item }) => (
+            <MessageRow
+              item={item}
+              mine={item.sender.id === me?.id}
+              meId={me?.id}
+              showSender={!!conversation && conversation.members.length > 2}
+              highlighted={highlight === item.id}
+              accent={accent}
+              h={rowHandlers}
+            />
+          )}
+          // Your messages waiting to be sent: only you see them, after the newest message.
+          ListFooterComponent={
+            <ScheduledList
+              items={scheduled.items}
+              accent={accent}
+              onChanged={(s) => scheduled.setItems((cur) => cur.map((x) => (x.id === s.id ? s : x)).sort((a, b) => a.sendAt.localeCompare(b.sendAt)))}
+              onSent={(s, m) => {
+                scheduled.setItems((cur) => cur.filter((x) => x.id !== s.id));
+                setMessages((cur) => (cur.some((x) => x.id === m.id) ? cur : [...cur, m]));
+              }}
+              onRemoved={(s) => scheduled.setItems((cur) => cur.filter((x) => x.id !== s.id))}
+              onError={setError}
+            />
+          }
+          initialNumToRender={20}
+          maxToRenderPerBatch={12}
+          windowSize={11}
+        />
+      </View>
       {yaps?.available && !recordingOn ? (
         <View style={{ paddingHorizontal: space[3], paddingTop: space[2] }}>
           <Pressable
@@ -879,7 +909,15 @@ export default function Chat() {
               ]}
             />
             {body.trim() || editing ? (
-              <Pressable accessibilityRole="button" accessibilityLabel={editing ? t('m.chat.saveEdit') : t('inbox.send')} onPress={send}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={editing ? t('m.chat.saveEdit') : t('inbox.send')}
+                accessibilityHint={editing ? undefined : t('m.chat.later.holdHint')}
+                accessibilityActions={editing ? [] : [{ name: 'sendLater', label: t('m.chat.later.title') }]}
+                onAccessibilityAction={(e) => e.nativeEvent.actionName === 'sendLater' && setLaterOpen(true)}
+                onPress={send}
+                onLongPress={editing ? undefined : () => setLaterOpen(true)}
+              >
                 <LinearGradient {...gradient(c)} style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}>
                   {/* Points up, not along the line, so it stays the same in right-to-left layouts. */}
                   <Icon name={editing ? 'checkmark' : 'arrow-up'} size={22} color={c.onYapi} />
@@ -952,7 +990,56 @@ export default function Chat() {
             icon: 'timer-outline',
             onPress: () => setDisappearingOpen(true),
           },
+          { label: t('m.chat.look.title'), icon: 'color-palette-outline', onPress: () => setLookOpen(true) },
         ]}
+      />
+      <DateTimeSheet
+        visible={laterOpen}
+        title={t('m.chat.later.title')}
+        min={laterLimits().min}
+        max={laterLimits().max}
+        value={new Date(Date.now() + 60 * 60_000)}
+        quick
+        hint={t('m.chat.later.hint')}
+        confirmLabel={() => t('m.chat.later.schedule')}
+        onClose={() => setLaterOpen(false)}
+        onPick={(at) => {
+          setLaterOpen(false);
+          const text = body.trim();
+          if (!text) return;
+          const quoting = replyTo;
+          void (async () => {
+            try {
+              const { scheduled: s } = await (
+                await client()
+              ).conversations.schedule(id, {
+                body: text,
+                sendAt: at.toISOString(),
+                ...(quoting ? { replyToId: quoting.id } : {}),
+              });
+              scheduled.setItems((cur) => [...cur.filter((x) => x.id !== s.id), s].sort((a, b) => a.sendAt.localeCompare(b.sendAt)));
+              setBody('');
+              setReplyTo(null);
+            } catch (e) {
+              fail(e);
+            }
+          })();
+        }}
+      />
+      <ChatLookSheet
+        visible={lookOpen}
+        onClose={() => setLookOpen(false)}
+        theme={conversation?.theme}
+        onPick={async (next) => {
+          try {
+            const r = await (await client()).conversations.setTheme(id, next);
+            setConversation((cur) => (cur ? { ...cur, theme: r.theme } : cur));
+            const line = r.message;
+            if (line) setMessages((cur) => (cur.some((x) => x.id === line.id) ? cur : [...cur, line]));
+          } catch (e) {
+            setError(errorMessage(e));
+          }
+        }}
       />
       <ActionSheet
         visible={addOpen}
@@ -1028,6 +1115,7 @@ const MessageRow = memo(function MessageRow({
   meId,
   showSender,
   highlighted,
+  accent,
   h,
 }: {
   item: Message;
@@ -1035,6 +1123,8 @@ const MessageRow = memo(function MessageRow({
   meId: string | undefined;
   showSender: boolean;
   highlighted: boolean;
+  /** Your bubbles' colours in this chat (the brand gradient unless the chat has its own). */
+  accent: AccentColors;
   h: RowHandlers;
 }) {
   const c = useColors();
@@ -1046,7 +1136,7 @@ const MessageRow = memo(function MessageRow({
     : rich
       ? ''
       : item.body || (item.attachments.length || item.story ? '' : t('m.message.deleted'));
-  const tint = mine ? c.onYapi : c.ink;
+  const tint = mine ? accent.on : c.ink;
   const quote = item.replyTo && !item.unsent ? <Quote preview={item.replyTo} tint={tint} meId={meId} onJump={h.jumpTo} /> : null;
   const textStyle = item.unsent ? { fontStyle: 'italic' as const, opacity: 0.8 } : null;
   const meta = item.editedAt && !item.unsent ? <Text style={{ color: tint, fontSize: 11, opacity: 0.75 }}>{t('m.chat.edited')}</Text> : null;
@@ -1069,10 +1159,15 @@ const MessageRow = memo(function MessageRow({
   const bubbleView = mine ? (
     <View style={{ alignSelf: 'flex-end', maxWidth: '80%', gap: 2 }}>
       <Pressable onLongPress={openActions} accessibilityHint={t('m.chat.messageOptions')}>
-        <LinearGradient {...gradient(c)} style={[bubble, { maxWidth: '100%', alignSelf: 'flex-end', borderBottomEndRadius: 6 }]}>
+        <LinearGradient
+          colors={[accent.from, accent.to]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[bubble, { maxWidth: '100%', alignSelf: 'flex-end', borderBottomEndRadius: 6 }]}
+        >
           {quote}
           {media}
-          {text ? <Text style={[{ color: c.onYapi, fontSize: 15, lineHeight: 21 }, userText, textStyle]}>{text}</Text> : null}
+          {text ? <Text style={[{ color: accent.on, fontSize: 15, lineHeight: 21 }, userText, textStyle]}>{text}</Text> : null}
           {meta}
         </LinearGradient>
       </Pressable>

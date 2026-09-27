@@ -65,10 +65,17 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
   const reload = useCallback(
     () =>
       api.users.get(username).then(
-        (r) => setProfile(r.profile),
+        (r) => {
+          // An old username (changed in the last 14 days) found the profile: move to its address now.
+          if (r.profile.username.toLowerCase() !== decodeURIComponent(username).toLowerCase()) {
+            router.replace(`/u/${encodeURIComponent(r.profile.username)}${window.location.search}`);
+            return;
+          }
+          setProfile(r.profile);
+        },
         () => setMissing(true),
       ),
-    [username],
+    [username, router],
   );
   useEffect(() => {
     if (signedOut && !isPublic) return;

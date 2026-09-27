@@ -3,6 +3,7 @@ import { Animated, FlatList, I18nManager, Modal, PanResponder, Pressable, Text, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Message, MessagePreview, PinnedMessage } from '../../../packages/shared/src/types';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
+import { chatTheme } from '../../../packages/shared/src/chat-theme';
 import { client, errorMessage } from './api';
 import { useT } from './i18n';
 import { radius, space } from './theme';
@@ -169,6 +170,20 @@ export function SystemLine({ message, meId, onJump }: { message: Message; meId?:
         <Icon name="notifications-outline" size={14} color={c.inkMuted} />
         <Text style={[{ color: c.inkMuted, fontSize: 13, textAlign: 'center', lineHeight: 18 }, userText]}>{text}</Text>
       </Pressable>
+    );
+  }
+  if (s?.type === 'theme') {
+    const look = chatTheme(s);
+    const text = t('m.chat.systemTheme', {
+      name,
+      wallpaper: t(`m.chat.wallpaper.${look.wallpaper}` as MessageKey),
+      colour: t(`m.chat.accent.${look.accent}` as MessageKey),
+    });
+    return (
+      <View style={{ alignSelf: 'center', flexDirection: 'row', gap: space[1], alignItems: 'center', maxWidth: '90%', paddingVertical: space[1] }}>
+        <Icon name="color-palette-outline" size={14} color={c.inkMuted} />
+        <Text style={[{ color: c.inkMuted, fontSize: 13, textAlign: 'center', lineHeight: 18 }, userText]}>{text}</Text>
+      </View>
     );
   }
   if (s?.type !== 'disappearing') return null;

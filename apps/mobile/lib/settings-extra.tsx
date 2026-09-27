@@ -2,10 +2,12 @@ import Constants from 'expo-constants';
 import { router, type Href } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Alert, Linking, Platform, Pressable, Text, View } from 'react-native';
-import type { AccountInfo, InteractionSettings, PublicUser } from '../../../packages/shared/src/types';
+import type { AccountInfo, InteractionSettings, PublicUser, UsernameCheck, UsernameStatus } from '../../../packages/shared/src/types';
+import type { MessageKey } from '../../../packages/shared/src/i18n';
+import { usernameProblem } from '../../../packages/shared/src/usernames';
 import { SUPPORTED_LOCALES } from '../../../packages/shared/src/i18n';
 import { LEGAL_DOCS } from '../../../packages/shared/src/legal';
-import { client, errorMessage, webUrl } from './api';
+import { checkNewUsername, client, errorMessage, webUrl } from './api';
 import { AppearanceSegments, goHome } from './account-menu';
 import { useAppearance } from './appearance';
 import { PasswordField } from './auth-ui';
@@ -14,7 +16,7 @@ import { openLegal } from './legal';
 import { registerForPush } from './push';
 import { useSession } from './session';
 import { radius, space } from './theme';
-import { Avatar, Button, Card, Field, Icon, Loading, Notice, SwitchRow, Title, useColors, userText, type IconName } from './ui';
+import { Avatar, BottomSheet, Button, Card, Field, Icon, Loading, Notice, SwitchRow, Title, useColors, userText, type IconName } from './ui';
 
 /**
  * The parts of Settings that are new on the phone: account details, password, two-step
@@ -184,17 +186,25 @@ export function ProfileSummary() {
   );
 }
 
-/** Username, date of birth and when you joined; read-only. */
+/** Username (with Change username), date of birth and when you joined. */
 export function AccountDetails() {
   const c = useColors();
   const { t, date } = useT();
   const { me } = useSession();
   const [account, setAccount] = useState<AccountInfo | null>(null);
+  const [status, setStatus] = useState<UsernameStatus | null>(null);
+  const [changing, setChanging] = useState(false);
   useEffect(() => {
     void client()
       .then((api) => api.me.account())
       .then(
         (r) => setAccount(r.account),
+        () => {},
+      );
+    void client()
+      .then((api) => api.me.username())
+      .then(
+        (r) => setStatus(r.status),
         () => {},
       );
   }, []);
@@ -210,9 +220,156 @@ export function AccountDetails() {
   return (
     <Card style={{ gap: space[3] }}>
       <Title sub={t('st.signin.desc')}>{t('st.signin.title')}</Title>
-      {fact(t('auth.username'), `@${me.username}`, t('st.username.hint'))}
+      {fact(t('auth.username'), `@${me.username}`, status?.nextChangeAt ? t('st.username.next', { date: long(status.nextChangeAt) }) : t('st.username.hint'))}
+      <Button
+        label={t('st.username.change')}
+        size="sm"
+        variant="secondary"
+        icon="at-outline"
+        disabled={!status || !!status.nextChangeAt}
+        onPress={() => setChanging(true)}
+        style={{ alignSelf: 'flex-start' }}
+      />
       {fact(t('auth.birthDate'), account ? (account.birthDate ? long(`${account.birthDate}T00:00:00Z`) : t('st.birthDate.none')) : '…', t('st.birthDate.hint'))}
       {account ? fact(t('st.memberSince'), long(account.createdAt)) : null}
+      <ChangeUsername visible={changing} onClose={() => setChanging(false)} onChanged={setStatus} />
+    </Card>
+  );
+}
+
+const CHECK_TEXT: Record<NonNullable<UsernameCheck['reason']>, MessageKey> = {
+  taken: 'st.username.taken',
+  held: 'st.username.taken',
+  reserved: 'st.username.reserved',
+  invalid: 'st.username.invalid',
+  current: 'st.username.current',
+};
+
+/**
+ * Change your username: checked as you type (after a short pause), then confirmed, since it can't
+ * change again for 14 days. The old one stays yours for 14 days and old links still lead to you.
+ */
+function ChangeUsername({ visible, onClose, onChanged }: { visible: boolean; onClose: () => void; onChanged: (s: UsernameStatus) => void }) {
+  const c = useColors();
+  const { t } = useT();
+  const { refresh } = useSession();
+  const [value, setValue] = useState('');
+  const [check, setCheck] = useState<{ name: string; ok: boolean | null; reason?: UsernameCheck['reason'] }>({ name: '', ok: null });
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const latest = useRef('');
+  useEffect(() => {
+    if (!visible) return;
+    setValue('');
+    setConfirming(false);
+    setError(null);
+  }, [visible]);
+  const name = value.trim();
+  useEffect(() => {
+    latest.current = name;
+    if (!name) return setCheck({ name, ok: null });
+    const problem = usernameProblem(name);
+    if (problem) return setCheck({ name, ok: false, reason: problem === 'reserved' ? 'reserved' : 'invalid' });
+    setCheck({ name, ok: null });
+    const timer = setTimeout(() => {
+      void checkNewUsername(name).then((r) => {
+        if (latest.current === name) setCheck(r ? { name, ok: r.available, reason: r.reason } : { name, ok: null });
+      });
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [name]);
+  const ready = !!name && check.name === name && check.ok === true;
+  const message = !name
+    ? t('st.username.rule')
+    : check.name !== name || check.ok === null
+      ? t('st.username.checking')
+      : check.ok
+        ? t('st.username.available', { name })
+        : t(CHECK_TEXT[check.reason ?? 'taken']);
+  return (
+    <BottomSheet visible={visible} title={t('st.username.changeTitle')} subtitle={t('st.username.changeDesc')} onClose={onClose}>
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      <Field
+        label={t('st.username.new')}
+        value={value}
+        onChangeText={(v) => {
+          setValue(v.replace(/^@/, ''));
+          setConfirming(false);
+        }}
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="off"
+        maxLength={30}
+        hint={check.ok === false ? undefined : message}
+        error={check.ok === false && check.name === name ? message : null}
+      />
+      {/* Read out when the answer comes, without moving focus. */}
+      <Text accessibilityLiveRegion="polite" style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
+        {name && check.name === name && check.ok !== null ? message : ''}
+      </Text>
+      {confirming ? (
+        <View style={{ gap: space[2] }}>
+          <Notice tone="warn">{t('st.username.confirm', { name })}</Notice>
+          <Button
+            label={t('st.username.save')}
+            onPress={async () => {
+              setError(null);
+              try {
+                const r = await (await client()).me.changeUsername(name);
+                onChanged(r.status);
+                await refresh();
+                onClose();
+                Alert.alert(t('st.username.saved', { name: r.user.username }));
+              } catch (e) {
+                setConfirming(false);
+                setError(errorMessage(e));
+              }
+            }}
+          />
+          <Button label={t('common.cancel')} variant="ghost" onPress={() => setConfirming(false)} />
+        </View>
+      ) : (
+        <Button label={t('st.username.change')} disabled={!ready} onPress={() => setConfirming(true)} />
+      )}
+      <Text style={{ color: c.inkMuted, fontSize: 12, lineHeight: 16 }}>{t('st.username.rule')}</Text>
+    </BottomSheet>
+  );
+}
+
+/** Sign-in alerts: a notification in the app for every new device; the email can be turned off. */
+export function SignInAlerts() {
+  const { t } = useT();
+  const [email, setEmail] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    void client()
+      .then((api) => api.me.signInAlerts())
+      .then(
+        (r) => setEmail(r.email),
+        () => setEmail(true),
+      );
+  }, []);
+  return (
+    <Card style={{ gap: space[3] }}>
+      <Title sub={t('st.alerts.desc')}>{t('st.alerts.title')}</Title>
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      <SwitchRow
+        label={t('st.alerts.email')}
+        hint={t('st.alerts.emailHint')}
+        value={email ?? true}
+        disabled={email === null}
+        onValueChange={async (on) => {
+          const before = email;
+          setEmail(on);
+          setError(null);
+          try {
+            setEmail((await (await client()).me.setSignInAlerts(on)).email);
+          } catch (e) {
+            setEmail(before);
+            setError(errorMessage(e));
+          }
+        }}
+      />
     </Card>
   );
 }
@@ -474,6 +631,9 @@ const EVENTS: Record<string, Parameters<ReturnType<typeof useT>['t']>[0]> = {
   session_revoked: 'st.event.session_revoked',
   account_created: 'st.event.account_created',
   email_verified: 'st.event.email_verified',
+  username_changed: 'st.event.username_changed',
+  sign_in_alerts_on: 'st.event.sign_in_alerts_on',
+  sign_in_alerts_off: 'st.event.sign_in_alerts_off',
 };
 
 /** Login alerts and activity: recent sign-ins and changes to the account. */

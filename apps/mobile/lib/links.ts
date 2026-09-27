@@ -21,6 +21,8 @@ export function notificationHref(n: NotificationTarget): string | null {
   if ((n.type === 'reel_duet' || n.type === 'reel_remix') && id) return `/reels?start=${id}`;
   if (n.type === 'recap_ready' || n.type === 'recap_failed' || n.entityType === 'recap') return id ? `/recaps?open=${id}` : '/recaps';
   if (n.type === 'account_limited' || n.type === 'account_review') return '/settings';
+  // A sign-in from a new device: where you're signed in, to log it out, and your password.
+  if (n.type === 'new_sign_in') return '/settings/security';
   // Money: a tip you got opens your tips and gifts; a new subscriber, a sale or a booking to confirm opens Studio.
   if (n.type === 'tip_received') return '/gifts';
   if (n.type === 'subscription_started' || n.type === 'order_paid' || n.type === 'booking_request') return '/studio';

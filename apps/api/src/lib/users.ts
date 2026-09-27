@@ -103,3 +103,17 @@ export async function isAdultViewer(db: Q, viewer: string | null | undefined): P
   );
   return !!rows[0]?.adult;
 }
+
+/**
+ * Matches the profile `alias` by a username given as `param` (SQL text): its current username,
+ * or one it changed from in the last 14 days (held for it, so old links and @mentions still lead
+ * there). Both can't point at different people: nobody else can take a held name.
+ */
+export const usernameMatchSql = (alias: string, param: string) =>
+  `(lower(${alias}.username) = lower(${param}) OR ${alias}.user_id = (SELECT h.user_id FROM username_history h
+     WHERE lower(h.old_username) = lower(${param}) AND h.held_until > now() ORDER BY h.changed_at DESC LIMIT 1))`;
+
+/** Mentions: profiles named in the list `param` (lower-case text[]), by their current name or a held earlier one. */
+export const usernameInListSql = (alias: string, param: string) =>
+  `(lower(${alias}.username) = ANY(${param}) OR ${alias}.user_id IN (SELECT h.user_id FROM username_history h
+     WHERE lower(h.old_username) = ANY(${param}) AND h.held_until > now()))`;

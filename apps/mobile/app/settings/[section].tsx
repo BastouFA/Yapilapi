@@ -26,6 +26,7 @@ import {
   RestrictedAccounts,
   SensitiveContent,
   SettingsGroup,
+  SignInAlerts,
   TwoStep,
   WhoCanReach,
 } from '../../lib/settings-extra';
@@ -91,6 +92,7 @@ function Content({ section }: { section: SectionId }): ReactNode {
           <PasskeysOnWeb />
           <SessionsCard />
           <LogoutEverywhere />
+          <SignInAlerts />
           <Activity />
           <ConnectedApps />
         </>

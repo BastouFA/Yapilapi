@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { eventVisibleSql, postVisibleSql } from '../lib/visibility.ts';
+import { usernameMatchSql } from '../lib/users.ts';
 
 /**
  * Public previews: what anyone can see of a shared link without an account.
@@ -133,7 +134,7 @@ export default async function publicModule(app: FastifyInstance, ctx: AppContext
               (SELECT count(*) FROM follows WHERE follower_id = pr.user_id)::int AS following,
               (SELECT count(*) FROM posts WHERE author_id = pr.user_id AND deleted_at IS NULL AND status = 'published' AND community_id IS NULL)::int AS posts
        FROM profiles pr JOIN users u ON u.id = pr.user_id
-       WHERE lower(pr.username) = lower($1) AND ${publicAccountSql('pr', 'u')}`,
+       WHERE ${usernameMatchSql('pr', '$1')} AND ${publicAccountSql('pr', 'u')}`,
       [username],
     );
     const r = rows[0];

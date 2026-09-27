@@ -1,9 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { Alert, Avatar, Button, Card, Select, TextField } from '@yapilapi/design-system';
-import { IMAGE_ACCEPT, PROFILE_MODES, type AccountInfo, type MessageKey, type Profile } from '@yapilapi/shared';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Avatar, BottomSheet, Button, Card, Select, TextField } from '@yapilapi/design-system';
+import {
+  IMAGE_ACCEPT,
+  PROFILE_MODES,
+  usernameProblem,
+  type AccountInfo,
+  type MessageKey,
+  type Profile,
+  type UsernameCheck,
+  type UsernameStatus,
+} from '@yapilapi/shared';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { PasswordField } from '@/components/PasswordField';
 import { useSession } from '@/app/providers';
@@ -92,13 +101,19 @@ export function ProfileCard() {
   );
 }
 
-/** Username, date of birth and when you joined, read-only. */
+/** Username (with Change username), date of birth and when you joined. */
 export function SignInDetailsCard() {
   const { me, t, locale } = useSession();
   const [account, setAccount] = useState<AccountInfo | null>(null);
+  const [status, setStatus] = useState<UsernameStatus | null>(null);
+  const [changing, setChanging] = useState(false);
   useEffect(() => {
     api.me.account().then(
       (r) => setAccount(r.account),
+      () => {},
+    );
+    api.me.username().then(
+      (r) => setStatus(r.status),
       () => {},
     );
   }, []);
@@ -112,7 +127,12 @@ export function SignInDetailsCard() {
             <dt>{t('auth.username')}</dt>
             <dd>
               @{me.username}
-              <span className="muted settings-facts__hint">{t('st.username.hint')}</span>
+              <span className="muted settings-facts__hint">
+                {status?.nextChangeAt ? t('st.username.next', { date: long.format(new Date(status.nextChangeAt)) }) : t('st.username.hint')}
+              </span>
+              <Button size="sm" variant="secondary" style={{ marginTop: 8 }} disabled={!status || !!status.nextChangeAt} onClick={() => setChanging(true)}>
+                {t('st.username.change')}
+              </Button>
             </dd>
           </div>
           <div>
@@ -133,7 +153,132 @@ export function SignInDetailsCard() {
           <SettingsLink href="/settings/security#password" icon="key" title={t('st.password.title')} desc={t('st.password.desc')} />
         </div>
       </Card>
+      <ChangeUsernameSheet open={changing} onClose={() => setChanging(false)} onChanged={setStatus} />
     </Anchor>
+  );
+}
+
+const CHECK_TEXT: Record<NonNullable<UsernameCheck['reason']>, MessageKey> = {
+  taken: 'st.username.taken',
+  held: 'st.username.taken',
+  reserved: 'st.username.reserved',
+  invalid: 'st.username.invalid',
+  current: 'st.username.current',
+};
+
+/** Whether a new username can be used, checked as you type (after a short pause). */
+function useUsernameCheck(value: string) {
+  const [state, setState] = useState<{ name: string; ok: boolean | null; reason?: UsernameCheck['reason'] }>({ name: '', ok: null });
+  const latest = useRef('');
+  useEffect(() => {
+    const name = value.trim();
+    latest.current = name;
+    if (!name) return setState({ name, ok: null });
+    // The rules are known here: no need to ask the server about a name that breaks them.
+    const problem = usernameProblem(name);
+    if (problem) return setState({ name, ok: false, reason: problem === 'reserved' ? 'reserved' : 'invalid' });
+    setState({ name, ok: null });
+    const timer = setTimeout(() => {
+      api.auth.checkUsername(name, 'change').then(
+        (r) => latest.current === name && setState({ name, ok: r.available, reason: r.reason }),
+        () => latest.current === name && setState({ name, ok: null }),
+      );
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [value]);
+  return state;
+}
+
+/** Change your username: checked as you type, then confirmed, since it can't change again for 14 days. */
+function ChangeUsernameSheet({ open, onClose, onChanged }: { open: boolean; onClose: () => void; onChanged: (s: UsernameStatus) => void }) {
+  const { t, toast, setMe } = useSession();
+  const [value, setValue] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const check = useUsernameCheck(value);
+  useEffect(() => {
+    if (!open) return;
+    setValue('');
+    setConfirming(false);
+    setError(null);
+  }, [open]);
+  const name = value.trim();
+  const checking = !!name && check.name === name && check.ok === null;
+  const message = !name
+    ? t('st.username.rule')
+    : check.name !== name || check.ok === null
+      ? t('st.username.checking')
+      : check.ok
+        ? t('st.username.available', { name })
+        : t(CHECK_TEXT[check.reason ?? 'taken']);
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api.me.changeUsername(name);
+      setMe(r.user);
+      onChanged(r.status);
+      toast(t('st.username.saved', { name: r.user.username }));
+      onClose();
+    } catch (e) {
+      setError(errorMessage(e));
+      setConfirming(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <BottomSheet open={open} onClose={onClose} title={t('st.username.changeTitle')}>
+      <form
+        className="stack"
+        style={{ gap: 12 }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (check.ok && check.name === name) setConfirming(true);
+        }}
+      >
+        <p className="muted" style={{ margin: 0, fontSize: 14 }}>
+          {t('st.username.changeDesc')}
+        </p>
+        {error ? <Alert tone="danger">{error}</Alert> : null}
+        <TextField
+          label={t('st.username.new')}
+          value={value}
+          onChange={(e) => {
+            setValue(e.currentTarget.value.replace(/^@/, ''));
+            setConfirming(false);
+          }}
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          maxLength={30}
+          hint={check.ok === false ? undefined : message}
+          error={check.ok === false && check.name === name ? message : undefined}
+          aria-busy={checking || undefined}
+        />
+        <span className="yp-visually-hidden" role="status" aria-live="polite">
+          {name && check.name === name && check.ok !== null ? message : ''}
+        </span>
+        {confirming ? <Alert tone="warning">{t('st.username.confirm', { name })}</Alert> : null}
+        <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
+          <Button variant="ghost" onClick={onClose}>
+            {t('common.cancel')}
+          </Button>
+          {confirming ? (
+            <Button loading={busy} onClick={() => void save()}>
+              {t('st.username.save')}
+            </Button>
+          ) : (
+            <Button type="submit" disabled={!(check.ok && check.name === name)}>
+              {t('st.username.change')}
+            </Button>
+          )}
+        </div>
+      </form>
+    </BottomSheet>
   );
 }
 
