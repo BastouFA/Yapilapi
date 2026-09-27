@@ -210,7 +210,13 @@ export function Segmented<T extends string>({
             onPress={() => press(o.id)}
             style={[s.segment, on && [{ backgroundColor: c.surface }, elevation(c)]]}
           >
-            <Text style={{ color: on ? c.ink : c.inkMuted, fontWeight: on ? '700' : '600', fontSize: 14 }} numberOfLines={1}>
+            <Text
+              style={{ color: on ? c.ink : c.inkMuted, fontWeight: on ? '700' : '600', fontSize: 14 }}
+              numberOfLines={1}
+              // Many tabs on a narrow phone: shrink a little rather than cut words off ("Mem…").
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+            >
               {o.label}
               {o.count !== undefined ? <Text style={{ color: c.inkMuted, fontWeight: '500' }}> {o.count}</Text> : null}
             </Text>

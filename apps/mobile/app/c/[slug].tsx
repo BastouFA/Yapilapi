@@ -210,6 +210,9 @@ export default function CommunityScreen() {
       {note ? <Notice>{note}</Notice> : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {locked ? <Notice>{t(LOCKED[tab])}</Notice> : null}
+      {tab === 'posts' && community.myRole && !locked ? (
+        <CommunityComposer slug={slug} communityId={community.id} name={community.name} onPosted={(p) => setPosts((cur) => [p, ...(cur ?? [])])} />
+      ) : null}
     </View>
   );
 
@@ -224,7 +227,7 @@ export default function CommunityScreen() {
         locked ? null : loadingTab ? (
           <Loading />
         ) : tab === 'posts' ? (
-          <EmptyState title={t('m.community.noPosts.title')} body={t('m.community.noPosts.body')} />
+          <EmptyState title={t('m.community.noPosts.title')} body={community?.myRole ? t('m.community.noPosts.member') : t('m.community.noPosts.body')} />
         ) : tab === 'faq' ? (
           <EmptyState title={t('m.community.noFaq.title')} body={faq?.canEdit ? t('m.community.noFaq.editor') : t('m.community.noFaq.body')} />
         ) : tab === 'rooms' ? (
@@ -457,6 +460,86 @@ function StartRoom({ slug, onScheduled }: { slug: string; onScheduled: () => voi
           }
         }}
       />
+    </Card>
+  );
+}
+
+/**
+ * Write to the community from the phone. While you type a question, answers already in the FAQ or
+ * earlier posts that look similar show up, so people find them before asking again.
+ */
+function CommunityComposer({ slug, communityId, name, onPosted }: { slug: string; communityId: string; name: string; onPosted: (p: Post) => void }) {
+  const c = useColors();
+  const { t } = useT();
+  const [body, setBody] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [similar, setSimilar] = useState<{ faq: FaqEntry[]; posts: Post[] }>({ faq: [], posts: [] });
+
+  useEffect(() => {
+    const q = body.trim();
+    if (q.length < 12) return setSimilar({ faq: [], posts: [] });
+    const timer = setTimeout(() => {
+      void client()
+        .then((api) => api.communities.similar(slug, q))
+        .then(
+          (r) => setSimilar({ faq: r.faq.slice(0, 2), posts: r.posts.slice(0, 2).map((x) => x.post) }),
+          () => {},
+        );
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [body, slug]);
+
+  async function post() {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await (await client()).posts.create({ body: body.trim(), communityId, visibility: 'public' });
+      onPosted(r.post);
+      setBody('');
+      setSimilar({ faq: [], posts: [] });
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const hasSimilar = similar.faq.length > 0 || similar.posts.length > 0;
+  return (
+    <Card style={{ gap: space[2] }}>
+      <Field
+        label={t('m.community.composeLabel')}
+        hideLabel
+        placeholder={t('m.community.composePlaceholder', { name })}
+        value={body}
+        onChangeText={setBody}
+        multiline
+        maxLength={2000}
+        style={{ minHeight: 72, paddingTop: space[2] }}
+      />
+      {hasSimilar ? (
+        <View accessibilityLiveRegion="polite" style={{ gap: space[1] }}>
+          <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '700' }}>{t('m.community.similarTitle')}</Text>
+          {similar.faq.map((f) => (
+            <View key={f.id} style={{ gap: 2 }}>
+              <Text style={[{ color: c.ink, fontWeight: '600' }, userText]}>{f.question}</Text>
+              <Text style={[{ color: c.inkMuted, fontSize: 13 }, userText]} numberOfLines={3}>
+                {f.answer}
+              </Text>
+            </View>
+          ))}
+          {similar.posts.map((p) => (
+            <Pressable key={p.id} accessibilityRole="link" onPress={() => router.push(`/p/${p.id}`)} hitSlop={6}>
+              <Text style={[{ color: c.yapi, fontWeight: '600' }, userText]} numberOfLines={2}>
+                {p.body}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      <Button label={t('create.publish')} size="sm" style={{ alignSelf: 'flex-end' }} disabled={!body.trim() || busy} onPress={() => void post()} />
     </Card>
   );
 }

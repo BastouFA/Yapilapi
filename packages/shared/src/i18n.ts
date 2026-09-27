@@ -2910,6 +2910,10 @@ const en = {
   'm.live.removePerson': 'Remove {name} from the live',
   'm.live.removed': 'Removed from the live',
   'm.live.removedYou': 'You were removed from this live.',
+  'm.community.composeLabel': 'Write to the community',
+  'm.community.composePlaceholder': 'Share something with {name}',
+  'm.community.similarTitle': 'Already asked here',
+  'm.community.noPosts.member': 'Be the first to post something.',
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -5842,6 +5846,10 @@ const fr: Catalog = {
   'm.live.removePerson': 'Retirer {name} du direct',
   'm.live.removed': 'Retiré du direct',
   'm.live.removedYou': 'Tu as été retiré de ce direct.',
+  'm.community.composeLabel': 'Écrire à la communauté',
+  'm.community.composePlaceholder': 'Partagez quelque chose avec {name}',
+  'm.community.similarTitle': 'Déjà demandé ici',
+  'm.community.noPosts.member': 'Soyez le premier à publier quelque chose.',
 };
 
 const ar: Catalog = {
@@ -8734,6 +8742,10 @@ const ar: Catalog = {
   'm.live.removePerson': 'أزل {name} من البث',
   'm.live.removed': 'أُزيل من البث',
   'm.live.removedYou': 'تمت إزالتك من هذا البث.',
+  'm.community.composeLabel': 'اكتب إلى المجتمع',
+  'm.community.composePlaceholder': 'شارك شيئًا مع {name}',
+  'm.community.similarTitle': 'سُئل هنا من قبل',
+  'm.community.noPosts.member': 'كن أول من ينشر شيئًا.',
 };
 
 const es: Catalog = {
@@ -11645,6 +11657,10 @@ const es: Catalog = {
   'm.live.removePerson': 'Quitar a {name} del directo',
   'm.live.removed': 'Quitado del directo',
   'm.live.removedYou': 'Te quitaron de este directo.',
+  'm.community.composeLabel': 'Escribir a la comunidad',
+  'm.community.composePlaceholder': 'Comparte algo con {name}',
+  'm.community.similarTitle': 'Ya se preguntó aquí',
+  'm.community.noPosts.member': 'Sé el primero en publicar algo.',
 };
 
 const pt: Catalog = {
@@ -14554,6 +14570,10 @@ const pt: Catalog = {
   'm.live.removePerson': 'Remover {name} da transmissão',
   'm.live.removed': 'Removido da transmissão',
   'm.live.removedYou': 'Você foi removido desta transmissão.',
+  'm.community.composeLabel': 'Escrever para a comunidade',
+  'm.community.composePlaceholder': 'Compartilhe algo com {name}',
+  'm.community.similarTitle': 'Já perguntaram aqui',
+  'm.community.noPosts.member': 'Seja a primeira pessoa a publicar algo.',
 };
 
 const sw: Catalog = {
@@ -17466,6 +17486,10 @@ const sw: Catalog = {
   'm.live.removePerson': 'Mwondoe {name} kwenye mubashara',
   'm.live.removed': 'Ameondolewa kwenye mubashara',
   'm.live.removedYou': 'Umeondolewa kwenye mubashara huu.',
+  'm.community.composeLabel': 'Andika kwa jumuiya',
+  'm.community.composePlaceholder': 'Shiriki kitu na {name}',
+  'm.community.similarTitle': 'Tayari imeulizwa hapa',
+  'm.community.noPosts.member': 'Kuwa wa kwanza kuchapisha kitu.',
 };
 
 const yo: Catalog = {
@@ -20372,6 +20396,10 @@ const yo: Catalog = {
   'm.live.removePerson': 'Yọ {name} kúrò nínú ìgbóhùnsáfẹ́fẹ́',
   'm.live.removed': 'A ti yọ ọ́ kúrò nínú ìgbóhùnsáfẹ́fẹ́',
   'm.live.removedYou': 'A ti yọ ọ́ kúrò nínú ìgbóhùnsáfẹ́fẹ́ yìí.',
+  'm.community.composeLabel': 'Kọ sí àwùjọ náà',
+  'm.community.composePlaceholder': 'Pín nǹkan pẹ̀lú {name}',
+  'm.community.similarTitle': 'Wọ́n ti béèrè èyí níbí',
+  'm.community.noPosts.member': 'Jẹ́ ẹni àkọ́kọ́ tí yóò fi nǹkan ránṣẹ́.',
 };
 
 const ha: Catalog = {
@@ -23285,6 +23313,10 @@ const ha: Catalog = {
   'm.live.removePerson': 'Cire {name} daga kai tsaye',
   'm.live.removed': 'An cire daga kai tsaye',
   'm.live.removedYou': 'An cire ka daga wannan kai tsaye.',
+  'm.community.composeLabel': "Rubuta wa al'umma",
+  'm.community.composePlaceholder': 'Raba wani abu da {name}',
+  'm.community.similarTitle': 'An riga an tambaya a nan',
+  'm.community.noPosts.member': 'Ka zama na farko da zai wallafa wani abu.',
 };
 
 export const CATALOGS: Record<string, Catalog> = { en, fr, ar, es, pt, sw, yo, ha };
