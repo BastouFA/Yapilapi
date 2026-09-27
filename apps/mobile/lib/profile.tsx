@@ -10,7 +10,7 @@ import { liveStatus, NowStatusLine, onStatusChanged } from './now-status';
 import { PostCard, RichText } from './post';
 import { radius, space } from './theme';
 import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, PlusBadge, Segmented, useColors, userText } from './ui';
-import { ShopList } from './money';
+import { ShopList, SupportCard } from './money';
 import { isVerificationError, VerifyPrompt } from './safety';
 import { ChaptersRow } from './chapters';
 import { ProfileBoards } from './boards';
@@ -329,6 +329,9 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
           onChanged={load}
           onMessage={(text, tone) => (tone === 'danger' ? (setError(text), setNote(null)) : (setNote(text), setError(null)))}
         />
+      )}
+      {rel.isSelf || rel.blocked ? null : (
+        <SupportCard userId={profile.id} username={profile.username} name={profile.displayName} isCreator={profile.mode === 'creator'} />
       )}
       <ChaptersRow userId={profile.id} isSelf={rel.isSelf} />
       <Segmented

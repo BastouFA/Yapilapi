@@ -84,7 +84,22 @@ export function SupportCreator({
 }
 
 /** Send a tip. With a liveId it's a gift: once paid, it appears in that live's chat for everyone watching. */
-export function TipSheet({ open, onClose, userId, name, liveId }: { open: boolean; onClose: () => void; userId: string; name: string; liveId?: string }) {
+export function TipSheet({
+  open,
+  onClose,
+  userId,
+  name,
+  liveId,
+  postId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  userId: string;
+  name: string;
+  liveId?: string;
+  /** A tip for one of their posts. */
+  postId?: string;
+}) {
   const { toast, locale } = useSession();
   const checkout = useCheckout();
   const [amount, setAmount] = useState('300');
@@ -102,6 +117,7 @@ export function TipSheet({ open, onClose, userId, name, liveId }: { open: boolea
               currency,
               message,
               liveId,
+              postId,
               idempotencyKey: crypto.randomUUID(),
             });
             setMessage('');

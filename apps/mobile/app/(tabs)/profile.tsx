@@ -1,6 +1,7 @@
 import { router, type Href } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import { useT } from '../../lib/i18n';
+import { hasStudio } from '../../lib/creator';
 import { useFlag } from '../../lib/flags';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
@@ -10,8 +11,9 @@ import { Icon, Loading, Notice, Screen, useColors, useTabBarSpace, type IconName
 /**
  * You: your profile, with "Your space" on top: everything that is yours to come back to (saved
  * posts and boards, drafts, your archive, memories, recap videos, circles, close friends, events,
- * communities, Together, Live), finding and inviting friends, Real and Settings. Memories, Together
- * and Live show when their features are on. Then your chapters and posts.
+ * communities, Together, Live), Studio for creator, professional and business accounts, your
+ * purchases, finding and inviting friends, Real and Settings. Memories, Together and Live show when
+ * their features are on. Then your chapters and posts.
  */
 export default function ProfileScreen() {
   const c = useColors();
@@ -43,6 +45,8 @@ export default function ProfileScreen() {
     { label: t('m.live.title'), icon: 'radio-outline', href: '/live', on: live === true },
     { label: t('friends.title'), icon: 'people-outline', href: '/find-friends' },
     { label: t('invite.title'), icon: 'gift-outline', href: '/invite' },
+    { label: t('m.studio.title'), icon: 'stats-chart-outline', href: '/studio', on: hasStudio(me.mode) },
+    { label: t('m.purchases.title'), icon: 'bag-handle-outline', href: '/purchases' },
     { label: t('plus.title'), icon: 'sparkles-outline', href: '/plus' },
     { label: t('m.title.real'), icon: 'camera-outline', href: '/real' },
     { label: t('m.title.settings'), icon: 'settings-outline', href: '/settings' },

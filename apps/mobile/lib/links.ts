@@ -21,6 +21,9 @@ export function notificationHref(n: NotificationTarget): string | null {
   if ((n.type === 'reel_duet' || n.type === 'reel_remix') && id) return `/reels?start=${id}`;
   if (n.type === 'recap_ready' || n.type === 'recap_failed' || n.entityType === 'recap') return id ? `/recaps?open=${id}` : '/recaps';
   if (n.type === 'account_limited' || n.type === 'account_review') return '/settings';
+  // Money: a tip you got opens your tips and gifts; a new subscriber, a sale or a booking to confirm opens Studio.
+  if (n.type === 'tip_received') return '/gifts';
+  if (n.type === 'subscription_started' || n.type === 'order_paid' || n.type === 'booking_request') return '/studio';
   switch (n.entityType) {
     case 'chapter':
       return id ? `/chapter/${id}` : null;
@@ -131,10 +134,36 @@ export function appPath(link: string): string {
   if (first === 'events' && second && parts[2] === 'edit') return `/event-edit?id=${encodeURIComponent(second)}`;
   if (first === 'c' && second && parts[2] === 'settings') return `/community-settings?slug=${encodeURIComponent(second)}`;
   if (first === 'plus') return '/plus';
+  // Creators and money: Studio, a creator's plans, one thing from a shop, boosting and a post's insights.
+  if (first === 'studio') return '/studio';
+  if (first === 'plans' && second) return `/plans?username=${encodeURIComponent(second)}`;
+  const params = queryParams(query);
+  const profileName = first.startsWith('@') ? first.slice(1) : (first === 'u' || first === 'profile') && second ? second : null;
+  if (profileName && params.subscribe !== undefined) return `/plans?username=${encodeURIComponent(profileName)}`;
+  if (profileName && params.product) return `/product?username=${encodeURIComponent(profileName)}&id=${encodeURIComponent(params.product)}`;
+  if ((first === 'p' || first === 'post' || first === 'posts') && second && parts[2] === 'insights') return `/insights/${encodeURIComponent(second)}`;
+  if ((first === 'p' || first === 'post' || first === 'posts') && second && params.boost !== undefined) return `/boost?id=${encodeURIComponent(second)}`;
   // A reel's remixes open the reel itself; the phone app has no remixes page yet.
   if ((first === 'reels' || first === 'reel') && second) return `/reels?start=${encodeURIComponent(second)}`;
   if (first.startsWith('@') && first.length > 1) return `/u/${first.slice(1)}`;
   const renamed = RENAMED[first];
   if (renamed && second) return `/${renamed}/${parts.slice(1).join('/')}${q}`;
   return scheme ? `/${parts.join('/')}${q}` : link;
+}
+
+/** A link's query as plain values (`a=1&b` gives { a: '1', b: '' }), without relying on URLSearchParams. */
+function queryParams(query: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const pair of query.split('#')[0]!.split('&')) {
+    if (!pair) continue;
+    const at = pair.indexOf('=');
+    const k = at < 0 ? pair : pair.slice(0, at);
+    const v = at < 0 ? '' : pair.slice(at + 1);
+    try {
+      out[decodeURIComponent(k)] = decodeURIComponent(v.replace(/\+/g, ' '));
+    } catch {
+      // A badly encoded value is left out.
+    }
+  }
+  return out;
 }

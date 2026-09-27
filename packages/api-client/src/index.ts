@@ -792,10 +792,16 @@ export function createClient(opts: ClientOptions) {
       deleteMemory: (id: string) => del(`/v1/ai/memories/${id}`),
     },
     creator: {
-      analytics: () =>
-        get<{ totals: Record<string, number>; topPosts: Record<string, any>[]; followerGrowth: { day: string; new_followers: number }[] }>(
-          '/v1/creator/analytics',
-        ),
+      /** The last 28 days: totals (views count each person once per post, reach once overall), top posts and reels, new followers per day. */
+      analytics: () => get<CreatorAnalytics>('/v1/creator/analytics'),
+      /** One of your posts (or one you co-authored): counts and views per day over the last 28 days. */
+      postInsights: (postId: string) => get<{ insights: PostInsights }>(`/v1/posts/${postId}/insights`),
+      /** What you earned from sales, subscriptions and tips, per currency, less fees and payouts. */
+      earnings: () => get<{ balances: { currency: string; grossCents: number; feeCents: number; availableCents: number }[] }>('/v1/me/earnings'),
+      /** Your payout requests and where each one is. */
+      payouts: () => get<{ items: Payout[] }>('/v1/me/payouts'),
+      /** Paid tips you got or sent; ones sent during a live are gifts. */
+      tips: (direction: 'received' | 'sent' = 'received') => get<{ direction: 'received' | 'sent'; items: TipRecord[] }>(`/v1/me/tips${qs({ direction })}`),
     },
     flags: () => get<{ flags: Record<string, boolean> }>('/v1/flags'),
     /** What anyone can see of a shared link without an account (link previews, signed-out views). */
@@ -1301,6 +1307,58 @@ export interface PaymentsConfig {
 }
 
 /** What checkout needs for an order the API just created. With Paystack, clientSecret is Paystack's hosted checkout URL. */
+export interface CreatorTopPost {
+  id: string;
+  excerpt: string;
+  kind: string;
+  format: 'post' | 'reel';
+  like_count: number;
+  comment_count: number;
+  view_count: number;
+  created_at: string;
+}
+
+export interface CreatorAnalytics {
+  period: 'last_28_days';
+  totals: { posts: number; likes: number; comments: number; saves: number; followers: number; views: number; reach: number };
+  topPosts: CreatorTopPost[];
+  topReels: CreatorTopPost[];
+  followerGrowth: { day: string; new_followers: number }[];
+}
+
+export interface PostInsights {
+  postId: string;
+  format: 'post' | 'reel';
+  createdAt: string;
+  views: number;
+  likes: number;
+  comments: number;
+  saves: number;
+  reposts: number;
+  viewsByDay: { day: string; views: number }[];
+}
+
+export interface Payout {
+  id: string;
+  amountCents: number;
+  currency: string;
+  status: 'pending' | 'verified' | 'paid' | 'failed';
+  createdAt: string;
+}
+
+export interface TipRecord {
+  id: string;
+  amountCents: number;
+  currency: string;
+  message: string;
+  postId: string | null;
+  /** Sent during a live, where it showed in the chat. */
+  gift: boolean;
+  createdAt: string;
+  /** Who sent it (tips you got) or who got it (tips you sent). */
+  person: PublicUser;
+}
+
 export interface CheckoutPayment {
   provider: string;
   clientSecret: string;

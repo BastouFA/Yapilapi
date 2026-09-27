@@ -25,7 +25,7 @@ import { AutocompleteText } from '@/components/Autocomplete';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { useSession } from '@/app/providers';
 import { useSignIn } from './SignedOut';
-import { BoostSheet } from './Boost';
+import { BoostSheet, type BoostChoices } from './Boost';
 import { SaveToSheet } from './Boards';
 import { CommentsSheet } from './Comments';
 
@@ -42,6 +42,7 @@ export function PostList({
   reloadKey,
   sponsored = false,
   showEnd = true,
+  boost,
 }: {
   load: (cursor?: string) => Promise<Page<Post>>;
   empty?: string;
@@ -51,6 +52,8 @@ export function PostList({
   sponsored?: boolean;
   /** Show "You're all caught up" at the end (off for short embedded lists such as search results). */
   showEnd?: boolean;
+  /** Open the boost sheet for this post once it loads, with these choices filled in (a link from the phone app). */
+  boost?: { postId: string; choices?: BoostChoices };
 }) {
   const { me, toast, t, locale, flags } = useSession();
   const [memoryFor, setMemoryFor] = useState<Post | null>(null);
@@ -116,6 +119,16 @@ export function PostList({
       setLoadingMore(false);
     }
   }, [cursor, loadingMore, load, toast]);
+
+  // A link asked to boost one of these posts: open the sheet once, when it's your own post.
+  const boostOpened = useRef(false);
+  useEffect(() => {
+    if (!boost || boostOpened.current || !posts || !me || !flags.ADS || flags.COMMERCE === false) return;
+    const target = posts.find((x) => x.id === boost.postId && x.author.id === me.id);
+    if (!target) return;
+    boostOpened.current = true;
+    setBoosting(target);
+  }, [boost, posts, me, flags.ADS, flags.COMMERCE]);
 
   // Load the next page when the reader reaches the end, but the feed still ends.
   useEffect(() => {
@@ -419,6 +432,7 @@ export function PostList({
       <ReportSheet target={reporting ? { type: 'post', id: reporting.id } : null} onClose={() => setReporting(null)} />
       <BoostSheet
         post={boosting}
+        choices={boosting && boost?.postId === boosting.id ? boost.choices : undefined}
         onClose={() => setBoosting(null)}
         onDone={() => {
           // Show the boost's status (and later its results) on the post.

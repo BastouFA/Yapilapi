@@ -10,7 +10,7 @@ import { useSession } from './session';
 import { useT, type Translate } from './i18n';
 import { radius, space } from './theme';
 import { Avatar, Button, Card, Icon, Notice, PlusBadge, useColors, userText } from './ui';
-import { LockedPanel } from './money';
+import { LockedPanel, TipButton } from './money';
 import { SensitiveCover } from './safety';
 import { EditPostSheet, HistorySheet } from './post-edit';
 import { RichText } from './rich-text';
@@ -224,10 +224,19 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
   const memoryOn = useFlag('MEMORY');
   const canRemember = !!me && !post.status && memoryOn === true;
   const [remembering, setRemembering] = useState(false);
+  // Your published posts (and ones you co-author) have insights; your public ones can be boosted.
+  const canSeeInsights = !post.status && (isAuthor || collab === 'accepted');
+  const adsOn = useFlag('ADS');
+  const commerceOn = useFlag('COMMERCE');
+  const canBoost = isAuthor && !post.status && post.visibility === 'public' && adsOn === true && commerceOn !== false;
+  // A tip for a creator's post, paid on the web.
+  const canTip = !!me && !isAuthor && !post.status && !post.locked && post.author.mode === 'creator';
 
-  /** More: edit your post, save to a board, add to a memory, leave as co-author, remove your photo tag. */
+  /** More: insights and boost, edit your post, save to a board, add to a memory, leave as co-author, remove your photo tag. */
   function more() {
     const options: { text: string; style?: 'destructive' | 'cancel'; onPress?: () => void }[] = [];
+    if (canSeeInsights) options.push({ text: t('m.post.insights'), onPress: () => router.push(`/insights/${post.id}`) });
+    if (canBoost) options.push({ text: t('m.boost.cta'), onPress: () => router.push({ pathname: '/boost', params: { id: post.id } }) });
     if (canEdit) options.push({ text: t('m.post.edit'), onPress: () => setEditing(true) });
     if (me) options.push({ text: t('m.boards.saveTo'), onPress: saveTo });
     if (canRemember) options.push({ text: t('m.mem.addToMemory'), onPress: () => setRemembering(true) });
@@ -503,8 +512,9 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
               <Icon name="paper-plane-outline" size={19} color={c.inkMuted} />
             </Pressable>
           ) : null}
+          {canTip ? <TipButton post={post} /> : null}
           <View style={{ flex: 1 }} />
-          {collab === 'accepted' || myTag || canEdit || canRemember ? (
+          {collab === 'accepted' || myTag || canEdit || canRemember || canSeeInsights ? (
             <Pressable accessibilityRole="button" accessibilityLabel={t('m.post.more')} hitSlop={8} onPress={more}>
               <Icon name="ellipsis-horizontal" size={20} color={c.inkMuted} />
             </Pressable>
