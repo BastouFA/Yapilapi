@@ -34,18 +34,23 @@ export async function emitWebhook(db: Q, ownerId: string, event: WebhookEvent, d
   }
 }
 
-function isPrivateIp(ip: string): boolean {
+/** Addresses that aren't on the public internet: loopback, private, link-local, shared, reserved and multicast. */
+export function isPrivateIp(ip: string): boolean {
   if (ip.includes(':')) {
     const l = ip.toLowerCase();
+    // IPv4 written as IPv6 (::ffff:10.0.0.1): check the IPv4 part.
+    const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(l);
+    if (mapped) return isPrivateIp(mapped[1]!);
     return (
       l === '::1' ||
+      l === '::' ||
       l.startsWith('fc') ||
       l.startsWith('fd') ||
       l.startsWith('fe80') ||
-      l === '::' ||
-      l.startsWith('::ffff:127.') ||
-      l.startsWith('::ffff:10.') ||
-      l.startsWith('::ffff:192.168.')
+      l.startsWith('ff') ||
+      l.startsWith('::ffff:') ||
+      l.startsWith('64:ff9b:') ||
+      l.startsWith('2001:db8')
     );
   }
   const [a, b] = ip.split('.').map(Number) as [number, number];
@@ -56,7 +61,10 @@ function isPrivateIp(ip: string): boolean {
     (a === 169 && b === 254) ||
     (a === 172 && b >= 16 && b <= 31) ||
     (a === 192 && b === 168) ||
-    (a === 100 && b >= 64 && b <= 127)
+    (a === 192 && b === 0) ||
+    (a === 198 && (b === 18 || b === 19)) ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    a >= 224
   );
 }
 
@@ -64,7 +72,12 @@ function isPrivateIp(ip: string): boolean {
  * SSRF guard. Production: https only and the host must resolve to public addresses.
  * Development/test: http to localhost is allowed so developers can test locally.
  */
-export async function assertSafeWebhookUrl(raw: string, allowLocal: boolean): Promise<URL> {
+export async function assertSafeWebhookUrl(
+  raw: string,
+  allowLocal: boolean,
+  /** Looks up a host's addresses (tests pass a fake). */
+  resolve: (host: string) => Promise<string[]> = async (host) => (await lookup(host, { all: true }).catch(() => [])).map((a) => a.address),
+): Promise<URL> {
   let url: URL;
   try {
     url = new URL(raw);
@@ -75,7 +88,8 @@ export async function assertSafeWebhookUrl(raw: string, allowLocal: boolean): Pr
   if (allowLocal && local) return url;
   if (url.protocol !== 'https:') throw new Error('Webhook URLs must use https.');
   if (url.username || url.password) throw new Error('Webhook URLs cannot contain credentials.');
-  const addrs = isIP(url.hostname) ? [url.hostname] : (await lookup(url.hostname, { all: true }).catch(() => [])).map((a) => a.address);
+  const host = url.hostname.replace(/^\[|\]$/g, '');
+  const addrs = isIP(host) ? [host] : await resolve(host).catch(() => []);
   if (!addrs.length) throw new Error("That host doesn't resolve.");
   if (addrs.some(isPrivateIp)) throw new Error('Webhook URLs must point to a public address.');
   return url;

@@ -101,7 +101,15 @@ export function useChapterMeta() {
  * (or an empty chapter) opens its page. On your own profile it starts a new chapter and links
  * to your archive.
  */
-export function ChaptersRow({ userId, isSelf }: { userId: string; isSelf: boolean }) {
+export function ChaptersRow({
+  userId,
+  isSelf,
+  emptyText,
+}: {
+  userId: string;
+  isSelf: boolean;
+  /** Shown to visitors when there are none (as a profile tab). */ emptyText?: string;
+}) {
   const c = useColors();
   const { t, date } = useT();
   const meta = useChapterMeta();
@@ -121,6 +129,8 @@ export function ChaptersRow({ userId, isSelf }: { userId: string; isSelf: boolea
     };
   }, [userId]);
 
+  if (items && !items.length && !isSelf && emptyText)
+    return <Text style={{ color: c.inkMuted, textAlign: 'center', paddingVertical: space[4] }}>{emptyText}</Text>;
   if (!items || (!items.length && !isSelf)) return null;
   return (
     <View style={{ gap: space[2] }}>

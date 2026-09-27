@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Avatar, Badge, Button, EmptyState, Menu, PlusBadge, Segments, Skeleton } from '@yapilapi/design-system';
 import { FollowList } from '@/components/FollowList';
-import type { Profile } from '@yapilapi/shared';
+import type { Profile, ProfileTab } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { PostList, ReportSheet } from '@/components/PostList';
 import { SupportCreator, TipSheet } from '@/components/SupportCreator';
@@ -15,6 +15,8 @@ import { ProfileBoards } from '@/components/Boards';
 import { JoinNote, NeedsAccount, useSignIn } from '@/components/SignedOut';
 import { CoverSheet, NowStatusLine, NowStatusSheet, ProfileCover, ShareProfileSheet } from '@/components/ProfilePlus';
 import { ProfileAccountActions } from '@/components/AccountMenu';
+import { ReelGrid } from '@/components/ReelGrid';
+import { AccentScope, FeaturedRow, ProfileAbout, ProfileLinks, ProfileSongChip, Pronouns, tabLabel } from '@/components/ProfileStyle';
 import { useSession } from '../../../providers';
 
 /**
@@ -32,7 +34,8 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
   const [reporting, setReporting] = useState(false);
   const [sheet, setSheet] = useState<'cover' | 'status' | 'share' | null>(null);
   const [list, setList] = useState<'followers' | 'following' | null>(null);
-  const [tab, setTab] = useState<'posts' | 'reposts' | 'tagged' | 'boards' | 'shop'>('posts');
+  // null: the first tab the person chose to show.
+  const [tab, setTab] = useState<ProfileTab | null>(null);
   // Tagged posts of a private profile you don't follow stay hidden.
   const [taggedHidden, setTaggedHidden] = useState(false);
   // Bumped when you subscribe, so posts for subscribers reload unlocked.
@@ -75,6 +78,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
     void reload();
   }, [reload, signedOut, isPublic]);
   const load = useCallback((cursor?: string) => api.users.posts(username, cursor), [username]);
+  const loadReels = useCallback((cursor?: string) => api.users.posts(username, cursor, { format: 'reel' }), [username]);
   const loadReposts = useCallback((cursor?: string) => api.users.reposts(profile?.id ?? '', cursor), [profile?.id]);
   const loadTagged = useCallback(
     (cursor?: string) =>
@@ -96,6 +100,9 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
     );
 
   const rel = profile.relationship;
+  // The tabs they chose, in their order; a link to the shop still opens it.
+  const tabs: ProfileTab[] = tab && !profile.tabs.includes(tab) ? [...profile.tabs, tab] : profile.tabs;
+  const current: ProfileTab = tab ?? tabs[0] ?? 'posts';
   const act = (fn: () => Promise<unknown>, done?: string) => async () => {
     try {
       await fn();
@@ -107,7 +114,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
   };
 
   return (
-    <div className="yp-shell__inner">
+    <AccentScope accent={profile.style.accent} className={`yp-shell__inner profile--${profile.style.header}`}>
       {rel.isSelf ? (
         <div className="profile__bar">
           <span className="profile__bar-handle">@{profile.username}</span>
@@ -122,6 +129,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
             <h1 className="profile__name">
               {profile.displayName}
               {profile.plus ? <PlusBadge label={t('plus.badge.label')} /> : null}
+              {profile.pronouns ? <Pronouns value={profile.pronouns} /> : null}
             </h1>
             <span className="muted">
               @{profile.username} {profile.mode !== 'personal' ? <Badge tone="neutral">{profile.mode}</Badge> : null}{' '}
@@ -242,15 +250,9 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
           )}
         </div>
         {profile.bio ? <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{profile.bio}</p> : null}
-        {profile.links.length ? (
-          <div className="row">
-            {profile.links.map((l) => (
-              <a key={l.url} href={l.url} target="_blank" rel="noopener noreferrer nofollow" className="yp-chip">
-                {l.label}
-              </a>
-            ))}
-          </div>
-        ) : null}
+        {profile.song ? <ProfileSongChip song={profile.song} /> : null}
+        <ProfileLinks links={profile.links} />
+        <ProfileAbout profile={profile} />
         <div className="profile__counts">
           <span>
             <strong>{compact.format(profile.counts.posts)}</strong> {t('profile.posts')}
@@ -302,22 +304,21 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
           <SupportCreator userId={profile.id} name={profile.displayName} isCreator={profile.mode === 'creator'} onSubscribed={() => setVersion((v) => v + 1)} />
         </div>
       ) : null}
-      <ChaptersRow userId={profile.id} isSelf={rel.isSelf} />
-      <Segments
-        label="Show"
-        value={tab}
-        onChange={setTab}
-        options={[
-          { id: 'posts', label: 'Posts' },
-          { id: 'reposts', label: 'Reposts' },
-          { id: 'tagged', label: 'Tagged' },
-          { id: 'boards', label: 'Boards' },
-          { id: 'shop', label: 'Shop' },
-        ]}
-      />
-      {tab === 'posts' ? (
+      <FeaturedRow posts={profile.featured} />
+      {tabs.length > 1 ? (
+        <Segments label={t('ps.tabs.title')} value={current} onChange={setTab} options={tabs.map((id) => ({ id, label: t(tabLabel(id)) }))} />
+      ) : (
+        <h2 className="section-title" style={{ margin: 0 }}>
+          {t(tabLabel(current))}
+        </h2>
+      )}
+      {current === 'posts' ? (
         <PostList load={load} reloadKey={`${username}-${version}`} empty={rel.isSelf ? 'Share your first post from Create.' : 'No posts yet.'} />
-      ) : tab === 'tagged' ? (
+      ) : current === 'reels' ? (
+        <ReelGrid load={loadReels} reloadKey={`${username}-reels`} empty={t('ps.empty.reels')} />
+      ) : current === 'chapters' ? (
+        <ChaptersRow userId={profile.id} isSelf={rel.isSelf} emptyText={t('ps.empty.chapters')} />
+      ) : current === 'tagged' ? (
         <PostList
           load={loadTagged}
           reloadKey={`${username}-tagged`}
@@ -330,9 +331,9 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
                 : `Photos ${profile.displayName} is tagged in show up here.`
           }
         />
-      ) : tab === 'boards' ? (
+      ) : current === 'boards' ? (
         <ProfileBoards username={profile.username} name={profile.displayName} isSelf={rel.isSelf} />
-      ) : tab === 'shop' ? (
+      ) : current === 'shop' ? (
         <Shop userId={profile.id} name={profile.displayName} isSelf={rel.isSelf} focusId={focus.product} />
       ) : (
         <PostList
@@ -365,6 +366,6 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
           />
         </>
       ) : null}
-    </div>
+    </AccentScope>
   );
 }

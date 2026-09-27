@@ -3,20 +3,25 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PROFILE_MODES } from '../../../packages/shared/src/constants';
 import { SUPPORTED_LOCALES, type MessageKey } from '../../../packages/shared/src/i18n';
-import type { Profile } from '../../../packages/shared/src/types';
+import type { Post, Profile } from '../../../packages/shared/src/types';
+import { CITY_MAX, PRONOUNS_MAX, type ProfileAccent, type ProfileHeaderStyle, type ProfileTab } from '../../../packages/shared/src/profile-style';
 import { languageName } from '../../../packages/shared/src/translation';
 import { ApiError } from '../../../packages/api-client/src/index';
 import { client, errorMessage, mediaUrl } from '../lib/api';
 import { Chip, ChipRow } from '../lib/chips';
 import { useT } from '../lib/i18n';
 import { pickOne, uploadPicked } from '../lib/media';
+import { MusicField, draftMusic, musicInput, type DraftMusic } from '../lib/music';
+import { FeaturedEditor, LinksEditor, StyleEditor, TabsEditor, editorTabs, songAsTrack, useTint } from '../lib/profile-style';
 import { useSession } from '../lib/session';
 import { space } from '../lib/theme';
 import { Avatar, Button, Card, Field, KeyboardAvoid, Loading, Notice, SwitchRow, Title, useColors } from '../lib/ui';
 
 /**
  * Edit profile: photo, name, bio, profile type, the app's language and a private account, the
- * same fields as the web settings. The cover photo is changed on the profile itself.
+ * same fields as the web settings, and how the profile looks: accent and header (with a live
+ * preview in light and dark), pronouns and city, links, a song, tabs and featured posts. The cover
+ * photo is changed on the profile itself.
  */
 export default function ProfileEdit() {
   const c = useColors();
@@ -33,6 +38,17 @@ export default function ProfileEdit() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
+  const [accent, setAccent] = useState<ProfileAccent>('yapi');
+  const [header, setHeader] = useState<ProfileHeaderStyle>('cover');
+  const [pronouns, setPronouns] = useState('');
+  const [city, setCity] = useState('');
+  const [links, setLinks] = useState<{ label: string; url: string }[]>([]);
+  const [tabOrder, setTabOrder] = useState<ProfileTab[]>(editorTabs([]));
+  const [tabsShown, setTabsShown] = useState<Set<ProfileTab>>(new Set(editorTabs([])));
+  const [featured, setFeatured] = useState<Post[]>([]);
+  const [song, setSong] = useState<DraftMusic | null>(null);
+  const [songChanged, setSongChanged] = useState(false);
+  const tint = useTint(accent);
 
   useEffect(() => {
     if (!me) return;
@@ -45,6 +61,15 @@ export default function ProfileEdit() {
           setBio(p.bio);
           setMode(p.mode);
           setIsPrivate(p.isPrivate);
+          setAccent(p.style.accent);
+          setHeader(p.style.header);
+          setPronouns(p.pronouns ?? '');
+          setCity(p.city ?? '');
+          setLinks(p.links.map(({ label, url }) => ({ label, url })));
+          setTabOrder(editorTabs(p.tabs));
+          setTabsShown(new Set(p.tabs));
+          setFeatured(p.featured);
+          setSong(p.song ? draftMusic(songAsTrack(p.song), 'post', { startMs: p.song.startMs, durationMs: p.song.durationMs }) : null);
           // The app's language as saved ("fr-CA" shows as French); only sent back if changed here.
           const current = SUPPORTED_LOCALES.find((l) => me.locale === l || me.locale?.startsWith(`${l}-`)) ?? 'en';
           setLocale(current);
@@ -89,6 +114,14 @@ export default function ProfileEdit() {
         mode,
         isPrivate,
         ...(locale !== initialLocale ? { locale } : {}),
+        accent,
+        headerStyle: header,
+        pronouns: pronouns.trim() || null,
+        city: city.trim() || null,
+        links: links.map((l) => ({ label: l.label.trim(), url: l.url.trim() })).filter((l) => l.label || l.url),
+        tabs: tabOrder.filter((x) => tabsShown.has(x)),
+        featuredPostIds: featured.map((p) => p.id),
+        ...(songChanged ? { song: song ? musicInput(song) : null } : {}),
       });
       await refresh();
       router.back();
@@ -164,6 +197,68 @@ export default function ProfileEdit() {
 
         <Card>
           <SwitchRow label={t('settings.private')} hint={t('settings.privateHint')} value={isPrivate} onValueChange={setIsPrivate} />
+        </Card>
+
+        <Card style={{ gap: space[3] }}>
+          <Title sub={t('ps.edit.desc')}>{t('ps.style.title')}</Title>
+          <StyleEditor profile={profile} accent={accent} onAccent={setAccent} header={header} onHeader={setHeader} pronouns={pronouns} />
+        </Card>
+
+        <Card style={{ gap: space[3] }}>
+          <Title>{t('ps.about')}</Title>
+          <Field
+            label={t('ps.pronouns')}
+            hint={t('ps.pronouns.hint')}
+            value={pronouns}
+            onChangeText={setPronouns}
+            maxLength={PRONOUNS_MAX}
+            autoCapitalize="none"
+            error={fields.pronouns}
+          />
+          <Field
+            label={t('ps.city')}
+            hint={t('ps.city.hint')}
+            value={city}
+            onChangeText={setCity}
+            maxLength={CITY_MAX}
+            textContentType="addressCity"
+            error={fields.city}
+          />
+        </Card>
+
+        <Card style={{ gap: space[3] }}>
+          <Title>{t('ps.links.title')}</Title>
+          <LinksEditor links={links} onChange={setLinks} errors={fields} />
+        </Card>
+
+        <Card style={{ gap: space[3] }}>
+          <Title sub={t('ps.song.hint')}>{t('ps.song.title')}</Title>
+          <MusicField
+            use="post"
+            value={song}
+            onChange={(m) => {
+              setSong(m);
+              setSongChanged(true);
+            }}
+          />
+          {fields['song.durationMs'] ? <Text style={{ color: c.danger, fontSize: 13 }}>{fields['song.durationMs']}</Text> : null}
+        </Card>
+
+        <Card style={{ gap: space[3] }}>
+          <Title>{t('ps.tabs.title')}</Title>
+          <TabsEditor
+            order={tabOrder}
+            shown={tabsShown}
+            onChange={(o, sh) => {
+              setTabOrder(o);
+              setTabsShown(sh);
+            }}
+          />
+        </Card>
+
+        <Card style={{ gap: space[3] }}>
+          <Title>{t('ps.featured.title')}</Title>
+          <FeaturedEditor username={me.username} value={featured} onChange={setFeatured} error={fields.featuredPostIds} tint={tint} />
         </Card>
 
         <Button label={busy ? t('m.common.saving') : t('settings.saveProfile')} disabled={busy || !displayName.trim()} onPress={() => save()} />

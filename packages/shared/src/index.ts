@@ -18,3 +18,4 @@ export * from './nav-glyphs.ts';
 export * from './reels.ts';
 export * from './scheduling.ts';
 export * from './legal.ts';
+export * from './profile-style.ts';

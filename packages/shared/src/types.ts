@@ -3,6 +3,7 @@ import type { PostMusic } from './music.ts';
 import type { DataSaverMode } from './data-saver.ts';
 import type { TranslationSettings } from './translation.ts';
 import type { ReelHighlight } from './reels.ts';
+import type { ProfileStyle, ProfileTab } from './profile-style.ts';
 import type {
   BoardVisibility,
   CircleKind,
@@ -92,6 +93,12 @@ export interface Circle {
   createdAt: string;
 }
 
+export interface ProfileLink {
+  label: string;
+  url: string;
+  iconUrl: string | null;
+}
+
 export interface Profile extends PublicUser {
   bio: string;
   coverUrl: string | null;
@@ -99,10 +106,25 @@ export interface Profile extends PublicUser {
   coverAlt: string | null;
   /** Their current "Now" status, when there is one and you're in its audience. */
   nowStatus: NowStatus | null;
-  links: { label: string; url: string }[];
+  /** Up to 5 web links. `iconUrl` is the site's icon, fetched and checked on the server (null: show a generic icon). */
+  links: ProfileLink[];
   isPrivate: boolean;
   interests: string[];
   counts: { followers: number; following: number; friends: number; posts: number };
+  /** Accent and header style; the apps turn the accent into contrast-checked colours (profileAccentColors). */
+  style: ProfileStyle;
+  /** Shown next to the name, when set. */
+  pronouns: string | null;
+  /** City, as text. Never shown to others on accounts of people under 18. */
+  city: string | null;
+  /** When the account was made. */
+  joinedAt: string;
+  /** Which tabs show, in order. */
+  tabs: ProfileTab[];
+  /** Up to 3 of their posts or reels shown first, only those this viewer can see. */
+  featured: Post[];
+  /** A song on the profile: plays only when tapped. `audioUrl` is null where it can't play (see `unavailable`). */
+  song: PostMusic | null;
   relationship: {
     isSelf: boolean;
     following: boolean;

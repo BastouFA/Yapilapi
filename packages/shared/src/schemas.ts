@@ -48,6 +48,16 @@ import {
 } from './constants.ts';
 import { storyMusicInputSchema, storyStickersSchema } from './stories.ts';
 import { postMusicInputSchema } from './music.ts';
+import {
+  CITY_MAX,
+  MAX_FEATURED_POSTS,
+  MAX_PROFILE_LINKS,
+  PROFILE_ACCENT_IDS,
+  PROFILE_HEADER_STYLES,
+  PROFILE_LINK_LABEL_MAX,
+  PROFILE_TABS,
+  PRONOUNS_MAX,
+} from './profile-style.ts';
 
 const trimmed = (max: number) => z.string().trim().min(1).max(max);
 export const uuid = z.string().uuid();
@@ -135,6 +145,35 @@ export const tokenSchema = z.object({ token: z.string().min(20).max(200) });
 export const forgotPasswordSchema = z.object({ email: z.string().trim().toLowerCase().email() });
 export const resetPasswordSchema = z.object({ token: z.string().min(20).max(200), password: passwordSchema });
 
+/**
+ * A profile link: a title and a web address. Only http and https, with a real host name, no
+ * user name or password in it (they make an address look like a different site).
+ */
+export const profileLinkSchema = z.object({
+  label: trimmed(PROFILE_LINK_LABEL_MAX),
+  url: webUrl(500).refine((u) => {
+    try {
+      const x = new URL(u);
+      return !x.username && !x.password && /^[^.]+(\.[^.]+)+$/.test(x.hostname.replace(/\.$/, '')) && !/^localhost$/i.test(x.hostname);
+    } catch {
+      return false;
+    }
+  }, 'Use a full web address, like https://example.com.'),
+});
+
+/** One line of plain text: no line breaks or control characters, no web addresses. Blank becomes null. */
+const plainLine = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .refine((v) => !/[\u0000-\u001f\u007f\u2028\u2029]/.test(v), 'Use one line of text.')
+    .refine((v) => !/(https?:\/\/|www\.)/i.test(v), 'Leave out web addresses here.')
+    .transform((v) => v || null);
+
+/** The song on a profile: a sound or a catalogue song and the part that plays (checked like music on a post). */
+export const profileSongSchema = postMusicInputSchema;
+
 export const updateProfileSchema = z
   .object({
     displayName: trimmed(60),
@@ -144,7 +183,27 @@ export const updateProfileSchema = z
     coverUrl: z.string().url().max(500).nullable(),
     /** Describes your cover photo for screen readers. */
     coverAlt: z.string().trim().max(300).nullable(),
-    links: z.array(z.object({ label: trimmed(40), url: webUrl(500) })).max(5),
+    links: z.array(profileLinkSchema).max(MAX_PROFILE_LINKS, `Add up to ${MAX_PROFILE_LINKS} links.`),
+    /** Shown next to your name, e.g. "she/her". Empty or null clears it. */
+    pronouns: plainLine(PRONOUNS_MAX).nullable(),
+    /** Your city, as text (never a map position). Empty or null clears it. */
+    city: plainLine(CITY_MAX).nullable(),
+    /** One of the curated accents; colours are adjusted for contrast in each theme. */
+    accent: z.enum(PROFILE_ACCENT_IDS),
+    headerStyle: z.enum(PROFILE_HEADER_STYLES),
+    /** Which tabs show, in order. At least one. */
+    tabs: z
+      .array(z.enum(PROFILE_TABS))
+      .min(1, 'Keep at least one tab.')
+      .max(PROFILE_TABS.length)
+      .refine((t) => new Set(t).size === t.length, 'Each tab can only be listed once.'),
+    /** Up to 3 of your own posts or reels, shown first under "Featured". */
+    featuredPostIds: z
+      .array(uuid)
+      .max(MAX_FEATURED_POSTS, `Feature up to ${MAX_FEATURED_POSTS} posts.`)
+      .refine((t) => new Set(t).size === t.length, 'Each post can only be featured once.'),
+    /** A song from the music picker for your profile, with the part that plays; null removes it. */
+    song: profileSongSchema.nullable(),
     mode: z.enum(PROFILE_MODES),
     locale: z.string().min(2).max(10),
     isPrivate: z.boolean(),

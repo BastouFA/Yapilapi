@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, Platform, Pressable, RefreshControl, Share, StyleSheet, Text, View } from 'react-native';
 import type { Post, Profile } from '../../../packages/shared/src/types';
+import type { ProfileTab } from '../../../packages/shared/src/profile-style';
 import { client, errorMessage, mediaUrl, webUrl } from './api';
 import { useT } from './i18n';
 import { pickOne, uploadPicked } from './media';
@@ -30,6 +31,8 @@ import { isVerificationError, VerifyPrompt } from './safety';
 import { ChaptersRow } from './chapters';
 import { ProfileBoards } from './boards';
 import { ProfileMenu } from './profile-menu';
+import { FeaturedRow, ProfileAbout, ProfileLinks, ProfileSongChip, tabLabel, useTint } from './profile-style';
+import type { Tint } from './ui';
 
 /**
  * A profile: name, bio, counts, Follow and Message for other people, and
@@ -50,9 +53,13 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
   const coverMenu = useActionSheet();
   const [needsVerify, setNeedsVerify] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [tab, setTab] = useState<'posts' | 'tagged' | 'boards' | 'shop'>('posts');
+  // null: the first tab the person chose to show.
+  const [tab, setTab] = useState<ProfileTab | null>(null);
   // Photos this person is tagged in, loaded the first time the tab opens.
   const [tagged, setTagged] = useState<{ items: Post[]; cursor: string | null; hidden: boolean } | null>(null);
+  // Their reels and reposts, each loaded the first time its tab opens.
+  const [lists, setLists] = useState<Partial<Record<'reels' | 'reposts', { items: Post[]; cursor: string | null }>>>({});
+  const tint = useTint(profile?.style?.accent);
   // A new cover photo on its way: the phone's copy shows while it uploads and is prepared.
   const [coverUpload, setCoverUpload] = useState<{ local: string; progress: number | null } | null>(null);
 
@@ -81,7 +88,32 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
   useEffect(() => {
     void load();
     setTagged(null);
+    setLists({});
   }, [load]);
+
+  const profileId = profile?.id;
+  const loadList = useCallback(
+    async (which: 'reels' | 'reposts', next?: string) => {
+      if (!profileId) return;
+      try {
+        const api = await client();
+        const page = which === 'reels' ? await api.users.posts(username, next, { format: 'reel' }) : await api.users.reposts(profileId, next);
+        setLists((cur) => {
+          const had = cur[which];
+          return {
+            ...cur,
+            [which]: {
+              items: next && had ? [...had.items, ...page.items.filter((x) => !had.items.some((y) => y.id === x.id))] : page.items,
+              cursor: page.nextCursor,
+            },
+          };
+        });
+      } catch {
+        setLists((cur) => ({ ...cur, [which]: cur[which] ?? { items: [], cursor: null } }));
+      }
+    },
+    [username, profileId],
+  );
 
   const loadTagged = useCallback(
     async (next?: string) => {
@@ -99,9 +131,11 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
     [username],
   );
 
+  const current: ProfileTab = tab ?? profile?.tabs?.[0] ?? 'posts';
   useEffect(() => {
-    if (tab === 'tagged' && !tagged) void loadTagged();
-  }, [tab, tagged, loadTagged]);
+    if (current === 'tagged' && !tagged) void loadTagged();
+    if ((current === 'reels' || current === 'reposts') && !lists[current]) void loadList(current);
+  }, [current, tagged, loadTagged, lists, loadList]);
 
   const more = async () => {
     if (!cursor) return;
@@ -187,19 +221,27 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
 
   const header = (
     <View style={{ gap: space[3], marginBottom: space[3] }}>
-      <Cover profile={profile} upload={coverUpload} onEdit={rel.isSelf ? editCover : undefined} />
-      <Card style={{ alignItems: 'center', gap: space[2], paddingVertical: space[6], marginTop: -56 }}>
+      <Cover profile={profile} tint={tint} upload={coverUpload} onEdit={rel.isSelf ? editCover : undefined} />
+      <Card style={{ alignItems: 'center', gap: space[2], paddingVertical: space[6], marginTop: profile.style?.header === 'clean' ? 0 : -56 }}>
         <Avatar name={profile.displayName} url={profile.avatarUrl} size={84} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
           <Text style={[{ color: c.ink, fontSize: 24, fontWeight: '800', letterSpacing: -0.4 }, userText]}>{profile.displayName}</Text>
           {profile.plus ? <PlusBadge /> : null}
         </View>
+        {profile.pronouns ? (
+          <Text accessibilityLabel={`${t('ps.pronouns')}: ${profile.pronouns}`} style={[{ color: c.inkMuted, fontSize: 14, marginTop: -4 }, userText]}>
+            {profile.pronouns}
+          </Text>
+        ) : null}
         <Text style={[{ color: c.inkMuted }, userText]}>
           @{profile.username}
           {rel.followedBy && !rel.isSelf ? ` · ${t('m.profile.followsYou')}` : ''}
         </Text>
         {status ? <NowStatusLine status={status} center /> : null}
         {profile.bio ? <RichText text={profile.bio} style={{ color: c.ink, fontSize: 15, lineHeight: 22, textAlign: 'center' }} /> : null}
+        {profile.song ? <ProfileSongChip song={profile.song} tint={tint} /> : null}
+        <ProfileLinks links={profile.links} tint={tint} />
+        <ProfileAbout profile={profile} />
         <View style={{ flexDirection: 'row', gap: space[4], marginTop: space[2] }}>
           {(
             [
@@ -260,6 +302,7 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
             <Button
               label={rel.following ? t('profile.unfollow') : t('profile.follow')}
               variant={rel.following ? 'secondary' : 'primary'}
+              tint={tint}
               disabled={busy || rel.blocked}
               onPress={async () => {
                 setBusy(true);
@@ -351,18 +394,20 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
       {rel.isSelf || rel.blocked ? null : (
         <SupportCard userId={profile.id} username={profile.username} name={profile.displayName} isCreator={profile.mode === 'creator'} />
       )}
-      <ChaptersRow userId={profile.id} isSelf={rel.isSelf} />
-      <Segmented
-        label={t('m.title.profile')}
-        value={tab}
-        onChange={setTab}
-        options={[
-          { id: 'posts', label: t('profile.posts') },
-          { id: 'tagged', label: t('m.tagged.tab') },
-          { id: 'boards', label: t('m.boards.title') },
-          { id: 'shop', label: t('m.shop.tab') },
-        ]}
-      />
+      <FeaturedRow posts={profile.featured} tint={tint} />
+      {profile.tabs.length > 1 ? (
+        <Segmented
+          label={t('m.title.profile')}
+          value={current}
+          onChange={setTab}
+          tint={tint}
+          options={profile.tabs.map((id) => ({ id, label: t(tabLabel(id)) }))}
+        />
+      ) : (
+        <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 17, fontWeight: '800' }}>
+          {t(tabLabel(current))}
+        </Text>
+      )}
       {needsVerify ? <VerifyPrompt action="message" /> : null}
       {coverMenu.sheet}
     </View>
@@ -374,11 +419,27 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
       {...feedListProps}
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: bottom + space[4] }}
-      data={tab === 'posts' ? posts : tab === 'tagged' ? (tagged?.items ?? []) : []}
+      data={
+        current === 'posts'
+          ? posts
+          : current === 'tagged'
+            ? (tagged?.items ?? [])
+            : current === 'reels' || current === 'reposts'
+              ? (lists[current]?.items ?? [])
+              : []
+      }
       keyExtractor={(p) => p.id}
       ListHeaderComponent={header}
       renderItem={({ item }) => <PostCard post={item} />}
-      onEndReached={() => void (tab === 'posts' ? more() : tab === 'tagged' && tagged?.cursor ? loadTagged(tagged.cursor) : undefined)}
+      onEndReached={() =>
+        void (current === 'posts'
+          ? more()
+          : current === 'tagged' && tagged?.cursor
+            ? loadTagged(tagged.cursor)
+            : (current === 'reels' || current === 'reposts') && lists[current]?.cursor
+              ? loadList(current, lists[current]!.cursor!)
+              : undefined)
+      }
       onEndReachedThreshold={0.5}
       refreshControl={
         <RefreshControl
@@ -386,17 +447,26 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
           onRefresh={async () => {
             setRefreshing(true);
             await load();
-            if (tab === 'tagged') await loadTagged();
+            if (current === 'tagged') await loadTagged();
+            if (current === 'reels' || current === 'reposts') await loadList(current);
             setRefreshing(false);
           }}
         />
       }
       ListEmptyComponent={
-        tab === 'shop' ? (
+        current === 'shop' ? (
           <ShopList userId={profile.id} username={profile.username} isSelf={rel.isSelf} />
-        ) : tab === 'boards' ? (
+        ) : current === 'boards' ? (
           <ProfileBoards username={profile.username} isSelf={rel.isSelf} />
-        ) : tab === 'tagged' ? (
+        ) : current === 'chapters' ? (
+          <ChaptersRow userId={profile.id} isSelf={rel.isSelf} emptyText={t('ps.empty.chapters')} />
+        ) : current === 'reels' || current === 'reposts' ? (
+          !lists[current] ? (
+            <SkeletonList kind="post" count={2} />
+          ) : (
+            <EmptyState title={current === 'reels' ? t('ps.empty.reels') : t('ps.empty.reposts')} />
+          )
+        ) : current === 'tagged' ? (
           !tagged ? (
             <SkeletonList kind="post" count={2} />
           ) : tagged.hidden ? (
@@ -451,12 +521,29 @@ function ProfileSkeleton({ bottom }: { bottom: number }) {
  * The cover photo across the top, fading into the page under the profile card, or a plain band
  * when there is none. On your own profile, `onEdit` adds a button to change or remove it.
  */
-function Cover({ profile, upload, onEdit }: { profile: Profile; upload: { local: string; progress: number | null } | null; onEdit?: () => void }) {
+function Cover({
+  profile,
+  tint,
+  upload,
+  onEdit,
+}: {
+  profile: Profile;
+  tint: Tint;
+  upload: { local: string; progress: number | null } | null;
+  onEdit?: () => void;
+}) {
   const c = useColors();
   const { t, number } = useT();
-  const uri = upload?.local ?? (profile.coverUrl ? mediaUrl(profile.coverUrl) : null);
+  // 'cover': the photo, or the accent gradient without one. 'gradient': always the gradient. 'clean': no band.
+  const header = profile.style?.header ?? 'cover';
+  if (header === 'clean' && !upload) return null;
+  const photoOk = header === 'cover' || !!upload;
+  const uri = upload?.local ?? (photoOk && profile.coverUrl ? mediaUrl(profile.coverUrl) : null);
   return (
     <View style={{ height: uri ? 176 : 104, marginHorizontal: -space[4], marginTop: -space[4], backgroundColor: c.surfaceSunken, overflow: 'hidden' }}>
+      {uri ? null : (
+        <LinearGradient colors={[tint.accentStrong, tint.accent, tint.gradEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+      )}
       {uri ? (
         <Image
           source={{ uri }}
@@ -490,7 +577,7 @@ function Cover({ profile, upload, onEdit }: { profile: Profile; upload: { local:
             {upload.progress === null ? t('m.cover.preparing') : t('m.cover.uploading', { progress: number(upload.progress, { style: 'percent' }) })}
           </Text>
         </View>
-      ) : onEdit ? (
+      ) : onEdit && header === 'cover' ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={profile.coverUrl ? t('m.cover.edit') : t('m.cover.add')}

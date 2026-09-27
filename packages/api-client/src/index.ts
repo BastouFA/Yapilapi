@@ -184,7 +184,9 @@ export function createClient(opts: ClientOptions) {
     },
     users: {
       get: (username: string) => get<{ profile: Profile }>(`/v1/users/${encodeURIComponent(username)}`),
-      posts: (username: string, cursor?: string) => get<Page<Post>>(`/v1/users/${encodeURIComponent(username)}/posts${qs({ cursor })}`),
+      /** `format: 'reel'` lists only their reels (the Reels tab). */
+      posts: (username: string, cursor?: string, o: { format?: 'reel' } = {}) =>
+        get<Page<Post>>(`/v1/users/${encodeURIComponent(username)}/posts${qs({ cursor, format: o.format })}`),
       follow: (id: string) => post(`/v1/users/${id}/follow`),
       unfollow: (id: string) => del(`/v1/users/${id}/follow`),
       friendRequest: (id: string) => post<{ status: string }>(`/v1/users/${id}/friend-request`),

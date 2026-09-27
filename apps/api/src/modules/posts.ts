@@ -343,19 +343,22 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
   app.get('/v1/users/:username/posts', async (req) => {
     const { username } = parse(z.object({ username: usernameSchema }), req.params);
     const q = parse(pageQuerySchema, req.query);
+    // `format=reel`: only their reels (the profile's Reels tab), with no pinned post on top.
+    const { format } = parse(z.object({ format: z.enum(['reel']).optional() }), req.query);
     const c = decodeCursor<KeyCursor>(q.cursor);
     const viewer = req.user?.id ?? null;
-    const pinned = c
-      ? null
-      : (await db.query(`SELECT p.id ${POST_FROM} WHERE lower(ap.username) = lower($2) AND p.id = ap.pinned_post_id AND ${VISIBLE}`, [viewer, username]))
-          .rows[0]?.id;
+    const pinned =
+      c || format
+        ? null
+        : (await db.query(`SELECT p.id ${POST_FROM} WHERE lower(ap.username) = lower($2) AND p.id = ap.pinned_post_id AND ${VISIBLE}`, [viewer, username]))
+            .rows[0]?.id;
     const { rows } = await db.query(
       `SELECT p.id, p.created_at ${POST_FROM}
        CROSS JOIN (SELECT pr.user_id AS id, pr.is_private, pr.pinned_post_id FROM profiles pr WHERE lower(pr.username) = lower($2)) o
        WHERE (p.author_id = o.id
               OR (${coAuthoredSql('o.id')}
                   AND (NOT o.is_private OR o.id = $1 OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = o.id))))
-         AND p.community_id IS NULL AND ${VISIBLE} AND p.id IS DISTINCT FROM o.pinned_post_id
+         AND p.community_id IS NULL AND ${VISIBLE} AND (${format ? `p.format = 'reel'` : 'p.id IS DISTINCT FROM o.pinned_post_id'})
          ${c ? 'AND (p.created_at, p.id) < ($4::timestamptz, $5::uuid)' : ''}
        ORDER BY p.created_at DESC, p.id DESC LIMIT $3`,
       c ? [req.user?.id ?? null, username, q.limit + 1, c.t, c.id] : [req.user?.id ?? null, username, q.limit + 1],
