@@ -1,8 +1,8 @@
 'use client';
 
-import { isVideoFile, MEDIA_ACCEPT, MESSAGE_EDIT_MINUTES, type PinnedMessage } from '@yapilapi/shared';
+import { isVideoFile, MEDIA_ACCEPT, MESSAGE_EDIT_MINUTES, WATCH_MAX_MEMBERS, type PinnedMessage } from '@yapilapi/shared';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { AIPanel, BottomSheet, Button, ChatBubble, Icon, Menu, Skeleton, Switch, TranslatableText, type MenuAction } from '@yapilapi/design-system';
 import type { Conversation, Message } from '@yapilapi/shared';
@@ -29,6 +29,7 @@ import {
   SystemLine,
 } from '@/components/ChatExtras';
 import { ListSheet, ListView, PollSheet, PollView, ReminderNote, ReminderSheet } from '@/components/ChatPolls';
+import { useChatWatch, WatchBanner } from '@/components/WatchTogether';
 
 type Pending = Message & { pending?: boolean };
 
@@ -64,6 +65,21 @@ export default function ChatPage() {
   const [pollOpen, setPollOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const [remindFor, setRemindFor] = useState<{ message: Message; scope: 'me' | 'group' } | null>(null);
+  // Watch together: the session running here (a banner and a Join link on its line), and starting one.
+  const router = useRouter();
+  const { session: watching } = useChatWatch(id);
+  const [startingWatch, setStartingWatch] = useState(false);
+  async function watchTogether() {
+    if (watching) return router.push(`/watch/${watching.id}`);
+    setStartingWatch(true);
+    try {
+      const r = await api.watch.start(id);
+      router.push(`/watch/${r.session.id}`);
+    } catch (e) {
+      toast(errorMessage(e));
+      setStartingWatch(false);
+    }
+  }
 
   const loadPins = () =>
     api.conversations.pins(id).then(
@@ -428,6 +444,8 @@ export default function ChatPage() {
 
   const others = conv?.members.filter((m) => m.id !== me?.id) ?? [];
   const title = conv ? conv.title || others.map((m) => m.displayName).join(', ') : '';
+  // Watch together: one-to-one chats and groups of up to 8 people.
+  const watchable = !!conv && (conv.kind === 'direct' || conv.kind === 'group') && conv.members.length <= WATCH_MAX_MEMBERS;
   let lastDay = '';
 
   return (
@@ -444,7 +462,20 @@ export default function ChatPage() {
             {conv?.nowStatus ? <NowStatusLine status={conv.nowStatus} compact /> : null}
           </div>
         </div>
-        <div ref={chatMenu} style={{ display: 'contents' }}>
+        <div ref={chatMenu} className="row chat-head__actions">
+          {watchable ? (
+            <button
+              type="button"
+              className="yp-action"
+              aria-label={watching ? `${t('watch.now')}: ${t('watch.join')}` : t('watch.start')}
+              title={watching ? t('watch.now') : t('watch.start')}
+              aria-busy={startingWatch || undefined}
+              disabled={startingWatch}
+              onClick={() => void watchTogether()}
+            >
+              <Icon name="play" />
+            </button>
+          ) : null}
           <Menu
             label={t('chat.options')}
             actions={[
@@ -470,6 +501,7 @@ export default function ChatPage() {
         </div>
       </div>
 
+      <WatchBanner session={watching} />
       {conv?.disappearingSeconds ? (
         <button type="button" className="chat-disappearing" onClick={() => setDisappearingOpen(true)}>
           <Icon name="info" size={14} /> {t('m.chat.disappearingOn', { time: disappearingLabel(t, conv.disappearingSeconds) })}
@@ -552,7 +584,7 @@ export default function ChatPage() {
               return (
                 <div key={m.id} id={`msg-${m.id}`} style={{ display: 'contents' }}>
                   {showDay ? <div className="yp-chat__day">{day}</div> : null}
-                  <SystemLine message={m} meId={me?.id} onJump={(mid) => void jumpTo(mid)} />
+                  <SystemLine message={m} meId={me?.id} onJump={(mid) => void jumpTo(mid)} watchSessionId={watching?.id} />
                 </div>
               );
             const time = new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(m.createdAt));

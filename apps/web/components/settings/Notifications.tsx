@@ -1,8 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Button, Card, Select, Switch, TextField } from '@yapilapi/design-system';
-import { NOTIFICATION_CATEGORIES, type InteractionSettings, type MessageKey } from '@yapilapi/shared';
+import { NOTIFICATION_CATEGORIES, type InteractionSettings, type MessageKey, type WeeklyWrapSettings } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { currentSubscription, disableBrowserPush, enableBrowserPush, pushSupported } from '@/lib/push';
 import { useSession } from '@/app/providers';
@@ -179,6 +180,51 @@ export function CategoriesCard() {
               }}
             />
           ))}
+        </div>
+      </Card>
+    </Anchor>
+  );
+}
+
+/**
+ * Weekly wrap: a private look back at your week on Sunday evening in your time zone, and
+ * whether to be told when it's ready (only while it's made at all).
+ */
+export function WeeklyWrapCard() {
+  const { t, toast } = useSession();
+  const [settings, setSettings] = useState<WeeklyWrapSettings | null>(null);
+  useEffect(() => {
+    api.wraps.settings().then(
+      (r) => setSettings(r.settings),
+      (e) => toast(errorMessage(e)),
+    );
+  }, [toast]);
+  if (!settings) return null;
+  const save = async (patch: { enabled?: boolean; notify?: boolean }) => {
+    const before = settings;
+    setSettings({ ...settings, ...patch });
+    try {
+      setSettings((await api.wraps.updateSettings(patch)).settings);
+    } catch (e) {
+      setSettings(before);
+      toast(errorMessage(e));
+    }
+  };
+  return (
+    <Anchor id="weekly-wrap">
+      <Card title={t('wrap.settings.title')} subtitle={t('wrap.settings.desc')}>
+        <div className="stack-sm">
+          <Switch label={t('wrap.settings.enabled')} checked={settings.enabled} onChange={(v) => void save({ enabled: v })} />
+          <Switch
+            label={t('wrap.settings.notify')}
+            checked={settings.enabled && settings.notify}
+            disabled={!settings.enabled}
+            onChange={(v) => void save({ notify: v })}
+          />
+          <p className="muted setting-hint">{t('wrap.settings.timezone', { zone: settings.timezone })}</p>
+          <p className="setting-hint">
+            <Link href="/wraps">{t('wrap.past')}</Link>
+          </p>
         </div>
       </Card>
     </Anchor>

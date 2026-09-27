@@ -9,6 +9,7 @@ import {
   BottomSheet,
   Button,
   EmptyState,
+  Icon,
   List,
   ListItem,
   PostCard,
@@ -28,6 +29,7 @@ import { useSignIn } from './SignedOut';
 import { BoostSheet, type BoostChoices } from './Boost';
 import { SaveToSheet } from './Boards';
 import { CommentsSheet } from './Comments';
+import { hasVideo, WatchChatPicker } from './WatchTogether';
 
 export { CommentsSheet };
 
@@ -69,6 +71,9 @@ export function PostList({
   const [saveTo, setSaveTo] = useState<Post | null>(null);
   const [editing, setEditing] = useState<Post | null>(null);
   const [historyFor, setHistoryFor] = useState<Post | null>(null);
+  // Video posts: sharing offers "Watch together" too, which picks a chat.
+  const [shareFor, setShareFor] = useState<Post | null>(null);
+  const [watchFor, setWatchFor] = useState<Post | null>(null);
   const sentinel = useRef<HTMLDivElement>(null);
   const [ad, setAd] = useState<SponsoredAd | null>(null);
   const [adWhy, setAdWhy] = useState(false);
@@ -362,7 +367,7 @@ export function PostList({
             onSaveTo={me ? setSaveTo : undefined}
             onRepost={guard(repost)}
             onReposters={(p) => setRepostersOf(p.id)}
-            onShare={share}
+            onShare={(post) => (me && hasVideo(post) ? setShareFor(post) : void share(post))}
             onVote={guard(vote)}
             onComment={setCommentsFor}
             onFeedback={me ? feedback : undefined}
@@ -402,6 +407,43 @@ export function PostList({
           onCountChange={(d) => patch(commentsFor.id, (x) => ({ ...x, counts: { ...x.counts, comments: Math.max(0, x.counts.comments + d) } }))}
         />
       ) : null}
+
+      <BottomSheet open={!!shareFor} onClose={() => setShareFor(null)} title={t('m.common.share')}>
+        <ul className="reel-sheet__list">
+          <li>
+            <button
+              type="button"
+              className="reel-sheet__item"
+              onClick={() => {
+                const p = shareFor;
+                setShareFor(null);
+                if (p) void share(p);
+              }}
+            >
+              <span className="reel-sheet__icon">
+                <Icon name="send" size={20} />
+              </span>
+              <span>{t('reel.share.link')}</span>
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              className="reel-sheet__item"
+              onClick={() => {
+                setWatchFor(shareFor);
+                setShareFor(null);
+              }}
+            >
+              <span className="reel-sheet__icon">
+                <Icon name="play" size={20} />
+              </span>
+              <span>{t('watch.start')}</span>
+            </button>
+          </li>
+        </ul>
+      </BottomSheet>
+      <WatchChatPicker post={watchFor} onClose={() => setWatchFor(null)} />
 
       <Reposters postId={repostersOf} onClose={() => setRepostersOf(null)} />
       <BottomSheet open={!!why} onClose={() => setWhy(null)} title={t('post.why')}>

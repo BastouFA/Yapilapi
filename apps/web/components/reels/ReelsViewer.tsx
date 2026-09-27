@@ -8,6 +8,7 @@ import type { Post, ReelHighlight, ReelMoment } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { CommentsSheet, ReportSheet } from '@/components/PostList';
 import { SaveToSheet } from '@/components/Boards';
+import { WatchChatPicker } from '@/components/WatchTogether';
 import { useSession } from '@/app/providers';
 import { ReelItem, type ReelViewerApi } from './ReelItem';
 import { HighlightsSheet, OptionsSheet, ShareSheet } from './sheets';
@@ -21,6 +22,7 @@ type Sheet =
   | { kind: 'highlights'; post: Post }
   | { kind: 'report'; post: Post }
   | { kind: 'saveTo'; post: Post }
+  | { kind: 'watch'; post: Post }
   | null;
 
 /** Keys that belong to what has focus (typing, a menu), not to the viewer. */
@@ -503,7 +505,9 @@ export function ReelsViewer() {
         onRemixes={(p) => router.push(`/reels/${p.id}/remixes`)}
         onDownload={(p) => void downloadToShare(p)}
         onSaveTo={(p) => setSheet({ kind: 'saveTo', post: p })}
+        onWatch={(p) => setSheet({ kind: 'watch', post: p })}
       />
+      <WatchChatPicker post={open?.kind === 'watch' ? open.post : null} onClose={closeSheet} />
       <OptionsSheet
         post={open?.kind === 'options' ? open.post : null}
         mine={open?.post.author.id === me?.id}

@@ -30,9 +30,9 @@ function SheetItem({ icon, label, onClick, danger, pressed }: { icon: IconName; 
 }
 
 /**
- * Share: the link first (the system share sheet, or copied), then more ways to share: repost,
- * duet side by side, remix with the sound, the reel's duets and remixes, a video to share
- * elsewhere, a board.
+ * Share: the link first (the system share sheet, or copied), then more ways to share: watch it
+ * together in a chat, repost, duet side by side, remix with the sound, the reel's duets and
+ * remixes, a video to share elsewhere, a board.
  */
 export function ShareSheet({
   post,
@@ -44,6 +44,7 @@ export function ShareSheet({
   onRemixes,
   onDownload,
   onSaveTo,
+  onWatch,
 }: {
   post: Post | null;
   mine: boolean;
@@ -54,6 +55,8 @@ export function ShareSheet({
   onRemixes: (p: Post) => void;
   onDownload: (p: Post) => void;
   onSaveTo: (p: Post) => void;
+  /** Watch it together with people in a chat. */
+  onWatch?: (p: Post) => void;
 }) {
   const { t, toast, locale } = useSession();
   if (!post) return null;
@@ -84,6 +87,9 @@ export function ShareSheet({
           />
         ) : null}
         <SheetItem icon="link" label={t('reel.share.copy')} onClick={done(() => void copy())} />
+        {signedIn && onWatch && post.media.some((m) => m.kind === 'video') ? (
+          <SheetItem icon="play" label={t('watch.start')} onClick={done(() => onWatch(post))} />
+        ) : null}
         {!mine && publicReel && signedIn ? (
           <SheetItem
             icon="repost"

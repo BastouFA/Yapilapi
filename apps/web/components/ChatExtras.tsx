@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { BottomSheet, Button, Icon } from '@yapilapi/design-system';
 import { DISAPPEARING_SECONDS, type Message, type MessageKey, type MessagePreview, type PinnedMessage } from '@yapilapi/shared';
@@ -156,13 +157,41 @@ export function applyReaction(m: Message, emoji: string, byMe: boolean, removed:
 }
 
 /**
- * A line in the chat that tells everyone about a change (who changed disappearing messages), or
- * a group reminder at its time. A reminder line goes to the message it's about.
+ * A line in the chat that tells everyone about a change (who changed disappearing messages), a
+ * group reminder at its time, or that someone started watching together. A reminder line goes to
+ * the message it's about; a watch together line joins the session while it runs.
  */
-export function SystemLine({ message, meId, onJump }: { message: Message; meId?: string; onJump?: (id: string) => void }) {
+export function SystemLine({
+  message,
+  meId,
+  onJump,
+  watchSessionId,
+}: {
+  message: Message;
+  meId?: string;
+  onJump?: (id: string) => void;
+  /** The watch together session running in this chat now: its line gets a Join link. */
+  watchSessionId?: string | null;
+}) {
   const { t } = useSession();
   const who = message.sender.id === meId ? t('m.chat.you') : message.sender.displayName;
   const s = message.system;
+  if (s?.type === 'watch') {
+    const text = message.sender.id === meId ? t('watch.system.startedYou') : t('watch.system.started', { name: message.sender.displayName });
+    return (
+      <p className="chat-system" role="note">
+        <Icon name="play" size={14} /> <bdi>{text}</bdi>
+        {watchSessionId && watchSessionId === s.sessionId ? (
+          <>
+            {' '}
+            <Link href={`/watch/${s.sessionId}`} className="chat-system__join">
+              {t('watch.join')}
+            </Link>
+          </>
+        ) : null}
+      </p>
+    );
+  }
   if (s?.type === 'reminder') {
     const about = s.message;
     const text = about?.available ? t('m.chat.systemReminder', { name: who, text: previewText(t, about) }) : t('m.chat.systemReminderGone', { name: who });
