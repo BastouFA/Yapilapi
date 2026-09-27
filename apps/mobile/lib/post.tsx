@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { Fragment, useEffect, useState } from 'react';
-import { Alert, Image, Platform, Pressable, Share, Text, View, type StyleProp, type TextStyle } from 'react-native';
-import type { Conversation, PhotoTag, Post, PublicUser } from '../../../packages/shared/src/types';
+import { Alert, Image, Platform, Pressable, ScrollView, Share, Text, View, type StyleProp, type TextStyle } from 'react-native';
+import type { Conversation, MediaItem, PhotoTag, Post, PublicUser } from '../../../packages/shared/src/types';
 import { formatBytes } from '../../../packages/shared/src/data-saver';
 import { client, errorMessage, mediaUrl, webUrl } from './api';
 import { useDataSaver } from './data-saver';
@@ -16,6 +16,8 @@ import { EditPostSheet, HistorySheet } from './post-edit';
 import { RichText } from './rich-text';
 import { TranslatableText } from './translation';
 import { PostMusicChip } from './music';
+import { MediaViewer } from './media-viewer';
+import { RepostersSheet } from './reposters';
 
 export { RichText };
 
@@ -152,29 +154,25 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
   const [reposts, setReposts] = useState(post.counts.reposts);
   const { me } = useSession();
   const canRepost = post.visibility === 'public' && post.author.id !== me?.id;
-  // Sensitive photos stay blurred until the person chooses to view them (the API never sends them to under-18s).
-  const [revealed, setRevealed] = useState(false);
-  const image = post.media.find((m) => m.kind === 'image');
-  const covered = !!image?.sensitive && !revealed;
-  // Data saver: the small size first, over its blurred preview, with "Load full photo" for the usual size.
   const saver = useDataSaver().active;
-  const [fullPhoto, setFullPhoto] = useState(false);
-  const usualUri = image ? (image.variants?.medium ?? image.url) : null;
-  const smallUri = image && saver && !fullPhoto ? (image.variants?.thumb ?? null) : null;
-  const imageUri = smallUri ?? usualUri;
-  const fullBytes = image?.sizes?.medium ?? image?.sizes?.original;
+  // The photos and videos shown in the card (a reel shows its own preview instead).
+  const gallery = post.media.filter((m) => m.kind === 'image' || m.kind === 'video');
   const isAuthor = !!me && post.author.id === me.id;
+  // "Reposted by", on your own posts.
+  const [repostersOpen, setRepostersOpen] = useState(false);
   // Co-authoring: your invite to this post (if any), who accepted, and (on your own posts) who hasn't answered yet.
   const [collab, setCollab] = useState(post.viewer.collab);
   const [coauthors, setCoauthors] = useState<PublicUser[]>(post.collaborators ?? []);
   const pending = isAuthor ? (post.pendingCollaborators ?? []) : [];
   const [collabBusy, setCollabBusy] = useState(false);
   const [collabError, setCollabError] = useState<string | null>(null);
-  // Photo tags: tap the photo to show or hide the names.
-  const [tags, setTags] = useState<PhotoTag[]>(image?.tags ?? []);
-  const [showTags, setShowTags] = useState(false);
-  const [photoSize, setPhotoSize] = useState<{ width: number; height: number } | null>(null);
-  const myTag = me ? tags.find((x) => x.user.id === me.id) : undefined;
+  // Photo tags, per photo: the tag button on a photo shows or hides the names.
+  const [tags, setTags] = useState<Record<string, PhotoTag[]>>(() => tagsOf(post));
+  const myTag = me
+    ? Object.values(tags)
+        .flat()
+        .find((x) => x.user.id === me.id)
+    : undefined;
 
   async function answerInvite(accept: boolean) {
     setCollabBusy(true);
@@ -209,7 +207,7 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
 
   async function removeTag(tag: PhotoTag) {
     const before = tags;
-    setTags((cur) => cur.filter((x) => x.id !== tag.id));
+    setTags((cur) => Object.fromEntries(Object.entries(cur).map(([id, list]) => [id, list.filter((x) => x.id !== tag.id)])));
     try {
       await (await client()).posts.removeTag(post.id, tag.id);
     } catch (e) {
@@ -392,88 +390,7 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
       {post.music ? <PostMusicChip music={post.music} /> : null}
 
       {post.format === 'reel' && !post.locked && post.media.some((m) => m.kind === 'video') ? <ReelPreview post={post} saver={saver} /> : null}
-
-      {imageUri ? (
-        <View
-          style={{ borderRadius: radius.md, overflow: 'hidden' }}
-          onLayout={(e) => setPhotoSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
-        >
-          <Pressable
-            // A photo with people tagged: a tap shows or hides their names (instead of opening the post).
-            disabled={!tags.length || covered}
-            accessibilityRole={tags.length && !covered ? 'button' : 'image'}
-            accessibilityLabel={covered ? undefined : `${image?.altText ?? t('m.post.photo')}${tags.length ? `. ${tp('m.tags.count', tags.length)}` : ''}`}
-            accessibilityHint={tags.length && !covered ? (showTags ? t('m.tags.hide') : t('m.tags.show')) : undefined}
-            accessibilityElementsHidden={covered}
-            onPress={() => setShowTags((v) => !v)}
-          >
-            {saver && image?.placeholder ? (
-              <Image
-                source={{ uri: image.placeholder }}
-                blurRadius={20}
-                style={{ position: 'absolute', top: 0, bottom: 0, start: 0, end: 0 }}
-                resizeMode="cover"
-                accessibilityIgnoresInvertColors
-              />
-            ) : null}
-            <Image
-              source={{ uri: mediaUrl(imageUri) }}
-              blurRadius={covered ? 40 : 0}
-              style={{
-                width: '100%',
-                aspectRatio: image?.width && image?.height ? Math.max(0.75, Math.min(1.9, image.width / image.height)) : 4 / 3,
-                backgroundColor: saver && image?.placeholder ? 'transparent' : c.surfaceSunken,
-              }}
-              resizeMode="cover"
-            />
-          </Pressable>
-          {smallUri && smallUri !== usualUri && !covered ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setFullPhoto(true)}
-              style={{
-                position: 'absolute',
-                bottom: space[2],
-                alignSelf: 'center',
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-                paddingHorizontal: space[3],
-                paddingVertical: 6,
-                borderRadius: 999,
-                backgroundColor: 'rgba(0,0,0,0.65)',
-              }}
-            >
-              <Icon name="image-outline" size={14} color="#FFFFFF" />
-              <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '600' }}>
-                {fullBytes ? t('dataSaver.loadFullSize', { size: formatBytes(fullBytes) }) : t('dataSaver.loadFull')}
-              </Text>
-            </Pressable>
-          ) : null}
-          {tags.length && !covered ? (
-            <View
-              pointerEvents="none"
-              style={{
-                position: 'absolute',
-                bottom: space[2],
-                start: space[2],
-                width: 28,
-                height: 28,
-                borderRadius: 14,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: 'rgba(0,0,0,0.6)',
-              }}
-            >
-              <Icon name="person" size={15} color="#FFFFFF" />
-            </View>
-          ) : null}
-          {showTags && photoSize && !covered ? (
-            <TagBubbles tags={tags} width={photoSize.width} height={photoSize.height} meId={me?.id} onRemove={(tag) => void removeTag(tag)} />
-          ) : null}
-          {covered ? <SensitiveCover onReveal={() => setRevealed(true)} /> : null}
-        </View>
-      ) : null}
+      {post.format !== 'reel' && gallery.length ? <MediaGallery media={gallery} tags={tags} meId={me?.id} onRemoveTag={(tag) => void removeTag(tag)} /> : null}
 
       {post.poll ? (
         <View style={{ gap: space[1] }}>
@@ -541,6 +458,24 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
               <Icon name="repeat" size={20} color={reposted ? c.success : c.inkMuted} />
               <Text style={{ color: reposted ? c.success : c.inkMuted, fontSize: 13, fontWeight: '600' }}>{number(reposts)}</Text>
             </Pressable>
+          ) : reposts && isAuthor ? (
+            // Your own post: the count opens who reposted it.
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${t('post.reposts')}, ${number(reposts)}`}
+              accessibilityHint={t('m.post.repostersHint')}
+              hitSlop={8}
+              onPress={() => setRepostersOpen(true)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32 }}
+            >
+              <Icon name="repeat" size={20} color={c.inkMuted} />
+              <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' }}>{number(reposts)}</Text>
+            </Pressable>
+          ) : reposts ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} accessible accessibilityLabel={`${t('post.reposts')}, ${number(reposts)}`}>
+              <Icon name="repeat" size={20} color={c.inkMuted} />
+              <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>{number(reposts)}</Text>
+            </View>
           ) : null}
           {post.visibility !== 'private' ? (
             <Pressable
@@ -600,12 +535,235 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
           onClose={() => setEditing(false)}
           onSaved={(p) => {
             setPost(p);
-            if (p.media.find((m) => m.kind === 'image')) setTags(p.media.find((m) => m.kind === 'image')!.tags ?? []);
+            setTags(tagsOf(p));
           }}
         />
       ) : null}
       {history ? <HistorySheet postId={post.id} onClose={() => setHistory(false)} /> : null}
+      {repostersOpen ? <RepostersSheet postId={post.id} onClose={() => setRepostersOpen(false)} /> : null}
     </Card>
+  );
+}
+
+/** Each photo's tags, by photo. */
+const tagsOf = (p: Post): Record<string, PhotoTag[]> => Object.fromEntries(p.media.filter((m) => m.tags?.length).map((m) => [m.id, m.tags!]));
+
+const clampRatio = (r: number) => Math.max(0.75, Math.min(1.9, r));
+
+/**
+ * A post's photos and videos: one, or a carousel to swipe through with dots. A tap opens the
+ * full-screen viewer at that one. Sensitive media stays blurred until the person chooses to see
+ * it (one choice for the post; the API never sends it to under-18s). On Data saver photos load
+ * small first, over their blurred preview, with "Load full photo". Photos with people tagged
+ * have a button that shows or hides the names.
+ */
+function MediaGallery({
+  media,
+  tags,
+  meId,
+  onRemoveTag,
+}: {
+  media: MediaItem[];
+  tags: Record<string, PhotoTag[]>;
+  meId?: string;
+  onRemoveTag: (tag: PhotoTag) => void;
+}) {
+  const c = useColors();
+  const { t, tp, number } = useT();
+  const saver = useDataSaver().active;
+  const [revealed, setRevealed] = useState(false);
+  const [full, setFull] = useState<ReadonlySet<string>>(() => new Set());
+  const [showTags, setShowTags] = useState(false);
+  const [width, setWidth] = useState(0);
+  const [page, setPage] = useState(0);
+  const [viewer, setViewer] = useState<number | null>(null);
+  const covered = media.some((m) => m.sensitive) && !revealed;
+  const first = media[0]!;
+  const ratio = first.width && first.height ? clampRatio(first.width / first.height) : first.kind === 'video' ? 16 / 9 : 4 / 3;
+  const many = media.length > 1;
+  const current = media[Math.min(page, media.length - 1)]!;
+  const currentTags = current.kind === 'image' ? (tags[current.id] ?? []) : [];
+
+  const small = (m: MediaItem) => saver && !full.has(m.id) && !!m.variants?.thumb;
+  const src = (m: MediaItem) =>
+    m.kind === 'video'
+      ? saver
+        ? (m.variants?.thumb ?? m.posterUrl ?? null)
+        : (m.posterUrl ?? m.variants?.thumb ?? null)
+      : small(m)
+        ? m.variants!.thumb!
+        : (m.variants?.medium ?? m.url);
+  const fullBytes = current.sizes?.medium ?? current.sizes?.original;
+  const label = (m: MediaItem, i: number) =>
+    m.altText || t(m.kind === 'video' ? 'm.viewer.videoOf' : 'ds.media.photoOf', { index: number(i + 1), total: number(media.length) });
+
+  const pageView = (m: MediaItem, i: number) => {
+    const uri = src(m);
+    return (
+      <Pressable
+        key={m.id}
+        accessibilityRole="imagebutton"
+        accessibilityLabel={t('ds.media.openFull', { label: label(m, i) })}
+        accessibilityElementsHidden={covered}
+        importantForAccessibility={covered ? 'no-hide-descendants' : 'auto'}
+        disabled={covered}
+        onPress={() => setViewer(i)}
+        style={{ width: many ? width : '100%', height: '100%' }}
+      >
+        {saver && m.placeholder ? (
+          <Image
+            source={{ uri: m.placeholder }}
+            blurRadius={20}
+            style={{ position: 'absolute', top: 0, bottom: 0, start: 0, end: 0 }}
+            resizeMode="cover"
+            accessibilityIgnoresInvertColors
+          />
+        ) : null}
+        {uri ? (
+          <Image
+            source={{ uri: mediaUrl(uri) }}
+            blurRadius={covered ? 40 : 0}
+            style={{ width: '100%', height: '100%' }}
+            resizeMode="cover"
+            accessibilityIgnoresInvertColors
+          />
+        ) : null}
+        {m.kind === 'video' && !covered ? (
+          <View style={{ position: 'absolute', top: 0, bottom: 0, start: 0, end: 0, alignItems: 'center', justifyContent: 'center' }} pointerEvents="none">
+            <View style={{ width: 52, height: 52, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(5,6,11,0.5)' }}>
+              <Icon name="play" size={24} color="#FFFFFF" />
+            </View>
+          </View>
+        ) : null}
+        {m.altText && !covered ? (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: space[2],
+              start: space[2],
+              paddingHorizontal: 5,
+              paddingVertical: 1,
+              borderRadius: 4,
+              backgroundColor: 'rgba(0,0,0,0.7)',
+            }}
+          >
+            <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 11 }}>{t('ds.media.alt')}</Text>
+          </View>
+        ) : null}
+      </Pressable>
+    );
+  };
+
+  return (
+    <View style={{ gap: space[2] }}>
+      <View
+        style={{ width: '100%', aspectRatio: ratio, borderRadius: radius.md, overflow: 'hidden', backgroundColor: c.surfaceSunken }}
+        onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      >
+        {many ? (
+          width ? (
+            <ScrollView
+              horizontal
+              pagingEnabled
+              scrollEnabled={!covered}
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={(e) => {
+                setPage(Math.max(0, Math.min(media.length - 1, Math.round(e.nativeEvent.contentOffset.x / width))));
+                setShowTags(false);
+              }}
+            >
+              {media.map(pageView)}
+            </ScrollView>
+          ) : null
+        ) : (
+          pageView(first, 0)
+        )}
+        {many && !covered ? (
+          <View
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{
+              position: 'absolute',
+              top: space[2],
+              end: space[2],
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              borderRadius: 999,
+              backgroundColor: 'rgba(0,0,0,0.6)',
+            }}
+          >
+            <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+              {t('m.boards.position', { index: number(page + 1), total: number(media.length) })}
+            </Text>
+          </View>
+        ) : null}
+        {!covered && current.kind === 'image' && small(current) && current.variants?.thumb !== (current.variants?.medium ?? current.url) ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setFull((f) => new Set(f).add(current.id))}
+            style={{
+              position: 'absolute',
+              bottom: space[2],
+              alignSelf: 'center',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              minHeight: 36,
+              paddingHorizontal: space[3],
+              borderRadius: 999,
+              backgroundColor: 'rgba(0,0,0,0.65)',
+            }}
+          >
+            <Icon name="image-outline" size={14} color="#FFFFFF" />
+            <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '600' }}>
+              {fullBytes ? t('dataSaver.loadFullSize', { size: formatBytes(fullBytes) }) : t('dataSaver.loadFull')}
+            </Text>
+          </Pressable>
+        ) : null}
+        {showTags && width > 0 && !covered && currentTags.length > 0 ? (
+          <TagBubbles tags={currentTags} width={width} height={width / ratio} meId={meId} onRemove={onRemoveTag} />
+        ) : null}
+        {currentTags.length && !covered ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={tp('m.tags.count', currentTags.length)}
+            accessibilityHint={showTags ? t('m.tags.hide') : t('m.tags.show')}
+            accessibilityState={{ expanded: showTags }}
+            onPress={() => setShowTags((v) => !v)}
+            style={{ position: 'absolute', bottom: 0, start: 0, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <View
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 14,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: showTags ? '#FFFFFF' : 'rgba(0,0,0,0.6)',
+              }}
+            >
+              <Icon name="person" size={15} color={showTags ? '#000000' : '#FFFFFF'} />
+            </View>
+          </Pressable>
+        ) : null}
+        {covered ? <SensitiveCover onReveal={() => setRevealed(true)} /> : null}
+      </View>
+      {many ? (
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={{ flexDirection: 'row', justifyContent: 'center', gap: 5 }}
+          pointerEvents="none"
+        >
+          {media.map((m, i) => (
+            <View key={m.id} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: i === page ? c.yapi : c.line }} />
+          ))}
+        </View>
+      ) : null}
+      {viewer !== null ? <MediaViewer media={media} index={viewer} onClose={() => setViewer(null)} /> : null}
+    </View>
   );
 }
 

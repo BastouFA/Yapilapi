@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Image, Linking, ScrollView, Text, View } from 'react-native';
 import type { EditorParamsInput } from '../../../../packages/shared/src/filters';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
-import type { Circle, PublicUser } from '../../../../packages/shared/src/types';
+import type { Circle, MediaItem, PublicUser } from '../../../../packages/shared/src/types';
+import { COMMENT_POLICIES, type CommentPolicy } from '../../../../packages/shared/src/constants';
 import { useAutocomplete } from '../../lib/autocomplete';
 import { Chips } from '../../lib/circles';
 import { CoauthorPicker, PhotoTagger, type DraftTag } from '../../lib/collab';
@@ -57,6 +58,8 @@ type Kind = (typeof KINDS)[number]['id'];
 /** 'circle' is offered for posts and reels once you have a circle; the post goes to the one chosen. */
 type Visibility = (typeof VISIBILITY)[number]['id'] | 'circle';
 type Attached = Uploaded & { local: string; seconds: number | null };
+/** The reel a duet plays beside, or a remix takes its sound from. */
+type Original = { id: string; username: string; media: MediaItem | null; soundTitle: string | null };
 
 const kindFrom = (mode: string | undefined): Kind | null => (mode === 'reel' || mode === 'story' || mode === 'post' ? mode : null);
 
@@ -70,7 +73,7 @@ export default function Create() {
   const { t, number, dateTime } = useT();
   const { me } = useSession();
   const bottom = useTabBarSpace();
-  const params = useLocalSearchParams<{ mode?: string; sound?: string; track?: string; draft?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; sound?: string; track?: string; draft?: string; remixOf?: string; remixMode?: string }>();
   const [kind, setKind] = useState<Kind>(kindFrom(params.mode) ?? 'post');
   const [body, setBody] = useState('');
   const [visibility, setVisibility] = useState<Visibility>(kind === 'story' ? 'friends' : 'public');
@@ -109,6 +112,13 @@ export default function Create() {
   const [allowReshare, setAllowReshare] = useState(true);
   // Music: a song or a sound, the part that plays (the whole sound on a reel) and, on stories, its sticker.
   const [music, setMusic] = useState<DraftMusic | null>(null);
+  // Who can comment on the post or reel, and (reels) whether others may duet or remix it.
+  const [commentPolicy, setCommentPolicy] = useState<CommentPolicy>('everyone');
+  const [allowRemix, setAllowRemix] = useState(true);
+  // A duet or remix of another reel ("Duet side by side" and "Remix with this sound" in Reels).
+  const [remix, setRemix] = useState<{ id: string; mode: 'duet' | 'remix' } | null>(null);
+  const [original, setOriginal] = useState<Original | null>(null);
+  const [originalMissing, setOriginalMissing] = useState(false);
   // Posting for subscribers needs a subscription plan (set up in Studio on the web).
   const [hasPlans, setHasPlans] = useState(false);
   const [editing, setEditing] = useState<Picked | null>(null);
@@ -138,6 +148,8 @@ export default function Create() {
     setKind(k);
     setError(null);
     setNote(null);
+    // Duets and remixes are reels.
+    if (k !== 'reel') setRemix(null);
     // Keep only what the new kind can hold: a reel is a video.
     setMedia((m) => (k === 'reel' && m?.kind !== 'video' ? null : m));
     if (k === 'story' && (visibility === 'public' || visibility === 'subscribers' || visibility === 'circle')) setVisibility('friends');
@@ -175,6 +187,35 @@ export default function Create() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.track]);
 
+  // "Duet side by side" or "Remix with this sound" on a reel opens this tab as a reel made from it.
+  useEffect(() => {
+    if (!params.remixOf) return;
+    const id = params.remixOf;
+    const mode = params.remixMode === 'remix' ? 'remix' : 'duet';
+    router.setParams({ remixOf: '', remixMode: '' });
+    setKind('reel');
+    setMedia((m) => (m?.kind === 'video' ? m : null));
+    setMusic(null);
+    setRemix({ id, mode });
+    setOriginal(null);
+    setOriginalMissing(false);
+    client()
+      .then((api) => api.posts.get(id))
+      .then(
+        (r) =>
+          r.post.format === 'reel'
+            ? setOriginal({
+                id: r.post.id,
+                username: r.post.author.username,
+                media: r.post.media.find((m) => m.kind === 'video') ?? null,
+                soundTitle: r.post.sound?.title ?? null,
+              })
+            : setOriginalMissing(true),
+        () => setOriginalMissing(true),
+      );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.remixOf]);
+
   // Drafts ("Continue") opens a draft here.
   useEffect(() => {
     if (!params.draft) return;
@@ -198,6 +239,12 @@ export default function Create() {
           setAltText(m?.altText ?? '');
           setMedia(m ? { id: m.id, kind: m.kind, url: m.url, local: mediaUrl(m.variants?.medium ?? m.url), seconds: null } : null);
           setCoauthors(post.pendingCollaborators ?? []);
+          setCommentPolicy(post.commentPolicy ?? 'everyone');
+          setAllowRemix(post.allowRemix ?? true);
+          const from = post.remixOf?.post;
+          setRemix(post.format === 'reel' && post.remixOf && from ? { id: from.id, mode: post.remixOf.mode } : null);
+          setOriginal(from ? { id: from.id, username: from.author.username, media: from.media, soundTitle: null } : null);
+          setOriginalMissing(post.format === 'reel' && !!post.remixOf && !from);
           // Music on the draft: the song or sound, with the part it plays.
           const use = post.format === 'reel' ? 'reel' : 'post';
           const part = post.music ? { startMs: post.music.startMs, durationMs: post.music.durationMs } : undefined;
@@ -373,12 +420,16 @@ export default function Create() {
         body,
         ...audience,
         media: [{ id: v.id, url: mediaUrl(v.url), kind: 'video', ...described }],
-        // A sound plays in full instead of the video's own; a song plays the chosen part.
-        ...(music?.track.source === 'library'
-          ? { soundId: music.track.id }
-          : music
-            ? { music: { trackId: music.track.id, startMs: music.startMs, durationMs: music.durationMs } }
-            : {}),
+        allowRemix,
+        commentPolicy,
+        // A duet or remix uses the original; otherwise a sound plays in full instead of the video's own, and a song plays the chosen part.
+        ...(remix && original
+          ? { remixOf: remix.id, remixMode: remix.mode }
+          : music?.track.source === 'library'
+            ? { soundId: music.track.id }
+            : music
+              ? { music: { trackId: music.track.id, startMs: music.startMs, durationMs: music.durationMs } }
+              : {}),
         ...(coauthors.length ? { collaborators: coauthors.map((u) => u.id) } : {}),
       };
     }
@@ -399,6 +450,7 @@ export default function Create() {
           }
         : {}),
       ...(coauthors.length ? { collaborators: coauthors.map((u) => u.id) } : {}),
+      commentPolicy,
       ...(music && postCanHaveMusic
         ? {
             music: {
@@ -419,6 +471,11 @@ export default function Create() {
     setAltText('');
     setDraftId(null);
     setKeptAudience(null);
+    setCommentPolicy('everyone');
+    setAllowRemix(true);
+    setRemix(null);
+    setOriginal(null);
+    setOriginalMissing(false);
   }
 
   /** Keep it for later: a draft, or scheduled for `at`. */
@@ -495,6 +552,7 @@ export default function Create() {
     !keeping &&
     !uploading &&
     (!forCircle || !!chosenCircle) &&
+    (kind !== 'reel' || !remix || !!original) &&
     (kind === 'reel' ? media?.kind === 'video' : !!body.trim() || !!media || (kind === 'story' && (stickers.length > 0 || !!music)));
   const audienceOptions: { id: Visibility; label: string }[] = [
     ...VISIBILITY.filter((v) => v.id !== 'subscribers' || (hasPlans && kind !== 'story')).map((v) => ({ id: v.id, label: t(v.label) })),
@@ -533,6 +591,18 @@ export default function Create() {
         doublePressLabel={t('m.create.openCamera')}
       />
       <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t(hint)}</Text>
+      {kind === 'reel' && remix ? (
+        <RemixSource
+          mode={remix.mode}
+          original={original}
+          missing={originalMissing}
+          onCancel={() => {
+            setRemix(null);
+            setOriginal(null);
+            setOriginalMissing(false);
+          }}
+        />
+      ) : null}
       <Card style={{ gap: space[3] }}>
         <Field
           label={kind === 'reel' ? t('m.create.reel.caption') : kind === 'story' ? t('m.create.story.body') : t('create.placeholder')}
@@ -654,7 +724,7 @@ export default function Create() {
         {kind === 'post' && media?.kind === 'image' ? <PhotoTagger uri={media.local} value={photoTags} onChange={setPhotoTags} /> : null}
         {kind !== 'story' ? <CoauthorPicker value={coauthors} onChange={setCoauthors} /> : null}
 
-        {kind === 'reel' ? <MusicField use="reel" value={music} onChange={setMusic} /> : null}
+        {kind === 'reel' && !remix ? <MusicField use="reel" value={music} onChange={setMusic} /> : null}
         {kind === 'post' && postCanHaveMusic ? <MusicField use="post" value={music} onChange={setMusic} /> : null}
 
         {kind === 'story' ? (
@@ -735,12 +805,34 @@ export default function Create() {
             ) : null}
           </>
         )}
+        {kind !== 'story' ? (
+          <View style={{ gap: space[2] }}>
+            <Text style={{ color: c.ink, fontWeight: '600' }}>{t('comments.settings.title')}</Text>
+            <Chips
+              label={t('comments.settings.title')}
+              options={COMMENT_POLICIES.map((p) => ({ id: p, label: t(`comments.policy.${p}`) }))}
+              value={commentPolicy}
+              onChange={(p) => p && setCommentPolicy(p)}
+            />
+          </View>
+        ) : null}
+        {kind === 'reel' ? (
+          <SwitchRow label={t('compose.allowRemix')} hint={t('compose.allowRemixHint')} value={allowRemix} onValueChange={setAllowRemix} />
+        ) : null}
         {error ? <Notice tone="danger">{error}</Notice> : null}
         {needsVerify || (me?.needsVerification && kind !== 'story' && visibility === 'public') ? <VerifyPrompt action="post" /> : null}
         {note ? <Notice>{note}</Notice> : null}
         <Button
           label={
-            busy ? t('m.create.publishing') : kind === 'story' ? t('m.create.shareStory') : kind === 'reel' ? t('m.create.publishReel') : t('create.publish')
+            busy
+              ? t('m.create.publishing')
+              : kind === 'story'
+                ? t('m.create.shareStory')
+                : kind === 'reel'
+                  ? remix
+                    ? t(remix.mode === 'duet' ? 'compose.publishDuet' : 'compose.publishRemix')
+                    : t('m.create.publishReel')
+                  : t('create.publish')
           }
           disabled={!canPublish}
           onPress={() => void publish()}
@@ -794,6 +886,42 @@ export default function Create() {
         />
       ) : null}
     </ScrollView>
+  );
+}
+
+/** The reel a duet plays beside (on the left), or whose sound a remix uses. */
+function RemixSource({ mode, original, missing, onCancel }: { mode: 'duet' | 'remix'; original: Original | null; missing: boolean; onCancel: () => void }) {
+  const c = useColors();
+  const { t } = useT();
+  if (missing)
+    return (
+      <Notice tone="danger">
+        <Text style={{ color: c.ink, lineHeight: 20 }}>{t(mode === 'duet' ? 'compose.duetUnavailable' : 'compose.remixUnavailable')}</Text>
+        <Button label={t('m.common.remove')} variant="secondary" size="sm" icon="close" onPress={onCancel} style={{ alignSelf: 'flex-start' }} />
+      </Notice>
+    );
+  if (!original) return <Text style={{ color: c.inkMuted, fontSize: 14 }}>{t('compose.loadingOriginal')}</Text>;
+  const poster = original.media ? (original.media.variants?.thumb ?? original.media.posterUrl) : null;
+  return (
+    <Card style={{ flexDirection: 'row', gap: space[3], alignItems: 'center' }}>
+      <View style={{ width: 60, height: 96, borderRadius: radius.md, overflow: 'hidden', backgroundColor: '#0B0C14' }}>
+        {poster ? (
+          <Image source={{ uri: mediaUrl(poster) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" accessibilityIgnoresInvertColors />
+        ) : null}
+      </View>
+      <View style={{ flex: 1, gap: space[1] }}>
+        <Text style={[{ color: c.ink, fontWeight: '700' }, userText]} numberOfLines={1}>
+          {t(mode === 'duet' ? 'm.reels.duetWith' : 'm.reels.remixOf', { name: original.username })}
+        </Text>
+        <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t(mode === 'duet' ? 'compose.duetHint' : 'compose.remixHint')}</Text>
+        {original.soundTitle ? (
+          <Text style={[{ color: c.inkMuted, fontSize: 13 }, userText]} numberOfLines={1}>
+            {t('m.create.sound', { title: original.soundTitle })}
+          </Text>
+        ) : null}
+        <Button label={t('m.common.remove')} variant="ghost" size="sm" icon="close" onPress={onCancel} style={{ alignSelf: 'flex-start' }} />
+      </View>
+    </Card>
   );
 }
 

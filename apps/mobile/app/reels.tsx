@@ -29,20 +29,32 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MediaItem, Post } from '../../../packages/shared/src/types';
 import { hls360 } from '../../../packages/shared/src/data-saver';
-import { formatReelTime, REEL_SPEEDS, resumeWorthKeeping, type ReelMoment, type ReelSpeed } from '../../../packages/shared/src/reels';
+import {
+  formatReelTime,
+  REEL_HIGHLIGHT_GAP_MS,
+  REEL_HIGHLIGHT_LABEL_MAX,
+  REEL_HIGHLIGHTS_MAX,
+  REEL_SPEEDS,
+  resumeWorthKeeping,
+  type ReelHighlight,
+  type ReelMoment,
+  type ReelSpeed,
+} from '../../../packages/shared/src/reels';
 import { REPORT_REASONS } from '../../../packages/shared/src/constants';
 import { client, errorMessage, mediaUrl, webUrl } from '../lib/api';
 import { useDataSaver } from '../lib/data-saver';
 import { useSession } from '../lib/session';
 import { useT } from '../lib/i18n';
 import { radius, space } from '../lib/theme';
-import { Avatar, Button, EmptyState, Icon, Loading, Notice, Segmented, SwitchRow, useColors, userText, type IconName } from '../lib/ui';
+import { Avatar, Button, EmptyState, Field, Icon, Loading, Notice, Segmented, SwitchRow, useColors, userText, type IconName } from '../lib/ui';
 import { LockedPanel } from '../lib/money';
 import { useBoards, type SaveChange } from '../lib/boards';
 import { AuthorNames, RichText } from '../lib/post';
 import { SensitiveCover } from '../lib/safety';
 import { TranslatableText } from '../lib/translation';
 import { openMusic, useMusicCredit, useMusicLoop } from '../lib/music';
+import { CaptionOverlay, useCaptionCues } from '../lib/captions';
+import { Sheet } from '../lib/post-edit';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 
 /** What a reel plays: on Data saver the lowest MP4, or the 360p stream for videos processed before it existed. */
@@ -58,6 +70,13 @@ const VIEWABILITY = { itemVisiblePercentThreshold: 60 };
 const TAP_MS = 260;
 const FADE_MS = 3000;
 const SOUND_HINT_KEY = 'yp.reels.soundHint';
+/** How this person likes to watch reels (speed, captions), kept on this phone only. */
+const PREFS_KEY = 'yp.reels.prefs';
+/** iOS can't show a sheet while another one is still sliding away. */
+const SHEET_SWAP_MS = 420;
+
+/** What the reel on screen lets the sheets do: read where it is, and go to a moment. */
+type ReelControls = { currentMs: () => number; seek: (ms: number) => void };
 const REASON_KEYS: Record<(typeof REPORT_REASONS)[number], MessageKey> = {
   spam: 'postList.reason.spam',
   harassment: 'postList.reason.harassment',
@@ -100,13 +119,16 @@ export default function Reels() {
   const { me } = useSession();
   const [muted, setMuted] = useState(true);
   const [clear, setClear] = useState(false);
-  const [speed, setSpeed] = useState<ReelSpeed>(1);
-  const [big, setBig] = useState(false);
+  const [speed, setSpeedState] = useState<ReelSpeed>(1);
+  const [big, setBigState] = useState(false);
+  const [captions, setCaptionsState] = useState(true);
   const [soundHint, setSoundHint] = useState(false);
   const [active, setActive] = useState(0);
   const [height, setHeight] = useState(0);
   const [moments, setMoments] = useState<Record<string, ReelMoment[]>>({});
-  const [sheet, setSheet] = useState<{ kind: 'share' | 'options'; post: Post } | null>(null);
+  const [sheet, setSheet] = useState<{ kind: 'share' | 'options' | 'highlights'; post: Post } | null>(null);
+  // The reel on screen registers what the highlights editor needs from it.
+  const controls = useRef<Record<string, ReelControls>>({});
   const loading = useRef(false);
   const list = useRef<FlatList<Post>>(null);
   const [preparing, setPreparing] = useState<string | null>(null);
@@ -117,6 +139,40 @@ export default function Reels() {
       () => setSoundHint(true),
     );
   }, []);
+  // Speed and captions: remembered on this phone (a convenience, never sent).
+  useEffect(() => {
+    void SecureStore.getItemAsync(PREFS_KEY).then(
+      (v) => {
+        try {
+          const p = JSON.parse(v ?? '{}') as { speed?: number; captions?: boolean; big?: boolean };
+          if ((REEL_SPEEDS as readonly number[]).includes(p.speed as number)) setSpeedState(p.speed as ReelSpeed);
+          setCaptionsState(p.captions !== false);
+          setBigState(p.big === true);
+        } catch {
+          // Unreadable: keep the defaults.
+        }
+      },
+      () => {},
+    );
+  }, []);
+  const prefs = useRef({ speed: 1 as number, captions: true, big: false });
+  prefs.current = { speed, captions, big };
+  const savePrefs = (change: Partial<{ speed: number; captions: boolean; big: boolean }>) => {
+    void SecureStore.setItemAsync(PREFS_KEY, JSON.stringify({ ...prefs.current, ...change })).catch(() => {});
+  };
+  const setSpeed = (v: ReelSpeed) => {
+    setSpeedState(v);
+    savePrefs({ speed: v });
+  };
+  const setBig = (v: boolean) => {
+    setBigState(v);
+    savePrefs({ big: v });
+  };
+  const setCaptions = (v: boolean) => {
+    setCaptionsState(v);
+    savePrefs({ captions: v });
+  };
+
   const hintSeen = useCallback(() => {
     setSoundHint(false);
     void SecureStore.setItemAsync(SOUND_HINT_KEY, 'seen').catch(() => {});
@@ -233,6 +289,31 @@ export default function Reels() {
     }
   }
   const [followed, setFollowed] = useState<Record<string, boolean>>({});
+
+  /**
+   * "Copy link": the phone has no clipboard module here, so the share sheet opens with the link
+   * alone, where Copy is the first choice.
+   */
+  async function copyLink(p: Post) {
+    const url = `${webUrl}/reels?start=${p.id}`;
+    try {
+      await Share.share(Platform.OS === 'ios' ? { url } : { message: url });
+    } catch {
+      // The person closed the share sheet.
+    }
+  }
+
+  async function saveHighlights(p: Post, list: ReelHighlight[]) {
+    const r = await (await client()).posts.setHighlights(p.id, list);
+    patch(p.id, (x) => ({ ...x, highlights: r.highlights }));
+    setStatus(t('reel.highlights.saved'));
+  }
+
+  /** Close the sheet on screen and open another once it has slid away. */
+  const swapSheet = (next: { kind: 'share' | 'options' | 'highlights'; post: Post }) => {
+    setSheet(null);
+    setTimeout(() => setSheet(next), SHEET_SWAP_MS);
+  };
 
   async function shareLink(p: Post) {
     const url = `${webUrl}/reels?start=${p.id}`;
@@ -368,6 +449,9 @@ export default function Reels() {
               clear={clear}
               speed={speed}
               big={big}
+              captions={captions}
+              hold={sheet?.kind === 'highlights' && sheet.post.id === item.id}
+              controls={controls.current}
               moments={moments[item.id] ?? []}
               startAt={index === 0 && item.id === start && at ? Number(at) : undefined}
               showSoundHint={soundHint}
@@ -424,12 +508,22 @@ export default function Reels() {
                 onPress={() => (setSheet(null), void repost(sheetPost))}
               />
             ) : null}
-            {sheetPost.allowRemix && sheetPost.visibility === 'public' && sheetPost.sound ? (
-              <SheetItem
-                icon="musical-notes-outline"
-                label={t('reel.share.remix')}
-                onPress={() => (setSheet(null), router.navigate({ pathname: '/create', params: { mode: 'reel', sound: sheetPost.sound!.id } }))}
-              />
+            {me && sheetPost.allowRemix && sheetPost.visibility === 'public' ? (
+              <>
+                <SheetItem
+                  icon="albums-outline"
+                  label={t('reel.share.duet')}
+                  onPress={() => (setSheet(null), router.navigate({ pathname: '/create', params: { mode: 'reel', remixOf: sheetPost.id, remixMode: 'duet' } }))}
+                />
+                <SheetItem
+                  icon="musical-notes-outline"
+                  label={t('reel.share.remix')}
+                  onPress={() => (
+                    setSheet(null),
+                    router.navigate({ pathname: '/create', params: { mode: 'reel', remixOf: sheetPost.id, remixMode: 'remix' } })
+                  )}
+                />
+              </>
             ) : null}
             {sheetPost.downloadable ? (
               <SheetItem icon="download-outline" label={t('share.video.download')} onPress={() => (setSheet(null), void shareVideo(sheetPost))} />
@@ -449,14 +543,27 @@ export default function Reels() {
         mine={sheetPost?.author.id === me?.id}
         speed={speed}
         big={big}
+        captions={captions}
         onSpeed={setSpeed}
         onBig={setBig}
+        onCaptions={setCaptions}
         onClose={() => setSheet(null)}
+        onCopy={(p) => void copyLink(p)}
+        onHighlights={(p) => swapSheet({ kind: 'highlights', post: p })}
         onNotInterested={(p) => void notInterested(p)}
         onReport={(p, r) => void report(p, r)}
         onDownload={(p) => void shareVideo(p)}
         onAllowRemix={(p, v) => void setAllowRemix(p, v)}
       />
+      {sheet?.kind === 'highlights' && sheetPost ? (
+        <HighlightsSheet
+          post={sheetPost}
+          currentMs={() => controls.current[sheetPost.id]?.currentMs() ?? 0}
+          onSeek={(ms) => controls.current[sheetPost.id]?.seek(ms)}
+          onSave={(list) => saveHighlights(sheetPost, list)}
+          onClose={() => setSheet(null)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -470,6 +577,9 @@ function Reel({
   clear,
   speed,
   big,
+  captions,
+  hold,
+  controls,
   moments,
   startAt,
   showSoundHint,
@@ -499,6 +609,12 @@ function Reel({
   clear: boolean;
   speed: ReelSpeed;
   big: boolean;
+  /** Subtitles on, when the reel has them. */
+  captions: boolean;
+  /** Held still while a sheet about this reel is open (the highlights editor). */
+  hold: boolean;
+  /** Where the reel on screen registers what the sheets need from it. */
+  controls: Record<string, ReelControls>;
   moments: ReelMoment[];
   /** Open at this moment (a moment comment tapped in the comments). */
   startAt?: number;
@@ -562,7 +678,7 @@ function Reel({
   const highlights = post.highlights ?? [];
 
   // Only the reel on screen plays; scrolling away clears a tap-to-pause (it continues from where it was next time).
-  const playing = visible && focused && !paused && !covered && !waiting;
+  const playing = visible && focused && !paused && !covered && !waiting && !hold;
   useEffect(() => {
     for (const p of [player, originalSrc ? originalPlayer : null]) {
       if (!p) continue;
@@ -760,6 +876,18 @@ function Reel({
     setTime((x) => ({ ...x, current: seconds }));
     wake();
   };
+  const seekRef = useRef(seek);
+  seekRef.current = seek;
+  useEffect(() => {
+    if (!visible) return;
+    controls[post.id] = { currentMs: () => Math.round(player.currentTime * 1000), seek: (ms) => seekRef.current(ms / 1000) };
+    return () => {
+      delete controls[post.id];
+    };
+  }, [visible, controls, post.id, player]);
+
+  // Subtitles: drawn over the video from the reel's caption track (loaded when it's on screen).
+  const cues = useCaptionCues(media, visible && captions && !waiting && !covered);
 
   const ratio = media?.width && media?.height ? media.width / media.height : natural;
   const frameRatio = width && height ? width / height : 9 / 16;
@@ -889,6 +1017,8 @@ function Reel({
           <Text style={{ color: WHITE, fontWeight: '700', fontSize: 13 }}>{t('reel.speed.hold')}</Text>
         </View>
       ) : null}
+
+      {!details ? <CaptionOverlay cues={cues} seconds={time.current} big={big} bottom={clear ? bottom + 56 : bottom + 150} /> : null}
 
       {/* The info strip: name, Follow, one caption line with "more", the sound. */}
       {!details ? (
@@ -1391,15 +1521,22 @@ function SheetItem({ icon, label, onPress, danger, selected }: { icon: IconName;
   );
 }
 
-/** The "…" sheet: speed, bigger captions, and what to do with the reel. */
+/**
+ * The "…" sheet: how to watch (speed, captions) and what to do with the reel (copy link,
+ * download, highlights and remix settings for the creator, not interested, report).
+ */
 function OptionsSheet({
   post,
   mine,
   speed,
   big,
+  captions,
   onSpeed,
   onBig,
+  onCaptions,
   onClose,
+  onCopy,
+  onHighlights,
   onNotInterested,
   onReport,
   onDownload,
@@ -1409,9 +1546,13 @@ function OptionsSheet({
   mine: boolean;
   speed: ReelSpeed;
   big: boolean;
+  captions: boolean;
   onSpeed: (s: ReelSpeed) => void;
   onBig: (v: boolean) => void;
+  onCaptions: (v: boolean) => void;
   onClose: () => void;
+  onCopy: (p: Post) => void;
+  onHighlights: (p: Post) => void;
   onNotInterested: (p: Post) => void;
   onReport: (p: Post, reason: string) => void;
   onDownload: (p: Post) => void;
@@ -1445,14 +1586,25 @@ function OptionsSheet({
             onChange={(v) => onSpeed(Number(v) as ReelSpeed)}
             options={REEL_SPEEDS.map((sp) => ({ id: String(sp), label: sp === 1 ? t('reel.speed.normal') : `${number(sp)}×` }))}
           />
+          <Text style={{ color: c.inkMuted, fontWeight: '700', fontSize: 13, marginTop: space[2] }}>{t('reel.captions')}</Text>
+          {post.media.find((m) => m.kind === 'video')?.captions?.length ? (
+            <SwitchRow label={t('reel.captions.show')} value={captions} onValueChange={onCaptions} />
+          ) : (
+            <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t('reel.captions.none')}</Text>
+          )}
           <SwitchRow label={t('reel.captions.bigger')} value={big} onValueChange={onBig} />
+          <View style={{ height: space[2] }} />
+          {post.visibility !== 'private' ? <SheetItem icon="link-outline" label={t('reel.share.copy')} onPress={done(() => onCopy(post))} /> : null}
           {post.downloadable ? <SheetItem icon="download-outline" label={t('share.video.download')} onPress={done(() => onDownload(post))} /> : null}
           {mine ? (
-            <SheetItem
-              icon="copy-outline"
-              label={post.allowRemix ? t('reel.remixes.stop') : t('reel.remixes.allow')}
-              onPress={done(() => onAllowRemix(post, !post.allowRemix))}
-            />
+            <>
+              <SheetItem icon="star-outline" label={t('reel.highlights.edit')} onPress={() => onHighlights(post)} />
+              <SheetItem
+                icon="copy-outline"
+                label={post.allowRemix ? t('reel.remixes.stop') : t('reel.remixes.allow')}
+                onPress={done(() => onAllowRemix(post, !post.allowRemix))}
+              />
+            </>
           ) : (
             <>
               <SheetItem icon="eye-off-outline" label={t('reel.notInterested')} onPress={done(() => onNotInterested(post))} />
@@ -1465,7 +1617,130 @@ function OptionsSheet({
   );
 }
 
+/**
+ * The creator's highlights: up to five named points people can jump to. The reel holds still
+ * while this is open: "Add at" uses where it stopped. Rename or remove the others, then save.
+ */
+function HighlightsSheet({
+  post,
+  currentMs,
+  onSeek,
+  onSave,
+  onClose,
+}: {
+  post: Post;
+  currentMs: () => number;
+  onSeek: (ms: number) => void;
+  onSave: (list: ReelHighlight[]) => Promise<void>;
+  onClose: () => void;
+}) {
+  const c = useColors();
+  const { t } = useT();
+  const [list, setList] = useState<ReelHighlight[]>(post.highlights ?? []);
+  const [name, setName] = useState('');
+  const [at, setAt] = useState(() => currentMs());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const full = list.length >= REEL_HIGHLIGHTS_MAX;
+  const tooClose = list.some((h) => Math.abs(h.atMs - at) < REEL_HIGHLIGHT_GAP_MS);
+
+  const add = () => {
+    const label = name.trim();
+    if (!label || full || tooClose) return;
+    setList((l) => [...l, { atMs: at, label }].sort((a, b) => a.atMs - b.atMs));
+    setName('');
+  };
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await onSave(list.map((h) => ({ ...h, label: h.label.trim() })).filter((h) => h.label));
+      onClose();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Sheet visible title={t('reel.highlights.edit')} onClose={onClose}>
+      <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t('reel.highlights.hint')}</Text>
+      {list.length ? (
+        <View style={{ gap: space[2] }}>
+          {list.map((h, i) => (
+            <View key={h.atMs} style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('reel.moment.seek', { time: formatReelTime(h.atMs) })}
+                onPress={() => {
+                  onSeek(h.atMs);
+                  setAt(h.atMs);
+                }}
+                style={({ pressed }) => [s.markTime, { backgroundColor: pressed ? c.yapiSoft : c.surfaceSunken }]}
+              >
+                <Text style={{ color: c.ink, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{formatReelTime(h.atMs)}</Text>
+              </Pressable>
+              <View style={{ flex: 1 }}>
+                <Field
+                  label={`${t('reel.highlights.name')}, ${formatReelTime(h.atMs)}`}
+                  hideLabel
+                  value={h.label}
+                  maxLength={REEL_HIGHLIGHT_LABEL_MAX}
+                  onChangeText={(v) => setList((l) => l.map((x, j) => (j === i ? { ...x, label: v } : x)))}
+                />
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('reel.highlights.remove', { label: h.label || formatReelTime(h.atMs) })}
+                onPress={() => setList((l) => l.filter((_, j) => j !== i))}
+                style={s.markRemove}
+              >
+                <Icon name="close" size={20} color={c.inkMuted} />
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <Text style={{ color: c.inkMuted, fontSize: 14 }}>{t('reel.highlights.none')}</Text>
+      )}
+      {full ? (
+        <Text style={{ color: c.inkMuted, fontSize: 14 }}>{t('reel.highlights.full')}</Text>
+      ) : (
+        <View style={{ gap: space[2] }}>
+          <Field
+            label={t('reel.highlights.name')}
+            value={name}
+            maxLength={REEL_HIGHLIGHT_LABEL_MAX}
+            placeholder={t('reel.highlights.placeholder')}
+            onFocus={() => setAt(currentMs())}
+            onChangeText={setName}
+            onSubmitEditing={add}
+            returnKeyType="done"
+          />
+          <Button
+            label={t('reel.highlights.addAt', { time: formatReelTime(at) })}
+            icon="add"
+            variant="secondary"
+            size="sm"
+            disabled={!name.trim() || tooClose}
+            onPress={add}
+            style={{ alignSelf: 'flex-start' }}
+          />
+        </View>
+      )}
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: space[2] }}>
+        <Button label={t('common.cancel')} variant="ghost" onPress={onClose} />
+        <Button label={t('common.save')} disabled={busy} onPress={() => void save()} />
+      </View>
+    </Sheet>
+  );
+}
+
 const s = StyleSheet.create({
+  markTime: { minWidth: 64, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[2] },
+  markRemove: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   back: {
     position: 'absolute',
     start: space[3],
