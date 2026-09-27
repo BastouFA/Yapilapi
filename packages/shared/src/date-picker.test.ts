@@ -122,8 +122,15 @@ describe('daylight saving', () => {
 });
 
 describe('limits', () => {
-  const min = at(2026, 10, 6, 14, 37);
-  const max = at(2026, 12, 5, 14, 37);
+  // Computed in beforeAll (not as a describe-body const) so they pick up the Europe/Paris TZ the
+  // outer beforeAll sets: describe bodies run during collection, before any beforeAll has run, so
+  // a plain const here would be built under the runner's default TZ instead.
+  let min: Date;
+  let max: Date;
+  beforeAll(() => {
+    min = at(2026, 10, 6, 14, 37);
+    max = at(2026, 12, 5, 14, 37);
+  });
 
   it('rounds to the five-minute grid inside the limits', () => {
     expect(ceilToStep(at(2026, 10, 6, 14, 37))).toEqual(at(2026, 10, 6, 14, 40));
