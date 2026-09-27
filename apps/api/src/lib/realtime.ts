@@ -21,7 +21,14 @@ export class RealtimeHub {
     private sub?: Redis,
   ) {
     if (sub) {
-      void sub.subscribe(this.channel);
+      // Subscribe now and again whenever the connection is ready: if Redis was slow to answer at
+      // start (or restarted), a single try would leave this instance deaf to every event.
+      const listen = () =>
+        void sub.subscribe(this.channel).catch(() => {
+          /* tried again on the next 'ready' */
+        });
+      listen();
+      sub.on('ready', listen);
       sub.on('message', (_ch, raw) => {
         try {
           const { userIds, event } = JSON.parse(raw) as { userIds: string[]; event: RealtimeEvent };

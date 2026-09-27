@@ -730,6 +730,11 @@ export default function Chat() {
             atBottom.current = contentSize.height - (contentOffset.y + layoutMeasurement.height) < 120;
           }}
           scrollEventThrottle={100}
+          // The space above the message box changed (the keyboard, suggested replies, the voice bar):
+          // if you were at the newest message, stay there.
+          onLayout={() => {
+            if (atBottom.current) requestAnimationFrame(() => list.current?.scrollToEnd({ animated: false }));
+          }}
           onScrollToIndexFailed={(info) => {
             list.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
             setTimeout(() => list.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: true }), 100);
