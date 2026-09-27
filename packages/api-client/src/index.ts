@@ -78,6 +78,10 @@ import type {
   StorySticker,
   StoryStickerInput,
   DualComposeInput,
+  ChatTheme,
+  ScheduledMessage,
+  UsernameCheck,
+  UsernameStatus,
 } from '@yapilapi/shared';
 
 export class ApiError extends Error {
@@ -185,7 +189,8 @@ export function createClient(opts: ClientOptions) {
       reset: (token: string, password: string) => post('/v1/auth/password/reset', { token, password }),
       sessions: () => get<{ items: { id: string; device: string; ip: string; last_seen_at: string; current: boolean }[] }>('/v1/auth/sessions'),
       revokeSession: (id: string) => del(`/v1/auth/sessions/${id}`),
-      checkUsername: (username: string) => post<{ available: boolean }>('/v1/auth/check-username', { username }),
+      /** `mode: 'change'` also applies the rules for a new username (letters, numbers and underscores). */
+      checkUsername: (username: string, mode: 'signup' | 'change' = 'signup') => post<UsernameCheck>('/v1/auth/check-username', { username, mode }),
       /** Once, for an account made before a birth date was required (Me.needsBirthDate). */
       setBirthDate: (birthDate: string) => post<{ user: Me }>('/v1/me/birth-date', { birthDate }),
     },
@@ -242,6 +247,13 @@ export function createClient(opts: ClientOptions) {
       preferences: () => get<{ notifications: Record<string, boolean>; attention: Record<string, unknown> }>('/v1/me/preferences'),
       /** Email, phone, date of birth and when the account was made (Settings > Account). */
       account: () => get<{ account: AccountInfo }>('/v1/me/account'),
+      /** Your username and when it can change next. */
+      username: () => get<{ status: UsernameStatus }>('/v1/me/username'),
+      /** Change your username (once every 14 days; the old one is held for you for 14 days). */
+      changeUsername: (username: string) => put<{ user: Me; status: UsernameStatus }>('/v1/me/username', { username }),
+      /** Email me about sign-ins from new devices (the notification in the app always comes). */
+      signInAlerts: () => get<{ email: boolean }>('/v1/me/sign-in-alerts'),
+      setSignInAlerts: (email: boolean) => put<{ email: boolean }>('/v1/me/sign-in-alerts', { email }),
       /** Who can message, comment on and mention you; quiet hours; sensitive media. */
       interactions: () => get<{ settings: InteractionSettings }>('/v1/me/interactions'),
       setInteractions: (b: Partial<Omit<InteractionSettings, 'sensitiveLocked'>>) => put<{ settings: InteractionSettings }>('/v1/me/interactions', b),
@@ -640,6 +652,20 @@ export function createClient(opts: ClientOptions) {
       reminders: (id: string) => get<{ items: ChatReminder[] }>(`/v1/conversations/${id}/reminders`),
       createPlan: (id: string, title: string, details: Record<string, unknown>) => post(`/v1/conversations/${id}/plans`, { title, details }),
       plans: (id: string) => get<{ items: { id: string; title: string; details: Record<string, unknown>; status: string }[] }>(`/v1/conversations/${id}/plans`),
+      /** Your messages waiting to be sent here (and ones that couldn't be), soonest first. Only you see them. */
+      scheduled: (id: string) => get<{ items: ScheduledMessage[] }>(`/v1/conversations/${id}/scheduled`),
+      /** Send later: a text message sent at `sendAt` (a minute to a year ahead). */
+      schedule: (id: string, input: { body: string; sendAt: string; replyToId?: string }) =>
+        post<{ scheduled: ScheduledMessage }>(`/v1/conversations/${id}/scheduled`, input),
+      /** The chat's wallpaper and bubble colour, the same for everyone; a line in the chat says who changed it. */
+      setTheme: (id: string, theme: Partial<ChatTheme>) => put<{ theme: ChatTheme; message: Message | null }>(`/v1/conversations/${id}/theme`, theme),
+    },
+    scheduledMessages: {
+      /** Change the text or time (a failed one needs a new time to try again). */
+      edit: (id: string, input: { body?: string; sendAt?: string }) => patch<{ scheduled: ScheduledMessage }>(`/v1/scheduled-messages/${id}`, input),
+      sendNow: (id: string) => post<{ message: Message }>(`/v1/scheduled-messages/${id}/send-now`),
+      /** Cancel it (or dismiss one that couldn't be sent). */
+      cancel: (id: string) => del<{ ok: true }>(`/v1/scheduled-messages/${id}`),
     },
     messages: {
       /** Edit your own message's text, within 15 minutes of sending it. */

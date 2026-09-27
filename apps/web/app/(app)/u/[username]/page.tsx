@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import { getPublicProfile } from '@/lib/public';
 import { privateMetadata, profileMetadata } from '@/lib/metadata';
 import ProfilePageClient from './PageClient';
@@ -13,5 +14,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProfilePage({ params }: Props) {
   const { username } = await params;
-  return <ProfilePageClient isPublic={!!(await getPublicProfile(username))} />;
+  const profile = await getPublicProfile(username);
+  // A username changed in the last 14 days: the old address leads to the new one.
+  if (profile && profile.username.toLowerCase() !== decodeURIComponent(username).toLowerCase()) redirect(`/u/${encodeURIComponent(profile.username)}`);
+  return <ProfilePageClient isPublic={!!profile} />;
 }

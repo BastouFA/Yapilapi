@@ -39,7 +39,18 @@ import type { Tint } from './ui';
  * their posts (pinned post first). `actions` adds your own buttons on your
  * profile.
  */
-export function ProfileView({ username, actions, bottom = 0 }: { username: string; actions?: ReactNode; bottom?: number }) {
+export function ProfileView({
+  username,
+  actions,
+  bottom = 0,
+  onMoved,
+}: {
+  username: string;
+  actions?: ReactNode;
+  bottom?: number;
+  /** An old username (changed in the last 14 days) found the profile: its current one, to move there. */
+  onMoved?: (username: string) => void;
+}) {
   const c = useColors();
   const { t, number } = useT();
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
@@ -70,9 +81,10 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
     const api = await client();
     try {
       const p = (await api.users.get(username)).profile;
+      if (onMoved && p.username.toLowerCase() !== username.toLowerCase()) return onMoved(p.username);
       setProfile(p);
       try {
-        const page = await api.users.posts(username);
+        const page = await api.users.posts(p.username);
         setPosts(page.items);
         setCursor(page.nextCursor);
         setLocked(false);
@@ -83,7 +95,7 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
     } catch {
       setProfile(null);
     }
-  }, [username]);
+  }, [username, onMoved]);
 
   useEffect(() => {
     void load();

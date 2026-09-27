@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { AIPanel, BottomSheet, Button, ChatBubble, Icon, Menu, Skeleton, Switch, TranslatableText, type MenuAction } from '@yapilapi/design-system';
-import type { Conversation, Message } from '@yapilapi/shared';
+import type { Conversation, Message, ScheduledMessage } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { ReportSheet } from '@/components/PostList';
 import { useRealtime, useSession } from '../../../providers';
@@ -30,6 +30,7 @@ import {
 } from '@/components/ChatExtras';
 import { SmartReplyChips } from '@/components/AiHelpers';
 import { ListSheet, ListView, PollSheet, PollView, ReminderNote, ReminderSheet } from '@/components/ChatPolls';
+import { ChatLookSheet, chatThemeClass, chatThemeVars, ScheduledList, ScheduleSheet, useScheduled } from '@/components/ChatLater';
 
 type Pending = Message & { pending?: boolean };
 
@@ -65,6 +66,11 @@ export default function ChatPage() {
   const [pollOpen, setPollOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const [remindFor, setRemindFor] = useState<{ message: Message; scope: 'me' | 'group' } | null>(null);
+  // Send later: your messages waiting here, the sheet to pick a time (or edit one), and the chat's look.
+  const scheduled = useScheduled(id);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [editingScheduled, setEditingScheduled] = useState<ScheduledMessage | null>(null);
+  const [lookOpen, setLookOpen] = useState(false);
 
   const loadPins = () =>
     api.conversations.pins(id).then(
@@ -186,6 +192,8 @@ export default function ChatPage() {
     if (e.type === 'list.updated' && e.data.conversationId === id) patchMessage(e.data.id, (x) => (x.unsent ? x : { ...x, list: e.data.list }));
     if (e.type === 'message.reminder' && e.data.conversationId === id) patchMessage(e.data.id, (x) => ({ ...x, reminder: e.data.reminder ?? undefined }));
     if (e.type === 'conversation.updated' && e.data.id === id) setConv((c) => (c ? { ...c, disappearingSeconds: e.data.disappearingSeconds } : c));
+    // Someone changed the wallpaper or bubble colour: everyone sees the same.
+    if (e.type === 'conversation.theme' && e.data.id === id) setConv((c) => (c ? { ...c, theme: e.data.theme } : c));
     // Someone opened a view-once photo you sent, or its file was deleted.
     if (e.type === 'view_once.updated' && e.data.conversationId === id)
       setMessages((cur) => cur?.map((x) => (x.id === e.data.id ? { ...x, viewOnce: e.data.viewOnce } : x)) ?? cur);
@@ -459,6 +467,7 @@ export default function ChatPage() {
               { label: t('chat.ai.draftPlan'), icon: 'calendar', onSelect: () => assist('plan_from_message') },
               { label: t('m.chat.search'), icon: 'search', onSelect: () => setSearchOpen(true) },
               { label: t('m.chat.disappearing'), icon: 'info', onSelect: () => setDisappearingOpen(true) },
+              { label: t('m.chat.look.title'), icon: 'palette', onSelect: () => setLookOpen(true) },
               ...(others.length === 1
                 ? [
                     {
@@ -534,7 +543,14 @@ export default function ChatPage() {
       {messages === null ? (
         <Skeleton height={300} />
       ) : (
-        <div className="yp-chat" role="log" aria-live="polite" aria-relevant="additions" aria-label={t('chat.messages')}>
+        <div
+          className={`yp-chat ${chatThemeClass(conv?.theme)}`}
+          style={chatThemeVars(conv?.theme)}
+          role="log"
+          aria-live="polite"
+          aria-relevant="additions"
+          aria-label={t('chat.messages')}
+        >
           {cursor ? (
             <Button
               size="sm"
@@ -651,6 +667,19 @@ export default function ChatPage() {
               </div>
             );
           })}
+          {/* Only you see these until they're sent. */}
+          <ScheduledList
+            items={scheduled.items}
+            onEdit={(s) => {
+              setEditingScheduled(s);
+              setScheduleOpen(true);
+            }}
+            onSent={(s, message) => {
+              scheduled.setItems((cur) => cur.filter((x) => x.id !== s.id));
+              addMessage(message);
+            }}
+            onRemoved={(s) => scheduled.setItems((cur) => cur.filter((x) => x.id !== s.id))}
+          />
           {typing ? (
             <span className="muted" style={{ fontSize: 12 }}>
               {t('chat.typing', { name: typing })}
@@ -791,6 +820,21 @@ export default function ChatPage() {
             if (e.key === 'Escape' && (replyTo || editing)) cancelCompose();
           }}
         />
+        {!editing ? (
+          <button
+            type="button"
+            className="yp-action"
+            aria-label={t('m.chat.later.title')}
+            title={t('m.chat.later.title')}
+            disabled={!body.trim()}
+            onClick={() => {
+              setEditingScheduled(null);
+              setScheduleOpen(true);
+            }}
+          >
+            <Icon name="clock" />
+          </button>
+        ) : null}
         <Button type="submit" icon={editing ? 'check' : 'send'} disabled={!body.trim()} aria-label={editing ? t('m.chat.saveEdit') : t('inbox.send')}>
           <span className="chat-send__label">{editing ? t('common.save') : t('inbox.send')}</span>
         </Button>
@@ -804,6 +848,40 @@ export default function ChatPage() {
           setCaptureStart('photo');
         }}
         onCaptured={(f) => void sendFile(f, t('chat.sendingViewOnce'), { viewOnce: true })}
+      />
+      <ScheduleSheet
+        open={scheduleOpen}
+        onClose={() => {
+          setScheduleOpen(false);
+          setEditingScheduled(null);
+        }}
+        conversationId={id}
+        body={body}
+        replyToId={replyTo?.id}
+        editing={editingScheduled}
+        onDone={(s) => {
+          scheduled.setItems((cur) => [...cur.filter((x) => x.id !== s.id), s].sort((a, b) => a.sendAt.localeCompare(b.sendAt)));
+          // A new one leaves the message box empty, as sending does.
+          if (!editingScheduled) {
+            setBody('');
+            setReplyTo(null);
+          }
+        }}
+      />
+      <ChatLookSheet
+        open={lookOpen}
+        onClose={() => setLookOpen(false)}
+        theme={conv?.theme}
+        onPick={async (next) => {
+          try {
+            const r = await api.conversations.setTheme(id, next);
+            setConv((c) => (c ? { ...c, theme: r.theme } : c));
+            const line = r.message;
+            if (line) addMessage(line);
+          } catch (e) {
+            toast(errorMessage(e));
+          }
+        }}
       />
       <ReportSheet target={reportId ? { type: 'message', id: reportId } : null} onClose={() => setReportId(null)} />
       <PollSheet open={pollOpen} onClose={() => setPollOpen(false)} conversationId={id} onSent={addMessage} />

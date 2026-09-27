@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { BottomSheet, Button, Icon } from '@yapilapi/design-system';
-import { DISAPPEARING_SECONDS, type Message, type MessageKey, type MessagePreview, type PinnedMessage } from '@yapilapi/shared';
+import { chatTheme, DISAPPEARING_SECONDS, type Message, type MessageKey, type MessagePreview, type PinnedMessage } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
@@ -185,7 +185,13 @@ export function SystemLine({ message, meId, onJump }: { message: Message; meId?:
       ? s.seconds
         ? t('m.chat.systemOn', { name: who, time: disappearingLabel(t, s.seconds) })
         : t('m.chat.systemOff', { name: who })
-      : '';
+      : s?.type === 'theme'
+        ? t('m.chat.systemTheme', {
+            name: who,
+            wallpaper: t(`m.chat.wallpaper.${chatTheme(s).wallpaper}` as MessageKey),
+            colour: t(`m.chat.accent.${chatTheme(s).accent}` as MessageKey),
+          })
+        : '';
   return (
     <p className="chat-system" role="note">
       <Icon name="info" size={14} /> <bdi>{text}</bdi>

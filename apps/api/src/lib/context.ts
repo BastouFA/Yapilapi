@@ -11,6 +11,7 @@ import type { SmsProvider } from './sms.ts';
 import type { MediaModerator } from './media-moderation.ts';
 import type { RoomMedia } from './room-media.ts';
 import type { MusicCatalog } from './music/index.ts';
+import type { JobHandler } from './jobs.ts';
 
 /** Everything a module needs, created once in buildApp. */
 export interface AppContext {
@@ -35,4 +36,9 @@ export interface AppContext {
   roomMedia: RoomMedia;
   /** Music from the sounds library and the catalogue providers that are switched on (lib/music). */
   music: MusicCatalog;
+  /**
+   * Background jobs that modules add while they register (messages scheduled to send later, for
+   * example). The worker runs them with the rest; tests run them with processJobs(db, ctx.jobs).
+   */
+  jobs: Record<string, JobHandler>;
 }

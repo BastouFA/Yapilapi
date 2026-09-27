@@ -62,6 +62,7 @@ const GROUP_TEXT: Record<string, MessageKey> = {
 /** Kinds about your own account or content, said the same way whoever caused them. {title} is the thing's name. */
 const OWN_TEXT: Record<string, MessageKey> = {
   scheduled_post_failed: 'm.notif.scheduledFailed',
+  scheduled_message_failed: 'm.notif.scheduledMessageFailed',
   recap_ready: 'm.notif.recapReady',
   recap_failed: 'm.notif.recapFailed',
   chat_reminder: 'm.notif.chatReminder',
@@ -129,6 +130,11 @@ function describe(g: Group, tr: Translator): string {
   if (n.type === 'board_item_added' && n.actor) return tp('m.notif.boardItemAdded', Math.max(1, Number(n.data.count) || 1), { name, board: title });
   if (n.type === 'plus_referral_reward') return tp('m.notif.plusReward', Number(n.data.days ?? 30));
   if (n.type === 'account_review') return n.data.outcome === 'cleared' ? t('m.notif.reviewCleared') : t('m.notif.reviewLimited');
+  // A sign-in from a device we hadn't seen: which one, and roughly where when known.
+  if (n.type === 'new_sign_in') {
+    const device = String(n.data.device ?? '');
+    return typeof n.data.place === 'string' && n.data.place ? t('m.notif.newSignInPlace', { device, place: n.data.place }) : t('m.notif.newSignIn', { device });
+  }
   const own = OWN_TEXT[n.type];
   if (own) return t(own, { title });
   const key = TEXT[n.type];

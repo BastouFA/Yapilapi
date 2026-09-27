@@ -4,6 +4,7 @@ import type { DataSaverMode } from './data-saver.ts';
 import type { TranslationSettings } from './translation.ts';
 import type { ReelHighlight } from './reels.ts';
 import type { ProfileStyle, ProfileTab } from './profile-style.ts';
+import type { ChatTheme } from './chat-theme.ts';
 import type {
   BoardVisibility,
   CircleKind,
@@ -400,6 +401,8 @@ export interface Conversation {
   myRole?: 'admin' | 'member';
   /** Suggested replies in this chat, for you. */
   smartReplies?: ConversationSmartReplies;
+  /** The chat's wallpaper and bubble colour, the same for everyone in it. Any member can change them. */
+  theme?: ChatTheme;
 }
 
 /**
@@ -412,6 +415,41 @@ export interface ConversationSmartReplies {
   defaultOn: boolean;
   /** The switch in Settings (all chats). */
   everywhere: boolean;
+}
+
+/**
+ * A message waiting to be sent later ("Send later"). Only its sender sees it. At `sendAt` it goes
+ * out as a normal message, with the chat's rules at that moment (blocks, membership, disappearing
+ * messages). A failed one keeps `failure`, the reason it couldn't go out.
+ */
+export interface ScheduledMessage {
+  id: string;
+  conversationId: string;
+  body: string;
+  replyToId: string | null;
+  sendAt: string;
+  status: 'scheduled' | 'sent' | 'failed' | 'cancelled';
+  failure?: string | null;
+  /** Once sent: the message it became. */
+  messageId?: string | null;
+  createdAt: string;
+}
+
+/** Settings > Account: your username and when it can change next. */
+export interface UsernameStatus {
+  username: string;
+  /** When you last changed it (null: never). */
+  changedAt: string | null;
+  /** The earliest moment you can change it again, or null when you can now. */
+  nextChangeAt: string | null;
+}
+
+/** Answer to "is this username free?" `reason` says why not. */
+export interface UsernameCheck {
+  available: boolean;
+  reason?: 'taken' | 'reserved' | 'invalid' | 'held' | 'current';
+  /** A plain sentence about why, for the field. */
+  message?: string;
 }
 
 /** The message a reply quotes, or a pinned message, as a short preview. */
@@ -450,6 +488,12 @@ export type MessageSystemInfo =
       type: 'disappearing';
       /** The new setting: seconds, or null when turned off. */
       seconds: number | null;
+    }
+  | {
+      /** The sender changed the chat's wallpaper or bubble colour. */
+      type: 'theme';
+      wallpaper: ChatTheme['wallpaper'];
+      accent: ChatTheme['accent'];
     }
   | {
       /** "Remind the group": a group admin asked for this line at this time. The sender is that admin. */

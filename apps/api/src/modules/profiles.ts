@@ -26,7 +26,7 @@ import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, encodeCursor } from '../lib/cursor.ts';
 import { notify, personalizationAllowed, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
-import { ageOf, areFriends, isBlockedEitherWay, PUBLIC_USER_COLS, toPublicUser, type PublicUserRow } from '../lib/users.ts';
+import { ageOf, areFriends, isBlockedEitherWay, PUBLIC_USER_COLS, toPublicUser, usernameMatchSql, type PublicUserRow } from '../lib/users.ts';
 import { notBlockedSql, postVisibleSql } from '../lib/visibility.ts';
 import { hostsWithIcons, iconHost, queueLinkIcons } from '../lib/link-icons.ts';
 import { hydratePosts } from '../lib/posts.ts';
@@ -113,8 +113,9 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
 
   async function userIdByUsername(username: string, viewer: string | null): Promise<string> {
     const { rows } = await db.query<{ user_id: string }>(
+      // A username changed in the last 14 days still finds the profile; the page then moves to the new address.
       `SELECT pr.user_id FROM profiles pr JOIN users u ON u.id = pr.user_id
-       WHERE lower(pr.username) = lower($1) AND u.status = 'active' AND ${notBlockedSql('pr.user_id', '$2')}`,
+       WHERE ${usernameMatchSql('pr', '$1')} AND u.status = 'active' AND ${notBlockedSql('pr.user_id', '$2')}`,
       [username, viewer],
     );
     if (!rows[0]) throw notFound('That profile');

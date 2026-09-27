@@ -13,7 +13,16 @@ import {
   tokenSchema,
   type AccountInfo,
   type Me,
+  type UsernameCheck,
+  type UsernameStatus,
+  changeUsernameSchema,
+  nextUsernameChange,
+  signInAlertsSchema,
   SUPPORTED_LOCALES,
+  USERNAME_CHANGE_DAYS,
+  USERNAME_HOLD_DAYS,
+  USERNAME_PROBLEM_MESSAGES,
+  usernameProblem,
 } from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, badRequest, conflict, notFound, parse, unauthorized } from '../lib/errors.ts';
@@ -22,6 +31,7 @@ import { audit, securityEvent, track } from '../lib/services.ts';
 import { applyMinorDefaults, checkBirthDate } from '../lib/users.ts';
 import { announceReferral, applyReferral, inviterByCode, qualifyReferral } from '../lib/invites.ts';
 import { recordSignals, scoreSignup } from '../lib/spam.ts';
+import { deviceName, recordSignIn } from '../lib/sign-in-alerts.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 import { registerMfa } from './mfa.ts';
 import { registerPasskeys } from './passkeys.ts';
@@ -63,13 +73,15 @@ export async function loadMe(ctx: AppContext, userId: string): Promise<Me> {
 
 export default async function authModule(app: FastifyInstance, ctx: AppContext) {
   const ttlMs = ctx.config.SESSION_TTL_DAYS * 86400_000;
+  // Links in emails open the web app (the first origin when several are allowed).
+  const webOrigin = ctx.config.WEB_ORIGIN.split(',')[0]!.replace(/\/+$/, '');
 
   /**
    * A new session. "Stay signed in" is the default; a web sign-in that turns it off
    * (`remember: false` in the body) gets a cookie that ends with the browser, and a session
    * that ends after a day at most.
    */
-  async function startSession(req: FastifyRequest, reply: FastifyReply, userId: string) {
+  async function startSession(req: FastifyRequest, reply: FastifyReply, userId: string, o: { signUp?: boolean } = {}) {
     const remember = (req.body as { remember?: unknown } | undefined)?.remember !== false;
     const lifetime = remember ? ttlMs : Math.min(ttlMs, 86400_000);
     const { token, hash } = newToken();
@@ -79,14 +91,10 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
       deviceName(ua),
       req.headers['x-client-platform'] === 'mobile' ? 'mobile' : 'web',
     ]);
-    await ctx.db.query(`INSERT INTO sessions (user_id, device_id, token_hash, user_agent, ip, expires_at) VALUES ($1,$2,$3,$4,$5,$6)`, [
-      userId,
-      device.rows[0]!.id,
-      hash,
-      ua,
-      req.ip,
-      new Date(Date.now() + lifetime),
-    ]);
+    const session = await ctx.db.query<{ id: string }>(
+      `INSERT INTO sessions (user_id, device_id, token_hash, user_agent, ip, expires_at) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+      [userId, device.rows[0]!.id, hash, ua, req.ip, new Date(Date.now() + lifetime)],
+    );
     reply.setCookie(SESSION_COOKIE, token, {
       httpOnly: true,
       secure: ctx.config.COOKIE_SECURE,
@@ -94,11 +102,21 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
       path: '/',
       ...(remember ? { maxAge: Math.floor(ttlMs / 1000) } : {}),
     });
+    // A sign-in from a device (or country) this account hasn't used before is announced; the sign-up itself isn't.
+    await recordSignIn(
+      { db: ctx.db, realtime: ctx.realtime, email: ctx.email, webOrigin, log: app.log },
+      { userId, sessionId: session.rows[0]!.id, userAgent: ua, country: requestCountry(req) },
+      { quiet: o.signUp },
+    ).catch((err: Error) => app.log.warn({ err: err.message }, 'sign-in alert'));
     return token;
   }
 
-  // Links in emails open the web app (the first origin when several are allowed).
-  const webOrigin = ctx.config.WEB_ORIGIN.split(',')[0]!.replace(/\/+$/, '');
+  /** The country a trusted CDN reports for this request, when one is configured. */
+  function requestCountry(req: FastifyRequest): string | null {
+    const header = ctx.config.TRUSTED_COUNTRY_HEADER;
+    const cc = header ? String(req.headers[header.toLowerCase()] ?? '').toUpperCase() : '';
+    return /^[A-Z]{2}$/.test(cc) && cc !== 'XX' && cc !== 'T1' ? cc : null;
+  }
 
   async function sendVerification(userId: string, email: string) {
     const { token, hash } = newToken();
@@ -124,6 +142,8 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
       throw new AppError(400, 'signup_blocked', 'We couldn’t create your account. Try again, or contact support if this keeps happening.');
     }
     // Everyone gives a birth date; under 13 can't join, 13 to 17 get the protections for minors.
+    if (usernameProblem(input.username) === 'reserved')
+      throw new AppError(409, 'conflict', USERNAME_PROBLEM_MESSAGES.reserved, { fields: { username: 'Reserved.' } });
     const age = checkBirthDate(input.birthDate);
     if (age < MIN_SIGNUP_AGE) {
       await securityEvent(ctx.db, null, 'signup_underage', req.ip, req.headers['user-agent']);
@@ -137,13 +157,14 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
     let inviterId: string | null = null;
     const userId = await tx(ctx.db, async (c) => {
       const taken = await c.query(
-        `SELECT (SELECT 1 FROM users WHERE lower(email) = $1 AND deleted_at IS NULL) AS email, (SELECT 1 FROM profiles WHERE lower(username) = lower($2)) AS username`,
+        `SELECT (SELECT 1 FROM users WHERE lower(email) = $1 AND deleted_at IS NULL) AS email, (SELECT 1 FROM profiles WHERE lower(username) = lower($2)) AS username,
+                (SELECT 1 FROM username_history WHERE lower(old_username) = lower($2) AND held_until > now() LIMIT 1) AS held`,
         [input.email, input.username],
       );
       const t = taken.rows[0];
       if (t.email)
         throw new AppError(409, 'conflict', 'An account with that email already exists. Log in instead.', { fields: { email: 'Already registered.' } });
-      if (t.username) throw new AppError(409, 'conflict', 'That username is taken. Try another.', { fields: { username: 'Taken.' } });
+      if (t.username || t.held) throw new AppError(409, 'conflict', 'That username is taken. Try another.', { fields: { username: 'Taken.' } });
       const inviter = input.inviteCode ? await inviterByCode(c, input.inviteCode) : null;
       if (input.inviteCode && !inviter)
         throw new AppError(400, 'invalid_invite', "That invite code doesn't work. Check it, or leave it empty.", {
@@ -175,7 +196,7 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
     });
     if (inviterId) await announceReferral(ctx.db, ctx.realtime, userId, inviterId);
     await sendVerification(userId, input.email);
-    const token = await startSession(req, reply, userId);
+    const token = await startSession(req, reply, userId, { signUp: true });
     track(ctx.db, userId, 'signup');
     reply.code(201);
     return { user: await loadMe(ctx, userId), token };
@@ -412,29 +433,122 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
     return { items: rows };
   });
 
-  app.post('/v1/auth/check-username', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {
-    const { username } = parse(z.object({ username: z.string().min(1).max(30) }), req.body);
-    const r = await ctx.db.query(`SELECT 1 FROM profiles WHERE lower(username) = lower($1)`, [username]);
-    return { available: !r.rowCount };
+  /**
+   * Whether a username is free, as you type it (sign-up, and changing it in Settings). `mode:
+   * 'change'` also applies the rules for a new username (letters, numbers and underscores). Names
+   * held after someone changed theirs count as taken, except your own old one.
+   */
+  app.post('/v1/auth/check-username', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req): Promise<UsernameCheck> => {
+    const { username, mode } = parse(z.object({ username: z.string().trim().min(1).max(60), mode: z.enum(['signup', 'change']).default('signup') }), req.body);
+    const viewer = req.user?.id ?? null;
+    const problem = usernameProblem(username);
+    if (problem === 'reserved') return { available: false, reason: 'reserved', message: USERNAME_PROBLEM_MESSAGES.reserved };
+    if (problem && (mode === 'change' || problem === 'length')) return { available: false, reason: 'invalid', message: USERNAME_PROBLEM_MESSAGES[problem] };
+    return usernameAvailability(username, viewer);
+  });
+
+  /** Taken by someone (or held after they changed it), or yours already. */
+  async function usernameAvailability(username: string, viewer: string | null, db: Pick<typeof ctx.db, 'query'> = ctx.db): Promise<UsernameCheck> {
+    const { rows } = await db.query<{ owner: string | null; holder: string | null }>(
+      `SELECT (SELECT user_id FROM profiles WHERE lower(username) = lower($1)) AS owner,
+              (SELECT user_id FROM username_history WHERE lower(old_username) = lower($1) AND held_until > now() ORDER BY changed_at DESC LIMIT 1) AS holder`,
+      [username],
+    );
+    const r = rows[0]!;
+    if (r.owner && r.owner === viewer) return { available: false, reason: 'current', message: 'That’s your username now.' };
+    if (r.owner) return { available: false, reason: 'taken', message: 'That username is taken. Try another.' };
+    if (r.holder && r.holder !== viewer) return { available: false, reason: 'held', message: 'That username is taken. Try another.' };
+    return { available: true };
+  }
+
+  // ── Changing your username ─────────────────────────────────────────
+  const USERNAME_STATUS_SQL = `SELECT pr.username, (SELECT max(changed_at) FROM username_history h WHERE h.user_id = pr.user_id) AS changed_at
+    FROM profiles pr WHERE pr.user_id = $1`;
+
+  async function usernameStatus(userId: string): Promise<UsernameStatus> {
+    const r = (await ctx.db.query<{ username: string; changed_at: Date | null }>(USERNAME_STATUS_SQL, [userId])).rows[0];
+    if (!r) throw notFound('Account');
+    const next = nextUsernameChange(r.changed_at);
+    return { username: r.username, changedAt: r.changed_at?.toISOString() ?? null, nextChangeAt: next && next > new Date() ? next.toISOString() : null };
+  }
+
+  app.get('/v1/me/username', { preHandler: requireAuth }, async (req) => ({ status: await usernameStatus(me(req).id) }));
+
+  /**
+   * Change your username: once every 14 days. The old one stays yours for 14 days, so nobody else
+   * can take it, and links to your old profile address and @mentions of it still lead to you.
+   */
+  app.put('/v1/me/username', { preHandler: requireAuth, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req) => {
+    const u = me(req);
+    const { username } = parse(changeUsernameSchema, req.body);
+    await tx(ctx.db, async (c) => {
+      // One change at a time per account, so two quick requests can't both slip past the 14 days.
+      await c.query(`SELECT pg_advisory_xact_lock(hashtext('username:' || $1))`, [u.id]);
+      const cur = (await c.query<{ username: string; changed_at: Date | null }>(USERNAME_STATUS_SQL, [u.id])).rows[0]!;
+      if (cur.username === username)
+        throw new AppError(400, 'username_unchanged', 'That’s your username now.', { fields: { username: 'That’s your username now.' } });
+      const next = nextUsernameChange(cur.changed_at);
+      if (next && next > new Date())
+        throw new AppError(
+          429,
+          'username_cooldown',
+          `You can change your username once every ${USERNAME_CHANGE_DAYS} days. You can change it again on ${next.toUTCString().slice(0, 16)}.`,
+          { nextChangeAt: next.toISOString() },
+        );
+      // A change of letter case only keeps the same name: nobody else can have it.
+      if (cur.username.toLowerCase() !== username.toLowerCase()) {
+        const check = await usernameAvailability(username, u.id, c);
+        if (!check.available) {
+          const message = check.message ?? 'That username is taken. Try another.';
+          throw new AppError(409, 'conflict', message, { fields: { username: message } });
+        }
+      }
+      await c.query(`UPDATE profiles SET username = $2 WHERE user_id = $1`, [u.id, username]).catch((e: { code?: string }) => {
+        if (e.code === '23505') throw new AppError(409, 'conflict', 'That username is taken. Try another.', { fields: { username: 'Taken.' } });
+        throw e;
+      });
+      // Taking back one of your own earlier names ends its hold; the name you leave is held for you.
+      await c.query(`UPDATE username_history SET held_until = now() WHERE user_id = $1 AND lower(old_username) = lower($2) AND held_until > now()`, [
+        u.id,
+        username,
+      ]);
+      await c.query(
+        `INSERT INTO username_history (user_id, old_username, new_username, held_until) VALUES ($1, $2, $3, now() + make_interval(days => $4::int))`,
+        [u.id, cur.username, username, USERNAME_HOLD_DAYS],
+      );
+      await securityEvent(c, u.id, 'username_changed', req.ip, req.headers['user-agent'], { from: cur.username, to: username });
+      await audit(c, {
+        actorId: u.id,
+        action: 'username.change',
+        entityType: 'user',
+        entityId: u.id,
+        ip: req.ip,
+        requestId: req.id,
+        metadata: { from: cur.username, to: username },
+      });
+    });
+    return { user: await loadMe(ctx, u.id), status: await usernameStatus(u.id) };
+  });
+
+  // ── Sign-in alerts ─────────────────────────────────────────────────
+  /** Email me about sign-ins from new devices. The notification in the app always comes. */
+  app.get('/v1/me/sign-in-alerts', { preHandler: requireAuth }, async (req) => {
+    const r = await ctx.db.query<{ on: boolean }>(`SELECT sign_in_email_alerts AS on FROM user_preferences WHERE user_id = $1`, [me(req).id]);
+    return { email: r.rows[0]?.on ?? true };
+  });
+
+  app.put('/v1/me/sign-in-alerts', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { email } = parse(signInAlertsSchema, req.body);
+    await ctx.db.query(
+      `INSERT INTO user_preferences (user_id, sign_in_email_alerts) VALUES ($1, $2)
+       ON CONFLICT (user_id) DO UPDATE SET sign_in_email_alerts = EXCLUDED.sign_in_email_alerts`,
+      [u.id, email],
+    );
+    await securityEvent(ctx.db, u.id, email ? 'sign_in_alerts_on' : 'sign_in_alerts_off', req.ip, req.headers['user-agent']);
+    return { email };
   });
 
   void conflict;
   void audit;
-}
-
-function deviceName(ua: string | null): string {
-  if (!ua) return 'Unknown device';
-  const os = /iPhone|iPad/.test(ua)
-    ? 'iOS'
-    : /Android/.test(ua)
-      ? 'Android'
-      : /Mac OS X/.test(ua)
-        ? 'macOS'
-        : /Windows/.test(ua)
-          ? 'Windows'
-          : /Linux/.test(ua)
-            ? 'Linux'
-            : 'Unknown OS';
-  const browser = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'App';
-  return `${browser} on ${os}`;
 }

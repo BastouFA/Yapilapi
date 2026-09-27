@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
 import {
+  chatTheme,
   conversationYapsSchema,
   createConversationSchema,
   disappearingSchema,
@@ -42,8 +43,13 @@ import { mediaIdsOf, messagePreviews, messageVisibleSql, reactionSummaries, revo
 import { langOf } from '../lib/translation.ts';
 import { listsFor, myReminders, pollsFor } from '../lib/chat-polls.ts';
 import { registerChatPollsLists } from './chat-polls-lists.ts';
+import { registerChatLater } from './chat-later.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
+
+/** Who sends a message: enough to apply the rules (minor safety needs the birth date). */
+type Sender = { id: string; birthDate: Date | null };
+type SendInput = z.output<typeof sendMessageSchema>;
 
 const MESSAGE_COLS = `m.id, m.conversation_id, m.body, m.lang, m.reply_to_id, m.attachments, m.created_at, m.client_id, m.moderation_status, m.kind, m.story_id,
   m.edited_at, m.unsent_at, m.expires_at, m.meta,
@@ -188,7 +194,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
 
   async function loadConversations(userId: string, ids?: string[]): Promise<Conversation[]> {
     const { rows } = await db.query(
-      `SELECT c.id, c.kind, c.title, c.last_message_at, c.disappearing_seconds, cm.last_read_at, cm.yaps_out_loud, cm.role, cm.smart_replies,
+      `SELECT c.id, c.kind, c.title, c.last_message_at, c.disappearing_seconds, c.wallpaper, c.accent, cm.last_read_at, cm.yaps_out_loud, cm.role, cm.smart_replies,
          EXISTS (SELECT 1 FROM conversation_members o JOIN friendships f ON f.user_a = LEAST(o.user_id, $1::uuid) AND f.user_b = GREATEST(o.user_id, $1::uuid)
                  WHERE o.conversation_id = c.id AND o.user_id <> $1 AND o.left_at IS NULL) AS has_friend,
          (SELECT count(*) FROM messages m WHERE m.conversation_id = c.id AND m.created_at > cm.last_read_at AND m.sender_id <> $1 AND m.deleted_at IS NULL
@@ -256,6 +262,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       disappearingSeconds: r.disappearing_seconds ?? null,
       myRole: r.role,
       smartReplies: smartRepliesState(r.kind, r.smart_replies ?? null, smartEverywhere, smartFlag),
+      theme: chatTheme({ wallpaper: r.wallpaper, accent: r.accent }),
     }));
   }
 
@@ -428,6 +435,18 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const u = me(req);
     const { id } = parse(idParam, req.params);
     const input = parse(sendMessageSchema, req.body);
+    const out = await sendMessage(u, id, input);
+    reply.code(201);
+    return out;
+  });
+
+  /**
+   * Send a message as `u` into conversation `id`, with every rule that applies at this moment:
+   * membership, blocks and who can message whom, minor safety, pace limits, spam checks and the
+   * chat's disappearing timer. Used when you press Send and when a message scheduled for later
+   * goes out.
+   */
+  async function sendMessage(u: Sender, id: string, input: SendInput): Promise<{ message: Message; notice?: string }> {
     await assertMember(id, u.id);
     const members = await memberIds(id);
     const conv = (await db.query(`SELECT kind, disappearing_seconds FROM conversations WHERE id = $1`, [id])).rows[0];
@@ -591,7 +610,6 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     if (row.moderation_status === 'review') {
       // Held: only the sender sees it until a moderator lets it through.
       await ctx.realtime.publish([u.id], { type: 'message.created', data: message });
-      reply.code(201);
       return {
         message: await ownCopy(message),
         notice:
@@ -623,9 +641,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     }
     if (yap && row.inserted) await deliverYap(u.id, id, members, (userId) => (adults.has(userId) ? forAdults! : forOthers!));
     track(db, u.id, row.kind === 'yap' ? 'yap_sent' : 'message_sent', { kind: conv.kind, ...(row.view_once ? { viewOnce: true } : {}) });
-    reply.code(201);
     return { message: await ownCopy(adults.has(u.id) ? forAdults! : forOthers!) };
-  });
+  }
 
   /**
    * A yap goes out as a `yap` event to everyone in the chat who hasn't blocked the sender.
@@ -1083,6 +1100,9 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     messageFor: (messageId, userId) => messageFor(messageId, userId),
     loadMessage,
   });
+
+  // Send later, and chat wallpapers and colours (modules/chat-later.ts).
+  registerChatLater(app, ctx, { assertMember, memberIds, loadMessage, sendMessage });
 
   // ── Realtime socket ───────────────────────────────────────────────────
   /** A 60-second ticket for opening the realtime socket from another origin (see lib/realtime-ticket.ts). */
