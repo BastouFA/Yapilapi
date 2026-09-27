@@ -121,6 +121,8 @@ export function appPath(link: string): string {
   // The query goes along as it came (?q=…, ?start=…, ?open=…).
   const q = query ? `?${query}` : '';
   if (!first) return '/';
+  // The development app's own "open this server" link isn't a page: land on Pulse.
+  if (first === 'expo-development-client') return '/';
   if (first === 'home') return '/';
   if (first === 'search') return `/discover${q}`;
   if (first === 'inbox') return second ? `/chat/${second}` : '/inbox';
