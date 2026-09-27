@@ -1,6 +1,7 @@
 import type {
   Circle,
   CircleKind,
+  DataSaverMode,
   NowStatus,
   NowStatusAudience,
   NowStatusIcon,
@@ -60,6 +61,16 @@ export interface ClientOptions {
   /** Bearer token for mobile / server clients. Browsers use the httpOnly cookie instead. */
   token?: string;
   fetch?: typeof fetch;
+  /**
+   * Extra headers for every request, read each time. Clients on Data saver send
+   * `Save-Data: on`, which makes responses lighter (no large photo sizes).
+   */
+  headers?: () => Record<string, string>;
+  /**
+   * Runs on every file before media.upload and uploads.resumable send it. The web
+   * app makes photos smaller here on Data saver.
+   */
+  prepareUpload?: (file: File) => Promise<File>;
 }
 
 /** Typed client for the YAPILAPI API, shared by web, mobile and admin. */
@@ -67,7 +78,7 @@ export function createClient(opts: ClientOptions) {
   const f = opts.fetch ?? fetch;
 
   async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { ...(opts.headers?.() ?? {}) };
     if (body !== undefined && !(body instanceof FormData)) headers['content-type'] = 'application/json';
     if (opts.token) headers.authorization = `Bearer ${opts.token}`;
     let res: Response;
@@ -160,6 +171,9 @@ export function createClient(opts: ClientOptions) {
       /** Who may tag you in photos. */
       tagging: () => get<{ allowFrom: TagPermission }>('/v1/me/tagging'),
       setTagging: (allowFrom: TagPermission) => put<{ allowFrom: TagPermission }>('/v1/me/tagging', { allowFrom }),
+      /** Data saver as saved on the account (also Me.dataSaver). Each device may override it locally. */
+      dataSaver: () => get<{ mode: DataSaverMode }>('/v1/me/data-saver'),
+      setDataSaver: (mode: DataSaverMode) => put<{ mode: DataSaverMode }>('/v1/me/data-saver', { mode }),
       /** Posts and reels you've been invited to co-author and haven't answered yet, newest first. */
       collabInvites: () => get<{ items: Post[] }>('/v1/me/collab-invites'),
       friendRequests: () => get<{ items: { id: string; from: PublicUser; createdAt: string }[] }>('/v1/me/friend-requests'),
@@ -354,7 +368,8 @@ export function createClient(opts: ClientOptions) {
     },
     media: {
       /** `viewOnce`: stored privately for a view-once chat message (no public address; url is empty). */
-      upload: (file: File, altText?: string, o: { viewOnce?: boolean } = {}) => {
+      upload: async (file: File, altText?: string, o: { viewOnce?: boolean } = {}) => {
+        if (opts.prepareUpload) file = await opts.prepareUpload(file);
         const fd = new FormData();
         if (altText) fd.append('altText', altText);
         fd.append('file', file);
@@ -693,6 +708,7 @@ export function createClient(opts: ClientOptions) {
     uploads: {
       /** Chunked, resumable upload. Retries each chunk and resumes from what the server already has. */
       resumable: async (file: File, onProgress?: (fraction: number) => void, altText?: string) => {
+        if (opts.prepareUpload) file = await opts.prepareUpload(file);
         const s = await post<{ uploadId: string; chunkSize: number; totalChunks: number }>('/v1/uploads', {
           filename: file.name,
           mime: file.type,
@@ -1273,6 +1289,8 @@ export interface MediaItemStatus {
   altText: string | null;
   status: 'uploading' | 'processing' | 'ready' | 'failed';
   variants: Record<string, string>;
+  /** Bytes of the original and of each processed size. */
+  sizes?: Record<string, number>;
   posterUrl: string | null;
   hlsUrl: string | null;
   blurhash: string | null;
@@ -1347,6 +1365,10 @@ export interface Story {
   mediaKind: 'image' | 'video' | 'audio' | null;
   posterUrl: string | null;
   hlsUrl: string | null;
+  /** Processed sizes (thumb/medium for photos; thumb, mp4_360 and hls_360 for videos), for Data saver. */
+  variants?: Record<string, string>;
+  /** Bytes of the original and of each processed size. */
+  sizes?: Record<string, number>;
   durationMs: number | null;
   locationText: string | null;
   /** Shared with the author's close friends only. */
@@ -1478,6 +1500,10 @@ export interface ArchivedStory {
   mediaKind: 'image' | 'video' | 'audio' | null;
   posterUrl: string | null;
   hlsUrl: string | null;
+  /** Processed sizes (thumb/medium for photos; thumb, mp4_360 and hls_360 for videos), for Data saver. */
+  variants?: Record<string, string>;
+  /** Bytes of the original and of each processed size. */
+  sizes?: Record<string, number>;
   durationMs: number | null;
   locationText: string | null;
   sensitive?: boolean;

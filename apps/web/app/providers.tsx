@@ -1,9 +1,20 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Toast, type ToastAction } from '@yapilapi/design-system';
-import { t as translate, type Me, type MessageKey } from '@yapilapi/shared';
+import { DataSaverProvider, Toast, type ToastAction } from '@yapilapi/design-system';
+import { t as translate, type ConnectionHints, type DataSaverMode, type Me, type MessageKey } from '@yapilapi/shared';
 import { api, WS_URL } from '@/lib/api';
+import {
+  connectionHints,
+  dataSaverActive,
+  effectiveMode,
+  onConnectionChange,
+  readDeviceDataSaver,
+  setDataSaverActive,
+  startMeasuringData,
+  writeDeviceDataSaver,
+  type DeviceDataSaver,
+} from '@/lib/data-saver';
 
 type Listener = (event: { type: string; data: any }) => void;
 
@@ -20,6 +31,18 @@ interface Session {
   subscribe: (fn: Listener) => () => void;
   t: (key: MessageKey, vars?: Record<string, string | number>) => string;
   locale: string;
+  dataSaver: DataSaverState;
+}
+
+/** Data saver: the account's setting, this browser's override, and whether it is on right now. */
+export interface DataSaverState {
+  account: DataSaverMode;
+  device: DeviceDataSaver;
+  /** The mode in use here: the device's choice, or the account's. */
+  mode: DataSaverMode;
+  active: boolean;
+  hints: ConnectionHints;
+  setDevice: (v: DeviceDataSaver) => void;
 }
 
 const Ctx = createContext<Session | null>(null);
@@ -48,6 +71,25 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const toast = useCallback((message: string, action?: ToastAction) => setToastState({ id: ++toastId.current, message, action }), []);
   const clearToast = useCallback(() => setToastState(null), []);
   const listeners = useRef(new Set<Listener>());
+
+  // Data saver: the account's setting (from /v1/auth/me), this browser's override and the connection.
+  const [deviceSaver, setDeviceSaver] = useState<DeviceDataSaver>('account');
+  const [hints, setHints] = useState<ConnectionHints>({});
+  useEffect(() => {
+    setDeviceSaver(readDeviceDataSaver());
+    setHints(connectionHints());
+    startMeasuringData();
+    return onConnectionChange(() => setHints(connectionHints()));
+  }, []);
+  const setDevice = useCallback((v: DeviceDataSaver) => {
+    writeDeviceDataSaver(v);
+    setDeviceSaver(v);
+  }, []);
+  const accountSaver: DataSaverMode = me?.dataSaver ?? 'auto';
+  const saverMode = effectiveMode(accountSaver, deviceSaver);
+  const saverOn = dataSaverActive(saverMode, hints);
+  // Set during render so requests made by children in this same render already ask for lite responses.
+  setDataSaverActive(saverOn);
 
   const refresh = useCallback(async () => {
     try {
@@ -140,8 +182,23 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const t = useCallback((key: MessageKey, vars?: Record<string, string | number>) => translate(key, locale, vars), [locale]);
 
   return (
-    <Ctx.Provider value={{ me, loading, refresh, setMe, flags, unread, setUnread, toast, subscribe, t, locale }}>
-      {children}
+    <Ctx.Provider
+      value={{
+        me,
+        loading,
+        refresh,
+        setMe,
+        flags,
+        unread,
+        setUnread,
+        toast,
+        subscribe,
+        t,
+        locale,
+        dataSaver: { account: accountSaver, device: deviceSaver, mode: saverMode, active: saverOn, hints, setDevice },
+      }}
+    >
+      <DataSaverProvider on={saverOn}>{children}</DataSaverProvider>
       <Toast key={toastState?.id} message={toastState?.message ?? null} action={toastState?.action} onDone={clearToast} />
     </Ctx.Provider>
   );

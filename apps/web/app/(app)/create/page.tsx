@@ -1,6 +1,6 @@
 'use client';
 
-import { extractHashtags, isVideoFile, MEDIA_ACCEPT, VIDEO_ACCEPT } from '@yapilapi/shared';
+import { extractHashtags, formatBytes, isVideoFile, MEDIA_ACCEPT, VIDEO_ACCEPT } from '@yapilapi/shared';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AutocompleteText } from '@/components/Autocomplete';
@@ -64,7 +64,9 @@ function videoSeconds(file: File): Promise<number> {
 }
 
 function Create() {
-  const { t, toast, me } = useSession();
+  const { t, toast, me, dataSaver } = useSession();
+  // Data saver: what the videos just picked will cost to upload (photos are made smaller on their own).
+  const [videoCost, setVideoCost] = useState<number | null>(null);
   const reelMax = me?.plus ? PLUS_REEL_MAX_SECONDS : REEL_MAX_SECONDS;
   const router = useRouter();
   const params = useSearchParams();
@@ -200,6 +202,8 @@ function Create() {
     const room = Math.max(0, limit - media.length - queue.length - pendingUploads.current);
     const picked = Array.from(files).slice(0, room);
     if (fileRef.current) fileRef.current.value = '';
+    const videoBytes = picked.filter(isVideoFile).reduce((n, f) => n + f.size, 0);
+    setVideoCost(dataSaver.active && videoBytes ? videoBytes : null);
     if (kind === 'reel' && picked.some((f) => !isVideoFile(f))) return toast('A reel is a video.');
     // Photos (not GIFs) and videos open in the editor first; anything else uploads as it is.
     const editable = picked.filter((f) => EDITABLE.has(f.type));
@@ -558,6 +562,11 @@ function Create() {
             </div>
           ) : null}
 
+          {videoCost ? (
+            <Alert tone="warning" title={t('dataSaver.title')} onDismiss={() => setVideoCost(null)}>
+              {t('dataSaver.videoSize', { size: formatBytes(videoCost) })} {t('dataSaver.videoWifi')}
+            </Alert>
+          ) : null}
           <div className="row">
             <input
               ref={fileRef}

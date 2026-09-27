@@ -20,6 +20,7 @@ import type { RealtimeHub } from './realtime.ts';
 import { notify } from './services.ts';
 import { publicUserFrom, usersByIds } from './users.ts';
 import { notBlockedSql } from './visibility.ts';
+import { mediaSizesSql, withSmallVariants } from './data-saver.ts';
 
 type Q = Pool | PoolClient;
 
@@ -57,7 +58,7 @@ export const PUBLIC_STORY = `m.visibility = 'public' AND m.deleted_at IS NULL AN
 /** Columns for hydrateStories; the viewer is $1. Use with STORY_FROM. */
 export const STORY_SELECT = `m.id, m.author_id, m.body, m.media_url, m.media_kind, m.location_text, m.expires_at, m.created_at, m.visibility,
   m.stickers, m.tags, m.mentions, m.reshare_of, m.allow_reshare,
-  md.poster_url, md.hls_url, md.variants, md.duration_ms, md.moderation,
+  md.poster_url, md.hls_url, md.variants, md.duration_ms, md.moderation, ${mediaSizesSql('md')} AS sizes,
   v.viewer_id IS NOT NULL AS seen, coalesce(v.liked, false) AS liked,
   CASE WHEN m.author_id = $1 THEN (SELECT count(*) FROM moment_views mv WHERE mv.moment_id = m.id AND mv.viewer_id <> $1) END AS views,
   pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode`;
@@ -221,6 +222,10 @@ export interface StoryOut {
   mediaKind: string | null;
   posterUrl: string | null;
   hlsUrl: string | null;
+  /** Processed sizes (thumb/medium for photos; mp4_360, hls_360, thumb for videos), for Data saver. */
+  variants?: Record<string, string>;
+  /** Bytes of the original and of each processed size. */
+  sizes?: Record<string, number>;
   durationMs: number | null;
   sensitive?: true;
   locationText: string | null;
@@ -358,6 +363,10 @@ export async function hydrateStories(db: Q, rows: Record<string, any>[], viewer:
       mediaKind: r.media_kind,
       posterUrl: r.poster_url ?? null,
       hlsUrl: r.hls_url ?? null,
+      ...(r.variants && Object.keys(r.variants).length
+        ? { variants: withSmallVariants({ kind: r.media_kind, hlsUrl: r.hls_url, variants: r.variants as Record<string, string> }).variants! }
+        : {}),
+      ...(r.sizes ? { sizes: r.sizes as Record<string, number> } : {}),
       durationMs: r.duration_ms ?? null,
       ...(r.moderation === 'sensitive' ? { sensitive: true as const } : {}),
       locationText: r.location_text,

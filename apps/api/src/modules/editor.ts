@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { AppError, badRequest, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { enqueue } from '../lib/jobs.ts';
+import { mediaSizesSql, withSmallVariants } from '../lib/data-saver.ts';
 import { isPlus, PLUS_REEL_MAX_MS, REEL_MAX_MS } from '../lib/plus.ts';
 import { videoDurationMs } from '../lib/studio.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
@@ -92,7 +93,7 @@ export default async function editorModule(app: FastifyInstance, ctx: AppContext
     const { id } = parse(idParam, req.params);
     const { rows } = await db.query(
       `SELECT m.id, m.kind, m.url, m.mime, m.alt_text, m.variants, m.poster_url, m.hls_url, m.blurhash, m.width, m.height, m.duration_ms,
-              ${STATUS_SQL} AS status, r.error AS edit_error, r.source_media_id AS edit_of
+              ${mediaSizesSql()} AS sizes, ${STATUS_SQL} AS status, r.error AS edit_error, r.source_media_id AS edit_of
        FROM media m LEFT JOIN media_editor_renders r ON r.result_media_id = m.id
        WHERE m.id = $1 AND m.owner_id = $2`,
       [id, me(req).id],
@@ -107,7 +108,8 @@ export default async function editorModule(app: FastifyInstance, ctx: AppContext
         mime: m.mime,
         altText: m.alt_text,
         status: m.status as 'uploading' | 'processing' | 'ready' | 'failed',
-        variants: m.variants,
+        variants: withSmallVariants({ kind: m.kind, hlsUrl: m.hls_url, variants: m.variants }).variants,
+        sizes: m.sizes as Record<string, number>,
         posterUrl: m.poster_url,
         hlsUrl: m.hls_url,
         blurhash: m.blurhash,

@@ -1,5 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { baseUrl, client, getToken } from './api';
+import { shrinkForUpload } from './data-saver';
 import { tr } from './locale';
 
 /** Reels are up to 3 minutes, as on the web (10 with Plus). */
@@ -54,7 +55,9 @@ export async function pickOne(kinds: ImagePicker.MediaType[], maxSeconds = REEL_
  * app uses (XMLHttpRequest, so progress shows); large ones (long videos) go in resumable
  * chunks that are retried on a flaky connection, up to the server's resumable limit.
  */
-export async function uploadPicked(asset: Picked, onProgress?: (fraction: number) => void): Promise<Uploaded> {
+export async function uploadPicked(picked: Picked, onProgress?: (fraction: number) => void): Promise<Uploaded> {
+  // On Data saver, photos are made smaller on the phone first.
+  const asset = await shrinkForUpload(picked);
   const video = asset.type === 'video';
   const type = asset.mimeType ?? (video ? 'video/mp4' : 'image/jpeg');
   const name = asset.fileName ?? `upload.${type.split('/')[1] ?? (video ? 'mp4' : 'jpg')}`;

@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { createClient } from '../../../packages/api-client/src/index';
+import { dataSaverHeaders } from './data-saver-state';
 import { tr } from './locale';
 
 const TOKEN_KEY = 'ypl_session';
@@ -12,7 +13,8 @@ export const getToken = async () => (await SecureStore.getItemAsync(TOKEN_KEY)) 
 
 /** Mobile uses a Bearer session token kept in the OS keychain (never AsyncStorage). */
 export async function client() {
-  return createClient({ baseUrl, token: await getToken() });
+  // On Data saver every request says Save-Data: on, so responses leave out large photo sizes.
+  return createClient({ baseUrl, token: await getToken(), headers: dataSaverHeaders });
 }
 
 /** The realtime socket URL (same endpoint as the web app). The token goes in a header, not the URL. */

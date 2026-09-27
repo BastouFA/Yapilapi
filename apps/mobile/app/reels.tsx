@@ -6,8 +6,10 @@ import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Platform, Pressable, Share, StyleSheet, Text, View, type ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { Post } from '../../../packages/shared/src/types';
+import type { MediaItem, Post } from '../../../packages/shared/src/types';
+import { hls360 } from '../../../packages/shared/src/data-saver';
 import { client, errorMessage, mediaUrl, webUrl } from '../lib/api';
+import { useDataSaver } from '../lib/data-saver';
 import { useSession } from '../lib/session';
 import { useT } from '../lib/i18n';
 import { radius, space } from '../lib/theme';
@@ -16,6 +18,10 @@ import { LockedPanel } from '../lib/money';
 import { useBoards, type SaveChange } from '../lib/boards';
 import { AuthorNames, RichText } from '../lib/post';
 import { SensitiveCover } from '../lib/safety';
+
+/** What a reel plays: on Data saver the lowest MP4, or the 360p stream for videos processed before it existed. */
+const reelSource = (m: MediaItem, saver: boolean) =>
+  mediaUrl(saver ? (m.variants?.mp4_360 ?? hls360(m) ?? m.variants?.mp4 ?? m.url) : (m.variants?.mp4 ?? m.url));
 
 const WHITE = '#FFFFFF';
 const SCRIM = 'rgba(0,0,0,0.35)';
@@ -308,7 +314,11 @@ function Reel({
   const { t, tp, number } = useT();
   const insets = useSafeAreaInsets();
   const media = post.media.find((m) => m.kind === 'video') ?? post.media[0];
-  const src = media ? mediaUrl(media.variants?.mp4 ?? media.url) : null;
+  // Data saver: nothing loads or plays until the reel is tapped; then the smallest version plays.
+  const saver = useDataSaver().active;
+  const [started, setStarted] = useState(false);
+  const waiting = saver && !started && !post.locked;
+  const src = media && !waiting ? reelSource(media, saver) : null;
   const [paused, setPaused] = useState(false);
   // A sensitive reel shows a blurred still until the viewer chooses to watch it.
   const [revealed, setRevealed] = useState(false);
@@ -319,16 +329,16 @@ function Reel({
   });
   // A duet plays beside the original (on the left); a reel using another sound plays that sound.
   const original = post.remixOf?.mode === 'duet' ? (post.remixOf.post?.media ?? null) : null;
-  const originalSrc = original ? mediaUrl(original.variants?.mp4 ?? original.url) : null;
+  const originalSrc = original && !waiting ? reelSource(original, saver) : null;
   const borrowed = !original && post.sound && !post.sound.original && post.sound.audioUrl ? mediaUrl(post.sound.audioUrl) : null;
   const originalPlayer = useVideoPlayer(originalSrc, (p) => {
     p.loop = true;
     p.muted = true;
   });
-  const sound = useAudioPlayer(visible ? borrowed : null);
+  const sound = useAudioPlayer(visible && !waiting ? borrowed : null);
 
   // Only the reel on screen plays; scrolling away rewinds it and clears a tap-to-pause.
-  const playing = visible && focused && !paused && !covered;
+  const playing = visible && focused && !paused && !covered && !waiting;
   useEffect(() => {
     for (const p of [player, originalSrc ? originalPlayer : null]) {
       if (!p) continue;
@@ -360,11 +370,19 @@ function Reel({
     <View style={{ height, backgroundColor: '#000' }} accessibilityLabel={t('m.reels.by', { name: post.author.displayName })}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={paused ? t('m.common.play') : t('m.common.pause')}
+        accessibilityLabel={waiting ? t('dataSaver.play') : paused ? t('m.common.play') : t('m.common.pause')}
         accessibilityHint={media?.altText || post.body || undefined}
-        onPress={() => setPaused((p) => !p)}
+        onPress={() => (waiting ? setStarted(true) : setPaused((p) => !p))}
         style={StyleSheet.absoluteFill}
       >
+        {waiting && !covered && media && (media.variants?.thumb || media.posterUrl) ? (
+          <Image
+            source={{ uri: mediaUrl(media.variants?.thumb ?? media.posterUrl!) }}
+            style={StyleSheet.absoluteFill}
+            resizeMode="cover"
+            accessibilityIgnoresInvertColors
+          />
+        ) : null}
         {originalSrc && !covered ? (
           <View style={[StyleSheet.absoluteFill, { flexDirection: 'row', gap: 2 }]} pointerEvents="none">
             <VideoView player={originalPlayer} style={{ flex: 1 }} contentFit="cover" nativeControls={false} />
@@ -382,7 +400,7 @@ function Reel({
             <LockedPanel post={post} dark />
           </View>
         ) : null}
-        {paused && !covered ? (
+        {(paused || waiting) && !covered && !post.locked ? (
           <View style={s.center} pointerEvents="none">
             <View style={s.playBadge}>
               <Icon name="play" size={40} color={WHITE} />

@@ -7,3 +7,4 @@ export * from './hashtags.ts';
 export * from './contacts.ts';
 export * from './filters.ts';
 export * from './stories.ts';
+export * from './data-saver.ts';

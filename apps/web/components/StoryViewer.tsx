@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Avatar, BottomSheet, Button, Checkbox, Icon, List, ListItem, Select, SensitiveCover, useModalFocus } from '@yapilapi/design-system';
+import { Avatar, BottomSheet, Button, Checkbox, Icon, List, ListItem, Select, SensitiveCover, useDataSaver, useModalFocus } from '@yapilapi/design-system';
 import type { Story, StoryGroup } from '@yapilapi/api-client';
 import { formatRelativeTime, type MessageKey, type PublicUser, type StickerResults, type StorySticker } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
@@ -58,6 +58,10 @@ export function StoryViewer({
   // Sensitive stories wait, blurred and paused, until the viewer chooses to see them.
   const [revealed, setRevealed] = useState<string[]>([]);
   const covered = !!story?.sensitive && !revealed.includes(story.id);
+  // Data saver: a video shows its poster until tapped, then plays its 360p file; photos use the medium size.
+  const saver = useDataSaver();
+  const [tapped, setTapped] = useState<string[]>([]);
+  const waiting = saver && story?.mediaKind === 'video' && !tapped.includes(story.id);
   useModalFocus(root, true, onClose);
 
   const next = useCallback(() => {
@@ -103,7 +107,7 @@ export function StoryViewer({
   }, [story?.id]);
 
   // Photos and text advance on a timer; videos report their own progress.
-  const stopped = paused || reply.length > 0 || !!viewers || sharing || answering;
+  const stopped = paused || reply.length > 0 || !!viewers || sharing || answering || waiting;
   useEffect(() => {
     if (!story || story.mediaKind === 'video' || stopped) return;
     const started = performance.now() - progress * PHOTO_MS;
@@ -193,10 +197,11 @@ export function StoryViewer({
             <video
               key={story.id}
               ref={videoRef}
-              src={story.mediaUrl}
+              src={saver ? (story.variants?.mp4_360 ?? story.mediaUrl) : story.mediaUrl}
               poster={story.posterUrl ?? undefined}
               className={covered ? 'yp-blurred' : undefined}
-              autoPlay={!covered}
+              autoPlay={!covered && !waiting}
+              preload={waiting ? 'none' : undefined}
               playsInline
               onTimeUpdate={(e) => {
                 const v = e.currentTarget;
@@ -207,7 +212,7 @@ export function StoryViewer({
           ) : story.mediaKind === 'image' && story.mediaUrl ? (
             <img
               key={story.id}
-              src={story.mediaUrl}
+              src={saver ? (story.variants?.medium ?? story.mediaUrl) : story.mediaUrl}
               alt={covered ? '' : story.body || `Story from ${group.author.displayName}`}
               className={covered ? 'yp-blurred' : undefined}
             />
@@ -237,6 +242,11 @@ export function StoryViewer({
                 void videoRef.current?.play().catch(() => {});
               }}
             />
+          ) : null}
+          {waiting && !covered ? (
+            <button type="button" className="story__play" onClick={() => setTapped((x) => [...x, story.id])} aria-label={t('dataSaver.play')}>
+              <Icon name="play" filled size={40} />
+            </button>
           ) : null}
           <button type="button" className="story__tap story__tap--prev" onClick={prev} aria-label="Previous" />
           <button type="button" className="story__tap story__tap--next" onClick={next} aria-label="Next" />

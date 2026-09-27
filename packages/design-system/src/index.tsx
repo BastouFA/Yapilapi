@@ -5,6 +5,7 @@
  *   import '@yapilapi/design-system/social.css';
  */
 export { Icon, ICON_NAMES, type IconName } from './icons.tsx';
+export { DataSaverProvider, useDataSaver } from './data-saver.tsx';
 export {
   Alert,
   Avatar,
