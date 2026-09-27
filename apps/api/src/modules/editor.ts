@@ -6,6 +6,7 @@ import { AppError, badRequest, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { enqueue } from '../lib/jobs.ts';
 import { isPlus, PLUS_REEL_MAX_MS, REEL_MAX_MS } from '../lib/plus.ts';
+import { assertRecapUse } from '../lib/recap-sharing.ts';
 import { videoDurationMs } from '../lib/studio.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
@@ -39,6 +40,8 @@ export default async function editorModule(app: FastifyInstance, ctx: AppContext
     const src = rows[0];
     // Someone else's upload looks the same as one that doesn't exist.
     if (!src) throw notFound('That photo or video');
+    // An edited copy of a recap could be posted; it's allowed only when the recap itself could be.
+    await assertRecapUse(db, u.id, [id], 'post');
     if (src.kind !== 'image' && src.kind !== 'video') throw badRequest('Only photos and videos can be edited.');
     if (!src.storage_key) throw badRequest('This file was not uploaded here, so it cannot be edited.');
     if (src.mime === 'image/gif') throw new AppError(415, 'unsupported_media', 'Animated GIFs cannot be edited.');

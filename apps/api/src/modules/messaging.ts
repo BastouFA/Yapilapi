@@ -20,6 +20,7 @@ import { z } from 'zod';
 import { activeControls } from '../lib/family.ts';
 import { enqueue } from '../lib/jobs.ts';
 import { openPrivate } from '../lib/private-files.ts';
+import { assertRecapUse } from '../lib/recap-sharing.ts';
 import { issueViewToken, OPEN_WINDOW_MINUTES, publishViewOnce, readViewToken, VIEW_ONCE_DAYS, viewOnceFor } from '../lib/view-once.ts';
 import { planYap, recentYaps, YAP_LENGTH_SLACK_MS, YAP_MAX_MEMBERS, YAP_MAX_MS, YAP_PER_MINUTE } from '../lib/yaps.ts';
 import { AppError, badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
@@ -424,6 +425,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       );
       if (media.length !== new Set(ids).size) throw notFound('That photo, video or voice message');
       if (media.some((m) => m.moderation === 'blocked')) throw new AppError(422, 'media_blocked', MEDIA_BLOCKED_MESSAGE);
+      // A recap video: everything in it must be yours or already public.
+      await assertRecapUse(db, u.id, ids, 'chat');
       if (yap) {
         const clip = media[0]!;
         if (clip.kind !== 'audio') throw new AppError(422, 'yap_not_voice', 'A Yap has to be a voice clip.');

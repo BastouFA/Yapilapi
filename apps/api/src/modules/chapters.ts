@@ -36,7 +36,7 @@ const contributor = (user: string) =>
 const invited = (user: string) => `EXISTS (SELECT 1 FROM chapter_members cm WHERE cm.chapter_id = ch.id AND cm.user_id = ${user} AND cm.status = 'invited')`;
 
 /** Before its opening date a time capsule shows only its cover, the date and how many stories are inside. */
-const SEALED = `(ch.opens_at IS NOT NULL AND ch.opens_at > now())`;
+export const SEALED = `(ch.opens_at IS NOT NULL AND ch.opens_at > now())`;
 /** Stories can be added until a capsule is sealed or its date comes. */
 const ADDING_OPEN = `(ch.opens_at IS NULL OR (ch.sealed_at IS NULL AND ch.opens_at > now()))`;
 
@@ -67,7 +67,7 @@ export function chapterVisibleSql(v: string): string {
  * stories by someone under 18 go only to people who follow them and to the chapter's members.
  * This does not look at the capsule seal; callers add that.
  */
-function storyVisibleSql(v: string): string {
+export function storyVisibleSql(v: string): string {
   return `(m.deleted_at IS NULL AND au.status = 'active'
     AND (m.author_id = ch.owner_id OR ${contributor('m.author_id')})
     AND ${notBlockedSql('m.author_id', v)}

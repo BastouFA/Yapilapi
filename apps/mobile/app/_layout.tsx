@@ -46,6 +46,8 @@ function Screens() {
         <Stack.Screen name="now-status" options={{ title: t('m.now.title'), presentation: 'modal' }} />
         <Stack.Screen name="archive" options={{ title: t('m.archive.title') }} />
         <Stack.Screen name="drafts" options={{ title: t('m.drafts.title') }} />
+        <Stack.Screen name="recaps" options={{ title: t('m.recap.title') }} />
+        <Stack.Screen name="recap-new" options={{ title: t('m.recap.new') }} />
         <Stack.Screen name="chapter/[id]" options={{ title: t('m.chapters.title') }} />
         <Stack.Screen name="chapter-edit" options={{ title: t('m.chapters.new'), presentation: 'modal' }} />
         <Stack.Screen name="saved" options={{ title: t('m.saved.title') }} />

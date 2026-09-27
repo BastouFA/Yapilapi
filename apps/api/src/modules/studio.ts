@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { AppError, badRequest, conflict, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { enqueue } from '../lib/jobs.ts';
+import { assertRecapUse } from '../lib/recap-sharing.ts';
 import { saveCaptionTrack, videoDurationMs } from '../lib/studio.ts';
 import { mediaVisibleSql } from '../lib/visibility.ts';
 import { decodeCueText, MAX_CUE_TEXT, MAX_CUES, MAX_VTT_BYTES, parseVtt, sanitizeCueText, VttError } from '../lib/webvtt.ts';
@@ -122,6 +123,8 @@ export default async function studioModule(app: FastifyInstance, ctx: AppContext
     const input = parse(editSchema, req.body);
     const video = await ownVideo(id, u.id);
     if (!video.processed || !video.storage_key) throw conflict('This video is still processing. Try again when it is ready.');
+    // A trim of a recap could be posted; it's allowed only when the recap itself could be.
+    await assertRecapUse(db, u.id, [id], 'post');
     if (input.kind === 'trim' && input.segments.length !== 1) throw fieldError('segments', 'A trim keeps one part of the video. Use clips for several parts.');
     const durationMs = await videoDurationMs(ctx, { id, storage_key: video.storage_key, duration_ms: video.duration_ms });
     if (!durationMs) throw badRequest("We couldn't read this video's length.");

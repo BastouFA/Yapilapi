@@ -5,6 +5,7 @@ import { AppError, conflict, forbidden, notFound, parse } from '../lib/errors.ts
 import type { AppContext } from '../lib/context.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
+import { assertRecapUse } from '../lib/recap-sharing.ts';
 import { notify, track } from '../lib/services.ts';
 import { plusCol, publicUserFrom } from '../lib/users.ts';
 import { notBlockedSql } from '../lib/visibility.ts';
@@ -117,6 +118,8 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
       const m = (await db.query(`SELECT url, kind, moderation FROM media WHERE id = $1 AND owner_id = $2 AND NOT private`, [input.mediaId, u.id])).rows[0];
       if (!m) throw notFound('That photo or video');
       if (m.moderation === 'blocked') throw new AppError(422, 'media_blocked', MEDIA_BLOCKED_MESSAGE);
+      // A recap video goes in a story only when everything in it is yours.
+      await assertRecapUse(db, u.id, [input.mediaId], 'story');
       mediaUrl = m.url;
       mediaKind = m.kind;
     }

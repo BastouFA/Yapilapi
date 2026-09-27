@@ -44,6 +44,7 @@ import mediaModule from './modules/media.ts';
 import creatorModule from './modules/creator.ts';
 import developerModule from './modules/developer.ts';
 import memoryModule from './modules/memory.ts';
+import recapsModule from './modules/recaps.ts';
 import liveModule from './modules/live.ts';
 import uploadsModule from './modules/uploads.ts';
 import callsModule from './modules/calls.ts';
@@ -74,6 +75,7 @@ import { studioJobHandlers } from './lib/studio.ts';
 import { editorJobHandlers } from './lib/media-edit.ts';
 import { liveRecordingJobHandlers } from './lib/live-recording.ts';
 import { shareVideoJobHandlers } from './lib/share-video.ts';
+import { recapJobHandlers } from './lib/recaps.ts';
 import { sweepViewOnce, viewOnceJobHandlers } from './lib/view-once.ts';
 import { chatJobHandlers, expireMessages } from './lib/chat.ts';
 import { scheduledPostJobHandlers } from './lib/publishing.ts';
@@ -344,6 +346,7 @@ export async function buildApp(
     creatorModule,
     developerModule,
     memoryModule,
+    recapsModule,
     tagsModule,
     collabsModule,
     soundsModule,
@@ -387,6 +390,8 @@ export async function buildApp(
     ...editorJobHandlers({ db, storage }),
     ...liveRecordingJobHandlers({ db, storage, recordingsDir: config.LIVE_RECORDINGS_DIR }),
     ...shareVideoJobHandlers({ db, storage }),
+    // Recap videos from Memories and Chapters.
+    ...recapJobHandlers({ db, storage, realtime: ctx.realtime, moderator: ctx.mediaModerator }),
     ...viewOnceJobHandlers(viewOnceDeps),
     ...chatJobHandlers(viewOnceDeps),
     // Scheduled posts go out at their time.
