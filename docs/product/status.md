@@ -1,6 +1,6 @@
 # Build status against the master directive
 
-Last updated 2026-09-27 (saved and boards). Legend: **Built** = UI + API + database + validation + authorization + tests. **API** = working, tested endpoints without a dedicated UI yet. **Schema** = tables and design exist, no endpoints. **Not started** = nothing yet.
+Last updated 2026-09-27 (launch readiness). Legend: **Built** = UI + API + database + validation + authorization + tests. **API** = working, tested endpoints without a dedicated UI yet. **Schema** = tables and design exist, no endpoints. **Not started** = nothing yet.
 
 ## The first integrated flow (directive §60)
 
@@ -52,6 +52,57 @@ Sign up → profile → interests → follow → Home → Discover → create po
 | — | Design system | Built | Coral and sun palette, light/dark themes with contrast-checked tokens, soft radii, layered shadows; 11 primitives, 20 social components; three-column desktop layout with a live/events/people/trending sidebar; published reference artifact. |
 | — | Navigation | Built | Five places with YAPILAPI's own names and symbols (web and mobile, 8 languages): **Pulse** (home feed, `/home`), **Wander** (discover, `/discover`), **Spark** (create: opens the camera), **Yap** (chats and notifications, `/inbox`, with the unread count) and **You** (your profile, shown as your own avatar). The symbols are drawn once as shared geometry (`packages/shared/src/nav-glyphs.ts`): SVG on the web (`Icon` names `pulse`, `wander`, `spark`, `yap`), plain Views on mobile. Phones get a floating glass dock: icons only, the current place's label inside a squircle highlight that slides (web: CSS transition; mobile: spring; none with reduced motion), other labels on hover and keyboard focus, and in every link's name with a short hint as its description; Spark is a raised brand-gradient squircle, tilted, that straightens when pressed. Wide screens get a side rail with every label visible. URLs are unchanged. |
 | — | CI/CD, observability | Built | CI workflow, Dockerfiles, health/readiness, Prometheus metrics and alerts, structured logs with request and trace ids, **OpenTelemetry tracing** (opt-in, Jaeger profile), **load tests** with p95 targets (docs/architecture/performance.md). |
+
+## Launch readiness
+
+What exists for a public launch and store review, and what only the owner can do. The step-by-step guides are `docs/operations/app-store.md` (stores, privacy answers, content rating, review notes) and `docs/operations/store-listing.md` (listing text in English and French).
+
+**Built:**
+
+- **Legal and policy pages:**
+  - public at `/legal`, no sign-in: terms, privacy, community guidelines, safety and minors, creator and seller terms (5% platform fee), copyright and takedowns, cookie notice;
+  - short links `/terms`, `/privacy`, `/guidelines`, `/cookies`, `/copyright`, `/dmca`;
+  - linked from the landing page, sign-in and sign-up, shared pages, the sidebar and Settings on the web, and from sign-up and Settings in the phone app (they open in the browser).
+- **How the legal pages are written:**
+  - The frame (navigation, titles, "Last updated", and a note that the text is English) is translated into all 8 languages. The text itself is English and marked `lang="en"`.
+  - The privacy policy is written from what the code collects.
+  - Company name, address, governing law and contact addresses come from `LEGAL_*` and `*_EMAIL` settings.
+  - In development, a banner says the pages are templates.
+- **Sign-up consent:** web and phone say that creating an account accepts the Terms and confirms reading the Privacy policy, with links. The age gate is unchanged.
+- **Account deletion and data download in the phone app:**
+  - Settings > Your data (`apps/mobile/app/your-data.tsx`): "Download my data" saves the export as a JSON file through the share sheet.
+  - "Delete account" explains what goes right away, what is kept and for how long, then asks for the password and a confirmation.
+  - The web's delete dialog now shows the same explanation.
+  - Deleting an account now also removes its photo and video files from storage (in the background), blanks its stories' text, and deletes its push tokens and passkeys (`apps/api/test/retention.test.ts`).
+- **Store configuration:**
+  - `apps/mobile/eas.json`: development, preview and production profiles; remote build numbers; submit to the Play internal track.
+  - `apps/mobile/app.config.js`: API and web addresses and the EAS project id come from EAS environment variables. A production build refuses local or non-https addresses.
+  - `app.json`: version 1.0.0, iOS build 1, Android version code 1; plain permission texts for camera, microphone, photo library (read and save) and contacts; an iOS privacy manifest with required-reason APIs and no tracking; Android media and location permissions blocked, since the system photo picker needs none.
+- **Search engines:**
+  - `robots.txt` also keeps search results, invite links, checkout and personal pages out.
+  - The sitemap lists the public pages, the legal pages, and what `GET /v1/public/sitemap` returns (`apps/api/test/sitemap.test.ts`):
+    - public profiles, posts, tags (used by 3 or more public posts in 90 days), communities and events;
+    - only from public adult accounts, following the public preview rules;
+    - never subscriber-only, withheld or sensitive posts.
+  - Tag pages now have a title, a canonical link and their own share image. Legal pages have canonical links.
+
+**The owner must still:**
+
+1. Have a lawyer review every legal page for the launch countries and fill in the `[bracketed]` decisions: providers and region, retention periods, payouts, fees, helplines, the U.S. copyright agent.
+2. Set `LEGAL_ENTITY_NAME`, `LEGAL_ADDRESS`, `LEGAL_JURISDICTION`, `SUPPORT_EMAIL`, `PRIVACY_EMAIL`, `COPYRIGHT_EMAIL` and `SAFETY_EMAIL` on the web service, with real inboxes behind them.
+3. Open the Apple Developer Program (99 USD a year, D-U-N-S number for a company), Google Play Console (25 USD) and Expo accounts. Then run `eas init`, set the EAS environment variables, and set up the APNs key, FCM credentials and a Play service account (app-store.md, section 3).
+4. Make the first EAS builds. This is the first native build of the app, which has never run on a device. Test on TestFlight and the Play internal track with the demo account.
+5. Decide how the iOS app handles digital purchases: Plus, subscriptions and tips go to web checkout today, which App Store guideline 3.1.1 doesn't allow.
+6. Before submitting, fix or accept the gaps listed in app-store.md ("Fix or accept these before launch"):
+   - reporting in the phone app only covers reels and profiles;
+   - original uploads keep their EXIF and GPS data;
+   - email is only logged, never sent;
+   - the analytics and personalization switches do nothing;
+   - there are no retention clean-up jobs;
+   - the birth date is optional;
+   - the web fonts come from Google Fonts;
+   - nobody checks that sellers are 18 or older.
+7. Fill in the App Store privacy label, Play data safety form and content rating questionnaires with the answers in app-store.md, and take screenshots.
 
 ## Not built yet
 

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import { EmptyState } from '@yapilapi/design-system';
+import { LegalLinks } from './Legal';
 
 /**
  * Shared links (posts, reels, profiles, events, communities) open for people
@@ -63,6 +64,9 @@ export function SignedOutShell({ children }: { children: React.ReactNode }) {
       <main className="yp-shell__main" id="main">
         {children}
       </main>
+      <footer className="legal-foot">
+        <LegalLinks />
+      </footer>
     </div>
   );
 }

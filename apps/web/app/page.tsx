@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { LegalLinks } from '@/components/Legal';
 import { useSession } from './providers';
 
 const JOURNEY = ['Discover', 'Connect', 'Communicate', 'Participate', 'Buy & book', 'Experience', 'Remember'];
@@ -94,7 +95,9 @@ export default function Landing() {
           </div>
         </div>
       </main>
-      <footer className="landing__foot">© {new Date().getFullYear()} YAPILAPI</footer>
+      <footer className="landing__foot site-legal">
+        <LegalLinks /> <span>© {new Date().getFullYear()} YAPILAPI</span>
+      </footer>
     </div>
   );
 }

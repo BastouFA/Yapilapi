@@ -35,6 +35,7 @@ import type {
   EditPostInput,
   Profile,
   PublicCommunityPreview,
+  PublicSitemap,
   PublicEventPreview,
   PublicPostPreview,
   PublicProfilePreview,
@@ -810,6 +811,7 @@ export function createClient(opts: ClientOptions) {
       user: (username: string) => get<{ profile: PublicProfilePreview }>(`/v1/public/users/${encodeURIComponent(username)}`),
       event: (id: string) => get<{ event: PublicEventPreview }>(`/v1/public/events/${encodeURIComponent(id)}`),
       community: (slug: string) => get<{ community: PublicCommunityPreview }>(`/v1/public/communities/${encodeURIComponent(slug)}`),
+      sitemap: () => get<PublicSitemap>('/v1/public/sitemap'),
     },
     passkeys: {
       list: () => get<{ items: { id: string; label: string; created_at: string; last_used_at: string | null; backed_up: boolean }[] }>('/v1/auth/passkeys'),

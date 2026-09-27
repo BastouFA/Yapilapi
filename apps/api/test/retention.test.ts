@@ -371,4 +371,30 @@ describe('your data', () => {
     );
     expect(left.rows[0]).toEqual({ cf: 0, s: 0 });
   });
+
+  it('removes the files of a deleted account from storage, but not the private files of digital products', async () => {
+    const owner = await adult();
+    const key = `2026/09/${crypto.randomUUID()}.jpg`;
+    const stored = await t.ctx.storage.putKey(key, Buffer.from('photo'), 'image/jpeg');
+    const productKey = `private/${crypto.randomUUID()}.pdf`;
+    await t.ctx.storage.putKey(productKey, Buffer.from('ebook'), 'application/pdf');
+    await t.ctx.db.query(
+      `INSERT INTO media (owner_id, kind, url, mime, status, storage_key) VALUES ($1, 'image', $2, 'image/jpeg', 'ready', $3),
+                                                                            ($1, 'image', '', 'application/pdf', 'ready', $4)`,
+      [owner.id, stored.url, key, productKey],
+    );
+    await t.ctx.db.query(`UPDATE media SET private = true WHERE storage_key = $1`, [productKey]);
+    expect((await as(t.app, owner).del('/v1/me', { password: owner.password })).status).toBe(200);
+    // Files go in the background, just after the answer.
+    let gone = false;
+    for (let i = 0; i < 40 && !gone; i++) {
+      gone = await t.ctx.storage.read(key).then(
+        () => false,
+        () => true,
+      );
+      if (!gone) await new Promise((r) => setTimeout(r, 50));
+    }
+    expect(gone).toBe(true);
+    expect((await t.ctx.storage.read(productKey)).toString()).toBe('ebook');
+  });
 });

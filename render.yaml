@@ -180,3 +180,18 @@ services:
         value: wss://yapilapi-api.onrender.com/v1/realtime
       - key: SITE_URL
         value: https://yapilapi-web.onrender.com
+      # Shown on the legal pages (/legal), read when a page is requested. Set them before launch.
+      - key: LEGAL_ENTITY_NAME
+        sync: false
+      - key: LEGAL_ADDRESS
+        sync: false
+      - key: LEGAL_JURISDICTION
+        sync: false
+      - key: SUPPORT_EMAIL
+        sync: false
+      - key: PRIVACY_EMAIL
+        sync: false
+      - key: COPYRIGHT_EMAIL
+        sync: false
+      - key: SAFETY_EMAIL
+        sync: false

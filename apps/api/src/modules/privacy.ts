@@ -5,6 +5,7 @@ import { consentSchema } from '@yapilapi/shared';
 import { z } from 'zod';
 import { badRequest, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
+import { storedKeys } from '../lib/chat.ts';
 import { audit, securityEvent } from '../lib/services.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
@@ -96,6 +97,9 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
     const { password } = parse(z.object({ password: z.string().min(1) }), req.body);
     const { rows } = await db.query(`SELECT password_hash FROM users WHERE id = $1`, [u.id]);
     if (!(await verifyPassword(password, rows[0]?.password_hash))) throw badRequest('Your password is incorrect.', { fields: { password: 'Incorrect.' } });
+    // The files behind their photos, videos and voice notes (not the private files of digital
+    // products they sold, which buyers paid for). Removed from storage once the account is gone.
+    const { rows: files } = await db.query(`SELECT url, poster_url, hls_url, variants, storage_key FROM media WHERE owner_id = $1 AND NOT private`, [u.id]);
     await tx(db, async (c) => {
       await c.query(
         `UPDATE users SET status = 'deleted', deleted_at = now(), email = 'deleted+' || id || '@deleted.invalid', password_hash = NULL, birth_date = NULL,
@@ -118,7 +122,9 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         [u.id],
       );
       await c.query(`UPDATE messages SET deleted_at = now(), body = '', attachments = '[]' WHERE sender_id = $1 AND deleted_at IS NULL`, [u.id]);
-      await c.query(`UPDATE moments SET deleted_at = now() WHERE author_id = $1`, [u.id]);
+      await c.query(`UPDATE moments SET deleted_at = coalesce(deleted_at, now()), body = '', media_url = NULL, location_text = NULL WHERE author_id = $1`, [
+        u.id,
+      ]);
       for (const sql of [
         `DELETE FROM follows WHERE follower_id = $1 OR followee_id = $1`,
         `DELETE FROM friendships WHERE user_a = $1 OR user_b = $1`,
@@ -129,6 +135,9 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         `DELETE FROM circle_members WHERE user_id = $1`,
         `DELETE FROM user_interests WHERE user_id = $1`,
         `DELETE FROM ai_memories WHERE user_id = $1`,
+        // Nothing can reach this phone or browser any more, and nobody can sign in with these.
+        `DELETE FROM push_subscriptions WHERE user_id = $1`,
+        `DELETE FROM passkeys WHERE user_id = $1`,
         `DELETE FROM media WHERE owner_id = $1`,
         `UPDATE conversation_members SET left_at = now() WHERE user_id = $1`,
         `UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`,
@@ -138,6 +147,12 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       await securityEvent(c, u.id, 'account_deleted', req.ip);
       await audit(c, { actorId: u.id, action: 'account.delete', entityType: 'user', entityId: u.id, ip: req.ip, requestId: req.id });
     });
+    // In the background: many files can take a while, and a file that fails to go is only logged.
+    void (async () => {
+      for (const f of files)
+        for (const key of storedKeys(f))
+          await ctx.storage.remove?.(key).catch((err: unknown) => req.log.warn({ err, key }, 'could not remove a deleted account’s file'));
+    })();
     reply.clearCookie(SESSION_COOKIE, { path: '/' });
     return { ok: true };
   });
