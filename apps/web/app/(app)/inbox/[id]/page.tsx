@@ -32,6 +32,7 @@ import { SmartReplyChips } from '@/components/AiHelpers';
 import { ListSheet, ListView, PollSheet, PollView, ReminderNote, ReminderSheet } from '@/components/ChatPolls';
 import { ChatLookSheet, chatThemeClass, chatThemeVars, ScheduledList, ScheduleSheet, useScheduled } from '@/components/ChatLater';
 import { useChatWatch, WatchBanner } from '@/components/WatchTogether';
+import { GameCard, GameSheet, StartGameSheet } from '@/components/ChatGames';
 
 type Pending = Message & { pending?: boolean };
 
@@ -87,6 +88,9 @@ export default function ChatPage() {
       setStartingWatch(false);
     }
   }
+  // Games: the sheet to start one, and the board that's open (by its card's message id, so live updates show in it).
+  const [gameStartOpen, setGameStartOpen] = useState(false);
+  const [boardFor, setBoardFor] = useState<string | null>(null);
 
   const loadPins = () =>
     api.conversations.pins(id).then(
@@ -189,8 +193,10 @@ export default function ChatPage() {
         story: undefined,
         poll: undefined,
         list: undefined,
+        game: undefined,
         reminder: undefined,
       }));
+      if (boardFor === e.data.id) setBoardFor(null);
       setMessages(
         (cur) =>
           cur?.map((x) => (x.replyTo && x.replyTo.id === e.data.id ? { ...x, replyTo: { ...x.replyTo, unsent: true, body: '', attachmentKind: null } } : x)) ??
@@ -206,6 +212,12 @@ export default function ChatPage() {
     // Live poll results and list changes, each as you see them; your next reminder on a message.
     if (e.type === 'poll.updated' && e.data.conversationId === id) patchMessage(e.data.id, (x) => (x.unsent ? x : { ...x, poll: e.data.poll }));
     if (e.type === 'list.updated' && e.data.conversationId === id) patchMessage(e.data.id, (x) => (x.unsent ? x : { ...x, list: e.data.list }));
+    // A move, a forfeit or the end of a game: the card and any open board follow.
+    if (e.type === 'game.updated' && e.data.conversationId === id)
+      patchMessage(e.data.id, (x) =>
+        // An older update arriving late never winds the board back.
+        x.unsent || (x.game && x.game.moveNumber > e.data.game.moveNumber) ? x : { ...x, game: e.data.game },
+      );
     if (e.type === 'message.reminder' && e.data.conversationId === id) patchMessage(e.data.id, (x) => ({ ...x, reminder: e.data.reminder ?? undefined }));
     if (e.type === 'conversation.updated' && e.data.id === id) setConv((c) => (c ? { ...c, disappearingSeconds: e.data.disappearingSeconds } : c));
     // Someone changed the wallpaper or bubble colour: everyone sees the same.
@@ -393,6 +405,7 @@ export default function ChatPage() {
       !m.viewOnce &&
       !m.poll &&
       !m.list &&
+      !m.game &&
       !m.unsent &&
       !m.pending &&
       Date.now() - new Date(m.createdAt).getTime() < MESSAGE_EDIT_MINUTES * 60_000;
@@ -617,6 +630,8 @@ export default function ChatPage() {
               <PollView message={m} meId={me?.id} mine={mine} onPoll={(poll) => patchMessage(m.id, (x) => ({ ...x, poll }))} />
             ) : m.list ? (
               <ListView message={m} meId={me?.id} mine={mine} onList={(list) => patchMessage(m.id, (x) => ({ ...x, list }))} />
+            ) : m.game ? (
+              <GameCard message={m} meId={me?.id} mine={mine} onOpen={() => setBoardFor(m.id)} />
             ) : m.viewOnce ? (
               <>
                 <ViewOnceMessage message={m} mine={mine} onChange={(next) => setMessages((cur) => cur?.map((x) => (x.id === next.id ? next : x)) ?? cur)} />
@@ -765,7 +780,13 @@ export default function ChatPage() {
                     body: replyTo.body,
                     attachmentKind: replyTo.attachments[0]?.kind ?? replyTo.viewOnce?.kind ?? null,
                     createdAt: replyTo.createdAt,
-                    ...(replyTo.poll ? { kind: 'poll' as const } : replyTo.list ? { kind: 'list' as const } : {}),
+                    ...(replyTo.poll
+                      ? { kind: 'poll' as const }
+                      : replyTo.list
+                        ? { kind: 'list' as const }
+                        : replyTo.game
+                          ? { kind: 'game' as const, gameKind: replyTo.game.kind }
+                          : {}),
                   })}
                 </span>
               ) : null}
@@ -812,6 +833,7 @@ export default function ChatPage() {
           actions={[
             { label: t('m.chat.poll.new'), icon: 'poll', onSelect: () => setPollOpen(true) },
             { label: t('m.chat.list.new'), icon: 'check-circle', onSelect: () => setListOpen(true) },
+            ...(conv && conv.kind !== 'community' ? [{ label: t('m.chat.game.new'), icon: 'game' as const, onSelect: () => setGameStartOpen(true) }] : []),
           ]}
         />
         <button type="button" className="yp-action" aria-label={t('m.chat.sendPhoto')} disabled={!!uploading} onClick={() => fileInput.current?.click()}>
@@ -918,6 +940,26 @@ export default function ChatPage() {
       <ReportSheet target={reportId ? { type: 'message', id: reportId } : null} onClose={() => setReportId(null)} />
       <PollSheet open={pollOpen} onClose={() => setPollOpen(false)} conversationId={id} onSent={addMessage} />
       <ListSheet open={listOpen} onClose={() => setListOpen(false)} conversationId={id} onSent={addMessage} />
+      <StartGameSheet
+        open={gameStartOpen}
+        onClose={() => setGameStartOpen(false)}
+        conversation={conv}
+        meId={me?.id}
+        onSent={(m) => {
+          addMessage(m);
+          setBoardFor(m.id);
+        }}
+      />
+      <GameSheet
+        game={messages?.find((m) => m.id === boardFor)?.game ?? null}
+        meId={me?.id}
+        onClose={() => setBoardFor(null)}
+        onGame={(game) => patchMessage(game.messageId, (x) => ({ ...x, game }))}
+        onRematch={(m) => {
+          addMessage(m);
+          setBoardFor(m.id);
+        }}
+      />
       <ReminderSheet
         message={remindFor?.message ?? null}
         scope={remindFor?.scope ?? 'me'}

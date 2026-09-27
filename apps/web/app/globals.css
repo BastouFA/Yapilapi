@@ -3849,6 +3849,279 @@ span.cam__icon {
   gap: var(--space-2);
 }
 
+/* Menus in the message box (add a poll, list or game; view once) open upwards from the start edge:
+   the box sits at the bottom of the screen, near the start edge. */
+.yp-composer .yp-menu__list {
+  top: auto;
+  bottom: calc(100% + 6px);
+  inset-inline-start: 0;
+  inset-inline-end: auto;
+  max-inline-size: calc(100vw - 32px);
+}
+/* ── Chat: games (Four up, Noughts, Word ladder) ──────────────────────── */
+.chat-game {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: min(240px, 60vw);
+  white-space: normal;
+}
+.chat-game__name {
+  font: 700 16px/22px var(--font-sans);
+}
+/* The board picture sits on its own panel, so it reads the same in anyone's bubble colour. */
+.chat-game__preview {
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.chat-game__status {
+  margin: 0;
+  font: 700 14px/20px var(--font-sans);
+}
+.chat-game__mini {
+  display: grid;
+  gap: 3px;
+}
+.chat-game__mini--four_up {
+  inline-size: 154px;
+}
+.chat-game__mini--noughts {
+  inline-size: 84px;
+}
+.chat-game__mini .game-piece--four_up {
+  inline-size: 19px;
+  block-size: 19px;
+}
+.chat-game__mini .game-piece--noughts {
+  display: grid;
+  place-items: center;
+  inline-size: 26px;
+  block-size: 26px;
+  border-radius: 6px;
+  background: var(--surface-sunken);
+  font: 800 16px/1 var(--font-sans);
+}
+.chat-game__ladder-mini {
+  font: 700 14px/20px var(--font-mono);
+  letter-spacing: 0.04em;
+}
+.game-piece {
+  display: block;
+  flex: none;
+}
+.game-piece--four_up {
+  inline-size: 36px;
+  block-size: 36px;
+  border-radius: 50%;
+}
+.game-piece--four_up.game-piece--empty {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+/* Seat 1 has a dark ring as well as its colour, so the two players differ by more than colour. */
+.game-piece--four_up.game-piece--p0 {
+  background: var(--yapi);
+}
+.game-piece--four_up.game-piece--p1 {
+  background: var(--saffron);
+  box-shadow: inset 0 0 0 3px var(--ink);
+}
+.game-piece--four_up.game-piece--last {
+  outline: 2px dashed var(--ink-muted);
+  outline-offset: 1px;
+}
+.game-piece--four_up.game-piece--line,
+.game-piece--noughts.game-piece--line {
+  outline: 3px solid var(--ink);
+  outline-offset: 1px;
+}
+.game-piece--noughts.game-piece--p0 {
+  color: var(--yapi);
+}
+.game-piece--noughts.game-piece--p1 {
+  color: var(--ink);
+}
+.game-piece--legend.game-piece--four_up {
+  inline-size: 16px;
+  block-size: 16px;
+}
+.game-piece--legend.game-piece--noughts {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 20px;
+  font: 800 16px/1 var(--font-sans);
+}
+.chat-game__players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chat-game__players li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+.chat-game__player--turn {
+  background: var(--yapi-soft);
+  font-weight: 700;
+}
+.chat-game__live {
+  margin: 0;
+  font-size: 15px;
+  line-height: 22px;
+}
+.game-board {
+  align-self: center;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--surface-sunken);
+}
+.game-board__row {
+  display: flex;
+  gap: 4px;
+}
+.game-board--noughts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.game-column {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-inline-size: 44px;
+  padding: 4px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+  align-items: center;
+}
+.game-column[aria-disabled='true'] {
+  cursor: default;
+}
+.game-column:not([aria-disabled='true']):hover {
+  background: var(--yapi-soft);
+}
+.game-column:focus-visible,
+.game-square:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.game-square {
+  display: grid;
+  place-items: center;
+  inline-size: 72px;
+  block-size: 72px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.game-square[aria-disabled='true'] {
+  cursor: default;
+}
+.game-square:not([aria-disabled='true']):hover {
+  background: var(--yapi-soft);
+}
+.game-square--line {
+  background: var(--yapi-soft);
+  border: 3px solid var(--ink);
+}
+.game-mark {
+  font: 800 40px/1 var(--font-sans);
+}
+.game-mark--p0 {
+  color: var(--yapi);
+}
+.game-mark--p1 {
+  color: var(--ink);
+}
+.chat-game__ends {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font: 700 18px/24px var(--font-mono);
+}
+.chat-game__rungs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-block-size: 220px;
+  margin: 0;
+  padding-inline-start: 28px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+}
+.chat-game__rungs .muted {
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+.chat-game-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+.chat-game-option--on {
+  border-color: var(--yapi);
+  background: var(--yapi-soft);
+}
+.chat-game-option input,
+.chat-game-person input {
+  flex: none;
+  inline-size: 18px;
+  block-size: 18px;
+  margin-block-start: 2px;
+  accent-color: var(--yapi);
+}
+.chat-game-option:has(input:disabled) {
+  opacity: 0.7;
+  cursor: default;
+}
+.chat-game-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  cursor: pointer;
+}
+/* Phones: columns stay 44px wide; the gaps get smaller. */
+@media (max-width: 400px) {
+  .game-board {
+    padding: 4px;
+  }
+  .game-board__row {
+    gap: 2px;
+  }
+  .game-piece--four_up {
+    inline-size: 34px;
+    block-size: 34px;
+  }
+  .game-column {
+    min-inline-size: 44px;
+    padding: 3px;
+  }
+  .game-square {
+    inline-size: 64px;
+    block-size: 64px;
+  }
+}
+
 /* ── Chapters and the story archive ─────────────────────────────────── */
 .chapters {
   display: grid;

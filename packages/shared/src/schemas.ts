@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { DATA_SAVER_MODES } from './data-saver.ts';
 import { CHAT_ACCENTS, CHAT_WALLPAPERS } from './chat-theme.ts';
+import { GAME_KINDS, GAME_PLAYERS } from './games/types.ts';
 import { USERNAME_PROBLEM_MESSAGES, usernameProblem } from './usernames.ts';
 import { REEL_LONGEST_MS, reelHighlightsSchema } from './reels.ts';
 import { MAX_UNDERSTOOD_LANGUAGES, TRANSLATABLE_KINDS, TRANSLATION_LANGUAGE_CODES } from './translation.ts';
@@ -494,6 +495,32 @@ export const chatListItemSchema = z.object({ text: z.string().trim().min(1).max(
 export const chatListItemPatchSchema = z.object({ done: z.boolean() });
 /** Every item of the list, in the new order. */
 export const chatListOrderSchema = z.object({ itemIds: z.array(uuid).min(1).max(CHAT_LIST_MAX_ITEMS) });
+/**
+ * A game in a chat. In a one-to-one chat you play the other person; in a group you choose who
+ * plays with you (one person for Four up and Noughts, up to five for Word ladder).
+ */
+export const createChatGameSchema = z.object({
+  kind: z.enum(GAME_KINDS),
+  playerIds: z
+    .array(uuid)
+    .max(GAME_PLAYERS.word_ladder.max - 1)
+    .default([]),
+  clientId: z.string().max(64).optional(),
+});
+/**
+ * One move. `moveNumber` is the game's move number you saw (a board that moved on since is refused),
+ * and `clientMoveId` is new for each move you mean, the same when you retry it (a retry isn't played twice).
+ */
+export const chatGameMoveSchema = z.object({
+  moveNumber: z.number().int().min(0).max(10_000),
+  clientMoveId: uuid,
+  move: z.union([
+    z.object({ column: z.number().int().min(0).max(6) }).strict(),
+    z.object({ cell: z.number().int().min(0).max(8) }).strict(),
+    z.object({ word: z.string().trim().min(1).max(20) }).strict(),
+    z.object({ pass: z.literal(true) }).strict(),
+  ]),
+});
 /** "Remind me" (just you) or "Remind the group" (group admins), at a time from a minute to a year ahead. */
 export const chatReminderSchema = z.object({
   at: z.string().datetime({ offset: true }),

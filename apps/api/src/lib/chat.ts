@@ -6,6 +6,7 @@ import type { MediaStorage } from './storage.ts';
 import { endViewOnce } from './view-once.ts';
 import { usersByIds } from './users.ts';
 import { chatPollJobHandlers } from './chat-polls.ts';
+import { chatGameJobHandlers } from './chat-games.ts';
 
 type Q = Pool | PoolClient;
 
@@ -46,7 +47,9 @@ export async function messagePreviews(db: Q, ids: string[], readerId: string): P
             m.moderation_status, m.kind, (m.expires_at IS NOT NULL AND m.expires_at <= now()) AS expired,
             EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $2 AND b.blocked_id = m.sender_id) AS blocked,
             CASE WHEN EXISTS (SELECT 1 FROM chat_polls p WHERE p.message_id = m.id) THEN 'poll'
-                 WHEN EXISTS (SELECT 1 FROM chat_lists l WHERE l.message_id = m.id) THEN 'list' END AS rich_kind
+                 WHEN EXISTS (SELECT 1 FROM chat_lists l WHERE l.message_id = m.id) THEN 'list'
+                 WHEN EXISTS (SELECT 1 FROM chat_games g WHERE g.message_id = m.id) THEN 'game' END AS rich_kind,
+            (SELECT g.kind FROM chat_games g WHERE g.message_id = m.id) AS game_kind
      FROM messages m WHERE m.id = ANY($1::uuid[])`,
     [unique, readerId],
   );
@@ -65,7 +68,13 @@ export async function messagePreviews(db: Q, ids: string[], readerId: string): P
       r.id,
       r.unsent_at
         ? { ...base, unsent: true, body: '', attachmentKind: null }
-        : { ...base, body: r.body, attachmentKind: r.attachment_kind ?? null, ...(r.rich_kind ? { kind: r.rich_kind } : {}) },
+        : {
+            ...base,
+            body: r.body,
+            attachmentKind: r.attachment_kind ?? null,
+            ...(r.rich_kind ? { kind: r.rich_kind } : {}),
+            ...(r.game_kind ? { gameKind: r.game_kind } : {}),
+          },
     );
   }
   return out;
@@ -175,5 +184,7 @@ export function chatJobHandlers(deps: ChatDeps & { realtime: RealtimeHub }) {
     },
     // Polls that end at a set time, and reminders.
     ...chatPollJobHandlers(deps),
+    // Games nobody moved in for a day end unfinished.
+    ...chatGameJobHandlers(deps),
   };
 }

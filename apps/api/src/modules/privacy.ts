@@ -107,6 +107,9 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
          FROM ask_questions WHERE recipient_id = $1 AND deleted_at IS NULL AND (moderation_status = 'normal' OR answered_at IS NOT NULL) ORDER BY created_at DESC`,
       ),
       questionBlocks: await q(`SELECT question_id, created_at FROM ask_blocks WHERE recipient_id = $1 ORDER BY created_at DESC`),
+      chatGames: await q(
+        `SELECT conversation_id, kind, status, winner_id = $1 AS won, created_at, ended_at FROM chat_games WHERE $1 = ANY(players) ORDER BY created_at DESC`,
+      ),
     };
     await db.query(`INSERT INTO privacy_requests (user_id, kind, status, completed_at) VALUES ($1,'export','completed',now())`, [u.id]);
     reply.header('content-disposition', `attachment; filename="yapilapi-export-${u.id}.json"`);

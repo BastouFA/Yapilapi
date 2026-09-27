@@ -100,6 +100,14 @@ const PATHS = {
   switch: ['M4 8h14', 'M15 5l3 3-3 3', 'M20 16H6', 'M9 13l-3 3 3 3'],
   /** A clock face: send later, times. */
   clock: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'M12 7v5l3.5 2'],
+  /** A game controller: games in chats. */
+  game: [
+    'M7 8h10a4 4 0 0 1 4 4v1.5a3 3 0 0 1-5.4 1.8L14.5 14h-5l-1.1 1.3A3 3 0 0 1 3 13.5V12a4 4 0 0 1 4-4z',
+    'M8 10.5v3',
+    'M6.5 12h3',
+    'M15.5 11h.01',
+    'M17.5 13h.01',
+  ],
 } as const;
 
 export type IconName = keyof typeof PATHS | NavGlyphName;

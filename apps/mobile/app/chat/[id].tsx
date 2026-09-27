@@ -47,6 +47,7 @@ import {
 import { TranslatableText } from '../../lib/translation';
 import { useReport } from '../../lib/report';
 import { ListCard, ListComposer, PollCard, PollComposer, ReminderNote, ReminderPicker } from '../../lib/chat-polls';
+import { GameCard, GameSheet, StartGameSheet } from '../../lib/chat-games';
 import { accentFor, ChatLookSheet, ChatWallpaperView, laterLimits, ScheduledList, useScheduled } from '../../lib/chat-later';
 import { DateTimeSheet } from '../../lib/date-time';
 import { chatTheme, type AccentColors } from '../../../../packages/shared/src/chat-theme';
@@ -92,6 +93,9 @@ export default function Chat() {
   const [addOpen, setAddOpen] = useState(false);
   const [pollOpen, setPollOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
+  // Games: the sheet to start one, and the board that's open (by its card's message id, so live updates show in it).
+  const [gameStartOpen, setGameStartOpen] = useState(false);
+  const [boardFor, setBoardFor] = useState<string | null>(null);
   const [remindFor, setRemindFor] = useState<{ message: Message; scope: 'me' | 'group' } | null>(null);
   // Send later (touch and hold Send), your messages waiting here, and the chat's wallpaper and colour.
   const scheduled = useScheduled(id);
@@ -163,8 +167,10 @@ export default function Chat() {
         story: undefined,
         poll: undefined,
         list: undefined,
+        game: undefined,
         reminder: undefined,
       }));
+      setBoardFor((cur) => (cur === e.data.id ? null : cur));
       setMessages((cur) =>
         cur.map((x) => (x.replyTo && x.replyTo.id === e.data.id ? { ...x, replyTo: { ...x.replyTo, unsent: true, body: '', attachmentKind: null } } : x)),
       );
@@ -178,6 +184,9 @@ export default function Chat() {
     // Live poll results and list changes, each as you see them; your next reminder on a message.
     if (e.type === 'poll.updated' && e.data?.conversationId === id) patchMessage(e.data.id, (x) => (x.unsent ? x : { ...x, poll: e.data.poll }));
     if (e.type === 'list.updated' && e.data?.conversationId === id) patchMessage(e.data.id, (x) => (x.unsent ? x : { ...x, list: e.data.list }));
+    // A move, a forfeit or the end of a game: the card and any open board follow. An older update arriving late never winds the board back.
+    if (e.type === 'game.updated' && e.data?.conversationId === id)
+      patchMessage(e.data.id, (x) => (x.unsent || (x.game && x.game.moveNumber > e.data.game.moveNumber) ? x : { ...x, game: e.data.game }));
     if (e.type === 'message.reminder' && e.data?.conversationId === id) patchMessage(e.data.id, (x) => ({ ...x, reminder: e.data.reminder ?? undefined }));
     if (e.type === 'conversation.updated' && e.data?.id === id)
       setConversation((cur) => (cur ? { ...cur, disappearingSeconds: e.data.disappearingSeconds } : cur));
@@ -517,7 +526,14 @@ export default function Chat() {
   function sheetActions(m: Message): SheetAction[] {
     const mine = m.sender.id === me?.id;
     const editable =
-      mine && !m.kind && !m.viewOnce && !m.poll && !m.list && !m.unsent && Date.now() - new Date(m.createdAt).getTime() < MESSAGE_EDIT_MINUTES * 60_000;
+      mine &&
+      !m.kind &&
+      !m.viewOnce &&
+      !m.poll &&
+      !m.list &&
+      !m.game &&
+      !m.unsent &&
+      Date.now() - new Date(m.createdAt).getTime() < MESSAGE_EDIT_MINUTES * 60_000;
     const out: SheetAction[] = [];
     if (!m.unsent) out.push({ label: t('m.chat.reply'), icon: 'arrow-undo-outline', onPress: () => startReply(m) });
     if (editable) out.push({ label: t('m.chat.edit'), icon: 'create-outline', onPress: () => startEdit(m) });
@@ -631,8 +647,8 @@ export default function Chat() {
   }
 
   // Stable handlers for the memoised rows; they call this render's functions.
-  const latest = useRef({ jumpTo, setActionsFor, startReply, react, patchMessage, replaceMessage });
-  latest.current = { jumpTo, setActionsFor, startReply, react, patchMessage, replaceMessage };
+  const latest = useRef({ jumpTo, setActionsFor, startReply, react, patchMessage, replaceMessage, setBoardFor });
+  latest.current = { jumpTo, setActionsFor, startReply, react, patchMessage, replaceMessage, setBoardFor };
   const rowHandlers = useMemo<RowHandlers>(
     () => ({
       jumpTo: (mid) => void latest.current.jumpTo(mid),
@@ -641,6 +657,7 @@ export default function Chat() {
       react: (m, emoji, on) => void latest.current.react(m, emoji, on),
       patchMessage: (mid, fn) => latest.current.patchMessage(mid, fn),
       replaceMessage: (m) => latest.current.replaceMessage(m),
+      openGame: (mid) => latest.current.setBoardFor(mid),
     }),
     [],
   );
@@ -1092,7 +1109,30 @@ export default function Chat() {
         actions={[
           { label: t('m.chat.poll.new'), icon: 'stats-chart-outline', onPress: () => setPollOpen(true) },
           { label: t('m.chat.list.new'), icon: 'checkbox-outline', onPress: () => setListOpen(true) },
+          ...(conversation && conversation.kind !== 'community'
+            ? [{ label: t('m.chat.game.new'), icon: 'game-controller-outline' as const, onPress: () => setGameStartOpen(true) }]
+            : []),
         ]}
+      />
+      <StartGameSheet
+        open={gameStartOpen}
+        onClose={() => setGameStartOpen(false)}
+        conversation={conversation}
+        meId={me?.id}
+        onSent={(m) => {
+          setMessages((cur) => (cur.some((x) => x.id === m.id) ? cur : [...cur, m]));
+          setBoardFor(m.id);
+        }}
+      />
+      <GameSheet
+        game={messages.find((m) => m.id === boardFor)?.game ?? null}
+        meId={me?.id}
+        onClose={() => setBoardFor(null)}
+        onGame={(game) => patchMessage(game.messageId, (x) => ({ ...x, game }))}
+        onRematch={(m) => {
+          setMessages((cur) => (cur.some((x) => x.id === m.id) ? cur : [...cur, m]));
+          setBoardFor(m.id);
+        }}
       />
       <PollComposer
         open={pollOpen}
@@ -1150,6 +1190,7 @@ interface RowHandlers {
   react: (m: Message, emoji: string, on: boolean) => void;
   patchMessage: (id: string, fn: (m: Message) => Message) => void;
   replaceMessage: (m: Message) => void;
+  openGame: (messageId: string) => void;
 }
 
 /** One message: its bubble (yours at the end edge), reactions, and swipe to reply. */
@@ -1176,7 +1217,7 @@ const MessageRow = memo(function MessageRow({
   const c = useColors();
   const { t } = useT();
   if (item.kind === 'system') return <SystemLine message={item} meId={meId} onJump={h.jumpTo} watchLive={watchLive} />;
-  const rich = !item.unsent && (item.poll || item.list);
+  const rich = !item.unsent && (item.poll || item.list || item.game);
   const text = item.unsent
     ? t(mine ? 'm.chat.unsentMine' : 'm.chat.unsent')
     : rich
@@ -1191,6 +1232,8 @@ const MessageRow = memo(function MessageRow({
     <PollCard message={item} meId={meId} tint={tint} onPoll={(poll) => h.patchMessage(item.id, (x) => ({ ...x, poll }))} />
   ) : item.list ? (
     <ListCard message={item} meId={meId} tint={tint} onList={(l) => h.patchMessage(item.id, (x) => ({ ...x, list: l }))} />
+  ) : item.game ? (
+    <GameCard message={item} meId={meId} tint={tint} onOpen={() => h.openGame(item.id)} />
   ) : item.viewOnce ? (
     <ViewOnceBubble message={item} mine={mine} tint={tint} onChange={h.replaceMessage} />
   ) : (
@@ -1231,8 +1274,8 @@ const MessageRow = memo(function MessageRow({
         {showSender ? <Text style={[{ color: c.yapi, fontSize: 12, fontWeight: '700' }, userText]}>{item.sender.displayName}</Text> : null}
         {quote}
         {media}
-        {item.body && !item.unsent ? (
-          // Their text, with "See translation" when it's in a language you don't understand.
+        {item.body && !item.unsent && !rich ? (
+          // Their text, with "See translation" when it's in a language you don't understand. (A poll, list or game shows its own.)
           <TranslatableText kind="message" id={item.id} text={item.body} lang={item.lang} rich={false} style={{ color: c.ink, fontSize: 15, lineHeight: 21 }} />
         ) : text ? (
           <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 21 }, userText, textStyle]}>{text}</Text>

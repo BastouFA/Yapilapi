@@ -43,6 +43,8 @@ import { mediaIdsOf, messagePreviews, messageVisibleSql, reactionSummaries, revo
 import { langOf } from '../lib/translation.ts';
 import { listsFor, myReminders, pollsFor } from '../lib/chat-polls.ts';
 import { registerChatPollsLists } from './chat-polls-lists.ts';
+import { gamesFor } from '../lib/chat-games.ts';
+import { registerChatGames } from './chat-games.ts';
 import { registerChatLater } from './chat-later.ts';
 import { registerWatch } from './watch.ts';
 
@@ -384,6 +386,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const live = items.filter((m) => !m.unsent && m.kind !== 'system').map((m) => m.id);
     const polls = await pollsFor(db, live, [reader]);
     const lists = await listsFor(db, live, [reader]);
+    const games = await gamesFor(db, live);
     const reminders = await myReminders(db, live, reader);
     return items.map((m) => {
       const out: Message = { ...m };
@@ -393,6 +396,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       if (poll) out.poll = poll;
       const list = lists(m.id, reader);
       if (list) out.list = list;
+      const game = games.get(m.id);
+      if (game) out.game = game;
       if (reminders.has(m.id)) out.reminder = reminders.get(m.id);
       const reminded = remindedOf(m);
       if (reminded && m.system?.type === 'reminder') out.system = { ...m.system, message: previews.get(reminded) ?? null };
@@ -420,7 +425,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       await db.query(
         `SELECT id, conversation_id, sender_id, kind, body, attachments, story_id, view_once, created_at, deleted_at, unsent_at, moderation_status, expires_at,
                 (created_at > now() - make_interval(mins => $2)) AS editable,
-                EXISTS (SELECT 1 FROM chat_polls p WHERE p.message_id = messages.id) OR EXISTS (SELECT 1 FROM chat_lists l WHERE l.message_id = messages.id) AS rich
+                EXISTS (SELECT 1 FROM chat_polls p WHERE p.message_id = messages.id) OR EXISTS (SELECT 1 FROM chat_lists l WHERE l.message_id = messages.id)
+                  OR EXISTS (SELECT 1 FROM chat_games g WHERE g.message_id = messages.id) AS rich
          FROM messages WHERE id = $1`,
         [messageId, MESSAGE_EDIT_MINUTES],
       )
@@ -737,9 +743,10 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       if (!r.rowCount) return null;
       await c.query(`DELETE FROM message_edits WHERE message_id = $1`, [messageId]);
       await c.query(`DELETE FROM message_reactions WHERE message_id = $1`, [messageId]);
-      // A poll or list goes with it (votes and items too), and nobody gets reminded about it.
+      // A poll, list or game goes with it (votes, items and moves too), and nobody gets reminded about it.
       await c.query(`DELETE FROM chat_polls WHERE message_id = $1`, [messageId]);
       await c.query(`DELETE FROM chat_lists WHERE message_id = $1`, [messageId]);
+      await c.query(`DELETE FROM chat_games WHERE message_id = $1`, [messageId]);
       await c.query(`DELETE FROM chat_reminders WHERE message_id = $1 AND sent_at IS NULL`, [messageId]);
       return (await c.query(`DELETE FROM conversation_pins WHERE message_id = $1`, [messageId])).rowCount ?? 0;
     });
@@ -1103,6 +1110,17 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
   };
   registerChatPollsLists(app, ctx, chatHelpers);
   registerWatch(app, ctx, chatHelpers);
+
+  // Games in chats (modules/chat-games.ts).
+  registerChatGames(app, ctx, {
+    assertMember,
+    memberIds,
+    notBlocking,
+    assertCanMessage,
+    assertGroupSafe,
+    messageFor: (messageId, userId) => messageFor(messageId, userId),
+    loadMessage,
+  });
 
   // Send later, and chat wallpapers and colours (modules/chat-later.ts).
   registerChatLater(app, ctx, { assertMember, memberIds, loadMessage, sendMessage });

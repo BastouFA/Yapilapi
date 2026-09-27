@@ -6,6 +6,7 @@ import type { ReelHighlight } from './reels.ts';
 import type { ProfileStyle, ProfileTab } from './profile-style.ts';
 import type { ChatTheme } from './chat-theme.ts';
 import type { ProfileAskBox, QuotedQuestion } from './ask.ts';
+import type { GameKind, GameState } from './games/types.ts';
 import type {
   BoardVisibility,
   CircleKind,
@@ -470,8 +471,10 @@ export interface MessagePreview {
   /** The first attachment's kind ('image', 'video', 'audio'), for "Photo" or "Voice message". */
   attachmentKind: string | null;
   createdAt: string | null;
-  /** A poll (body is its question) or a shared list (body is its title). */
-  kind?: 'poll' | 'list';
+  /** A poll (body is its question), a shared list (body is its title) or a game (see `gameKind`). */
+  kind?: 'poll' | 'list' | 'game';
+  /** Which game, when `kind` is 'game'. */
+  gameKind?: GameKind;
 }
 
 export interface PinnedMessage {
@@ -511,6 +514,17 @@ export type MessageSystemInfo =
       /** "Watch together" started here. The sender started it; the session may have ended since. */
       type: 'watch';
       sessionId: string;
+    }
+  | {
+      /**
+       * A game in the chat ended. 'won': the sender won ("Ada won Four up"), by playing or because
+       * the others forfeited. 'draw' and 'unfinished' (a day without a move): the sender made the last move.
+       */
+      type: 'game';
+      gameId: string;
+      kind: GameKind;
+      outcome: 'won' | 'draw' | 'unfinished';
+      by?: 'play' | 'forfeit';
     };
 
 /** One option of a poll in a chat. */
@@ -564,6 +578,37 @@ export interface ChatList {
   createdBy: string;
   /** Items allowed (100). */
   max: number;
+}
+
+/**
+ * A game in a chat (Four up, Noughts or Word ladder), as everyone in the chat sees it. It shows as a
+ * message whose card opens the board. `state` is the board as the shared rules in
+ * packages/shared/src/games describe it; players sit in `players` order (seat 0 started it).
+ */
+export interface ChatGame {
+  id: string;
+  /** The game's card in the chat. */
+  messageId: string;
+  conversationId: string;
+  kind: GameKind;
+  players: PublicUser[];
+  state: GameState;
+  /** Moves so far (forfeits count). Send it with your next move. */
+  moveNumber: number;
+  status: 'active' | 'won' | 'draw' | 'unfinished';
+  winnerId: string | null;
+  /** Whose turn it is, while it's going. */
+  turnId: string | null;
+  createdBy: string;
+  createdAt: string;
+  lastMoveAt: string;
+  /** It ends unfinished at this time if nobody moves (null once over). */
+  idleEndsAt: string | null;
+  endedAt: string | null;
+  /** The rematch started from this game, if any. */
+  rematchId: string | null;
+  /** Wins at this game in this chat so far, for each of the players (a quiet count, no scores anywhere else). */
+  tally: { userId: string; wins: number }[];
 }
 
 /** A reminder about a chat message: just for you, or (admins in groups) a line for the whole group. */
@@ -659,6 +704,8 @@ export interface Message {
   poll?: ChatPoll;
   /** A shared list: body is its title. */
   list?: ChatList;
+  /** A game: the message is its card in the chat. */
+  game?: ChatGame;
   /** Your earliest waiting "Remind me" on this message. */
   reminder?: { id: string; remindAt: string };
 }
