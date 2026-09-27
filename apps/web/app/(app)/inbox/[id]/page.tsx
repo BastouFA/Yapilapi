@@ -1,10 +1,10 @@
 'use client';
 
-import { isVideoFile, MEDIA_ACCEPT } from '@yapilapi/shared';
+import { isVideoFile, MEDIA_ACCEPT, MESSAGE_EDIT_MINUTES, type PinnedMessage } from '@yapilapi/shared';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { AIPanel, BottomSheet, Button, ChatBubble, Icon, Menu, Skeleton, Switch } from '@yapilapi/design-system';
+import { AIPanel, BottomSheet, Button, ChatBubble, Icon, Menu, Skeleton, Switch, type MenuAction } from '@yapilapi/design-system';
 import type { Conversation, Message } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { ReportSheet } from '@/components/PostList';
@@ -15,6 +15,18 @@ import { MessageAttachments, ViewOnceMessage, VoiceRecorder } from '@/components
 import { TurnOnYapsPrompt, YapButton } from '@/components/Yap';
 import { StoryCardView } from '@/components/StoryStickers';
 import { NowStatusLine } from '@/components/ProfilePlus';
+import {
+  applyReaction,
+  ChatSearch,
+  disappearingLabel,
+  DisappearingSheet,
+  MessageQuote,
+  PinnedBar,
+  previewText,
+  ReactionPicker,
+  ReactionRow,
+  SystemLine,
+} from '@/components/ChatExtras';
 
 type Pending = Message & { pending?: boolean };
 
@@ -32,6 +44,22 @@ export default function ChatPage() {
   const endRef = useRef<HTMLDivElement>(null);
   const calls = useCalls();
   const [appsOpen, setAppsOpen] = useState(false);
+  const [pins, setPins] = useState<PinnedMessage[]>([]);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [editing, setEditing] = useState<Message | null>(null);
+  const [pickerFor, setPickerFor] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [disappearingOpen, setDisappearingOpen] = useState(false);
+  const [jump, setJump] = useState<string | null>(null);
+  const [highlight, setHighlight] = useState<string | null>(null);
+  const composer = useRef<HTMLTextAreaElement>(null);
+
+  const loadPins = () =>
+    api.conversations.pins(id).then(
+      (r) => setPins(r.items),
+      () => {},
+    );
+  const patchMessage = (messageId: string, fn: (m: Pending) => Pending) => setMessages((cur) => cur?.map((x) => (x.id === messageId ? fn(x) : x)) ?? cur);
 
   useEffect(() => {
     api.conversations.get(id).then(
@@ -47,12 +75,49 @@ export default function ChatPage() {
       },
       (e) => toast(errorMessage(e)),
     );
+    void loadPins();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  // Follow the newest message (not when earlier ones are loaded above).
+  const lastId = messages?.at(-1)?.id;
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' });
-  }, [messages?.length]);
+  }, [lastId]);
+
+  // Go to a message once it's on the page, and mark it for a moment.
+  useEffect(() => {
+    if (!jump) return;
+    const el = document.getElementById(`msg-${jump}`);
+    if (!el) return;
+    el.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    const target = jump;
+    setHighlight(target);
+    setJump(null);
+    setTimeout(() => setHighlight((h) => (h === target ? null : h)), 1800);
+  }, [jump, messages]);
+
+  /** Scroll to a message, loading earlier ones until it's there. */
+  async function jumpTo(target: string) {
+    if (messages?.some((m) => m.id === target)) return setJump(target);
+    let c = cursor;
+    const earlier: Message[] = [];
+    try {
+      for (let i = 0; i < 20 && c && !earlier.some((m) => m.id === target); i++) {
+        const r = await api.conversations.messages(id, c);
+        earlier.unshift(...r.items);
+        c = r.nextCursor;
+      }
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+    if (earlier.length) {
+      setMessages((cur) => [...earlier, ...(cur ?? [])]);
+      setCursor(c);
+    }
+    if (earlier.some((m) => m.id === target)) setJump(target);
+    else toast('That message isn’t in this chat anymore.');
+  }
 
   useRealtime((e) => {
     if (e.type === 'message.created' && e.data.conversationId === id) {
@@ -66,7 +131,33 @@ export default function ChatPage() {
       });
       if (e.data.sender.id !== me?.id) void api.conversations.read(id);
     }
-    if (e.type === 'message.deleted' && e.data.conversationId === id) setMessages((cur) => cur?.filter((x) => x.id !== e.data.id) ?? cur);
+    // Disappeared (or removed by moderation), or deleted just for you on another device.
+    if ((e.type === 'message.deleted' || e.type === 'message.hidden') && e.data.conversationId === id) {
+      setMessages((cur) => cur?.filter((x) => x.id !== e.data.id) ?? cur);
+      if (pins.some((p) => p.message.id === e.data.id)) void loadPins();
+    }
+    if (e.type === 'message.edited' && e.data.conversationId === id) {
+      patchMessage(e.data.id, (x) => ({ ...x, body: e.data.body, editedAt: e.data.editedAt }));
+      setMessages(
+        (cur) =>
+          cur?.map((x) => (x.replyTo && x.replyTo.id === e.data.id ? { ...x, replyTo: { ...x.replyTo, body: String(e.data.body).slice(0, 200) } } : x)) ?? cur,
+      );
+    }
+    if (e.type === 'message.unsent' && e.data.conversationId === id) {
+      patchMessage(e.data.id, (x) => ({ ...x, unsent: true, body: '', attachments: [], reactions: undefined, viewOnce: undefined, story: undefined }));
+      setMessages(
+        (cur) =>
+          cur?.map((x) => (x.replyTo && x.replyTo.id === e.data.id ? { ...x, replyTo: { ...x.replyTo, unsent: true, body: '', attachmentKind: null } } : x)) ??
+          cur,
+      );
+      if (editing?.id === e.data.id) setEditing(null);
+      if (replyTo?.id === e.data.id) setReplyTo(null);
+    }
+    // Your own taps are already shown.
+    if (e.type === 'message.reaction' && e.data.conversationId === id && e.data.userId !== me?.id)
+      patchMessage(e.data.id, (x) => applyReaction(x, e.data.emoji, false, !!e.data.removed));
+    if (e.type === 'conversation.pins' && e.data.conversationId === id) void loadPins();
+    if (e.type === 'conversation.updated' && e.data.id === id) setConv((c) => (c ? { ...c, disappearingSeconds: e.data.disappearingSeconds } : c));
     // Someone opened a view-once photo you sent, or its file was deleted.
     if (e.type === 'view_once.updated' && e.data.conversationId === id)
       setMessages((cur) => cur?.map((x) => (x.id === e.data.id ? { ...x, viewOnce: e.data.viewOnce } : x)) ?? cur);
@@ -106,16 +197,47 @@ export default function ChatPage() {
     }
   }
 
+  async function saveEdit(m: Message) {
+    const text = body.trim();
+    if (!text) return toast('Write a message. To remove it, unsend it instead.');
+    if (text === m.body) return cancelCompose();
+    try {
+      const { message } = await api.messages.edit(m.id, text);
+      if (message) patchMessage(m.id, () => message);
+      cancelCompose();
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  }
+
+  function cancelCompose() {
+    if (editing) setBody('');
+    setEditing(null);
+    setReplyTo(null);
+  }
+
   async function send() {
+    if (editing) return saveEdit(editing);
     const text = body.trim();
     if (!text || !me) return;
+    const quoting = replyTo;
     const clientId = crypto.randomUUID();
     const optimistic: Pending = {
       id: clientId,
       conversationId: id,
       sender: { id: me.id, username: me.username, displayName: me.displayName, avatarUrl: me.avatarUrl, mode: me.mode },
       body: text,
-      replyToId: null,
+      replyToId: quoting?.id ?? null,
+      replyTo: quoting
+        ? {
+            id: quoting.id,
+            available: true,
+            sender: quoting.sender,
+            body: quoting.body.slice(0, 200),
+            attachmentKind: quoting.attachments[0]?.kind ?? null,
+            createdAt: quoting.createdAt,
+          }
+        : undefined,
       attachments: [],
       createdAt: new Date().toISOString(),
       clientId,
@@ -123,13 +245,15 @@ export default function ChatPage() {
     };
     setMessages((cur) => [...(cur ?? []), optimistic]);
     setBody('');
+    setReplyTo(null);
     try {
-      const { message, notice } = await api.conversations.send(id, text, clientId);
+      const { message, notice } = await api.conversations.send(id, text, clientId, [], quoting ? { replyToId: quoting.id } : {});
       setMessages((cur) => cur?.map((x) => (x.clientId === clientId ? message : x)) ?? cur);
       if (notice) toast(notice);
     } catch (e) {
       setMessages((cur) => cur?.filter((x) => x.clientId !== clientId) ?? cur);
       setBody(text);
+      setReplyTo(quoting);
       toast(errorMessage(e));
     }
   }
@@ -162,6 +286,85 @@ export default function ChatPage() {
     }
   }
 
+  const canManage = conv?.kind === 'direct' || conv?.myRole === 'admin';
+  const pinnedIds = new Set(pins.map((p) => p.message.id));
+
+  function startReply(m: Message) {
+    setEditing(null);
+    setReplyTo(m);
+    composer.current?.focus();
+  }
+
+  function startEdit(m: Message) {
+    setReplyTo(null);
+    setEditing(m);
+    setBody(m.body);
+    composer.current?.focus();
+  }
+
+  async function react(m: Message, emoji: string, on: boolean) {
+    setPickerFor(null);
+    if (!me) return;
+    patchMessage(m.id, (x) => applyReaction(x, emoji, true, !on));
+    try {
+      if (on) await api.messages.react(m.id, emoji);
+      else await api.messages.unreact(m.id, emoji);
+    } catch (e) {
+      patchMessage(m.id, (x) => applyReaction(x, emoji, true, on));
+      toast(errorMessage(e));
+    }
+  }
+
+  async function run(action: () => Promise<unknown>) {
+    try {
+      await action();
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  }
+
+  /** What you can do with one message, from its menu. */
+  function actionsFor(m: Pending, mine: boolean): MenuAction[] {
+    const editable = mine && !m.kind && !m.viewOnce && !m.unsent && !m.pending && Date.now() - new Date(m.createdAt).getTime() < MESSAGE_EDIT_MINUTES * 60_000;
+    const pinned = pinnedIds.has(m.id);
+    const actions: MenuAction[] = [];
+    if (!m.unsent) {
+      actions.push({ label: 'Reply', icon: 'message', onSelect: () => startReply(m) });
+      actions.push({ label: 'React', icon: 'heart', onSelect: () => setPickerFor(m.id) });
+    }
+    if (editable) actions.push({ label: 'Edit', icon: 'create', onSelect: () => startEdit(m) });
+    if (canManage && !m.unsent && !m.moderation)
+      actions.push(
+        pinned
+          ? { label: 'Unpin', icon: 'map-pin', onSelect: () => void run(async () => setPins((await api.messages.unpin(m.id)).items)) }
+          : { label: 'Pin', icon: 'map-pin', onSelect: () => void run(async () => setPins((await api.messages.pin(m.id)).items)) },
+      );
+    if (!mine && !m.unsent) actions.push({ label: 'Report', icon: 'flag', onSelect: () => setReportId(m.id) });
+    actions.push({
+      label: 'Delete for me',
+      icon: 'trash',
+      onSelect: () =>
+        void run(async () => {
+          await api.messages.deleteForMe(m.id);
+          setMessages((cur) => cur?.filter((x) => x.id !== m.id) ?? cur);
+        }),
+    });
+    if (mine && !m.unsent)
+      actions.push({
+        label: 'Unsend',
+        icon: 'x-circle',
+        danger: true,
+        onSelect: () => {
+          if (!confirm('Unsend this message? It will be removed for everyone in this chat, and anything attached stops working.')) return;
+          void run(async () => {
+            const { message } = await api.messages.unsend(m.id);
+            if (message) patchMessage(m.id, () => message);
+          });
+        },
+      });
+    return actions;
+  }
+
   const others = conv?.members.filter((m) => m.id !== me?.id) ?? [];
   const title = conv ? conv.title || others.map((m) => m.displayName).join(', ') : '';
   let lastDay = '';
@@ -188,6 +391,8 @@ export default function ChatPage() {
             { label: 'Audio call', icon: 'bell', onSelect: () => void calls.start(id, 'audio') },
             { label: t('inbox.summarize'), icon: 'sparkle', onSelect: () => assist('summarize_conversation') },
             { label: 'Draft a plan from the last message', icon: 'calendar', onSelect: () => assist('plan_from_message') },
+            { label: 'Search this chat', icon: 'search', onSelect: () => setSearchOpen(true) },
+            { label: 'Disappearing messages', icon: 'info', onSelect: () => setDisappearingOpen(true) },
             ...(others.length === 1
               ? [{ label: `View ${others[0]!.displayName}'s profile`, icon: 'user' as const, onSelect: () => (location.href = `/u/${others[0]!.username}`) }]
               : []),
@@ -195,6 +400,19 @@ export default function ChatPage() {
           ]}
         />
       </div>
+
+      {conv?.disappearingSeconds ? (
+        <button type="button" className="chat-disappearing" onClick={() => setDisappearingOpen(true)}>
+          <Icon name="info" size={14} /> Disappearing messages: {disappearingLabel(conv.disappearingSeconds)}
+        </button>
+      ) : null}
+      <PinnedBar
+        pins={pins}
+        canManage={canManage}
+        onJump={(mid) => void jumpTo(mid)}
+        onUnpin={(mid) => void run(async () => setPins((await api.messages.unpin(mid)).items))}
+      />
+      {searchOpen ? <ChatSearch conversationId={id} onJump={(mid) => void jumpTo(mid)} onClose={() => setSearchOpen(false)} /> : null}
 
       {ai || aiLoading ? (
         <AIPanel
@@ -249,44 +467,79 @@ export default function ChatPage() {
             const showDay = day !== lastDay;
             lastDay = day;
             const mine = m.sender.id === me?.id;
+            if (m.kind === 'system')
+              return (
+                <div key={m.id} id={`msg-${m.id}`} style={{ display: 'contents' }}>
+                  {showDay ? <div className="yp-chat__day">{day}</div> : null}
+                  <SystemLine message={m} meId={me?.id} />
+                </div>
+              );
+            const time = new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(m.createdAt));
+            const content = m.unsent ? (
+              <span className="chat-unsent">{mine ? 'You unsent a message' : 'Message unsent'}</span>
+            ) : m.viewOnce ? (
+              <>
+                <ViewOnceMessage message={m} mine={mine} onChange={(next) => setMessages((cur) => cur?.map((x) => (x.id === next.id ? next : x)) ?? cur)} />
+                {m.body ? <div>{m.body}</div> : null}
+              </>
+            ) : m.attachments.length || m.story ? (
+              <>
+                {m.kind === 'yap' ? <span className="chat-yap-label">Yap</span> : null}
+                {m.story ? <StoryCardView card={m.story} /> : null}
+                {m.attachments.length ? <MessageAttachments items={m.attachments} /> : null}
+                {m.body ? <div>{m.body}</div> : null}
+              </>
+            ) : (
+              m.body
+            );
             return (
               <div key={m.id} style={{ display: 'contents' }}>
                 {showDay ? <div className="yp-chat__day">{day}</div> : null}
                 <div
-                  style={{ display: 'flex', flexDirection: 'column' }}
+                  id={`msg-${m.id}`}
+                  className={`chat-msg${mine ? ' chat-msg--mine' : ''}${highlight === m.id ? ' chat-msg--highlight' : ''}`}
                   onContextMenu={(e) => {
-                    if (mine) return;
+                    if (mine || m.unsent) return;
                     e.preventDefault();
                     setReportId(m.id);
                   }}
                 >
-                  <ChatBubble
-                    mine={mine}
-                    sender={others.length > 1 ? m.sender.displayName : undefined}
-                    body={
-                      m.viewOnce ? (
+                  <div className="chat-msg__line">
+                    <ChatBubble
+                      mine={mine}
+                      sender={others.length > 1 ? m.sender.displayName : undefined}
+                      body={
                         <>
-                          <ViewOnceMessage
-                            message={m}
-                            mine={mine}
-                            onChange={(next) => setMessages((cur) => cur?.map((x) => (x.id === next.id ? next : x)) ?? cur)}
-                          />
-                          {m.body ? <div>{m.body}</div> : null}
+                          {m.replyTo && !m.unsent ? <MessageQuote preview={m.replyTo} mine={mine} meId={me?.id} onJump={(mid) => void jumpTo(mid)} /> : null}
+                          {content}
                         </>
-                      ) : m.attachments.length || m.story ? (
-                        <>
-                          {m.kind === 'yap' ? <span className="chat-yap-label">Yap</span> : null}
-                          {m.story ? <StoryCardView card={m.story} /> : null}
-                          {m.attachments.length ? <MessageAttachments items={m.attachments} /> : null}
-                          {m.body ? <div>{m.body}</div> : null}
-                        </>
-                      ) : (
-                        m.body
-                      )
-                    }
-                    pending={m.pending}
-                    time={new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(m.createdAt))}
-                  />
+                      }
+                      pending={m.pending}
+                      time={m.editedAt && !m.unsent ? `Edited · ${time}` : time}
+                    />
+                    {!m.pending ? (
+                      <div className="chat-msg__tools">
+                        {!m.unsent ? (
+                          <>
+                            <button type="button" className="yp-action chat-msg__quick" aria-label="Reply" title="Reply" onClick={() => startReply(m)}>
+                              <Icon name="message" size={18} />
+                            </button>
+                            <button type="button" className="yp-action chat-msg__quick" aria-label="React" title="React" onClick={() => setPickerFor(m.id)}>
+                              <Icon name="heart" size={18} />
+                            </button>
+                          </>
+                        ) : null}
+                        <Menu label="Message options" actions={actionsFor(m, mine)} />
+                      </div>
+                    ) : null}
+                  </div>
+                  {pickerFor === m.id ? (
+                    <ReactionPicker
+                      onPick={(emoji) => void react(m, emoji, !m.reactions?.some((r) => r.emoji === emoji && r.mine))}
+                      onClose={() => setPickerFor(null)}
+                    />
+                  ) : null}
+                  <ReactionRow message={m} mine={mine} onToggle={(emoji, on) => void react(m, emoji, on)} />
                   {m.moderation === 'review' ? <span className="chat-held">Waiting for a quick check before it’s delivered</span> : null}
                 </div>
               </div>
@@ -308,12 +561,36 @@ export default function ChatPage() {
         </div>
       ) : null}
       <form
-        className="yp-composer"
+        className={`yp-composer${replyTo || editing ? ' yp-composer--context' : ''}`}
         onSubmit={(e) => {
           e.preventDefault();
           void send();
         }}
       >
+        {replyTo || editing ? (
+          <div className="chat-compose-context" role="status">
+            <div style={{ minWidth: 0 }}>
+              <span className="chat-compose-context__label">
+                {editing ? 'Editing message' : `Replying to ${replyTo!.sender.id === me?.id ? 'yourself' : replyTo!.sender.displayName}`}
+              </span>
+              {replyTo ? (
+                <span className="chat-compose-context__text" dir="auto">
+                  {previewText({
+                    id: replyTo.id,
+                    available: true,
+                    sender: replyTo.sender,
+                    body: replyTo.body,
+                    attachmentKind: replyTo.attachments[0]?.kind ?? replyTo.viewOnce?.kind ?? null,
+                    createdAt: replyTo.createdAt,
+                  })}
+                </span>
+              ) : null}
+            </div>
+            <button type="button" className="yp-action" aria-label={editing ? 'Cancel editing' : 'Cancel reply'} onClick={cancelCompose}>
+              <Icon name="x" size={18} />
+            </button>
+          </div>
+        ) : null}
         <input
           ref={fileInput}
           type="file"
@@ -359,6 +636,7 @@ export default function ChatPage() {
           {t('inbox.placeholder')}
         </label>
         <textarea
+          ref={composer}
           id="msg"
           rows={1}
           placeholder={t('inbox.placeholder')}
@@ -370,13 +648,30 @@ export default function ChatPage() {
               e.preventDefault();
               void send();
             }
+            if (e.key === 'Escape' && (replyTo || editing)) cancelCompose();
           }}
         />
-        <Button type="submit" icon="send" disabled={!body.trim()} aria-label={t('inbox.send')}>
-          {t('inbox.send')}
+        <Button type="submit" icon={editing ? 'check' : 'send'} disabled={!body.trim()} aria-label={editing ? 'Save edit' : t('inbox.send')}>
+          {editing ? 'Save' : t('inbox.send')}
         </Button>
       </form>
       <ReportSheet target={reportId ? { type: 'message', id: reportId } : null} onClose={() => setReportId(null)} />
+      <DisappearingSheet
+        open={disappearingOpen}
+        onClose={() => setDisappearingOpen(false)}
+        current={conv?.disappearingSeconds ?? null}
+        canChange={canManage}
+        onChange={async (seconds) => {
+          try {
+            const r = await api.conversations.setDisappearing(id, seconds);
+            setConv((c) => (c ? { ...c, disappearingSeconds: r.disappearingSeconds } : c));
+            const line = r.message;
+            if (line) setMessages((cur) => (cur?.some((x) => x.id === line.id) ? cur : [...(cur ?? []), line]));
+          } catch (e) {
+            toast(errorMessage(e));
+          }
+        }}
+      />
       {conv?.yaps ? (
         <BottomSheet open={yapSettings} onClose={() => setYapSettings(false)} title="Yaps">
           <div className="stack" style={{ gap: 16 }}>
