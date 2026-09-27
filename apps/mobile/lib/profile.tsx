@@ -13,6 +13,7 @@ import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, PlusBadge, Seg
 import { ShopList } from './money';
 import { isVerificationError, VerifyPrompt } from './safety';
 import { ChaptersRow } from './chapters';
+import { ProfileBoards } from './boards';
 
 /**
  * A profile: name, bio, counts, Follow and Message for other people, and
@@ -30,7 +31,7 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
   const [error, setError] = useState<string | null>(null);
   const [needsVerify, setNeedsVerify] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [tab, setTab] = useState<'posts' | 'tagged' | 'shop'>('posts');
+  const [tab, setTab] = useState<'posts' | 'tagged' | 'boards' | 'shop'>('posts');
   // Photos this person is tagged in, loaded the first time the tab opens.
   const [tagged, setTagged] = useState<{ items: Post[]; cursor: string | null; hidden: boolean } | null>(null);
   // A new cover photo on its way: the phone's copy shows while it uploads and is prepared.
@@ -272,6 +273,7 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
         options={[
           { id: 'posts', label: t('profile.posts') },
           { id: 'tagged', label: t('m.tagged.tab') },
+          { id: 'boards', label: t('m.boards.title') },
           { id: 'shop', label: t('m.shop.tab') },
         ]}
       />
@@ -303,6 +305,8 @@ export function ProfileView({ username, actions, bottom = 0 }: { username: strin
       ListEmptyComponent={
         tab === 'shop' ? (
           <ShopList userId={profile.id} username={profile.username} isSelf={rel.isSelf} />
+        ) : tab === 'boards' ? (
+          <ProfileBoards username={profile.username} isSelf={rel.isSelf} />
         ) : tab === 'tagged' ? (
           !tagged ? (
             <Loading />

@@ -1369,6 +1369,37 @@ a.yp-ecard:hover {
     bottom: var(--space-8);
   }
 }
+/* A toast with a button ("Saved. Add to a board"). */
+.yp-toast--action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-inline-end: var(--space-2);
+}
+.yp-toast__action {
+  flex: none;
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid color-mix(in oklab, var(--ground) 45%, transparent);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--ground);
+  font: 700 14px/1 var(--font-sans);
+  cursor: pointer;
+}
+.yp-toast__action:hover {
+  background: color-mix(in oklab, var(--ground) 14%, transparent);
+}
+.yp-toast__action:focus-visible {
+  outline: 2px solid var(--ground);
+  outline-offset: 2px;
+}
+/* The save button also opens "Save to a board" on a long press: no text selection or callout. */
+.yp-action--hold {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
 .yp-dev-badge {
   display: inline-flex;
   align-items: center;

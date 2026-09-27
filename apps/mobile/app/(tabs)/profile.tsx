@@ -20,6 +20,7 @@ export default function ProfileScreen() {
     );
   if (!me) return <Loading />;
   const shortcuts: { label: string; icon: IconName; href: Href }[] = [
+    { label: t('m.saved.title'), icon: 'bookmark-outline', href: '/saved' },
     { label: t('friends.title'), icon: 'people-outline', href: '/find-friends' },
     { label: t('invite.title'), icon: 'gift-outline', href: '/invite' },
     { label: t('m.title.real'), icon: 'camera-outline', href: '/real' },

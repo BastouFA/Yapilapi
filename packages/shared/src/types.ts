@@ -1,5 +1,5 @@
 import type { StoryCard } from './stories.ts';
-import type { CircleKind, CommunityRole, NowStatusAudience, NowStatusIcon, PostKind, ProfileMode, Visibility } from './constants.ts';
+import type { BoardVisibility, CircleKind, CommunityRole, NowStatusAudience, NowStatusIcon, PostKind, ProfileMode, Visibility } from './constants.ts';
 
 export interface PublicUser {
   id: string;
@@ -143,6 +143,8 @@ export interface Post {
     reposted: boolean;
     /** Set when the viewer was invited to co-author this post: waiting for their answer, or accepted. */
     collab?: CollabStatus;
+    /** Only in your Saved list and boards: your private note on your save of this post. */
+    note?: string;
   };
   /**
    * Co-authors who accepted, in the order they were invited. The post shows as by
@@ -479,4 +481,38 @@ export interface PublicCommunityPreview {
   excerpt: string;
   memberCount: number;
   topics: string[];
+}
+
+/** A board: a named collection of saved posts. Counts and covers only include posts the viewer can see. */
+export interface Board {
+  id: string;
+  name: string;
+  description: string;
+  visibility: BoardVisibility;
+  owner: PublicUser;
+  /** The viewer's part: owner, collaborator (accepted), invited (not answered yet), or null (someone else's public board). */
+  role: 'owner' | 'collaborator' | 'invited' | null;
+  itemCount: number;
+  /** The chosen cover, or else the first item the viewer can see. Null for an empty board. */
+  cover: { postId: string; imageUrl: string | null; placeholder: string | null; text: string | null } | null;
+  /** Only for the owner: the cover they picked (null means the first item). */
+  coverPostId?: string | null;
+  collaboratorCount: number;
+  /** The viewer may add posts: the owner, or a collaborator while the board is shared or public. */
+  canAdd: boolean;
+  /** Set when the list was asked about one post: whether that post is on this board. */
+  contains?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BoardCollaborator {
+  user: PublicUser;
+  status: 'invited' | 'accepted';
+}
+
+export interface BoardDetail {
+  board: Board;
+  /** Accepted collaborators for everyone who can see the board; open invites too for the owner. */
+  collaborators: BoardCollaborator[];
 }

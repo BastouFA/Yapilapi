@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { BoardsProvider } from '../lib/boards';
 import { CallsProvider } from '../lib/calls';
 import { LocaleProvider, useT } from '../lib/i18n';
 import { SessionProvider, useSession } from '../lib/session';
@@ -46,6 +47,9 @@ function Screens() {
         <Stack.Screen name="archive" options={{ title: t('m.archive.title') }} />
         <Stack.Screen name="chapter/[id]" options={{ title: t('m.chapters.title') }} />
         <Stack.Screen name="chapter-edit" options={{ title: t('m.chapters.new'), presentation: 'modal' }} />
+        <Stack.Screen name="saved" options={{ title: t('m.saved.title') }} />
+        <Stack.Screen name="board/[id]" options={{ title: t('m.boards.board') }} />
+        <Stack.Screen name="board-edit" options={{ title: t('m.boards.new'), presentation: 'modal' }} />
         <Stack.Screen name="invite" options={{ title: t('invite.title') }} />
         <Stack.Screen name="find-friends" options={{ title: t('friends.title') }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
@@ -78,9 +82,11 @@ export default function Root() {
     <SessionProvider>
       <LocaleProvider>
         <CallsProvider>
-          <Heartbeat />
-          <Screens />
-          <YapPlayer />
+          <BoardsProvider>
+            <Heartbeat />
+            <Screens />
+            <YapPlayer />
+          </BoardsProvider>
         </CallsProvider>
       </LocaleProvider>
     </SessionProvider>

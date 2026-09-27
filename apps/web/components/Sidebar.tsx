@@ -169,6 +169,10 @@ export function Sidebar() {
       ) : null}
 
       <p className="yp-aside-foot">
+        <Link href="/saved" className="muted">
+          Saved
+        </Link>{' '}
+        ·{' '}
         <Link href="/settings" className="muted">
           Privacy & settings
         </Link>{' '}

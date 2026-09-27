@@ -12,6 +12,7 @@ import { PeoplePicker } from '@/components/PeoplePicker';
 import { useSession } from '@/app/providers';
 import { signInHref, useSignIn } from './SignedOut';
 import { BoostSheet } from './Boost';
+import { SaveToSheet } from './Boards';
 
 /**
  * A paginated list of posts with every post interaction wired to the API:
@@ -44,6 +45,7 @@ export function PostList({
   const [reporting, setReporting] = useState<Post | null>(null);
   const [boosting, setBoosting] = useState<Post | null>(null);
   const [coauthorsFor, setCoauthorsFor] = useState<string | null>(null);
+  const [saveTo, setSaveTo] = useState<Post | null>(null);
   const sentinel = useRef<HTMLDivElement>(null);
   const [ad, setAd] = useState<SponsoredAd | null>(null);
   const [adWhy, setAdWhy] = useState(false);
@@ -154,7 +156,8 @@ export function PostList({
     try {
       if (saved) await api.posts.save(p.id);
       else await api.posts.unsave(p.id);
-      toast(saved ? t('common.saved') : 'Removed from saved');
+      if (saved) toast(`${t('common.saved')}.`, { label: 'Add to a board', onClick: () => setSaveTo(p) });
+      else toast('Removed from saved');
     } catch (e) {
       patch(p.id, () => p);
       toast(errorMessage(e));
@@ -323,6 +326,7 @@ export function PostList({
             isOwn={p.author.id === me?.id}
             onLike={guard(like)}
             onSave={guard(save)}
+            onSaveTo={me ? setSaveTo : undefined}
             onRepost={guard(repost)}
             onShare={share}
             onVote={guard(vote)}
@@ -405,6 +409,7 @@ export function PostList({
             );
         }}
       />
+      <SaveToSheet post={saveTo} onClose={() => setSaveTo(null)} onSaved={(id) => patch(id, (x) => ({ ...x, viewer: { ...x.viewer, saved: true } }))} />
       {memoryFor ? <AddToMemorySheet post={memoryFor} onClose={() => setMemoryFor(null)} /> : null}
       {coauthorsFor && posts.some((x) => x.id === coauthorsFor) ? (
         <CoauthorsSheet

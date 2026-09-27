@@ -13,6 +13,7 @@ import { useT } from '../lib/i18n';
 import { radius, space } from '../lib/theme';
 import { Avatar, Button, EmptyState, Icon, Loading, Notice, useColors, userText, type IconName } from '../lib/ui';
 import { LockedPanel } from '../lib/money';
+import { useBoards, type SaveChange } from '../lib/boards';
 import { AuthorNames, RichText } from '../lib/post';
 import { SensitiveCover } from '../lib/safety';
 
@@ -86,6 +87,8 @@ export default function Reels() {
   }).current;
 
   const patch = (id: string, fn: (p: Post) => Post) => setItems((cur) => cur?.map((p) => (p.id === id ? fn(p) : p)) ?? cur);
+  const boards = useBoards();
+  const syncSaved = (id: string) => (ch: SaveChange) => patch(id, (x) => ({ ...x, viewer: { ...x.viewer, saved: ch.saved } }));
 
   async function like(p: Post) {
     const liked = !p.viewer.liked;
@@ -122,6 +125,7 @@ export default function Reels() {
     try {
       const api = await client();
       await (saved ? api.posts.save(p.id) : api.posts.unsave(p.id));
+      if (saved) boards.confirmSaved(p, syncSaved(p.id));
     } catch (e) {
       patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, saved: !saved } }));
       setError(errorMessage(e));
@@ -235,6 +239,7 @@ export default function Reels() {
               preparing={preparing === item.id}
               onRepost={item.author.id !== me?.id && item.visibility === 'public' ? () => void repost(item) : undefined}
               onSave={() => void save(item)}
+              onSaveTo={me ? () => boards.openSaveSheet(item, syncSaved(item.id)) : undefined}
             />
           )}
           ListFooterComponent={
@@ -275,6 +280,7 @@ function Reel({
   onShare,
   onRepost,
   onSave,
+  onSaveTo,
   onShareVideo,
   preparing,
 }: {
@@ -292,6 +298,8 @@ function Reel({
   /** Absent for your own reels and ones that aren't public. */
   onRepost?: () => void;
   onSave: () => void;
+  /** "Save to…" (press and hold the bookmark); absent when signed out. */
+  onSaveTo?: () => void;
   /** Absent when the creator doesn't allow downloads. */
   onShareVideo?: () => void;
   preparing?: boolean;
@@ -468,6 +476,8 @@ function Reel({
           label={post.viewer.saved ? t('m.reels.unsave') : t('post.save')}
           selected={post.viewer.saved}
           onPress={onSave}
+          onLongPress={onSaveTo}
+          longPressLabel={t('m.boards.saveTo')}
         />
         <Action icon="paper-plane-outline" label={t('m.common.share')} onPress={onShare} />
         {onShareVideo ? <Action icon="download-outline" label={t('share.video')} selected={preparing} onPress={onShareVideo} /> : null}
@@ -489,6 +499,8 @@ function Action({
   color = WHITE,
   selected,
   onPress,
+  onLongPress,
+  longPressLabel,
 }: {
   icon: IconName;
   label: string;
@@ -496,14 +508,22 @@ function Action({
   color?: string;
   selected?: boolean;
   onPress: () => void;
+  /** Press and hold; screen readers get it as a named action (`longPressLabel`). */
+  onLongPress?: () => void;
+  longPressLabel?: string;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={selected === undefined ? undefined : { selected }}
+      accessibilityActions={onLongPress && longPressLabel ? [{ name: 'longAction', label: longPressLabel }] : undefined}
+      onAccessibilityAction={(e) => {
+        if (e.nativeEvent.actionName === 'longAction') onLongPress?.();
+      }}
       hitSlop={6}
       onPress={onPress}
+      onLongPress={onLongPress}
       style={({ pressed }) => [{ alignItems: 'center', gap: 2, opacity: pressed ? 0.7 : 1 }]}
     >
       <View style={s.actionIcon}>

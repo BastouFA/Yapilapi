@@ -185,3 +185,22 @@ export const MAX_PINNED_MESSAGES = 3;
 /** Disappearing messages: 24 hours, 7 days or 90 days (off is null). */
 export const DISAPPEARING_SECONDS = [86_400, 604_800, 7_776_000] as const;
 export type DisappearingSeconds = (typeof DISAPPEARING_SECONDS)[number];
+/**
+ * Saved posts and boards. A board is private (only you), shared (you and the
+ * collaborators you invite) or public (also on your profile). People under 18
+ * can't make a board public.
+ */
+export const BOARD_VISIBILITIES = ['private', 'shared', 'public'] as const;
+export type BoardVisibility = (typeof BOARD_VISIBILITIES)[number];
+export const BOARD_NAME_MAX = 60;
+export const BOARD_DESCRIPTION_MAX = 160;
+/** Boards one person can own. */
+export const BOARDS_MAX = 200;
+/** Collaborators on one board, invited or accepted. */
+export const BOARD_COLLABORATORS_MAX = 30;
+export const BOARD_ITEMS_MAX = 1000;
+/** A private note on a saved post. */
+export const SAVE_NOTE_MAX = 280;
+/** Filters on the Saved page and inside a board. */
+export const SAVED_FILTERS = ['all', 'photos', 'videos', 'text'] as const;
+export type SavedFilter = (typeof SAVED_FILTERS)[number];

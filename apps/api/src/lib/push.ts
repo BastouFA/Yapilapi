@@ -91,6 +91,8 @@ const TEXT: Record<string, (actor: string) => string> = {
   account_limited: () => 'Your account is limited while our team reviews some recent activity',
   account_review: () => 'Our team finished reviewing your account',
   chapter_invite: (a) => `${a} invited you to add stories to a chapter`,
+  // Posts added to a shared board are batched in the inbox and never pushed.
+  board_invite: (a) => `${a} invited you to add to a board`,
   chapter_opened: () => 'A time capsule you are part of has opened',
   yap_received: (a) => `${a} sent you a Yap`,
   view_once_screenshot: (a) => `${a} took a screenshot of your view-once photo or video`,

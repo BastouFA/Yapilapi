@@ -4,6 +4,10 @@ import type {
   NowStatus,
   NowStatusAudience,
   NowStatusIcon,
+  Board,
+  BoardDetail,
+  BoardVisibility,
+  SavedFilter,
   ChapterAudience,
   ChapterGradient,
   ChapterSymbol,
@@ -165,7 +169,8 @@ export function createClient(opts: ClientOptions) {
       setConsent: (purpose: string, granted: boolean) => put('/v1/me/consents', { purpose, granted }),
       exportData: () => get<Record<string, unknown>>('/v1/me/export'),
       deleteAccount: (password: string) => del('/v1/me', { password }),
-      saved: () => get<{ items: Post[] }>('/v1/me/saved'),
+      /** Everything you saved, newest first, with your notes (post.viewer.note). */
+      saved: (filter?: SavedFilter, cursor?: string) => get<Page<Post>>(`/v1/me/saved${qs({ filter, cursor })}`),
       circles: () => get<{ items: Circle[] }>('/v1/me/circles'),
       /** Make one of your uploaded photos your cover. Refused (409 media_processing) until the photo has been prepared. */
       setCover: (mediaId: string, altText?: string) => put<{ profile: Profile }>('/v1/me/cover', { mediaId, altText }),
@@ -212,7 +217,12 @@ export function createClient(opts: ClientOptions) {
       pin: (postId: string | null) => put<{ pinnedPostId: string | null }>('/v1/me/pinned-post', { postId }),
       repost: (id: string) => put<{ reposted: boolean; reposts: number }>(`/v1/posts/${id}/repost`),
       unrepost: (id: string) => del<{ reposted: boolean; reposts: number }>(`/v1/posts/${id}/repost`),
+      /** Unsave; the post also comes off the boards you own. */
       unsave: (id: string) => del(`/v1/posts/${id}/save`),
+      /** Whether you saved it, your private note, and which of your boards it's on. */
+      saveState: (id: string) => get<{ saved: boolean; note: string; boardIds: string[] }>(`/v1/posts/${id}/save`),
+      /** Your private note on a save (saves the post if needed). An empty note clears it. */
+      setSaveNote: (id: string, note: string) => put<{ saved: true; note: string }>(`/v1/posts/${id}/save/note`, { note }),
       vote: (id: string, optionId: string) => post<{ poll: Post['poll'] }>(`/v1/posts/${id}/vote`, { optionId }),
       why: (id: string) => get<{ reasons: string[] }>(`/v1/posts/${id}/why`),
       comments: (id: string, cursor?: string) => get<Page<Comment>>(`/v1/posts/${id}/comments${qs({ cursor })}`),
@@ -288,6 +298,34 @@ export function createClient(opts: ClientOptions) {
       sign: (id: string, body: string) => post<{ entry: Omit<GuestbookEntry, 'author'> }>(`/v1/chapters/${id}/guestbook`, { body }),
       hideLine: (id: string, entryId: string, hidden: boolean) => put<{ hidden: boolean }>(`/v1/chapters/${id}/guestbook/${entryId}/hidden`, { hidden }),
       deleteLine: (id: string, entryId: string) => del<{ ok: true }>(`/v1/chapters/${id}/guestbook/${entryId}`),
+    },
+    /** Boards: named collections of saved posts, private, shared with collaborators, or public on your profile. */
+    boards: {
+      /** Boards you own, then ones you collaborate on or are invited to. With `postId`, each says whether that post is on it. */
+      mine: (postId?: string) => get<{ items: Board[] }>(`/v1/boards${qs({ postId })}`),
+      /** The Boards tab on a profile: public boards only. */
+      forUser: (username: string) => get<{ items: Board[] }>(`/v1/users/${encodeURIComponent(username)}/boards`),
+      get: (id: string) => get<BoardDetail>(`/v1/boards/${id}`),
+      /** Posts on a board in its order, only the ones you can see, with your notes. `removable`: the ones on this page you may take off. */
+      items: (id: string, filter?: SavedFilter, cursor?: string) =>
+        get<Page<Post> & { removable: string[] }>(`/v1/boards/${id}/items${qs({ filter, cursor })}`),
+      create: (b: { name: string; description?: string; visibility?: BoardVisibility; postIds?: string[] }) => post<{ board: Board }>('/v1/boards', b),
+      /** Owner only. `coverPostId: null` goes back to the first item. */
+      update: (id: string, b: { name?: string; description?: string; visibility?: BoardVisibility; coverPostId?: string | null }) =>
+        patch<{ board: Board }>(`/v1/boards/${id}`, b),
+      /** Owner only. The posts stay in your saves. */
+      remove: (id: string) => del<{ ok: true }>(`/v1/boards/${id}`),
+      addItem: (id: string, postId: string) => post<{ added: boolean }>(`/v1/boards/${id}/items`, { postId }),
+      removeItem: (id: string, postId: string) => del<{ ok: true }>(`/v1/boards/${id}/items/${postId}`),
+      /** The new order of the posts you can see on the board (all of them). */
+      reorder: (id: string, postIds: string[]) => put<{ ok: true }>(`/v1/boards/${id}/order`, { postIds }),
+      invite: (id: string, userId: string) => post<BoardDetail>(`/v1/boards/${id}/collaborators`, { userId }),
+      /** Owner: take someone off or cancel an invite. */
+      removeCollaborator: (id: string, userId: string) => del<{ ok: true }>(`/v1/boards/${id}/collaborators/${userId}`),
+      /** Accept an invitation. */
+      join: (id: string) => post<{ board: Board }>(`/v1/boards/${id}/join`),
+      /** Decline an invitation or leave a board. */
+      leave: (id: string) => del<{ ok: true }>(`/v1/boards/${id}/membership`),
     },
     contacts: {
       /** The salt and identifier kinds to hash with (see contactHashInput in @yapilapi/shared). */

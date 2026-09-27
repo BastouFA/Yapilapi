@@ -58,6 +58,11 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
   account_limited: () =>
     'Some of your recent posts or messages were flagged, so your account is limited while our team takes a look. You can still post for yourself and message friends.',
   chapter_invite: (n) => `invited you to add your stories to the chapter "${String(n.data.title ?? '')}"`,
+  board_invite: (n) => `invited you to add to the board “${String(n.data.name ?? '')}”`,
+  board_item_added: (n) => {
+    const count = Number(n.data.count ?? 1);
+    return `added ${count === 1 ? '1 post' : `${count} posts`} to “${String(n.data.name ?? '')}”`;
+  },
   chapter_opened: (n) => `The time capsule "${String(n.data.title ?? '')}" has opened.`,
   account_review: (n) =>
     n.data.outcome === 'cleared'
@@ -68,6 +73,7 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
 function hrefFor(n: NotificationItem): string | undefined {
   if (n.type === 'reel_duet' || n.type === 'reel_remix') return `/reels?start=${n.entityId}`;
   if (n.entityType === 'chapter') return `/chapters/${n.entityId}`;
+  if (n.entityType === 'board') return `/boards/${n.entityId}`;
   if (n.entityType === 'post') return `/p/${n.entityId}`;
   if (n.entityType === 'moment') return `/s/${n.entityId}`;
   if (n.entityType === 'live') return `/live/${n.entityId}`;
@@ -124,6 +130,19 @@ export default function Notifications() {
   // Co-author invites answered here, by post id.
   const [answered, setAnswered] = useState<Record<string, 'accepted' | 'declined'>>({});
   const [answering, setAnswering] = useState<string | null>(null);
+  // Board invites answered here, by board id.
+  const [boardAnswered, setBoardAnswered] = useState<Record<string, 'accepted' | 'declined'>>({});
+  const answerBoard = async (boardId: string, accept: boolean) => {
+    setAnswering(boardId);
+    try {
+      await (accept ? api.boards.join(boardId) : api.boards.leave(boardId));
+      setBoardAnswered((a) => ({ ...a, [boardId]: accept ? 'accepted' : 'declined' }));
+    } catch (e) {
+      toast(errorMessage(e));
+    } finally {
+      setAnswering(null);
+    }
+  };
   const answer = async (postId: string, accept: boolean) => {
     setAnswering(postId);
     try {
@@ -220,6 +239,38 @@ export default function Notifications() {
                                 Accept
                               </Button>
                               <Button size="sm" variant="ghost" disabled={!!answering} onClick={() => answer(postId, false)}>
+                                Decline
+                              </Button>
+                            </span>
+                          )
+                        }
+                      />
+                    );
+                  }
+                  if (n.type === 'board_invite' && n.entityId) {
+                    const boardId = n.entityId;
+                    const outcome = boardAnswered[boardId];
+                    return (
+                      <ListItem
+                        key={g.key}
+                        start={start}
+                        primary={
+                          <Link href={`/boards/${boardId}`} className="notif__link">
+                            {text}
+                          </Link>
+                        }
+                        secondary={formatRelativeTime(n.createdAt, locale)}
+                        end={
+                          outcome ? (
+                            <span className="muted" role="status">
+                              {outcome === 'accepted' ? 'You can add to it now' : 'Declined'}
+                            </span>
+                          ) : (
+                            <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
+                              <Button size="sm" loading={answering === boardId} disabled={!!answering} onClick={() => answerBoard(boardId, true)}>
+                                Accept
+                              </Button>
+                              <Button size="sm" variant="ghost" disabled={!!answering} onClick={() => answerBoard(boardId, false)}>
                                 Decline
                               </Button>
                             </span>
