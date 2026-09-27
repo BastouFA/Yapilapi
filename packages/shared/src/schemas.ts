@@ -60,6 +60,7 @@ import {
   PROFILE_TABS,
   PRONOUNS_MAX,
 } from './profile-style.ts';
+import { ASK_ANSWER_MAX, ASK_AUDIENCES, ASK_FILTERS, ASK_PROMPT_MAX, ASK_QUESTION_MAX, ASK_SHARE_VISIBILITIES } from './ask.ts';
 
 const trimmed = (max: number) => z.string().trim().min(1).max(max);
 export const uuid = z.string().uuid();
@@ -790,3 +791,34 @@ export const createRecapSchema = z
     if (v.source !== 'on_this_day' && !v.sourceId) ctx.addIssue({ code: 'custom', message: 'Choose a memory or chapter.', path: ['sourceId'] });
   });
 export type CreateRecapInput = z.input<typeof createRecapSchema>;
+
+// ── "Ask me" (question box) ────────────────────────────────────────────
+
+/** Your question box: on or off, the prompt shown above it, who can ask and whether askers may hide their name. */
+export const askBoxSchema = z
+  .object({
+    enabled: z.boolean(),
+    /** "Ask me about film photography". Empty or null clears it. */
+    prompt: plainLine(ASK_PROMPT_MAX).nullable(),
+    audience: z.enum(ASK_AUDIENCES),
+    allowHiddenNames: z.boolean(),
+  })
+  .partial();
+
+/** A question for someone's box. `hideName`: "Ask without your name shown" (never hidden from moderators). */
+export const askQuestionSchema = z.object({
+  body: z.string().trim().min(1, 'Write your question.').max(ASK_QUESTION_MAX, `Questions can be up to ${ASK_QUESTION_MAX} characters.`),
+  hideName: z.boolean().default(false),
+});
+
+/** Answer a question; `share` also posts the answer, quoting the question, to this audience. */
+export const answerQuestionSchema = z.object({
+  answer: z.string().trim().min(1, 'Write your answer.').max(ASK_ANSWER_MAX, `Answers can be up to ${ASK_ANSWER_MAX} characters.`),
+  share: z.object({ visibility: z.enum(ASK_SHARE_VISIBILITIES) }).optional(),
+});
+
+export const askInboxQuerySchema = z.object({
+  filter: z.enum(ASK_FILTERS).default('new'),
+  cursor: z.string().max(500).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});

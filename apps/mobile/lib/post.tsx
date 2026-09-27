@@ -22,6 +22,7 @@ import { useFlag } from './flags';
 import { AddToMemorySheet } from './memories';
 import { useReport } from './report';
 import { canWatch, useWatchStart } from './watch';
+import { QuestionQuoteView } from './ask';
 
 export { RichText };
 
@@ -405,6 +406,7 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
         </Pressable>
       ) : null}
 
+      {post.question ? <QuestionQuoteView question={post.question} /> : null}
       {post.body ? (
         <TranslatableText
           kind="post"

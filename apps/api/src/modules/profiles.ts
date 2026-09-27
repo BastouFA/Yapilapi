@@ -19,6 +19,7 @@ import {
   type PostMusic,
   type Profile,
   type ProfileLink,
+  type ProfileTab,
 } from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
@@ -26,7 +27,7 @@ import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, encodeCursor } from '../lib/cursor.ts';
 import { notify, personalizationAllowed, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
-import { ageOf, areFriends, isBlockedEitherWay, PUBLIC_USER_COLS, toPublicUser, usernameMatchSql, type PublicUserRow } from '../lib/users.ts';
+import { ageOf, areFriends, blockUser, isBlockedEitherWay, PUBLIC_USER_COLS, toPublicUser, usernameMatchSql, type PublicUserRow } from '../lib/users.ts';
 import { notBlockedSql, postVisibleSql } from '../lib/visibility.ts';
 import { hostsWithIcons, iconHost, queueLinkIcons } from '../lib/link-icons.ts';
 import { hydratePosts } from '../lib/posts.ts';
@@ -36,6 +37,7 @@ import { messagesAllowedSql } from '../lib/interactions.ts';
 import { byOrWithSql, canInviteSql, canTagSql } from '../lib/collabs.ts';
 import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
 import { nowStatusesFor, ownNowStatus } from '../lib/now-status.ts';
+import { hasAnswersTab, profileAskBox } from '../lib/ask.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -190,6 +192,14 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     };
   }
 
+  /** The tabs they chose; Answers only while their question box is on or has answers (never leaving none). */
+  async function tabsOf(userId: string, saved: string[] | null): Promise<ProfileTab[]> {
+    const tabs = profileTabs(saved);
+    if (!tabs.includes('answers') || (await hasAnswersTab(db, userId))) return tabs;
+    const rest = tabs.filter((t) => t !== 'answers');
+    return rest.length ? rest : ['posts'];
+  }
+
   async function loadProfile(userId: string, viewer: string | null): Promise<Profile> {
     const { rows } = await db.query(
       `SELECT ${PUBLIC_USER_COLS}, pr.bio, pr.cover_url, pr.cover_alt, pr.links, pr.is_private,
@@ -230,9 +240,10 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       // A city on an under-18's account is only ever shown to them.
       city: r.city && (isSelf || !r.is_minor) ? r.city : null,
       joinedAt: new Date(r.joined_at).toISOString(),
-      tabs: profileTabs(r.tabs),
+      tabs: await tabsOf(userId, r.tabs),
       featured: await featuredOut(userId, r.featured_post_ids ?? [], viewer),
       song: await songOut(r, viewer),
+      ask: await profileAskBox(db, userId, viewer),
       relationship: {
         isSelf: viewer === userId,
         following: r.following_them,
@@ -270,6 +281,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
           city: null,
           featured: [],
           song: null,
+          ask: null,
         },
       };
     return { profile };
@@ -689,27 +701,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     const u = me(req);
     const { id } = parse(idParam, req.params);
     if (id === u.id) throw badRequest("You can't block yourself.");
-    await tx(db, async (c) => {
-      await c.query(`INSERT INTO blocks (blocker_id, blocked_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [u.id, id]);
-      // Blocking cuts every connection both ways.
-      await c.query(`DELETE FROM follows WHERE (follower_id = $1 AND followee_id = $2) OR (follower_id = $2 AND followee_id = $1)`, [u.id, id]);
-      const [a, b] = [u.id, id].sort();
-      await c.query(`DELETE FROM friendships WHERE user_a = $1 AND user_b = $2`, [a, b]);
-      await c.query(
-        `UPDATE friend_requests SET status = 'cancelled' WHERE status = 'pending' AND ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1))`,
-        [u.id, id],
-      );
-      // …and ends co-authoring and photo tags between the two, on either one's posts.
-      await c.query(
-        `UPDATE post_collaborators pc SET status = 'removed', responded_at = now() FROM posts p
-         WHERE p.id = pc.post_id AND pc.status IN ('pending', 'accepted') AND ((p.author_id = $1 AND pc.user_id = $2) OR (p.author_id = $2 AND pc.user_id = $1))`,
-        [u.id, id],
-      );
-      await c.query(
-        `DELETE FROM photo_tags t USING posts p WHERE p.id = t.post_id AND ((p.author_id = $1 AND t.user_id = $2) OR (p.author_id = $2 AND t.user_id = $1))`,
-        [u.id, id],
-      );
-    });
+    await tx(db, (c) => blockUser(c, u.id, id));
     return { blocked: true };
   });
 

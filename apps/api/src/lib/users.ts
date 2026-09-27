@@ -45,6 +45,30 @@ export async function isBlockedEitherWay(db: Q, a: string, b: string): Promise<b
   return !!r.rowCount;
 }
 
+/**
+ * Block someone: blocking cuts every connection both ways (follows, friendship, friend requests)
+ * and ends co-authoring and photo tags between the two, on either one's posts. Call inside a transaction.
+ */
+export async function blockUser(c: PoolClient, blocker: string, blocked: string): Promise<void> {
+  await c.query(`INSERT INTO blocks (blocker_id, blocked_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [blocker, blocked]);
+  await c.query(`DELETE FROM follows WHERE (follower_id = $1 AND followee_id = $2) OR (follower_id = $2 AND followee_id = $1)`, [blocker, blocked]);
+  const [a, b] = [blocker, blocked].sort();
+  await c.query(`DELETE FROM friendships WHERE user_a = $1 AND user_b = $2`, [a, b]);
+  await c.query(
+    `UPDATE friend_requests SET status = 'cancelled' WHERE status = 'pending' AND ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1))`,
+    [blocker, blocked],
+  );
+  await c.query(
+    `UPDATE post_collaborators pc SET status = 'removed', responded_at = now() FROM posts p
+     WHERE p.id = pc.post_id AND pc.status IN ('pending', 'accepted') AND ((p.author_id = $1 AND pc.user_id = $2) OR (p.author_id = $2 AND pc.user_id = $1))`,
+    [blocker, blocked],
+  );
+  await c.query(
+    `DELETE FROM photo_tags t USING posts p WHERE p.id = t.post_id AND ((p.author_id = $1 AND t.user_id = $2) OR (p.author_id = $2 AND t.user_id = $1))`,
+    [blocker, blocked],
+  );
+}
+
 export async function areFriends(db: Q, a: string, b: string): Promise<boolean> {
   const [x, y] = [a, b].sort();
   return !!(await db.query(`SELECT 1 FROM friendships WHERE user_a = $1 AND user_b = $2`, [x, y])).rowCount;

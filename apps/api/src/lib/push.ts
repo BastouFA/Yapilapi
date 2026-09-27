@@ -109,6 +109,9 @@ const TEXT: Record<string, (actor: string) => string> = {
   recap_failed: () => "We couldn't make your recap video",
   watch_invite: (a) => `${a} wants to watch together`,
   weekly_wrap: () => 'Your week in YAPILAPI is ready to look back on',
+  // Questions asked without a name have no actor, so they read "Someone asked you a question".
+  question_received: (a) => `${a} asked you a question`,
+  question_answered: (a) => `${a} answered your question`,
 };
 
 /** Human text for a notification type, or null for types that shouldn't push. */

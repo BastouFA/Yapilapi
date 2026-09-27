@@ -132,6 +132,9 @@ function describe(g: Group, tr: Translator): string {
   if (n.type === 'board_item_added' && n.actor) return tp('m.notif.boardItemAdded', Math.max(1, Number(n.data.count) || 1), { name, board: title });
   if (n.type === 'plus_referral_reward') return tp('m.notif.plusReward', Number(n.data.days ?? 30));
   if (n.type === 'account_review') return n.data.outcome === 'cleared' ? t('m.notif.reviewCleared') : t('m.notif.reviewLimited');
+  // A question asked without a name has no actor: it never says who.
+  if (n.type === 'question_received') return n.actor ? t('ask.notif.received', { name }) : t('ask.notif.receivedHidden');
+  if (n.type === 'question_answered') return t('ask.notif.answered', { name });
   // A sign-in from a device we hadn't seen: which one, and roughly where when known.
   if (n.type === 'new_sign_in') {
     const device = String(n.data.device ?? '');

@@ -5,6 +5,7 @@ import type { TranslationSettings } from './translation.ts';
 import type { ReelHighlight } from './reels.ts';
 import type { ProfileStyle, ProfileTab } from './profile-style.ts';
 import type { ChatTheme } from './chat-theme.ts';
+import type { ProfileAskBox, QuotedQuestion } from './ask.ts';
 import type {
   BoardVisibility,
   CircleKind,
@@ -126,6 +127,8 @@ export interface Profile extends PublicUser {
   featured: Post[];
   /** A song on the profile: plays only when tapped. `audioUrl` is null where it can't play (see `unavailable`). */
   song: PostMusic | null;
+  /** Their question box ("Ask me"), for this viewer. Null when it's off and there are no answers to show. */
+  ask: ProfileAskBox | null;
   relationship: {
     isSelf: boolean;
     following: boolean;
@@ -255,6 +258,8 @@ export interface Post {
   status?: 'draft' | 'scheduled';
   /** Scheduled posts: when it will be published. */
   scheduledAt?: string | null;
+  /** An answer shared from the author's question box: the question it answers (the post's text is the answer). */
+  question?: QuotedQuestion | null;
   /** Why this post is in the viewer's feed (recommendation explanation). */
   reason?: string;
   /** Only on the author's own posts: countries where regional rules withhold it. */

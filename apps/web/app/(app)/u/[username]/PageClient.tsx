@@ -17,6 +17,7 @@ import { CoverSheet, NowStatusLine, NowStatusSheet, ProfileCover, ShareProfileSh
 import { ProfileAccountActions } from '@/components/AccountMenu';
 import { ReelGrid } from '@/components/ReelGrid';
 import { AccentScope, FeaturedRow, ProfileAbout, ProfileLinks, ProfileSongChip, Pronouns, tabLabel } from '@/components/ProfileStyle';
+import { AnswersTab, AskCard } from '@/components/Ask';
 import { useSession } from '../../../providers';
 
 /**
@@ -50,6 +51,8 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
       const v = q.get(k);
       return v && /^[0-9a-f-]{36}$/i.test(v) ? v : undefined;
     };
+    // From a notification about an answer: open the Answers tab.
+    if (q.get('tab') === 'answers') setTab('answers');
     if (q.has('subscribe')) setIntent('subscribe');
     else if (q.has('tip')) {
       setIntent('tip');
@@ -311,6 +314,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
           <SupportCreator userId={profile.id} name={profile.displayName} isCreator={profile.mode === 'creator'} onSubscribed={() => setVersion((v) => v + 1)} />
         </div>
       ) : null}
+      {!signedOut || profile.ask?.enabled ? <AskCard profile={profile} onChanged={reload} /> : null}
       <FeaturedRow posts={profile.featured} />
       {tabs.length > 1 ? (
         <Segments label={t('ps.tabs.title')} value={current} onChange={setTab} options={tabs.map((id) => ({ id, label: t(tabLabel(id)) }))} />
@@ -342,6 +346,8 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
         <ProfileBoards username={profile.username} name={profile.displayName} isSelf={rel.isSelf} />
       ) : current === 'shop' ? (
         <Shop userId={profile.id} name={profile.displayName} isSelf={rel.isSelf} focusId={focus.product} />
+      ) : current === 'answers' ? (
+        <AnswersTab profile={profile} />
       ) : (
         <PostList
           load={loadReposts}

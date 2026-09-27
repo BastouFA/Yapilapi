@@ -78,6 +78,9 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
 
 function hrefFor(n: NotificationItem): string | undefined {
   if (n.type === 'new_sign_in') return '/settings/security?review=sign-in';
+  // Questions for your box open your questions; an answer to yours opens their Answers tab.
+  if (n.type === 'question_received') return '/questions';
+  if (n.type === 'question_answered' && n.actor) return `/u/${n.actor.username}?tab=answers`;
   if (n.type === 'reel_duet' || n.type === 'reel_remix') return `/reels?start=${n.entityId}`;
   if (n.type === 'weekly_wrap' || n.entityType === 'wrap') return n.entityId ? `/wraps/${n.entityId}` : '/wraps';
   if (n.type === 'watch_invite' || n.entityType === 'watch') return n.entityId ? `/watch/${n.entityId}` : '/inbox';
@@ -117,6 +120,9 @@ function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): s
   // Whole sentences in your language (the name, when there is one, is part of them).
   if (n.type === 'weekly_wrap') return t('wrap.notif');
   if (n.type === 'watch_invite') return t('watch.invite', { name: n.actor?.displayName ?? t('m.calls.someone') });
+  // A question asked without a name has no actor: it never says who.
+  if (n.type === 'question_received') return n.actor ? t('ask.notif.received', { name: n.actor.displayName }) : t('ask.notif.receivedHidden');
+  if (n.type === 'question_answered') return t('ask.notif.answered', { name: n.actor?.displayName ?? '' });
   if (n.type !== 'comment_like' && n.type !== 'comment_reply') return null;
   const name = n.actor?.displayName ?? '';
   const others = Math.max(0, Number(n.data.count ?? 1) - 1);

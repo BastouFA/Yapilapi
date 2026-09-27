@@ -92,6 +92,11 @@ import type {
   WeeklyWrap,
   WeeklyWrapCard,
   WeeklyWrapSettings,
+  AnswerCard,
+  AskBoxSettings,
+  AskFilter,
+  AskShareVisibility,
+  InboxQuestion,
 } from '@yapilapi/shared';
 
 export class ApiError extends Error {
@@ -303,6 +308,31 @@ export function createClient(opts: ClientOptions) {
       clearStatus: () => del<{ status: null }>('/v1/me/status'),
       moderation: () =>
         get<{ items: { id: string; target_type: string; decision: string; status: string; appeal_status: string | null }[] }>('/v1/me/moderation'),
+    },
+    /**
+     * "Ask me": your question box, asking someone, your inbox of questions and the answers on a
+     * profile. Questions asked without a name never come back with who asked.
+     */
+    questions: {
+      box: () => get<{ box: AskBoxSettings }>('/v1/me/ask-box'),
+      setBox: (b: Partial<Pick<AskBoxSettings, 'enabled' | 'prompt' | 'audience' | 'allowHiddenNames'>>) => put<{ box: AskBoxSettings }>('/v1/me/ask-box', b),
+      /** `notice` is set when the question waits for a moderator before it reaches them. */
+      ask: (userId: string, body: string, hideName = false) =>
+        post<{ question: { id: string }; notice?: string }>(`/v1/users/${userId}/questions`, { body, hideName }),
+      inbox: (filter: AskFilter = 'new', cursor?: string) =>
+        get<Page<InboxQuestion> & { counts: Record<AskFilter, number> }>(`/v1/me/questions${qs({ filter, cursor })}`),
+      /** Answer; with `share`, the answer is also posted, quoting the question. */
+      answer: (id: string, answer: string, share?: { visibility: AskShareVisibility }) =>
+        post<{ question: InboxQuestion; post?: Post; moderation?: { status: string; message: string } }>(`/v1/questions/${id}/answer`, { answer, share }),
+      hide: (id: string) => post<{ question: InboxQuestion }>(`/v1/questions/${id}/hide`),
+      unhide: (id: string) => del<{ question: InboxQuestion }>(`/v1/questions/${id}/hide`),
+      remove: (id: string) => del<{ ok: true }>(`/v1/questions/${id}`),
+      /** Block whoever asked: an ordinary block for a named question, a question block (you don't learn who) otherwise. */
+      blockAsker: (id: string) => post<{ blocked: true; scope: 'account' | 'questions'; question: InboxQuestion }>(`/v1/questions/${id}/block-asker`),
+      unblockAsker: (id: string) => del<{ blocked: false; question: InboxQuestion }>(`/v1/questions/${id}/block-asker`),
+      /** Answers on someone's profile (the Answers tab). */
+      answers: (userId: string, cursor?: string) => get<Page<AnswerCard>>(`/v1/users/${userId}/answers${qs({ cursor })}`),
+      get: (id: string) => get<{ answer: AnswerCard }>(`/v1/questions/${id}`),
     },
     /** Confirming a phone number (an alternative to confirming the email address). */
     verification: {

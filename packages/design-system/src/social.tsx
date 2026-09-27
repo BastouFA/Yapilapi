@@ -968,6 +968,49 @@ export function PostMusicChip({ music, locale = 'en', linkAs: L = A }: { music: 
   );
 }
 
+/**
+ * A question from someone's question box ("Ask me"), quoted: on the Answers tab above its answer,
+ * and on a post that shares the answer. "Asked by @name" links to the asker; a question asked
+ * without a name says so and never carries who asked.
+ */
+export function QuestionQuote({
+  question,
+  locale = 'en',
+  linkAs: L = A,
+  children,
+}: {
+  question: { question: string; askedWithoutName: boolean; asker: PublicUser | null };
+  locale?: string;
+  linkAs?: LinkLike;
+  /** The answer, when it's shown inside the card. */
+  children?: ReactNode;
+}) {
+  const by = question.askedWithoutName ? 'ask.card.askedWithoutName' : question.asker ? 'ask.card.askedBy' : 'ask.card.askedBySomeone';
+  return (
+    <figure className="yp-ask-quote">
+      <blockquote className="yp-ask-quote__text" aria-label={t('ask.card.question', locale)}>
+        <Icon name="help" size={16} />
+        <bdi>{question.question}</bdi>
+      </blockquote>
+      <figcaption className="yp-ask-quote__by">
+        {question.asker && !question.askedWithoutName ? (
+          fill(t(by, locale), 'name', (at) => (
+            <L href={`/u/${question.asker!.username}`}>
+              <bdi>
+                {at}
+                {question.asker!.username}
+              </bdi>
+            </L>
+          ))
+        ) : (
+          <span>{t(by, locale)}</span>
+        )}
+      </figcaption>
+      {children}
+    </figure>
+  );
+}
+
 const VIS_ICON: Record<string, IconName> = {
   public: 'globe',
   followers: 'users',
@@ -1138,6 +1181,7 @@ export function PostCard({
         </p>
       ) : null}
 
+      {post.question ? <QuestionQuote question={post.question} locale={locale} linkAs={L} /> : null}
       {post.body ? (
         <TranslatableText
           kind="post"

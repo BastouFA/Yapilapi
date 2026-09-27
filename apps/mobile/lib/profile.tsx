@@ -33,6 +33,7 @@ import { ProfileBoards } from './boards';
 import { ProfileMenu } from './profile-menu';
 import { FeaturedRow, ProfileAbout, ProfileLinks, ProfileSongChip, tabLabel, useTint } from './profile-style';
 import type { Tint } from './ui';
+import { AnswersList, AskCard } from './ask';
 
 /**
  * A profile: name, bio, counts, Follow and Message for other people, and
@@ -44,10 +45,13 @@ export function ProfileView({
   actions,
   bottom = 0,
   onMoved,
+  initialTab,
 }: {
   username: string;
   actions?: ReactNode;
   bottom?: number;
+  /** Open on this tab (a notification about an answer opens Answers). */
+  initialTab?: ProfileTab;
   /** An old username (changed in the last 14 days) found the profile: its current one, to move there. */
   onMoved?: (username: string) => void;
 }) {
@@ -65,7 +69,7 @@ export function ProfileView({
   const [needsVerify, setNeedsVerify] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   // null: the first tab the person chose to show.
-  const [tab, setTab] = useState<ProfileTab | null>(null);
+  const [tab, setTab] = useState<ProfileTab | null>(initialTab ?? null);
   // Photos this person is tagged in, loaded the first time the tab opens.
   const [tagged, setTagged] = useState<{ items: Post[]; cursor: string | null; hidden: boolean } | null>(null);
   // Their reels and reposts, each loaded the first time its tab opens.
@@ -166,6 +170,8 @@ export function ProfileView({
 
   const rel = profile.relationship;
   const status = liveStatus(profile.nowStatus);
+  // The tabs they chose, in their order; a link to one they don't list (Answers from a notification) still opens it.
+  const tabs: ProfileTab[] = tab && !profile.tabs.includes(tab) ? [...profile.tabs, tab] : profile.tabs;
 
   async function shareProfile() {
     if (!profile) return;
@@ -406,15 +412,10 @@ export function ProfileView({
       {rel.isSelf || rel.blocked ? null : (
         <SupportCard userId={profile.id} username={profile.username} name={profile.displayName} isCreator={profile.mode === 'creator'} />
       )}
+      {rel.blocked ? null : <AskCard profile={profile} tint={tint} onChanged={load} />}
       <FeaturedRow posts={profile.featured} tint={tint} />
-      {profile.tabs.length > 1 ? (
-        <Segmented
-          label={t('m.title.profile')}
-          value={current}
-          onChange={setTab}
-          tint={tint}
-          options={profile.tabs.map((id) => ({ id, label: t(tabLabel(id)) }))}
-        />
+      {tabs.length > 1 ? (
+        <Segmented label={t('m.title.profile')} value={current} onChange={setTab} tint={tint} options={tabs.map((id) => ({ id, label: t(tabLabel(id)) }))} />
       ) : (
         <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 17, fontWeight: '800' }}>
           {t(tabLabel(current))}
@@ -466,7 +467,9 @@ export function ProfileView({
         />
       }
       ListEmptyComponent={
-        current === 'shop' ? (
+        current === 'answers' ? (
+          <AnswersList profile={profile} />
+        ) : current === 'shop' ? (
           <ShopList userId={profile.id} username={profile.username} isSelf={rel.isSelf} />
         ) : current === 'boards' ? (
           <ProfileBoards username={profile.username} isSelf={rel.isSelf} />

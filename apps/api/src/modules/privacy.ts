@@ -94,6 +94,19 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       weeklyWraps: await q(
         `SELECT week_start, timezone, summary, moment_post_id, created_at FROM weekly_wraps WHERE user_id = $1 AND NOT empty ORDER BY week_start DESC`,
       ),
+      // Your question box, the questions you asked (with the answer while it's shown) and the ones you were asked.
+      // Who asked a question without their name stays out, here as everywhere else.
+      askBox: (await q(`SELECT enabled, prompt, audience, allow_hidden_names, updated_at FROM ask_boxes WHERE user_id = $1`))[0] ?? null,
+      questionsAsked: await q(
+        `SELECT recipient_id, body, hide_name, CASE WHEN moderation_status = 'normal' AND hidden_at IS NULL THEN answer END AS answer,
+                CASE WHEN moderation_status = 'normal' AND hidden_at IS NULL THEN answered_at END AS answered_at, created_at
+         FROM ask_questions WHERE asker_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC`,
+      ),
+      questionsReceived: await q(
+        `SELECT id, body, hide_name, CASE WHEN hide_name THEN NULL ELSE asker_id END AS asker_id, answer, answered_at, hidden_at, created_at
+         FROM ask_questions WHERE recipient_id = $1 AND deleted_at IS NULL AND (moderation_status = 'normal' OR answered_at IS NOT NULL) ORDER BY created_at DESC`,
+      ),
+      questionBlocks: await q(`SELECT question_id, created_at FROM ask_blocks WHERE recipient_id = $1 ORDER BY created_at DESC`),
     };
     await db.query(`INSERT INTO privacy_requests (user_id, kind, status, completed_at) VALUES ($1,'export','completed',now())`, [u.id]);
     reply.header('content-disposition', `attachment; filename="yapilapi-export-${u.id}.json"`);
@@ -159,6 +172,10 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         `DELETE FROM username_history WHERE user_id = $1`,
         `DELETE FROM known_sign_ins WHERE user_id = $1`,
         `DELETE FROM scheduled_messages WHERE sender_id = $1`,
+        // Their question box, the questions they asked (with the answers to them) and the ones they were asked.
+        `DELETE FROM ask_questions WHERE asker_id = $1 OR recipient_id = $1`,
+        `DELETE FROM ask_boxes WHERE user_id = $1`,
+        `DELETE FROM ask_blocks WHERE recipient_id = $1 OR asker_id = $1`,
         `DELETE FROM media WHERE owner_id = $1`,
         `DELETE FROM share_videos sv USING posts p WHERE p.id = sv.post_id AND p.author_id = $1`,
         `UPDATE recaps SET deleted_at = coalesce(deleted_at, now()) WHERE owner_id = $1`,

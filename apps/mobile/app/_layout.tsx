@@ -90,6 +90,7 @@ function Screens() {
         <Stack.Screen name="now-status" options={{ title: t('m.now.title'), presentation: 'modal', headerLeft: closeButton }} />
         <Stack.Screen name="archive" options={{ title: t('m.archive.title') }} />
         <Stack.Screen name="drafts" options={{ title: t('m.drafts.title') }} />
+        <Stack.Screen name="questions" options={{ title: t('ask.title') }} />
         <Stack.Screen name="recaps" options={{ title: t('m.recap.title') }} />
         <Stack.Screen name="recap-new" options={{ title: t('m.recap.new') }} />
         <Stack.Screen name="chapter/[id]" options={{ title: t('m.chapters.title') }} />
