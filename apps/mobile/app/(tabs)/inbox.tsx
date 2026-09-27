@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, Text, View } from 'react-native';
+import { FlatList, RefreshControl, Text, View } from 'react-native';
 import type { Conversation } from '../../../../packages/shared/src/types';
 import { client } from '../../lib/api';
 import { useT } from '../../lib/i18n';
@@ -16,10 +16,18 @@ export default function Inbox() {
   const { me } = useSession();
   const bottom = useTabBarSpace();
   const [items, setItems] = useState<Conversation[] | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(() => {
-    void (async () => setItems((await (await client()).conversations.list()).items))().catch(() => setItems([]));
+  const fetchList = useCallback(async () => {
+    try {
+      setItems((await (await client()).conversations.list()).items);
+    } catch {
+      setItems((cur) => cur ?? []);
+    }
   }, []);
+  const load = useCallback(() => {
+    void fetchList();
+  }, [fetchList]);
   useFocusEffect(load);
   useRealtime((e) => {
     if (e.type === 'message.created' || e.type === 'conversation.created') load();
@@ -46,6 +54,18 @@ export default function Inbox() {
         data={items}
         keyExtractor={(x) => x.id}
         contentContainerStyle={{ gap: space[2], paddingBottom: bottom }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={c.yapi}
+            colors={[c.yapi]}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await fetchList();
+              setRefreshing(false);
+            }}
+          />
+        }
         ListEmptyComponent={<EmptyState title={t('m.inbox.empty.title')} body={t('m.inbox.empty.body')} />}
         renderItem={({ item }) => {
           const title = conversationTitle(item, me?.id, t);
