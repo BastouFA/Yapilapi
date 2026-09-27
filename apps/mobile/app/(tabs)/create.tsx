@@ -419,7 +419,9 @@ export default function Create() {
       ? [{ id: 'circle' as const, label: forCircle && chosenCircle ? t('m.create.circle', { name: chosenCircle.name }) : t('visibility.circle') }]
       : []),
     // A draft's audience the choices here don't cover (chosen people): kept unless another is picked.
-    ...(keptAudience && kind !== 'story' ? [{ id: keptAudience.visibility as Visibility, label: t(`visibility.${keptAudience.visibility}` as MessageKey) }] : []),
+    ...(keptAudience && kind !== 'story'
+      ? [{ id: keptAudience.visibility as Visibility, label: t(`visibility.${keptAudience.visibility}` as MessageKey) }]
+      : []),
   ];
 
   return (

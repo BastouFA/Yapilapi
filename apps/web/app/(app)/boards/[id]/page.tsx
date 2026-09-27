@@ -3,7 +3,20 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Avatar, AvatarGroup, Badge, BottomSheet, Button, EmptyState, joinNames, List, ListItem, Segments, Skeleton, type MenuAction } from '@yapilapi/design-system';
+import {
+  Avatar,
+  AvatarGroup,
+  Badge,
+  BottomSheet,
+  Button,
+  EmptyState,
+  joinNames,
+  List,
+  ListItem,
+  Segments,
+  Skeleton,
+  type MenuAction,
+} from '@yapilapi/design-system';
 import { BOARD_COLLABORATORS_MAX, type BoardDetail, type Post, type PublicUser, type SavedFilter } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { PeoplePicker } from '@/components/PeoplePicker';

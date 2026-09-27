@@ -131,9 +131,9 @@ export default function Notifications() {
               ? `/board/${n.entityId}`
               : n.entityType === 'draft'
                 ? '/drafts'
-              : n.actor
-                ? `/u/${n.actor.username}`
-                : null;
+                : n.actor
+                  ? `/u/${n.actor.username}`
+                  : null;
         const answered = answers[n.id];
         const boardInvite = n.type === 'board_invite';
         const invite = (n.type === 'collab_invite' || boardInvite) && !!n.entityId;

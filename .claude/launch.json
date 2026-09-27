@@ -4,22 +4,14 @@
     {
       "name": "api",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "--filter",
-        "@yapilapi/api",
-        "dev"
-      ],
+      "runtimeArgs": ["--filter", "@yapilapi/api", "dev"],
       "port": 4000,
       "autoPort": false
     },
     {
       "name": "web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "--filter",
-        "@yapilapi/web",
-        "dev"
-      ],
+      "runtimeArgs": ["--filter", "@yapilapi/web", "dev"],
       "port": 3000
     }
   ]

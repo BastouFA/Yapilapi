@@ -2,7 +2,20 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Avatar, AvatarGroup, BottomSheet, Button, EmptyState, Icon, List, ListItem, Select, Skeleton, TextField, type MenuAction } from '@yapilapi/design-system';
+import {
+  Avatar,
+  AvatarGroup,
+  BottomSheet,
+  Button,
+  EmptyState,
+  Icon,
+  List,
+  ListItem,
+  Select,
+  Skeleton,
+  TextField,
+  type MenuAction,
+} from '@yapilapi/design-system';
 import {
   BOARD_DESCRIPTION_MAX,
   BOARD_NAME_MAX,
@@ -72,7 +85,11 @@ export function BoardCover({ board }: { board: Board }) {
       </span>
     );
   return (
-    <span className="board-cover board-cover--empty" aria-hidden style={placeholder ? { backgroundImage: `url(${placeholder})`, backgroundSize: 'cover' } : undefined}>
+    <span
+      className="board-cover board-cover--empty"
+      aria-hidden
+      style={placeholder ? { backgroundImage: `url(${placeholder})`, backgroundSize: 'cover' } : undefined}
+    >
       <Icon name="bookmark" size={28} />
     </span>
   );
@@ -83,7 +100,11 @@ export function BoardCard({ board }: { board: Board }) {
   const others = board.role !== 'owner' && board.role !== null;
   const people = board.collaboratorCount;
   return (
-    <Link href={boardHref(board)} className="board-card" aria-label={`${board.name}, ${boardMeta(board)}${others ? `, ${board.owner.displayName}'s board` : ''}`}>
+    <Link
+      href={boardHref(board)}
+      className="board-card"
+      aria-label={`${board.name}, ${boardMeta(board)}${others ? `, ${board.owner.displayName}'s board` : ''}`}
+    >
       <span className="board-card__cover">
         <BoardCover board={board} />
         {board.visibility !== 'private' || board.role === 'invited' ? (
