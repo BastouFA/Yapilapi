@@ -16,7 +16,7 @@ import { AppError } from './lib/errors.ts';
 import { RealtimeHub } from './lib/realtime.ts';
 import { AiGateway } from './lib/ai/gateway.ts';
 import { anthropicProvider, devProvider } from './lib/ai/providers.ts';
-import { logEmailSender } from './lib/email.ts';
+import { logEmailSender, smtpEmailSender, type MailTransport } from './lib/email.ts';
 import { localDiskStorage, s3Storage } from './lib/storage.ts';
 import { devPaymentProvider, paymentRegistry, paystackPaymentProvider, stripePaymentProvider } from './lib/payments.ts';
 import { transcriberFromConfig } from './lib/transcription.ts';
@@ -72,7 +72,7 @@ import moneyModule from './modules/money.ts';
 import musicModule from './modules/music.ts';
 import { musicCatalogFromConfig } from './lib/music/index.ts';
 import { createPushSender } from './lib/push.ts';
-import { setPushSender } from './lib/services.ts';
+import { securityMailer, setPushSender, setSecurityMailer, unsetSecurityMailer } from './lib/services.ts';
 import { processWebhooks } from './lib/webhooks.ts';
 import { processJobs } from './lib/jobs.ts';
 import { mediaJobHandlers } from './lib/media-processing.ts';
@@ -89,6 +89,7 @@ import { endExpiredCampaigns } from './lib/boosts.ts';
 import { sendCountdownReminders } from './lib/stories.ts';
 import { meshRoomMedia } from './lib/room-media.ts';
 import { sweepRooms } from './lib/rooms.ts';
+import { maybeRunRetention } from './lib/retention.ts';
 
 export interface BuiltApp {
   app: FastifyInstance;
@@ -106,6 +107,8 @@ export async function buildApp(
     paystackFetch?: typeof fetch;
     /** Used for calls to music catalogue providers (tests pass a fake). */
     musicFetch?: typeof fetch;
+    /** Replaces the SMTP connection with EMAIL_TRANSPORT=smtp (tests pass a fake). */
+    mailTransport?: MailTransport;
   } = {},
 ): Promise<BuiltApp> {
   const app = Fastify({
@@ -189,7 +192,10 @@ export async function buildApp(
     redis,
     realtime,
     ai: new AiGateway(db, provider),
-    email: logEmailSender(app.log),
+    email:
+      config.EMAIL_TRANSPORT === 'smtp'
+        ? smtpEmailSender({ url: config.SMTP_URL, from: config.EMAIL_FROM, transport: opts.mailTransport })
+        : logEmailSender(app.log),
     storage,
     payments: defaultPayments,
     paymentProviders: paymentRegistry(defaultPayments, paystack ? [paystack] : []),
@@ -397,6 +403,9 @@ export async function buildApp(
     await mod(app, ctx);
 
   setPushSender(config.APP_ENV === 'test' ? null : createPushSender(db, config));
+  // Security notices (password changed, two-step verification off, ...) go to the account's email address.
+  const mailer = securityMailer(ctx, app.log);
+  setSecurityMailer(mailer);
 
   // Webhook delivery worker. Tests drive processWebhooks directly instead.
   let webhookTimer: NodeJS.Timeout | undefined;
@@ -411,6 +420,7 @@ export async function buildApp(
   let lastViewOnceSweep = 0;
   let lastRoomSweep = 0;
   let lastMusicRefresh = 0;
+  let lastRetentionCheck = 0;
   const jobHandlers = {
     ...mediaJobHandlers({ db, storage, moderator: ctx.mediaModerator, realtime: ctx.realtime }),
     ...studioJobHandlers({ db, storage, transcription: ctx.transcription }),
@@ -451,6 +461,15 @@ export async function buildApp(
         lastMusicRefresh = Date.now();
         await ctx.music.refresh().catch((e) => app.log.warn({ err: e.message }, 'music refresh'));
       }
+      // Once a day (checked hourly, claimed in the database so one instance does it): delete what we no longer keep (lib/retention.ts).
+      if (Date.now() - lastRetentionCheck > 60 * 60_000) {
+        lastRetentionCheck = Date.now();
+        // Not awaited: a long clean-up must not hold up media processing.
+        void maybeRunRetention({ db, storage, config }).then(
+          (r) => r && app.log.info({ counts: r.counts, errors: r.errors }, 'retention'),
+          (e: Error) => app.log.warn({ err: e.message }, 'retention'),
+        );
+      }
       // Story countdowns that ended: remind the people who asked.
       await sendCountdownReminders(db, ctx.realtime).catch((e) => app.log.warn({ err: e.message }, 'countdown reminders'));
       busy = false;
@@ -464,6 +483,7 @@ export async function buildApp(
     close: async () => {
       clearInterval(webhookTimer);
       clearInterval(jobTimer);
+      unsetSecurityMailer(mailer);
       await app.close();
       await db.end();
       sub?.disconnect();

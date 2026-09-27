@@ -22,6 +22,7 @@ import { client, errorMessage, mediaUrl } from '../../lib/api';
 import { useFlag } from '../../lib/flags';
 import { useT } from '../../lib/i18n';
 import { openOnWeb } from '../../lib/money';
+import { useReport } from '../../lib/report';
 import { useRealtime, useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
 import {
@@ -70,6 +71,7 @@ export default function LiveScreen() {
   const nearBottom = useRef(true);
   const joined = useRef(false);
   const menu = useActionSheet();
+  const report = useReport();
 
   useEffect(() => {
     void AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
@@ -171,8 +173,9 @@ export default function LiveScreen() {
 
   function messageMenu(m: LiveChatMessage) {
     const mine = m.author.id === me?.id;
-    const actions: ActionSheetAction[] = [
-      {
+    const actions: ActionSheetAction[] = [];
+    if (canModerate || mine)
+      actions.push({
         label: t('m.live.removeMessage'),
         icon: 'trash-outline',
         destructive: true,
@@ -184,8 +187,7 @@ export default function LiveScreen() {
             setNote({ tone: 'danger', text: errorMessage(e) });
           }
         },
-      },
-    ];
+      });
     if (canModerate && !mine && m.author.id !== l.host.id)
       actions.push({
         label: t('m.live.removePerson', { name: m.author.displayName }),
@@ -199,6 +201,14 @@ export default function LiveScreen() {
             setNote({ tone: 'danger', text: errorMessage(e) });
           }
         },
+      });
+    // Live chat lines aren't reported one by one: report the person who wrote it.
+    if (me && !mine)
+      actions.push({
+        label: t('m.profile.reportTitle', { name: m.author.displayName }),
+        icon: 'flag-outline',
+        destructive: true,
+        onPress: () => report.open({ type: 'user', id: m.author.id, authorId: m.author.id, authorName: m.author.displayName }),
       });
     menu.show({ title: t('m.live.messageOptions'), actions });
   }
@@ -230,7 +240,37 @@ export default function LiveScreen() {
 
   return (
     <KeyboardAvoid style={{ backgroundColor: c.ground }}>
-      <Stack.Screen options={{ title: l.title }} />
+      <Stack.Screen
+        options={{
+          title: l.title,
+          // More: report the live (not your own).
+          headerRight:
+            me && !isHost
+              ? () => (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('m.post.more')}
+                    hitSlop={10}
+                    onPress={() =>
+                      menu.show({
+                        title: l.title,
+                        actions: [
+                          {
+                            label: t('post.report'),
+                            icon: 'flag-outline',
+                            destructive: true,
+                            onPress: () => report.open({ type: 'live', id: l.id, authorId: l.host.id, authorName: l.host.displayName }),
+                          },
+                        ],
+                      })
+                    }
+                  >
+                    <Icon name="ellipsis-horizontal-circle-outline" size={24} color={c.yapi} />
+                  </Pressable>
+                )
+              : undefined,
+        }}
+      />
       <View style={{ aspectRatio: 16 / 9, width: '100%', backgroundColor: '#0B100E', alignItems: 'center', justifyContent: 'center' }}>
         {l.status === 'live' && playUrl ? (
           <LivePlayer url={playUrl} label={t('m.live.video', { title: l.title })} />
@@ -319,9 +359,7 @@ export default function LiveScreen() {
             />
             <View accessibilityLabel={tab === 'questions' ? t('m.live.questions') : t('m.live.chat')} style={{ gap: space[2] }}>
               {shown.length ? (
-                shown.map((m) => (
-                  <ChatLine key={m.id} m={m} mine={m.author.id === me?.id} onMore={canModerate || m.author.id === me?.id ? () => messageMenu(m) : undefined} />
-                ))
+                shown.map((m) => <ChatLine key={m.id} m={m} mine={m.author.id === me?.id} onMore={me ? () => messageMenu(m) : undefined} />)
               ) : (
                 <Text style={{ color: c.inkMuted, textAlign: 'center', paddingVertical: space[4] }}>
                   {l.status === 'scheduled' ? t('m.live.chatClosed') : tab === 'questions' ? t('m.live.noQuestions') : t('m.live.chatEmpty')}
@@ -394,6 +432,7 @@ export default function LiveScreen() {
       ) : null}
       {canChat ? null : <View style={{ height: insets.bottom }} />}
       {menu.sheet}
+      {report.sheet}
     </KeyboardAvoid>
   );
 }

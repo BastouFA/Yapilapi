@@ -20,7 +20,7 @@ import { z } from 'zod';
 import { AppError, badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, encodeCursor } from '../lib/cursor.ts';
-import { notify, track } from '../lib/services.ts';
+import { notify, personalizationAllowed, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
 import { ageOf, areFriends, isBlockedEitherWay, PUBLIC_USER_COLS, toPublicUser, type PublicUserRow } from '../lib/users.ts';
 import { notBlockedSql } from '../lib/visibility.ts';
@@ -315,12 +315,12 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     // Recent public posts on the topics the person picked (onboarding saves interests first).
     const topical = `(SELECT count(*) FROM posts rp WHERE rp.author_id = pr.user_id AND rp.deleted_at IS NULL AND rp.status = 'published' AND rp.visibility = 'public'
                        AND rp.moderation_status = 'normal' AND rp.created_at > now() - interval '30 days'
-                       AND rp.topics && coalesce((SELECT array_agg(t.slug) FROM user_interests ui JOIN topics t ON t.id = ui.topic_id WHERE ui.user_id = $1), '{}'))`;
+                       AND $3 AND rp.topics && coalesce((SELECT array_agg(t.slug) FROM user_interests ui JOIN topics t ON t.id = ui.topic_id WHERE ui.user_id = $1), '{}'))`;
     const { rows } = await db.query(
       `SELECT * FROM (
          SELECT ${PUBLIC_USER_COLS}, pr.bio, pr.created_at,
-          (SELECT count(*) FROM user_interests a JOIN user_interests b ON a.topic_id = b.topic_id WHERE a.user_id = $1 AND b.user_id = pr.user_id) AS shared,
-          (SELECT count(*) FROM follows f1 JOIN follows f2 ON f2.follower_id = f1.followee_id WHERE f1.follower_id = $1 AND f2.followee_id = pr.user_id) AS mutual,
+          (SELECT count(*) FROM user_interests a JOIN user_interests b ON a.topic_id = b.topic_id WHERE $3 AND a.user_id = $1 AND b.user_id = pr.user_id) AS shared,
+          (SELECT count(*) FROM follows f1 JOIN follows f2 ON f2.follower_id = f1.followee_id WHERE $3 AND f1.follower_id = $1 AND f2.followee_id = pr.user_id) AS mutual,
           (SELECT count(*) FROM follows WHERE followee_id = pr.user_id) AS followers
           ${creators ? `, ${recent} AS recent, ${recentReels} AS reels, ${topical} AS topical` : ''}
          FROM profiles pr JOIN users us ON us.id = pr.user_id
@@ -331,7 +331,8 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
        ${creators ? 'WHERE s.recent > 0' : ''}
        ORDER BY ${creators ? '(s.topical > 0) DESC, s.shared DESC, (s.reels > 0) DESC, s.mutual DESC, s.followers DESC, s.topical DESC, s.recent DESC' : 's.shared DESC, s.mutual DESC, s.followers DESC'}, s.created_at DESC
        LIMIT $2`,
-      [u.id, q.limit],
+      // $3: Personalization. Off, shared interests, people you follow and your topics are left out: popular people come first.
+      [u.id, q.limit, await personalizationAllowed(db, u.id)],
     );
     return {
       items: rows.map((r) => ({

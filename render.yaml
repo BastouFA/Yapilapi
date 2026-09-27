@@ -37,7 +37,7 @@ envVarGroups:
         sync: false
       - key: STRIPE_PUBLISHABLE_KEY
         sync: false
-      # Email (verification, password reset). Any SMTP relay, e.g. smtps://resend:<api key>@smtp.resend.com:465
+      # Email (verification, password reset, security notices; required in production). Any SMTP relay, e.g. smtps://resend:<api key>@smtp.resend.com:465
       - key: EMAIL_TRANSPORT
         value: smtp
       - key: SMTP_URL

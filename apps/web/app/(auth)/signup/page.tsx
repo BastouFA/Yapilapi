@@ -38,8 +38,11 @@ function SignupForm() {
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
-    setBusy(true);
     setError(null);
+    // Everyone gives a date of birth (the server decides what it means, including who can join).
+    const birthDate = String(f.get('birthDate') || '');
+    if (!birthDate) return setFields({ birthDate: t('auth.birthDate.required') });
+    setBusy(true);
     setFields({});
     try {
       const { user } = await api.auth.register({
@@ -47,7 +50,7 @@ function SignupForm() {
         password: String(f.get('password')),
         username: String(f.get('username')),
         displayName: String(f.get('displayName')),
-        birthDate: String(f.get('birthDate') || '') || undefined,
+        birthDate,
         locale: navigator.language,
         inviteCode: String(f.get('inviteCode') ?? '').trim() || undefined,
         website: String(f.get('website') ?? '') || undefined,
@@ -92,10 +95,13 @@ function SignupForm() {
         error={fields.password}
       />
       <TextField
-        label="Date of birth"
+        label={t('auth.birthDate')}
         name="birthDate"
         type="date"
-        hint="Used to keep younger people safe. Never shown on your profile."
+        required
+        autoComplete="bday"
+        max={new Date().toISOString().slice(0, 10)}
+        hint={t('auth.birthDate.hint')}
         error={fields.birthDate}
       />
       <TextField

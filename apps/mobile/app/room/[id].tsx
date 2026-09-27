@@ -4,10 +4,11 @@ import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { ROOM_REACTIONS } from '../../../../packages/shared/src/constants';
 import type { RoomParticipant } from '../../../../packages/shared/src/types';
 import { useT } from '../../lib/i18n';
+import { useReport } from '../../lib/report';
 import { everyone, REACTION_ICON, REACTION_LABEL, roomDuration, roomStatusLabel, useRoom } from '../../lib/rooms';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
-import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, Title, useColors, userText } from '../../lib/ui';
+import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, Title, useActionSheet, useColors, userText } from '../../lib/ui';
 import { callsSupported } from '../../lib/webrtc';
 
 /**
@@ -24,9 +25,42 @@ export default function RoomScreen() {
   const [open, setOpen] = useState<string | null>(null);
   const r = room.env?.room;
 
+  // More in the header: report the room (not one you started).
+  const menu = useActionSheet();
+  const report = useReport();
+  const { show: showMenu } = menu;
+  const { open: openReport } = report;
+  const canReport = !!me && !!r && r.createdBy.id !== me.id;
   useLayoutEffect(() => {
-    if (r) navigation.setOptions({ title: r.title });
-  }, [navigation, r]);
+    if (!r) return;
+    navigation.setOptions({
+      title: r.title,
+      headerRight: canReport
+        ? () => (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('m.post.more')}
+              hitSlop={10}
+              onPress={() =>
+                showMenu({
+                  title: r.title,
+                  actions: [
+                    {
+                      label: t('post.report'),
+                      icon: 'flag-outline',
+                      destructive: true,
+                      onPress: () => openReport({ type: 'room', id: r.id, authorId: r.createdBy.id, authorName: r.createdBy.displayName }),
+                    },
+                  ],
+                })
+              }
+            >
+              <Icon name="ellipsis-horizontal-circle-outline" size={24} color={c.yapi} />
+            </Pressable>
+          )
+        : undefined,
+    });
+  }, [navigation, r, canReport, showMenu, openReport, t, c.yapi]);
 
   if (room.error && !room.env)
     return (
@@ -276,6 +310,8 @@ export default function RoomScreen() {
           </>
         )}
       </ScrollView>
+      {menu.sheet}
+      {report.sheet}
     </View>
   );
 }

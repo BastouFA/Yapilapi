@@ -36,6 +36,8 @@ export async function signUp(app: FastifyInstance, extra: Record<string, unknown
     password: 'correct-horse-battery',
     username: `t_${suffix}`.slice(0, 30),
     displayName: `Tester ${n}`,
+    // A birth date is required; tests that need a minor pass their own.
+    birthDate: '1990-01-01',
     ...extra,
   };
   const res = await app.inject({ method: 'POST', url: '/v1/auth/register', payload: body });

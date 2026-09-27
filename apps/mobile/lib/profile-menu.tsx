@@ -1,28 +1,14 @@
-import { useState } from 'react';
 import { Alert, View } from 'react-native';
-import { REPORT_REASONS } from '../../../packages/shared/src/constants';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
 import type { Profile } from '../../../packages/shared/src/types';
 import { client, errorMessage } from './api';
 import { useT } from './i18n';
+import { useReport } from './report';
 import { BottomSheet, SheetItem } from './ui';
-
-const REASON_KEYS: Record<(typeof REPORT_REASONS)[number], MessageKey> = {
-  spam: 'postList.reason.spam',
-  harassment: 'postList.reason.harassment',
-  hate: 'postList.reason.hate',
-  violence: 'postList.reason.violence',
-  nudity: 'postList.reason.nudity',
-  self_harm: 'postList.reason.selfHarm',
-  impersonation: 'postList.reason.impersonation',
-  fraud: 'postList.reason.fraud',
-  minor_safety: 'postList.reason.minorSafety',
-  other: 'postList.reason.other',
-};
 
 /**
  * More for someone else's profile: add or accept them as a friend, mute, block, or report them.
- * `onChanged` reloads the profile; `onMessage` shows what happened ("Muted", the report's thanks).
+ * `onChanged` reloads the profile; `onMessage` shows what happened ("Muted"). Reporting opens the
+ * shared report sheet, which says what happens next itself.
  */
 export function ProfileMenu({
   profile,
@@ -38,13 +24,11 @@ export function ProfileMenu({
   onMessage: (text: string, tone?: 'info' | 'danger') => void;
 }) {
   const { t } = useT();
-  const [reporting, setReporting] = useState(false);
   const rel = profile.relationship;
+  // Reporting from the shared sheet; blocking from there too reloads the profile.
+  const reporter = useReport({ onBlocked: () => void onChanged() });
 
-  const close = () => {
-    setReporting(false);
-    onClose();
-  };
+  const close = () => onClose();
 
   const act = async (fn: () => Promise<unknown>, done?: string) => {
     close();
@@ -73,26 +57,15 @@ export function ProfileMenu({
     ]);
   };
 
-  const report = async (reason: string) => {
+  const report = () => {
     close();
-    try {
-      const r = await (await client()).reports.create({ targetType: 'user', targetId: profile.id, reason });
-      onMessage(r.message);
-    } catch (e) {
-      onMessage(errorMessage(e), 'danger');
-    }
+    // After the menu has gone: iOS can't show a sheet over one that is closing.
+    setTimeout(() => reporter.open({ type: 'user', id: profile.id, authorId: rel.blocked ? undefined : profile.id, authorName: profile.displayName }), 400);
   };
 
   return (
-    <BottomSheet visible={open} title={reporting ? t('m.profile.reportTitle', { name: profile.displayName }) : profile.displayName} onClose={close}>
-      {reporting ? (
-        <View style={{ gap: 2 }}>
-          {REPORT_REASONS.map((r) => (
-            <SheetItem key={r} icon="flag-outline" label={t(REASON_KEYS[r])} onPress={() => void report(r)} />
-          ))}
-          <SheetItem icon="arrow-back" label={t('m.common.back')} onPress={() => setReporting(false)} />
-        </View>
-      ) : (
+    <>
+      <BottomSheet visible={open} title={profile.displayName} onClose={close}>
         <View style={{ gap: 2 }}>
           {rel.blocked ? null : rel.friends ? (
             <SheetItem
@@ -131,9 +104,10 @@ export function ProfileMenu({
           ) : (
             <SheetItem icon="ban-outline" label={t('profile.block')} danger onPress={block} />
           )}
-          <SheetItem icon="flag-outline" label={t('reel.report')} danger onPress={() => setReporting(true)} />
+          <SheetItem icon="flag-outline" label={t('reel.report')} danger onPress={report} />
         </View>
-      )}
-    </BottomSheet>
+      </BottomSheet>
+      {reporter.sheet}
+    </>
   );
 }

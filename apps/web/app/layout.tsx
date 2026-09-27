@@ -1,9 +1,15 @@
 import type { Metadata, Viewport } from 'next';
+import { Bricolage_Grotesque, Figtree, JetBrains_Mono } from 'next/font/google';
 import '@yapilapi/design-system/tokens.css';
 import '@yapilapi/design-system/components.css';
 import '@yapilapi/design-system/social.css';
 import './globals.css';
 import { Providers } from './providers';
+
+// Fonts are downloaded when the app is built and served from our own domain: visitors' browsers never contact Google.
+const sans = Figtree({ subsets: ['latin', 'latin-ext'], variable: '--font-figtree', display: 'swap' });
+const display = Bricolage_Grotesque({ subsets: ['latin', 'latin-ext'], axes: ['opsz'], variable: '--font-bricolage', display: 'swap' });
+const mono = JetBrains_Mono({ subsets: ['latin', 'latin-ext'], weight: '400', variable: '--font-jetbrains-mono', display: 'swap' });
 
 const SITE_URL = (process.env.SITE_URL || process.env.WEB_ORIGIN?.split(',')[0] || 'http://localhost:3000').replace(/\/+$/, '');
 
@@ -28,15 +34,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600;700&family=Inter:wght@400;700&family=JetBrains+Mono:wght@400&display=swap"
-        />
-      </head>
+    <html lang="en" suppressHydrationWarning className={`${sans.variable} ${display.variable} ${mono.variable}`}>
       <body className="yp-root">
         <a href="#main" className="skip-link">
           Skip to content

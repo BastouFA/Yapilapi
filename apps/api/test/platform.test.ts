@@ -148,7 +148,8 @@ describe('trust, safety and privacy', () => {
       displayName: 'Kid',
       birthDate: `${new Date().getFullYear() - 10}-01-01`,
     });
-    expect(tooYoung.status).toBe(400);
+    expect(tooYoung.status).toBe(403);
+    expect(tooYoung.body.error.code).toBe('under_minimum_age');
   });
 
   it('routes automated flags and reports to moderators, with appeals', async () => {

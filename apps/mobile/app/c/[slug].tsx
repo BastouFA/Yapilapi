@@ -8,6 +8,7 @@ import { client, errorMessage } from '../../lib/api';
 import { DateField } from '../../lib/date-time';
 import { canManage, canOrganize, roleName } from '../../lib/community-roles';
 import { useT } from '../../lib/i18n';
+import { useReport } from '../../lib/report';
 import { PostCard } from '../../lib/post';
 import { roomDuration, roomStatusLabel } from '../../lib/rooms';
 import { useSession } from '../../lib/session';
@@ -27,6 +28,7 @@ import {
   Row,
   Segmented,
   Title,
+  useActionSheet,
   useColors,
   useRefresh,
   userText,
@@ -78,9 +80,37 @@ export default function CommunityScreen() {
     }, [reload]),
   );
 
+  // More in the header: report the community (not your own).
+  const menu = useActionSheet();
+  const report = useReport();
+  const { show: showMenu } = menu;
+  const { open: openReport } = report;
+  const canReport = !!me && !!community && community.myRole !== 'owner';
   useLayoutEffect(() => {
-    if (community) navigation.setOptions({ title: community.name });
-  }, [navigation, community]);
+    if (!community) return;
+    navigation.setOptions({
+      title: community.name,
+      headerRight: canReport
+        ? () => (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('m.post.more')}
+              hitSlop={10}
+              onPress={() =>
+                showMenu({
+                  title: community.name,
+                  actions: [
+                    { label: t('post.report'), icon: 'flag-outline', destructive: true, onPress: () => openReport({ type: 'community', id: community.id }) },
+                  ],
+                })
+              }
+            >
+              <Icon name="ellipsis-horizontal-circle-outline" size={24} color={c.yapi} />
+            </Pressable>
+          )
+        : undefined,
+    });
+  }, [navigation, community, canReport, showMenu, openReport, t, c.yapi]);
 
   const locked = !!community && community.visibility === 'private' && !community.myRole;
 
@@ -335,6 +365,8 @@ export default function CommunityScreen() {
           ) : null
         }
       />
+      {menu.sheet}
+      {report.sheet}
     </KeyboardAvoid>
   );
 }

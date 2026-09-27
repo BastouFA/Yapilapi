@@ -76,12 +76,13 @@ export function authProblem(e: unknown, t: Translate): { message: string; fields
   if (f.email) fields.email = e.status === 409 ? t('m.auth.emailTaken') : t('m.auth.emailInvalid');
   if (f.username) fields.username = e.status === 409 ? t('m.auth.usernameTaken') : t('m.auth.usernameRule');
   if (f.password) fields.password = t('auth.password.hint');
-  if (f.birthDate) fields.birthDate = t('m.auth.tooYoung');
+  if (f.birthDate) fields.birthDate = e.status === 403 ? t('m.auth.tooYoung') : t('auth.birthDate.required');
   if (f.inviteCode) fields.inviteCode = t('m.auth.inviteInvalid');
   if (f.code) fields.code = t('m.auth.codeWrong');
   if (f.displayName) fields.displayName = t('m.auth.nameNeeded');
   const first = Object.values(fields)[0];
   if (e.status === 401) return { message: e.message.includes('expired') ? t('m.auth.challengeExpired') : t('m.auth.wrongPassword'), fields };
+  if (e.code === 'under_minimum_age') return { message: t('m.auth.tooYoung'), fields };
   if (e.status === 403) return { message: e.message, fields };
   return { message: first ?? e.message ?? t('error.generic'), fields };
 }

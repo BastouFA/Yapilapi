@@ -44,9 +44,16 @@ describe('core vertical slice', () => {
       password: 'another-long-password',
       username: 'someone_new',
       displayName: 'X',
+      birthDate: '1990-01-01',
     });
     expect(dup.status).toBe(409);
-    const weak = await as(t.app, null).post('/v1/auth/register', { email: 'weak@example.test', password: 'short', username: 'weakling', displayName: 'W' });
+    const weak = await as(t.app, null).post('/v1/auth/register', {
+      email: 'weak@example.test',
+      password: 'short',
+      username: 'weakling',
+      displayName: 'W',
+      birthDate: '1990-01-01',
+    });
     expect(weak.status).toBe(400);
     expect(weak.body.error.details.fields.password).toBeTruthy();
   });

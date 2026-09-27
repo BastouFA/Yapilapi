@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
-import type { PublicUser } from '@yapilapi/shared';
+import { ADULT_AGE, type PublicUser } from '@yapilapi/shared';
+import { AppError } from './errors.ts';
 
 type Q = Pool | PoolClient;
 
@@ -57,6 +58,37 @@ export function ageOf(birthDate: Date | string | null, now = new Date()): number
   const m = now.getUTCMonth() - b.getUTCMonth();
   if (m < 0 || (m === 0 && now.getUTCDate() < b.getUTCDate())) age--;
   return age;
+}
+
+/** Age from a birth date that birthDateSchema already checked. */
+export function checkBirthDate(birthDate: string): number {
+  const age = ageOf(birthDate);
+  if (age === null || Number.isNaN(age))
+    throw new AppError(400, 'validation_failed', 'Enter a real date of birth.', { fields: { birthDate: 'Enter a real date of birth.' } });
+  return age;
+}
+
+/** Protections for 13 to 17 year olds that are settings: a private account and no ad personalization. */
+export async function applyMinorDefaults(db: Q, userId: string): Promise<void> {
+  await db.query(`UPDATE profiles SET is_private = true WHERE user_id = $1`, [userId]);
+  await db.query(
+    `INSERT INTO consents (user_id, purpose, granted) VALUES ($1, 'advertising', false)
+     ON CONFLICT (user_id, purpose) DO UPDATE SET granted = false, updated_at = now()`,
+    [userId],
+  );
+}
+
+/**
+ * Selling, paid plans, payouts and receiving tips are for adults (creator and seller terms).
+ * `self`: the person asking is the one who would be paid. Otherwise they are paying someone who can't be.
+ */
+export async function assertAdultForMoney(db: Q, userId: string, self = true): Promise<void> {
+  const { rows } = await db.query<{ birth_date: Date | null }>(`SELECT birth_date FROM users WHERE id = $1`, [userId]);
+  const age = ageOf(rows[0]?.birth_date ?? null);
+  if (age !== null && age >= ADULT_AGE) return;
+  if (!self) throw new AppError(403, 'recipient_not_eligible', "This person can't receive payments on YAPILAPI.");
+  if (age === null) throw new AppError(403, 'birth_date_required', 'Add your date of birth to sell, get paid or receive tips. You need to be 18 or older.');
+  throw new AppError(403, 'adults_only', 'You need to be 18 or older to sell, get paid or receive tips on YAPILAPI.');
 }
 
 /**

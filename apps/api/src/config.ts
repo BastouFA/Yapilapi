@@ -15,7 +15,10 @@ const schema = z.object({
   REDIS_URL: z.string().optional().default(''),
   SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
   COOKIE_SECURE: bool,
+  /** log: emails are only written to the log (development and tests). smtp: sent through SMTP_URL. Production needs smtp. */
   EMAIL_TRANSPORT: z.enum(['log', 'smtp']).default('log'),
+  /** SMTP connection URL (EMAIL_TRANSPORT=smtp), e.g. smtps://user:password@smtp.example.com:465. */
+  SMTP_URL: z.string().default(''),
   EMAIL_FROM: z.string().default('YAPILAPI <no-reply@yapilapi.local>'),
   AI_PROVIDER: z.enum(['dev', 'anthropic']).default('dev'),
   AI_MODEL: z.string().default('claude-opus-5'),
@@ -155,10 +158,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     throw new Error('MEDIA_MODERATION_PROVIDER=rekognition needs REKOGNITION_ACCESS_KEY_ID and REKOGNITION_SECRET_ACCESS_KEY.');
   if (!!cfg.MUSIC_LICENSED_API_URL !== !!cfg.MUSIC_LICENSED_API_KEY)
     throw new Error('The licensed music catalogue needs both MUSIC_LICENSED_API_URL and MUSIC_LICENSED_API_KEY.');
+  if (cfg.EMAIL_TRANSPORT === 'smtp' && !cfg.SMTP_URL) throw new Error('EMAIL_TRANSPORT=smtp needs SMTP_URL.');
   if (cfg.APP_ENV === 'production') {
     if (cfg.PAYMENTS_PROVIDER === 'dev') throw new Error('The development payment provider moves no money. Set PAYMENTS_PROVIDER for production.');
     if (Buffer.from(cfg.MFA_ENCRYPTION_KEY, 'base64').length !== 32) throw new Error('Set MFA_ENCRYPTION_KEY (32 bytes, base64) for production.');
     if (!cfg.COOKIE_SECURE) throw new Error('COOKIE_SECURE must be true in production.');
+    // Verification, password reset and security emails must reach people.
+    if (cfg.EMAIL_TRANSPORT !== 'smtp')
+      throw new Error('Emails are only logged with EMAIL_TRANSPORT=log. Set EMAIL_TRANSPORT=smtp and SMTP_URL for production.');
   }
   return cfg;
 }

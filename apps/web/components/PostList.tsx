@@ -719,6 +719,7 @@ const REASON_LABEL: Record<string, MessageKey> = {
   impersonation: 'postList.reason.impersonation',
   fraud: 'postList.reason.fraud',
   minor_safety: 'postList.reason.minorSafety',
+  copyright: 'postList.reason.copyright',
   other: 'postList.reason.other',
 };
 

@@ -183,6 +183,7 @@ describe('invites', () => {
       password: 'correct-horse-battery',
       username: `wrong_${Date.now().toString(36)}`,
       displayName: 'Wrong code',
+      birthDate: ADULT,
       inviteCode: 'zzzzzzzz',
     });
     expect(wrong.status).toBe(400);
@@ -250,6 +251,7 @@ describe('invites', () => {
       password: 'correct-horse-battery',
       username: `alias_${Date.now().toString(36)}`,
       displayName: 'Second me',
+      birthDate: ADULT,
       inviteCode: code,
     });
     expect(alias.status).toBe(400);

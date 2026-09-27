@@ -76,11 +76,28 @@ const WEB_IMAGES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'
 const WEB_AUDIO = new Set(['audio/mpeg', 'audio/mp4']);
 
 /**
+ * ffmpeg output options that drop every metadata tag (GPS location, camera, owner, dates) and
+ * chapter, globally and per stream. ffmpeg copies tags from the input unless told not to, so
+ * every video or audio file we write passes these.
+ */
+export const NO_METADATA = ['-map_metadata', '-1', '-map_metadata:s', '-1', '-map_chapters', '-1'];
+
+/** Containers a video is remuxed into as it is (tags dropped, nothing encoded again). */
+const REMUX_VIDEO = new Set(['mp4', 'mov', 'webm', 'mkv', 'avi', '3gp', 'mpg', 'ts']);
+
+/**
  * Turn an upload into something every browser and phone can show, before it
- * is stored: HEIC/HEIF, AVIF, TIFF and BMP photos become JPEG (upright, no
- * location data), and audio other than MP3/M4A becomes M4A with its length
- * measured. Videos are stored as they are; processing makes a web MP4 of any
- * format ffmpeg reads (MOV, MKV, AVI, 3GP, MPEG, …).
+ * is stored, with its metadata removed: nothing we store keeps the location
+ * (EXIF GPS, QuickTime ISO 6709), camera or owner tags it arrived with.
+ *
+ * - HEIC/HEIF, AVIF, TIFF and BMP photos become JPEG (upright, no metadata).
+ * - JPEG, PNG, WebP and GIF photos that carry EXIF, XMP, IPTC or text tags are
+ *   written again without them (upright); untagged ones are kept byte for byte.
+ * - Videos are remuxed without their tags (streams copied, not encoded again);
+ *   one that can't be remuxed is encoded as MP4 instead. Processing then makes
+ *   the web MP4 and HLS from this clean copy, also written without tags.
+ * - Audio other than MP3/M4A becomes M4A; MP3 and M4A are remuxed without tags
+ *   (a phone's voice memo can say where it was recorded). Its length is measured.
  */
 export async function toWebFormat(buf: Buffer, d: Detected): Promise<{ buf: Buffer; mime: string; ext: string; durationMs?: number }> {
   if (d.kind === 'image' && !WEB_IMAGES.has(d.mime)) {
@@ -88,18 +105,90 @@ export async function toWebFormat(buf: Buffer, d: Detected): Promise<{ buf: Buff
     if (d.mime === 'image/heic' || d.mime === 'image/heif') {
       source = Buffer.from(await heicConvert({ buffer: buf, format: 'JPEG', quality: 0.92 }));
     } else if (d.mime === 'image/bmp') {
-      source = await ffmpegConvert(buf, 'bmp', 'png', ['-frames:v', '1']);
+      source = await ffmpegConvert(buf, 'bmp', 'png', ['-frames:v', '1', ...NO_METADATA]);
     }
-    const jpeg = await sharp(source, { limitInputPixels: 100_000_000 }).rotate().jpeg({ quality: 90, mozjpeg: true }).toBuffer();
+    // sharp writes no metadata unless asked to; the colour profile is kept so colours don't shift.
+    const jpeg = await sharp(source, { limitInputPixels: 100_000_000 }).rotate().keepIccProfile().jpeg({ quality: 90, mozjpeg: true }).toBuffer();
     return { buf: jpeg, mime: 'image/jpeg', ext: 'jpg' };
   }
+  if (d.kind === 'image') return { buf: await stripImageMetadata(buf, d.mime), mime: d.mime, ext: d.ext };
   if (d.kind === 'audio') {
-    const needsConvert = !WEB_AUDIO.has(d.mime);
-    const out = needsConvert ? await ffmpegConvert(buf, d.ext, 'm4a', ['-vn', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart']) : buf;
-    const durationMs = await audioDurationMs(out, needsConvert ? 'm4a' : d.ext).catch(() => undefined);
-    return needsConvert ? { buf: out, mime: 'audio/mp4', ext: 'm4a', durationMs } : { buf, mime: d.mime, ext: d.ext, durationMs };
+    const toM4a = () => ffmpegConvert(buf, d.ext, 'm4a', ['-vn', '-c:a', 'aac', '-b:a', '96k', ...NO_METADATA, '-movflags', '+faststart']);
+    let converted = !WEB_AUDIO.has(d.mime);
+    let out: Buffer;
+    if (converted) out = await toM4a();
+    else {
+      const remuxed = await ffmpegConvert(buf, d.ext, d.ext, [
+        '-map',
+        '0:a',
+        '-c',
+        'copy',
+        ...NO_METADATA,
+        ...(d.ext === 'm4a' ? ['-movflags', '+faststart'] : []),
+      ]).catch(() => null);
+      if (remuxed?.length) out = remuxed;
+      else {
+        out = await toM4a();
+        converted = true;
+      }
+    }
+    const durationMs = await audioDurationMs(out, converted ? 'm4a' : d.ext).catch(() => undefined);
+    return converted ? { buf: out, mime: 'audio/mp4', ext: 'm4a', durationMs } : { buf: out, mime: d.mime, ext: d.ext, durationMs };
   }
-  return { buf, mime: d.mime, ext: d.ext };
+  return stripVideoMetadata(buf, d);
+}
+
+/** A JPEG, PNG, WebP or GIF without EXIF (GPS), XMP, IPTC or text tags, turned upright. Untagged files come back as they are. */
+export async function stripImageMetadata(buf: Buffer, mime: string): Promise<Buffer> {
+  const limitInputPixels = 100_000_000;
+  const meta = await sharp(buf, { limitInputPixels, animated: true }).metadata();
+  const tagged = !!(meta.exif || meta.xmp || meta.iptc || meta.comments?.length || (meta.orientation && meta.orientation > 1));
+  if (!tagged) return buf;
+  // Turning upright only applies to single frames; animations are written again frame by frame.
+  const img = (meta.pages ?? 1) > 1 ? sharp(buf, { limitInputPixels, animated: true }) : sharp(buf, { limitInputPixels }).rotate();
+  const out =
+    mime === 'image/jpeg'
+      ? img.keepIccProfile().jpeg({ quality: 92, mozjpeg: true })
+      : mime === 'image/png'
+        ? img.keepIccProfile().png({ compressionLevel: 9 })
+        : mime === 'image/webp'
+          ? img.keepIccProfile().webp({ quality: 90 })
+          : img.gif();
+  return out.toBuffer();
+}
+
+/**
+ * A video without its tags (location, device, dates): remuxed in its own container with the
+ * streams copied. When that fails (an unusual container), it is encoded as MP4 instead.
+ */
+async function stripVideoMetadata(buf: Buffer, d: Detected): Promise<{ buf: Buffer; mime: string; ext: string }> {
+  if (REMUX_VIDEO.has(d.ext)) {
+    const faststart = d.ext === 'mp4' || d.ext === 'mov' || d.ext === '3gp' ? ['-movflags', '+faststart'] : [];
+    const out = await ffmpegConvert(buf, d.ext, d.ext, ['-map', '0:v', '-map', '0:a?', '-c', 'copy', ...NO_METADATA, ...faststart]).catch(() => null);
+    if (out?.length) return { buf: out, mime: d.mime, ext: d.ext };
+  }
+  const mp4 = await ffmpegConvert(buf, d.ext, 'mp4', [
+    '-map',
+    '0:v:0',
+    '-map',
+    '0:a:0?',
+    '-c:v',
+    'libx264',
+    '-preset',
+    'veryfast',
+    '-crf',
+    '20',
+    '-pix_fmt',
+    'yuv420p',
+    '-c:a',
+    'aac',
+    '-b:a',
+    '128k',
+    ...NO_METADATA,
+    '-movflags',
+    '+faststart',
+  ]);
+  return { buf: mp4, mime: 'video/mp4', ext: 'mp4' };
 }
 
 function ffmpeg(args: string[]): Promise<string> {

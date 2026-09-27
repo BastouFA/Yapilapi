@@ -3,6 +3,7 @@ import { FEATURE_FLAGS, type FeatureFlag } from '@yapilapi/shared';
 import type { RealtimeHub } from './realtime.ts';
 import { pushTextFor, type PushSender } from './push.ts';
 import { activeControls } from './family.ts';
+import { deliverable, securityEmail, SECURITY_EMAILS, type EmailSender } from './email.ts';
 
 type Q = Pool | PoolClient;
 
@@ -30,6 +31,37 @@ export async function securityEvent(db: Q, userId: string | null, type: string, 
     userAgent ?? null,
     metadata,
   ]);
+  if (userId && SECURITY_EMAILS[type]) securityMailerFn?.(userId, type);
+}
+
+type SecurityMailer = (userId: string, type: string) => void;
+let securityMailerFn: SecurityMailer | null = null;
+/** Called once at startup: security events listed in SECURITY_EMAILS also email the account. */
+export function setSecurityMailer(mailer: SecurityMailer | null) {
+  securityMailerFn = mailer;
+}
+/** On shutdown: stop using this app's mailer (another app in the same process may have replaced it). */
+export function unsetSecurityMailer(mailer: SecurityMailer) {
+  if (securityMailerFn === mailer) securityMailerFn = null;
+}
+
+/**
+ * Emails a security notice to the account's current address, in the background: a slow or
+ * failing mail server never holds up or fails the request. Failures are logged.
+ */
+export function securityMailer(
+  deps: { db: Pool; email: EmailSender; config: { WEB_ORIGIN: string } },
+  log: { warn(obj: object, msg: string): void },
+): SecurityMailer {
+  return (userId, type) => {
+    void (async () => {
+      const { rows } = await deps.db.query<{ email: string }>(`SELECT email FROM users WHERE id = $1 AND status <> 'deleted'`, [userId]);
+      const to = rows[0]?.email;
+      if (!deliverable(to)) return;
+      const mail = securityEmail(type, to, deps.config.WEB_ORIGIN);
+      if (mail) await deps.email.send(mail);
+    })().catch((err: Error) => log.warn({ err: err.message, type }, 'security email not sent'));
+  };
 }
 
 /**
@@ -48,12 +80,35 @@ const MEANINGFUL = new Set([
   'moment_created',
 ]);
 
-export function track(db: Q, userId: string | null, name: string, properties: object = {}): void {
-  db.query(`INSERT INTO analytics_events (user_id, name, meaningful, properties) VALUES ($1,$2,$3,$4)`, [userId, name, MEANINGFUL.has(name), properties]).catch(
-    () => {
-      /* analytics must never break a request */
-    },
-  );
+/**
+ * Record a product analytics event. Nothing is recorded for someone who turned "Analytics" off
+ * in Settings (Privacy): the consent is checked in the same statement, so there is no window.
+ * Returns when the write has finished; callers normally don't wait for it.
+ */
+export function track(db: Q, userId: string | null, name: string, properties: object = {}): Promise<void> {
+  return db
+    .query(
+      `INSERT INTO analytics_events (user_id, name, meaningful, properties)
+       SELECT $1, $2, $3, $4
+       WHERE $1::uuid IS NULL OR NOT EXISTS (SELECT 1 FROM consents WHERE user_id = $1 AND purpose = 'analytics' AND NOT granted)`,
+      [userId, name, MEANINGFUL.has(name), properties],
+    )
+    .then(
+      () => undefined,
+      () => {
+        /* analytics must never break a request */
+      },
+    );
+}
+
+/**
+ * Whether recommendations may use what we know about this person (interests, feedback, who they
+ * follow and talk to). Off when they turned "Personalization" off in Settings (Privacy): For you,
+ * Reels and suggestions then rank the same way for everyone. On when never set.
+ */
+export async function personalizationAllowed(db: Q, userId: string): Promise<boolean> {
+  const { rows } = await db.query<{ granted: boolean }>(`SELECT granted FROM consents WHERE user_id = $1 AND purpose = 'personalization'`, [userId]);
+  return rows[0]?.granted ?? true;
 }
 
 /**

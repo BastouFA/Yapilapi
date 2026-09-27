@@ -69,15 +69,23 @@ export const usernameSchema = z
 
 export const passwordSchema = z.string().min(10, 'Use at least 10 characters.').max(200);
 
+/** A real calendar date (YYYY-MM-DD) in the past, at most 120 years ago. */
+export const birthDateSchema = z
+  .string({ required_error: 'Enter your date of birth.' })
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter your date of birth.')
+  .refine((s) => {
+    const d = new Date(`${s}T00:00:00Z`);
+    if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s) return false;
+    const years = (Date.now() - d.getTime()) / (365.25 * 86400_000);
+    return years > 0 && years < 120;
+  }, 'Enter a real date of birth.');
+
 export const registerSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(254),
   password: passwordSchema,
   username: usernameSchema,
   displayName: trimmed(60),
-  birthDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional(),
+  birthDate: birthDateSchema,
   /** The browser's or phone's language, so a new account starts in it (unsupported ones fall back to English). */
   locale: z.string().max(35).optional(),
   /** A friend's invite code, from a /join/<code> link. */

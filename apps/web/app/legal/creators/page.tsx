@@ -19,7 +19,10 @@ export default async function CreatorsPage() {
 
       <h2>1. Who can earn</h2>
       <ul>
-        <li>You must be 18 or older, or the age of adulthood where you live if that is higher, and able to enter into contracts.</li>
+        <li>
+          You must be 18 or older, or the age of adulthood where you live if that is higher, and able to enter into contracts. We check your date of birth
+          before you can list something for sale, start a paid plan, receive tips or ask for a payout.
+        </li>
         <li>You need a confirmed email address to ask for a payout. We may ask you to confirm your identity, your business details or tax information.</li>
         <li>A business account can only use music cleared for commercial use.</li>
       </ul>

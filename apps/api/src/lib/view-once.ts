@@ -1,4 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { NO_METADATA } from './media-formats.ts';
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -274,6 +275,7 @@ export function viewOnceJobHandlers(deps: ViewOnceDeps) {
               'aac',
               '-b:a',
               '128k',
+              ...NO_METADATA,
               '-movflags',
               '+faststart',
               web,

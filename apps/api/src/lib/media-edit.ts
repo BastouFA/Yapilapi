@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { NO_METADATA } from './media-formats.ts';
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -278,6 +279,7 @@ export function planVideo(
       'veryfast',
       '-crf',
       '20',
+      ...NO_METADATA,
       '-movflags',
       '+faststart',
       '-t',

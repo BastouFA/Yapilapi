@@ -6,7 +6,7 @@ import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } fro
 import type { AppContext } from '../lib/context.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { audit, isEnabled, notify } from '../lib/services.ts';
-import { isBlockedEitherWay, publicUserFrom } from '../lib/users.ts';
+import { assertAdultForMoney, isBlockedEitherWay, publicUserFrom } from '../lib/users.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 import { refundOrder, startPayment } from '../lib/checkout.ts';
 
@@ -55,6 +55,8 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
       }),
       req.body,
     );
+    // Paid plans are for adults (creator terms).
+    await assertAdultForMoney(db, u.id);
     if (input.priceCents > 100_000 * CURRENCY_SCALE[input.currency]) throw badRequest('That price is higher than plans can be.');
     const count = await db.query(`SELECT count(*) AS n FROM creator_plans WHERE creator_id = $1 AND active`, [u.id]);
     if (Number(count.rows[0].n) >= 5) throw new AppError(409, 'conflict', 'You can have up to 5 plans.');
@@ -93,6 +95,7 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
     if (!plan) throw notFound('Plan');
     if (plan.creator_id === u.id) throw badRequest("You can't subscribe to yourself.");
     if (await isBlockedEitherWay(db, u.id, plan.creator_id)) throw forbidden();
+    await assertAdultForMoney(db, plan.creator_id, false);
     const result = await tx(db, async (c) => {
       const existing = await c.query(
         `SELECT id, status FROM creator_subscriptions WHERE subscriber_id = $1 AND creator_id = $2 AND status IN ('pending','active')`,
@@ -170,6 +173,8 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
     if (id === u.id) throw badRequest("You can't tip yourself.");
     if (input.amountCents > 50_000 * CURRENCY_SCALE[input.currency]) throw badRequest('That tip is higher than tips can be.');
     if (await isBlockedEitherWay(db, u.id, id)) throw forbidden();
+    // Only adults can receive tips.
+    await assertAdultForMoney(db, id, false);
     if (input.message && analyzeText(input.message).risk !== 'normal') throw new AppError(422, 'content_blocked', "That message can't be sent.");
     const result = await tx(db, async (c) => {
       const pay = await createPaymentOrder(c, u.id, id, 'tip', input.amountCents, input.currency, input.idempotencyKey);

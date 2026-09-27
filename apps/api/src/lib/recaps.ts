@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { NO_METADATA } from './media-formats.ts';
 import { copyFile, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -625,6 +626,7 @@ export async function renderRecap(dir: string, input: RenderInput, output: strin
       'yuv420p',
       '-r',
       String(RECAP_FPS),
+      ...NO_METADATA,
       '-movflags',
       '+faststart',
       '-t',
@@ -701,6 +703,8 @@ export async function removeRecapMedia(deps: Pick<RecapDeps, 'db' | 'storage'>, 
   const m = rows[0];
   if (!m) return false;
   if (m.storage_key) for (const key of recapStoredKeys(m.storage_key, m.duration_ms)) await deps.storage.remove?.(key).catch(() => {});
+  // And the whole HLS folder, however many segments it has.
+  if (m.storage_key) await deps.storage.removePrefix?.(`${m.storage_key.replace(/\.[^.]+$/, '')}_hls/`).catch(() => {});
   await deps.db.query(`UPDATE recaps SET media_id = NULL WHERE media_id = $1`, [mediaId]);
   await deps.db.query(`DELETE FROM media WHERE id = $1`, [mediaId]);
   return true;

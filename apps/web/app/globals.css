@@ -1,3 +1,9 @@
+/* The design system's fonts, self-hosted by next/font (app/layout.tsx sets these variables on <html>). */
+:root {
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-figtree), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, 'SF Mono', Menlo, monospace;
+}
 html,
 body {
   margin: 0;

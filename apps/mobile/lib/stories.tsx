@@ -30,7 +30,8 @@ import { useDataSaver } from './data-saver';
 import { useT } from './i18n';
 import { RichText } from './post';
 import { gradient, radius, space } from './theme';
-import { Avatar, Icon, KeyboardAvoid, Segmented, SwitchRow, useColors, userText } from './ui';
+import { ActionSheet, Avatar, Icon, KeyboardAvoid, Segmented, SwitchRow, useColors, userText } from './ui';
+import { useReport } from './report';
 import { SensitiveCover } from './safety';
 import { AddToChapterSheet } from './chapters';
 import { StickerLayer, StoryCardView } from './story-stickers';
@@ -195,6 +196,9 @@ function Viewer({
   const [sharing, setSharing] = useState(false);
   const [answering, setAnswering] = useState(false);
   const [chapterFor, setChapterFor] = useState<string | null>(null);
+  // Someone else's story: More, with Report.
+  const [moreOpen, setMoreOpen] = useState(false);
+  const report = useReport();
   backRef.current = () => {
     if (sharing) return (setSharing(false), true);
     if (viewers) return (setViewers(null), true);
@@ -209,7 +213,8 @@ function Viewer({
   const saver = useDataSaver().active;
   const [tapped, setTapped] = useState<string[]>([]);
   const waiting = saver && story?.mediaKind === 'video' && !tapped.includes(story.id);
-  const stopped = held || paused || typing || viewers !== null || covered || sharing || answering || chapterFor !== null || waiting;
+  const stopped =
+    held || paused || typing || viewers !== null || covered || sharing || answering || chapterFor !== null || waiting || moreOpen || report.isOpen;
   // The story's music, in a loop while it's on screen and playing (instead of a video's own sound).
   const [musicOn, setMusicOn] = useMusicOn();
   const music = !covered ? (story?.music ?? null) : null;
@@ -540,6 +545,11 @@ function Viewer({
             >
               <Icon name={paused ? 'play' : 'pause'} size={20} color={WHITE} />
             </Pressable>
+            {group.mine ? null : (
+              <Pressable accessibilityRole="button" accessibilityLabel={t('m.post.more')} hitSlop={8} onPress={() => setMoreOpen(true)} style={st.icon}>
+                <Icon name="ellipsis-horizontal" size={22} color={WHITE} />
+              </Pressable>
+            )}
             <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} hitSlop={8} onPress={onClose} style={st.icon}>
               <Icon name="close" size={24} color={WHITE} />
             </Pressable>
@@ -655,6 +665,20 @@ function Viewer({
       </Animated.View>
 
       <AddToChapterSheet momentId={chapterFor} onClose={() => setChapterFor(null)} onAdded={setSent} />
+      <ActionSheet
+        visible={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        title={name}
+        actions={[
+          {
+            label: t('post.report'),
+            icon: 'flag-outline',
+            destructive: true,
+            onPress: () => report.open({ type: 'story', id: story.id, authorId: group.author.id, authorName: name }),
+          },
+        ]}
+      />
+      {report.sheet}
       {viewers !== null ? (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay, justifyContent: 'flex-end' }]}>
           <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} style={{ flex: 1 }} onPress={() => setViewers(null)} />

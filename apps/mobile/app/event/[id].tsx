@@ -1,4 +1,4 @@
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Linking, Platform, Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
 import { formatEventWhen, safeTimeZone } from '../../../../packages/shared/src/i18n';
@@ -7,11 +7,12 @@ import type { EventItem, PublicUser } from '../../../../packages/shared/src/type
 import { client, errorMessage, webUrl } from '../../lib/api';
 import { isWebLink } from '../../lib/forms';
 import { useT } from '../../lib/i18n';
+import { useReport } from '../../lib/report';
 import { RichText } from '../../lib/post';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
 import { deviceTimeZone } from '../../lib/time-zone';
-import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, Segmented, useColors, userText } from '../../lib/ui';
+import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, Segmented, useActionSheet, useColors, userText } from '../../lib/ui';
 
 type Rsvp = 'going' | 'interested' | 'not_going';
 
@@ -30,6 +31,9 @@ export default function EventScreen() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // More in the header: report someone else's event.
+  const menu = useActionSheet();
+  const report = useReport();
 
   const load = useCallback(async () => {
     try {
@@ -138,6 +142,37 @@ export default function EventScreen() {
         />
       }
     >
+      <Stack.Screen
+        options={{
+          headerRight:
+            me && !hosting
+              ? () => (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('m.post.more')}
+                    hitSlop={10}
+                    onPress={() =>
+                      menu.show({
+                        title: event.title,
+                        actions: [
+                          {
+                            label: t('post.report'),
+                            icon: 'flag-outline',
+                            destructive: true,
+                            onPress: () => report.open({ type: 'event', id: event.id, authorId: event.host.id, authorName: event.host.displayName }),
+                          },
+                        ],
+                      })
+                    }
+                  >
+                    <Icon name="ellipsis-horizontal-circle-outline" size={24} color={c.yapi} />
+                  </Pressable>
+                )
+              : undefined,
+        }}
+      />
+      {menu.sheet}
+      {report.sheet}
       <Card style={{ gap: space[3] }}>
         {event.community ? (
           <Pressable

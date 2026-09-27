@@ -50,6 +50,7 @@ describe('distributed tracing', () => {
         email: `trace_${suffix}@example.test`,
         password: 'correct-horse-battery',
         username: `trace_${suffix}`,
+        birthDate: '1990-01-01',
         displayName: 'Tracer',
       }),
     });

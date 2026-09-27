@@ -20,6 +20,7 @@ import { MediaViewer } from './media-viewer';
 import { RepostersSheet } from './reposters';
 import { useFlag } from './flags';
 import { AddToMemorySheet } from './memories';
+import { useReport } from './report';
 
 export { RichText };
 
@@ -235,7 +236,16 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
   // A tip for a creator's post, paid on the web.
   const canTip = !!me && !isAuthor && !post.status && !post.locked && post.author.mode === 'creator';
 
-  /** More: insights and boost, edit your post, save to a board, add to a memory, leave as co-author, remove your photo tag. */
+  // Someone else's published post can be reported (not one you co-author).
+  const canReport = !!me && !isAuthor && !post.status && collab !== 'accepted';
+  // Blocking the author from the report sheet folds the card away.
+  const [blockedAuthor, setBlockedAuthor] = useState(false);
+  const report = useReport({ onBlocked: () => setBlockedAuthor(true) });
+
+  /**
+   * More: insights and boost, edit your post, save to a board, add to a memory, leave as
+   * co-author, remove your photo tag, report someone else's post.
+   */
   const menu = useActionSheet();
   function more() {
     const actions: ActionSheetAction[] = [];
@@ -247,12 +257,27 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
     if (canRemember) actions.push({ label: t('m.mem.addToMemory'), icon: 'albums-outline', onPress: () => setRemembering(true) });
     if (collab === 'accepted') actions.push({ label: t('m.collab.leave'), icon: 'exit-outline', destructive: true, onPress: () => void leave() });
     if (myTag) actions.push({ label: t('m.tags.removeMine'), icon: 'pricetag-outline', onPress: () => void removeTag(myTag) });
+    if (canReport)
+      actions.push({
+        label: t('post.report'),
+        icon: 'flag-outline',
+        destructive: true,
+        onPress: () => report.open({ type: 'post', id: post.id, authorId: post.author.id, authorName: post.author.displayName }),
+      });
     menu.show({
       title: t('m.post.more'),
       message: collab === 'accepted' ? t('m.collab.leaveBody', { name: post.author.displayName }) : undefined,
       actions,
     });
   }
+
+  if (blockedAuthor)
+    return (
+      <Card>
+        <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('m.profile.blocked', { name: post.author.displayName })}</Text>
+        {report.sheet}
+      </Card>
+    );
 
   return (
     <Card
@@ -522,7 +547,7 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
           ) : null}
           {canTip ? <TipButton post={post} /> : null}
           <View style={{ flex: 1 }} />
-          {collab === 'accepted' || myTag || canEdit || canRemember || canSeeInsights ? (
+          {collab === 'accepted' || myTag || canEdit || canRemember || canSeeInsights || canReport ? (
             <Pressable accessibilityRole="button" accessibilityLabel={t('m.post.more')} hitSlop={8} onPress={more}>
               <Icon name="ellipsis-horizontal" size={20} color={c.inkMuted} />
             </Pressable>
@@ -568,6 +593,7 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
       {repostersOpen ? <RepostersSheet postId={post.id} onClose={() => setRepostersOpen(false)} /> : null}
       {remembering ? <AddToMemorySheet postId={post.id} onClose={() => setRemembering(false)} /> : null}
       {menu.sheet}
+      {report.sheet}
     </Card>
   );
 }

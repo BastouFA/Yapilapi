@@ -10,7 +10,7 @@ import { signDevWebhook } from '../lib/payments.ts';
 import { businessOverview } from '../lib/ai/agents.ts';
 import { refundUnspentBudget } from '../lib/ad-refunds.ts';
 import { submitBoostForReview } from '../lib/boosts.ts';
-import { publicUserFrom } from '../lib/users.ts';
+import { assertAdultForMoney, publicUserFrom } from '../lib/users.ts';
 import { EVENT_SELECT, toEvent } from './events.ts';
 import { eventVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
@@ -254,6 +254,8 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     if (!(await isEnabled(db, 'COMMERCE'))) throw featureDisabled('Commerce');
     const u = me(req);
     const input = parse(createProductSchema, req.body);
+    // Selling is for adults (creator and seller terms).
+    await assertAdultForMoney(db, u.id);
     if (input.businessId) {
       const own = await db.query(`SELECT 1 FROM businesses WHERE id = $1 AND owner_id = $2`, [input.businessId, u.id]);
       if (!own.rowCount) throw forbidden('You can only sell under your own business.');
@@ -325,6 +327,8 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
         const live = (await c.query(`SELECT ticket_product_id FROM live_sessions WHERE id = $1 AND status <> 'ended'`, [input.liveSessionId])).rows[0];
         if (!live?.ticket_product_id || !ids.includes(live.ticket_product_id)) throw badRequest("That isn't the ticket for this live.");
       }
+      // Sellers must be adults; a listing made before that rule can't be bought from someone younger.
+      for (const seller of new Set(products.map((p) => p.seller_id as string))) if (seller !== u.id) await assertAdultForMoney(c, seller, false);
       const currencies = new Set(products.map((p) => p.currency));
       if (currencies.size > 1) throw badRequest('All items in one order must use the same currency.');
       let total = 0;
@@ -614,6 +618,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     const u = me(req);
     const input = parse(z.object({ amountCents: z.number().int().positive(), currency: z.string().length(3).toUpperCase() }), req.body);
     if (!u.emailVerified) throw forbidden('Verify your email before requesting a payout.');
+    await assertAdultForMoney(db, u.id);
     const { rows } = await db.query(`INSERT INTO payouts (user_id, amount_cents, currency) VALUES ($1,$2,$3) RETURNING id, status`, [
       u.id,
       input.amountCents,
@@ -631,6 +636,10 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
 
   app.post('/v1/admin/payouts/:id/verify', { preHandler: requireRole('admin') }, async (req) => {
     const { id } = parse(idParam, req.params);
+    const payout = (await db.query(`SELECT user_id FROM payouts WHERE id = $1 AND status = 'pending'`, [id])).rows[0];
+    if (!payout) throw notFound('Payout');
+    // Payouts only go to adults, whatever was requested before the rule.
+    await assertAdultForMoney(db, payout.user_id, false);
     const r = await db.query(`UPDATE payouts SET status = 'verified' WHERE id = $1 AND status = 'pending'`, [id]);
     if (!r.rowCount) throw notFound('Payout');
     await audit(db, { actorId: me(req).id, action: 'payout.verify', entityType: 'payout', entityId: id });

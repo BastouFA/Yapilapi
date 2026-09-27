@@ -4,7 +4,16 @@ import { pipeline } from 'node:stream/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
-import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  CreateBucketCommand,
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  HeadBucketCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 
 export interface StoredObject {
   key: string;
@@ -26,6 +35,13 @@ export interface MediaStorage {
   get?(key: string, range?: string): Promise<{ body: Readable; contentType?: string; contentLength?: number; contentRange?: string; status: number } | null>;
   /** Delete an object for good (view-once media). Deleting something already gone is not an error. */
   remove?(key: string): Promise<void>;
+  /** Delete every object under a folder-like prefix ending in "/" (a video's HLS segments). Nothing there is not an error. */
+  removePrefix?(prefix: string): Promise<void>;
+}
+
+/** Only a stored video's HLS folder (<year>/<month>/<uuid>_hls/) can be removed as a whole. */
+export function isSafePrefix(prefix: string): boolean {
+  return /^\d{4}\/\d{2}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_hls\/$/i.test(prefix);
 }
 
 function newKey(ext: string) {
@@ -131,6 +147,16 @@ export function s3Storage(opts: {
     async remove(key) {
       await s3.send(new DeleteObjectCommand({ Bucket: opts.bucket, Key: key }));
     },
+    async removePrefix(prefix) {
+      if (!isSafePrefix(prefix)) return;
+      let token: string | undefined;
+      do {
+        const page = await s3.send(new ListObjectsV2Command({ Bucket: opts.bucket, Prefix: prefix, ContinuationToken: token }));
+        const keys = (page.Contents ?? []).map((o) => ({ Key: o.Key! })).filter((o) => o.Key);
+        if (keys.length) await s3.send(new DeleteObjectsCommand({ Bucket: opts.bucket, Delete: { Objects: keys, Quiet: true } }));
+        token = page.IsTruncated ? page.NextContinuationToken : undefined;
+      } while (token);
+    },
   };
 }
 
@@ -175,6 +201,10 @@ export function localDiskStorage(dir: string, publicBase: string): MediaStorage 
     },
     async remove(key) {
       await rm(path.join(dir, key), { force: true });
+    },
+    async removePrefix(prefix) {
+      if (!isSafePrefix(prefix)) return;
+      await rm(path.join(dir, prefix), { recursive: true, force: true });
     },
   };
 }

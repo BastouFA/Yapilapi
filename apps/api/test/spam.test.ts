@@ -40,7 +40,14 @@ async function signUpFrom(ip: string, extra: Record<string, unknown> = {}) {
     method: 'POST',
     url: '/v1/auth/register',
     headers: { 'x-forwarded-for': ip },
-    payload: { email: `s_${s}@example.test`, password: 'correct-horse-battery', username: `s_${s}`, displayName: 'Spam test', ...extra },
+    payload: {
+      email: `s_${s}@example.test`,
+      password: 'correct-horse-battery',
+      username: `s_${s}`,
+      displayName: 'Spam test',
+      birthDate: '1990-01-01',
+      ...extra,
+    },
   });
   return { status: res.statusCode, body: res.json() as any };
 }

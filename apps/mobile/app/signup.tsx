@@ -14,8 +14,8 @@ const MIN_PASSWORD = 10;
 
 /**
  * Create an account: name, username (checked as you type, suggested from the name), email,
- * password, and optionally a date of birth and a friend's invite code (filled in from an invite
- * link). Problems show next to the field they are about. Then onboarding.
+ * password, date of birth (required: under 13 can't join), and optionally a friend's invite code
+ * (filled in from an invite link). Problems show next to the field they are about. Then onboarding.
  */
 export default function Signup() {
   const c = useColors();
@@ -78,6 +78,7 @@ export default function Signup() {
     else if (available === false) f.username = t('m.auth.usernameTaken');
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) f.email = t('m.auth.emailInvalid');
     if (password.length < MIN_PASSWORD) f.password = t('auth.password.hint');
+    if (!birth) f.birthDate = t('auth.birthDate.required');
     return f;
   }
 
@@ -97,7 +98,7 @@ export default function Signup() {
         username: username.trim(),
         email: email.trim(),
         password,
-        birthDate: birth ? isoDay(birth) : undefined,
+        birthDate: isoDay(birth!),
         locale,
         inviteCode: invite.trim() || undefined,
       });
@@ -187,7 +188,6 @@ export default function Signup() {
         min={earliest}
         max={today}
         openAt={openAt}
-        placeholder={t('m.auth.birthDate.optional')}
         note={fields.birthDate ?? t('m.auth.birthDate.hint')}
       />
       {showInvite ? (

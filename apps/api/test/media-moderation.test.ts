@@ -116,6 +116,8 @@ describe('automated media checks in the media job', () => {
     const adult = await signUp(t.app, { birthDate: ADULT });
     const teen = await signUp(t.app, { birthDate: MINOR });
     const unknownAge = await signUp(t.app);
+    // An account made before a birth date was required.
+    await t.ctx.db.query(`UPDATE users SET birth_date = NULL WHERE id = $1`, [unknownAge.id]);
     const m = await upload(author, 'beach-sensitive.jpg');
     expect((await moderation(m.id)).moderation).toBe('sensitive');
     const post = (await as(t.app, author).post('/v1/posts', { body: 'At the beach', media: [{ id: m.id, url: m.url, kind: 'image' }] })).body.post;
@@ -193,6 +195,8 @@ describe('automated media checks in the media job', () => {
     const sender = await signUp(t.app, { birthDate: ADULT });
     const adult = await signUp(t.app, { birthDate: ADULT });
     const unknownAge = await signUp(t.app);
+    // An account made before a birth date was required.
+    await t.ctx.db.query(`UPDATE users SET birth_date = NULL WHERE id = $1`, [unknownAge.id]);
     await befriend(sender, adult);
     await befriend(sender, unknownAge);
     const m = await upload(sender, 'sunset-nsfw.jpg');
@@ -281,6 +285,8 @@ describe('automated media checks in the media job', () => {
       STRIPE_PUBLISHABLE_KEY: 'pk',
       MFA_ENCRYPTION_KEY: Buffer.alloc(32).toString('base64'),
       COOKIE_SECURE: 'true',
+      EMAIL_TRANSPORT: 'smtp',
+      SMTP_URL: 'smtp://localhost:2525',
     });
     expect(prod.MEDIA_MODERATION_PROVIDER).toBe('none');
     expect(prod.REQUIRE_VERIFICATION).toBe(true);

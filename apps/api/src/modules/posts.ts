@@ -26,7 +26,7 @@ import { attachSaveNotes, savedFilterSql } from '../lib/saves.ts';
 import { notifyMentions } from '../lib/mentions.ts';
 import { coAuthoredSql } from '../lib/collabs.ts';
 import { topicsFor } from './tags.ts';
-import { notify, track } from '../lib/services.ts';
+import { notify, personalizationAllowed, track } from '../lib/services.ts';
 import { isAdultViewer, plusCol, publicUserFrom } from '../lib/users.ts';
 import { notBlockedSql, postUnlockedSql, postVisibleSql } from '../lib/visibility.ts';
 import { assessPost } from '../lib/spam.ts';
@@ -94,15 +94,16 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
        WHERE p.format = 'reel' AND ${VISIBLE} AND p.moderation_status = 'normal' AND p.created_at <= $2::timestamptz
          AND ($5 OR NOT EXISTS (SELECT 1 FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id AND m.moderation = 'sensitive'))
        ORDER BY (
-           CASE WHEN EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = p.author_id) OR (fr.user_b = $1 AND fr.user_a = p.author_id)) THEN 3 ELSE 0 END
-         + CASE WHEN EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = p.author_id) THEN 2 ELSE 0 END
-         + (SELECT count(*) FROM unnest(p.topics) t WHERE t IN (SELECT tp.slug FROM user_interests ui JOIN topics tp ON tp.id = ui.topic_id WHERE ui.user_id = $1)) * 1.2
+           -- People you're close to and your interests only count with Personalization on ($6).
+           CASE WHEN $6 AND EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = p.author_id) OR (fr.user_b = $1 AND fr.user_a = p.author_id)) THEN 3 ELSE 0 END
+         + CASE WHEN $6 AND EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = p.author_id) THEN 2 ELSE 0 END
+         + (SELECT count(*) FROM unnest(p.topics) t WHERE $6 AND t IN (SELECT tp.slug FROM user_interests ui JOIN topics tp ON tp.id = ui.topic_id WHERE ui.user_id = $1)) * 1.2
          + ln(1 + p.like_count + 2 * p.comment_count) * 0.6
          + 4.0 * exp(-extract(epoch FROM ($2::timestamptz - p.created_at)) / 86400.0)
        ) DESC, p.created_at DESC, p.id DESC
        LIMIT $3 OFFSET $4`,
       // A reel is its video: people under 18 don't get reels whose video is marked sensitive.
-      [u.id, c.asOf, q.limit + 1, c.o, await isAdultViewer(db, u.id)],
+      [u.id, c.asOf, q.limit + 1, c.o, await isAdultViewer(db, u.id), await personalizationAllowed(db, u.id)],
     );
     const page = rows.slice(0, q.limit);
     const items = await hydratePosts(
@@ -518,7 +519,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
          OR (ff.signal = 'mute_creator' AND ff.author_id = p.author_id)
          OR (ff.signal = 'mute_topic' AND ff.topic = ANY(p.topics))))`;
 
-    if (mode === 'for_you') return rankedFeed(u.id, q.cursor, q.limit, personal, !!prefs.reduced_recommendations);
+    if (mode === 'for_you') return rankedFeed(u.id, q.cursor, q.limit, personal, !!prefs.reduced_recommendations, await personalizationAllowed(db, u.id));
 
     const scope: Record<string, string> = {
       following: `(p.author_id = $1 OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = p.author_id)) AND p.community_id IS NULL`,
@@ -589,7 +590,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
    * so pagination is stable. Diversity: at most 2 posts per author per page.
    * Not optimized for time spent: no autoplay loops, a clear end of feed.
    */
-  async function rankedFeed(userId: string, cursor: string | undefined, limit: number, personal: string, reduced: boolean) {
+  async function rankedFeed(userId: string, cursor: string | undefined, limit: number, personal: string, reduced: boolean, personalized: boolean) {
     // The window starts at the database's clock, not this process's: a post written a moment ago must be inside it
     // even when the two clocks drift (common with containers after the host sleeps).
     const c = decodeCursor<{ asOf: string; o: number }>(cursor) ?? {
@@ -600,6 +601,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       ? `AND (p.author_id = $1 OR p.author_id IN (SELECT id FROM followed)
               OR EXISTS (SELECT 1 FROM community_members cm WHERE cm.community_id = p.community_id AND cm.user_id = $1))`
       : '';
+    if (!personalized) return popularFeed(userId, c, limit, personal, connectionOnly);
     // Candidates: everything in the window from you, people you follow, friends and your
     // communities, plus the newest RECENT_CANDIDATES other posts. Scoring every post of the
     // last 14 days made this query grow with the whole platform (docs/architecture/performance.md).
@@ -719,6 +721,63 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     };
   }
 
+  /**
+   * For you with "Personalization" off: the same for everyone, ranked by engagement and
+   * freshness only. Nothing about the viewer (interests, feedback topics, who they follow,
+   * their communities) moves a post up. Their own filters still apply (muted people, "not
+   * interested", muted topics, "Fewer suggestions"), and so does who may see what.
+   */
+  async function popularFeed(userId: string, c: { asOf: string; o: number }, limit: number, personal: string, connectionOnly: string) {
+    const { rows } = await db.query(
+      `WITH followed AS (SELECT followee_id AS id FROM follows WHERE follower_id = $1),
+       candidates AS (
+         (SELECT id FROM posts
+          WHERE deleted_at IS NULL AND status = 'published' AND created_at <= $2::timestamptz AND created_at > $2::timestamptz - interval '14 days'
+          ORDER BY created_at DESC, id DESC LIMIT ${RECENT_CANDIDATES})
+         UNION
+         SELECT id FROM posts
+         WHERE author_id = $1 AND deleted_at IS NULL AND status = 'published' AND created_at <= $2::timestamptz AND created_at > $2::timestamptz - interval '14 days'
+       )
+       SELECT p.id, p.author_id, cm_c.name AS community_name,
+              ln(1 + p.like_count + 2 * p.comment_count) * 0.6 + 4.0 * exp(-extract(epoch FROM ($2::timestamptz - p.created_at)) / 86400.0) AS score
+       ${POST_FROM}
+       LEFT JOIN communities cm_c ON cm_c.id = p.community_id
+       LEFT JOIN community_members cm_self ON cm_self.community_id = p.community_id AND cm_self.user_id = $1 AND cm_self.status = 'active'
+       WHERE p.id IN (SELECT id FROM candidates) AND ${VISIBLE} ${personal} ${connectionOnly}
+         AND (p.community_id IS NULL OR cm_self.user_id IS NOT NULL OR cm_c.visibility = 'public')
+       ORDER BY score DESC, p.created_at DESC, p.id DESC
+       LIMIT $3 OFFSET $4`,
+      [userId, c.asOf, limit * 2 + 1, c.o],
+    );
+    const perAuthor = new Map<string, number>();
+    const picked: typeof rows = [];
+    let consumed = 0;
+    for (const r of rows) {
+      if (picked.length >= limit) break;
+      consumed++;
+      const n = perAuthor.get(r.author_id) ?? 0;
+      if (n >= 2) continue;
+      perAuthor.set(r.author_id, n + 1);
+      picked.push(r);
+    }
+    const reasons = new Map<string, string>(
+      picked.map((r) => [
+        r.id as string,
+        r.author_id === userId ? 'Your post' : r.community_name ? `Popular in ${r.community_name}` : 'Popular with people on YAPILAPI right now',
+      ]),
+    );
+    return {
+      mode: 'for_you',
+      items: await hydratePosts(
+        db,
+        picked.map((r) => r.id),
+        userId,
+        reasons,
+      ),
+      nextCursor: rows.length > consumed ? encodeCursor({ asOf: c.asOf, o: c.o + consumed }) : null,
+    };
+  }
+
   app.post('/v1/feed/feedback', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const input = parse(feedbackSchema, req.body);
@@ -754,6 +813,10 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     );
     const r = rows[0];
     const reasons: string[] = [];
+    if (!(await personalizationAllowed(db, u.id))) {
+      reasons.push('Personalization is off in your settings, so this is ranked by how recent it is and how many people engage with it.');
+      return { reasons, controls: ['not_interested', 'mute_topic', 'mute_creator'] };
+    }
     if (r.friend) reasons.push(`You're friends with ${r.display_name}.`);
     else if (r.followed) reasons.push(`You follow ${r.display_name}.`);
     if (r.member) reasons.push(`This is from ${r.community}, a community you joined.`);

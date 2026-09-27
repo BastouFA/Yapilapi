@@ -39,7 +39,6 @@ import {
   type ReelMoment,
   type ReelSpeed,
 } from '../../../packages/shared/src/reels';
-import { REPORT_REASONS } from '../../../packages/shared/src/constants';
 import { client, errorMessage, mediaUrl, webUrl } from '../lib/api';
 import { useDataSaver } from '../lib/data-saver';
 import { useSession } from '../lib/session';
@@ -49,6 +48,7 @@ import { Avatar, BottomSheet, Button, EmptyState, Field, Icon, type IconName, Lo
 import { LockedPanel } from '../lib/money';
 import { useBoards, type SaveChange } from '../lib/boards';
 import { AuthorNames, RichText } from '../lib/post';
+import { useReport } from '../lib/report';
 import { SensitiveCover } from '../lib/safety';
 import { TranslatableText } from '../lib/translation';
 import { openMusic, useMusicCredit, useMusicLoop } from '../lib/music';
@@ -75,18 +75,6 @@ const SHEET_SWAP_MS = 420;
 
 /** What the reel on screen lets the sheets do: read where it is, and go to a moment. */
 type ReelControls = { currentMs: () => number; seek: (ms: number) => void };
-const REASON_KEYS: Record<(typeof REPORT_REASONS)[number], MessageKey> = {
-  spam: 'postList.reason.spam',
-  harassment: 'postList.reason.harassment',
-  hate: 'postList.reason.hate',
-  violence: 'postList.reason.violence',
-  nudity: 'postList.reason.nudity',
-  self_harm: 'postList.reason.selfHarm',
-  impersonation: 'postList.reason.impersonation',
-  fraud: 'postList.reason.fraud',
-  minor_safety: 'postList.reason.minorSafety',
-  other: 'postList.reason.other',
-};
 
 function useReducedMotion() {
   const [reduce, setReduce] = useState(false);
@@ -357,14 +345,12 @@ export default function Reels() {
     setStatus(t('reel.notInterested.done'));
   }
 
-  async function report(p: Post, reason: string) {
-    try {
-      const r = await (await client()).reports.create({ targetType: 'post', targetId: p.id, reason });
-      setStatus(r.message);
-    } catch (e) {
-      setError(errorMessage(e));
-    }
-  }
+  // Report a reel from the options sheet; blocking its creator from there too hides their reels.
+  const reporter = useReport({ onBlocked: (userId) => setItems((cur) => cur?.filter((x) => x.author.id !== userId) ?? cur) });
+  const report = (p: Post) => {
+    setSheet(null);
+    setTimeout(() => reporter.open({ type: 'post', id: p.id, authorId: p.author.id, authorName: p.author.displayName }), SHEET_SWAP_MS);
+  };
 
   async function setAllowRemix(p: Post, allowRemix: boolean) {
     patch(p.id, (x) => ({ ...x, allowRemix }));
@@ -417,6 +403,7 @@ export default function Reels() {
           style={{ alignSelf: 'center' }}
           onPress={() => router.navigate({ pathname: '/create', params: { mode: 'reel' } })}
         />
+        {reporter.sheet}
       </View>
     );
 
@@ -550,10 +537,11 @@ export default function Reels() {
         onCopy={(p) => void copyLink(p)}
         onHighlights={(p) => swapSheet({ kind: 'highlights', post: p })}
         onNotInterested={(p) => void notInterested(p)}
-        onReport={(p, r) => void report(p, r)}
+        onReport={report}
         onDownload={(p) => void shareVideo(p)}
         onAllowRemix={(p, v) => void setAllowRemix(p, v)}
       />
+      {reporter.sheet}
       {sheet?.kind === 'highlights' && sheetPost ? (
         <HighlightsSheet
           post={sheetPost}
@@ -1520,30 +1508,19 @@ function OptionsSheet({
   onCopy: (p: Post) => void;
   onHighlights: (p: Post) => void;
   onNotInterested: (p: Post) => void;
-  onReport: (p: Post, reason: string) => void;
+  onReport: (p: Post) => void;
   onDownload: (p: Post) => void;
   onAllowRemix: (p: Post, allow: boolean) => void;
 }) {
   const c = useColors();
   const { t, number } = useT();
-  const [reporting, setReporting] = useState(false);
-  useEffect(() => {
-    if (!post) setReporting(false);
-  }, [post]);
   const done = (fn: () => void) => () => {
     onClose();
     fn();
   };
   return (
     <BottomSheet done gap={space[2]} visible={!!post} title={t('reel.options')} onClose={onClose}>
-      {post && reporting ? (
-        <>
-          <Text style={{ color: c.inkMuted, fontWeight: '700', fontSize: 13 }}>{t('postList.reportWhat')}</Text>
-          {REPORT_REASONS.map((r) => (
-            <SheetItem key={r} icon="flag-outline" label={t(REASON_KEYS[r])} onPress={done(() => onReport(post, r))} />
-          ))}
-        </>
-      ) : post ? (
+      {post ? (
         <>
           <Text style={{ color: c.inkMuted, fontWeight: '700', fontSize: 13 }}>{t('reel.speed')}</Text>
           <Segmented
@@ -1574,7 +1551,7 @@ function OptionsSheet({
           ) : (
             <>
               <SheetItem icon="eye-off-outline" label={t('reel.notInterested')} onPress={done(() => onNotInterested(post))} />
-              {post.viewer.collab === 'accepted' ? null : <SheetItem icon="flag-outline" label={t('reel.report')} danger onPress={() => setReporting(true)} />}
+              {post.viewer.collab === 'accepted' ? null : <SheetItem icon="flag-outline" label={t('reel.report')} danger onPress={() => onReport(post)} />}
             </>
           )}
         </>

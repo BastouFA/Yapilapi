@@ -152,7 +152,8 @@ export function createClient(opts: ClientOptions) {
         password: string;
         username: string;
         displayName: string;
-        birthDate?: string;
+        /** YYYY-MM-DD. Required: under 13 can't join. */
+        birthDate: string;
         locale?: string;
         inviteCode?: string;
         website?: string;
@@ -167,6 +168,8 @@ export function createClient(opts: ClientOptions) {
       sessions: () => get<{ items: { id: string; device: string; ip: string; last_seen_at: string; current: boolean }[] }>('/v1/auth/sessions'),
       revokeSession: (id: string) => del(`/v1/auth/sessions/${id}`),
       checkUsername: (username: string) => post<{ available: boolean }>('/v1/auth/check-username', { username }),
+      /** Once, for an account made before a birth date was required (Me.needsBirthDate). */
+      setBirthDate: (birthDate: string) => post<{ user: Me }>('/v1/me/birth-date', { birthDate }),
     },
     users: {
       get: (username: string) => get<{ profile: Profile }>(`/v1/users/${encodeURIComponent(username)}`),

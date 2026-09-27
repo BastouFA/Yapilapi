@@ -1,24 +1,34 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { hashPassword, hashToken, newToken, SESSION_COOKIE, verifyPassword } from '@yapilapi/auth';
 import { tx } from '@yapilapi/database';
-import { forgotPasswordSchema, loginSchema, registerSchema, resetPasswordSchema, tokenSchema, type Me, SUPPORTED_LOCALES } from '@yapilapi/shared';
+import {
+  ADULT_AGE,
+  birthDateSchema,
+  forgotPasswordSchema,
+  loginSchema,
+  MIN_SIGNUP_AGE,
+  registerSchema,
+  resetPasswordSchema,
+  tokenSchema,
+  type Me,
+  SUPPORTED_LOCALES,
+} from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, badRequest, conflict, notFound, parse, unauthorized } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { audit, securityEvent, track } from '../lib/services.ts';
-import { ageOf } from '../lib/users.ts';
+import { applyMinorDefaults, checkBirthDate } from '../lib/users.ts';
 import { announceReferral, applyReferral, inviterByCode, qualifyReferral } from '../lib/invites.ts';
 import { recordSignals, scoreSignup } from '../lib/spam.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 import { registerMfa } from './mfa.ts';
 import { registerPasskeys } from './passkeys.ts';
 
-const MIN_AGE = 13;
 const authLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } };
 
 export async function loadMe(ctx: AppContext, userId: string): Promise<Me> {
   const { rows } = await ctx.db.query(
-    `SELECT u.id, u.email, u.email_verified_at, u.phone_e164, u.phone_verified_at, u.restricted_at, u.role, u.onboarded_at, pr.username, pr.display_name, pr.avatar_url, pr.mode, pr.locale, pr.country, pr.plus_until,
+    `SELECT u.id, u.email, u.email_verified_at, (u.birth_date IS NULL) AS no_birth_date, u.phone_e164, u.phone_verified_at, u.restricted_at, u.role, u.onboarded_at, pr.username, pr.display_name, pr.avatar_url, pr.mode, pr.locale, pr.country, pr.plus_until,
             coalesce(up.data_saver, 'auto') AS data_saver, coalesce(up.languages, '{}') AS languages, coalesce(up.auto_translate, false) AS auto_translate
      FROM users u JOIN profiles pr ON pr.user_id = u.id LEFT JOIN user_preferences up ON up.user_id = u.id WHERE u.id = $1`,
     [userId],
@@ -33,6 +43,7 @@ export async function loadMe(ctx: AppContext, userId: string): Promise<Me> {
     phoneVerified: !!r.phone_verified_at,
     needsVerification: ctx.config.REQUIRE_VERIFICATION && !r.email_verified_at && !r.phone_verified_at,
     ...(r.restricted_at ? { limited: true } : {}),
+    ...(r.no_birth_date ? { needsBirthDate: true } : {}),
     role: r.role,
     onboarded: !!r.onboarded_at,
     username: r.username,
@@ -77,17 +88,23 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
     return token;
   }
 
+  // Links in emails open the web app (the first origin when several are allowed).
+  const webOrigin = ctx.config.WEB_ORIGIN.split(',')[0]!.replace(/\/+$/, '');
+
   async function sendVerification(userId: string, email: string) {
     const { token, hash } = newToken();
     await ctx.db.query(`INSERT INTO auth_tokens (user_id, purpose, token_hash, expires_at) VALUES ($1,'verify_email',$2, now() + interval '2 days')`, [
       userId,
       hash,
     ]);
-    await ctx.email.send({
-      to: email,
-      subject: 'Confirm your email for YAPILAPI',
-      text: `Confirm your email: ${ctx.config.WEB_ORIGIN}/verify-email?token=${token}`,
-    });
+    // A mail server that is down must not fail the sign-up: "Send the link again" in Settings retries.
+    await ctx.email
+      .send({
+        to: email,
+        subject: 'Confirm your email for YAPILAPI',
+        text: `Confirm your email: ${webOrigin}/verify-email?token=${token}`,
+      })
+      .catch((err: Error) => app.log.error({ err: err.message }, 'verification email not sent'));
   }
 
   app.post('/v1/auth/register', { config: authLimit }, async (req, reply) => {
@@ -97,10 +114,13 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
       await securityEvent(ctx.db, null, 'signup_blocked', req.ip, req.headers['user-agent'], { reason: 'honeypot' });
       throw new AppError(400, 'signup_blocked', 'We couldn’t create your account. Try again, or contact support if this keeps happening.');
     }
-    if (input.birthDate) {
-      const age = ageOf(input.birthDate);
-      if (age === null || age < MIN_AGE)
-        throw badRequest(`You need to be at least ${MIN_AGE} to join.`, { fields: { birthDate: `You need to be at least ${MIN_AGE}.` } });
+    // Everyone gives a birth date; under 13 can't join, 13 to 17 get the protections for minors.
+    const age = checkBirthDate(input.birthDate);
+    if (age < MIN_SIGNUP_AGE) {
+      await securityEvent(ctx.db, null, 'signup_underage', req.ip, req.headers['user-agent']);
+      throw new AppError(403, 'under_minimum_age', `You need to be at least ${MIN_SIGNUP_AGE} to join YAPILAPI.`, {
+        fields: { birthDate: `You need to be at least ${MIN_SIGNUP_AGE}.` },
+      });
     }
     const passwordHash = await hashPassword(input.password);
     // Risk signals (throwaway email, many sign-ups from one network) never block a sign-up; moderators see them.
@@ -122,7 +142,7 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
         });
       const u = await c.query<{ id: string; created_at: Date }>(
         `INSERT INTO users (email, password_hash, birth_date) VALUES ($1,$2,$3) RETURNING id, created_at`,
-        [input.email, passwordHash, input.birthDate ?? null],
+        [input.email, passwordHash, input.birthDate],
       );
       const id = u.rows[0]!.id;
       // Start in the person's own language when we support it.
@@ -130,17 +150,16 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
       const locale = SUPPORTED_LOCALES.includes(base) ? base : 'en';
       await c.query(`INSERT INTO profiles (user_id, username, display_name, locale) VALUES ($1,$2,$3,$4)`, [id, input.username, input.displayName, locale]);
       await c.query(`INSERT INTO user_preferences (user_id) VALUES ($1)`, [id]);
-      // Minors get protective defaults: private account, no personalization for ads.
-      const age = ageOf(input.birthDate ?? null);
-      if (age !== null && age < 18) await c.query(`UPDATE profiles SET is_private = true WHERE user_id = $1`, [id]);
       await c.query(
         `INSERT INTO consents (user_id, purpose, granted) VALUES ($1,'personalization',true),($1,'ai_processing',false),($1,'advertising',false),($1,'analytics',true)`,
         [id],
       );
+      // Minors get protective defaults: private account, no personalization for ads.
+      if (age < ADULT_AGE) await applyMinorDefaults(c, id);
       await securityEvent(c, id, 'account_created', req.ip, req.headers['user-agent']);
       await recordSignals(c, id, risk);
       if (inviter) {
-        await applyReferral(c, { id, email: input.email, birthDate: input.birthDate ?? null, createdAt: u.rows[0]!.created_at }, inviter);
+        await applyReferral(c, { id, email: input.email, birthDate: input.birthDate, createdAt: u.rows[0]!.created_at }, inviter);
         inviterId = inviter.id;
       }
       return id;
@@ -213,6 +232,37 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
     return { user: await loadMe(ctx, me(req).id) };
   });
 
+  /**
+   * Accounts made before a birth date was required give it once, on their next sign-in. It can
+   * only be set while there is none. Under 13: the account is closed to sign-in (suspended, every
+   * session revoked) and staff are told through the moderation queue. 13 to 17: the protections
+   * for minors apply from now on.
+   */
+  app.post('/v1/me/birth-date', { preHandler: requireAuth, config: authLimit }, async (req, reply) => {
+    const u = me(req);
+    const { birthDate } = parse(z.object({ birthDate: birthDateSchema }), req.body);
+    const age = checkBirthDate(birthDate);
+    const set = await ctx.db.query(`UPDATE users SET birth_date = $2 WHERE id = $1 AND birth_date IS NULL RETURNING id`, [u.id, birthDate]);
+    if (!set.rowCount) throw conflict('Your date of birth is already on your account. Contact support to correct it.');
+    if (age < MIN_SIGNUP_AGE) {
+      await tx(ctx.db, async (c) => {
+        await c.query(`UPDATE users SET status = 'suspended' WHERE id = $1 AND role = 'user'`, [u.id]);
+        await c.query(`UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`, [u.id]);
+        await c.query(
+          `INSERT INTO moderation_cases (target_type, target_id, subject_user_id, source, risk, signals) VALUES ('user', $1, $1, 'automated', 'escalate', $2)
+           ON CONFLICT (target_type, target_id) WHERE status = 'open' DO NOTHING`,
+          [u.id, { reason: 'under_minimum_age' }],
+        );
+        await securityEvent(c, u.id, 'underage_closed', req.ip, req.headers['user-agent']);
+      });
+      reply.clearCookie(SESSION_COOKIE, { path: '/' });
+      throw new AppError(403, 'under_minimum_age', `You need to be at least ${MIN_SIGNUP_AGE} to use YAPILAPI, so this account is now closed.`);
+    }
+    if (age < ADULT_AGE) await applyMinorDefaults(ctx.db, u.id);
+    await audit(ctx.db, { actorId: u.id, action: 'birth_date.set', entityType: 'user', entityId: u.id, ip: req.ip, requestId: req.id });
+    return { user: await loadMe(ctx, u.id) };
+  });
+
   app.post('/v1/auth/verify-email', { config: authLimit }, async (req) => {
     const { token } = parse(tokenSchema, req.body);
     const { rows } = await ctx.db.query<{ user_id: string }>(
@@ -246,11 +296,14 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
         rows[0].id,
         hash,
       ]);
-      await ctx.email.send({
-        to: email,
-        subject: 'Reset your YAPILAPI password',
-        text: `Reset your password: ${ctx.config.WEB_ORIGIN}/reset-password?token=${token} (valid for 1 hour)`,
-      });
+      // The answer stays the same whether or not the email went out, so it can't reveal accounts; failures are logged.
+      await ctx.email
+        .send({
+          to: email,
+          subject: 'Reset your YAPILAPI password',
+          text: `Reset your password: ${webOrigin}/reset-password?token=${token} (valid for 1 hour). If you didn't ask for this, you can ignore this email.`,
+        })
+        .catch((err: Error) => req.log.error({ err: err.message }, 'password reset email not sent'));
       await securityEvent(ctx.db, rows[0].id, 'password_reset_requested', req.ip);
     }
     return { ok: true, message: 'If that email has an account, we sent a reset link.' };

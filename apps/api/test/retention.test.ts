@@ -1,4 +1,9 @@
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import ffmpegPath from '../src/lib/ffmpeg-path.ts';
 import { as, signUp, testApp, type TestUser } from './helpers.ts';
 import type { BuiltApp } from '../src/app.ts';
 
@@ -308,8 +313,22 @@ describe('close friends stories', () => {
 describe('voice messages', () => {
   it('accepts M4A voice messages recorded on phones', async () => {
     const a = await adult();
-    // A minimal ISO base media header ("ftypM4A ").
-    const m4a = Buffer.concat([Buffer.from([0, 0, 0, 0x20]), Buffer.from('ftypM4A '), Buffer.alloc(64)]);
+    // A real, short AAC voice note in an M4A file, as phones record them (uploads are remuxed without their tags, so they must be readable).
+    const out = path.join(mkdtempSync(path.join(tmpdir(), 'ypl-voice-')), 'voice.m4a');
+    execFileSync(ffmpegPath as unknown as string, [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-y',
+      '-f',
+      'lavfi',
+      '-i',
+      'sine=frequency=300:duration=1',
+      '-c:a',
+      'aac',
+      out,
+    ]);
+    const m4a = readFileSync(out);
     const mediaIds: string[] = [];
     for (const mime of ['audio/mp4', 'audio/x-m4a']) {
       const boundary = '----yp' + Math.random().toString(16).slice(2);

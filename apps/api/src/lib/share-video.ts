@@ -1,4 +1,5 @@
 import { copyFile, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { NO_METADATA } from './media-formats.ts';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -85,7 +86,7 @@ export async function renderShareVideo(input: string, output: string, username: 
     '-i',
     'logo.png',
   ];
-  const encode = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-movflags', '+faststart'];
+  const encode = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', ...NO_METADATA, '-movflags', '+faststart'];
 
   if (info.hasAudio) {
     await run(

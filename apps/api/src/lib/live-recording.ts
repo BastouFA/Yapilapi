@@ -1,4 +1,5 @@
 import { mkdtemp, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { NO_METADATA } from './media-formats.ts';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { Pool } from 'pg';
@@ -125,7 +126,7 @@ export async function processLiveRecording(deps: LiveRecordingDeps, sessionId: s
     await writeFile(list, segments.map((sg) => `file '${sg.file.replace(/'/g, "'\\''")}'`).join('\n'));
     const out = path.join(work, 'recording.mp4');
     // Segments share codecs, so they are joined without re-encoding.
-    await run(['-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', '-movflags', '+faststart', out]);
+    await run(['-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', ...NO_METADATA, '-movflags', '+faststart', out]);
     const info = await probe(out);
     // Streamed from disk: a long live can be many gigabytes.
     const stored = await deps.storage.putFile(out, 'mp4', 'video/mp4');
@@ -163,6 +164,8 @@ export async function processLiveRecording(deps: LiveRecordingDeps, sessionId: s
         await enqueue(c, 'media.edit', { editId: edit.rows[0].id });
       }
     });
+    // The raw segments are a second copy of the stored recording: remove them now it is safe.
+    await rm(path.resolve(deps.recordingsDir, 'live', sessionId), { recursive: true, force: true }).catch(() => {});
   } catch (err) {
     await deps.db.query(`UPDATE live_sessions SET recording_status = 'failed' WHERE id = $1 AND recording_media_id IS NULL`, [sessionId]);
     throw err;

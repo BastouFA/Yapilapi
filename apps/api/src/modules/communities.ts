@@ -6,7 +6,7 @@ import { AppError, badRequest, forbidden, notFound, parse } from '../lib/errors.
 import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
 import { hydratePosts } from '../lib/posts.ts';
-import { audit, notify, track } from '../lib/services.ts';
+import { audit, notify, personalizationAllowed, track } from '../lib/services.ts';
 import { PUBLIC_USER_COLS, toPublicUser, type PublicUserRow } from '../lib/users.ts';
 import { postVisibleSql } from '../lib/visibility.ts';
 import { removeFromCommunityRooms } from '../lib/rooms.ts';
@@ -98,9 +98,11 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
       );
       return { items: rows.map(toCommunity) };
     }
+    // Your interests put matching communities first, unless Personalization is off.
+    const byInterests = !!viewer && (await personalizationAllowed(db, viewer));
     const { rows } = await db.query(
       `${SELECT} WHERE c.deleted_at IS NULL AND c.visibility = 'public' ${q.topic ? 'AND $3 = ANY(c.topics)' : ''}
-       ORDER BY (SELECT count(*) FROM user_interests ui JOIN topics t ON t.id = ui.topic_id WHERE ui.user_id = $1 AND t.slug = ANY(c.topics)) DESC,
+       ORDER BY ${byInterests ? '(SELECT count(*) FROM user_interests ui JOIN topics t ON t.id = ui.topic_id WHERE ui.user_id = $1 AND t.slug = ANY(c.topics)) DESC,' : ''}
                 c.member_count DESC, c.created_at DESC LIMIT $2`,
       q.topic ? [viewer, q.limit, q.topic.toLowerCase()] : [viewer, q.limit],
     );

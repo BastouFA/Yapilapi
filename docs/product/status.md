@@ -14,7 +14,7 @@ Sign up → profile → interests → follow → Home → Discover → create po
 | 2 | Profiles | Built | Avatar, bio, links, interests, counts, personal/creator/professional/business modes, private accounts. Follower and following counts open the lists (Follow buttons; a private account's lists only for itself and approved followers). Posts and Reposts tabs; one **pinned post** at the top. **Cover photo** (web and mobile): chosen from your own processed photo uploads (never sensitive or blocked; comes down if a later check blocks it), with alt text and a soft fade under the avatar. **"Now" status**: a line of up to 60 characters with an optional icon from the design-system set, for everyone, followers or close friends, shown on the profile and in one-to-one chat headers; ends after 24 hours or when cleared. **Share profile**: QR code (drawn in the browser) and copy link on web; native share sheet on mobile. |
 | 3 | Social graph | Built | Follow, friends with requests, block, mute. Restrict: API. **Circles** (web /circles and mobile): create, rename, delete, add and remove people (suggested from friends and people you follow; blocked people skipped), and pick a circle as a post's audience in Create ("Circle: Family"). Only the owner sees circles; members are never told, and only the author sees which circle a post went to. |
 | 4 | Content | Built | Text, photo, video, carousel, audio, poll, link, community, event- and product-linked posts; visibility public/followers/friends/circle/selected/private; moderation status, rights and AI provenance fields. **Reels**: one vertical video up to 3 minutes (10 with Plus), a ranked full-screen feed at /reels: autoplay on screen, double-tap to like, comments, **repost**, save, share, not interested and report, follow the creator in place, **view counts** (after 2 seconds of play, once per person, never the author). **Reels viewer** (web and mobile, 0038): on phone-width web the frame is exactly the space between the top of the screen and the navigation dock; on larger screens a centred 9:16 column with the actions beside it. Vertical videos fill the frame; landscape and square ones show whole over a blurred copy of their poster. A compact info strip (name and Follow, one caption line with "more", the sound as a chip) fades after 3 seconds of playback and returns on tap, hover, focus or pause; "more" opens the full caption with See translation, tags, sound and the creator's highlights; **Clear view** (a toggle, C, or press and hold on mobile) shows the video alone. Tap plays or pauses with a brief sign; double tap likes with the three YAPILAPI blocks bursting from the tap (not under reduced motion); hold pauses while held on the web and plays at 2× on the right edge of touch screens. A shorter rail: author with a follow badge, like, comments, share (repost, duet and remix in "More ways to share"), save (hold for a board), and an options sheet (speed 0.5× to 2×, captions and bigger captions, quality, picture in picture on the web, not interested, copy link, download when allowed, highlights and remix settings for the creator, report). The scrubber stays visible above the dock and can be dragged, with the time, highlight ticks and moment-comment bubbles; keys ↑/↓ and J/K, Space, ←/→, M, C; a "Tap for sound" hint the first time; the address follows the reel on screen so Back returns to it. **Moment comments**: a top-level comment on a reel can point to a time in it ("at 0:12", `atMs`, within the video); they show as bubbles on the scrubber and briefly near the bottom as the video passes them (`GET /v1/posts/:id/moment-comments`), and tapping the time in the comments plays from there. **Highlights**: creators mark up to 5 named points, a second apart, when posting or later (`PUT /v1/posts/:id/highlights`; editing on the web). **Continue where I left off**: each viewer's mid-way position is kept per reel (`PUT`/`DELETE /v1/posts/:id/resume`, `viewer.resumeMs`) and the reel picks up there with "Start over". Reel cards in feeds, profiles, tag, sound, music and search pages open the viewer at that reel. Tests: `apps/api/test/reels-plus.test.ts`, web e2e reels states and keyboard. **Reposts** reach your followers' Following feed, labelled. **Hashtags** (any script) become topics with tag pages (recent and top, related tags, follow a tag); **@mentions** notify people who can see the post. Composer and comments suggest people and tags as you type. **Editing**: the author changes a post's text, audience and photo descriptions (not its media); "Edited" opens the history for anyone who can see the post; hashtags follow the new text and only newly mentioned people are told; 20 text changes a day. **Drafts and scheduled posts** (web and mobile): save a draft or pick a time 5 minutes to 60 days ahead (web: date and time field; mobile: in 1 hour, tonight, tomorrow or a typed time); a Drafts page to continue, publish now, reschedule, cancel or delete. Only the author ever sees them; a scheduled post goes out through the jobs table as a new post (checks, mentions, tags and invites then), or back to drafts with a notification if it can't. **Alt text** on photos and videos in both composers; an ALT badge on described photos. **Comments** (web and mobile): threads with one visible level of nesting (a reply to a reply joins the top-level thread and starts with an @mention; "View N replies" collapsed by default; the person answered is told); likes with counts, the liker list only for the writer, a "Liked by the author" mark; the post author pins one top-level comment to the top; Top (likes, the author's like, replies, freshness) or Newest, Top by default; the writer edits within 15 minutes ("Edited"), with the same safety and spam checks as a new comment and only newly mentioned people told. **Comment controls** per post (composer and comments sheet): everyone, people you follow, your followers, or off; existing posts stay open to everyone. **Hidden words** (Settings): comments on your posts containing one are hidden from everyone but their writer, and the post author reviews them in a Hidden comments section and can show them. Blocked people can't comment, reply or like; counts leave out removed, held and hidden comments; comment likes and replies are batched into one notification ("Ada and 3 others liked your comment"). |
-| 5 | Media | Built | S3-compatible storage, resumable uploads, background processing: photos resized to webp (thumb/medium/large) with location metadata stripped and a blurred placeholder; videos get a poster, a web MP4 and 2-rung adaptive HLS (360p/720p) via bundled ffmpeg. |
+| 5 | Media | Built | S3-compatible storage, resumable uploads, background processing: every upload stored without its metadata (EXIF, GPS, QuickTime location), photos resized to webp (thumb/medium/large) and a blurred placeholder; videos get a poster, a web MP4 and 2-rung adaptive HLS (360p/720p) via bundled ffmpeg. |
 | 6 | Feed | Built | For You (ranked: affinity, interests, engagement, freshness, feedback, diversity), Following, Friends, Communities, Local; cursor pagination; more/less like this, not interested, mute topic/creator, "why am I seeing this". |
 | 7 | Discovery | Built | Discover page, **Trending** (tags ranked by how many different people used them this week, rising ones marked), NOW surface, communities and events, **Suggested for you** on Home with the reason. Creators/businesses/products tabs are search-driven. |
 | 8 | Search | Built | Universal search over people, posts, communities, events, places, businesses, products, topics with natural-language intent ("something to do tonight", "restaurants for six"). Postgres full-text now; OpenSearch adapter later (ADR-0004). |
@@ -68,7 +68,7 @@ What exists for a public launch and store review, and what only the owner can do
   - The privacy policy is written from what the code collects.
   - Company name, address, governing law and contact addresses come from `LEGAL_*` and `*_EMAIL` settings.
   - In development, a banner says the pages are templates.
-- **Sign-up consent:** web and phone say that creating an account accepts the Terms and confirms reading the Privacy policy, with links. The age gate is unchanged.
+- **Sign-up consent:** web and phone say that creating an account accepts the Terms and confirms reading the Privacy policy, with links. A date of birth is required (see below).
 - **Account deletion and data download in the phone app:**
   - Settings > Your data (`apps/mobile/app/your-data.tsx`): "Download my data" saves the export as a JSON file through the share sheet.
   - "Delete account" explains what goes right away, what is kept and for how long, then asks for the password and a confirmation.
@@ -86,6 +86,40 @@ What exists for a public launch and store review, and what only the owner can do
     - never subscriber-only, withheld or sensitive posts.
   - Tag pages now have a title, a canonical link and their own share image. Legal pages have canonical links.
 
+**Launch gaps closed (2026-09-27, migration 0039, `apps/api/test/launch-gaps.test.ts`):**
+
+- **Reporting everywhere in the phone app:** one report sheet (`apps/mobile/lib/report.tsx`: reason, optional details, "Also block" option, a confirmation, and "already reported") from posts, comments, chat messages, stories, communities, audio rooms, lives and live chat lines, events, products, board posts, reels and profiles. The API also takes reports of stories, rooms and lives, and a "Uses my work without permission" (copyright) reason.
+- **No location metadata is stored:**
+  - Photos lose EXIF, GPS, XMP and IPTC tags before they are stored, including the original: HEIC and other formats are converted, and JPEG, PNG, WebP and GIF files with tags are written again. Untagged files are kept as they are.
+  - Videos are remuxed without their tags. The web MP4, HLS, editor renders, recaps, clips, shared-reel videos and live recordings are written without tags too.
+  - Voice notes lose their tags.
+  - This covers direct and resumable uploads, view-once media, chat attachments, stories, avatars and covers.
+- **Email is sent:** SMTP through nodemailer (`EMAIL_TRANSPORT=smtp`, `SMTP_URL`), required in production. The API sends:
+  - verification and password reset emails, whose failures are logged and never fail the request;
+  - security notices for password changed or reset, two-step verification on or off, new recovery codes, passkey added or removed, and phone added or removed;
+  - a note when an account is deleted.
+- **Privacy switches work:**
+  - With Analytics off, no events are recorded for that person, and the events already recorded are unlinked from them.
+  - With Personalization off, For you is ranked the same for everyone, by engagement and freshness only; the person's own filters still apply. Reels ignore follows and interests, people suggestions ignore shared interests and follows, communities aren't sorted by interests, and "Why am I seeing this" says so.
+- **Retention:** a daily job (`apps/api/src/lib/retention.ts`) runs once a day across all API instances, claimed in `maintenance_runs`. It deletes:
+  - ended sessions, security events, audit logs, analytics events, daily minutes, the AI call log, notifications and phone checks;
+  - used or expired one-time data (email links, challenges, OAuth codes, download links, unfinished uploads and their chunks);
+  - finished jobs and webhook deliveries;
+  - view-once uploads that were never sent;
+  - deleted posts, stories, messages, comments, live chat and recaps after 30 days (180 days when moderators removed them), with the files only they used;
+  - raw live recordings.
+
+  The periods are in the privacy policy.
+- **Age gate:**
+  - A birth date is required at sign-up on the web and phone, and under 13 is refused. 13 to 17 year olds get a private account and ads personalization off.
+  - Accounts without a birth date see a one-time screen (`Me.needsBirthDate`, `POST /v1/me/birth-date`). Under 13 there closes the account.
+  - Selling, paid plans, payouts and receiving tips need 18 or older, enforced in the API with the error codes `adults_only`, `birth_date_required` and `recipient_not_eligible`.
+- **Web fonts are self-hosted** with `next/font`. They are downloaded at build time and served from our domain, so visitors never contact Google.
+- **Files are removed with what they belong to:**
+  - Account deletion removes every size, web MP4, HLS folder, caption file, view-once file, stored and raw live recording, recap video and shared-reel video.
+  - Deleting a recap removes its HLS folder.
+  - A live's raw recording is removed once it has been stored.
+
 **The owner must still:**
 
 1. Have a lawyer review every legal page for the launch countries and fill in the `[bracketed]` decisions: providers and region, retention periods, payouts, fees, helplines, the U.S. copyright agent.
@@ -93,16 +127,9 @@ What exists for a public launch and store review, and what only the owner can do
 3. Open the Apple Developer Program (99 USD a year, D-U-N-S number for a company), Google Play Console (25 USD) and Expo accounts. Then run `eas init`, set the EAS environment variables, and set up the APNs key, FCM credentials and a Play service account (app-store.md, section 3).
 4. Make the first EAS builds. This is the first native build of the app, which has never run on a device. Test on TestFlight and the Play internal track with the demo account.
 5. Decide how the iOS app handles digital purchases: Plus, subscriptions and tips go to web checkout today, which App Store guideline 3.1.1 doesn't allow.
-6. Before submitting, fix or accept the gaps listed in app-store.md ("Fix or accept these before launch"):
-   - reporting in the phone app only covers reels and profiles;
-   - original uploads keep their EXIF and GPS data;
-   - email is only logged, never sent;
-   - the analytics and personalization switches do nothing;
-   - there are no retention clean-up jobs;
-   - the birth date is optional;
-   - the web fonts come from Google Fonts;
-   - nobody checks that sellers are 18 or older.
-7. Fill in the App Store privacy label, Play data safety form and content rating questionnaires with the answers in app-store.md, and take screenshots.
+6. Set `EMAIL_TRANSPORT=smtp` and `SMTP_URL` on the API (an SMTP relay account). Production refuses to start without them.
+7. Have a lawyer confirm the retention periods now stated in the privacy policy (they are constants in `apps/api/src/lib/retention.ts`), and state the ones that stay open: payment records and reports.
+8. Fill in the App Store privacy label, Play data safety form and content rating questionnaires with the answers in app-store.md, and take screenshots.
 
 ## Not built yet
 

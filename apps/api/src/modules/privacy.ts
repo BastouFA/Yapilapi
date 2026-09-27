@@ -5,7 +5,8 @@ import { consentSchema } from '@yapilapi/shared';
 import { z } from 'zod';
 import { badRequest, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
-import { storedKeys } from '../lib/chat.ts';
+import { deliverable } from '../lib/email.ts';
+import { collectAccountFiles, removeAccountFiles } from '../lib/media-files.ts';
 import { audit, securityEvent } from '../lib/services.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
@@ -37,6 +38,8 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       `INSERT INTO consents (user_id, purpose, granted) VALUES ($1,$2,$3) ON CONFLICT (user_id, purpose) DO UPDATE SET granted = EXCLUDED.granted, updated_at = now()`,
       [me(req).id, input.purpose, input.granted],
     );
+    // Turning analytics off also unlinks the events already recorded: they stay in the totals without being yours.
+    if (input.purpose === 'analytics' && !input.granted) await db.query(`UPDATE analytics_events SET user_id = NULL WHERE user_id = $1`, [me(req).id]);
     await audit(db, { actorId: me(req).id, action: 'consent.update', entityType: 'consent', entityId: input.purpose, metadata: { granted: input.granted } });
     return { ok: true };
   });
@@ -97,9 +100,11 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
     const { password } = parse(z.object({ password: z.string().min(1) }), req.body);
     const { rows } = await db.query(`SELECT password_hash FROM users WHERE id = $1`, [u.id]);
     if (!(await verifyPassword(password, rows[0]?.password_hash))) throw badRequest('Your password is incorrect.', { fields: { password: 'Incorrect.' } });
-    // The files behind their photos, videos and voice notes (not the private files of digital
+    // Every file behind their photos, videos and voice notes, with each size, MP4 and HLS segment,
+    // view-once files, live recordings, recap and shared-reel videos (not the private files of digital
     // products they sold, which buyers paid for). Removed from storage once the account is gone.
-    const { rows: files } = await db.query(`SELECT url, poster_url, hls_url, variants, storage_key FROM media WHERE owner_id = $1 AND NOT private`, [u.id]);
+    const files = await collectAccountFiles(db, u.id);
+    const address = (await db.query<{ email: string }>(`SELECT email FROM users WHERE id = $1`, [u.id])).rows[0]?.email;
     await tx(db, async (c) => {
       await c.query(
         `UPDATE users SET status = 'deleted', deleted_at = now(), email = 'deleted+' || id || '@deleted.invalid', password_hash = NULL, birth_date = NULL,
@@ -139,6 +144,10 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         `DELETE FROM push_subscriptions WHERE user_id = $1`,
         `DELETE FROM passkeys WHERE user_id = $1`,
         `DELETE FROM media WHERE owner_id = $1`,
+        `DELETE FROM share_videos sv USING posts p WHERE p.id = sv.post_id AND p.author_id = $1`,
+        `UPDATE recaps SET deleted_at = coalesce(deleted_at, now()) WHERE owner_id = $1`,
+        // Product analytics stay in the totals without being linked to them.
+        `UPDATE analytics_events SET user_id = NULL WHERE user_id = $1`,
         `UPDATE conversation_members SET left_at = now() WHERE user_id = $1`,
         `UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`,
       ])
@@ -148,11 +157,19 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       await audit(c, { actorId: u.id, action: 'account.delete', entityType: 'user', entityId: u.id, ip: req.ip, requestId: req.id });
     });
     // In the background: many files can take a while, and a file that fails to go is only logged.
-    void (async () => {
-      for (const f of files)
-        for (const key of storedKeys(f))
-          await ctx.storage.remove?.(key).catch((err: unknown) => req.log.warn({ err, key }, 'could not remove a deleted account’s file'));
-    })();
+    void removeAccountFiles(ctx, files).then(
+      (r) => r.failed && req.log.warn({ failed: r.failed }, 'some of a deleted account’s files could not be removed'),
+      (err: unknown) => req.log.warn({ err }, 'could not remove a deleted account’s files'),
+    );
+    // A last note to the address the account had, so a deletion nobody asked for doesn't go unnoticed.
+    if (deliverable(address))
+      await ctx.email
+        .send({
+          to: address,
+          subject: 'Your YAPILAPI account was deleted',
+          text: 'Your YAPILAPI account and what you shared were deleted, as you asked. Nothing else will be sent to this address.\n\nIf you didn’t delete your account, reply to this email or contact support straight away.',
+        })
+        .catch((err: Error) => req.log.warn({ err: err.message }, 'account deletion email not sent'));
     reply.clearCookie(SESSION_COOKIE, { path: '/' });
     return { ok: true };
   });

@@ -44,6 +44,7 @@ import {
   type SheetAction,
 } from '../../lib/chat-extras';
 import { TranslatableText } from '../../lib/translation';
+import { useReport } from '../../lib/report';
 import { ListCard, ListComposer, PollCard, PollComposer, ReminderNote, ReminderPicker } from '../../lib/chat-polls';
 
 /** Voice messages shorter than this are treated as a slip of the finger and not sent. */
@@ -76,6 +77,7 @@ export default function Chat() {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [editing, setEditing] = useState<Message | null>(null);
   const [actionsFor, setActionsFor] = useState<Message | null>(null);
+  const report = useReport();
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [disappearingOpen, setDisappearingOpen] = useState(false);
@@ -568,6 +570,14 @@ export default function Chat() {
           ]);
         },
       });
+    // Someone else's message can be reported (not the chat's own lines, like "Ada joined").
+    if (!mine && !m.unsent && m.kind !== 'system')
+      out.push({
+        label: t('post.report'),
+        icon: 'flag-outline',
+        danger: true,
+        onPress: () => report.open({ type: 'message', id: m.id, authorId: m.sender.id, authorName: m.sender.displayName }),
+      });
     return out;
   }
 
@@ -974,6 +984,7 @@ export default function Chat() {
             patchMessage(r.messageId, (x) => (x.reminder && x.reminder.remindAt <= r.remindAt ? x : { ...x, reminder: { id: r.id, remindAt: r.remindAt } }));
         }}
       />
+      {report.sheet}
       <SearchSheet conversationId={id} open={searchOpen} onClose={() => setSearchOpen(false)} onJump={(mid) => void jumpTo(mid)} />
       <DisappearingSheet
         open={disappearingOpen}

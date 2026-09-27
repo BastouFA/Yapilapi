@@ -211,6 +211,8 @@ describe('regional rules with a CDN country', () => {
   it('hides posts waiting for review from accounts without a birth date', async () => {
     const author = await signUp(t.app, { birthDate: ADULT });
     const noAge = await signUp(t.app);
+    // An account made before a birth date was required.
+    await t.ctx.db.query(`UPDATE users SET birth_date = NULL WHERE id = $1`, [noAge.id]);
     const post = (await as(t.app, author).post('/v1/posts', { body: 'Needs a second look' })).body.post;
     await t.ctx.db.query(`UPDATE posts SET moderation_status = 'review' WHERE id = $1`, [post.id]);
     expect((await as(t.app, noAge).get(`/v1/posts/${post.id}`)).status).toBe(404);

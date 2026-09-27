@@ -10,6 +10,7 @@ import { client, errorMessage } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { useAutocomplete } from '../../lib/autocomplete';
 import { PostCard } from '../../lib/post';
+import { useReport } from '../../lib/report';
 import { TranslatableText } from '../../lib/translation';
 import { useSession } from '../../lib/session';
 import { elevation, radius, space } from '../../lib/theme';
@@ -61,6 +62,13 @@ export default function PostScreen() {
   const ac = useAutocomplete(body, setBody);
   // The Reply buttons, so focus can go back to the one used once the reply is sent.
   const replyButtons = useRef<Record<string, View | null>>({});
+  // Report a comment; blocking its writer from there too hides their comments here.
+  const report = useReport({
+    onBlocked: (userId) => {
+      setComments((cur) => cur.filter((x) => x.author.id !== userId));
+      setThreads((cur) => Object.fromEntries(Object.entries(cur).map(([k, th]) => [k, { ...th, items: th.items.filter((x) => x.author.id !== userId) }])));
+    },
+  });
 
   const focusReplyButton = (commentId: string | undefined) => {
     const node = commentId ? findNodeHandle(replyButtons.current[commentId] ?? null) : null;
@@ -394,6 +402,11 @@ export default function PostScreen() {
               {controls?.isPostAuthor && !reply ? action(t(x.pinned ? 'comments.unpin' : 'comments.pin'), () => void pin(x)) : null}
               {own && x.likes > 0 ? action(t('comments.likers.show'), () => void showLikers(x)) : null}
               {x.viewer.canDelete ? action(t('m.common.delete'), () => remove(x)) : null}
+              {me && !own
+                ? action(t('post.report'), () => report.open({ type: 'comment', id: x.id, authorId: x.author.id, authorName: name }), {
+                    a11y: t('m.report.commentBy', { name }),
+                  })
+                : null}
               {x.likedByAuthor ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Icon name="heart" size={12} color={c.yapi} />
@@ -636,6 +649,7 @@ export default function PostScreen() {
           )}
         </View>
       ) : null}
+      {report.sheet}
     </KeyboardAvoid>
   );
 }

@@ -1,6 +1,6 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import type { ShopItem } from '../../../packages/api-client/src/index';
 import { formatBytes } from '../../../packages/shared/src/data-saver';
 import { formatMoney } from '../../../packages/shared/src/i18n';
@@ -10,8 +10,10 @@ import { useFlag } from '../lib/flags';
 import { Pill } from '../lib/forms';
 import { useT } from '../lib/i18n';
 import { openDownload, openOnWeb, useKindLabel, useWebCheckout, webCheckout } from '../lib/money';
+import { useReport } from '../lib/report';
+import { useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
-import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, useColors, userText } from '../lib/ui';
+import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, useActionSheet, useColors, userText } from '../lib/ui';
 
 /**
  * One thing from a profile's Shop (`product?username=&id=`, and web links to
@@ -30,6 +32,10 @@ export default function ProductScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // More in the header: report someone else's listing.
+  const { me } = useSession();
+  const menu = useActionSheet();
+  const report = useReport();
 
   const load = useCallback(async () => {
     try {
@@ -86,6 +92,37 @@ export default function ProductScreen() {
         />
       }
     >
+      <Stack.Screen
+        options={{
+          headerRight:
+            me && !self
+              ? () => (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('m.post.more')}
+                    hitSlop={10}
+                    onPress={() =>
+                      menu.show({
+                        title: item.title,
+                        actions: [
+                          {
+                            label: t('post.report'),
+                            icon: 'flag-outline',
+                            destructive: true,
+                            onPress: () => report.open({ type: 'product', id: item.id, authorId: seller.id, authorName: seller.displayName }),
+                          },
+                        ],
+                      })
+                    }
+                  >
+                    <Icon name="ellipsis-horizontal-circle-outline" size={24} color={c.yapi} />
+                  </Pressable>
+                )
+              : undefined,
+        }}
+      />
+      {menu.sheet}
+      {report.sheet}
       <Card style={{ gap: space[3] }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
           <View style={{ width: 52, height: 52, borderRadius: radius.md, backgroundColor: c.yapiSoft, alignItems: 'center', justifyContent: 'center' }}>

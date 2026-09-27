@@ -9,7 +9,7 @@ import { startPayment } from '../lib/checkout.ts';
 import { DIGITAL_TYPES, openPrivate, putPrivate } from '../lib/private-files.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { audit, isEnabled, notify, track } from '../lib/services.ts';
-import { isBlockedEitherWay, plusCol, publicUserFrom } from '../lib/users.ts';
+import { assertAdultForMoney, isBlockedEitherWay, plusCol, publicUserFrom } from '../lib/users.ts';
 import { notBlockedSql } from '../lib/visibility.ts';
 import { MAX_UPLOAD_BYTES } from './media.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
@@ -198,6 +198,7 @@ export default async function moneyModule(app: FastifyInstance, ctx: AppContext)
       await db.query(`SELECT id, seller_id, kind, title, price_cents, currency FROM products WHERE id = $1 AND deleted_at IS NULL AND status = 'active'`, [id])
     ).rows[0];
     if (!product || product.kind !== 'service') throw notFound('Service');
+    await assertAdultForMoney(db, product.seller_id, false);
     if (product.seller_id === u.id) throw badRequest("You can't book your own service.");
     if (await isBlockedEitherWay(db, u.id, product.seller_id)) throw forbidden();
     const again = await db.query(`SELECT id FROM orders WHERE buyer_id = $1 AND idempotency_key = $2`, [u.id, input.idempotencyKey]);

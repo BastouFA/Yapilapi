@@ -37,6 +37,8 @@ export interface Me extends PublicUser {
   needsVerification: boolean;
   /** Set while the account is limited pending a moderator's review. */
   limited?: boolean;
+  /** Set when the account has no birth date yet (made before it was required): the apps ask for it once. */
+  needsBirthDate?: boolean;
   role: 'user' | 'moderator' | 'admin';
   onboarded: boolean;
   locale: string;

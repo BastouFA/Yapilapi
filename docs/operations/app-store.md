@@ -53,24 +53,45 @@ These come from checking the code against the store rules and the privacy policy
 | Issue | Where | Why it matters |
 | --- | --- | --- |
 | **Digital purchases in the iOS app go to web checkout.** Plus, creator subscriptions and tips open the web. | `apps/mobile/lib/money.tsx`, `apps/mobile/app/plus.tsx` | Apple guideline 3.1.1: digital content and features bought inside an iOS app must use In-App Purchase. Tips are only exempt when 100% goes to the creator, and a 5% fee is taken. Physical goods, event tickets and real-world services (3.1.3(e), 3.1.5) may use Stripe or Paystack. Choose one of these for the first iOS release: hide Plus, subscriptions and tips in the iOS app; move them to In-App Purchase; or, for the U.S. storefront only, use Apple's external purchase link rules. Google Play has similar rules (Payments policy); check them for Android too. |
-| **Original photo and video files keep their metadata.** EXIF and GPS data is removed from the resized copies but not from the original upload, which is still reachable at its URL. | `apps/api/src/lib/media-formats.ts`, `apps/api/src/modules/media.ts` | The privacy policy says this plainly today. Stripping it at upload (sharp for photos, an ffmpeg remux for videos) is strongly recommended. Once that's done, update section 1 of the privacy policy. |
-| **Reporting in the phone app** is only available for reels and profiles. Posts in the feed, comments, messages and stories can't be reported there. | `apps/mobile/app/reels.tsx`, `apps/mobile/lib/profile-menu.tsx` | Apple guideline 1.2 and Google's user-generated content policy require a way to report objectionable content. Add Report to the post, comment and message menus in the phone app (the API, `POST /v1/reports`, already takes every kind). Also consider adding a "Copyright" report reason (`REPORT_REASONS` in `packages/shared/src/constants.ts`). |
-| **Birth date is optional at sign-up**, so the 13+ check only runs when one is given. There is no way to add a birth date later. | `apps/web/app/(auth)/signup/page.tsx`, `apps/mobile/app/signup.tsx`, `apps/api/src/modules/auth.ts` | Stores and several laws expect a neutral age screen. Making the date required (the gate itself stays as built) is a product and legal decision. |
-| **Email is only logged, never sent.** `EMAIL_TRANSPORT=smtp` is accepted but there is no SMTP sender. | `apps/api/src/lib/email.ts` | Verification and password reset emails won't arrive in production. The review team also needs them. |
-| **Two privacy switches are stored but not used.** The "analytics" and "personalization" consents don't change anything, and "AI processing" only controls assistant memory. | `apps/api/src/lib/services.ts` (`track`), `apps/api/src/modules/ai.ts` | Either make them work or remove them from Settings. The privacy policy doesn't promise them. |
-| **No retention clean-up.** Sessions, security events, audit logs, analytics events, the AI call log, usage minutes, phone verifications and notifications are kept forever. | `apps/api/src/app.ts` (scheduled jobs) | Choose periods (the privacy policy has a placeholder), then add the clean-up jobs. |
-| **Some files survive account deletion.** Deleting an account now removes its photo and video files from storage in the background. HLS segment folders, live recordings and recap videos are not removed yet. The private files of digital products are kept; decide whether buyers keep access to them. | `apps/api/src/modules/privacy.ts` | Finish the clean-up, or say so in the privacy policy. |
-| **Web fonts come from Google Fonts**, which sends each visitor's IP address to Google. | `apps/web/app/layout.tsx` | European regulators have objected to this. Serving the fonts yourself (`next/font`) removes the issue and the matching sentence in the cookie notice. |
-| **Nobody checks that a seller is 18 or older.** The creator terms require it. | `apps/api/src/modules/money.ts`, `economy.ts`, `commerce.ts` | Enforce it at payout verification, or in the API. |
+| **Digital products after a seller deletes their account.** Their private files are kept so buyers keep their downloads. | `apps/api/src/lib/media-files.ts` (`collectAccountFiles`) | Decide whether buyers keep access, and say so in the creator terms. |
+| **Files uploaded before 2026-09-27 still carry their metadata.** Stripping happens at upload, and nothing rewrites the files stored before then. | `apps/api/src/lib/media-formats.ts` | Only matters if real people uploaded before this change. If they did, run a one-off job that rewrites those originals. |
+| **Periods to confirm.** The retention periods are in `RETENTION` (`apps/api/src/lib/retention.ts`) and in section 5 of the privacy policy. Payment records, and reports with their moderation decisions, have no period yet. | `apps/web/app/legal/privacy/page.tsx` | This is a legal decision. Change the code and the policy together. |
+
+#### Closed on 2026-09-27
+
+Migration 0039. Tests: `apps/api/test/launch-gaps.test.ts`.
+
+- **Reporting in the phone app.** One shared sheet in `apps/mobile/lib/report.tsx`:
+  - It asks for a reason, optional details and whether to block the person too, then confirms. It says so if you already reported the thing.
+  - It opens from posts, comments, chat messages, stories, communities, audio rooms, lives and their chat lines, events, products, board posts, reels and profiles.
+  - The API also takes stories, rooms and lives, and a copyright reason ("Uses my work without permission").
+- **Metadata.** Everything is stripped before it is stored, originals included:
+  - Photos lose EXIF, GPS, XMP and IPTC, using sharp.
+  - Videos and voice notes are remuxed with ffmpeg `-map_metadata -1`.
+  - The web MP4, HLS files, editor renders, recaps, clips and live recordings are written without tags.
+  - Section 1 of the privacy policy is updated.
+- **Email.** SMTP goes through nodemailer (`EMAIL_TRANSPORT=smtp`, `SMTP_URL`). Production refuses to start with `log`.
+  - Verification and password reset emails are sent.
+  - Security notices go out for password changes, two-step verification, recovery codes, passkeys and phone numbers, and when an account is deleted.
+- **Privacy switches.**
+  - **Analytics off:** no events are recorded for that person, and past events are unlinked from them.
+  - **Personalization off:** For you is ranked the same for everyone. Reels, people suggestions and community discovery ignore interests and follows.
+- **Retention.** A daily clean-up (`apps/api/src/lib/retention.ts`) runs once across all instances. It deletes sessions, security events, audit logs, analytics, daily minutes, the AI call log, notifications, phone checks, one-time data, finished jobs, unsent view-once files, deleted content after its grace period (with the files only it used), and raw live recordings. The periods are in the privacy policy.
+- **Age gate.**
+  - A birth date is required at sign-up on the web and the phone, and under 13 is refused.
+  - Existing accounts without a birth date are asked once, and under 13 closes the account.
+  - Selling, paid plans, payouts and receiving tips need someone 18 or older. The API enforces this.
+- **Fonts.** The web fonts are self-hosted with `next/font` and fetched at build time. Visitors never contact Google.
+- **Files on deletion.** Deleting an account removes every size, MP4, HLS folder, caption file, view-once file, live recording (stored and raw), recap video and shared-reel video. A recap's deletion removes its HLS folder.
 
 ### Account deletion (Apple guideline 5.1.1(v))
 
 - **Web:** Settings > Privacy > "Delete my account".
 - **Phone:** Settings > "Your data" (`apps/mobile/app/your-data.tsx`), which also has "Download my data".
 - Both ask for the password and call `DELETE /v1/me`. Deletion is immediate:
-  - Removed: profile, posts, reels, stories, comments, messages sent, media files, connections, circles, interests, assistant memory, push tokens and passkeys.
+  - Removed: profile, posts, reels, stories, comments, messages sent, media files (every size, MP4, HLS segment, caption file, view-once file, live recording and recap video), connections, circles, interests, assistant memory, push tokens and passkeys.
   - The person is signed out everywhere.
-  - Payment records, reports and moderation decisions, and security logs are kept.
+  - Payment records, reports and moderation decisions are kept. Security logs are kept for 12 months (daily clean-up, `apps/api/src/lib/retention.ts`). A last email goes to the old address.
   - Backups roll over in 30 days.
 - The screen explains all of this before the person confirms.
 
@@ -373,7 +394,7 @@ Both stores require the following. Here is where each one is today.
 | Requirement | Where | Status |
 | --- | --- | --- |
 | Terms users must accept, with zero tolerance for objectionable content | `/legal/terms`, `/legal/guidelines`. Sign-up says continuing means accepting them (web `apps/web/app/(auth)/signup/page.tsx`, phone `apps/mobile/app/signup.tsx`) | Done |
-| A way to report content and users | API `POST /v1/reports` (`apps/api/src/modules/safety.ts`). Web: `ReportSheet` in `apps/web/components/PostList.tsx`, reels, messages, profiles. Phone: reels (`app/reels.tsx`) and profiles (`lib/profile-menu.tsx`) | **Phone: add posts, comments, messages and stories** |
+| A way to report content and users | API `POST /v1/reports` (`apps/api/src/modules/safety.ts`). Web: `ReportSheet` in `apps/web/components/PostList.tsx`, reels, messages, profiles. Phone: one sheet (`lib/report.tsx`) from posts, comments, messages, stories, communities, rooms, lives, events, products, reels and profiles | Done |
 | A way to block abusive users | API `POST /v1/users/:id/block`. Web profile menu, Settings. Phone: `lib/profile-menu.tsx`, and Settings > Blocked accounts | Done |
 | Timely moderation (Apple asks for action within 24 hours) | Moderation queue and cases in `/admin` (`apps/web/app/(app)/admin/page.tsx`), appeals, automated checks (`apps/api/src/lib/moderation.ts`), and photo and video checks (`apps/api/src/lib/media-moderation.ts`, AWS Rekognition when configured) | Staff the queue. Turn on Rekognition (`MEDIA_MODERATION_PROVIDER=rekognition`) before opening sign-ups. |
 | Contact information for users | Legal pages, via the `*_EMAIL` settings | Set the addresses |
@@ -385,7 +406,7 @@ This is the basis for the privacy policy and the two forms above. It was checked
 
 - **Account:**
   - email, scrypt password hash, username, display name;
-  - optional birth date, locale and invite code;
+  - birth date (required; under 13 refused), locale and optional invite code;
   - optional phone number, verified through Twilio Verify (`phone_verifications` keeps the number, IP and time).
 - **Profile and content:**
   - profile, posts, reels, stories, comments, chats (not end-to-end encrypted; edit history kept), voice messages, media, boards, chapters, recaps, events, communities, rooms and products;
@@ -394,7 +415,7 @@ This is the basis for the privacy policy and the two forms above. It was checked
   - IP address and user agent per session and security event;
   - a failed sign-in keeps the email address that was typed.
 - **Usage:**
-  - `analytics_events` (event name and properties, no IP);
+  - `analytics_events` (event name and properties, no IP; none when Analytics is off; deleted after 13 months);
   - post and story views, reel resume position, feed feedback, ad events;
   - daily minutes (`usage_days`).
 - **Country:** from the CDN header, used for regional rules and ads. The app never asks for GPS location.
@@ -408,5 +429,5 @@ This is the basis for the privacy policy and the two forms above. It was checked
   - `ai_tool_calls` logs metadata without content;
   - translations are cached.
 - **Media moderation:** AWS Rekognition (optional).
-- **Third parties the device talks to directly:** Jamendo (music audio), Google STUN, Google Fonts (web), Stripe.js (web checkout), Expo, APNs and FCM.
+- **Third parties the device talks to directly:** Jamendo (music audio), Google STUN, Stripe.js (web checkout), Expo, APNs and FCM.
 - **No third-party analytics, crash reporting, ad SDK or tracking.**

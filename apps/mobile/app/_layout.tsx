@@ -2,6 +2,7 @@ import { router, Stack } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Pressable, Text } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { BirthDateGate } from '../lib/birth-date-gate';
 import { BoardsProvider } from '../lib/boards';
 import { CallsProvider } from '../lib/calls';
 import { DataSaverProvider } from '../lib/data-saver';
@@ -157,6 +158,7 @@ export default function Root() {
               <BoardsProvider>
                 <Heartbeat />
                 <Screens />
+                <BirthDateGate />
                 <YapPlayer />
                 <OfflineBanner />
               </BoardsProvider>

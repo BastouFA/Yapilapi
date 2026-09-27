@@ -33,6 +33,9 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       community: `SELECT owner_id AS uid FROM communities WHERE id = $1`,
       event: `SELECT host_id AS uid FROM events WHERE id = $1`,
       product: `SELECT seller_id AS uid FROM products WHERE id = $1`,
+      story: `SELECT author_id AS uid FROM moments WHERE id = $1 AND deleted_at IS NULL`,
+      room: `SELECT created_by AS uid FROM rooms WHERE id = $1`,
+      live: `SELECT host_id AS uid FROM live_sessions WHERE id = $1`,
     };
     const r = await db.query(q[type]!, [id]);
     return r.rows[0]?.uid ?? null;
@@ -198,6 +201,14 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       if (mc.target_type === 'community') await c.query(`UPDATE communities SET deleted_at = now() WHERE id = $1`, [mc.target_id]);
       if (mc.target_type === 'event') await c.query(`UPDATE events SET deleted_at = now() WHERE id = $1`, [mc.target_id]);
       if (mc.target_type === 'product') await c.query(`UPDATE products SET deleted_at = now() WHERE id = $1`, [mc.target_id]);
+      if (mc.target_type === 'story') await c.query(`UPDATE moments SET deleted_at = coalesce(deleted_at, now()) WHERE id = $1`, [mc.target_id]);
+      // A removed room or live ends now; its history stays for the case.
+      if (mc.target_type === 'room')
+        await c.query(`UPDATE rooms SET status = 'ended', ended_at = coalesce(ended_at, now()) WHERE id = $1 AND status IN ('scheduled', 'live')`, [
+          mc.target_id,
+        ]);
+      if (mc.target_type === 'live')
+        await c.query(`UPDATE live_sessions SET status = 'ended', ended_at = coalesce(ended_at, now()) WHERE id = $1 AND status <> 'ended'`, [mc.target_id]);
     }
     // Removed or restricted comments leave the post's counts; cleared ones come back.
     if (mc.target_type === 'comment') {

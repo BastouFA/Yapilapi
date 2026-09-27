@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { NavBar, Skeleton, type NavEntry } from '@yapilapi/design-system';
 import { NextLink } from '@/lib/link';
+import { BirthDateGate } from '@/components/BirthDateGate';
 import { CallsProvider } from '@/components/Calls';
 import { CheckoutProvider } from '@/components/Checkout';
 import { RoomsProvider } from '@/components/Rooms';
@@ -47,6 +48,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [loading, me, path, router, openWithoutAccount]);
 
   if (!loading && !me && openWithoutAccount) return <SignedOutShell>{children}</SignedOutShell>;
+  // An account made before a date of birth was required gives it once, before anything else.
+  if (!loading && me?.needsBirthDate) return <BirthDateGate />;
 
   if (loading || !me)
     return (

@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { NO_METADATA } from './media-formats.ts';
 import { mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -148,6 +149,7 @@ async function processVideo(deps: ProcessDeps, m: MediaRow) {
       'aac',
       '-b:a',
       '128k',
+      ...NO_METADATA,
       '-movflags',
       '+faststart',
       path.join(dir, 'web.mp4'),
@@ -183,6 +185,7 @@ async function processVideo(deps: ProcessDeps, m: MediaRow) {
         '48',
         '-sc_threshold',
         '0',
+        ...NO_METADATA,
         '-f',
         'hls',
         '-hls_time',
@@ -222,6 +225,7 @@ async function processVideo(deps: ProcessDeps, m: MediaRow) {
           '48',
           '-sc_threshold',
           '0',
+          ...NO_METADATA,
           '-f',
           'hls',
           '-hls_time',
@@ -240,7 +244,7 @@ async function processVideo(deps: ProcessDeps, m: MediaRow) {
       );
     });
     // The 360p rung as a plain MP4 too (copied from the HLS segments, not encoded again): browsers without HLS play it on Data saver.
-    const low = await run(['-i', 'v0.m3u8', '-c', 'copy', '-movflags', '+faststart', 'low.mp4'], dir).then(
+    const low = await run(['-i', 'v0.m3u8', '-c', 'copy', ...NO_METADATA, '-movflags', '+faststart', 'low.mp4'], dir).then(
       () => true,
       () => false,
     );

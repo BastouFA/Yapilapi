@@ -78,9 +78,27 @@ export const COMMENT_EDIT_MINUTES = 15;
 export const HIDDEN_WORDS_MAX = 100;
 export const HIDDEN_WORD_MAX = 60;
 
-export const REPORT_REASONS = ['spam', 'harassment', 'hate', 'violence', 'nudity', 'self_harm', 'impersonation', 'fraud', 'minor_safety', 'other'] as const;
+/** Nobody younger than this can have an account. */
+export const MIN_SIGNUP_AGE = 13;
+/** Minor protections apply below this age; selling, payouts, paid plans and receiving tips need it. */
+export const ADULT_AGE = 18;
 
-export const REPORT_TARGETS = ['user', 'post', 'comment', 'message', 'community', 'event', 'product'] as const;
+export const REPORT_REASONS = [
+  'spam',
+  'harassment',
+  'hate',
+  'violence',
+  'nudity',
+  'self_harm',
+  'impersonation',
+  'fraud',
+  'minor_safety',
+  'copyright',
+  'other',
+] as const;
+
+/** What can be reported. A story is a moment; a live is a live session; a room is an audio room. */
+export const REPORT_TARGETS = ['user', 'post', 'comment', 'message', 'community', 'event', 'product', 'story', 'room', 'live'] as const;
 
 export const FEEDBACK_SIGNALS = ['more_like_this', 'less_like_this', 'not_interested', 'mute_topic', 'mute_creator'] as const;
 

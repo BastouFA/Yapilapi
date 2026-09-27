@@ -92,8 +92,8 @@ async function main() {
         continue;
       }
       const { rows } = await c.query<{ id: string }>(
-        `INSERT INTO users (email, email_verified_at, password_hash, role, onboarded_at, is_dev_data)
-         VALUES ($1, now(), $2, $3, now(), true) RETURNING id`,
+        `INSERT INTO users (email, email_verified_at, password_hash, role, onboarded_at, is_dev_data, birth_date)
+         VALUES ($1, now(), $2, $3, now(), true, '1994-06-15') RETURNING id`,
         [`${u.username}@dev.yapilapi.local`, pw, 'role' in u ? u.role : 'user'],
       );
       const id = rows[0]!.id;

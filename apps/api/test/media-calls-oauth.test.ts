@@ -3,6 +3,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { createHash, randomBytes } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import sharp from 'sharp';
 import { buildApp, type BuiltApp } from '../src/app.ts';
 import { loadConfig } from '../src/config.ts';
 import { CHUNK_SIZE } from '../src/modules/uploads.ts';
@@ -47,7 +48,11 @@ async function befriend(a: TestUser, b: TestUser) {
 describe('resumable uploads', () => {
   it('uploads in chunks, resumes, rejects bad chunks, and creates media', async () => {
     const u = await signUp(t.app);
-    const file = pngOf(CHUNK_SIZE + 1234);
+    // A real PNG just over one chunk (uploads are checked and written again without tags, so they must be readable).
+    const file = await sharp({ create: { width: 1400, height: 1400, channels: 3, background: '#808080', noise: { type: 'gaussian', mean: 128, sigma: 60 } } })
+      .png({ compressionLevel: 0 })
+      .toBuffer();
+    expect(file.length).toBeGreaterThan(CHUNK_SIZE);
     const s = await as(t.app, u).post('/v1/uploads', { filename: 'big.png', mime: 'image/png', size: file.length });
     expect(s.body.totalChunks).toBe(2);
     const id = s.body.uploadId;

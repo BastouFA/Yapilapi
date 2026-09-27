@@ -6,6 +6,7 @@ import type { BoardDetail, Post, PublicUser } from '../../../../packages/shared/
 import { client, errorMessage, mediaUrl } from '../../lib/api';
 import { BoardCover, SaveTile, tileRows, useBoardMeta, useBoards, usePostLabel, useSavedFilters, VISIBILITY_ICON, type SaveChange } from '../../lib/boards';
 import { useT } from '../../lib/i18n';
+import { useReport } from '../../lib/report';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
 import {
@@ -62,6 +63,7 @@ export default function BoardScreen() {
   const orderStart = useRef('');
   const seq = useRef(0);
   const menu = useActionSheet();
+  const report = useReport();
 
   const load = useCallback(async () => {
     try {
@@ -173,6 +175,13 @@ export default function BoardScreen() {
     if (owner) actions.push({ label: t('m.boards.useAsCover'), icon: 'image-outline', onPress: () => void setCover(post) });
     if (member && removable.has(post.id))
       actions.push({ label: t('m.boards.removeItem'), icon: 'trash-outline', destructive: true, onPress: () => void removeItem(post) });
+    if (me && post.author.id !== me.id)
+      actions.push({
+        label: t('post.report'),
+        icon: 'flag-outline',
+        destructive: true,
+        onPress: () => report.open({ type: 'post', id: post.id, authorId: post.author.id, authorName: post.author.displayName }),
+      });
     menu.show({ title: postLabel(post), actions });
   }
 
@@ -444,6 +453,7 @@ export default function BoardScreen() {
 
       {!order ? <Segmented label={t('m.saved.filter')} value={filter} onChange={setFilter} options={filters} /> : null}
       {menu.sheet}
+      {report.sheet}
     </View>
   );
 

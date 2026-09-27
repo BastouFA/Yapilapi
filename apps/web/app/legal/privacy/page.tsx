@@ -24,8 +24,9 @@ export default async function PrivacyPage() {
       <ul>
         <li>Your email address, a password (we store only a scrambled form of it, never the password itself), your username and your name.</li>
         <li>
-          Your date of birth, if you give it. We use it to protect younger people (see <Link href="/legal/safety">Safety and minors</Link>) and never show it on
-          your profile.
+          Your date of birth. Everyone gives it when they sign up (accounts made before we asked give it once, the next time they sign in). We use it to refuse
+          people under 13, to protect people under 18 (see <Link href="/legal/safety">Safety and minors</Link>), and to check that people who sell, get paid or
+          receive tips are 18 or older. We never show it on your profile.
         </li>
         <li>Your language, and the invite code you used and who invited you, if any.</li>
         <li>
@@ -51,8 +52,8 @@ export default async function PrivacyPage() {
           are not recorded.
         </li>
         <li>
-          Photos and videos: files can contain information added by your device, such as when and where they were taken. The sizes we show in the app are made
-          without it, and photos taken with the in-app camera don’t include it. The original file you upload is kept as it was uploaded.
+          Photos, videos and voice notes: files can contain information added by your device, such as where and when they were taken and the camera used. We
+          remove it before we store anything: the file we keep, and every size and copy made from it, has no location or device information.
         </li>
         <li>Things you ask the assistant to remember (“assistant memory”). You can see and delete them in Settings.</li>
       </ul>
@@ -66,7 +67,8 @@ export default async function PrivacyPage() {
         <li>
           Activity: the posts and stories you view, reactions and saves, the feedback you give on your feed (“Show less like this”, muting), where you stopped
           in a reel, and events about actions you take (for example “created a post” or “joined a community”) with a few details about them, without your IP
-          address. We use these to run your feed and to understand how YAPILAPI is used.
+          address. We use these to run your feed and to understand how YAPILAPI is used. If you turn off “Analytics” in Settings (Privacy), we stop recording
+          these events for you and unlink the ones already recorded from your account.
         </li>
         <li>Time spent: the minutes you use YAPILAPI each day, for your own reminders and, if you are a supervised teen, for your family link.</li>
         <li>Screenshots of view-once media: the phone app tells the sender, and we record that it happened.</li>
@@ -111,8 +113,10 @@ export default async function PrivacyPage() {
       <ul>
         <li>To provide YAPILAPI: your account, profile, feed, messages, calls, events, shops and everything else you use.</li>
         <li>
-          To personalise it: your interests, who you follow and what you engage with decide what For you and Wander show. Every post can tell you why you are
-          seeing it.
+          To personalise it: your interests, who you follow and what you engage with decide what For you, Reels and Wander show and who we suggest you follow.
+          Every post can tell you why you are seeing it. If you turn off “Personalization” in Settings (Privacy), these use nothing about you: they are ranked
+          the same way for everyone, by how recent posts are and how many people engage with them. Your own filters (muted people and topics, “Not interested”)
+          still apply.
         </li>
         <li>To keep people safe: moderation, age protections, family links, regional rules, and preventing spam, fraud and attacks.</li>
         <li>To process payments, refunds and payouts.</li>
@@ -153,7 +157,7 @@ export default async function PrivacyPage() {
             <li>Expo, Apple and Google, to deliver notifications to phones, and your browser’s push service on the web.</li>
             <li>
               Jamendo, when music from its catalogue plays: your device gets the song straight from Jamendo, which sees your IP address. Google’s servers help
-              calls connect (STUN) and serve the website’s fonts, and also see your IP address.
+              calls connect (STUN) and also see your IP address. The website’s fonts are served by YAPILAPI itself, not by Google.
             </li>
           </ul>
         </li>
@@ -173,13 +177,29 @@ export default async function PrivacyPage() {
       <ul>
         <li>Your account and content: until you delete them or your account.</li>
         <li>
-          When you delete your account: your profile, posts, reels, stories, comments, the messages you sent, your photos and videos, connections, circles,
-          interests, assistant memory and notification tokens are removed right away. Backups are replaced within 30 days.
+          When you delete a post, story, comment or message, it disappears right away and is erased for good, with its photos and videos, 30 days later. Content
+          removed by our moderators is kept for 180 days first, for appeals and legal requests.
         </li>
         <li>
-          We keep, for as long as the law or people’s safety requires: records of payments, refunds and payouts; reports, moderation decisions and appeals; and
-          security logs. [Set and state a period for each, for example 12 months for security logs and activity events, and the period your tax law requires for
-          payment records.]
+          When you delete your account: your profile, posts, reels, stories, comments, the messages you sent, your photos, videos and voice notes (with every
+          size and streaming copy made of them), live recordings, recap videos, connections, circles, interests, assistant memory and notification tokens are
+          removed right away. Backups are replaced within 30 days.
+        </li>
+        <li>
+          A daily clean-up deletes, after these periods:
+          <ul>
+            <li>Sessions that expired or were signed out: 30 days.</li>
+            <li>Security events (sign-ins, failed sign-ins, password and two-step changes) with their IP address and device: 12 months.</li>
+            <li>Activity events (see “How you use YAPILAPI”): 13 months. The minutes you use YAPILAPI each day: 13 months.</li>
+            <li>Notifications: 12 months. Phone number checks: 90 days. The log of assistant and translation requests: 90 days.</li>
+            <li>Email and password reset links, sign-in challenges, download links and unfinished uploads: 7 days after they are used or expire.</li>
+            <li>View-once photos and videos that were never sent: 24 hours. The raw recording of a live on our video server: 2 days after it ends.</li>
+            <li>Our record of actions taken on accounts, money and moderation (the audit log): 2 years.</li>
+          </ul>
+        </li>
+        <li>
+          We keep, for as long as the law or people’s safety requires: records of payments, refunds and payouts; and reports, moderation decisions and appeals.
+          [State the period your tax law requires for payment records, and how long reports and decisions are kept.]
         </li>
         <li>Stories disappear from view after 24 hours (or the time you chose) and stay in your archive, visible only to you, until you delete them.</li>
       </ul>
@@ -200,7 +220,8 @@ export default async function PrivacyPage() {
         </li>
         <li>
           <strong>Choose</strong>: who sees each post, a private account, who can tag you, whether people with your email can find you, ads (off unless you turn
-          them on), assistant memory (off unless you turn it on), notifications, and hidden words.
+          them on), assistant memory (off unless you turn it on), personalization and analytics (on unless you turn them off, in Settings, Privacy),
+          notifications, and hidden words.
         </li>
         <li>
           <strong>Object, restrict, or withdraw consent</strong>, and <strong>complain</strong> to your data protection authority. Write to{' '}
@@ -210,8 +231,10 @@ export default async function PrivacyPage() {
 
       <h2>7. Children and teens</h2>
       <p>
-        YAPILAPI is not for children under 13. If we learn that someone under 13 has an account, we delete it; if you think this has happened, write to{' '}
-        <Mail to={c.safety} />. Accounts of people under 18 get extra protections, described in <Link href="/legal/safety">Safety and minors</Link>.
+        YAPILAPI is not for children under 13. We ask everyone’s date of birth when they sign up and don’t create an account for anyone under 13. If an existing
+        account gives a date of birth under 13, it is closed straight away. If we learn in another way that someone under 13 has an account, we delete it; if
+        you think this has happened, write to <Mail to={c.safety} />. Accounts of people under 18 get extra protections, described in{' '}
+        <Link href="/legal/safety">Safety and minors</Link>, and people under 18 can’t sell, get paid or receive tips.
       </p>
 
       <h2>8. Security</h2>

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { NO_METADATA } from './media-formats.ts';
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -96,6 +97,7 @@ async function renderEdit(deps: StudioDeps, editId: string) {
         '20',
         '-pix_fmt',
         'yuv420p',
+        ...NO_METADATA,
         '-movflags',
         '+faststart',
         '-avoid_negative_ts',
