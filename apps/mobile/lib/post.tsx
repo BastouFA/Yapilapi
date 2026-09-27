@@ -18,6 +18,8 @@ import { TranslatableText } from './translation';
 import { PostMusicChip } from './music';
 import { MediaViewer } from './media-viewer';
 import { RepostersSheet } from './reposters';
+import { useFlag } from './flags';
+import { AddToMemorySheet } from './memories';
 
 export { RichText };
 
@@ -218,12 +220,17 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
 
   // Drafts and scheduled posts are changed from Drafts, not here.
   const canEdit = isAuthor && !post.status;
+  // Memories (behind the MEMORY flag): add a published post to one of yours.
+  const memoryOn = useFlag('MEMORY');
+  const canRemember = !!me && !post.status && memoryOn === true;
+  const [remembering, setRemembering] = useState(false);
 
-  /** More: edit your post, save to a board, leave as co-author, remove your photo tag. */
+  /** More: edit your post, save to a board, add to a memory, leave as co-author, remove your photo tag. */
   function more() {
     const options: { text: string; style?: 'destructive' | 'cancel'; onPress?: () => void }[] = [];
     if (canEdit) options.push({ text: t('m.post.edit'), onPress: () => setEditing(true) });
     if (me) options.push({ text: t('m.boards.saveTo'), onPress: saveTo });
+    if (canRemember) options.push({ text: t('m.mem.addToMemory'), onPress: () => setRemembering(true) });
     if (collab === 'accepted') options.push({ text: t('m.collab.leave'), style: 'destructive', onPress: () => void leave() });
     if (myTag) options.push({ text: t('m.tags.removeMine'), onPress: () => void removeTag(myTag) });
     options.push({ text: t('common.cancel'), style: 'cancel' });
@@ -497,7 +504,7 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
             </Pressable>
           ) : null}
           <View style={{ flex: 1 }} />
-          {collab === 'accepted' || myTag || canEdit ? (
+          {collab === 'accepted' || myTag || canEdit || canRemember ? (
             <Pressable accessibilityRole="button" accessibilityLabel={t('m.post.more')} hitSlop={8} onPress={more}>
               <Icon name="ellipsis-horizontal" size={20} color={c.inkMuted} />
             </Pressable>
@@ -541,6 +548,7 @@ export function PostCard({ post: given, open = true }: { post: Post; open?: bool
       ) : null}
       {history ? <HistorySheet postId={post.id} onClose={() => setHistory(false)} /> : null}
       {repostersOpen ? <RepostersSheet postId={post.id} onClose={() => setRepostersOpen(false)} /> : null}
+      {remembering ? <AddToMemorySheet postId={post.id} onClose={() => setRemembering(false)} /> : null}
     </Card>
   );
 }

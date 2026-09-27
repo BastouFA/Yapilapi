@@ -1,6 +1,7 @@
 import { router, type Href } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import { useT } from '../../lib/i18n';
+import { useFlag } from '../../lib/flags';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
 import { ProfileView } from '../../lib/profile';
@@ -8,14 +9,18 @@ import { Icon, Loading, Notice, Screen, useColors, useTabBarSpace, type IconName
 
 /**
  * You: your profile, with "Your space" on top: everything that is yours to come back to (saved
- * posts and boards, drafts, your archive, recap videos, circles, close friends, events,
- * communities), finding and inviting friends, Real and Settings. Then your chapters and posts.
+ * posts and boards, drafts, your archive, memories, recap videos, circles, close friends, events,
+ * communities, Together, Live), finding and inviting friends, Real and Settings. Memories, Together
+ * and Live show when their features are on. Then your chapters and posts.
  */
 export default function ProfileScreen() {
   const c = useColors();
   const { t } = useT();
   const { me } = useSession();
   const bottom = useTabBarSpace();
+  const memories = useFlag('MEMORY');
+  const together = useFlag('REAL_TOGETHER');
+  const live = useFlag('LIVE');
 
   if (me === null)
     return (
@@ -24,15 +29,18 @@ export default function ProfileScreen() {
       </Screen>
     );
   if (!me) return <Loading />;
-  const shortcuts: { label: string; icon: IconName; href: Href }[] = [
+  const shortcuts: { label: string; icon: IconName; href: Href; on?: boolean }[] = [
     { label: t('m.saved.title'), icon: 'bookmark-outline', href: '/saved' },
     { label: t('m.drafts.title'), icon: 'document-text-outline', href: '/drafts' },
     { label: t('m.you.archive'), icon: 'archive-outline', href: '/archive' },
+    { label: t('memories.title'), icon: 'images-outline', href: '/memories', on: memories === true },
     { label: t('m.you.recaps'), icon: 'film-outline', href: '/recaps' },
     { label: t('m.circles.title'), icon: 'ellipse-outline', href: '/circles' },
     { label: t('m.closeFriends.title'), icon: 'star-outline', href: '/close-friends' },
     { label: t('events.title'), icon: 'calendar-outline', href: '/events' },
     { label: t('communities.title'), icon: 'people-circle-outline', href: '/communities' },
+    { label: t('m.together.title'), icon: 'aperture-outline', href: '/together', on: together === true },
+    { label: t('m.live.title'), icon: 'radio-outline', href: '/live', on: live === true },
     { label: t('friends.title'), icon: 'people-outline', href: '/find-friends' },
     { label: t('invite.title'), icon: 'gift-outline', href: '/invite' },
     { label: t('m.title.real'), icon: 'camera-outline', href: '/real' },
@@ -48,9 +56,11 @@ export default function ProfileScreen() {
             {t('m.you.space')}
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: space[3] }}>
-            {shortcuts.map((s) => (
-              <Shortcut key={String(s.href)} {...s} />
-            ))}
+            {shortcuts
+              .filter((s) => s.on !== false)
+              .map((s) => (
+                <Shortcut key={String(s.href)} label={s.label} icon={s.icon} href={s.href} />
+              ))}
           </View>
         </View>
       }

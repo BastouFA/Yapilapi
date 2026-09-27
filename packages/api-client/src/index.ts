@@ -968,6 +968,7 @@ export function createClient(opts: ClientOptions) {
           hiddenItems: number;
         }>(`/v1/memories/${id}`),
       create: (b: { title: string; kind?: string; description?: string }) => post<{ memory: MemorySummary }>('/v1/memories', b),
+      update: (id: string, b: { title?: string; description?: string }) => patch<{ memory: MemorySummary }>(`/v1/memories/${id}`, b),
       remove: (id: string) => del(`/v1/memories/${id}`),
       suggestions: () => get<{ events: EventItem[]; onThisDay: Post[] }>('/v1/memories/suggestions'),
       fromEvent: (eventId: string) => post<{ memoryId: string }>(`/v1/memories/from-event/${eventId}`),
@@ -1169,6 +1170,7 @@ export interface LiveSummary {
   host: PublicUser;
   viewers: number;
   peakViewers: number;
+  scheduledFor: string | null;
   startedAt: string | null;
   endedAt: string | null;
   myRole: 'host' | 'cohost' | 'moderator' | 'viewer' | null;
