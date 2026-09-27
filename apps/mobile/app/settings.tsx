@@ -15,8 +15,12 @@ import type { DataSaverMode } from '../../../packages/shared/src/data-saver';
 import { HIDDEN_WORD_MAX, HIDDEN_WORDS_MAX } from '../../../packages/shared/src/constants';
 import { baseLanguage, languageName, MAX_UNDERSTOOD_LANGUAGES, TRANSLATION_LANGUAGES } from '../../../packages/shared/src/translation';
 import { useTranslationSettings } from '../lib/translation';
+import { BlockedAccounts, DataUseSettings, FeedSettings, NotificationSettings, SessionsCard, SettingsHeading } from '../lib/settings-more';
 
-/** Settings: email and phone confirmation, family supervision and advertising consent (same endpoints as the web settings page). */
+/**
+ * Settings, in groups: your account, your space, notifications and feed, privacy and safety, data
+ * and language, family, and security (same endpoints as the web settings page).
+ */
 export default function Settings() {
   const c = useColors();
   const { t } = useT();
@@ -34,6 +38,17 @@ export default function Settings() {
       contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
       keyboardShouldPersistTaps="handled"
     >
+      <SettingsHeading>{t('m.settings.section.account')}</SettingsHeading>
+      <Row
+        title={t('profile.edit')}
+        subtitle={t('m.settings.editProfileHint')}
+        start={<Icon name="person-circle-outline" size={18} color={c.yapi} />}
+        end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
+        onPress={() => router.push('/profile-edit')}
+      />
+      <VerificationCard />
+
+      <SettingsHeading>{t('m.you.space')}</SettingsHeading>
       <Row
         title={t('m.closeFriends.title')}
         subtitle={t('m.closeFriends.manage')}
@@ -49,6 +64,20 @@ export default function Settings() {
         onPress={() => router.push('/circles')}
       />
       <Row
+        title={t('m.saved.title')}
+        subtitle={t('m.settings.savedHint')}
+        start={<Icon name="bookmark-outline" size={18} color={c.inkMuted} />}
+        end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
+        onPress={() => router.push('/saved')}
+      />
+      <Row
+        title={t('m.drafts.title')}
+        subtitle={t('m.settings.draftsHint')}
+        start={<Icon name="document-text-outline" size={18} color={c.inkMuted} />}
+        end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
+        onPress={() => router.push('/drafts')}
+      />
+      <Row
         title={t('m.archive.title')}
         subtitle={t('m.archive.manage')}
         start={<Icon name="archive-outline" size={18} color={c.inkMuted} />}
@@ -62,14 +91,28 @@ export default function Settings() {
         end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
         onPress={() => router.push('/recaps')}
       />
-      <DataSaver />
-      <Translation />
+
+      <SettingsHeading>{t('m.settings.section.attention')}</SettingsHeading>
+      <NotificationSettings />
+      <FeedSettings />
+
+      <SettingsHeading>{t('m.settings.section.privacy')}</SettingsHeading>
       <Sharing />
       <Tagging />
       <HiddenWords />
-      <VerificationCard />
-      <Family />
+      <DataUseSettings />
       <Advertising />
+      <BlockedAccounts />
+
+      <SettingsHeading>{t('m.settings.section.data')}</SettingsHeading>
+      <DataSaver />
+      <Translation />
+
+      <SettingsHeading>{t('m.family.title')}</SettingsHeading>
+      <Family />
+
+      <SettingsHeading>{t('m.settings.section.security')}</SettingsHeading>
+      <SessionsCard />
       <PushAndSignOut />
     </ScrollView>
   );

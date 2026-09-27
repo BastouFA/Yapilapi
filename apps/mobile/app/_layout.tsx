@@ -9,16 +9,19 @@ import { SessionProvider, useSession } from '../lib/session';
 import { useColors } from '../lib/ui';
 import { useUsageHeartbeat } from '../lib/usage';
 import { YapPlayer } from '../lib/yaps';
-import { useStoryPushLinks } from '../lib/stories';
+import { useNotificationLinks } from '../lib/links';
 
 function Heartbeat() {
   const { me } = useSession();
   useUsageHeartbeat(!!me);
-  useStoryPushLinks();
+  useNotificationLinks();
   return null;
 }
 
-/** Tabs live in (tabs); detail screens (chat, post, community, settings, Real, Reels) push on top. */
+/**
+ * Tabs live in (tabs); detail screens (chat, post, community, event, place, settings, Real, Reels) push on top.
+ * Links from outside (yapilapi://…, web paths) are mapped in +native-intent.tsx; push taps in useNotificationLinks.
+ */
 function Screens() {
   const c = useColors();
   const { t } = useT();
@@ -66,6 +69,11 @@ function Screens() {
         <Stack.Screen name="real" options={{ title: t('m.title.real') }} />
         <Stack.Screen name="assistant" options={{ title: t('m.title.assistant') }} />
         <Stack.Screen name="events" options={{ title: t('events.title') }} />
+        <Stack.Screen name="event/[id]" options={{ title: t('m.event.title') }} />
+        <Stack.Screen name="place/[id]" options={{ title: t('m.place.title') }} />
+        <Stack.Screen name="communities" options={{ title: t('communities.title') }} />
+        <Stack.Screen name="follows" options={{ title: t('profile.followers') }} />
+        <Stack.Screen name="profile-edit" options={{ title: t('profile.edit'), presentation: 'modal' }} />
         <Stack.Screen name="reels" options={{ title: t('m.title.reels'), headerShown: false, contentStyle: { backgroundColor: '#000' } }} />
         <Stack.Screen name="new-group" options={{ title: t('m.inbox.newGroup'), presentation: 'modal' }} />
         <Stack.Screen
