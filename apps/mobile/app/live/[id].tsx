@@ -286,6 +286,8 @@ export default function LiveScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: space[4] }}
         keyboardShouldPersistTaps="handled"
+        // Scrolling tucks the keyboard away, so the whole conversation is readable again.
+        keyboardDismissMode="on-drag"
         onScroll={onScroll}
         scrollEventThrottle={100}
         refreshControl={

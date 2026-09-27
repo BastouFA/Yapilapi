@@ -286,6 +286,8 @@ export default function CommunityScreen() {
     <KeyboardAvoid>
       <FlatList
         keyboardShouldPersistTaps="handled"
+        // Scrolling tucks the keyboard away, so the whole conversation is readable again.
+        keyboardDismissMode="on-drag"
         {...feedListProps}
         style={{ backgroundColor: c.ground }}
         contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: space[8] }}

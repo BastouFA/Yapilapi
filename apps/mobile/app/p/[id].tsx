@@ -566,6 +566,8 @@ export default function PostScreen() {
         ListEmptyComponent={<Text style={{ color: c.inkMuted }}>{t('m.comment.none')}</Text>}
         onEndReached={() => cursor && void loadComments(cursor).catch(() => {})}
         keyboardShouldPersistTaps="handled"
+        // Scrolling tucks the keyboard away, so the whole conversation is readable again.
+        keyboardDismissMode="on-drag"
         renderItem={({ item }) => renderComment(item, false)}
       />
       {me ? (

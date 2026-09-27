@@ -671,6 +671,8 @@ export default function Chat() {
       ) : null}
       <FlatList
         keyboardShouldPersistTaps="handled"
+        // Scrolling tucks the keyboard away, so the whole conversation is readable again.
+        keyboardDismissMode="on-drag"
         ref={list}
         data={messages}
         keyExtractor={(m) => m.id}
