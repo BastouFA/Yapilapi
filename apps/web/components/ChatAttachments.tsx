@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Button, Icon, SensitiveCover } from '@yapilapi/design-system';
-import type { Message } from '@yapilapi/shared';
+import type { Message, MessageKey } from '@yapilapi/shared';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
@@ -117,6 +117,9 @@ export function ViewOnceMessage({ message, mine, onChange }: { message: Message;
   const list = (names: string[]) => new Intl.ListFormat(locale, { type: 'conjunction' }).format(names);
   const info = message.viewOnce!;
   const video = info.kind === 'video';
+  const voice = info.kind === 'audio';
+  /** The right words for a photo, a video or a voice note. */
+  const pick = (photo: MessageKey, vid: MessageKey, audio: MessageKey) => (voice ? audio : video ? vid : photo);
   const [open, setOpen] = useState<{ src: string; kind: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -167,16 +170,16 @@ export function ViewOnceMessage({ message, mine, onChange }: { message: Message;
           <Icon name={info.state === 'ready' ? 'eye' : 'check'} size={18} />
           <span>
             {info.state === 'ready'
-              ? t(video ? 'm.viewOnce.videoSent' : 'm.viewOnce.photoSent')
+              ? t(pick('m.viewOnce.photoSent', 'm.viewOnce.videoSent', 'm.viewOnce.voiceSent'))
               : info.state === 'viewed'
-                ? t(video ? 'm.viewOnce.videoViewed' : 'm.viewOnce.photoViewed')
-                : t(video ? 'm.viewOnce.videoExpired' : 'm.viewOnce.photoExpired')}
+                ? t(pick('m.viewOnce.photoViewed', 'm.viewOnce.videoViewed', 'm.viewOnce.voiceViewed'))
+                : t(pick('m.viewOnce.photoExpired', 'm.viewOnce.videoExpired', 'm.viewOnce.voiceExpired'))}
           </span>
         </div>
       ) : (
         <button type="button" className="view-once__row view-once__open" onClick={() => void view()} disabled={loading}>
           <Icon name="eye" size={18} />
-          <span>{loading ? t('m.viewOnce.opening') : t(video ? 'm.viewOnce.tapVideo' : 'm.viewOnce.tapPhoto')}</span>
+          <span>{loading ? t('m.viewOnce.opening') : t(pick('m.viewOnce.tapPhoto', 'm.viewOnce.tapVideo', 'm.viewOnce.tapVoice'))}</span>
         </button>
       )}
       {mine ? (
@@ -199,15 +202,28 @@ export function ViewOnceMessage({ message, mine, onChange }: { message: Message;
           className="view-once__viewer"
           role="dialog"
           aria-modal
-          aria-label={t(video ? 'chat.viewOnce.videoFrom' : 'chat.viewOnce.photoFrom', { name: message.sender.displayName })}
+          aria-label={t(pick('chat.viewOnce.photoFrom', 'chat.viewOnce.videoFrom', 'chat.viewOnce.voiceFrom'), { name: message.sender.displayName })}
         >
           <div className="view-once__bar">
-            <span>{t(video ? 'chat.viewOnce.videoBar' : 'chat.viewOnce.photoBar', { name: message.sender.displayName })}</span>
+            <span>{t(pick('chat.viewOnce.photoBar', 'chat.viewOnce.videoBar', 'chat.viewOnce.voiceBar'), { name: message.sender.displayName })}</span>
             <Button size="sm" variant="ghost" onClick={() => void close()} autoFocus>
               {t('m.common.close')}
             </Button>
           </div>
-          {open.kind === 'video' ? (
+          {open.kind === 'audio' ? (
+            <div className="view-once__voice">
+              <Icon name="mic" size={40} />
+              {/* Plays once: when it ends, closing is the only way on, and the file is deleted. */}
+              <audio
+                src={open.src}
+                autoPlay
+                controls
+                controlsList="nodownload noplaybackrate"
+                onEnded={() => void close()}
+                onContextMenu={(e) => e.preventDefault()}
+              />
+            </div>
+          ) : open.kind === 'video' ? (
             <video
               src={open.src}
               autoPlay

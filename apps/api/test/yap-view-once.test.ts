@@ -438,10 +438,33 @@ describe('View once', () => {
     expect(existsSync(privatePath(t.ctx, after.storage_key))).toBe(true);
   });
 
-  it('accepts only photos and videos, and each upload goes in one message', async () => {
+  it('sends a voice note that plays once, served privately to the person who opens it', async () => {
     const sender = await adult();
     const b = await adult();
-    expect((await upload(sender, 'voice.m4a', 'audio/mp4', tone(1), true)).status).toBe(415);
+    const convo = (await as(t.app, sender).post('/v1/conversations', { memberIds: [b.id] })).body.conversation.id;
+    const up = await upload(sender, 'voice.m4a', 'audio/mp4', tone(1), true);
+    expect(up.status).toBe(201);
+    expect(up.body.media).toMatchObject({ kind: 'audio', url: '', viewOnce: true });
+    const sent = await as(t.app, sender).post(`/v1/conversations/${convo}/messages`, { viewOnce: true, attachments: [{ mediaId: up.body.media.id }] });
+    expect(sent.status).toBe(201);
+    expect(sent.body.message.viewOnce).toMatchObject({ kind: 'audio', state: 'ready' });
+    await runJobs();
+    const opened = await as(t.app, b).post(`/v1/messages/${sent.body.message.id}/view-once/open`);
+    expect(opened.status).toBe(200);
+    expect(opened.body).toMatchObject({ kind: 'audio', mime: 'audio/mp4' });
+    const file = await t.app.inject({ method: 'GET', url: opened.body.url, headers: { authorization: `Bearer ${b.token}` } });
+    expect(file.statusCode).toBe(200);
+    expect(file.headers['content-type']).toBe('audio/mp4');
+    expect(file.headers['cache-control']).toContain('no-store');
+    // Not for the sender, and a view-once voice note can't go out as an ordinary message.
+    expect((await as(t.app, sender).post(`/v1/messages/${sent.body.message.id}/view-once/open`)).status).toBeGreaterThanOrEqual(400);
+    const plain = await upload(sender, 'voice2.m4a', 'audio/mp4', tone(1), true);
+    expect((await as(t.app, sender).post(`/v1/conversations/${convo}/messages`, { attachments: [{ mediaId: plain.body.media.id }] })).status).toBe(400);
+  });
+
+  it('sends each view-once upload in one message only', async () => {
+    const sender = await adult();
+    const b = await adult();
     const { convo, mediaId } = await sendViewOnce(sender, [b]);
     const again = await as(t.app, sender).post(`/v1/conversations/${convo}/messages`, { viewOnce: true, attachments: [{ mediaId }] });
     expect(again.status).toBe(409);

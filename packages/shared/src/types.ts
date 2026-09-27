@@ -482,7 +482,7 @@ export interface ViewOnceInfo {
    * expired: 14 days passed; the file is deleted.
    */
   state: 'ready' | 'viewed' | 'expired';
-  /** 'image' or 'video'. */
+  /** 'image', 'video' or 'audio' (a voice note that plays once). */
   kind: string;
   expiresAt: string;
   /** Only on your own messages: who opened it and when, and whether they took a screenshot we could detect. */

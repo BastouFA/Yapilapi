@@ -17,7 +17,7 @@ const uploadQuery = z.object({ viewOnce: z.enum(['true', 'false', '1', '0']).opt
  * MediaStorage adapter, and recorded in `media`. Transcoding and adaptive
  * streaming run behind the same adapter in production (documented in docs/architecture).
  *
- * With ?viewOnce=true the photo or video is for a view-once chat message: it is
+ * With ?viewOnce=true the photo, video or voice note is for a view-once chat message: it is
  * stored privately (never at a public address, url is empty) and can only be
  * sent with `viewOnce: true`.
  */
@@ -33,7 +33,6 @@ export default async function mediaModule(app: FastifyInstance, ctx: AppContext)
     // The file's real type comes from its contents, not from its name or the browser's label.
     const detected = detectMedia(raw, file.mimetype);
     if (!detected) throw new AppError(415, 'unsupported_media', `That file type isn't supported. ${SUPPORTED_FORMATS}`);
-    if (viewOnce && detected.kind === 'audio') throw new AppError(415, 'unsupported_media', 'Only photos and videos can be sent to view once.');
     const unreadable = () => {
       throw new AppError(415, 'unsupported_media', "That file couldn't be read. It may be damaged; try exporting it again.");
     };

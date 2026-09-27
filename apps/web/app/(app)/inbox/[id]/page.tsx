@@ -12,6 +12,7 @@ import { useRealtime, useSession } from '../../../providers';
 import { useCalls } from '@/components/Calls';
 import { MiniAppsSheet } from '@/components/MiniApps';
 import { MessageAttachments, ViewOnceMessage, VoiceRecorder } from '@/components/ChatAttachments';
+import { ViewOnceCapture } from '@/components/ViewOnceCapture';
 import { TurnOnYapsPrompt, YapButton } from '@/components/Yap';
 import { StoryCardView } from '@/components/StoryStickers';
 import { NowStatusLine } from '@/components/ProfilePlus';
@@ -202,6 +203,13 @@ export default function ChatPage() {
 
   const fileInput = useRef<HTMLInputElement>(null);
   const viewOnceInput = useRef<HTMLInputElement>(null);
+  // View once straight from the camera or the microphone.
+  const [captureOpen, setCaptureOpen] = useState(false);
+  const [captureStart, setCaptureStart] = useState<'photo' | 'voice'>('photo');
+  const setCaptureMode = (m: 'voice') => {
+    setCaptureStart(m);
+    setCaptureOpen(true);
+  };
   const [uploading, setUploading] = useState<string | null>(null);
   const [yapSettings, setYapSettings] = useState(false);
 
@@ -713,7 +721,7 @@ export default function ChatPage() {
         <input
           ref={viewOnceInput}
           type="file"
-          accept="image/*,video/*,.heic,.heif"
+          accept="image/*,video/*,audio/*,.heic,.heif"
           hidden
           onChange={(e) => {
             const f = e.currentTarget.files?.[0];
@@ -732,16 +740,15 @@ export default function ChatPage() {
         <button type="button" className="yp-action" aria-label={t('m.chat.sendPhoto')} disabled={!!uploading} onClick={() => fileInput.current?.click()}>
           <Icon name="image" />
         </button>
-        <button
-          type="button"
-          className="yp-action"
-          aria-label={t('chat.viewOnceA11y')}
-          title={t('chat.viewOnceTitle')}
-          disabled={!!uploading}
-          onClick={() => viewOnceInput.current?.click()}
-        >
-          <Icon name="eye" />
-        </button>
+        <Menu
+          label={t('viewOnce.menu.label')}
+          icon="eye"
+          actions={[
+            { label: t('viewOnce.menu.camera'), icon: 'image', onSelect: () => setCaptureOpen(true) },
+            { label: t('viewOnce.menu.voice'), icon: 'mic', onSelect: () => setCaptureMode('voice') },
+            { label: t('viewOnce.menu.file'), icon: 'create', onSelect: () => viewOnceInput.current?.click() },
+          ]}
+        />
         <VoiceRecorder disabled={!!uploading} onError={toast} onRecorded={(f) => void sendFile(f, t('chat.sendingVoice'))} />
         {uploading ? (
           <span className="muted" role="status" style={{ fontSize: 13 }}>
@@ -772,6 +779,16 @@ export default function ChatPage() {
           <span className="chat-send__label">{editing ? t('common.save') : t('inbox.send')}</span>
         </Button>
       </form>
+      <ViewOnceCapture
+        key={captureStart}
+        open={captureOpen}
+        initialMode={captureStart}
+        onClose={() => {
+          setCaptureOpen(false);
+          setCaptureStart('photo');
+        }}
+        onCaptured={(f) => void sendFile(f, t('chat.sendingViewOnce'), { viewOnce: true })}
+      />
       <ReportSheet target={reportId ? { type: 'message', id: reportId } : null} onClose={() => setReportId(null)} />
       <PollSheet open={pollOpen} onClose={() => setPollOpen(false)} conversationId={id} onSent={addMessage} />
       <ListSheet open={listOpen} onClose={() => setListOpen(false)} conversationId={id} onSent={addMessage} />

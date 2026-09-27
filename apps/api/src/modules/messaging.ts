@@ -480,8 +480,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       }
       if (input.viewOnce) {
         const m = media[0]!;
-        if (!m.private || (m.kind !== 'image' && m.kind !== 'video'))
-          throw new AppError(400, 'view_once_upload', 'To send a photo or video to view once, upload it as view once first.');
+        if (!m.private || !['image', 'video', 'audio'].includes(m.kind))
+          throw new AppError(400, 'view_once_upload', 'To send a photo, video or voice note to view once, upload it as view once first.');
       } else if (media.some((m) => m.private)) {
         throw new AppError(400, 'view_once_only', 'This photo or video was uploaded to view once. Send it as view once.');
       }
