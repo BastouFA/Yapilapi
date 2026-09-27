@@ -25,7 +25,7 @@ import { conversationTitle } from '../../lib/post';
 import { isVerificationError, SensitiveCover, UnavailableMedia, VerifyPrompt } from '../../lib/safety';
 import { useRealtime, useSession } from '../../lib/session';
 import { elevation, gradient, radius, space } from '../../lib/theme';
-import { ActionSheet, BottomSheet, Icon, KeyboardAvoid, Notice, SwitchRow, useColors, userText } from '../../lib/ui';
+import { ActionSheet, BottomSheet, Icon, KeyboardAvoid, Notice, SwitchRow, useColors, useKeyboardVisible, userText } from '../../lib/ui';
 import { ViewOnceBubble } from '../../lib/view-once';
 import { Waveform, YAP_MAX_MS, YAP_MIN_MS } from '../../lib/yaps';
 import { SmartRepliesSwitch, SmartReplyChips } from '../../lib/ai-helpers';
@@ -72,6 +72,8 @@ export default function Chat() {
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [body, setBody] = useState('');
+  // While you type, the voice bar and suggested replies step aside so more of the chat shows.
+  const typing = useKeyboardVisible();
   const [error, setError] = useState<string | null>(null);
   const [needsVerify, setNeedsVerify] = useState(false);
   const list = useRef<FlatList<Message>>(null);
@@ -746,7 +748,7 @@ export default function Chat() {
           windowSize={11}
         />
       </View>
-      {yaps?.available && !recordingOn ? (
+      {yaps?.available && !recordingOn && !typing ? (
         <View style={{ paddingHorizontal: space[3], paddingTop: space[2] }}>
           <Pressable
             accessibilityRole="button"
@@ -779,7 +781,7 @@ export default function Chat() {
           </Pressable>
         </View>
       ) : null}
-      {!editing && !recordingOn ? (
+      {!editing && !recordingOn && !body.trim() ? (
         <SmartReplyChips
           conversationId={id}
           lastMessageId={messages.at(-1)?.id ?? null}
@@ -840,7 +842,7 @@ export default function Chat() {
           gap: space[2],
           paddingHorizontal: space[3],
           paddingTop: space[2],
-          paddingBottom: Math.max(insets.bottom, space[3]),
+          paddingBottom: typing ? space[2] : Math.max(insets.bottom, space[3]),
         }}
       >
         {recordingOn ? (
@@ -1060,6 +1062,8 @@ export default function Chat() {
               scheduled.setItems((cur) => [...cur.filter((x) => x.id !== s.id), s].sort((a, b) => a.sendAt.localeCompare(b.sendAt)));
               setBody('');
               setReplyTo(null);
+              // Show it where it waits, below the newest message.
+              setTimeout(() => list.current?.scrollToEnd({ animated: true }), 150);
             } catch (e) {
               fail(e);
             }

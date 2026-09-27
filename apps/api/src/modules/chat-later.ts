@@ -279,18 +279,31 @@ export function registerChatLater(app: FastifyInstance, ctx: AppContext, h: Chat
     const result = await tx(db, async (c) => {
       const cur = (await c.query(`SELECT wallpaper, accent FROM conversations WHERE id = $1 FOR UPDATE`, [id])).rows[0];
       const next: ChatTheme = chatTheme({ wallpaper: input.wallpaper ?? cur.wallpaper, accent: input.accent ?? cur.accent });
-      if (next.wallpaper === cur.wallpaper && next.accent === cur.accent) return { theme: next, lineId: null as string | null };
+      if (next.wallpaper === cur.wallpaper && next.accent === cur.accent)
+        return { theme: next, lineId: null as string | null, replaced: null as string | null };
       await c.query(`UPDATE conversations SET wallpaper = $2, accent = $3 WHERE id = $1`, [id, next.wallpaper, next.accent]);
+      // Trying a few looks in a row leaves one line, not one per tap: when the chat's newest
+      // message is your own look line from the last few minutes, it's replaced.
+      const replaced = (
+        await c.query(
+          `DELETE FROM messages WHERE id = (
+             SELECT id FROM messages WHERE conversation_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1
+           ) AND sender_id = $2 AND kind = 'system' AND meta->>'type' = 'theme' AND created_at > now() - interval '10 minutes'
+           RETURNING id`,
+          [id, u.id],
+        )
+      ).rows[0]?.id as string | undefined;
       const { rows } = await c.query(`INSERT INTO messages (conversation_id, sender_id, body, kind, meta) VALUES ($1,$2,'','system',$3) RETURNING id`, [
         id,
         u.id,
         { type: 'theme', wallpaper: next.wallpaper, accent: next.accent },
       ]);
-      return { theme: next, lineId: rows[0].id as string };
+      return { theme: next, lineId: rows[0].id as string, replaced: replaced ?? null };
     });
     if (!result.lineId) return { theme: result.theme, message: null };
     const members = await h.memberIds(id);
     const line = await h.loadMessage(result.lineId, u.id);
+    if (result.replaced) await ctx.realtime.publish(members, { type: 'message.deleted', data: { id: result.replaced, conversationId: id } });
     await ctx.realtime.publish(members, { type: 'message.created', data: line });
     await ctx.realtime.publish(members, { type: 'conversation.theme', data: { id, theme: result.theme } });
     return { theme: result.theme, message: line };

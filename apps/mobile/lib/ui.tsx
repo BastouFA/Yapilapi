@@ -8,6 +8,7 @@ import {
   Animated,
   I18nManager,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -602,6 +603,20 @@ export const feedListProps = {
   maxToRenderPerBatch: 4,
   windowSize: 7,
 } as const;
+
+/** Whether the on-screen keyboard is showing, for layouts that make room while you type. */
+export function useKeyboardVisible() {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setVisible(true));
+    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setVisible(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  return visible;
+}
 
 /**
  * Keeps its content above the keyboard on iOS and Android. Android draws edge to edge, so the

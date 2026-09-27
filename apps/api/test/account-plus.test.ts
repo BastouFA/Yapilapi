@@ -378,6 +378,21 @@ describe('chat wallpapers and colours', () => {
     expect((await as(t.app, ada).put(`/v1/conversations/${g}/theme`, { accent: 'forest' })).body.theme).toEqual({ wallpaper: 'dusk', accent: 'forest' });
     // No change, no line.
     expect((await as(t.app, ada).put(`/v1/conversations/${g}/theme`, { accent: 'forest' })).body.message).toBeNull();
+
+    // Trying a few looks in a row leaves one line: Ada's newest line is replaced, Bola's stays.
+    await as(t.app, ada).put(`/v1/conversations/${g}/theme`, { wallpaper: 'stripes' });
+    const last = (await as(t.app, ada).put(`/v1/conversations/${g}/theme`, { accent: 'ocean' })).body.message;
+    const after = (await as(t.app, cleo).get(`/v1/conversations/${g}/messages`)).body.items.filter((m: any) => m.kind === 'system');
+    expect(after.map((m: any) => [m.sender.id, m.system.wallpaper, m.system.accent])).toEqual([
+      [bola.id, 'dusk', 'ocean'],
+      [ada.id, 'stripes', 'ocean'],
+    ]);
+    expect(after[1].id).toBe(last.id);
+
+    // Once someone writes in between, the next change gets its own line.
+    await as(t.app, cleo).post(`/v1/conversations/${g}/messages`, { body: 'Nice' });
+    await as(t.app, ada).put(`/v1/conversations/${g}/theme`, { wallpaper: 'dots' });
+    expect((await as(t.app, cleo).get(`/v1/conversations/${g}/messages`)).body.items.filter((m: any) => m.kind === 'system')).toHaveLength(3);
   });
 
   it('only takes known names, from people in the chat', async () => {
