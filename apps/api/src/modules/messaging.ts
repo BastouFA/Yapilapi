@@ -64,6 +64,16 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     if (!r.rowCount) throw notFound('Conversation');
   }
 
+  /** Of these people, the ones who haven't blocked the sender: people who did never see their messages (in a group they share), live or when they load the chat. */
+  async function notBlocking(senderId: string, ids: string[]): Promise<string[]> {
+    const { rows } = await db.query<{ id: string }>(`SELECT blocker_id AS id FROM blocks WHERE blocked_id = $1 AND blocker_id = ANY($2::uuid[])`, [
+      senderId,
+      ids,
+    ]);
+    const blockers = new Set(rows.map((r) => r.id));
+    return ids.filter((id) => !blockers.has(id));
+  }
+
   async function memberIds(conversationId: string): Promise<string[]> {
     const { rows } = await db.query<{ user_id: string }>(`SELECT user_id FROM conversation_members WHERE conversation_id = $1 AND left_at IS NULL`, [
       conversationId,
@@ -108,6 +118,31 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       await requireVerified(db, ctx.config, senderId, 'message');
       if (await isRestricted(db, senderId)) throw restrictedError('message');
     }
+  }
+
+  /**
+   * Minor safety in groups: everyone in a group can message everyone else in it, so the rule for
+   * direct messages holds between each pair. An adult and someone under 18 can be in a group
+   * together only when they're friends (or linked through family). `adding` are the people joining;
+   * `members` everyone who will be in the group, them included.
+   */
+  async function assertGroupSafe(adding: string[], members: string[]) {
+    const { rows } = await db.query(
+      `WITH m AS (SELECT u.id, coalesce(u.birth_date > current_date - interval '18 years', false) AS minor FROM users u WHERE u.id = ANY($2::uuid[]))
+       SELECT 1 FROM m a JOIN m b ON a.minor AND NOT b.minor
+       WHERE (a.id = ANY($1::uuid[]) OR b.id = ANY($1::uuid[]))
+         AND NOT EXISTS (SELECT 1 FROM friendships fr WHERE fr.user_a = LEAST(a.id, b.id) AND fr.user_b = GREATEST(a.id, b.id))
+         AND NOT EXISTS (SELECT 1 FROM family_links fl WHERE fl.status = 'active'
+                         AND ((fl.guardian_id = a.id AND fl.teen_id = b.id) OR (fl.guardian_id = b.id AND fl.teen_id = a.id)))
+       LIMIT 1`,
+      [adding, [...new Set(members)]],
+    );
+    if (rows.length)
+      throw new AppError(
+        403,
+        'minor_protection',
+        'To keep younger people safe, adults and people under 18 can be in a group together only when they are friends.',
+      );
   }
 
   type Attachment = Message['attachments'][number];
@@ -166,6 +201,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
                             AND (x.moderation_status = 'normal' OR (x.moderation_status = 'review' AND x.sender_id = $1))
                             AND (x.expires_at IS NULL OR x.expires_at > now())
                             AND NOT EXISTS (SELECT 1 FROM message_hides h WHERE h.user_id = $1 AND h.message_id = x.id)
+                            AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $1 AND b.blocked_id = x.sender_id)
                           ORDER BY x.created_at DESC LIMIT 1) lm ON true
        WHERE cm.user_id = $1 AND cm.left_at IS NULL ${ids ? 'AND c.id = ANY($2)' : ''}
        ORDER BY c.last_message_at DESC LIMIT 100`,
@@ -256,6 +292,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       return { conversation: (await loadConversations(u.id, [id]))[0] };
     }
 
+    await assertGroupSafe(others, [u.id, ...others]);
     const id = await tx(db, async (c) => {
       const { rows } = await c.query<{ id: string }>(`INSERT INTO conversations (kind, title, created_by) VALUES ('group',$1,$2) RETURNING id`, [
         input.title ?? null,
@@ -282,6 +319,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     if (!conv.rows[0]) throw notFound('Conversation');
     if (conv.rows[0].kind !== 'group') throw badRequest('You can only add people to group conversations.');
     for (const other of userIds) await assertCanMessage(u.id, u.birthDate, other);
+    await assertGroupSafe(userIds, [...(await memberIds(id)), ...userIds]);
     await db.query(
       `INSERT INTO conversation_members (conversation_id, user_id) SELECT $1, unnest($2::uuid[]) ON CONFLICT (conversation_id, user_id) DO UPDATE SET left_at = NULL`,
       [id, userIds],
@@ -551,17 +589,18 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     );
     const [forAdults] = await withVerdicts([message], true);
     const [forOthers] = await withVerdicts([message], false);
+    const readers = await notBlocking(u.id, members);
     if (storyId) {
       // Each reader gets the story card as they'd see it.
-      for (const m of members)
+      for (const m of readers)
         await ctx.realtime.publish([m], { type: 'message.created', data: { ...(adults.has(m) ? forAdults : forOthers)!, ...(await cardFor(m)) } });
     } else {
       await ctx.realtime.publish(
-        members.filter((m) => adults.has(m)),
+        readers.filter((m) => adults.has(m)),
         { type: 'message.created', data: forAdults },
       );
       await ctx.realtime.publish(
-        members.filter((m) => !adults.has(m)),
+        readers.filter((m) => !adults.has(m)),
         { type: 'message.created', data: forOthers },
       );
     }
@@ -619,6 +658,18 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     if (!body && !(m.attachments ?? []).length && !m.story_id) throw badRequest('Write a message. To remove it, unsend it instead.');
     if (body !== m.body) {
       if (analyzeText(body).risk === 'escalate') throw new AppError(422, 'content_blocked', "This edit wasn't saved because it may put someone at risk.");
+      // A delivered message to someone who isn't a friend was checked for spam when it was sent; its new text is too.
+      if (m.moderation_status === 'normal') {
+        const conv = (await db.query(`SELECT kind FROM conversations WHERE id = $1`, [m.conversation_id])).rows[0];
+        const other = conv?.kind === 'direct' ? (await memberIds(m.conversation_id)).find((x) => x !== u.id) : undefined;
+        if (other && !(await areFriends(db, u.id, other))) {
+          const spam = await assessMessage(db, ctx.config, u.id, m.conversation_id, body);
+          if (spam.flags.length) {
+            await flagContent(db, ctx.realtime, u.id, { type: 'message', id }, spam.flags);
+            throw new AppError(422, 'content_blocked', "This edit wasn't saved because it looks like spam.");
+          }
+        }
+      }
       await tx(db, async (c) => {
         // The earlier text is kept for safety reports, and removed if the message is unsent.
         await c.query(`INSERT INTO message_edits (message_id, body) SELECT id, body FROM messages WHERE id = $1`, [id]);
@@ -626,7 +677,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       });
       const edited = (await db.query(`SELECT body, edited_at FROM messages WHERE id = $1`, [id])).rows[0];
       // A message held for a check is still only the sender's.
-      const to = m.moderation_status === 'normal' ? await memberIds(m.conversation_id) : [u.id];
+      const to = m.moderation_status === 'normal' ? await notBlocking(u.id, await memberIds(m.conversation_id)) : [u.id];
       await ctx.realtime.publish(to, {
         type: 'message.edited',
         data: { id, conversationId: m.conversation_id, body: edited.body, editedAt: edited.edited_at.toISOString() },

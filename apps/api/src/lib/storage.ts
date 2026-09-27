@@ -34,6 +34,21 @@ function newKey(ext: string) {
 }
 
 /**
+ * Whether an address points at a file stored here (…/media/<year>/<month>/<uuid>…, an upload or one of
+ * its processed sizes), on whatever host. Stored files are attached by their media id, which checks who
+ * owns them and where they may go (a recap video, someone else's photo); never by address alone.
+ */
+export function isStoredMediaUrl(url: string): boolean {
+  let pathname: string;
+  try {
+    pathname = decodeURIComponent(new URL(url, 'http://localhost').pathname);
+  } catch {
+    return true;
+  }
+  return /\/media\/+\d{4}\/+\d{2}\/+[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(pathname);
+}
+
+/**
  * S3-compatible storage (AWS S3, Cloudflare R2, MinIO, SeaweedFS). The bucket
  * stays private; the API streams objects at /media/<key>, and a CDN in front of
  * that path caches them (keys are content-unique, so responses are immutable).

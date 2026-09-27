@@ -10,7 +10,8 @@ import { assertCanInvite, assertCanTag, notifyCollabInvites, notifyPhotoTags } f
 import { isPlus, PLUS_REEL_MAX_MS, REEL_MAX_MS } from './plus.ts';
 import { notify, track } from './services.ts';
 import { emitWebhook } from './webhooks.ts';
-import { postVisibleSql } from './visibility.ts';
+import { eventVisibleSql, postVisibleSql } from './visibility.ts';
+import { isStoredMediaUrl } from './storage.ts';
 import { assertRemixable, assertSoundUsable, registerOwnSound } from './sounds.ts';
 import { assertRecapUse } from './recap-sharing.ts';
 import { assertPostPace, assessPost, flagContent, recordSignals, type Assessment } from './spam.ts';
@@ -108,6 +109,11 @@ export async function writePost(
     const own = await c.query(`SELECT 1 FROM products WHERE id = $1 AND seller_id = $2 AND deleted_at IS NULL`, [input.productId, userId]);
     if (!own.rowCount) throw forbidden('You can only link products you sell.');
   }
+  // A post shows its event's title and time to everyone who sees it: only an event the author can see.
+  if (input.eventId) {
+    const seen = await c.query(`SELECT 1 FROM events e WHERE e.id = $2 AND ${eventVisibleSql('$1')}`, [userId, input.eventId]);
+    if (!seen.rowCount) throw notFound('That event');
+  }
   // What the post says and where it goes; the same for a new post and a draft saved again.
   const content = [
     kind,
@@ -170,6 +176,8 @@ export async function writePost(
       if (!own.rowCount) throw notFound('One of the photos or videos');
       if (own.rows[0].moderation === 'blocked') throw new AppError(422, 'media_blocked', MEDIA_BLOCKED_MESSAGE);
     } else {
+      // An address alone is for files elsewhere: one stored here goes by its id, so the checks above apply to it.
+      if (isStoredMediaUrl(m.url)) throw new AppError(400, 'validation_failed', 'Attach photos and videos uploaded here by their id.');
       const media = await c.query<{ id: string }>(`INSERT INTO media (owner_id, kind, url, alt_text, width, height) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`, [
         userId,
         m.kind,
@@ -376,6 +384,16 @@ export async function publishDraft(deps: Deps, postId: string, authorId: string)
   // A recap in it: everything in the recap must still be the author's own.
   const mediaIds = (await db.query<{ media_id: string }>(`SELECT media_id FROM post_media WHERE post_id = $1`, [postId])).rows.map((r) => r.media_id);
   await assertRecapUse(db, authorId, mediaIds, 'post');
+  // People tagged and invited to co-author when it was saved: checked again as for a new post, since tag settings,
+  // follows, friendships and ages may have changed while it waited.
+  const [tagged, invited] = await Promise.all([
+    db.query<{ user_id: string }>(`SELECT DISTINCT user_id FROM photo_tags WHERE post_id = $1`, [postId]),
+    db.query<{ user_id: string }>(`SELECT user_id FROM post_collaborators WHERE post_id = $1 AND status = 'pending'`, [postId]),
+  ]);
+  const taggedIds = tagged.rows.map((r) => r.user_id);
+  const invitedIds = invited.rows.map((r) => r.user_id);
+  await assertCanTag(db, authorId, taggedIds);
+  await assertCanInvite(db, authorId, invitedIds, { visibility: d.visibility, communityId: d.community_id });
   const s = await screenPost(db, deps.config, authorId, { body: d.body, pollText: d.poll_text ?? '', visibility: d.visibility, communityId: d.community_id });
   let limitedNow = false;
   const published = await tx(db, async (c) => {
@@ -390,10 +408,6 @@ export async function publishDraft(deps: Deps, postId: string, authorId: string)
     return true;
   });
   if (!published) throw notFound('That draft');
-  const [tagged, invited] = await Promise.all([
-    db.query<{ user_id: string }>(`SELECT DISTINCT user_id FROM photo_tags WHERE post_id = $1`, [postId]),
-    db.query<{ user_id: string }>(`SELECT user_id FROM post_collaborators WHERE post_id = $1 AND status = 'pending'`, [postId]),
-  ]);
   await announcePost(deps, {
     postId,
     authorId,
@@ -402,8 +416,8 @@ export async function publishDraft(deps: Deps, postId: string, authorId: string)
     communityId: d.community_id,
     body: d.body,
     status: s.status,
-    taggedIds: tagged.rows.map((r) => r.user_id),
-    collaborators: invited.rows.map((r) => r.user_id),
+    taggedIds,
+    collaborators: invitedIds,
     remixAuthor,
     remixOf: d.remix_of_post_id,
     remixMode: d.remix_mode,

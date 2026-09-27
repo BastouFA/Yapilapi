@@ -33,6 +33,18 @@ import { storyMusicInputSchema, storyStickersSchema } from './stories.ts';
 
 const trimmed = (max: number) => z.string().trim().min(1).max(max);
 export const uuid = z.string().uuid();
+/**
+ * A link people open (profile links, a post's link, a business website): http or https only.
+ * z.string().url() alone accepts javascript:, data: and other schemes that run or open something
+ * other than a web page when clicked.
+ */
+export const webUrl = (max: number) =>
+  z
+    .string()
+    .trim()
+    .url()
+    .max(max)
+    .refine((u) => /^https?:\/\//i.test(u), 'Use a web address starting with http:// or https://.');
 
 export const usernameSchema = z
   .string()
@@ -78,7 +90,7 @@ export const updateProfileSchema = z
     coverUrl: z.string().url().max(500).nullable(),
     /** Describes your cover photo for screen readers. */
     coverAlt: z.string().trim().max(300).nullable(),
-    links: z.array(z.object({ label: trimmed(40), url: z.string().url().max(500) })).max(5),
+    links: z.array(z.object({ label: trimmed(40), url: webUrl(500) })).max(5),
     mode: z.enum(PROFILE_MODES),
     locale: z.string().min(2).max(10),
     isPrivate: z.boolean(),
@@ -111,7 +123,7 @@ export const createPostSchema = z
     communityId: uuid.optional(),
     eventId: uuid.optional(),
     productId: uuid.optional(),
-    linkUrl: z.string().url().max(1000).optional(),
+    linkUrl: webUrl(1000).optional(),
     media: z
       .array(
         z.object({
@@ -344,7 +356,7 @@ export const createBusinessSchema = z.object({
     .regex(/^[a-z0-9-]+$/),
   description: z.string().trim().max(2000).default(''),
   category: z.string().trim().max(60).default('general'),
-  website: z.string().url().optional(),
+  website: webUrl(2000).optional(),
 });
 
 export const createProductSchema = z.object({
