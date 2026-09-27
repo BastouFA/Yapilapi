@@ -156,7 +156,8 @@ export function Button({
         <View
           style={[
             s.button,
-            { height },
+            // Rounded here too, so the outline follows the curved ends instead of being clipped off.
+            { height, borderRadius: height / 2 },
             variant === 'secondary' && { backgroundColor: c.surface, borderWidth: 1, borderColor: c.line },
             variant === 'danger' && { backgroundColor: c.danger },
           ]}
