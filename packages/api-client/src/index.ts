@@ -71,6 +71,9 @@ import type {
   ChatList,
   ChatPoll,
   ChatReminder,
+  ChatGame,
+  GameKind,
+  GameMove,
   StickerResults,
   StoryCard,
   StoryMusic,
@@ -650,6 +653,11 @@ export function createClient(opts: ClientOptions) {
         post<{ message: Message }>(`/v1/conversations/${id}/lists`, input),
       /** Your reminders waiting in this chat. */
       reminders: (id: string) => get<{ items: ChatReminder[] }>(`/v1/conversations/${id}/reminders`),
+      /** Start a game. One-to-one: you play the other person. Groups: `playerIds` are who plays with you. */
+      startGame: (id: string, input: { kind: GameKind; playerIds?: string[]; clientId?: string }) =>
+        post<{ message: Message }>(`/v1/conversations/${id}/games`, input),
+      /** The games going in this chat (one of each kind at most). */
+      games: (id: string) => get<{ items: ChatGame[] }>(`/v1/conversations/${id}/games`),
       createPlan: (id: string, title: string, details: Record<string, unknown>) => post(`/v1/conversations/${id}/plans`, { title, details }),
       plans: (id: string) => get<{ items: { id: string; title: string; details: Record<string, unknown>; status: string }[] }>(`/v1/conversations/${id}/plans`),
       /** Your messages waiting to be sent here (and ones that couldn't be), soonest first. Only you see them. */
@@ -659,6 +667,18 @@ export function createClient(opts: ClientOptions) {
         post<{ scheduled: ScheduledMessage }>(`/v1/conversations/${id}/scheduled`, input),
       /** The chat's wallpaper and bubble colour, the same for everyone; a line in the chat says who changed it. */
       setTheme: (id: string, theme: Partial<ChatTheme>) => put<{ theme: ChatTheme; message: Message | null }>(`/v1/conversations/${id}/theme`, theme),
+    },
+    games: {
+      get: (id: string) => get<{ game: ChatGame }>(`/v1/games/${id}`),
+      /**
+       * Play a move. `moveNumber` is the board's number you saw (409 `game_moved_on` when it moved on);
+       * `clientMoveId` is new for each move and the same on a retry, so a double tap plays once.
+       */
+      move: (id: string, moveNumber: number, move: GameMove, clientMoveId: string) =>
+        post<{ game: ChatGame; duplicate?: boolean }>(`/v1/games/${id}/moves`, { moveNumber, clientMoveId, move }),
+      forfeit: (id: string) => post<{ game: ChatGame }>(`/v1/games/${id}/forfeit`),
+      /** Play again with the same people; everyone asking gets the same rematch. */
+      rematch: (id: string) => post<{ message: Message }>(`/v1/games/${id}/rematch`),
     },
     scheduledMessages: {
       /** Change the text or time (a failed one needs a new time to try again). */

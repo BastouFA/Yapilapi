@@ -24,6 +24,7 @@ export function previewText(t: T, p: MessagePreview): string {
   if (p.unsent) return t('m.chat.unsent');
   if (p.kind === 'poll') return t('m.chat.poll.preview', { question: p.body });
   if (p.kind === 'list') return t('m.chat.list.preview', { title: p.body });
+  if (p.kind === 'game') return t('m.chat.game.preview', { game: p.gameKind ? t(`m.chat.game.kind.${p.gameKind}` as MessageKey) : p.body });
   if (p.body) return p.body;
   switch (p.attachmentKind) {
     case 'image':
@@ -177,6 +178,20 @@ export function SystemLine({ message, meId, onJump }: { message: Message; meId?:
             <Icon name="bell" size={14} /> <bdi>{text}</bdi>
           </>
         )}
+      </p>
+    );
+  }
+  if (s?.type === 'game') {
+    const game = t(`m.chat.game.kind.${s.kind}` as MessageKey);
+    const text =
+      s.outcome === 'won'
+        ? t(s.by === 'forfeit' ? 'm.chat.systemGameForfeit' : 'm.chat.systemGameWon', { name: who, game })
+        : s.outcome === 'draw'
+          ? t('m.chat.systemGameDraw', { game })
+          : t('m.chat.systemGameUnfinished', { game });
+    return (
+      <p className="chat-system" role="note">
+        <Icon name="game" size={14} /> <bdi>{text}</bdi>
       </p>
     );
   }
