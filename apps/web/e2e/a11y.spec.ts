@@ -81,6 +81,26 @@ async function settle(page: Page) {
         .map((a) => a.finished.catch(() => {})),
     ),
   );
+  // Pages that keep a position (chat following the newest message, "jump to" a message) may still be
+  // scrolling; audit once the page has held still for a few frames, so nothing is caught mid-way.
+  await page
+    .waitForFunction(
+      () =>
+        new Promise<boolean>((resolve) => {
+          let last = scrollY;
+          let still = 0;
+          const tick = () => {
+            still = scrollY === last ? still + 1 : 0;
+            last = scrollY;
+            if (still >= 10) resolve(true);
+            else requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        }),
+      undefined,
+      { timeout: 5_000 },
+    )
+    .catch(() => {});
 }
 
 async function audit(page: Page, name: string, project: string) {
@@ -337,7 +357,7 @@ const STATES: [string, (page: Page, d: SeedData) => Promise<void>][] = [
     async (page) => {
       await open(page, '/create?mode=story');
       await page.getByRole('button', { name: 'Add music' }).click();
-      await expect(page.getByRole('dialog', { name: 'Choose a sound' }).getByRole('button', { name: /^Use/ }).first()).toBeVisible();
+      await expect(page.getByRole('dialog', { name: 'Add music' }).getByRole('button', { name: /^Use/ }).first()).toBeVisible();
     },
   ],
   [
@@ -346,7 +366,7 @@ const STATES: [string, (page: Page, d: SeedData) => Promise<void>][] = [
       await open(page, '/create?mode=story');
       await page.getByRole('textbox').first().fill('Oven timer beats all day');
       await page.getByRole('button', { name: 'Add music' }).click();
-      await page.getByRole('dialog', { name: 'Choose a sound' }).getByRole('button', { name: /^Use/ }).first().click();
+      await page.getByRole('dialog', { name: 'Add music' }).getByRole('button', { name: /^Use/ }).first().click();
       await expect(page.getByRole('button', { name: 'Choose another sound' })).toBeVisible();
     },
   ],
