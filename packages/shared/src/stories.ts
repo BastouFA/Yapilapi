@@ -141,3 +141,62 @@ export function pollPercents(counts: [number, number]): [number, number] {
   const a = Math.round((counts[0] / total) * 100);
   return [a, 100 - a];
 }
+
+// ── Music on stories ──────────────────────────────────────────────────
+
+/** How the music sticker looks: a small pill, or a card with the sound's cover (no lyrics). */
+export const STORY_MUSIC_STYLES = ['compact', 'card'] as const;
+export type StoryMusicStyle = (typeof STORY_MUSIC_STYLES)[number];
+/** A story plays one part of a sound, in a loop: 15 seconds at most, 5 at least (shorter sounds play whole). */
+export const STORY_MUSIC_MAX_MS = 15_000;
+export const STORY_MUSIC_MIN_MS = 5_000;
+
+/** Music the author adds to a photo, text or video story: a sound from the library, the part to play, and its sticker. */
+export const storyMusicInputSchema = z.object({
+  soundId: z.string().uuid(),
+  /** Where the part starts in the sound. */
+  startMs: z
+    .number()
+    .int()
+    .min(0)
+    .max(60 * 60 * 1000),
+  durationMs: z.number().int().min(STORY_MUSIC_MIN_MS).max(STORY_MUSIC_MAX_MS).default(STORY_MUSIC_MAX_MS),
+  style: z.enum(STORY_MUSIC_STYLES).default('compact'),
+  /** Where the sticker sits on the frame (0–1, like other stickers). */
+  x: z.number().min(0).max(1).default(0.5),
+  y: z.number().min(0).max(1).default(0.78),
+});
+export type StoryMusicInput = z.input<typeof storyMusicInputSchema>;
+
+/**
+ * A story's music as a viewer gets it. The part from `startMs` for `durationMs` plays in a loop
+ * while the story is on screen; on a video story it plays instead of the video's own sound.
+ */
+export interface StoryMusic {
+  sound: {
+    id: string;
+    title: string;
+    /** Who made the sound: the owner's display name and username. */
+    artist: string;
+    username: string;
+    durationMs: number | null;
+    /** Plays the sound: the source reel's video, whose audio track is the sound. */
+    audioUrl: string | null;
+    coverUrl: string | null;
+  };
+  startMs: number;
+  durationMs: number;
+  style: StoryMusicStyle;
+  x: number;
+  y: number;
+}
+
+/** The part of a sound a story plays from `startMs`: up to `durationMs`, never past the end. Null when it starts past the end. */
+export function storyMusicPart(startMs: number, durationMs: number, soundMs: number | null): { startMs: number; durationMs: number } | null {
+  if (soundMs === null) return { startMs, durationMs };
+  if (startMs >= soundMs) return null;
+  return { startMs, durationMs: Math.min(durationMs, soundMs - startMs) };
+}
+
+/** The latest start that still leaves a full part (0 for sounds shorter than a part). */
+export const storyMusicMaxStart = (soundMs: number | null, durationMs: number = STORY_MUSIC_MAX_MS) => Math.max(0, (soundMs ?? durationMs) - durationMs);

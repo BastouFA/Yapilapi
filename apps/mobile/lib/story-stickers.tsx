@@ -454,10 +454,15 @@ export function StickerEditor({
   stickers,
   onChange,
   preview,
+  music,
+  onMoveMusic,
 }: {
   stickers: DraftSticker[];
   onChange: (s: DraftSticker[]) => void;
   preview: { uri?: string; kind?: string; body: string };
+  /** The music sticker ("title · artist"), dragged into place like the others. */
+  music?: { label: string; x: number; y: number } | null;
+  onMoveMusic?: (x: number, y: number) => void;
 }) {
   const c = useColors();
   const { t } = useT();
@@ -499,6 +504,9 @@ export function StickerEditor({
             onMove={(x, y) => onChange(latest.current.map((d) => (d.key === s.key ? { ...d, x, y } : d)))}
           />
         ))}
+        {music && onMoveMusic ? (
+          <Draggable sticker={music} icon="musical-notes" frame={frame} label={t('m.sticker.drag', { label: music.label })} onMove={onMoveMusic} />
+        ) : null}
       </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
         {KINDS.map((k) => (
@@ -556,11 +564,13 @@ export function StickerEditor({
 
 function Draggable({
   sticker,
+  icon,
   frame,
   label,
   onMove,
 }: {
-  sticker: DraftSticker;
+  sticker: { x: number; y: number; label: string };
+  icon?: IconName;
   frame: { current: { w: number; h: number } };
   label: string;
   onMove: (x: number, y: number) => void;
@@ -590,9 +600,19 @@ function Draggable({
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
         onAccessibilityAction={(e) => move.current(sticker.x, clamp(sticker.y + (e.nativeEvent.actionName === 'increment' ? 0.05 : -0.05)))}
         {...pan.panHandlers}
-        style={{ backgroundColor: CARD, borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 6, maxWidth: 160 }}
+        style={{
+          backgroundColor: CARD,
+          borderRadius: radius.full,
+          paddingHorizontal: 10,
+          paddingVertical: 6,
+          maxWidth: 160,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+        }}
       >
-        <Text style={[{ color: INK, fontWeight: '700', fontSize: 12 }, userText]} numberOfLines={1}>
+        {icon ? <Icon name={icon} size={12} color={INK} /> : null}
+        <Text style={[{ color: INK, fontWeight: '700', fontSize: 12, flexShrink: 1 }, userText]} numberOfLines={1}>
           {sticker.label}
         </Text>
       </View>

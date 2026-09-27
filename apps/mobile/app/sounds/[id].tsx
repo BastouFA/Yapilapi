@@ -82,6 +82,7 @@ export default function SoundScreen() {
           </Pressable>
           <Text style={{ color: c.inkMuted, fontSize: 13 }}>
             {tp('m.sound.reelCount', sound.reels)}
+            {sound.stories ? ` · ${tp('m.sound.storyCount', sound.stories)}` : ''}
             {sound.durationMs ? ` · ${clock(sound.durationMs / 1000)}` : ''}
           </Text>
           {sound.sourcePostId ? (
@@ -92,11 +93,19 @@ export default function SoundScreen() {
         </View>
       </View>
       {me && sound.canUse ? (
-        <Button
-          label={t('m.sound.use')}
-          icon="musical-notes"
-          onPress={() => router.navigate({ pathname: '/create', params: { mode: 'reel', sound: sound.id } })}
-        />
+        <View style={{ gap: space[2] }}>
+          <Button
+            label={t('m.sound.use')}
+            icon="musical-notes"
+            onPress={() => router.navigate({ pathname: '/create', params: { mode: 'reel', sound: sound.id } })}
+          />
+          <Button
+            label={t('m.sound.useInStory')}
+            icon="add-circle-outline"
+            variant="secondary"
+            onPress={() => router.navigate({ pathname: '/create', params: { mode: 'story', sound: sound.id } })}
+          />
+        </View>
       ) : me ? (
         <Text style={{ color: c.inkMuted, fontSize: 14 }}>{t('m.sound.cantUse')}</Text>
       ) : null}

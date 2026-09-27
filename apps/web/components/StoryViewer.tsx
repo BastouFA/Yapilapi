@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Avatar, BottomSheet, Button, Checkbox, Icon, List, ListItem, Select, SensitiveCover, useModalFocus } from '@yapilapi/design-system';
 import type { Story, StoryGroup } from '@yapilapi/api-client';
@@ -9,6 +10,7 @@ import { useSession } from '@/app/providers';
 import { AddToChapter } from '@/components/Chapters';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { StickerLayer, StoryCardView, StoryText } from '@/components/StoryStickers';
+import { MusicSticker, useMusicLoop, useStoryMusicOn } from '@/components/StoryMusic';
 
 const PHOTO_MS = 5000;
 /** Who a reshare goes to. */
@@ -22,7 +24,10 @@ const RESHARE_AUDIENCES = ['followers', 'friends', 'public', 'close_friends'] as
  * sent to a chat, linked to, and added to your own story when they're public
  * or mention you. Stickers (polls, questions, sliders, countdowns, links,
  * places, mentions and tags) work in place. Your own show who saw them, what
- * people answered, and can be deleted.
+ * people answered, and can be deleted. Stories with music play their part of
+ * the sound in a loop while on screen (instead of a video's own sound); music
+ * stays silent until the viewer turns it on once, and that choice is kept.
+ * The music sticker opens the sound's page.
  */
 export function StoryViewer({
   groups,
@@ -37,6 +42,8 @@ export function StoryViewer({
   onChange: (groups: StoryGroup[]) => void;
 }) {
   const { toast, locale, t } = useSession();
+  const router = useRouter();
+  const [musicOn, setMusicOn] = useStoryMusicOn();
   const [g, setG] = useState(start);
   const [i, setI] = useState(() => Math.max(0, groups[start]?.moments.findIndex((m) => !m.seen) ?? 0));
   const [paused, setPaused] = useState(false);
@@ -126,6 +133,10 @@ export function StoryViewer({
     else void v.play().catch(() => {});
   }, [stopped, story?.id]);
 
+  // The story's music, in a loop, while it's on screen and playing, once the viewer has turned music on.
+  const music = !covered ? (story?.music ?? null) : null;
+  useMusicLoop(music, !!music && musicOn && !stopped);
+
   if (!group || !story) return null;
   const hold = { onPointerDown: () => setPaused(true), onPointerUp: () => setPaused(false), onPointerLeave: () => setPaused(false) };
   const addToStory = async (visibility: string) => {
@@ -177,6 +188,17 @@ export function StoryViewer({
               Close friends
             </span>
           ) : null}
+          {story.music ? (
+            <button
+              type="button"
+              className="story__icon"
+              onClick={() => setMusicOn(!musicOn)}
+              aria-label={musicOn ? 'Turn music off' : 'Turn music on'}
+              title={musicOn ? 'Turn music off' : 'Turn music on'}
+            >
+              <Icon name={musicOn ? 'volume' : 'volume-off'} />
+            </button>
+          ) : null}
           <button type="button" className="story__icon" onClick={() => setSharing(true)} aria-label="Share story">
             <Icon name="send" />
           </button>
@@ -197,6 +219,8 @@ export function StoryViewer({
               poster={story.posterUrl ?? undefined}
               className={covered ? 'yp-blurred' : undefined}
               autoPlay={!covered}
+              // With music, the music plays instead of the video's own sound.
+              muted={!!story.music}
               playsInline
               onTimeUpdate={(e) => {
                 const v = e.currentTarget;
@@ -240,6 +264,18 @@ export function StoryViewer({
           ) : null}
           <button type="button" className="story__tap story__tap--prev" onClick={prev} aria-label="Previous" />
           <button type="button" className="story__tap story__tap--next" onClick={next} aria-label="Next" />
+          {music ? (
+            <div className="story-stickers">
+              <MusicSticker
+                music={music}
+                playing={musicOn && !stopped}
+                onOpen={() => {
+                  onClose();
+                  router.push(`/sounds/${music.sound.id}`);
+                }}
+              />
+            </div>
+          ) : null}
           {!covered && story.stickers.length ? (
             <StickerLayer
               story={story}

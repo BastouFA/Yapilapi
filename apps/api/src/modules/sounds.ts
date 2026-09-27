@@ -6,6 +6,7 @@ import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, encodeCursor } from '../lib/cursor.ts';
 import { hydratePosts } from '../lib/posts.ts';
 import { soundUsableSql, soundVisibleSql } from '../lib/sounds.ts';
+import { storyVisibleSql } from '../lib/stories.ts';
 import { plusCol, publicUserFrom } from '../lib/users.ts';
 import { postVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
@@ -30,6 +31,8 @@ export default async function soundsModule(app: FastifyInstance, ctx: AppContext
               pr.user_id AS o_id, pr.username AS o_username, pr.display_name AS o_display_name, pr.avatar_url AS o_avatar_url, pr.mode AS o_mode, ${plusCol('o_')},
               (SELECT p.id ${REELS_FROM} WHERE p.id = s.source_post_id AND ${postVisibleSql('$2')}) AS source_post_id,
               (SELECT count(*) ${REELS_FROM} WHERE p.sound_id = s.id AND p.format = 'reel' AND ${postVisibleSql('$2')})::int AS reels,
+              (SELECT count(*) FROM moments m JOIN users au ON au.id = m.author_id
+                WHERE m.sound_id = s.id AND m.music IS NOT NULL AND ${storyVisibleSql('$2', { open: true })})::int AS stories,
               ${soundUsableSql('$2')} AS can_use
        FROM sounds s JOIN profiles pr ON pr.user_id = s.owner_id LEFT JOIN media m ON m.id = s.media_id
        WHERE s.id = ANY($1) AND ${soundVisibleSql('$2')}`,
@@ -47,6 +50,7 @@ export default async function soundsModule(app: FastifyInstance, ctx: AppContext
           audioUrl: r.audio_url ?? null,
           coverUrl: r.poster_url ?? null,
           reels: r.reels,
+          stories: r.stories,
           canUse: !!r.can_use,
           createdAt: r.created_at.toISOString(),
         } satisfies Sound,
@@ -56,8 +60,8 @@ export default async function soundsModule(app: FastifyInstance, ctx: AppContext
   }
 
   /**
-   * Sounds to pick from when making a reel: ones you can use, most used in the
-   * last 30 days first. `q` matches the title or the owner's name.
+   * Sounds to pick from when making a reel or a story: ones you can use, most used
+   * (in reels and stories) in the last 30 days first. `q` matches the title or the owner's name.
    */
   app.get('/v1/sounds', { preHandler: requireAuth, config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (req) => {
     const u = me(req);
@@ -65,7 +69,8 @@ export default async function soundsModule(app: FastifyInstance, ctx: AppContext
     const term = q.q.replace(/[\\%_]/g, (c) => `\\${c}`);
     const { rows } = await db.query(
       `SELECT s.id,
-              (SELECT count(*) FROM posts p WHERE p.sound_id = s.id AND p.deleted_at IS NULL AND p.status = 'published' AND p.created_at > now() - interval '30 days') AS recent_uses
+              (SELECT count(*) FROM posts p WHERE p.sound_id = s.id AND p.deleted_at IS NULL AND p.status = 'published' AND p.created_at > now() - interval '30 days')
+              + (SELECT count(*) FROM moments m WHERE m.sound_id = s.id AND m.deleted_at IS NULL AND m.created_at > now() - interval '30 days') AS recent_uses
        FROM sounds s JOIN profiles pr ON pr.user_id = s.owner_id
        WHERE ($2 = '' OR s.title ILIKE '%' || $2 || '%' OR pr.display_name ILIKE $2 || '%' OR pr.username ILIKE $2 || '%')
          AND ${soundUsableSql('$1')}

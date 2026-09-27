@@ -33,6 +33,7 @@ import { SoundPicker, SoundPlayButton } from '@/components/SoundPicker';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { PhotoTagger, type DraftTag } from '@/components/PhotoTags';
 import { StoryStickerEditor, type DraftSticker } from '@/components/StoryStickerEditor';
+import { draftMusic, musicInput, StoryMusicField, type DraftMusic } from '@/components/StoryMusic';
 import { localInput, nextHour, SCHEDULE_HINT, scheduleBounds } from '@/lib/schedule';
 import { useSession } from '../../providers';
 
@@ -68,11 +69,17 @@ function Create() {
   const reelMax = me?.plus ? PLUS_REEL_MAX_SECONDS : REEL_MAX_SECONDS;
   const router = useRouter();
   const params = useSearchParams();
-  // Duet, remix or "Use this sound" links open Create as a reel, prefilled.
+  // Duet, remix or "Use this sound" links open Create as a reel, prefilled; "Add to your story" on a sound opens a story with it.
   const remixOf = params.get('remixOf');
   const remixMode = params.get('remixMode') === 'remix' ? 'remix' : 'duet';
   const initialMode =
-    params.get('mode') === 'reel' || remixOf || params.get('sound') ? 'reel' : params.get('mode') === 'story' || params.get('moment') ? 'story' : 'post';
+    params.get('mode') === 'story' && !remixOf
+      ? 'story'
+      : params.get('mode') === 'reel' || remixOf || params.get('sound')
+        ? 'reel'
+        : params.get('moment')
+          ? 'story'
+          : 'post';
   const [kind, setKind] = useState<'post' | 'reel' | 'story'>(initialMode);
   const [body, setBody] = useState(() => (params.get('text') ?? '').slice(0, 5000));
   const [visibility, setVisibility] = useState<Audience>(initialMode === 'story' ? 'friends' : 'public');
@@ -102,6 +109,8 @@ function Create() {
   // Stories: stickers placed on the preview, and whether people may add it to their own story.
   const [stickers, setStickers] = useState<DraftSticker[]>([]);
   const [allowReshare, setAllowReshare] = useState(true);
+  // Stories: a sound from the library, the part that plays and its sticker.
+  const [music, setMusic] = useState<DraftMusic | null>(null);
   const [ai, setAi] = useState<{ text: string; notice?: string } | null>(null);
   const [aiUsed, setAiUsed] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -165,7 +174,7 @@ function Create() {
     const soundId = params.get('sound');
     if (soundId && !remixOf)
       api.sounds.get(soundId).then(
-        (r) => setSound(r.sound),
+        (r) => (initialMode === 'story' ? setMusic(draftMusic(r.sound)) : setSound(r.sound)),
         () => toast("That sound isn't available."),
       );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -364,6 +373,7 @@ function Create() {
           visibility,
           allowReshare,
           stickers: stickers.map(({ key: _key, label: _label, ...s }) => s),
+          music: music ? musicInput(music) : undefined,
         });
         toast('Added to your story');
         router.push('/home');
@@ -390,7 +400,7 @@ function Create() {
   const empty =
     kind === 'reel'
       ? media.length !== 1 || media[0]!.kind !== 'video' || (!!remixOf && !original)
-      : !body.trim() && !media.length && !poll && !(kind === 'story' && stickers.length);
+      : !body.trim() && !media.length && !poll && !(kind === 'story' && (stickers.length || music));
   const blocked = uploading || !draftLoaded || empty;
 
   return (
@@ -627,7 +637,16 @@ function Create() {
           />
         ) : null}
         {kind === 'story' ? (
-          <StoryStickerEditor stickers={stickers} onChange={setStickers} preview={{ mediaUrl: media[0]?.url, mediaKind: media[0]?.kind, body }} />
+          <>
+            {media[0]?.kind !== 'audio' ? <StoryMusicField value={music} onChange={setMusic} video={media[0]?.kind === 'video'} /> : null}
+            <StoryStickerEditor
+              stickers={stickers}
+              onChange={setStickers}
+              preview={{ mediaUrl: media[0]?.url, mediaKind: media[0]?.kind, body }}
+              music={music ? { title: music.sound.title, artist: music.sound.owner.displayName, style: music.style, x: music.x, y: music.y } : null}
+              onMoveMusic={(x, y) => setMusic((m) => (m ? { ...m, x, y } : m))}
+            />
+          </>
         ) : null}
 
         {kind === 'reel' && !remixOf ? (

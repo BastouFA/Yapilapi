@@ -28,6 +28,7 @@ import { radius, space } from '../../lib/theme';
 import { Button, Card, Field, Icon, Notice, Screen, Segmented, SwitchRow, useColors, useTabBarSpace, userText } from '../../lib/ui';
 import { isVerificationError, VerifyPrompt } from '../../lib/safety';
 import { StickerEditor, type DraftSticker } from '../../lib/story-stickers';
+import { draftMusic, MusicField, musicInput, type DraftMusic } from '../../lib/story-music';
 import { SchedulePicker } from '../../lib/post-edit';
 
 const VISIBILITY = [
@@ -105,6 +106,8 @@ export default function Create() {
   // Stories: stickers placed on the preview, and whether people may add it to their own story.
   const [stickers, setStickers] = useState<DraftSticker[]>([]);
   const [allowReshare, setAllowReshare] = useState(true);
+  // Stories: a sound from the library, the part that plays and its sticker.
+  const [music, setMusic] = useState<DraftMusic | null>(null);
   // Posting for subscribers needs a subscription plan (set up in Studio on the web).
   const [hasPlans, setHasPlans] = useState(false);
   const [editing, setEditing] = useState<Picked | null>(null);
@@ -130,17 +133,19 @@ export default function Create() {
     if (k === 'story' && (visibility === 'public' || visibility === 'subscribers' || visibility === 'circle')) setVisibility('friends');
   }
 
-  // "Use this sound" on a sound page opens this tab as a reel with that sound.
+  // "Use this sound" on a sound page opens this tab as a reel with that sound; "Add to your story" as a story with it.
   useEffect(() => {
     if (!params.sound) return;
     const soundId = params.sound;
+    const forStory = params.mode === 'story';
     router.setParams({ sound: '' });
     client()
       .then((api) => api.sounds.get(soundId))
       .then(
-        (r) => setSound(r.sound),
+        (r) => (forStory ? setMusic(draftMusic(r.sound)) : setSound(r.sound)),
         (e) => setError(errorMessage(e)),
       );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.sound]);
 
   // Drafts ("Continue") opens a draft here.
@@ -377,10 +382,12 @@ export default function Create() {
           visibility: closeFriends ? 'close_friends' : visibility === 'subscribers' || visibility === 'circle' ? 'friends' : visibility,
           allowReshare,
           stickers: stickers.map(({ key: _key, label: _label, ...s }) => s),
+          music: music ? musicInput(music) : undefined,
         });
         setBody('');
         setMedia(null);
         setStickers([]);
+        setMusic(null);
         Alert.alert(t('m.create.storyShared'));
         router.navigate('/');
         return;
@@ -412,7 +419,7 @@ export default function Create() {
     !keeping &&
     !uploading &&
     (!forCircle || !!chosenCircle) &&
-    (kind === 'reel' ? media?.kind === 'video' : !!body.trim() || !!media || (kind === 'story' && stickers.length > 0));
+    (kind === 'reel' ? media?.kind === 'video' : !!body.trim() || !!media || (kind === 'story' && (stickers.length > 0 || !!music)));
   const audienceOptions: { id: Visibility; label: string }[] = [
     ...VISIBILITY.filter((v) => v.id !== 'subscribers' || (hasPlans && kind !== 'story')).map((v) => ({ id: v.id, label: t(v.label) })),
     ...(kind !== 'story' && circles?.length
@@ -515,7 +522,14 @@ export default function Create() {
 
         {kind === 'story' ? (
           <>
-            <StickerEditor stickers={stickers} onChange={setStickers} preview={{ uri: media?.local, kind: media?.kind, body }} />
+            {media?.kind !== 'audio' ? <MusicField value={music} onChange={setMusic} video={media?.kind === 'video'} /> : null}
+            <StickerEditor
+              stickers={stickers}
+              onChange={setStickers}
+              preview={{ uri: media?.local, kind: media?.kind, body }}
+              music={music ? { label: `${music.sound.title} · ${music.sound.owner.displayName}`, x: music.x, y: music.y } : null}
+              onMoveMusic={(x, y) => setMusic((m) => (m ? { ...m, x, y } : m))}
+            />
             <SwitchRow label={t('m.stories.allowReshare')} hint={t('m.stories.allowReshareHint')} value={allowReshare} onValueChange={setAllowReshare} />
             <SwitchRow label={t('m.closeFriends.title')} hint={t('m.closeFriends.storyHint')} value={closeFriends} onValueChange={setCloseFriends} />
             <Button

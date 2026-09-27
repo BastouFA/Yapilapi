@@ -9,6 +9,8 @@ import {
   type PublicUser,
   type StickerResults,
   type StoryCard,
+  type StoryMusic,
+  type StoryMusicStyle,
   type StorySticker,
   type StoryStickerInput,
   type storyStickerInputSchema,
@@ -18,6 +20,7 @@ import { AppError, notFound } from './errors.ts';
 import { analyzeText } from './moderation.ts';
 import type { RealtimeHub } from './realtime.ts';
 import { notify } from './services.ts';
+import { soundVisibleSql } from './sounds.ts';
 import { publicUserFrom, usersByIds } from './users.ts';
 import { notBlockedSql } from './visibility.ts';
 
@@ -56,7 +59,7 @@ export const PUBLIC_STORY = `m.visibility = 'public' AND m.deleted_at IS NULL AN
 
 /** Columns for hydrateStories; the viewer is $1. Use with STORY_FROM. */
 export const STORY_SELECT = `m.id, m.author_id, m.body, m.media_url, m.media_kind, m.location_text, m.expires_at, m.created_at, m.visibility,
-  m.stickers, m.tags, m.mentions, m.reshare_of, m.allow_reshare,
+  m.stickers, m.tags, m.mentions, m.reshare_of, m.allow_reshare, m.sound_id, m.music,
   md.poster_url, md.hls_url, md.variants, md.duration_ms, md.moderation,
   v.viewer_id IS NOT NULL AS seen, coalesce(v.liked, false) AS liked,
   CASE WHEN m.author_id = $1 THEN (SELECT count(*) FROM moment_views mv WHERE mv.moment_id = m.id AND mv.viewer_id <> $1) END AS views,
@@ -240,6 +243,43 @@ export interface StoryOut {
   canReshare: boolean;
   /** Your own stories: whether others may reshare it. */
   allowReshare?: boolean;
+  /** A sound playing with the story, while the viewer can see that sound. */
+  music: StoryMusic | null;
+}
+
+/** A story's music as stored (the sound is moments.sound_id). */
+export interface StoredMusic {
+  startMs: number;
+  durationMs: number;
+  style: StoryMusicStyle;
+  x: number;
+  y: number;
+}
+
+/** The sounds on these stories that the viewer can see (the same rule as sound pages), by id. */
+async function storySounds(db: Q, ids: string[], viewer: string | null): Promise<Map<string, StoryMusic['sound']>> {
+  if (!ids.length) return new Map();
+  const { rows } = await db.query(
+    `SELECT s.id, s.title, coalesce(s.duration_ms, sm.duration_ms) AS duration_ms, coalesce(sm.variants->>'mp4', sm.url) AS audio_url, sm.poster_url,
+            pr.display_name, pr.username
+     FROM sounds s JOIN profiles pr ON pr.user_id = s.owner_id LEFT JOIN media sm ON sm.id = s.media_id
+     WHERE s.id = ANY($1::uuid[]) AND ${soundVisibleSql('$2::uuid')}`,
+    [ids, viewer],
+  );
+  return new Map(
+    rows.map((r) => [
+      r.id as string,
+      {
+        id: r.id,
+        title: r.title,
+        artist: r.display_name,
+        username: r.username,
+        durationMs: r.duration_ms ?? null,
+        audioUrl: r.audio_url ?? null,
+        coverUrl: r.poster_url ?? null,
+      },
+    ]),
+  );
 }
 
 /** Turn story rows (STORY_SELECT) into what a viewer sees: stickers with their state, reshare cards, mentions. */
@@ -251,7 +291,8 @@ export async function hydrateStories(db: Q, rows: Record<string, any>[], viewer:
   const userIds = [...new Set(all.flatMap((s) => (s.type === 'mention' ? [s.userId] : [])))];
   const placeIds = [...new Set(all.flatMap((s) => (s.type === 'place' ? [s.placeId] : [])))];
   const interactive = all.some((s) => s.type === 'poll' || s.type === 'question' || s.type === 'slider' || s.type === 'countdown');
-  const [users, places, mine, totals, cards] = await Promise.all([
+  const soundIds = [...new Set(rows.flatMap((r) => (r.sound_id && r.music ? [r.sound_id as string] : [])))];
+  const [users, places, mine, totals, cards, sounds] = await Promise.all([
     usersByIds(db, userIds),
     placeIds.length
       ? db.query<{ id: string; name: string; city: string | null }>(`SELECT id, name, city FROM places WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL`, [
@@ -277,6 +318,7 @@ export async function hydrateStories(db: Q, rows: Record<string, any>[], viewer:
       rows.flatMap((r) => (r.reshare_of ? [r.reshare_of as string] : [])),
       viewer,
     ),
+    storySounds(db, soundIds, viewer),
   ]);
   const placeById = new Map((places?.rows ?? []).map((p) => [p.id, p]));
   const key = (m: string, s: string) => `${m}:${s}`;
@@ -351,6 +393,8 @@ export async function hydrateStories(db: Q, rows: Record<string, any>[], viewer:
     }
     const mentions = (r.mentions ?? []) as string[];
     const mentionsYou = !!viewer && mentions.includes(viewer);
+    const sound = r.sound_id ? sounds.get(r.sound_id) : undefined;
+    const stored = r.music as StoredMusic | null;
     return {
       id: r.id,
       body: r.body,
@@ -374,6 +418,7 @@ export async function hydrateStories(db: Q, rows: Record<string, any>[], viewer:
       mentionsYou,
       canReshare: !!viewer && !isAuthor && r.allow_reshare && !r.reshare_of && (r.visibility === 'public' || mentionsYou),
       ...(isAuthor ? { allowReshare: !!r.allow_reshare } : {}),
+      music: sound && stored ? { sound, startMs: stored.startMs, durationMs: stored.durationMs, style: stored.style, x: stored.x, y: stored.y } : null,
     };
   });
 }

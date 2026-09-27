@@ -77,13 +77,13 @@ export async function assertRemixable(db: Q, postId: string, viewer: string): Pr
   return { authorId: o.author_id, soundId: await soundOfReel(db, postId) };
 }
 
-/** Check that the viewer may use a sound in a new reel. */
-export async function assertSoundUsable(db: Q, soundId: string, viewer: string): Promise<void> {
+/** Check that the viewer may use a sound in a new reel (or story: the same rules). */
+export async function assertSoundUsable(db: Q, soundId: string, viewer: string, what: 'reels' | 'stories' = 'reels'): Promise<void> {
   const { rows } = await db.query(`SELECT ${soundUsableSql('$1')} AS usable, ${soundVisibleSql('$1')} AS visible FROM sounds s WHERE s.id = $2`, [
     viewer,
     soundId,
   ]);
   const r = rows[0];
   if (!r || (!r.visible && !r.usable)) throw notFound('That sound');
-  if (!r.usable) throw new AppError(403, 'forbidden', "This sound can't be used in new reels.");
+  if (!r.usable) throw new AppError(403, 'forbidden', `This sound can't be used in new ${what}.`);
 }

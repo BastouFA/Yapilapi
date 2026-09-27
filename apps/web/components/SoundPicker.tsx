@@ -55,7 +55,7 @@ export function SoundPlayButton({ sound, size = 'md' }: { sound: Pick<Sound, 'ti
   );
 }
 
-/** Pick a sound for a reel: the most used ones you can use, searchable by name or by who made it. */
+/** Pick a sound for a reel or a story: the most used ones you can use, searchable by name or by who made it. */
 export function SoundPicker({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (s: Sound) => void }) {
   const [q, setQ] = useState('');
   const [items, setItems] = useState<Sound[] | null>(null);
@@ -104,6 +104,7 @@ export function SoundPicker({ open, onClose, onPick }: { open: boolean; onClose:
                   <span className="sound-row__meta">
                     <bdi>@{s.owner.username}</bdi>
                     {soundLength(s.durationMs) ? ` · ${soundLength(s.durationMs)}` : ''} · {s.reels} {s.reels === 1 ? 'reel' : 'reels'}
+                    {s.stories ? ` · ${s.stories} ${s.stories === 1 ? 'story' : 'stories'}` : ''}
                   </span>
                 </span>
                 <Button size="sm" variant="secondary" onClick={() => onPick(s)}>

@@ -8,6 +8,7 @@ import sharp, { type Sharp } from 'sharp';
 import type { Pool } from 'pg';
 import {
   colorMatrix,
+  dualInsetBox,
   effectiveAdjustments,
   isIdentityMatrix,
   sharpenAmount,
@@ -15,6 +16,7 @@ import {
   VIGNETTE_INNER,
   vignetteAlpha,
   type ColorMatrix,
+  type DualCorner,
   type EditorParams,
   type TextFont,
   type TextOverlay,
@@ -153,6 +155,43 @@ export async function renderPhoto(input: Buffer, p: EditorParams): Promise<{ dat
     out = sharp(png);
   }
   const data = await out.jpeg({ quality: 90, mozjpeg: true }).toBuffer();
+  return { data, width, height };
+}
+
+/** A rounded rectangle as SVG: white for the frame, or an opaque mask to cut the small photo's corners. */
+const roundedRect = (width: number, height: number, r: number) =>
+  Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="${width}" height="${height}" rx="${r}" ry="${r}" fill="#fff"/></svg>`,
+  );
+
+/**
+ * A "Both sides" photo: the back camera photo, upright and capped in size, with the front camera photo
+ * in a rounded, white-edged corner (dualInsetBox, the same layout the web camera draws). Returns a JPEG.
+ */
+export async function renderDual(back: Buffer, front: Buffer, corner: DualCorner): Promise<{ data: Buffer; width: number; height: number }> {
+  const base = await sharp(back, { failOn: 'none' })
+    .autoOrient()
+    .resize({ width: MAX_EDIT_EDGE, height: MAX_EDIT_EDGE, fit: 'inside', withoutEnlargement: true })
+    .flatten({ background: '#ffffff' })
+    .toBuffer({ resolveWithObject: true });
+  const upright = await sharp(front, { failOn: 'none' }).autoOrient().flatten({ background: '#ffffff' }).toBuffer({ resolveWithObject: true });
+  const { width, height } = base.info;
+  const box = dualInsetBox(width, height, upright.info.width, upright.info.height, corner);
+  const innerW = Math.max(1, box.width - 2 * box.border);
+  const innerH = Math.max(1, box.height - 2 * box.border);
+  const small = await sharp(upright.data)
+    .resize(innerW, innerH, { fit: 'cover' })
+    .ensureAlpha()
+    .composite([{ input: roundedRect(innerW, innerH, Math.max(0, box.radius - box.border)), blend: 'dest-in' }])
+    .png()
+    .toBuffer();
+  const data = await sharp(base.data)
+    .composite([
+      { input: roundedRect(box.width, box.height, box.radius), left: box.left, top: box.top },
+      { input: small, left: box.left + box.border, top: box.top + box.border },
+    ])
+    .jpeg({ quality: 90, mozjpeg: true })
+    .toBuffer();
   return { data, width, height };
 }
 
@@ -309,20 +348,22 @@ async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
  */
 export async function renderEditorJob(deps: EditDeps, renderId: string): Promise<void> {
   const { rows } = await deps.db.query(
-    `SELECT r.id, r.kind, r.params, r.status, r.result_media_id, s.storage_key, s.mime
-     FROM media_editor_renders r JOIN media s ON s.id = r.source_media_id WHERE r.id = $1`,
+    `SELECT r.id, r.kind, r.params, r.status, r.result_media_id, r.second_media_id, s.storage_key, s.mime, f.storage_key AS second_key
+     FROM media_editor_renders r JOIN media s ON s.id = r.source_media_id LEFT JOIN media f ON f.id = r.second_media_id WHERE r.id = $1`,
     [renderId],
   );
   const job = rows[0];
   if (!job || !['queued', 'rendering'].includes(job.status)) return;
   await deps.db.query(`UPDATE media_editor_renders SET status = 'rendering' WHERE id = $1`, [renderId]);
-  const p = job.params as EditorParams;
+  const p = job.params as EditorParams & { dual?: { corner: DualCorner } };
   const resultId = job.result_media_id as string;
   try {
-    if (!job.storage_key) throw new Error('The original file is no longer stored.');
+    if (!job.storage_key || (job.second_media_id && !job.second_key)) throw new Error('The original file is no longer stored.');
     let cover: Buffer | null = null;
     if (job.kind === 'image') {
-      const out = await renderPhoto(await deps.storage.read(job.storage_key), p);
+      const out = p.dual
+        ? await renderDual(await deps.storage.read(job.storage_key), await deps.storage.read(job.second_key), p.dual.corner)
+        : await renderPhoto(await deps.storage.read(job.storage_key), p);
       const stored = await deps.storage.put(out.data, 'jpg', 'image/jpeg');
       await deps.db.query(`UPDATE media SET url = $2, storage_key = $3, mime = 'image/jpeg', size_bytes = $4, width = $5, height = $6 WHERE id = $1`, [
         resultId,

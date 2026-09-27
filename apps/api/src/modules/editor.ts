@@ -1,10 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
-import { mediaEditSchema } from '@yapilapi/shared';
+import { dualComposeSchema, mediaEditSchema } from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, badRequest, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { enqueue } from '../lib/jobs.ts';
+import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
 import { isPlus, PLUS_REEL_MAX_MS, REEL_MAX_MS } from '../lib/plus.ts';
 import { videoDurationMs } from '../lib/studio.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
@@ -22,8 +23,10 @@ const STATUS_SQL = `CASE WHEN r.status IN ('queued', 'rendering') THEN 'processi
  * The photo and video editor, before posting:
  *   POST /v1/media/:id/edit → a new media item made from one of your uploads with a look,
  *                             adjustments, crop, turn, flips, text and (videos) trim, mute and cover
+ *   POST /v1/media/dual     → a "Both sides" photo: your back camera photo with your front camera
+ *                             photo in a rounded corner, as a new media item
  *   GET  /v1/media/:id      → one of your media items, to wait for an edit to finish
- * The original upload is never changed. Rendering runs as a 'media.editor' job.
+ * The original uploads are never changed. Rendering runs as a 'media.editor' job.
  */
 export default async function editorModule(app: FastifyInstance, ctx: AppContext) {
   const db = ctx.db;
@@ -86,6 +89,43 @@ export default async function editorModule(app: FastifyInstance, ctx: AppContext
     });
     reply.code(202);
     return { media: { id: media.id, kind: media.kind, url: media.url, altText: media.alt_text, status: 'processing' as const, editOf: id } };
+  });
+
+  /**
+   * Put two of your own photos together: the back camera photo with the front camera one in a
+   * rounded corner (see DUAL_LAYOUT). Someone else's upload looks the same as one that doesn't exist.
+   */
+  app.post('/v1/media/dual', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (req, reply) => {
+    const u = me(req);
+    const input = parse(dualComposeSchema, req.body);
+    if (input.backId === input.frontId) throw fieldError('frontId', 'Choose two different photos.');
+    const { rows } = await db.query(
+      `SELECT m.id, m.kind, m.mime, m.url, m.storage_key, m.moderation FROM media m WHERE m.id = ANY($1::uuid[]) AND m.owner_id = $2 AND NOT m.private`,
+      [[input.backId, input.frontId], u.id],
+    );
+    const back = rows.find((r) => r.id === input.backId);
+    const front = rows.find((r) => r.id === input.frontId);
+    if (!back || !front) throw notFound('That photo');
+    for (const m of [back, front]) {
+      if (m.kind !== 'image') throw badRequest('Both sides photos are made from two photos.');
+      if (!m.storage_key) throw badRequest('This photo was not uploaded here, so it cannot be used.');
+      if (m.mime === 'image/gif') throw new AppError(415, 'unsupported_media', 'Animated GIFs cannot be used.');
+      if (m.moderation === 'blocked') throw new AppError(422, 'media_blocked', MEDIA_BLOCKED_MESSAGE);
+    }
+    const media = await tx(db, async (c) => {
+      const m = await c.query(
+        `INSERT INTO media (owner_id, kind, url, mime, status) VALUES ($1,'image',$2,'image/jpeg','processing') RETURNING id, kind, url, alt_text`,
+        [u.id, back.url],
+      );
+      const r = await c.query(
+        `INSERT INTO media_editor_renders (source_media_id, second_media_id, result_media_id, owner_id, kind, params) VALUES ($1,$2,$3,$4,'image',$5) RETURNING id`,
+        [back.id, front.id, m.rows[0].id, u.id, { dual: { corner: input.corner } }],
+      );
+      await enqueue(c, 'media.editor', { renderId: r.rows[0].id });
+      return m.rows[0];
+    });
+    reply.code(202);
+    return { media: { id: media.id, kind: 'image' as const, url: media.url, altText: media.alt_text, status: 'processing' as const, editOf: back.id } };
   });
 
   app.get('/v1/media/:id', { preHandler: requireAuth }, async (req) => {

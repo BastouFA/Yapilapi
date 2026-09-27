@@ -10,7 +10,7 @@ import { ReelGrid } from '@/components/ReelGrid';
 import { SoundPlayButton, soundLength } from '@/components/SoundPicker';
 import { useSession } from '../../../providers';
 
-/** A sound: play it, see who made it and the reels that use it (most recent or top), and make your own reel with it. */
+/** A sound: play it, see who made it and the reels that use it (most recent or top), and make your own reel or story with it. */
 export default function SoundPage() {
   const { id } = useParams<{ id: string }>();
   const { me, locale } = useSession();
@@ -49,6 +49,12 @@ export default function SoundPage() {
           </Link>
           <p className="muted" style={{ margin: 0 }}>
             <strong>{n.format(sound.reels)}</strong> {sound.reels === 1 ? 'reel' : 'reels'}
+            {sound.stories ? (
+              <>
+                {' · '}
+                <strong>{n.format(sound.stories)}</strong> {sound.stories === 1 ? 'story' : 'stories'}
+              </>
+            ) : null}
             {soundLength(sound.durationMs) ? ` · ${soundLength(sound.durationMs)}` : ''}
             {sound.sourcePostId ? (
               <>
@@ -58,12 +64,17 @@ export default function SoundPage() {
             ) : null}
           </p>
           {me && sound.canUse ? (
-            <Link href={`/create?mode=reel&sound=${sound.id}`} className="yp-btn yp-btn--primary yp-btn--sm" style={{ alignSelf: 'flex-start' }}>
-              Use this sound
-            </Link>
+            <div className="row">
+              <Link href={`/create?mode=reel&sound=${sound.id}`} className="yp-btn yp-btn--primary yp-btn--sm">
+                Use this sound
+              </Link>
+              <Link href={`/create?mode=story&sound=${sound.id}`} className="yp-btn yp-btn--secondary yp-btn--sm">
+                Add to your story
+              </Link>
+            </div>
           ) : me ? (
             <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-              This sound can&apos;t be used in new reels.
+              This sound can&apos;t be used in new reels or stories.
             </p>
           ) : (
             <Link href="/login" className="yp-btn yp-btn--secondary yp-btn--sm" style={{ alignSelf: 'flex-start' }}>

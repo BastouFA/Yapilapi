@@ -39,8 +39,11 @@ import type {
   ViewOnceInfo,
   StickerResults,
   StoryCard,
+  StoryMusic,
+  StoryMusicInput,
   StorySticker,
   StoryStickerInput,
+  DualComposeInput,
 } from '@yapilapi/shared';
 
 export class ApiError extends Error {
@@ -375,6 +378,9 @@ export function createClient(opts: ClientOptions) {
           `/v1/media/${id}/edit`,
           b,
         ),
+      /** A "Both sides" photo from two of your uploaded photos (back, and front in a corner). Wait for it with waitUntilReady. */
+      dual: (b: DualComposeInput) =>
+        post<{ media: { id: string; kind: 'image'; url: string; altText: string | null; status: 'processing'; editOf: string } }>(`/v1/media/dual`, b),
       /** Poll GET /v1/media/:id until it is ready (resolves) or failed (rejects). */
       waitUntilReady: async (id: string, o: { intervalMs?: number; timeoutMs?: number; signal?: AbortSignal } = {}) => {
         const started = Date.now();
@@ -422,6 +428,8 @@ export function createClient(opts: ClientOptions) {
         visibility?: string;
         stickers?: StoryStickerInput[];
         allowReshare?: boolean;
+        /** A sound from the library, played in a loop (on a video, instead of its own sound). */
+        music?: StoryMusicInput;
       }) => post<{ moment: { id: string; expiresAt: string | null; tags: string[] } }>('/v1/moments', b),
       /** One story (as a group of one), for links, story cards and notifications. */
       get: (id: string) => get<{ group: StoryGroup }>(`/v1/moments/${id}`),
@@ -1372,6 +1380,8 @@ export interface Story {
   canReshare: boolean;
   /** Your own stories: whether others may reshare it. */
   allowReshare?: boolean;
+  /** Music playing with the story (null when there is none, or you can't see its sound). */
+  music: StoryMusic | null;
 }
 
 export interface StoryGroup {

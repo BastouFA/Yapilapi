@@ -22,7 +22,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { DualCorner } from '../../../packages/shared/src/dual';
 import { createModeFrom, deliverPendingAsset, type CreateMode } from '../lib/create-sheet';
+import { composeOnServer, DualReview, type Shot } from '../lib/dual';
 import { useT } from '../lib/i18n';
 import { CLIP_MAX_SECONDS, clock, pickOne, PLUS_REEL_MAX_SECONDS, REEL_MAX_SECONDS, type Picked } from '../lib/media';
 import { useSession } from '../lib/session';
@@ -118,7 +120,9 @@ async function recordedVideo(uri: string, recordedMs: number): Promise<Picked> {
 /**
  * The in-app camera that "+" opens, like Instagram's: pick Post, Reel or Story at the bottom,
  * take a photo (tap) or a video (hold, or tap to start and stop in Reel), or choose from the
- * library. What is taken is handed to Create, which opens the editor.
+ * library. What is taken is handed to Create, which opens the editor. "Both sides" (Post and
+ * Story) takes a back camera photo, then switches to the front camera and takes another; the two
+ * are put together on the server, with the small one in a corner you drag into place.
  */
 export default function Camera() {
   const { t } = useT();
@@ -133,6 +137,11 @@ export default function Camera() {
   const [recording, setRecording] = useState<Recording | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [busy, setBusy] = useState(false);
+  // Both sides: on, the photos being checked, the corner for the small one, and the step being taken.
+  const [dual, setDual] = useState(false);
+  const [dualShots, setDualShots] = useState<{ back: Shot; front: Shot } | null>(null);
+  const [dualCorner, setDualCorner] = useState<DualCorner>('top-left');
+  const [dualStep, setDualStep] = useState<'back' | 'front' | 'compose' | null>(null);
   const [camPerm, requestCam, getCam] = useCameraPermissions();
   const [micPerm, requestMic, getMic] = useMicrophonePermissions();
 
@@ -207,6 +216,7 @@ export default function Camera() {
     if (recordingRef.current || busyRef.current) return;
     setMode(next);
     setVideoMode(false);
+    if (next === 'reel') setDual(false);
   }
 
   /** Swipe left or right anywhere on the preview (or the switcher) to change mode. */
@@ -279,6 +289,64 @@ export default function Camera() {
     } finally {
       busyRef.current = false;
       if (mounted.current) setBusy(false);
+    }
+  }
+
+  /** Both sides: the back camera photo, then the front camera right after. */
+  async function takeDual() {
+    if (busyRef.current || recordingRef.current || !camera.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    const snap = async (): Promise<Shot> => {
+      const p = await camera.current!.takePictureAsync({ quality: 0.9, exif: false });
+      if (!p?.uri) throw new Error('no photo');
+      return { uri: p.uri, width: p.width, height: p.height };
+    };
+    try {
+      setDualStep('back');
+      if (facing !== 'back') {
+        setFacing('back');
+        await Promise.all([cameraReady(2500), sleep(500)]);
+      }
+      const back = await snap();
+      if (!mounted.current) return;
+      setDualStep('front');
+      setFacing('front');
+      // Switching sides restarts the camera; give it a moment to set its exposure too.
+      await Promise.all([cameraReady(3000), sleep(700)]);
+      if (!mounted.current || !camera.current) return;
+      const front = await snap();
+      if (!mounted.current) return;
+      setFacing('back');
+      setDualShots({ back, front });
+    } catch {
+      if (mounted.current) {
+        setFacing('back');
+        Alert.alert(t('m.camera.dualFailed'));
+      }
+    } finally {
+      busyRef.current = false;
+      if (mounted.current) {
+        setBusy(false);
+        setDualStep(null);
+      }
+    }
+  }
+
+  async function acceptDualPhoto() {
+    if (!dualShots || busyRef.current) return;
+    busyRef.current = true;
+    setDualStep('compose');
+    try {
+      const asset = await composeOnServer(dualShots.back, dualShots.front, dualCorner);
+      if (!mounted.current) return;
+      setDualShots(null);
+      handOff(asset);
+    } catch {
+      if (mounted.current) Alert.alert(t('m.camera.dualComposeFailed'));
+    } finally {
+      busyRef.current = false;
+      if (mounted.current) setDualStep(null);
     }
   }
 
@@ -371,6 +439,7 @@ export default function Camera() {
   function onShutter() {
     if (recordingRef.current) return stopRecording();
     if (mode === 'reel') void startRecording('toggle');
+    else if (dual) void takeDual();
     else void takePhoto();
   }
 
@@ -384,7 +453,14 @@ export default function Camera() {
   }
 
   const clipMode = mode !== 'reel';
-  const shutterLabel = recording ? t('m.camera.stopRecording') : clipMode ? t('m.camera.takePhoto') : t('m.camera.startRecording');
+  const bothSides = dual && clipMode;
+  const shutterLabel = recording
+    ? t('m.camera.stopRecording')
+    : bothSides
+      ? t('m.camera.dualShutter')
+      : clipMode
+        ? t('m.camera.takePhoto')
+        : t('m.camera.startRecording');
   const torch = back && shownFlash === 'on' && (mode === 'reel' || !!recording);
   const writeLabel = mode === 'post' ? t('m.create.textOnly') : mode === 'story' ? t('m.camera.storyStickers') : null;
 
@@ -445,8 +521,24 @@ export default function Camera() {
         )}
       </View>
 
-      {/* Bottom: gallery, shutter, flip; the mode switcher under them. */}
+      {/* Bottom: Both sides; gallery, shutter, flip; the mode switcher under them. */}
       <View style={[s.bottom, { paddingBottom: insets.bottom + space[3] }]} pointerEvents="box-none">
+        {granted && clipMode && !recording ? (
+          <Pressable
+            accessibilityRole="switch"
+            accessibilityState={{ checked: dual, disabled: busy }}
+            accessibilityHint={t('m.camera.dualShutter')}
+            disabled={busy}
+            onPress={() => {
+              setDual((d) => !d);
+              if (!dual) setFacing('back');
+            }}
+            style={({ pressed }) => [s.dualToggle, dual && s.dualToggleOn, pressed && { opacity: 0.8 }]}
+          >
+            <Icon name="albums-outline" size={16} color={dual ? '#0B0C14' : WHITE} />
+            <Text style={[s.dualToggleText, dual && { color: '#0B0C14' }]}>{t('m.camera.dual')}</Text>
+          </Pressable>
+        ) : null}
         <View style={s.controls}>
           {recording ? (
             <View style={s.slot} />
@@ -465,9 +557,9 @@ export default function Camera() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={shutterLabel}
-            accessibilityHint={clipMode && !recording ? t('m.camera.holdHint') : undefined}
+            accessibilityHint={clipMode && !recording && !bothSides ? t('m.camera.holdHint') : undefined}
             accessibilityState={{ disabled: !granted || (busy && !recording) }}
-            accessibilityActions={clipMode && !recording ? [{ name: 'record', label: t('m.camera.startRecording') }] : undefined}
+            accessibilityActions={clipMode && !recording && !bothSides ? [{ name: 'record', label: t('m.camera.startRecording') }] : undefined}
             onAccessibilityAction={onShutterAction}
             disabled={!granted}
             onPressIn={() => {
@@ -478,7 +570,7 @@ export default function Camera() {
               if (recordingRef.current === 'hold') stopRecording();
             }}
             onPress={onShutter}
-            onLongPress={clipMode ? () => void startRecording('hold') : undefined}
+            onLongPress={clipMode && !bothSides ? () => void startRecording('hold') : undefined}
             delayLongPress={250}
             style={[s.shutter, !granted && { opacity: 0.35 }]}
           >
@@ -495,12 +587,17 @@ export default function Camera() {
             />
           </Pressable>
 
-          {recording || !granted ? (
+          {recording || !granted || bothSides ? (
             <View style={s.slot} />
           ) : (
             <RoundButton icon="camera-reverse-outline" label={t('m.camera.flip')} onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))} />
           )}
         </View>
+        {bothSides && !dualShots ? (
+          <Text accessibilityLiveRegion="polite" style={s.dualHint}>
+            {dualStep === 'front' ? t('m.camera.dualTaking') : t('m.camera.dualHint')}
+          </Text>
+        ) : null}
 
         <View
           accessibilityRole="tablist"
@@ -531,6 +628,18 @@ export default function Camera() {
           </Animated.View>
         </View>
       </View>
+
+      {dualShots ? (
+        <DualReview
+          back={dualShots.back}
+          front={dualShots.front}
+          corner={dualCorner}
+          onCorner={setDualCorner}
+          onRetake={() => setDualShots(null)}
+          onUse={() => void acceptDualPhoto()}
+          busy={dualStep === 'compose'}
+        />
+      ) : null}
     </View>
   );
 }
@@ -619,4 +728,17 @@ const s = StyleSheet.create({
   mode: { width: MODE_WIDTH, height: 40, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[1] },
   modeText: { color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
   modeTextOn: { color: WHITE },
+  dualToggle: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  dualToggleOn: { backgroundColor: WHITE },
+  dualToggleText: { color: WHITE, fontWeight: '700', fontSize: 14 },
+  dualHint: { color: WHITE, textAlign: 'center', fontSize: 14, fontWeight: '600' },
 });

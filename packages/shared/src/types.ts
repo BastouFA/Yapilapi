@@ -233,6 +233,8 @@ export interface Sound {
   coverUrl: string | null;
   /** Reels you can see that use it. */
   reels: number;
+  /** Stories you can see that use it. */
+  stories: number;
   /** Whether you can make a reel with it (its source reel is public and allows remixes). */
   canUse: boolean;
   createdAt: string;

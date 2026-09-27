@@ -21,7 +21,7 @@ import {
   STORY_VISIBILITIES,
   VISIBILITIES,
 } from './constants.ts';
-import { storyStickersSchema } from './stories.ts';
+import { storyMusicInputSchema, storyStickersSchema } from './stories.ts';
 
 const trimmed = (max: number) => z.string().trim().min(1).max(max);
 export const uuid = z.string().uuid();
@@ -392,6 +392,8 @@ export const createMomentSchema = z.object({
   stickers: storyStickersSchema,
   /** Let people reshare this story into their own (public stories, or people it mentions). */
   allowReshare: z.boolean().default(true),
+  /** A sound from the library, played in a loop while the story shows (on a video, instead of its own sound). */
+  music: storyMusicInputSchema.optional(),
 });
 
 /** Reshare a story into your own: it shows as a card, credited to its author. */

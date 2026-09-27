@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@yapilapi/design-system';
-import { isVideoFile, MEDIA_ACCEPT, VIDEO_ACCEPT } from '@yapilapi/shared';
+import { isVideoFile, MEDIA_ACCEPT, VIDEO_ACCEPT, type DualCorner } from '@yapilapi/shared';
+import { DualReview, type DualShots } from '@/components/DualReview';
+import { canvasBlob, composeDual, grabFrame } from '@/lib/dual-photo';
 import { deliverPendingMedia, type CreateMode } from '@/lib/pending-media';
 import { useSession } from '../../providers';
 
@@ -18,11 +20,14 @@ const HOLD_MS = 350;
 const CLIP_MAX_SECONDS = 60;
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
  * The camera that "+" opens. Choose Post, Reel or Story at the bottom, then:
  * - Post and Story: tap the shutter for a photo, hold it to record a video.
  * - Reel: tap to start recording, tap again to stop (up to the reel limit).
+ * - Both sides (Post and Story, on devices with two cameras): a back camera photo, then the
+ *   front camera right after, put together with the small one in a corner you can drag.
  * Or open the gallery. What you take goes to Create, where the editor opens with it.
  */
 function Camera() {
@@ -45,6 +50,12 @@ function Camera() {
   const pressAt = useRef(0);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gallery = useRef<HTMLInputElement>(null);
+  // Both sides: the two photos being checked, the corner for the small one, and who waits for the camera to restart.
+  const [dual, setDual] = useState(false);
+  const [dualShots, setDualShots] = useState<DualShots | null>(null);
+  const [dualCorner, setDualCorner] = useState<DualCorner>('top-left');
+  const [dualBusy, setDualBusy] = useState(false);
+  const readyWaiters = useRef<(() => void)[]>([]);
 
   const reelMax = me?.plus ? 600 : 180;
   const maxSeconds = mode === 'reel' ? reelMax : CLIP_MAX_SECONDS;
@@ -73,6 +84,7 @@ function Camera() {
         await video.current.play().catch(() => {});
       }
       setStatus('ready');
+      readyWaiters.current.splice(0).forEach((w) => w());
       const devices = await navigator.mediaDevices.enumerateDevices().catch(() => []);
       if (!cancelled) setCanFlip(devices.filter((d) => d.kind === 'videoinput').length > 1);
     };
@@ -104,6 +116,72 @@ function Camera() {
     setFlash(true);
     setTimeout(() => setFlash(false), 150);
     c.toBlob((b) => b && finish([new File([b], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' })], mode), 'image/jpeg', 0.92);
+  };
+
+  /** Resolves once the camera has restarted (after switching sides), or after `ms`. */
+  const cameraReady = (ms = 5000) =>
+    new Promise<void>((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        readyWaiters.current = readyWaiters.current.filter((w) => w !== done);
+        resolve();
+      };
+      const timer = setTimeout(done, ms);
+      readyWaiters.current.push(done);
+    });
+
+  /** Both sides: the back camera photo, then switch to the front camera and take another right away. */
+  const takeDual = async () => {
+    if (dualBusy) return;
+    setDualBusy(true);
+    try {
+      if (facing !== 'environment') {
+        const ready = cameraReady();
+        setFacing('environment');
+        await ready;
+        await sleep(300);
+      }
+      const back = video.current && grabFrame(video.current);
+      if (!back) throw new Error('no back photo');
+      setFlash(true);
+      setTimeout(() => setFlash(false), 150);
+      const ready = cameraReady();
+      setFacing('user');
+      await ready;
+      // Give the front camera a moment to set its exposure.
+      await sleep(450);
+      const front = video.current && grabFrame(video.current);
+      setFacing('environment');
+      if (!front) throw new Error('no front photo');
+      const [b, f] = await Promise.all([canvasBlob(back, 0.85), canvasBlob(front, 0.85)]);
+      setDualShots({ back, front, backUrl: URL.createObjectURL(b), frontUrl: URL.createObjectURL(f) });
+    } catch {
+      toast("Couldn't take both photos. Try again.");
+    } finally {
+      setDualBusy(false);
+    }
+  };
+
+  const closeDual = () => {
+    if (dualShots) {
+      URL.revokeObjectURL(dualShots.backUrl);
+      URL.revokeObjectURL(dualShots.frontUrl);
+    }
+    setDualShots(null);
+  };
+
+  const acceptDual = async () => {
+    if (!dualShots) return;
+    setDualBusy(true);
+    try {
+      const blob = await composeDual(dualShots.back, dualShots.front, dualCorner);
+      closeDual();
+      finish([new File([blob], `both-sides-${Date.now()}.jpg`, { type: 'image/jpeg' })], mode);
+    } catch {
+      toast("Couldn't put the photos together. Try again.");
+    } finally {
+      setDualBusy(false);
+    }
   };
 
   const startRecording = () => {
@@ -146,13 +224,14 @@ function Camera() {
 
   // Shutter: reel = tap to start and stop; post and story = tap for a photo, hold for a video.
   const onShutterDown = () => {
-    if (status !== 'ready' || mode === 'reel') return;
+    if (status !== 'ready' || mode === 'reel' || dual) return;
     pressAt.current = Date.now();
     holdTimer.current = setTimeout(startRecording, HOLD_MS);
   };
   const onShutterUp = () => {
     if (status !== 'ready') return;
     if (mode === 'reel') return recording ? stopRecording() : startRecording();
+    if (dual) return void takeDual();
     if (holdTimer.current) clearTimeout(holdTimer.current);
     if (recording) stopRecording();
     else if (Date.now() - pressAt.current < HOLD_MS + 50) takePhoto();
@@ -160,7 +239,8 @@ function Camera() {
 
   const onKey = (e: React.KeyboardEvent) => {
     // Keyboard: Enter or Space acts like a tap (photo, or start/stop a reel); R starts and stops a video.
-    if (e.key === 'r' || e.key === 'R') {
+    if (dualShots) return;
+    if ((e.key === 'r' || e.key === 'R') && !dual) {
       e.preventDefault();
       return recording ? stopRecording() : startRecording();
     }
@@ -170,7 +250,14 @@ function Camera() {
     }
   };
 
-  const shutterLabel = recording ? 'Stop recording' : mode === 'reel' ? 'Start recording' : 'Take photo, or hold to record a video';
+  const bothSides = dual && mode !== 'reel';
+  const shutterLabel = recording
+    ? 'Stop recording'
+    : mode === 'reel'
+      ? 'Start recording'
+      : bothSides
+        ? 'Take a photo with the back camera, then the front camera'
+        : 'Take photo, or hold to record a video';
 
   return (
     <div className="cam" role="dialog" aria-modal="true" aria-label="Camera" onKeyDown={onKey}>
@@ -209,7 +296,7 @@ function Camera() {
             {mode === 'story' ? 'Text and stickers' : 'Write instead'}
           </Link>
         )}
-        {canFlip && !recording ? (
+        {canFlip && !recording && !bothSides ? (
           <button type="button" className="cam__icon" aria-label="Switch camera" onClick={() => setFacing((f) => (f === 'user' ? 'environment' : 'user'))}>
             <Icon name="repost" />
           </button>
@@ -219,6 +306,21 @@ function Camera() {
       </div>
 
       <div className="cam__bottom">
+        {/* Both sides needs a second camera, and makes photos only. */}
+        {canFlip && mode !== 'reel' && !recording && status === 'ready' ? (
+          <button
+            type="button"
+            className="cam__pill cam__pill--ghost"
+            aria-pressed={dual}
+            disabled={dualBusy}
+            onClick={() => {
+              setDual((d) => !d);
+              if (!dual && facing !== 'environment') setFacing('environment');
+            }}
+          >
+            Both sides
+          </button>
+        ) : null}
         <div className="cam__controls">
           <button type="button" className="cam__gallery" aria-label="Choose from gallery" disabled={recording} onClick={() => gallery.current?.click()}>
             <Icon name="image" />
@@ -227,7 +329,7 @@ function Camera() {
             type="button"
             className={`cam__shutter${recording ? ' cam__shutter--rec' : ''}${mode === 'reel' ? ' cam__shutter--reel' : ''}`}
             aria-label={shutterLabel}
-            disabled={status !== 'ready'}
+            disabled={status !== 'ready' || dualBusy}
             onPointerDown={onShutterDown}
             onPointerUp={onShutterUp}
             onPointerLeave={() => {
@@ -238,6 +340,7 @@ function Camera() {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 if (mode === 'reel') return recording ? stopRecording() : startRecording();
+                if (bothSides) return void takeDual();
                 if (!recording) takePhoto();
               }
             }}
@@ -246,17 +349,39 @@ function Camera() {
             <span aria-hidden />
           </button>
           <span className="cam__hint" aria-hidden>
-            {mode === 'reel' ? (recording ? 'Tap to stop' : 'Tap to record') : hasAudio ? 'Tap for photo, hold for video' : 'Tap for photo'}
+            {mode === 'reel'
+              ? recording
+                ? 'Tap to stop'
+                : 'Tap to record'
+              : bothSides
+                ? dualBusy
+                  ? 'Hold still, now the front camera'
+                  : 'Tap for a photo of both sides'
+                : hasAudio
+                  ? 'Tap for photo, hold for video'
+                  : 'Tap for photo'}
           </span>
         </div>
         <div className="cam__modes" role="tablist" aria-label="What to create">
           {MODES.map((m) => (
-            <button key={m.id} type="button" role="tab" aria-selected={m.id === mode} disabled={recording} className="cam__mode" onClick={() => setMode(m.id)}>
+            <button
+              key={m.id}
+              type="button"
+              role="tab"
+              aria-selected={m.id === mode}
+              disabled={recording || dualBusy}
+              className="cam__mode"
+              onClick={() => setMode(m.id)}
+            >
               {m.label}
             </button>
           ))}
         </div>
       </div>
+
+      {dualShots ? (
+        <DualReview shots={dualShots} corner={dualCorner} onCorner={setDualCorner} onRetake={closeDual} onUse={() => void acceptDual()} busy={dualBusy} />
+      ) : null}
 
       <input
         ref={gallery}

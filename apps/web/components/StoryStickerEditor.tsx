@@ -6,6 +6,9 @@ import { INTERACTIVE_STICKERS, linkDomain, type StoryStickerInput } from '@yapil
 import { api } from '@/lib/api';
 import { stickerStyle, timeLeft } from '@/components/StoryStickers';
 
+/** The music sticker's key while dragging it. */
+const MUSIC = 'music';
+
 /** A sticker being placed, with what to show for it before it's published. */
 export type DraftSticker = StoryStickerInput & { key: string; label: string };
 type Kind = StoryStickerInput['type'];
@@ -34,16 +37,22 @@ export function StoryStickerEditor({
   stickers,
   onChange,
   preview,
+  music,
+  onMoveMusic,
 }: {
   stickers: DraftSticker[];
   onChange: (s: DraftSticker[]) => void;
   preview: { mediaUrl?: string; mediaKind?: string; body: string };
+  /** The music sticker, moved here like the others. */
+  music?: { title: string; artist: string; style: 'compact' | 'card'; x: number; y: number } | null;
+  onMoveMusic?: (x: number, y: number) => void;
 }) {
   const frame = useRef<HTMLDivElement>(null);
   const [adding, setAdding] = useState<Kind | null>(null);
   const drag = useRef<{ key: string; pointer: number } | null>(null);
 
-  const move = (key: string, x: number, y: number) => onChange(stickers.map((s) => (s.key === key ? { ...s, x: clamp(x), y: clamp(y) } : s)));
+  const move = (key: string, x: number, y: number) =>
+    key === MUSIC ? onMoveMusic?.(clamp(x), clamp(y)) : onChange(stickers.map((s) => (s.key === key ? { ...s, x: clamp(x), y: clamp(y) } : s)));
   const onPointerMove = (e: PointerEvent) => {
     const d = drag.current;
     const box = frame.current?.getBoundingClientRect();
@@ -52,12 +61,12 @@ export function StoryStickerEditor({
     const fromStart = rtl ? box.right - e.clientX : e.clientX - box.left;
     move(d.key, fromStart / box.width, (e.clientY - box.top) / box.height);
   };
-  const onKey = (s: DraftSticker, e: KeyboardEvent) => {
+  const onKey = (s: { key: string; x: number; y: number }, e: KeyboardEvent) => {
     const step = 0.02;
     const rtl = frame.current ? getComputedStyle(frame.current).direction === 'rtl' : false;
     const dx = e.key === 'ArrowRight' ? step : e.key === 'ArrowLeft' ? -step : 0;
     const dy = e.key === 'ArrowDown' ? step : e.key === 'ArrowUp' ? -step : 0;
-    if (e.key === 'Delete' || e.key === 'Backspace') {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && s.key !== MUSIC) {
       e.preventDefault();
       onChange(stickers.filter((x) => x.key !== s.key));
       return;
@@ -108,6 +117,23 @@ export function StoryStickerEditor({
               <bdi>{s.label}</bdi>
             </button>
           ))}
+          {music ? (
+            <button
+              type="button"
+              className={`sticker-editor__sticker sticker-editor__sticker--music${music.style === 'card' ? ' sticker-editor__sticker--card' : ''}`}
+              style={stickerStyle({ x: music.x, y: music.y })}
+              aria-label={`Music: ${music.title}, by ${music.artist}. Drag or use the arrow keys to move it.`}
+              onKeyDown={(e) => onKey({ key: MUSIC, x: music.x, y: music.y }, e)}
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId);
+                drag.current = { key: MUSIC, pointer: e.pointerId };
+              }}
+              onPointerMove={onPointerMove}
+              onPointerUp={() => (drag.current = null)}
+            >
+              <Icon name="music" size={12} /> <bdi>{music.title}</bdi> · <bdi>{music.artist}</bdi>
+            </button>
+          ) : null}
         </div>
         <div className="stack-sm">
           <div className="sticker-editor__kinds" role="group" aria-label="Add a sticker">

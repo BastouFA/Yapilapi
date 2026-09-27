@@ -1,11 +1,12 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { createMomentSchema, pollPercents, reshareMomentSchema } from '@yapilapi/shared';
+import { createMomentSchema, pollPercents, reshareMomentSchema, storyMusicPart } from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
 import { notify, track } from '../lib/services.ts';
+import { assertSoundUsable } from '../lib/sounds.ts';
 import { plusCol, publicUserFrom } from '../lib/users.ts';
 import { notBlockedSql } from '../lib/visibility.ts';
 import {
@@ -16,6 +17,7 @@ import {
   STORY_SELECT,
   stickerResults,
   storyVisibleSql,
+  type StoredMusic,
   type StoredSticker,
 } from '../lib/stories.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
@@ -78,13 +80,15 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
       stickers: Parameters<typeof prepareStory>[3];
       allowReshare: boolean;
       reshareOf?: string;
+      music?: { soundId: string; stored: StoredMusic } | null;
     },
   ) {
     if (analyzeText(input.body).risk !== 'normal') throw new AppError(422, 'content_blocked', "This story can't be shared.");
     const prepared = await prepareStory(db, authorId, input.body, input.stickers);
     const { rows } = await db.query(
-      `INSERT INTO moments (author_id, body, media_url, media_kind, media_id, visibility, location_text, expires_at, stickers, tags, mentions, reshare_of, allow_reshare)
-       VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $8::int IS NULL THEN NULL ELSE now() + make_interval(hours => $8::int) END, $9, $10, $11, $12, $13)
+      `INSERT INTO moments (author_id, body, media_url, media_kind, media_id, visibility, location_text, expires_at, stickers, tags, mentions, reshare_of, allow_reshare,
+                            sound_id, music)
+       VALUES ($1,$2,$3,$4,$5,$6,$7, CASE WHEN $8::int IS NULL THEN NULL ELSE now() + make_interval(hours => $8::int) END, $9, $10, $11, $12, $13, $14, $15)
        RETURNING id, expires_at, created_at, tags`,
       [
         authorId,
@@ -100,11 +104,38 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
         prepared.mentionIds,
         input.reshareOf ?? null,
         input.allowReshare,
+        input.music?.soundId ?? null,
+        input.music ? JSON.stringify(input.music.stored) : null,
       ],
     );
     const moment = rows[0] as { id: string; expires_at: Date | null; created_at: Date; tags: string[] };
     await notifyStoryMentions(db, ctx.realtime, { storyId: moment.id, actorId: authorId, userIds: prepared.mentionIds });
     return moment;
+  }
+
+  /**
+   * Check music for a new story: a sound the author may use (the same rules as for reels) and a
+   * part that starts inside it. Photo, text and video stories only (on a video it replaces the
+   * video's own sound; the two are not mixed).
+   */
+  async function storyMusic(
+    authorId: string,
+    m: NonNullable<ReturnType<typeof createMomentSchema.parse>['music']>,
+    mediaKind: string | null,
+  ): Promise<{ soundId: string; stored: StoredMusic }> {
+    if (mediaKind === 'audio') throw new AppError(400, 'validation_failed', 'Music can be added to photo, video and text stories.');
+    await assertSoundUsable(db, m.soundId, authorId, 'stories');
+    const { rows } = await db.query(
+      `SELECT coalesce(s.duration_ms, sm.duration_ms) AS ms FROM sounds s LEFT JOIN media sm ON sm.id = s.media_id WHERE s.id = $1`,
+      [m.soundId],
+    );
+    const soundMs = (rows[0]?.ms as number | null) ?? null;
+    const part = storyMusicPart(m.startMs, m.durationMs, soundMs);
+    if (!part)
+      throw new AppError(400, 'validation_failed', 'Check the highlighted fields.', {
+        fields: { 'music.startMs': `This sound is ${Math.floor((soundMs ?? 0) / 1000)} seconds long. Choose an earlier start.` },
+      });
+    return { soundId: m.soundId, stored: { ...part, style: m.style, x: m.x, y: m.y } };
   }
 
   app.post('/v1/moments', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (req, reply) => {
@@ -120,7 +151,9 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
       mediaUrl = m.url;
       mediaKind = m.kind;
     }
-    if (!input.body && !mediaUrl && !input.stickers.length) throw new AppError(400, 'validation_failed', 'Add text, a photo or a video to your story.');
+    if (!input.body && !mediaUrl && !input.stickers.length && !input.music)
+      throw new AppError(400, 'validation_failed', 'Add text, a photo or a video to your story.');
+    const music = input.music ? await storyMusic(u.id, input.music, mediaKind) : null;
     const moment = await createStory(u.id, {
       body: input.body,
       mediaUrl,
@@ -131,8 +164,9 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
       hours: hoursFor(input.expiresIn, input.customHours),
       stickers: input.stickers,
       allowReshare: input.allowReshare,
+      music,
     });
-    track(db, u.id, 'moment_created', { expiresIn: input.expiresIn, stickers: input.stickers.length });
+    track(db, u.id, 'moment_created', { expiresIn: input.expiresIn, stickers: input.stickers.length, music: !!music });
     reply.code(201);
     return { moment };
   });

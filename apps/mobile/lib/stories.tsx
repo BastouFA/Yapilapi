@@ -37,6 +37,7 @@ import { Avatar, Icon, Segmented, SwitchRow, useColors, userText } from './ui';
 import { SensitiveCover } from './safety';
 import { AddToChapterSheet } from './chapters';
 import { StickerLayer, StoryCardView } from './story-stickers';
+import { MusicSticker, useMusicLoop, useMusicOn } from './story-music';
 
 const PHOTO_MS = 5000;
 const WHITE = '#FFFFFF';
@@ -176,6 +177,10 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
   const [revealed, setRevealed] = useState<string[]>([]);
   const covered = !!story?.sensitive && !revealed.includes(story.id);
   const stopped = held || paused || typing || viewers !== null || covered || sharing || answering || chapterFor !== null;
+  // The story's music, in a loop while it's on screen and playing (instead of a video's own sound).
+  const [musicOn, setMusicOn] = useMusicOn();
+  const music = !covered ? (story?.music ?? null) : null;
+  useMusicLoop(music, !!music && musicOn && !stopped);
 
   const next = useCallback(() => {
     if (!group) return onClose();
@@ -354,7 +359,7 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
               <SensitiveCover onReveal={() => setRevealed((r) => [...r, story.id])} />
             </>
           ) : story.mediaKind === 'video' && uri ? (
-            <StoryVideo key={story.id} uri={uri} paused={stopped} onProgress={setProgress} onEnd={next} />
+            <StoryVideo key={story.id} uri={uri} paused={stopped} muted={!!story.music} onProgress={setProgress} onEnd={next} />
           ) : story.mediaKind === 'image' && uri ? (
             <Image
               key={story.id}
@@ -396,6 +401,15 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
               </View>
             </View>
           ) : null}
+          {music ? (
+            <MusicSticker
+              music={music}
+              onOpen={() => {
+                onClose();
+                router.push(`/sounds/${music.sound.id}`);
+              }}
+            />
+          ) : null}
           {!covered && story.stickers.length ? (
             <StickerLayer
               story={story}
@@ -428,6 +442,17 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
                 <Icon name="people" size={12} color={c.onCloseFriends} />
                 <Text style={{ color: c.onCloseFriends, fontSize: 12, fontWeight: '700' }}>{t('m.closeFriends.title')}</Text>
               </View>
+            ) : null}
+            {story.music ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={musicOn ? t('m.music.off') : t('m.music.on')}
+                hitSlop={8}
+                onPress={() => setMusicOn(!musicOn)}
+                style={st.icon}
+              >
+                <Icon name={musicOn ? 'volume-high-outline' : 'volume-mute-outline'} size={20} color={WHITE} />
+              </Pressable>
             ) : null}
             <Pressable accessibilityRole="button" accessibilityLabel={t('m.stories.share')} hitSlop={8} onPress={() => setSharing(true)} style={st.icon}>
               <Icon name="paper-plane-outline" size={20} color={WHITE} directional />
@@ -647,10 +672,23 @@ function Viewer({ groups, start, onClose, onChange }: { groups: StoryGroup[]; st
   }
 }
 
-/** A story video: plays once to the end, reporting progress, and pauses while held. */
-function StoryVideo({ uri, paused, onProgress, onEnd }: { uri: string; paused: boolean; onProgress: (p: number) => void; onEnd: () => void }) {
+/** A story video: plays once to the end, reporting progress, and pauses while held. Muted when the story has music. */
+function StoryVideo({
+  uri,
+  paused,
+  muted,
+  onProgress,
+  onEnd,
+}: {
+  uri: string;
+  paused: boolean;
+  muted: boolean;
+  onProgress: (p: number) => void;
+  onEnd: () => void;
+}) {
   const player = useVideoPlayer(uri, (p) => {
     p.loop = false;
+    p.muted = muted;
     p.timeUpdateEventInterval = 0.1;
   });
   useEventListener(player, 'timeUpdate', ({ currentTime }) => {

@@ -4857,3 +4857,188 @@ button.yp-chip[aria-pressed='true'] {
     white-space: nowrap;
   }
 }
+
+/* ── Story music: the sticker on a story, and choosing the part in Create ── */
+.music-sticker {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 78%;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: #ffffff;
+  color: #14151f;
+  font: 700 13px/1.2 var(--font-sans);
+  text-align: start;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 2px 10px #00000040;
+}
+.music-sticker:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.music-sticker--card {
+  padding: 8px;
+  border-radius: 14px;
+  gap: 10px;
+}
+.music-sticker__cover {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: #e7e8f2 center / cover no-repeat;
+}
+.music-sticker__text {
+  display: grid;
+  min-width: 0;
+}
+.music-sticker__title,
+.music-sticker__artist {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.music-sticker__artist {
+  font-weight: 500;
+  font-size: 12px;
+  opacity: 0.7;
+}
+.music-sticker--compact .music-sticker__text {
+  display: flex;
+  gap: 6px;
+}
+.music-sticker__bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+  flex: none;
+}
+.music-sticker__bars > span {
+  width: 3px;
+  height: 4px;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.6;
+}
+.music-sticker__bars--on > span {
+  animation: yp-music-bar 900ms ease-in-out infinite alternate;
+}
+.music-sticker__bars--on > span:nth-child(2) {
+  animation-delay: -300ms;
+}
+.music-sticker__bars--on > span:nth-child(3) {
+  animation-delay: -600ms;
+}
+@keyframes yp-music-bar {
+  from {
+    height: 3px;
+  }
+  to {
+    height: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .music-sticker__bars--on > span {
+    animation: none;
+    height: 9px;
+  }
+}
+.music-range {
+  width: 100%;
+  accent-color: var(--yapi);
+}
+.sticker-editor__sticker--music {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sticker-editor__sticker--card {
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+/* ── Camera: "Both sides" photos ── */
+.cam__pill[aria-pressed='true'] {
+  background: #fff;
+  color: #0b0c14;
+}
+.cam__dual {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: var(--space-4);
+  padding: max(var(--space-4), env(safe-area-inset-top)) var(--space-4) max(var(--space-6), env(safe-area-inset-bottom));
+  background: #000;
+}
+.cam__dual-title {
+  margin: 0;
+  text-align: center;
+  font: 700 16px/1.4 var(--font-sans);
+}
+.cam__dual-hint {
+  margin: 4px 0 0;
+  text-align: center;
+  font-size: 14px;
+  opacity: 0.8;
+}
+.cam__dual-stage {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+}
+.cam__dual-frame {
+  position: relative;
+  max-width: 100%;
+  touch-action: none;
+}
+.cam__dual-frame > img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100dvh - 240px);
+}
+.cam__dual-inset {
+  position: absolute;
+  padding: 0;
+  overflow: hidden;
+  border: 0 solid #fff;
+  background: #fff;
+  cursor: grab;
+  touch-action: none;
+  transition:
+    left var(--duration-base) ease-out,
+    top var(--duration-base) ease-out;
+}
+.cam__dual-inset--dragging {
+  transition: none;
+  cursor: grabbing;
+}
+.cam__dual-inset > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.cam__dual-inset:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cam__dual-inset {
+    transition: none;
+  }
+}
+.cam__dual-actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-3);
+}
