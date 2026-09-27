@@ -18,7 +18,7 @@ import { useSession } from '../../../providers';
  */
 export default function ChapterPage() {
   const { id } = useParams<{ id: string }>();
-  const { me, toast, locale } = useSession();
+  const { me, toast, locale, flags } = useSession();
   const router = useRouter();
   const [data, setData] = useState<ChapterDetail | null>(null);
   const [missing, setMissing] = useState(false);
@@ -131,6 +131,12 @@ export default function ChapterPage() {
               <Button variant="secondary" icon="users" onClick={() => setInviting(true)}>
                 Invite
               </Button>
+            ) : null}
+            {stories.length && flags.MEMORY !== false ? (
+              <Link href={`/recaps/new?source=chapter&sourceId=${chapter.id}`} className="yp-btn yp-btn--secondary">
+                <Icon name="play" size={16} />
+                Make a recap video
+              </Link>
             ) : null}
             <Button
               variant="ghost"

@@ -211,3 +211,23 @@ export const SAVE_NOTE_MAX = 280;
 /** Filters on the Saved page and inside a board. */
 export const SAVED_FILTERS = ['all', 'photos', 'videos', 'text'] as const;
 export type SavedFilter = (typeof SAVED_FILTERS)[number];
+
+/**
+ * Recap videos: made from a memory, "On this day" or one of your chapters.
+ * Up to 30 photos and video clips (clips are cut to 4 seconds), at most 60
+ * seconds long, rendered on the server. Each person can start 10 a day.
+ */
+export const RECAP_STYLES = ['calm', 'quick', 'film'] as const;
+export type RecapStyle = (typeof RECAP_STYLES)[number];
+export const RECAP_ASPECTS = ['9:16', '1:1'] as const;
+export type RecapAspect = (typeof RECAP_ASPECTS)[number];
+export const RECAP_SOURCES = ['memory', 'on_this_day', 'chapter'] as const;
+export type RecapSource = (typeof RECAP_SOURCES)[number];
+export const RECAP_MAX_ITEMS = 30;
+export const RECAP_MAX_SECONDS = 60;
+export const RECAP_MIN_SECONDS = 3;
+export const RECAP_CLIP_MAX_SECONDS = 4;
+export const RECAP_TITLE_MAX = 60;
+export const RECAP_DAILY_LIMIT = 10;
+/** Length choices offered in the apps ("up to"); null is automatic. */
+export const RECAP_LENGTHS = [15, 30, 60] as const;

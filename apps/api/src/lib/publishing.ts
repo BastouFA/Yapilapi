@@ -12,6 +12,7 @@ import { notify, track } from './services.ts';
 import { emitWebhook } from './webhooks.ts';
 import { postVisibleSql } from './visibility.ts';
 import { assertRemixable, assertSoundUsable, registerOwnSound } from './sounds.ts';
+import { assertRecapUse } from './recap-sharing.ts';
 import { assertPostPace, assessPost, flagContent, recordSignals, type Assessment } from './spam.ts';
 import { requireVerified } from './verification.ts';
 import { MEDIA_BLOCKED_MESSAGE } from './media-moderation.ts';
@@ -71,6 +72,19 @@ export async function writePost(
     const plan = await c.query(`SELECT 1 FROM creator_plans WHERE creator_id = $1 AND active LIMIT 1`, [userId]);
     if (!plan.rowCount) throw badRequest('Add a subscription plan in Studio before posting for subscribers.');
   }
+  // A recap video goes out only as a reel, only when everything in it is the author's own, and with the sound it was made with.
+  const recap = await assertRecapUse(
+    c,
+    userId,
+    input.media.map((m) => m.id),
+    'post',
+  );
+  if (recap) {
+    if (input.format !== 'reel' || input.media.length !== 1) throw badRequest('A recap can be posted as a reel.');
+    if (input.remixOf) throw badRequest("A recap can't be a duet or remix.");
+    if (recap.soundId && input.soundId && input.soundId !== recap.soundId) throw badRequest('A recap is posted with the sound it was made with.');
+  }
+  const chosenSound = input.soundId ?? recap?.soundId ?? undefined;
   // Reels: a duet or remix borrows the original's sound; otherwise a chosen sound, or the reel's own audio.
   let soundId: string | null = null;
   let remixAuthor: string | null = null;
@@ -78,9 +92,9 @@ export async function writePost(
     const o = await assertRemixable(c, input.remixOf, userId);
     remixAuthor = o.authorId;
     soundId = o.soundId;
-  } else if (input.format === 'reel' && input.soundId) {
-    await assertSoundUsable(c, input.soundId, userId);
-    soundId = input.soundId;
+  } else if (input.format === 'reel' && chosenSound) {
+    await assertSoundUsable(c, chosenSound, userId);
+    soundId = chosenSound;
   }
   if (input.communityId) {
     const m = await c.query(`SELECT role FROM community_members WHERE community_id = $1 AND user_id = $2 AND status = 'active'`, [input.communityId, userId]);
@@ -359,6 +373,9 @@ export async function publishDraft(deps: Deps, postId: string, authorId: string)
     if (!plan.rowCount) throw badRequest('Add a subscription plan in Studio before posting for subscribers.');
   }
   const remixAuthor = d.format === 'reel' && d.remix_of_post_id ? (await assertRemixable(db, d.remix_of_post_id, authorId)).authorId : null;
+  // A recap in it: everything in the recap must still be the author's own.
+  const mediaIds = (await db.query<{ media_id: string }>(`SELECT media_id FROM post_media WHERE post_id = $1`, [postId])).rows.map((r) => r.media_id);
+  await assertRecapUse(db, authorId, mediaIds, 'post');
   const s = await screenPost(db, deps.config, authorId, { body: d.body, pollText: d.poll_text ?? '', visibility: d.visibility, communityId: d.community_id });
   let limitedNow = false;
   const published = await tx(db, async (c) => {

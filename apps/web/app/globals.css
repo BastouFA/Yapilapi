@@ -5042,3 +5042,307 @@ button.yp-chip[aria-pressed='true'] {
   justify-content: center;
   gap: var(--space-3);
 }
+
+/* Recap videos: the maker (/recaps/new) and your recaps (/recaps). */
+.recap-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.recap-cta .muted {
+  font-size: 14px;
+}
+.recap-thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--ink-muted);
+}
+.recap-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.recap-thumb__badge,
+.recap-thumb__other {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  background: rgb(0 0 0 / 0.62);
+  color: #fff;
+  font: 600 11px/14px var(--font-sans);
+}
+.recap-thumb__badge {
+  inset: auto auto 4px 4px;
+}
+.recap-thumb__other {
+  inset: 4px 4px auto auto;
+  padding: 3px;
+}
+.recap-picked {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.recap-picked__item {
+  display: grid;
+  grid-template-columns: 20px 56px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.recap-picked__num {
+  text-align: center;
+  font: 700 13px/1 var(--font-sans);
+  color: var(--ink-muted);
+}
+.recap-picked__text {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recap-picked__tools {
+  display: flex;
+  gap: 2px;
+}
+.recap-tool {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.recap-tool:hover:not(:disabled) {
+  background: var(--surface-sunken);
+}
+.recap-tool:focus-visible,
+.recap-add:focus-visible,
+.recap-row:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.recap-tool:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.recap-tool__up {
+  transform: rotate(180deg);
+}
+.recap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.recap-add {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  cursor: pointer;
+}
+.recap-add:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.recap-add__plus {
+  position: absolute;
+  inset: auto 4px 4px auto;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--yapi);
+  color: var(--on-yapi);
+}
+.recap-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.recap-choices > legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+}
+.recap-choice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+}
+.recap-choice:has(input:checked) {
+  border-color: var(--yapi);
+  background: var(--yapi-soft);
+}
+.recap-choice:has(input:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+.recap-choice > span:last-child {
+  display: grid;
+  gap: 2px;
+  font-size: 14px;
+}
+.recap-choice .muted {
+  font-size: 13px;
+}
+.recap-shape {
+  flex: none;
+  border: 2px solid currentColor;
+  border-radius: 3px;
+}
+.recap-shape--tall {
+  width: 14px;
+  height: 24px;
+}
+.recap-shape--square {
+  width: 20px;
+  height: 20px;
+}
+.recap-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.recap-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.recap-row[aria-current='true'] {
+  border-color: var(--yapi);
+}
+.recap-row__poster {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 54px;
+  height: 96px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--ink-muted);
+}
+.recap-row__poster--square {
+  height: 54px;
+}
+.recap-row__poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.recap-row__text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.recap-row__title {
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recap-row__meta {
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+.recap-row__status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+}
+.recap-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+.recap-detail h2:focus {
+  outline: none;
+}
+/* The player keeps the video's shape: tall ones fit the screen's height, square ones its width. */
+.recap-video {
+  display: block;
+  max-width: 100%;
+  margin-inline: auto;
+  border-radius: var(--radius-md);
+  background: #000;
+  object-fit: contain;
+}
+.recap-video--tall {
+  height: min(70vh, 640px);
+}
+.recap-video--square {
+  width: min(100%, 480px);
+}
+.recap-video--waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: min(100%, 320px);
+  height: auto;
+  padding: var(--space-4);
+  background: var(--surface-sunken);
+  color: var(--ink);
+  text-align: center;
+  font-size: 14px;
+}
+.recap-inline {
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}

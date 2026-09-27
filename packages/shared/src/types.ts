@@ -538,3 +538,61 @@ export interface BoardDetail {
   /** Accepted collaborators for everyone who can see the board; open invites too for the owner. */
   collaborators: BoardCollaborator[];
 }
+
+export type RecapStatus = 'queued' | 'rendering' | 'ready' | 'failed';
+
+/** A photo or video that can go in a recap: one the maker can see in the source right now. */
+export interface RecapCandidate {
+  mediaId: string;
+  kind: 'image' | 'video';
+  /** A small image for the picker (the poster frame for videos). */
+  thumbUrl: string | null;
+  durationMs: number | null;
+  /** Likes on the post it comes from (stories count 0). */
+  likes: number;
+  /** When it was shared (ISO). */
+  takenAt: string;
+  from: 'post' | 'story';
+  fromId: string;
+  /** Yours, rather than someone else's. */
+  mine: boolean;
+}
+
+export interface RecapCandidates {
+  /** A suggested title: the memory's or chapter's, or "On this day". */
+  title: string;
+  items: RecapCandidate[];
+  /** The suggested pick, in playing order: the best-liked and most varied, up to 30. */
+  preselected: string[];
+  /** Recaps you can still start today. */
+  remainingToday: number;
+}
+
+export interface Recap {
+  id: string;
+  title: string;
+  source: 'memory' | 'on_this_day' | 'chapter';
+  sourceId: string | null;
+  style: 'calm' | 'quick' | 'film';
+  aspect: '9:16' | '1:1';
+  sound: { id: string; title: string } | null;
+  lengthSeconds: number | null;
+  status: RecapStatus;
+  /** Why it failed, in plain words. */
+  error: string | null;
+  /** Photos and videos chosen. */
+  itemCount: number;
+  /** How many made it in (once ready): ones you can no longer see are left out. */
+  usedCount: number | null;
+  durationMs: number | null;
+  /** The finished video. Only its maker sees a recap. */
+  video: { mediaId: string; url: string; posterUrl: string | null; hlsUrl: string | null; width: number | null; height: number | null } | null;
+  /** A file name for saving it. */
+  fileName: string;
+  /** Everything in it is yours, so it can be posted as a reel. */
+  canPost: boolean;
+  /** It can be sent in a chat: everything in it is yours or already public. */
+  canSend: boolean;
+  createdAt: string;
+  finishedAt: string | null;
+}

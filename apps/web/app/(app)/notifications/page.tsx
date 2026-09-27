@@ -65,6 +65,8 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
     return `added ${count === 1 ? '1 post' : `${count} posts`} to “${String(n.data.name ?? '')}”`;
   },
   chapter_opened: (n) => `The time capsule "${String(n.data.title ?? '')}" has opened.`,
+  recap_ready: (n) => `Your recap video “${String(n.data.title ?? '')}” is ready.`,
+  recap_failed: (n) => `We couldn't make your recap video “${String(n.data.title ?? '')}”.`,
   account_review: (n) =>
     n.data.outcome === 'cleared'
       ? 'We reviewed your account and lifted the limit. Held posts and messages are now shared.'
@@ -74,6 +76,7 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
 function hrefFor(n: NotificationItem): string | undefined {
   if (n.type === 'reel_duet' || n.type === 'reel_remix') return `/reels?start=${n.entityId}`;
   if (n.entityType === 'chapter') return `/chapters/${n.entityId}`;
+  if (n.entityType === 'recap' || n.type === 'recap_ready' || n.type === 'recap_failed') return n.entityId ? `/recaps?open=${n.entityId}` : '/recaps';
   if (n.entityType === 'board') return `/boards/${n.entityId}`;
   if (n.entityType === 'draft') return `/create?draft=${n.entityId}`;
   if (n.entityType === 'post') return `/p/${n.entityId}`;

@@ -4,7 +4,7 @@ import { FeatureOff } from '@/components/FeatureOff';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Badge, Button, EmptyState, EventCard, PostCard, Skeleton, TextField } from '@yapilapi/design-system';
+import { Badge, Button, EmptyState, EventCard, Icon, PostCard, Skeleton, TextField } from '@yapilapi/design-system';
 import type { MemorySummary } from '@yapilapi/api-client';
 import type { EventItem, Post } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
@@ -36,6 +36,9 @@ export default function Memories() {
     <div className="yp-shell__inner">
       <div className="yp-topbar">
         <h1>Memories</h1>
+        <Link href="/recaps" className="yp-btn yp-btn--ghost yp-btn--sm">
+          Your recaps
+        </Link>
       </div>
       <p className="muted" style={{ margin: 0 }}>
         Private unless you share them with friends. Only you can add to your memories.
@@ -80,14 +83,24 @@ export default function Memories() {
         </section>
       ) : null}
 
-      {sugg?.onThisDay.length ? (
-        <section className="stack-sm">
-          <h2 className="section-title">On this day</h2>
-          {sugg.onThisDay.map((p) => (
-            <PostCard key={p.id} post={p} locale={locale} linkAs={NextLink} />
-          ))}
-        </section>
-      ) : null}
+      <section className="stack-sm" aria-labelledby="on-this-day">
+        <h2 id="on-this-day" className="section-title">
+          On this day
+        </h2>
+        <div className="recap-cta">
+          <span className="stack-sm" style={{ gap: 2, minWidth: 0 }}>
+            <strong>Make a recap video</strong>
+            <span className="muted">From photos and videos you shared on this day in earlier years. Only you see it until you share it.</span>
+          </span>
+          <Link href="/recaps/new?source=on_this_day" className="yp-btn yp-btn--secondary yp-btn--sm">
+            <Icon name="play" size={16} />
+            Make one
+          </Link>
+        </div>
+        {sugg?.onThisDay.map((p) => (
+          <PostCard key={p.id} post={p} locale={locale} linkAs={NextLink} />
+        ))}
+      </section>
 
       <section className="stack-sm">
         <h2 className="section-title">Your memories</h2>

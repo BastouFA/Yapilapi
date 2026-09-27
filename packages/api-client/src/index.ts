@@ -31,6 +31,10 @@ import type {
   PublicProfilePreview,
   PublicUser,
   PhotoTag,
+  CreateRecapInput,
+  Recap,
+  RecapCandidates,
+  RecapSource,
   Sound,
   EditorParamsInput,
   TagPermission,
@@ -816,6 +820,19 @@ export function createClient(opts: ClientOptions) {
       removeItem: (id: string, itemType: string, itemId: string) => del(`/v1/memories/${id}/items/${itemType}/${itemId}`),
       share: (id: string, userIds: string[]) => put<{ visibility: string }>(`/v1/memories/${id}/shares`, { userIds }),
       recap: (id: string) => post<{ recap: string; notice?: string }>(`/v1/memories/${id}/recap`),
+    },
+    /**
+     * Recap videos from a memory, "On this day" or one of your chapters. Only you see
+     * them. Post one as a reel with posts.create (format 'reel', the recap's video as
+     * the media, its sound as soundId), or send it in a chat as an attachment.
+     */
+    recaps: {
+      list: (q: { source?: RecapSource; sourceId?: string } = {}) =>
+        get<{ items: Recap[]; remainingToday: number }>(`/v1/recaps${qs({ source: q.source, sourceId: q.sourceId })}`),
+      candidates: (source: RecapSource, sourceId?: string) => get<RecapCandidates>(`/v1/recaps/candidates${qs({ source, sourceId })}`),
+      create: (b: CreateRecapInput) => post<{ recap: Recap }>('/v1/recaps', b),
+      get: (id: string) => get<{ recap: Recap }>(`/v1/recaps/${id}`),
+      remove: (id: string) => del<{ ok: true; fileRemoved: boolean }>(`/v1/recaps/${id}`),
     },
     live: {
       list: () => get<{ items: LiveSummary[] }>('/v1/live'),

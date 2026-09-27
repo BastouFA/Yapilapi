@@ -97,6 +97,8 @@ const TEXT: Record<string, (actor: string) => string> = {
   yap_received: (a) => `${a} sent you a Yap`,
   view_once_screenshot: (a) => `${a} took a screenshot of your view-once photo or video`,
   scheduled_post_failed: () => "A scheduled post couldn't be published. It's back in your drafts",
+  recap_ready: () => 'Your recap video is ready',
+  recap_failed: () => "We couldn't make your recap video",
 };
 
 /** Human text for a notification type, or null for types that shouldn't push. */

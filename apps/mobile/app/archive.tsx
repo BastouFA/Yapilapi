@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import type { ArchivedStory } from '../../../packages/api-client/src/index';
@@ -97,6 +98,14 @@ export default function Archive() {
         ListHeaderComponent={
           <View style={{ gap: space[3] }}>
             <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('m.archive.hint')}</Text>
+            <Button
+              size="sm"
+              variant="secondary"
+              icon="film-outline"
+              label={t('m.recap.title')}
+              onPress={() => router.push('/recaps')}
+              style={{ alignSelf: 'flex-start' }}
+            />
             {note ? <Notice>{note}</Notice> : null}
             {months.length ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space[2] }}>

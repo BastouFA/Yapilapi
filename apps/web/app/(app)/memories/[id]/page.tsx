@@ -1,8 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { AIPanel, Avatar, BottomSheet, Button, Checkbox, EmptyState, EventCard, PostCard, Skeleton } from '@yapilapi/design-system';
+import { AIPanel, Avatar, BottomSheet, Button, Checkbox, EmptyState, EventCard, Icon, PostCard, Skeleton } from '@yapilapi/design-system';
 import type { PublicUser } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
@@ -10,7 +11,7 @@ import { useSession } from '../../../providers';
 
 export default function MemoryPage() {
   const { id } = useParams<{ id: string }>();
-  const { me, toast, locale } = useSession();
+  const { me, toast, locale, flags } = useSession();
   const router = useRouter();
   const [data, setData] = useState<Awaited<ReturnType<typeof api.memories.get>> | null>(null);
   const [missing, setMissing] = useState(false);
@@ -33,31 +34,46 @@ export default function MemoryPage() {
     <div className="yp-shell__inner">
       <div className="yp-topbar">
         <h1>{m.title}</h1>
-        {m.mine ? (
-          <div className="row">
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={async () => {
-                if (me) setFriends((await api.raw.get<{ items: PublicUser[] }>(`/v1/users/${me.id}/friends`)).items);
-                setSharing(true);
-              }}
-            >
-              {m.visibility === 'private' ? 'Share' : 'Sharing'}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={async () => {
-                await api.memories.remove(id);
-                router.push('/memories');
-              }}
-            >
-              Delete
-            </Button>
-          </div>
-        ) : null}
+        <div className="row">
+          {m.mine ? (
+            <>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={async () => {
+                  if (me) setFriends((await api.raw.get<{ items: PublicUser[] }>(`/v1/users/${me.id}/friends`)).items);
+                  setSharing(true);
+                }}
+              >
+                {m.visibility === 'private' ? 'Share' : 'Sharing'}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={async () => {
+                  await api.memories.remove(id);
+                  router.push('/memories');
+                }}
+              >
+                Delete
+              </Button>
+            </>
+          ) : null}
+        </div>
       </div>
+
+      {flags.MEMORY !== false ? (
+        <div className="recap-cta">
+          <span className="stack-sm" style={{ gap: 2, minWidth: 0 }}>
+            <strong>Make a recap video</strong>
+            <span className="muted">A short video from the photos and videos here. Only you see it until you share it.</span>
+          </span>
+          <Link href={`/recaps/new?source=memory&sourceId=${id}`} className="yp-btn yp-btn--secondary yp-btn--sm">
+            <Icon name="play" size={16} />
+            Make one
+          </Link>
+        </div>
+      ) : null}
 
       {m.recap || m.mine ? (
         <AIPanel

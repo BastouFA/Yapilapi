@@ -14,6 +14,13 @@ import {
   CURRENCIES,
   DISAPPEARING_SECONDS,
   PROFILE_MODES,
+  RECAP_ASPECTS,
+  RECAP_MAX_ITEMS,
+  RECAP_MAX_SECONDS,
+  RECAP_MIN_SECONDS,
+  RECAP_SOURCES,
+  RECAP_STYLES,
+  RECAP_TITLE_MAX,
   REMIX_MODES,
   REPORT_REASONS,
   REPORT_TARGETS,
@@ -478,3 +485,30 @@ export type RegisterInput = z.infer<typeof registerSchema>;
 export type CreatePostInput = z.infer<typeof createPostSchema>;
 export type EditPostInput = z.infer<typeof editPostSchema>;
 export type CreateEventInput = z.infer<typeof createEventSchema>;
+
+/**
+ * Make a recap video. `mediaIds` are photos and videos from the source, in the
+ * order they play; each must be one the maker can see there right now.
+ */
+export const createRecapSchema = z
+  .object({
+    source: z.enum(RECAP_SOURCES),
+    /** The memory or chapter. Not used for "On this day". */
+    sourceId: uuid.optional(),
+    title: trimmed(RECAP_TITLE_MAX),
+    mediaIds: z
+      .array(uuid)
+      .min(1, 'Choose at least one photo or video.')
+      .max(RECAP_MAX_ITEMS, `Choose up to ${RECAP_MAX_ITEMS} photos and videos.`)
+      .refine((ids) => new Set(ids).size === ids.length, { message: 'Each photo or video can be in a recap once.' }),
+    style: z.enum(RECAP_STYLES).default('calm'),
+    aspect: z.enum(RECAP_ASPECTS).default('9:16'),
+    /** A sound from the sounds library, under the same rules as for reels. */
+    soundId: uuid.nullable().optional(),
+    /** The longest it may be, in seconds. Left out, it's as long as the photos and clips need (up to 60). */
+    lengthSeconds: z.number().int().min(RECAP_MIN_SECONDS).max(RECAP_MAX_SECONDS).optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.source !== 'on_this_day' && !v.sourceId) ctx.addIssue({ code: 'custom', message: 'Choose a memory or chapter.', path: ['sourceId'] });
+  });
+export type CreateRecapInput = z.input<typeof createRecapSchema>;

@@ -115,6 +115,14 @@ export default function ChapterScreen() {
           {owner ? (
             <>
               <Button variant="secondary" label={t('m.chapters.edit')} onPress={() => router.push(`/chapter-edit?id=${chapter.id}`)} />
+              {stories.length && !sealed ? (
+                <Button
+                  variant="secondary"
+                  icon="film-outline"
+                  label={t('m.recap.make')}
+                  onPress={() => router.push({ pathname: '/recap-new', params: { source: 'chapter', sourceId: chapter.id } })}
+                />
+              ) : null}
               {chapter.canAdd ? (
                 <Button variant="secondary" icon="people-outline" label={t('m.chapters.invite')} onPress={() => setInviting((v) => !v)} />
               ) : null}

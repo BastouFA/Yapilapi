@@ -50,6 +50,13 @@ export default function Settings() {
         end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
         onPress={() => router.push('/archive')}
       />
+      <Row
+        title={t('m.recap.title')}
+        subtitle={t('m.recap.manage')}
+        start={<Icon name="film-outline" size={18} color={c.inkMuted} />}
+        end={<Icon name="chevron-forward" size={18} color={c.inkMuted} directional />}
+        onPress={() => router.push('/recaps')}
+      />
       <Sharing />
       <Tagging />
       <VerificationCard />

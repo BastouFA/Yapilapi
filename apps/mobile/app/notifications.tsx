@@ -27,6 +27,8 @@ const TEXT: Record<string, MessageKey> = {
 /** Kinds about your own account or content, with no one else in them. */
 const OWN_TEXT: Record<string, MessageKey> = {
   scheduled_post_failed: 'm.notif.scheduledFailed',
+  recap_ready: 'm.notif.recapReady',
+  recap_failed: 'm.notif.recapFailed',
 };
 
 type Answer = 'accepted' | 'declined';
@@ -114,7 +116,7 @@ export default function Notifications() {
         const board = typeof n.data.name === 'string' ? n.data.name : '';
         const own = OWN_TEXT[n.type];
         const text = own
-          ? t(own)
+          ? t(own, { title: typeof n.data.title === 'string' ? n.data.title : '' })
           : n.type === 'board_invite' && n.actor
             ? t('m.notif.boardInvite', { name, board })
             : n.type === 'board_item_added' && n.actor
@@ -131,9 +133,11 @@ export default function Notifications() {
               ? `/board/${n.entityId}`
               : n.entityType === 'draft'
                 ? '/drafts'
-                : n.actor
-                  ? `/u/${n.actor.username}`
-                  : null;
+                : n.entityType === 'recap' && n.entityId
+                  ? `/recaps?open=${n.entityId}`
+                  : n.actor
+                    ? `/u/${n.actor.username}`
+                    : null;
         const answered = answers[n.id];
         const boardInvite = n.type === 'board_invite';
         const invite = (n.type === 'collab_invite' || boardInvite) && !!n.entityId;
