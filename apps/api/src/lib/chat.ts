@@ -5,6 +5,7 @@ import type { RealtimeHub } from './realtime.ts';
 import type { MediaStorage } from './storage.ts';
 import { endViewOnce } from './view-once.ts';
 import { usersByIds } from './users.ts';
+import { chatPollJobHandlers } from './chat-polls.ts';
 
 type Q = Pool | PoolClient;
 
@@ -43,7 +44,9 @@ export async function messagePreviews(db: Q, ids: string[], readerId: string): P
   const { rows } = await db.query(
     `SELECT m.id, m.sender_id, left(m.body, 200) AS body, m.attachments->0->>'kind' AS attachment_kind, m.created_at, m.deleted_at, m.unsent_at,
             m.moderation_status, m.kind, (m.expires_at IS NOT NULL AND m.expires_at <= now()) AS expired,
-            EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $2 AND b.blocked_id = m.sender_id) AS blocked
+            EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $2 AND b.blocked_id = m.sender_id) AS blocked,
+            CASE WHEN EXISTS (SELECT 1 FROM chat_polls p WHERE p.message_id = m.id) THEN 'poll'
+                 WHEN EXISTS (SELECT 1 FROM chat_lists l WHERE l.message_id = m.id) THEN 'list' END AS rich_kind
      FROM messages m WHERE m.id = ANY($1::uuid[])`,
     [unique, readerId],
   );
@@ -60,7 +63,9 @@ export async function messagePreviews(db: Q, ids: string[], readerId: string): P
     const base = { id: r.id, available: true, sender: users.get(r.sender_id) ?? null, createdAt: r.created_at.toISOString() };
     out.set(
       r.id,
-      r.unsent_at ? { ...base, unsent: true, body: '', attachmentKind: null } : { ...base, body: r.body, attachmentKind: r.attachment_kind ?? null },
+      r.unsent_at
+        ? { ...base, unsent: true, body: '', attachmentKind: null }
+        : { ...base, body: r.body, attachmentKind: r.attachment_kind ?? null, ...(r.rich_kind ? { kind: r.rich_kind } : {}) },
     );
   }
   return out;
@@ -162,11 +167,13 @@ export async function expireMessages(deps: ChatDeps, limit = 200): Promise<numbe
   return n;
 }
 
-export function chatJobHandlers(deps: ChatDeps) {
+export function chatJobHandlers(deps: ChatDeps & { realtime: RealtimeHub }) {
   return {
-    /** Queued for each disappearing message at its expiry; deletes every message that is due. */
+    /** Queued for each disappearing message at its expiry; deletes every message that is due (with its poll or list). */
     'messages.expire': async () => {
       await expireMessages(deps);
     },
+    // Polls that end at a set time, and reminders.
+    ...chatPollJobHandlers(deps),
   };
 }

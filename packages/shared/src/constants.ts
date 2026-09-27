@@ -192,6 +192,19 @@ export const MAX_PINNED_MESSAGES = 3;
 /** Disappearing messages: 24 hours, 7 days or 90 days (off is null). */
 export const DISAPPEARING_SECONDS = [86_400, 604_800, 7_776_000] as const;
 export type DisappearingSeconds = (typeof DISAPPEARING_SECONDS)[number];
+/** Chat polls: 2 to 10 options, a question of up to 200 characters, options of up to 80. They can end up to 30 days after they start. */
+export const CHAT_POLL_MIN_OPTIONS = 2;
+export const CHAT_POLL_MAX_OPTIONS = 10;
+export const CHAT_POLL_QUESTION_MAX = 200;
+export const CHAT_POLL_OPTION_MAX = 80;
+export const CHAT_POLL_MAX_DAYS = 30;
+/** Shared lists (checklists) in chats: up to 100 items of up to 200 characters, under a title of up to 80. */
+export const CHAT_LIST_MAX_ITEMS = 100;
+export const CHAT_LIST_TITLE_MAX = 80;
+export const CHAT_LIST_ITEM_MAX = 200;
+/** Reminders on chat messages: at least a minute and at most a year ahead, up to 100 waiting per person. */
+export const CHAT_REMINDER_MAX_DAYS = 365;
+export const CHAT_REMINDER_MAX_PENDING = 100;
 /**
  * Saved posts and boards. A board is private (only you), shared (you and the
  * collaborators you invite) or public (also on your profile). People under 18

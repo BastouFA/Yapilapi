@@ -38,6 +38,8 @@ import { canSeeStory, storyCards } from '../lib/stories.ts';
 import { nowStatusesFor } from '../lib/now-status.ts';
 import { mediaIdsOf, messagePreviews, messageVisibleSql, reactionSummaries, revokeChatMedia } from '../lib/chat.ts';
 import { langOf } from '../lib/translation.ts';
+import { listsFor, myReminders, pollsFor } from '../lib/chat-polls.ts';
+import { registerChatPollsLists } from './chat-polls-lists.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 
@@ -353,20 +355,31 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
   }
 
   async function decorate(items: Message[], reader: string): Promise<Message[]> {
+    // A "Remind the group" line quotes the message it's about, as this reader sees it.
+    const remindedOf = (m: Message) => (m.system?.type === 'reminder' ? m.system.messageId : null);
     const previews = await messagePreviews(
       db,
-      items.flatMap((m) => (m.replyToId ? [m.replyToId] : [])),
+      items.flatMap((m) => [m.replyToId, remindedOf(m)].filter((x): x is string => !!x)),
       reader,
     );
-    const reactions = await reactionSummaries(
-      db,
-      items.map((m) => m.id),
-      reader,
-    );
+    const ids = items.map((m) => m.id);
+    const reactions = await reactionSummaries(db, ids, reader);
+    // Polls and shared lists (an unsent one has none left), and your own "Remind me".
+    const live = items.filter((m) => !m.unsent && m.kind !== 'system').map((m) => m.id);
+    const polls = await pollsFor(db, live, [reader]);
+    const lists = await listsFor(db, live, [reader]);
+    const reminders = await myReminders(db, live, reader);
     return items.map((m) => {
       const out: Message = { ...m };
       if (m.replyToId) out.replyTo = previews.get(m.replyToId) ?? null;
       if (reactions.has(m.id)) out.reactions = reactions.get(m.id);
+      const poll = polls(m.id, reader);
+      if (poll) out.poll = poll;
+      const list = lists(m.id, reader);
+      if (list) out.list = list;
+      if (reminders.has(m.id)) out.reminder = reminders.get(m.id);
+      const reminded = remindedOf(m);
+      if (reminded && m.system?.type === 'reminder') out.system = { ...m.system, message: previews.get(reminded) ?? null };
       // An unsent view-once message has nothing left to open.
       if (m.unsent) delete out.viewOnce;
       return out;
@@ -390,7 +403,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const m = (
       await db.query(
         `SELECT id, conversation_id, sender_id, kind, body, attachments, story_id, view_once, created_at, deleted_at, unsent_at, moderation_status, expires_at,
-                (created_at > now() - make_interval(mins => $2)) AS editable
+                (created_at > now() - make_interval(mins => $2)) AS editable,
+                EXISTS (SELECT 1 FROM chat_polls p WHERE p.message_id = messages.id) OR EXISTS (SELECT 1 FROM chat_lists l WHERE l.message_id = messages.id) AS rich
          FROM messages WHERE id = $1`,
         [messageId, MESSAGE_EDIT_MINUTES],
       )
@@ -648,7 +662,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const { body } = parse(editMessageSchema, req.body);
     const m = await messageFor(id, u.id, { ownOnly: 'Only the person who sent a message can edit it.' });
     if (m.deleted_at) throw notFound('Message');
-    if (m.kind !== 'message' || m.view_once) throw new AppError(400, 'not_editable', 'Only text messages can be edited.');
+    // A poll's question and a list's title are part of what people answered, so they stay as they are.
+    if (m.kind !== 'message' || m.view_once || m.rich) throw new AppError(400, 'not_editable', 'Only text messages can be edited.');
     if (!m.editable) throw new AppError(403, 'edit_window_closed', `Messages can be edited for ${MESSAGE_EDIT_MINUTES} minutes after sending.`);
     if (!body && !(m.attachments ?? []).length && !m.story_id) throw badRequest('Write a message. To remove it, unsend it instead.');
     if (body !== m.body) {
@@ -696,6 +711,10 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       if (!r.rowCount) return null;
       await c.query(`DELETE FROM message_edits WHERE message_id = $1`, [messageId]);
       await c.query(`DELETE FROM message_reactions WHERE message_id = $1`, [messageId]);
+      // A poll or list goes with it (votes and items too), and nobody gets reminded about it.
+      await c.query(`DELETE FROM chat_polls WHERE message_id = $1`, [messageId]);
+      await c.query(`DELETE FROM chat_lists WHERE message_id = $1`, [messageId]);
+      await c.query(`DELETE FROM chat_reminders WHERE message_id = $1 AND sent_at IS NULL`, [messageId]);
       return (await c.query(`DELETE FROM conversation_pins WHERE message_id = $1`, [messageId])).rowCount ?? 0;
     });
     if (pinsRemoved === null) return; // already unsent or deleted
@@ -726,6 +745,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const { id } = parse(idParam, req.params);
     const m = await messageFor(id, u.id);
     await db.query(`INSERT INTO message_hides (message_id, user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [id, u.id]);
+    // Your reminders about it go too.
+    await db.query(`DELETE FROM chat_reminders WHERE message_id = $1 AND user_id = $2 AND sent_at IS NULL`, [id, u.id]);
     // Your other devices drop it too.
     await ctx.realtime.publish([u.id], { type: 'message.hidden', data: { id, conversationId: m.conversation_id } });
     return { ok: true };
@@ -1042,6 +1063,17 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     await assertMember(id, me(req).id);
     const { rows } = await db.query(`SELECT id, title, details, status, created_at FROM plans WHERE conversation_id = $1 ORDER BY created_at DESC`, [id]);
     return { items: rows };
+  });
+
+  // Polls, shared lists and reminders (modules/chat-polls-lists.ts).
+  registerChatPollsLists(app, ctx, {
+    assertMember,
+    memberIds,
+    notBlocking,
+    assertCanMessage,
+    assertGroupSafe,
+    messageFor: (messageId, userId) => messageFor(messageId, userId),
+    loadMessage,
   });
 
   // ── Realtime socket ───────────────────────────────────────────────────

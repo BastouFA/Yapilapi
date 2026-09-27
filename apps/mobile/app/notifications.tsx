@@ -30,6 +30,7 @@ const OWN_TEXT: Record<string, MessageKey> = {
   scheduled_post_failed: 'm.notif.scheduledFailed',
   recap_ready: 'm.notif.recapReady',
   recap_failed: 'm.notif.recapFailed',
+  chat_reminder: 'm.notif.chatReminder',
 };
 
 type Answer = 'accepted' | 'declined';
@@ -134,13 +135,15 @@ export default function Notifications() {
               ? `/board/${n.entityId}`
               : n.entityType === 'room' && n.entityId
                 ? `/room/${n.entityId}`
-                : n.entityType === 'draft'
-                  ? '/drafts'
-                  : n.entityType === 'recap' && n.entityId
-                    ? `/recaps?open=${n.entityId}`
-                    : n.actor
-                      ? `/u/${n.actor.username}`
-                      : null;
+                : n.entityType === 'conversation' && n.entityId
+                  ? `/chat/${n.entityId}`
+                  : n.entityType === 'draft'
+                    ? '/drafts'
+                    : n.entityType === 'recap' && n.entityId
+                      ? `/recaps?open=${n.entityId}`
+                      : n.actor
+                        ? `/u/${n.actor.username}`
+                        : null;
         const answered = answers[n.id];
         const boardInvite = n.type === 'board_invite';
         const invite = (n.type === 'collab_invite' || boardInvite) && !!n.entityId;

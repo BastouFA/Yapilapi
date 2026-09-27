@@ -49,6 +49,9 @@ import type {
   ConversationYaps,
   PinnedMessage,
   ViewOnceInfo,
+  ChatList,
+  ChatPoll,
+  ChatReminder,
   StickerResults,
   StoryCard,
   StoryMusic,
@@ -512,6 +515,24 @@ export function createClient(opts: ClientOptions) {
       /** "Let Yaps play out loud" here; null goes back to the default (on for yaps from friends). */
       setYaps: (id: string, playOutLoud: boolean | null) => put<{ yaps: ConversationYaps }>(`/v1/conversations/${id}/yaps`, { playOutLoud }),
       read: (id: string) => post(`/v1/conversations/${id}/read`),
+      /** A poll: 2 to 10 options; one choice unless `multiple`; `endsAt` from 5 minutes to 30 days ahead. */
+      createPoll: (
+        id: string,
+        input: {
+          question: string;
+          options: string[];
+          multiple?: boolean;
+          anonymous?: boolean;
+          allowAddOptions?: boolean;
+          endsAt?: string | null;
+          clientId?: string;
+        },
+      ) => post<{ message: Message }>(`/v1/conversations/${id}/polls`, input),
+      /** A shared list (checklist) with its first items, up to 100. */
+      createList: (id: string, input: { title: string; items?: string[]; clientId?: string }) =>
+        post<{ message: Message }>(`/v1/conversations/${id}/lists`, input),
+      /** Your reminders waiting in this chat. */
+      reminders: (id: string) => get<{ items: ChatReminder[] }>(`/v1/conversations/${id}/reminders`),
       createPlan: (id: string, title: string, details: Record<string, unknown>) => post(`/v1/conversations/${id}/plans`, { title, details }),
       plans: (id: string) => get<{ items: { id: string; title: string; details: Record<string, unknown>; status: string }[] }>(`/v1/conversations/${id}/plans`),
     },
@@ -526,6 +547,20 @@ export function createClient(opts: ClientOptions) {
       unreact: (id: string, emoji: string) => del<{ ok: true }>(`/v1/messages/${id}/reactions/${encodeURIComponent(emoji)}`),
       pin: (id: string) => put<{ items: PinnedMessage[] }>(`/v1/messages/${id}/pin`),
       unpin: (id: string) => del<{ items: PinnedMessage[] }>(`/v1/messages/${id}/pin`),
+      /** Vote, change your vote, or take it back (an empty list). */
+      vote: (id: string, optionIds: string[]) => put<{ poll: ChatPoll | null }>(`/v1/messages/${id}/poll/vote`, { optionIds }),
+      addPollOption: (id: string, text: string) => post<{ poll: ChatPoll | null }>(`/v1/messages/${id}/poll/options`, { text }),
+      /** End the poll now (the person who made it). */
+      endPoll: (id: string) => post<{ poll: ChatPoll | null }>(`/v1/messages/${id}/poll/end`),
+      addListItem: (id: string, text: string) => post<{ list: ChatList | null }>(`/v1/messages/${id}/list/items`, { text }),
+      /** Tick an item off, or back on. */
+      tickListItem: (id: string, itemId: string, done: boolean) => patch<{ list: ChatList | null }>(`/v1/messages/${id}/list/items/${itemId}`, { done }),
+      removeListItem: (id: string, itemId: string) => del<{ list: ChatList | null }>(`/v1/messages/${id}/list/items/${itemId}`),
+      /** Every item, in the new order. */
+      reorderList: (id: string, itemIds: string[]) => put<{ list: ChatList | null }>(`/v1/messages/${id}/list/order`, { itemIds }),
+      /** "Remind me" at a time (just you), or "Remind the group" (group admins). */
+      remind: (id: string, at: string, scope: 'me' | 'group' = 'me') => post<{ reminder: ChatReminder }>(`/v1/messages/${id}/reminders`, { at, scope }),
+      cancelReminder: (reminderId: string) => del<{ ok: true }>(`/v1/reminders/${reminderId}`),
     },
     yaps: {
       /** "Pause Yaps" everywhere. */

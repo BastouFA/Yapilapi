@@ -27,6 +27,7 @@ import {
   ReactionRow,
   SystemLine,
 } from '@/components/ChatExtras';
+import { ListSheet, ListView, PollSheet, PollView, ReminderNote, ReminderSheet } from '@/components/ChatPolls';
 
 type Pending = Message & { pending?: boolean };
 
@@ -53,6 +54,9 @@ export default function ChatPage() {
   const [jump, setJump] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<string | null>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
+  const [pollOpen, setPollOpen] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
+  const [remindFor, setRemindFor] = useState<{ message: Message; scope: 'me' | 'group' } | null>(null);
 
   const loadPins = () =>
     api.conversations.pins(id).then(
@@ -60,6 +64,7 @@ export default function ChatPage() {
       () => {},
     );
   const patchMessage = (messageId: string, fn: (m: Pending) => Pending) => setMessages((cur) => cur?.map((x) => (x.id === messageId ? fn(x) : x)) ?? cur);
+  const addMessage = (m: Message) => setMessages((cur) => (cur?.some((x) => x.id === m.id) ? cur : [...(cur ?? []), m]));
 
   useEffect(() => {
     api.conversations.get(id).then(
@@ -167,7 +172,18 @@ export default function ChatPage() {
       );
     }
     if (e.type === 'message.unsent' && e.data.conversationId === id) {
-      patchMessage(e.data.id, (x) => ({ ...x, unsent: true, body: '', attachments: [], reactions: undefined, viewOnce: undefined, story: undefined }));
+      patchMessage(e.data.id, (x) => ({
+        ...x,
+        unsent: true,
+        body: '',
+        attachments: [],
+        reactions: undefined,
+        viewOnce: undefined,
+        story: undefined,
+        poll: undefined,
+        list: undefined,
+        reminder: undefined,
+      }));
       setMessages(
         (cur) =>
           cur?.map((x) => (x.replyTo && x.replyTo.id === e.data.id ? { ...x, replyTo: { ...x.replyTo, unsent: true, body: '', attachmentKind: null } } : x)) ??
@@ -180,6 +196,10 @@ export default function ChatPage() {
     if (e.type === 'message.reaction' && e.data.conversationId === id && e.data.userId !== me?.id)
       patchMessage(e.data.id, (x) => applyReaction(x, e.data.emoji, false, !!e.data.removed));
     if (e.type === 'conversation.pins' && e.data.conversationId === id) void loadPins();
+    // Live poll results and list changes, each as you see them; your next reminder on a message.
+    if (e.type === 'poll.updated' && e.data.conversationId === id) patchMessage(e.data.id, (x) => (x.unsent ? x : { ...x, poll: e.data.poll }));
+    if (e.type === 'list.updated' && e.data.conversationId === id) patchMessage(e.data.id, (x) => (x.unsent ? x : { ...x, list: e.data.list }));
+    if (e.type === 'message.reminder' && e.data.conversationId === id) patchMessage(e.data.id, (x) => ({ ...x, reminder: e.data.reminder ?? undefined }));
     if (e.type === 'conversation.updated' && e.data.id === id) setConv((c) => (c ? { ...c, disappearingSeconds: e.data.disappearingSeconds } : c));
     // Someone opened a view-once photo you sent, or its file was deleted.
     if (e.type === 'view_once.updated' && e.data.conversationId === id)
@@ -348,7 +368,15 @@ export default function ChatPage() {
 
   /** What you can do with one message, from its menu. */
   function actionsFor(m: Pending, mine: boolean): MenuAction[] {
-    const editable = mine && !m.kind && !m.viewOnce && !m.unsent && !m.pending && Date.now() - new Date(m.createdAt).getTime() < MESSAGE_EDIT_MINUTES * 60_000;
+    const editable =
+      mine &&
+      !m.kind &&
+      !m.viewOnce &&
+      !m.poll &&
+      !m.list &&
+      !m.unsent &&
+      !m.pending &&
+      Date.now() - new Date(m.createdAt).getTime() < MESSAGE_EDIT_MINUTES * 60_000;
     const pinned = pinnedIds.has(m.id);
     const actions: MenuAction[] = [];
     if (!m.unsent) {
@@ -362,6 +390,25 @@ export default function ChatPage() {
           ? { label: t('m.chat.unpin'), icon: 'map-pin', onSelect: () => void run(async () => setPins((await api.messages.unpin(m.id)).items)) }
           : { label: t('m.chat.pin'), icon: 'map-pin', onSelect: () => void run(async () => setPins((await api.messages.pin(m.id)).items)) },
       );
+    if (!m.unsent && !m.pending && !m.moderation) {
+      const reminder = m.reminder;
+      actions.push(
+        reminder
+          ? {
+              label: t('m.chat.remind.cancel'),
+              icon: 'bell',
+              onSelect: () =>
+                void run(async () => {
+                  await api.messages.cancelReminder(reminder.id);
+                  patchMessage(m.id, (x) => ({ ...x, reminder: undefined }));
+                  toast(t('m.chat.remind.cancelled'));
+                }),
+            }
+          : { label: t('m.chat.remind.me'), icon: 'bell', onSelect: () => setRemindFor({ message: m, scope: 'me' }) },
+      );
+      if (conv?.kind === 'group' && conv.myRole === 'admin')
+        actions.push({ label: t('m.chat.remind.group'), icon: 'users', onSelect: () => setRemindFor({ message: m, scope: 'group' }) });
+    }
     if (!mine && !m.unsent) actions.push({ label: t('post.report'), icon: 'flag', onSelect: () => setReportId(m.id) });
     actions.push({
       label: t('m.chat.deleteForMe'),
@@ -504,7 +551,7 @@ export default function ChatPage() {
               return (
                 <div key={m.id} id={`msg-${m.id}`} style={{ display: 'contents' }}>
                   {showDay ? <div className="yp-chat__day">{day}</div> : null}
-                  <SystemLine message={m} meId={me?.id} />
+                  <SystemLine message={m} meId={me?.id} onJump={(mid) => void jumpTo(mid)} />
                 </div>
               );
             const time = new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(m.createdAt));
@@ -512,6 +559,10 @@ export default function ChatPage() {
             const text = m.body ? <TranslatableText kind="message" id={m.id} text={m.body} lang={m.lang} own={mine || !!m.pending} locale={locale} /> : null;
             const content = m.unsent ? (
               <span className="chat-unsent">{mine ? t('m.chat.unsentMine') : t('m.chat.unsent')}</span>
+            ) : m.poll ? (
+              <PollView message={m} meId={me?.id} mine={mine} onPoll={(poll) => patchMessage(m.id, (x) => ({ ...x, poll }))} />
+            ) : m.list ? (
+              <ListView message={m} meId={me?.id} mine={mine} onList={(list) => patchMessage(m.id, (x) => ({ ...x, list }))} />
             ) : m.viewOnce ? (
               <>
                 <ViewOnceMessage message={m} mine={mine} onChange={(next) => setMessages((cur) => cur?.map((x) => (x.id === next.id ? next : x)) ?? cur)} />
@@ -589,6 +640,7 @@ export default function ChatPage() {
                   ) : null}
                   <ReactionRow message={m} mine={mine} onToggle={(emoji, on) => void react(m, emoji, on)} />
                   {m.moderation === 'review' ? <span className="chat-held">{t('m.chat.held')}</span> : null}
+                  {m.reminder && !m.unsent ? <ReminderNote at={m.reminder.remindAt} /> : null}
                 </div>
               </div>
             );
@@ -635,6 +687,7 @@ export default function ChatPage() {
                     body: replyTo.body,
                     attachmentKind: replyTo.attachments[0]?.kind ?? replyTo.viewOnce?.kind ?? null,
                     createdAt: replyTo.createdAt,
+                    ...(replyTo.poll ? { kind: 'poll' as const } : replyTo.list ? { kind: 'list' as const } : {}),
                   })}
                 </span>
               ) : null}
@@ -674,6 +727,14 @@ export default function ChatPage() {
             e.currentTarget.value = '';
             if (f) void sendFile(f, t('chat.sendingViewOnce'), { viewOnce: true });
           }}
+        />
+        <Menu
+          label={t('m.chat.addMenu')}
+          icon="plus"
+          actions={[
+            { label: t('m.chat.poll.new'), icon: 'poll', onSelect: () => setPollOpen(true) },
+            { label: t('m.chat.list.new'), icon: 'check-circle', onSelect: () => setListOpen(true) },
+          ]}
         />
         <button type="button" className="yp-action" aria-label={t('m.chat.sendPhoto')} disabled={!!uploading} onClick={() => fileInput.current?.click()}>
           <Icon name="image" />
@@ -719,6 +780,18 @@ export default function ChatPage() {
         </Button>
       </form>
       <ReportSheet target={reportId ? { type: 'message', id: reportId } : null} onClose={() => setReportId(null)} />
+      <PollSheet open={pollOpen} onClose={() => setPollOpen(false)} conversationId={id} onSent={addMessage} />
+      <ListSheet open={listOpen} onClose={() => setListOpen(false)} conversationId={id} onSent={addMessage} />
+      <ReminderSheet
+        message={remindFor?.message ?? null}
+        scope={remindFor?.scope ?? 'me'}
+        onClose={() => setRemindFor(null)}
+        onSet={(r) => {
+          // Your own reminder shows on the message (the earliest one); the group's shows as a line at its time.
+          if (r.scope === 'me')
+            patchMessage(r.messageId, (x) => (x.reminder && x.reminder.remindAt <= r.remindAt ? x : { ...x, reminder: { id: r.id, remindAt: r.remindAt } }));
+        }}
+      />
       <DisappearingSheet
         open={disappearingOpen}
         onClose={() => setDisappearingOpen(false)}
