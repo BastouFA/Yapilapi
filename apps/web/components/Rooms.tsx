@@ -287,6 +287,8 @@ export function RoomsProvider({ children }: { children: React.ReactNode }) {
       if (!r) return false;
       try {
         await fn(r.id);
+        // Show the result straight away, even if the live connection missed the update.
+        void heartbeat.current();
         return true;
       } catch (e) {
         toast(errorMessage(e));
