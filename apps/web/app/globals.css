@@ -4833,3 +4833,27 @@ button.yp-chip[aria-pressed='true'] {
 .save-pick__new {
   flex: 1;
 }
+
+/* Phones: the chat composer's text box keeps most of the row. Send shows only its icon
+   (it keeps its accessible name), and the attach, view-once and voice buttons tighten up. */
+@media (max-width: 520px) {
+  .yp-composer {
+    gap: 2px;
+    padding-inline-start: var(--space-2);
+  }
+  .yp-composer > .yp-action {
+    width: 36px;
+    min-width: 36px;
+  }
+  .yp-composer > .yp-btn {
+    padding-inline: 12px;
+  }
+  .chat-send__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}

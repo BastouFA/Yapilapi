@@ -652,7 +652,7 @@ export default function ChatPage() {
           }}
         />
         <Button type="submit" icon={editing ? 'check' : 'send'} disabled={!body.trim()} aria-label={editing ? 'Save edit' : t('inbox.send')}>
-          {editing ? 'Save' : t('inbox.send')}
+          <span className="chat-send__label">{editing ? 'Save' : t('inbox.send')}</span>
         </Button>
       </form>
       <ReportSheet target={reportId ? { type: 'message', id: reportId } : null} onClose={() => setReportId(null)} />
