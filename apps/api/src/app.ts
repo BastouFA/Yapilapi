@@ -73,6 +73,7 @@ import { editorJobHandlers } from './lib/media-edit.ts';
 import { liveRecordingJobHandlers } from './lib/live-recording.ts';
 import { shareVideoJobHandlers } from './lib/share-video.ts';
 import { sweepViewOnce, viewOnceJobHandlers } from './lib/view-once.ts';
+import { chatJobHandlers, expireMessages } from './lib/chat.ts';
 import { fastifyTracingPlugin, traceLogMixin } from './lib/tracing.ts';
 import { endExpiredCampaigns } from './lib/boosts.ts';
 import { sendCountdownReminders } from './lib/stories.ts';
@@ -382,6 +383,7 @@ export async function buildApp(
     ...liveRecordingJobHandlers({ db, storage, recordingsDir: config.LIVE_RECORDINGS_DIR }),
     ...shareVideoJobHandlers({ db, storage }),
     ...viewOnceJobHandlers(viewOnceDeps),
+    ...chatJobHandlers(viewOnceDeps),
   };
   if (opts.webhookWorker ?? config.APP_ENV !== 'test') {
     let busy = false;
@@ -397,6 +399,8 @@ export async function buildApp(
       if (Date.now() - lastViewOnceSweep > 60_000) {
         lastViewOnceSweep = Date.now();
         await sweepViewOnce(viewOnceDeps).catch((e) => app.log.warn({ err: e.message }, 'view-once sweep'));
+        // Disappearing messages past their time (each also has its own job; this catches any that were missed).
+        await expireMessages(viewOnceDeps).catch((e) => app.log.warn({ err: e.message }, 'disappearing messages'));
       }
       // Story countdowns that ended: remind the people who asked.
       await sendCountdownReminders(db, ctx.realtime).catch((e) => app.log.warn({ err: e.message }, 'countdown reminders'));

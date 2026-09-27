@@ -161,3 +161,11 @@ export const CHAPTER_GRADIENT_NAMES = Object.keys(CHAPTER_GRADIENTS) as ChapterG
 /** Cover symbols: plain line icons, never emoji. Each app maps them to its own icon set. */
 export const CHAPTER_SYMBOLS = ['star', 'sparkle', 'heart', 'music', 'globe', 'calendar', 'compass', 'home', 'bookmark', 'image'] as const;
 export type ChapterSymbol = (typeof CHAPTER_SYMBOLS)[number];
+
+/** Chats: how long after sending a message its text can be edited. */
+export const MESSAGE_EDIT_MINUTES = 15;
+/** Chats: pinned messages per conversation. */
+export const MAX_PINNED_MESSAGES = 3;
+/** Disappearing messages: 24 hours, 7 days or 90 days (off is null). */
+export const DISAPPEARING_SECONDS = [86_400, 604_800, 7_776_000] as const;
+export type DisappearingSeconds = (typeof DISAPPEARING_SECONDS)[number];

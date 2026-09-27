@@ -217,6 +217,45 @@ export interface Conversation {
   updatedAt: string;
   /** Yaps in this chat, for you. */
   yaps?: ConversationYaps;
+  /** Disappearing messages: seconds until new messages are deleted (86400, 604800 or 7776000), or null when off. */
+  disappearingSeconds?: number | null;
+  /** Your role here. In groups, admins pin messages and change disappearing messages. */
+  myRole?: 'admin' | 'member';
+}
+
+/** The message a reply quotes, or a pinned message, as a short preview. */
+export interface MessagePreview {
+  id: string;
+  /** False when you can't see it (it was removed, disappeared, or you blocked the sender). */
+  available: boolean;
+  /** The sender unsent it. */
+  unsent?: boolean;
+  sender: PublicUser | null;
+  /** Up to 200 characters. */
+  body: string;
+  /** The first attachment's kind ('image', 'video', 'audio'), for "Photo" or "Voice message". */
+  attachmentKind: string | null;
+  createdAt: string | null;
+}
+
+export interface PinnedMessage {
+  message: MessagePreview;
+  pinnedBy: PublicUser | null;
+  pinnedAt: string;
+}
+
+export interface MessageReaction {
+  emoji: string;
+  count: number;
+  /** You reacted with this. */
+  mine: boolean;
+}
+
+/** What a system line in a chat says. */
+export interface MessageSystemInfo {
+  type: 'disappearing';
+  /** The new setting: seconds, or null when turned off. */
+  seconds: number | null;
 }
 
 export interface ConversationYaps {
@@ -277,10 +316,23 @@ export interface Message {
   story?: StoryCard | null;
   createdAt: string;
   clientId?: string | null;
-  /** 'yap' for a hold-to-talk voice clip; absent for other messages. */
-  kind?: 'yap';
+  /** 'yap' for a hold-to-talk voice clip, 'system' for a line about a change in the chat (see `system`); absent for other messages. */
+  kind?: 'yap' | 'system';
   /** Present on view-once messages. Their attachment has no url: open it with POST /v1/messages/:id/view-once/open. */
   viewOnce?: ViewOnceInfo;
+  /** The message this one replies to. */
+  replyTo?: MessagePreview | null;
+  /** When the text was last edited. */
+  editedAt?: string | null;
+  /** The sender unsent it: body and attachments are empty, show "Message unsent". */
+  unsent?: boolean;
+  /** Disappearing messages: when it will be deleted. */
+  expiresAt?: string | null;
+  reactions?: MessageReaction[];
+  /** Pinned in this conversation. */
+  pinned?: boolean;
+  /** On system lines: what changed (the sender is who changed it). */
+  system?: MessageSystemInfo;
 }
 
 export interface Community {

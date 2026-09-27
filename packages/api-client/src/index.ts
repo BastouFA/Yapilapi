@@ -23,6 +23,7 @@ import type {
   EditorParamsInput,
   TagPermission,
   ConversationYaps,
+  PinnedMessage,
   ViewOnceInfo,
   StickerResults,
   StoryCard,
@@ -369,13 +370,32 @@ export function createClient(opts: ClientOptions) {
         body: string,
         clientId?: string,
         attachments: { mediaId: string; name?: string }[] = [],
-        o: { kind?: 'message' | 'yap'; viewOnce?: boolean } = {},
+        o: { kind?: 'message' | 'yap'; viewOnce?: boolean; replyToId?: string } = {},
       ) => post<{ message: Message; notice?: string }>(`/v1/conversations/${id}/messages`, { body, clientId, attachments, ...o }),
+      /** Text search in this chat (messages you can see, since you joined), newest first. */
+      search: (id: string, q: string, cursor?: string) => get<Page<Message>>(`/v1/conversations/${id}/search${qs({ q, cursor })}`),
+      /** Pinned messages (up to 3). */
+      pins: (id: string) => get<{ items: PinnedMessage[]; max: number }>(`/v1/conversations/${id}/pins`),
+      /** Disappearing messages: 86400, 604800 or 7776000 seconds, or null for off. */
+      setDisappearing: (id: string, seconds: number | null) =>
+        put<{ disappearingSeconds: number | null; message: Message | null }>(`/v1/conversations/${id}/disappearing`, { seconds }),
       /** "Let Yaps play out loud" here; null goes back to the default (on for yaps from friends). */
       setYaps: (id: string, playOutLoud: boolean | null) => put<{ yaps: ConversationYaps }>(`/v1/conversations/${id}/yaps`, { playOutLoud }),
       read: (id: string) => post(`/v1/conversations/${id}/read`),
       createPlan: (id: string, title: string, details: Record<string, unknown>) => post(`/v1/conversations/${id}/plans`, { title, details }),
       plans: (id: string) => get<{ items: { id: string; title: string; details: Record<string, unknown>; status: string }[] }>(`/v1/conversations/${id}/plans`),
+    },
+    messages: {
+      /** Edit your own message's text, within 15 minutes of sending it. */
+      edit: (id: string, body: string) => patch<{ message: Message }>(`/v1/messages/${id}`, { body }),
+      /** Unsend for everyone: a "Message unsent" line stays in its place. */
+      unsend: (id: string) => post<{ message: Message | null }>(`/v1/messages/${id}/unsend`),
+      /** Delete for me: gone from your view of the chat only. */
+      deleteForMe: (id: string) => post<{ ok: true }>(`/v1/messages/${id}/delete-for-me`),
+      react: (id: string, emoji: string) => put<{ ok: true }>(`/v1/messages/${id}/reactions/${encodeURIComponent(emoji)}`),
+      unreact: (id: string, emoji: string) => del<{ ok: true }>(`/v1/messages/${id}/reactions/${encodeURIComponent(emoji)}`),
+      pin: (id: string) => put<{ items: PinnedMessage[] }>(`/v1/messages/${id}/pin`),
+      unpin: (id: string) => del<{ items: PinnedMessage[] }>(`/v1/messages/${id}/pin`),
     },
     yaps: {
       /** "Pause Yaps" everywhere. */

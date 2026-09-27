@@ -3,11 +3,17 @@ import { tx } from '@yapilapi/database';
 import {
   conversationYapsSchema,
   createConversationSchema,
+  disappearingSchema,
+  editMessageSchema,
+  MAX_PINNED_MESSAGES,
+  MESSAGE_EDIT_MINUTES,
+  messageSearchSchema,
   pageQuerySchema,
   sendMessageSchema,
   yapSettingsSchema,
   type Conversation,
   type Message,
+  type PinnedMessage,
   type YapEvent,
 } from '@yapilapi/shared';
 import { z } from 'zod';
@@ -28,8 +34,25 @@ import { requireVerified } from '../lib/verification.ts';
 import { me, requireAuth, resolveSession, sessionTokenOf } from '../plugins/auth.ts';
 import { issueTicket, readTicket } from '../lib/realtime-ticket.ts';
 import { canSeeStory, storyCards } from '../lib/stories.ts';
+import { mediaIdsOf, messagePreviews, reactionSummaries, revokeChatMedia } from '../lib/chat.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
+
+const MESSAGE_COLS = `m.id, m.conversation_id, m.body, m.reply_to_id, m.attachments, m.created_at, m.client_id, m.moderation_status, m.kind, m.story_id,
+  m.edited_at, m.unsent_at, m.expires_at, m.meta,
+  EXISTS (SELECT 1 FROM conversation_pins p WHERE p.message_id = m.id) AS pinned,
+  pr.user_id AS s_id, pr.username AS s_username, pr.display_name AS s_display_name, pr.avatar_url AS s_avatar_url, pr.mode AS s_mode`;
+
+/**
+ * The messages reader $2 sees (message alias m): not deleted (unsent ones stay as a
+ * placeholder), not past their disappearing time, not held for a check unless their own,
+ * not from someone they blocked, and not deleted just for them.
+ */
+const VISIBLE_TO_READER = `(m.deleted_at IS NULL OR m.unsent_at IS NOT NULL)
+  AND (m.expires_at IS NULL OR m.expires_at > now())
+  AND (m.moderation_status = 'normal' OR (m.moderation_status = 'review' AND m.sender_id = $2))
+  AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $2 AND b.blocked_id = m.sender_id)
+  AND NOT EXISTS (SELECT 1 FROM message_hides h WHERE h.user_id = $2 AND h.message_id = m.id)`;
 
 export default async function messagingModule(app: FastifyInstance, ctx: AppContext) {
   const db = ctx.db;
@@ -128,17 +151,20 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
 
   async function loadConversations(userId: string, ids?: string[]): Promise<Conversation[]> {
     const { rows } = await db.query(
-      `SELECT c.id, c.kind, c.title, c.last_message_at, cm.last_read_at, cm.yaps_out_loud,
+      `SELECT c.id, c.kind, c.title, c.last_message_at, c.disappearing_seconds, cm.last_read_at, cm.yaps_out_loud, cm.role,
          EXISTS (SELECT 1 FROM conversation_members o JOIN friendships f ON f.user_a = LEAST(o.user_id, $1::uuid) AND f.user_b = GREATEST(o.user_id, $1::uuid)
                  WHERE o.conversation_id = c.id AND o.user_id <> $1 AND o.left_at IS NULL) AS has_friend,
          (SELECT count(*) FROM messages m WHERE m.conversation_id = c.id AND m.created_at > cm.last_read_at AND m.sender_id <> $1 AND m.deleted_at IS NULL
-            AND m.moderation_status = 'normal') AS unread,
+            AND m.moderation_status = 'normal' AND m.kind <> 'system') AS unread,
          (SELECT array_agg(user_id) FROM conversation_members WHERE conversation_id = c.id AND left_at IS NULL) AS member_ids,
          lm.id AS lm_id, lm.body AS lm_body, lm.created_at AS lm_created_at, lm.sender_id AS lm_sender, lm.attachments AS lm_attachments, lm.story_id
        FROM conversation_members cm JOIN conversations c ON c.id = cm.conversation_id
-       LEFT JOIN LATERAL (SELECT id, body, created_at, sender_id, attachments, story_id FROM messages
-                          WHERE conversation_id = c.id AND deleted_at IS NULL AND (moderation_status = 'normal' OR (moderation_status = 'review' AND sender_id = $1))
-                          ORDER BY created_at DESC LIMIT 1) lm ON true
+       LEFT JOIN LATERAL (SELECT x.id, x.body, x.created_at, x.sender_id, x.attachments, x.story_id FROM messages x
+                          WHERE x.conversation_id = c.id AND x.deleted_at IS NULL AND x.kind <> 'system'
+                            AND (x.moderation_status = 'normal' OR (x.moderation_status = 'review' AND x.sender_id = $1))
+                            AND (x.expires_at IS NULL OR x.expires_at > now())
+                            AND NOT EXISTS (SELECT 1 FROM message_hides h WHERE h.user_id = $1 AND h.message_id = x.id)
+                          ORDER BY x.created_at DESC LIMIT 1) lm ON true
        WHERE cm.user_id = $1 AND cm.left_at IS NULL ${ids ? 'AND c.id = ANY($2)' : ''}
        ORDER BY c.last_message_at DESC LIMIT 100`,
       ids ? [userId, ids] : [userId],
@@ -179,6 +205,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
         defaultOutLoud: r.kind === 'direct' ? r.has_friend : true,
         paused,
       },
+      disappearingSeconds: r.disappearing_seconds ?? null,
+      myRole: r.role,
     }));
   }
 
@@ -265,23 +293,73 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     await assertMember(id, u.id);
     const c = decodeCursor<KeyCursor>(q.cursor);
     const { rows } = await db.query(
-      `SELECT m.id, m.conversation_id, m.body, m.reply_to_id, m.attachments, m.created_at, m.client_id, m.moderation_status, m.kind, m.story_id,
-              pr.user_id AS s_id, pr.username AS s_username, pr.display_name AS s_display_name, pr.avatar_url AS s_avatar_url, pr.mode AS s_mode
+      `SELECT ${MESSAGE_COLS}
        FROM messages m JOIN profiles pr ON pr.user_id = m.sender_id
-       WHERE m.conversation_id = $1 AND m.deleted_at IS NULL
-         AND (m.moderation_status = 'normal' OR (m.moderation_status = 'review' AND m.sender_id = $2))
-         AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $2 AND b.blocked_id = m.sender_id)
+       WHERE m.conversation_id = $1 AND ${VISIBLE_TO_READER}
          ${c ? 'AND (m.created_at, m.id) < ($4::timestamptz, $5::uuid)' : ''}
        ORDER BY m.created_at DESC, m.id DESC LIMIT $3`,
       c ? [id, u.id, q.limit + 1, c.t, c.id] : [id, u.id, q.limit + 1],
     );
     const page = rows.slice(0, q.limit);
-    const items: Message[] = await withViewOnce(
-      (await withVerdicts((await withStories(page, u.id)).map(toMessage), await isAdultViewer(db, u.id))).reverse(),
-      u.id,
-    );
+    const items = (await present(page, u.id)).reverse();
     return { items, nextCursor: rows.length > q.limit ? keyCursorOf(page.at(-1)!) : null };
   });
+
+  /** Messages as one reader sees them: attachment verdicts, story cards, view once, the quoted reply and reactions. */
+  async function present(rows: Record<string, any>[], reader: string): Promise<Message[]> {
+    const items = await withViewOnce(await withVerdicts((await withStories(rows, reader)).map(toMessage), await isAdultViewer(db, reader)), reader);
+    return decorate(items, reader);
+  }
+
+  async function decorate(items: Message[], reader: string): Promise<Message[]> {
+    const previews = await messagePreviews(
+      db,
+      items.flatMap((m) => (m.replyToId ? [m.replyToId] : [])),
+      reader,
+    );
+    const reactions = await reactionSummaries(
+      db,
+      items.map((m) => m.id),
+      reader,
+    );
+    return items.map((m) => {
+      const out: Message = { ...m };
+      if (m.replyToId) out.replyTo = previews.get(m.replyToId) ?? null;
+      if (reactions.has(m.id)) out.reactions = reactions.get(m.id);
+      // An unsent view-once message has nothing left to open.
+      if (m.unsent) delete out.viewOnce;
+      return out;
+    });
+  }
+
+  /** One message as a member sees it, or null when they can't. */
+  async function loadMessage(messageId: string, reader: string): Promise<Message | null> {
+    const { rows } = await db.query(
+      `SELECT ${MESSAGE_COLS} FROM messages m JOIN profiles pr ON pr.user_id = m.sender_id WHERE m.id = $1 AND ${VISIBLE_TO_READER}`,
+      [messageId, reader],
+    );
+    return rows[0] ? (await present(rows, reader))[0]! : null;
+  }
+
+  /**
+   * A message someone wants to act on. People outside the conversation get "not found"
+   * (nothing is revealed); with `ownOnly`, members who didn't send it get a clear refusal.
+   */
+  async function messageFor(messageId: string, userId: string, o: { ownOnly?: string } = {}) {
+    const m = (
+      await db.query(
+        `SELECT id, conversation_id, sender_id, kind, body, attachments, story_id, view_once, created_at, deleted_at, unsent_at, moderation_status, expires_at,
+                (created_at > now() - make_interval(mins => $2)) AS editable
+         FROM messages WHERE id = $1`,
+        [messageId, MESSAGE_EDIT_MINUTES],
+      )
+    ).rows[0];
+    if (!m || (m.expires_at && m.expires_at <= new Date())) throw notFound('Message');
+    await assertMember(m.conversation_id, userId);
+    if (m.sender_id !== userId && m.moderation_status !== 'normal') throw notFound('Message');
+    if (o.ownOnly && m.sender_id !== userId) throw new AppError(403, 'not_sender', o.ownOnly);
+    return m;
+  }
 
   app.post('/v1/conversations/:id/messages', { preHandler: requireAuth, config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (req, reply) => {
     const u = me(req);
@@ -289,8 +367,16 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const input = parse(sendMessageSchema, req.body);
     await assertMember(id, u.id);
     const members = await memberIds(id);
-    const conv = (await db.query(`SELECT kind FROM conversations WHERE id = $1`, [id])).rows[0];
+    const conv = (await db.query(`SELECT kind, disappearing_seconds FROM conversations WHERE id = $1`, [id])).rows[0];
     const yap = input.kind === 'yap';
+    // A reply quotes a message from this same chat that the sender can see.
+    if (input.replyToId) {
+      const original = await db.query(
+        `SELECT 1 FROM messages m WHERE m.id = $1 AND m.conversation_id = $3 AND m.deleted_at IS NULL AND m.kind <> 'system' AND ${VISIBLE_TO_READER}`,
+        [input.replyToId, u.id, id],
+      );
+      if (!original.rowCount) throw new AppError(400, 'reply_unavailable', 'You can only reply to a message in this chat.');
+    }
     if (yap && input.viewOnce) throw badRequest('A Yap can’t be view once.');
     if (yap) {
       if (conv.kind === 'community' || members.length > YAP_MAX_MEMBERS)
@@ -369,10 +455,10 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       }
       const { rows } = await c
         .query(
-          `INSERT INTO messages (conversation_id, sender_id, body, reply_to_id, attachments, client_id, moderation_status, kind, view_once, view_once_media_id, story_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+          `INSERT INTO messages (conversation_id, sender_id, body, reply_to_id, attachments, client_id, moderation_status, kind, view_once, view_once_media_id, story_id, expires_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now() + make_interval(secs => $12::int))
            ON CONFLICT (sender_id, client_id) WHERE client_id IS NOT NULL DO UPDATE SET client_id = EXCLUDED.client_id
-           RETURNING id, conversation_id, body, reply_to_id, attachments, created_at, client_id, moderation_status, kind, view_once, story_id, (xmax = 0) AS inserted`,
+           RETURNING id, conversation_id, body, reply_to_id, attachments, created_at, client_id, moderation_status, kind, view_once, story_id, expires_at, (xmax = 0) AS inserted`,
           [
             id,
             u.id,
@@ -385,6 +471,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
             input.viewOnce,
             viewOnceMediaId,
             input.storyId ?? null,
+            // Disappearing messages: deleted this long after sending (NULL when off).
+            conv.disappearing_seconds ?? null,
           ],
         )
         .catch((e: { code?: string; constraint?: string }) => {
@@ -394,6 +482,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
         });
       // The file is deleted 14 days after sending at the latest (sooner once everyone has viewed it).
       if (rows[0].view_once && rows[0].inserted) await enqueue(c, 'viewonce.check', { messageId: rows[0].id }, VIEW_ONCE_DAYS * 86_400 + 60);
+      if (rows[0].expires_at && rows[0].inserted) await enqueue(c, 'messages.expire', { messageId: rows[0].id }, conv.disappearing_seconds + 1);
       if (!held) await c.query(`UPDATE conversations SET last_message_at = now() WHERE id = $1`, [id]);
       await c.query(`UPDATE conversation_members SET last_read_at = now() WHERE conversation_id = $1 AND user_id = $2`, [id, u.id]);
       if (held && spam) {
@@ -422,7 +511,9 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       clientId: row.client_id,
       ...(row.moderation_status === 'review' ? { moderation: 'review' as const } : {}),
       ...(row.kind === 'yap' ? { kind: 'yap' as const } : {}),
+      ...(row.expires_at ? { expiresAt: row.expires_at.toISOString() } : {}),
     };
+    if (row.reply_to_id) message.replyTo = (await messagePreviews(db, [row.reply_to_id], u.id)).get(row.reply_to_id) ?? null;
     if (row.view_once) {
       // Everyone gets the same starting state; the sender's copy also lists who opened it (nobody yet).
       const info = (await viewOnceFor(db, [row.id], u.id)).get(row.id);
@@ -503,32 +594,239 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     return { ok: true };
   });
 
-  app.delete('/v1/messages/:id', { preHandler: requireAuth }, async (req) => {
+  // ── Edit, unsend, delete for me ───────────────────────────────────────
+  /** Edit the text of your own message, within 15 minutes of sending it. Everyone's view updates. */
+  app.patch('/v1/messages/:id', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
-    const r = await db.query(
-      `UPDATE messages SET deleted_at = now(), body = '', attachments = '[]' WHERE id = $1 AND sender_id = $2 AND deleted_at IS NULL RETURNING conversation_id, view_once`,
-      [id, u.id],
-    );
-    if (!r.rowCount) throw notFound('Message');
-    // Unsending a view-once message deletes its file too.
-    if (r.rows[0].view_once) await enqueue(db, 'viewonce.check', { messageId: id });
-    await ctx.realtime.publish(await memberIds(r.rows[0].conversation_id), {
-      type: 'message.deleted',
-      data: { id, conversationId: r.rows[0].conversation_id },
+    const { body } = parse(editMessageSchema, req.body);
+    const m = await messageFor(id, u.id, { ownOnly: 'Only the person who sent a message can edit it.' });
+    if (m.deleted_at) throw notFound('Message');
+    if (m.kind !== 'message' || m.view_once) throw new AppError(400, 'not_editable', 'Only text messages can be edited.');
+    if (!m.editable) throw new AppError(403, 'edit_window_closed', `Messages can be edited for ${MESSAGE_EDIT_MINUTES} minutes after sending.`);
+    if (!body && !(m.attachments ?? []).length && !m.story_id) throw badRequest('Write a message. To remove it, unsend it instead.');
+    if (body !== m.body) {
+      if (analyzeText(body).risk === 'escalate') throw new AppError(422, 'content_blocked', "This edit wasn't saved because it may put someone at risk.");
+      await tx(db, async (c) => {
+        // The earlier text is kept for safety reports, and removed if the message is unsent.
+        await c.query(`INSERT INTO message_edits (message_id, body) SELECT id, body FROM messages WHERE id = $1`, [id]);
+        await c.query(`UPDATE messages SET body = $2, edited_at = now() WHERE id = $1`, [id, body]);
+      });
+      const edited = (await db.query(`SELECT body, edited_at FROM messages WHERE id = $1`, [id])).rows[0];
+      // A message held for a check is still only the sender's.
+      const to = m.moderation_status === 'normal' ? await memberIds(m.conversation_id) : [u.id];
+      await ctx.realtime.publish(to, {
+        type: 'message.edited',
+        data: { id, conversationId: m.conversation_id, body: edited.body, editedAt: edited.edited_at.toISOString() },
+      });
+    }
+    return { message: await loadMessage(id, u.id) };
+  });
+
+  /**
+   * Unsend, for everyone: the text and attachments are removed and a "Message unsent" line
+   * stays in its place. The files it carried stop working (unless used somewhere else).
+   */
+  async function unsend(messageId: string, userId: string) {
+    const m = await messageFor(messageId, userId, { ownOnly: 'Only the person who sent a message can unsend it.' });
+    if (m.kind === 'system') throw new AppError(400, 'not_unsendable', 'This line can’t be unsent.');
+    const pinsRemoved = await tx(db, async (c) => {
+      const r = await c.query(
+        `UPDATE messages SET deleted_at = now(), unsent_at = now(), body = '', attachments = '[]' WHERE id = $1 AND deleted_at IS NULL RETURNING id`,
+        [messageId],
+      );
+      if (!r.rowCount) return null;
+      await c.query(`DELETE FROM message_edits WHERE message_id = $1`, [messageId]);
+      await c.query(`DELETE FROM message_reactions WHERE message_id = $1`, [messageId]);
+      return (await c.query(`DELETE FROM conversation_pins WHERE message_id = $1`, [messageId])).rowCount ?? 0;
     });
+    if (pinsRemoved === null) return; // already unsent or deleted
+    await revokeChatMedia(ctx, userId, mediaIdsOf(m.attachments));
+    // A view-once file is deleted by the view-once worker.
+    if (m.view_once) await enqueue(db, 'viewonce.check', { messageId });
+    const members = await memberIds(m.conversation_id);
+    await ctx.realtime.publish(members, { type: 'message.unsent', data: { id: messageId, conversationId: m.conversation_id } });
+    if (pinsRemoved) await ctx.realtime.publish(members, { type: 'conversation.pins', data: { conversationId: m.conversation_id } });
+  }
+
+  app.post('/v1/messages/:id/unsend', { preHandler: requireAuth }, async (req) => {
+    const { id } = parse(idParam, req.params);
+    await unsend(id, me(req).id);
+    return { message: await loadMessage(id, me(req).id) };
+  });
+
+  /** The same as POST /v1/messages/:id/unsend (kept for older apps). */
+  app.delete('/v1/messages/:id', { preHandler: requireAuth }, async (req) => {
+    const { id } = parse(idParam, req.params);
+    await unsend(id, me(req).id);
     return { ok: true };
   });
 
+  /** Delete for me: the message goes from your view of the chat only. */
+  app.post('/v1/messages/:id/delete-for-me', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const m = await messageFor(id, u.id);
+    await db.query(`INSERT INTO message_hides (message_id, user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [id, u.id]);
+    // Your other devices drop it too.
+    await ctx.realtime.publish([u.id], { type: 'message.hidden', data: { id, conversationId: m.conversation_id } });
+    return { ok: true };
+  });
+
+  // ── Reactions ─────────────────────────────────────────────────────────
+  const reactionParams = z.object({ id: z.string().uuid(), emoji: z.string().min(1).max(16) });
+
   app.put('/v1/messages/:id/reactions/:emoji', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
-    const { id, emoji } = parse(z.object({ id: z.string().uuid(), emoji: z.string().min(1).max(16) }), req.params);
-    const m = await db.query(`SELECT conversation_id FROM messages WHERE id = $1 AND deleted_at IS NULL`, [id]);
-    if (!m.rows[0]) throw notFound('Message');
-    await assertMember(m.rows[0].conversation_id, u.id);
-    await db.query(`INSERT INTO message_reactions (message_id, user_id, emoji) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, [id, u.id, emoji]);
-    await ctx.realtime.publish(await memberIds(m.rows[0].conversation_id), { type: 'message.reaction', data: { id, emoji, userId: u.id } });
+    const { id, emoji } = parse(reactionParams, req.params);
+    const m = await messageFor(id, u.id);
+    if (m.deleted_at || m.kind === 'system') throw notFound('Message');
+    const r = await db.query(`INSERT INTO message_reactions (message_id, user_id, emoji) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, [id, u.id, emoji]);
+    if (r.rowCount)
+      await ctx.realtime.publish(await memberIds(m.conversation_id), {
+        type: 'message.reaction',
+        data: { id, conversationId: m.conversation_id, emoji, userId: u.id },
+      });
     return { ok: true };
+  });
+
+  app.delete('/v1/messages/:id/reactions/:emoji', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { id, emoji } = parse(reactionParams, req.params);
+    const m = await messageFor(id, u.id);
+    const r = await db.query(`DELETE FROM message_reactions WHERE message_id = $1 AND user_id = $2 AND emoji = $3`, [id, u.id, emoji]);
+    if (r.rowCount)
+      await ctx.realtime.publish(await memberIds(m.conversation_id), {
+        type: 'message.reaction',
+        data: { id, conversationId: m.conversation_id, emoji, userId: u.id, removed: true },
+      });
+    return { ok: true };
+  });
+
+  // ── Pinned messages ───────────────────────────────────────────────────
+  /** In a one-to-one chat anyone in it can do this; in groups, only admins. */
+  async function assertCanManage(conversationId: string, userId: string, what: string) {
+    const r = (
+      await db.query(
+        `SELECT c.kind, cm.role FROM conversations c JOIN conversation_members cm ON cm.conversation_id = c.id
+         WHERE c.id = $1 AND cm.user_id = $2 AND cm.left_at IS NULL`,
+        [conversationId, userId],
+      )
+    ).rows[0];
+    if (!r) throw notFound('Conversation');
+    if (r.kind !== 'direct' && r.role !== 'admin') throw new AppError(403, 'admins_only', `Only group admins can ${what}.`);
+  }
+
+  async function pinsFor(conversationId: string, reader: string): Promise<PinnedMessage[]> {
+    const { rows } = await db.query(`SELECT message_id, pinned_by, pinned_at FROM conversation_pins WHERE conversation_id = $1 ORDER BY pinned_at DESC`, [
+      conversationId,
+    ]);
+    const previews = await messagePreviews(
+      db,
+      rows.map((r) => r.message_id),
+      reader,
+    );
+    const users = await usersByIds(
+      db,
+      rows.map((r) => r.pinned_by),
+    );
+    return rows
+      .map((r) => ({ message: previews.get(r.message_id)!, pinnedBy: users.get(r.pinned_by) ?? null, pinnedAt: r.pinned_at.toISOString() }))
+      .filter((p) => p.message?.available);
+  }
+
+  app.get('/v1/conversations/:id/pins', { preHandler: requireAuth }, async (req) => {
+    const { id } = parse(idParam, req.params);
+    await assertMember(id, me(req).id);
+    return { items: await pinsFor(id, me(req).id), max: MAX_PINNED_MESSAGES };
+  });
+
+  app.put('/v1/messages/:id/pin', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const m = await messageFor(id, u.id);
+    if (m.deleted_at || m.kind === 'system' || m.moderation_status !== 'normal') throw new AppError(400, 'not_pinnable', 'This message can’t be pinned.');
+    await assertCanManage(m.conversation_id, u.id, 'pin messages');
+    await tx(db, async (c) => {
+      // One pin at a time per chat, so two people can't both take the last place.
+      await c.query(`SELECT pg_advisory_xact_lock(hashtext('pins:' || $1))`, [m.conversation_id]);
+      const pins = (await c.query<{ message_id: string }>(`SELECT message_id FROM conversation_pins WHERE conversation_id = $1`, [m.conversation_id])).rows;
+      if (pins.some((p) => p.message_id === id)) return;
+      if (pins.length >= MAX_PINNED_MESSAGES) throw new AppError(409, 'pins_full', `You can pin up to ${MAX_PINNED_MESSAGES} messages. Unpin one to pin this.`);
+      await c.query(`INSERT INTO conversation_pins (conversation_id, message_id, pinned_by) VALUES ($1,$2,$3)`, [m.conversation_id, id, u.id]);
+    });
+    await ctx.realtime.publish(await memberIds(m.conversation_id), { type: 'conversation.pins', data: { conversationId: m.conversation_id } });
+    return { items: await pinsFor(m.conversation_id, u.id) };
+  });
+
+  app.delete('/v1/messages/:id/pin', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const m = await messageFor(id, u.id);
+    await assertCanManage(m.conversation_id, u.id, 'unpin messages');
+    const r = await db.query(`DELETE FROM conversation_pins WHERE message_id = $1`, [id]);
+    if (r.rowCount) await ctx.realtime.publish(await memberIds(m.conversation_id), { type: 'conversation.pins', data: { conversationId: m.conversation_id } });
+    return { items: await pinsFor(m.conversation_id, u.id) };
+  });
+
+  // ── Search ────────────────────────────────────────────────────────────
+  /** Text search in one chat: the messages you can see there, sent since you joined. Newest first. */
+  app.get('/v1/conversations/:id/search', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const q = parse(messageSearchSchema, req.query);
+    const joined = (
+      await db.query<{ joined_at: Date }>(`SELECT joined_at FROM conversation_members WHERE conversation_id = $1 AND user_id = $2 AND left_at IS NULL`, [
+        id,
+        u.id,
+      ])
+    ).rows[0];
+    if (!joined) throw notFound('Conversation');
+    const c = decodeCursor<KeyCursor>(q.cursor);
+    const pattern = `%${q.q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+    const limit = 30;
+    const { rows } = await db.query(
+      `SELECT ${MESSAGE_COLS}
+       FROM messages m JOIN profiles pr ON pr.user_id = m.sender_id
+       WHERE m.conversation_id = $1 AND ${VISIBLE_TO_READER} AND m.deleted_at IS NULL AND m.kind <> 'system'
+         AND m.created_at >= $4 AND m.body ILIKE $5
+         ${c ? 'AND (m.created_at, m.id) < ($6::timestamptz, $7::uuid)' : ''}
+       ORDER BY m.created_at DESC, m.id DESC LIMIT $3`,
+      c ? [id, u.id, limit + 1, joined.joined_at, pattern, c.t, c.id] : [id, u.id, limit + 1, joined.joined_at, pattern],
+    );
+    const page = rows.slice(0, limit);
+    return { items: await present(page, u.id), nextCursor: rows.length > limit ? keyCursorOf(page.at(-1)!) : null };
+  });
+
+  // ── Disappearing messages ─────────────────────────────────────────────
+  /**
+   * Turn disappearing messages on (24 hours, 7 days or 90 days) or off for a chat. Anyone
+   * in a one-to-one chat can; in groups, admins. A line in the chat tells everyone who
+   * changed it. It applies to messages sent from then on.
+   */
+  app.put('/v1/conversations/:id/disappearing', { preHandler: requireAuth, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const { seconds } = parse(disappearingSchema, req.body);
+    await assertCanManage(id, u.id, 'change disappearing messages');
+    const row = await tx(db, async (c) => {
+      const cur = (await c.query(`SELECT disappearing_seconds FROM conversations WHERE id = $1 FOR UPDATE`, [id])).rows[0];
+      if ((cur.disappearing_seconds ?? null) === seconds) return null;
+      await c.query(`UPDATE conversations SET disappearing_seconds = $2 WHERE id = $1`, [id, seconds]);
+      const { rows } = await c.query(`INSERT INTO messages (conversation_id, sender_id, body, kind, meta) VALUES ($1,$2,'','system',$3) RETURNING id`, [
+        id,
+        u.id,
+        { type: 'disappearing', seconds },
+      ]);
+      await c.query(`UPDATE conversations SET last_message_at = now() WHERE id = $1`, [id]);
+      return rows[0] as { id: string };
+    });
+    if (!row) return { disappearingSeconds: seconds, message: null };
+    const members = await memberIds(id);
+    const line = await loadMessage(row.id, u.id);
+    await ctx.realtime.publish(members, { type: 'message.created', data: line });
+    await ctx.realtime.publish(members, { type: 'conversation.updated', data: { id, disappearingSeconds: seconds } });
+    return { disappearingSeconds: seconds, message: line };
   });
 
   // ── Yaps: settings ────────────────────────────────────────────────────
@@ -750,7 +1048,12 @@ function toMessage(r: Record<string, any>): Message {
     createdAt: r.created_at.toISOString(),
     clientId: r.client_id,
     ...(r.moderation_status === 'review' ? { moderation: 'review' as const } : {}),
-    ...(r.kind === 'yap' ? { kind: 'yap' as const } : {}),
+    ...(r.kind === 'yap' || r.kind === 'system' ? { kind: r.kind as 'yap' | 'system' } : {}),
+    ...(r.kind === 'system' && r.meta ? { system: r.meta } : {}),
     ...(r.story ? { story: r.story } : {}),
+    ...(r.edited_at ? { editedAt: r.edited_at.toISOString() } : {}),
+    ...(r.unsent_at ? { unsent: true } : {}),
+    ...(r.expires_at ? { expiresAt: r.expires_at.toISOString() } : {}),
+    ...(r.pinned ? { pinned: true } : {}),
   };
 }

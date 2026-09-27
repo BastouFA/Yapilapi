@@ -9,6 +9,7 @@ import {
   PRODUCT_KINDS,
   POST_VISIBILITIES,
   CURRENCIES,
+  DISAPPEARING_SECONDS,
   PROFILE_MODES,
   REMIX_MODES,
   REPORT_REASONS,
@@ -204,6 +205,22 @@ export const sendMessageSchema = z
     storyId: uuid.optional(),
   })
   .refine((v) => v.body.length > 0 || v.attachments.length > 0 || !!v.storyId, { message: 'Write a message or attach a file.', path: ['body'] });
+
+/** Edit your own message's text, within 15 minutes of sending it. */
+export const editMessageSchema = z.object({ body: z.string().trim().max(4000) });
+/** Disappearing messages in one chat: null turns them off. */
+export const disappearingSchema = z.object({
+  seconds: z
+    .number()
+    .int()
+    .refine((s) => (DISAPPEARING_SECONDS as readonly number[]).includes(s), { message: 'Choose 24 hours, 7 days or 90 days.' })
+    .nullable(),
+});
+/** Search the messages of one chat. */
+export const messageSearchSchema = z.object({
+  q: z.string().trim().min(1).max(100),
+  cursor: z.string().max(200).optional(),
+});
 
 /** "Let Yaps play out loud" in one chat. null goes back to the default (on for yaps from friends). */
 export const conversationYapsSchema = z.object({ playOutLoud: z.boolean().nullable() });

@@ -11,9 +11,10 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { Conversation, Message } from '../../../../packages/shared/src/types';
+import type { Conversation, Message, PinnedMessage } from '../../../../packages/shared/src/types';
+import { MESSAGE_EDIT_MINUTES } from '../../../../packages/shared/src/constants';
 import { useCalls } from '../../lib/calls';
 import { client, errorMessage, mediaUrl } from '../../lib/api';
 import { clock, MAX_UPLOAD_BYTES, pickOne, uploadFile, uploadPicked, VOICE_MIME } from '../../lib/media';
@@ -26,6 +27,22 @@ import { elevation, gradient, radius, space } from '../../lib/theme';
 import { Icon, Notice, SwitchRow, useColors, userText } from '../../lib/ui';
 import { ViewOnceBubble } from '../../lib/view-once';
 import { Waveform, YAP_MAX_MS, YAP_MIN_MS } from '../../lib/yaps';
+import {
+  applyReaction,
+  disappearingText,
+  DisappearingSheet,
+  MessageActions,
+  PinnedBar,
+  previewOf,
+  previewText,
+  Quote,
+  ReactionRow,
+  SearchSheet,
+  Sheet,
+  SwipeToReply,
+  SystemLine,
+  type SheetAction,
+} from '../../lib/chat-extras';
 
 /** Voice messages shorter than this are treated as a slip of the finger and not sent. */
 const MIN_VOICE_MS = 1000;
@@ -50,6 +67,24 @@ export default function Chat() {
   const [error, setError] = useState<string | null>(null);
   const [needsVerify, setNeedsVerify] = useState(false);
   const list = useRef<FlatList<Message>>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [pins, setPins] = useState<PinnedMessage[]>([]);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [editing, setEditing] = useState<Message | null>(null);
+  const [actionsFor, setActionsFor] = useState<Message | null>(null);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [disappearingOpen, setDisappearingOpen] = useState(false);
+  const [highlight, setHighlight] = useState<string | null>(null);
+  const input = useRef<TextInput>(null);
+  const patchMessage = (messageId: string, fn: (m: Message) => Message) => setMessages((cur) => cur.map((x) => (x.id === messageId ? fn(x) : x)));
+  const loadPins = useCallback(async () => {
+    try {
+      setPins((await (await client()).conversations.pins(id)).items);
+    } catch {
+      // Pins are extra: the chat works without them.
+    }
+  }, [id]);
   const fail = (e: unknown) => {
     if (isVerificationError(e)) setNeedsVerify(true);
     else setError(errorMessage(e));
@@ -61,11 +96,13 @@ export default function Chat() {
       const [conv, page] = await Promise.all([api.conversations.get(id), api.conversations.messages(id)]);
       setConversation(conv.conversation);
       setMessages(page.items); // oldest first, the latest page
+      setCursor(page.nextCursor);
       void api.conversations.read(id).catch(() => {});
+      void loadPins();
     } catch (e) {
       setError(errorMessage(e));
     }
-  }, [id]);
+  }, [id, loadPins]);
 
   useEffect(() => {
     void load();
@@ -78,6 +115,27 @@ export default function Chat() {
       void client().then((api) => api.conversations.read(id).catch(() => {}));
     }
     if ((e.type === 'message.deleted' || e.type === 'message.released') && e.data?.conversationId === id) void load();
+    if (e.type === 'message.hidden' && e.data?.conversationId === id) setMessages((cur) => cur.filter((x) => x.id !== e.data.id));
+    if (e.type === 'message.edited' && e.data?.conversationId === id) {
+      patchMessage(e.data.id, (x) => ({ ...x, body: e.data.body, editedAt: e.data.editedAt }));
+      setMessages((cur) =>
+        cur.map((x) => (x.replyTo && x.replyTo.id === e.data.id ? { ...x, replyTo: { ...x.replyTo, body: String(e.data.body).slice(0, 200) } } : x)),
+      );
+    }
+    if (e.type === 'message.unsent' && e.data?.conversationId === id) {
+      patchMessage(e.data.id, (x) => ({ ...x, unsent: true, body: '', attachments: [], reactions: undefined, viewOnce: undefined, story: undefined }));
+      setMessages((cur) =>
+        cur.map((x) => (x.replyTo && x.replyTo.id === e.data.id ? { ...x, replyTo: { ...x.replyTo, unsent: true, body: '', attachmentKind: null } } : x)),
+      );
+      setEditing((cur) => (cur?.id === e.data.id ? null : cur));
+      setReplyTo((cur) => (cur?.id === e.data.id ? null : cur));
+    }
+    // Your own taps are already shown.
+    if (e.type === 'message.reaction' && e.data?.conversationId === id && e.data.userId !== me?.id)
+      patchMessage(e.data.id, (x) => applyReaction(x, e.data.emoji, false, !!e.data.removed));
+    if (e.type === 'conversation.pins' && e.data?.conversationId === id) void loadPins();
+    if (e.type === 'conversation.updated' && e.data?.id === id)
+      setConversation((cur) => (cur ? { ...cur, disappearingSeconds: e.data.disappearingSeconds } : cur));
     if (e.type === 'app.foreground') void load();
     // Someone opened a view-once photo you sent, or its file was deleted.
     if (e.type === 'view_once.updated' && e.data?.conversationId === id)
@@ -92,38 +150,28 @@ export default function Chat() {
   useLayoutEffect(() => {
     navigation.setOptions({
       title: conversation ? conversationTitle(conversation, me?.id, t) : t('m.title.conversation'),
-      headerRight:
-        canCall || yaps?.available
-          ? () => (
-              <View style={{ flexDirection: 'row', gap: space[4] }}>
-                {yaps?.available ? (
-                  <Pressable accessibilityRole="button" accessibilityLabel={t('m.yap.settings')} hitSlop={10} onPress={() => setYapSettings(true)}>
-                    <Icon name={yaps.paused ? 'volume-mute-outline' : 'volume-high-outline'} size={22} color={c.yapi} />
-                  </Pressable>
-                ) : null}
-                {canCall ? (
-                  <>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={t('m.calls.startAudio')}
-                      hitSlop={10}
-                      onPress={() => void calls.start(id, 'audio')}
-                    >
-                      <Icon name="call-outline" size={22} color={c.yapi} />
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={t('m.calls.startVideo')}
-                      hitSlop={10}
-                      onPress={() => void calls.start(id, 'video')}
-                    >
-                      <Icon name="videocam-outline" size={24} color={c.yapi} />
-                    </Pressable>
-                  </>
-                ) : null}
-              </View>
-            )
-          : undefined,
+      headerRight: () => (
+        <View style={{ flexDirection: 'row', gap: space[4] }}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('m.chat.options')} hitSlop={10} onPress={() => setOptionsOpen(true)}>
+            <Icon name="ellipsis-horizontal-circle-outline" size={24} color={c.yapi} />
+          </Pressable>
+          {yaps?.available ? (
+            <Pressable accessibilityRole="button" accessibilityLabel={t('m.yap.settings')} hitSlop={10} onPress={() => setYapSettings(true)}>
+              <Icon name={yaps.paused ? 'volume-mute-outline' : 'volume-high-outline'} size={22} color={c.yapi} />
+            </Pressable>
+          ) : null}
+          {canCall ? (
+            <>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('m.calls.startAudio')} hitSlop={10} onPress={() => void calls.start(id, 'audio')}>
+                <Icon name="call-outline" size={22} color={c.yapi} />
+              </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('m.calls.startVideo')} hitSlop={10} onPress={() => void calls.start(id, 'video')}>
+                <Icon name="videocam-outline" size={24} color={c.yapi} />
+              </Pressable>
+            </>
+          ) : null}
+        </View>
+      ),
     });
   }, [navigation, conversation, me?.id, canCall, calls, id, c.yapi, t, yaps?.available, yaps?.paused]);
 
@@ -313,17 +361,158 @@ export default function Chat() {
 
   async function send() {
     const text = body.trim();
+    if (editing) return saveEdit(editing, text);
     if (!text) return;
+    const quoting = replyTo;
     setBody('');
+    setReplyTo(null);
     const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     try {
-      const { message } = await (await client()).conversations.send(id, text, clientId);
+      const { message } = await (await client()).conversations.send(id, text, clientId, [], quoting ? { replyToId: quoting.id } : {});
       setMessages((cur) => (cur.some((x) => x.id === message.id) ? cur : [...cur, message]));
     } catch (e) {
       setBody(text);
+      setReplyTo(quoting);
       fail(e);
     }
   }
+
+  async function saveEdit(m: Message, text: string) {
+    if (!text) return setError(t('m.chat.editEmpty'));
+    if (text === m.body) return cancelCompose();
+    try {
+      const { message } = await (await client()).messages.edit(m.id, text);
+      if (message) patchMessage(m.id, () => message);
+      cancelCompose();
+    } catch (e) {
+      fail(e);
+    }
+  }
+
+  function cancelCompose() {
+    if (editing) setBody('');
+    setEditing(null);
+    setReplyTo(null);
+  }
+
+  function startReply(m: Message) {
+    setActionsFor(null);
+    setEditing(null);
+    setReplyTo(m);
+    input.current?.focus();
+  }
+
+  function startEdit(m: Message) {
+    setActionsFor(null);
+    setReplyTo(null);
+    setEditing(m);
+    setBody(m.body);
+    input.current?.focus();
+  }
+
+  async function react(m: Message, emoji: string, on: boolean) {
+    setActionsFor(null);
+    patchMessage(m.id, (x) => applyReaction(x, emoji, true, !on));
+    try {
+      const api = await client();
+      if (on) await api.messages.react(m.id, emoji);
+      else await api.messages.unreact(m.id, emoji);
+    } catch (e) {
+      patchMessage(m.id, (x) => applyReaction(x, emoji, true, on));
+      setError(errorMessage(e));
+    }
+  }
+
+  async function run(action: () => Promise<unknown>) {
+    setActionsFor(null);
+    try {
+      await action();
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  }
+
+  const canManage = conversation?.kind === 'direct' || conversation?.myRole === 'admin';
+  const pinnedIds = new Set(pins.map((p) => p.message.id));
+
+  /** The long-press menu for one message. */
+  function sheetActions(m: Message): SheetAction[] {
+    const mine = m.sender.id === me?.id;
+    const editable = mine && !m.kind && !m.viewOnce && !m.unsent && Date.now() - new Date(m.createdAt).getTime() < MESSAGE_EDIT_MINUTES * 60_000;
+    const out: SheetAction[] = [];
+    if (!m.unsent) out.push({ label: t('m.chat.reply'), icon: 'arrow-undo-outline', onPress: () => startReply(m) });
+    if (editable) out.push({ label: t('m.chat.edit'), icon: 'create-outline', onPress: () => startEdit(m) });
+    if (canManage && !m.unsent && !m.moderation)
+      out.push(
+        pinnedIds.has(m.id)
+          ? { label: t('m.chat.unpin'), icon: 'pin-outline', onPress: () => void run(async () => setPins((await (await client()).messages.unpin(m.id)).items)) }
+          : { label: t('m.chat.pin'), icon: 'pin-outline', onPress: () => void run(async () => setPins((await (await client()).messages.pin(m.id)).items)) },
+      );
+    out.push({
+      label: t('m.chat.deleteForMe'),
+      icon: 'trash-outline',
+      onPress: () =>
+        void run(async () => {
+          await (await client()).messages.deleteForMe(m.id);
+          setMessages((cur) => cur.filter((x) => x.id !== m.id));
+        }),
+    });
+    if (mine && !m.unsent)
+      out.push({
+        label: t('m.chat.unsend'),
+        icon: 'close-circle-outline',
+        danger: true,
+        onPress: () => {
+          setActionsFor(null);
+          Alert.alert(t('m.chat.unsend'), t('m.chat.unsendConfirm'), [
+            { text: t('m.chat.cancel'), style: 'cancel' },
+            {
+              text: t('m.chat.unsend'),
+              style: 'destructive',
+              onPress: () =>
+                void run(async () => {
+                  const { message } = await (await client()).messages.unsend(m.id);
+                  if (message) patchMessage(m.id, () => message);
+                }),
+            },
+          ]);
+        },
+      });
+    return out;
+  }
+
+  /** Scroll to a message, loading earlier ones until it's there, and mark it for a moment. */
+  async function jumpTo(target: string) {
+    setSearchOpen(false);
+    let all = messages;
+    if (!all.some((m) => m.id === target)) {
+      let c2 = cursor;
+      const earlier: Message[] = [];
+      try {
+        const api = await client();
+        for (let i = 0; i < 20 && c2 && !earlier.some((m) => m.id === target); i++) {
+          const r = await api.conversations.messages(id, c2);
+          earlier.unshift(...r.items);
+          c2 = r.nextCursor;
+        }
+      } catch (e) {
+        setError(errorMessage(e));
+      }
+      all = [...earlier, ...messages];
+      if (earlier.length) {
+        setMessages(all);
+        setCursor(c2);
+      }
+    }
+    const index = all.findIndex((m) => m.id === target);
+    if (index < 0) return setError(t('m.chat.notFound'));
+    setHighlight(target);
+    setTimeout(() => setHighlight((h) => (h === target ? null : h)), 1800);
+    setTimeout(() => list.current?.scrollToIndex({ index, viewPosition: 0.5, animated: true }), 50);
+  }
+
+  // Follow the newest message, not when earlier ones are loaded above it.
+  const followed = useRef<string | null>(null);
 
   return (
     <KeyboardAvoidingView
@@ -351,17 +540,51 @@ export default function Chat() {
           <VerifyPrompt action="message" />
         </View>
       ) : null}
+      <PinnedBar
+        pins={pins}
+        canManage={canManage}
+        onJump={(mid) => void jumpTo(mid)}
+        onUnpin={(mid) => void run(async () => setPins((await (await client()).messages.unpin(mid)).items))}
+      />
+      {conversation?.disappearingSeconds ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setDisappearingOpen(true)}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: space[1], alignSelf: 'center', paddingVertical: space[1] }}
+        >
+          <Icon name="timer-outline" size={14} color={c.inkMuted} />
+          <Text style={{ color: c.inkMuted, fontSize: 12, fontWeight: '600' }}>
+            {t('m.chat.disappearingOn', { time: disappearingText(t, conversation.disappearingSeconds) })}
+          </Text>
+        </Pressable>
+      ) : null}
       <FlatList
         ref={list}
         data={messages}
         keyExtractor={(m) => m.id}
         contentContainerStyle={{ padding: space[4], gap: space[2] }}
-        onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
+        onContentSizeChange={() => {
+          const last = messages.at(-1)?.id ?? null;
+          if (last === followed.current) return;
+          followed.current = last;
+          list.current?.scrollToEnd({ animated: false });
+        }}
+        onScrollToIndexFailed={(info) => {
+          list.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+          setTimeout(() => list.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: true }), 100);
+        }}
         renderItem={({ item }) => {
+          if (item.kind === 'system') return <SystemLine message={item} meId={me?.id} />;
           const mine = item.sender.id === me?.id;
-          const text = item.body || (item.attachments.length || item.story ? '' : t('m.message.deleted'));
+          const text = item.unsent
+            ? t(mine ? 'm.chat.unsentMine' : 'm.chat.unsent')
+            : item.body || (item.attachments.length || item.story ? '' : t('m.message.deleted'));
           const tint = mine ? c.onYapi : c.ink;
-          const media = item.viewOnce ? (
+          const quote = item.replyTo && !item.unsent ? <Quote preview={item.replyTo} tint={tint} meId={me?.id} onJump={(mid) => void jumpTo(mid)} /> : null;
+          const textStyle = item.unsent ? { fontStyle: 'italic' as const, opacity: 0.8 } : null;
+          const meta = item.editedAt && !item.unsent ? <Text style={{ color: tint, fontSize: 11, opacity: 0.75 }}>{t('m.chat.edited')}</Text> : null;
+          const openActions = () => setActionsFor(item);
+          const media = item.unsent ? null : item.viewOnce ? (
             <ViewOnceBubble message={item} mine={mine} tint={tint} onChange={replaceMessage} />
           ) : (
             <>
@@ -374,21 +597,53 @@ export default function Chat() {
           );
           // Your messages sit at the end edge (the right in English, the left in Arabic), with the
           // tail corner on that side.
-          return mine ? (
+          const bubbleView = mine ? (
             <View style={{ alignSelf: 'flex-end', maxWidth: '80%', gap: 2 }}>
-              <LinearGradient {...gradient(c)} style={[bubble, { maxWidth: '100%', alignSelf: 'flex-end', borderBottomEndRadius: 6 }]}>
-                {media}
-                {text ? <Text style={[{ color: c.onYapi, fontSize: 15, lineHeight: 21 }, userText]}>{text}</Text> : null}
-              </LinearGradient>
+              <Pressable onLongPress={openActions} accessibilityHint={t('m.chat.messageOptions')}>
+                <LinearGradient {...gradient(c)} style={[bubble, { maxWidth: '100%', alignSelf: 'flex-end', borderBottomEndRadius: 6 }]}>
+                  {quote}
+                  {media}
+                  {text ? <Text style={[{ color: c.onYapi, fontSize: 15, lineHeight: 21 }, userText, textStyle]}>{text}</Text> : null}
+                  {meta}
+                </LinearGradient>
+              </Pressable>
+              <ReactionRow message={item} mine onToggle={(emoji, on) => void react(item, emoji, on)} />
               {item.moderation === 'review' ? <Text style={{ color: c.inkMuted, fontSize: 12, alignSelf: 'flex-end' }}>{t('m.chat.held')}</Text> : null}
             </View>
           ) : (
-            <View style={[bubble, { alignSelf: 'flex-start', backgroundColor: c.surface, borderBottomStartRadius: 6 }, elevation(c)]}>
-              {conversation && conversation.members.length > 2 ? (
-                <Text style={[{ color: c.yapi, fontSize: 12, fontWeight: '700' }, userText]}>{item.sender.displayName}</Text>
-              ) : null}
-              {media}
-              {text ? <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 21 }, userText]}>{text}</Text> : null}
+            <View style={{ alignSelf: 'flex-start', maxWidth: '80%', gap: 2 }}>
+              <Pressable
+                onLongPress={openActions}
+                accessibilityHint={t('m.chat.messageOptions')}
+                style={[bubble, { maxWidth: '100%', backgroundColor: c.surface, borderBottomStartRadius: 6 }, elevation(c)]}
+              >
+                {conversation && conversation.members.length > 2 ? (
+                  <Text style={[{ color: c.yapi, fontSize: 12, fontWeight: '700' }, userText]}>{item.sender.displayName}</Text>
+                ) : null}
+                {quote}
+                {media}
+                {text ? <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 21 }, userText, textStyle]}>{text}</Text> : null}
+                {meta}
+              </Pressable>
+              <ReactionRow message={item} mine={false} onToggle={(emoji, on) => void react(item, emoji, on)} />
+            </View>
+          );
+          return (
+            <View
+              style={{ borderRadius: radius.lg, backgroundColor: highlight === item.id ? c.surfaceSunken : 'transparent' }}
+              accessibilityActions={
+                item.unsent
+                  ? []
+                  : [
+                      { name: 'reply', label: t('m.chat.reply') },
+                      { name: 'longpress', label: t('m.chat.messageOptions') },
+                    ]
+              }
+              onAccessibilityAction={(e) => (e.nativeEvent.actionName === 'reply' ? startReply(item) : openActions())}
+            >
+              <SwipeToReply enabled={!item.unsent} onReply={() => startReply(item)}>
+                {bubbleView}
+              </SwipeToReply>
             </View>
           );
         }}
@@ -423,6 +678,49 @@ export default function Chat() {
               </Text>
               {yapping ? <Waveform color={c.onYapi} bars={7} height={18} /> : null}
             </LinearGradient>
+          </Pressable>
+        </View>
+      ) : null}
+      {replyTo || editing ? (
+        <View
+          accessibilityLiveRegion="polite"
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: space[2],
+            marginHorizontal: space[3],
+            marginTop: space[2],
+            paddingStart: space[3],
+            paddingEnd: space[1],
+            paddingVertical: space[1],
+            borderStartWidth: 3,
+            borderStartColor: c.yapi,
+            borderRadius: radius.md,
+            backgroundColor: c.surface,
+          }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: c.yapi, fontSize: 12, fontWeight: '700' }}>
+              {editing
+                ? t('m.chat.editing')
+                : replyTo!.sender.id === me?.id
+                  ? t('m.chat.replyingToSelf')
+                  : t('m.chat.replyingTo', { name: replyTo!.sender.displayName })}
+            </Text>
+            {replyTo ? (
+              <Text numberOfLines={1} style={[{ color: c.ink, fontSize: 14 }, userText]}>
+                {previewText(t, previewOf(replyTo))}
+              </Text>
+            ) : null}
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t(editing ? 'm.chat.cancelEdit' : 'm.chat.cancelReply')}
+            hitSlop={8}
+            onPress={cancelCompose}
+            style={{ padding: space[2] }}
+          >
+            <Icon name="close" size={20} color={c.inkMuted} />
           </Pressable>
         </View>
       ) : null}
@@ -486,6 +784,7 @@ export default function Chat() {
               <Icon name="eye-outline" size={24} color={c.inkMuted} />
             </Pressable>
             <TextInput
+              ref={input}
               accessibilityLabel={t('inbox.placeholder')}
               placeholder={t('inbox.placeholder')}
               placeholderTextColor={c.inkMuted}
@@ -510,11 +809,11 @@ export default function Chat() {
                 elevation(c),
               ]}
             />
-            {body.trim() ? (
-              <Pressable accessibilityRole="button" accessibilityLabel={t('inbox.send')} onPress={send}>
+            {body.trim() || editing ? (
+              <Pressable accessibilityRole="button" accessibilityLabel={editing ? t('m.chat.saveEdit') : t('inbox.send')} onPress={send}>
                 <LinearGradient {...gradient(c)} style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}>
                   {/* Points up, not along the line, so it stays the same in right-to-left layouts. */}
-                  <Icon name="arrow-up" size={22} color={c.onYapi} />
+                  <Icon name={editing ? 'checkmark' : 'arrow-up'} size={22} color={c.onYapi} />
                 </LinearGradient>
               </Pressable>
             ) : (
@@ -581,6 +880,59 @@ export default function Chat() {
           </View>
         </Modal>
       ) : null}
+      <MessageActions
+        open={!!actionsFor}
+        onClose={() => setActionsFor(null)}
+        onReact={
+          actionsFor && !actionsFor.unsent
+            ? (emoji) => void react(actionsFor, emoji, !actionsFor.reactions?.some((r) => r.emoji === emoji && r.mine))
+            : undefined
+        }
+        actions={actionsFor ? sheetActions(actionsFor) : []}
+      />
+      <Sheet open={optionsOpen} onClose={() => setOptionsOpen(false)} title={t('m.chat.options')}>
+        {[
+          { label: t('m.chat.search'), icon: 'search-outline' as const, onPress: () => setSearchOpen(true) },
+          {
+            label: `${t('m.chat.disappearing')} · ${disappearingText(t, conversation?.disappearingSeconds)}`,
+            icon: 'timer-outline' as const,
+            onPress: () => setDisappearingOpen(true),
+          },
+        ].map((row) => (
+          <Pressable
+            key={row.icon}
+            accessibilityRole="button"
+            onPress={() => {
+              setOptionsOpen(false);
+              row.onPress();
+            }}
+            style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44, opacity: pressed ? 0.7 : 1 })}
+          >
+            <Icon name={row.icon} size={22} color={c.ink} />
+            <Text style={{ color: c.ink, fontSize: 16, fontWeight: '600' }}>{row.label}</Text>
+          </Pressable>
+        ))}
+      </Sheet>
+      <SearchSheet conversationId={id} open={searchOpen} onClose={() => setSearchOpen(false)} onJump={(mid) => void jumpTo(mid)} />
+      <DisappearingSheet
+        open={disappearingOpen}
+        onClose={() => setDisappearingOpen(false)}
+        current={conversation?.disappearingSeconds ?? null}
+        canChange={canManage}
+        onChange={(seconds) =>
+          void (async () => {
+            try {
+              const r = await (await client()).conversations.setDisappearing(id, seconds);
+              setConversation((cur) => (cur ? { ...cur, disappearingSeconds: r.disappearingSeconds } : cur));
+              const line = r.message;
+              if (line) setMessages((cur) => (cur.some((x) => x.id === line.id) ? cur : [...cur, line]));
+              setDisappearingOpen(false);
+            } catch (e) {
+              setError(errorMessage(e));
+            }
+          })()
+        }
+      />
     </KeyboardAvoidingView>
   );
 }
