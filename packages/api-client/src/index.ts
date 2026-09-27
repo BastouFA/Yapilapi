@@ -1,4 +1,6 @@
 import type {
+  AccountInfo,
+  InteractionSettings,
   Circle,
   CircleKind,
   DataSaverMode,
@@ -158,9 +160,18 @@ export function createClient(opts: ClientOptions) {
         inviteCode?: string;
         website?: string;
       }) => post<{ user: Me; token: string }>('/v1/auth/register', b),
-      login: (b: { email: string; password: string }) =>
+      /** `remember: false` ("Stay signed in" off): the web session ends when the browser closes. */
+      login: (b: { email: string; password: string; remember?: boolean }) =>
         post<{ user?: Me; token?: string; mfaRequired?: boolean; challengeToken?: string }>('/v1/auth/login', b),
       logout: () => post<{ ok: true }>('/v1/auth/logout'),
+      /** Ends every session of the account, this one included. */
+      logoutAll: () => post<{ ok: true; revoked: number }>('/v1/auth/logout-all'),
+      /** Ends every other session; this one stays signed in. */
+      revokeOtherSessions: () => post<{ revoked: number }>('/v1/auth/sessions/revoke-others'),
+      /** Other devices are signed out; this one stays signed in. */
+      changePassword: (currentPassword: string, newPassword: string) => post<{ ok: true }>('/v1/auth/password/change', { currentPassword, newPassword }),
+      /** Recent sign-ins and security changes (newest first, at most 50). */
+      securityEvents: () => get<{ items: { type: string; ip: string | null; created_at: string }[] }>('/v1/auth/security-events'),
       verifyEmail: (token: string) => post('/v1/auth/verify-email', { token }),
       resendVerification: () => post('/v1/auth/verify-email/resend'),
       forgot: (email: string) => post<{ message: string }>('/v1/auth/password/forgot', { email }),
@@ -181,6 +192,9 @@ export function createClient(opts: ClientOptions) {
       block: (id: string) => post(`/v1/users/${id}/block`),
       unblock: (id: string) => del(`/v1/users/${id}/block`),
       mute: (id: string) => post(`/v1/users/${id}/mute`),
+      unmute: (id: string) => del(`/v1/users/${id}/mute`),
+      restrict: (id: string) => post(`/v1/users/${id}/restrict`),
+      unrestrict: (id: string) => del(`/v1/users/${id}/restrict`),
       followers: (id: string, cursor?: string) => get<Page<PublicUser> & { viewerFollows: string[] }>(`/v1/users/${id}/followers${qs({ cursor })}`),
       following: (id: string, cursor?: string) => get<Page<PublicUser> & { viewerFollows: string[] }>(`/v1/users/${id}/following${qs({ cursor })}`),
       reposts: (id: string, cursor?: string) => get<Page<Post>>(`/v1/users/${id}/reposts${qs({ cursor })}`),
@@ -217,6 +231,16 @@ export function createClient(opts: ClientOptions) {
       acceptFriend: (id: string) => post(`/v1/friend-requests/${id}/accept`),
       declineFriend: (id: string) => post(`/v1/friend-requests/${id}/decline`),
       preferences: () => get<{ notifications: Record<string, boolean>; attention: Record<string, unknown> }>('/v1/me/preferences'),
+      /** Email, phone, date of birth and when the account was made (Settings > Account). */
+      account: () => get<{ account: AccountInfo }>('/v1/me/account'),
+      /** Who can message, comment on and mention you; quiet hours; sensitive media. */
+      interactions: () => get<{ settings: InteractionSettings }>('/v1/me/interactions'),
+      setInteractions: (b: Partial<Omit<InteractionSettings, 'sensitiveLocked'>>) => put<{ settings: InteractionSettings }>('/v1/me/interactions', b),
+      /** "Report a problem" from Settings > Help. */
+      reportProblem: (b: { body: string; platform: 'web' | 'ios' | 'android' | 'other'; appVersion?: string; page?: string }) =>
+        post<{ report: { id: string } }>('/v1/me/problems', b),
+      muted: () => get<{ items: PublicUser[] }>('/v1/me/muted'),
+      restricted: () => get<{ items: PublicUser[] }>('/v1/me/restricted'),
       setNotificationPrefs: (categories: Record<string, boolean>) => put('/v1/me/preferences/notifications', { categories }),
       setAttention: (b: Record<string, unknown>) => put('/v1/me/preferences/attention', b),
       privacy: () => get<{ consents: { purpose: string; granted: boolean }[]; dataSummary: Record<string, number>; requests: unknown[] }>('/v1/me/privacy'),
@@ -822,7 +846,8 @@ export function createClient(opts: ClientOptions) {
       registerVerify: (challengeId: string, response: unknown, label: string) => post('/v1/auth/passkeys/register/verify', { challengeId, response, label }),
       remove: (id: string) => del(`/v1/auth/passkeys/${id}`),
       loginOptions: () => post<{ options: any; challengeId: string }>('/v1/auth/passkeys/login/options'),
-      loginVerify: (challengeId: string, response: unknown) => post<{ user: Me; token: string }>('/v1/auth/passkeys/login/verify', { challengeId, response }),
+      loginVerify: (challengeId: string, response: unknown, remember?: boolean) =>
+        post<{ user: Me; token: string }>('/v1/auth/passkeys/login/verify', { challengeId, response, ...(remember === false ? { remember } : {}) }),
     },
     push: {
       config: () => get<{ webPush: boolean; vapidPublicKey: string | null }>('/v1/push/config'),
@@ -961,7 +986,8 @@ export function createClient(opts: ClientOptions) {
         ),
       setup: () => post<{ secret: string; otpauthUri: string }>('/v1/auth/mfa/totp/setup'),
       confirm: (code: string) => post<{ enabled: true; recoveryCodes: string[] }>('/v1/auth/mfa/totp/confirm', { code }),
-      verify: (challengeToken: string, code: string) => post<{ user: Me; token: string }>('/v1/auth/mfa/verify', { challengeToken, code }),
+      verify: (challengeToken: string, code: string, remember?: boolean) =>
+        post<{ user: Me; token: string }>('/v1/auth/mfa/verify', { challengeToken, code, ...(remember === false ? { remember } : {}) }),
       disable: (password: string, code: string) => post('/v1/auth/mfa/disable', { password, code }),
       newRecoveryCodes: (code: string) => post<{ recoveryCodes: string[] }>('/v1/auth/mfa/recovery-codes', { code }),
     },

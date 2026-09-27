@@ -2,7 +2,7 @@ import type { PoolClient } from 'pg';
 import { refundUnspentBudget } from '../lib/ad-refunds.ts';
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
-import { appealSchema, FEATURE_FLAG_KEYS, moderationDecisionSchema, reportSchema } from '@yapilapi/shared';
+import { appealSchema, FEATURE_FLAG_KEYS, moderationDecisionSchema, problemReportSchema, reportSchema } from '@yapilapi/shared';
 import { z } from 'zod';
 import { badRequest, conflict, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
@@ -76,6 +76,25 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     });
     reply.code(201);
     return { report: { id: report.id }, message: 'Thanks for reporting. Our team will review it. You can also block this account.' };
+  });
+
+  // ── Report a problem (Settings > Help) ────────────────────────────────
+  app.post('/v1/me/problems', { preHandler: requireAuth, config: { rateLimit: { max: 5, timeWindow: '1 hour' } } }, async (req, reply) => {
+    const input = parse(problemReportSchema, req.body);
+    const { rows } = await db.query<{ id: string }>(
+      `INSERT INTO problem_reports (user_id, body, platform, app_version, page) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+      [me(req).id, input.body, input.platform, input.appVersion ?? null, input.page ?? null],
+    );
+    reply.code(201);
+    return { report: { id: rows[0]!.id } };
+  });
+
+  app.get('/v1/admin/problems', { preHandler: requireRole('moderator', 'admin') }, async () => {
+    const { rows } = await db.query(
+      `SELECT r.id, r.body, r.platform, r.app_version, r.page, r.status, r.created_at, pr.username
+       FROM problem_reports r LEFT JOIN profiles pr ON pr.user_id = r.user_id WHERE r.status = 'open' ORDER BY r.created_at DESC LIMIT 200`,
+    );
+    return { items: rows };
   });
 
   // ── Moderator console ─────────────────────────────────────────────────

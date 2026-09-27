@@ -5,7 +5,8 @@ import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } fro
 import type { AppContext } from '../lib/context.ts';
 import { hydratePosts } from '../lib/posts.ts';
 import { isEnabled, notify, track } from '../lib/services.ts';
-import { areFriends, isAdultViewer, publicUserFrom } from '../lib/users.ts';
+import { areFriends, publicUserFrom } from '../lib/users.ts';
+import { seesSensitiveMedia } from '../lib/interactions.ts';
 import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
 import { assertRecapUse } from '../lib/recap-sharing.ts';
 import { requireVerified } from '../lib/verification.ts';
@@ -184,7 +185,7 @@ export default async function realModule(app: FastifyInstance, ctx: AppContext) 
        FROM together_contributions c JOIN profiles pr ON pr.user_id = c.user_id LEFT JOIN media md ON md.id = c.media_id
        WHERE c.together_id = $1 AND c.deleted_at IS NULL AND md.moderation IS DISTINCT FROM 'blocked'
          AND (md.moderation IS DISTINCT FROM 'sensitive' OR $2) ORDER BY c.captured_at, c.created_at`,
-      [id, await isAdultViewer(db, userId)],
+      [id, await seesSensitiveMedia(db, userId)],
     );
     return {
       id: t.id,

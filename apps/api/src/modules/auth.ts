@@ -4,12 +4,14 @@ import { tx } from '@yapilapi/database';
 import {
   ADULT_AGE,
   birthDateSchema,
+  changePasswordSchema,
   forgotPasswordSchema,
   loginSchema,
   MIN_SIGNUP_AGE,
   registerSchema,
   resetPasswordSchema,
   tokenSchema,
+  type AccountInfo,
   type Me,
   SUPPORTED_LOCALES,
 } from '@yapilapi/shared';
@@ -62,7 +64,14 @@ export async function loadMe(ctx: AppContext, userId: string): Promise<Me> {
 export default async function authModule(app: FastifyInstance, ctx: AppContext) {
   const ttlMs = ctx.config.SESSION_TTL_DAYS * 86400_000;
 
+  /**
+   * A new session. "Stay signed in" is the default; a web sign-in that turns it off
+   * (`remember: false` in the body) gets a cookie that ends with the browser, and a session
+   * that ends after a day at most.
+   */
   async function startSession(req: FastifyRequest, reply: FastifyReply, userId: string) {
+    const remember = (req.body as { remember?: unknown } | undefined)?.remember !== false;
+    const lifetime = remember ? ttlMs : Math.min(ttlMs, 86400_000);
     const { token, hash } = newToken();
     const ua = req.headers['user-agent']?.slice(0, 300) ?? null;
     const device = await ctx.db.query<{ id: string }>(`INSERT INTO devices (user_id, name, platform) VALUES ($1, $2, $3) RETURNING id`, [
@@ -76,14 +85,14 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
       hash,
       ua,
       req.ip,
-      new Date(Date.now() + ttlMs),
+      new Date(Date.now() + lifetime),
     ]);
     reply.setCookie(SESSION_COOKIE, token, {
       httpOnly: true,
       secure: ctx.config.COOKIE_SECURE,
       sameSite: 'lax',
       path: '/',
-      maxAge: Math.floor(ttlMs / 1000),
+      ...(remember ? { maxAge: Math.floor(ttlMs / 1000) } : {}),
     });
     return token;
   }
@@ -216,6 +225,34 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
     return { ok: true };
   });
 
+  /** Log out everywhere: every session of this account ends, this one included. */
+  app.post('/v1/auth/logout-all', { preHandler: requireAuth }, async (req, reply) => {
+    const u = me(req);
+    const r = await ctx.db.query(`UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`, [u.id]);
+    await securityEvent(ctx.db, u.id, 'sessions_revoked', req.ip, req.headers['user-agent'], { count: r.rowCount, everywhere: true });
+    reply.clearCookie(SESSION_COOKIE, { path: '/' });
+    return { ok: true, revoked: r.rowCount };
+  });
+
+  /** Settings > Account: sign-in details and the date of birth (read-only), for the account itself only. */
+  app.get('/v1/me/account', { preHandler: requireAuth }, async (req) => {
+    const { rows } = await ctx.db.query(
+      `SELECT email, email_verified_at, phone_e164, phone_verified_at, to_char(birth_date, 'YYYY-MM-DD') AS birth_date, created_at FROM users WHERE id = $1`,
+      [me(req).id],
+    );
+    const r = rows[0];
+    if (!r) throw notFound('Account');
+    const account: AccountInfo = {
+      email: r.email,
+      emailVerified: !!r.email_verified_at,
+      phone: r.phone_e164 ?? null,
+      phoneVerified: !!r.phone_verified_at,
+      birthDate: r.birth_date ?? null,
+      createdAt: r.created_at.toISOString(),
+    };
+    return { account };
+  });
+
   app.get('/v1/auth/me', { preHandler: requireAuth }, async (req) => {
     // Record the country from a trusted CDN header unless the person chose one themselves.
     const header = ctx.config.TRUSTED_COUNTRY_HEADER;
@@ -328,7 +365,7 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
 
   app.post('/v1/auth/password/change', { preHandler: requireAuth, config: authLimit }, async (req) => {
     const u = me(req);
-    const input = parse(z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(10).max(200) }), req.body);
+    const input = parse(changePasswordSchema, req.body);
     const { rows } = await ctx.db.query<{ password_hash: string }>(`SELECT password_hash FROM users WHERE id = $1`, [u.id]);
     if (!(await verifyPassword(input.currentPassword, rows[0]?.password_hash)))
       throw badRequest('Your current password is incorrect.', { fields: { currentPassword: 'Incorrect.' } });

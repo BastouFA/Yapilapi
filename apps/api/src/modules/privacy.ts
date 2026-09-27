@@ -84,6 +84,7 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       consents: await q(`SELECT purpose, granted, updated_at FROM consents WHERE user_id = $1`),
       aiMemories: await q(`SELECT content, source, created_at FROM ai_memories WHERE user_id = $1`),
       securityEvents: await q(`SELECT type, created_at FROM security_events WHERE user_id = $1 ORDER BY created_at DESC LIMIT 500`),
+      problemReports: await q(`SELECT body, platform, app_version, page, status, created_at FROM problem_reports WHERE user_id = $1 ORDER BY created_at DESC`),
     };
     await db.query(`INSERT INTO privacy_requests (user_id, kind, status, completed_at) VALUES ($1,'export','completed',now())`, [u.id]);
     reply.header('content-disposition', `attachment; filename="yapilapi-export-${u.id}.json"`);
@@ -116,6 +117,8 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         [u.id],
       );
       await c.query(`UPDATE posts SET deleted_at = now(), body = '' WHERE author_id = $1 AND deleted_at IS NULL`, [u.id]);
+      // Problems they reported stay (they may describe a bug), without their words or who sent them.
+      await c.query(`UPDATE problem_reports SET user_id = NULL, body = '', page = NULL WHERE user_id = $1`, [u.id]);
       // Earlier versions of the text go too.
       await c.query(`DELETE FROM post_edits e USING posts p WHERE p.id = e.post_id AND p.author_id = $1`, [u.id]);
       await c.query(`UPDATE comments SET deleted_at = now(), body = '' WHERE author_id = $1 AND deleted_at IS NULL`, [u.id]);

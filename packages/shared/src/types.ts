@@ -52,6 +52,29 @@ export interface Me extends PublicUser {
   translation: TranslationSettings;
 }
 
+/** Account details for Settings > Account (GET /v1/me/account). Only ever sent to the account itself. */
+export interface AccountInfo {
+  email: string;
+  emailVerified: boolean;
+  phone: string | null;
+  phoneVerified: boolean;
+  /** YYYY-MM-DD, or null for an account made before a birth date was required. */
+  birthDate: string | null;
+  createdAt: string;
+}
+
+/** Who can reach you, notification quiet hours and sensitive media (GET/PUT /v1/me/interactions). */
+export interface InteractionSettings {
+  messagesFrom: 'everyone' | 'following' | 'friends';
+  commentsFrom: 'everyone' | 'following' | 'followers';
+  mentionsFrom: 'everyone' | 'following' | 'nobody';
+  /** "HH:MM" in `timezone`; null when quiet hours are off. */
+  quietHours: { start: string; end: string; timezone: string } | null;
+  sensitiveMedia: 'standard' | 'less';
+  /** Under 18: sensitive media is never shown, whatever the setting. */
+  sensitiveLocked: boolean;
+}
+
 /** A short "Now" line, for 24 hours. `audience` is only included for its owner. */
 export interface NowStatus {
   text: string;

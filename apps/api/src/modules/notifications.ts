@@ -2,14 +2,25 @@ import type { FastifyInstance } from 'fastify';
 import {
   attentionSchema,
   dataSaverSchema,
+  interactionSettingsSchema,
   NOTIFICATION_CATEGORIES,
   notificationPrefsSchema,
   pageQuerySchema,
   type DataSaverMode,
   type NotificationItem,
 } from '@yapilapi/shared';
-import { parse } from '../lib/errors.ts';
+import { AppError, badRequest, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
+import { interactionSettings } from '../lib/interactions.ts';
+
+/** An IANA time zone Postgres knows (quiet hours are worked out in it). */
+function safeTimeZoneOrThrow(tz: string) {
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: tz });
+  } catch {
+    throw badRequest('That time zone isn’t recognized.');
+  }
+}
 import { decodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
 import { plusCol, publicUserFrom } from '../lib/users.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
@@ -53,6 +64,41 @@ export default async function notificationsModule(app: FastifyInstance, ctx: App
       await db.query(`UPDATE notifications SET read_at = now() WHERE user_id = $1 AND id = ANY($2::uuid[]) AND read_at IS NULL`, [me(req).id, body.ids]);
     else await db.query(`UPDATE notifications SET read_at = now() WHERE user_id = $1 AND read_at IS NULL`, [me(req).id]);
     return { ok: true };
+  });
+
+  /**
+   * Who can message, comment on and mention you, notification quiet hours, and sensitive media.
+   * Under 18, sensitive media is never shown, so that setting can't be changed.
+   */
+  app.get('/v1/me/interactions', { preHandler: requireAuth }, async (req) => ({ settings: await interactionSettings(db, me(req).id) }));
+
+  app.put('/v1/me/interactions', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const input = parse(interactionSettingsSchema, req.body);
+    const current = await interactionSettings(db, u.id);
+    if (input.sensitiveMedia && current.sensitiveLocked && input.sensitiveMedia !== 'less')
+      throw new AppError(403, 'sensitive_locked', 'Sensitive photos and videos stay hidden for people under 18.');
+    if (input.quietHours) safeTimeZoneOrThrow(input.quietHours.timezone);
+    const sets: string[] = [];
+    const values: unknown[] = [u.id];
+    const set = (col: string, v: unknown) => {
+      values.push(v);
+      sets.push(`${col} = $${values.length}`);
+    };
+    if (input.messagesFrom) set('messages_from', input.messagesFrom);
+    if (input.commentsFrom) set('comments_from', input.commentsFrom);
+    if (input.mentionsFrom) set('mentions_from', input.mentionsFrom);
+    if (input.sensitiveMedia) set('sensitive_media', input.sensitiveMedia);
+    if (input.quietHours !== undefined) {
+      set('quiet_start', input.quietHours?.start ?? null);
+      set('quiet_end', input.quietHours?.end ?? null);
+      if (input.quietHours) set('quiet_timezone', input.quietHours.timezone);
+    }
+    if (sets.length) {
+      await db.query(`INSERT INTO user_preferences (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING`, [u.id]);
+      await db.query(`UPDATE user_preferences SET ${sets.join(', ')}, updated_at = now() WHERE user_id = $1`, values);
+    }
+    return { settings: await interactionSettings(db, u.id) };
   });
 
   app.get('/v1/me/preferences', { preHandler: requireAuth }, async (req) => {

@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import { extractMentions } from '@yapilapi/shared';
 import type { RealtimeHub } from './realtime.ts';
 import { minorRuleSql } from './collabs.ts';
+import { mentionAllowedSql } from './interactions.ts';
 import { notify } from './services.ts';
 import { postVisibleSql } from './visibility.ts';
 
@@ -25,7 +26,7 @@ export async function notifyMentions(
   if (!names.length) return 0;
   const { rows } = await db.query(
     // Minor protection, as for photo tags: an adult and someone under 18 who aren't friends don't reach each other this way.
-    `SELECT pr.user_id FROM profiles pr WHERE lower(pr.username) = ANY($2::text[]) AND pr.user_id <> $3 AND ${minorRuleSql('$3', 'pr.user_id')}
+    `SELECT pr.user_id FROM profiles pr WHERE lower(pr.username) = ANY($2::text[]) AND pr.user_id <> $3 AND ${minorRuleSql('$3', 'pr.user_id')} AND ${mentionAllowedSql('$3', 'pr.user_id')}
        AND EXISTS (SELECT 1 FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
                    WHERE p.id = $1 AND p.moderation_status = 'normal' AND ${postVisibleSql('pr.user_id')})`,
     [m.postId, names, m.actorId],

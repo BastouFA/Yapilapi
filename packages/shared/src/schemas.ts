@@ -6,6 +6,10 @@ import {
   CIRCLE_KINDS,
   COMMENT_POLICIES,
   COMMENT_SORTS,
+  COMMENT_PERMISSIONS,
+  MENTION_PERMISSIONS,
+  MESSAGE_PERMISSIONS,
+  SENSITIVE_MEDIA_LEVELS,
   HIDDEN_WORD_MAX,
   HIDDEN_WORDS_MAX,
   COMMUNITY_ROLES,
@@ -97,7 +101,35 @@ export const registerSchema = z.object({
 export const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
   password: z.string().min(1).max(200),
+  /** "Stay signed in" (the default). false: the web session ends when the browser closes, and after a day at most. */
+  remember: z.boolean().optional(),
 });
+
+const clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use a time like 22:00.');
+
+/** PUT /v1/me/interactions: any of the settings; quietHours null turns quiet hours off. */
+export const interactionSettingsSchema = z
+  .object({
+    messagesFrom: z.enum(MESSAGE_PERMISSIONS),
+    commentsFrom: z.enum(COMMENT_PERMISSIONS),
+    mentionsFrom: z.enum(MENTION_PERMISSIONS),
+    quietHours: z
+      .object({ start: clock, end: clock, timezone: z.string().min(1).max(64) })
+      .refine((q) => q.start !== q.end, { message: 'Quiet hours need a different start and end.' })
+      .nullable(),
+    sensitiveMedia: z.enum(SENSITIVE_MEDIA_LEVELS),
+  })
+  .partial();
+
+/** "Report a problem" (Settings > Help). */
+export const problemReportSchema = z.object({
+  body: z.string().trim().min(5, 'Tell us a little more about what happened.').max(2000),
+  platform: z.enum(['web', 'ios', 'android', 'other']),
+  appVersion: z.string().trim().max(40).optional(),
+  page: z.string().trim().max(300).optional(),
+});
+
+export const changePasswordSchema = z.object({ currentPassword: z.string().min(1).max(200), newPassword: passwordSchema });
 
 export const tokenSchema = z.object({ token: z.string().min(20).max(200) });
 export const forgotPasswordSchema = z.object({ email: z.string().trim().toLowerCase().email() });

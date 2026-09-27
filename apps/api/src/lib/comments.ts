@@ -7,6 +7,7 @@ import { assessComment, type Assessment } from './spam.ts';
 import { langOf } from './translation.ts';
 import { plusCol, publicUserFrom } from './users.ts';
 import { notBlockedSql } from './visibility.ts';
+import { accountCommentsAllowedSql } from './interactions.ts';
 
 type Q = Pool | PoolClient;
 
@@ -31,7 +32,7 @@ export function commentAllowedSql(v: string): string {
     OR (p.comment_policy <> 'off' AND p.author_id = ${v})
     OR (p.comment_policy = 'following' AND EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = p.author_id AND f.followee_id = ${v}))
     OR (p.comment_policy = 'followers' AND EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${v} AND f.followee_id = p.author_id))
-  ))`;
+  ) AND ${accountCommentsAllowedSql(v)})`;
 }
 
 /**
@@ -223,7 +224,9 @@ export const reachesOthers = (s: CommentScreening) => !s.hidden && (s.status ===
 export function closedMessage(policy: CommentPolicy): string {
   return policy === 'off'
     ? 'Comments are turned off for this post.'
-    : policy === 'following'
-      ? 'Only people the author follows can comment on this post.'
-      : 'Only people who follow the author can comment on this post.';
+    : policy === 'everyone'
+      ? 'The author limits who can comment on their posts.'
+      : policy === 'following'
+        ? 'Only people the author follows can comment on this post.'
+        : 'Only people who follow the author can comment on this post.';
 }

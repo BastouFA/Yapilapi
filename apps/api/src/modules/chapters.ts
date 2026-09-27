@@ -20,6 +20,7 @@ import type { RealtimeHub } from '../lib/realtime.ts';
 import { notify, track } from '../lib/services.ts';
 import { ageOf, plusCol, publicUserFrom } from '../lib/users.ts';
 import { notBlockedSql } from '../lib/visibility.ts';
+import { seesSensitiveSql } from '../lib/interactions.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 /*
@@ -72,7 +73,7 @@ export function storyVisibleSql(v: string): string {
     AND (m.author_id = ch.owner_id OR ${contributor('m.author_id')})
     AND ${notBlockedSql('m.author_id', v)}
     AND NOT EXISTS (SELECT 1 FROM media x WHERE x.id = m.media_id AND (x.moderation = 'blocked'
-      OR (x.moderation = 'sensitive' AND NOT coalesce((SELECT uv.birth_date <= current_date - interval '18 years' FROM users uv WHERE uv.id = ${v}), false))))
+      OR (x.moderation = 'sensitive' AND NOT ${seesSensitiveSql(v)})))
     AND (ch.audience <> 'public' OR NOT ${minor('au.birth_date')} OR m.author_id = ${v} OR ch.owner_id = ${v} OR ${contributor(v)} OR ${follows(v, 'm.author_id')}))`;
 }
 

@@ -26,6 +26,7 @@ import { notify } from './services.ts';
 import { soundVisibleSql } from './sounds.ts';
 import { publicUserFrom, usersByIds } from './users.ts';
 import { notBlockedSql } from './visibility.ts';
+import { mentionAllowedSql, seesSensitiveSql } from './interactions.ts';
 import { mediaSizesSql, withSmallVariants } from './data-saver.ts';
 import { trackMusic, tracksByIds, viewerCountries, type TrackRow } from './music/view.ts';
 
@@ -51,7 +52,7 @@ export function storyVisibleSql(v: string, opts: { open?: boolean } = {}): strin
     OR (m.visibility IN ('public','followers','friends') AND EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = ${v} AND fr.user_b = m.author_id) OR (fr.user_b = ${v} AND fr.user_a = m.author_id)))
     ${opts.open ? `OR (m.visibility = 'public' AND NOT EXISTS (SELECT 1 FROM profiles px WHERE px.user_id = m.author_id AND px.is_private))` : ''})
   AND NOT EXISTS (SELECT 1 FROM media x WHERE x.id = m.media_id AND (x.moderation = 'blocked'
-    OR (x.moderation = 'sensitive' AND NOT coalesce((SELECT uv.birth_date <= current_date - interval '18 years' FROM users uv WHERE uv.id = ${v}), false))))`;
+    OR (x.moderation = 'sensitive' AND NOT ${seesSensitiveSql(v)})))`;
 }
 
 /**
@@ -182,7 +183,10 @@ export async function prepareStory(
 export async function notifyStoryMentions(db: Q, realtime: RealtimeHub, m: { storyId: string; actorId: string; userIds: string[] }): Promise<number> {
   if (!m.userIds.length) return 0;
   const allowed = (
-    await db.query<{ id: string }>(`SELECT x.id FROM unnest($2::uuid[]) AS x(id) WHERE ${minorRuleSql('$1::uuid', 'x.id')}`, [m.actorId, m.userIds])
+    await db.query<{ id: string }>(
+      `SELECT x.id FROM unnest($2::uuid[]) AS x(id) WHERE ${minorRuleSql('$1::uuid', 'x.id')} AND ${mentionAllowedSql('$1::uuid', 'x.id')}`,
+      [m.actorId, m.userIds],
+    )
   ).rows.map((r) => r.id);
   let sent = 0;
   for (const userId of allowed) {

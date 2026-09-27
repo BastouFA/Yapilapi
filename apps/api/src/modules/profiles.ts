@@ -24,6 +24,7 @@ import { notify, personalizationAllowed, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
 import { ageOf, areFriends, isBlockedEitherWay, PUBLIC_USER_COLS, toPublicUser, type PublicUserRow } from '../lib/users.ts';
 import { notBlockedSql } from '../lib/visibility.ts';
+import { messagesAllowedSql } from '../lib/interactions.ts';
 import { byOrWithSql, canInviteSql, canTagSql } from '../lib/collabs.ts';
 import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
 import { nowStatusesFor, ownNowStatus } from '../lib/now-status.ts';
@@ -83,7 +84,8 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
               -- Minor protection: an adult and a minor can only message once they're friends.
               (rel.friend OR NOT (
                  (coalesce(u2.birth_date > current_date - interval '18 years', false)) <>
-                 (coalesce((SELECT birth_date FROM me) > current_date - interval '18 years', false)))) AS can_message,
+                 (coalesce((SELECT birth_date FROM me) > current_date - interval '18 years', false))))
+                AND ${messagesAllowedSql('$1', 'pr.user_id')} AS can_message,
               ${canTagSql('$1', 'pr.user_id')} AS can_tag
        FROM rel JOIN profiles pr ON pr.user_id = rel.user_id JOIN users u2 ON u2.id = rel.user_id
        ORDER BY rel.friend DESC, rel.following DESC, rel.last_chat DESC NULLS LAST,
@@ -566,6 +568,20 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     );
     return { items: rows.map(toPublicUser) };
   });
+
+  // People you muted or restricted, for Settings (each can be undone from there).
+  for (const [path, table, a, b] of [
+    ['muted', 'mutes', 'muter_id', 'muted_id'],
+    ['restricted', 'restrictions', 'restrictor_id', 'restricted_id'],
+  ] as const)
+    app.get(`/v1/me/${path}`, { preHandler: requireAuth }, async (req) => {
+      const { rows } = await db.query<PublicUserRow>(
+        `SELECT ${PUBLIC_USER_COLS} FROM ${table} x JOIN profiles pr ON pr.user_id = x.${b} JOIN users u ON u.id = x.${b}
+         WHERE x.${a} = $1 AND u.status = 'active' AND u.deleted_at IS NULL ORDER BY pr.display_name`,
+        [me(req).id],
+      );
+      return { items: rows.map(toPublicUser) };
+    });
 
   for (const [path, table, a, b] of [
     ['mute', 'mutes', 'muter_id', 'muted_id'],

@@ -27,7 +27,8 @@ import { notifyMentions } from '../lib/mentions.ts';
 import { coAuthoredSql } from '../lib/collabs.ts';
 import { topicsFor } from './tags.ts';
 import { notify, personalizationAllowed, track } from '../lib/services.ts';
-import { isAdultViewer, plusCol, publicUserFrom } from '../lib/users.ts';
+import { plusCol, publicUserFrom } from '../lib/users.ts';
+import { seesSensitiveMedia } from '../lib/interactions.ts';
 import { notBlockedSql, postUnlockedSql, postVisibleSql } from '../lib/visibility.ts';
 import { assessPost } from '../lib/spam.ts';
 import { requireVerified } from '../lib/verification.ts';
@@ -103,7 +104,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
        ) DESC, p.created_at DESC, p.id DESC
        LIMIT $3 OFFSET $4`,
       // A reel is its video: people under 18 don't get reels whose video is marked sensitive.
-      [u.id, c.asOf, q.limit + 1, c.o, await isAdultViewer(db, u.id), await personalizationAllowed(db, u.id)],
+      [u.id, c.asOf, q.limit + 1, c.o, await seesSensitiveMedia(db, u.id), await personalizationAllowed(db, u.id)],
     );
     const page = rows.slice(0, q.limit);
     const items = await hydratePosts(

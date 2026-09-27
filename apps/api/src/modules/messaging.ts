@@ -28,7 +28,8 @@ import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { notify, track } from '../lib/services.ts';
-import { ageOf, areFriends, isAdultViewer, isBlockedEitherWay, publicUserFrom, usersByIds } from '../lib/users.ts';
+import { ageOf, areFriends, isBlockedEitherWay, publicUserFrom, usersByIds } from '../lib/users.ts';
+import { messagesAllowed, seesSensitiveMedia, seesSensitiveSql } from '../lib/interactions.ts';
 import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
 import { assertMessagePace, assessMessage, flagContent, isRestricted, restrictedError } from '../lib/spam.ts';
 import { requireVerified } from '../lib/verification.ts';
@@ -108,6 +109,9 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       if (controls.messagesFrom === 'nobody' || !(await areFriends(db, senderId, recipientId)))
         throw new AppError(403, 'family_controls', 'Family settings on this account limit who it can message.');
     }
+    // The recipient's own "Who can message you" (friends, and chats they started, always get through).
+    if (!(await messagesAllowed(db, senderId, recipientId)))
+      throw new AppError(403, 'messages_limited', 'This person only gets messages from people they know.');
     // Messaging people who aren't friends needs a confirmed email or phone, and isn't open to limited accounts.
     if (!(await areFriends(db, senderId, recipientId))) {
       await requireVerified(db, ctx.config, senderId, 'message');
@@ -210,7 +214,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       rows.map(otherOf).filter((id): id is string => !!id),
       userId,
     );
-    const adult = await isAdultViewer(db, userId);
+    const adult = await seesSensitiveMedia(db, userId);
     const paused = !!(await db.query(`SELECT yaps_paused FROM user_preferences WHERE user_id = $1`, [userId])).rows[0]?.yaps_paused;
     const withLast = await withStories(
       await withVerdicts(
@@ -350,7 +354,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
 
   /** Messages as one reader sees them: attachment verdicts, story cards, view once, the quoted reply and reactions. */
   async function present(rows: Record<string, any>[], reader: string): Promise<Message[]> {
-    const items = await withViewOnce(await withVerdicts((await withStories(rows, reader)).map(toMessage), await isAdultViewer(db, reader)), reader);
+    const items = await withViewOnce(await withVerdicts((await withStories(rows, reader)).map(toMessage), await seesSensitiveMedia(db, reader)), reader);
     return decorate(items, reader);
   }
 
@@ -592,9 +596,9 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     }
     // Sensitive attachments are marked for adults and replaced for everyone else.
     const adults = new Set(
-      (
-        await db.query<{ id: string }>(`SELECT id FROM users WHERE id = ANY($1::uuid[]) AND birth_date <= current_date - interval '18 years'`, [members])
-      ).rows.map((r) => r.id),
+      (await db.query<{ id: string }>(`SELECT u.id FROM users u WHERE u.id = ANY($1::uuid[]) AND ${seesSensitiveSql('u.id')}`, [members])).rows.map(
+        (r) => r.id,
+      ),
     );
     const [forAdults] = await withVerdicts([message], true);
     const [forOthers] = await withVerdicts([message], false);
@@ -961,7 +965,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
   async function assertCanOpen(r: Awaited<ReturnType<typeof viewOnceMessage>>, userId: string) {
     if (r.viewed_at || r.stale) throw gone('view_once_viewed', 'You already opened this. View-once photos and videos can only be opened once.');
     if (r.view_once_ended_at || !r.storage_key || r.media_deleted_at) throw gone('view_once_expired', 'This photo or video is no longer available.');
-    if (r.moderation === 'blocked' || (r.moderation === 'sensitive' && !(await isAdultViewer(db, userId))))
+    if (r.moderation === 'blocked' || (r.moderation === 'sensitive' && !(await seesSensitiveMedia(db, userId))))
       throw gone('view_once_removed', 'This photo or video isn’t available.');
   }
 

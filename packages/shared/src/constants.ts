@@ -69,6 +69,20 @@ export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
  */
 export const COMMENT_POLICIES = ['everyone', 'following', 'followers', 'off'] as const;
 export type CommentPolicy = (typeof COMMENT_POLICIES)[number];
+/**
+ * Who can reach you (Settings > Privacy). Friends always can. Messages: who can start a chat
+ * with you. Comments: who can comment on your posts, on top of each post's own setting.
+ * Mentions: whose @mentions notify you.
+ */
+export const MESSAGE_PERMISSIONS = ['everyone', 'following', 'friends'] as const;
+export type MessagePermission = (typeof MESSAGE_PERMISSIONS)[number];
+export const COMMENT_PERMISSIONS = ['everyone', 'following', 'followers'] as const;
+export type CommentPermission = (typeof COMMENT_PERMISSIONS)[number];
+export const MENTION_PERMISSIONS = ['everyone', 'following', 'nobody'] as const;
+export type MentionPermission = (typeof MENTION_PERMISSIONS)[number];
+/** Sensitive photos and videos: covered until you choose to see them, or not shown at all (always so under 18). */
+export const SENSITIVE_MEDIA_LEVELS = ['standard', 'less'] as const;
+export type SensitiveMediaLevel = (typeof SENSITIVE_MEDIA_LEVELS)[number];
 /** Top: likes, a like from the post's author, replies and freshness. Newest: most recent first. */
 export const COMMENT_SORTS = ['top', 'newest'] as const;
 export type CommentSort = (typeof COMMENT_SORTS)[number];

@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import type { MediaItem, Post, RemixRef } from '@yapilapi/shared';
-import { isAdultViewer, plusCol, publicUserFrom } from './users.ts';
+import { plusCol, publicUserFrom } from './users.ts';
+import { seesSensitiveMedia } from './interactions.ts';
 import { allowDownloadSql, postUnlockedSql, postVisibleSql } from './visibility.ts';
 import { attachCollabsAndTags } from './collabs.ts';
 import { mediaSizesSql, withSmallVariants } from './data-saver.ts';
@@ -20,7 +21,7 @@ type Q = Pool | PoolClient;
 export async function hydratePosts(db: Q, ids: string[], viewer: string | null, reasons?: Map<string, string>): Promise<Post[]> {
   if (!ids.length) return [];
   // Media the automated check marked sensitive is never sent to people under 18 (or whose age we don't know); blocked media to nobody.
-  const adult = await isAdultViewer(db, viewer);
+  const adult = await seesSensitiveMedia(db, viewer);
   const { rows } = await db.query(
     `SELECT p.id, p.kind, p.format, p.body, p.lang, p.visibility, p.link_url, p.topics, p.like_count, p.comment_count, p.view_count, p.created_at, p.edited_at, p.status, p.scheduled_at, p.ai_provenance, p.metadata->'real' AS real,
             pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode, ${plusCol('a_')},
