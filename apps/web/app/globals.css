@@ -8080,3 +8080,80 @@ button.profile-song__play::after {
   border-radius: 50%;
   background: linear-gradient(135deg, var(--ca-from), var(--ca-to));
 }
+
+/* Watch together: pick a reel or a saved video to add */
+.watch-picks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.watch-picks__row {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 var(--space-1);
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+}
+.watch-picks__row li {
+  flex: 0 0 104px;
+  scroll-snap-align: start;
+}
+.watch-picks__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  text-align: start;
+  cursor: pointer;
+  font: inherit;
+}
+.watch-picks__item:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.watch-picks__item:focus-visible {
+  outline: 2px solid var(--yapi);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+.watch-picks__thumb {
+  position: relative;
+  display: block;
+  width: 104px;
+  height: 160px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: #000;
+}
+.watch-picks__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.watch-picks__badge {
+  position: absolute;
+  inset-inline-end: 6px;
+  bottom: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+.watch-picks__title {
+  font-size: 12px;
+  line-height: 16px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

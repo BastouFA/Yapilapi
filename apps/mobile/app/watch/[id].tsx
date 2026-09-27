@@ -3,7 +3,7 @@ import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { Message, PublicUser } from '../../../../packages/shared/src/types';
+import type { Message, Post, PublicUser } from '../../../../packages/shared/src/types';
 import { WATCH_REACTIONS, type WatchQueueItem, type WatchSkipReason } from '../../../../packages/shared/src/watch';
 import { client, errorMessage } from '../../lib/api';
 import { previewOf, previewText, SystemLine } from '../../lib/chat-extras';
@@ -29,7 +29,7 @@ import {
   useColors,
   userText,
 } from '../../lib/ui';
-import { FloatingReaction, postIdFromLink, postThumb, useWatchSync, videoOf } from '../../lib/watch';
+import { canWatch, FloatingReaction, postIdFromLink, postThumb, useWatchSync, videoOf } from '../../lib/watch';
 
 const WHITE = '#FFFFFF';
 const SCRIM = 'rgba(5,6,11,0.55)';
@@ -486,11 +486,94 @@ function Queue({
     if (await onAdd([postId])) setLink('');
   }
 
+  // Something to pick without leaving: reels, or the videos you saved.
+  const [source, setSource] = useState<'reels' | 'saved'>('reels');
+  const [picks, setPicks] = useState<Post[] | null>(null);
+  const [adding, setAdding] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    setPicks(null);
+    void (async () => {
+      try {
+        const api = await client();
+        const page = source === 'reels' ? await api.reels() : await api.me.saved('videos');
+        if (live) setPicks(page.items.filter(canWatch));
+      } catch {
+        if (live) setPicks([]);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [source]);
+  const queued = new Set(items.map((q) => q.post.id));
+
   return (
     <ScrollView
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={{ padding: space[3], gap: space[3], paddingBottom: Math.max(insets.bottom, space[4]) }}
     >
+      <View style={{ gap: space[2] }}>
+        <Segmented
+          label={t('watch.pickFrom')}
+          value={source}
+          onChange={setSource}
+          options={[
+            { id: 'reels', label: t('watch.pickReels') },
+            { id: 'saved', label: t('watch.pickSaved') },
+          ]}
+        />
+        {picks === null ? (
+          <Loading />
+        ) : picks.length ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space[2] }}>
+            {picks.map((p) => {
+              const thumb = postThumb(p);
+              const inQueue = queued.has(p.id);
+              const label = p.body.trim() || t('watch.pickUntitled', { name: p.author.displayName });
+              return (
+                <Pressable
+                  key={p.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={inQueue ? t('watch.pickQueued', { title: label }) : t('watch.pickAdd', { title: label })}
+                  accessibilityState={{ disabled: inQueue || adding === p.id }}
+                  disabled={inQueue || adding === p.id}
+                  onPress={async () => {
+                    setAdding(p.id);
+                    await onAdd([p.id]);
+                    setAdding(null);
+                  }}
+                  style={{ width: 96, gap: 4, opacity: inQueue ? 0.55 : 1 }}
+                >
+                  <View style={{ width: 96, height: 150, borderRadius: radius.md, overflow: 'hidden', backgroundColor: '#000' }}>
+                    {thumb ? <Image source={{ uri: thumb }} style={{ width: '100%', height: '100%' }} /> : null}
+                    <View
+                      style={{
+                        position: 'absolute',
+                        right: 6,
+                        bottom: 6,
+                        width: 28,
+                        height: 28,
+                        borderRadius: 14,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'rgba(0,0,0,0.6)',
+                      }}
+                    >
+                      <Icon name={inQueue ? 'checkmark' : 'add'} size={18} color="#fff" />
+                    </View>
+                  </View>
+                  <Text numberOfLines={2} style={[{ color: c.ink, fontSize: 12, lineHeight: 16 }, userText]}>
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        ) : (
+          <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{source === 'reels' ? t('watch.pickNoReels') : t('watch.pickNoSaved')}</Text>
+        )}
+      </View>
       <View style={{ gap: space[2] }}>
         <Field
           label={t('watch.add')}

@@ -3696,6 +3696,14 @@ const en = {
   'watch.progress': '{position} of {duration}',
   'watch.seek': 'Position in the video',
   'watch.playNow': 'Play now',
+  'watch.pickFrom': 'Pick from',
+  'watch.pickReels': 'Reels',
+  'watch.pickSaved': 'Saved videos',
+  'watch.pickUntitled': 'Video by {name}',
+  'watch.pickAdd': 'Add {title} to the queue',
+  'watch.pickQueued': '{title}, in the queue',
+  'watch.pickNoReels': 'No reels to pick right now. Paste a link below.',
+  'watch.pickNoSaved': 'Videos you save show here.',
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -7420,6 +7428,14 @@ const fr: Catalog = {
   'watch.progress': '{position} sur {duration}',
   'watch.seek': 'Position dans la vidéo',
   'watch.playNow': 'Lire maintenant',
+  'watch.pickFrom': 'Choisir parmi',
+  'watch.pickReels': 'Reels',
+  'watch.pickSaved': 'Vidéos enregistrées',
+  'watch.pickUntitled': 'Vidéo de {name}',
+  'watch.pickAdd': 'Ajouter {title} à la file',
+  'watch.pickQueued': '{title}, dans la file',
+  'watch.pickNoReels': 'Aucun reel à choisir pour l’instant. Collez un lien ci-dessous.',
+  'watch.pickNoSaved': 'Les vidéos que vous enregistrez apparaissent ici.',
 };
 
 const ar: Catalog = {
@@ -11095,6 +11111,14 @@ const ar: Catalog = {
   'watch.progress': '{position} من {duration}',
   'watch.seek': 'الموضع في الفيديو',
   'watch.playNow': 'شغّل الآن',
+  'watch.pickFrom': 'اختر من',
+  'watch.pickReels': 'ريلز',
+  'watch.pickSaved': 'الفيديوهات المحفوظة',
+  'watch.pickUntitled': 'فيديو من {name}',
+  'watch.pickAdd': 'أضف {title} إلى القائمة',
+  'watch.pickQueued': '{title}، في القائمة',
+  'watch.pickNoReels': 'لا توجد ريلز للاختيار الآن. الصق رابطًا في الأسفل.',
+  'watch.pickNoSaved': 'تظهر هنا الفيديوهات التي تحفظها.',
 };
 
 const es: Catalog = {
@@ -14800,6 +14824,14 @@ const es: Catalog = {
   'watch.progress': '{position} de {duration}',
   'watch.seek': 'Posición en el video',
   'watch.playNow': 'Reproducir ahora',
+  'watch.pickFrom': 'Elegir de',
+  'watch.pickReels': 'Reels',
+  'watch.pickSaved': 'Videos guardados',
+  'watch.pickUntitled': 'Video de {name}',
+  'watch.pickAdd': 'Añadir {title} a la cola',
+  'watch.pickQueued': '{title}, en la cola',
+  'watch.pickNoReels': 'No hay reels para elegir ahora. Pega un enlace abajo.',
+  'watch.pickNoSaved': 'Aquí aparecen los videos que guardas.',
 };
 
 const pt: Catalog = {
@@ -18499,6 +18531,14 @@ const pt: Catalog = {
   'watch.progress': '{position} de {duration}',
   'watch.seek': 'Posição no vídeo',
   'watch.playNow': 'Reproduzir agora',
+  'watch.pickFrom': 'Escolher de',
+  'watch.pickReels': 'Reels',
+  'watch.pickSaved': 'Vídeos salvos',
+  'watch.pickUntitled': 'Vídeo de {name}',
+  'watch.pickAdd': 'Adicionar {title} à fila',
+  'watch.pickQueued': '{title}, na fila',
+  'watch.pickNoReels': 'Nenhum reel para escolher agora. Cole um link abaixo.',
+  'watch.pickNoSaved': 'Os vídeos que você salva aparecem aqui.',
 };
 
 const sw: Catalog = {
@@ -22202,6 +22242,14 @@ const sw: Catalog = {
   'watch.progress': '{position} kati ya {duration}',
   'watch.seek': 'Mahali kwenye video',
   'watch.playNow': 'Cheza sasa',
+  'watch.pickFrom': 'Chagua kutoka',
+  'watch.pickReels': 'Reels',
+  'watch.pickSaved': 'Video ulizohifadhi',
+  'watch.pickUntitled': 'Video ya {name}',
+  'watch.pickAdd': 'Ongeza {title} kwenye foleni',
+  'watch.pickQueued': '{title}, iko kwenye foleni',
+  'watch.pickNoReels': 'Hakuna reels za kuchagua sasa. Bandika kiungo hapa chini.',
+  'watch.pickNoSaved': 'Video unazohifadhi zinaonekana hapa.',
 };
 
 const yo: Catalog = {
@@ -25894,6 +25942,14 @@ const yo: Catalog = {
   'watch.progress': '{position} nínú {duration}',
   'watch.seek': 'Ibi tí fídíò dé',
   'watch.playNow': 'Ṣe é báyìí',
+  'watch.pickFrom': 'Yan láti',
+  'watch.pickReels': 'Reels',
+  'watch.pickSaved': 'Àwọn fídíò tí o fipamọ́',
+  'watch.pickUntitled': 'Fídíò láti ọwọ́ {name}',
+  'watch.pickAdd': 'Fi {title} kún ìlà',
+  'watch.pickQueued': '{title}, wà nínú ìlà',
+  'watch.pickNoReels': 'Kò sí reel láti yàn báyìí. Lẹ ìjápọ̀ sí ìsàlẹ̀.',
+  'watch.pickNoSaved': 'Àwọn fídíò tí o fipamọ́ máa hàn níbí.',
 };
 
 const ha: Catalog = {
@@ -29598,6 +29654,14 @@ const ha: Catalog = {
   'watch.progress': '{position} cikin {duration}',
   'watch.seek': 'Wurin da bidiyo ya kai',
   'watch.playNow': 'Kunna yanzu',
+  'watch.pickFrom': 'Zaɓa daga',
+  'watch.pickReels': 'Reels',
+  'watch.pickSaved': 'Bidiyon da ka adana',
+  'watch.pickUntitled': 'Bidiyo daga {name}',
+  'watch.pickAdd': 'Ƙara {title} cikin jerin gaba',
+  'watch.pickQueued': '{title}, yana cikin jerin gaba',
+  'watch.pickNoReels': 'Babu reels da za a zaɓa yanzu. Liƙa hanyar haɗi a ƙasa.',
+  'watch.pickNoSaved': 'Bidiyon da ka adana suna bayyana a nan.',
 };
 
 export const CATALOGS: Record<string, Catalog> = { en, fr, ar, es, pt, sw, yo, ha };

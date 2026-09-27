@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { Avatar, Badge, BottomSheet, Button, CaptionTracks, ChatBubble, EmptyState, Icon, Skeleton, videoCrossOrigin } from '@yapilapi/design-system';
+import { Avatar, Badge, BottomSheet, Button, CaptionTracks, ChatBubble, EmptyState, Icon, Segments, Skeleton, videoCrossOrigin } from '@yapilapi/design-system';
 import {
   betterClock,
   clockSample,
@@ -1032,25 +1032,28 @@ export function WatchScreen({ id }: { id: string }) {
   const playing = !!playback?.playing && !w.needsTap;
   const title = chatName({ title: session.conversationTitle, members: session.members }, me?.id);
 
+  async function addIds(postIds: string[]): Promise<boolean> {
+    setAdding(true);
+    try {
+      const r = await api.watch.add(id, postIds);
+      w.applySession(r.session);
+      if (r.added.length) toast(t('watch.added'));
+      const note = addNotes(t, r.skipped);
+      if (note) toast(note);
+      return r.added.length > 0;
+    } catch (err) {
+      toast(errorMessage(err));
+      return false;
+    } finally {
+      setAdding(false);
+    }
+  }
+
   async function add(e: FormEvent) {
     e.preventDefault();
     const postId = postIdFrom(link);
     if (!postId) return toast(t('watch.badLink'));
-    setAdding(true);
-    try {
-      const r = await api.watch.add(id, [postId]);
-      w.applySession(r.session);
-      if (r.added.length) {
-        setLink('');
-        toast(t('watch.added'));
-      }
-      const note = addNotes(t, r.skipped);
-      if (note) toast(note);
-    } catch (err) {
-      toast(errorMessage(err));
-    } finally {
-      setAdding(false);
-    }
+    if (await addIds([postId])) setLink('');
   }
 
   async function remove(itemId: string) {
@@ -1241,6 +1244,7 @@ export function WatchScreen({ id }: { id: string }) {
             ) : !current ? null : (
               <p className="muted watch-note">{t('watch.queueEmpty')}</p>
             )}
+            <WatchPicks queued={new Set(session.queue.map((q) => q.post.id))} busy={adding} onAdd={(pid) => void addIds([pid])} />
             <form className="watch-add" onSubmit={(e) => void add(e)}>
               <label htmlFor="watch-add" className="watch-add__label">
                 {t('watch.add')}
@@ -1292,6 +1296,70 @@ export function WatchScreen({ id }: { id: string }) {
           </section>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Something to add without leaving: reels, or the videos you saved. */
+function WatchPicks({ queued, busy, onAdd }: { queued: Set<string>; busy: boolean; onAdd: (postId: string) => void }) {
+  const { t } = useSession();
+  const [source, setSource] = useState<'reels' | 'saved'>('reels');
+  const [picks, setPicks] = useState<Post[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    setPicks(null);
+    (source === 'reels' ? api.reels() : api.me.saved('videos'))
+      .then((page) => live && setPicks(page.items.filter((p) => hasVideo(p) && !p.status && !p.locked)))
+      .catch(() => live && setPicks([]));
+    return () => {
+      live = false;
+    };
+  }, [source]);
+  return (
+    <div className="watch-picks">
+      <Segments
+        label={t('watch.pickFrom')}
+        value={source}
+        onChange={setSource}
+        options={[
+          { id: 'reels', label: t('watch.pickReels') },
+          { id: 'saved', label: t('watch.pickSaved') },
+        ]}
+      />
+      {picks === null ? (
+        <Skeleton height={150} />
+      ) : picks.length ? (
+        <ul className="watch-picks__row">
+          {picks.map((p) => {
+            const thumb = postThumb(p);
+            const inQueue = queued.has(p.id);
+            const title = p.body.trim() || t('watch.pickUntitled', { name: p.author.displayName });
+            return (
+              <li key={p.id}>
+                <button
+                  type="button"
+                  className="watch-picks__item"
+                  disabled={inQueue || busy}
+                  aria-label={inQueue ? t('watch.pickQueued', { title }) : t('watch.pickAdd', { title })}
+                  onClick={() => onAdd(p.id)}
+                >
+                  <span className="watch-picks__thumb">
+                    {thumb ? <img src={thumb} alt="" loading="lazy" /> : null}
+                    <span className="watch-picks__badge" aria-hidden>
+                      <Icon name={inQueue ? 'check' : 'plus'} size={16} />
+                    </span>
+                  </span>
+                  <span className="watch-picks__title" dir="auto">
+                    {title}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="muted watch-note">{source === 'reels' ? t('watch.pickNoReels') : t('watch.pickNoSaved')}</p>
+      )}
     </div>
   );
 }
