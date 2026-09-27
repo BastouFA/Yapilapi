@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { HeaderHeightContext } from 'expo-router/react-navigation';
+import { HeaderHeightContext, NavigationContext } from 'expo-router/react-navigation';
 import { useCallback, useContext, useEffect, useRef, useState, type ComponentProps, type ReactNode, type Ref } from 'react';
 import {
   AccessibilityInfo,
@@ -705,6 +705,23 @@ export function ErrorState({ message, onRetry, style }: { message: string; onRet
   );
 }
 
+/** Whether this screen is the one in front; true outside a navigator (the root layout). */
+function useScreenFocused() {
+  const navigation = useContext(NavigationContext);
+  const [focused, setFocused] = useState(() => navigation?.isFocused() ?? true);
+  useEffect(() => {
+    if (!navigation) return;
+    setFocused(navigation.isFocused());
+    const on = navigation.addListener('focus', () => setFocused(true));
+    const off = navigation.addListener('blur', () => setFocused(false));
+    return () => {
+      on();
+      off();
+    };
+  }, [navigation]);
+  return focused;
+}
+
 /**
  * A panel that slides up from the bottom over a dimmed screen. Tapping outside or the Android
  * back button closes it; it stays above the keyboard, and taps on its buttons land the first
@@ -741,8 +758,11 @@ export function BottomSheet({
   const c = useColors();
   const { t } = useT();
   const insets = useSafeAreaInsets();
+  const focused = useScreenFocused();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} onDismiss={onDismiss}>
+    // A sheet belongs to its screen: when another screen comes on top (a link, a notification), it
+    // steps aside and comes back with its screen.
+    <Modal visible={visible && focused} transparent animationType="slide" onRequestClose={onClose} onDismiss={onDismiss}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <View style={{ flex: 1, backgroundColor: c.overlay, justifyContent: 'flex-end' }}>
           <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} style={{ flex: 1 }} onPress={onClose} />
