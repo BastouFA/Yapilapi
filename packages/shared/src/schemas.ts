@@ -42,6 +42,7 @@ import {
   VISIBILITIES,
 } from './constants.ts';
 import { storyMusicInputSchema, storyStickersSchema } from './stories.ts';
+import { postMusicInputSchema } from './music.ts';
 
 const trimmed = (max: number) => z.string().trim().min(1).max(max);
 export const uuid = z.string().uuid();
@@ -166,6 +167,11 @@ export const createPostSchema = z
     soundId: uuid.optional(),
     /** Reels: a name for this reel's own sound (when it doesn't use another one). */
     soundTitle: z.string().trim().min(1).max(100).optional(),
+    /**
+     * Music: part of a sound or a catalogue song that plays with a photo, carousel or text post (muted
+     * until the viewer taps it), or a catalogue song a reel plays instead of its own audio.
+     */
+    music: postMusicInputSchema.optional(),
     /** People to invite as co-authors (people you follow who follow you back). They each accept or decline. */
     collaborators: z.array(uuid).max(MAX_COLLABORATORS).default([]),
     /** Save it as a draft only you can see, instead of publishing. */
@@ -187,6 +193,10 @@ export const createPostSchema = z
     if (v.format === 'reel' && v.poll) ctx.addIssue({ code: 'custom', message: "Reels can't have polls.", path: ['poll'] });
     if (v.format !== 'reel' && (v.remixOf || v.soundId || v.soundTitle))
       ctx.addIssue({ code: 'custom', message: 'Only reels can use sounds or remix other reels.', path: ['format'] });
+    if (v.music && v.format === 'reel' && (v.soundId || v.remixOf || v.music.soundId))
+      ctx.addIssue({ code: 'custom', message: 'A reel plays one sound: choose a sound or a song.', path: ['music'] });
+    if (v.music && v.format !== 'reel' && (v.poll || v.linkUrl || v.media.some((m) => m.kind !== 'image')))
+      ctx.addIssue({ code: 'custom', message: 'Music can be added to photo and text posts.', path: ['music'] });
     if (!!v.remixOf !== !!v.remixMode) ctx.addIssue({ code: 'custom', message: 'Choose duet or remix.', path: ['remixMode'] });
     if (new Set(v.collaborators).size !== v.collaborators.length)
       ctx.addIssue({ code: 'custom', message: 'Invite each person once.', path: ['collaborators'] });

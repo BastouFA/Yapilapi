@@ -32,6 +32,7 @@ import {
   announcePost,
   assertDraftRoom,
   moderationNotice,
+  prepareMusic,
   recordFlags,
   schedulePost,
   scheduleTime,
@@ -129,12 +130,13 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     const u = me(req);
     const input = parse(createPostSchema, req.body);
     if (input.draft || input.scheduledAt) {
+      const music = await prepareMusic(ctx, u.id, input);
       const at = input.scheduledAt ? scheduleTime(input.scheduledAt) : null;
       // Scheduling says now, not at the time, if the account can't reach everyone yet.
       if (at && (input.visibility === 'public' || input.communityId)) await requireVerified(db, ctx.config, u.id, 'post');
       await assertDraftRoom(db, u.id);
       const { id } = await tx(db, async (c) => {
-        const w = await writePost(c, u.id, input, { state: 'draft' });
+        const w = await writePost(c, u.id, input, { state: 'draft', music });
         if (at) await schedulePost(c, w.id, u.id, at);
         return w;
       });
@@ -149,9 +151,11 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       visibility: input.visibility,
       communityId: input.communityId,
     });
+    // A song is checked again at publish time: still offered, and its licence allows this author, country and part.
+    const music = await prepareMusic(ctx, u.id, input);
     let limitedNow = false;
     const written = await tx(db, async (c) => {
-      const w = await writePost(c, u.id, input, { state: 'published', moderationStatus: screening.status });
+      const w = await writePost(c, u.id, input, { state: 'published', moderationStatus: screening.status, music });
       limitedNow = await recordFlags(c, ctx.realtime, u.id, w.id, screening);
       return w;
     });

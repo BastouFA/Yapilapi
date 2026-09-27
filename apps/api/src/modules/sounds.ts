@@ -33,12 +33,14 @@ export default async function soundsModule(app: FastifyInstance, ctx: AppContext
               (SELECT count(*) ${REELS_FROM} WHERE p.sound_id = s.id AND p.format = 'reel' AND ${postVisibleSql('$2')})::int AS reels,
               (SELECT count(*) FROM moments m JOIN users au ON au.id = m.author_id
                 WHERE m.sound_id = s.id AND m.music IS NOT NULL AND ${storyVisibleSql('$2', { open: true })})::int AS stories,
+              (SELECT count(*) ${REELS_FROM} WHERE p.sound_id = s.id AND p.format <> 'reel' AND p.music IS NOT NULL AND ${postVisibleSql('$2')})::int AS posts,
+              EXISTS (SELECT 1 FROM music_saves ms WHERE ms.sound_id = s.id AND ms.user_id = $2) AS saved,
               ${soundUsableSql('$2')} AS can_use
        FROM sounds s JOIN profiles pr ON pr.user_id = s.owner_id LEFT JOIN media m ON m.id = s.media_id
        WHERE s.id = ANY($1) AND ${soundVisibleSql('$2')}`,
       [ids, viewer],
     );
-    const byId = new Map(
+    const byId = new Map<string, Sound>(
       rows.map((r) => [
         r.id as string,
         {
@@ -51,6 +53,8 @@ export default async function soundsModule(app: FastifyInstance, ctx: AppContext
           coverUrl: r.poster_url ?? null,
           reels: r.reels,
           stories: r.stories,
+          posts: r.posts,
+          saved: !!r.saved,
           canUse: !!r.can_use,
           createdAt: r.created_at.toISOString(),
         } satisfies Sound,

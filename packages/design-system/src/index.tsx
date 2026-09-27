@@ -49,6 +49,7 @@ export {
   NavBar,
   PostCard,
   PostHistory,
+  PostMusicChip,
   ProductCard,
   Segments,
   Skeleton,

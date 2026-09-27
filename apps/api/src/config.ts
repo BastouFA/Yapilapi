@@ -110,6 +110,22 @@ const schema = z.object({
   REKOGNITION_ACCESS_KEY_ID: z.string().default(''),
   REKOGNITION_SECRET_ACCESS_KEY: z.string().default(''),
   REKOGNITION_SESSION_TOKEN: z.string().default(''),
+  /**
+   * Music catalogue (docs/operations/music.md). Jamendo (Creative Commons songs): a free client id from
+   * https://devportal.jamendo.com. Unset: off.
+   */
+  JAMENDO_CLIENT_ID: z.string().default(''),
+  JAMENDO_API_URL: z.string().default('https://api.jamendo.com/v3.0'),
+  /** A licensing partner's catalogue, once a deal is signed: its API address and key. Unset: off. */
+  MUSIC_LICENSED_API_URL: z.string().default(''),
+  MUSIC_LICENSED_API_KEY: z.string().default(''),
+  /** The partner's name as the music picker shows it. */
+  MUSIC_LICENSED_NAME: z.string().default('Licensed catalogue'),
+  /** Generated "[Dev data]" tones for development and tests. Unset: on outside production; never on in production. */
+  MUSIC_DEV_PROVIDER: z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined || v === '' ? undefined : v === 'true' || v === '1')),
 });
 
 const resolved = schema.transform((c) => ({
@@ -118,6 +134,7 @@ const resolved = schema.transform((c) => ({
   SPAM_CHECKS: c.SPAM_CHECKS ?? c.APP_ENV !== 'test',
   JOB_WORKER: c.JOB_WORKER ?? c.APP_ENV !== 'test',
   MEDIA_MODERATION_PROVIDER: c.MEDIA_MODERATION_PROVIDER ?? (c.APP_ENV === 'production' ? ('none' as const) : ('dev' as const)),
+  MUSIC_DEV_PROVIDER: c.APP_ENV !== 'production' && (c.MUSIC_DEV_PROVIDER ?? true),
 }));
 
 export type Config = z.infer<typeof resolved>;
@@ -136,6 +153,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     throw new Error('SMS_PROVIDER=twilio needs TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_VERIFY_SERVICE_SID.');
   if (cfg.MEDIA_MODERATION_PROVIDER === 'rekognition' && (!cfg.REKOGNITION_ACCESS_KEY_ID || !cfg.REKOGNITION_SECRET_ACCESS_KEY))
     throw new Error('MEDIA_MODERATION_PROVIDER=rekognition needs REKOGNITION_ACCESS_KEY_ID and REKOGNITION_SECRET_ACCESS_KEY.');
+  if (!!cfg.MUSIC_LICENSED_API_URL !== !!cfg.MUSIC_LICENSED_API_KEY)
+    throw new Error('The licensed music catalogue needs both MUSIC_LICENSED_API_URL and MUSIC_LICENSED_API_KEY.');
   if (cfg.APP_ENV === 'production') {
     if (cfg.PAYMENTS_PROVIDER === 'dev') throw new Error('The development payment provider moves no money. Set PAYMENTS_PROVIDER for production.');
     if (Buffer.from(cfg.MFA_ENCRYPTION_KEY, 'base64').length !== 32) throw new Error('Set MFA_ENCRYPTION_KEY (32 bytes, base64) for production.');

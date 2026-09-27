@@ -4,12 +4,13 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AuthorNames, Avatar, EmptyState, Icon, Menu, SensitiveCover, Skeleton, TaggedText, useDataSaver, useLongPress } from '@yapilapi/design-system';
-import { videoPoster, videoSrc, type Post } from '@yapilapi/shared';
+import { videoPoster, videoSrc, type MessageKey, type Post } from '@yapilapi/shared';
 import { NextLink } from '@/lib/link';
 import { api, errorMessage } from '@/lib/api';
 import { CommentsSheet, PostList, ReportSheet } from '@/components/PostList';
 import { JoinNote, NeedsAccount } from '@/components/SignedOut';
 import { SaveToSheet } from '@/components/Boards';
+import { musicHref, useMusicCredit, useMusicLoop } from '@/components/StoryMusic';
 import { useSession } from '../../providers';
 
 type AuthorStats = Record<string, { followers: number; following: boolean }>;
@@ -262,6 +263,7 @@ function Reels() {
                   <bdi>{p.sound.title}</bdi>
                 </Link>
               ) : null}
+              {p.music ? <ReelSong music={p.music} /> : null}
               {p.topics.length ? (
                 <div className="reel__tags">
                   {p.topics.map((t) => (
@@ -509,6 +511,9 @@ function ReelVideo({
   const original = post.remixOf?.mode === 'duet' ? (post.remixOf.post?.media ?? null) : null;
   const originalSrc = original ? videoSrc(original, saver) : null;
   const borrowed = !original && post.sound && !post.sound.original ? post.sound.audioUrl : null;
+  // A catalogue song plays its part in a loop instead of the reel's own sound (only once sound is on, so nothing loads before).
+  const song = !original && !borrowed && post.music?.audioUrl ? post.music : null;
+  useMusicLoop(song ? { startMs: song.startMs, durationMs: song.durationMs, sound: { audioUrl: song.audioUrl } } : null, playing && !muted);
   const companion = useRef<HTMLVideoElement & HTMLAudioElement>(null);
   // A sensitive reel plays blurred until the viewer chooses to see it.
   const [revealed, setRevealed] = useState(false);
@@ -583,7 +588,7 @@ function ReelVideo({
           className={covered ? 'reel__video yp-blurred' : 'reel__video'}
           src={src}
           poster={media ? videoPoster(media, saver) : undefined}
-          muted={muted || !!borrowed}
+          muted={muted || !!borrowed || !!song}
           loop
           playsInline
           preload={saver ? 'none' : 'metadata'}
@@ -686,5 +691,20 @@ function SharedReel({ id }: { id: string }) {
       <PostList load={load} reloadKey={id} empty="This reel isn't available. It may have been removed." />
       <JoinNote text="Join YAPILAPI to watch more reels and follow the people who make them." />
     </div>
+  );
+}
+
+/** A reel's catalogue song: its name (opening its page), and the credit its licence asks for or why it doesn't play here. */
+function ReelSong({ music }: { music: NonNullable<Post['music']> }) {
+  const { t } = useSession();
+  const credit = useMusicCredit();
+  return (
+    <>
+      <Link href={musicHref(music)} className="reel__soundlink">
+        <Icon name="music" size={14} />
+        <bdi>{music.title}</bdi> · <bdi>{music.artist}</bdi>
+      </Link>
+      <span className="reel__credit">{music.unavailable ? t(`music.unavailable.${music.unavailable}` as MessageKey) : credit(music)}</span>
+    </>
   );
 }

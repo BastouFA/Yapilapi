@@ -10,6 +10,7 @@ import type { TranscriptionProvider } from './transcription.ts';
 import type { SmsProvider } from './sms.ts';
 import type { MediaModerator } from './media-moderation.ts';
 import type { RoomMedia } from './room-media.ts';
+import type { MusicCatalog } from './music/index.ts';
 
 /** Everything a module needs, created once in buildApp. */
 export interface AppContext {
@@ -32,4 +33,6 @@ export interface AppContext {
   mediaModerator: MediaModerator;
   /** How audio rooms move their audio: a WebRTC mesh today; an SFU adapter can replace it (lib/room-media.ts). */
   roomMedia: RoomMedia;
+  /** Music from the sounds library and the catalogue providers that are switched on (lib/music). */
+  music: MusicCatalog;
 }

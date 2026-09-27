@@ -69,6 +69,8 @@ import phoneModule from './modules/phone.ts';
 import publicModule from './modules/public.ts';
 import growthModule from './modules/growth.ts';
 import moneyModule from './modules/money.ts';
+import musicModule from './modules/music.ts';
+import { musicCatalogFromConfig } from './lib/music/index.ts';
 import { createPushSender } from './lib/push.ts';
 import { setPushSender } from './lib/services.ts';
 import { processWebhooks } from './lib/webhooks.ts';
@@ -102,6 +104,8 @@ export async function buildApp(
     webhookWorker?: boolean;
     /** Used for calls to Paystack (tests pass a fake so nothing leaves the machine). */
     paystackFetch?: typeof fetch;
+    /** Used for calls to music catalogue providers (tests pass a fake). */
+    musicFetch?: typeof fetch;
   } = {},
 ): Promise<BuiltApp> {
   const app = Fastify({
@@ -196,6 +200,7 @@ export async function buildApp(
         : devSmsProvider((msg) => app.log.info(msg)),
     mediaModerator: mediaModeratorFromConfig(config),
     roomMedia: meshRoomMedia(config, realtime),
+    music: musicCatalogFromConfig(config, db, { fetch: opts.musicFetch, log: (msg, err) => app.log.warn({ err: (err as Error)?.message }, msg) }),
   };
   if (config.APP_ENV === 'production' && config.SMS_PROVIDER === 'dev')
     app.log.warn('SMS_PROVIDER=dev in production: phone codes are only written to the log. Configure Twilio Verify.');
@@ -368,6 +373,7 @@ export async function buildApp(
     tagsModule,
     collabsModule,
     soundsModule,
+    musicModule,
     liveModule,
     uploadsModule,
     callsModule,
@@ -404,6 +410,7 @@ export async function buildApp(
   const viewOnceDeps = { db, config, storage, realtime: ctx.realtime, moderator: ctx.mediaModerator };
   let lastViewOnceSweep = 0;
   let lastRoomSweep = 0;
+  let lastMusicRefresh = 0;
   const jobHandlers = {
     ...mediaJobHandlers({ db, storage, moderator: ctx.mediaModerator, realtime: ctx.realtime }),
     ...studioJobHandlers({ db, storage, transcription: ctx.transcription }),
@@ -438,6 +445,11 @@ export async function buildApp(
       if (Date.now() - lastRoomSweep > 10_000) {
         lastRoomSweep = Date.now();
         await sweepRooms({ db, realtime: ctx.realtime, media: ctx.roomMedia }).catch((e) => app.log.warn({ err: e.message }, 'room sweep'));
+      }
+      // Every 10 minutes: songs in use are read again from their providers (withdrawn ones play silently with a note).
+      if (Date.now() - lastMusicRefresh > 10 * 60_000) {
+        lastMusicRefresh = Date.now();
+        await ctx.music.refresh().catch((e) => app.log.warn({ err: e.message }, 'music refresh'));
       }
       // Story countdowns that ended: remind the people who asked.
       await sendCountdownReminders(db, ctx.realtime).catch((e) => app.log.warn({ err: e.message }, 'countdown reminders'));

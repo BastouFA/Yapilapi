@@ -30,6 +30,7 @@ import {
   type PhotoTag,
   type PluralKey,
   type Post,
+  type PostMusic,
   type PostVersion,
   type PublicUser,
 } from '@yapilapi/shared';
@@ -832,6 +833,135 @@ export function PostHistory({ versions, locale = 'en', linkAs }: { versions: Pos
   );
 }
 
+/** The chip that is playing on the page: one at a time. */
+let playingChip: HTMLAudioElement | null = null;
+
+/**
+ * Music on a post: the song's title and artist (opening its page), a button to play the part, and
+ * the credit its licence asks for. It stays silent until tapped, so nothing is downloaded before
+ * (Data saver or not), and stops when scrolled away. A song that can't play here says why, quietly.
+ */
+export function PostMusicChip({ music, locale = 'en', linkAs: L = A }: { music: PostMusic; locale?: string; linkAs?: LinkLike }) {
+  const tt = (k: MessageKey, vars?: Vars) => tr(k, locale, vars);
+  const [playing, setPlaying] = useState(false);
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const start = music.startMs / 1000;
+  const end = start + music.durationMs / 1000;
+  const names = { title: music.title, artist: music.artist };
+
+  // Stop when the post leaves the screen, and let go of the file when it goes away.
+  useEffect(() => {
+    const el = box.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e && !e.isIntersecting) audio.current?.pause();
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  useEffect(
+    () => () => {
+      const a = audio.current;
+      if (!a) return;
+      a.pause();
+      a.removeAttribute('src');
+      a.load();
+      if (playingChip === a) playingChip = null;
+    },
+    [],
+  );
+
+  function toggle() {
+    if (!music.audioUrl) return;
+    let a = audio.current;
+    if (!a) {
+      // Made on the first tap: nothing loads before.
+      a = new Audio();
+      a.preload = 'auto';
+      const toStart = () => {
+        try {
+          a!.currentTime = start;
+        } catch {
+          // Not seekable yet: loadedmetadata tries again.
+        }
+      };
+      a.addEventListener('loadedmetadata', toStart);
+      a.addEventListener('timeupdate', () => {
+        if (a!.currentTime >= end - 0.05 || a!.currentTime < start - 0.5) toStart();
+      });
+      a.addEventListener('ended', () => {
+        toStart();
+        void a!.play().catch(() => {});
+      });
+      a.addEventListener('play', () => setPlaying(true));
+      a.addEventListener('pause', () => setPlaying(false));
+      a.src = music.audioUrl;
+      audio.current = a;
+    }
+    if (a.paused) {
+      if (playingChip && playingChip !== a) playingChip.pause();
+      playingChip = a;
+      void a.play().catch(() => setPlaying(false));
+    } else a.pause();
+  }
+
+  const catalogue = music.source !== 'library';
+  const credit = catalogue
+    ? tt('music.credit', { title: music.title, artist: music.artist, licence: music.licenceName ?? '' }) +
+      (music.attribution && !music.attribution.startsWith(music.title) ? ` · ${music.attribution}` : '')
+    : tt('music.originalCredit', { artist: music.artist });
+  return (
+    <div className="yp-post__music" ref={box}>
+      <div className="yp-post__music-chip">
+        {music.audioUrl ? (
+          <button
+            type="button"
+            className="yp-post__music-play"
+            // The name says what pressing does (play or pause), so no aria-pressed as well.
+            aria-label={tt(playing ? 'music.pauseOn' : 'music.playOn', names)}
+            onClick={toggle}
+          >
+            <Icon name={playing ? 'pause' : 'play'} filled size={14} />
+          </button>
+        ) : (
+          <span className="yp-post__music-play yp-post__music-play--off" aria-hidden>
+            <Icon name="volume-off" size={14} />
+          </span>
+        )}
+        <L
+          href={catalogue ? `/music/${music.id}` : `/sounds/${music.id}`}
+          className="yp-post__music-link"
+          aria-label={tt('music.open', { title: music.title })}
+        >
+          <Icon name="music" size={14} />
+          <bdi className="yp-post__music-title">{music.title}</bdi>
+          <span aria-hidden>·</span>
+          <bdi className="yp-post__music-artist">{music.artist}</bdi>
+        </L>
+        <span className={cx('yp-post__music-bars', playing && 'yp-post__music-bars--on')} aria-hidden>
+          <span />
+          <span />
+          <span />
+        </span>
+      </div>
+      {music.unavailable ? (
+        <p className="yp-post__music-note">{tt(`music.unavailable.${music.unavailable}` as MessageKey)}</p>
+      ) : (
+        <p className="yp-post__music-credit">
+          {music.licenceUrl ? (
+            <a href={music.licenceUrl} target="_blank" rel="noopener noreferrer license">
+              {credit}
+            </a>
+          ) : (
+            credit
+          )}
+        </p>
+      )}
+    </div>
+  );
+}
+
 const VIS_ICON: Record<string, IconName> = {
   public: 'globe',
   followers: 'users',
@@ -1043,6 +1173,8 @@ export function PostCard({
           ) : null}
         </p>
       ) : null}
+
+      {post.music ? <PostMusicChip music={post.music} locale={locale} linkAs={L} /> : null}
 
       {post.poll ? (
         <div className="yp-poll" role="group" aria-label={tt('m.sticker.kind.poll')}>

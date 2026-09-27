@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Image, Linking, ScrollView, Text, View } from 'react-native';
 import type { EditorParamsInput } from '../../../../packages/shared/src/filters';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
-import type { Circle, PublicUser, Sound } from '../../../../packages/shared/src/types';
+import type { Circle, PublicUser } from '../../../../packages/shared/src/types';
 import { useAutocomplete } from '../../lib/autocomplete';
 import { Chips } from '../../lib/circles';
 import { CoauthorPicker, PhotoTagger, type DraftTag } from '../../lib/collab';
@@ -30,7 +30,7 @@ import { radius, space } from '../../lib/theme';
 import { Button, Card, Field, Icon, Notice, Screen, Segmented, SwitchRow, useColors, useTabBarSpace, userText } from '../../lib/ui';
 import { isVerificationError, VerifyPrompt } from '../../lib/safety';
 import { StickerEditor, type DraftSticker } from '../../lib/story-stickers';
-import { draftMusic, MusicField, musicInput, type DraftMusic } from '../../lib/story-music';
+import { clipMax, draftMusic, MusicField, musicInput, soundAsTrack, type DraftMusic } from '../../lib/music';
 import { SchedulePicker } from '../../lib/post-edit';
 
 const VISIBILITY = [
@@ -70,7 +70,7 @@ export default function Create() {
   const { t, number, dateTime } = useT();
   const { me } = useSession();
   const bottom = useTabBarSpace();
-  const params = useLocalSearchParams<{ mode?: string; sound?: string; draft?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; sound?: string; track?: string; draft?: string }>();
   const [kind, setKind] = useState<Kind>(kindFrom(params.mode) ?? 'post');
   const [body, setBody] = useState('');
   const [visibility, setVisibility] = useState<Visibility>(kind === 'story' ? 'friends' : 'public');
@@ -90,7 +90,6 @@ export default function Create() {
   const [note, setNote] = useState<string | null>(null);
   const [needsVerify, setNeedsVerify] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [sound, setSound] = useState<Sound | null>(null);
   const [closeFriends, setCloseFriends] = useState(false);
   // Posts and reels: people invited to co-author (up to 3), and people tagged in the photo.
   const [coauthors, setCoauthors] = useState<PublicUser[]>([]);
@@ -108,7 +107,7 @@ export default function Create() {
   // Stories: stickers placed on the preview, and whether people may add it to their own story.
   const [stickers, setStickers] = useState<DraftSticker[]>([]);
   const [allowReshare, setAllowReshare] = useState(true);
-  // Stories: a sound from the library, the part that plays and its sticker.
+  // Music: a song or a sound, the part that plays (the whole sound on a reel) and, on stories, its sticker.
   const [music, setMusic] = useState<DraftMusic | null>(null);
   // Posting for subscribers needs a subscription plan (set up in Studio on the web).
   const [hasPlans, setHasPlans] = useState(false);
@@ -142,22 +141,39 @@ export default function Create() {
     // Keep only what the new kind can hold: a reel is a video.
     setMedia((m) => (k === 'reel' && m?.kind !== 'video' ? null : m));
     if (k === 'story' && (visibility === 'public' || visibility === 'subscribers' || visibility === 'circle')) setVisibility('friends');
+    // The part keeps within what the new kind plays (15 seconds on stories).
+    setMusic((m) => (m ? { ...m, durationMs: Math.min(m.durationMs, clipMax(m.track, k)) } : m));
   }
 
   // "Use this sound" on a sound page opens this tab as a reel with that sound; "Add to your story" as a story with it.
   useEffect(() => {
     if (!params.sound) return;
     const soundId = params.sound;
-    const forStory = params.mode === 'story';
+    const use = kindFrom(params.mode) ?? 'reel';
     router.setParams({ sound: '' });
     client()
       .then((api) => api.sounds.get(soundId))
       .then(
-        (r) => (forStory ? setMusic(draftMusic(r.sound)) : setSound(r.sound)),
+        (r) => setMusic(draftMusic(soundAsTrack(r.sound), use)),
         (e) => setError(errorMessage(e)),
       );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.sound]);
+
+  // "Use this song" on a song's page: in a post, reel or story.
+  useEffect(() => {
+    if (!params.track) return;
+    const trackId = params.track;
+    const use = kindFrom(params.mode) ?? 'post';
+    router.setParams({ track: '' });
+    client()
+      .then((api) => api.music.track(trackId))
+      .then(
+        (r) => setMusic(draftMusic(r.track, use)),
+        (e) => setError(errorMessage(e)),
+      );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.track]);
 
   // Drafts ("Continue") opens a draft here.
   useEffect(() => {
@@ -182,6 +198,25 @@ export default function Create() {
           setAltText(m?.altText ?? '');
           setMedia(m ? { id: m.id, kind: m.kind, url: m.url, local: mediaUrl(m.variants?.medium ?? m.url), seconds: null } : null);
           setCoauthors(post.pendingCollaborators ?? []);
+          // Music on the draft: the song or sound, with the part it plays.
+          const use = post.format === 'reel' ? 'reel' : 'post';
+          const part = post.music ? { startMs: post.music.startMs, durationMs: post.music.durationMs } : undefined;
+          setMusic(null);
+          if (post.music?.source === 'library')
+            void client()
+              .then((api) => api.sounds.get(post.music!.id))
+              .then((r) => setMusic(draftMusic(soundAsTrack(r.sound), use, part)))
+              .catch(() => {});
+          else if (post.music)
+            void client()
+              .then((api) => api.music.track(post.music!.id))
+              .then((r) => setMusic(draftMusic(r.track, use, part)))
+              .catch(() => {});
+          else if (post.format === 'reel' && post.sound && !post.sound.original)
+            void client()
+              .then((api) => api.sounds.get(post.sound!.id))
+              .then((r) => setMusic(draftMusic(soundAsTrack(r.sound), 'reel')))
+              .catch(() => {});
           setError(null);
           setNote(null);
         },
@@ -318,6 +353,9 @@ export default function Create() {
     return null;
   }
 
+  // Music goes on photo and text posts (not videos).
+  const postCanHaveMusic = !media || media.kind === 'image';
+
   /** What the post or reel says and shows. */
   function content(): Record<string, unknown> {
     const audience = keptAudience
@@ -335,7 +373,12 @@ export default function Create() {
         body,
         ...audience,
         media: [{ id: v.id, url: mediaUrl(v.url), kind: 'video', ...described }],
-        ...(sound ? { soundId: sound.id } : {}),
+        // A sound plays in full instead of the video's own; a song plays the chosen part.
+        ...(music?.track.source === 'library'
+          ? { soundId: music.track.id }
+          : music
+            ? { music: { trackId: music.track.id, startMs: music.startMs, durationMs: music.durationMs } }
+            : {}),
         ...(coauthors.length ? { collaborators: coauthors.map((u) => u.id) } : {}),
       };
     }
@@ -356,6 +399,15 @@ export default function Create() {
           }
         : {}),
       ...(coauthors.length ? { collaborators: coauthors.map((u) => u.id) } : {}),
+      ...(music && postCanHaveMusic
+        ? {
+            music: {
+              ...(music.track.source === 'library' ? { soundId: music.track.id } : { trackId: music.track.id }),
+              startMs: music.startMs,
+              durationMs: music.durationMs,
+            },
+          }
+        : {}),
     };
   }
 
@@ -363,7 +415,7 @@ export default function Create() {
     setBody('');
     setCoauthors([]);
     setMedia(null);
-    setSound(null);
+    setMusic(null);
     setAltText('');
     setDraftId(null);
     setKeptAudience(null);
@@ -602,24 +654,17 @@ export default function Create() {
         {kind === 'post' && media?.kind === 'image' ? <PhotoTagger uri={media.local} value={photoTags} onChange={setPhotoTags} /> : null}
         {kind !== 'story' ? <CoauthorPicker value={coauthors} onChange={setCoauthors} /> : null}
 
-        {kind === 'reel' && sound ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
-            <Icon name="musical-notes" size={18} color={c.ink} />
-            <Text style={[{ color: c.ink, fontWeight: '600', flex: 1 }, userText]} numberOfLines={2}>
-              {t('m.create.sound', { title: sound.title })}
-            </Text>
-            <Button label={t('m.create.ownSound')} variant="ghost" size="sm" onPress={() => setSound(null)} />
-          </View>
-        ) : null}
+        {kind === 'reel' ? <MusicField use="reel" value={music} onChange={setMusic} /> : null}
+        {kind === 'post' && postCanHaveMusic ? <MusicField use="post" value={music} onChange={setMusic} /> : null}
 
         {kind === 'story' ? (
           <>
-            {media?.kind !== 'audio' ? <MusicField value={music} onChange={setMusic} video={media?.kind === 'video'} /> : null}
+            {media?.kind !== 'audio' ? <MusicField use="story" value={music} onChange={setMusic} video={media?.kind === 'video'} /> : null}
             <StickerEditor
               stickers={stickers}
               onChange={setStickers}
               preview={{ uri: media?.local, kind: media?.kind, body }}
-              music={music ? { label: `${music.sound.title} · ${music.sound.owner.displayName}`, x: music.x, y: music.y } : null}
+              music={music ? { label: `${music.track.title} · ${music.track.artist}`, x: music.x, y: music.y } : null}
               onMoveMusic={(x, y) => setMusic((m) => (m ? { ...m, x, y } : m))}
             />
             <SwitchRow label={t('m.stories.allowReshare')} hint={t('m.stories.allowReshareHint')} value={allowReshare} onValueChange={setAllowReshare} />

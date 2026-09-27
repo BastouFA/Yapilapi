@@ -83,6 +83,7 @@ export default function SoundScreen() {
           <Text style={{ color: c.inkMuted, fontSize: 13 }}>
             {tp('m.sound.reelCount', sound.reels)}
             {sound.stories ? ` · ${tp('m.sound.storyCount', sound.stories)}` : ''}
+            {sound.posts ? ` · ${tp('m.sound.postCount', sound.posts)}` : ''}
             {sound.durationMs ? ` · ${clock(sound.durationMs / 1000)}` : ''}
           </Text>
           {sound.sourcePostId ? (
@@ -104,6 +105,12 @@ export default function SoundScreen() {
             icon="add-circle-outline"
             variant="secondary"
             onPress={() => router.navigate({ pathname: '/create', params: { mode: 'story', sound: sound.id } })}
+          />
+          <Button
+            label={t('music.track.inPost')}
+            icon="image-outline"
+            variant="secondary"
+            onPress={() => router.navigate({ pathname: '/create', params: { mode: 'post', sound: sound.id } })}
           />
         </View>
       ) : me ? (

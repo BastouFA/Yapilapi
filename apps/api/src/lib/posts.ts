@@ -6,6 +6,9 @@ import { attachCollabsAndTags } from './collabs.ts';
 import { mediaSizesSql, withSmallVariants } from './data-saver.ts';
 import { commentAllowedSql } from './comments.ts';
 import { langOf } from './translation.ts';
+import { soundVisibleSql } from './sounds.ts';
+import { trackMusic, viewerCountries, type StoredPart, type TrackRow } from './music/view.ts';
+import type { PostMusic } from '@yapilapi/shared';
 
 type Q = Pool | PoolClient;
 
@@ -43,7 +46,12 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
                  THEN (SELECT json_build_object('id', ci.id, 'name', ci.name) FROM circles ci WHERE ci.id = p.circle_id) END AS own_circle,
             CASE WHEN p.format = 'reel' THEN (SELECT count(*) FROM posts rx WHERE rx.remix_of_post_id = p.id AND rx.deleted_at IS NULL AND rx.status = 'published')::int END AS remix_count,
             s.id AS s_id, s.title AS s_title, s.source_post_id AS s_source, coalesce(s.duration_ms, sm.duration_ms) AS s_duration,
-            coalesce(sm.variants->>'mp4', sm.url) AS s_audio,
+            coalesce(sm.variants->>'mp4', sm.url) AS s_audio, so.display_name AS s_artist, sm.poster_url AS s_cover,
+            -- Music on a photo or text post: its part, and the sound (while the viewer can see it) or the catalogue song.
+            p.music AS music_part, p.music_track_id,
+            CASE WHEN p.music IS NOT NULL AND p.sound_id IS NOT NULL AND p.format <> 'reel' THEN ${soundVisibleSql('$2')} END AS s_visible,
+            mt.provider AS mt_provider, mt.title AS mt_title, mt.artist AS mt_artist, mt.cover_url AS mt_cover, mt.preview_url AS mt_preview,
+            mt.licence AS mt_licence, mt.status AS mt_status,
             CASE WHEN p.format = 'reel' THEN (p.author_id IS NOT DISTINCT FROM $2 OR ${allowDownloadSql('pr', 'au')}) END AS downloadable,
             coalesce(${postUnlockedSql('$2')}, false) AS unlocked,
             p.comment_policy, coalesce(${postUnlockedSql('$2')} AND ${commentAllowedSql('$2')}, false) AS can_comment,
@@ -59,6 +67,8 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
      JOIN users au ON au.id = p.author_id
      LEFT JOIN sounds s ON s.id = p.sound_id
      LEFT JOIN media sm ON sm.id = s.media_id
+     LEFT JOIN profiles so ON so.user_id = s.owner_id
+     LEFT JOIN music_tracks mt ON mt.id = p.music_track_id
      LEFT JOIN communities c ON c.id = p.community_id
      LEFT JOIN events e ON e.id = p.event_id AND e.deleted_at IS NULL
      LEFT JOIN products pd ON pd.id = p.product_id AND pd.deleted_at IS NULL
@@ -73,7 +83,11 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
       .filter((x): x is string => !!x),
     viewer,
   );
-  const byId = new Map<string, Post>(rows.map((r) => [r.id as string, r.unlocked ? toPost(r, originals, reasons) : lockedPost(r, reasons)]));
+  // Catalogue songs are checked for where the viewer is (and whether they're still offered).
+  const countries = rows.some((r) => r.music_track_id && r.unlocked) ? await viewerCountries(db, viewer) : [];
+  const byId = new Map<string, Post>(
+    rows.map((r) => [r.id as string, r.unlocked ? { ...toPost(r, originals, reasons), ...musicOf(r, countries) } : lockedPost(r, reasons)]),
+  );
   const posts = ids.map((id) => byId.get(id)).filter((p): p is Post => !!p);
   // Co-authors ("Ada and Bola") and people tagged in photos (none on locked posts, which carry no media).
   await attachCollabsAndTags(db, [...new Set(posts)], viewer);
@@ -122,6 +136,43 @@ function toPost(r: Record<string, any>, originals: Map<string, NonNullable<Remix
     ...(r.boost ? { boost: r.boost } : {}),
     ...(r.own_circle_post ? { circle: r.own_circle ?? null } : {}),
   } satisfies Post;
+}
+
+/** A post's music for this viewer: left out when there is none, or when it is a sound the viewer can't see. */
+function musicOf(r: Record<string, any>, countries: string[]): { music?: PostMusic } {
+  const part = r.music_part as StoredPart | null;
+  if (!part) return {};
+  if (r.music_track_id && r.mt_provider) {
+    const row: TrackRow = {
+      id: r.music_track_id,
+      provider: r.mt_provider,
+      title: r.mt_title,
+      artist: r.mt_artist,
+      cover_url: r.mt_cover,
+      preview_url: r.mt_preview,
+      licence: r.mt_licence,
+      status: r.mt_status,
+    };
+    return { music: trackMusic(row, part, { countries, commercial: r.a_mode === 'business' }) };
+  }
+  if (r.s_id && r.format !== 'reel' && r.s_visible)
+    return {
+      music: {
+        source: 'library',
+        id: r.s_id,
+        title: r.s_title,
+        artist: r.s_artist,
+        coverUrl: r.s_cover ?? null,
+        audioUrl: r.s_audio ?? null,
+        startMs: part.startMs,
+        durationMs: part.durationMs,
+        style: 'compact',
+        licenceName: null,
+        licenceUrl: null,
+        attribution: null,
+      },
+    };
+  return {};
 }
 
 /** "Edited" on published posts; the state and time of the author's own drafts and scheduled posts (only they are ever given those). */

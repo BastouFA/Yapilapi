@@ -18,6 +18,8 @@ import { LockedPanel } from '../lib/money';
 import { useBoards, type SaveChange } from '../lib/boards';
 import { AuthorNames, RichText } from '../lib/post';
 import { SensitiveCover } from '../lib/safety';
+import { openMusic, useMusicCredit, useMusicLoop } from '../lib/music';
+import type { MessageKey } from '../../../packages/shared/src/i18n';
 
 /** What a reel plays: on Data saver the lowest MP4, or the 360p stream for videos processed before it existed. */
 const reelSource = (m: MediaItem, saver: boolean) =>
@@ -312,6 +314,7 @@ function Reel({
 }) {
   const c = useColors();
   const { t, tp, number } = useT();
+  const credit = useMusicCredit();
   const insets = useSafeAreaInsets();
   const media = post.media.find((m) => m.kind === 'video') ?? post.media[0];
   // Data saver: nothing loads or plays until the reel is tapped; then the smallest version plays.
@@ -336,6 +339,8 @@ function Reel({
     p.muted = true;
   });
   const sound = useAudioPlayer(visible && !waiting ? borrowed : null);
+  // A catalogue song plays its part in a loop instead of the reel's own sound (only with sound on, so nothing loads before).
+  const song = !original && !borrowed && post.music?.audioUrl ? post.music : null;
 
   // Only the reel on screen plays; scrolling away rewinds it and clears a tap-to-pause.
   const playing = visible && focused && !paused && !covered && !waiting;
@@ -365,6 +370,10 @@ function Reel({
       sound.loop = true;
     }
   }, [muted, player, originalPlayer, originalSrc, borrowed, sound]);
+  useMusicLoop(song ? { sound: { audioUrl: song.audioUrl }, startMs: song.startMs, durationMs: song.durationMs } : null, playing && !muted);
+  useEffect(() => {
+    if (song) player.muted = true;
+  }, [song, muted, player]);
 
   return (
     <View style={{ height, backgroundColor: '#000' }} accessibilityLabel={t('m.reels.by', { name: post.author.displayName })}>
@@ -460,6 +469,25 @@ function Reel({
               {post.sound.title}
             </Text>
           </Pressable>
+        ) : null}
+        {post.music ? (
+          <>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={t('music.open', { title: post.music.title })}
+              hitSlop={6}
+              onPress={() => openMusic(post.music!)}
+              style={s.chip}
+            >
+              <Icon name="musical-notes" size={14} color={WHITE} />
+              <Text style={[s.chipText, userText]} numberOfLines={1}>
+                {post.music.title} · {post.music.artist}
+              </Text>
+            </Pressable>
+            <Text style={{ color: WHITE, opacity: 0.85, fontSize: 11 }} numberOfLines={2}>
+              {post.music.unavailable ? t(`music.unavailable.${post.music.unavailable}` as MessageKey) : credit(post.music)}
+            </Text>
+          </>
         ) : null}
       </View>
 

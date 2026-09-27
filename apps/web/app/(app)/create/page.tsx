@@ -17,7 +17,6 @@ import {
   type MessageKey,
   type Post,
   type PublicUser,
-  type Sound,
   type StoryVisibility,
   type Visibility,
   type EditorParamsInput,
@@ -31,11 +30,10 @@ import { SimilarQuestions } from '@/components/CommunityExtras';
 import { PhotoEditor } from '@/components/editor/PhotoEditor';
 import { VideoEditor } from '@/components/editor/VideoEditor';
 import { onPendingMedia, takePendingMedia } from '@/lib/pending-media';
-import { SoundPicker, SoundPlayButton } from '@/components/SoundPicker';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { PhotoTagger, type DraftTag } from '@/components/PhotoTags';
 import { StoryStickerEditor, type DraftSticker } from '@/components/StoryStickerEditor';
-import { draftMusic, musicInput, StoryMusicField, type DraftMusic } from '@/components/StoryMusic';
+import { clipMax, draftMusic, MusicField, musicInput, soundAsTrack, type DraftMusic } from '@/components/MusicPicker';
 import { localInput, nextHour, scheduleBounds } from '@/lib/schedule';
 import { useSession } from '../../providers';
 
@@ -82,7 +80,7 @@ function Create() {
   const initialMode =
     params.get('mode') === 'story' && !remixOf
       ? 'story'
-      : params.get('mode') === 'reel' || remixOf || params.get('sound')
+      : params.get('mode') === 'reel' || remixOf || (params.get('sound') && params.get('mode') !== 'post')
         ? 'reel'
         : params.get('moment')
           ? 'story'
@@ -92,9 +90,7 @@ function Create() {
   const [visibility, setVisibility] = useState<Audience>(initialMode === 'story' ? 'friends' : 'public');
   const [original, setOriginal] = useState<Post | null>(null);
   const [originalMissing, setOriginalMissing] = useState(false);
-  const [sound, setSound] = useState<Sound | null>(null);
   const [soundTitle, setSoundTitle] = useState('');
-  const [picking, setPicking] = useState(false);
   const [allowRemix, setAllowRemix] = useState(true);
   const [commentPolicy, setCommentPolicy] = useState<CommentPolicy>('everyone');
   const [communityId, setCommunityId] = useState(params.get('community') ?? '');
@@ -117,7 +113,7 @@ function Create() {
   // Stories: stickers placed on the preview, and whether people may add it to their own story.
   const [stickers, setStickers] = useState<DraftSticker[]>([]);
   const [allowReshare, setAllowReshare] = useState(true);
-  // Stories: a sound from the library, the part that plays and its sticker.
+  // Music: a song or a sound, the part that plays (the whole sound on a reel) and, on stories, its sticker.
   const [music, setMusic] = useState<DraftMusic | null>(null);
   const [ai, setAi] = useState<{ text: string; notice?: string } | null>(null);
   const [aiUsed, setAiUsed] = useState(false);
@@ -162,6 +158,24 @@ function Create() {
         if (post.allowRemix !== undefined) setAllowRemix(post.allowRemix);
         if (post.commentPolicy) setCommentPolicy(post.commentPolicy);
         if (post.sound?.original) setSoundTitle(post.sound.title);
+        // Music on the draft: the song or sound as the picker has it, with the part it plays.
+        const use = post.format === 'reel' ? 'reel' : 'post';
+        const part = post.music ? { startMs: post.music.startMs, durationMs: post.music.durationMs } : undefined;
+        if (post.music?.source === 'library')
+          api.sounds.get(post.music.id).then(
+            (r) => setMusic(draftMusic(soundAsTrack(r.sound), use, part)),
+            () => {},
+          );
+        else if (post.music)
+          api.music.track(post.music.id).then(
+            (r) => setMusic(draftMusic(r.track, use, part)),
+            () => {},
+          );
+        else if (post.format === 'reel' && post.sound && !post.sound.original)
+          api.sounds.get(post.sound.id).then(
+            (r) => setMusic(draftMusic(soundAsTrack(r.sound), 'reel')),
+            () => {},
+          );
         setAiUsed(post.aiAssisted);
         if (post.scheduledAt) setWhen(localInput(new Date(post.scheduledAt)));
         setDraftLoaded(true);
@@ -180,11 +194,18 @@ function Create() {
         (r) => (r.post.format === 'reel' ? setOriginal(r.post) : setOriginalMissing(true)),
         () => setOriginalMissing(true),
       );
+    // "Use this sound" and "Use this song" links.
     const soundId = params.get('sound');
     if (soundId && !remixOf)
       api.sounds.get(soundId).then(
-        (r) => (initialMode === 'story' ? setMusic(draftMusic(r.sound)) : setSound(r.sound)),
+        (r) => setMusic(draftMusic(soundAsTrack(r.sound), initialMode)),
         () => toast(t('m.sound.missing')),
+      );
+    const trackId = params.get('track');
+    if (trackId && !remixOf)
+      api.music.track(trackId).then(
+        (r) => setMusic(draftMusic(r.track, initialMode)),
+        () => toast(t('music.track.missing')),
       );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remixOf]);
@@ -308,6 +329,9 @@ function Create() {
       .filter(Boolean)
       .slice(0, 5);
 
+  // Music goes on photo and text posts (not videos, polls or links).
+  const postCanHaveMusic = !poll && media.every((m) => m.kind === 'image');
+
   /** What the post says and shows, for publishing it now, saving it as a draft or scheduling it. */
   function postContent(): Record<string, unknown> {
     if (kind === 'reel') {
@@ -319,7 +343,16 @@ function Create() {
         circleId: visibility === 'circle' ? circleId || undefined : undefined,
         allowRemix,
         commentPolicy,
-        ...(remixOf && original ? { remixOf, remixMode } : sound ? { soundId: sound.id } : soundTitle.trim() ? { soundTitle: soundTitle.trim() } : {}),
+        // A sound plays in full instead of the video's own; a song plays the chosen part.
+        ...(remixOf && original
+          ? { remixOf, remixMode }
+          : music?.track.source === 'library'
+            ? { soundId: music.track.id }
+            : music
+              ? { music: { trackId: music.track.id, startMs: music.startMs, durationMs: music.durationMs } }
+              : soundTitle.trim()
+                ? { soundTitle: soundTitle.trim() }
+                : {}),
         media: [{ id: v.id, url: new URL(v.url, location.origin).toString(), kind: 'video', altText: v.altText || undefined }],
         collaborators: collaborators.map((u) => u.id),
         topics: topicList(),
@@ -341,6 +374,7 @@ function Create() {
       })),
       collaborators: collaborators.map((u) => u.id),
       poll: poll ? { options: poll.filter((o) => o.trim()) } : undefined,
+      music: music && postCanHaveMusic ? { ...musicInput(music), x: undefined, y: undefined, style: undefined } : undefined,
       topics: topicList(),
       aiAssisted: aiUsed,
       commentPolicy,
@@ -448,6 +482,8 @@ function Create() {
                 setMedia((m) => m.filter((x) => k !== 'reel' || x.kind === 'video').slice(0, 1));
               }
               if (k === 'story' && (visibility === 'selected' || visibility === 'subscribers' || visibility === 'circle')) setVisibility('friends');
+              // The part keeps within what the new kind plays (15 seconds on stories).
+              setMusic((m) => (m ? { ...m, durationMs: Math.min(m.durationMs, clipMax(m.track, k)) } : m));
               if (k !== 'story' && visibility === 'close_friends') setVisibility('friends');
             }}
             options={KINDS.map((id) => ({ id, label: t(`m.create.mode.${id}`) }))}
@@ -638,36 +674,35 @@ function Create() {
         ) : null}
         {kind === 'story' ? (
           <>
-            {media[0]?.kind !== 'audio' ? <StoryMusicField value={music} onChange={setMusic} video={media[0]?.kind === 'video'} /> : null}
+            {media[0]?.kind !== 'audio' ? (
+              <MusicField use="story" value={music} onChange={setMusic} video={media[0]?.kind === 'video'}>
+                {music ? (
+                  <Segments
+                    label={t('m.music.style')}
+                    value={music.style}
+                    onChange={(style) => setMusic({ ...music, style })}
+                    options={[
+                      { id: 'compact', label: t('m.music.compact') },
+                      { id: 'card', label: t('m.music.card') },
+                    ]}
+                  />
+                ) : null}
+              </MusicField>
+            ) : null}
             <StoryStickerEditor
               stickers={stickers}
               onChange={setStickers}
               preview={{ mediaUrl: media[0]?.url, mediaKind: media[0]?.kind, body }}
-              music={music ? { title: music.sound.title, artist: music.sound.owner.displayName, style: music.style, x: music.x, y: music.y } : null}
+              music={music ? { title: music.track.title, artist: music.track.artist, style: music.style, x: music.x, y: music.y } : null}
               onMoveMusic={(x, y) => setMusic((m) => (m ? { ...m, x, y } : m))}
             />
           </>
         ) : null}
 
         {kind === 'reel' && !remixOf ? (
-          <section className="stack-sm" aria-labelledby="sound-heading">
-            <h2 id="sound-heading" className="yp-field__label" style={{ margin: 0 }}>
-              {t('m.sound.title')}
-            </h2>
-            {sound ? (
-              <div className="sound-row sound-row--picked">
-                <SoundPlayButton sound={sound} />
-                <span className="sound-row__text">
-                  <bdi className="sound-row__title">{sound.title}</bdi>
-                  <span className="sound-row__meta">
-                    {t('compose.soundReplaces')} · <bdi>@{sound.owner.username}</bdi>
-                  </span>
-                </span>
-                <Button size="sm" variant="ghost" onClick={() => setSound(null)}>
-                  {t('m.common.remove')}
-                </Button>
-              </div>
-            ) : (
+          <div className="stack-sm">
+            <MusicField use="reel" value={music} onChange={setMusic} />
+            {music ? null : (
               <TextField
                 label={t('compose.soundName')}
                 hint={t('compose.soundNameHint')}
@@ -676,21 +711,9 @@ function Create() {
                 onChange={(e) => setSoundTitle(e.currentTarget.value)}
               />
             )}
-            <div className="row">
-              <Button size="sm" variant="secondary" icon="music" onClick={() => setPicking(true)}>
-                {t(sound ? 'm.music.another' : 'm.music.choose')}
-              </Button>
-            </div>
-            <SoundPicker
-              open={picking}
-              onClose={() => setPicking(false)}
-              onPick={(s) => {
-                setSound(s);
-                setPicking(false);
-              }}
-            />
-          </section>
+          </div>
         ) : null}
+        {kind === 'post' && postCanHaveMusic ? <MusicField use="post" value={music} onChange={setMusic} /> : null}
 
         <div className="stack">
           {kind === 'reel' ? null : kind === 'post' ? (

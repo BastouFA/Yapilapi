@@ -1,57 +1,30 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Button, Icon, Segments } from '@yapilapi/design-system';
-import { STORY_MUSIC_MAX_MS, storyMusicMaxStart, storyMusicPart, type Sound, type StoryMusic, type StoryMusicStyle } from '@yapilapi/shared';
-import { SoundPicker } from '@/components/SoundPicker';
+import { Icon } from '@yapilapi/design-system';
+import type { MessageKey, StoryMusic } from '@yapilapi/shared';
 import { stickerStyle } from '@/components/StoryStickers';
 import { useSession } from '@/app/providers';
 
-/** Music chosen for a story that isn't posted yet. */
-export interface DraftMusic {
-  sound: Sound;
-  startMs: number;
-  style: StoryMusicStyle;
-  x: number;
-  y: number;
-}
+/** Where a song or sound's page is: sounds under /sounds, catalogue songs under /music. */
+export const musicHref = (m: { source?: string; id: string }) => (!m.source || m.source === 'library' ? `/sounds/${m.id}` : `/music/${m.id}`);
 
-export const draftMusic = (sound: Sound): DraftMusic => ({ sound, startMs: 0, style: 'compact', x: 0.5, y: 0.78 });
-
-/** What the API takes for the draft. */
-export const musicInput = (m: DraftMusic) => ({ soundId: m.sound.id, startMs: m.startMs, durationMs: STORY_MUSIC_MAX_MS, style: m.style, x: m.x, y: m.y });
-
-/** The part as a viewer will get it, for previews before posting. */
-export function draftAsStoryMusic(m: DraftMusic): StoryMusic {
-  const part = storyMusicPart(m.startMs, STORY_MUSIC_MAX_MS, m.sound.durationMs) ?? { startMs: 0, durationMs: STORY_MUSIC_MAX_MS };
-  return {
-    sound: {
-      id: m.sound.id,
-      title: m.sound.title,
-      artist: m.sound.owner.displayName,
-      username: m.sound.owner.username,
-      durationMs: m.sound.durationMs,
-      audioUrl: m.sound.audioUrl,
-      coverUrl: m.sound.coverUrl,
-    },
-    ...part,
-    style: m.style,
-    x: m.x,
-    y: m.y,
+/** "Music: Title by Artist · CC BY 4.0" (and a partner's own credit), or "Original sound by Ada" for sounds. */
+export function useMusicCredit() {
+  const { t } = useSession();
+  return (m: { source?: string; title: string; artist: string; licenceName?: string | null; attribution?: string | null }) => {
+    if (!m.source || m.source === 'library') return t('music.originalCredit', { artist: m.artist });
+    const line = t('music.credit', { title: m.title, artist: m.artist, licence: m.licenceName ?? '' });
+    // A partner's own credit (a label line) goes after, when it isn't the same line.
+    return m.attribution && !m.attribution.startsWith(m.title) ? `${line} · ${m.attribution}` : line;
   };
 }
-
-/** "0:30" style time. */
-const clock = (ms: number) => {
-  const s = Math.max(0, Math.round(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-};
 
 /**
  * Play the part of a sound in a loop while `playing`. Nothing loads until it is asked to play,
  * so stories stay silent (and cost no data) for people who keep music off.
  */
-export function useMusicLoop(music: Pick<StoryMusic, 'startMs' | 'durationMs' | 'sound'> | null, playing: boolean) {
+export function useMusicLoop(music: { startMs: number; durationMs: number; sound: { audioUrl: string | null } } | null, playing: boolean) {
   const audio = useRef<HTMLAudioElement | null>(null);
   const url = music?.sound.audioUrl ?? null;
   const start = (music?.startMs ?? 0) / 1000;
@@ -141,6 +114,8 @@ export function useStoryMusicOn(): [boolean, (on: boolean) => void] {
  */
 export function MusicSticker({ music, playing, onOpen }: { music: StoryMusic; playing: boolean; onOpen?: () => void }) {
   const { t } = useSession();
+  const credit = useMusicCredit();
+  const catalogue = !!music.sound.source && music.sound.source !== 'library';
   const names = { title: music.sound.title, artist: music.sound.artist };
   const inner = (
     <>
@@ -154,6 +129,8 @@ export function MusicSticker({ music, playing, onOpen }: { music: StoryMusic; pl
       <span className="music-sticker__text">
         <bdi className="music-sticker__title">{music.sound.title}</bdi>
         <bdi className="music-sticker__artist">{music.sound.artist}</bdi>
+        {catalogue ? <span className="music-sticker__credit">{credit(music.sound)}</span> : null}
+        {music.sound.unavailable ? <span className="music-sticker__credit">{t(`music.unavailable.${music.sound.unavailable}` as MessageKey)}</span> : null}
       </span>
       <span className={`music-sticker__bars${playing ? ' music-sticker__bars--on' : ''}`} aria-hidden>
         <span />
@@ -171,112 +148,5 @@ export function MusicSticker({ music, playing, onOpen }: { music: StoryMusic; pl
     <span className={className} style={stickerStyle(music)} aria-label={t('storyMusic.stickerLabel', names)} role="img">
       {inner}
     </span>
-  );
-}
-
-/**
- * Music for a story in Create: pick a sound (search, or the most used ones), choose the 15 second
- * part that plays, and how the sticker looks. The sticker is moved on the sticker preview.
- */
-export function StoryMusicField({ value, onChange, video }: { value: DraftMusic | null; onChange: (m: DraftMusic | null) => void; video: boolean }) {
-  const { t } = useSession();
-  const [picking, setPicking] = useState(false);
-  const [previewing, setPreviewing] = useState(false);
-  // After a sound is picked the "Add music" button is gone: focus goes to "Choose another sound".
-  const another = useRef<HTMLButtonElement>(null);
-  const [picked, setPicked] = useState(0);
-  useEffect(() => {
-    if (picked) another.current?.focus();
-  }, [picked]);
-  const preview = value ? draftAsStoryMusic(value) : null;
-  useMusicLoop(preview, previewing);
-  useEffect(() => {
-    if (!value) setPreviewing(false);
-  }, [value]);
-
-  const maxStart = value ? storyMusicMaxStart(value.sound.durationMs) : 0;
-  return (
-    <section className="stack-sm" aria-labelledby="music-heading">
-      <h2 id="music-heading" className="yp-field__label" style={{ margin: 0 }}>
-        {t('m.music.title')}
-      </h2>
-      {value && preview ? (
-        <div className="stack-sm">
-          <div className="sound-row sound-row--picked">
-            <button
-              type="button"
-              className="sound-play"
-              // The name says what pressing does, so no aria-pressed as well.
-              aria-label={t(previewing ? 'm.music.stopPart' : 'm.music.playPart')}
-              disabled={!value.sound.audioUrl}
-              onClick={() => setPreviewing((p) => !p)}
-            >
-              <Icon name={previewing ? 'pause' : 'play'} filled size={18} />
-            </button>
-            <span className="sound-row__text">
-              <bdi className="sound-row__title">{value.sound.title}</bdi>
-              <span className="sound-row__meta">
-                <bdi>@{value.sound.owner.username}</bdi> ·{' '}
-                {t('m.music.part', { from: clock(preview.startMs), to: clock(preview.startMs + preview.durationMs) })}
-              </span>
-            </span>
-            <Button size="sm" variant="ghost" onClick={() => onChange(null)}>
-              {t('m.common.remove')}
-            </Button>
-          </div>
-          {maxStart > 0 ? (
-            <label className="yp-field">
-              <span className="yp-field__label">{t('m.music.start')}</span>
-              <input
-                type="range"
-                className="music-range"
-                min={0}
-                max={maxStart}
-                step={500}
-                value={Math.min(value.startMs, maxStart)}
-                aria-valuetext={t('storyMusic.startsAt', { time: clock(value.startMs) })}
-                onChange={(e) => onChange({ ...value, startMs: Number(e.currentTarget.value) })}
-              />
-            </label>
-          ) : (
-            <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-              {t('m.music.short')}
-            </p>
-          )}
-          <Segments
-            label={t('m.music.style')}
-            value={value.style}
-            onChange={(style) => onChange({ ...value, style })}
-            options={[
-              { id: 'compact', label: t('m.music.compact') },
-              { id: 'card', label: t('m.music.card') },
-            ]}
-          />
-          <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-            {t(video ? 'm.music.videoHint' : 'm.music.moveHint')}
-          </p>
-          <div className="row">
-            <Button ref={another} size="sm" variant="secondary" icon="music" onClick={() => (setPreviewing(false), setPicking(true))}>
-              {t('m.music.another')}
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="row">
-          <Button size="sm" variant="secondary" icon="music" onClick={() => setPicking(true)}>
-            {t('m.music.add')}
-          </Button>
-        </div>
-      )}
-      <SoundPicker
-        open={picking}
-        onClose={() => setPicking(false)}
-        onPick={(s) => {
-          onChange(value ? { ...value, sound: s, startMs: 0 } : draftMusic(s));
-          setPicking(false);
-          setPicked((n) => n + 1);
-        }}
-      />
-    </section>
   );
 }
