@@ -166,6 +166,8 @@ export function isVideoFile(file: { type: string; name: string }): boolean {
  */
 export const CURRENCIES = ['USD', 'EUR', 'GBP', 'NGN', 'GHS', 'KES', 'ZAR', 'XOF'] as const;
 
+/** The platform's share of each sale, tip and subscription, in basis points (5%, as the creator and seller terms say). */
+export const PLATFORM_FEE_BPS = 500;
 /** Days a sale's earnings wait before they can be paid out, so early refunds and chargebacks come out of them. */
 export const EARNINGS_HOLD_DAYS = 7;
 export type Currency = (typeof CURRENCIES)[number];

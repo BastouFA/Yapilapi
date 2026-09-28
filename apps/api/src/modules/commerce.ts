@@ -1,7 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import type { Pool } from 'pg';
 import { tx } from '@yapilapi/database';
-import { createBusinessSchema, createOrderSchema, createPlaceSchema, createProductSchema, EARNINGS_HOLD_DAYS, PLACE_CATEGORIES } from '@yapilapi/shared';
+import {
+  createBusinessSchema,
+  createOrderSchema,
+  createPlaceSchema,
+  createProductSchema,
+  EARNINGS_HOLD_DAYS,
+  PLACE_CATEGORIES,
+  PLATFORM_FEE_BPS,
+} from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
@@ -23,7 +31,6 @@ import { confirmDropOrder, dropGateSql, publishDropChange, releaseDropOrder, tak
 import { issueOrderTickets, publishDoor } from '../lib/tickets.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
-const PLATFORM_FEE_BPS = 500; // 5%
 
 export default async function commerceModule(app: FastifyInstance, ctx: AppContext) {
   /** A paid tip sent during a live shows up in that live's chat as a gift, for everyone watching (minor safety as for chat). */
