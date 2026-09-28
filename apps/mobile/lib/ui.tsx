@@ -324,6 +324,8 @@ export function Segmented<T extends string>({
           if (e.nativeEvent.actionName === 'doublePress') onDoublePress?.(o.id);
         }}
         onPress={() => press(o.id)}
+        // 36 high inside the track's 4 of padding: the tap area reaches 44 without touching neighbours.
+        hitSlop={{ top: 4, bottom: 4 }}
         onLayout={scrolls ? (e) => spots.current.set(o.id, e.nativeEvent.layout.x) : undefined}
         style={[s.segment, scrolls && { flex: 0, paddingHorizontal: space[3] + 2 }, on && [{ backgroundColor: tint?.accent ?? c.surface }, elevation(c)]]}
       >
