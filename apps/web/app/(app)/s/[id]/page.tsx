@@ -7,6 +7,7 @@ import { EmptyState, Skeleton } from '@yapilapi/design-system';
 import type { StoryGroup } from '@yapilapi/api-client';
 import { api } from '@/lib/api';
 import { StoryViewer } from '@/components/StoryViewer';
+import { useSession } from '../../../providers';
 
 /**
  * One story, opened from a link, a story card in a chat, a reshare or a
@@ -15,6 +16,7 @@ import { StoryViewer } from '@/components/StoryViewer';
 export default function StoryPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { t } = useSession();
   const [groups, setGroups] = useState<StoryGroup[] | null>(null);
   const [missing, setMissing] = useState(false);
 
@@ -32,11 +34,7 @@ export default function StoryPage() {
   if (missing)
     return (
       <div className="yp-shell__inner">
-        <EmptyState
-          title="This story isn't available"
-          body="It may have ended, been deleted, or be shared with people you aren't connected to."
-          action={<Link href="/home">Go home</Link>}
-        />
+        <EmptyState title={t('m.stories.unavailable')} body={t('m.stories.unavailableBody')} action={<Link href="/home">{t('storyPage.goHome')}</Link>} />
       </div>
     );
   if (!groups) return <Skeleton height={320} />;

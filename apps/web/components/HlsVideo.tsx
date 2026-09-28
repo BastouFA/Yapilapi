@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CaptionTracks, videoCrossOrigin } from '@yapilapi/design-system';
 import type { CaptionTrackRef } from '@yapilapi/shared';
+import { useSession } from '@/app/providers';
 
 /**
  * Plays an HLS stream: natively on Safari/iOS, through hls.js elsewhere. Retries while a live stream starts.
@@ -21,6 +22,7 @@ export function HlsVideo({
   label: string;
   captions?: CaptionTrackRef[];
 }) {
+  const { t } = useSession();
   const ref = useRef<HTMLVideoElement>(null);
   const [waiting, setWaiting] = useState(false);
 
@@ -67,7 +69,7 @@ export function HlsVideo({
       </video>
       {waiting ? (
         <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: '#c7d2cd', pointerEvents: 'none' }}>
-          Waiting for the stream to start…
+          {t('video.waitingForStream')}
         </span>
       ) : null}
     </div>

@@ -14,7 +14,7 @@ import { useSession } from '../../../providers';
 /** An event. Without an account, a public event is readable and RSVP leads to sign in. */
 export default function EventPageClient({ isPublic }: { isPublic: boolean }) {
   const { id } = useParams<{ id: string }>();
-  const { t, toast, locale, me } = useSession();
+  const { t, tp, toast, locale, me } = useSession();
   const signIn = useSignIn();
   const signedOut = !me;
   const [ev, setEv] = useState<EventItem | null>(null);
@@ -33,15 +33,16 @@ export default function EventPageClient({ isPublic }: { isPublic: boolean }) {
       .catch(() => {});
   }, [id, signedOut, isPublic]);
 
-  if (signedOut && !isPublic)
-    return <NeedsAccount title="Sign in to see this event" body="Some events are only shared with the host's followers or friends." />;
-  if (missing) return <EmptyState title="Event not found" body="It may have been cancelled, or it's private." />;
+  if (signedOut && !isPublic) return <NeedsAccount title={t('eventPage.signIn.title')} body={t('eventPage.signIn.body')} />;
+  if (missing) return <EmptyState title={t('m.event.notFound')} body={t('eventPage.notFoundBody')} />;
   if (!ev) return <Skeleton height={240} />;
 
   const tz = safeTimeZone(ev.timezone);
   const when = formatEventWhen(ev.startsAt, locale, tz);
   const until = ev.endsAt ? new Intl.DateTimeFormat(locale, { timeStyle: 'short', timeZone: tz }).format(new Date(ev.endsAt)) : null;
   const going = attendees.filter((a) => a.status === 'going');
+  const [hostedBefore = '', hostedAfter = ''] = t('m.event.hostedBy').split('{name}');
+  const goingNames = new Intl.ListFormat(locale, { type: 'unit', style: 'short' }).format(going.slice(0, 3).map((a) => a.user.displayName.split(' ')[0] ?? ''));
 
   return (
     <div className="yp-shell__inner">
@@ -57,28 +58,30 @@ export default function EventPageClient({ isPublic }: { isPublic: boolean }) {
           {until ? ` – ${until}` : ''}
         </p>
         <p className="muted" style={{ margin: 0 }}>
-          {ev.online ? 'Online' : ev.place ? <Link href={`/places/${ev.place.id}`}>{ev.place.name}</Link> : (ev.locationText ?? 'Location to be announced')}
-          {ev.capacity ? ` · ${ev.counts.going}/${ev.capacity} spots taken` : ` · ${ev.counts.going} going`} · {ev.counts.interested} interested
+          {ev.online ? t('m.event.online') : ev.place ? <Link href={`/places/${ev.place.id}`}>{ev.place.name}</Link> : (ev.locationText ?? t('ds.locationTba'))}
+          {ev.capacity ? ` · ${t('eventPage.spotsTaken', { going: ev.counts.going, capacity: ev.capacity })}` : ` · ${tp('m.event.going', ev.counts.going)}`}
+          {` · ${tp('m.event.interested', ev.counts.interested)}`}
         </p>
         <div className="row">
-          Hosted by
+          {hostedBefore}
           <Link href={`/u/${ev.host.username}`} className="row">
             <Avatar name={ev.host.displayName} src={ev.host.avatarUrl} size="sm" /> {ev.host.displayName}
           </Link>
+          {hostedAfter}
         </div>
       </div>
 
       {ev.host.id !== me?.id ? (
         <div className="stack-sm">
           <Segments
-            label="Your RSVP"
+            label={t('eventPage.yourRsvp')}
             value={ev.myRsvp ?? ('none' as never)}
             onChange={async (status: 'going' | 'interested' | 'not_going') => {
               if (signedOut) return signIn();
               try {
                 const r = await api.events.rsvp(id, status);
                 setEv(r.event);
-                toast(r.status === 'waitlist' ? "It's full, so you're on the waitlist." : 'RSVP saved');
+                toast(r.status === 'waitlist' ? t('m.event.waitlist') : t('eventPage.rsvpSaved'));
               } catch (e) {
                 toast(errorMessage(e));
               }
@@ -89,10 +92,10 @@ export default function EventPageClient({ isPublic }: { isPublic: boolean }) {
               { id: 'not_going', label: t('events.notGoing') },
             ]}
           />
-          {ev.myRsvp === 'interested' && ev.capacity && ev.counts.going >= ev.capacity ? <Badge tone="warning">Waitlist</Badge> : null}
+          {ev.myRsvp === 'interested' && ev.capacity && ev.counts.going >= ev.capacity ? <Badge tone="warning">{t('eventPage.waitlist')}</Badge> : null}
         </div>
       ) : (
-        <Badge tone="success">You're hosting</Badge>
+        <Badge tone="success">{t('eventPage.hosting')}</Badge>
       )}
 
       {ev.canCheckIn || (ev.myRsvp === 'going' && ev.host.id !== me?.id) ? (
@@ -116,33 +119,27 @@ export default function EventPageClient({ isPublic }: { isPublic: boolean }) {
 
       {going.length && !signedOut ? (
         <section className="stack-sm">
-          <h2 className="section-title">Going</h2>
+          <h2 className="section-title">{t('events.going')}</h2>
           <div className="row">
             <AvatarGroup>
               {going.slice(0, 8).map((a) => (
                 <Avatar key={a.user.id} name={a.user.displayName} src={a.user.avatarUrl} size="sm" />
               ))}
             </AvatarGroup>
-            <span className="muted">
-              {going
-                .map((a) => a.user.displayName.split(' ')[0])
-                .slice(0, 3)
-                .join(', ')}
-              {going.length > 3 ? ` and ${going.length - 3} more` : ''}
-            </span>
+            <span className="muted">{going.length > 3 ? tp('eventPage.goingMore', going.length - 3, { names: goingNames }) : goingNames}</span>
           </div>
         </section>
       ) : null}
 
       {signedOut ? (
-        <JoinNote text="Join YAPILAPI to say you're going and keep up with this event." />
+        <JoinNote text={t('eventPage.join')} />
       ) : (
         <Link href={`/create`} className="yp-btn yp-btn--secondary">
-          Share a post about this event
+          {t('eventPage.sharePost')}
         </Link>
       )}
       <Button variant="ghost" onClick={async () => toast((await copyText(location.href)) ? t('invite.copied') : t('story.copyFailed'))}>
-        Copy link
+        {t('invite.copy')}
       </Button>
     </div>
   );

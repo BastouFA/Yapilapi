@@ -3,22 +3,43 @@
 import { useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card, EmptyState, SensitiveCover, Select, Stat, Switch, Tabs, TextField } from '@yapilapi/design-system';
 import type { RegionalRule, RiskAccount } from '@yapilapi/api-client';
-import { FEATURE_FLAGS, formatRelativeTime, type StorePurchasePolicy } from '@yapilapi/shared';
+import { FEATURE_FLAGS, formatRelativeTime, type MessageKey, type StorePurchasePolicy } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
-import { useSession } from '../../providers';
+import { useSession, type Session } from '../../providers';
+
+/** Moderation decisions (the server's codes) in plain words. Unknown codes are shown as they are. */
+const DECISIONS: Record<string, MessageKey> = {
+  no_action: 'admin.decision.noAction',
+  restrict: 'admin.decision.restrict',
+  remove: 'admin.decision.remove',
+  suspend_user: 'admin.decision.suspendUser',
+  approve_ad: 'admin.decision.approveAd',
+  reject_ad: 'admin.decision.rejectAd',
+};
+function decisionLabel(decision: unknown, t: Session['t']): string {
+  const key = DECISIONS[String(decision)];
+  return key ? t(key) : String(decision ?? '').replace(/_/g, ' ');
+}
+
+const CASE_STATUS: Record<string, MessageKey> = {
+  open: 'admin.caseStatus.open',
+  appealed: 'admin.caseStatus.appealed',
+  decided: 'admin.caseStatus.decided',
+  final: 'admin.caseStatus.final',
+};
 
 /**
  * Admin and moderation console. The UI is only a convenience: every endpoint
  * it calls enforces the moderator/admin role on the server.
  */
 export default function Admin() {
-  const { me } = useSession();
+  const { me, t } = useSession();
   const [tab, setTab] = useState('moderation');
-  if (me?.role === 'user') return <EmptyState title="Admins only" body="You don't have access to this page." />;
+  if (me?.role === 'user') return <EmptyState title={t('admin.only')} body={t('admin.onlyBody')} />;
   return (
     <div className="yp-shell__inner yp-shell__inner--wide">
       <div className="yp-topbar">
-        <h1>Admin</h1>
+        <h1>{t('m.role.admin')}</h1>
       </div>
       <Tabs
         id="admin-tabs"
@@ -26,14 +47,14 @@ export default function Admin() {
         value={tab}
         onChange={setTab}
         tabs={[
-          { id: 'moderation', label: 'Moderation' },
-          { id: 'accounts', label: 'Account signals' },
+          { id: 'moderation', label: t('admin.tab.moderation') },
+          { id: 'accounts', label: t('admin.tab.accounts') },
           ...(me?.role === 'admin'
             ? [
-                { id: 'overview', label: 'Overview' },
-                { id: 'flags', label: 'Feature flags' },
-                { id: 'regions', label: 'Regional rules' },
-                { id: 'audit', label: 'Audit log' },
+                { id: 'overview', label: t('admin.tab.overview') },
+                { id: 'flags', label: t('admin.tab.flags') },
+                { id: 'regions', label: t('admin.tab.regions') },
+                { id: 'audit', label: t('admin.tab.audit') },
               ]
             : []),
         ]}
@@ -61,7 +82,7 @@ export default function Admin() {
 }
 
 function Moderation() {
-  const { toast, locale, me } = useSession();
+  const { toast, locale, me, t } = useSession();
   const [status, setStatus] = useState('open');
   const [items, setItems] = useState<Record<string, any>[] | null>(null);
   const load = () =>
@@ -76,7 +97,7 @@ function Moderation() {
   const decide = async (id: string, decision: string, note?: string) => {
     try {
       await api.admin.decide(id, decision, note);
-      toast('Decision recorded');
+      toast(t('admin.case.recorded'));
       await load();
     } catch (e) {
       toast(errorMessage(e));
@@ -87,7 +108,7 @@ function Moderation() {
       <div className="row">
         {['open', 'appealed', 'decided', 'final'].map((s) => (
           <Button key={s} size="sm" variant={s === status ? 'primary' : 'secondary'} onClick={() => setStatus(s)}>
-            {s}
+            {CASE_STATUS[s] ? t(CASE_STATUS[s]) : s}
           </Button>
         ))}
       </div>
@@ -95,54 +116,62 @@ function Moderation() {
         items.map((c) => (
           <Card
             key={c.id}
-            title={c.target_type === 'ad_campaign' ? `Ad review · ${c.signals?.name ?? 'campaign'}` : `${c.target_type} · ${c.risk}`}
-            subtitle={`${c.source} · @${c.subject_username ?? 'unknown'} · ${formatRelativeTime(c.created_at, locale)}`}
+            title={
+              c.target_type === 'ad_campaign'
+                ? c.signals?.name
+                  ? t('admin.case.adReview', { name: String(c.signals.name) })
+                  : t('admin.case.adReviewNoName')
+                : `${c.target_type} · ${c.risk}`
+            }
+            subtitle={[c.source, c.subject_username ? `@${c.subject_username}` : t('admin.case.unknownAccount'), formatRelativeTime(c.created_at, locale)].join(
+              ' · ',
+            )}
             footer={
               c.needs_other_reviewer ? (
                 // The server refuses it too: whoever made the decision can't decide its appeal.
-                <span className="muted">Needs another reviewer</span>
+                <span className="muted">{t('admin.case.needsOtherReviewer')}</span>
               ) : ['open', 'appealed'].includes(c.status) && c.target_type === 'ad_campaign' ? (
                 <AdDecision onDecide={(approve, note) => decide(c.id, approve ? 'approve_ad' : 'reject_ad', note)} />
               ) : ['open', 'appealed'].includes(c.status) ? (
                 <>
                   <Button size="sm" variant="ghost" onClick={() => decide(c.id, 'no_action')}>
-                    No action
+                    {t('admin.decision.noAction')}
                   </Button>
                   <Button size="sm" variant="secondary" onClick={() => decide(c.id, 'restrict')}>
-                    Restrict
+                    {t('admin.decision.restrict')}
                   </Button>
                   <Button size="sm" variant="danger" onClick={() => decide(c.id, 'remove')}>
-                    Remove
+                    {t('admin.decision.remove')}
                   </Button>
                   {me?.role === 'admin' ? (
                     <Button size="sm" variant="danger" onClick={() => decide(c.id, 'suspend_user')}>
-                      Suspend user
+                      {t('admin.decision.suspendUser')}
                     </Button>
                   ) : null}
                 </>
               ) : (
-                <span className="muted">Decision: {c.decision}</span>
+                <span className="muted">{t('admin.case.decision', { decision: decisionLabel(c.decision, t) })}</span>
               )
             }
           >
-            {c.risk === 'escalate' ? <Alert tone="danger">Escalated: review first.</Alert> : null}
+            {c.risk === 'escalate' ? <Alert tone="danger">{t('admin.case.escalated')}</Alert> : null}
             {c.needs_other_reviewer ? (
-              <Alert tone="info" title="Needs another reviewer">
-                You made the decision being appealed ({String(c.decision).replace('_', ' ')}), so another moderator reviews this appeal. It waits until someone
-                else does.
+              <Alert tone="info" title={t('admin.case.needsOtherReviewer')}>
+                {t('admin.case.needsOtherReviewerBody', { decision: decisionLabel(c.decision, t) })}
               </Alert>
             ) : null}
             {c.appeal_statement ? (
               <p style={{ whiteSpace: 'pre-wrap' }}>
-                <strong>Appeal{c.status === 'appealed' ? ` against “${String(c.decision).replace('_', ' ')}”` : ''}:</strong> {c.appeal_statement}
+                <strong>{c.status === 'appealed' ? t('admin.case.appealAgainst', { decision: decisionLabel(c.decision, t) }) : t('admin.case.appeal')}</strong>{' '}
+                {c.appeal_statement}
               </p>
             ) : null}
-            {c.media ? <CaseMedia media={c.media} /> : <p style={{ whiteSpace: 'pre-wrap' }}>{c.excerpt ?? '(no text preview)'}</p>}
+            {c.media ? <CaseMedia media={c.media} /> : <p style={{ whiteSpace: 'pre-wrap' }}>{c.excerpt ?? t('admin.case.noPreview')}</p>}
             <code style={{ fontSize: 12 }}>{JSON.stringify(c.signals)}</code>
           </Card>
         ))
       ) : (
-        <EmptyState title="Queue is clear" />
+        <EmptyState title={t('admin.case.queueClear')} />
       )}
     </div>
   );
@@ -151,11 +180,11 @@ function Moderation() {
 /** Media an automated check flagged, blurred until the moderator chooses to look. */
 function CaseMedia({ media }: { media: { kind: string; url: string; moderation: string } }) {
   const [shown, setShown] = useState(false);
-  const { locale } = useSession();
+  const { locale, t } = useSession();
   return (
     <div className="stack-sm">
       <p className="muted" style={{ margin: 0 }}>
-        Automated check: {media.moderation}. No action puts the {media.kind} back up; Restrict keeps it up but blurred; Remove keeps it down.
+        {t(media.kind === 'video' ? 'admin.media.checkVideo' : 'admin.media.checkPhoto', { result: media.moderation })}
       </p>
       <div className="case-media">
         {media.kind === 'video' && !/\.(jpe?g|png|webp)$/i.test(media.url) ? (
@@ -169,16 +198,16 @@ function CaseMedia({ media }: { media: { kind: string; url: string; moderation: 
   );
 }
 
-const SIGNAL_TEXT: Record<string, string> = {
-  disposable_email: 'Signed up with a throwaway email address',
-  signup_ip_velocity: 'Many sign-ups from the same address',
-  signup_subnet_velocity: 'Many sign-ups from the same network',
-  post_velocity: 'Hit the new-account posting pace',
-  message_velocity: 'Hit the new-account messaging pace',
-  duplicate_text: 'Posted or sent the same text many times',
-  link_spam: 'Many links from a new account',
-  auto_restricted: 'Limited automatically after repeated flags',
-  held_while_limited: 'Posted while limited (visible only to them)',
+const SIGNAL_TEXT: Record<string, MessageKey> = {
+  disposable_email: 'admin.signal.disposableEmail',
+  signup_ip_velocity: 'admin.signal.signupIpVelocity',
+  signup_subnet_velocity: 'admin.signal.signupSubnetVelocity',
+  post_velocity: 'admin.signal.postVelocity',
+  message_velocity: 'admin.signal.messageVelocity',
+  duplicate_text: 'admin.signal.duplicateText',
+  link_spam: 'admin.signal.linkSpam',
+  auto_restricted: 'admin.signal.autoRestricted',
+  held_while_limited: 'admin.signal.heldWhileLimited',
 };
 
 /**
@@ -186,7 +215,7 @@ const SIGNAL_TEXT: Record<string, string> = {
  * posts and messages; confirming keeps the limit and removes the flagged items.
  */
 function AccountSignals() {
-  const { toast, locale } = useSession();
+  const { toast, locale, t } = useSession();
   const [status, setStatus] = useState<'open' | 'reviewed'>('open');
   const [items, setItems] = useState<RiskAccount[] | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -202,7 +231,7 @@ function AccountSignals() {
   const review = async (id: string, action: 'clear' | 'confirm') => {
     try {
       await api.admin.reviewRisk(id, action, notes[id]?.trim() || undefined);
-      toast(action === 'clear' ? 'Signals cleared' : 'Signals confirmed');
+      toast(action === 'clear' ? t('admin.risk.cleared') : t('admin.risk.confirmed'));
       await load();
     } catch (e) {
       toast(errorMessage(e));
@@ -213,7 +242,7 @@ function AccountSignals() {
       <div className="row">
         {(['open', 'reviewed'] as const).map((s) => (
           <Button key={s} size="sm" variant={s === status ? 'primary' : 'secondary'} onClick={() => setStatus(s)}>
-            {s === 'open' ? 'Waiting for review' : 'Reviewed (30 days)'}
+            {s === 'open' ? t('admin.risk.waiting') : t('admin.risk.reviewed')}
           </Button>
         ))}
       </div>
@@ -223,28 +252,32 @@ function AccountSignals() {
             key={a.user.id}
             title={
               <>
-                {a.user.displayName} <span className="muted">@{a.user.username}</span> {a.restrictedAt ? <Badge tone="warning">Limited</Badge> : null}
+                {a.user.displayName} <span className="muted">@{a.user.username}</span>{' '}
+                {a.restrictedAt ? <Badge tone="warning">{t('admin.risk.limited')}</Badge> : null}
               </>
             }
-            subtitle={`Joined ${formatRelativeTime(a.user.createdAt, locale)} · email ${a.user.emailVerified ? 'confirmed' : 'not confirmed'} · phone ${
-              a.user.phoneVerified ? 'confirmed' : 'not confirmed'
-            } · risk score ${a.score}`}
+            subtitle={[
+              t('admin.risk.joined', { when: formatRelativeTime(a.user.createdAt, locale) }),
+              t(a.user.emailVerified ? 'admin.risk.emailConfirmed' : 'admin.risk.emailNotConfirmed'),
+              t(a.user.phoneVerified ? 'admin.risk.phoneConfirmed' : 'admin.risk.phoneNotConfirmed'),
+              t('admin.risk.score', { score: a.score }),
+            ].join(' · ')}
             footer={
               status === 'open' ? (
                 <>
                   <div style={{ flex: 1, minWidth: 200 }}>
                     <TextField
-                      label="Note (optional)"
+                      label={t('admin.risk.note')}
                       value={notes[a.user.id] ?? ''}
                       onChange={(e) => setNotes({ ...notes, [a.user.id]: e.currentTarget.value })}
                       maxLength={2000}
                     />
                   </div>
                   <Button size="sm" variant="secondary" onClick={() => review(a.user.id, 'clear')}>
-                    {a.restrictedAt ? 'Clear and lift limit' : 'Clear'}
+                    {a.restrictedAt ? t('admin.risk.clearAndLift') : t('admin.risk.clear')}
                   </Button>
                   <Button size="sm" variant="danger" onClick={() => review(a.user.id, 'confirm')}>
-                    Confirm
+                    {t('admin.risk.confirm')}
                   </Button>
                 </>
               ) : null
@@ -254,10 +287,10 @@ function AccountSignals() {
               {a.signals.map((s) => (
                 <li key={s.id} data-status={s.status}>
                   <span>
-                    <strong>{SIGNAL_TEXT[s.kind] ?? s.kind.replace(/_/g, ' ')}</strong>{' '}
+                    <strong>{SIGNAL_TEXT[s.kind] ? t(SIGNAL_TEXT[s.kind]!) : s.kind.replace(/_/g, ' ')}</strong>{' '}
                     <span className="muted">
                       · {s.status} · {formatRelativeTime(s.createdAt, locale)}
-                      {s.weight ? ` · weight ${s.weight}` : ''}
+                      {s.weight ? ` · ${t('admin.risk.weight', { weight: s.weight })}` : ''}
                     </span>
                   </span>
                   {s.excerpt ? <span style={{ whiteSpace: 'pre-wrap' }}>“{s.excerpt}”</span> : null}
@@ -268,14 +301,14 @@ function AccountSignals() {
           </Card>
         ))
       ) : (
-        <EmptyState title={status === 'open' ? 'Nothing waiting' : 'No recent reviews'} />
+        <EmptyState title={status === 'open' ? t('admin.risk.nothingWaiting') : t('admin.risk.noRecent')} />
       )}
     </div>
   );
 }
 
 function Overview() {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const [data, setData] = useState<Awaited<ReturnType<typeof api.admin.summary>> | null>(null);
   useEffect(() => {
     api.admin.summary().then(setData, (e) => toast(errorMessage(e)));
@@ -283,21 +316,21 @@ function Overview() {
   if (!data) return null;
   return (
     <div className="stack">
-      <p className="muted">North Star: meaningful social actions (posts, comments, messages, follows, joins, RSVPs).</p>
+      <p className="muted">{t('admin.overview.northStar')}</p>
       <div className="stats">
-        <Stat label="Meaningful actions, 24h" value={data.summary.meaningful_actions_24h} />
-        <Stat label="Active users, 24h" value={data.summary.dau} />
-        <Stat label="Users" value={data.summary.users} />
-        <Stat label="Sign-ups, 7d" value={data.summary.signups_7d} />
-        <Stat label="Open cases" value={data.summary.open_cases} />
-        <Stat label="Paid orders, 7d" value={data.summary.paid_orders_7d} />
+        <Stat label={t('admin.overview.actions24h')} value={data.summary.meaningful_actions_24h} />
+        <Stat label={t('admin.overview.dau')} value={data.summary.dau} />
+        <Stat label={t('admin.overview.users')} value={data.summary.users} />
+        <Stat label={t('admin.overview.signups7d')} value={data.summary.signups_7d} />
+        <Stat label={t('admin.overview.openCases')} value={data.summary.open_cases} />
+        <Stat label={t('admin.overview.paidOrders7d')} value={data.summary.paid_orders_7d} />
       </div>
       <div className="table-wrap">
         <table className="table">
           <thead>
             <tr>
-              <th>Action (7 days)</th>
-              <th>Count</th>
+              <th>{t('admin.overview.action7d')}</th>
+              <th>{t('admin.overview.count')}</th>
             </tr>
           </thead>
           <tbody>
@@ -315,7 +348,7 @@ function Overview() {
 }
 
 function Flags() {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const [flags, setFlags] = useState<Record<string, boolean>>({});
   useEffect(() => {
     api.flags().then(
@@ -324,7 +357,7 @@ function Flags() {
     );
   }, [toast]);
   return (
-    <Card title="Feature flags" subtitle="Changes apply to everyone immediately and are recorded in the audit log.">
+    <Card title={t('admin.tab.flags')} subtitle={t('admin.flags.subtitle')}>
       <div className="stack-sm">
         {Object.entries(FEATURE_FLAGS).map(([k, f]) => (
           <Switch
@@ -351,6 +384,7 @@ function Flags() {
  * explained in docs/operations/in-app-purchases.md.
  */
 function PhonePurchases() {
+  const { t } = useSession();
   const [policy, setPolicy] = useState<StorePurchasePolicy | null>(null);
   useEffect(() => {
     api.flags().then(
@@ -359,50 +393,48 @@ function PhonePurchases() {
     );
   }, []);
   const ios = {
-    hidden: 'Hidden: no buy buttons or prices for digital goods, only a line that they are managed on the web.',
-    external_link: 'Link to the web checkout, in the listed storefront countries; hidden elsewhere.',
-    iap: 'Apple In-App Purchase. Until the app has a StoreKit module this works like hidden.',
-  } as const;
+    hidden: 'admin.purchases.hidden',
+    external_link: 'admin.purchases.iosLink',
+    iap: 'admin.purchases.iosIap',
+  } as const satisfies Record<string, MessageKey>;
   const android = {
-    play_billing_required: 'Hidden: no buy buttons or prices for digital goods, only a line that they are managed on the web.',
-    user_choice: 'Link to the web checkout, in the listed countries; hidden elsewhere.',
-  } as const;
+    play_billing_required: 'admin.purchases.hidden',
+    user_choice: 'admin.purchases.androidLink',
+  } as const satisfies Record<string, MessageKey>;
+  const countries = (list: string[]) => (list.length ? t('admin.purchases.countries', { list: list.join(', ') }) : t('admin.purchases.noCountries'));
   return (
-    <Card
-      title="Phone app purchases"
-      subtitle="Digital goods in the iPhone and Android apps. Physical products, services and event tickets always keep their checkout, and the web checkout always works."
-    >
+    <Card title={t('admin.purchases.title')} subtitle={t('admin.purchases.subtitle')}>
       {policy ? (
         <dl className="stack-sm">
           <div>
             <dt>
-              <strong>iPhone (IOS_DIGITAL_PURCHASES = {policy.ios.mode})</strong>
+              <strong>{t('admin.purchases.ios', { setting: 'IOS_DIGITAL_PURCHASES', mode: policy.ios.mode })}</strong>
             </dt>
             <dd>
-              {ios[policy.ios.mode]}
-              {policy.ios.mode === 'external_link' ? ` Countries: ${policy.ios.linkCountries.join(', ') || 'none'}.` : ''}
+              {t(ios[policy.ios.mode])}
+              {policy.ios.mode === 'external_link' ? ` ${countries(policy.ios.linkCountries)}` : ''}
             </dd>
           </div>
           <div>
             <dt>
-              <strong>Android (ANDROID_DIGITAL_PURCHASES = {policy.android.mode})</strong>
+              <strong>{t('admin.purchases.android', { setting: 'ANDROID_DIGITAL_PURCHASES', mode: policy.android.mode })}</strong>
             </dt>
             <dd>
-              {android[policy.android.mode]}
-              {policy.android.mode === 'user_choice' ? ` Countries: ${policy.android.linkCountries.join(', ') || 'none'}.` : ''}
+              {t(android[policy.android.mode])}
+              {policy.android.mode === 'user_choice' ? ` ${countries(policy.android.linkCountries)}` : ''}
             </dd>
           </div>
         </dl>
       ) : (
-        <p className="muted">Loading…</p>
+        <p className="muted">{t('m.common.loadingMore')}</p>
       )}
-      <p className="muted">Change these in the API's environment settings. See docs/operations/in-app-purchases.md.</p>
+      <p className="muted">{t('admin.purchases.howToChange', { path: 'docs/operations/in-app-purchases.md' })}</p>
     </Card>
   );
 }
 
 function Audit() {
-  const { toast } = useSession();
+  const { toast, t, locale } = useSession();
   const [items, setItems] = useState<Record<string, any>[]>([]);
   useEffect(() => {
     api.admin.auditLogs().then(
@@ -415,21 +447,21 @@ function Audit() {
       <table className="table">
         <thead>
           <tr>
-            <th>When</th>
-            <th>Action</th>
-            <th>Entity</th>
-            <th>Actor</th>
+            <th>{t('admin.audit.when')}</th>
+            <th>{t('admin.audit.action')}</th>
+            <th>{t('admin.audit.entity')}</th>
+            <th>{t('admin.audit.actor')}</th>
           </tr>
         </thead>
         <tbody>
           {items.map((l) => (
             <tr key={l.id}>
-              <td>{new Date(l.created_at).toLocaleString()}</td>
+              <td>{new Date(l.created_at).toLocaleString(locale)}</td>
               <td>{l.action}</td>
               <td>
                 {l.entity_type} {l.entity_id?.slice(0, 8)}
               </td>
-              <td>{l.actor_id?.slice(0, 8) ?? 'system'}</td>
+              <td>{l.actor_id?.slice(0, 8) ?? t('admin.audit.system')}</td>
             </tr>
           ))}
         </tbody>
@@ -440,6 +472,7 @@ function Audit() {
 
 /** Approve an ad, or reject it with a reason the advertiser will see. */
 function AdDecision({ onDecide }: { onDecide: (approve: boolean, note?: string) => void }) {
+  const { t } = useSession();
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState('');
   if (rejecting)
@@ -453,23 +486,23 @@ function AdDecision({ onDecide }: { onDecide: (approve: boolean, note?: string) 
         }}
       >
         <div style={{ flex: 1, minWidth: 200 }}>
-          <TextField label="Why it was rejected (the advertiser sees this)" value={note} onChange={(e) => setNote(e.currentTarget.value)} maxLength={2000} />
+          <TextField label={t('admin.ad.why')} value={note} onChange={(e) => setNote(e.currentTarget.value)} maxLength={2000} />
         </div>
         <Button type="submit" size="sm" variant="danger" disabled={!note.trim()}>
-          Reject ad
+          {t('admin.decision.rejectAd')}
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setRejecting(false)}>
-          Cancel
+          {t('common.cancel')}
         </Button>
       </form>
     );
   return (
     <>
       <Button size="sm" variant="secondary" onClick={() => setRejecting(true)}>
-        Reject
+        {t('admin.ad.reject')}
       </Button>
       <Button size="sm" onClick={() => onDecide(true)}>
-        Approve ad
+        {t('admin.decision.approveAd')}
       </Button>
     </>
   );
@@ -477,7 +510,7 @@ function AdDecision({ onDecide }: { onDecide: (approve: boolean, note?: string) 
 
 /** Per-country rules: matching posts are withheld for viewers in that country, never deleted. */
 function RegionalRules() {
-  const { toast } = useSession();
+  const { toast, t, tp } = useSession();
   const [items, setItems] = useState<RegionalRule[] | null>(null);
   const [kind, setKind] = useState<'blocked_term' | 'restrict_topic'>('blocked_term');
   const [country, setCountry] = useState('');
@@ -494,19 +527,16 @@ function RegionalRules() {
   }, []);
   return (
     <div className="stack">
-      <Alert tone="info">
-        Rules withhold matching posts only for people whose country is set to the rule&apos;s country. Authors see where their post is withheld. Record the
-        legal basis for every rule; each change is in the audit log.
-      </Alert>
+      <Alert tone="info">{t('admin.regions.intro')}</Alert>
       {items?.length ? (
         <div className="table-wrap">
           <table className="table">
             <thead>
               <tr>
-                <th>Country</th>
-                <th>Rule</th>
-                <th>Legal basis</th>
-                <th>Posts withheld</th>
+                <th>{t('settings.country')}</th>
+                <th>{t('admin.regions.rule')}</th>
+                <th>{t('admin.regions.legalBasis')}</th>
+                <th>{t('admin.regions.withheld')}</th>
                 <th />
               </tr>
             </thead>
@@ -514,7 +544,9 @@ function RegionalRules() {
               {items.map((r) => (
                 <tr key={r.id}>
                   <td>{r.country}</td>
-                  <td>{r.kind === 'blocked_term' ? `Term: ${r.term}` : `Topic: #${r.topic}`}</td>
+                  <td>
+                    {r.kind === 'blocked_term' ? t('admin.regions.termRow', { term: r.term ?? '' }) : t('admin.regions.topicRow', { topic: r.topic ?? '' })}
+                  </td>
                   <td>{r.legalBasis}</td>
                   <td>{r.withheldPosts}</td>
                   <td>
@@ -524,14 +556,14 @@ function RegionalRules() {
                       onClick={async () => {
                         try {
                           await api.admin.deleteRegionalRule(r.id);
-                          toast('Rule removed');
+                          toast(t('admin.regions.removed'));
                           await load();
                         } catch (e) {
                           toast(errorMessage(e));
                         }
                       }}
                     >
-                      Remove
+                      {t('m.common.remove')}
                     </Button>
                   </td>
                 </tr>
@@ -540,9 +572,9 @@ function RegionalRules() {
           </table>
         </div>
       ) : (
-        <p className="muted">No regional rules.</p>
+        <p className="muted">{t('admin.regions.none')}</p>
       )}
-      <Card title="Add a rule">
+      <Card title={t('admin.regions.addTitle')}>
         <form
           className="stack-sm"
           onSubmit={async (e) => {
@@ -553,7 +585,7 @@ function RegionalRules() {
                   ? { kind, country, term: value, legalBasis: basis }
                   : { kind, country, topic: value.replace(/^#/, ''), legalBasis: basis },
               );
-              toast(`Rule added. ${r.rule.withheldPosts} existing posts withheld in ${r.rule.country}.`);
+              toast(tp('admin.regions.added', r.rule.withheldPosts, { country: r.rule.country }));
               setValue('');
               setBasis('');
               await load();
@@ -562,28 +594,35 @@ function RegionalRules() {
             }
           }}
         >
-          <Select label="Rule" value={kind} onChange={(e) => setKind(e.currentTarget.value as typeof kind)}>
-            <option value="blocked_term">Withhold posts containing a term</option>
-            <option value="restrict_topic">Withhold posts in a topic</option>
+          <Select label={t('admin.regions.rule')} value={kind} onChange={(e) => setKind(e.currentTarget.value as typeof kind)}>
+            <option value="blocked_term">{t('admin.regions.kindTerm')}</option>
+            <option value="restrict_topic">{t('admin.regions.kindTopic')}</option>
           </Select>
           <TextField
-            label="Country code"
-            hint="Two letters, for example DE"
+            label={t('admin.regions.countryCode')}
+            hint={t('admin.regions.countryCodeHint')}
             value={country}
             onChange={(e) => setCountry(e.currentTarget.value)}
             maxLength={2}
             required
           />
           <TextField
-            label={kind === 'blocked_term' ? 'Term' : 'Topic'}
+            label={kind === 'blocked_term' ? t('admin.regions.term') : t('admin.regions.topic')}
             value={value}
             onChange={(e) => setValue(e.currentTarget.value)}
             maxLength={100}
             required
           />
-          <TextField label="Legal basis" multiline value={basis} onChange={(e) => setBasis(e.currentTarget.value)} maxLength={1000} required />
+          <TextField
+            label={t('admin.regions.legalBasis')}
+            multiline
+            value={basis}
+            onChange={(e) => setBasis(e.currentTarget.value)}
+            maxLength={1000}
+            required
+          />
           <Button type="submit" size="sm" disabled={country.length !== 2 || !value.trim() || basis.trim().length < 3}>
-            Add rule
+            {t('admin.regions.add')}
           </Button>
         </form>
       </Card>

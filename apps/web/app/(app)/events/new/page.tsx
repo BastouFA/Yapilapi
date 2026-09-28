@@ -40,7 +40,7 @@ function NewEvent() {
             visibility: String(f.get('visibility')),
             communityId: communityId ?? undefined,
           });
-          toast('Event created');
+          toast(t('eventForm.created'));
           router.push(`/events/${event.id}`);
         } catch (err) {
           setError(errorMessage(err));
@@ -55,19 +55,26 @@ function NewEvent() {
       </div>
       {error ? <Alert tone="danger">{error}</Alert> : null}
       <div className="stack">
-        <TextField label="Title" name="title" required maxLength={120} error={fields.title} />
-        <TextField label="Starts" name="start" type="datetime-local" required hint={`Your time zone: ${tz}`} error={fields.startsAt} />
-        <TextField label="Ends (optional)" name="end" type="datetime-local" error={fields.endsAt} />
-        <Checkbox label="This is an online event" checked={online} onChange={(e) => setOnline(e.currentTarget.checked)} />
-        {!online ? <TextField label="Where" name="location" maxLength={300} placeholder="Address or meeting point" /> : null}
-        <TextField label="Capacity (optional)" name="capacity" type="number" min={1} hint="People beyond this go on a waitlist." />
-        <Select label="Who can see it" name="visibility" defaultValue="public">
-          <option value="public">Everyone</option>
-          <option value="followers">Followers</option>
-          <option value="friends">Friends</option>
-          <option value="private">Only invited people</option>
+        <TextField label={t('m.eventForm.name')} name="title" required maxLength={120} error={fields.title} />
+        <TextField
+          label={t('m.eventForm.starts')}
+          name="start"
+          type="datetime-local"
+          required
+          hint={t('eventForm.yourTimeZone', { zone: tz })}
+          error={fields.startsAt}
+        />
+        <TextField label={t('m.eventForm.ends')} name="end" type="datetime-local" error={fields.endsAt} />
+        <Checkbox label={t('eventForm.online')} checked={online} onChange={(e) => setOnline(e.currentTarget.checked)} />
+        {!online ? <TextField label={t('m.eventForm.where')} name="location" maxLength={300} placeholder={t('m.eventForm.addressLabel')} /> : null}
+        <TextField label={t('eventForm.capacity')} name="capacity" type="number" min={1} hint={t('eventForm.capacityHint')} />
+        <Select label={t('m.eventForm.whoSees')} name="visibility" defaultValue="public">
+          <option value="public">{t('m.eventForm.everyone')}</option>
+          <option value="followers">{t('m.eventForm.followers')}</option>
+          <option value="friends">{t('m.eventForm.friends')}</option>
+          <option value="private">{t('m.eventForm.invited')}</option>
         </Select>
-        <TextField label="Details" name="description" multiline maxLength={5000} />
+        <TextField label={t('m.eventForm.details')} name="description" multiline maxLength={5000} />
       </div>
       <Button type="submit" size="lg" block loading={busy}>
         {t('events.create')}

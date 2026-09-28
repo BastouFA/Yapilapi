@@ -398,7 +398,11 @@ export function PasskeysCard() {
               try {
                 const { options, challengeId } = await api.passkeys.registerOptions();
                 const response = await startRegistration({ optionsJSON: options });
-                await api.passkeys.registerVerify(challengeId, response, navigator.platform ? `Passkey on ${navigator.platform}` : 'Passkey');
+                await api.passkeys.registerVerify(
+                  challengeId,
+                  response,
+                  navigator.platform ? t('security.passkeyOn', { platform: navigator.platform }) : t('security.passkey'),
+                );
                 toast(t('settings.passkeys.added'));
                 await load();
               } catch (e) {

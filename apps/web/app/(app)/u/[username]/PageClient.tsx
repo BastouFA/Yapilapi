@@ -104,8 +104,8 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
     [username],
   );
 
-  if (signedOut && !isPublic) return <NeedsAccount title="Sign in to see this profile" body="Some profiles are only visible to people with an account." />;
-  if (missing) return <EmptyState title="This profile isn't available" body="It may have been removed, or you may not be able to see it." />;
+  if (signedOut && !isPublic) return <NeedsAccount title={t('profilePage.signIn.title')} body={t('profilePage.signIn.body')} />;
+  if (missing) return <EmptyState title={t('profilePage.missing.title')} body={t('profilePage.missing.body')} />;
   if (!profile)
     return (
       <div className="yp-shell__inner">
@@ -147,13 +147,13 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
               {profile.pronouns ? <Pronouns value={profile.pronouns} /> : null}
             </h1>
             <span className="muted">
-              @{profile.username} {profile.mode !== 'personal' ? <Badge tone="neutral">{profile.mode}</Badge> : null}{' '}
-              {profile.isPrivate ? <Badge tone="neutral">Private</Badge> : null}
+              @{profile.username} {profile.mode !== 'personal' ? <Badge tone="neutral">{t(`settings.mode.${profile.mode}` as const)}</Badge> : null}{' '}
+              {profile.isPrivate ? <Badge tone="neutral">{t('profilePage.private')}</Badge> : null}
             </span>
             {profile.nowStatus ? <NowStatusLine status={profile.nowStatus} /> : null}
             {rel.isSelf ? (
               <Button size="sm" variant="ghost" icon={profile.nowStatus ? undefined : 'plus'} className="now-status__edit" onClick={() => setSheet('status')}>
-                {profile.nowStatus ? 'Edit status' : 'Set a status'}
+                {profile.nowStatus ? t('profilePage.editStatus') : t('m.now.set')}
               </Button>
             ) : null}
           </div>
@@ -163,17 +163,17 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
                 {t('profile.edit')}
               </Link>
               <Link href="/saved" className="yp-btn yp-btn--ghost yp-btn--sm">
-                Saved
+                {t('m.saved.title')}
               </Link>
               <Link href="/studio" className="yp-btn yp-btn--ghost yp-btn--sm">
-                Studio
+                {t('m.studio.title')}
               </Link>
               <Link href="/drafts" className="yp-btn yp-btn--ghost yp-btn--sm">
-                Drafts
+                {t('m.drafts.title')}
               </Link>
               {flags.MEMORY ? (
                 <Link href="/memories" className="yp-btn yp-btn--ghost yp-btn--sm">
-                  Memories
+                  {t('memories.title')}
                 </Link>
               ) : null}
               <Link href="/find-friends" className="yp-btn yp-btn--ghost yp-btn--sm">
@@ -186,10 +186,10 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
                 {t('plus.short')}
               </Link>
               <Link href="/circles" className="yp-btn yp-btn--ghost yp-btn--sm">
-                Circles
+                {t('m.circles.title')}
               </Link>
               <Button size="sm" variant="ghost" icon="link" onClick={() => setSheet('share')}>
-                Share profile
+                {t('m.profile.share')}
               </Button>
             </div>
           ) : signedOut ? (
@@ -201,7 +201,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
                 {t('profile.message')}
               </Button>
               <Button size="sm" variant="ghost" icon="link" onClick={() => setSheet('share')}>
-                Share profile
+                {t('m.profile.share')}
               </Button>
             </div>
           ) : (
@@ -232,11 +232,15 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
                 {t('profile.message')}
               </Button>
               <Menu
-                label="More"
+                label={t('m.profile.more')}
                 actions={[
-                  { label: 'Share profile', icon: 'link', onSelect: () => setSheet('share') },
+                  { label: t('m.profile.share'), icon: 'link', onSelect: () => setSheet('share') },
                   rel.friends
-                    ? { label: 'Remove friend', icon: 'users', onSelect: act(() => api.users.unfriend(profile.id), 'Removed from friends') }
+                    ? {
+                        label: t('m.profile.unfriend'),
+                        icon: 'users',
+                        onSelect: act(() => api.users.unfriend(profile.id), t('m.profile.unfriended', { name: profile.displayName })),
+                      }
                     : rel.friendRequest === 'sent'
                       ? { label: t('profile.requestSent'), icon: 'check', onSelect: () => {} }
                       : {
@@ -245,20 +249,23 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
                           onSelect: act(() => api.users.friendRequest(profile.id)),
                         },
                   {
-                    label: rel.muted ? 'Unmute' : 'Mute',
+                    label: rel.muted ? t('m.profile.unmute') : t('m.profile.mute'),
                     icon: 'bell',
                     onSelect: act(
                       () => (rel.muted ? api.raw.del(`/v1/users/${profile.id}/mute`) : api.users.mute(profile.id)),
-                      rel.muted ? 'Unmuted' : 'Muted',
+                      rel.muted ? t('m.profile.unmuted', { name: profile.displayName }) : t('m.profile.muted', { name: profile.displayName }),
                     ),
                   },
                   {
                     label: rel.blocked ? t('profile.unblock') : t('profile.block'),
                     icon: 'shield',
                     danger: !rel.blocked,
-                    onSelect: act(() => (rel.blocked ? api.users.unblock(profile.id) : api.users.block(profile.id)), rel.blocked ? 'Unblocked' : 'Blocked'),
+                    onSelect: act(
+                      () => (rel.blocked ? api.users.unblock(profile.id) : api.users.block(profile.id)),
+                      rel.blocked ? t('m.profile.unblocked', { name: profile.displayName }) : t('m.profile.blocked', { name: profile.displayName }),
+                    ),
                   },
-                  { label: 'Report', icon: 'flag', danger: true, onSelect: () => setReporting(true) },
+                  { label: t('post.report'), icon: 'flag', danger: true, onSelect: () => setReporting(true) },
                 ]}
               />
             </div>
@@ -297,11 +304,11 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
             variant="ghost"
             onClick={async () => {
               await api.auth.resendVerification();
-              toast('Verification email sent');
+              toast(t('profilePage.verificationSent'));
               setMe({ ...me });
             }}
           >
-            Confirm your email
+            {t('profilePage.confirmEmail')}
           </Button>
         ) : null}
       </div>
@@ -309,8 +316,8 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
         <JoinNote
           text={
             intent === 'subscribe'
-              ? `Join YAPILAPI to subscribe to ${profile.displayName} and see posts for subscribers.`
-              : `Join YAPILAPI to follow ${profile.displayName} and see more from the people you care about.`
+              ? t('profilePage.join.subscribe', { name: profile.displayName })
+              : t('profilePage.join.follow', { name: profile.displayName })
           }
         />
       ) : null}
@@ -330,7 +337,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
         </h2>
       )}
       {current === 'posts' ? (
-        <PostList load={load} reloadKey={`${username}-${version}`} empty={rel.isSelf ? 'Share your first post from Create.' : 'No posts yet.'} />
+        <PostList load={load} reloadKey={`${username}-${version}`} empty={rel.isSelf ? t('profilePage.empty.postsSelf') : t('m.profile.noPosts')} />
       ) : current === 'reels' ? (
         <ReelGrid load={loadReels} reloadKey={`${username}-reels`} empty={t('ps.empty.reels')} />
       ) : current === 'chapters' ? (
@@ -339,13 +346,13 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
         <PostList
           load={loadTagged}
           reloadKey={`${username}-tagged`}
-          emptyTitle={taggedHidden ? 'This account is private' : 'No tagged posts yet'}
+          emptyTitle={taggedHidden ? t('profilePage.tagged.privateTitle') : t('profilePage.tagged.emptyTitle')}
           empty={
             taggedHidden
-              ? `Follow ${profile.displayName} to see photos they're tagged in.`
+              ? t('profilePage.tagged.privateBody', { name: profile.displayName })
               : rel.isSelf
-                ? 'Photos people tag you in show up here.'
-                : `Photos ${profile.displayName} is tagged in show up here.`
+                ? t('profilePage.tagged.emptySelf')
+                : t('profilePage.tagged.emptyOther', { name: profile.displayName })
           }
         />
       ) : current === 'boards' ? (
@@ -362,7 +369,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
         <PostList
           load={loadReposts}
           reloadKey={`${username}-reposts`}
-          empty={rel.isSelf ? 'Posts and reels you repost show up here.' : `${profile.displayName} hasn't reposted anything yet.`}
+          empty={rel.isSelf ? t('profilePage.reposts.emptySelf') : t('profilePage.reposts.emptyOther', { name: profile.displayName })}
         />
       )}
       <FollowList

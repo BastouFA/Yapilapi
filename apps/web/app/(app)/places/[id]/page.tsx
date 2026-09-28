@@ -14,13 +14,13 @@ import { useSession } from '../../../providers';
 
 export default function PlacePage() {
   const { id } = useParams<{ id: string }>();
-  const { locale } = useSession();
+  const { locale, t } = useSession();
   const [data, setData] = useState<{ place: Record<string, any>; events: EventItem[]; products: Record<string, any>[] } | null>(null);
   const [missing, setMissing] = useState(false);
   useEffect(() => {
     api.places.get(id).then(setData, () => setMissing(true));
   }, [id]);
-  if (missing) return <EmptyState title="Place not found" />;
+  if (missing) return <EmptyState title={t('m.place.notFound')} />;
   if (!data) return <Skeleton height={240} />;
   const { place, events, products } = data;
   const hours = Object.entries(place.hours ?? {}) as [string, string][];
@@ -41,13 +41,13 @@ export default function PlacePage() {
             rel="noopener noreferrer"
             className="yp-chip"
           >
-            Open in map
+            {t('m.place.openMap')}
           </a>
         ) : null}
       </div>
       {hours.length ? (
         <section className="stack-sm">
-          <h2 className="section-title">Hours</h2>
+          <h2 className="section-title">{t('m.place.hours')}</h2>
           <table className="table">
             <tbody>
               {hours.map(([d, h]) => (
@@ -62,7 +62,7 @@ export default function PlacePage() {
       ) : null}
       {events.length ? (
         <section className="stack-sm">
-          <h2 className="section-title">Upcoming here</h2>
+          <h2 className="section-title">{t('m.place.upcoming')}</h2>
           <div className="yp-grid">
             {events.map((e) => (
               <EventCard key={e.id} event={e} linkAs={NextLink} locale={locale} />
@@ -72,7 +72,7 @@ export default function PlacePage() {
       ) : null}
       {products.length ? (
         <section className="stack-sm">
-          <h2 className="section-title">Menu, products and bookings</h2>
+          <h2 className="section-title">{t('m.place.offers')}</h2>
           <div className="yp-grid">
             {products.map((p) => (
               <ProductCard key={p.id} product={p as never} locale={locale} action={<BuyButton productId={p.id} />} />

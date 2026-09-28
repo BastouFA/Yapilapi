@@ -12,7 +12,7 @@ import { isVerificationError, VerifyPrompt } from '@/components/Verification';
 import { useSession } from '../../providers';
 
 export default function LiveList() {
-  const { flags, toast, me, locale } = useSession();
+  const { flags, toast, me, locale, t } = useSession();
   const router = useRouter();
   const [items, setItems] = useState<LiveSummary[] | null>(null);
   const [title, setTitle] = useState('');
@@ -38,12 +38,12 @@ export default function LiveList() {
     );
   }, [flags.LIVE, toast]);
 
-  if (flags.LIVE === false) return <FeatureOff name="Live" />;
+  if (flags.LIVE === false) return <FeatureOff name={t('m.live.title')} />;
 
   return (
     <div className="yp-shell__inner">
       <div className="yp-topbar">
-        <h1>Live</h1>
+        <h1>{t('m.live.title')}</h1>
       </div>
       <form
         className="stack-sm yp-card"
@@ -61,20 +61,20 @@ export default function LiveList() {
         }}
       >
         {needsVerify || me?.needsVerification ? <VerifyPrompt action="live" /> : null}
-        <TextField label="Go live about…" value={title} onChange={(e) => setTitle(e.currentTarget.value)} maxLength={120} />
+        <TextField label={t('live.form.title')} value={title} onChange={(e) => setTitle(e.currentTarget.value)} maxLength={120} />
         <Select
-          label="Who can watch"
+          label={t('live.form.audience')}
           value={teen && visibility === 'public' ? 'followers' : visibility}
           onChange={(e) => setVisibility(e.currentTarget.value)}
-          hint={teen ? 'Because you’re under 18, only your friends and followers under 18 can watch. Adults who aren’t your friends can’t.' : undefined}
+          hint={teen ? t('live.form.teenHint') : undefined}
         >
-          {teen ? null : <option value="public">Everyone</option>}
-          <option value="followers">Followers</option>
-          <option value="friends">Friends</option>
+          {teen ? null : <option value="public">{t('visibility.public')}</option>}
+          <option value="followers">{t('visibility.followers')}</option>
+          <option value="friends">{t('visibility.friends')}</option>
         </Select>
         {tickets.length ? (
-          <Select label="Ticket" value={ticketId} onChange={(e) => setTicketId(e.currentTarget.value)} hint="Only people who bought this ticket can watch.">
-            <option value="">Free to watch</option>
+          <Select label={t('tickets.label.type')} value={ticketId} onChange={(e) => setTicketId(e.currentTarget.value)} hint={t('live.form.ticketHint')}>
+            <option value="">{t('live.form.free')}</option>
             {tickets.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.title} · {formatMoney(p.priceCents, p.currency, locale)}
@@ -83,7 +83,7 @@ export default function LiveList() {
           </Select>
         ) : null}
         <Button type="submit" disabled={!title.trim()}>
-          Set up live
+          {t('live.form.submit')}
         </Button>
       </form>
       {items === null ? (
@@ -99,14 +99,18 @@ export default function LiveList() {
                   <span className="yp-list__secondary">{l.host.displayName}</span>
                 </span>
                 <span className="yp-list__end">
-                  {l.status === 'live' ? <Badge tone="danger">Live · {l.viewers}</Badge> : <Badge tone="neutral">Scheduled</Badge>}
+                  {l.status === 'live' ? (
+                    <Badge tone="danger">{t('m.live.badge', { count: l.viewers })}</Badge>
+                  ) : (
+                    <Badge tone="neutral">{t('m.live.scheduled')}</Badge>
+                  )}
                 </span>
               </Link>
             </li>
           ))}
         </ul>
       ) : (
-        <EmptyState title="Nobody's live right now" />
+        <EmptyState title={t('m.live.empty')} />
       )}
     </div>
   );

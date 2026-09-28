@@ -3,17 +3,17 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { EmptyState, EventCard, Segments, Skeleton } from '@yapilapi/design-system';
-import type { EventItem } from '@yapilapi/shared';
+import type { EventItem, MessageKey } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { useSession } from '../../providers';
 
 type Scope = 'upcoming' | 'now' | 'going' | 'hosting';
-const EMPTY: Record<Scope, string> = {
-  upcoming: 'No upcoming events you can see yet.',
-  now: 'Nothing is happening right now.',
-  going: "You haven't said you're going to anything yet.",
-  hosting: "You aren't hosting any events.",
+const EMPTY: Record<Scope, MessageKey> = {
+  upcoming: 'm.events.empty.upcoming',
+  now: 'm.events.empty.now',
+  going: 'm.events.empty.going',
+  hosting: 'm.events.empty.hosting',
 };
 
 /** Events you can see: upcoming, happening now, ones you're going to and ones you host. */
@@ -34,20 +34,20 @@ export default function EventsPage() {
   return (
     <div className="yp-shell__inner">
       <div className="yp-topbar">
-        <h1>Events</h1>
+        <h1>{t('events.title')}</h1>
         <Link href="/events/new" className="yp-btn yp-btn--primary yp-btn--sm">
           {t('events.create')}
         </Link>
       </div>
       <Segments
-        label="Which events"
+        label={t('m.events.scope')}
         value={scope}
         onChange={setScope}
         options={[
-          { id: 'upcoming', label: 'Upcoming' },
-          { id: 'now', label: 'Happening now' },
-          { id: 'going', label: 'Going' },
-          { id: 'hosting', label: 'Hosting' },
+          { id: 'upcoming', label: t('m.events.upcoming') },
+          { id: 'now', label: t('discover.now') },
+          { id: 'going', label: t('events.going') },
+          { id: 'hosting', label: t('m.events.hosting') },
         ]}
       />
       {items === null ? (
@@ -59,7 +59,7 @@ export default function EventsPage() {
           ))}
         </div>
       ) : (
-        <EmptyState title="No events" body={EMPTY[scope]} />
+        <EmptyState title={t('m.events.none')} body={t(EMPTY[scope])} />
       )}
     </div>
   );

@@ -5,8 +5,10 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { Alert, Button, TextField } from '@yapilapi/design-system';
 import { api, errorMessage } from '@/lib/api';
+import { useSession } from '../../providers';
 
 function ResetForm() {
+  const { t } = useSession();
   const token = useSearchParams().get('token') ?? '';
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -15,20 +17,20 @@ function ResetForm() {
   if (!token)
     return (
       <div className="stack">
-        <h1>Choose a new password</h1>
-        <Alert tone="danger">This link is incomplete. Open the link in the email again, or ask for a new one.</Alert>
+        <h1>{t('auth.reset.title')}</h1>
+        <Alert tone="danger">{t('auth.reset.incomplete')}</Alert>
         <Link href="/forgot-password" className="yp-btn yp-btn--primary yp-btn--block">
-          Send a new link
+          {t('auth.reset.newLink')}
         </Link>
       </div>
     );
   if (done)
     return (
       <div className="stack">
-        <h1>Password changed</h1>
-        <Alert tone="success">You were signed out everywhere else. Log in with your new password.</Alert>
+        <h1>{t('st.event.password_changed')}</h1>
+        <Alert tone="success">{t('auth.reset.signedOut')}</Alert>
         <Link href="/login" className="yp-btn yp-btn--primary yp-btn--block">
-          Log in
+          {t('auth.login.submit')}
         </Link>
       </div>
     );
@@ -50,11 +52,19 @@ function ResetForm() {
         }
       }}
     >
-      <h1>Choose a new password</h1>
+      <h1>{t('auth.reset.title')}</h1>
       {error ? <Alert tone="danger">{error}</Alert> : null}
-      <TextField label="New password" name="password" type="password" autoComplete="new-password" minLength={10} hint="At least 10 characters." required />
+      <TextField
+        label={t('st.password.new')}
+        name="password"
+        type="password"
+        autoComplete="new-password"
+        minLength={10}
+        hint={t('auth.password.hint')}
+        required
+      />
       <Button type="submit" block loading={busy}>
-        Change password
+        {t('st.password.change')}
       </Button>
     </form>
   );

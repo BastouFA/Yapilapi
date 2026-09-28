@@ -240,6 +240,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
         dataSaver: { account: accountSaver, device: deviceSaver, mode: saverMode, active: saverOn, hints, setDevice },
       }}
     >
+      {/* First thing a keyboard reaches on every page, in the reader's language. */}
+      <a href="#main" className="skip-link">
+        {t('nav.skipToContent')}
+      </a>
       <DataSaverProvider on={saverOn}>
         <TranslationProvider value={translation}>{children}</TranslationProvider>
       </DataSaverProvider>

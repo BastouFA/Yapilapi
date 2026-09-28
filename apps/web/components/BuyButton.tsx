@@ -12,7 +12,7 @@ import { useCheckout } from './Checkout';
  * once per click so a retry never charges twice.
  */
 export function BuyButton({ productId, onPaid }: { productId: string; onPaid?: () => void }) {
-  const { toast, flags } = useSession();
+  const { toast, flags, t, locale } = useSession();
   const checkout = useCheckout();
   const [busy, setBusy] = useState(false);
   if (flags.COMMERCE === false) return null;
@@ -24,13 +24,16 @@ export function BuyButton({ productId, onPaid }: { productId: string; onPaid?: (
         setBusy(true);
         try {
           const r = await api.orders.create([{ productId, quantity: 1 }], crypto.randomUUID());
-          if (r.order.status === 'paid' || !r.payment) toast('Order confirmed');
+          if (r.order.status === 'paid' || !r.payment) toast(t('shop.orderConfirmed'));
           else
             checkout({
               orderId: r.order.id,
               clientSecret: r.payment.clientSecret,
               provider: r.payment.provider,
-              label: `${(r.order.items as { title: string }[] | null)?.[0]?.title ?? 'Your order'}, ${formatMoney(r.order.totalCents, r.order.currency)}`,
+              label: t('shop.checkoutLabel', {
+                title: (r.order.items as { title: string }[] | null)?.[0]?.title ?? t('buy.yourOrder'),
+                price: formatMoney(r.order.totalCents, r.order.currency, locale),
+              }),
               onPaid,
             });
         } catch (e) {
@@ -40,7 +43,7 @@ export function BuyButton({ productId, onPaid }: { productId: string; onPaid?: (
         }
       }}
     >
-      Buy
+      {t('m.shop.buy')}
     </Button>
   );
 }

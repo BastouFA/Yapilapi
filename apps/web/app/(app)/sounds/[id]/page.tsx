@@ -18,6 +18,17 @@ export default function SoundPage() {
   const [missing, setMissing] = useState<string | null>(null);
   const [sort, setSort] = useState<'recent' | 'top'>('recent');
   const n = new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 });
+  // "{number} reels" with the number in bold, in whatever order the language puts them.
+  const stat = (text: string, value: number) => {
+    const [before = '', after = ''] = text.split('{number}');
+    return (
+      <>
+        {before}
+        <strong>{n.format(value)}</strong>
+        {after}
+      </>
+    );
+  };
 
   useEffect(() => {
     setSound(null);
@@ -30,7 +41,7 @@ export default function SoundPage() {
 
   const load = useCallback((cursor?: string) => api.sounds.reels(id, sort, cursor), [id, sort]);
 
-  if (missing) return <EmptyState title="This sound isn't available" body={missing} />;
+  if (missing) return <EmptyState title={t('soundPage.unavailable')} body={missing} />;
   if (!sound) return <Skeleton height={240} />;
 
   return (
@@ -48,11 +59,11 @@ export default function SoundPage() {
             <bdi>{sound.owner.displayName}</bdi>
           </Link>
           <p className="muted" style={{ margin: 0 }}>
-            <strong>{n.format(sound.reels)}</strong> {sound.reels === 1 ? 'reel' : 'reels'}
+            {stat(tp('soundPage.reels', sound.reels), sound.reels)}
             {sound.stories ? (
               <>
                 {' · '}
-                <strong>{n.format(sound.stories)}</strong> {sound.stories === 1 ? 'story' : 'stories'}
+                {stat(tp('soundPage.stories', sound.stories), sound.stories)}
               </>
             ) : null}
             {sound.posts ? ` · ${tp('m.sound.postCount', sound.posts)}` : ''}
@@ -60,17 +71,17 @@ export default function SoundPage() {
             {sound.sourcePostId ? (
               <>
                 {' · '}
-                <Link href={`/reels?start=${sound.sourcePostId}`}>Original reel</Link>
+                <Link href={`/reels?start=${sound.sourcePostId}`}>{t('m.sound.original')}</Link>
               </>
             ) : null}
           </p>
           {me && sound.canUse ? (
             <div className="row">
               <Link href={`/create?mode=reel&sound=${sound.id}`} className="yp-btn yp-btn--primary yp-btn--sm">
-                Use this sound
+                {t('m.sound.use')}
               </Link>
               <Link href={`/create?mode=story&sound=${sound.id}`} className="yp-btn yp-btn--secondary yp-btn--sm">
-                Add to your story
+                {t('m.sound.useInStory')}
               </Link>
               <Link href={`/create?mode=post&sound=${sound.id}`} className="yp-btn yp-btn--secondary yp-btn--sm">
                 {t('music.track.inPost')}
@@ -78,25 +89,25 @@ export default function SoundPage() {
             </div>
           ) : me ? (
             <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-              This sound can&apos;t be used in new reels or stories.
+              {t('soundPage.cantUse')}
             </p>
           ) : (
             <Link href="/login" className="yp-btn yp-btn--secondary yp-btn--sm" style={{ alignSelf: 'flex-start' }}>
-              Sign in to use this sound
+              {t('soundPage.signIn')}
             </Link>
           )}
         </div>
       </section>
       <Segments
-        label="Sort reels"
+        label={t('soundPage.sort')}
         value={sort}
         onChange={setSort}
         options={[
-          { id: 'recent', label: 'Most recent' },
-          { id: 'top', label: 'Top' },
+          { id: 'recent', label: t('m.sound.recent') },
+          { id: 'top', label: t('m.sound.top') },
         ]}
       />
-      <ReelGrid load={load} reloadKey={`${id}:${sort}`} empty="No reels you can see use this sound yet." />
+      <ReelGrid load={load} reloadKey={`${id}:${sort}`} empty={t('m.sound.empty')} />
     </div>
   );
 }

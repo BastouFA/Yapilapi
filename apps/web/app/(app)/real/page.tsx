@@ -11,7 +11,7 @@ import { useSession } from '../../providers';
 
 /** Real: capture what's in front of you now, both cameras if you like. No filters, no library. */
 export default function RealPage() {
-  const { flags, toast, locale } = useSession();
+  const { flags, toast, locale, t } = useSession();
   const [items, setItems] = useState<Post[]>([]);
   const [capturing, setCapturing] = useState(false);
   const [caption, setCaption] = useState('');
@@ -29,7 +29,7 @@ export default function RealPage() {
     if (flags.REAL) void load();
   }, [flags.REAL, load]);
 
-  if (!flags.REAL) return <FeatureOff name="Real" />;
+  if (!flags.REAL) return <FeatureOff name={t('m.title.real')} />;
 
   async function share(files: File[]) {
     setBusy(true);
@@ -39,7 +39,7 @@ export default function RealPage() {
       await api.real.create({ mediaIds: ids, caption, visibility });
       setCapturing(false);
       setCaption('');
-      toast('Real shared');
+      toast(t('real.shared'));
       await load();
     } catch (e) {
       toast(errorMessage(e));
@@ -51,30 +51,30 @@ export default function RealPage() {
   return (
     <div className="yp-shell__inner">
       <div className="yp-topbar">
-        <h1>Real</h1>
-        {!capturing ? <Button onClick={() => setCapturing(true)}>Capture a Real</Button> : null}
+        <h1>{t('m.title.real')}</h1>
+        {!capturing ? <Button onClick={() => setCapturing(true)}>{t('m.real.capture')}</Button> : null}
       </div>
       <p className="muted" style={{ margin: 0 }}>
-        Photos taken here and now, marked with the time they were captured. Up to three a day.
+        {t('real.intro')}
       </p>
       {capturing ? (
         <div className="stack-sm yp-card" style={{ padding: 16 }}>
-          <TextField label="Caption (optional)" value={caption} onChange={(e) => setCaption(e.currentTarget.value)} maxLength={300} />
-          <Select label="Who can see it" value={visibility} onChange={(e) => setVisibility(e.currentTarget.value)}>
-            <option value="friends">Friends</option>
-            <option value="followers">Followers</option>
-            <option value="public">Everyone</option>
+          <TextField label={t('m.real.caption')} value={caption} onChange={(e) => setCaption(e.currentTarget.value)} maxLength={300} />
+          <Select label={t('m.eventForm.whoSees')} value={visibility} onChange={(e) => setVisibility(e.currentTarget.value)}>
+            <option value="friends">{t('visibility.friends')}</option>
+            <option value="followers">{t('visibility.followers')}</option>
+            <option value="public">{t('visibility.public')}</option>
           </Select>
-          {busy ? <p>Sharing…</p> : <Capture dual onCaptured={share} />}
+          {busy ? <p>{t('m.real.sharing')}</p> : <Capture dual onCaptured={share} />}
           <Button variant="ghost" onClick={() => setCapturing(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
         </div>
       ) : null}
       {items.length ? (
         items.map((p) => <PostCard key={p.id} post={p} locale={locale} linkAs={NextLink} />)
       ) : (
-        <EmptyState title="No Reals in the last day" body="When friends share a Real, it shows up here for 24 hours." />
+        <EmptyState title={t('real.empty.title')} body={t('real.empty.body')} />
       )}
     </div>
   );

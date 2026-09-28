@@ -5,38 +5,40 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { AIPanel, Button, Icon } from '@yapilapi/design-system';
 import type { AgentKind, AgentResult } from '@yapilapi/api-client';
+import type { MessageKey } from '@yapilapi/shared';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
-const TYPE_LABEL: Record<string, string> = {
-  event: 'Event',
-  place: 'Place',
-  community: 'Community',
-  person: 'Person',
-  product: 'Product',
-  business: 'Business',
+const TYPE_LABEL: Record<string, MessageKey> = {
+  event: 'm.type.event',
+  place: 'm.type.place',
+  community: 'm.type.community',
+  person: 'm.type.person',
+  product: 'm.type.product',
+  business: 'm.type.business',
 };
 
-export const AGENTS: Record<AgentKind, { title: string; placeholder: string; examples: string[] }> = {
+/** Catalog keys for each assistant; translate them with t() where they show. */
+export const AGENTS: Record<AgentKind, { title: MessageKey; placeholder: MessageKey; examples: MessageKey[] }> = {
   discover: {
-    title: 'Discover',
-    placeholder: 'What are you in the mood for?',
-    examples: ['Something to do tonight', 'Photography groups near me', 'Live music this weekend'],
+    title: 'm.assistant.kind.discover',
+    placeholder: 'm.assistant.placeholder.discover',
+    examples: ['agent.example.discover.tonight', 'agent.example.discover.photography', 'agent.example.discover.music'],
   },
   travel: {
-    title: 'Trips',
-    placeholder: 'Where are you going, and when?',
-    examples: ['Two days in Lisbon next weekend', 'A food day in Accra on Saturday'],
+    title: 'm.assistant.kind.travel',
+    placeholder: 'm.assistant.placeholder.travel',
+    examples: ['agent.example.travel.lisbon', 'agent.example.travel.accra'],
   },
   shopping: {
-    title: 'Shopping',
-    placeholder: 'What do you need?',
-    examples: ['A handmade gift under $40', 'Tickets for a concert this month'],
+    title: 'm.assistant.kind.shopping',
+    placeholder: 'm.assistant.placeholder.shopping',
+    examples: ['agent.example.shopping.gift', 'agent.example.shopping.tickets'],
   },
   business: {
-    title: 'Business',
-    placeholder: 'Ask about your bookings, reviews or sales',
-    examples: ['How did we do this month?', 'Draft replies to our latest reviews'],
+    title: 'm.assistant.kind.business',
+    placeholder: 'm.assistant.placeholder.business',
+    examples: ['agent.example.business.month', 'agent.example.business.reviews'],
   },
 };
 
@@ -45,14 +47,15 @@ export const AGENTS: Record<AgentKind, { title: string; placeholder: string; exa
  * with the reason it was picked; suggested actions only happen when you tap them.
  */
 export function AgentPanel({ kind, businessId, compact = false }: { kind: AgentKind; businessId?: string; compact?: boolean }) {
-  const { toast, locale } = useSession();
+  const { toast, locale, t } = useSession();
   const router = useRouter();
   const [prompt, setPrompt] = useState('');
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<AgentResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<Set<string>>(new Set());
-  const a = AGENTS[kind];
+  const agent = AGENTS[kind];
+  const a = { title: t(agent.title), placeholder: t(agent.placeholder), examples: agent.examples.map((k) => t(k)) };
 
   async function ask(text: string) {
     if (!text.trim()) return;
@@ -63,36 +66,38 @@ export function AgentPanel({ kind, businessId, compact = false }: { kind: AgentK
       setRes(await api.agents.run(kind, text.trim(), businessId));
     } catch (e) {
       setRes(null);
-      setError(
-        kind === 'business' && e instanceof ApiError && e.status === 404
-          ? 'The business assistant works for business owners. Create a business profile first.'
-          : errorMessage(e),
-      );
+      setError(kind === 'business' && e instanceof ApiError && e.status === 404 ? t('agent.businessOnly') : errorMessage(e));
     } finally {
       setBusy(false);
     }
   }
 
   async function act(action: AgentResult['actions'][number]) {
-    const t = action.target;
+    const target = action.target;
     try {
-      if (action.kind === 'rsvp') await api.events.rsvp(t.id, 'going');
-      else if (action.kind === 'follow') await api.users.follow(t.id);
-      else if (action.kind === 'join') await api.communities.join(t.href.replace('/c/', ''));
+      if (action.kind === 'rsvp') await api.events.rsvp(target.id, 'going');
+      else if (action.kind === 'follow') await api.users.follow(target.id);
+      else if (action.kind === 'join') await api.communities.join(target.href.replace('/c/', ''));
       else {
         // Bookings need a time and party size, purchases need checkout: open the item to finish there.
-        router.push(t.href);
+        router.push(target.href);
         return;
       }
-      setDone((d) => new Set(d).add(t.id));
-      toast(action.kind === 'rsvp' ? `You're going to ${t.title}` : action.kind === 'follow' ? `Following ${t.title}` : `Joined ${t.title}`);
+      setDone((d) => new Set(d).add(target.id));
+      toast(
+        action.kind === 'rsvp'
+          ? t('agent.going', { title: target.title })
+          : action.kind === 'follow'
+            ? t('follow.followingName', { name: target.title })
+            : t('agent.joined', { title: target.title }),
+      );
     } catch (e) {
       toast(errorMessage(e));
     }
   }
 
   return (
-    <section className={compact ? 'agent agent--compact' : 'agent'} aria-label={`${a.title} assistant`}>
+    <section className={compact ? 'agent agent--compact' : 'agent'} aria-label={t('agent.panelLabel', { name: a.title })}>
       <form
         className="agent__ask"
         onSubmit={(e) => {
@@ -106,7 +111,7 @@ export function AgentPanel({ kind, businessId, compact = false }: { kind: AgentK
         </label>
         <input id={`agent-${kind}`} value={prompt} onChange={(e) => setPrompt(e.currentTarget.value)} placeholder={a.placeholder} maxLength={1000} />
         <Button type="submit" size="sm" loading={busy} disabled={!prompt.trim()}>
-          Ask
+          {t('m.assistant.ask')}
         </Button>
       </form>
       {!res && !busy && !error ? (
@@ -120,7 +125,7 @@ export function AgentPanel({ kind, businessId, compact = false }: { kind: AgentK
       ) : null}
       {error ? <p className="yp-field__error">{error}</p> : null}
       {res ? (
-        <AIPanel title={`${a.title} assistant`} notice={res.notice ?? `Answered by ${res.model}. It only used what you can see on YAPILAPI.`}>
+        <AIPanel title={t('agent.panelLabel', { name: a.title })} notice={res.notice ?? t('m.assistant.answeredBy', { model: res.model })}>
           <div className="stack">
             {res.text ? <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{res.text}</p> : null}
             {res.recommendations.length ? (
@@ -128,7 +133,7 @@ export function AgentPanel({ kind, businessId, compact = false }: { kind: AgentK
                 {res.recommendations.map((r) => (
                   <li key={`${r.type}:${r.id}`}>
                     <Link href={r.href} className="agent__card">
-                      <span className="agent__type">{TYPE_LABEL[r.type]}</span>
+                      <span className="agent__type">{TYPE_LABEL[r.type] ? t(TYPE_LABEL[r.type]) : r.type}</span>
                       <strong>{r.title}</strong>
                       {r.startsAt || r.subtitle ? (
                         <span className="muted">
@@ -156,7 +161,7 @@ export function AgentPanel({ kind, businessId, compact = false }: { kind: AgentK
                     disabled={done.has(x.target.id)}
                     onClick={() => act(x)}
                   >
-                    {done.has(x.target.id) ? 'Done' : x.label}
+                    {done.has(x.target.id) ? t('m.common.done') : x.label}
                   </Button>
                 ))}
               </div>

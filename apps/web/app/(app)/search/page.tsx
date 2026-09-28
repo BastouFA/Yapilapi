@@ -95,7 +95,7 @@ function SearchPage() {
 
   return (
     <div className="yp-shell__inner stack">
-      <h1 className="yp-visually-hidden">Search</h1>
+      <h1 className="yp-visually-hidden">{t('home.search')}</h1>
       <form
         role="search"
         className="search-bar"
@@ -106,7 +106,7 @@ function SearchPage() {
       >
         <Icon name="search" />
         <label htmlFor="search-q" className="yp-visually-hidden">
-          Search YAPILAPI
+          {t('m.wander.label')}
         </label>
         <input
           ref={input}
@@ -114,33 +114,33 @@ function SearchPage() {
           type="search"
           enterKeyHint="search"
           autoComplete="off"
-          placeholder="Search people, #tags, posts, communities"
+          placeholder={t('search.placeholder')}
           value={q}
           maxLength={200}
           onChange={(e) => setQ(e.currentTarget.value)}
         />
         {q ? (
-          <button type="button" className="search-bar__clear" aria-label="Clear search" onClick={() => (setQ(''), input.current?.focus())}>
+          <button type="button" className="search-bar__clear" aria-label={t('m.wander.clear')} onClick={() => (setQ(''), input.current?.focus())}>
             <Icon name="x" size={16} />
           </button>
         ) : null}
         <Button type="submit" size="sm" disabled={!q.trim()}>
-          Search
+          {t('home.search')}
         </Button>
       </form>
 
       {q.trim() ? (
         <Segments
-          label="Show"
+          label={t('m.wander.show')}
           value={tab}
           onChange={setTab}
           options={[
-            { id: 'all', label: 'All' },
-            { id: 'people', label: 'People' },
-            { id: 'topics', label: 'Tags' },
-            { id: 'posts', label: 'Posts' },
-            { id: 'communities', label: 'Communities' },
-            { id: 'events', label: 'Events' },
+            { id: 'all', label: t('m.wander.all') },
+            { id: 'people', label: t('discover.people') },
+            { id: 'topics', label: t('m.wander.tags') },
+            { id: 'posts', label: t('discover.posts') },
+            { id: 'communities', label: t('discover.communities') },
+            { id: 'events', label: t('discover.events') },
           ]}
         />
       ) : null}
@@ -151,7 +151,7 @@ function SearchPage() {
             <section className="stack-sm" aria-labelledby="recent-title">
               <div className="row" style={{ justifyContent: 'space-between' }}>
                 <h2 id="recent-title" className="section-title">
-                  Recent searches
+                  {t('m.wander.recent')}
                 </h2>
                 <Button
                   size="sm"
@@ -165,7 +165,7 @@ function SearchPage() {
                     }
                   }}
                 >
-                  Clear
+                  {t('m.wander.clearRecent')}
                 </Button>
               </div>
               <div className="row" style={{ flexWrap: 'wrap' }}>
@@ -179,7 +179,7 @@ function SearchPage() {
           ) : null}
           <section className="stack-sm" aria-labelledby="trend-title">
             <h2 id="trend-title" className="section-title">
-              Trending tags
+              {t('m.wander.trending')}
             </h2>
             <TrendingTags limit={10} />
           </section>
@@ -187,7 +187,7 @@ function SearchPage() {
       ) : loading && !results ? (
         <Skeleton height={240} />
       ) : nothing ? (
-        <EmptyState title={`No results for “${q.trim()}”`} body="Check the spelling, try fewer words, or search for a #tag." />
+        <EmptyState title={t('search.noResults', { query: q.trim() })} body={t('m.wander.noResultsBody')} />
       ) : results ? (
         <div className="stack" aria-busy={loading}>
           {show('people') && people.length ? (
@@ -212,7 +212,7 @@ function SearchPage() {
           {show('topics') && topics.length ? (
             <section className="stack-sm" aria-labelledby="res-tags">
               <h2 id="res-tags" className="section-title">
-                Tags
+                {t('m.wander.tags')}
               </h2>
               <div className="row" style={{ flexWrap: 'wrap' }}>
                 {topics.map((tp) => (

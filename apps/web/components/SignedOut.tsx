@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import { EmptyState } from '@yapilapi/design-system';
+import { useSession } from '@/app/providers';
 import { LegalLinks } from './Legal';
 
 /**
@@ -43,19 +44,20 @@ export function useSignIn(): () => void {
 /** The bar at the top of a shared page for people who aren't signed in. */
 export function SignedOutBar() {
   const path = usePathname();
+  const { t } = useSession();
   return (
     <header className="public-bar">
       <Link href="/" className="auth__brand">
         <img src="/mark.svg" alt="" width={28} height={28} />
         YAPILAPI
       </Link>
-      <p className="public-bar__note">You're viewing this without an account.</p>
+      <p className="public-bar__note">{t('signedOut.note')}</p>
       <div className="row">
         <Link href={signInHref(here(path))} className="yp-btn yp-btn--ghost yp-btn--sm">
-          Sign in
+          {t('postList.signIn')}
         </Link>
         <Link href="/signup" className="yp-btn yp-btn--primary yp-btn--sm">
-          Join YAPILAPI
+          {t('auth.signup.title')}
         </Link>
       </div>
     </header>
@@ -80,6 +82,7 @@ export function SignedOutShell({ children }: { children: React.ReactNode }) {
 /** What someone without an account sees when the link isn't public. */
 export function NeedsAccount({ title, body }: { title: string; body: string }) {
   const path = usePathname();
+  const { t } = useSession();
   return (
     <div className="yp-shell__inner">
       <EmptyState
@@ -88,10 +91,10 @@ export function NeedsAccount({ title, body }: { title: string; body: string }) {
         action={
           <div className="row" style={{ justifyContent: 'center' }}>
             <Link href={signInHref(here(path))} className="yp-btn yp-btn--primary">
-              Sign in
+              {t('postList.signIn')}
             </Link>
             <Link href="/signup" className="yp-btn yp-btn--secondary">
-              Join YAPILAPI
+              {t('auth.signup.title')}
             </Link>
           </div>
         }
@@ -103,15 +106,16 @@ export function NeedsAccount({ title, body }: { title: string; body: string }) {
 /** A short note under public content, for people who aren't signed in. */
 export function JoinNote({ text }: { text: string }) {
   const path = usePathname();
+  const { t } = useSession();
   return (
-    <aside className="public-join" aria-label="Join YAPILAPI">
+    <aside className="public-join" aria-label={t('auth.signup.title')}>
       <p>{text}</p>
       <div className="row">
         <Link href="/signup" className="yp-btn yp-btn--primary yp-btn--sm">
-          Join YAPILAPI
+          {t('auth.signup.title')}
         </Link>
         <Link href={signInHref(here(path))} className="yp-btn yp-btn--ghost yp-btn--sm">
-          Sign in
+          {t('postList.signIn')}
         </Link>
       </div>
     </aside>

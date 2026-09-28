@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Badge, Button, EmptyState, List, ListItem, Select, TextField } from '@yapilapi/design-system';
 import type { CaptionCue, CaptionTrack, MediaEdit, StudioVideo } from '@yapilapi/api-client';
-import { formatRelativeTime } from '@yapilapi/shared';
+import { formatRelativeTime, type MessageKey } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
@@ -13,12 +13,12 @@ const MAX_CLIPS = 20;
 const MAX_VTT_BYTES = 512 * 1024;
 const LANGS = ['en', 'fr', 'es', 'pt', 'pt-BR', 'de', 'it', 'nl', 'ar', 'sw', 'yo', 'ha', 'ig', 'wo', 'am', 'hi', 'zh', 'ja', 'ko', 'ru', 'tr'];
 
-const EDIT_STATUS: Record<MediaEdit['status'], { label: string; tone: 'neutral' | 'warning' | 'success' | 'danger' }> = {
-  queued: { label: 'Waiting', tone: 'neutral' },
-  rendering: { label: 'Cutting', tone: 'warning' },
-  processing: { label: 'Preparing for playback', tone: 'warning' },
-  ready: { label: 'Ready', tone: 'success' },
-  failed: { label: 'Failed', tone: 'danger' },
+const EDIT_STATUS: Record<MediaEdit['status'], { label: MessageKey; tone: 'neutral' | 'warning' | 'success' | 'danger' }> = {
+  queued: { label: 'recaps.status.queued', tone: 'neutral' },
+  rendering: { label: 'videoEditor.status.rendering' as MessageKey, tone: 'warning' },
+  processing: { label: 'videoEditor.status.processing' as MessageKey, tone: 'warning' },
+  ready: { label: 'm.recap.status.ready', tone: 'success' },
+  failed: { label: 'videoEditor.status.failed' as MessageKey, tone: 'danger' },
 };
 
 /** 83.4 → "1:23.4" */
@@ -36,7 +36,7 @@ const round = (n: number) => Math.round(n * 10) / 10;
  * trim or clip becomes a new video; the original is never changed.
  */
 export function VideoEditor() {
-  const { toast, locale } = useSession();
+  const { toast, locale, t, tp } = useSession();
   const [videos, setVideos] = useState<StudioVideo[] | null>(null);
   const [selectedId, setSelectedId] = useState('');
   const [range, setRange] = useState<[number, number]>([0, 0]);
@@ -105,11 +105,11 @@ export function VideoEditor() {
   const length = end - start;
   const rangeError =
     length < MIN_SEGMENT
-      ? 'Choose at least 1 second.'
+      ? t('videoEditor.range.tooShort')
       : length > MAX_SEGMENT
-        ? 'Choose 10 minutes or less.'
+        ? t('videoEditor.range.tooLong')
         : end > duration + 0.01
-          ? 'The end is past the end of the video.'
+          ? t('videoEditor.range.pastEnd')
           : null;
 
   const seek = (t: number) => {
@@ -133,7 +133,7 @@ export function VideoEditor() {
     try {
       await api.studio.createEdits(video.id, { kind, segments: segments.map(([s, e]) => ({ start: s, end: e })) });
       if (kind === 'clip') setPending([]);
-      toast(kind === 'trim' ? 'Trimming. The new video will show up below.' : 'Making clips. They will show up below.');
+      toast(kind === 'trim' ? t('videoEditor.trimming') : t('videoEditor.clipping'));
       await loadEdits(video.id);
     } catch (err) {
       toast(errorMessage(err));
@@ -145,21 +145,27 @@ export function VideoEditor() {
   return (
     <section className="stack-sm" aria-labelledby="edit-video-title">
       <h2 className="section-title" id="edit-video-title">
-        Edit video
+        {t('m.editor.videoTitle')}
       </h2>
       {!videos.length ? (
-        <EmptyState title="No videos yet" body="Upload a video from Create, then come back here to trim it, cut clips or add captions." />
+        <EmptyState title={t('videoEditor.empty.title')} body={t('videoEditor.empty.body')} />
       ) : (
         <div className="yp-card stack" style={{ padding: 16 }}>
-          <Select label="Video" value={selectedId} onChange={(e) => setSelectedId(e.currentTarget.value)}>
-            {videos.map((v) => (
-              <option key={v.id} value={v.id} disabled={!v.processed}>
-                {`${v.editOf ? 'Edited video' : 'Video'}${v.durationMs ? `, ${formatSeconds(v.durationMs / 1000)}` : ''} · ${formatRelativeTime(v.createdAt, locale)}${v.processed ? '' : ' (processing)'}`}
-              </option>
-            ))}
+          <Select label={t('m.create.video')} value={selectedId} onChange={(e) => setSelectedId(e.currentTarget.value)}>
+            {videos.map((v) => {
+              const when = formatRelativeTime(v.createdAt, locale);
+              const name = v.durationMs
+                ? t(v.editOf ? 'videoEditor.option.editedLength' : 'videoEditor.option.videoLength', { length: formatSeconds(v.durationMs / 1000), when })
+                : t(v.editOf ? 'videoEditor.option.edited' : 'videoEditor.option.video', { when });
+              return (
+                <option key={v.id} value={v.id} disabled={!v.processed}>
+                  {v.processed ? name : t('videoEditor.option.processing', { label: name })}
+                </option>
+              );
+            })}
           </Select>
 
-          {video && !video.processed ? <p className="muted">This video is still processing. You can edit it once it is ready.</p> : null}
+          {video && !video.processed ? <p className="muted">{t('videoEditor.stillProcessing')}</p> : null}
 
           {video?.processed ? (
             <>
@@ -172,7 +178,7 @@ export function VideoEditor() {
                 controls
                 playsInline
                 preload="metadata"
-                aria-label="Video preview"
+                aria-label={t('videoEditor.preview')}
                 style={{ width: '100%', maxHeight: 360, background: '#000', borderRadius: 8 }}
                 onLoadedMetadata={(e) => {
                   const d = e.currentTarget.duration;
@@ -189,9 +195,9 @@ export function VideoEditor() {
                 }}
               >
                 {tracks
-                  .filter((t) => t.status === 'ready' && t.url)
-                  .map((t) => (
-                    <track key={t.url} kind="subtitles" src={t.url!} srcLang={t.lang} label={t.label} />
+                  .filter((tr) => tr.status === 'ready' && tr.url)
+                  .map((tr) => (
+                    <track key={tr.url} kind="subtitles" src={tr.url!} srcLang={tr.lang} label={tr.label} />
                   ))}
               </video>
 
@@ -205,7 +211,7 @@ export function VideoEditor() {
                 >
                   <input
                     type="range"
-                    aria-label="Start"
+                    aria-label={t('m.editor.start')}
                     aria-valuetext={formatSeconds(start)}
                     min={0}
                     max={duration}
@@ -215,7 +221,7 @@ export function VideoEditor() {
                   />
                   <input
                     type="range"
-                    aria-label="End"
+                    aria-label={t('m.editor.end')}
                     aria-valuetext={formatSeconds(end)}
                     min={0}
                     max={duration}
@@ -226,7 +232,7 @@ export function VideoEditor() {
                 </div>
                 <div className="row" style={{ alignItems: 'flex-end' }}>
                   <TextField
-                    label="Start (seconds)"
+                    label={t('videoEditor.startSeconds')}
                     type="number"
                     min={0}
                     max={duration}
@@ -237,10 +243,10 @@ export function VideoEditor() {
                     style={{ width: 120 }}
                   />
                   <Button variant="secondary" size="sm" onClick={() => setStart(now())}>
-                    Set start to now
+                    {t('videoEditor.setStartNow')}
                   </Button>
                   <TextField
-                    label="End (seconds)"
+                    label={t('videoEditor.endSeconds')}
                     type="number"
                     min={0}
                     max={duration}
@@ -251,7 +257,7 @@ export function VideoEditor() {
                     style={{ width: 120 }}
                   />
                   <Button variant="secondary" size="sm" onClick={() => setEnd(now())}>
-                    Set end to now
+                    {t('videoEditor.setEndNow')}
                   </Button>
                   <Button
                     variant="ghost"
@@ -262,39 +268,45 @@ export function VideoEditor() {
                       void videoRef.current?.play();
                     }}
                   >
-                    Play selection
+                    {t('videoEditor.playSelection')}
                   </Button>
                 </div>
                 <p className={rangeError ? 'yp-field__error' : 'muted'} style={{ margin: 0 }} role="status">
-                  {rangeError ?? `Selected ${formatSeconds(start)} to ${formatSeconds(end)} (${length.toFixed(1)} seconds) of ${formatSeconds(duration)}.`}
+                  {rangeError ??
+                    t('videoEditor.selected', {
+                      start: formatSeconds(start),
+                      end: formatSeconds(end),
+                      length: length.toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+                      total: formatSeconds(duration),
+                    })}
                 </p>
                 <div className="row">
                   <Button onClick={() => submit('trim', [[start, end]])} disabled={!!rangeError} loading={busy}>
-                    Trim
+                    {t('m.editor.tab.trim')}
                   </Button>
                   <Button variant="secondary" onClick={() => setPending((p) => [...p, [start, end]])} disabled={!!rangeError || pending.length >= MAX_CLIPS}>
-                    Add clip
+                    {t('videoEditor.addClip')}
                   </Button>
                   {pending.length ? (
                     <Button variant="secondary" onClick={() => submit('clip', pending)} loading={busy}>
-                      {pending.length === 1 ? 'Make 1 clip' : `Make ${pending.length} clips`}
+                      {tp('videoEditor.makeClips', pending.length)}
                     </Button>
                   ) : null}
                 </div>
                 <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-                  Trim and clips make new videos. Your original stays as it is.
+                  {t('videoEditor.newVideosNote')}
                 </p>
               </div>
 
               {pending.length ? (
-                <List label="Clips to make">
+                <List label={t('videoEditor.clipsToMake')}>
                   {pending.map(([s, e], i) => (
                     <ListItem
                       key={`${s}-${e}-${i}`}
-                      primary={`Clip ${i + 1}: ${formatSeconds(s)} to ${formatSeconds(e)}`}
+                      primary={t('videoEditor.clipRange', { number: i + 1, start: formatSeconds(s), end: formatSeconds(e) })}
                       end={
                         <Button variant="ghost" size="sm" onClick={() => setPending((p) => p.filter((_, j) => j !== i))}>
-                          Remove
+                          {t('m.common.remove')}
                         </Button>
                       }
                     />
@@ -304,22 +316,25 @@ export function VideoEditor() {
 
               {edits.length ? (
                 <div className="stack-sm">
-                  <h3 style={{ margin: 0 }}>Trims and clips</h3>
-                  <List label="Trims and clips">
+                  <h3 style={{ margin: 0 }}>{t('videoEditor.edits')}</h3>
+                  <List label={t('videoEditor.edits')}>
                     {edits.map((e) => (
                       <ListItem
                         key={e.id}
                         primary={
                           <span className="row">
-                            {e.kind === 'trim' ? 'Trim' : 'Clip'} {formatSeconds(e.start)} to {formatSeconds(e.end)}
-                            <Badge tone={EDIT_STATUS[e.status].tone}>{EDIT_STATUS[e.status].label}</Badge>
+                            {t(e.kind === 'trim' ? 'videoEditor.edit.trim' : 'videoEditor.edit.clip', {
+                              start: formatSeconds(e.start),
+                              end: formatSeconds(e.end),
+                            })}
+                            <Badge tone={EDIT_STATUS[e.status].tone}>{t(EDIT_STATUS[e.status].label)}</Badge>
                           </span>
                         }
                         secondary={e.error ?? formatRelativeTime(e.createdAt, locale)}
                         end={
                           e.status === 'ready' && e.result ? (
                             <Button variant="ghost" size="sm" onClick={() => setSelectedId(e.result!.id)}>
-                              Open
+                              {t('rooms.open')}
                             </Button>
                           ) : undefined
                         }
@@ -354,7 +369,7 @@ function CaptionsEditor({
   videoRef: RefObject<HTMLVideoElement | null>;
   onTracks: (t: CaptionTrack[]) => void;
 }) {
-  const { toast, locale } = useSession();
+  const { toast, locale, t, tp } = useSession();
   const [tracks, setTracks] = useState<CaptionTrack[]>([]);
   const [autoCaptions, setAutoCaptions] = useState(false);
   const [lang, setLang] = useState('en');
@@ -453,24 +468,25 @@ function CaptionsEditor({
 
   return (
     <div className="stack-sm">
-      <h3 style={{ margin: 0 }}>Captions</h3>
+      <h3 style={{ margin: 0 }}>{t('reel.captions')}</h3>
       {tracks.length ? (
         <p className="muted" style={{ margin: 0 }}>
           {tracks
-            .map(
-              (t) =>
-                `${t.label} (${t.status === 'ready' ? `${t.cueCount} caption${t.cueCount === 1 ? '' : 's'}` : t.status === 'processing' ? 'being made' : 'failed'})`,
+            .map((tr) =>
+              tr.status === 'ready'
+                ? tp('videoEditor.captions.trackReady', tr.cueCount, { label: tr.label })
+                : t(tr.status === 'processing' ? 'videoEditor.captions.trackMaking' : 'videoEditor.captions.trackFailed', { label: tr.label }),
             )
             .join(' · ')}
         </p>
       ) : (
         <p className="muted" style={{ margin: 0 }}>
-          No captions yet. Captions show as subtitles wherever this video plays.
+          {t('videoEditor.captions.none')}
         </p>
       )}
       <div className="row" style={{ alignItems: 'flex-end' }}>
         <Select
-          label="Language"
+          label={t('settings.language')}
           value={lang}
           onChange={(e) => {
             const code = e.currentTarget.value;
@@ -480,56 +496,61 @@ function CaptionsEditor({
         >
           {options.map((code) => (
             <option key={code} value={code}>
-              {`${names(code)}${tracks.some((t) => t.lang === code) ? ' (has captions)' : ''}`}
+              {tracks.some((tr) => tr.lang === code) ? t('videoEditor.captions.hasCaptions', { language: names(code) }) : names(code)}
             </option>
           ))}
         </Select>
-        <TextField label="Label shown to viewers" value={label} maxLength={60} onChange={(e) => ((dirty.current = true), setLabel(e.currentTarget.value))} />
+        <TextField
+          label={t('videoEditor.captions.label')}
+          value={label}
+          maxLength={60}
+          onChange={(e) => ((dirty.current = true), setLabel(e.currentTarget.value))}
+        />
       </div>
       {current?.status === 'failed' && current.error ? <p className="yp-field__error">{current.error}</p> : null}
-      {current?.status === 'processing' ? <p className="muted">Making captions automatically. This can take a few minutes.</p> : null}
+      {current?.status === 'processing' ? <p className="muted">{t('videoEditor.captions.making')}</p> : null}
 
-      <ol className="stack-sm" style={{ listStyle: 'none', padding: 0, margin: 0 }} aria-label="Captions">
+      <ol className="stack-sm" style={{ listStyle: 'none', padding: 0, margin: 0 }} aria-label={t('reel.captions')}>
         {cues.map((c, i) => (
           <li key={c.key} className="row" style={{ alignItems: 'flex-end' }}>
             <TextField
-              label="Start"
+              label={t('m.editor.start')}
               type="number"
               min={0}
               max={duration}
               step={0.1}
               value={c.start}
               onChange={(e) => update(c.key, { start: Number(e.currentTarget.value) })}
-              aria-label={`Caption ${i + 1} start in seconds`}
+              aria-label={t('videoEditor.captions.cueStart', { number: i + 1 })}
               style={{ width: 90 }}
             />
             <TextField
-              label="End"
+              label={t('m.editor.end')}
               type="number"
               min={0}
               max={duration}
               step={0.1}
               value={c.end}
               onChange={(e) => update(c.key, { end: Number(e.currentTarget.value) })}
-              aria-label={`Caption ${i + 1} end in seconds`}
+              aria-label={t('videoEditor.captions.cueEnd', { number: i + 1 })}
               style={{ width: 90 }}
-              error={c.end <= c.start ? 'Ends before it starts' : undefined}
+              error={c.end <= c.start ? t('videoEditor.captions.endsBefore') : undefined}
             />
             <TextField
-              label="Text"
+              label={t('m.post.text')}
               value={c.text}
               maxLength={1000}
               onChange={(e) => update(c.key, { text: e.currentTarget.value })}
-              aria-label={`Caption ${i + 1} text`}
+              aria-label={t('videoEditor.captions.cueText', { number: i + 1 })}
               style={{ minWidth: 240 }}
             />
             <Button
               variant="ghost"
               size="sm"
               onClick={() => ((dirty.current = true), setCues((cs) => cs.filter((x) => x.key !== c.key)))}
-              aria-label={`Remove caption ${i + 1}`}
+              aria-label={t('videoEditor.captions.cueRemove', { number: i + 1 })}
             >
-              Remove
+              {t('m.common.remove')}
             </Button>
           </li>
         ))}
@@ -537,7 +558,7 @@ function CaptionsEditor({
 
       <div className="row">
         <Button variant="secondary" onClick={addCue}>
-          Add caption
+          {t('videoEditor.captions.add')}
         </Button>
         <Button
           loading={saving}
@@ -549,11 +570,11 @@ function CaptionsEditor({
                   label: label.trim(),
                   cues: cues.map(({ start, end, text }) => ({ start, end, text })),
                 }),
-              'Captions saved.',
+              t('videoEditor.captions.saved'),
             )
           }
         >
-          Save captions
+          {t('videoEditor.captions.save')}
         </Button>
         <input
           ref={fileRef}
@@ -564,33 +585,31 @@ function CaptionsEditor({
             const file = e.currentTarget.files?.[0];
             e.currentTarget.value = '';
             if (!file) return;
-            if (file.size > MAX_VTT_BYTES) return toast('Caption files can be up to 512 KB.');
-            void act(() => api.studio.uploadCaptions(mediaId, lang, file, label.trim() || names(lang)), 'Captions uploaded.');
+            if (file.size > MAX_VTT_BYTES) return toast(t('videoEditor.captions.tooBig'));
+            void act(() => api.studio.uploadCaptions(mediaId, lang, file, label.trim() || names(lang)), t('videoEditor.captions.uploaded'));
           }}
         />
         <Button variant="secondary" onClick={() => fileRef.current?.click()} disabled={saving}>
-          Upload .vtt file
+          {t('videoEditor.captions.upload')}
         </Button>
         {current ? (
-          <Button variant="danger" onClick={() => act(() => api.studio.deleteCaptions(mediaId, lang), 'Captions deleted.')} disabled={saving}>
-            Delete captions
+          <Button variant="danger" onClick={() => act(() => api.studio.deleteCaptions(mediaId, lang), t('videoEditor.captions.deleted'))} disabled={saving}>
+            {t('videoEditor.captions.delete')}
           </Button>
         ) : null}
         {autoCaptions && (!current || current.status === 'failed') ? (
           <Button
             variant="ghost"
-            onClick={() =>
-              act(() => api.studio.transcribe(mediaId, { lang, label: label.trim() || names(lang) }), 'Making captions. Check back in a few minutes.')
-            }
+            onClick={() => act(() => api.studio.transcribe(mediaId, { lang, label: label.trim() || names(lang) }), t('videoEditor.captions.autoStarted'))}
             disabled={saving}
           >
-            Make captions automatically
+            {t('videoEditor.captions.auto')}
           </Button>
         ) : null}
       </div>
       {!autoCaptions ? (
         <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-          Automatic captions are not set up on this server. Write them here or upload a .vtt file.
+          {t('videoEditor.captions.autoOff')}
         </p>
       ) : null}
     </div>

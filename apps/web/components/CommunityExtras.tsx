@@ -10,7 +10,7 @@ import { useSession } from '@/app/providers';
 
 /** Community FAQ: everyone who can see the community reads it; moderators add and remove entries. */
 export function CommunityFaq({ slug }: { slug: string }) {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const [data, setData] = useState<{ items: FaqEntry[]; canEdit: boolean } | null>(null);
   const [q, setQ] = useState('');
   const [a, setA] = useState('');
@@ -47,17 +47,17 @@ export function CommunityFaq({ slug }: { slug: string }) {
                     }
                   }}
                 >
-                  Remove
+                  {t('m.common.remove')}
                 </Button>
               ) : null}
             </details>
           ))}
         </div>
       ) : (
-        <EmptyState title="No FAQ yet" body={data.canEdit ? 'Add the questions members ask most.' : 'Moderators can add answers to common questions here.'} />
+        <EmptyState title={t('m.community.noFaq.title')} body={data.canEdit ? t('m.community.noFaq.editor') : t('m.community.noFaq.body')} />
       )}
       {data.canEdit ? (
-        <Card title="Add a question">
+        <Card title={t('m.faq.add.title')}>
           <form
             className="stack-sm"
             onSubmit={async (e) => {
@@ -67,7 +67,7 @@ export function CommunityFaq({ slug }: { slug: string }) {
                 await api.communities.addFaq(slug, { question: q, answer: a });
                 setQ('');
                 setA('');
-                toast('Added to the FAQ');
+                toast(t('communityPage.faq.added'));
                 await load();
               } catch (err) {
                 toast(errorMessage(err));
@@ -76,10 +76,10 @@ export function CommunityFaq({ slug }: { slug: string }) {
               }
             }}
           >
-            <TextField label="Question" value={q} onChange={(e) => setQ(e.currentTarget.value)} minLength={5} maxLength={300} required />
-            <TextField label="Answer" multiline value={a} onChange={(e) => setA(e.currentTarget.value)} maxLength={4000} required />
+            <TextField label={t('m.faq.question')} value={q} onChange={(e) => setQ(e.currentTarget.value)} minLength={5} maxLength={300} required />
+            <TextField label={t('m.faq.answer')} multiline value={a} onChange={(e) => setA(e.currentTarget.value)} maxLength={4000} required />
             <Button type="submit" size="sm" loading={saving} disabled={q.trim().length < 5 || !a.trim()}>
-              Add to FAQ
+              {t('m.faq.add')}
             </Button>
           </form>
         </Card>
@@ -93,6 +93,7 @@ export function CommunityFaq({ slug }: { slug: string }) {
  * posts that look like the same question, so they can find the answer first.
  */
 export function SimilarQuestions({ slug, text }: { slug: string; text: string }) {
+  const { t, tp } = useSession();
   const [res, setRes] = useState<{ faq: (FaqEntry & { score: number })[]; posts: { post: Post; score: number }[] } | null>(null);
   useEffect(() => {
     const q = text.trim();
@@ -108,8 +109,8 @@ export function SimilarQuestions({ slug, text }: { slug: string; text: string })
 
   if (!res || (!res.faq.length && !res.posts.length)) return null;
   return (
-    <section className="similar" aria-live="polite" aria-label="Similar questions">
-      <strong>This may already be answered</strong>
+    <section className="similar" aria-live="polite" aria-label={t('communityPage.similar.label')}>
+      <strong>{t('communityPage.similar.title')}</strong>
       {res.faq.map((f) => (
         <details key={f.id}>
           <summary>{f.question}</summary>
@@ -120,7 +121,7 @@ export function SimilarQuestions({ slug, text }: { slug: string; text: string })
         <Link key={post.id} href={`/p/${post.id}`} className="similar__post">
           <span>{post.body.length > 120 ? `${post.body.slice(0, 120)}…` : post.body}</span>
           <span className="muted">
-            {post.author.displayName} · {post.counts.comments} {post.counts.comments === 1 ? 'reply' : 'replies'}
+            {post.author.displayName} · {tp('communityPage.similar.replies', post.counts.comments)}
           </span>
         </Link>
       ))}

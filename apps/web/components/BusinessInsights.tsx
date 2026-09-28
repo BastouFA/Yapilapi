@@ -10,7 +10,7 @@ import { AgentPanel } from './AgentPanel';
 
 /** Owner-only: visits, bookings, reviews, sales and ads, with the business assistant underneath. */
 export function BusinessInsights({ businessId }: { businessId: string }) {
-  const { locale } = useSession();
+  const { locale, t, tp } = useSession();
   const [days, setDays] = useState<'7' | '30' | '90'>('30');
   const [data, setData] = useState<BusinessAnalytics | null>(null);
   useEffect(() => {
@@ -32,16 +32,16 @@ export function BusinessInsights({ businessId }: { businessId: string }) {
   const maxVisitors = Math.max(1, ...(data?.views.map((d) => d.visitors) ?? []));
 
   return (
-    <Card title="Insights" subtitle="Only you can see this. Visits count signed-in people once a day, not you.">
+    <Card title={t('m.insights.title')} subtitle={t('bizInsights.subtitle')}>
       <div className="stack">
         <Segments
-          label="Period"
+          label={t('bizInsights.period')}
           value={days}
           onChange={setDays}
           options={[
-            { id: '7', label: '7 days' },
-            { id: '30', label: '30 days' },
-            { id: '90', label: '90 days' },
+            { id: '7', label: tp('m.boost.days', 7) },
+            { id: '30', label: tp('m.boost.days', 30) },
+            { id: '90', label: tp('m.boost.days', 90) },
           ]}
         />
         {!data ? (
@@ -49,16 +49,18 @@ export function BusinessInsights({ businessId }: { businessId: string }) {
         ) : (
           <>
             <div className="stats">
-              <Stat label="Visitors" value={visitors} />
-              <Stat label="Booking requests" value={bookings} delta={bookings ? `${confirmed} confirmed` : undefined} />
-              <Stat label="Upcoming bookings" value={data.upcomingBookings} />
-              <Stat label="Rating" value={data.reviews.average ?? '–'} delta={`${data.reviews.count} review${data.reviews.count === 1 ? '' : 's'}`} />
-              {data.ads.impressions ? <Stat label="Ad views" value={data.ads.impressions} delta={`${data.ads.clicks} clicks`} /> : null}
+              <Stat label={t('bizInsights.visitors')} value={visitors} />
+              <Stat label={t('m.booking.requests')} value={bookings} delta={bookings ? tp('bizInsights.confirmed', confirmed) : undefined} />
+              <Stat label={t('bizInsights.upcoming')} value={data.upcomingBookings} />
+              <Stat label={t('bizInsights.rating')} value={data.reviews.average ?? '–'} delta={tp('m.place.reviewCount', data.reviews.count)} />
+              {data.ads.impressions ? (
+                <Stat label={t('bizInsights.adViews')} value={data.ads.impressions} delta={tp('bizInsights.clicks', data.ads.clicks)} />
+              ) : null}
             </div>
             {data.views.length ? (
-              <div className="usage" aria-label="Visitors per day">
+              <div className="usage" aria-label={t('bizInsights.visitorsPerDay')}>
                 {data.views.slice(-30).map((d) => (
-                  <div key={d.day} className="usage__day" title={`${d.visitors} visitors`}>
+                  <div key={d.day} className="usage__day" title={tp('bizInsights.dayVisitors', d.visitors)}>
                     <span className="usage__bar" style={{ height: `${Math.max(4, (d.visitors / maxVisitors) * 64)}px` }} />
                     <span className="usage__label">{new Date(d.day).getDate()}</span>
                   </div>
@@ -66,7 +68,7 @@ export function BusinessInsights({ businessId }: { businessId: string }) {
               </div>
             ) : (
               <p className="muted" style={{ margin: 0 }}>
-                No visits recorded in this period.
+                {t('bizInsights.noVisits')}
               </p>
             )}
             {data.topProducts.length ? (
@@ -74,9 +76,9 @@ export function BusinessInsights({ businessId }: { businessId: string }) {
                 <table className="table">
                   <thead>
                     <tr>
-                      <th>Product</th>
-                      <th>Sold</th>
-                      <th>Revenue</th>
+                      <th>{t('shop.kind.product')}</th>
+                      <th>{t('m.drops.stats.sold')}</th>
+                      <th>{t('bizInsights.revenue')}</th>
                     </tr>
                   </thead>
                   <tbody>

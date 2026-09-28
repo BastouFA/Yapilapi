@@ -18,7 +18,7 @@ import { useSession } from '../../../providers';
 export default function TagPage() {
   const params = useParams<{ tag: string }>();
   const tag = normalizeTag(decodeURIComponent(params.tag));
-  const { me, toast, locale } = useSession();
+  const { me, toast, locale, t, tp } = useSession();
   const router = useRouter();
   const [info, setInfo] = useState<TagSummary | null>(null);
   const [missing, setMissing] = useState(false);
@@ -28,6 +28,17 @@ export default function TagPage() {
   const [stories, setStories] = useState<StoryGroup[]>([]);
   const [viewing, setViewing] = useState<number | null>(null);
   const n = new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 });
+  // "{number} posts" with the number in bold, in whatever order the language puts them.
+  const stat = (text: string, value: number) => {
+    const [before = '', after = ''] = text.split('{number}');
+    return (
+      <span>
+        {before}
+        <strong>{n.format(value)}</strong>
+        {after}
+      </span>
+    );
+  };
 
   useEffect(() => {
     setInfo(null);
@@ -42,7 +53,7 @@ export default function TagPage() {
 
   const load = useCallback((cursor?: string) => api.tags.posts(tag, sort, cursor), [tag, sort]);
 
-  if (missing) return <EmptyState title="That isn't a hashtag" body="Tags are 2 to 40 letters, numbers or underscores." />;
+  if (missing) return <EmptyState title={t('tag.invalid.title')} body={t('tag.invalid.body')} />;
 
   return (
     <div className="yp-shell__inner stack">
@@ -52,20 +63,10 @@ export default function TagPage() {
         </h1>
         {info ? (
           <div className="tag-hero__stats">
-            <span>
-              <strong>{n.format(info.posts)}</strong> {info.posts === 1 ? 'post' : 'posts'}
-            </span>
-            <span>
-              <strong>{n.format(info.people)}</strong> {info.people === 1 ? 'person' : 'people'}
-            </span>
-            {info.comments > 0 ? (
-              <span>
-                <strong>{n.format(info.comments)}</strong> {info.comments === 1 ? 'comment' : 'comments'}
-              </span>
-            ) : null}
-            <span>
-              <strong>{n.format(info.postsThisWeek)}</strong> this week
-            </span>
+            {stat(tp('trending.posts', info.posts), info.posts)}
+            {stat(tp('trending.people', info.people), info.people)}
+            {info.comments > 0 ? stat(tp('tag.stat.comments', info.comments), info.comments) : null}
+            {stat(t('tag.stat.thisWeek'), info.postsThisWeek)}
           </div>
         ) : (
           <Skeleton height={24} />
@@ -82,7 +83,7 @@ export default function TagPage() {
                 try {
                   const r = info.following ? await api.tags.unfollow(tag) : await api.tags.follow(tag);
                   setInfo({ ...info, following: r.following });
-                  toast(r.following ? `You'll see more #${tag} in For you` : `Unfollowed #${tag}`);
+                  toast(r.following ? t('tag.followed', { tag }) : t('tag.unfollowed', { tag }));
                 } catch (e) {
                   toast(errorMessage(e));
                 } finally {
@@ -90,22 +91,22 @@ export default function TagPage() {
                 }
               }}
             >
-              {info.following ? 'Following' : 'Follow tag'}
+              {info.following ? t('m.tag.following') : t('m.tag.follow')}
             </Button>
           ) : null}
           <Button variant="secondary" size="sm" icon="plus" onClick={() => router.push(`/create?text=${encodeURIComponent(`#${tag} `)}`)}>
-            Post with #{tag}
+            {t('tag.postWith', { tag })}
           </Button>
           {me ? (
             <Button variant="secondary" size="sm" onClick={() => router.push(`/create?mode=story&text=${encodeURIComponent(`#${tag} `)}`)}>
-              Story with #{tag}
+              {t('tag.storyWith', { tag })}
             </Button>
           ) : null}
         </div>
       </section>
 
       {info?.related.length ? (
-        <nav aria-label="Related tags" className="row" style={{ flexWrap: 'wrap' }}>
+        <nav aria-label={t('tag.related')} className="row" style={{ flexWrap: 'wrap' }}>
           {info.related.map((r) => (
             <Link key={r} href={`/t/${encodeURIComponent(r)}`} className="yp-chip">
               <bdi>#{r}</bdi>
@@ -117,7 +118,7 @@ export default function TagPage() {
       {stories.length ? (
         <section className="stack-sm" aria-labelledby="stories-now">
           <h2 id="stories-now" className="tag-stories__title">
-            Stories now
+            {t('m.tag.storiesNow')}
           </h2>
           <MomentsStrip groups={stories} onOpen={setViewing} locale={locale} />
         </section>
@@ -125,15 +126,15 @@ export default function TagPage() {
       {viewing !== null && stories[viewing] ? <StoryViewer groups={stories} start={viewing} onClose={() => setViewing(null)} onChange={setStories} /> : null}
 
       <Segments
-        label="Sort posts"
+        label={t('tag.sort')}
         value={sort}
         onChange={setSort}
         options={[
-          { id: 'recent', label: 'Recent' },
-          { id: 'top', label: 'Top' },
+          { id: 'recent', label: t('m.tag.recent') },
+          { id: 'top', label: t('m.tag.top') },
         ]}
       />
-      <PostList load={load} reloadKey={`${tag}-${sort}`} empty={`No posts with #${tag} yet. Be the first.`} />
+      <PostList load={load} reloadKey={`${tag}-${sort}`} empty={t('tag.empty', { tag })} />
     </div>
   );
 }

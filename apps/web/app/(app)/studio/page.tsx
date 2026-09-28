@@ -11,7 +11,7 @@ import { useSession } from '../../providers';
 
 /** Creator Studio: how your content performs over the last 28 days, and what you've earned. */
 export default function Studio() {
-  const { locale, t } = useSession();
+  const { locale, t, tp } = useSession();
   const [data, setData] = useState<Awaited<ReturnType<typeof api.creator.analytics>> | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [earnings, setEarnings] = useState<{ currency: string; grossCents: number; feeCents: number; availableCents: number }[]>([]);
@@ -44,6 +44,7 @@ export default function Studio() {
   if (!data) return <Skeleton height={240} />;
   const growth = data.followerGrowth.map((d) => Number(d.new_followers));
   const max = Math.max(1, ...growth);
+  const total = growth.reduce((a, b) => a + b, 0);
   const w = 560;
   const h = 120;
   const pts = growth.map((v, i) => `${(i / Math.max(1, growth.length - 1)) * w},${h - (v / max) * (h - 12) - 6}`).join(' ');
@@ -51,20 +52,20 @@ export default function Studio() {
   return (
     <div className="yp-shell__inner">
       <div className="yp-topbar">
-        <h1>Studio</h1>
-        <span className="muted">Last 28 days</span>
+        <h1>{t('m.studio.title')}</h1>
+        <span className="muted">{t('m.studio.period')}</span>
       </div>
       <div className="stats">
-        <Stat label="Posts" value={data.totals.posts} />
-        <Stat label="Likes" value={data.totals.likes} />
-        <Stat label="Comments" value={data.totals.comments} />
-        <Stat label="Saves" value={data.totals.saves} />
-        <Stat label="Followers" value={data.totals.followers} delta={`+${growth.reduce((a, b) => a + b, 0)} this period`} />
+        <Stat label={t('profile.posts')} value={data.totals.posts} />
+        <Stat label={t('m.studio.likes')} value={data.totals.likes} />
+        <Stat label={t('m.studio.comments')} value={data.totals.comments} />
+        <Stat label={t('m.studio.saves')} value={data.totals.saves} />
+        <Stat label={t('profile.followers')} value={data.totals.followers} delta={t('m.studio.followersDelta', { count: total })} />
       </div>
       <section className="stack-sm">
-        <h2 className="section-title">New followers per day</h2>
+        <h2 className="section-title">{t('m.studio.growth')}</h2>
         <div className="yp-card" style={{ padding: 16, overflowX: 'auto' }}>
-          <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} role="img" aria-label={`New followers per day, peak ${max}`}>
+          <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} role="img" aria-label={t('m.studio.growthA11y', { total, peak: Math.max(0, ...growth) })}>
             <line x1="0" x2={w} y1={h - 6} y2={h - 6} stroke="var(--line)" />
             <polyline points={`0,${h - 6} ${pts} ${w},${h - 6}`} fill="var(--yapi-soft)" stroke="none" />
             <polyline points={pts} fill="none" stroke="var(--yapi)" strokeWidth="2" />
@@ -73,34 +74,34 @@ export default function Studio() {
       </section>
       {earnings.length ? (
         <section className="stack-sm">
-          <h2 className="section-title">Earnings</h2>
+          <h2 className="section-title">{t('m.studio.earnings')}</h2>
           <div className="stats">
             {earnings.map((e) => (
               <Stat
                 key={e.currency}
-                label={`Available (${e.currency})`}
+                label={t('m.studio.available', { currency: e.currency })}
                 value={formatMoney(e.availableCents, e.currency, locale)}
-                delta={`${formatMoney(e.grossCents, e.currency, locale)} gross, ${formatMoney(e.feeCents, e.currency, locale)} fees`}
+                delta={t('m.studio.earningsLine', { gross: formatMoney(e.grossCents, e.currency, locale), fees: formatMoney(e.feeCents, e.currency, locale) })}
               />
             ))}
           </div>
         </section>
       ) : null}
       <section className="stack-sm">
-        <h2 className="section-title">Top posts</h2>
+        <h2 className="section-title">{t('m.studio.topPosts')}</h2>
         {data.topPosts.length ? (
           <List>
             {data.topPosts.map((p) => (
               <ListItem
                 key={p.id}
-                primary={p.excerpt || `(${p.kind})`}
+                primary={p.excerpt || t(p.format === 'reel' ? 'm.studio.untitledReel' : 'm.studio.untitledPost')}
                 secondary={formatRelativeTime(p.created_at, locale)}
-                end={`${p.like_count} likes · ${p.comment_count} comments`}
+                end={`${tp('comments.likes', p.like_count)} · ${tp('m.post.commentCount', p.comment_count)}`}
               />
             ))}
           </List>
         ) : (
-          <EmptyState title="No posts yet" body="Publish something from Create to see how it does." />
+          <EmptyState title={t('m.studio.noPosts')} />
         )}
       </section>
       <SalesPanel />
@@ -114,7 +115,7 @@ export default function Studio() {
 }
 
 function PlansManager() {
-  const { me, toast, locale } = useSession();
+  const { me, toast, locale, t, tp } = useSession();
   const [plans, setPlans] = useState<{ id: string; name: string; priceCents: number; currency: string }[]>([]);
   const [subs, setSubs] = useState<{ active: number; cancelled: number } | null>(null);
   const [name, setName] = useState('');
@@ -131,14 +132,14 @@ function PlansManager() {
   }, [me?.id]);
   return (
     <section className="stack-sm">
-      <h2 className="section-title">Subscriptions</h2>
+      <h2 className="section-title">{t('m.studio.subscriptions')}</h2>
       <p className="muted" style={{ margin: 0 }}>
-        {subs ? `${subs.active} active subscriber${subs.active === 1 ? '' : 's'}.` : ''} Fans subscribe from your profile. With a plan, you can choose
-        Subscribers when you post: everyone else sees a locked preview.
+        {subs ? `${tp('m.studio.subscriberCount', subs.active)}. ` : ''}
+        {t('studio.plans.intro')}
       </p>
       {plans.map((p) => (
         <div key={p.id} className="yp-card" style={{ padding: 12 }}>
-          <strong>{p.name}</strong> · {formatMoney(p.priceCents, p.currency, locale)} a month
+          <strong>{p.name}</strong> · {t('m.money.perMonth', { price: formatMoney(p.priceCents, p.currency, locale) })}
         </div>
       ))}
       <form
@@ -154,15 +155,15 @@ function PlansManager() {
           }
         }}
       >
-        <TextField label="Plan name" value={name} onChange={(e) => setName(e.currentTarget.value)} maxLength={60} />
-        <TextField label="Monthly price" type="number" min={1} step="0.5" value={price} onChange={(e) => setPrice(e.currentTarget.value)} />
-        <Select label="Currency" value={currency} onChange={(e) => setCurrency(e.currentTarget.value)}>
+        <TextField label={t('studio.plans.name')} value={name} onChange={(e) => setName(e.currentTarget.value)} maxLength={60} />
+        <TextField label={t('studio.plans.price')} type="number" min={1} step="0.5" value={price} onChange={(e) => setPrice(e.currentTarget.value)} />
+        <Select label={t('m.boost.currency')} value={currency} onChange={(e) => setCurrency(e.currentTarget.value)}>
           {CURRENCIES.map((c) => (
             <option key={c}>{c}</option>
           ))}
         </Select>
         <Button type="submit" disabled={!name.trim()} style={{ alignSelf: 'flex-end' }}>
-          Add plan
+          {t('studio.plans.add')}
         </Button>
       </form>
     </section>

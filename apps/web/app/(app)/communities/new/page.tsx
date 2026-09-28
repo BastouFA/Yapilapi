@@ -49,7 +49,7 @@ export default function NewCommunity() {
               .filter(Boolean)
               .slice(0, 20),
           });
-          toast(`${community.name} is ready`);
+          toast(t('communityPage.created', { name: community.name }));
           router.push(`/c/${community.slug}`);
         } catch (err) {
           setError(errorMessage(err));
@@ -65,7 +65,7 @@ export default function NewCommunity() {
       {error ? <Alert tone="danger">{error}</Alert> : null}
       <div className="stack">
         <TextField
-          label="Name"
+          label={t('m.communityForm.name')}
           value={name}
           required
           maxLength={80}
@@ -76,7 +76,7 @@ export default function NewCommunity() {
           }}
         />
         <TextField
-          label="Address"
+          label={t('m.communityForm.address')}
           hint={`yapilapi.com/c/${slug || 'your-community'}`}
           value={slug}
           required
@@ -88,13 +88,13 @@ export default function NewCommunity() {
             setSlug(autoSlug(e.currentTarget.value));
           }}
         />
-        <TextField label="What's it about?" name="description" multiline maxLength={2000} />
-        <Select label="Who can join" name="visibility" defaultValue="public">
-          <option value="public">Anyone can join and read</option>
-          <option value="private">People request to join; only members read</option>
+        <TextField label={t('m.communityForm.about')} name="description" multiline maxLength={2000} />
+        <Select label={t('m.communityForm.whoJoins')} name="visibility" defaultValue="public">
+          <option value="public">{t('m.communityForm.publicHint')}</option>
+          <option value="private">{t('m.communityForm.privateHint')}</option>
         </Select>
-        <TextField label="Topics" name="topics" hint="Up to 5, separated by commas." />
-        <TextField label="Rules" name="rules" multiline hint="One rule per line." />
+        <TextField label={t('m.communityForm.topics')} name="topics" hint={t('compose.topicsHint')} />
+        <TextField label={t('m.communityForm.rules')} name="rules" multiline hint={t('m.communityForm.rulesHint')} />
       </div>
       <Button type="submit" size="lg" block loading={busy} disabled={!name || slug.length < 3}>
         {t('communities.create')}

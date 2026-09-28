@@ -6,7 +6,7 @@ import { BuyButton } from '@/components/BuyButton';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { Avatar, Button, CommunityCard, EmptyState, EventCard, List, ListItem, ProductCard, Skeleton } from '@yapilapi/design-system';
-import type { Community, EventItem, Post, PublicUser } from '@yapilapi/shared';
+import type { Community, EventItem, MessageKey, Post, PublicUser } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { TrendingTags } from '@/components/TrendingTags';
@@ -14,8 +14,27 @@ import { PostList } from '@/components/PostList';
 import { normalizeTag } from '@yapilapi/shared';
 import { useSession } from '../../providers';
 
+/** What the search understood, as words for "Showing events for tonight". */
+const INTENT_TYPE: Record<string, MessageKey> = {
+  people: 'discover.intent.type.people',
+  posts: 'discover.intent.type.posts',
+  communities: 'discover.intent.type.communities',
+  events: 'discover.intent.type.events',
+  places: 'discover.intent.type.places',
+  businesses: 'discover.intent.type.businesses',
+  products: 'discover.intent.type.products',
+  topics: 'discover.intent.type.topics',
+};
+const INTENT_WHEN: Record<string, MessageKey> = {
+  tonight: 'discover.intent.when.tonight',
+  today: 'discover.intent.when.today',
+  tomorrow: 'discover.intent.when.tomorrow',
+  'this weekend': 'discover.intent.when.thisWeekend',
+  'next week': 'discover.intent.when.nextWeek',
+};
+
 function Discover() {
-  const { t, locale, toast, flags } = useSession();
+  const { t, tp, locale, toast, flags } = useSession();
   const router = useRouter();
   const q = useSearchParams().get('q') ?? '';
   const [input, setInput] = useState(q);
@@ -54,6 +73,22 @@ function Discover() {
   const places = (r.places ?? []) as { id: string; name: string; category: string; city: string | null }[];
   const products = (r.products ?? []) as { id: string; kind: string; title: string; priceCents: number; currency: string }[];
   const nothing = results && ![people, posts, foundCommunities, foundEvents, places, products].some((x) => x.length);
+  const intent = results?.intent;
+  let showing = '';
+  if (intent && (intent.when || intent.placeCategory || intent.groupSize)) {
+    const typeWords = (intent.types as string[]).map((x) => {
+      const k = INTENT_TYPE[x];
+      return k ? t(k) : x;
+    });
+    const types = typeWords.length ? new Intl.ListFormat(locale, { type: 'unit', style: 'short' }).format(typeWords) : t('discover.intent.results');
+    const whenKey = intent.when ? INTENT_WHEN[intent.when.label] : undefined;
+    const when = intent.when ? (whenKey ? t(whenKey) : intent.when.label) : '';
+    if (intent.groupSize)
+      showing = when
+        ? tp('discover.intent.showingWhenGroup', intent.groupSize, { types, when })
+        : tp('discover.intent.showingGroup', intent.groupSize, { types });
+    else showing = when ? t('discover.intent.showingWhen', { types, when }) : t('discover.intent.showing', { types });
+  }
 
   return (
     <div className="yp-shell__inner yp-shell__inner--wide">
@@ -62,11 +97,11 @@ function Discover() {
         <div className="row">
           {flags.LIVE ? (
             <Link href="/live" className="yp-btn yp-btn--ghost yp-btn--sm">
-              Live
+              {t('m.live.title')}
             </Link>
           ) : null}
           <Link href="/assistant" className="yp-btn yp-btn--ghost yp-btn--sm">
-            Assistant
+            {t('m.title.assistant')}
           </Link>
           <Link href="/market" className="yp-btn yp-btn--ghost yp-btn--sm">
             {t('market.title')}
@@ -82,7 +117,7 @@ function Discover() {
 
       <form
         role="search"
-        aria-label="Discover"
+        aria-label={t('discover.title')}
         className="row"
         onSubmit={(e) => {
           e.preventDefault();
@@ -99,12 +134,12 @@ function Discover() {
           id="q"
           className="yp-input"
           style={{ flex: 1, minWidth: 0 }}
-          placeholder={`${t('discover.search')}. Try "something to do tonight"`}
+          placeholder={t('discover.searchPlaceholder')}
           value={input}
           onChange={(e) => setInput(e.currentTarget.value)}
         />
         <Button type="submit" icon="search">
-          Search
+          {t('home.search')}
         </Button>
       </form>
       {!q ? <AgentPanel kind="discover" compact /> : null}
@@ -113,16 +148,10 @@ function Discover() {
         results === null ? (
           <Skeleton height={200} />
         ) : nothing ? (
-          <EmptyState title={`No results for “${q}”`} body="Try fewer words, or search for a person, community, event or place." />
+          <EmptyState title={t('search.noResults', { query: q })} body={t('discover.noResultsBody')} />
         ) : (
           <div className="stack">
-            {results.intent.when || results.intent.placeCategory || results.intent.groupSize ? (
-              <p className="muted">
-                Showing {results.intent.types.join(', ') || 'results'}
-                {results.intent.when ? ` for ${results.intent.when.label}` : ''}
-                {results.intent.groupSize ? ` for ${results.intent.groupSize} people` : ''}.
-              </p>
-            ) : null}
+            {showing ? <p className="muted">{showing}</p> : null}
             {people.length ? (
               <section className="stack-sm">
                 <h2 className="section-title">{t('discover.people')}</h2>
@@ -134,7 +163,7 @@ function Discover() {
                       linkAs={NextLink}
                       start={<Avatar name={u.displayName} src={u.avatarUrl} />}
                       primary={u.displayName}
-                      secondary={`@${u.username} · ${u.mode}`}
+                      secondary={`@${u.username} · ${t(`settings.mode.${u.mode}` as MessageKey)}`}
                     />
                   ))}
                 </List>
@@ -201,7 +230,7 @@ function Discover() {
       ) : (
         <div className="stack">
           <section className="stack-sm">
-            <h2 className="section-title">Trending</h2>
+            <h2 className="section-title">{t('sidebar.trending')}</h2>
             <TrendingTags />
           </section>
           <section className="stack-sm">
@@ -219,7 +248,7 @@ function Discover() {
                 ) : null}
               </>
             ) : (
-              <p className="muted">It's quiet right now. Check upcoming events below.</p>
+              <p className="muted">{t('discover.quiet')}</p>
             )}
           </section>
           <section className="stack-sm">
@@ -239,7 +268,7 @@ function Discover() {
                 ))}
               </div>
             ) : (
-              <p className="muted">No upcoming events yet.</p>
+              <p className="muted">{t('discover.noUpcoming')}</p>
             )}
           </section>
         </div>

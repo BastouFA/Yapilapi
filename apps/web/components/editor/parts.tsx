@@ -10,27 +10,45 @@ import {
   FILTERS,
   NEUTRAL_ADJUSTMENTS,
   sharpenAmount,
-  TEXT_COLOR_NAMES,
   TEXT_COLORS,
   TEXT_FONT_CSS,
   TEXT_FONTS,
   textBoxColor,
+  type TextFont,
   vignetteAlpha,
   vignetteCss,
   type AdjustmentKey,
   type Adjustments,
   type FilterId,
+  type MessageKey,
   type TextOverlay,
 } from '@yapilapi/shared';
+import { useSession } from '@/app/providers';
 
-export const ADJUSTMENT_LABELS: Record<AdjustmentKey, string> = {
-  brightness: 'Brightness',
-  contrast: 'Contrast',
-  saturation: 'Saturation',
-  warmth: 'Warmth',
-  fade: 'Fade',
-  vignette: 'Vignette',
-  sharpen: 'Sharpen',
+/** Catalog keys for the adjustment names. */
+export const ADJUSTMENT_LABELS: Record<AdjustmentKey, MessageKey> = {
+  brightness: 'm.editor.adjust.brightness',
+  contrast: 'm.editor.adjust.contrast',
+  saturation: 'm.editor.adjust.saturation',
+  warmth: 'm.editor.adjust.warmth',
+  fade: 'm.editor.adjust.fade',
+  vignette: 'm.editor.adjust.vignette',
+  sharpen: 'm.editor.adjust.sharpen',
+};
+
+const FONT_LABELS: Record<TextFont, MessageKey> = {
+  clean: 'videoEditor.font.clean' as MessageKey,
+  bold: 'videoEditor.font.bold' as MessageKey,
+  mono: 'videoEditor.font.mono' as MessageKey,
+};
+
+const COLOR_LABELS: Record<(typeof TEXT_COLORS)[number], MessageKey> = {
+  '#FFFFFF': 'videoEditor.color.white' as MessageKey,
+  '#111111': 'videoEditor.color.black' as MessageKey,
+  '#FFD60A': 'videoEditor.color.yellow' as MessageKey,
+  '#FF5A5F': 'videoEditor.color.coral' as MessageKey,
+  '#3FA9F5': 'videoEditor.color.blue' as MessageKey,
+  '#34C759': 'videoEditor.color.green' as MessageKey,
 };
 
 export const DEFAULT_TEXT: TextOverlay = { value: '', font: 'bold', color: '#FFFFFF', x: 0.5, y: 0.5, size: 0.07, background: false };
@@ -79,7 +97,7 @@ export function EditorShell({
   title,
   onCancel,
   onDone,
-  doneLabel = 'Done',
+  doneLabel,
   canUndo,
   onUndo,
   onReset,
@@ -98,6 +116,7 @@ export function EditorShell({
   stage: ReactNode;
   tools: ReactNode;
 }) {
+  const { t } = useSession();
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
   useModalFocus(ref, true, busy ? undefined : onCancel);
@@ -128,20 +147,20 @@ export function EditorShell({
     >
       <div className="ed__bar">
         <Button variant="ghost" size="sm" onClick={onCancel} disabled={busy}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <h2 id={titleId} className="ed__title">
           {title}
         </h2>
         <div className="row" style={{ gap: 4 }}>
           <Button variant="ghost" size="sm" onClick={onUndo} disabled={!canUndo || busy} aria-keyshortcuts="Control+Z Meta+Z">
-            Undo
+            {t('m.editor.undo')}
           </Button>
           <Button variant="ghost" size="sm" onClick={onReset} disabled={!canUndo || busy}>
-            Reset
+            {t('m.editor.reset')}
           </Button>
           <Button size="sm" onClick={onDone} loading={busy}>
-            {doneLabel}
+            {doneLabel ?? t('m.common.done')}
           </Button>
         </div>
       </div>
@@ -254,6 +273,7 @@ export async function drawText(ctx: CanvasRenderingContext2D, t: TextOverlay, w:
  * (Shift for bigger steps). `width` is the preview's width in CSS pixels, for the font size.
  */
 export function TextOnStage({ text, width, onMove }: { text: TextOverlay; width: number; onMove: (x: number, y: number) => void }) {
+  const { t } = useSession();
   const ref = useRef<HTMLDivElement>(null);
   const drag = useRef<{ dx: number; dy: number } | null>(null);
   const f = TEXT_FONT_CSS[text.font];
@@ -296,8 +316,8 @@ export function TextOnStage({ text, width, onMove }: { text: TextOverlay; width:
       style={style}
       role="button"
       tabIndex={0}
-      aria-label={`Text: ${text.value}. Drag, or use the arrow keys, to move it.`}
-      aria-roledescription="movable text"
+      aria-label={t('videoEditor.text.onStage', { text: text.value })}
+      aria-roledescription={t('videoEditor.text.role')}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={() => (drag.current = null)}
@@ -340,8 +360,9 @@ export function useFit(W: number, H: number) {
 
 /** The looks, each shown on a small copy of the picture. */
 export function FilterStrip({ thumb, value, onChange }: { thumb: string | null; value: FilterId; onChange: (f: FilterId) => void }) {
+  const { t } = useSession();
   return (
-    <div className="ed__filters" role="group" aria-label="Filters">
+    <div className="ed__filters" role="group" aria-label={t('m.editor.tab.filters')}>
       {FILTERS.map((f) => (
         <button key={f.id} type="button" className="ed__filter" aria-pressed={f.id === value} onClick={() => onChange(f.id)}>
           <span className="ed__filter-thumb">
@@ -350,7 +371,7 @@ export function FilterStrip({ thumb, value, onChange }: { thumb: string | null; 
               <span className="ed__vignette" style={{ background: vignetteCss(vignetteAlpha({ ...NEUTRAL_ADJUSTMENTS, ...f.extra })) }} />
             ) : null}
           </span>
-          <span className="ed__filter-name">{f.name}</span>
+          <span className="ed__filter-name">{t(`m.editor.filter.${f.id}` as MessageKey)}</span>
         </button>
       ))}
     </div>
@@ -359,6 +380,7 @@ export function FilterStrip({ thumb, value, onChange }: { thumb: string | null; 
 
 /** One labelled slider per adjustment, each with its own reset. */
 export function AdjustPanel({ value, onChange }: { value: Adjustments; onChange: (key: AdjustmentKey, v: number) => void }) {
+  const { t, locale } = useSession();
   const base = useId();
   return (
     <div className="ed__sliders">
@@ -368,7 +390,7 @@ export function AdjustPanel({ value, onChange }: { value: Adjustments; onChange:
         const id = `${base}-${k}`;
         return (
           <div key={k} className="ed__slider">
-            <label htmlFor={id}>{ADJUSTMENT_LABELS[k]}</label>
+            <label htmlFor={id}>{t(ADJUSTMENT_LABELS[k])}</label>
             <input
               id={id}
               type="range"
@@ -383,8 +405,14 @@ export function AdjustPanel({ value, onChange }: { value: Adjustments; onChange:
             <output htmlFor={id} className="ed__value">
               {r.min < 0 && v > 0 ? `+${v}` : v}
             </output>
-            <Button variant="ghost" size="sm" onClick={() => onChange(k, 0)} disabled={v === 0} aria-label={`Reset ${ADJUSTMENT_LABELS[k].toLowerCase()}`}>
-              Reset
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onChange(k, 0)}
+              disabled={v === 0}
+              aria-label={t('videoEditor.adjust.reset', { name: t(ADJUSTMENT_LABELS[k]).toLocaleLowerCase(locale) })}
+            >
+              {t('m.editor.reset')}
             </Button>
           </div>
         );
@@ -395,15 +423,21 @@ export function AdjustPanel({ value, onChange }: { value: Adjustments; onChange:
 
 /** Add, change or remove the text on the picture. */
 export function TextPanel({ text, onChange }: { text: TextOverlay | null; onChange: (t: TextOverlay | null, group?: string) => void }) {
+  const { t } = useSession();
   const base = useId();
   if (!text)
     return (
       <div className="stack-sm">
         <p className="muted" style={{ margin: 0 }}>
-          Add a few words on top of your picture. You can drag them where you want.
+          {t('videoEditor.text.intro')}
         </p>
-        <Button variant="secondary" icon="plus" onClick={() => onChange({ ...DEFAULT_TEXT, value: 'Your text' })} style={{ alignSelf: 'flex-start' }}>
-          Add text
+        <Button
+          variant="secondary"
+          icon="plus"
+          onClick={() => onChange({ ...DEFAULT_TEXT, value: t('videoEditor.text.default') })}
+          style={{ alignSelf: 'flex-start' }}
+        >
+          {t('videoEditor.text.add')}
         </Button>
       </div>
     );
@@ -411,7 +445,7 @@ export function TextPanel({ text, onChange }: { text: TextOverlay | null; onChan
     <div className="stack-sm ed__text-panel">
       <div className="yp-field">
         <label className="yp-field__label" htmlFor={`${base}-value`}>
-          Text
+          {t('m.post.text')}
         </label>
         <input
           id={`${base}-value`}
@@ -422,7 +456,7 @@ export function TextPanel({ text, onChange }: { text: TextOverlay | null; onChan
           onChange={(e) => onChange({ ...text, value: e.currentTarget.value }, 'text-value')}
         />
       </div>
-      <div className="row" role="group" aria-label="Font">
+      <div className="row" role="group" aria-label={t('videoEditor.text.font')}>
         {TEXT_FONTS.map((f) => (
           <button
             key={f}
@@ -432,26 +466,26 @@ export function TextPanel({ text, onChange }: { text: TextOverlay | null; onChan
             style={{ fontFamily: TEXT_FONT_CSS[f].family, fontWeight: TEXT_FONT_CSS[f].weight }}
             onClick={() => onChange({ ...text, font: f })}
           >
-            {TEXT_FONT_CSS[f].name}
+            {t(FONT_LABELS[f])}
           </button>
         ))}
       </div>
-      <div className="row" role="group" aria-label="Color">
+      <div className="row" role="group" aria-label={t('videoEditor.text.color')}>
         {TEXT_COLORS.map((c) => (
           <button
             key={c}
             type="button"
             className="ed__swatch"
             aria-pressed={text.color === c}
-            aria-label={TEXT_COLOR_NAMES[c]}
-            title={TEXT_COLOR_NAMES[c]}
+            aria-label={t(COLOR_LABELS[c])}
+            title={t(COLOR_LABELS[c])}
             style={{ background: c }}
             onClick={() => onChange({ ...text, color: c })}
           />
         ))}
       </div>
       <div className="ed__slider">
-        <label htmlFor={`${base}-size`}>Size</label>
+        <label htmlFor={`${base}-size`}>{t('videoEditor.text.size')}</label>
         <input
           id={`${base}-size`}
           type="range"
@@ -459,7 +493,7 @@ export function TextPanel({ text, onChange }: { text: TextOverlay | null; onChan
           max={0.2}
           step={0.005}
           value={text.size}
-          aria-valuetext={`${Math.round(text.size * 100)} percent of the width`}
+          aria-valuetext={t('videoEditor.text.sizeValue', { percent: Math.round(text.size * 100) })}
           onChange={(e) => onChange({ ...text, size: Number(e.currentTarget.value) }, 'text-size')}
         />
         <output htmlFor={`${base}-size`} className="ed__value">
@@ -467,12 +501,12 @@ export function TextPanel({ text, onChange }: { text: TextOverlay | null; onChan
         </output>
       </div>
       <div className="row">
-        <Switch label="Box behind the text" checked={text.background} onChange={(v) => onChange({ ...text, background: v })} />
+        <Switch label={t('videoEditor.text.box')} checked={text.background} onChange={(v) => onChange({ ...text, background: v })} />
         <Button variant="ghost" size="sm" onClick={() => onChange({ ...text, x: 0.5, y: 0.5 })}>
-          Center it
+          {t('videoEditor.text.center')}
         </Button>
         <Button variant="ghost" size="sm" onClick={() => onChange(null)}>
-          Remove text
+          {t('videoEditor.text.remove')}
         </Button>
       </div>
     </div>

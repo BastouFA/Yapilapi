@@ -4,14 +4,14 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, EmptyState, List, ListItem, Select, Stat, TextField } from '@yapilapi/design-system';
 import type { Boost, SalesReport, ServiceBooking, ShopItem } from '@yapilapi/api-client';
-import { CURRENCIES, currencyForCountry, formatMoney, formatRelativeTime, t as translate, type MessageKey } from '@yapilapi/shared';
+import { CURRENCIES, currencyForCountry, formatMoney, formatRelativeTime, type MessageKey } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { useSession } from '@/app/providers';
 
 /** Add what you sell on your profile's Shop tab: products, downloads (with their file) and services. */
 export function ShopManager() {
-  const { me, toast, locale } = useSession();
+  const { me, toast, locale, t } = useSession();
   const [items, setItems] = useState<ShopItem[]>([]);
   const [kind, setKind] = useState<'product' | 'digital' | 'service'>('digital');
   const [title, setTitle] = useState('');
@@ -32,20 +32,20 @@ export function ShopManager() {
 
   return (
     <section className="stack-sm" id="shop">
-      <h2 className="section-title">Shop</h2>
+      <h2 className="section-title">{t('m.shop.tab')}</h2>
       <p className="muted" style={{ margin: 0 }}>
-        What you add here shows on the Shop tab of your profile. Downloads are stored privately and only buyers can get them. A 5% platform fee applies.
+        {t('studio.shop.intro')}
       </p>
       {items.map((p) => (
         <div key={p.id} className="yp-card shop__item">
           <div className="shop__main">
             <div className="row" style={{ gap: 8 }}>
               <strong>{p.title}</strong>
-              <Badge tone="neutral">{p.kind === 'digital' ? 'Download' : p.kind === 'service' ? 'Service' : 'Product'}</Badge>
+              <Badge tone="neutral">{t(p.kind === 'digital' ? 'shop.kind.digital' : p.kind === 'service' ? 'm.shop.service' : 'shop.kind.product')}</Badge>
             </div>
             <span className="shop__price">
               {formatMoney(p.priceCents, p.currency, locale)}
-              {p.kind === 'digital' ? <span className="muted"> · {p.file ? p.file.name : "No file yet. Buyers can't buy it until you add one."}</span> : null}
+              {p.kind === 'digital' ? <span className="muted"> · {p.file ? p.file.name : t('studio.shop.noFile')}</span> : null}
             </span>
           </div>
           {p.kind === 'digital' ? (
@@ -58,7 +58,7 @@ export function ShopManager() {
                   input.current?.click();
                 }}
               >
-                {p.file ? 'Replace file' : 'Add file'}
+                {p.file ? t('studio.shop.replaceFile') : t('shop.addFile')}
               </Button>
             </div>
           ) : null}
@@ -75,7 +75,7 @@ export function ShopManager() {
           if (!file || !fileFor.current) return;
           try {
             await api.shop.uploadFile(fileFor.current, file, file.name);
-            toast('File added');
+            toast(t('studio.shop.fileAdded'));
             await load();
           } catch (err) {
             toast(errorMessage(err));
@@ -94,10 +94,10 @@ export function ShopManager() {
             setDescription('');
             await load();
             if (kind === 'digital') {
-              toast('Added. Now add the file buyers will download.');
+              toast(t('studio.shop.addedNeedsFile'));
               fileFor.current = r.product.id;
               input.current?.click();
-            } else toast('Added to your shop');
+            } else toast(t('studio.shop.added'));
           } catch (err) {
             toast(errorMessage(err));
           } finally {
@@ -106,22 +106,28 @@ export function ShopManager() {
         }}
       >
         <div className="row">
-          <Select label="Type" value={kind} onChange={(e) => setKind(e.currentTarget.value as typeof kind)}>
-            <option value="digital">Download</option>
-            <option value="service">Service</option>
-            <option value="product">Product</option>
+          <Select label={t('studio.shop.type')} value={kind} onChange={(e) => setKind(e.currentTarget.value as typeof kind)}>
+            <option value="digital">{t('shop.kind.digital')}</option>
+            <option value="service">{t('m.shop.service')}</option>
+            <option value="product">{t('shop.kind.product')}</option>
           </Select>
-          <TextField label="Price" type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.currentTarget.value)} />
-          <Select label="Currency" value={currency} onChange={(e) => setCurrency(e.currentTarget.value)}>
+          <TextField label={t('market.form.price')} type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.currentTarget.value)} />
+          <Select label={t('m.boost.currency')} value={currency} onChange={(e) => setCurrency(e.currentTarget.value)}>
             {CURRENCIES.map((c) => (
               <option key={c}>{c}</option>
             ))}
           </Select>
         </div>
-        <TextField label="Title" value={title} onChange={(e) => setTitle(e.currentTarget.value)} maxLength={120} />
-        <TextField label="Description" multiline value={description} onChange={(e) => setDescription(e.currentTarget.value)} maxLength={5000} />
+        <TextField label={t('market.form.title')} value={title} onChange={(e) => setTitle(e.currentTarget.value)} maxLength={120} />
+        <TextField
+          label={t('market.form.description')}
+          multiline
+          value={description}
+          onChange={(e) => setDescription(e.currentTarget.value)}
+          maxLength={5000}
+        />
         <Button type="submit" loading={busy} disabled={!title.trim()} style={{ alignSelf: 'flex-start' }}>
-          Add to shop
+          {t('studio.shop.add')}
         </Button>
       </form>
     </section>
@@ -130,7 +136,7 @@ export function ShopManager() {
 
 /** Sales from your shop over the last 30 days, and bookings for your services to confirm. */
 export function SalesPanel() {
-  const { toast, locale } = useSession();
+  const { toast, locale, t, tp } = useSession();
   const [sales, setSales] = useState<SalesReport | null>(null);
   const [bookings, setBookings] = useState<ServiceBooking[]>([]);
   const load = useCallback(async () => {
@@ -146,7 +152,7 @@ export function SalesPanel() {
   const decide = async (id: string, confirm: boolean) => {
     try {
       await api.bookings.decide(id, confirm);
-      toast(confirm ? 'Booking confirmed' : 'Booking declined. The customer gets their money back.');
+      toast(t(confirm ? 'studio.bookings.confirmed' : 'studio.bookings.declined'));
       await load();
     } catch (e) {
       toast(errorMessage(e));
@@ -155,25 +161,25 @@ export function SalesPanel() {
 
   return (
     <section className="stack-sm">
-      <h2 className="section-title">Sales</h2>
+      <h2 className="section-title">{t('m.studio.sales')}</h2>
       {sales.totals.length ? (
         <div className="stats">
           {sales.totals.map((x) => (
             <Stat
               key={x.currency}
-              label={`${x.orders} ${x.orders === 1 ? 'sale' : 'sales'} (${x.currency})`}
+              label={tp('m.studio.salesCount', x.orders, { currency: x.currency })}
               value={formatMoney(x.netCents, x.currency, locale)}
-              delta={`${formatMoney(x.grossCents, x.currency, locale)} before the 5% fee`}
+              delta={t('m.studio.salesGross', { gross: formatMoney(x.grossCents, x.currency, locale) })}
             />
           ))}
         </div>
       ) : (
         <p className="muted" style={{ margin: 0 }}>
-          No sales in the last {sales.days} days.
+          {tp('studio.sales.none', sales.days)}
         </p>
       )}
       {sales.items.length ? (
-        <List label="Latest sales">
+        <List label={t('studio.sales.latest')}>
           {sales.items.slice(0, 20).map((x) => (
             <ListItem
               key={`${x.orderId}-${x.product.id}`}
@@ -181,7 +187,7 @@ export function SalesPanel() {
               secondary={`${x.buyer.displayName} · ${formatRelativeTime(x.createdAt, locale)}`}
               end={
                 <span>
-                  {formatMoney(x.amountCents, x.currency, locale)} {x.status === 'refunded' ? <Badge tone="warning">Refunded</Badge> : null}
+                  {formatMoney(x.amountCents, x.currency, locale)} {x.status === 'refunded' ? <Badge tone="warning">{t('m.studio.refunded')}</Badge> : null}
                 </span>
               }
             />
@@ -190,8 +196,8 @@ export function SalesPanel() {
       ) : null}
       {bookings.length ? (
         <>
-          <h3 className="section-title">Service bookings</h3>
-          <List label="Service bookings">
+          <h3 className="section-title">{t('m.studio.bookings')}</h3>
+          <List label={t('m.studio.bookings')}>
             {bookings.map((b) => (
               <ListItem
                 key={b.id}
@@ -201,15 +207,21 @@ export function SalesPanel() {
                   b.status === 'requested' ? (
                     <span className="row">
                       <Button size="sm" onClick={() => decide(b.id, true)}>
-                        Confirm
+                        {t('m.studio.confirm')}
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => decide(b.id, false)}>
-                        Decline
+                        {t('m.studio.decline')}
                       </Button>
                     </span>
                   ) : (
                     <Badge tone={b.status === 'confirmed' ? 'success' : 'neutral'}>
-                      {b.status === 'confirmed' ? 'Confirmed' : b.status === 'declined' ? 'Declined' : 'Cancelled'}
+                      {t(
+                        b.status === 'confirmed'
+                          ? 'm.booking.status.confirmed'
+                          : b.status === 'declined'
+                            ? 'm.booking.status.declined'
+                            : 'm.booking.status.cancelled',
+                      )}
                     </Badge>
                   )
                 }
@@ -224,7 +236,7 @@ export function SalesPanel() {
 
 /** Your boosts and how they're doing. Boost a post from its menu (public posts only). */
 export function BoostsPanel() {
-  const { locale, me } = useSession();
+  const { locale, me, t } = useSession();
   const [items, setItems] = useState<(Boost & { postId: string; excerpt: string })[] | null>(null);
   useEffect(() => {
     api.boosts.mine().then(
@@ -236,33 +248,34 @@ export function BoostsPanel() {
   const n = (v: number) => new Intl.NumberFormat(locale).format(v);
   return (
     <section className="stack-sm">
-      <h2 className="section-title">Boosts</h2>
+      <h2 className="section-title">{t('m.studio.boosts')}</h2>
       {items.length ? (
-        <List label="Boosts">
+        <List label={t('m.studio.boosts')}>
           {items.map((b) => (
             <ListItem
               key={b.campaignId}
               href={`/p/${b.postId}`}
               linkAs={NextLink}
-              primary={b.excerpt || 'Your post'}
-              secondary={`${translate(`post.boost.status.${b.status}` as MessageKey, locale)} · ${
+              primary={b.excerpt || t('m.studio.untitledPost')}
+              secondary={`${t(`post.boost.status.${b.status}` as MessageKey)} · ${
                 b.audience.type === 'country' ? b.audience.countries.join(', ') : b.audience.topics.map((x) => `#${x}`).join(' ')
               }${b.reviewNote ? ` · ${b.reviewNote}` : ''}`}
-              end={`${n(b.impressions)} views · ${n(b.clicks)} clicks · ${formatMoney(b.spentCents, b.currency, locale)} of ${formatMoney(
-                b.budgetCents + b.refundedCents,
-                b.currency,
-                locale,
-              )}`}
+              end={t('studio.boosts.line', {
+                views: n(b.impressions),
+                clicks: n(b.clicks),
+                spent: formatMoney(b.spentCents, b.currency, locale),
+                budget: formatMoney(b.budgetCents + b.refundedCents, b.currency, locale),
+              })}
             />
           ))}
         </List>
       ) : (
         <EmptyState
-          title="No boosts yet"
-          body="Open the menu on one of your public posts and choose Boost."
+          title={t('studio.boosts.empty')}
+          body={t('studio.boosts.emptyBody')}
           action={
             <Link href={me ? `/u/${me.username}` : '/home'} className="yp-btn yp-btn--secondary yp-btn--sm">
-              Go to your posts
+              {t('studio.boosts.goToPosts')}
             </Link>
           }
         />
