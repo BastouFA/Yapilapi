@@ -72,6 +72,8 @@ describe('payouts', () => {
 
     // Refunded after the request: there's nothing left to cover it, so it can't be verified.
     expect((await as(t.app, seller).post(`/v1/orders/${o}/refund`, { reason: 'Changed my mind' })).body.status).toBe('succeeded');
+    const listed = (await as(t.app, admin).get('/v1/admin/payouts')).body.items.find((p: any) => p.id === payoutId);
+    expect(listed).toMatchObject({ amount_cents: 950, available_cents: -950 });
     expect((await as(t.app, admin).post(`/v1/admin/payouts/${payoutId}/verify`)).status).toBe(400);
     expect((await db().query(`SELECT status FROM payouts WHERE id = $1`, [payoutId])).rows[0].status).toBe('pending');
   });

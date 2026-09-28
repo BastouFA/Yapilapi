@@ -683,7 +683,12 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
 
   app.get('/v1/admin/payouts', { preHandler: requireRole('admin') }, async () => {
     const { rows } = await db.query(`SELECT id, user_id, amount_cents, currency, status, created_at FROM payouts WHERE status = 'pending' ORDER BY created_at`);
-    return { items: rows };
+    // What each person still has in that currency with their pending payouts taken off: below zero means refunds have left it uncovered.
+    const balances = new Map<string, Awaited<ReturnType<typeof earnings>>>();
+    for (const r of rows) if (!balances.has(r.user_id)) balances.set(r.user_id, await earnings(db, r.user_id));
+    return {
+      items: rows.map((r) => ({ ...r, available_cents: balances.get(r.user_id)!.find((b) => b.currency === r.currency)?.availableCents ?? 0 })),
+    };
   });
 
   app.post('/v1/admin/payouts/:id/verify', { preHandler: requireRole('admin') }, async (req) => {
