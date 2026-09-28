@@ -37,6 +37,7 @@ export function previewText(t: T, p: MessagePreview): string {
   if (p.kind === 'poll') return t('m.chat.poll.preview', { question: p.body });
   if (p.kind === 'list') return t('m.chat.list.preview', { title: p.body });
   if (p.kind === 'mix') return t('mixes.preview', { title: p.body });
+  if (p.kind === 'location') return t('location.pin');
   if (p.kind === 'game') return t('m.chat.game.preview', { game: p.gameKind ? t(`m.chat.game.kind.${p.gameKind}` as MessageKey) : p.body });
   if (p.body) return p.body;
   if (p.attachmentKind === 'image') return t('m.post.photo');
@@ -62,7 +63,9 @@ export function previewOf(m: Message): MessagePreview {
           ? { kind: 'game' as const, gameKind: m.game.kind }
           : m.mix
             ? { kind: 'mix' as const }
-            : {}),
+            : m.location
+              ? { kind: 'location' as const }
+              : {}),
   };
 }
 

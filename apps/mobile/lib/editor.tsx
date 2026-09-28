@@ -115,7 +115,10 @@ export function Slider({
   format?: (v: number) => string;
 }) {
   const c = useColors();
+  // The knob travels inside the row (KNOB/2 from each end), so it's never cut off at the ends.
+  const KNOB = 22;
   const width = useRef(1);
+  const [trackWidth, setTrackWidth] = useState(0);
   const startValue = useRef(value);
   const latest = useRef({ value, min, max, step, onChange });
   latest.current = { value, min, max, step, onChange };
@@ -130,7 +133,7 @@ export function Slider({
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: (e) => {
         const l = latest.current;
-        const v = snap(l.min + (e.nativeEvent.locationX / width.current) * (l.max - l.min));
+        const v = snap(l.min + ((e.nativeEvent.locationX - KNOB / 2) / width.current) * (l.max - l.min));
         startValue.current = v;
         l.onChange(v);
       },
@@ -155,8 +158,11 @@ export function Slider({
         accessibilityValue={{ min, max, now: value, text: format(value) }}
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
         onAccessibilityAction={(e) => onChange(snap(value + (e.nativeEvent.actionName === 'increment' ? bigStep : -bigStep)))}
-        onLayout={(e) => (width.current = Math.max(1, e.nativeEvent.layout.width))}
-        style={{ height: 32, justifyContent: 'center', direction: 'ltr' }}
+        onLayout={(e) => {
+          width.current = Math.max(1, e.nativeEvent.layout.width - KNOB);
+          setTrackWidth(width.current);
+        }}
+        style={{ height: 32, justifyContent: 'center', direction: 'ltr', paddingHorizontal: KNOB / 2 }}
         {...pan.panHandlers}
       >
         <View pointerEvents="none" style={{ height: 4, borderRadius: 2, backgroundColor: c.line }}>
@@ -166,11 +172,10 @@ export function Slider({
           pointerEvents="none"
           style={{
             position: 'absolute',
-            left: `${frac * 100}%`,
-            marginLeft: -11,
-            width: 22,
-            height: 22,
-            borderRadius: 11,
+            left: frac * trackWidth,
+            width: KNOB,
+            height: KNOB,
+            borderRadius: KNOB / 2,
             backgroundColor: c.surface,
             borderWidth: 2,
             borderColor: c.yapi,

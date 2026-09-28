@@ -1,6 +1,7 @@
 import { readdir, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { Pool } from 'pg';
+import { tx } from '@yapilapi/database';
 import type { Config } from '../config.ts';
 import type { MediaStorage } from './storage.ts';
 import { purgeMedia, removeFiles, removeLiveRecordingFolder, unusedMedia } from './media-files.ts';
@@ -40,6 +41,27 @@ export const RETENTION = {
   removedByModerationDays: 180,
   /** A live's raw recording on the video server, after the live ended (the stored video is the host's to keep or delete). */
   rawLiveRecordingDays: 2,
+  /**
+   * Payment records (orders, payments, refunds, payouts, tips, subscriptions that ended and the
+   * payment provider's notices): the legal accounting period, in years. FINANCIAL_RECORDS_YEARS
+   * in the configuration changes it. A download someone bought stays theirs while their account
+   * and the product exist.
+   */
+  financialRecordsYears: 7,
+  /** Reports, moderation decisions, appeals and enforcements, after the case closed (kept while the account stays suspended). */
+  safetyRecordsDays: 730,
+  /** Call history (who called, when, how long), after the call. */
+  callHistoryDays: 365,
+  /** Watch together sessions (who joined and left, the queue), after they end. */
+  watchSessionsDays: 90,
+  /** Games in chats (and their card in the chat), after they end. */
+  endedGamesDays: 365,
+  /** An earlier username, after the 14-day hold on it ends. */
+  usernameHistoryDaysAfterHold: 30,
+  /** Devices remembered for sign-in alerts, and the devices of sessions, after they were last seen. */
+  signInDevicesDays: 395,
+  /** Visits to business pages, the times you opened Pulse, post and reel views, and ad impressions and clicks: 13 months. */
+  visitsDays: 395,
 } as const;
 
 export interface RetentionDeps {
@@ -96,6 +118,49 @@ async function eraseDeleted(deps: RetentionDeps, table: 'posts' | 'moments' | 'm
     if (ids.length < 500) break;
   }
   return { rows, media };
+}
+
+/**
+ * Payment records older than the accounting period: orders with their payments, refunds and the
+ * tips they paid for, then payouts, subscriptions that ended and the payment provider's notices.
+ * An order for a download stays while its buyer's account and the product exist (it is how they
+ * keep access to what they bought).
+ */
+async function eraseFinancialRecords(db: Pool, years: number): Promise<number> {
+  const cutoff = `now() - make_interval(years => ${Math.max(1, Math.floor(years))})`;
+  let total = 0;
+  for (let i = 0; i < 200; i++) {
+    const ids = (
+      await db.query<{ id: string }>(
+        `SELECT o.id FROM orders o WHERE o.created_at < ${cutoff}
+           AND NOT (o.status IN ('paid', 'partially_refunded')
+                    AND EXISTS (SELECT 1 FROM users b WHERE b.id = o.buyer_id AND b.status = 'active')
+                    AND EXISTS (SELECT 1 FROM order_items oi JOIN products pd ON pd.id = oi.product_id
+                                WHERE oi.order_id = o.id AND pd.kind = 'digital' AND pd.deleted_at IS NULL))
+         LIMIT 500`,
+      )
+    ).rows.map((r) => r.id);
+    if (!ids.length) break;
+    await tx(db, async (c) => {
+      await c.query(`DELETE FROM refunds WHERE payment_id IN (SELECT id FROM payments WHERE order_id = ANY($1::uuid[]))`, [ids]);
+      await c.query(`DELETE FROM payments WHERE order_id = ANY($1::uuid[])`, [ids]);
+      await c.query(`DELETE FROM tips WHERE order_id = ANY($1::uuid[])`, [ids]);
+      // A subscription still running keeps going; it just no longer points at its first payment.
+      await c.query(`UPDATE creator_subscriptions SET order_id = NULL WHERE order_id = ANY($1::uuid[])`, [ids]);
+      // Order lines and drop orders go with the order; bookings and Plus grants forget it.
+      await c.query(`DELETE FROM orders WHERE id = ANY($1::uuid[])`, [ids]);
+    });
+    total += ids.length;
+    if (ids.length < 500) break;
+  }
+  total += await deleteInBatches(db, 'payouts', `status IN ('paid', 'failed') AND created_at < ${cutoff}`);
+  total += await deleteInBatches(
+    db,
+    'creator_subscriptions',
+    `status IN ('cancelled', 'expired') AND coalesce(current_period_end, cancelled_at, created_at) < ${cutoff}`,
+  );
+  total += await deleteInBatches(db, 'payment_webhook_events', `received_at < ${cutoff}`);
+  return total;
 }
 
 /** Raw live recordings left on the video server's disk after their live ended. */
@@ -258,6 +323,69 @@ export async function runRetention(deps: RetentionDeps): Promise<{ counts: Recor
     return rows.length;
   });
   await step('rawLiveRecordings', () => sweepRawRecordings(deps));
+
+  // Payment records, after the accounting period.
+  await step('financialRecords', () => eraseFinancialRecords(db, deps.config.FINANCIAL_RECORDS_YEARS ?? RETENTION.financialRecordsYears));
+
+  // Safety records, after the case closed. Kept while the account they're about stays suspended.
+  const safety = days(RETENTION.safetyRecordsDays);
+  const notSuspended = (col: string) => `NOT EXISTS (SELECT 1 FROM users su WHERE su.id = ${col} AND su.status = 'suspended')`;
+  await step('reports', () => deleteInBatches(db, 'reports', `status = 'closed' AND coalesce(closed_at, created_at) < ${safety}`));
+  await step('moderationCases', () =>
+    // Appeals go with their case.
+    deleteInBatches(
+      db,
+      'moderation_cases',
+      `status IN ('decided', 'final') AND decided_at < ${safety} AND ${notSuspended('moderation_cases.subject_user_id')}
+       AND NOT EXISTS (SELECT 1 FROM appeals a WHERE a.case_id = moderation_cases.id AND a.status = 'open')`,
+    ),
+  );
+  await step('enforcements', () =>
+    deleteInBatches(
+      db,
+      'enforcements',
+      `created_at < ${safety} AND (expires_at IS NULL OR expires_at < ${safety}) AND ${notSuspended('enforcements.user_id')}`,
+    ),
+  );
+
+  // History with a set period.
+  await step('calls', () =>
+    deleteInBatches(db, 'calls', `status NOT IN ('ringing', 'active') AND coalesce(ended_at, created_at) < ${days(RETENTION.callHistoryDays)}`),
+  );
+  await step('watchSessions', () => deleteInBatches(db, 'watch_sessions', `status = 'ended' AND ended_at < ${days(RETENTION.watchSessionsDays)}`));
+  // A game goes with its card in the chat, as when the card is unsent (the message is then erased like any deleted one).
+  await step('endedGames', async () => {
+    let n = 0;
+    for (let i = 0; i < 200; i++) {
+      const { rows } = await db.query<{ message_id: string }>(
+        `WITH g AS (DELETE FROM chat_games WHERE id IN (SELECT id FROM chat_games WHERE status <> 'active' AND ended_at < ${days(RETENTION.endedGamesDays)} LIMIT 1000)
+                    RETURNING message_id)
+         UPDATE messages m SET deleted_at = coalesce(m.deleted_at, now()), body = '' FROM g WHERE m.id = g.message_id RETURNING m.id AS message_id`,
+      );
+      n += rows.length;
+      if (rows.length < 1000) break;
+    }
+    return n;
+  });
+  await step('usernameHistory', () =>
+    deleteInBatches(db, 'username_history', `held_until < now() - interval '${RETENTION.usernameHistoryDaysAfterHold} days'`),
+  );
+  const seen = days(RETENTION.signInDevicesDays);
+  await step('knownSignIns', () => deleteInBatches(db, 'known_sign_ins', `last_seen_at < ${seen}`));
+  await step('devices', () =>
+    deleteInBatches(
+      db,
+      'devices',
+      `last_seen_at < ${seen} AND NOT EXISTS (SELECT 1 FROM sessions s WHERE s.device_id = devices.id AND s.revoked_at IS NULL AND s.expires_at > now())`,
+    ),
+  );
+  const visits = days(RETENTION.visitsDays);
+  await step('businessViews', () => deleteInBatches(db, 'business_views', `day < (current_date - ${RETENTION.visitsDays})`));
+  await step('pulseVisits', () => deleteInBatches(db, 'pulse_visits', `last_seen_at < ${visits}`));
+  // View counts stay on the post; only who viewed it goes.
+  await step('postViews', () => deleteInBatches(db, 'post_views', `viewed_at < ${visits}`));
+  // "Hide this ad" is a choice, not an event: it stays while the campaign exists.
+  await step('adEvents', () => deleteInBatches(db, 'ad_events', `kind <> 'hide' AND created_at < ${visits}`));
   return { counts, errors };
 }
 

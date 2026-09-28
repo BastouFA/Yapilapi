@@ -74,6 +74,15 @@ export default async function PrivacyPage() {
           chat see them.
         </li>
         <li>
+          Sharing where you are: we ask your device for its location only when you tap “Share where I am” in a chat. A live share lasts 15 minutes, 1 hour or 8
+          hours, and ends sooner if you stop it, leave the chat, someone joins it, or you or someone in it blocks the other. While it runs we keep only the
+          latest place (rounded to about 1 km if you choose “Approximate”) and send it only to the people in that chat; when it ends the place is deleted and we
+          keep only that you shared, with which chat, and when. A location you send once stays like a message until you unsend it. Places are never written to
+          our logs or product analytics, never shown to AI features, and your data download lists when you shared, not where. On the web, sharing stops if you
+          close the page. The distance and direction to someone are worked out on your own device, and your position for them is never sent to us. “Open in
+          maps” gives the place to the maps service you open (OpenStreetMap on the web, your phone’s maps app), only when you choose it.
+        </li>
+        <li>
           Watch together: while people in a chat watch videos together, we keep the session, who joined and left, the queue of videos and where playback is.
         </li>
         <li>
@@ -131,7 +140,8 @@ export default async function PrivacyPage() {
         <li>Advertising: which sponsored posts were shown to you, clicked or hidden.</li>
         <li>
           Your country, as reported by our network provider when you use YAPILAPI, or as you choose it in Settings. We use it to apply the law in your country,
-          to check where music may be played, for sign-in alerts and, if you allow ads, to choose them. We don’t use your device’s location (GPS) at all.
+          to check where music may be played, for sign-in alerts and, if you allow ads, to choose them. We don’t use your device’s location (GPS), except when
+          you choose to share where you are in a chat (see above).
         </li>
         <li>Your settings: for example who can message, comment on or mention you, quiet hours and their time zone, and notification choices.</li>
         <li>Notifications: a token for each browser or phone where you turn on notifications.</li>
@@ -290,8 +300,8 @@ export default async function PrivacyPage() {
           profile song and “Now” status), posts, reels, stories, comments, the messages you sent and the ones scheduled to send, questions you asked and
           received, weekly wraps, your photos, videos and voice notes (with every size and streaming copy made of them), live recordings, recap videos,
           connections, circles, interests, assistant memory, username history, the devices remembered for sign-in alerts, notification tokens and passkeys are
-          removed right away, and you are signed out everywhere. Backups are replaced within 30 days. Files of digital products you sold are kept so buyers can
-          still download what they paid for. [Owner to confirm how long.]
+          removed right away, your account type and language go back to the defaults, and you are signed out everywhere. Backups are replaced within 30 days.
+          Files of digital products you sold are kept so buyers can still download what they paid for. [Owner to confirm how long.]
         </li>
         <li>
           A daily clean-up deletes, after these periods:
@@ -304,15 +314,26 @@ export default async function PrivacyPage() {
             <li>Email and password reset links, sign-in challenges, download links and unfinished uploads: 7 days after they are used or expire.</li>
             <li>View-once photos and videos that were never sent: 24 hours. The raw recording of a live on our video server: 2 days after it ends.</li>
             <li>Our record of actions taken on accounts, money and moderation (the audit log): 2 years.</li>
+            <li>
+              Records of payments, refunds, payouts, tips and paid subscriptions that ended: 7 years, for tax and accounting law. [Owner to confirm the period
+              with an accountant for each launch country.] A download you bought stays in your purchases while your account and the product exist.
+            </li>
+            <li>
+              Reports, moderation decisions, appeals and the actions taken: 2 years after the case is closed, and for as long as an account stays suspended
+              because of them.
+            </li>
+            <li>Call history: 12 months. Games in chats: 12 months after they end. Watch together sessions: 90 days after they end.</li>
+            <li>An earlier username: 30 days after the 14 days it is held for you end.</li>
+            <li>The devices remembered for sign-in alerts and the devices you signed in on: 13 months after they were last used.</li>
+            <li>
+              Visits to business pages, the times you opened Pulse, who viewed a post or reel (the view count stays), and ad views and clicks: 13 months. When
+              you hide an ad, that choice stays.
+            </li>
           </ul>
         </li>
         <li>
-          We keep, for as long as the law or people’s safety requires: records of payments, refunds and payouts ([Payment records retention period]); and
-          reports, moderation decisions and appeals ([Moderation records retention period]).
-        </li>
-        <li>
-          Some records have no fixed period yet and are kept while your account exists: the devices remembered for sign-in alerts, your username history, call
-          history, watch together sessions, games in chats, visits to business pages and the times you opened Pulse. [Owner to set periods for these.]
+          Your feed choices (“Show more”, “Show less”, muted topics and people) stay until you change them or delete your account. The law or people’s safety
+          can require us to keep something longer, for example when it is evidence in an investigation.
         </li>
         <li>Stories disappear from view after 24 hours (or the time you chose) and stay in your archive, visible only to you, until you delete them.</li>
       </ul>

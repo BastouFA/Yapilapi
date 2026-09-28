@@ -9,8 +9,10 @@ import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } fro
 import type { AppContext } from '../lib/context.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { isEnabled, notify, track } from '../lib/services.ts';
-import { publicUserFrom } from '../lib/users.ts';
-import { notBlockedSql } from '../lib/visibility.ts';
+import { liveChatAudience, liveChatVisibleSql } from '../lib/live.ts';
+import { roomStageRuleSql } from '../lib/rooms.ts';
+import { ageOf, publicUserFrom } from '../lib/users.ts';
+import { liveVisibleSql } from '../lib/visibility.ts';
 import { isRestricted, restrictedError } from '../lib/spam.ts';
 import { requireVerified } from '../lib/verification.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
@@ -80,11 +82,8 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
     if (!(await isEnabled(db, 'LIVE'))) throw featureDisabled('Live');
   };
 
-  const VISIBLE = `(
-    ${notBlockedSql('l.host_id', '$1')} AND (
-      l.host_id = $1 OR l.visibility = 'public'
-      OR (l.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = l.host_id))
-      OR (l.visibility = 'friends' AND EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = l.host_id) OR (fr.user_b = $1 AND fr.user_a = l.host_id)))))`;
+  // Who may see a live (and so join, chat, send a gift or buy a ticket), minor safety included: lib/visibility.ts.
+  const VISIBLE = liveVisibleSql('$1');
   const SELECT = `SELECT l.*, pr.user_id AS h_id, pr.username AS h_username, pr.display_name AS h_display_name, pr.avatar_url AS h_avatar_url, pr.mode AS h_mode,
       (SELECT count(*) FROM live_participants p WHERE p.session_id = l.id AND p.left_at IS NULL AND p.role = 'viewer') AS viewers,
       (SELECT role FROM live_participants p WHERE p.session_id = l.id AND p.user_id = $1) AS my_role,
@@ -250,11 +249,14 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
     );
     await canGoLive(u.id);
     if (input.ticketProductId) await assertTicket(input.ticketProductId, u.id);
+    // Accounts of people under 18 stay private, so their lives are never for everyone: "Everyone" means their followers.
+    const age = ageOf(u.birthDate);
+    const visibility = age !== null && age < 18 && input.visibility === 'public' ? 'followers' : input.visibility;
     const streamKey = `sk_${randomBytes(20).toString('base64url')}`;
     const id = await tx(db, async (c) => {
       const { rows } = await c.query(
         `INSERT INTO live_sessions (host_id, title, visibility, scheduled_for, stream_key_hash, ticket_product_id) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-        [u.id, input.title, input.visibility, input.scheduledFor ?? null, hashToken(streamKey), input.ticketProductId ?? null],
+        [u.id, input.title, visibility, input.scheduledFor ?? null, hashToken(streamKey), input.ticketProductId ?? null],
       );
       await c.query(`INSERT INTO live_participants (session_id, user_id, role) VALUES ($1,$2,'host')`, [rows[0].id, u.id]);
       return rows[0].id as string;
@@ -277,8 +279,12 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
       [id, u.id],
     );
     if (!r.rowCount) throw badRequest('Only the host can start a scheduled live.');
-    // Tell followers (bounded fan-out; larger audiences go through a queue).
-    const followers = await db.query<{ follower_id: string }>(`SELECT follower_id FROM follows WHERE followee_id = $1 LIMIT 500`, [u.id]);
+    // Tell followers who can see it (bounded fan-out; larger audiences go through a queue).
+    const followers = await db.query<{ follower_id: string }>(
+      `SELECT f0.follower_id FROM follows f0 JOIN live_sessions l ON l.id = $2
+       WHERE f0.followee_id = $1 AND ${liveVisibleSql('f0.follower_id')} LIMIT 500`,
+      [u.id, id],
+    );
     for (const f of followers.rows)
       await notify(db, ctx.realtime, { userId: f.follower_id, category: 'creators', type: 'live_started', actorId: u.id, entityType: 'live', entityId: id });
     track(db, u.id, 'live_started');
@@ -337,7 +343,8 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
     if (!l.has_access) throw new AppError(402, 'ticket_required', 'This live needs a ticket.');
     const { rows } = await db.query(
       `SELECT c.id, c.kind, c.body, c.answered, c.amount_cents, c.currency, c.created_at, pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode
-       FROM live_chat c JOIN profiles pr ON pr.user_id = c.user_id WHERE c.session_id = $1 AND c.deleted_at IS NULL AND ${notBlockedSql('c.user_id', '$2')}
+       FROM live_chat c JOIN profiles pr ON pr.user_id = c.user_id JOIN live_sessions l ON l.id = c.session_id
+       WHERE c.session_id = $1 AND c.deleted_at IS NULL AND ${liveChatVisibleSql('c.user_id', '$2::uuid', '$1::uuid')}
        ORDER BY c.created_at DESC LIMIT 200`,
       [id, u.id],
     );
@@ -376,7 +383,8 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
       )
     ).rows[0];
     const msg = { id: rows[0].id, kind: input.kind, body: input.body, answered: false, author: publicUserFrom(author, 'a_'), createdAt: rows[0].created_at };
-    await ctx.realtime.publish(await audience(id), { type: 'live.chat', data: { liveId: id, message: msg } });
+    // Between adults and under-18s, chat follows the rule for messages (lib/live.ts).
+    await ctx.realtime.publish(await liveChatAudience(db, id, u.id), { type: 'live.chat', data: { liveId: id, message: msg } });
     reply.code(201);
     return { message: msg };
   });
@@ -403,6 +411,10 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
     const l = await load(id, u.id);
     if (l.my_role !== 'host') throw forbidden('Only the host can change roles.');
     if (input.userId === u.id) throw badRequest("You're already the host.");
+    // A co-host or moderator talks to everyone watching: between an adult and someone under 18, only friends (or family), as for messages.
+    const safe = await db.query<{ ok: boolean }>(`SELECT ${roomStageRuleSql('$1::uuid', '$2::uuid')} AS ok`, [u.id, input.userId]);
+    if (input.role !== 'viewer' && !safe.rows[0]?.ok)
+      throw new AppError(403, 'minor_protection', 'To keep younger people safe, you can only give them a role once you are friends.');
     await db.query(
       `INSERT INTO live_participants (session_id, user_id, role, left_at) VALUES ($1,$2,$3, now()) ON CONFLICT (session_id, user_id) DO UPDATE SET role = EXCLUDED.role`,
       [id, input.userId, input.role],

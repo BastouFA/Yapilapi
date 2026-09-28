@@ -2,9 +2,9 @@ import type { PoolClient } from 'pg';
 import { refundUnspentBudget } from '../lib/ad-refunds.ts';
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
-import { appealSchema, FEATURE_FLAG_KEYS, moderationDecisionSchema, problemReportSchema, reportSchema } from '@yapilapi/shared';
+import { appealSchema, FEATURE_FLAG_KEYS, moderationDecisionSchema, problemReportSchema, reportOutcome, reportSchema } from '@yapilapi/shared';
 import { z } from 'zod';
-import { badRequest, conflict, notFound, parse } from '../lib/errors.ts';
+import { AppError, badRequest, conflict, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { audit, getFlags, notify } from '../lib/services.ts';
 import { storePurchasePolicy } from '../lib/store-purchases.ts';
@@ -128,10 +128,15 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
   });
 
   // ── Moderator console ─────────────────────────────────────────────────
+  /**
+   * Appealed cases carry the person's statement, and `needs_other_reviewer` when the moderator
+   * asking made the decision being appealed: someone else decides the appeal.
+   */
   app.get('/v1/admin/moderation/cases', { preHandler: requireRole('moderator', 'admin') }, async (req) => {
     const q = parse(z.object({ status: z.enum(['open', 'decided', 'appealed', 'final']).default('open') }), req.query);
     const { rows } = await db.query(
-      `SELECT mc.*, pr.username AS subject_username,
+      `SELECT mc.*, pr.username AS subject_username, ap.statement AS appeal_statement, ap.status AS appeal_status,
+         (mc.status = 'appealed' AND coalesce(ap.original_reviewer_id, mc.reviewer_id) = $2) AS needs_other_reviewer,
          CASE mc.target_type WHEN 'post' THEN (SELECT body FROM posts WHERE id = mc.target_id)
                              WHEN 'comment' THEN (SELECT body FROM comments WHERE id = mc.target_id)
                              WHEN 'message' THEN (SELECT body FROM messages WHERE id = mc.target_id)
@@ -144,9 +149,9 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
                                                     FROM media m WHERE m.id = mc.target_id)
               WHEN mc.target_type = 'together_item' THEN (SELECT json_build_object('kind', m.kind, 'url', coalesce(m.variants->>'medium', m.poster_url, m.url), 'moderation', m.moderation)
                                                     FROM together_contributions tc JOIN media m ON m.id = tc.media_id WHERE tc.id = mc.target_id) END AS media
-       FROM moderation_cases mc LEFT JOIN profiles pr ON pr.user_id = mc.subject_user_id
+       FROM moderation_cases mc LEFT JOIN profiles pr ON pr.user_id = mc.subject_user_id LEFT JOIN appeals ap ON ap.case_id = mc.id
        WHERE mc.status = $1 ORDER BY CASE mc.risk WHEN 'escalate' THEN 0 WHEN 'restrict' THEN 1 ELSE 2 END, mc.created_at LIMIT 100`,
-      [q.status],
+      [q.status, me(req).id],
     );
     return { items: rows };
   });
@@ -157,9 +162,20 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     const input = parse(moderationDecisionSchema, req.body);
     if (input.decision === 'suspend_user' && mod.role !== 'admin') throw badRequest('Only admins can suspend accounts.');
     await tx(db, async (c) => {
-      const { rows } = await c.query(`SELECT * FROM moderation_cases WHERE id = $1 AND status IN ('open','appealed') FOR UPDATE`, [id]);
+      const { rows } = await c.query(
+        `SELECT mc.*, ap.id AS appeal_id, coalesce(ap.original_reviewer_id, mc.reviewer_id) AS original_reviewer_id
+         FROM moderation_cases mc LEFT JOIN appeals ap ON ap.case_id = mc.id WHERE mc.id = $1 AND mc.status IN ('open','appealed') FOR UPDATE OF mc`,
+        [id],
+      );
       const mc = rows[0];
       if (!mc) throw notFound('Case');
+      // "A different reviewer will look at it": whoever made the decision can't decide its appeal. It waits for someone else.
+      if (mc.status === 'appealed' && mc.original_reviewer_id === mod.id)
+        throw new AppError(
+          403,
+          'different_reviewer_needed',
+          'You made the decision being appealed, so another moderator needs to review this appeal. It waits until someone else does.',
+        );
       const isAd = mc.target_type === 'ad_campaign';
       if (isAd !== (input.decision === 'approve_ad' || input.decision === 'reject_ad'))
         throw badRequest(isAd ? 'Approve or reject this ad.' : 'That decision is only for ad reviews.');
@@ -184,7 +200,29 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
         mod.id,
         input.note ?? null,
       ]);
-      await c.query(`UPDATE reports SET status = 'closed' WHERE target_type = $1 AND target_id = $2 AND status <> 'closed'`, [mc.target_type, mc.target_id]);
+      // The appeal is settled: the first decision stands (upheld) or not (overturned).
+      if (mc.status === 'appealed' && mc.appeal_id)
+        await c.query(`UPDATE appeals SET status = $2, reviewer_id = $3, decided_at = now() WHERE id = $1`, [
+          mc.appeal_id,
+          input.decision === mc.decision ? 'upheld' : 'overturned',
+          mod.id,
+        ]);
+      const closed = await c.query<{ reporter_id: string }>(
+        `UPDATE reports SET status = 'closed', closed_at = now() WHERE target_type = $1 AND target_id = $2 AND status <> 'closed' RETURNING reporter_id`,
+        [mc.target_type, mc.target_id],
+      );
+      // Tell the people who reported it what happened, in plain words, without how the other person was penalised.
+      const outcome = reportOutcome(mc.target_type, input.decision);
+      for (const reporter of new Set(closed.rows.map((r) => r.reporter_id)))
+        if (reporter !== mc.subject_user_id)
+          await notify(c, ctx.realtime, {
+            userId: reporter,
+            category: 'moderation',
+            type: 'report_outcome',
+            entityType: 'report',
+            entityId: mc.target_id,
+            data: { targetType: mc.target_type, outcome },
+          });
       if (input.decision !== 'no_action' && !isAd && mc.subject_user_id) {
         await c.query(`INSERT INTO enforcements (case_id, user_id, action) VALUES ($1,$2,$3)`, [id, mc.subject_user_id, input.decision]);
         await notify(c, ctx.realtime, {
@@ -529,16 +567,24 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     const input = parse(appealSchema, req.body);
     await tx(db, async (c) => {
       // Ad reviews aren't penalties: the advertiser sees the reason in Studio and can promote the post again after fixing it.
-      const mc = await c.query(`SELECT status FROM moderation_cases WHERE id = $1 AND subject_user_id = $2 AND target_type <> 'ad_campaign' FOR UPDATE`, [
-        input.caseId,
-        u.id,
-      ]);
+      const mc = await c.query(
+        `SELECT status, reviewer_id FROM moderation_cases WHERE id = $1 AND subject_user_id = $2 AND target_type <> 'ad_campaign' FOR UPDATE`,
+        [input.caseId, u.id],
+      );
       if (!mc.rows[0]) throw notFound('Case');
       if (mc.rows[0].status !== 'decided') throw badRequest('This decision can’t be appealed.');
-      await c.query(`INSERT INTO appeals (case_id, user_id, statement) VALUES ($1,$2,$3)`, [input.caseId, u.id, input.statement]).catch((e) => {
-        if (e.code === '23505') throw conflict('You already appealed this decision.');
-        throw e;
-      });
+      // Who made the decision is kept with the appeal: they can't decide it.
+      await c
+        .query(`INSERT INTO appeals (case_id, user_id, statement, original_reviewer_id) VALUES ($1,$2,$3,$4)`, [
+          input.caseId,
+          u.id,
+          input.statement,
+          mc.rows[0].reviewer_id,
+        ])
+        .catch((e) => {
+          if (e.code === '23505') throw conflict('You already appealed this decision.');
+          throw e;
+        });
       await c.query(`UPDATE moderation_cases SET status = 'appealed' WHERE id = $1`, [input.caseId]);
     });
     reply.code(201);

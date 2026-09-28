@@ -8,7 +8,7 @@ import { errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
 /**
- * Reels as a grid of poster frames (sound pages, remixes). Each opens in the
+ * Reels as a grid of poster frames (sound pages, remixes, echoes). Each opens in the
  * Reels player. Loads a page at a time with a "Show more" button.
  */
 export function ReelGrid({ load, reloadKey, empty }: { load: (cursor?: string) => Promise<Page<Post>>; reloadKey: string; empty: string }) {
@@ -59,7 +59,12 @@ export function ReelGrid({ load, reloadKey, empty }: { load: (cursor?: string) =
                 ) : m && !dataSaver.active ? (
                   <video src={(m.variants as Record<string, string> | undefined)?.mp4 ?? m.url} muted playsInline preload="metadata" aria-hidden />
                 ) : null}
-                {p.remixOf ? (
+                {p.echoOf ? (
+                  <span className="reel-grid__badge">
+                    <Icon name="repost" size={12} />
+                    {t('echo.title')}
+                  </span>
+                ) : p.remixOf ? (
                   <span className="reel-grid__badge">
                     <Icon name="duet" size={12} />
                     {p.remixOf.mode === 'duet' ? 'Duet' : 'Remix'}

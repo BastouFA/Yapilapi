@@ -80,7 +80,8 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       ),
       closeFriends: await q(`SELECT friend_id, created_at FROM close_friends WHERE owner_id = $1`),
       posts: await q(
-        `SELECT id, kind, format, body, visibility, topics, allow_remix, remix_of_post_id, remix_mode, sound_id, status, scheduled_at, created_at, edited_at, deleted_at
+        `SELECT id, kind, format, body, visibility, topics, allow_remix, remix_of_post_id, remix_mode, sound_id, allow_echoes, is_echo, echo_of_post_id, status, scheduled_at,
+                created_at, edited_at, deleted_at
          FROM posts WHERE author_id = $1`,
       ),
       // Earlier versions of your posts' text.
@@ -129,6 +130,13 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       // Collages you made: the layout and settings, which photos went in them, and the photo it became.
       collages: await q(
         `SELECT media_id, source_ids, spec, created_at FROM media_collages WHERE owner_id = $1 AND media_id IS NOT NULL ORDER BY created_at DESC`,
+      ),
+      // Echoes you made: the reel each answers (and whose it was, by username), how it was put together,
+      // what was heard of the original, the video it became and the reel you posted it as.
+      echoes: await q(
+        `SELECT e.id, e.original_post_id, (SELECT username FROM profiles WHERE user_id = e.original_author_id) AS original_author, e.source_media_id,
+                e.result_media_id, e.post_id, e.layout, e.cut_start_ms, e.cut_end_ms, e.balance, e.their_audio, e.status, e.duration_ms, e.created_at
+         FROM echoes e WHERE e.owner_id = $1 ORDER BY e.created_at DESC`,
       ),
       // Your mixes with their songs in order (who added each), the songs you added to other people's
       // mixes, and the mixes you liked or saved.
@@ -197,7 +205,7 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       await c.query(
         `UPDATE profiles SET username = 'deleted_' || substr(replace(user_id::text, '-', ''), 1, 12), display_name = 'Deleted account', bio = '', avatar_url = NULL, cover_url = NULL, cover_media_id = NULL, cover_alt = NULL, cover_edit = NULL, cover_render_media_id = NULL, links = '[]', is_private = true,
            country = NULL, country_source = NULL, cdn_country = NULL, pinned_post_id = NULL, accent = NULL, header_style = 'cover', pronouns = NULL, city = NULL,
-           tabs = NULL, featured_post_ids = '{}', song_sound_id = NULL, song_track_id = NULL, song_part = NULL
+           tabs = NULL, featured_post_ids = '{}', song_sound_id = NULL, song_track_id = NULL, song_part = NULL, mode = 'personal', locale = 'en'
          WHERE user_id = $1`,
         [u.id],
       );
@@ -256,6 +264,10 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         `DELETE FROM ask_blocks WHERE recipient_id = $1 OR asker_id = $1`,
         // Collages go with their photos (and so does any half-made one).
         `DELETE FROM media_collages WHERE owner_id = $1`,
+        // Echoes they made go with their videos. Echoes other people made of their reels stay with
+        // their makers, hidden from everyone else now that the originals are gone (echoShownSql).
+        `DELETE FROM echoes WHERE owner_id = $1`,
+        `UPDATE echoes SET original_author_id = NULL WHERE original_author_id = $1`,
         // Their mixes go (with their songs, likes, saves and sharing). Songs they added to other people's
         // mixes stay there, "added by a former member"; their likes come off the counts.
         `DELETE FROM mixes WHERE owner_id = $1`,
@@ -279,6 +291,8 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         // Product analytics stay in the totals without being linked to them.
         `UPDATE analytics_events SET user_id = NULL WHERE user_id = $1`,
         `UPDATE conversation_members SET left_at = now() WHERE user_id = $1`,
+        // Where they shared their location: points and records alike.
+        `DELETE FROM location_shares WHERE user_id = $1`,
         `UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`,
         // Sign-in material goes: devices, one-time links and challenges, two-step methods and codes,
         // download links. Apps they allowed lose access; their own apps, keys and webhooks stop.

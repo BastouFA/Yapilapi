@@ -32,9 +32,7 @@ Replace these in `apps/web/app/legal/*/page.tsx`. They have no settings behind t
 | `[Server region]` | Privacy, section 4 | The country or region where the servers and data are |
 | `[Transfer safeguards to be confirmed by counsel.]` | Privacy, section 4 | The transfer mechanism for each origin country (review pack, question 21) |
 | `[Owner to confirm how long.]` | Privacy, section 5 | How long a deleted seller's digital-product files stay available to buyers |
-| `[Payment records retention period]` | Privacy, section 5 | How long payment, refund and payout records are kept (usually set by tax law) |
-| `[Moderation records retention period]` | Privacy, section 5 | How long reports, decisions and appeals are kept |
-| `[Owner to set periods for these.]` | Privacy, section 5 | Periods for sign-in devices, username history, call history, watch together, games, business-page visits and Pulse visits. Then add them to `RETENTION` in `apps/api/src/lib/retention.ts` |
+| `[Owner to confirm the period with an accountant for each launch country.]` | Privacy, section 5 | How long payment, refund and payout records must be kept (7 years by default). Set `FINANCIAL_RECORDS_YEARS` in the API settings and change the text to match |
 | `[Data protection officer and EU or UK representative, if required.]` | Privacy, section 11 | Their names and contact details, or remove the note if none is required |
 | `[Refund rules for Plus.]` | Terms, section 7 | Whether and when Plus is refunded |
 | `[Consumer cancellation rights and how to exercise them, by country.]` | Terms, section 7 | Withdrawal or cooling-off rights and how a buyer uses them (review pack, question 15) |
@@ -55,6 +53,6 @@ These aren't placeholders, but if you change them, change the text too.
 | --- | --- | --- |
 | Plus: 4.99 US dollars for 30 days | `PLUS_PRICE_CENTS`, `PLUS_CURRENCY` (API settings) | Terms, section 7 |
 | Platform fee 5% | `PLATFORM_FEE_PERCENT` in `packages/shared/src/legal.ts` (and `PLATFORM_FEE_BPS` in the API) | Creator terms |
-| Retention periods | `RETENTION` in `apps/api/src/lib/retention.ts` | Privacy, section 5 |
+| Retention periods | `RETENTION` in `apps/api/src/lib/retention.ts` (payment records: `FINANCIAL_RECORDS_YEARS`) | Privacy, section 5 |
 | Drop hold of 15 minutes | `DROP_HOLD_MINUTES` in `packages/shared/src/drops.ts` | Terms, creator terms, privacy |
 | Session cookie of 30 days | `SESSION_TTL_DAYS` | Cookie notice |

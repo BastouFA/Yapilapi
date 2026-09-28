@@ -44,6 +44,7 @@ import { coverRecipeProblem, editSize, renderCover } from '../lib/cover-render.t
 import { nowStatusesFor, ownNowStatus } from '../lib/now-status.ts';
 import { hasAnswersTab, profileAskBox } from '../lib/ask.ts';
 import { hasMixesTab } from '../lib/mixes.ts';
+import { publishShares } from '../lib/location.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -816,7 +817,9 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     const u = me(req);
     const { id } = parse(idParam, req.params);
     if (id === u.id) throw badRequest("You can't block yourself.");
-    await tx(db, (c) => blockUser(c, u.id, id));
+    const stopped = await tx(db, (c) => blockUser(c, u.id, id));
+    // Anyone sharing where they are with the other sees that it stopped.
+    await publishShares({ db, realtime: ctx.realtime }, stopped);
     return { blocked: true };
   });
 

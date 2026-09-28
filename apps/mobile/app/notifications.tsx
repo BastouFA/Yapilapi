@@ -3,7 +3,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, SectionList, Text, View } from 'react-native';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import type { NotificationItem, PublicUser } from '../../../packages/shared/src/types';
+import { reportOutcomeText } from '../../../packages/shared/src/report-outcome';
 import { togetherNoticeText } from '../../../packages/shared/src/together';
+import { echoNoticeText } from '../../../packages/shared/src/echoes';
 import { client, errorMessage } from '../lib/api';
 import { SectionHeader } from '../lib/chips';
 import { useT, type Translator } from '../lib/i18n';
@@ -51,6 +53,7 @@ const TEXT: Record<string, MessageKey> = {
   view_once_screenshot: 'm.notif.viewOnceScreenshot',
   chapter_invite: 'm.notif.chapterInvite',
   watch_invite: 'watch.invite',
+  location_shared: 'location.notif',
   drop_opened: 'm.notif.dropOpened',
   drop_cancelled: 'm.notif.dropCancelled',
 };
@@ -131,6 +134,9 @@ function describe(g: Group, tr: Translator): string {
   // Together albums: whole sentences with the album's name ("Ada added 12 photos to Lagos weekend").
   const together = togetherNoticeText(n, t, tp);
   if (together) return together;
+  // "Ada and 3 others echoed your reel".
+  const echo = echoNoticeText(n, t, tp);
+  if (echo) return echo;
   // Likes on a comment and replies to it arrive batched: the newest person, and how many in all.
   const others = Math.max(0, Number(n.data.count ?? 1) - 1);
   if (n.type === 'comment_like' && n.actor) return others ? tp('comments.notif.likeOthers', others, { name }) : t('comments.notif.like', { name });
@@ -139,6 +145,9 @@ function describe(g: Group, tr: Translator): string {
   if (n.type === 'board_item_added' && n.actor) return tp('m.notif.boardItemAdded', Math.max(1, Number(n.data.count) || 1), { name, board: title });
   if (n.type === 'plus_referral_reward') return tp('m.notif.plusReward', Number(n.data.days ?? 30));
   if (n.type === 'account_review') return n.data.outcome === 'cleared' ? t('m.notif.reviewCleared') : t('m.notif.reviewLimited');
+  // What happened to something you reported, in plain words.
+  const report = reportOutcomeText(n, t);
+  if (report) return report;
   // A question asked without a name has no actor: it never says who.
   if (n.type === 'question_received') return n.actor ? t('ask.notif.received', { name }) : t('ask.notif.receivedHidden');
   if (n.type === 'question_answered') return t('ask.notif.answered', { name });

@@ -585,7 +585,7 @@ const NEW_STATES: [string, (page: Page, d: SeedData) => Promise<void>][] = [
       await expect(page.getByRole('dialog', { name: 'Start a game' })).toBeVisible();
     },
   ],
-  ...(['Four up', 'Noughts', 'Word ladder'] as const).map((game): [string, (page: Page, d: SeedData) => Promise<void>] => [
+  ...(['Four up', 'Noughts', 'Word ladder', 'Chess'] as const).map((game): [string, (page: Page, d: SeedData) => Promise<void>] => [
     `chat: ${game} board`,
     async (page, d) => {
       await open(page, `/inbox/${d.gamesChatId}`);

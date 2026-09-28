@@ -34,6 +34,7 @@ import { ChatLookSheet, chatThemeClass, chatThemeVars, ScheduledList, ScheduleSh
 import { useChatWatch, WatchBanner } from '@/components/WatchTogether';
 import { GameCard, GameSheet, StartGameSheet } from '@/components/ChatGames';
 import { ChatMixCard, ShareMixHereSheet } from '@/components/Mixes';
+import { LocationCard, LocationRequestLine, ShareLocationSheet, SharingBanner, useLocationSharing } from '@/components/ChatLocation';
 
 type Pending = Message & { pending?: boolean };
 
@@ -94,6 +95,22 @@ export default function ChatPage() {
   const [boardFor, setBoardFor] = useState<string | null>(null);
   // Mixes: the sheet to share one of yours here.
   const [mixShareOpen, setMixShareOpen] = useState(false);
+  // Sharing where you are: the sheet, your live share here (the banner), and where this device is (for distances, never sent).
+  const [locationOpen, setLocationOpen] = useState(false);
+  const sharing = useLocationSharing(id, me?.id);
+  async function stopSharing() {
+    const ended = await sharing.stop();
+    if (ended) patchMessage(ended.messageId, (x) => (x.location ? { ...x, location: ended } : x));
+  }
+  async function askLocation() {
+    try {
+      const { message } = await api.conversations.askLocation(id);
+      addMessage(message);
+      toast(t('location.request.sent'));
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  }
 
   const loadPins = () =>
     api.conversations.pins(id).then(
@@ -197,9 +214,12 @@ export default function ChatPage() {
         poll: undefined,
         list: undefined,
         game: undefined,
+        location: undefined,
         reminder: undefined,
       }));
       if (boardFor === e.data.id) setBoardFor(null);
+      const own = sharing.mine;
+      if (own && own.messageId === e.data.id) sharing.apply({ ...own, live: false, stoppedAt: new Date().toISOString(), point: null });
       setMessages(
         (cur) =>
           cur?.map((x) => (x.replyTo && x.replyTo.id === e.data.id ? { ...x, replyTo: { ...x.replyTo, unsent: true, body: '', attachmentKind: null } } : x)) ??
@@ -221,6 +241,11 @@ export default function ChatPage() {
         // An older update arriving late never winds the board back.
         x.unsent || (x.game && x.game.moveNumber > e.data.game.moveNumber) ? x : { ...x, game: e.data.game },
       );
+    // Where someone is: the card moves, or says they stopped; your own share's banner follows.
+    if (e.type === 'location.updated' && e.data.conversationId === id) {
+      patchMessage(e.data.id, (x) => (x.unsent ? x : { ...x, location: e.data.location }));
+      sharing.apply(e.data.location);
+    }
     // "Ada added 3 songs": more adds raise the line's count.
     if (e.type === 'message.system' && e.data.conversationId === id) patchMessage(e.data.id, (x) => ({ ...x, system: e.data.system }));
     // A mix shared here changed: its cards show it as it is now (or that it's gone).
@@ -420,6 +445,7 @@ export default function ChatPage() {
       !m.list &&
       !m.game &&
       !m.mix &&
+      !m.location &&
       !m.unsent &&
       !m.pending &&
       Date.now() - new Date(m.createdAt).getTime() < MESSAGE_EDIT_MINUTES * 60_000;
@@ -547,6 +573,7 @@ export default function ChatPage() {
       </div>
 
       <WatchBanner session={watching} />
+      <SharingBanner share={sharing.mine} here={sharing.here} onStop={stopSharing} />
       {conv?.disappearingSeconds ? (
         <button type="button" className="chat-disappearing" onClick={() => setDisappearingOpen(true)}>
           <Icon name="info" size={14} /> {t('m.chat.disappearingOn', { time: disappearingLabel(t, conv.disappearingSeconds) })}
@@ -636,7 +663,11 @@ export default function ChatPage() {
               return (
                 <div key={m.id} id={`msg-${m.id}`} style={{ display: 'contents' }}>
                   {showDay ? <div className="yp-chat__day">{day}</div> : null}
-                  <SystemLine message={m} meId={me?.id} onJump={(mid) => void jumpTo(mid)} watchSessionId={watching?.id} />
+                  {m.system?.type === 'location_request' ? (
+                    <LocationRequestLine message={m} meId={me?.id} onShare={() => setLocationOpen(true)} />
+                  ) : (
+                    <SystemLine message={m} meId={me?.id} onJump={(mid) => void jumpTo(mid)} watchSessionId={watching?.id} />
+                  )}
                 </div>
               );
             const time = new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(m.createdAt));
@@ -652,6 +683,8 @@ export default function ChatPage() {
               <GameCard message={m} meId={me?.id} mine={mine} onOpen={() => setBoardFor(m.id)} />
             ) : m.mix ? (
               <ChatMixCard mix={m.mix} onMix={(mix) => patchMessage(m.id, (x) => ({ ...x, mix }))} />
+            ) : m.location ? (
+              <LocationCard message={m} meId={me?.id} mine={mine} viewer={sharing.viewer} onViewer={sharing.setViewer} onStop={stopSharing} />
             ) : m.viewOnce ? (
               <>
                 <ViewOnceMessage message={m} mine={mine} onChange={(next) => setMessages((cur) => cur?.map((x) => (x.id === next.id ? next : x)) ?? cur)} />
@@ -813,7 +846,9 @@ export default function ChatPage() {
                           ? { kind: 'game' as const, gameKind: replyTo.game.kind }
                           : replyTo.mix
                             ? { kind: 'mix' as const }
-                            : {}),
+                            : replyTo.location
+                              ? { kind: 'location' as const }
+                              : {}),
                   })}
                 </span>
               ) : null}
@@ -862,6 +897,13 @@ export default function ChatPage() {
             { label: t('m.chat.list.new'), icon: 'check-circle', onSelect: () => setListOpen(true) },
             ...(conv && conv.kind !== 'community' ? [{ label: t('m.chat.game.new'), icon: 'game' as const, onSelect: () => setGameStartOpen(true) }] : []),
             ...(conv && conv.kind !== 'community' ? [{ label: t('mixes.shareHere'), icon: 'mix' as const, onSelect: () => setMixShareOpen(true) }] : []),
+            // Where you are: live for a while or once (the browser asks for permission only when you tap Share), or ask the others.
+            ...(conv && conv.kind !== 'community'
+              ? [
+                  { label: t('location.menu'), icon: 'map-pin' as const, onSelect: () => setLocationOpen(true) },
+                  { label: t('location.ask'), icon: 'compass' as const, onSelect: () => void askLocation() },
+                ]
+              : []),
           ]}
         />
         <button type="button" className="yp-action" aria-label={t('m.chat.sendPhoto')} disabled={!!uploading} onClick={() => fileInput.current?.click()}>
@@ -969,6 +1011,15 @@ export default function ChatPage() {
       <PollSheet open={pollOpen} onClose={() => setPollOpen(false)} conversationId={id} onSent={addMessage} />
       <ListSheet open={listOpen} onClose={() => setListOpen(false)} conversationId={id} onSent={addMessage} />
       <ShareMixHereSheet open={mixShareOpen} onClose={() => setMixShareOpen(false)} conversationId={id} onSent={addMessage} />
+      <ShareLocationSheet
+        open={locationOpen}
+        onClose={() => setLocationOpen(false)}
+        conversationId={id}
+        onSent={(m) => {
+          addMessage(m);
+          if (m.location) sharing.started(m.location);
+        }}
+      />
       <StartGameSheet
         open={gameStartOpen}
         onClose={() => setGameStartOpen(false)}

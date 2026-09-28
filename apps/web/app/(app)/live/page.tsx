@@ -16,7 +16,9 @@ export default function LiveList() {
   const router = useRouter();
   const [items, setItems] = useState<LiveSummary[] | null>(null);
   const [title, setTitle] = useState('');
-  const [visibility, setVisibility] = useState('public');
+  // Lives of people under 18 are never for everyone (the server holds to this too).
+  const teen = !!me?.under18;
+  const [visibility, setVisibility] = useState(teen ? 'followers' : 'public');
   const [ticketId, setTicketId] = useState('');
   const [tickets, setTickets] = useState<LiveProduct[]>([]);
   const [needsVerify, setNeedsVerify] = useState(false);
@@ -60,8 +62,13 @@ export default function LiveList() {
       >
         {needsVerify || me?.needsVerification ? <VerifyPrompt action="live" /> : null}
         <TextField label="Go live about…" value={title} onChange={(e) => setTitle(e.currentTarget.value)} maxLength={120} />
-        <Select label="Who can watch" value={visibility} onChange={(e) => setVisibility(e.currentTarget.value)}>
-          <option value="public">Everyone</option>
+        <Select
+          label="Who can watch"
+          value={teen && visibility === 'public' ? 'followers' : visibility}
+          onChange={(e) => setVisibility(e.currentTarget.value)}
+          hint={teen ? 'Because you’re under 18, only your friends and followers under 18 can watch. Adults who aren’t your friends can’t.' : undefined}
+        >
+          {teen ? null : <option value="public">Everyone</option>}
           <option value="followers">Followers</option>
           <option value="friends">Friends</option>
         </Select>

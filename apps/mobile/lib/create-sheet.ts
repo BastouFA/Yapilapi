@@ -29,3 +29,28 @@ export function deliverPendingAsset(asset: Picked, mode: CreateMode) {
 }
 
 export const createModeFrom = (mode: unknown): CreateMode | null => (mode === 'post' || mode === 'reel' || mode === 'story' ? mode : null);
+
+/**
+ * A video recorded in the camera for an echo (the camera opened with `echo=<reel id>`), handed back
+ * to the Echo screen rather than to Create.
+ */
+let pendingEcho: { postId: string; asset: Picked } | null = null;
+const echoListeners = new Set<() => void>();
+
+export function deliverEchoAsset(postId: string, asset: Picked) {
+  pendingEcho = { postId, asset };
+  echoListeners.forEach((l) => l());
+}
+
+/** The video recorded for an echo of `postId`, once. */
+export function takeEchoAsset(postId: string): Picked | null {
+  if (pendingEcho?.postId !== postId) return null;
+  const a = pendingEcho.asset;
+  pendingEcho = null;
+  return a;
+}
+
+export function onEchoAsset(fn: () => void): () => void {
+  echoListeners.add(fn);
+  return () => void echoListeners.delete(fn);
+}

@@ -143,7 +143,14 @@ export function useMusicLoop(music: { sound: { audioUrl: string | null }; startM
     }
     if (player.currentTime < start - 0.5 || player.currentTime >= end - 0.05) void player.seekTo(start);
     player.play();
-    return () => player.pause();
+    return () => {
+      // The player may already be released when the screen goes (or reloads); nothing left to stop then.
+      try {
+        player.pause();
+      } catch {
+        /* already gone */
+      }
+    };
   }, [url, playing, start, end, player]);
 
   // Back to the start of the part when it reaches its end (or the song ends).

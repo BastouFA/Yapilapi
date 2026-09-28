@@ -9,6 +9,8 @@ export type NotificationTarget = {
   entityType?: string | null;
   entityId?: string | null;
   actor?: { username: string } | null;
+  /** From the list (pushes carry only the above). */
+  data?: Record<string, unknown>;
 };
 
 /**
@@ -19,6 +21,12 @@ export type NotificationTarget = {
 export function notificationHref(n: NotificationTarget): string | null {
   const id = n.entityId ? encodeURIComponent(n.entityId) : null;
   if ((n.type === 'reel_duet' || n.type === 'reel_remix') && id) return `/reels?start=${id}`;
+  // Echoes of your reel (batched): all of them, or the one when only one person echoed it.
+  if (n.type === 'reel_echo') {
+    const original = typeof n.data?.originalId === 'string' ? n.data.originalId : null;
+    if (original && Number(n.data?.count ?? 1) > 1) return `/echoes/${encodeURIComponent(original)}`;
+    return id ? `/reels?start=${id}` : null;
+  }
   if (n.type === 'recap_ready' || n.type === 'recap_failed' || n.entityType === 'recap') return id ? `/recaps?open=${id}` : '/recaps';
   // Watch together: an invite opens the session (it says when it has ended); the weekly wrap opens that week.
   if (n.type === 'watch_invite' || n.entityType === 'watch') return id ? `/watch/${id}` : null;

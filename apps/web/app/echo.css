@@ -1,0 +1,215 @@
+/* ── Echo: answer a reel with your own video ─────────────────────────── */
+
+.echo__intro {
+  margin: 0;
+  font-size: 15px;
+  line-height: 22px;
+}
+.echo__h2 {
+  margin: 0;
+  font: 700 18px/24px var(--font-sans);
+}
+.echo__note {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+/* The reel being answered. */
+.echo__original {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  color: var(--ink);
+  text-decoration: none;
+}
+.echo__original > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.echo__original-body {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.echo__original:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* The preview: both videos where the server puts them. */
+.echo__stage {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  max-height: 64vh;
+  margin-inline: auto;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: #05060b;
+  /* The frame is the same whatever the reading direction. */
+  direction: ltr;
+}
+.echo__video,
+.echo__slot {
+  position: absolute;
+  object-fit: cover;
+}
+.echo__video--theirs.echo__video--corner {
+  z-index: 1;
+  outline: 3px solid #fff;
+}
+.echo__slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3);
+  border: 2px dashed #ffffff66;
+  color: #fff;
+  font-size: 13px;
+  line-height: 18px;
+  text-align: center;
+}
+.echo__credit {
+  position: absolute;
+  z-index: 2;
+  top: 9%;
+  left: 4%;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: #000000a0;
+  color: #fff;
+  font: 700 11px/16px var(--font-sans);
+}
+.echo__result {
+  width: 100%;
+  max-width: 360px;
+  max-height: 70vh;
+  margin-inline: auto;
+  border-radius: var(--radius-lg);
+  background: #05060b;
+}
+
+.echo__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.echo__group > legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  font: 700 16px/22px var(--font-sans);
+}
+
+/* Layout choices: a radio each, with a small drawing and words. */
+.echo__layouts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-2);
+}
+.echo__layout {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 64px;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+}
+.echo__layout:has(input:checked) {
+  border-color: var(--yapi);
+  box-shadow: inset 0 0 0 1px var(--yapi);
+}
+.echo__layout:has(input:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+.echo__layout input {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  margin: 0;
+  accent-color: var(--yapi);
+}
+.echo__layout-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 18px;
+}
+.echo__layout-text strong {
+  font-size: 15px;
+  line-height: 20px;
+}
+.echo-glyph {
+  position: relative;
+  width: 36px;
+  flex: none;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--surface-sunken);
+  outline: 1px solid var(--line-strong);
+  direction: ltr;
+}
+.echo-glyph__yours,
+.echo-glyph__theirs {
+  position: absolute;
+}
+.echo-glyph__yours {
+  background: var(--yapi-soft);
+  box-shadow: inset 0 0 0 1px var(--yapi);
+}
+.echo-glyph__theirs {
+  background: var(--ink-muted);
+  box-shadow: 0 0 0 1px var(--surface);
+}
+
+.echo__range {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 14px;
+}
+.echo__range input[type='range'] {
+  width: 100%;
+  min-height: 44px;
+  accent-color: var(--yapi);
+}
+.echo__balance {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.echo__balance > span {
+  flex: none;
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+
+/* On an echo whose original is gone: the note for its author, with what they can do. */
+.reel__echo-gone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: #ffffff1f;
+}
+.reel__echo-gone p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+}

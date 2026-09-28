@@ -36,7 +36,7 @@ export interface SeedData {
   reel2Id: string;
   /** The message Ben sent that the keyboard test replies to. */
   replyTargetId: string;
-  /** A one-to-one chat with Cleo: a wallpaper, a scheduled message and three games (your turn in each). */
+  /** A one-to-one chat with Cleo: a wallpaper, a scheduled message and four games (your turn in each). */
   gamesChatId: string;
   /** Ben's drop (scheduled, you asked to be told) and your own draft drop. */
   dropId: string;
@@ -373,7 +373,7 @@ export default async function globalSetup(config: FullConfig) {
     }),
   );
 
-  // A chat with Cleo: a wallpaper and colour, a message to send later, and a game of each kind (you start, so it's your turn).
+  // A chat with Cleo: a wallpaper and colour, a message to send later, and a game of each kind (you start, so it's your turn; in chess you play white).
   const chat2 = await must(main.ctx.post('/api/v1/conversations', { data: { memberIds: [third.id] } }));
   const gamesChatId = chat2.conversation.id;
   await must(third.ctx.post(`/api/v1/conversations/${gamesChatId}/messages`, { data: { body: 'Rematch tonight?' } }));
@@ -383,7 +383,7 @@ export default async function globalSetup(config: FullConfig) {
       data: { body: 'Happy birthday, Cleo', sendAt: new Date(Date.now() + 3 * 86_400_000).toISOString() },
     }),
   );
-  for (const kind of ['four_up', 'noughts', 'word_ladder'])
+  for (const kind of ['four_up', 'noughts', 'word_ladder', 'chess'])
     await must(main.ctx.post(`/api/v1/conversations/${gamesChatId}/games`, { data: { kind, clientId: randomUUID() } }));
 
   // This week's wrap, made now (development-only hook; normally it comes on Sunday evening).

@@ -6,8 +6,8 @@ export const generateMetadata = () => legalMetadata('safety');
 
 /**
  * Safety and minors: what the code does for people under 18 (apps/api: auth, lib/users.ts
- * applyMinorDefaults, visibility, messaging, ask, rooms, boards, family). Not legal advice: see
- * docs/legal/review-pack.md, which also lists the gaps (for example lives).
+ * applyMinorDefaults, visibility, messaging, ask, rooms, live, boards, family). Not legal advice: see
+ * docs/legal/review-pack.md, which also lists the gaps.
  */
 export default async function SafetyPage() {
   const c = await legalContacts();
@@ -30,7 +30,15 @@ export default async function SafetyPage() {
           Adults can only message a teen, send them a question or invite them to speak in an audio room if they are friends. A guardian can limit messages
           further. Teens never receive questions asked without a name.
         </li>
-        <li>In audio rooms, their connection goes through our relay server when one is set up, so other people don’t see their IP address.</li>
+        <li>
+          Their lives can only be watched by their friends, a guardian linked to them, and followers under 18 they approved: never by everyone. Adults who
+          aren’t their friends can’t find, join or chat in them. In any live, chat between an adult and a teen only reaches the other if they are friends, like
+          a message.
+        </li>
+        <li>
+          They don’t start or host audio rooms. In audio rooms, their connection goes through our relay server when one is set up, so other people don’t see
+          their IP address.
+        </li>
         <li>Photos and videos marked sensitive, and posts waiting for a moderator, are not shown to them.</li>
         <li>They see no ads, and ad personalization is off.</li>
         <li>Suggested replies in chats are off unless they turn them on.</li>
@@ -54,7 +62,8 @@ export default async function SafetyPage() {
       <ul>
         <li>
           Report posts, reels, stories, comments, profiles, messages, questions and answers, communities, audio rooms, lives, events, products and drops from
-          their menus. Reports are confidential.
+          their menus. Reports are confidential. Once a moderator has decided, we tell you whether we removed it, took action or found it didn’t break our
+          rules.
         </li>
         <li>
           Block someone: they can’t see your profile or contact you, and you won’t see them. For a question asked without a name, you can block whoever asked it

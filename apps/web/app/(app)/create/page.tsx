@@ -19,6 +19,8 @@ import { AutocompleteText } from '@/components/Autocomplete';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { Alert, BottomSheet, Button, Checkbox, formatScheduled, Segments, Select, TextField } from '@yapilapi/design-system';
 import {
+  ECHO_PERMISSIONS,
+  type EchoPermission,
   MAX_COLLABORATORS,
   POST_VISIBILITIES,
   SCHEDULE_MAX_DAYS,
@@ -106,6 +108,8 @@ function Create() {
   const [originalMissing, setOriginalMissing] = useState(false);
   const [soundTitle, setSoundTitle] = useState('');
   const [allowRemix, setAllowRemix] = useState(true);
+  // Who may echo the reel; '' keeps the default for the account (everyone, or nobody for private and under-18 accounts).
+  const [allowEchoes, setAllowEchoes] = useState<EchoPermission | ''>('');
   const [commentPolicy, setCommentPolicy] = useState<CommentPolicy>('everyone');
   const [communityId, setCommunityId] = useState(params.get('community') ?? '');
   const [communities, setCommunities] = useState<Community[]>([]);
@@ -173,6 +177,7 @@ function Create() {
         const inText = extractHashtags(post.body, 50);
         setTopics(post.topics.filter((tp) => !inText.includes(tp)).join(', '));
         if (post.allowRemix !== undefined) setAllowRemix(post.allowRemix);
+        if (post.allowEchoes) setAllowEchoes(post.allowEchoes);
         if (post.commentPolicy) setCommentPolicy(post.commentPolicy);
         if (post.sound?.original) setSoundTitle(post.sound.title);
         // Music on the draft: the song or sound as the picker has it, with the part it plays.
@@ -397,6 +402,7 @@ function Create() {
         visibility,
         circleId: visibility === 'circle' ? circleId || undefined : undefined,
         allowRemix,
+        ...(allowEchoes ? { allowEchoes } : {}),
         commentPolicy,
         // A sound plays in full instead of the video's own; a song plays the chosen part.
         ...(remixOf && original
@@ -864,6 +870,21 @@ function Create() {
               checked={allowRemix}
               onChange={(e) => setAllowRemix(e.currentTarget.checked)}
             />
+          ) : null}
+          {kind === 'reel' ? (
+            <Select
+              label={t('echo.settings')}
+              hint={allowEchoes ? t('echo.settings.hint') : t('echo.settings.defaultHint')}
+              value={allowEchoes}
+              onChange={(e) => setAllowEchoes(e.currentTarget.value as EchoPermission | '')}
+            >
+              <option value="">{t('echo.settings.default')}</option>
+              {ECHO_PERMISSIONS.map((p) => (
+                <option key={p} value={p}>
+                  {t(`echo.settings.${p}`)}
+                </option>
+              ))}
+            </Select>
           ) : null}
           {visibility === 'subscribers' && !communityId && kind !== 'story' ? (
             <p className="muted" style={{ margin: 0, fontSize: 13 }}>

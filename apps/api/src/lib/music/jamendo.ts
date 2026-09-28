@@ -96,6 +96,8 @@ export function jamendoLicence(ccUrl: unknown, credit: { title: string; artist: 
     expiresAt: null,
     // We keep references only; Creative Commons would allow copies, but nothing needs them.
     cacheAllowed: false,
+    // No derivatives (ND) licences are left out above, so what's here allows adaptations (echoes).
+    derivatives: true,
   };
 }
 

@@ -64,11 +64,16 @@ const LINE_ON_DARK = '#3A3F5C';
 
 // ── Words ───────────────────────────────────────────────────────────────
 
-/** "Sat 04:00", or with the date when it's more than a week away. */
+/** "Sat 04:00", or with the date when it's more than a week away (and the year when it's another year). */
 export function whenShort(iso: string, tr: Pick<Translator, 'date'>): string {
   const at = new Date(iso);
   const far = Math.abs(at.getTime() - Date.now()) > 6 * 86_400_000;
-  return tr.date(at, far ? { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' } : { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+  // Another year gets the year too, so an old photo doesn't read as this year's.
+  const year = at.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' as const } : {};
+  return tr.date(
+    at,
+    far ? { day: 'numeric', month: 'short', ...year, hour: 'numeric', minute: '2-digit' } : { weekday: 'short', hour: 'numeric', minute: '2-digit' },
+  );
 }
 
 export function statusText(s: Pick<TogetherSummary, 'status' | 'closesAt' | 'closedAt'>, tr: Translator): string {

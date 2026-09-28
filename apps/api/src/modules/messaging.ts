@@ -50,6 +50,8 @@ import { registerMixChats } from './mixes.ts';
 import { registerChatLater } from './chat-later.ts';
 import { registerWatch } from './watch.ts';
 import { registerTogether } from './together.ts';
+import { sharesFor, stopSharesOnJoin, stopSharesOnLeave } from '../lib/location.ts';
+import { registerLocation } from './location.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 
@@ -340,6 +342,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       `INSERT INTO conversation_members (conversation_id, user_id) SELECT $1, unnest($2::uuid[]) ON CONFLICT (conversation_id, user_id) DO UPDATE SET left_at = NULL`,
       [id, userIds],
     );
+    // People sharing where they are chose who saw it: their live shares here stop, and they can start again.
+    await stopSharesOnJoin({ db, realtime: ctx.realtime }, id);
     return { ok: true };
   });
 
@@ -347,6 +351,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const { id } = parse(idParam, req.params);
     await assertMember(id, me(req).id);
     await db.query(`UPDATE conversation_members SET left_at = now() WHERE conversation_id = $1 AND user_id = $2`, [id, me(req).id]);
+    // Sharing where you are with this chat stops when you leave it.
+    await stopSharesOnLeave({ db, realtime: ctx.realtime }, id, me(req).id);
     return { ok: true };
   });
 
@@ -390,6 +396,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const polls = await pollsFor(db, live, [reader]);
     const lists = await listsFor(db, live, [reader]);
     const games = await gamesFor(db, live);
+    const locations = await sharesFor(db, live, reader);
     const mixes = await mixCardsForMessages(db, live, reader);
     const reminders = await myReminders(db, live, reader);
     return items.map((m) => {
@@ -402,6 +409,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       if (list) out.list = list;
       const game = games.get(m.id);
       if (game) out.game = game;
+      const location = locations.get(m.id);
+      if (location) out.location = location;
       const mix = mixes.get(m.id);
       if (mix) out.mix = mix;
       if (reminders.has(m.id)) out.reminder = reminders.get(m.id);
@@ -432,7 +441,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
         `SELECT id, conversation_id, sender_id, kind, body, attachments, story_id, view_once, created_at, deleted_at, unsent_at, moderation_status, expires_at,
                 (created_at > now() - make_interval(mins => $2)) AS editable,
                 EXISTS (SELECT 1 FROM chat_polls p WHERE p.message_id = messages.id) OR EXISTS (SELECT 1 FROM chat_lists l WHERE l.message_id = messages.id)
-                  OR EXISTS (SELECT 1 FROM chat_games g WHERE g.message_id = messages.id) OR (messages.meta ? 'mixId') AS rich
+                  OR EXISTS (SELECT 1 FROM chat_games g WHERE g.message_id = messages.id) OR (messages.meta ? 'mixId')
+                  OR EXISTS (SELECT 1 FROM location_shares s WHERE s.message_id = messages.id) AS rich
          FROM messages WHERE id = $1`,
         [messageId, MESSAGE_EDIT_MINUTES],
       )
@@ -755,6 +765,12 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       await c.query(`DELETE FROM chat_lists WHERE message_id = $1`, [messageId]);
       await c.query(`DELETE FROM chat_games WHERE message_id = $1`, [messageId]);
       await c.query(`DELETE FROM mix_chats WHERE message_id = $1`, [messageId]);
+      // A shared location keeps no place once it's unsent (a live one stops); only the fact that it was shared stays.
+      await c.query(
+        `UPDATE location_shares SET lat = NULL, lng = NULL, accuracy_m = NULL, point_at = NULL, stopped_at = coalesce(stopped_at, now()),
+           stop_reason = coalesce(stop_reason, 'unsent') WHERE message_id = $1`,
+        [messageId],
+      );
       await c.query(`DELETE FROM chat_reminders WHERE message_id = $1 AND sent_at IS NULL`, [messageId]);
       return (await c.query(`DELETE FROM conversation_pins WHERE message_id = $1`, [messageId])).rowCount ?? 0;
     });
@@ -1120,6 +1136,9 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
   registerWatch(app, ctx, chatHelpers);
   // Together albums (modules/together.ts): one started from a chat posts a card there.
   registerTogether(app, ctx, chatHelpers);
+
+  // Sharing where you are, live for a while or once (modules/location.ts).
+  registerLocation(app, ctx, chatHelpers);
 
   // Games in chats (modules/chat-games.ts).
   registerChatGames(app, ctx, {

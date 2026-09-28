@@ -27,12 +27,32 @@ export function collabNotBlockedSql(v: string): string {
 }
 
 /**
+ * Posts aliased `p`: an echo (a reel answering another reel, which it shows) is seen only while
+ * the reel it echoes is there for the viewer too: not deleted or taken down, from an active
+ * account, shared with them, and neither of them blocked the other. Its author and the echo's
+ * author haven't blocked each other either. Otherwise only the echo's author sees it, with a note.
+ * An echo whose original was removed for good keeps is_echo and loses echo_of_post_id: hidden too.
+ */
+export function echoShownSql(v: string): string {
+  return `(NOT p.is_echo OR p.author_id = ${v} OR EXISTS (
+            SELECT 1 FROM posts eo JOIN profiles eop ON eop.user_id = eo.author_id JOIN users eou ON eou.id = eo.author_id
+            WHERE eo.id = p.echo_of_post_id AND eo.deleted_at IS NULL AND eo.status = 'published' AND eou.status = 'active'
+              AND eo.moderation_status = 'normal'
+              AND ${notBlockedSql('eo.author_id', v)}
+              AND ${notBlockedSql('eo.author_id', 'p.author_id')}
+              AND (eo.author_id = ${v}
+                   OR (eo.visibility = 'public' AND (NOT eop.is_private OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${v} AND f.followee_id = eo.author_id)))
+                   OR (eo.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${v} AND f.followee_id = eo.author_id))
+                   OR (eo.visibility = 'friends' AND EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = ${v} AND fr.user_b = eo.author_id) OR (fr.user_b = ${v} AND fr.user_a = eo.author_id))))))`;
+}
+
+/**
  * Posts aliased `p`, author's profile aliased `ap`, author user aliased `au`.
  * Posts waiting for a moderator (flagged as possibly sensitive) stay hidden until cleared from people under 18 and
  * from anyone whose age isn't known (no birth date, or not signed in). Posts withheld by a regional rule are hidden
  * from viewers in that country: the one they chose, the one the CDN reports for their account, and the one the CDN
  * reports for this request (which also covers people who aren't signed in). Posts with a co-author the viewer
- * blocked (or who blocked them) are hidden too. Drafts and scheduled posts are hidden from everyone, their author
+ * blocked (or who blocked them) are hidden too, and so are echoes of reels the viewer can't see (echoShownSql). Drafts and scheduled posts are hidden from everyone, their author
  * included: they're listed only by the author's own drafts endpoints, never where published posts are.
  */
 export function postVisibleSql(v: string): string {
@@ -45,6 +65,7 @@ export function postVisibleSql(v: string): string {
          OR coalesce((SELECT uv.birth_date FROM users uv WHERE uv.id = ${v}) <= current_date - interval '18 years', false))
     AND ${notBlockedSql('p.author_id', v)}
     AND ${collabNotBlockedSql(v)}
+    AND ${echoShownSql(v)}
     AND (p.author_id = ${v} OR NOT EXISTS (
       SELECT 1 FROM post_withholdings w WHERE w.post_id = p.id AND w.country IN (
         (SELECT pv.country FROM profiles pv WHERE pv.user_id = ${v}),
@@ -126,4 +147,32 @@ export function eventVisibleSql(v: string): string {
  */
 export function allowDownloadSql(pr = 'pr', au = 'au'): string {
   return `(coalesce(${pr}.allow_download, NOT ${pr}.is_private) AND NOT coalesce(${au}.birth_date > current_date - interval '18 years', false))`;
+}
+
+/**
+ * Lives aliased `l`: who may see a live, and so join it, chat in it, send a gift or buy a ticket.
+ * Blocks apply both ways, and the host always sees their own. An adult's live reaches its audience
+ * (everyone, followers or friends). A live hosted by someone under 18 follows the rule for
+ * messages: adults see it only when they are the host's friends or a guardian the teen accepted
+ * through a family link; other under-18s who follow the host see it unless it is for friends (a
+ * teen's account is private, so its followers are ones the teen approved). It is never shown to
+ * everyone. Unknown ages count as adult, as for messages.
+ */
+export function liveVisibleSql(v: string): string {
+  const minor = (x: string) => `coalesce((SELECT ux.birth_date > current_date - interval '18 years' FROM users ux WHERE ux.id = ${x}), false)`;
+  const follows = `EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${v} AND f.followee_id = l.host_id)`;
+  const friends = `EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = ${v} AND fr.user_b = l.host_id) OR (fr.user_b = ${v} AND fr.user_a = l.host_id))`;
+  return `(
+    ${notBlockedSql('l.host_id', v)} AND (
+      l.host_id = ${v}
+      OR (NOT ${minor('l.host_id')} AND (
+        l.visibility = 'public'
+        OR (l.visibility = 'followers' AND ${follows})
+        OR (l.visibility = 'friends' AND ${friends})))
+      OR (${minor('l.host_id')} AND (
+        ${friends}
+        OR EXISTS (SELECT 1 FROM family_links fl WHERE fl.status = 'active' AND fl.guardian_id = ${v} AND fl.teen_id = l.host_id)
+        OR (${minor(v)} AND l.visibility IN ('public', 'followers') AND ${follows})))
+    )
+  )`;
 }

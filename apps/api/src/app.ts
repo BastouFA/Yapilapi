@@ -64,6 +64,7 @@ import familyModule from './modules/family.ts';
 import studioModule from './modules/studio.ts';
 import editorModule from './modules/editor.ts';
 import collagesModule from './modules/collages.ts';
+import echoesModule from './modules/echoes.ts';
 import tagsModule from './modules/tags.ts';
 import collabsModule from './modules/collabs.ts';
 import soundsModule from './modules/sounds.ts';
@@ -89,6 +90,7 @@ import { shareVideoJobHandlers } from './lib/share-video.ts';
 import { recapJobHandlers } from './lib/recaps.ts';
 import { sweepViewOnce, viewOnceJobHandlers } from './lib/view-once.ts';
 import { chatJobHandlers, expireMessages } from './lib/chat.ts';
+import { expireShares, locationJobHandlers } from './lib/location.ts';
 import { scheduledPostJobHandlers } from './lib/publishing.ts';
 import { linkIconJobHandlers } from './lib/link-icons.ts';
 import { fastifyTracingPlugin, traceLogMixin } from './lib/tracing.ts';
@@ -126,8 +128,8 @@ export async function buildApp(
         ? false
         : {
             level: config.APP_ENV === 'production' ? 'info' : 'debug',
-            // Never log credentials or session tokens.
-            redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]', '*.password', '*.token'],
+            // Never log credentials or session tokens, nor a place someone shared (request bodies aren't logged either).
+            redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]', '*.password', '*.token', '*.lat', '*.lng'],
             // With tracing on, log lines carry trace_id/span_id next to reqId.
             mixin: traceLogMixin(),
           },
@@ -407,6 +409,7 @@ export async function buildApp(
     studioModule,
     editorModule,
     collagesModule,
+    echoesModule,
     plusModule,
     invitesModule,
     growthModule,
@@ -447,6 +450,8 @@ export async function buildApp(
     ...recapJobHandlers({ db, storage, realtime: ctx.realtime, moderator: ctx.mediaModerator }),
     ...viewOnceJobHandlers(viewOnceDeps),
     ...chatJobHandlers(viewOnceDeps),
+    // Live location shares stop at their time, and their point is deleted.
+    ...locationJobHandlers({ db, realtime: ctx.realtime }),
     // Scheduled posts go out at their time.
     ...scheduledPostJobHandlers(ctx),
     // Site icons for profile links, fetched through the SSRF guard.
@@ -479,6 +484,8 @@ export async function buildApp(
         await sweepRooms({ db, realtime: ctx.realtime, media: ctx.roomMedia }).catch((e) => app.log.warn({ err: e.message }, 'room sweep'));
         // Watch together: people whose player went quiet leave, the host passes on, and sessions nobody watches end.
         await sweepWatch({ db, realtime: ctx.realtime }).catch((e) => app.log.warn({ err: e.message }, 'watch sweep'));
+        // Live location shares past their time (each has its own job; this catches any that were missed).
+        await expireShares({ db, realtime: ctx.realtime }).catch((e) => app.log.warn({ err: e.message }, 'location sweep'));
       }
       // Once a minute: weekly wraps (up to 200 at a time) for people whose Sunday evening has come (lib/wrap.ts).
       if (Date.now() - lastWrapSweep > 60_000) {

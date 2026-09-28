@@ -407,3 +407,88 @@ test('reels: keys, toggles, the scrubber and the options sheet', async ({ page }
   await page.keyboard.press('k');
   await expect(page).toHaveURL(new RegExp(d.reel2Id));
 });
+
+/** Open a sheet with the keyboard, check focus moved in and stays in, close it with Escape and check where focus went back to. */
+async function sheetRoundTrip(page: Page, name: string, returnsTo: import('@playwright/test').Locator) {
+  const sheet = page.getByRole('dialog', { name });
+  await expect(sheet).toBeVisible();
+  await expect.poll(() => focusInside(page, '[role="dialog"]'), { message: `focus should move into ${name}` }).toBe(true);
+  await auditOpen(page, '[role="dialog"]');
+  await tabStaysInside(page, '[role="dialog"]');
+  await page.keyboard.press('Escape');
+  await expect(sheet).toBeHidden();
+  await expect(returnsTo).toBeFocused();
+}
+
+test('chat: start a game, send later and wallpaper sheets', async ({ page }) => {
+  const { gamesChatId } = seed();
+  await page.goto(`/inbox/${gamesChatId}`);
+  await page.waitForLoadState('networkidle');
+
+  // Start a game: from the composer's menu.
+  const add = page.getByRole('button', { name: 'Add a poll, a list or a game' });
+  await add.focus();
+  await page.keyboard.press('Enter');
+  await tabUntil(page, isFocused(page.getByRole('menuitem', { name: 'Play a game' })), 8, 'ArrowDown');
+  await page.keyboard.press('Enter');
+  await sheetRoundTrip(page, 'Start a game', add);
+
+  // Send later: write, then Tab to the button (nothing is scheduled: Escape closes it).
+  const box = page.getByRole('textbox', { name: /message/i });
+  await box.focus();
+  await page.keyboard.type('See you at the market');
+  const later = page.getByRole('button', { name: 'Send later' });
+  await tabUntil(page, isFocused(later), 10);
+  await page.keyboard.press('Enter');
+  await sheetRoundTrip(page, 'Send later', later);
+
+  // Wallpaper and colour: from the chat's menu.
+  const chatMenu = page.getByRole('button', { name: 'Conversation options' });
+  await chatMenu.focus();
+  await page.keyboard.press('Enter');
+  await tabUntil(page, isFocused(page.getByRole('menuitem', { name: 'Wallpaper and colour' })), 14, 'ArrowDown');
+  await page.keyboard.press('Enter');
+  await sheetRoundTrip(page, 'Wallpaper and colour', chatMenu);
+});
+
+test('chat: the chess board with the keyboard', async ({ page }) => {
+  const { gamesChatId } = seed();
+  await page.goto(`/inbox/${gamesChatId}`);
+  await page.waitForLoadState('networkidle');
+  const opener = page.getByRole('button', { name: 'Your turn: Chess' });
+  await opener.focus();
+  await page.keyboard.press('Enter');
+  const sheet = page.getByRole('dialog', { name: 'Chess' });
+  await expect(sheet).toBeVisible();
+  await auditOpen(page, '[role="dialog"]');
+
+  // One square in the tab order, starting on your king.
+  const board = sheet.getByRole('grid', { name: /Chess/ });
+  await expect(board.locator('button[tabindex="0"]')).toHaveCount(1);
+  const square = (name: RegExp) => board.getByRole('button', { name });
+  await tabUntil(page, isFocused(square(/^e1, white king/)), 30);
+  // Arrow keys move around the grid.
+  await page.keyboard.press('ArrowUp');
+  await expect(square(/^e2, white pawn/)).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(square(/^f2, white pawn/)).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  // Enter picks the pawn up and shows where it can go.
+  await page.keyboard.press('Enter');
+  await expect(square(/^e2, white pawn, picked up/)).toBeFocused();
+  await expect(square(/^e3, empty, move here/)).toBeAttached();
+  await expect(square(/^e4, empty, move here/)).toBeAttached();
+  await page.keyboard.press('ArrowUp');
+  await expect(square(/^e3, empty, move here/)).toBeFocused();
+  // Escape puts it back and keeps the board open (no move is made: the projects share this game).
+  await page.keyboard.press('Escape');
+  await expect(sheet).toBeVisible();
+  await expect(square(/^e3, empty$/)).toBeFocused();
+  await expect(board.getByRole('button', { name: /picked up/ })).toHaveCount(0);
+  // Tab leaves the board for the rest of the sheet, and stays in the sheet.
+  await tabStaysInside(page, '[role="dialog"]', 6);
+  // A second Escape closes the sheet and returns focus.
+  await page.keyboard.press('Escape');
+  await expect(sheet).toBeHidden();
+  await expect(opener).toBeFocused();
+});

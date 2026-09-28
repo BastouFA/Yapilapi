@@ -39,6 +39,21 @@ export interface MusicLicence {
   expiresAt: string | null;
   /** Whether the licence lets us keep a copy of the audio (we still only keep a reference). */
   cacheAllowed: boolean;
+  /**
+   * Whether the song may be used in something made from a post (an echo of a reel playing it).
+   * Left out on songs stored before this was asked: see allowsDerivatives.
+   */
+  derivatives?: boolean;
+}
+
+/**
+ * Whether a song's licence allows derivatives: an echo of a reel playing it may keep the song.
+ * When the provider didn't say, Creative Commons licences without "No derivatives" (ND) do, and
+ * nothing else does.
+ */
+export function allowsDerivatives(licence: Pick<MusicLicence, 'name' | 'derivatives'>): boolean {
+  if (typeof licence.derivatives === 'boolean') return licence.derivatives;
+  return /^CC(0| BY)/.test(licence.name) && !/\bND\b/.test(licence.name);
 }
 
 /** Why a song can't be used (or played) here. 'unavailable': its provider is switched off here for now. */

@@ -90,6 +90,8 @@ const TEXT: Record<string, (actor: string, data: Record<string, unknown>) => str
   post_repost: (a) => `${a} reposted your post`,
   reel_duet: (a) => `${a} made a duet with your reel`,
   reel_remix: (a) => `${a} remixed your reel`,
+  // Echoes of one reel are batched (lib/echoes.ts), so this pushes for the first one only.
+  reel_echo: (a) => `${a} echoed your reel`,
   post_mention: (a) => `${a} mentioned you in a post`,
   comment_mention: (a) => `${a} mentioned you in a comment`,
   comment_like: (a) => `${a} liked your comment`,
@@ -113,6 +115,8 @@ const TEXT: Record<string, (actor: string, data: Record<string, unknown>) => str
   media_restored: () => 'Your photo or video is back up after review',
   account_limited: () => 'Your account is limited while our team reviews some recent activity',
   account_review: () => 'Our team finished reviewing your account',
+  // What happened is in the app, in the reader's language; the push only says there's an answer.
+  report_outcome: () => 'We finished reviewing something you reported',
   chapter_invite: (a) => `${a} invited you to add stories to a chapter`,
   // Posts added to a shared board are batched in the inbox and never pushed.
   board_invite: (a) => `${a} invited you to add to a board`,
@@ -127,6 +131,8 @@ const TEXT: Record<string, (actor: string, data: Record<string, unknown>) => str
   recap_ready: () => 'Your recap video is ready',
   recap_failed: () => "We couldn't make your recap video",
   watch_invite: (a) => `${a} wants to watch together`,
+  // Quiet: no sound, like every push but calls. Never says where.
+  location_shared: (a) => `${a} is sharing where they are with you`,
   weekly_wrap: () => 'Your week in YAPILAPI is ready to look back on',
   // Questions asked without a name have no actor, so they read "Someone asked you a question".
   question_received: (a) => `${a} asked you a question`,

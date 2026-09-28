@@ -35,3 +35,8 @@ export * from './store-purchases.ts';
 export * from './mixes.ts';
 export * from './mix-schemas.ts';
 export * from './cover.ts';
+export * from './location.ts';
+export * from './location-schemas.ts';
+export * from './report-outcome.ts';
+export * from './echoes.ts';
+export * from './echo-schemas.ts';

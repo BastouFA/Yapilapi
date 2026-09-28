@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Avatar, Button, EmptyState, List, ListItem, Skeleton } from '@yapilapi/design-system';
-import { formatRelativeTime, togetherNoticeText, type NotificationItem } from '@yapilapi/shared';
+import { echoNoticeText, formatRelativeTime, reportOutcomeText, togetherNoticeText, type NotificationItem } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { useRealtime, useSession, type Session } from '../../providers';
@@ -82,6 +82,9 @@ function hrefFor(n: NotificationItem): string | undefined {
   if (n.type === 'question_received') return '/questions';
   if (n.type === 'question_answered' && n.actor) return `/u/${n.actor.username}?tab=answers`;
   if (n.type === 'reel_duet' || n.type === 'reel_remix') return `/reels?start=${n.entityId}`;
+  // Echoes of your reel (batched): all of them, or the one when only one person echoed it.
+  if (n.type === 'reel_echo')
+    return Number(n.data.count ?? 1) > 1 && typeof n.data.originalId === 'string' ? `/reels/${n.data.originalId}/echoes` : `/reels?start=${n.entityId}`;
   if (n.type === 'weekly_wrap' || n.entityType === 'wrap') return n.entityId ? `/wraps/${n.entityId}` : '/wraps';
   if (n.type === 'watch_invite' || n.entityType === 'watch') return n.entityId ? `/watch/${n.entityId}` : '/inbox';
   if (n.entityType === 'chapter') return `/chapters/${n.entityId}`;
@@ -118,12 +121,20 @@ function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): s
     return typeof n.data.place === 'string' && n.data.place ? t('m.notif.newSignInPlace', { device, place: n.data.place }) : t('m.notif.newSignIn', { device });
   }
   if (n.type === 'scheduled_message_failed') return t('m.notif.scheduledMessageFailed');
+  // What happened to something you reported, in plain words.
+  const report = reportOutcomeText(n, t);
+  if (report) return report;
   // Together albums: whole sentences with the album's name ("Ada added 12 photos to Lagos weekend").
   const together = togetherNoticeText(n, t, tp);
   if (together) return together;
+  // "Ada and 3 others echoed your reel".
+  const echo = echoNoticeText(n, t, tp);
+  if (echo) return echo;
   // Whole sentences in your language (the name, when there is one, is part of them).
   if (n.type === 'weekly_wrap') return t('wrap.notif');
   if (n.type === 'watch_invite') return t('watch.invite', { name: n.actor?.displayName ?? t('m.calls.someone') });
+  // Someone started sharing where they are with a chat you're in (it opens the chat).
+  if (n.type === 'location_shared') return t('location.notif', { name: n.actor?.displayName ?? t('m.calls.someone') });
   // A question asked without a name has no actor: it never says who.
   if (n.type === 'question_received') return n.actor ? t('ask.notif.received', { name: n.actor.displayName }) : t('ask.notif.receivedHidden');
   if (n.type === 'question_answered') return t('ask.notif.answered', { name: n.actor?.displayName ?? '' });
