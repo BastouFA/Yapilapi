@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'r
 import { Animated, I18nManager, Image, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { smallAvatarUrl } from '../../../../packages/shared/src/data-saver';
+import { initialsOf } from '../../../../packages/shared/src/initials';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
 import type { NavGlyphName } from '../../../../packages/shared/src/nav-glyphs';
 import { client, mediaUrl } from '../../lib/api';
@@ -56,13 +57,7 @@ function YouAvatar({ c, focused }: { c: Palette; focused: boolean }) {
   const url = me?.avatarUrl ? mediaUrl(me.avatarUrl) : null;
   const small = url ? smallAvatarUrl(url) : null;
   const name = me?.displayName ?? '';
-  const initials =
-    name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((w) => w[0]!.toUpperCase())
-      .join('') || '?';
+  const initials = initialsOf(name);
   const face = (
     <View style={[s.you, { backgroundColor: c.surfaceSunken }, !focused && { borderWidth: 1.5, borderColor: c.lineStrong }]}>
       {url ? (

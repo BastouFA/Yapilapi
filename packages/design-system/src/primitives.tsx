@@ -12,7 +12,7 @@ import {
   type RefObject,
   type TextareaHTMLAttributes,
 } from 'react';
-import { smallAvatarUrl, t } from '@yapilapi/shared';
+import { initialsOf, smallAvatarUrl, t } from '@yapilapi/shared';
 import { Icon, type IconName } from './icons.tsx';
 import { useDataSaver } from './data-saver.tsx';
 
@@ -462,10 +462,6 @@ export function Tabs({
   );
 }
 
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/);
-  return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? (parts.at(-1)?.[0] ?? '') : '')).toUpperCase();
-}
 export function Avatar({
   name,
   src,
@@ -486,7 +482,7 @@ export function Avatar({
   const small = saver && src && smallFailed !== src ? smallAvatarUrl(src) : null;
   return (
     <span className={cx('yp-avatar', `yp-avatar--${size === 'xl' ? 'lg' : size}`, className)} style={style} title={name} role="img" aria-label={name}>
-      {src ? <img src={small ?? src} alt="" onError={small && small !== src ? () => setSmallFailed(src) : undefined} /> : initials(name)}
+      {src ? <img src={small ?? src} alt="" onError={small && small !== src ? () => setSmallFailed(src) : undefined} /> : initialsOf(name)}
       {online ? <span className="yp-avatar__status" /> : null}
     </span>
   );

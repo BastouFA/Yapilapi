@@ -139,6 +139,14 @@ export const DROP_SCHEDULE_MESSAGES: Record<DropScheduleProblem, string> = {
   endTooLate: `Choose an end within ${DROP_MAX_OPEN_DAYS} days of the start.`,
 };
 
+/** The calendar day of `x` in that zone (or on this device), as a UTC midnight to count days between. */
+function dayKey(x: Date, timeZone?: string): number {
+  if (!timeZone) return Date.UTC(x.getFullYear(), x.getMonth(), x.getDate());
+  const parts = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'numeric', day: 'numeric', timeZone }).formatToParts(x);
+  const part = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  return Date.UTC(part('year'), part('month') - 1, part('day'));
+}
+
 /**
  * What a drop's time says, for plain wording: "today", "tomorrow", a weekday within the next
  * six days, or a date. `day` is the weekday or date text and `time` the time, both in the
@@ -153,13 +161,7 @@ export function dropDay(
   const d = new Date(at);
   const zone = timeZone ? { timeZone } : {};
   const time = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', ...zone }).format(d);
-  // The calendar day in that zone (or on this device), as a UTC midnight to count days between.
-  const key = (x: Date) => {
-    if (!timeZone) return Date.UTC(x.getFullYear(), x.getMonth(), x.getDate());
-    const parts = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'numeric', day: 'numeric', timeZone }).formatToParts(x);
-    const part = (type: string) => Number(parts.find((p) => p.type === type)?.value);
-    return Date.UTC(part('year'), part('month') - 1, part('day'));
-  };
+  const key = (x: Date) => dayKey(x, timeZone);
   const days = Math.round((key(d) - key(now)) / 86_400_000);
   if (days === 0) return { kind: 'today', day: '', time };
   if (days === 1) return { kind: 'tomorrow', day: '', time };
@@ -173,13 +175,14 @@ export function dropDay(
 }
 
 /**
- * How long until a moment, in whole days, hours or minutes (rounded down, never seconds), for a
- * calm "in 2 days". null once it has passed.
+ * How long until a moment, for a calm "in 2 days": hours or minutes (rounded down, never seconds)
+ * within a day; beyond that, calendar days, counted like dropDay so the two agree ("Opens Wednesday
+ * · in 2 days" on a Monday, even when it's 47 hours away). null once it has passed.
  */
-export function dropCountdown(at: string | Date, now: Date = new Date()): { value: number; unit: 'day' | 'hour' | 'minute' } | null {
+export function dropCountdown(at: string | Date, now: Date = new Date(), timeZone?: string): { value: number; unit: 'day' | 'hour' | 'minute' } | null {
   const ms = new Date(at).getTime() - now.getTime();
   if (!(ms > 0)) return null;
-  if (ms >= 86_400_000) return { value: Math.floor(ms / 86_400_000), unit: 'day' };
+  if (ms >= 86_400_000) return { value: Math.max(1, Math.round((dayKey(new Date(at), timeZone) - dayKey(now, timeZone)) / 86_400_000)), unit: 'day' };
   if (ms >= 3_600_000) return { value: Math.floor(ms / 3_600_000), unit: 'hour' };
   return { value: Math.max(1, Math.floor(ms / 60_000)), unit: 'minute' };
 }

@@ -11,6 +11,17 @@ function ResetForm() {
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Opened without the link's token: the form could only fail, so say what to do instead.
+  if (!token)
+    return (
+      <div className="stack">
+        <h1>Choose a new password</h1>
+        <Alert tone="danger">This link is incomplete. Open the link in the email again, or ask for a new one.</Alert>
+        <Link href="/forgot-password" className="yp-btn yp-btn--primary yp-btn--block">
+          Send a new link
+        </Link>
+      </div>
+    );
   if (done)
     return (
       <div className="stack">

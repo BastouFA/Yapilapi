@@ -40,3 +40,4 @@ export * from './location-schemas.ts';
 export * from './report-outcome.ts';
 export * from './echoes.ts';
 export * from './echo-schemas.ts';
+export * from './initials.ts';
