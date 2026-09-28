@@ -1,4 +1,7 @@
 import type {
+  CaptionErrorCode,
+  MediaEditErrorCode,
+  MessageFailureCode,
   PostWhy,
   AdWhy,
   ModerationNotice,
@@ -274,7 +277,9 @@ export function createClient(opts: ClientOptions) {
       resendVerification: () => post('/v1/auth/verify-email/resend'),
       forgot: (email: string) => post<{ message: string }>('/v1/auth/password/forgot', { email }),
       reset: (token: string, password: string) => post('/v1/auth/password/reset', { token, password }),
-      sessions: () => get<{ items: { id: string; device: string; ip: string; last_seen_at: string; current: boolean }[] }>('/v1/auth/sessions'),
+      /** `deviceLabel` names the device in your language; `device` is the stored English name. */
+      sessions: () =>
+        get<{ items: { id: string; device: string; deviceLabel?: string; ip: string; last_seen_at: string; current: boolean }[] }>('/v1/auth/sessions'),
       revokeSession: (id: string) => del(`/v1/auth/sessions/${id}`),
       /** `mode: 'change'` also applies the rules for a new username (letters, numbers and underscores). */
       checkUsername: (username: string, mode: 'signup' | 'change' = 'signup') => post<UsernameCheck>('/v1/auth/check-username', { username, mode }),
@@ -759,7 +764,7 @@ export function createClient(opts: ClientOptions) {
         post<{ moment: { id: string } }>(`/v1/moments/${id}/reshare`, b),
       /** Send a story to people or conversations as a story card. */
       send: (id: string, b: { userIds?: string[]; conversationIds?: string[]; body?: string }) =>
-        post<{ conversationIds: string[]; failed: { id: string; message: string }[] }>(`/v1/moments/${id}/send`, b),
+        post<{ conversationIds: string[]; failed: { id: string; code?: MessageFailureCode; message: string }[] }>(`/v1/moments/${id}/send`, b),
       vote: (id: string, stickerId: string, option: 0 | 1) =>
         post<{ voted: number; results: [number, number]; votes: number }>(`/v1/moments/${id}/stickers/${stickerId}/vote`, { option }),
       answer: (id: string, stickerId: string, text: string) => post<{ answered: number }>(`/v1/moments/${id}/stickers/${stickerId}/answers`, { text }),
@@ -2045,6 +2050,9 @@ export interface SponsoredAd {
 export interface AdCampaign {
   id: string;
   name: string;
+  /** 'boost' for a boost named after its post: the apps name it in the reader's language (campaignName). */
+  nameCode?: 'boost';
+  nameParams?: { excerpt: string };
   status: 'draft' | 'pending_review' | 'active' | 'paused' | 'ended' | 'rejected';
   postId: string;
   topics: string[];
@@ -2101,6 +2109,10 @@ export interface AgentEntity {
   startsAt?: string;
   /** Communities: the member count (`subtitle` says it in English). */
   memberCount?: number;
+  /** Products: the price and kind, for the app to write in the viewer's language (`subtitle` says it in English). */
+  priceCents?: number;
+  currency?: string;
+  productKind?: string;
   href: string;
 }
 
@@ -2184,7 +2196,9 @@ export interface MediaEdit {
   start: number;
   end: number;
   status: 'queued' | 'rendering' | 'processing' | 'ready' | 'failed';
+  /** Why it failed, in English, for older apps; newer ones put `errorCode` into words. */
   error: string | null;
+  errorCode?: MediaEditErrorCode | null;
   createdAt: string;
   result: {
     id: string;
@@ -2206,8 +2220,9 @@ export interface CaptionTrack {
   /** The .vtt file, served with a text/vtt content type. */
   url: string | null;
   cueCount: number;
-  /** Why automatic captions failed (owner only). */
+  /** Why automatic captions failed (owner only), in English, for older apps; newer ones put `errorCode` into words. */
   error: string | null;
+  errorCode?: CaptionErrorCode | null;
   updatedAt: string;
 }
 

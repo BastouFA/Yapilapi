@@ -74,7 +74,7 @@ describe('sentences the API sends as codes', () => {
     expect(agentActionLabel(join, tr('en').t)).toBe('Join: Film Club');
     expect(agentActionLabel(join, tr('fr').t)).toBe('Rejoindre : Film Club');
     expect(agentActionLabel({ ...join, kind: 'teleport', label: 'Teleport: Film Club' }, tr('fr').t)).toBe('Teleport: Film Club');
-    expect(agentSubtitle({ type: 'community', subtitle: '1 members', memberCount: 1 }, tr('en').tp)).toBe('1 member');
-    expect(agentSubtitle({ type: 'place', subtitle: 'Café · Lagos' }, tr('en').tp)).toBe('Café · Lagos');
+    expect(agentSubtitle({ type: 'community', subtitle: '1 members', memberCount: 1 }, tr('en'))).toBe('1 member');
+    expect(agentSubtitle({ type: 'place', subtitle: 'Café · Lagos' }, tr('en'))).toBe('Café · Lagos');
   });
 });

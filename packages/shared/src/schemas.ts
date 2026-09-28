@@ -488,6 +488,11 @@ export const sendMessageSchema = z
     viewOnce: z.boolean().default(false),
     /** Share a story you can see: it shows as a card, which opens only for people who can see it too. */
     storyId: uuid.optional(),
+    /**
+     * Reply to a story by the other person in this one-to-one chat (one you can see): the body is
+     * the reply, and the message says what it answers (`Message.storyReply`).
+     */
+    storyReplyTo: uuid.optional(),
   })
   .refine((v) => v.body.length > 0 || v.attachments.length > 0 || !!v.storyId, { message: 'Write a message or attach a file.', path: ['body'] });
 

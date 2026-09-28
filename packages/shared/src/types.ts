@@ -289,6 +289,24 @@ export interface AdWhy {
 /** Why someone is suggested to you: people you follow follow them, shared interests, they post about your interests or post reels, or they're popular. */
 export type SuggestionReasonCode = 'mutual' | 'shared_interests' | 'topical' | 'reels' | 'popular';
 
+/**
+ * Why a job someone started didn't work, as codes the apps put into words (job-failures.ts). The
+ * API keeps its English next to each for older apps; what went wrong inside (ffmpeg's output, a
+ * provider's error) only goes to the logs.
+ */
+/** A recap video that couldn't be made (`Recap.errorCode`). */
+export type RecapErrorCode = 'source_unavailable' | 'items_unavailable' | 'items_unreadable' | 'render_failed' | 'failed';
+/** A trim or clip that couldn't be made (`MediaEdit.errorCode`). */
+export type MediaEditErrorCode = 'source_missing' | 'render_failed' | 'process_failed';
+/** Automatic captions that couldn't be made (`CaptionTrack.errorCode`). */
+export type CaptionErrorCode = 'not_set_up' | 'no_sound' | 'no_speech' | 'too_long' | 'failed';
+/** A message that couldn't be sent: one scheduled for later, or a story sent to several chats. */
+export type MessageFailureCode =
+  'left_chat' | 'unavailable' | 'cannot_message' | 'account_inactive' | 'account_limited' | 'verify' | 'content_blocked' | 'too_fast' | 'not_sent';
+/** A scheduled post that couldn't go out and went back to drafts (the `scheduled_post_failed` notification's `data.code`). */
+export type ScheduledPostFailureCode =
+  'media_blocked' | 'community' | 'no_plan' | 'music' | 'people' | 'content_blocked' | 'verify' | 'too_fast' | 'check_draft';
+
 /** GET /v1/me/suggestions. */
 export interface PeopleSuggestion {
   user: PublicUser;
@@ -560,7 +578,9 @@ export interface ScheduledMessage {
   replyToId: string | null;
   sendAt: string;
   status: 'scheduled' | 'sent' | 'failed' | 'cancelled';
+  /** Why it wasn't sent, in English, for older apps. Newer ones put `failureCode` into words. */
   failure?: string | null;
+  failureCode?: MessageFailureCode;
   /** Once sent: the message it became. */
   messageId?: string | null;
   createdAt: string;
@@ -603,6 +623,29 @@ export interface MessagePreview {
   kind?: 'poll' | 'list' | 'game' | 'mix' | 'location' | 'listing' | 'offer';
   /** Which game, when `kind` is 'game'. */
   gameKind?: GameKind;
+  /** When `kind` is 'location': a live share (else one sent once). */
+  live?: boolean;
+  /** When `kind` is 'offer': the amount, for the app to write in the reader's language (body has it in English). */
+  offer?: OfferSummary;
+  /** A reply to a story: body is only the reply. */
+  storyReply?: StoryReply;
+}
+
+/** An offer or a counter-offer on a Market listing, as a one-line preview says it. */
+export interface OfferSummary {
+  amountCents: number;
+  currency: string;
+  counter: boolean;
+}
+
+/**
+ * A reply to someone's story, sent to them in your one-to-one chat. The body is the reply; the
+ * apps say "Replied to your story" (or to the story's words) in the reader's language. Replies
+ * sent before this was kept have it all in their body, in English.
+ */
+export interface StoryReply {
+  /** The story's words when the reply was sent (up to 80 characters, then "…"), or null when it had none. */
+  quote: string | null;
 }
 
 export interface PinnedMessage {
@@ -867,6 +910,10 @@ export interface Message {
   offer?: MarketOffer;
   /** Your earliest waiting "Remind me" on this message. */
   reminder?: { id: string; remindAt: string };
+  /** A reply to the other person's story (see StoryReply). */
+  storyReply?: StoryReply;
+  /** On a chat's last message in the inbox: what it is, for its one-line preview in the reader's language. */
+  preview?: MessagePreview;
 }
 
 export interface Community {
@@ -1076,8 +1123,9 @@ export interface Recap {
   sound: { id: string; title: string } | null;
   lengthSeconds: number | null;
   status: RecapStatus;
-  /** Why it failed, in plain words. */
+  /** Why it failed, in English, for older apps. Newer ones put `errorCode` into words. */
   error: string | null;
+  errorCode?: RecapErrorCode | null;
   /** Photos and videos chosen. */
   itemCount: number;
   /** How many made it in (once ready): ones you can no longer see are left out. */

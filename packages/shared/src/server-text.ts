@@ -1,4 +1,5 @@
-import type { MessageKey, PluralKey } from './i18n-core.ts';
+import { formatMoney, type MessageKey, type PluralKey } from './i18n-core.ts';
+import type { PRODUCT_KINDS, REPORT_TARGETS } from './constants.ts';
 import { formatList, type ReasonTranslator } from './feed-reasons.ts';
 import type { AdWhy, AdWhyCode, NoticeCode, SuggestionReasonCode } from './types.ts';
 
@@ -83,7 +84,107 @@ export function agentActionLabel(a: { kind: string; label: string; target: { tit
   return key ? t(key, { title: a.target.title }) : a.label;
 }
 
-/** The small line under an assistant's card: a community's member count in words, else what the API sent. */
-export function agentSubtitle(e: { type: string; subtitle?: string; memberCount?: number }, tp: ReasonTranslator['tp']): string | undefined {
-  return e.type === 'community' && typeof e.memberCount === 'number' ? tp('m.community.members', e.memberCount) : e.subtitle;
+export const PRODUCT_KIND_KEYS: Record<(typeof PRODUCT_KINDS)[number], MessageKey> = {
+  product: 'shop.kind.product',
+  service: 'm.shop.service',
+  ticket: 'tickets.label.type',
+  booking: 'shop.kind.booking',
+  digital: 'shop.kind.digital',
+};
+
+/** An amount in the reader's format, or plain digits and the currency code where the device can't format it. */
+function money(cents: number, currency: string, locale: string | undefined): string {
+  try {
+    return formatMoney(cents, currency, locale ?? 'en');
+  } catch {
+    return `${(cents / 100).toFixed(2)} ${currency}`;
+  }
+}
+
+/**
+ * The small line under an assistant's card: a community's member count, or a product's price
+ * and kind ("₦5,000.00 · Download"), in the reader's language; else what the API sent.
+ */
+export function agentSubtitle(
+  e: { type: string; subtitle?: string; memberCount?: number; priceCents?: number; currency?: string; productKind?: string },
+  tr: Pick<ReasonTranslator, 't' | 'tp' | 'locale'>,
+): string | undefined {
+  if (e.type === 'community' && typeof e.memberCount === 'number') return tr.tp('m.community.members', e.memberCount);
+  if (e.type === 'product' && typeof e.priceCents === 'number' && e.currency) {
+    const key = PRODUCT_KIND_KEYS[e.productKind as keyof typeof PRODUCT_KIND_KEYS];
+    return [money(e.priceCents, e.currency, tr.locale), key ? tr.t(key) : ''].filter(Boolean).join(' · ');
+  }
+  return e.subtitle;
+}
+
+/**
+ * The `new_sign_in` notification as a sentence: which device, and roughly where when known. The
+ * API names both in the reader's language (`deviceLabel`, `placeLabel`: the phone can't name
+ * countries itself); older APIs sent them in English only. Null for other kinds.
+ */
+export function signInNoticeText(n: { type: string; data: Record<string, unknown> }, t: T): string | null {
+  if (n.type !== 'new_sign_in') return null;
+  const text = (v: unknown) => (typeof v === 'string' && v ? v : null);
+  const device = text(n.data.deviceLabel) ?? text(n.data.device) ?? '';
+  const place = text(n.data.placeLabel) ?? text(n.data.place);
+  return place ? t('m.notif.newSignInPlace', { device, place }) : t('m.notif.newSignIn', { device });
+}
+
+/** A campaign's name: a boost is named after its post ("Boost: Our new menu"), in the reader's language; others as their owner wrote it. */
+export function campaignName(c: { name: string; nameCode?: string | null; nameParams?: { excerpt?: string } | null }, t: T): string {
+  if (c.nameCode !== 'boost') return c.name;
+  const excerpt = c.nameParams?.excerpt?.trim();
+  return excerpt ? t('ads.boostName', { excerpt }) : t('ads.boostNameEmpty');
+}
+
+export type ModerationDecision = 'no_action' | 'restrict' | 'remove' | 'suspend_user';
+export type AppealStatus = 'open' | 'upheld' | 'overturned';
+
+/** What a decision was about, as a short label ("Post", "Your account"). */
+export const MODERATION_TARGET_KEYS: Record<(typeof REPORT_TARGETS)[number], MessageKey> = {
+  user: 'moderation.target.user',
+  post: 'moderation.target.post',
+  comment: 'moderation.target.comment',
+  message: 'moderation.target.message',
+  community: 'moderation.target.community',
+  event: 'moderation.target.event',
+  product: 'moderation.target.product',
+  story: 'moderation.target.story',
+  room: 'moderation.target.room',
+  live: 'moderation.target.live',
+  question: 'moderation.target.question',
+  answer: 'moderation.target.answer',
+  drop: 'moderation.target.drop',
+  mix: 'moderation.target.mix',
+  together_item: 'moderation.target.togetherItem',
+  listing: 'moderation.target.listing',
+};
+
+export const MODERATION_DECISION_KEYS: Record<ModerationDecision, MessageKey> = {
+  no_action: 'moderation.decision.noAction',
+  restrict: 'moderation.decision.restrict',
+  remove: 'moderation.decision.remove',
+  suspend_user: 'moderation.decision.suspendUser',
+};
+
+export const APPEAL_STATUS_KEYS: Record<AppealStatus, MessageKey> = {
+  open: 'moderation.appeal.open',
+  upheld: 'moderation.appeal.upheld',
+  overturned: 'moderation.appeal.overturned',
+};
+
+/** A decision about your content in Settings: "Post: Removed". Codes this app doesn't know are shown readably. */
+export function moderationCaseText(c: { target_type: string; decision: string }, t: T): string {
+  const target = MODERATION_TARGET_KEYS[c.target_type as keyof typeof MODERATION_TARGET_KEYS];
+  const decision = MODERATION_DECISION_KEYS[c.decision as ModerationDecision];
+  return t('moderation.case', {
+    target: target ? t(target) : c.target_type.replace(/_/g, ' '),
+    decision: decision ? t(decision) : c.decision.replace(/_/g, ' '),
+  });
+}
+
+/** Where your appeal is, as a sentence. */
+export function appealStatusText(status: string, t: T): string {
+  const key = APPEAL_STATUS_KEYS[status as AppealStatus];
+  return key ? t(key) : t('settings.appeal.status', { status: status.replace(/_/g, ' ') });
 }
