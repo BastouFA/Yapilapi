@@ -9,7 +9,7 @@ import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { PostList } from '@/components/PostList';
 import { CommunityFaq } from '@/components/CommunityExtras';
-import { CommunityRooms } from '@/components/Rooms';
+import { CommunityRooms } from '@/components/RoomView';
 import { JoinNote, NeedsAccount, useSignIn } from '@/components/SignedOut';
 import { useSession } from '../../../providers';
 

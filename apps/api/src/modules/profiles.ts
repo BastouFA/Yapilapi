@@ -782,7 +782,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
   app.get('/v1/me/friend-requests', { preHandler: requireAuth }, async (req) => {
     const { rows } = await db.query(
       `SELECT fr.id AS request_id, fr.created_at AS requested_at, ${PUBLIC_USER_COLS} FROM friend_requests fr JOIN profiles pr ON pr.user_id = fr.from_user_id
-       WHERE fr.to_user_id = $1 AND fr.status = 'pending' ORDER BY fr.created_at DESC`,
+       WHERE fr.to_user_id = $1 AND fr.status = 'pending' ORDER BY fr.created_at DESC LIMIT 200`,
       [me(req).id],
     );
     return { items: rows.map((r) => ({ id: r.request_id, createdAt: r.requested_at, from: toPublicUser(r as PublicUserRow) })) };
@@ -834,7 +834,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
 
   app.get('/v1/me/blocked', { preHandler: requireAuth }, async (req) => {
     const { rows } = await db.query<PublicUserRow>(
-      `SELECT ${PUBLIC_USER_COLS} FROM blocks b JOIN profiles pr ON pr.user_id = b.blocked_id WHERE b.blocker_id = $1`,
+      `SELECT ${PUBLIC_USER_COLS} FROM blocks b JOIN profiles pr ON pr.user_id = b.blocked_id WHERE b.blocker_id = $1 ORDER BY b.created_at DESC LIMIT 1000`,
       [me(req).id],
     );
     return { items: rows.map(toPublicUser) };
@@ -848,7 +848,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     app.get(`/v1/me/${path}`, { preHandler: requireAuth }, async (req) => {
       const { rows } = await db.query<PublicUserRow>(
         `SELECT ${PUBLIC_USER_COLS} FROM ${table} x JOIN profiles pr ON pr.user_id = x.${b} JOIN users u ON u.id = x.${b}
-         WHERE x.${a} = $1 AND u.status = 'active' AND u.deleted_at IS NULL ORDER BY pr.display_name`,
+         WHERE x.${a} = $1 AND u.status = 'active' AND u.deleted_at IS NULL ORDER BY pr.display_name LIMIT 1000`,
         [me(req).id],
       );
       return { items: rows.map(toPublicUser) };

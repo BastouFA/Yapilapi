@@ -149,7 +149,7 @@ function Recaps() {
               <button type="button" className="recap-row" aria-current={r.id === openId || undefined} onClick={() => open(r.id)}>
                 <span className={`recap-row__poster${r.aspect === '1:1' ? ' recap-row__poster--square' : ''}`}>
                   {r.video?.posterUrl ? (
-                    <img src={r.video.posterUrl} alt="" loading="lazy" />
+                    <img src={r.video.posterUrl} alt="" loading="lazy" decoding="async" />
                   ) : (
                     <Icon name={r.status === 'failed' ? 'alert' : isPending(r) ? 'sparkle' : 'play'} size={20} />
                   )}

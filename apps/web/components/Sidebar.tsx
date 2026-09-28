@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { Avatar, Button } from '@yapilapi/design-system';
 import type { EventItem, PublicUser } from '@yapilapi/shared';
 import type { LiveSummary } from '@yapilapi/api-client';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, sharedRequest } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
 type Suggestion = { user: PublicUser; bio: string; reason: string };
@@ -22,8 +22,9 @@ export function Sidebar() {
   const [topics, setTopics] = useState<{ topic: string; posts: number }[]>([]);
   const [live, setLive] = useState<LiveSummary[]>([]);
 
+  // Once: flags arrive after the first render, and only the live panel depends on them.
   useEffect(() => {
-    api.me.suggestions().then(
+    sharedRequest('suggestions', () => api.me.suggestions()).then(
       (r) => setPeople(r.items.slice(0, 4)),
       () => {},
     );
@@ -38,6 +39,9 @@ export function Sidebar() {
           () => {},
         ),
     );
+  }, []);
+
+  useEffect(() => {
     if (flags.LIVE)
       api.live.list().then(
         (r) => setLive(r.items.filter((l) => l.status === 'live').slice(0, 3)),

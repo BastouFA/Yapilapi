@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FlatList, View } from 'react-native';
 import type { PublicUser } from '../../../packages/shared/src/types';
 import { client, errorMessage } from '../lib/api';
@@ -65,8 +65,8 @@ export default function Follows() {
     setFollows((f) => new Set([...f, ...r.viewerFollows]));
   };
 
-  const toggle = async (u: PublicUser) => {
-    const on = follows.has(u.id);
+  // Stable (it's told whether you follow them), so the memoised rows keep the same props.
+  const toggle = useCallback(async (u: PublicUser, on: boolean) => {
     setBusy(u.id);
     setError(null);
     try {
@@ -83,7 +83,12 @@ export default function Follows() {
     } finally {
       setBusy(null);
     }
-  };
+  }, []);
+  const meId = me?.id;
+  const renderPerson = useCallback(
+    ({ item: u }: { item: PublicUser }) => <PersonRow u={u} on={follows.has(u.id)} busy={busy === u.id} self={u.id === meId} onToggle={toggle} />,
+    [follows, busy, meId, toggle],
+  );
 
   const empty =
     kind === 'followers'
@@ -118,32 +123,47 @@ export default function Follows() {
           onEndReached={() => void more().catch(() => {})}
           onEndReachedThreshold={0.5}
           ListEmptyComponent={error ? null : <EmptyState title={empty} />}
-          renderItem={({ item: u }) => {
-            const on = follows.has(u.id);
-            return (
-              <Row
-                title={u.displayName}
-                subtitle={`@${u.username}`}
-                start={<Avatar name={u.displayName} url={u.avatarUrl} size={40} />}
-                onPress={() => router.push(`/u/${encodeURIComponent(u.username)}`)}
-                end={
-                  u.id === me?.id ? null : (
-                    <View>
-                      <Button
-                        label={on ? t('profile.unfollow') : t('profile.follow')}
-                        variant={on ? 'secondary' : 'primary'}
-                        size="sm"
-                        disabled={busy === u.id}
-                        onPress={() => toggle(u)}
-                      />
-                    </View>
-                  )
-                }
-              />
-            );
-          }}
+          renderItem={renderPerson}
         />
       )}
     </Screen>
   );
 }
+
+/** A person in the list, with Follow or Unfollow unless it's you. Memoised. */
+const PersonRow = memo(function PersonRow({
+  u,
+  on,
+  busy,
+  self,
+  onToggle,
+}: {
+  u: PublicUser;
+  on: boolean;
+  busy: boolean;
+  self: boolean;
+  onToggle: (u: PublicUser, on: boolean) => void;
+}) {
+  const { t } = useT();
+  return (
+    <Row
+      title={u.displayName}
+      subtitle={`@${u.username}`}
+      start={<Avatar name={u.displayName} url={u.avatarUrl} size={40} />}
+      onPress={() => router.push(`/u/${encodeURIComponent(u.username)}`)}
+      end={
+        self ? null : (
+          <View>
+            <Button
+              label={on ? t('profile.unfollow') : t('profile.follow')}
+              variant={on ? 'secondary' : 'primary'}
+              size="sm"
+              disabled={busy}
+              onPress={() => onToggle(u, on)}
+            />
+          </View>
+        )
+      }
+    />
+  );
+});

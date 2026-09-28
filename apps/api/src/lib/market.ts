@@ -107,28 +107,36 @@ export async function trustedPair(db: Q, a: string, b: string): Promise<boolean>
   return !!rowCount;
 }
 
+/** Which of `others` are friends of `viewer` or linked with them as teen and guardian: trustedPair for a whole page in one query. */
+export async function trustedAmong(db: Q, viewer: string, others: string[]): Promise<Set<string>> {
+  if (!others.length) return new Set();
+  const { rows } = await db.query<{ id: string }>(
+    `SELECT CASE WHEN user_a = $1 THEN user_b ELSE user_a END AS id FROM friendships
+     WHERE (user_a = $1 AND user_b = ANY($2::uuid[])) OR (user_b = $1 AND user_a = ANY($2::uuid[]))
+     UNION
+     SELECT CASE WHEN guardian_id = $1 THEN teen_id ELSE guardian_id END FROM family_links
+     WHERE status = 'active' AND ((guardian_id = $1 AND teen_id = ANY($2::uuid[])) OR (teen_id = $1 AND guardian_id = ANY($2::uuid[])))`,
+    [viewer, others],
+  );
+  return new Set(rows.map((r) => r.id));
+}
+
 /** Whether someone is under 18 (unknown ages count as adults here, as for messages). */
 export async function isMinor(db: Q, userId: string): Promise<boolean> {
   const { rows } = await db.query<{ birth_date: Date | null }>(`SELECT birth_date FROM users WHERE id = $1`, [userId]);
   return (ageOf(rows[0]?.birth_date ?? null) ?? 18) < 18;
 }
 
-/** Why `viewer` can't write to the seller about this listing, or null when they can (the rest is checked when they do). */
-async function contactBlock(
-  db: Q,
-  r: ListingRow,
-  viewer: string | null,
-  viewerMinor: boolean,
-  trusted: Map<string, boolean>,
-): Promise<MarketContactBlock | null> {
+/**
+ * Why `viewer` can't write to the seller about this listing, or null when they can (the rest is checked when they do).
+ * `trusted` holds the sellers a minor viewer may write to (trustedAmong).
+ */
+function contactBlock(r: ListingRow, viewer: string | null, viewerMinor: boolean, trusted: Set<string>): MarketContactBlock | null {
   if (!viewer) return 'unavailable';
   if (r.seller_id === viewer) return 'self';
   const partOfIt = r.reserved_for === viewer || r.sold_to === viewer;
   if (r.moderation_status !== 'normal' || (!partOfIt && (r.status === 'sold' || r.expired))) return 'unavailable';
-  if (viewerMinor) {
-    if (!trusted.has(r.seller_id)) trusted.set(r.seller_id, await trustedPair(db, viewer, r.seller_id));
-    if (!trusted.get(r.seller_id)) return 'minor_protection';
-  }
+  if (viewerMinor && !trusted.has(r.seller_id)) return 'minor_protection';
   return null;
 }
 
@@ -145,11 +153,13 @@ export async function presentListings(db: Q, rows: ListingRow[], viewer: string 
       )
     : new Set<string>();
   const viewerMinor = viewer ? await isMinor(db, viewer) : false;
-  const trusted = new Map<string, boolean>();
+  // One query for every seller on the page, not one per listing.
+  const trusted =
+    viewer && viewerMinor ? await trustedAmong(db, viewer, [...new Set(rows.map((r) => r.seller_id).filter((id) => id !== viewer))]) : new Set<string>();
   const out: MarketListing[] = [];
   for (const r of rows) {
     const mine = r.seller_id === viewer;
-    const block = await contactBlock(db, r, viewer, viewerMinor, trusted);
+    const block = contactBlock(r, viewer, viewerMinor, trusted);
     const expiresAt: Date = r.expires_at;
     const listing: MarketListing = {
       id: r.id,

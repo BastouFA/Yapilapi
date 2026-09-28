@@ -55,7 +55,7 @@ export function ReelGrid({ load, reloadKey, empty }: { load: (cursor?: string) =
                 aria-label={`${t('reel.card.label', { name: p.author.displayName })}${p.body ? ` ${p.body.slice(0, 80)}` : ''}`}
               >
                 {m && videoPoster(m, dataSaver.active) ? (
-                  <img src={videoPoster(m, dataSaver.active)} alt="" loading="lazy" />
+                  <img src={videoPoster(m, dataSaver.active)} alt="" loading="lazy" decoding="async" />
                 ) : m && !dataSaver.active ? (
                   <video src={(m.variants as Record<string, string> | undefined)?.mp4 ?? m.url} muted playsInline preload="metadata" aria-hidden />
                 ) : null}

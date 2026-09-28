@@ -1,5 +1,5 @@
 import { Redirect, router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import type { StoryGroup } from '../../../../packages/api-client/src/index';
 import type { FeedMode } from '../../../../packages/shared/src/constants';
@@ -34,6 +34,9 @@ export default function Home() {
   if (!me.onboarded) return <Redirect href="/onboarding" />;
   return <Feed />;
 }
+
+/** Outside the component, so it's the same function on every render and the list leaves its rows alone. */
+const renderPost = ({ item }: { item: Post }) => <PostCard post={item} />;
 
 function Feed() {
   const c = useColors();
@@ -104,6 +107,16 @@ function Feed() {
     void load();
   }, [load]);
 
+  // The end of the list can be reached more than once before a page arrives: ask for each page once.
+  const fetching = useRef<string | null>(null);
+  const loadMore = useCallback(() => {
+    if (!cursor || fetching.current === cursor) return;
+    fetching.current = cursor;
+    void load(cursor).finally(() => {
+      fetching.current = null;
+    });
+  }, [cursor, load]);
+
   // Offline, then back: fetch again, so the feed isn't left with an error.
   useEffect(() => onBackOnline(() => void Promise.all([load(), loadStories()])), [load, loadStories]);
 
@@ -156,7 +169,7 @@ function Feed() {
             }}
           />
         }
-        onEndReached={() => cursor && load(cursor)}
+        onEndReached={loadMore}
         ListEmptyComponent={
           posts === null ? (
             <SkeletonList kind="post" />
@@ -169,7 +182,7 @@ function Feed() {
             <Text style={{ color: c.inkMuted, textAlign: 'center', padding: space[4] }}>{cursor ? t('m.common.loadingMore') : t('feed.end')}</Text>
           ) : null
         }
-        renderItem={({ item }) => <PostCard post={item} />}
+        renderItem={renderPost}
       />
       <StoryViewer groups={stories} start={viewing} onClose={() => setViewing(null)} onChange={setStories} />
     </>

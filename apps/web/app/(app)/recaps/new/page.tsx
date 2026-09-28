@@ -45,7 +45,7 @@ function Thumb({ c }: { c: RecapCandidate }) {
   const { t } = useSession();
   return (
     <span className="recap-thumb">
-      {c.thumbUrl ? <img src={c.thumbUrl} alt="" loading="lazy" /> : <Icon name={c.kind === 'video' ? 'play' : 'image'} size={24} />}
+      {c.thumbUrl ? <img src={c.thumbUrl} alt="" loading="lazy" decoding="async" /> : <Icon name={c.kind === 'video' ? 'play' : 'image'} size={24} />}
       {c.kind === 'video' ? (
         <span className="recap-thumb__badge">
           <Icon name="play" filled size={12} />

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Avatar, Button, EmptyState, List, ListItem, Skeleton } from '@yapilapi/design-system';
 import { echoNoticeText, formatRelativeTime, reportOutcomeText, togetherNoticeText, type MessageKey, type NotificationItem } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, sharedRequest } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { useRealtime, useSession, type Session } from '../../providers';
 
@@ -246,7 +246,7 @@ export default function Notifications() {
     }
   };
   const load = () =>
-    api.notifications.list().then(
+    sharedRequest('notifications', () => api.notifications.list()).then(
       (r) => setItems(r.items),
       (e) => toast(errorMessage(e)),
     );

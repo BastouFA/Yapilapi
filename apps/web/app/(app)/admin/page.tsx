@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card, EmptyState, SensitiveCover, Select, Stat, Switch, Tabs, TextField } from '@yapilapi/design-system';
 import type { RegionalRule, RiskAccount } from '@yapilapi/api-client';
 import { FEATURE_FLAGS, formatRelativeTime, type MessageKey, type StorePurchasePolicy } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, sharedRequest } from '@/lib/api';
 import { useSession, type Session } from '../../providers';
 
 /** Moderation decisions (the server's codes) in plain words. Unknown codes are shown as they are. */
@@ -190,7 +190,7 @@ function CaseMedia({ media }: { media: { kind: string; url: string; moderation: 
         {media.kind === 'video' && !/\.(jpe?g|png|webp)$/i.test(media.url) ? (
           <video src={media.url} controls={shown} muted className={shown ? undefined : 'yp-blurred'} />
         ) : (
-          <img src={media.url} alt="" className={shown ? undefined : 'yp-blurred'} />
+          <img src={media.url} alt="" loading="lazy" decoding="async" className={shown ? undefined : 'yp-blurred'} />
         )}
         {shown ? null : <SensitiveCover onReveal={() => setShown(true)} locale={locale} />}
       </div>
@@ -351,7 +351,7 @@ function Flags() {
   const { toast, t } = useSession();
   const [flags, setFlags] = useState<Record<string, boolean>>({});
   useEffect(() => {
-    api.flags().then(
+    sharedRequest('flags', () => api.flags()).then(
       (r) => setFlags(r.flags),
       (e) => toast(errorMessage(e)),
     );
@@ -387,7 +387,8 @@ function PhonePurchases() {
   const { t } = useSession();
   const [policy, setPolicy] = useState<StorePurchasePolicy | null>(null);
   useEffect(() => {
-    api.flags().then(
+    // The flags card above reads the same response.
+    sharedRequest('flags', () => api.flags()).then(
       (r) => setPolicy(r.purchases ?? null),
       () => setPolicy(null),
     );

@@ -290,7 +290,7 @@ export function SongList({ mix, player, onMix }: { mix: MixDetail; player: Retur
                   <Icon name="volume-off" size={18} />
                 </span>
               )}
-              {s.coverUrl && !dataSaver.active ? <img className="mix-song__cover" src={s.coverUrl} alt="" loading="lazy" /> : null}
+              {s.coverUrl && !dataSaver.active ? <img className="mix-song__cover" src={s.coverUrl} alt="" loading="lazy" decoding="async" /> : null}
               <span className="mix-song__text">
                 {s.title ? (
                   <Link href={musicHref({ source: s.source, id: s.musicId })} className="mix-song__title">

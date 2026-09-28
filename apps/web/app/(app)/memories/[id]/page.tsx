@@ -111,7 +111,7 @@ export default function MemoryPage() {
       ))}
       {data.moments.map((mo) => (
         <figure key={mo.id} style={{ margin: 0 }}>
-          {mo.media_url && mo.media_kind === 'image' ? <img src={mo.media_url} alt="" style={{ borderRadius: 8 }} /> : null}
+          {mo.media_url && mo.media_kind === 'image' ? <img src={mo.media_url} alt="" loading="lazy" decoding="async" style={{ borderRadius: 8 }} /> : null}
           {mo.body ? <figcaption>{mo.body}</figcaption> : null}
         </figure>
       ))}

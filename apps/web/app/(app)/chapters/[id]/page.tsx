@@ -205,9 +205,9 @@ export default function ChapterPage() {
                   aria-label={t('chapters.playFrom', { index: n + 1 })}
                 >
                   {s.mediaKind === 'image' && s.mediaUrl ? (
-                    <img src={s.mediaUrl} alt="" />
+                    <img src={s.mediaUrl} alt="" loading="lazy" decoding="async" />
                   ) : s.posterUrl ? (
-                    <img src={s.posterUrl} alt="" />
+                    <img src={s.posterUrl} alt="" loading="lazy" decoding="async" />
                   ) : (
                     <p dir="auto">{s.body}</p>
                   )}

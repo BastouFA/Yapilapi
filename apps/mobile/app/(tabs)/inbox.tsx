@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, Text, View } from 'react-native';
 import type { Conversation, PublicUser } from '../../../../packages/shared/src/types';
 import { client, errorMessage } from '../../lib/api';
@@ -19,7 +19,7 @@ type FriendRequest = { id: string; from: PublicUser; createdAt: string };
  */
 export default function Inbox() {
   const c = useColors();
-  const { t, timeAgo, number } = useT();
+  const { t, number } = useT();
   const { me } = useSession();
   const bottom = useTabBarSpace();
   const [items, setItems] = useState<Conversation[] | null>(null);
@@ -71,6 +71,9 @@ export default function Inbox() {
       setError(errorMessage(e));
     }
   }
+
+  const meId = me?.id;
+  const renderConversation = useCallback(({ item }: { item: Conversation }) => <ConversationRow item={item} meId={meId} />, [meId]);
 
   if (me === null)
     return (
@@ -171,40 +174,43 @@ export default function Inbox() {
           </View>
         }
         ListEmptyComponent={<YapEmpty />}
-        renderItem={({ item }) => {
-          const title = conversationTitle(item, me?.id, t);
-          const other = item.members.find((m) => m.id !== me?.id);
-          return (
-            <Row
-              title={title}
-              subtitle={
-                item.lastMessage ? `${item.lastMessage.body || t('m.message.attachment')} · ${timeAgo(item.lastMessage.createdAt)}` : t('m.inbox.noMessages')
-              }
-              start={<Avatar name={title} url={item.kind === 'direct' ? (other?.avatarUrl ?? null) : null} size={44} />}
-              end={
-                item.unreadCount ? (
-                  <View
-                    style={{
-                      minWidth: 22,
-                      height: 22,
-                      borderRadius: radius.full,
-                      backgroundColor: c.yapi,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      paddingHorizontal: 6,
-                    }}
-                  >
-                    <Text style={{ color: c.onYapi, fontWeight: '700', fontSize: 12 }} accessibilityLabel={t('m.inbox.unread', { count: item.unreadCount })}>
-                      {item.unreadCount}
-                    </Text>
-                  </View>
-                ) : null
-              }
-              onPress={() => router.push(`/chat/${item.id}`)}
-            />
-          );
-        }}
+        renderItem={renderConversation}
       />
     </Screen>
   );
 }
+
+/** A conversation in the list. Memoised: pulling to refresh or a new friend request leaves the rows alone. */
+const ConversationRow = memo(function ConversationRow({ item, meId }: { item: Conversation; meId: string | undefined }) {
+  const c = useColors();
+  const { t, timeAgo } = useT();
+  const title = conversationTitle(item, meId, t);
+  const other = item.members.find((m) => m.id !== meId);
+  return (
+    <Row
+      title={title}
+      subtitle={item.lastMessage ? `${item.lastMessage.body || t('m.message.attachment')} · ${timeAgo(item.lastMessage.createdAt)}` : t('m.inbox.noMessages')}
+      start={<Avatar name={title} url={item.kind === 'direct' ? (other?.avatarUrl ?? null) : null} size={44} />}
+      end={
+        item.unreadCount ? (
+          <View
+            style={{
+              minWidth: 22,
+              height: 22,
+              borderRadius: radius.full,
+              backgroundColor: c.yapi,
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingHorizontal: 6,
+            }}
+          >
+            <Text style={{ color: c.onYapi, fontWeight: '700', fontSize: 12 }} accessibilityLabel={t('m.inbox.unread', { count: item.unreadCount })}>
+              {item.unreadCount}
+            </Text>
+          </View>
+        ) : null
+      }
+      onPress={() => router.push(`/chat/${item.id}`)}
+    />
+  );
+});

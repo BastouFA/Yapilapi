@@ -7,6 +7,7 @@ import {
   WRAP_CARD_DAYS,
   WRAP_HOUR,
   type OnThisDayCard,
+  type Post,
   type PublicUser,
   type WeeklyWrap,
   type WeeklyWrapCard,
@@ -282,11 +283,17 @@ export async function listWraps(db: Q, owner: string, limit = 12): Promise<Weekl
     owner,
     limit,
   ]);
-  return Promise.all(rows.map((r) => cardOf(db, r, owner)));
+  return cardsOf(db, rows, owner);
 }
 
-async function cardOf(db: Q, w: Record<string, any>, owner: string): Promise<WeeklyWrapCard> {
-  const moment = w.moment_post_id ? (await hydratePosts(db, [w.moment_post_id], owner))[0] : undefined;
+/** Cards for these wraps, with every wrap's moment loaded in one hydratePosts call. */
+async function cardsOf(db: Q, rows: Record<string, any>[], owner: string): Promise<WeeklyWrapCard[]> {
+  const ids = [...new Set(rows.map((w) => w.moment_post_id as string | null).filter((id): id is string => !!id))];
+  const moments = new Map((ids.length ? await hydratePosts(db, ids, owner) : []).map((p) => [p.id, p]));
+  return rows.map((w) => cardOf(w, w.moment_post_id ? moments.get(w.moment_post_id) : undefined));
+}
+
+function cardOf(w: Record<string, any>, moment: Post | undefined): WeeklyWrapCard {
   const m = moment?.media.find((x) => x.kind === 'image' || x.kind === 'video');
   return {
     id: w.id,
@@ -306,7 +313,7 @@ export async function currentWrapCard(db: Q, owner: string): Promise<WeeklyWrapC
      ORDER BY w.week_start DESC LIMIT 1`,
     [owner, WRAP_CARD_DAYS],
   );
-  return rows[0] ? cardOf(db, rows[0], owner) : null;
+  return rows[0] ? ((await cardsOf(db, rows, owner))[0] ?? null) : null;
 }
 
 /** "On this day": your own posts from this day in earlier years, in your time zone. */

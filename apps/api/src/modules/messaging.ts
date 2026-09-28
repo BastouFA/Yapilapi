@@ -1127,7 +1127,9 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
   app.get('/v1/conversations/:id/plans', { preHandler: requireAuth }, async (req) => {
     const { id } = parse(idParam, req.params);
     await assertMember(id, me(req).id);
-    const { rows } = await db.query(`SELECT id, title, details, status, created_at FROM plans WHERE conversation_id = $1 ORDER BY created_at DESC`, [id]);
+    const { rows } = await db.query(`SELECT id, title, details, status, created_at FROM plans WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 100`, [
+      id,
+    ]);
     return { items: rows };
   });
 
