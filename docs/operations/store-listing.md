@@ -58,6 +58,9 @@ What you won't find elsewhere:
 - Boards. Save posts and reels into named collections, add private notes, and build boards with friends.
 - Rooms. Live audio rooms for your community, with hosts, speakers and listeners. Schedule one or start it now.
 - Recaps. Turn a trip, a week or an event into a short video to keep or share.
+- Watch together. Play reels and videos in sync with a chat, react as you watch, and talk in the chat at the same time.
+- Games in chats. Four up, Noughts and Word ladder, turn by turn, right inside a conversation.
+- Ask me. Turn on a question box on your profile and answer the questions you choose to.
 - Data saver. Photos load small until you ask for more, videos wait for a tap, and uploads are made smaller on your phone. It turns on by itself on slow connections if you want.
 - 8 languages. English, French, Arabic, Spanish, Portuguese, Swahili, Yorùbá and Hausa, with right-to-left support. "See translation" translates posts, comments and messages written in a language you don't read.
 
@@ -68,6 +71,11 @@ Also inside:
 - A shop tab for creators and businesses.
 - Subscriber-only posts and tips for creators.
 - Live video.
+- Drops: creators announce a launch ahead of time, and you can ask to be told when it opens.
+- Music on posts, reels and stories, from songs cleared for use.
+- Send a message later, and give each chat its own wallpaper and colours.
+- Your profile, your way: a colour, a header style, links and a profile song.
+- A private look back at your week, every Sunday, if you want it.
 - An assistant that suggests plans and answers questions using what you allow it to see.
 
 You're in control:
@@ -129,6 +137,9 @@ Ce que tu ne trouveras pas ailleurs :
 - Les Tableaux. Enregistre des publications et des reels dans des collections nommées, ajoute des notes privées, et crée des tableaux à plusieurs.
 - Les Salons. Des salons audio en direct pour ta communauté, avec hôtes, intervenants et auditeurs. Programme-en un ou lance-le maintenant.
 - Les vidéos récap. Transforme un voyage, une semaine ou un événement en une courte vidéo à garder ou partager.
+- Regarder ensemble. Des vidéos en même temps que ta discussion.
+- Des jeux dans tes discussions, chacun son tour.
+- Demande-moi : une boîte à questions sur ton profil.
 - L'économiseur de données. Les photos se chargent en petit jusqu'à ce que tu en demandes plus, les vidéos attendent un geste, et les envois sont allégés sur ton téléphone. Il peut s'activer tout seul quand la connexion est lente.
 - 8 langues. Anglais, français, arabe, espagnol, portugais, swahili, yoruba et haoussa, avec prise en charge de l'écriture de droite à gauche. « Voir la traduction » traduit les publications, commentaires et messages écrits dans une langue que tu ne lis pas.
 
@@ -139,6 +150,9 @@ Et aussi :
 - Une boutique pour les créateurs et les entreprises.
 - Des publications réservées aux abonnés et des pourboires pour les créateurs.
 - La vidéo en direct.
+- Les lancements annoncés à l'avance par les créateurs.
+- De la musique sur tes publications et stories.
+- Des messages programmés et un fond pour chaque discussion.
 - Un assistant qui propose des plans et répond à tes questions à partir de ce que tu lui permets de voir.
 
 C'est toi qui décides :
