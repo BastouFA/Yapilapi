@@ -32,6 +32,9 @@ export interface ReelViewerApi {
   /** Where the viewer stopped, sent now and then (the server keeps it only mid-way). */
   resume: (p: Post, positionMs: number, durationMs: number) => void;
   clearResume: (p: Post) => void;
+  /** Your echo whose original is gone: keep it to yourself, or delete it. */
+  keepEchoPrivate: (p: Post) => void;
+  deleteEcho: (p: Post) => void;
 }
 
 type AuthorStat = { followers: number; following: boolean } | undefined;
@@ -128,6 +131,10 @@ export function ReelItem({
   const originalSrc = original ? videoSrc(original, saver) : null;
   const borrowed = !original && post.sound && !post.sound.original ? post.sound.audioUrl : null;
   const song = !original && !borrowed && post.music?.audioUrl ? post.music : null;
+  // An echo keeping the original's song plays it with the echo's own sound (their voice and yours).
+  const songWithVideo = !!song && !!post.echoOf;
+  const echoGone = !!post.echoOf && !post.echoOf.post;
+  const echoes = post.counts.echoes ?? 0;
   const captions = media?.captions ?? [];
   const highlights = post.highlights ?? [];
 
@@ -447,7 +454,7 @@ export function ReelItem({
                 .join(' ')}
               src={active || near || started ? src : undefined}
               poster={poster}
-              muted={muted || !!borrowed || !!song}
+              muted={muted || !!borrowed || (!!song && !songWithVideo)}
               loop
               playsInline
               crossOrigin={videoCrossOrigin(captions)}
@@ -625,8 +632,24 @@ export function ReelItem({
               {t('reel.more')}
             </button>
           </div>
-          {post.sound || post.music || post.remixOf ? (
+          {post.sound || post.music || post.remixOf || post.echoOf ? (
             <div className="reel__chips">
+              {echoGone && mine ? (
+                <button type="button" className="reel__chip" onClick={() => setDetails(true)} aria-controls={detailsId} aria-expanded={details}>
+                  <Icon name="repost" size={13} />
+                  <bdi>{t('echo.title')}</bdi>
+                </button>
+              ) : null}
+              {post.echoOf?.post ? (
+                <Link
+                  href={`/reels?start=${post.echoOf.post.id}`}
+                  className="reel__chip"
+                  aria-label={t('echo.ofLabel', { name: post.echoOf.post.author.displayName })}
+                >
+                  <Icon name="repost" size={13} />
+                  <bdi>{t('echo.of', { name: post.echoOf.post.author.username })}</bdi>
+                </Link>
+              ) : null}
               {post.remixOf?.post ? (
                 <Link href={`/reels?start=${post.remixOf.post.id}`} className="reel__chip">
                   <Icon name="duet" size={13} />
@@ -706,6 +729,28 @@ export function ReelItem({
                 </div>
               ) : null}
               {post.remixOf && !post.remixOf.post ? <p className="reel__credit">{t('m.reels.remixUnavailable')}</p> : null}
+              {echoGone && mine ? (
+                <div className="reel__echo-gone" role="note">
+                  <p>{t('echo.unavailable')}</p>
+                  <div className="row">
+                    {post.visibility !== 'private' ? (
+                      <button type="button" className="yp-btn yp-btn--secondary yp-btn--sm" onClick={() => viewer.keepEchoPrivate(post)}>
+                        {t('echo.keepPrivate')}
+                      </button>
+                    ) : null}
+                    <button type="button" className="yp-btn yp-btn--danger yp-btn--sm" onClick={() => viewer.deleteEcho(post)}>
+                      {t('echo.delete')}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              {post.echoOf?.theirAudio === 'dropped' ? <p className="reel__credit">{t('echo.audioDropped')}</p> : null}
+              {echoes ? (
+                <Link href={`/reels/${post.id}/echoes`} className="reel__soundlink">
+                  <Icon name="repost" size={14} />
+                  {tp('echo.count', echoes, { count: compact.format(echoes) })}
+                </Link>
+              ) : null}
               {post.sound ? (
                 <Link href={`/sounds/${post.sound.id}`} className="reel__soundlink">
                   <Icon name="music" size={14} />

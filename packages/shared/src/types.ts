@@ -10,6 +10,7 @@ import type { DrawReason, GameKind, GameState } from './games/types.ts';
 import type { MixCard } from './mixes.ts';
 import type { LocationShare } from './location.ts';
 import type { CoverRecipe } from './cover.ts';
+import type { EchoPermission, EchoRef } from './echoes.ts';
 import type {
   BoardVisibility,
   CircleKind,
@@ -239,12 +240,19 @@ export interface Post {
   community: { id: string; slug: string; name: string } | null;
   event: { id: string; title: string; startsAt: string } | null;
   product: { id: string; title: string; priceCents: number; currency: string } | null;
-  /** Views count each person once and never the author; recorded for reels. Remixes counts duets and remixes of a reel. */
-  counts: { likes: number; comments: number; reposts: number; views: number; remixes?: number };
+  /**
+   * Views count each person once and never the author; recorded for reels. Remixes counts duets and remixes of a reel;
+   * echoes counts the echoes of a reel that are up (the list shows the ones you can see).
+   */
+  counts: { likes: number; comments: number; reposts: number; views: number; remixes?: number; echoes?: number };
   /** Reels: whether other people may duet or remix it. */
   allowRemix?: boolean;
   /** Reels posted as a duet or remix of another reel. */
   remixOf?: RemixRef | null;
+  /** Reels posted as an echo of another reel: the reel it answers (see echoes.ts). */
+  echoOf?: EchoRef | null;
+  /** Only on your own reels: who may echo it (your choice, or the default for your account). */
+  allowEchoes?: EchoPermission;
   /** Reels: the sound it uses (its own, or one it borrowed). */
   sound?: SoundRef | null;
   /** Reels: named points the creator marked in the video (up to five, in time order), shown on the scrubber. */
@@ -270,6 +278,8 @@ export interface Post {
     note?: string;
     /** Reels: where you stopped watching it last time (continue where you left off). Absent when there's nothing to resume. */
     resumeMs?: number;
+    /** Reels: whether you may echo it (the creator's setting, your account and theirs, and the reel itself). */
+    canEcho?: boolean;
   };
   /**
    * Co-authors who accepted, in the order they were invited. The post shows as by

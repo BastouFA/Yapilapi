@@ -24,7 +24,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import type { DualCorner } from '../../../packages/shared/src/dual';
-import { createModeFrom, deliverPendingAsset, type CreateMode } from '../lib/create-sheet';
+import { createModeFrom, deliverEchoAsset, deliverPendingAsset, type CreateMode } from '../lib/create-sheet';
 import { composeOnServer, DualReview, type Shot } from '../lib/dual';
 import { useT } from '../lib/i18n';
 import { CLIP_MAX_SECONDS, clock, pickOne, PLUS_REEL_MAX_SECONDS, REEL_MAX_SECONDS, type Picked } from '../lib/media';
@@ -129,8 +129,10 @@ export default function Camera() {
   const { t } = useT();
   const { me } = useSession();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ mode?: string }>();
-  const [mode, setMode] = useState<CreateMode>(createModeFrom(params.mode) ?? 'post');
+  const params = useLocalSearchParams<{ mode?: string; echo?: string }>();
+  // Recording for an echo (echo=<reel id>): a reel-style video, handed back to the Echo screen.
+  const echoOf = typeof params.echo === 'string' && /^[0-9a-f-]{36}$/i.test(params.echo) ? params.echo : null;
+  const [mode, setMode] = useState<CreateMode>(echoOf ? 'reel' : (createModeFrom(params.mode) ?? 'post'));
   const [facing, setFacing] = useState<CameraType>('back');
   const [flash, setFlash] = useState<Flash>('off');
   // Post and Story take photos; the camera switches to video only while holding the shutter.
@@ -225,7 +227,7 @@ export default function Camera() {
   }, [recording, maxSeconds]);
 
   function choose(next: CreateMode) {
-    if (recordingRef.current || busyRef.current) return;
+    if (recordingRef.current || busyRef.current || echoOf) return;
     setMode(next);
     setVideoMode(false);
     if (next === 'reel') setDual(false);
@@ -258,6 +260,12 @@ export default function Camera() {
 
   /** Hand the photo or video to Create, which opens the editor, and put Create in the camera's place. */
   function handOff(asset: Picked) {
+    if (echoOf) {
+      if (asset.type !== 'video') return;
+      deliverEchoAsset(echoOf, asset);
+      close();
+      return;
+    }
     deliverPendingAsset(asset, mode);
     // Back to the tabs already underneath (a plain replace would stack a second copy of them).
     router.dismissTo({ pathname: '/create', params: mode === 'post' ? {} : { mode } });
@@ -614,10 +622,10 @@ export default function Camera() {
         <View
           accessibilityRole="tablist"
           accessibilityLabel={t('m.camera.modes')}
-          style={[s.modes, recording && { opacity: 0 }]}
-          pointerEvents={recording ? 'none' : 'auto'}
-          importantForAccessibility={recording ? 'no-hide-descendants' : 'auto'}
-          accessibilityElementsHidden={!!recording}
+          style={[s.modes, (recording || echoOf) && { opacity: 0 }]}
+          pointerEvents={recording || echoOf ? 'none' : 'auto'}
+          importantForAccessibility={recording || echoOf ? 'no-hide-descendants' : 'auto'}
+          accessibilityElementsHidden={!!recording || !!echoOf}
           {...swipe.panHandlers}
         >
           <Animated.View style={[s.modeRow, { transform: [{ translateX: modeX }] }]}>

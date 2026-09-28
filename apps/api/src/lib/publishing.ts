@@ -20,6 +20,7 @@ import { MEDIA_BLOCKED_MESSAGE } from './media-moderation.ts';
 import { topicsFor } from '../modules/tags.ts';
 import { langOf } from './translation.ts';
 import type { PreparedMusic } from './music/index.ts';
+import { claimEcho, linkEcho } from './echoes.ts';
 
 type Q = Pool | PoolClient;
 type Deps = Pick<AppContext, 'db' | 'config' | 'realtime' | 'music'>;
@@ -73,7 +74,7 @@ export async function writePost(
   userId: string,
   input: CreatePostInput,
   opts: { id?: string; state: PostState; scheduledAt?: Date | null; moderationStatus?: string; music?: PreparedMusic | null },
-): Promise<{ id: string; kind: string; taggedIds: string[]; remixAuthor: string | null }> {
+): Promise<{ id: string; kind: string; taggedIds: string[]; remixAuthor: string | null; echo: EchoPosted | null }> {
   const kind = postKind(input);
   // Music was checked by prepareMusic; photo, carousel and text posts, or a reel with a catalogue song.
   if (input.music && !opts.music) throw new Error('writePost: check the music with prepareMusic first');
@@ -96,6 +97,10 @@ export async function writePost(
     if (input.remixOf) throw badRequest("A recap can't be a duet or remix.");
     if (recap.soundId && input.soundId && input.soundId !== recap.soundId) throw badRequest('A recap is posted with the sound it was made with.');
   }
+  // An echo: the video made for it, of a reel you may still echo. It keeps the sound it was made with.
+  if (input.echo && (opts.id || opts.state !== 'published')) throw badRequest('An echo is posted right away.');
+  const echo = input.echo ? await claimEcho(c, userId, input.echo, input.media[0]?.id) : null;
+  if (echo && recap) throw badRequest("A recap can't be an echo.");
   const chosenSound = input.soundId ?? recap?.soundId ?? undefined;
   // Reels: a duet or remix borrows the original's sound; otherwise a chosen sound, or the reel's own audio.
   let soundId: string | null = null;
@@ -151,6 +156,8 @@ export async function writePost(
     langOf(input.body),
     music?.trackId ?? null,
     music ? { ...music.stored, style: 'compact' } : null,
+    // Reels: who may echo it (NULL: the default for the account).
+    input.format === 'reel' ? (input.allowEchoes ?? null) : null,
   ];
   let id: string;
   if (opts.id) {
@@ -158,7 +165,7 @@ export async function writePost(
     const r = await c.query(
       `UPDATE posts SET kind = $3, body = $4, visibility = $5, circle_id = $6, community_id = $7, event_id = $8, product_id = $9, link_url = $10, topics = $11,
                         ai_provenance = $12, format = $13, allow_remix = $14, remix_of_post_id = $15, remix_mode = $16, sound_id = $17, comment_policy = $18, lang = $19,
-                        music_track_id = $20, music = $21, updated_at = now()
+                        music_track_id = $20, music = $21, allow_echoes = $22, updated_at = now()
        WHERE id = $1 AND author_id = $2 AND status <> 'published' AND deleted_at IS NULL`,
       [opts.id, userId, ...content],
     );
@@ -171,8 +178,9 @@ export async function writePost(
   } else {
     const { rows } = await c.query<{ id: string }>(
       `INSERT INTO posts (author_id, kind, body, visibility, circle_id, community_id, event_id, product_id, link_url, topics, ai_provenance, format,
-                          allow_remix, remix_of_post_id, remix_mode, sound_id, comment_policy, lang, music_track_id, music, moderation_status, rights, status, scheduled_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24) RETURNING id`,
+                          allow_remix, remix_of_post_id, remix_mode, sound_id, comment_policy, lang, music_track_id, music, allow_echoes, moderation_status, rights, status,
+                          scheduled_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25) RETURNING id`,
       [
         userId,
         ...content,
@@ -184,6 +192,7 @@ export async function writePost(
     );
     id = rows[0]!.id;
   }
+  if (echo && input.echo) await linkEcho(c, id, input.echo, echo.originalId, echo.song);
   const mediaIds: string[] = [];
   for (const [i, m] of input.media.entries()) {
     let mediaId = m.id;
@@ -234,7 +243,7 @@ export async function writePost(
     await c.query(`UPDATE posts SET highlights = $2 WHERE id = $1`, [id, highlights.length ? JSON.stringify(highlights) : null]);
   }
   // A reel playing a catalogue song has no sound of its own to offer others (its audio isn't heard).
-  if (input.format === 'reel' && !soundId && !music) {
+  if (input.format === 'reel' && !soundId && !music && !echo) {
     const mediaId = (await c.query(`SELECT media_id FROM post_media WHERE post_id = $1 ORDER BY position LIMIT 1`, [id])).rows[0]?.media_id;
     if (mediaId) await registerOwnSound(c, { postId: id, ownerId: userId, mediaId, title: input.soundTitle });
   }
@@ -264,7 +273,13 @@ export async function writePost(
     await assertCanInvite(c, userId, input.collaborators, { visibility: input.communityId ? 'public' : input.visibility, communityId: input.communityId });
     await c.query(`INSERT INTO post_collaborators (post_id, user_id, invited_by) SELECT $1, unnest($2::uuid[]), $3`, [id, input.collaborators, userId]);
   }
-  return { id, kind, taggedIds, remixAuthor };
+  return { id, kind, taggedIds, remixAuthor, echo: echo ? { originalId: echo.originalId, originalAuthorId: echo.originalAuthorId } : null };
+}
+
+/** An echo that was just posted: the reel it answers and who made that reel. */
+export interface EchoPosted {
+  originalId: string;
+  originalAuthorId: string;
 }
 
 export interface Screening {
@@ -339,7 +354,7 @@ export function moderationNotice(s: Screening, limitedNow: boolean): { status: s
 
 /**
  * A post just went out: analytics, webhooks, and (when it isn't held for
- * review) mentions, photo tags, co-author invites and the duet or remix notice.
+ * review) mentions, photo tags, co-author invites and the duet, remix or echo notice.
  */
 export async function announcePost(
   deps: Deps,
@@ -356,6 +371,7 @@ export async function announcePost(
     remixAuthor: string | null;
     remixOf: string | null | undefined;
     remixMode: string | null | undefined;
+    echo?: EchoPosted | null;
   },
 ): Promise<void> {
   const { db, realtime } = deps;
@@ -383,6 +399,26 @@ export async function announcePost(
         data: { originalId: p.remixOf },
       });
     track(db, p.authorId, 'reel_remixed', { mode: p.remixMode });
+  }
+  // Tell the original's creator about an echo, when they can see it. Echoes of one reel are
+  // batched into one notification ("Ada and 3 others echoed your reel").
+  if (p.echo) {
+    const seen = await db.query(
+      `SELECT 1 FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id WHERE p.id = $2 AND ${postVisibleSql('$1')}`,
+      [p.echo.originalAuthorId, p.postId],
+    );
+    if (seen.rowCount)
+      await notify(db, realtime, {
+        userId: p.echo.originalAuthorId,
+        category: 'creators',
+        type: 'reel_echo',
+        actorId: p.authorId,
+        entityType: 'post',
+        entityId: p.postId,
+        data: { originalId: p.echo.originalId },
+        group: p.echo.originalId,
+      });
+    track(db, p.authorId, 'reel_echoed');
   }
 }
 

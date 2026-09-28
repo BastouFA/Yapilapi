@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Avatar, Button, EmptyState, List, ListItem, Skeleton } from '@yapilapi/design-system';
-import { formatRelativeTime, reportOutcomeText, togetherNoticeText, type NotificationItem } from '@yapilapi/shared';
+import { echoNoticeText, formatRelativeTime, reportOutcomeText, togetherNoticeText, type NotificationItem } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { useRealtime, useSession, type Session } from '../../providers';
@@ -82,6 +82,9 @@ function hrefFor(n: NotificationItem): string | undefined {
   if (n.type === 'question_received') return '/questions';
   if (n.type === 'question_answered' && n.actor) return `/u/${n.actor.username}?tab=answers`;
   if (n.type === 'reel_duet' || n.type === 'reel_remix') return `/reels?start=${n.entityId}`;
+  // Echoes of your reel (batched): all of them, or the one when only one person echoed it.
+  if (n.type === 'reel_echo')
+    return Number(n.data.count ?? 1) > 1 && typeof n.data.originalId === 'string' ? `/reels/${n.data.originalId}/echoes` : `/reels?start=${n.entityId}`;
   if (n.type === 'weekly_wrap' || n.entityType === 'wrap') return n.entityId ? `/wraps/${n.entityId}` : '/wraps';
   if (n.type === 'watch_invite' || n.entityType === 'watch') return n.entityId ? `/watch/${n.entityId}` : '/inbox';
   if (n.entityType === 'chapter') return `/chapters/${n.entityId}`;
@@ -124,6 +127,9 @@ function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): s
   // Together albums: whole sentences with the album's name ("Ada added 12 photos to Lagos weekend").
   const together = togetherNoticeText(n, t, tp);
   if (together) return together;
+  // "Ada and 3 others echoed your reel".
+  const echo = echoNoticeText(n, t, tp);
+  if (echo) return echo;
   // Whole sentences in your language (the name, when there is one, is part of them).
   if (n.type === 'weekly_wrap') return t('wrap.notif');
   if (n.type === 'watch_invite') return t('watch.invite', { name: n.actor?.displayName ?? t('m.calls.someone') });

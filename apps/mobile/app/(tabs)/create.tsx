@@ -7,6 +7,7 @@ import type { EditorParamsInput } from '../../../../packages/shared/src/filters'
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
 import type { CaptionIdeas, Circle, MediaItem, PublicUser } from '../../../../packages/shared/src/types';
 import { COMMENT_POLICIES, type CommentPolicy } from '../../../../packages/shared/src/constants';
+import { ECHO_PERMISSIONS, type EchoPermission } from '../../../../packages/shared/src/echoes';
 import { useAutocomplete } from '../../lib/autocomplete';
 import { Chips } from '../../lib/circles';
 import { CoauthorPicker, PhotoTagger, type DraftTag } from '../../lib/collab';
@@ -123,6 +124,8 @@ export default function Create() {
   // Who can comment on the post or reel, and (reels) whether others may duet or remix it.
   const [commentPolicy, setCommentPolicy] = useState<CommentPolicy>('everyone');
   const [allowRemix, setAllowRemix] = useState(true);
+  // Reels: who may echo it; 'default' keeps the default for the account (everyone, or nobody for private and under-18 accounts).
+  const [allowEchoes, setAllowEchoes] = useState<EchoPermission | 'default'>('default');
   // A duet or remix of another reel ("Duet side by side" and "Remix with this sound" in Reels).
   const [remix, setRemix] = useState<{ id: string; mode: 'duet' | 'remix' } | null>(null);
   const [original, setOriginal] = useState<Original | null>(null);
@@ -252,6 +255,7 @@ export default function Create() {
           setCoauthors(post.pendingCollaborators ?? []);
           setCommentPolicy(post.commentPolicy ?? 'everyone');
           setAllowRemix(post.allowRemix ?? true);
+          setAllowEchoes(post.allowEchoes ?? 'default');
           const from = post.remixOf?.post;
           setRemix(post.format === 'reel' && post.remixOf && from ? { id: from.id, mode: post.remixOf.mode } : null);
           setOriginal(from ? { id: from.id, username: from.author.username, media: from.media, soundTitle: null } : null);
@@ -460,6 +464,7 @@ export default function Create() {
         ...audience,
         media: [{ id: v.id, url: mediaUrl(v.url), kind: 'video', ...described }],
         allowRemix,
+        ...(allowEchoes !== 'default' ? { allowEchoes } : {}),
         commentPolicy,
         // A duet or remix uses the original; otherwise a sound plays in full instead of the video's own, and a song plays the chosen part.
         ...(remix && original
@@ -909,6 +914,23 @@ export default function Create() {
           ) : null}
           {kind === 'reel' ? (
             <SwitchRow label={t('compose.allowRemix')} hint={t('compose.allowRemixHint')} value={allowRemix} onValueChange={setAllowRemix} />
+          ) : null}
+          {kind === 'reel' ? (
+            <View style={{ gap: space[2] }}>
+              <Text style={{ color: c.ink, fontWeight: '600' }}>{t('echo.settings')}</Text>
+              <Chips
+                label={t('echo.settings')}
+                options={[
+                  { id: 'default' as const, label: t('echo.settings.default') },
+                  ...ECHO_PERMISSIONS.map((p) => ({ id: p, label: t(`echo.settings.${p}`) })),
+                ]}
+                value={allowEchoes}
+                onChange={(p) => p && setAllowEchoes(p)}
+              />
+              <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>
+                {allowEchoes === 'default' ? t('echo.settings.defaultHint') : t('echo.settings.hint')}
+              </Text>
+            </View>
           ) : null}
           {error ? <Notice tone="danger">{error}</Notice> : null}
           {needsVerify || (me?.needsVerification && kind !== 'story' && visibility === 'public') ? <VerifyPrompt action="post" /> : null}

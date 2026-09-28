@@ -7,6 +7,7 @@ import { REEL_LONGEST_MS, reelHighlightsSchema } from './reels.ts';
 import { MAX_UNDERSTOOD_LANGUAGES, TRANSLATABLE_KINDS, TRANSLATION_LANGUAGE_CODES } from './translation.ts';
 import { cropSchema, mediaEditSchema } from './filters.ts';
 import { COVER_MAX_STRAIGHTEN } from './cover.ts';
+import { ECHO_PERMISSIONS } from './echoes.ts';
 import {
   CIRCLE_KINDS,
   COMMENT_POLICIES,
@@ -299,8 +300,22 @@ export const createPostSchema = z
     commentPolicy: z.enum(COMMENT_POLICIES).default('everyone'),
     /** Reels: up to five named points in the video, shown on the scrubber (the creator can change them later). */
     highlights: reelHighlightsSchema.optional(),
+    /** Reels: who may echo it. Left out, the default for your account (everyone, or nobody for private and under-18 accounts). */
+    allowEchoes: z.enum(ECHO_PERMISSIONS).optional(),
+    /** Reels: post an echo video you made (POST /v1/posts/:id/echoes) as a reel linked to the reel it answers. */
+    echo: uuid.optional(),
   })
   .superRefine((v, ctx) => {
+    if (v.echo) {
+      const refuse = (message: string, path: string) => ctx.addIssue({ code: 'custom', message, path: [path] });
+      if (v.format !== 'reel') refuse('An echo is posted as a reel.', 'format');
+      if (v.remixOf || v.soundId || v.music) refuse('An echo keeps the sound it was made with.', 'echo');
+      if (v.draft || v.scheduledAt) refuse('An echo is posted right away.', 'echo');
+      if (v.communityId) refuse("An echo can't be posted in a community.", 'communityId');
+      if (v.visibility === 'subscribers') refuse("An echo can't be for subscribers only: it shows someone else's reel.", 'visibility');
+      if (v.collaborators.length) refuse("An echo can't have co-authors.", 'collaborators');
+    }
+    if (v.allowEchoes && v.format !== 'reel') ctx.addIssue({ code: 'custom', message: 'Only reels can be echoed.', path: ['allowEchoes'] });
     if (v.highlights?.length && v.format !== 'reel') ctx.addIssue({ code: 'custom', message: 'Only reels have highlights.', path: ['highlights'] });
     if (v.draft && v.scheduledAt) ctx.addIssue({ code: 'custom', message: 'Save a draft or schedule it, not both.', path: ['scheduledAt'] });
     if (!v.body && v.media.length === 0 && !v.linkUrl && !v.poll)

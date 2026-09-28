@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { EmptyState, Skeleton } from '@yapilapi/design-system';
-import type { Post, ReelHighlight, ReelMoment } from '@yapilapi/shared';
+import type { EchoPermission, Post, ReelHighlight, ReelMoment } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { CommentsSheet, ReportSheet } from '@/components/PostList';
 import { SaveToSheet } from '@/components/Boards';
@@ -257,6 +257,39 @@ export function ReelsViewer() {
     }
   }
 
+  async function setAllowEchoes(p: Post, allowEchoes: EchoPermission) {
+    const before = p.allowEchoes;
+    patch(p.id, (x) => ({ ...x, allowEchoes }));
+    try {
+      await api.posts.setAllowEchoes(p.id, allowEchoes);
+      toast(t('echo.settings.saved'));
+    } catch (e) {
+      patch(p.id, (x) => ({ ...x, allowEchoes: before }));
+      toast(errorMessage(e));
+    }
+  }
+
+  /** An echo whose original is gone: its author keeps it to themselves, or deletes it. */
+  async function keepEchoPrivate(p: Post) {
+    try {
+      const r = await api.posts.edit(p.id, { visibility: 'private' });
+      patch(p.id, () => r.post);
+      toast(t('echo.keptPrivate'));
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  }
+  async function deleteEcho(p: Post) {
+    if (!window.confirm(t('echo.deleteConfirm'))) return;
+    try {
+      await api.posts.remove(p.id);
+      setItems((cur) => cur?.filter((x) => x.id !== p.id) ?? cur);
+      toast(t('echo.deleted'));
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  }
+
   async function leaveCollab(p: Post) {
     try {
       await api.posts.leaveCollab(p.id);
@@ -327,6 +360,8 @@ export function ReelsViewer() {
       );
     },
     clearResume: (p) => void api.posts.clearResume(p.id).catch(() => {}),
+    keepEchoPrivate: (p) => void keepEchoPrivate(p),
+    deleteEcho: (p) => void deleteEcho(p),
   };
   const [viewer] = useState<ReelViewerApi>(() => {
     const call =
@@ -352,6 +387,8 @@ export function ReelsViewer() {
       register: call('register'),
       resume: call('resume'),
       clearResume: call('clearResume'),
+      keepEchoPrivate: call('keepEchoPrivate'),
+      deleteEcho: call('deleteEcho'),
     } as ReelViewerApi;
   });
 
@@ -506,6 +543,8 @@ export function ReelsViewer() {
         onDownload={(p) => void downloadToShare(p)}
         onSaveTo={(p) => setSheet({ kind: 'saveTo', post: p })}
         onWatch={(p) => setSheet({ kind: 'watch', post: p })}
+        onEcho={(p) => router.push(`/reels/${p.id}/echo`)}
+        onEchoes={(p) => router.push(`/reels/${p.id}/echoes`)}
       />
       <WatchChatPicker post={open?.kind === 'watch' ? open.post : null} onClose={closeSheet} />
       <OptionsSheet
@@ -525,6 +564,7 @@ export function ReelsViewer() {
         onDownload={(p) => void downloadToShare(p)}
         onHighlights={(p) => setSheet({ kind: 'highlights', post: p })}
         onAllowRemix={(p, allow) => void setAllowRemix(p, allow)}
+        onAllowEchoes={(p, allow) => void setAllowEchoes(p, allow)}
         onLeaveCollab={(p) => void leaveCollab(p)}
         onReport={(p) => setSheet({ kind: 'report', post: p })}
       />

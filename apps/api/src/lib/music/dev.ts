@@ -4,7 +4,8 @@ import type { MusicProvider, ProviderQuery, ProviderTrack } from './types.ts';
 /**
  * An offline provider for development and tests: a few generated tones, each titled "[Dev data]"
  * so nobody takes them for real songs, with licences that cover the cases the checks handle
- * (business use, a country list, a short clip limit). Never on in production.
+ * (business use, a country list, a short clip limit, and one that allows no derivatives, so echoes
+ * of reels playing it keep only the echo's own audio). Never on in production.
  */
 interface DevTone {
   id: string;
@@ -23,35 +24,35 @@ export const DEV_TONES: DevTone[] = [
     title: '[Dev data] Morning tone',
     seconds: 40,
     notes: [262, 330, 392, 523, 392, 330],
-    licence: { ...everywhere, name: 'Dev licence', commercialUse: true, maxClipSeconds: 30 },
+    licence: { ...everywhere, name: 'Dev licence', commercialUse: true, maxClipSeconds: 30, derivatives: true },
   },
   {
     id: 'tone-evening',
     title: '[Dev data] Evening tone',
     seconds: 45,
     notes: [220, 262, 330, 262],
-    licence: { ...everywhere, name: 'Dev licence, personal use', commercialUse: false, maxClipSeconds: 30 },
+    licence: { ...everywhere, name: 'Dev licence, personal use', commercialUse: false, maxClipSeconds: 30, derivatives: false },
   },
   {
     id: 'tone-regional',
     title: '[Dev data] Regional tone',
     seconds: 35,
     notes: [294, 370, 440, 370],
-    licence: { ...everywhere, name: 'Dev licence, some countries', commercialUse: true, maxClipSeconds: 30, regions: ['NG', 'GH', 'KE'] },
+    licence: { ...everywhere, name: 'Dev licence, some countries', commercialUse: true, maxClipSeconds: 30, regions: ['NG', 'GH', 'KE'], derivatives: true },
   },
   {
     id: 'tone-short',
     title: '[Dev data] Short clip tone',
     seconds: 60,
     notes: [349, 440, 523, 440],
-    licence: { ...everywhere, name: 'Dev licence, 10 second clips', commercialUse: true, maxClipSeconds: 10 },
+    licence: { ...everywhere, name: 'Dev licence, 10 second clips', commercialUse: true, maxClipSeconds: 10, derivatives: true },
   },
   {
     id: 'tone-long',
     title: '[Dev data] Long tone',
     seconds: 120,
     notes: [196, 247, 294, 392, 294, 247],
-    licence: { ...everywhere, name: 'Dev licence', commercialUse: true, maxClipSeconds: 30 },
+    licence: { ...everywhere, name: 'Dev licence', commercialUse: true, maxClipSeconds: 30, derivatives: true },
   },
 ];
 
