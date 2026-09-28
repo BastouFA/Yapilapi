@@ -192,26 +192,30 @@ const ConversationRow = memo(function ConversationRow({ item, meId }: { item: Co
   return (
     <Row
       title={title}
-      subtitle={item.lastMessage ? `${last} · ${timeAgo(item.lastMessage.createdAt)}` : t('m.inbox.noMessages')}
+      subtitle={item.lastMessage ? (item.lastMessage.sender.id === meId ? t('chat.lastFromYou', { text: last ?? '' }) : (last ?? '')) : t('m.inbox.noMessages')}
       start={<Avatar name={title} url={item.kind === 'direct' ? (other?.avatarUrl ?? null) : null} size={44} />}
+      // The time above the unread count, so a long preview never cuts it off.
       end={
-        item.unreadCount ? (
-          <View
-            style={{
-              minWidth: 22,
-              height: 22,
-              borderRadius: radius.full,
-              backgroundColor: c.yapi,
-              alignItems: 'center',
-              justifyContent: 'center',
-              paddingHorizontal: 6,
-            }}
-          >
-            <Text style={{ color: c.onYapi, fontWeight: '700', fontSize: 12 }} accessibilityLabel={t('m.inbox.unread', { count: item.unreadCount })}>
-              {item.unreadCount}
-            </Text>
-          </View>
-        ) : null
+        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+          {item.lastMessage ? <Text style={{ color: c.inkMuted, fontSize: 12 }}>{timeAgo(item.lastMessage.createdAt)}</Text> : null}
+          {item.unreadCount ? (
+            <View
+              style={{
+                minWidth: 22,
+                height: 22,
+                borderRadius: radius.full,
+                backgroundColor: c.yapi,
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingHorizontal: 6,
+              }}
+            >
+              <Text style={{ color: c.onYapi, fontWeight: '700', fontSize: 12 }} accessibilityLabel={t('m.inbox.unread', { count: item.unreadCount })}>
+                {item.unreadCount}
+              </Text>
+            </View>
+          ) : null}
+        </View>
       }
       onPress={() => router.push(`/chat/${item.id}`)}
     />
