@@ -4859,7 +4859,7 @@ export const es: Catalog = {
   'm.market.leftToday.other': 'Puedes publicar {count} anuncios más hoy.',
   'm.market.photoOf': 'Foto {n} de {total}',
   'm.market.photoAlt': 'Foto de {title}',
-  'm.market.details.condition': 'Estado',
+  'm.market.details.condition': 'Condición',
   'm.market.details.category': 'Categoría',
   'm.market.details.delivery': 'Entrega',
   'm.market.details.where': 'Dónde',

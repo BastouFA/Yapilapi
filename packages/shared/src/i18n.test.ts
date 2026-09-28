@@ -44,6 +44,14 @@ describe('message catalogs', () => {
     });
   }
 
+  it('gives the rows of listing details different names in every language', () => {
+    const rows = ['condition', 'category', 'delivery', 'where', 'status'].map((k) => `m.market.details.${k}` as MessageKey);
+    for (const locale of SUPPORTED_LOCALES) {
+      const names = rows.map((k) => t(k, locale));
+      expect(new Set(names).size, locale).toBe(names.length);
+    }
+  });
+
   it('comes with both halves of every plural pair', () => {
     // `.other` alone can be an ordinary key (m.notif.other); a `.one` always needs its `.other`.
     const lonely = keys.filter((k) => k.endsWith('.one') && !(k.replace(/\.one$/, '.other') in en));

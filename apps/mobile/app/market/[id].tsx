@@ -183,12 +183,12 @@ export default function ListingScreen() {
         : l.contactBlock === 'unavailable'
           ? t('m.market.contact.unavailable')
           : null;
-  const details: [string, string][] = [
-    [t('m.market.details.condition'), t(CONDITION_KEYS[l.condition])],
-    [t('m.market.details.category'), t(CATEGORY_KEYS[l.category])],
-    [t('m.market.details.delivery'), l.delivery.map((d) => t(DELIVERY_KEYS[d])).join(', ')],
-    [t('m.market.details.where'), l.where.distanceKm !== null ? `${l.where.area} · ${whereText(tr, l.where)}` : l.where.area],
-    [t('m.market.details.status'), l.expired ? t('m.market.ended') : t(STATUS_KEYS[l.status])],
+  const details: [key: string, label: string, value: string][] = [
+    ['condition', t('m.market.details.condition'), t(CONDITION_KEYS[l.condition])],
+    ['category', t('m.market.details.category'), t(CATEGORY_KEYS[l.category])],
+    ['delivery', t('m.market.details.delivery'), l.delivery.map((d) => t(DELIVERY_KEYS[d])).join(', ')],
+    ['where', t('m.market.details.where'), l.where.distanceKm !== null ? `${l.where.area} · ${whereText(tr, l.where)}` : l.where.area],
+    ['status', t('m.market.details.status'), l.expired ? t('m.market.ended') : t(STATUS_KEYS[l.status])],
   ];
 
   return (
@@ -362,8 +362,8 @@ export default function ListingScreen() {
       ) : null}
 
       <View style={{ gap: space[1], padding: space[3], borderRadius: radius.md, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line }}>
-        {details.map(([label, value]) => (
-          <View key={label} accessible accessibilityLabel={`${label}: ${value}`} style={{ flexDirection: 'row', gap: space[3], paddingVertical: space[1] }}>
+        {details.map(([key, label, value]) => (
+          <View key={key} accessible accessibilityLabel={`${label}: ${value}`} style={{ flexDirection: 'row', gap: space[3], paddingVertical: space[1] }}>
             <Text style={{ color: c.inkMuted, width: 120 }}>{label}</Text>
             <Text style={[{ color: c.ink, fontWeight: '600', flex: 1 }, userText]}>{value}</Text>
           </View>

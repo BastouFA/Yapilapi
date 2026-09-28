@@ -4857,7 +4857,7 @@ export const sw: Catalog = {
   'm.market.leftToday.other': 'Unaweza kuchapisha matangazo {count} zaidi leo.',
   'm.market.photoOf': 'Picha {n} kati ya {total}',
   'm.market.photoAlt': 'Picha ya {title}',
-  'm.market.details.condition': 'Hali',
+  'm.market.details.condition': 'Hali ya bidhaa',
   'm.market.details.category': 'Aina',
   'm.market.details.delivery': 'Jinsi ya kukabidhi',
   'm.market.details.where': 'Wapi',

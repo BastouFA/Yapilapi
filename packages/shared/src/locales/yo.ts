@@ -4845,7 +4845,7 @@ export const yo: Catalog = {
   'm.market.leftToday.other': 'O lè gbé ọjà {count} sí i jáde lónìí.',
   'm.market.photoOf': 'Àwòrán {n} nínú {total}',
   'm.market.photoAlt': 'Àwòrán {title}',
-  'm.market.details.condition': 'Ipò',
+  'm.market.details.condition': 'Ipò ọjà',
   'm.market.details.category': 'Ẹ̀ka',
   'm.market.details.delivery': 'Bí a ṣe máa fi lé ẹni lọ́wọ́',
   'm.market.details.where': 'Ibo',

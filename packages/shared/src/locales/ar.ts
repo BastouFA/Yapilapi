@@ -4824,7 +4824,7 @@ export const ar: Catalog = {
   'm.market.leftToday.other': 'يمكنك نشر {count} إعلانات أخرى اليوم.',
   'm.market.photoOf': 'الصورة {n} من {total}',
   'm.market.photoAlt': 'صورة {title}',
-  'm.market.details.condition': 'الحالة',
+  'm.market.details.condition': 'حالة الغرض',
   'm.market.details.category': 'الفئة',
   'm.market.details.delivery': 'طريقة التسليم',
   'm.market.details.where': 'المكان',
