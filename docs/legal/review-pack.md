@@ -37,7 +37,7 @@ Some features are optional helpers that use a third-party AI model: summaries, s
 | Terms of service | Agreement, eligibility, accounts and usernames, content licence, conduct, moderation, AI features, paid features (Plus, drops, boosts), third-party services, music, liability, termination, governing law | Liability cap: the greater of 12 months' payments or 100 USD. Governing law comes from the `LEGAL_JURISDICTION` setting. |
 | Privacy policy | Data collected, uses, legal bases, AI features, sharing, transfers, retention, rights, children, security | Written from the database and API code. Retention periods match `apps/api/src/lib/retention.ts`. |
 | Community guidelines | What's allowed, questions without a name, selling and drops, enforcement, appeals, reporting | Also needs review by a trust and safety lead. |
-| Safety and minors | Minimum age, teen protections, family links, tools, child sexual abuse material, emergencies, law enforcement | See the findings in section 11 (lives). |
+| Safety and minors | Minimum age, teen protections (lives and audio rooms included), family links, tools, child sexual abuse material, emergencies, law enforcement | See the findings in section 11. |
 | Creator and seller terms | Eligibility (18+), 5% platform fee, drops, subscriptions, tips and gifts, lives, downloads, refunds, payouts, boosts, business insights | The fee comes from `PLATFORM_FEE_PERCENT` in `packages/shared/src/legal.ts`. |
 | Copyright and takedowns | Notice, counter-notice, music licences, repeat infringement, trademarks | DMCA-style. There is no designated agent yet. |
 | Cookie notice | One cookie (`ypl_session`), what the browser and the phone keep, other companies | No analytics or advertising cookies. |
@@ -62,42 +62,42 @@ The "basis claimed" column below applies that general statement to each item. "N
 | Email, password hash (scrypt), username, display name, language, invite code and inviter | `users`, `profiles`, `invite_codes`, `referrals` | Account | Contract | Until deletion (email and hash cleared on deletion) | Email service (emails), Paystack (email, at checkout) |
 | Date of birth | `users.birth_date` | Age gate (13+), teen protections, 18+ for money | Contract or legitimate interests (not stated) | Until deletion (cleared on deletion) | Nobody |
 | Phone number, and each code request (number, IP address, time) | `users.phone_e164`, `phone_verifications` | Verification | Not stated | Number until removed. Requests: 90 days | Twilio Verify |
-| Username history (old and new name, dates, 14-day hold) | `username_history` | Old links and @mentions keep working for 14 days | Not stated | Until account deletion. No period set | Nobody (old links redirect publicly for 14 days) |
+| Username history (old and new name, dates, 14-day hold) | `username_history` | Old links and @mentions keep working for 14 days | Not stated | 30 days after the hold ends. Deleted with the account | Nobody (old links redirect publicly for 14 days) |
 | Profile: photo, cover, bio, pronouns, links (up to 5), interests, mode, accent colour, header style, tabs, featured posts, profile song, "Now" status, city, chosen country | `profiles`, `profile_statuses`, `user_interests` | Profile | Contract | Until deletion | Public, per the privacy settings. A minor's city is never shown to others |
 | Site icons of linked websites | `link_icons` (per host, not per person) | Show link icons | Not stated | Refreshed every 7 days | The server fetches `https://<host>/favicon.ico` itself, so linked sites see the server, not users |
 | Posts, reels, stories, comments, reactions, polls, boards, chapters, memories, recaps, events, communities, products, reviews, drops; edit history of posts and comments | many (`posts`, `post_edits`, `moments`, `comments`, `comment_edits`, …) | The service | Contract | Until deletion. Deleted items are erased after 30 days, or 180 days if moderators removed them | Other users, per the audience chosen. Public adult content can appear signed out and in search engines |
-| Chats: messages, voice notes, attachments, edit history, reactions, pins, polls, lists, reminders, games (board, moves, winner), wallpapers and bubble colours | `messages`, `chat_*`, `chat_games`, `chat_game_moves`, `conversations.wallpaper`/`accent` | Messaging | Contract | Until deleted or unsent. Disappearing chats: 24 h, 7 d or 90 d. View-once: when seen, or after 14 days. Deleted: erased after 30 days | Chat members. Not end-to-end encrypted |
+| Chats: messages, voice notes, attachments, edit history, reactions, pins, polls, lists, reminders, games (board, moves, winner), wallpapers and bubble colours | `messages`, `chat_*`, `chat_games`, `chat_game_moves`, `conversations.wallpaper`/`accent` | Messaging | Contract | Until deleted or unsent. Disappearing chats: 24 h, 7 d or 90 d. View-once: when seen, or after 14 days. Deleted: erased after 30 days. Games (and their card): 12 months after they end | Chat members. Not end-to-end encrypted |
 | Scheduled messages ("Send later") | `scheduled_messages` | Send at a chosen time | Contract | Until sent or cancelled. Deleted with the account | Nobody until sent |
-| Calls: history (who, when, audio or video, status) | `calls`, `call_participants` | Call history | Contract | No period set | Call media goes peer to peer or through the TURN relay. Google STUN sees IP addresses. Not recorded |
+| Calls: history (who, when, audio or video, status) | `calls`, `call_participants` | Call history | Contract | 12 months after the call | Call media goes peer to peer or through the TURN relay. Google STUN sees IP addresses. Not recorded |
 | Audio rooms: participants and roles | `rooms`, `room_participants`, `room_reminders` | Rooms | Contract | No period set | Other participants. Not recorded |
 | Lives: sessions, chat, participants, recordings and clips | `live_sessions`, `live_chat`, `live_participants` | Live video | Contract | Recordings: the host's to keep or delete. Raw recording on the video server: 2 days. Deleted chat lines: 30 days | Viewers. Self-hosted MediaMTX |
-| Watch together: session, participants, queue, playback state | `watch_sessions`, `watch_participants`, `watch_queue_items` | Shared viewing | Contract | No period set | Chat members watching |
+| Watch together: session, participants, queue, playback state | `watch_sessions`, `watch_participants`, `watch_queue_items` | Shared viewing | Contract | 90 days after the session ends | Chat members watching |
 | Questions ("Ask me"): box settings, questions, answers, asker identity (always stored, even when "without your name shown"), question blocks | `ask_boxes`, `ask_questions` (`asker_id`), `ask_blocks` | Q&A on profiles | Contract | Until deletion. Deleted questions: 30 days (180 if removed by moderators) | Answers are public per the profile's privacy. The asker's identity is shown only to moderators |
 | Weekly wraps (counts, what they point to, time zone) | `weekly_wraps`, `user_preferences.timezone` | Private weekly recap. On by default | Not stated | Until the person deletes it or the account | Nobody. The share image is made on request, for the person only |
 | "On this day" | Not stored (computed). A dismissal is kept on the device | Memories | Not stated | — | Nobody |
-| Catch me up: visits to Pulse, cached summaries | `pulse_visits`, `ai_catchups` | AI summary. On by default | Not stated | Summaries: 7 days. Visits: no period set | Anthropic (see section 9) |
+| Catch me up: visits to Pulse, cached summaries | `pulse_visits`, `ai_catchups` | AI summary. On by default | Not stated | Summaries: 7 days. Visits: 13 months after the last one | Anthropic (see section 9) |
 | Suggested replies (cached per reader and message) | `ai_reply_suggestions` | AI helper | Not stated | 7 days | Anthropic |
 | Assistant memory | `ai_memories` | Assistant | Consent (`ai_processing`, off by default) | Until deleted | Anthropic, when the assistant is used |
 | AI request log (task, provider, model, status, no content) | `ai_tool_calls` | Audit, rate limits | Legitimate interests (not stated) | 90 days | Nobody |
 | Translations cache | `translations` | Don't translate twice | Not stated | Until the source text changes or is deleted | Anthropic (the text) |
 | Sessions: IP address, user agent, last used | `sessions` | Sign-in, security | Legitimate interests | 30 days after they end | Nobody |
 | Security events, including a failed sign-in's typed email, IP address and device | `security_events` | Security | Legitimate interests | 12 months | Nobody |
-| Sign-in alert devices ("Chrome on macOS" and the CDN country, not hashed, no IP address) | `known_sign_ins` | New-device alerts. Email on by default | Legitimate interests (not stated) | Until account deletion. No period set | Email service (the alert email) |
+| Sign-in alert devices ("Chrome on macOS" and the CDN country, not hashed, no IP address), and session devices | `known_sign_ins`, `devices` | New-device alerts. Email on by default | Legitimate interests (not stated) | 13 months after last seen | Email service (the alert email) |
 | Audit log of account, money and moderation actions (can include IP address) | `audit_logs` | Accountability | Legitimate interests | 2 years | Nobody |
 | Product analytics events (no IP address) | `analytics_events` | Feed and product analytics. On by default | Legitimate interests | 13 months. Unlinked when turned off | Nobody (no third-party analytics) |
-| Views, feed feedback, reel positions, saves | `post_views`, `moment_views`, `feed_feedback`, `reel_resume`, `saves` | Ranking, "seen by" on stories | Legitimate interests | No period set | Story authors see who viewed |
+| Views, feed feedback, reel positions, saves | `post_views`, `moment_views`, `feed_feedback`, `reel_resume`, `saves` | Ranking, "seen by" on stories | Legitimate interests | Post and reel views: 13 months (the count stays). Feed feedback (show more or less, muted topics and people) is a setting: until changed or deletion. Others: no period set | Story authors see who viewed |
 | Daily minutes | `usage_days` | Reminders, family links | Not stated | 13 months | The guardian of a supervised teen |
-| Business and place page visits (viewer, day) | `business_views` | Business insights (owners see totals only) | Not stated | No period set | Owners see only counts |
+| Business and place page visits (viewer, day) | `business_views` | Business insights (owners see totals only) | Not stated | 13 months | Owners see only counts |
 | Country (chosen, or from the CDN header) | `profiles.country`, `profiles.cdn_country`, per request | Regional rules, music licences, ads, sign-in alerts | Not stated | Until changed or deleted | The CDN provider supplies it |
 | Settings (who can message, comment and mention, quiet hours and their time zone, sensitive media, data saver, AI helper switches) | `user_preferences`, `profiles` | The service | Contract | Until deletion (not cleared on deletion) | Nobody |
 | Consents (personalization, ai_processing, advertising, analytics) | `consents` | Record choices | Legal obligation or consent | Until deletion | Nobody |
 | Push tokens (Expo, web push endpoints) | `push_subscriptions` | Notifications | Consent | Until removed or deletion | Expo, Apple (APNs), Google (FCM), browser push services |
 | Notifications inbox | `notifications` | The service | Contract | 12 months | Push services get a short line (a name and what happened, never message content) |
 | Contacts (salted SHA-256 of emails, computed on the device) | Not stored (only counts) | Find friends | Consent | Not kept | Nobody |
-| Payments: orders, payments, provider webhooks (can include email and the card's last digits and brand), refunds, tips, subscriptions, Plus grants | `orders`, `payments`, `payment_webhook_events`, `refunds`, `tips`, `creator_*`, `plus_grants` | Payments | Contract, legal obligation | No period set; a placeholder asks for one | Stripe, Paystack |
-| Seller data: products, drops (reminder lists, held and paid units), sales, payouts | `products`, `drops`, `drop_items`, `drop_reminders`, `drop_orders`, `payouts` | Selling | Contract | No period set | Buyers see products. Sellers see the reminder count only |
-| Ads: campaigns, impressions, clicks, hides | `ad_campaigns`, `ad_events` | Sponsored posts | Consent (ads off by default) | No period set | Advertisers see totals only |
-| Reports, moderation cases, decisions, appeals, risk signals, enforcement | `reports`, `moderation_cases`, `appeals`, `enforcements`, `risk_signals` | Safety | Legitimate interests | No period set; a placeholder asks for one | AWS Rekognition (media), authorities when required |
+| Payments: orders, payments, provider webhooks (can include email and the card's last digits and brand), refunds, tips, subscriptions, Plus grants | `orders`, `payments`, `payment_webhook_events`, `refunds`, `tips`, `creator_*`, `plus_grants` | Payments | Contract, legal obligation | 7 years (`FINANCIAL_RECORDS_YEARS`), except a paid download while the buyer's account and the product exist. Plus grants: no period set | Stripe, Paystack |
+| Seller data: products, drops (reminder lists, held and paid units), sales, payouts | `products`, `drops`, `drop_items`, `drop_reminders`, `drop_orders`, `payouts` | Selling | Contract | Sales and payouts: 7 years, like payments. Products and drops: until deletion | Buyers see products. Sellers see the reminder count only |
+| Ads: campaigns, impressions, clicks, hides | `ad_campaigns`, `ad_events` | Sponsored posts | Consent (ads off by default) | Impressions and clicks: 13 months. Hides: while the campaign exists. Campaigns: no period set | Advertisers see totals only |
+| Reports, moderation cases, decisions, appeals, risk signals, enforcement | `reports`, `moderation_cases`, `appeals`, `enforcements`, `risk_signals` | Safety | Legitimate interests | Reports, cases, appeals and enforcements: 2 years after the case closed, and while the account stays suspended. Risk signals: no period set | AWS Rekognition (media), authorities when required |
 | Family links and teen controls | `family_links`, `teen_controls` | Teen supervision | Not stated | Until the link ends | The guardian sees daily minutes and settings only |
 | Developer apps, API keys, OAuth grants, mini app installs, webhook deliveries | `developer_apps`, `api_keys`, `oauth_grants`, `mini_app_installs`, `webhook_deliveries` | Developer platform | Contract | Deliveries: 30 days. Other rows: no period set | Connected apps and mini app developers (see section 5) |
 | Problem reports (text, page, app version) | `problem_reports` | Support | Not stated | Kept. On deletion the person's link and text are removed | Nobody |
@@ -147,6 +147,8 @@ The "basis claimed" column below applies that general statement to each item. "N
   - Reels can't be downloaded. Boards are never public. The profile city is hidden from others.
   - Not findable by email.
   - Adults can message them, ask them questions or invite them to speak in rooms only if they are friends.
+  - Their lives (`liveVisibleSql` in `apps/api/src/lib/visibility.ts`) are for their friends, an active guardian, and followers under 18 (who they approved): never for everyone ("Everyone" becomes followers), never listed for others. Adults who aren't friends can't see, join, chat, gift or buy a ticket. Live chat between an adult and someone under 18 only reaches the other when they are friends or family-linked, in any live; the host, co-hosts and moderators see all of it. A teen host can only give co-host or moderator roles to adults who are friends.
+  - They don't start or host audio rooms, even as community moderators: they speak when a host invites them, under the friends rule.
   - They never receive questions without a name, and the setting can't be turned on.
   - Suggested replies are off by default.
   - They use the TURN relay in rooms.
@@ -158,7 +160,7 @@ The "basis claimed" column below applies that general statement to each item. "N
   - A guardian aged 18 or over invites a teen, and the teen accepts. A teen can have up to two guardians.
   - The guardian sets who can message the teen, a daily reminder and quiet hours, and sees daily minutes only.
   - Nothing checks that the guardian is actually the teen's parent.
-- **Gap: lives.** See section 11.
+- **Lives and audio rooms:** see the two points above (finding 4, fixed). There is no "adults only" flag for lives, so under-18s can watch an adult's public live, as they can listen in rooms.
 
 ## 7. Content moderation and appeals
 
@@ -169,15 +171,14 @@ The "basis claimed" column below applies that general statement to each item. "N
 - **Reports:**
   - Anyone signed in can report posts, reels, stories, comments, profiles, messages, questions, answers, communities, rooms, lives, events, products and drops.
   - The reasons include copyright ("Uses my work without permission").
-  - Reports are confidential. The reporter isn't told the outcome.
+  - Reports are confidential. When a moderator decides, everyone whose report was open is told in plain words: removed, action taken, or it didn't break the rules (`report_outcome` notifications, in the Moderation category people can turn off). They aren't told how the other person was penalised.
 - **Decisions and appeals:**
   - Moderators decide in `/admin`. The affected person gets an in-app notification with the decision.
-  - They can appeal once from Settings. The app says "A different reviewer will look at it", but the code does not enforce a different reviewer.
+  - They can appeal once from Settings. The app says "A different reviewer will look at it", and the code enforces it: whoever made the decision can't decide its appeal (`different_reviewer_needed`), and the moderator console shows "Needs another reviewer". With only one moderator, the appeal waits. The appeal records the reviewer and whether the decision was upheld or overturned.
   - There is no appeal time limit.
 - **Regional rules:** content can be withheld per country, with a recorded legal basis. Authors see where a post is withheld.
 - **Not built:**
   - notice-and-action for people without an account (only the copyright email);
-  - telling reporters the outcome;
   - statements of reasons in a structured form;
   - transparency reports;
   - trusted flaggers;
@@ -243,12 +244,12 @@ Details: [../operations/music.md](../operations/music.md).
 
 ## 11. Findings: where the code and the texts don't match yet
 
-The pages are written so they don't promise what the code doesn't do. These findings are for the owner and the lawyer to decide on. Per the brief, no code was changed.
+The pages are written so they don't promise what the code doesn't do. These findings are for the owner and the lawyer to decide on. The review itself changed no code; findings marked "fixed" were fixed afterwards.
 
 1. **Account deletion and profile fields: fixed.**
    - This review found that `DELETE /v1/me` (`apps/api/src/modules/privacy.ts`) left some profile fields in place: pronouns, city, accent colour, header style, tabs, featured posts, profile song and country.
    - Since fixed (commit `ed7edc0`, test in `apps/api/test/profile-style.test.ts`). Deletion now also clears those fields and the pinned post, and deletes the "Now" status. The privacy policy lists them as removed.
-   - Still left on the anonymised profile: `profiles.mode` (personal, creator, business) and `profiles.locale` (language). Both are low risk; please confirm.
+   - `profiles.mode` (personal, creator, business) and `profiles.locale` (language) now go back to the defaults too (same test).
 2. **Account deletion doesn't touch many other tables.** The `users` row stays (status `deleted`, email, password hash, birth date and phone cleared), so rows in other tables stay linked to an anonymised account. These include:
    - settings and quiet-hours time zone (`user_preferences`), consents and hidden words;
    - blocks, mutes and restrictions;
@@ -300,18 +301,14 @@ The pages are written so they don't promise what the code doesn't do. These find
      - family links and teen controls, developer apps, API keys, OAuth grants, mini app installs.
    - **Safety:** reports made, moderation cases, appeals and enforcements about the person.
 
-4. **Lives have no age rules.** `apps/api/src/modules/live.ts` checks verification and restrictions, but not age. A 13 to 17 year old can host a public live that any signed-in adult can watch and chat in. Lives sit behind the `LIVE` feature flag. The safety page doesn't claim otherwise, but this should be fixed or explicitly accepted before lives are turned on.
-5. **Appeals:** the app promises "A different reviewer will look at it", but the code does not enforce it. The terms and guidelines now say "a moderator reviews every appeal".
-6. **Retention periods are missing** for:
-   - payment records;
-   - reports and moderation decisions;
-   - call history, watch together, chat games;
-   - sign-in alert devices, username history;
-   - business-page visits, Pulse visits;
-   - views and feed feedback;
-   - ad events.
-
-   The privacy policy states this openly, with placeholders.
+4. **Lives had no age rules: fixed.**
+   - A teen's live is for their friends, an active guardian and followers under 18; adults who aren't friends can't see, join, chat, gift or buy a ticket. Live chat follows the messaging rule between adults and under-18s in every live. Section 6 has the details; tests in `apps/api/test/safety-gaps.test.ts`.
+   - Audio rooms had a smaller gap: a teen who moderates a community could start a room and speak to every adult member. Teens no longer start or host rooms; they speak when invited, under the friends rule.
+   - The safety page says so. There is no "adults only" setting for lives.
+5. **Appeals: fixed.** A different moderator must decide an appeal; it waits if nobody else can. The terms and guidelines now say "a different moderator from the one who decided reviews every appeal". Reporters are now told the outcome too (section 7).
+6. **Retention periods: set.** Payment records 7 years (configurable, `FINANCIAL_RECORDS_YEARS`); reports, cases, appeals and enforcements 2 years after the case closed (longer while the account stays suspended); call history 12 months; watch together 90 days after the end; ended games 12 months; username history 30 days after the hold; sign-in devices 13 months after last seen; business-page visits, Pulse visits, post and reel views and ad impressions and clicks 13 months. The daily clean-up (`apps/api/src/lib/retention.ts`) deletes them and the privacy policy states them.
+   - Still to confirm: the payment period per country (a placeholder asks), and whether child-safety evidence needs longer preservation than 2 years (question 27).
+   - Kept on purpose without a period: feed feedback (it is a setting), "hide this ad", risk signals, Plus grants, audio room history.
 7. **Weekly wrap, Catch me up (Pulse visits), analytics, personalization, suggested replies (one-to-one) and sign-in alert emails are on by default.** Ads and assistant memory are off by default. See question 2.
 8. **Metadata on old files:** files uploaded before 2026-09-27 may still carry location metadata. This only matters if real users uploaded before then (app-store.md).
 9. **Copyright takedowns are handled by email.** There is no takedown tool: the "tell the person who posted it, with a copy of your notice" step is manual.
@@ -341,7 +338,7 @@ Each question is specific to what the code does. The laws named are pointers for
    - The app lets anyone from 13 sign up without parental consent. Its only mechanism is the terms' statement that a parent agreed "where the law requires it".
    - In which launch countries is a higher age or verifiable parental consent required (for example GDPR Art. 8 member-state ages of 13 to 16; US COPPA under 13; Kenya and South Africa under 18)?
    - Is self-declared date of birth an acceptable age check?
-8. **UK and EU online-safety rules for children.** Do the UK Age Appropriate Design Code, the Online Safety Act 2023 (children's risk assessment, age assurance) or DSA Art. 28 (minors' protection; no profiling-based ads to minors) apply? Do the teen defaults meet them? Note the live-video gap (finding 4).
+8. **UK and EU online-safety rules for children.** Do the UK Age Appropriate Design Code, the Online Safety Act 2023 (children's risk assessment, age assurance) or DSA Art. 28 (minors' protection; no profiling-based ads to minors) apply? Do the teen defaults meet them? Finding 4 (lives) is fixed.
 9. **EU Digital Services Act, if EU users are served.**
    - Is YAPILAPI an online platform (it is at least a hosting service)?
    - What is needed for: a notice-and-action channel open to people without an account (Art. 16); statements of reasons, including to the DSA transparency database (Art. 17, 24(5)); internal complaints within 6 months of a decision (Art. 20, where today there is one appeal and no time limit); informing notifiers of outcomes; trusted flaggers (Art. 22); ad transparency, meaning who paid and the main targeting parameters (Art. 26, where a "why am I seeing this" sheet exists); recommender transparency and a non-profiling option (Art. 27, 38, where Personalization off exists); traceability of traders for the marketplace and drops (Art. 30); points of contact and a legal representative (Art. 11 to 13); transparency reports (Art. 15, 24)?
@@ -397,7 +394,7 @@ Each question is specific to what the code does. The laws named are pointers for
     - Servers are in [Server region]. Anthropic, Stripe, Twilio, AWS, Expo, Apple and Google process data elsewhere, often in the US.
     - Which transfer mechanisms are needed per origin country (SCCs or the EU-US Data Privacy Framework; NDPA adequacy and transfer rules; Kenya's s.48 to 50; POPIA s.72; LGPD Art. 33)?
     - Which processors have signed DPAs?
-22. **Retention.** Please confirm the periods in the privacy policy (section 5), and set the missing ones (finding 6). This matters especially for payment records (tax law) and for moderation records, including child-safety evidence preservation.
+22. **Retention.** Please confirm the periods in the privacy policy (section 5), including the ones set for finding 6. This matters especially for payment records (tax law, 7 years by default) and for moderation records (2 years after the case closes), including child-safety evidence preservation.
 23. **Account deletion and export completeness.**
     - Is anonymising the account row, while keeping the linked rows in finding 2, acceptable as erasure?
     - Is keeping digital-product files for buyers after a seller deletes their account acceptable, and for how long?

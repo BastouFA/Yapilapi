@@ -46,6 +46,8 @@ export interface Me extends PublicUser {
   limited?: boolean;
   /** Set when the account has no birth date yet (made before it was required): the apps ask for it once. */
   needsBirthDate?: boolean;
+  /** Set for people 13 to 17, so the apps can explain rules that apply to them (the server enforces them either way). */
+  under18?: boolean;
   role: 'user' | 'moderator' | 'admin';
   onboarded: boolean;
   locale: string;

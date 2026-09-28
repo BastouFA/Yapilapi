@@ -323,7 +323,7 @@ describe('profile song', () => {
 });
 
 describe('deleting an account', () => {
-  it('clears the profile style, the about details, the song and the Now status', async () => {
+  it('clears the profile style, the about details, the song, the Now status, the account type and the language', async () => {
     const ada = await adult();
     const post = await newPost(ada);
     expect(
@@ -331,13 +331,13 @@ describe('deleting an account', () => {
         .status,
     ).toBe(200);
     expect((await as(t.app, ada).put('/v1/me/status', { text: 'At the market' })).status).toBe(200);
-    await db().query(`UPDATE profiles SET country = 'NG', pinned_post_id = $2 WHERE user_id = $1`, [ada.id, post]);
+    await db().query(`UPDATE profiles SET country = 'NG', pinned_post_id = $2, mode = 'creator', locale = 'fr' WHERE user_id = $1`, [ada.id, post]);
 
     expect((await as(t.app, ada).del('/v1/me', { password: ada.password })).status).toBe(200);
 
     const row = (
       await db().query(
-        `SELECT accent, header_style, pronouns, city, tabs, featured_post_ids, song_sound_id, song_track_id, song_part, country, pinned_post_id
+        `SELECT accent, header_style, pronouns, city, tabs, featured_post_ids, song_sound_id, song_track_id, song_part, country, pinned_post_id, mode, locale
          FROM profiles WHERE user_id = $1`,
         [ada.id],
       )
@@ -354,6 +354,9 @@ describe('deleting an account', () => {
       song_part: null,
       country: null,
       pinned_post_id: null,
+      // The account type and language go back to the defaults.
+      mode: 'personal',
+      locale: 'en',
     });
     expect((await db().query(`SELECT 1 FROM profile_statuses WHERE user_id = $1`, [ada.id])).rowCount).toBe(0);
   });

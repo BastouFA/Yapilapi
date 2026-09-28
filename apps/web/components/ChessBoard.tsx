@@ -103,9 +103,11 @@ export function ChessBoard({
 
   function onKeyDown(e: KeyboardEvent, d: number) {
     if (e.key === 'Escape' && (picked !== null || promotion)) {
-      // Put the piece back (and keep the sheet open).
+      // Put the piece back (and keep the sheet open). The sheet listens on the document, where React
+      // does too, so stopping the event going further up isn't enough.
       e.preventDefault();
       e.stopPropagation();
+      e.nativeEvent.stopImmediatePropagation();
       setPicked(null);
       setPromotion(null);
       return;
@@ -211,6 +213,7 @@ export function ChessBoard({
                   if (e.key !== 'Escape') return;
                   e.preventDefault();
                   e.stopPropagation();
+                  e.nativeEvent.stopImmediatePropagation();
                   setPromotion(null);
                 }}
               >

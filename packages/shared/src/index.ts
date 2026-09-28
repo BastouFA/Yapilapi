@@ -37,3 +37,4 @@ export * from './mix-schemas.ts';
 export * from './cover.ts';
 export * from './location.ts';
 export * from './location-schemas.ts';
+export * from './report-outcome.ts';

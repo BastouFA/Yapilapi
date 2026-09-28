@@ -3,6 +3,7 @@ import { tx } from '@yapilapi/database';
 import { z } from 'zod';
 import { CURRENCIES, CURRENCY_SCALE } from '@yapilapi/shared';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
+import { liveVisibleSql } from '../lib/visibility.ts';
 import type { AppContext } from '../lib/context.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { audit, isEnabled, notify } from '../lib/services.ts';
@@ -178,6 +179,11 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
     if (await isBlockedEitherWay(db, u.id, id)) throw forbidden();
     // Only adults can receive tips.
     await assertAdultForMoney(db, id, false);
+    // A gift in a live goes to its host, in a live the sender may see.
+    if (input.liveId) {
+      const live = await db.query(`SELECT 1 FROM live_sessions l WHERE l.id = $2 AND l.host_id = $3 AND ${liveVisibleSql('$1')}`, [u.id, input.liveId, id]);
+      if (!live.rowCount) throw notFound('Live');
+    }
     if (input.message && analyzeText(input.message).risk !== 'normal') throw new AppError(422, 'content_blocked', "That message can't be sent.");
     const result = await tx(db, async (c) => {
       const pay = await createPaymentOrder(c, u.id, id, 'tip', input.amountCents, input.currency, input.idempotencyKey);
