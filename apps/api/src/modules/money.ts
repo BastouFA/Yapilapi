@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { startPayment } from '../lib/checkout.ts';
+import { assertDigitalCheckoutAllowed } from '../lib/store-purchases.ts';
 import { DIGITAL_TYPES, openPrivate, putPrivate } from '../lib/private-files.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { audit, isEnabled, notify, track } from '../lib/services.ts';
@@ -359,6 +360,7 @@ export default async function moneyModule(app: FastifyInstance, ctx: AppContext)
   app.post('/v1/posts/:id/boost', { preHandler: requireAuth, config: { rateLimit: { max: 20, timeWindow: '1 hour' } } }, async (req, reply) => {
     if (!(await isEnabled(db, 'ADS'))) throw featureDisabled('Sponsored posts');
     await commerceOn();
+    assertDigitalCheckoutAllowed(req, ctx.config, 'boost');
     const u = me(req);
     const { id } = parse(idParam, req.params);
     const input = parse(boostInput, req.body);

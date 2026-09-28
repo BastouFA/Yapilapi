@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { badRequest, conflict, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { audit, getFlags, notify } from '../lib/services.ts';
+import { storePurchasePolicy } from '../lib/store-purchases.ts';
 import { applyMediaDecision } from '../lib/media-moderation.ts';
 import { notifyReleasedPosts } from '../lib/collabs.ts';
 import { syncCommentCounts } from '../lib/comments.ts';
@@ -591,7 +592,8 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
   });
 
   // ── Feature flags ─────────────────────────────────────────────────────
-  app.get('/v1/flags', async () => ({ flags: await getFlags(db) }));
+  // `purchases`: how the phone apps offer digital goods (lib/store-purchases.ts), set in the API's configuration.
+  app.get('/v1/flags', async () => ({ flags: await getFlags(db), purchases: storePurchasePolicy(ctx.config) }));
 
   app.put('/v1/admin/flags/:key', { preHandler: requireRole('admin') }, async (req) => {
     const { key } = parse(z.object({ key: z.enum(FEATURE_FLAG_KEYS as [string, ...string[]]) }), req.params);

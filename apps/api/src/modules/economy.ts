@@ -9,6 +9,7 @@ import { audit, isEnabled, notify } from '../lib/services.ts';
 import { assertAdultForMoney, isBlockedEitherWay, publicUserFrom } from '../lib/users.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 import { refundOrder, startPayment } from '../lib/checkout.ts';
+import { assertDigitalCheckoutAllowed } from '../lib/store-purchases.ts';
 
 const PLATFORM_FEE_BPS = 500;
 
@@ -88,6 +89,7 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
 
   app.post('/v1/creator/plans/:id/subscribe', { preHandler: requireAuth, config: { rateLimit: { max: 20, timeWindow: '1 hour' } } }, async (req, reply) => {
     await commerceOn();
+    assertDigitalCheckoutAllowed(req, ctx.config, 'creator_subscription');
     const u = me(req);
     const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
     const { idempotencyKey } = parse(z.object({ idempotencyKey: z.string().min(8).max(100) }), req.body);
@@ -157,6 +159,7 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
   // ── Tips ──────────────────────────────────────────────────────────────
   app.post('/v1/users/:id/tips', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (req, reply) => {
     await commerceOn();
+    assertDigitalCheckoutAllowed(req, ctx.config, 'tip');
     const u = me(req);
     const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
     const input = parse(

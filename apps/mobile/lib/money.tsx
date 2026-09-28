@@ -8,6 +8,7 @@ import type { Post } from '../../../packages/shared/src/types';
 import { client, webUrl } from './api';
 import { useFlag } from './flags';
 import { useT } from './i18n';
+import { ManagedOnWeb, useDigitalPurchases } from './store';
 import { radius, space } from './theme';
 import { Button, Card, EmptyState, Icon, Loading, useColors, userText } from './ui';
 
@@ -57,11 +58,14 @@ const isInlinePreview = (s: string | null | undefined): s is string => !!s && /^
 /**
  * A post for subscribers, seen by someone who isn't one: a blurred preview, who it's from, what
  * it holds, and a way to subscribe. Subscribing is paid on the web; the plans and their perks can
- * be read here first.
+ * be read here first. Where the app store rules don't allow a link out (lib/store.tsx), there is
+ * no subscribe button, only a line that subscriptions are managed on the web.
  */
 export function LockedPanel({ post, dark }: { post: Post; dark?: boolean }) {
   const c = useColors();
   const { t, tp } = useT();
+  const offer = useDigitalPurchases();
+  const link = offer === 'link';
   const preview = post.locked?.placeholder;
   const blurred = isInlinePreview(preview);
   const fg = dark || blurred ? '#FFFFFF' : c.ink;
@@ -104,10 +108,14 @@ export function LockedPanel({ post, dark }: { post: Post; dark?: boolean }) {
         <Text accessibilityRole="header" style={{ color: fg, fontWeight: '800', fontSize: 17 }}>
           {t('post.locked.title')}
         </Text>
-        <Text style={[{ color: muted, textAlign: 'center', lineHeight: 20 }, userText]}>{t('post.locked.body', { name: post.author.displayName })}</Text>
+        <Text style={[{ color: muted, textAlign: 'center', lineHeight: 20 }, userText]}>
+          {link ? t('post.locked.body', { name: post.author.displayName }) : t('m.store.locked', { name: post.author.displayName })}
+        </Text>
         {media ? <Text style={{ color: muted, fontSize: 13 }}>{tp('m.money.lockedMedia', media)}</Text> : null}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: space[2], marginTop: space[1] }}>
-          <Button label={t('m.money.subscribeOnWeb')} size="sm" icon="open-outline" onPress={() => openOnWeb(webCheckout.subscribe(post.author.username))} />
+          {link ? (
+            <Button label={t('m.money.subscribeOnWeb')} size="sm" icon="open-outline" onPress={() => openOnWeb(webCheckout.subscribe(post.author.username))} />
+          ) : null}
           <Button
             label={t('m.money.seePlans')}
             size="sm"
@@ -115,7 +123,7 @@ export function LockedPanel({ post, dark }: { post: Post; dark?: boolean }) {
             onPress={() => router.push({ pathname: '/plans', params: { username: post.author.username } })}
           />
         </View>
-        <Text style={{ color: muted, fontSize: 12, textAlign: 'center' }}>{t('m.shop.onWeb')}</Text>
+        <Text style={{ color: muted, fontSize: 12, textAlign: 'center' }}>{link ? t('m.shop.onWeb') : t('m.store.support')}</Text>
       </View>
     </View>
   );
@@ -137,6 +145,8 @@ export function ShopList({ userId, username, isSelf }: { userId: string; usernam
   const { t, locale } = useT();
   const kindLabel = useKindLabel();
   const commerce = useFlag('COMMERCE');
+  // Downloads are digital goods: without a link out, their prices aren't shown (lib/store.tsx).
+  const offer = useDigitalPurchases();
   const [items, setItems] = useState<ShopItem[] | null>(null);
   useEffect(() => {
     void (async () => {
@@ -154,7 +164,7 @@ export function ShopList({ userId, username, isSelf }: { userId: string; usernam
   return (
     <View style={{ gap: space[3] }}>
       {items.map((p) => {
-        const price = formatMoney(p.priceCents, p.currency, locale);
+        const price = p.kind === 'digital' && offer !== 'link' && !p.owned ? null : formatMoney(p.priceCents, p.currency, locale);
         const state = p.owned ? t('m.product.owned') : p.inventory === 0 ? t('shop.soldOut') : null;
         return (
           <Card
@@ -188,7 +198,7 @@ export function ShopList({ userId, username, isSelf }: { userId: string; usernam
               </Text>
             ) : null}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
-              <Text style={{ color: c.ink, fontWeight: '800', fontSize: 15 }}>{price}</Text>
+              {price ? <Text style={{ color: c.ink, fontWeight: '800', fontSize: 15 }}>{price}</Text> : null}
               {state ? <Text style={{ color: p.owned ? c.success : c.inkMuted, fontSize: 13, fontWeight: '600' }}>{state}</Text> : null}
             </View>
           </Card>
@@ -218,8 +228,11 @@ export function usePlans(userId: string | undefined) {
   return { data, load };
 }
 
-/** Each plan with its price and perks (what the creator wrote about it), and yours marked. */
-export function PlanList({ plans, mine }: { plans: PlansData['items']; mine: PlansData['mySubscription'] }) {
+/**
+ * Each plan with its price and perks (what the creator wrote about it), and yours marked. Prices
+ * are left out where the app store rules don't allow a link out (lib/store.tsx).
+ */
+export function PlanList({ plans, mine, hidePrices }: { plans: PlansData['items']; mine: PlansData['mySubscription']; hidePrices?: boolean }) {
   const c = useColors();
   const { t, locale } = useT();
   return (
@@ -227,7 +240,7 @@ export function PlanList({ plans, mine }: { plans: PlansData['items']; mine: Pla
       {plans.map((p) => {
         const yours = mine?.plan_id === p.id;
         const status = yours ? (mine!.status === 'active' ? t('m.money.subscribed') : t('m.money.waitingPayment')) : null;
-        const price = t('m.money.perMonth', { price: formatMoney(p.priceCents, p.currency, locale) });
+        const price = hidePrices ? null : t('m.money.perMonth', { price: formatMoney(p.priceCents, p.currency, locale) });
         return (
           <View
             key={p.id}
@@ -250,7 +263,7 @@ export function PlanList({ plans, mine }: { plans: PlansData['items']; mine: Pla
                 </View>
               ) : null}
             </View>
-            <Text style={{ color: c.ink, fontWeight: '700' }}>{price}</Text>
+            {price ? <Text style={{ color: c.ink, fontWeight: '700' }}>{price}</Text> : null}
             {p.description ? <Text style={[{ color: c.inkMuted, lineHeight: 20 }, userText]}>{p.description}</Text> : null}
           </View>
         );
@@ -267,6 +280,7 @@ export function SupportCard({ userId, username, name, isCreator }: { userId: str
   const c = useColors();
   const { t } = useT();
   const commerce = useFlag('COMMERCE');
+  const offer = useDigitalPurchases();
   const { data, load } = usePlans(userId);
   const { open, opened } = useWebCheckout(() => void load());
   if (commerce === false || !data || (!data.items.length && !isCreator)) return null;
@@ -279,26 +293,33 @@ export function SupportCard({ userId, username, name, isCreator }: { userId: str
           {t('m.money.supportTitle', { name })}
         </Text>
       </View>
-      {data.items.length ? <PlanList plans={data.items} mine={sub} /> : null}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-        {data.items.length && !sub ? (
-          <Button label={t('m.money.subscribeOnWeb')} size="sm" icon="open-outline" onPress={() => open(webCheckout.subscribe(username))} />
-        ) : null}
-        <Button label={t('m.money.tip')} size="sm" variant="secondary" icon="cash-outline" onPress={() => open(webCheckout.tip(username))} />
-      </View>
-      <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted, fontSize: 12, lineHeight: 17 }}>
-        {opened ? t('m.money.afterSubscribing') : `${t('m.money.fee')} ${t('m.shop.onWeb')}`}
-      </Text>
+      {data.items.length ? <PlanList plans={data.items} mine={sub} hidePrices={offer !== 'link'} /> : null}
+      {offer !== 'link' ? (
+        <ManagedOnWeb text={t('m.store.support')} />
+      ) : (
+        <>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+            {data.items.length && !sub ? (
+              <Button label={t('m.money.subscribeOnWeb')} size="sm" icon="open-outline" onPress={() => open(webCheckout.subscribe(username))} />
+            ) : null}
+            <Button label={t('m.money.tip')} size="sm" variant="secondary" icon="cash-outline" onPress={() => open(webCheckout.tip(username))} />
+          </View>
+          <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted, fontSize: 12, lineHeight: 17 }}>
+            {opened ? t('m.money.afterSubscribing') : `${t('m.money.fee')} ${t('m.shop.onWeb')}`}
+          </Text>
+        </>
+      )}
     </Card>
   );
 }
 
-/** The small tip button on a creator's post: a tip for this post, paid on the web. */
+/** The small tip button on a creator's post: a tip for this post, paid on the web. Only where a link out is allowed. */
 export function TipButton({ post }: { post: Post }) {
   const c = useColors();
   const { t } = useT();
   const commerce = useFlag('COMMERCE');
-  if (commerce === false) return null;
+  const offer = useDigitalPurchases();
+  if (commerce === false || offer !== 'link') return null;
   return (
     <Pressable
       accessibilityRole="button"

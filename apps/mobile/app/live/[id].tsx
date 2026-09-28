@@ -24,6 +24,7 @@ import { useT } from '../../lib/i18n';
 import { openOnWeb } from '../../lib/money';
 import { useReport } from '../../lib/report';
 import { useRealtime, useSession } from '../../lib/session';
+import { ManagedOnWeb, useDigitalPurchases } from '../../lib/store';
 import { radius, space } from '../../lib/theme';
 import {
   type ActionSheetAction,
@@ -47,8 +48,9 @@ type Note = { tone: 'info' | 'danger' | 'warn'; text: string };
 /**
  * Watching a live: the video (HLS, from the signed playback link the API gives each viewer), the
  * chat and questions for the host, updating live, and gifts. Ticketed lives only play for ticket
- * holders; tickets and gifts are paid for on the web (checkout isn't in the phone app), and the
- * screen checks again when you come back. Going live needs streaming software on a computer.
+ * holders; tickets and gifts are paid for on the web (checkout isn't in the phone app), offered
+ * only where the app store rules allow a link out (lib/store.tsx), and the screen checks again
+ * when you come back. Going live needs streaming software on a computer.
  */
 export default function LiveScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -57,6 +59,8 @@ export default function LiveScreen() {
   const { me } = useSession();
   const insets = useSafeAreaInsets();
   const commerceOn = useFlag('COMMERCE');
+  // Tickets and gifts are digital goods: only offered where a link out is allowed (lib/store.tsx).
+  const offer = useDigitalPurchases();
   const [live, setLive] = useState<LiveSummary | null | undefined>(undefined);
   const [chat, setChat] = useState<LiveChatMessage[]>([]);
   const [tab, setTab] = useState<Tab>('chat');
@@ -318,7 +322,11 @@ export default function LiveScreen() {
 
         {note ? <Notice tone={note.tone}>{note.text}</Notice> : null}
 
-        {needsTicket && l.ticket ? (
+        {needsTicket && l.ticket && offer !== 'link' ? (
+          <Notice tone="warn" title={t('m.live.ticketNeeded')}>
+            <ManagedOnWeb text={t('m.store.live')} />
+          </Notice>
+        ) : needsTicket && l.ticket ? (
           <Notice tone="warn" title={`${l.ticket.title}: ${formatMoney(l.ticket.priceCents, l.ticket.currency, locale)}`}>
             <Text style={{ color: c.ink, lineHeight: 20 }}>{t('m.live.ticketBody')}</Text>
             <Button
@@ -341,7 +349,7 @@ export default function LiveScreen() {
           </Notice>
         ) : null}
 
-        {l.status === 'live' && !isHost && commerceOn !== false ? (
+        {l.status === 'live' && !isHost && commerceOn !== false && offer === 'link' ? (
           <View style={{ gap: space[1] }}>
             <Button label={t('m.live.giftOnWeb')} icon="gift-outline" variant="secondary" onPress={() => openOnWeb(`/live/${encodeURIComponent(id)}`)} />
             <Text style={{ color: c.inkMuted, fontSize: 12, textAlign: 'center' }}>{t('m.live.giftHint')}</Text>

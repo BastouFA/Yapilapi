@@ -5,6 +5,7 @@ import {
   ADULT_AGE,
   birthDateSchema,
   changePasswordSchema,
+  clientPlatformFrom,
   forgotPasswordSchema,
   loginSchema,
   MIN_SIGNUP_AGE,
@@ -89,7 +90,7 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
     const device = await ctx.db.query<{ id: string }>(`INSERT INTO devices (user_id, name, platform) VALUES ($1, $2, $3) RETURNING id`, [
       userId,
       deviceName(ua),
-      req.headers['x-client-platform'] === 'mobile' ? 'mobile' : 'web',
+      clientPlatformFrom(req.headers['x-client-platform']) === 'web' ? 'web' : 'mobile',
     ]);
     const session = await ctx.db.query<{ id: string }>(
       `INSERT INTO sessions (user_id, device_id, token_hash, user_agent, ip, expires_at) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,

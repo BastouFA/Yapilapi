@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card, EmptyState, SensitiveCover, Select, Stat, Switch, Tabs, TextField } from '@yapilapi/design-system';
 import type { RegionalRule, RiskAccount } from '@yapilapi/api-client';
-import { FEATURE_FLAGS, formatRelativeTime } from '@yapilapi/shared';
+import { FEATURE_FLAGS, formatRelativeTime, type StorePurchasePolicy } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '../../providers';
 
@@ -46,7 +46,10 @@ export default function Admin() {
         ) : tab === 'overview' ? (
           <Overview />
         ) : tab === 'flags' ? (
-          <Flags />
+          <div className="stack">
+            <Flags />
+            <PhonePurchases />
+          </div>
         ) : tab === 'regions' ? (
           <RegionalRules />
         ) : (
@@ -320,6 +323,59 @@ function Flags() {
           />
         ))}
       </div>
+    </Card>
+  );
+}
+
+/**
+ * How the phone apps offer digital goods (Plus, creator subscriptions, tips, boosts, downloads,
+ * tickets to lives). Read only: it is set in the API's configuration, and the choices are
+ * explained in docs/operations/in-app-purchases.md.
+ */
+function PhonePurchases() {
+  const [policy, setPolicy] = useState<StorePurchasePolicy | null>(null);
+  useEffect(() => {
+    api.flags().then((r) => setPolicy(r.purchases ?? null));
+  }, []);
+  const ios = {
+    hidden: 'Hidden: no buy buttons or prices for digital goods, only a line that they are managed on the web.',
+    external_link: 'Link to the web checkout, in the listed storefront countries; hidden elsewhere.',
+    iap: 'Apple In-App Purchase. Until the app has a StoreKit module this works like hidden.',
+  } as const;
+  const android = {
+    play_billing_required: 'Hidden: no buy buttons or prices for digital goods, only a line that they are managed on the web.',
+    user_choice: 'Link to the web checkout, in the listed countries; hidden elsewhere.',
+  } as const;
+  return (
+    <Card
+      title="Phone app purchases"
+      subtitle="Digital goods in the iPhone and Android apps. Physical products, services and event tickets always keep their checkout, and the web checkout always works."
+    >
+      {policy ? (
+        <dl className="stack-sm">
+          <div>
+            <dt>
+              <strong>iPhone (IOS_DIGITAL_PURCHASES = {policy.ios.mode})</strong>
+            </dt>
+            <dd>
+              {ios[policy.ios.mode]}
+              {policy.ios.mode === 'external_link' ? ` Countries: ${policy.ios.linkCountries.join(', ') || 'none'}.` : ''}
+            </dd>
+          </div>
+          <div>
+            <dt>
+              <strong>Android (ANDROID_DIGITAL_PURCHASES = {policy.android.mode})</strong>
+            </dt>
+            <dd>
+              {android[policy.android.mode]}
+              {policy.android.mode === 'user_choice' ? ` Countries: ${policy.android.linkCountries.join(', ') || 'none'}.` : ''}
+            </dd>
+          </div>
+        </dl>
+      ) : (
+        <p className="muted">Loading…</p>
+      )}
+      <p className="muted">Change these in the API's environment settings. See docs/operations/in-app-purchases.md.</p>
     </Card>
   );
 }

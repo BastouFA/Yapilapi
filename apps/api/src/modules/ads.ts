@@ -13,6 +13,7 @@ import { REQUEST_COUNTRY } from '../lib/request-context.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 import { isPlus } from '../lib/plus.ts';
 import { startPayment } from '../lib/checkout.ts';
+import { assertDigitalCheckoutAllowed } from '../lib/store-purchases.ts';
 
 const FREQUENCY_CAP_PER_DAY = 3;
 
@@ -192,6 +193,7 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
   app.post('/v1/ads/campaigns/:id/fund', { preHandler: requireAuth, config: { rateLimit: { max: 20, timeWindow: '1 hour' } } }, async (req, reply) => {
     await adsOn();
     if (!(await isEnabled(db, 'COMMERCE'))) throw featureDisabled('Payments');
+    assertDigitalCheckoutAllowed(req, ctx.config, 'ad_budget');
     const u = me(req);
     const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
     const input = parse(z.object({ amountCents: z.number().int().min(500).max(1_000_000), idempotencyKey: z.string().min(8).max(100) }), req.body);

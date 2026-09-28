@@ -12,6 +12,7 @@ import { useT } from '../lib/i18n';
 import { openDownload, openOnWeb, useKindLabel, useWebCheckout, webCheckout } from '../lib/money';
 import { useReport } from '../lib/report';
 import { useSession } from '../lib/session';
+import { ManagedOnWeb, useDigitalPurchases } from '../lib/store';
 import { radius, space } from '../lib/theme';
 import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, useActionSheet, useColors, userText } from '../lib/ui';
 
@@ -19,7 +20,9 @@ import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, useActionSheet
  * One thing from a profile's Shop (`product?username=&id=`, and web links to
  * /u/<name>?shop=1&product=<id>): what it is, its price, the file for a download, and who sells
  * it. A download you bought opens from here with a fresh link that works for 10 minutes, in the
- * system (browser or Files). Buying and booking open checkout on the web.
+ * system (browser or Files). Buying and booking open checkout on the web. A download is a digital
+ * good: where the app store rules don't allow a link out (lib/store.tsx), it shows no price and no
+ * button. Products and services always keep their checkout.
  */
 export default function ProductScreen() {
   const { username, id } = useLocalSearchParams<{ username: string; id: string }>();
@@ -27,6 +30,7 @@ export default function ProductScreen() {
   const { t, tp, locale } = useT();
   const kindLabel = useKindLabel();
   const commerce = useFlag('COMMERCE');
+  const offer = useDigitalPurchases();
   const [seller, setSeller] = useState<Profile | null>(null);
   const [item, setItem] = useState<ShopItem | null | undefined>(undefined);
   const [busy, setBusy] = useState(false);
@@ -61,6 +65,8 @@ export default function ProductScreen() {
     );
 
   const self = seller.relationship.isSelf;
+  // A download that isn't yours, where the store rules hide digital goods: no price, no button.
+  const storeHidden = item.kind === 'digital' && !item.owned && offer !== 'link';
   const price = formatMoney(item.priceCents, item.currency, locale);
   const soldOut = item.inventory === 0;
 
@@ -139,7 +145,7 @@ export default function ProductScreen() {
             </Text>
           </View>
         </View>
-        <Text style={{ color: c.ink, fontSize: 22, fontWeight: '800' }}>{price}</Text>
+        {storeHidden ? null : <Text style={{ color: c.ink, fontSize: 22, fontWeight: '800' }}>{price}</Text>}
         {item.owned ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Icon name="checkmark-circle" size={18} color={c.success} />
@@ -175,7 +181,9 @@ export default function ProductScreen() {
           <Button label={t('m.shop.download')} icon="download-outline" disabled={busy} onPress={() => download()} />
           <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('m.purchases.linkNote')}</Text>
         </View>
-      ) : soldOut ? null : (
+      ) : soldOut ? null : storeHidden ? (
+        <ManagedOnWeb text={t('m.store.download')} />
+      ) : (
         <View style={{ gap: space[2] }}>
           {item.kind === 'service' ? <Text style={{ color: c.ink, lineHeight: 20 }}>{t('m.product.serviceNote', { name: seller.displayName })}</Text> : null}
           <Button

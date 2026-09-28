@@ -13,6 +13,7 @@ import { ChoiceField, FieldError, TopicsField } from '../lib/forms';
 import { useT } from '../lib/i18n';
 import { useWebCheckout } from '../lib/money';
 import { useSession } from '../lib/session';
+import { ManagedOnWeb, useDigitalPurchases } from '../lib/store';
 import { space } from '../lib/theme';
 import { Button, Card, EmptyState, KeyboardAvoid, Loading, Notice, useColors, userText } from '../lib/ui';
 
@@ -23,7 +24,8 @@ const COUNTRIES = ['NG', 'GH', 'KE', 'ZA', 'CI', 'SN', 'CM', 'UG', 'TZ', 'RW', '
  * Boost one of your public posts (`boost?id=<post>`): choose the budget, how long and who sees it,
  * read what that buys, and continue on the web, where the boost is created and paid with the
  * same choices filled in. The post's boosts so far are shown with their results; while one is
- * running, another can't start.
+ * running, another can't start. A boost is a digital good: where the app store rules don't allow a
+ * link out (lib/store.tsx), there are no prices or form, only the results and a plain line.
  */
 export default function BoostScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -32,6 +34,7 @@ export default function BoostScreen() {
   const { me } = useSession();
   const ads = useFlag('ADS');
   const commerce = useFlag('COMMERCE');
+  const offer = useDigitalPurchases();
   const [post, setPost] = useState<Post | null | undefined>(undefined);
   const [boosts, setBoosts] = useState<Boost[]>([]);
 
@@ -128,6 +131,8 @@ export default function BoostScreen() {
           </View>
         ) : post.visibility !== 'public' ? (
           <Notice>{t('m.boost.onlyPublic')}</Notice>
+        ) : offer !== 'link' ? (
+          <ManagedOnWeb text={t('m.store.boost')} />
         ) : (
           <>
             <Text style={{ color: c.ink, lineHeight: 22 }}>{t('m.boost.intro')}</Text>

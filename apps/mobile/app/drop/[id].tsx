@@ -9,6 +9,7 @@ import { useT } from '../../lib/i18n';
 import { openOnWeb, useWebCheckout } from '../../lib/money';
 import { useReport } from '../../lib/report';
 import { useRealtime, useSession } from '../../lib/session';
+import { ManagedOnWeb, useDigitalPurchases } from '../../lib/store';
 import { radius, space } from '../../lib/theme';
 import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, useActionSheet, useColors, userText } from '../../lib/ui';
 
@@ -17,7 +18,9 @@ import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, useActionSheet
  * real numbers left. Before it opens, "Notify me" puts you on the reminder list (a notification
  * when it opens; nothing is charged or held). Once open, products are bought on the web, like
  * everything that costs money. The seller also sees how many are waiting and the sales, and can
- * cancel; making and editing a drop happen on the web.
+ * cancel; making and editing a drop happen on the web. Downloads in a drop are digital goods:
+ * where the app store rules don't allow a link out (lib/store.tsx) their prices are left out, and a
+ * drop of only downloads has no buy button. Physical products always keep their checkout.
  */
 export default function DropScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -31,6 +34,7 @@ export default function DropScreen() {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const offer = useDigitalPurchases();
   const menu = useActionSheet();
   const report = useReport();
 
@@ -227,7 +231,9 @@ export default function DropScreen() {
             <Card key={item.productId} style={{ gap: space[2] }}>
               <View style={{ flexDirection: 'row', gap: space[3], alignItems: 'flex-start' }}>
                 <Text style={[{ flex: 1, color: c.ink, fontSize: 16, fontWeight: '800' }, userText]}>{item.title}</Text>
-                <Text style={{ color: c.ink, fontSize: 16, fontWeight: '800' }}>{formatMoney(item.priceCents, item.currency, locale)}</Text>
+                {item.kind === 'digital' && offer !== 'link' ? null : (
+                  <Text style={{ color: c.ink, fontSize: 16, fontWeight: '800' }}>{formatMoney(item.priceCents, item.currency, locale)}</Text>
+                )}
               </View>
               {item.description ? <Text style={[{ color: c.inkMuted, lineHeight: 20 }, userText]}>{item.description}</Text> : null}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[3] }}>
@@ -252,7 +258,9 @@ export default function DropScreen() {
         })}
       </View>
 
-      {phase === 'open' && !d.isSeller ? (
+      {phase === 'open' && !d.isSeller && offer !== 'link' && d.items.every((i) => i.kind === 'digital') ? (
+        <ManagedOnWeb text={t('m.store.download')} />
+      ) : phase === 'open' && !d.isSeller ? (
         <View style={{ gap: space[2] }}>
           <Button label={t('m.drops.buyOnWeb')} icon="open-outline" onPress={() => openCheckout(webPath)} />
           <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>

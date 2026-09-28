@@ -8,6 +8,7 @@ import { SectionHeader } from '../lib/chips';
 import { useT } from '../lib/i18n';
 import { openOnWeb } from '../lib/money';
 import { useSession } from '../lib/session';
+import { ManagedOnWeb, useDigitalPurchases } from '../lib/store';
 import { radius, space } from '../lib/theme';
 import { Button, Card, ErrorState, Icon, type IconName, Loading, Notice, PlusBadge, useColors } from '../lib/ui';
 
@@ -22,7 +23,8 @@ const ICON: Record<PlusInfo['benefits'][number]['id'], IconName> = {
  * YAPILAPI Plus (apps/web/app/(app)/plus): what it gives, what it costs, whether you have it and
  * until when, and how close your invites are to a free month. Paying happens in the web checkout,
  * opened in the browser: the app never sees card details. Coming back to the app shows the new end
- * date as soon as the payment is confirmed.
+ * date as soon as the payment is confirmed. Where the app store rules don't allow a link out
+ * (lib/store.tsx), there is no price and no button, only a line that Plus is managed on the web.
  */
 export default function PlusScreen() {
   const c = useColors();
@@ -33,6 +35,7 @@ export default function PlusScreen() {
   const [error, setError] = useState<string | null>(null);
   const [opened, setOpened] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const offer = useDigitalPurchases();
 
   const load = useCallback(async () => {
     try {
@@ -110,14 +113,20 @@ export default function PlusScreen() {
       {error ? <Notice tone="danger">{error}</Notice> : null}
 
       <Card style={{ gap: space[3] }}>
-        <Text style={{ color: c.ink, fontSize: 18, fontWeight: '800' }}>{t('plus.price', { price })}</Text>
-        <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('plus.noRenew')}</Text>
+        {offer === 'link' ? (
+          <>
+            <Text style={{ color: c.ink, fontSize: 18, fontWeight: '800' }}>{t('plus.price', { price })}</Text>
+            <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('plus.noRenew')}</Text>
+          </>
+        ) : null}
         {status?.active && status.until ? (
           <Notice title={t('plus.status.active', { date: long(status.until) })}>{t('plus.status.ends')}</Notice>
         ) : (
           <Text style={{ color: c.ink }}>{status ? t('plus.status.none') : t('m.plus.signIn')}</Text>
         )}
-        {!status ? null : !status.canExtend ? (
+        {!status ? null : offer !== 'link' ? (
+          <ManagedOnWeb text={t('m.store.plus')} />
+        ) : !status.canExtend ? (
           <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('plus.maxed')}</Text>
         ) : (
           <View style={{ gap: space[2] }}>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DEFAULT_STORE_PURCHASE_POLICY, type StorePurchasePolicy } from '../../../packages/shared/src/store-purchases';
 import { client } from './api';
 import { useSession } from './session';
 
@@ -8,6 +9,7 @@ type Flags = Record<string, boolean>;
 const FRESH_MS = 60_000;
 
 let cached: Flags | null = null;
+let cachedPurchases: StorePurchasePolicy | null = null;
 let fetchedAt = 0;
 let pending: Promise<Flags> | null = null;
 
@@ -19,6 +21,8 @@ export function loadFlags(): Promise<Flags> {
     .then((api) => api.flags())
     .then((r) => {
       cached = r.flags;
+      // An older server doesn't send it: nothing digital is offered then.
+      cachedPurchases = r.purchases ?? DEFAULT_STORE_PURCHASE_POLICY;
       fetchedAt = Date.now();
       return r.flags;
     })
@@ -27,6 +31,15 @@ export function loadFlags(): Promise<Flags> {
     });
   return pending;
 }
+
+/** How the app store rules say this app may offer digital goods, from the same answer as the flags. */
+export async function loadStorePolicy(): Promise<StorePurchasePolicy> {
+  await loadFlags();
+  return cachedPurchases ?? DEFAULT_STORE_PURCHASE_POLICY;
+}
+
+/** The last known store policy, if any, to show straight away. */
+export const cachedStorePolicy = () => cachedPurchases;
 
 /**
  * Whether a feature is turned on: undefined while it's being checked, then true or false. The
