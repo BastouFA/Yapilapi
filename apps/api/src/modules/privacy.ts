@@ -6,8 +6,11 @@ import { z } from 'zod';
 import { badRequest, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { deliverable } from '../lib/email.ts';
+import { EXPORT_README, exportSections, usernameOf } from '../lib/data-export.ts';
 import { collectAccountFiles, removeAccountFiles } from '../lib/media-files.ts';
-import { audit, securityEvent } from '../lib/services.ts';
+import { refundUnspentBudget } from '../lib/ad-refunds.ts';
+import { releaseDropOrder } from '../lib/drops.ts';
+import { audit, notify, securityEvent } from '../lib/services.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 /** Privacy Center: inspect, export and delete your data; manage consent. */
@@ -44,18 +47,28 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
     return { ok: true };
   });
 
-  /** Everything we hold about you, as JSON. Messages include only what you sent. */
+  /**
+   * Everything we hold about you, as JSON (the right of access). Messages include only what you
+   * sent; other people appear by username; no secrets. The newer parts are built in lib/data-export.ts,
+   * which explains what is summarised, capped or left out and why.
+   */
   app.get('/v1/me/export', { preHandler: requireAuth, config: { rateLimit: { max: 3, timeWindow: '1 hour' } } }, async (req, reply) => {
     const u = me(req);
     const q = (sql: string) => db.query(sql, [u.id]).then((r) => r.rows);
     const data = {
+      readme: EXPORT_README,
       exportedAt: new Date().toISOString(),
       account: (
-        await q(`SELECT id, email, email_verified_at, phone_e164, phone_verified_at, role, status, birth_date, created_at FROM users WHERE id = $1`)
+        await q(
+          `SELECT id, email, email_verified_at, phone_e164, phone_verified_at, role, status, birth_date, mfa_enabled, findable_by_contacts, onboarded_at, created_at
+           FROM users WHERE id = $1`,
+        )
       )[0],
       profile: (
         await q(
-          `SELECT username, display_name, bio, avatar_url, cover_url, cover_alt, cover_media_id, cover_edit, links, mode, locale, is_private, pronouns, city, accent, header_style, tabs, featured_post_ids, song_sound_id, song_track_id, song_part FROM profiles WHERE user_id = $1`,
+          `SELECT username, display_name, bio, avatar_url, cover_url, cover_alt, cover_media_id, cover_edit, links, mode, locale, is_private, pronouns, city, accent, header_style, tabs, featured_post_ids,
+                  song_sound_id, song_track_id, song_part, country, country_source, cdn_country, plus_until, allow_download, tag_permission, pinned_post_id, created_at
+           FROM profiles WHERE user_id = $1`,
         )
       )[0],
       nowStatus: (await q(`SELECT text, icon, audience, created_at, expires_at FROM profile_statuses WHERE user_id = $1`))[0] ?? null,
@@ -82,10 +95,16 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       messagesSent: await q(`SELECT conversation_id, body, attachments, created_at FROM messages WHERE sender_id = $1 AND deleted_at IS NULL`),
       communities: await q(`SELECT c.slug, cm.role, cm.joined_at FROM community_members cm JOIN communities c ON c.id = cm.community_id WHERE cm.user_id = $1`),
       events: await q(`SELECT event_id, status FROM event_attendees WHERE user_id = $1`),
-      orders: await q(`SELECT id, status, total_cents, currency, created_at FROM orders WHERE buyer_id = $1`),
+      // What you bought or paid for; the seller or person paid by username. Sales are under money.sales.
+      orders: await q(
+        `SELECT o.id, o.purpose, o.status, o.total_cents, o.currency, o.created_at, ${usernameOf('o.payee_id')} AS paid_to,
+                coalesce((SELECT json_agg(json_build_object('product_id', p.id, 'title', p.title, 'seller', ${usernameOf('p.seller_id')}, 'quantity', i.quantity, 'unit_cents', i.unit_cents))
+                          FROM order_items i JOIN products p ON p.id = i.product_id WHERE i.order_id = o.id), '[]') AS items
+         FROM orders o WHERE o.buyer_id = $1 ORDER BY o.created_at DESC`,
+      ),
       consents: await q(`SELECT purpose, granted, updated_at FROM consents WHERE user_id = $1`),
       aiMemories: await q(`SELECT content, source, created_at FROM ai_memories WHERE user_id = $1`),
-      securityEvents: await q(`SELECT type, created_at FROM security_events WHERE user_id = $1 ORDER BY created_at DESC LIMIT 500`),
+      securityEvents: await q(`SELECT type, host(ip) AS ip, user_agent, created_at FROM security_events WHERE user_id = $1 ORDER BY created_at DESC LIMIT 500`),
       problemReports: await q(`SELECT body, platform, app_version, page, status, created_at FROM problem_reports WHERE user_id = $1 ORDER BY created_at DESC`),
       usernameChanges: await q(`SELECT old_username, new_username, changed_at, held_until FROM username_history WHERE user_id = $1 ORDER BY changed_at DESC`),
       signInDevices: await q(`SELECT fingerprint, first_seen_at, last_seen_at FROM known_sign_ins WHERE user_id = $1 ORDER BY last_seen_at DESC`),
@@ -133,6 +152,7 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       chatGames: await q(
         `SELECT conversation_id, kind, status, winner_id = $1 AS won, created_at, ended_at FROM chat_games WHERE $1 = ANY(players) ORDER BY created_at DESC`,
       ),
+      ...(await exportSections(db, u.id)),
     };
     await db.query(`INSERT INTO privacy_requests (user_id, kind, status, completed_at) VALUES ($1,'export','completed',now())`, [u.id]);
     reply.header('content-disposition', `attachment; filename="yapilapi-export-${u.id}.json"`);
@@ -154,10 +174,11 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
     // products they sold, which buyers paid for). Removed from storage once the account is gone.
     const files = await collectAccountFiles(db, u.id);
     const address = (await db.query<{ email: string }>(`SELECT email FROM users WHERE id = $1`, [u.id])).rows[0]?.email;
+    let endedCampaigns: string[] = [];
     await tx(db, async (c) => {
       await c.query(
         `UPDATE users SET status = 'deleted', deleted_at = now(), email = 'deleted+' || id || '@deleted.invalid', password_hash = NULL, birth_date = NULL,
-           phone_e164 = NULL, phone_verified_at = NULL WHERE id = $1`,
+           phone_e164 = NULL, phone_verified_at = NULL, mfa_enabled = false, contact_email_hash = NULL, findable_by_contacts = false WHERE id = $1`,
         [u.id],
       );
       await c.query(
@@ -225,12 +246,165 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         `UPDATE analytics_events SET user_id = NULL WHERE user_id = $1`,
         `UPDATE conversation_members SET left_at = now() WHERE user_id = $1`,
         `UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`,
+        // Sign-in material goes: devices, one-time links and challenges, two-step methods and codes,
+        // download links. Apps they allowed lose access; their own apps, keys and webhooks stop.
+        `DELETE FROM devices WHERE user_id = $1`,
+        `DELETE FROM auth_tokens WHERE user_id = $1`,
+        `DELETE FROM mfa_challenges WHERE user_id = $1`,
+        `DELETE FROM mfa_factors WHERE user_id = $1`,
+        `DELETE FROM mfa_recovery_codes WHERE user_id = $1`,
+        `DELETE FROM webauthn_challenges WHERE user_id = $1`,
+        `DELETE FROM oauth_codes WHERE user_id = $1`,
+        `DELETE FROM download_links WHERE user_id = $1`,
+        `UPDATE oauth_grants SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`,
+        `UPDATE developer_apps SET deleted_at = now() WHERE owner_id = $1 AND deleted_at IS NULL`,
+        `UPDATE api_keys SET revoked_at = now() WHERE owner_id = $1 AND revoked_at IS NULL`,
+        `UPDATE webhook_subscriptions w SET active = false FROM developer_apps a WHERE a.id = w.app_id AND a.owner_id = $1`,
+        // Unfinished uploads expire now, so the daily clean-up removes them with their pieces.
+        `UPDATE upload_sessions SET expires_at = least(expires_at, now()) WHERE user_id = $1`,
+        // Their inbox, and what they did in other people's (it would point at nothing).
+        `DELETE FROM notifications WHERE user_id = $1 OR actor_id = $1`,
+        // Who they are connected to or kept away, both ways.
+        `DELETE FROM friend_requests WHERE from_user_id = $1 OR to_user_id = $1`,
+        `DELETE FROM blocks WHERE blocker_id = $1 OR blocked_id = $1`,
+        `DELETE FROM mutes WHERE muter_id = $1 OR muted_id = $1`,
+        `DELETE FROM restrictions WHERE restrictor_id = $1 OR restricted_id = $1`,
+        `UPDATE family_links SET status = 'ended', ended_at = now() WHERE (guardian_id = $1 OR teen_id = $1) AND status <> 'ended'`,
+        `DELETE FROM teen_controls WHERE teen_id = $1`,
+        `UPDATE teen_controls SET updated_by = NULL WHERE updated_by = $1`,
+        `DELETE FROM invite_codes WHERE user_id = $1`,
+        // What they made that is theirs alone: chapters, boards and memories (with what was in them),
+        // rooms they started, and their places in other people's.
+        `DELETE FROM chapters WHERE owner_id = $1`,
+        `DELETE FROM chapter_members WHERE user_id = $1`,
+        `DELETE FROM chapter_guestbook WHERE author_id = $1`,
+        `DELETE FROM boards WHERE owner_id = $1`,
+        `DELETE FROM board_members WHERE user_id = $1`,
+        `DELETE FROM memories WHERE owner_id = $1`,
+        `DELETE FROM memory_shares WHERE user_id = $1`,
+        `DELETE FROM rooms WHERE created_by = $1`,
+        `UPDATE room_participants SET left_at = now(), hand_raised_at = NULL WHERE user_id = $1 AND left_at IS NULL`,
+        `DELETE FROM room_reminders WHERE user_id = $1`,
+        `DELETE FROM together_members WHERE user_id = $1 AND role = 'member'`,
+        `DELETE FROM together_contributions WHERE user_id = $1`,
+        `UPDATE togethers SET status = 'closed' WHERE creator_id = $1`,
+        `DELETE FROM event_attendees WHERE user_id = $1`,
+        // Lives: any still to come or on air end, and the titles and stream keys go. What they said in lives goes like comments.
+        `UPDATE live_sessions SET status = 'ended', ended_at = coalesce(ended_at, now()) WHERE host_id = $1 AND status <> 'ended'`,
+        `UPDATE live_sessions SET title = '', stream_key_hash = NULL WHERE host_id = $1`,
+        `UPDATE live_chat SET deleted_at = now(), body = '' WHERE user_id = $1 AND deleted_at IS NULL`,
+        `UPDATE live_participants SET left_at = now() WHERE user_id = $1 AND left_at IS NULL`,
+        `UPDATE call_participants SET left_at = now() WHERE user_id = $1 AND left_at IS NULL`,
+        // Their shop and listings come down. Orders, payments and bookings stay as payment records
+        // (buyers keep their downloads), without the notes and tip messages they wrote.
+        `UPDATE products SET status = 'archived', updated_at = now() WHERE seller_id = $1 AND status <> 'archived'`,
+        `DELETE FROM drops WHERE seller_id = $1 AND status = 'draft'`,
+        `UPDATE businesses SET deleted_at = now() WHERE owner_id = $1 AND deleted_at IS NULL`,
+        `UPDATE places SET deleted_at = now() WHERE created_by = $1 AND deleted_at IS NULL`,
+        `DELETE FROM place_reviews WHERE author_id = $1`,
+        `UPDATE creator_plans SET active = false WHERE creator_id = $1`,
+        `UPDATE creator_subscriptions SET status = 'cancelled', cancelled_at = now() WHERE (subscriber_id = $1 OR creator_id = $1) AND status IN ('pending', 'active')`,
+        `UPDATE tips SET message = '' WHERE from_id = $1`,
+        `UPDATE bookings SET note = '' WHERE user_id = $1`,
+        `DELETE FROM drop_reminders WHERE user_id = $1`,
+        // What they did: saves, views, votes, answers to stickers, reactions in chats, tags and collaborations,
+        // feed feedback, minutes, reel positions, their settings, and what the assistant kept for them.
+        `DELETE FROM saves WHERE user_id = $1`,
+        `DELETE FROM post_views WHERE viewer_id = $1`,
+        `DELETE FROM moment_views WHERE viewer_id = $1`,
+        `DELETE FROM business_views WHERE viewer_id = $1`,
+        `DELETE FROM story_responses WHERE user_id = $1`,
+        `DELETE FROM poll_votes WHERE user_id = $1`,
+        `DELETE FROM chat_poll_votes WHERE user_id = $1`,
+        `DELETE FROM message_reactions WHERE user_id = $1`,
+        `DELETE FROM message_hides WHERE user_id = $1`,
+        `DELETE FROM chat_reminders WHERE user_id = $1`,
+        `DELETE FROM photo_tags WHERE user_id = $1 OR tagged_by = $1`,
+        `DELETE FROM post_collaborators WHERE user_id = $1`,
+        `DELETE FROM post_audience WHERE user_id = $1`,
+        `DELETE FROM music_saves WHERE user_id = $1`,
+        `DELETE FROM feed_feedback WHERE user_id = $1`,
+        `DELETE FROM usage_days WHERE user_id = $1`,
+        `DELETE FROM pulse_visits WHERE user_id = $1`,
+        `DELETE FROM reel_resume WHERE user_id = $1`,
+        `DELETE FROM user_preferences WHERE user_id = $1`,
+        `DELETE FROM ai_catchups WHERE user_id = $1`,
+        `DELETE FROM ai_reply_suggestions WHERE user_id = $1`,
+        `DELETE FROM ai_conversations WHERE user_id = $1`,
+        // Automated flags only matter while the account exists.
+        `DELETE FROM risk_signals WHERE user_id = $1`,
+        // Logs stay in the totals without being linked to them.
+        `UPDATE ai_tool_calls SET user_id = NULL WHERE user_id = $1`,
+        `UPDATE ad_events SET user_id = NULL WHERE user_id = $1`,
+        `UPDATE share_videos SET requested_by = NULL WHERE requested_by = $1`,
+        `UPDATE watch_queue_items SET added_by = NULL WHERE added_by = $1`,
       ])
         await c.query(sql, [u.id]);
+      // Their likes and reposts come off other people's posts, and they leave their communities.
+      await c.query(
+        `WITH gone AS (DELETE FROM reactions WHERE user_id = $1 RETURNING post_id)
+         UPDATE posts SET like_count = greatest(like_count - 1, 0) WHERE id IN (SELECT post_id FROM gone)`,
+        [u.id],
+      );
+      await c.query(
+        `WITH gone AS (DELETE FROM post_reposts WHERE user_id = $1 RETURNING post_id)
+         UPDATE posts SET repost_count = greatest(repost_count - 1, 0) WHERE id IN (SELECT post_id FROM gone)`,
+        [u.id],
+      );
+      await c.query(
+        `WITH gone AS (DELETE FROM community_members WHERE user_id = $1 RETURNING community_id, status)
+         UPDATE communities SET member_count = greatest(member_count - 1, 0) WHERE id IN (SELECT community_id FROM gone WHERE status = 'active')`,
+        [u.id],
+      );
+      // Their boosts stop (a review still waiting is closed); what they didn't spend is refunded below.
+      const campaigns = await c.query<{ id: string }>(
+        `UPDATE ad_campaigns SET status = 'ended' WHERE advertiser_id = $1 AND status IN ('draft', 'pending_review', 'active', 'paused') RETURNING id`,
+        [u.id],
+      );
+      endedCampaigns = campaigns.rows.map((r) => r.id);
+      await c.query(
+        `UPDATE moderation_cases SET status = 'decided', decision = 'no_action', note = 'Withdrawn: the account was deleted', decided_at = now()
+         WHERE target_type = 'ad_campaign' AND target_id = ANY($1) AND status = 'open'`,
+        [endedCampaigns],
+      );
+      // Drops still to come or open are cancelled as the seller would: unpaid orders are cancelled and
+      // their units released, paid ones stay paid, and everyone waiting is told.
+      const drops = await c.query<{ id: string; title: string }>(
+        `UPDATE drops SET status = 'cancelled', cancelled_at = now(), updated_at = now() WHERE seller_id = $1 AND status IN ('scheduled', 'open') RETURNING id, title`,
+        [u.id],
+      );
+      for (const d of drops.rows) {
+        const pending = await c.query<{ order_id: string }>(
+          `SELECT o.id AS order_id FROM orders o
+           WHERE o.status = 'pending' AND o.id IN (SELECT order_id FROM drop_orders WHERE drop_id = $1 AND status = 'held') FOR UPDATE`,
+          [d.id],
+        );
+        for (const o of pending.rows) {
+          await c.query(`UPDATE orders SET status = 'cancelled', updated_at = now() WHERE id = $1`, [o.order_id]);
+          await releaseDropOrder(c, o.order_id);
+        }
+        const waiting = await c.query<{ user_id: string }>(`SELECT user_id FROM drop_reminders WHERE drop_id = $1`, [d.id]);
+        for (const w of waiting.rows)
+          await notify(c, ctx.realtime, {
+            userId: w.user_id,
+            category: 'commerce',
+            type: 'drop_cancelled',
+            actorId: u.id,
+            entityType: 'drop',
+            entityId: d.id,
+            data: { title: d.title },
+          });
+      }
       await c.query(`INSERT INTO privacy_requests (user_id, kind, status, completed_at) VALUES ($1,'delete','completed',now())`, [u.id]);
       await securityEvent(c, u.id, 'account_deleted', req.ip);
       await audit(c, { actorId: u.id, action: 'account.delete', entityType: 'user', entityId: u.id, ip: req.ip, requestId: req.id });
     });
+    // Unspent boost budgets go back to the payments that funded them, one campaign at a time; a refund
+    // that fails is only logged (and recorded as failed, like any other refund).
+    for (const id of endedCampaigns)
+      await tx(db, (c) => refundUnspentBudget(c, ctx.paymentProviders, id, null)).catch((err: unknown) =>
+        req.log.warn({ err, campaignId: id }, 'could not refund a deleted account’s unspent boost budget'),
+      );
     // In the background: many files can take a while, and a file that fails to go is only logged.
     void removeAccountFiles(ctx, files).then(
       (r) => r.failed && req.log.warn({ failed: r.failed }, 'some of a deleted account’s files could not be removed'),
