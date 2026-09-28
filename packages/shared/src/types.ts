@@ -9,6 +9,7 @@ import type { ProfileAskBox, QuotedQuestion } from './ask.ts';
 import type { DrawReason, GameKind, GameState } from './games/types.ts';
 import type { MixCard } from './mixes.ts';
 import type { LocationShare } from './location.ts';
+import type { MarketChatCard, MarketOffer } from './market.ts';
 import type { CoverRecipe } from './cover.ts';
 import type { EchoPermission, EchoRef } from './echoes.ts';
 import type {
@@ -517,8 +518,11 @@ export interface MessagePreview {
   /** The first attachment's kind ('image', 'video', 'audio'), for "Photo" or "Voice message". */
   attachmentKind: string | null;
   createdAt: string | null;
-  /** A poll (body is its question), a shared list (body is its title), a game (see `gameKind`), a mix (body is its title) or a shared location. */
-  kind?: 'poll' | 'list' | 'game' | 'mix' | 'location';
+  /**
+   * A poll (body is its question), a shared list (body is its title), a game (see `gameKind`), a mix (body is its title), a shared
+   * location, a Market listing (body is its title) or an offer on one.
+   */
+  kind?: 'poll' | 'list' | 'game' | 'mix' | 'location' | 'listing' | 'offer';
   /** Which game, when `kind` is 'game'. */
   gameKind?: GameKind;
 }
@@ -779,6 +783,10 @@ export interface Message {
   mix?: MixCard;
   /** Where the sender is: a live share (for a limited time) or a pin sent once. Body is "Live location" or "Location". */
   location?: LocationShare;
+  /** The card at the top of a chat about a Market listing. Body is the listing's title. */
+  market?: MarketChatCard;
+  /** An offer (or a counter-offer) on a Market listing, answered from the card. */
+  offer?: MarketOffer;
   /** Your earliest waiting "Remind me" on this message. */
   reminder?: { id: string; remindAt: string };
 }

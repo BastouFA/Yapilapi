@@ -133,6 +133,15 @@ const TEXT: Record<string, (actor: string, data: Record<string, unknown>) => str
   watch_invite: (a) => `${a} wants to watch together`,
   // Quiet: no sound, like every push but calls. Never says where.
   location_shared: (a) => `${a} is sharing where they are with you`,
+  // Market (never an amount on a lock screen).
+  market_offer: (a, d) => `${a} made an offer on ${d.title ?? 'your listing'}`,
+  market_offer_accepted: (a, d) => `${a} accepted your offer on ${d.title ?? 'a listing'}`,
+  market_offer_declined: (a, d) => `${a} declined your offer on ${d.title ?? 'a listing'}`,
+  market_offer_countered: (a, d) => `${a} made a counter-offer on ${d.title ?? 'a listing'}`,
+  market_sold_to_you: (a, d) => `${a} marked ${d.title ?? 'a listing'} as sold to you. You can rate them now.`,
+  market_rated: (a, d) => `${a} rated you after ${d.title ?? 'a sale'}`,
+  market_expiring: (_a, d) => `${d.title ?? 'Your listing'} ends in ${d.days ?? 3} days. Renew it to keep it listed.`,
+  market_expired: (_a, d) => `${d.title ?? 'Your listing'} has ended. Renew it to list it again.`,
   weekly_wrap: () => 'Your week in YAPILAPI is ready to look back on',
   // Questions asked without a name have no actor, so they read "Someone asked you a question".
   question_received: (a) => `${a} asked you a question`,

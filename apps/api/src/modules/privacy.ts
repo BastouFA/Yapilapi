@@ -293,6 +293,16 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         `UPDATE conversation_members SET left_at = now() WHERE user_id = $1`,
         // Where they shared their location: points and records alike.
         `DELETE FROM location_shares WHERE user_id = $1`,
+        // Market: their listings go (with their photos, saves, offers and the cards in chats, which then
+        // say "no longer available"), and so do what they saved, their offers and chats about other
+        // people's listings, and ratings they gave or got. A listing reserved for or sold to them forgets them.
+        `DELETE FROM market_listings WHERE seller_id = $1`,
+        `DELETE FROM market_saves WHERE user_id = $1`,
+        `DELETE FROM market_offers WHERE buyer_id = $1 OR seller_id = $1`,
+        `DELETE FROM market_chats WHERE buyer_id = $1`,
+        `DELETE FROM market_ratings WHERE rater_id = $1 OR ratee_id = $1`,
+        `UPDATE market_listings SET reserved_for = NULL WHERE reserved_for = $1`,
+        `UPDATE market_listings SET sold_to = NULL WHERE sold_to = $1`,
         `UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`,
         // Sign-in material goes: devices, one-time links and challenges, two-step methods and codes,
         // download links. Apps they allowed lose access; their own apps, keys and webhooks stop.

@@ -157,6 +157,7 @@ export default function Wander() {
     { label: t('m.title.reels'), icon: 'film-outline', href: '/reels' },
     { label: t('events.title'), icon: 'calendar-outline', href: '/events' },
     { label: t('communities.title'), icon: 'people-circle-outline', href: '/communities' },
+    { label: t('m.market.title'), icon: 'storefront-outline', href: '/market' },
     { label: t('m.title.assistant'), icon: 'sparkles-outline', href: '/assistant' },
   ];
 

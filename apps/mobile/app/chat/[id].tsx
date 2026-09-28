@@ -50,6 +50,7 @@ import { ListCard, ListComposer, PollCard, PollComposer, ReminderNote, ReminderP
 import { GameCard, GameSheet, StartGameSheet } from '../../lib/chat-games';
 import { ChatMixCard, ShareMixHereSheet } from '../../lib/mixes';
 import { LocationCard, LocationRequestLine, ShareLocationSheet, SharingBanner, useLocationSharing } from '../../lib/chat-location';
+import { ListingChatCard, OfferChatCard } from '../../lib/chat-market';
 import type { LatLng } from '../../../../packages/shared/src/location';
 import { accentFor, ChatLookSheet, ChatWallpaperView, laterLimits, ScheduledList, useScheduled } from '../../lib/chat-later';
 import { DateTimeSheet } from '../../lib/date-time';
@@ -181,6 +182,8 @@ export default function Chat() {
         list: undefined,
         game: undefined,
         location: undefined,
+        market: undefined,
+        offer: undefined,
         reminder: undefined,
       }));
       setBoardFor((cur) => (cur === e.data.id ? null : cur));
@@ -207,6 +210,11 @@ export default function Chat() {
       patchMessage(e.data.id, (x) => (x.unsent ? x : { ...x, location: e.data.location }));
       sharing.apply(e.data.location);
     }
+    // Market: the listing card (reserved, sold, rated) or an offer (answered, withdrawn) changed, as you see it.
+    if (e.type === 'market.updated' && e.data?.conversationId === id)
+      patchMessage(e.data.messageId, (x) =>
+        x.unsent ? x : { ...x, ...(e.data.market ? { market: e.data.market } : {}), ...(e.data.offer ? { offer: e.data.offer } : {}) },
+      );
     // "Ada added 3 songs": more adds raise the line's count.
     if (e.type === 'message.system' && e.data?.conversationId === id) patchMessage(e.data.id, (x) => ({ ...x, system: e.data.system }));
     // A mix shared here changed: its cards show it as it is now (or that it's gone).
@@ -231,6 +239,8 @@ export default function Chat() {
   });
 
   const replaceMessage = (m: Message) => setMessages((cur) => cur.map((x) => (x.id === m.id ? m : x)));
+  // A new card from an answer on another (a counter-offer); the socket may have brought it already.
+  const appendMessage = (m: Message) => setMessages((cur) => (cur.some((x) => x.id === m.id) ? cur : [...cur, m]));
   const yaps = conversation?.yaps;
   const [yapSettings, setYapSettings] = useState(false);
   const [smartSettings, setSmartSettings] = useState(false);
@@ -588,6 +598,8 @@ export default function Chat() {
       !m.game &&
       !m.mix &&
       !m.location &&
+      !m.market &&
+      !m.offer &&
       !m.unsent &&
       Date.now() - new Date(m.createdAt).getTime() < MESSAGE_EDIT_MINUTES * 60_000;
     const out: SheetAction[] = [];
@@ -710,13 +722,27 @@ export default function Chat() {
     react,
     patchMessage,
     replaceMessage,
+    appendMessage,
     setBoardFor,
     setError,
     stopSharing,
     setLocationOpen,
     sharing,
   });
-  latest.current = { jumpTo, setActionsFor, startReply, react, patchMessage, replaceMessage, setBoardFor, setError, stopSharing, setLocationOpen, sharing };
+  latest.current = {
+    jumpTo,
+    setActionsFor,
+    startReply,
+    react,
+    patchMessage,
+    replaceMessage,
+    appendMessage,
+    setBoardFor,
+    setError,
+    stopSharing,
+    setLocationOpen,
+    sharing,
+  };
   const rowHandlers = useMemo<RowHandlers>(
     () => ({
       jumpTo: (mid) => void latest.current.jumpTo(mid),
@@ -725,6 +751,7 @@ export default function Chat() {
       react: (m, emoji, on) => void latest.current.react(m, emoji, on),
       patchMessage: (mid, fn) => latest.current.patchMessage(mid, fn),
       replaceMessage: (m) => latest.current.replaceMessage(m),
+      appendMessage: (m) => latest.current.appendMessage(m),
       openGame: (mid) => latest.current.setBoardFor(mid),
       stopSharing: () => latest.current.stopSharing(),
       shareLocation: () => latest.current.setLocationOpen(true),
@@ -1290,6 +1317,7 @@ interface RowHandlers {
   react: (m: Message, emoji: string, on: boolean) => void;
   patchMessage: (id: string, fn: (m: Message) => Message) => void;
   replaceMessage: (m: Message) => void;
+  appendMessage: (m: Message) => void;
   openGame: (messageId: string) => void;
   note: (text: string, failed?: boolean) => void;
   stopSharing: () => Promise<unknown>;
@@ -1329,7 +1357,7 @@ const MessageRow = memo(function MessageRow({
     ) : (
       <SystemLine message={item} meId={meId} onJump={h.jumpTo} watchLive={watchLive} />
     );
-  const rich = !item.unsent && (item.poll || item.list || item.game || item.mix || item.location);
+  const rich = !item.unsent && (item.poll || item.list || item.game || item.mix || item.location || item.market || item.offer);
   const text = item.unsent
     ? t(mine ? 'm.chat.unsentMine' : 'm.chat.unsent')
     : rich
@@ -1348,6 +1376,17 @@ const MessageRow = memo(function MessageRow({
     <GameCard message={item} meId={meId} tint={tint} onOpen={() => h.openGame(item.id)} />
   ) : item.mix ? (
     <ChatMixCard mix={item.mix} onMix={(mix) => h.patchMessage(item.id, (x) => ({ ...x, mix }))} onNote={h.note} />
+  ) : item.market ? (
+    <ListingChatCard card={item.market} tint={tint} onCard={(market) => h.patchMessage(item.id, (x) => ({ ...x, market }))} onNote={h.note} />
+  ) : item.offer ? (
+    <OfferChatCard
+      offer={item.offer}
+      meId={meId}
+      tint={tint}
+      onOffer={(offer) => h.patchMessage(item.id, (x) => ({ ...x, offer }))}
+      onAppend={h.appendMessage}
+      onNote={h.note}
+    />
   ) : item.location ? (
     <LocationCard message={item} meId={meId} tint={tint} viewer={viewer} onViewer={h.setViewer} onStop={h.stopSharing} />
   ) : item.viewOnce ? (

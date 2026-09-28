@@ -76,8 +76,11 @@ const TEXT: Record<string, (n: NotificationItem) => string> = {
       : 'We reviewed your account. It stays limited for now. You can see decisions and appeal from Settings.',
 };
 
-function hrefFor(n: NotificationItem): string | undefined {
+function hrefFor(n: NotificationItem, meUsername?: string): string | undefined {
   if (n.type === 'new_sign_in') return '/settings/security?review=sign-in';
+  // Market: a rating opens your profile's Market tab; the rest open the listing (offers open the chat, below).
+  if (n.type === 'market_rated' && meUsername) return `/u/${meUsername}?tab=market`;
+  if (n.entityType === 'listing') return `/market/${n.entityId}`;
   // Questions for your box open your questions; an answer to yours opens their Answers tab.
   if (n.type === 'question_received') return '/questions';
   if (n.type === 'question_answered' && n.actor) return `/u/${n.actor.username}?tab=answers`;
@@ -143,6 +146,16 @@ function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): s
   if (n.type === 'drop_opened') return t('m.notif.dropOpened', { name: n.actor?.displayName ?? '', title });
   if (n.type === 'drop_cancelled') return t('m.notif.dropCancelled', { name: n.actor?.displayName ?? '', title });
   if (n.type === 'drop_sold_out') return t('m.notif.dropSoldOut', { title });
+  // Market: offers and answers (they open the chat), a sale to you, a rating, and a listing ending.
+  const someone = n.actor?.displayName ?? t('m.calls.someone');
+  if (n.type === 'market_offer') return t('market.notif.offer', { name: someone, title });
+  if (n.type === 'market_offer_accepted') return t('market.notif.offerAccepted', { name: someone, title });
+  if (n.type === 'market_offer_declined') return t('market.notif.offerDeclined', { name: someone, title });
+  if (n.type === 'market_offer_countered') return t('market.notif.offerCountered', { name: someone, title });
+  if (n.type === 'market_sold_to_you') return t('market.notif.soldToYou', { name: someone, title });
+  if (n.type === 'market_rated') return t('market.notif.rated', { name: someone, title });
+  if (n.type === 'market_expiring') return tp('market.notif.expiring', Number(n.data.days ?? 3), { title });
+  if (n.type === 'market_expired') return t('market.notif.expired', { title });
   if (n.type !== 'comment_like' && n.type !== 'comment_reply') return null;
   const name = n.actor?.displayName ?? '';
   const others = Math.max(0, Number(n.data.count ?? 1) - 1);
@@ -183,7 +196,7 @@ function names(g: Group): string {
 }
 
 export default function Notifications() {
-  const { t, tp, locale, toast, setUnread } = useSession();
+  const { t, tp, locale, toast, setUnread, me } = useSession();
   const [items, setItems] = useState<NotificationItem[] | null>(null);
   const [followed, setFollowed] = useState<Set<string>>(new Set());
   // Co-author invites answered here, by post id.
@@ -376,7 +389,7 @@ export default function Notifications() {
                       }
                     />
                   ) : (
-                    <ListItem key={g.key} href={hrefFor(n)} linkAs={NextLink} start={start} primary={text} end={when} />
+                    <ListItem key={g.key} href={hrefFor(n, me?.username)} linkAs={NextLink} start={start} primary={text} end={when} />
                   );
                 })}
               </List>

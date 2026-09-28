@@ -62,6 +62,9 @@ export const RETENTION = {
   signInDevicesDays: 395,
   /** Visits to business pages, the times you opened Pulse, post and reel views, and ad impressions and clicks: 13 months. */
   visitsDays: 395,
+  /** Market listings that ended without being renewed, and sold ones, are deleted after this (then erased like other deleted content). */
+  marketEndedListingsDays: 180,
+  marketSoldListingsDays: 365,
 } as const;
 
 export interface RetentionDeps {
@@ -323,6 +326,35 @@ export async function runRetention(deps: RetentionDeps): Promise<{ counts: Recor
     return rows.length;
   });
   await step('rawLiveRecordings', () => sweepRawRecordings(deps));
+  // Market listings: ended and not renewed, or sold long ago, are deleted; deleted ones are erased with their photos
+  // (removed by moderators, after the longer period). Ratings keep the listing's title.
+  await step('endedListings', async () => {
+    const r = await db.query(
+      `UPDATE market_listings SET deleted_at = now() WHERE deleted_at IS NULL AND (
+         (status <> 'sold' AND expires_at < ${days(RETENTION.marketEndedListingsDays)}) OR (status = 'sold' AND sold_at < ${days(RETENTION.marketSoldListingsDays)}))`,
+    );
+    return r.rowCount ?? 0;
+  });
+  await step('deletedListings', async () => {
+    let n = 0;
+    for (let i = 0; i < 200; i++) {
+      const { rows } = await db.query<{ id: string }>(
+        `SELECT id FROM market_listings WHERE deleted_at IS NOT NULL AND (
+           (deleted_at < ${days(RETENTION.deletedContentDays)} AND moderation_status <> 'removed') OR deleted_at < ${days(RETENTION.removedByModerationDays)})
+         LIMIT 500`,
+      );
+      if (!rows.length) break;
+      const ids = rows.map((r) => r.id);
+      const media = (await db.query<{ id: string }>(`SELECT media_id AS id FROM market_listing_photos WHERE listing_id = ANY($1::uuid[])`, [ids])).rows.map(
+        (r) => r.id,
+      );
+      await db.query(`DELETE FROM market_listings WHERE id = ANY($1::uuid[])`, [ids]);
+      counts.deletedListingMedia = (counts.deletedListingMedia ?? 0) + (await purgeMedia(deps, await unusedMedia(db, [...new Set(media)])));
+      n += ids.length;
+      if (ids.length < 500) break;
+    }
+    return n;
+  });
 
   // Payment records, after the accounting period.
   await step('financialRecords', () => eraseFinancialRecords(db, deps.config.FINANCIAL_RECORDS_YEARS ?? RETENTION.financialRecordsYears));

@@ -86,6 +86,13 @@ export default async function PrivacyPage() {
           Watch together: while people in a chat watch videos together, we keep the session, who joined and left, the queue of videos and where playback is.
         </li>
         <li>
+          Market: when you list something, we keep its photos, words, price, the area you wrote and, if you choose “Use my approximate location”, a place
+          rounded to about 1 km. Nobody is ever shown that place: people see your area and a distance in whole kilometres, worked out on our servers. To show
+          what is near you, the web asks your browser for your position only when you tap the button, rounds it to about 1 km before sending it, and we use it
+          for that search only, without keeping it. We keep your saved listings, the chats you start about listings, offers and ratings. Nothing is paid through
+          YAPILAPI: you meet and pay in person.
+        </li>
+        <li>
           Questions (“Ask me”): if you turn on a question box, we keep its settings, the questions you receive and your answers. When you ask a question, we
           always store that it was you. If you ask “without your name shown”, the person you asked and everyone else can’t see who asked, and neither can their
           data download, but our moderators can see it when they review the question, and we can disclose it when the law requires it.
@@ -323,6 +330,10 @@ export default async function PrivacyPage() {
               because of them.
             </li>
             <li>Call history: 12 months. Games in chats: 12 months after they end. Watch together sessions: 90 days after they end.</li>
+            <li>
+              Market listings: 180 days after they end without being renewed, 12 months after they are sold, and 30 days after you delete them (180 days when
+              our team removed them). Ratings stay while both accounts exist.
+            </li>
             <li>An earlier username: 30 days after the 14 days it is held for you end.</li>
             <li>The devices remembered for sign-in alerts and the devices you signed in on: 13 months after they were last used.</li>
             <li>

@@ -7,6 +7,7 @@ import './globals.css';
 import './settings.css';
 import './watch.css';
 import './echo.css';
+import './market.css';
 import { Providers } from './providers';
 import { THEME_SCRIPT } from '@/lib/theme-script';
 

@@ -6,7 +6,14 @@
 import { headers } from 'next/headers';
 import { cache } from 'react';
 import { createClient } from '@yapilapi/api-client';
-import type { PublicCommunityPreview, PublicDropPreview, PublicEventPreview, PublicPostPreview, PublicProfilePreview } from '@yapilapi/shared';
+import type {
+  PublicCommunityPreview,
+  PublicDropPreview,
+  PublicEventPreview,
+  PublicListingPreview,
+  PublicPostPreview,
+  PublicProfilePreview,
+} from '@yapilapi/shared';
 
 /** Where the server reaches the API (the same origin next.config rewrites /api to). */
 export const API_ORIGIN = process.env.API_INTERNAL_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -96,4 +103,10 @@ export const getPublicCommunity = cache(async (slug: string): Promise<PublicComm
 export const getPublicDrop = cache(async (id: string): Promise<PublicDropPreview | null> => {
   if (!UUID.test(id)) return null;
   return orNull(async () => (await (await client()).public.drop(id)).drop);
+});
+
+/** A Market listing, while it's for sale and nothing about it waits for review. */
+export const getPublicListing = cache(async (id: string): Promise<PublicListingPreview | null> => {
+  if (!UUID.test(id)) return null;
+  return orNull(async () => (await (await client()).public.listing(id)).listing);
 });

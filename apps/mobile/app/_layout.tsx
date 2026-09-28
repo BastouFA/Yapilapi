@@ -145,6 +145,11 @@ function Screens() {
         <Stack.Screen name="drop/[id]" options={{ title: t('m.drops.title') }} />
         <Stack.Screen name="mixes/index" options={{ title: t('mixes.title') }} />
         <Stack.Screen name="mixes/[id]" options={{ title: t('mixes.card.kind') }} />
+        <Stack.Screen name="market/index" options={{ title: t('m.market.title') }} />
+        <Stack.Screen name="market/[id]" options={{ title: t('m.market.listing') }} />
+        <Stack.Screen name="market/mine" options={{ title: t('m.market.yours') }} />
+        <Stack.Screen name="market/saved" options={{ title: t('m.market.saved') }} />
+        <Stack.Screen name="market-edit" options={{ title: t('m.market.sell'), presentation: 'modal', headerLeft: closeButton }} />
         <Stack.Screen name="gifts" options={{ title: t('m.gifts.title') }} />
         <Stack.Screen name="follows" options={{ title: t('profile.followers') }} />
         <Stack.Screen name="profile-edit" options={{ title: t('profile.edit'), presentation: 'modal', headerLeft: closeButton }} />

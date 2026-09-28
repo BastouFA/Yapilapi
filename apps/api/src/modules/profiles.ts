@@ -44,6 +44,7 @@ import { coverRecipeProblem, editSize, renderCover } from '../lib/cover-render.t
 import { nowStatusesFor, ownNowStatus } from '../lib/now-status.ts';
 import { hasAnswersTab, profileAskBox } from '../lib/ask.ts';
 import { hasMixesTab } from '../lib/mixes.ts';
+import { hasMarketTab } from '../lib/market.ts';
 import { publishShares } from '../lib/location.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
@@ -201,12 +202,14 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
 
   /**
    * The tabs they chose; Answers only while their question box is on or has answers, Mixes only
-   * while the viewer may see one of their mixes (never leaving none).
+   * while the viewer may see one of their mixes, Market only while they have something listed the
+   * viewer may see or Market ratings (never leaving none).
    */
   async function tabsOf(userId: string, saved: string[] | null, viewer: string | null): Promise<ProfileTab[]> {
     let tabs = profileTabs(saved);
     if (tabs.includes('answers') && !(await hasAnswersTab(db, userId))) tabs = tabs.filter((t) => t !== 'answers');
     if (tabs.includes('mixes') && !(await hasMixesTab(db, userId, viewer))) tabs = tabs.filter((t) => t !== 'mixes');
+    if (tabs.includes('market') && !(await hasMarketTab(db, userId, viewer))) tabs = tabs.filter((t) => t !== 'market');
     return tabs.length ? tabs : ['posts'];
   }
 

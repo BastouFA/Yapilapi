@@ -68,6 +68,9 @@ function Discover() {
           <Link href="/assistant" className="yp-btn yp-btn--ghost yp-btn--sm">
             Assistant
           </Link>
+          <Link href="/market" className="yp-btn yp-btn--ghost yp-btn--sm">
+            {t('market.title')}
+          </Link>
           <Link href="/communities/new" className="yp-btn yp-btn--secondary yp-btn--sm">
             {t('communities.create')}
           </Link>

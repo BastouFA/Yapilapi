@@ -35,6 +35,7 @@ import { useChatWatch, WatchBanner } from '@/components/WatchTogether';
 import { GameCard, GameSheet, StartGameSheet } from '@/components/ChatGames';
 import { ChatMixCard, ShareMixHereSheet } from '@/components/Mixes';
 import { LocationCard, LocationRequestLine, ShareLocationSheet, SharingBanner, useLocationSharing } from '@/components/ChatLocation';
+import { MarketListingChat, MarketOfferChat } from '@/components/MarketChat';
 
 type Pending = Message & { pending?: boolean };
 
@@ -215,6 +216,8 @@ export default function ChatPage() {
         list: undefined,
         game: undefined,
         location: undefined,
+        market: undefined,
+        offer: undefined,
         reminder: undefined,
       }));
       if (boardFor === e.data.id) setBoardFor(null);
@@ -246,6 +249,11 @@ export default function ChatPage() {
       patchMessage(e.data.id, (x) => (x.unsent ? x : { ...x, location: e.data.location }));
       sharing.apply(e.data.location);
     }
+    // A Market card changed (reserved, sold, an answer to an offer, a rating): it shows as it is now.
+    if (e.type === 'market.updated' && e.data.conversationId === id)
+      patchMessage(e.data.messageId, (x) =>
+        x.unsent ? x : { ...x, ...(e.data.market ? { market: e.data.market } : {}), ...(e.data.offer ? { offer: e.data.offer } : {}) },
+      );
     // "Ada added 3 songs": more adds raise the line's count.
     if (e.type === 'message.system' && e.data.conversationId === id) patchMessage(e.data.id, (x) => ({ ...x, system: e.data.system }));
     // A mix shared here changed: its cards show it as it is now (or that it's gone).
@@ -446,6 +454,8 @@ export default function ChatPage() {
       !m.game &&
       !m.mix &&
       !m.location &&
+      !m.market &&
+      !m.offer &&
       !m.unsent &&
       !m.pending &&
       Date.now() - new Date(m.createdAt).getTime() < MESSAGE_EDIT_MINUTES * 60_000;
@@ -685,6 +695,10 @@ export default function ChatPage() {
               <ChatMixCard mix={m.mix} onMix={(mix) => patchMessage(m.id, (x) => ({ ...x, mix }))} />
             ) : m.location ? (
               <LocationCard message={m} meId={me?.id} mine={mine} viewer={sharing.viewer} onViewer={sharing.setViewer} onStop={stopSharing} />
+            ) : m.market ? (
+              <MarketListingChat card={m.market} onCard={(market) => patchMessage(m.id, (x) => ({ ...x, market }))} />
+            ) : m.offer ? (
+              <MarketOfferChat offer={m.offer} meId={me?.id} onOffer={(offer) => patchMessage(m.id, (x) => ({ ...x, offer }))} onMessage={addMessage} />
             ) : m.viewOnce ? (
               <>
                 <ViewOnceMessage message={m} mine={mine} onChange={(next) => setMessages((cur) => cur?.map((x) => (x.id === next.id ? next : x)) ?? cur)} />
@@ -848,7 +862,11 @@ export default function ChatPage() {
                             ? { kind: 'mix' as const }
                             : replyTo.location
                               ? { kind: 'location' as const }
-                              : {}),
+                              : replyTo.market
+                                ? { kind: 'listing' as const }
+                                : replyTo.offer
+                                  ? { kind: 'offer' as const }
+                                  : {}),
                   })}
                 </span>
               ) : null}

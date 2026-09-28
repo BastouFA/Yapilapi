@@ -10,6 +10,7 @@ import { client, errorMessage } from '../lib/api';
 import { SectionHeader } from '../lib/chips';
 import { useT, type Translator } from '../lib/i18n';
 import { notificationHref } from '../lib/links';
+import { marketNoticeText } from '../lib/market';
 import { useRealtime, useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
 import { Avatar, Button, EmptyState, ErrorState, Notice, SkeletonList, useColors, userText } from '../lib/ui';
@@ -137,6 +138,9 @@ function describe(g: Group, tr: Translator): string {
   // "Ada and 3 others echoed your reel".
   const echo = echoNoticeText(n, t, tp);
   if (echo) return echo;
+  // Market: offers and answers to them, a sale to you, a rating, and listings ending.
+  const market = marketNoticeText(n, t, tp);
+  if (market) return market;
   // Likes on a comment and replies to it arrive batched: the newest person, and how many in all.
   const others = Math.max(0, Number(n.data.count ?? 1) - 1);
   if (n.type === 'comment_like' && n.actor) return others ? tp('comments.notif.likeOthers', others, { name }) : t('comments.notif.like', { name });

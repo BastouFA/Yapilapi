@@ -13,6 +13,7 @@ import { notifyReleasedPosts } from '../lib/collabs.ts';
 import { syncCommentCounts } from '../lib/comments.ts';
 import { answerCards } from '../lib/ask.ts';
 import { MIX_FROM, mixVisibleSql } from '../lib/mixes.ts';
+import { LISTING_FROM, listingVisibleSql } from '../lib/market.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -46,6 +47,8 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       mix: `SELECT owner_id AS uid FROM mixes WHERE id = $1 AND deleted_at IS NULL`,
       // A photo or video in a Together album is the person who added it.
       together_item: `SELECT user_id AS uid FROM together_contributions WHERE id = $1 AND deleted_at IS NULL`,
+      // A Market listing is its seller's.
+      listing: `SELECT seller_id AS uid FROM market_listings WHERE id = $1 AND deleted_at IS NULL`,
     };
     const r = await db.query(q[type]!, [id]);
     return r.rows[0]?.uid ?? null;
@@ -74,6 +77,11 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     // A mix, only by someone who may see it.
     if (input.targetType === 'mix') {
       const ok = await db.query(`SELECT 1 ${MIX_FROM} WHERE mx.id = $2 AND ${mixVisibleSql('$1')}`, [u.id, input.targetId]);
+      if (!ok.rowCount) throw notFound('The item you reported');
+    }
+    // A Market listing, only by someone who may see it.
+    if (input.targetType === 'listing') {
+      const ok = await db.query(`SELECT 1 ${LISTING_FROM} WHERE l.id = $2 AND ${listingVisibleSql('$1')}`, [u.id, input.targetId]);
       if (!ok.rowCount) throw notFound('The item you reported');
     }
     // Albums are for their members: only someone in it (who can see the item) can report what's in it.
@@ -144,11 +152,16 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
                              WHEN 'answer' THEN (SELECT 'Q: ' || body || E'\nA: ' || coalesce(answer, '') FROM ask_questions WHERE id = mc.target_id)
                              WHEN 'mix' THEN (SELECT title || E'\n' || description FROM mixes WHERE id = mc.target_id)
                              WHEN 'together_item' THEN (SELECT caption FROM together_contributions WHERE id = mc.target_id)
+                             WHEN 'listing' THEN (SELECT title || E'\n' || description || E'\n' || area FROM market_listings WHERE id = mc.target_id)
+                             WHEN 'market_rating' THEN (SELECT stars || '/5: ' || body FROM market_ratings WHERE id = mc.target_id)
                              WHEN 'ad_campaign' THEN (SELECT p.body FROM ad_campaigns a JOIN posts p ON p.id = a.post_id WHERE a.id = mc.target_id) END AS excerpt,
          CASE WHEN mc.target_type = 'media' THEN (SELECT json_build_object('kind', m.kind, 'url', coalesce(m.variants->>'medium', m.poster_url, m.url), 'moderation', m.moderation)
                                                     FROM media m WHERE m.id = mc.target_id)
               WHEN mc.target_type = 'together_item' THEN (SELECT json_build_object('kind', m.kind, 'url', coalesce(m.variants->>'medium', m.poster_url, m.url), 'moderation', m.moderation)
-                                                    FROM together_contributions tc JOIN media m ON m.id = tc.media_id WHERE tc.id = mc.target_id) END AS media
+                                                    FROM together_contributions tc JOIN media m ON m.id = tc.media_id WHERE tc.id = mc.target_id)
+              WHEN mc.target_type = 'listing' THEN (SELECT json_build_object('kind', m.kind, 'url', coalesce(m.variants->>'medium', m.url), 'moderation', m.moderation)
+                                                    FROM market_listing_photos ph JOIN media m ON m.id = ph.media_id WHERE ph.listing_id = mc.target_id
+                                                    ORDER BY (m.moderation = 'sensitive') DESC, ph.position LIMIT 1) END AS media
        FROM moderation_cases mc LEFT JOIN profiles pr ON pr.user_id = mc.subject_user_id LEFT JOIN appeals ap ON ap.case_id = mc.id
        WHERE mc.status = $1 ORDER BY CASE mc.risk WHEN 'escalate' THEN 0 WHEN 'restrict' THEN 1 ELSE 2 END, mc.created_at LIMIT 100`,
       [q.status, me(req).id],
@@ -282,8 +295,17 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     decision: string,
   ) {
     // A question and its answer are one row: a decision on either applies to the card.
-    // A restricted mix is seen by its owner alone; a removed one by nobody.
-    const table: Record<string, string> = { post: 'posts', comment: 'comments', question: 'ask_questions', answer: 'ask_questions', mix: 'mixes' };
+    // A restricted mix is seen by its owner alone; a removed one by nobody. So is a Market listing (one
+    // held for review shows once cleared), and a held Market rating.
+    const table: Record<string, string> = {
+      post: 'posts',
+      comment: 'comments',
+      question: 'ask_questions',
+      answer: 'ask_questions',
+      mix: 'mixes',
+      listing: 'market_listings',
+      market_rating: 'market_ratings',
+    };
     const t = table[mc.target_type];
     if (decision === 'no_action' && t) await c.query(`UPDATE ${t} SET moderation_status = 'normal' WHERE id = $1`, [mc.target_id]);
     // A held message is delivered once a moderator lets it through.

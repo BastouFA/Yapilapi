@@ -18,6 +18,7 @@ export function isPublicPath(path: string): boolean {
     /^\/(p|u|c|t|boards)\/[^/]+\/?$/.test(path) ||
     /^\/events\/(?!new\/?$)[^/]+\/?$/.test(path) ||
     /^\/drops\/(?!new\/?$)[^/]+\/?$/.test(path) ||
+    /^\/market\/(?!(new|mine)\/?$)[^/]+\/?$/.test(path) ||
     /^\/reels\/?$/.test(path)
   );
 }

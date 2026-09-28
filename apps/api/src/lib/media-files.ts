@@ -104,7 +104,8 @@ export async function unusedMedia(db: Q, ids: string[]): Promise<string[]> {
        -- A sound made from it counts while a post still uses that sound.
        AND NOT EXISTS (SELECT 1 FROM sounds s JOIN posts sp ON sp.sound_id = s.id WHERE s.media_id = m.id AND sp.deleted_at IS NULL)
        AND NOT EXISTS (SELECT 1 FROM recaps r WHERE r.media_id = m.id AND r.deleted_at IS NULL)
-       AND NOT EXISTS (SELECT 1 FROM live_sessions l WHERE l.recording_media_id = m.id)`,
+       AND NOT EXISTS (SELECT 1 FROM live_sessions l WHERE l.recording_media_id = m.id)
+       AND NOT EXISTS (SELECT 1 FROM market_listing_photos mp JOIN market_listings ml ON ml.id = mp.listing_id WHERE mp.media_id = m.id AND ml.deleted_at IS NULL)`,
     [ids],
   );
   return rows.map((r) => r.id);

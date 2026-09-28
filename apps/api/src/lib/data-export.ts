@@ -469,7 +469,42 @@ export async function exportSections(db: Q, userId: string) {
     ),
   };
 
-  return { content, chats, activity, relationships, money, safety, ai, security, developer, invites, settings };
+  // Market: what you listed, saved, offered and rated. A listing's place is kept only to about a
+  // kilometre and is left out here like everywhere else; whether it has one is said.
+  const market = {
+    listings: await q(
+      `SELECT l.id, l.title, l.description, l.category, l.condition, l.price_cents, l.currency, l.area, (l.approx_lat IS NOT NULL) AS has_approximate_place,
+              l.delivery, l.status, ${un('l.reserved_for')} AS reserved_for, ${un('l.sold_to')} AS sold_to, l.sold_at, l.expires_at, l.renewed_at,
+              l.moderation_status, l.created_at, l.updated_at, l.deleted_at,
+              coalesce((SELECT json_agg(json_build_object('url', ${openUrl('m')}, 'alt_text', p.alt_text) ORDER BY p.position)
+                        FROM market_listing_photos p JOIN media m ON m.id = p.media_id WHERE p.listing_id = l.id), '[]') AS photos
+       FROM market_listings l WHERE l.seller_id = $1 ORDER BY l.created_at DESC`,
+    ),
+    saved: await q(
+      `SELECT s.listing_id, l.title, s.created_at FROM market_saves s JOIN market_listings l ON l.id = s.listing_id WHERE s.user_id = $1 ORDER BY s.created_at DESC`,
+    ),
+    // Chats you started about other people's listings.
+    chatsAboutListings: await q(
+      `SELECT c.listing_id, l.title, ${un('l.seller_id')} AS seller, c.conversation_id, c.created_at
+       FROM market_chats c JOIN market_listings l ON l.id = c.listing_id WHERE c.buyer_id = $1 ORDER BY c.created_at DESC`,
+    ),
+    offers: await q(
+      `SELECT o.listing_id, l.title, CASE WHEN o.buyer_id = $1 THEN 'buyer' ELSE 'seller' END AS your_side,
+              ${un('CASE WHEN o.buyer_id = $1 THEN o.seller_id ELSE o.buyer_id END')} AS with,
+              CASE WHEN (o.made_by = 'buyer') = (o.buyer_id = $1) THEN 'you' ELSE 'them' END AS made_by, o.amount_cents, o.currency, o.status, o.created_at, o.responded_at
+       FROM market_offers o JOIN market_listings l ON l.id = o.listing_id WHERE o.buyer_id = $1 OR o.seller_id = $1 ORDER BY o.created_at DESC`,
+    ),
+    ratingsGiven: await q(
+      `SELECT listing_title, ${un('ratee_id')} AS rated, rater_role AS your_side, stars, body, moderation_status, created_at
+       FROM market_ratings WHERE rater_id = $1 ORDER BY created_at DESC`,
+    ),
+    ratingsReceived: await q(
+      `SELECT listing_title, ${un('rater_id')} AS rated_by, rater_role AS their_side, stars, body, created_at
+       FROM market_ratings WHERE ratee_id = $1 AND moderation_status = 'normal' AND deleted_at IS NULL ORDER BY created_at DESC`,
+    ),
+  };
+
+  return { content, chats, activity, relationships, money, safety, ai, security, developer, invites, settings, market };
 }
 
 /** A short guide at the top of the file: what each part holds, the limits, and what is left out. */
@@ -492,6 +527,7 @@ export const EXPORT_README = {
     developer: 'Your developer apps, key names and webhooks.',
     invites: 'Your invite code, who joined with it, and who invited you.',
     settings: 'Your preferences and, for teens, the controls a parent or guardian set.',
+    market: 'Market: things you listed (with their photos), saved, the chats you started about listings, offers, and ratings you gave and got.',
   },
   limits: {
     'activity.*PerDay': `Counts per day (UTC) for the last ${EXPORT_LIMITS.days} days with any, not every view.`,
@@ -511,7 +547,7 @@ export const EXPORT_README = {
     'Passwords, sign-in and reset links, session and API key tokens, two-step secrets and codes, passkey keys, stream keys and webhook secrets (and their hashes).',
     'Other people’s messages, email addresses and private details.',
     'Who reported you, and cases still being reviewed.',
-    'Where you were: places you shared in chats are not included, and a live share keeps none once it ends.',
+    'Where you were: places you shared in chats are not included, and a live share keeps none once it ends. Market listings say whether they have an approximate place, not where.',
     'How automated spam and abuse checks work: the flags on your account are counted, not described.',
   ],
 } as const;

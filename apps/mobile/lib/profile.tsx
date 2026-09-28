@@ -51,6 +51,7 @@ import { FeaturedRow, ProfileAbout, ProfileLinks, ProfileSongChip, tabLabel, use
 import type { Tint } from './ui';
 import { AnswersList, AskCard } from './ask';
 import { ProfileMixes } from './mixes';
+import { ProfileMarket } from './market';
 
 /**
  * A profile: name, bio, counts, Follow and Message for other people, and
@@ -585,6 +586,8 @@ export function ProfileView({
           <AnswersList profile={profile} />
         ) : current === 'mixes' ? (
           <ProfileMixes username={profile.username} isSelf={rel.isSelf} />
+        ) : current === 'market' ? (
+          <ProfileMarket userId={profile.id} isSelf={rel.isSelf} />
         ) : current === 'shop' ? (
           <ShopList userId={profile.id} username={profile.username} isSelf={rel.isSelf} />
         ) : current === 'boards' ? (
