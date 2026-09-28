@@ -2,7 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { as, signUp, testApp, type TestUser } from './helpers.ts';
 import type { BuiltApp } from '../src/app.ts';
 import { fetchLinkIcon, refreshLinkIcons, sniffIcon } from '../src/lib/link-icons.ts';
-import { isPrivateIp } from '../src/lib/webhooks.ts';
+import { isPrivateIp } from '../src/lib/safe-fetch.ts';
+import { fakeWeb } from './fake-web.ts';
 import type { MusicTrack } from '@yapilapi/shared';
 
 let t: BuiltApp;
@@ -30,7 +31,6 @@ const newPost = async (u: TestUser, extra: Record<string, unknown> = {}) => {
 
 const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
 const SVG = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
-const publicDns = async () => ['93.184.216.34'];
 
 describe('profile style, pronouns and about', () => {
   it('has defaults, saves the choices and shows them to visitors', async () => {
@@ -130,45 +130,41 @@ describe('profile links', () => {
   });
 
   it('fetches site icons safely: public https hosts only, small images recognised by their bytes', async () => {
-    const calls: string[] = [];
-    const fake = (routes: Record<string, () => Response>): typeof fetch =>
-      (async (url: string | URL) => {
-        calls.push(String(url));
-        const r = routes[String(url)];
-        return r ? r() : new Response('nope', { status: 404 });
-      }) as typeof fetch;
-
-    // A PNG from a public host is kept.
-    expect(
-      await fetchLinkIcon('good.example', { fetchImpl: fake({ 'https://good.example/favicon.ico': () => new Response(PNG) }), resolve: publicDns }),
-    ).toMatchObject({
-      mime: 'image/png',
-    });
-    // SVG (can carry script) and HTML are refused, whatever the site says they are.
-    expect(
-      await fetchLinkIcon('svg.example', {
-        fetchImpl: fake({ 'https://svg.example/favicon.ico': () => new Response(SVG, { headers: { 'content-type': 'image/png' } }) }),
-        resolve: publicDns,
-      }),
-    ).toBeNull();
-    // Too big.
-    expect(
-      await fetchLinkIcon('big.example', {
-        fetchImpl: fake({ 'https://big.example/favicon.ico': () => new Response(new Uint8Array(40_000).fill(0x89)) }),
-        resolve: publicDns,
-      }),
-    ).toBeNull();
-    // A host that resolves to a private address is never contacted.
-    calls.length = 0;
-    expect(await fetchLinkIcon('internal.example', { fetchImpl: fake({}), resolve: async () => ['10.0.0.5'] })).toBeNull();
-    expect(await fetchLinkIcon('meta.example', { fetchImpl: fake({}), resolve: async () => ['169.254.169.254'] })).toBeNull();
-    expect(calls).toEqual([]);
-    // A redirect is checked again: one to a private address is not followed.
-    const hop = fake({
-      'https://hop.example/favicon.ico': () => new Response(null, { status: 302, headers: { location: 'http://127.0.0.1/favicon.ico' } }),
-    });
-    expect(await fetchLinkIcon('hop.example', { fetchImpl: hop, resolve: publicDns })).toBeNull();
-    expect(calls).toEqual(['https://hop.example/favicon.ico']);
+    const dns = (host: string) =>
+      host === 'internal.example' ? ['10.0.0.5'] : host === 'meta.example' ? ['169.254.169.254'] : host === 'v6.example' ? ['::1'] : ['93.184.216.34'];
+    const web = await fakeWeb(
+      {
+        'good.example/favicon.ico': () => ({ body: PNG }),
+        // SVG (can carry script) and HTML are refused, whatever the site says they are.
+        'svg.example/favicon.ico': () => ({ body: SVG, headers: { 'content-type': 'image/png' } }),
+        'big.example/favicon.ico': () => ({ body: new Uint8Array(40_000).fill(0x89) }),
+        'hop.example/favicon.ico': () => ({ status: 302, headers: { location: 'http://127.0.0.1/favicon.ico' } }),
+        'rehop.example/favicon.ico': () => ({ status: 302, headers: { location: 'https://internal.example/favicon.ico' } }),
+        'moved.example/favicon.ico': () => ({ status: 301, headers: { location: 'https://good.example/favicon.ico' } }),
+      },
+      dns,
+    );
+    try {
+      // A PNG from a public host is kept.
+      expect(await fetchLinkIcon('good.example', web.deps)).toMatchObject({ mime: 'image/png' });
+      expect(await fetchLinkIcon('svg.example', web.deps)).toBeNull();
+      // Too big.
+      expect(await fetchLinkIcon('big.example', web.deps)).toBeNull();
+      // A host that resolves to a private address is never contacted.
+      web.hits.length = 0;
+      expect(await fetchLinkIcon('internal.example', web.deps)).toBeNull();
+      expect(await fetchLinkIcon('meta.example', web.deps)).toBeNull();
+      expect(await fetchLinkIcon('v6.example', web.deps)).toBeNull();
+      expect(web.hits).toEqual([]);
+      // A redirect is checked again: one to a private address is not followed, by address or by name.
+      expect(await fetchLinkIcon('hop.example', web.deps)).toBeNull();
+      expect(await fetchLinkIcon('rehop.example', web.deps)).toBeNull();
+      expect(web.hits).toEqual(['GET hop.example/favicon.ico', 'GET rehop.example/favicon.ico']);
+      // One to another public host is followed.
+      expect(await fetchLinkIcon('moved.example', web.deps)).toMatchObject({ mime: 'image/png' });
+    } finally {
+      await web.close();
+    }
 
     expect(sniffIcon(Uint8Array.from([0, 0, 1, 0, 1, 0]))).toBe('image/x-icon');
     expect(isPrivateIp('::ffff:172.16.0.1')).toBe(true);
@@ -185,13 +181,14 @@ describe('profile links', () => {
         { label: 'Blog', url: 'https://blog.icons.example' },
       ],
     });
-    await refreshLinkIcons(db(), ['shop.icons.example', 'blog.icons.example'], {
-      resolve: publicDns,
-      fetchImpl: (async (url: string | URL) =>
-        String(url).startsWith('https://shop.')
-          ? new Response(PNG)
-          : new Response('<html></html>', { headers: { 'content-type': 'image/x-icon' } })) as typeof fetch,
-    });
+    const web = await fakeWeb(
+      {
+        'shop.icons.example/favicon.ico': () => ({ body: PNG }),
+        'blog.icons.example/favicon.ico': () => ({ body: '<html></html>', headers: { 'content-type': 'image/x-icon' } }),
+      },
+      () => ['93.184.216.34'],
+    );
+    await refreshLinkIcons(db(), ['shop.icons.example', 'blog.icons.example'], web.deps).finally(web.close);
     const links = (await profileOf(bola, ada)).links;
     expect(links[0].iconUrl).toMatch(/\/v1\/link-icons\/shop\.icons\.example$/);
     expect(links[1].iconUrl).toBeNull();

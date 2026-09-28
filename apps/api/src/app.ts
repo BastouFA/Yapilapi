@@ -459,7 +459,7 @@ export async function buildApp(
     ...locationJobHandlers({ db, realtime: ctx.realtime }),
     // Scheduled posts go out at their time.
     ...scheduledPostJobHandlers(ctx),
-    // Site icons for profile links, fetched through the SSRF guard.
+    // Site icons for profile links, fetched through safeFetch (lib/safe-fetch.ts).
     ...linkIconJobHandlers(db),
     // Jobs the modules added (messages sent later).
     ...ctx.jobs,

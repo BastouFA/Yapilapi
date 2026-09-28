@@ -1,12 +1,13 @@
 import type { Pool, PoolClient } from 'pg';
 import { enqueue, type JobHandler } from './jobs.ts';
-import { assertSafeWebhookUrl } from './webhooks.ts';
+import { safeFetch, type SafeFetchDeps } from './safe-fetch.ts';
 
 type Q = Pool | PoolClient;
 
 /**
- * Site icons for profile links. The server fetches `https://<host>/favicon.ico` itself, through the
- * same SSRF guard as webhooks (https only, public addresses only, each redirect checked again), keeps
+ * Site icons for profile links. The server fetches `https://<host>/favicon.ico` itself, through
+ * safeFetch like webhooks (https only, connections only to addresses checked as public, each
+ * redirect checked again), keeps
  * only a small image it recognises by its bytes, and serves it from /v1/link-icons/:host. Browsers
  * and phones never contact the linked site just to show a profile.
  */
@@ -18,11 +19,7 @@ export const LINK_ICON_TTL_DAYS = 7;
 const MAX_REDIRECTS = 2;
 const TIMEOUT_MS = 4_000;
 
-export interface LinkIconDeps {
-  fetchImpl?: typeof fetch;
-  /** Looks up a host's addresses (tests pass a fake). */
-  resolve?: (host: string) => Promise<string[]>;
-}
+export type LinkIconDeps = SafeFetchDeps;
 
 /** The host whose icon a link shows: lower case, no port. Null for anything that isn't a web address. */
 export function iconHost(url: string): string | null {
@@ -51,7 +48,10 @@ export function sniffIcon(b: Uint8Array): string | null {
 /** Read at most `max` bytes of a response; null if it is longer. */
 async function readCapped(res: Response, max: number): Promise<Uint8Array | null> {
   const declared = Number(res.headers.get('content-length') ?? '');
-  if (Number.isFinite(declared) && declared > max) return null;
+  if (Number.isFinite(declared) && declared > max) {
+    await res.body?.cancel().catch(() => {});
+    return null;
+  }
   if (!res.body) return new Uint8Array(await res.arrayBuffer()).slice(0, max + 1);
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -80,30 +80,25 @@ async function readCapped(res: Response, max: number): Promise<Uint8Array | null
  * show. Never throws for anything the site does.
  */
 export async function fetchLinkIcon(host: string, deps: LinkIconDeps = {}): Promise<{ image: Buffer; mime: string } | null> {
-  const f = deps.fetchImpl ?? fetch;
-  let url = `https://${host}/favicon.ico`;
   try {
-    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-      // https only, no credentials, and every address the host resolves to must be public.
-      await assertSafeWebhookUrl(url, false, deps.resolve);
-      const res = await f(url, {
-        method: 'GET',
+    // https only, no credentials, and the connection goes only to addresses checked as public (each redirect too).
+    const res = await safeFetch(
+      `https://${host}/favicon.ico`,
+      {
         headers: { accept: 'image/*', 'user-agent': 'YAPILAPI-LinkIcons/1' },
-        redirect: 'manual',
+        maxRedirects: MAX_REDIRECTS,
         signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
-      if (res.status >= 300 && res.status < 400) {
-        const next = res.headers.get('location');
-        if (!next) return null;
-        url = new URL(next, url).toString();
-        continue;
-      }
-      if (res.status !== 200) return null;
-      const bytes = await readCapped(res, LINK_ICON_MAX_BYTES);
-      if (!bytes) return null;
-      const mime = sniffIcon(bytes);
-      return mime ? { image: Buffer.from(bytes), mime } : null;
+      },
+      deps,
+    );
+    if (res.status !== 200) {
+      await res.body?.cancel().catch(() => {});
+      return null;
     }
+    const bytes = await readCapped(res, LINK_ICON_MAX_BYTES);
+    if (!bytes) return null;
+    const mime = sniffIcon(bytes);
+    return mime ? { image: Buffer.from(bytes), mime } : null;
   } catch {
     // Unreachable, unsafe, too slow or too big: no icon.
   }
