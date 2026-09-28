@@ -1,13 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { HeaderHeightContext, NavigationContext } from 'expo-router/react-navigation';
-import { useCallback, useContext, useEffect, useRef, useState, type ComponentProps, type ReactNode, type Ref } from 'react';
+import { useCallback, useContext, useEffect, useId, useRef, useState, type ComponentProps, type ReactNode, type Ref } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
   Animated,
   I18nManager,
   Image,
+  InputAccessoryView,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -185,12 +186,17 @@ export function Field({
   ...props
 }: TextInputProps & { label: string; hideLabel?: boolean; ref?: Ref<TextInput>; hint?: string; error?: string | null; end?: ReactNode }) {
   const c = useColors();
+  const { t } = useT();
   const below = error || hint;
+  // iPhone number keypads have no return key: a Done bar above them closes the keyboard.
+  const accessoryId = `field-${useId()}`;
+  const keypad = Platform.OS === 'ios' && ['number-pad', 'decimal-pad', 'numeric', 'phone-pad'].includes(String(props.keyboardType));
   const input = (
     <TextInput
       accessibilityLabel={props.label}
       accessibilityHint={below || undefined}
       placeholderTextColor={c.inkMuted}
+      inputAccessoryViewID={keypad ? accessoryId : undefined}
       {...props}
       style={[
         s.input,
@@ -212,6 +218,19 @@ export function Field({
       ) : (
         input
       )}
+      {keypad ? (
+        <InputAccessoryView nativeID={accessoryId}>
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', backgroundColor: c.surfaceSunken, borderTopWidth: 1, borderTopColor: c.line }}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => Keyboard.dismiss()}
+              style={{ minHeight: 44, minWidth: 64, paddingHorizontal: space[4], alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={{ color: c.yapi, fontWeight: '700', fontSize: 16 }}>{t('m.common.done')}</Text>
+            </Pressable>
+          </View>
+        </InputAccessoryView>
+      ) : null}
       {below ? (
         <Text
           accessibilityElementsHidden

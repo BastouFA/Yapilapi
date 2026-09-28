@@ -280,6 +280,11 @@ export default function MarketEdit() {
             </View>
           ))}
           {!full ? <Button label={t('m.market.addPhoto')} icon="image-outline" variant="secondary" onPress={addPhoto} /> : null}
+          {photos.some((p) => p.progress !== null) ? (
+            <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted, fontSize: 13 }}>
+              {t('m.market.form.waitPhotos')}
+            </Text>
+          ) : null}
           {photoDenied ? (
             <Notice tone="warn">
               <Text style={{ color: c.ink, lineHeight: 20 }}>{t('m.market.photoDenied')}</Text>
