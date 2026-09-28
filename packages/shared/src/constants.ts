@@ -165,6 +165,9 @@ export function isVideoFile(file: { type: string; name: string }): boolean {
  * and mobile money) when it is configured; the others go to the default provider.
  */
 export const CURRENCIES = ['USD', 'EUR', 'GBP', 'NGN', 'GHS', 'KES', 'ZAR', 'XOF'] as const;
+
+/** Days a sale's earnings wait before they can be paid out, so early refunds and chargebacks come out of them. */
+export const EARNINGS_HOLD_DAYS = 7;
 export type Currency = (typeof CURRENCIES)[number];
 
 /**

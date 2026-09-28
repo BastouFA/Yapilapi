@@ -245,7 +245,7 @@ describe('creator economy, reviews and bookings', () => {
     });
     await pay(tip.body.payment.orderId, 300);
     const earnings = (await as(t.app, creator).get('/v1/me/earnings')).body.balances.find((b: { currency: string }) => b.currency === 'EUR');
-    expect(earnings).toMatchObject({ grossCents: 800, feeCents: 40, availableCents: 760 });
+    expect(earnings).toMatchObject({ grossCents: 800, feeCents: 40, heldCents: 760, availableCents: 0 });
     const notes = (await as(t.app, creator).get('/v1/notifications')).body.items.map((n: { type: string }) => n.type);
     expect(notes).toEqual(expect.arrayContaining(['subscription_started', 'tip_received']));
     expect((await as(t.app, fan).post(`/v1/creator/subscriptions/${mine.id}/cancel`)).body.status).toBe('cancelled');

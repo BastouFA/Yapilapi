@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
 import type { AdCampaign, Boost, CreatorAnalytics, CreatorTopPost, Payout, SalesReport, ServiceBooking } from '../../../packages/api-client/src/index';
+import { EARNINGS_HOLD_DAYS } from '../../../packages/shared/src/constants';
 import { formatMoney } from '../../../packages/shared/src/i18n';
 import { client, errorMessage } from '../lib/api';
 import { SectionHeader } from '../lib/chips';
@@ -14,7 +15,7 @@ import { useSession } from '../lib/session';
 import { space } from '../lib/theme';
 import { Button, Card, ErrorState, Icon, Loading, Notice, Row, useColors, userText } from '../lib/ui';
 
-type Earnings = { currency: string; grossCents: number; feeCents: number; availableCents: number }[];
+type Earnings = { currency: string; grossCents: number; feeCents: number; heldCents: number; availableCents: number }[];
 
 /** What each section got; a section that failed to load (or is turned off) stays out of the way. */
 type StudioData = {
@@ -180,7 +181,12 @@ export default function StudioScreen() {
             items={data.earnings.map((e) => ({
               label: t('m.studio.available', { currency: e.currency }),
               value: money(e.availableCents, e.currency),
-              sub: t('m.studio.earningsLine', { gross: money(e.grossCents, e.currency), fees: money(e.feeCents, e.currency) }),
+              sub: [
+                t('m.studio.earningsLine', { gross: money(e.grossCents, e.currency), fees: money(e.feeCents, e.currency) }),
+                e.heldCents > 0 ? t('m.studio.earningsHeld', { amount: money(e.heldCents, e.currency), days: EARNINGS_HOLD_DAYS }) : null,
+              ]
+                .filter(Boolean)
+                .join(' · '),
             }))}
           />
         ) : (

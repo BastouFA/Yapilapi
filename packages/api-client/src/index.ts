@@ -1216,7 +1216,8 @@ export function createClient(opts: ClientOptions) {
       /** One of your posts (or one you co-authored): counts and views per day over the last 28 days. */
       postInsights: (postId: string) => get<{ insights: PostInsights }>(`/v1/posts/${postId}/insights`),
       /** What you earned from sales, subscriptions and tips, per currency, less fees and payouts. */
-      earnings: () => get<{ balances: { currency: string; grossCents: number; feeCents: number; availableCents: number }[] }>('/v1/me/earnings'),
+      earnings: () =>
+        get<{ balances: { currency: string; grossCents: number; feeCents: number; heldCents: number; availableCents: number }[] }>('/v1/me/earnings'),
       /** Your payout requests and where each one is. */
       payouts: () => get<{ items: Payout[] }>('/v1/me/payouts'),
       /** Paid tips you got or sent; ones sent during a live are gifts. */
