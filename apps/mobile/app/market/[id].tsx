@@ -4,7 +4,7 @@ import { AccessibilityInfo, Alert, Image, Platform, Pressable, RefreshControl, S
 import { ApiError } from '../../../../packages/api-client/src/index';
 import { MARKET_LISTING_DAYS, marketDaysLeft, type MarketListingDetail, type MarketPhoto } from '../../../../packages/shared/src/market';
 import type { PublicUser } from '../../../../packages/shared/src/types';
-import { client, errorMessage, mediaUrl, webUrl } from '../../lib/api';
+import { client, errorMessage, isGone, mediaUrl, webUrl } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import {
   AmountSheet,
@@ -23,7 +23,7 @@ import {
 import { useReport } from '../../lib/report';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
-import { Button, EmptyState, Icon, Loading, Notice, useActionSheet, useColors, userText } from '../../lib/ui';
+import { Button, EmptyState, Icon, Loading, Notice, ScreenError, useActionSheet, useColors, userText } from '../../lib/ui';
 
 /**
  * A Market listing: its photos (with the seller's descriptions for screen readers), price,
@@ -39,6 +39,8 @@ export default function ListingScreen() {
   const { t, tp, date } = tr;
   const { me } = useSession();
   const [listing, setListing] = useState<MarketListingDetail | null | undefined>(undefined);
+  // Why it couldn't load, when that isn't because it's gone; a listing already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -51,12 +53,10 @@ export default function ListingScreen() {
     try {
       const near = currentNear();
       setListing((await (await client()).market.get(id, near ?? undefined)).listing);
+      setLoadError(null);
     } catch (e) {
-      if (e instanceof ApiError && (e.status === 404 || e.status === 403)) setListing(null);
-      else {
-        setListing((cur) => cur ?? null);
-        setError(errorMessage(e));
-      }
+      if (isGone(e)) setListing(null);
+      else setLoadError(errorMessage(e));
     }
   }, [id]);
   useFocusEffect(
@@ -70,7 +70,7 @@ export default function ListingScreen() {
     if (said) AccessibilityInfo.announceForAccessibility(said);
   }, [said]);
 
-  if (listing === undefined) return <Loading />;
+  if (listing === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <Loading />;
   if (listing === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>

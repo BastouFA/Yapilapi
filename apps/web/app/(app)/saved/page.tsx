@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { EmptyState, Segments, Skeleton, type MenuAction } from '@yapilapi/design-system';
+import { Button, EmptyState, Segments, Skeleton, type MenuAction } from '@yapilapi/design-system';
 import type { Board, MessageKey, Post, SavedFilter } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import {
@@ -108,7 +108,9 @@ export default function SavedPage() {
           {t('saved.allSaves')}
         </h2>
         <Segments label={t('m.saved.filter')} value={filter} onChange={setFilter} options={savedFilterOptions(t)} />
-        {saves.items === null ? (
+        {saves.items === null && saves.loadError ? (
+          <EmptyState title={saves.loadError} action={<Button onClick={() => saves.reload()}>{t('m.common.retry')}</Button>} />
+        ) : saves.items === null ? (
           <Skeleton height={320} />
         ) : saves.items.length ? (
           <>

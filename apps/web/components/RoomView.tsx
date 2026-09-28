@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Avatar, Badge, Button, Dialog, EmptyState, Icon, Menu, Skeleton, TextField, type MenuAction } from '@yapilapi/design-system';
 import { ROOM_MAX_LISTENERS, ROOM_MAX_SPEAKERS, ROOM_REACTIONS, ROOM_TITLE_MAX, type RoomParticipant, type RoomSummary } from '@yapilapi/shared';
 import type { RoomEnvelope } from '@yapilapi/api-client';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { localInput } from '@/lib/schedule';
 import { useRealtime, useSession } from '@/app/providers';
 import { everyone, nameList, REACTION_LABEL, useRooms, type T, type TP } from './Rooms';
@@ -36,6 +36,8 @@ export function RoomView({ id }: { id: string }) {
   const router = useRouter();
   const [env, setEnv] = useState<RoomEnvelope | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Whether that error means the room is gone or not open to you, rather than that it couldn't load right now.
+  const [gone, setGone] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
   // Joining swaps the Join button for the room controls: focus goes to the room's title, not nowhere.
   const title = useRef<HTMLHeadingElement>(null);
@@ -50,7 +52,7 @@ export function RoomView({ id }: { id: string }) {
     () =>
       api.rooms.get(id).then(
         (r) => (setEnv(r), setError(null)),
-        (e) => setError(errorMessage(e)),
+        (e) => (setError(errorMessage(e)), setGone(isGone(e))),
       ),
     [id],
   );
@@ -62,7 +64,8 @@ export function RoomView({ id }: { id: string }) {
     if (e.type === 'room.removed' && e.data?.roomId === id) setEnv((v) => (v ? { ...v, removed: true } : v));
   });
 
-  if (error && !env) return <EmptyState title={t('rooms.notOpen')} body={error} />;
+  if (error && !env && gone) return <EmptyState title={t('rooms.notOpen')} body={error} />;
+  if (error && !env) return <EmptyState title={error} action={<Button onClick={() => void load()}>{t('m.common.retry')}</Button>} />;
   if (!env || !me) return <Skeleton height={240} />;
 
   const joined = rooms.room?.id === id;

@@ -12,7 +12,7 @@ import {
   type MessageKey,
   type PublicListingPreview,
 } from '@yapilapi/shared';
-import { api, ApiError, errorMessage } from '@/lib/api';
+import { api, ApiError, errorMessage, isGone } from '@/lib/api';
 import {
   AmountSheet,
   categoryLabel,
@@ -59,6 +59,8 @@ export default function ListingPageClient({ preview }: { preview: PublicListingP
   const place = useApproxHere();
   const [listing, setListing] = useState<MarketListingDetail | null>(null);
   const [missing, setMissing] = useState(false);
+  // Why it couldn't load, when that isn't because it's gone; a listing already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [offering, setOffering] = useState(false);
   const [reporting, setReporting] = useState(false);
@@ -66,17 +68,16 @@ export default function ListingPageClient({ preview }: { preview: PublicListingP
   const [marking, setMarking] = useState<'reserved' | 'sold' | null>(null);
   const [said, setSaid] = useState('');
 
-  const load = useCallback(
-    () =>
-      api.market.get(id, place.here ?? undefined).then(
-        (r) => {
-          setListing(r.listing);
-          setMissing(false);
-        },
-        () => setMissing(true),
-      ),
-    [id, place.here],
-  );
+  const load = useCallback(() => {
+    setLoadError(null);
+    return api.market.get(id, place.here ?? undefined).then(
+      (r) => {
+        setListing(r.listing);
+        setMissing(false);
+      },
+      (e) => (isGone(e) ? setMissing(true) : setLoadError(errorMessage(e))),
+    );
+  }, [id, place.here]);
   useEffect(() => {
     if (me) void load();
   }, [load, me]);
@@ -86,6 +87,7 @@ export default function ListingPageClient({ preview }: { preview: PublicListingP
     return preview ? <PublicListing preview={preview} /> : <NeedsAccount title={t('market.signIn.title')} body={t('market.signIn.body')} />;
   }
   if (missing) return <EmptyState title={t('market.listing.missing')} body={t('market.listing.missingBody')} />;
+  if (!listing && loadError) return <EmptyState title={loadError} action={<Button onClick={() => void load()}>{t('m.common.retry')}</Button>} />;
   if (!listing) return <Skeleton height={420} />;
 
   const l = listing;

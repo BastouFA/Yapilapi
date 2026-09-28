@@ -19,6 +19,12 @@ export function errorMessage(e: unknown): string {
   return t('error.generic', locale);
 }
 
+/**
+ * Whether a failed request means the thing is gone or not for this person (not found, private,
+ * removed), rather than that it couldn't load right now (offline, a timeout, a server error).
+ */
+export const isGone = (e: unknown) => e instanceof ApiError && (e.status === 403 || e.status === 404 || e.status === 410);
+
 export function fieldErrors(e: unknown): Record<string, string> {
   return e instanceof ApiError && e.fields ? e.fields : {};
 }

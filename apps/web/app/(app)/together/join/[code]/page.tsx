@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Avatar, Button, EmptyState, Icon, Skeleton } from '@yapilapi/design-system';
 import type { TogetherInvitePreview } from '@yapilapi/shared';
 import { FeatureOff } from '@/components/FeatureOff';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { useSession } from '../../../../providers';
 
 /**
@@ -18,21 +18,33 @@ export default function JoinTogether() {
   const { flags, me, t, tp, toast } = useSession();
   const [invite, setInvite] = useState<TogetherInvitePreview | null>(null);
   const [missing, setMissing] = useState(false);
+  // Why it couldn't load, when that isn't because it's gone.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    if (!flags.REAL_TOGETHER || !me) return;
+  const load = useCallback(() => {
+    setLoadError(null);
     api.together.invite(code).then(
       (r) => setInvite(r.invite),
-      () => setMissing(true),
+      (e) => (isGone(e) ? setMissing(true) : setLoadError(errorMessage(e))),
     );
-  }, [code, flags.REAL_TOGETHER, me]);
+  }, [code]);
+  useEffect(() => {
+    if (!flags.REAL_TOGETHER || !me) return;
+    load();
+  }, [load, flags.REAL_TOGETHER, me]);
 
   if (!flags.REAL_TOGETHER) return <FeatureOff name="Together" />;
   if (missing)
     return (
       <div className="yp-shell__inner">
         <EmptyState title={t('together.join.missing')} body={t('together.join.missingBody')} />
+      </div>
+    );
+  if (!invite && loadError)
+    return (
+      <div className="yp-shell__inner">
+        <EmptyState title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />
       </div>
     );
   if (!invite)

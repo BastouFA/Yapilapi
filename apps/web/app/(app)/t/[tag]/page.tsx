@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, EmptyState, MomentsStrip, Segments, Skeleton } from '@yapilapi/design-system';
 import type { StoryGroup, TagSummary } from '@yapilapi/api-client';
 import { normalizeTag } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, ApiError, errorMessage, isGone } from '@/lib/api';
 import { PostList } from '@/components/PostList';
 import { ScreenLoading } from '@/components/Loading';
 import { useSession } from '../../../providers';
@@ -29,6 +29,8 @@ export default function TagPage() {
   const router = useRouter();
   const [info, setInfo] = useState<TagSummary | null>(null);
   const [missing, setMissing] = useState(false);
+  // Why it couldn't load, when that isn't because the tag is invalid.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [sort, setSort] = useState<'recent' | 'top'>('recent');
   const [busy, setBusy] = useState(false);
   // "Stories now": active public stories with the tag (never followers-only or close friends ones).
@@ -47,20 +49,26 @@ export default function TagPage() {
     );
   };
 
+  const loadInfo = useCallback(() => {
+    setMissing(false);
+    setLoadError(null);
+    // An invalid tag is a 400; anything else that isn't "gone" is a failed load.
+    api.tags.get(tag).then(setInfo, (e) => (isGone(e) || (e instanceof ApiError && e.status === 400) ? setMissing(true) : setLoadError(errorMessage(e))));
+  }, [tag]);
   useEffect(() => {
     setInfo(null);
-    setMissing(false);
-    api.tags.get(tag).then(setInfo, () => setMissing(true));
+    loadInfo();
     setStories([]);
     api.tags.stories(tag).then(
       (r) => setStories(r.items),
       () => {},
     );
-  }, [tag]);
+  }, [tag, loadInfo]);
 
   const load = useCallback((cursor?: string) => api.tags.posts(tag, sort, cursor), [tag, sort]);
 
   if (missing) return <EmptyState title={t('tag.invalid.title')} body={t('tag.invalid.body')} />;
+  if (!info && loadError) return <EmptyState title={loadError} action={<Button onClick={loadInfo}>{t('m.common.retry')}</Button>} />;
 
   return (
     <div className="yp-shell__inner stack">

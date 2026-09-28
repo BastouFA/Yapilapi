@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import type { Boost, PostInsights } from '../../../../packages/api-client/src/index';
 import type { Post } from '../../../../packages/shared/src/types';
-import { client, errorMessage } from '../../lib/api';
+import { client, errorMessage, isGone } from '../../lib/api';
 import { SectionHeader } from '../../lib/chips';
 import { BoostResult, DayBars, StatGrid } from '../../lib/creator';
 import { useFlag } from '../../lib/flags';
@@ -11,7 +11,7 @@ import { useT } from '../../lib/i18n';
 import { useSession } from '../../lib/session';
 import { ManagedOnWeb, useDigitalPurchases } from '../../lib/store';
 import { space } from '../../lib/theme';
-import { Button, Card, EmptyState, ErrorState, Loading, Notice, useColors, userText } from '../../lib/ui';
+import { Button, Card, EmptyState, ErrorState, Loading, Notice, ScreenError, useColors, userText } from '../../lib/ui';
 
 /**
  * How one of your posts is doing (from its More menu, "See insights"): views, likes, comments,
@@ -48,8 +48,9 @@ export default function InsightsScreen() {
       setData({ insights: insights.insights, post, boosts });
       setError(null);
     } catch (e) {
+      // Not yours or gone: say so; anything else keeps what's showing, or offers Try again.
       setError(errorMessage(e));
-      setData((cur) => cur ?? null);
+      if (isGone(e)) setData(null);
     }
   }, [id]);
 
@@ -60,7 +61,7 @@ export default function InsightsScreen() {
     }, [load]),
   );
 
-  if (data === undefined) return <Loading />;
+  if (data === undefined) return error ? <ScreenError message={error} onRetry={load} /> : <Loading />;
   if (data === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground, padding: space[4], gap: space[3] }}>

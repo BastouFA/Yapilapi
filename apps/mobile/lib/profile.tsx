@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import type { Post, Profile } from '../../../packages/shared/src/types';
 import type { ProfileTab } from '../../../packages/shared/src/profile-style';
-import { client, errorMessage, mediaUrl, webUrl } from './api';
+import { client, errorMessage, isGone, mediaUrl, webUrl } from './api';
 import { useT } from './i18n';
 import { pickOne, uploadPicked, type Picked } from './media';
 import { CoverEditor, CoverPhotoPicker, type CoverEditorTab } from './cover-editor';
@@ -34,6 +34,7 @@ import {
   Icon,
   Notice,
   PlusBadge,
+  ScreenError,
   Segmented,
   Skeleton,
   SkeletonList,
@@ -76,6 +77,8 @@ export function ProfileView({
   const c = useColors();
   const { t, number } = useT();
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
+  // Why it couldn't load, when that isn't because it's gone; a profile already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
@@ -116,6 +119,7 @@ export function ProfileView({
       const p = (await api.users.get(username)).profile;
       if (onMoved && p.username.toLowerCase() !== username.toLowerCase()) return onMoved(p.username);
       setProfile(p);
+      setLoadError(null);
       try {
         const page = await api.users.posts(p.username);
         setPosts(page.items);
@@ -125,8 +129,9 @@ export function ProfileView({
         setPosts([]);
         setLocked(p.isPrivate && !p.relationship.isSelf);
       }
-    } catch {
-      setProfile(null);
+    } catch (e) {
+      if (isGone(e)) setProfile(null);
+      else setLoadError(errorMessage(e));
     }
   }, [username, onMoved]);
 
@@ -189,7 +194,7 @@ export function ProfileView({
     setCursor(page.nextCursor);
   };
 
-  if (profile === undefined) return <ProfileSkeleton bottom={bottom} />;
+  if (profile === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <ProfileSkeleton bottom={bottom} />;
   if (profile === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Alert, Platform, Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
 import { dropPhase, type Drop } from '../../../../packages/shared/src/drops';
 import { formatMoney } from '../../../../packages/shared/src/i18n';
-import { client, errorMessage, webUrl } from '../../lib/api';
+import { client, errorMessage, isGone, webUrl } from '../../lib/api';
 import { DropCover, dropStatusText, useNow } from '../../lib/drops';
 import { useT } from '../../lib/i18n';
 import { openOnWeb, useWebCheckout } from '../../lib/money';
@@ -11,7 +11,7 @@ import { useReport } from '../../lib/report';
 import { useRealtime, useSession } from '../../lib/session';
 import { ManagedOnWeb, useDigitalPurchases } from '../../lib/store';
 import { radius, space } from '../../lib/theme';
-import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, useActionSheet, useColors, userText } from '../../lib/ui';
+import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, ScreenError, useActionSheet, useColors, userText } from '../../lib/ui';
 
 /**
  * A drop: what it is, who sells it, when it opens (in plain words), and its products with the
@@ -30,6 +30,8 @@ export default function DropScreen() {
   const { me } = useSession();
   const now = useNow(15_000);
   const [drop, setDrop] = useState<Drop | null | undefined>(undefined);
+  // Why it couldn't load, when that isn't because it's gone; a drop already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -41,8 +43,10 @@ export default function DropScreen() {
   const load = useCallback(async () => {
     try {
       setDrop((await (await client()).drops.get(id)).drop);
-    } catch {
-      setDrop((cur) => cur ?? null);
+      setLoadError(null);
+    } catch (e) {
+      if (isGone(e)) setDrop(null);
+      else setLoadError(errorMessage(e));
     }
   }, [id]);
   useFocusEffect(
@@ -75,7 +79,7 @@ export default function DropScreen() {
     if (said) AccessibilityInfo.announceForAccessibility(said);
   }, [said]);
 
-  if (drop === undefined) return <Loading />;
+  if (drop === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <Loading />;
   if (drop === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>

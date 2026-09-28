@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { Badge, EmptyState, List, ListItem, ProductCard, Skeleton } from '@yapilapi/design-system';
-import { api } from '@/lib/api';
+import { useCallback, useEffect, useState } from 'react';
+import { Badge, Button, EmptyState, List, ListItem, ProductCard, Skeleton } from '@yapilapi/design-system';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { BuyButton } from '@/components/BuyButton';
 import { BusinessInsights } from '@/components/BusinessInsights';
@@ -15,10 +15,17 @@ export default function BusinessPage() {
   const { locale, me, t } = useSession();
   const [data, setData] = useState<Awaited<ReturnType<typeof api.businesses.get>> | null>(null);
   const [missing, setMissing] = useState(false);
-  useEffect(() => {
-    api.businesses.get(slug).then(setData, () => setMissing(true));
+  // Why it couldn't load, when that isn't because it's gone.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const load = useCallback(() => {
+    setLoadError(null);
+    api.businesses.get(slug).then(setData, (e) => (isGone(e) ? setMissing(true) : setLoadError(errorMessage(e))));
   }, [slug]);
+  useEffect(() => {
+    load();
+  }, [load]);
   if (missing) return <EmptyState title={t('bizPage.notFound')} />;
+  if (!data && loadError) return <EmptyState title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />;
   if (!data) return <Skeleton height={240} />;
   const { business, places, products } = data;
   const [runBefore, runAfter = ''] = t('bizPage.runBy').split('{name}');

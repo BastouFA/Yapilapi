@@ -18,7 +18,7 @@ import {
   type QueuedCheckIn,
   type TicketGuest,
 } from '@yapilapi/shared';
-import { api, ApiError, errorMessage } from '@/lib/api';
+import { api, ApiError, errorMessage, isGone } from '@/lib/api';
 import { useRealtime, useSession } from '@/app/providers';
 import { PeoplePicker } from './PeoplePicker';
 
@@ -82,6 +82,8 @@ export function CheckInDesk({ eventId }: { eventId: string }) {
   const { t, tp, locale, toast, me } = useSession();
   const [door, setDoor] = useState<DoorSummary | null>(null);
   const [missing, setMissing] = useState(false);
+  // Why the door couldn't load, when that isn't because the event is gone or not yours to run.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [counts, setCounts] = useState<CheckInCounts | null>(null);
   const [last, setLast] = useState<{ result: CheckInResult; n: number } | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -95,17 +97,21 @@ export function CheckInDesk({ eventId }: { eventId: string }) {
   const tz = door ? safeTimeZone(door.event.timezone) : 'UTC';
   const time = useCallback((iso: string) => new Intl.DateTimeFormat(locale, { timeStyle: 'short', timeZone: tz }).format(new Date(iso)), [locale, tz]);
 
-  useEffect(() => {
+  const loadDoor = useCallback(() => {
+    setLoadError(null);
     api.events.door(eventId).then(
       (d) => {
         setDoor(d);
         setCounts(d.counts);
       },
-      () => setMissing(true),
+      (e) => (isGone(e) ? setMissing(true) : setLoadError(errorMessage(e))),
     );
+  }, [eventId]);
+  useEffect(() => {
+    loadDoor();
     setQueue(readQueue(eventId));
     setOnline(navigator.onLine);
-  }, [eventId]);
+  }, [eventId, loadDoor]);
 
   const enqueue = useCallback(
     (entry: QueuedCheckIn) => {
@@ -227,6 +233,7 @@ export function CheckInDesk({ eventId }: { eventId: string }) {
   );
 
   if (missing) return <EmptyState title={t('checkin.title')} body={t('checkin.detail.invalid')} />;
+  if ((!door || !counts) && loadError) return <EmptyState title={loadError} action={<Button onClick={loadDoor}>{t('m.common.retry')}</Button>} />;
   if (!door || !counts) return <Skeleton height={320} />;
   const pct = counts.expected ? Math.round((counts.checkedIn / counts.expected) * 100) : 0;
 

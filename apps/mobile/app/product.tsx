@@ -5,7 +5,7 @@ import type { ShopItem } from '../../../packages/api-client/src/index';
 import { formatBytes } from '../../../packages/shared/src/data-saver';
 import { formatMoney } from '../../../packages/shared/src/i18n';
 import type { Profile } from '../../../packages/shared/src/types';
-import { client, errorMessage } from '../lib/api';
+import { client, errorMessage, isGone } from '../lib/api';
 import { useFlag } from '../lib/flags';
 import { Pill } from '../lib/forms';
 import { useT } from '../lib/i18n';
@@ -14,7 +14,7 @@ import { useReport } from '../lib/report';
 import { useSession } from '../lib/session';
 import { ManagedOnWeb, useDigitalPurchases } from '../lib/store';
 import { radius, space } from '../lib/theme';
-import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, useActionSheet, useColors, userText } from '../lib/ui';
+import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, ScreenError, useActionSheet, useColors, userText } from '../lib/ui';
 
 /**
  * One thing from a profile's Shop (`product?username=&id=`, and web links to
@@ -33,6 +33,8 @@ export default function ProductScreen() {
   const offer = useDigitalPurchases();
   const [seller, setSeller] = useState<Profile | null>(null);
   const [item, setItem] = useState<ShopItem | null | undefined>(undefined);
+  // Why it couldn't load, when that isn't because it's gone; a product already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -47,8 +49,10 @@ export default function ProductScreen() {
       const p = (await api.users.get(username)).profile;
       setSeller(p);
       setItem((await api.shop.list(p.id)).items.find((x) => x.id === id) ?? null);
-    } catch {
-      setItem((cur) => cur ?? null);
+      setLoadError(null);
+    } catch (e) {
+      if (isGone(e)) setItem(null);
+      else setLoadError(errorMessage(e));
     }
   }, [username, id]);
   useEffect(() => {
@@ -56,7 +60,7 @@ export default function ProductScreen() {
   }, [load]);
   const { open, opened } = useWebCheckout(() => void load());
 
-  if (item === undefined) return <Loading />;
+  if (item === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <Loading />;
   if (item === null || !seller)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>

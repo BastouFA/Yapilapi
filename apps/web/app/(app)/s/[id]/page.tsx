@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { EmptyState, Skeleton } from '@yapilapi/design-system';
+import { useCallback, useEffect, useState } from 'react';
+import { Button, EmptyState, Skeleton } from '@yapilapi/design-system';
 import type { StoryGroup } from '@yapilapi/api-client';
-import { api } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { StoryViewer } from '@/components/StoryViewer';
 import { useSession } from '../../../providers';
 
@@ -19,15 +19,21 @@ export default function StoryPage() {
   const { t } = useSession();
   const [groups, setGroups] = useState<StoryGroup[] | null>(null);
   const [missing, setMissing] = useState(false);
+  // Why it couldn't load, when that isn't because it's gone or private.
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setGroups(null);
+  const load = useCallback(() => {
     setMissing(false);
+    setLoadError(null);
     api.moments.get(id).then(
       (r) => setGroups([r.group]),
-      () => setMissing(true),
+      (e) => (isGone(e) ? setMissing(true) : setLoadError(errorMessage(e))),
     );
   }, [id]);
+  useEffect(() => {
+    setGroups(null);
+    load();
+  }, [load]);
 
   const close = () => (window.history.length > 1 ? router.back() : router.push('/home'));
 
@@ -35,6 +41,12 @@ export default function StoryPage() {
     return (
       <div className="yp-shell__inner">
         <EmptyState title={t('m.stories.unavailable')} body={t('m.stories.unavailableBody')} action={<Link href="/home">{t('storyPage.goHome')}</Link>} />
+      </div>
+    );
+  if (!groups && loadError)
+    return (
+      <div className="yp-shell__inner">
+        <EmptyState title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />
       </div>
     );
   if (!groups) return <Skeleton height={320} />;

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Alert, Avatar, Button, EmptyState, Select, Skeleton, Switch, TextField } from '@yapilapi/design-system';
 import {
   ECHO_BALANCE_DEFAULT,
@@ -22,7 +22,7 @@ import {
   type EchoRender,
   type MessageKey,
 } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { takeEchoMedia } from '@/lib/pending-media';
 import { useSession } from '@/app/providers';
 
@@ -62,6 +62,8 @@ export function EchoComposer({ postId }: { postId: string }) {
   const router = useRouter();
   const [options, setOptions] = useState<EchoOptions | null>(null);
   const [missing, setMissing] = useState<string | null>(null);
+  // Why it couldn't load, when that isn't because the reel is gone or private.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [uploaded, setUploaded] = useState<{ id: string; forFile: File } | null>(null);
@@ -82,15 +84,19 @@ export function EchoComposer({ postId }: { postId: string }) {
   const waiting = useRef<AbortController | null>(null);
   const ids = useId();
 
-  useEffect(() => {
+  const loadOptions = useCallback(() => {
+    setLoadError(null);
     api.posts.echoOptions(postId).then(
       (o) => {
         setOptions(o);
         const len = o.original.durationMs ?? 0;
         if (len) setCut({ startMs: 0, endMs: Math.min(len, 5000) });
       },
-      (e) => setMissing(errorMessage(e)),
+      (e) => (isGone(e) ? setMissing(errorMessage(e)) : setLoadError(errorMessage(e))),
     );
+  }, [postId]);
+  useEffect(() => {
+    loadOptions();
     // A video just recorded with the camera for this echo.
     const recorded = takeEchoMedia(postId);
     if (recorded) choose(recorded);
@@ -123,6 +129,7 @@ export function EchoComposer({ postId }: { postId: string }) {
   };
 
   if (missing) return <EmptyState title={t('echo.block.unavailable')} body={missing} />;
+  if (!options && loadError) return <EmptyState title={loadError} action={<Button onClick={loadOptions}>{t('m.common.retry')}</Button>} />;
   if (!options) return <Skeleton height={320} />;
 
   const name = options.original.author.username;

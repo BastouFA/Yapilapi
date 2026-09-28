@@ -22,7 +22,7 @@ import {
   type MarketWhere,
   type MessageKey,
 } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { useSession, type Session } from '@/app/providers';
 
 /**
@@ -569,13 +569,19 @@ export function RateSheet({
 export function ProfileMarket({ userId, isSelf }: { userId: string; isSelf: boolean }) {
   const { t, tp, locale } = useSession();
   const [data, setData] = useState<MarketProfile | null | 'missing'>(null);
+  // Why it couldn't load, when that isn't because it's not for this person to see.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     setData(null);
+    setLoadError(null);
     api.market.profile(userId).then(
       (r) => setData(r.market),
-      () => setData('missing'),
+      (e) => (isGone(e) ? setData('missing') : setLoadError(errorMessage(e))),
     );
-  }, [userId]);
+  }, [userId, attempt]);
+  if (data === null && loadError)
+    return <EmptyState title={loadError} action={<Button onClick={() => setAttempt((n) => n + 1)}>{t('m.common.retry')}</Button>} />;
   if (data === null) return <Skeleton height={240} />;
   if (data === 'missing') return <EmptyState title={t('market.profile.unavailable')} />;
   return (

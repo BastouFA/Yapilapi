@@ -1,17 +1,17 @@
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { ApiError } from '../../../packages/api-client/src/index';
 import { utcToZonedWall, zonedWallToUtc } from '../../../packages/shared/src/scheduling';
 import type { Community, EventItem } from '../../../packages/shared/src/types';
-import { client, errorMessage } from '../lib/api';
+import { client, errorMessage, isGone } from '../lib/api';
 import { canOrganize } from '../lib/community-roles';
 import { DateField } from '../lib/date-time';
 import { ChoiceField, FieldError, isWebLink, useScrollToError } from '../lib/forms';
 import { useT } from '../lib/i18n';
 import { space } from '../lib/theme';
 import { deviceTimeZone, TimeZoneField } from '../lib/time-zone';
-import { Button, Card, Field, Icon, KeyboardAvoid, Loading, Notice, Row, useColors, userText } from '../lib/ui';
+import { Button, Card, Field, Icon, KeyboardAvoid, Loading, Notice, Row, ScreenError, useColors, userText } from '../lib/ui';
 
 type Where = 'address' | 'place' | 'online';
 type Visibility = 'public' | 'followers' | 'friends' | 'private';
@@ -31,6 +31,8 @@ export default function EventEdit() {
   const { t } = useT();
   const navigation = useNavigation();
   const [loaded, setLoaded] = useState<EventItem | null | undefined>(editing ? undefined : null);
+  // Why the event couldn't load, when that isn't because it's gone or not yours.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [tz, setTz] = useState(deviceTimeZone());
@@ -54,8 +56,9 @@ export default function EventEdit() {
   }, [navigation, editing, t]);
 
   // Changing an event: start from what it says now, in its own time zone.
-  useEffect(() => {
+  const loadEvent = useCallback(() => {
     if (!editing) return;
+    setLoadError(null);
     void client()
       .then((api) => api.events.get(editing))
       .then(
@@ -77,9 +80,12 @@ export default function EventEdit() {
           setVisibility((['public', 'followers', 'friends', 'private'] as const).find((v) => v === event.visibility) ?? 'public');
           setLoaded(event);
         },
-        () => setLoaded(null),
+        (e) => (isGone(e) ? setLoaded(null) : setLoadError(errorMessage(e))),
       );
   }, [editing]);
+  useEffect(() => {
+    loadEvent();
+  }, [loadEvent]);
 
   // Communities where you can make events (organizers and up), for a new event.
   useEffect(() => {
@@ -92,7 +98,7 @@ export default function EventEdit() {
       );
   }, [editing]);
 
-  if (editing && loaded === undefined) return <Loading />;
+  if (editing && loaded === undefined) return loadError ? <ScreenError message={loadError} onRetry={loadEvent} /> : <Loading />;
   if (editing && loaded === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground, padding: space[4] }}>

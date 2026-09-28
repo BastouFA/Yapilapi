@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AccessibilityInfo, ActivityIndicator, Alert, FlatList, Image, Pressable, RefreshControl, Text, View } from 'react-native';
 import { BOARD_COLLABORATORS_MAX, type SavedFilter } from '../../../../packages/shared/src/constants';
 import type { BoardDetail, Post, PublicUser } from '../../../../packages/shared/src/types';
-import { client, errorMessage, mediaUrl } from '../../lib/api';
+import { client, errorMessage, isGone, mediaUrl } from '../../lib/api';
 import { BoardCover, SaveTile, tileRows, useBoardMeta, useBoards, usePostLabel, useSavedFilters, VISIBILITY_ICON, type SaveChange } from '../../lib/boards';
 import { useT } from '../../lib/i18n';
 import { useReport } from '../../lib/report';
@@ -19,6 +19,7 @@ import {
   Icon,
   Loading,
   Notice,
+  ScreenError,
   Segmented,
   Title,
   useActionSheet,
@@ -45,6 +46,8 @@ export default function BoardScreen() {
   const postLabel = usePostLabel();
   const filters = useSavedFilters();
   const [data, setData] = useState<BoardDetail | null | undefined>(undefined);
+  // Why it couldn't load, when that isn't because it's gone or private; a board already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [filter, setFilter] = useState<SavedFilter>('all');
   const [items, setItems] = useState<Post[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -68,8 +71,10 @@ export default function BoardScreen() {
   const load = useCallback(async () => {
     try {
       setData(await (await client()).boards.get(id));
-    } catch {
-      setData((cur) => (cur === undefined ? null : cur));
+      setLoadError(null);
+    } catch (e) {
+      if (isGone(e)) setData(null);
+      else setLoadError(errorMessage(e));
     }
   }, [id]);
 
@@ -103,7 +108,7 @@ export default function BoardScreen() {
     void loadItems(filter);
   }, [filter, loadItems]);
 
-  if (data === undefined) return <Loading />;
+  if (data === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <Loading />;
   if (data === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>

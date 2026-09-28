@@ -20,7 +20,7 @@ import {
 } from '@yapilapi/design-system';
 import type { SponsoredAd } from '@yapilapi/api-client';
 import { MAX_COLLABORATORS, REPORT_REASONS, type MessageKey, type Page, type PhotoTag, type Post, type PostVersion, type PublicUser } from '@yapilapi/shared';
-import { api, errorMessage, fieldErrors } from '@/lib/api';
+import { api, errorMessage, fieldErrors, isGone } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { AutocompleteText } from '@/components/Autocomplete';
 import { PeoplePicker } from '@/components/PeoplePicker';
@@ -61,6 +61,9 @@ export function PostList({
   const { me, toast, t, locale, flags } = useSession();
   const [memoryFor, setMemoryFor] = useState<Post | null>(null);
   const [posts, setPosts] = useState<Post[] | null>(null);
+  // Why the first page couldn't load, when that isn't because it's gone or private (which shows as empty).
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [commentsFor, setCommentsFor] = useState<Post | null>(null);
@@ -99,18 +102,24 @@ export function PostList({
   useEffect(() => {
     let cancelled = false;
     setPosts(null);
+    setLoadError(null);
     load()
       .then((p) => {
         if (cancelled) return;
         setPosts(p.items);
         setCursor(p.nextCursor);
       })
-      .catch((e) => !cancelled && (setPosts([]), toast(errorMessage(e))));
+      .catch((e) => {
+        if (cancelled) return;
+        if (!isGone(e)) return setLoadError(errorMessage(e));
+        setPosts([]);
+        toast(errorMessage(e));
+      });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reloadKey]);
+  }, [reloadKey, attempt]);
 
   const more = useCallback(async () => {
     if (!cursor || loadingMore) return;
@@ -343,6 +352,8 @@ export function PostList({
     </section>
   );
 
+  if (posts === null && loadError)
+    return <EmptyState title={loadError} action={<Button onClick={() => setAttempt((n) => n + 1)}>{t('m.common.retry')}</Button>} />;
   if (posts === null)
     return (
       <div className="stack" aria-busy>
