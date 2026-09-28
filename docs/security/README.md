@@ -12,6 +12,7 @@
 | Authorization | Every protected route uses `requireAuth` / `requireRole`; visibility enforced in shared SQL predicates; hidden content returns 404, not 403 | `plugins/auth.ts`, `lib/visibility.ts` |
 | Input | zod validation on every body, query and path parameter; parameterized SQL only | `packages/shared/src/schemas.ts` |
 | Abuse | Global and per-route rate limits (Redis-backed), stricter on auth, posting, messaging, reports, AI | `app.ts`, route configs |
+| Caller address | `X-Forwarded-For` is only believed from proxies on loopback and private networks (`TRUST_PROXY`), so a caller can't write in a different address to get fresh rate limits or hide from sign-in alerts | `config.ts`, `test/trust-proxy.test.ts` |
 | Uploads | MIME allowlist, magic-byte sniffing, 50 MB limit, random object keys | `modules/media.ts`, `lib/storage.ts` |
 | Payments | No card data stored; HMAC-verified webhooks, event replay protection, amount reconciliation, idempotent orders | `modules/commerce.ts`, `lib/payments.ts` |
 | Minors | Minimum age 13, private by default under 18, no adult→minor DMs unless friends, immediate hiding on minor-safety reports | `modules/auth.ts`, `modules/messaging.ts`, `modules/safety.ts` |

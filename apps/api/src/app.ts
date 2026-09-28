@@ -137,7 +137,7 @@ export async function buildApp(
             mixin: traceLogMixin(),
           },
     genReqId: (req) => (req.headers['x-request-id'] as string) || randomUUID(),
-    trustProxy: true,
+    trustProxy: config.TRUST_PROXY,
     bodyLimit: 1_000_000,
   });
   if (opts.onRoute) app.addHook('onRoute', opts.onRoute);
