@@ -1,6 +1,6 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { Alert, Platform, Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Alert, Platform, Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
 import { dropPhase, type Drop } from '../../../../packages/shared/src/drops';
 import { formatMoney } from '../../../../packages/shared/src/i18n';
 import { client, errorMessage, webUrl } from '../../lib/api';
@@ -59,6 +59,21 @@ export default function DropScreen() {
     if (opening) void load();
   }, [opening, now, load]);
   const { open: openCheckout, opened } = useWebCheckout(() => void load());
+
+  // The status line changes every minute ("in 5 minutes"), so it isn't a live region: say it only
+  // when the drop moves on (it opens, sells out, ends) while the screen is open.
+  const phaseNow = drop ? dropPhase(drop, now) : null;
+  const lastPhase = useRef<string | null>(null);
+  useEffect(() => {
+    if (!drop || !phaseNow) return;
+    if (lastPhase.current && lastPhase.current !== phaseNow) AccessibilityInfo.announceForAccessibility(dropStatusText(tr, drop, now));
+    lastPhase.current = phaseNow;
+  }, [phaseNow, drop, now, tr]);
+  // What Notify me (or Stop) did, or why it didn't work, is read out: the notes appear further down.
+  const said = error ?? note;
+  useEffect(() => {
+    if (said) AccessibilityInfo.announceForAccessibility(said);
+  }, [said]);
 
   if (drop === undefined) return <Loading />;
   if (drop === null)
@@ -166,15 +181,14 @@ export default function DropScreen() {
         </Text>
         <Pressable
           accessibilityRole="link"
+          accessibilityLabel={t('m.drops.by', { name: d.seller.displayName })}
           onPress={() => router.push(`/u/${d.seller.username}`)}
           style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: 44 }}
         >
           <Avatar name={d.seller.displayName} url={d.seller.avatarUrl} size={32} />
           <Text style={[{ color: c.ink, fontWeight: '700' }, userText]}>{t('m.drops.by', { name: d.seller.displayName })}</Text>
         </Pressable>
-        <Text accessibilityLiveRegion="polite" style={{ color: phase === 'open' ? c.success : c.ink, fontWeight: '800', fontSize: 16 }}>
-          {dropStatusText(tr, d, now)}
-        </Text>
+        <Text style={{ color: phase === 'open' ? c.success : c.ink, fontWeight: '800', fontSize: 16 }}>{dropStatusText(tr, d, now)}</Text>
         {d.description ? <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 22 }, userText]}>{d.description}</Text> : null}
       </View>
 
@@ -281,7 +295,12 @@ export default function DropScreen() {
             [t('m.drops.stats.held'), String(d.stats.unitsHeld)],
             [t('m.drops.stats.revenue'), d.stats.revenue.length ? d.stats.revenue.map((r) => formatMoney(r.grossCents, r.currency, locale)).join(' · ') : '0'],
           ].map(([label, value]) => (
-            <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space[3] }}>
+            <View
+              key={label}
+              accessible
+              accessibilityLabel={`${label}: ${value}`}
+              style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space[3] }}
+            >
               <Text style={{ color: c.inkMuted }}>{label}</Text>
               <Text style={{ color: c.ink, fontWeight: '800' }}>{value}</Text>
             </View>
@@ -302,6 +321,7 @@ export default function DropScreen() {
       {d.status !== 'draft' ? (
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel={t('m.drops.share')}
           onPress={() => void share()}
           style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space[2], borderRadius: radius.md }}
         >

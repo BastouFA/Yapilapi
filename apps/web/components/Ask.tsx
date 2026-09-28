@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, Card, Checkbox, EmptyState, QuestionQuote, Skeleton, Switch, TextField } from '@yapilapi/design-system';
 import {
   ASK_PROMPT_MAX,
@@ -43,11 +43,19 @@ export function AskCard({ profile, onChanged }: { profile: Profile; onChanged: (
   const [error, setError] = useState<string | undefined>();
   const box = profile.ask;
   const isSelf = profile.relationship.isSelf;
+  // Turning the box on swaps the card: focus moves from the button that went to the link that came.
+  const openLink = useRef<HTMLAnchorElement>(null);
+  const [turnedOn, setTurnedOn] = useState(false);
+  useEffect(() => {
+    if (!turnedOn || !box?.enabled) return;
+    openLink.current?.focus();
+    setTurnedOn(false);
+  }, [turnedOn, box?.enabled]);
 
   if (isSelf) {
     if (!box?.enabled)
       return (
-        <Card className="ask-card ask-card--self">
+        <Card level={2} className="ask-card ask-card--self">
           <div className="ask-card__row">
             <p className="muted" style={{ margin: 0 }}>
               {t('ask.card.self')}
@@ -61,6 +69,7 @@ export function AskCard({ profile, onChanged }: { profile: Profile; onChanged: (
                 try {
                   await api.questions.setBox({ enabled: true });
                   toast(t('ask.box.saved'));
+                  setTurnedOn(true);
                   onChanged();
                 } catch (e) {
                   toast(errorMessage(e));
@@ -75,9 +84,9 @@ export function AskCard({ profile, onChanged }: { profile: Profile; onChanged: (
         </Card>
       );
     return (
-      <Card className="ask-card ask-card--self" title={t('ask.box.title')} subtitle={box.prompt ?? undefined}>
+      <Card level={2} className="ask-card ask-card--self" title={t('ask.box.title')} subtitle={box.prompt ?? undefined}>
         <div className="row">
-          <Link href="/questions" className="yp-btn yp-btn--secondary yp-btn--sm">
+          <Link ref={openLink} href="/questions" className="yp-btn yp-btn--secondary yp-btn--sm">
             {t('ask.box.open')}
           </Link>
           <Link href="/settings/account#ask" className="yp-btn yp-btn--ghost yp-btn--sm">
@@ -109,7 +118,7 @@ export function AskCard({ profile, onChanged }: { profile: Profile; onChanged: (
   }
 
   return (
-    <Card className="ask-card" title={title} subtitle={box.prompt ?? undefined}>
+    <Card level={2} className="ask-card" title={title} subtitle={box.prompt ?? undefined}>
       {!me ? (
         <Button size="sm" onClick={signIn}>
           {t('ask.card.signIn')}

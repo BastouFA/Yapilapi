@@ -1160,9 +1160,10 @@ export function WatchScreen({ id }: { id: string }) {
             <button
               type="button"
               className="watch-ctl"
-              aria-label={muted ? t('m.reels.soundOn') : t('m.reels.soundOff')}
+              // One name with a pressed state (pressed: sound on), like the reels' sound button.
+              aria-label={t('m.reels.sound')}
               title={muted ? t('m.reels.soundOn') : t('m.reels.soundOff')}
-              aria-pressed={muted}
+              aria-pressed={!muted}
               onClick={() => setMuted((m) => !m)}
             >
               <Icon name={muted ? 'volume-off' : 'volume'} size={20} />
@@ -1339,9 +1340,10 @@ function WatchPicks({ queued, busy, onAdd }: { queued: Set<string>; busy: boolea
                 <button
                   type="button"
                   className="watch-picks__item"
-                  disabled={inQueue || busy}
+                  // Stays focusable while it's added and once it's queued (named so), so focus isn't lost.
+                  aria-disabled={inQueue || busy || undefined}
                   aria-label={inQueue ? t('watch.pickQueued', { title }) : t('watch.pickAdd', { title })}
-                  onClick={() => onAdd(p.id)}
+                  onClick={() => !inQueue && !busy && onAdd(p.id)}
                 >
                   <span className="watch-picks__thumb">
                     {thumb ? <img src={thumb} alt="" loading="lazy" /> : null}

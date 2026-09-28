@@ -301,7 +301,9 @@ export function ProfileView({
       <Card style={{ alignItems: 'center', gap: space[2], paddingVertical: space[6], marginTop: profile.style?.header === 'clean' ? 0 : -56 }}>
         <Avatar name={profile.displayName} url={profile.avatarUrl} size={84} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
-          <Text style={[{ color: c.ink, fontSize: 24, fontWeight: '800', letterSpacing: -0.4 }, userText]}>{profile.displayName}</Text>
+          <Text accessibilityRole="header" style={[{ color: c.ink, fontSize: 24, fontWeight: '800', letterSpacing: -0.4 }, userText]}>
+            {profile.displayName}
+          </Text>
           {profile.plus ? <PlusBadge /> : null}
         </View>
         {profile.pronouns ? (
@@ -707,7 +709,8 @@ function Cover({
           accessibilityRole="button"
           accessibilityLabel={profile.coverUrl ? t('m.cover.edit') : t('m.cover.add')}
           onPress={onEdit}
-          hitSlop={6}
+          // About 30pt tall; the touch area still reaches 44pt.
+          hitSlop={8}
           style={({ pressed }) => ({
             position: 'absolute',
             top: space[3],

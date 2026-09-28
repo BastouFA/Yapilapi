@@ -138,8 +138,10 @@ export function ScheduledList({
         const action = (label: string, onPress: () => void) => (
           <Pressable
             accessibilityRole="button"
+            accessibilityState={{ disabled: busy === s.id, busy: busy === s.id }}
             disabled={busy === s.id}
-            hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
+            // Small words in a row: the touch area reaches 44pt tall.
+            hitSlop={{ top: 14, bottom: 14, left: 6, right: 6 }}
             onPress={onPress}
             style={{ opacity: busy === s.id ? 0.5 : 1 }}
           >
@@ -176,13 +178,15 @@ export function ScheduledList({
                 backgroundColor: c.surface,
               }}
             >
-              <Icon name={failed ? 'alert-circle-outline' : 'time-outline'} size={13} color={failed ? c.danger : c.inkMuted} />
+              <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                <Icon name={failed ? 'alert-circle-outline' : 'time-outline'} size={13} color={failed ? c.danger : c.inkMuted} />
+              </View>
               <Text style={{ color: failed ? c.danger : c.inkMuted, fontSize: 12 }}>
                 {failed ? t('m.chat.later.failed', { reason: s.failure ?? '' }) : sendsLabel(s.sendAt)}
               </Text>
-              <Text style={{ color: c.inkMuted, fontSize: 12 }}>·</Text>
+              <Dot color={c.inkMuted} />
               {failed ? action(t('m.chat.later.newTime'), () => setEditTime(s)) : action(t('m.chat.later.edit'), () => edit(s))}
-              <Text style={{ color: c.inkMuted, fontSize: 12 }}>·</Text>
+              <Dot color={c.inkMuted} />
               {action(
                 t('m.chat.later.sendNow'),
                 () =>
@@ -191,7 +195,7 @@ export function ScheduledList({
                     onSent(s, message);
                   }),
               )}
-              <Text style={{ color: c.inkMuted, fontSize: 12 }}>·</Text>
+              <Dot color={c.inkMuted} />
               {action(failed ? t('m.chat.later.dismiss') : t('m.chat.later.cancel'), () => cancel(s))}
             </View>
           </View>
@@ -236,6 +240,15 @@ export function ScheduledList({
   );
 }
 
+/** The dot between the actions under a waiting message: only a separator, so screen readers skip it. */
+function Dot({ color }: { color: string }) {
+  return (
+    <Text accessibilityElementsHidden importantForAccessibility="no" style={{ color, fontSize: 12 }}>
+      ·
+    </Text>
+  );
+}
+
 // ─── Wallpaper and bubble colour ────────────────────────────────────────
 
 /** Your bubbles' colours in this chat for the app's appearance. */
@@ -265,7 +278,13 @@ export function ChatWallpaperView({ wallpaper, radiusSize = 0 }: { wallpaper: Ch
   const cols = Math.ceil(size.w / step) + 1;
   const rows = Math.ceil(size.h / step) + 1;
   return (
-    <View pointerEvents="none" onLayout={onLayout} style={[fill, { backgroundColor: colors.from }]}>
+    <View
+      pointerEvents="none"
+      onLayout={onLayout}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={[fill, { backgroundColor: colors.from }]}
+    >
       {spec.pattern === 'dots'
         ? Array.from({ length: rows }, (_, r) => (
             <View key={r} style={{ position: 'absolute', top: r * step + step / 2, left: r % 2 ? step / 2 : 0, flexDirection: 'row' }}>
@@ -396,7 +415,7 @@ export function ChatLookSheet({
       <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 15, fontWeight: '800' }}>
         {t('m.chat.look.wallpaper')}
       </Text>
-      <View accessibilityRole="radiogroup" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+      <View accessibilityRole="radiogroup" accessibilityLabel={t('m.chat.look.wallpaper')} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
         {CHAT_WALLPAPERS.map((w) =>
           swatch(
             current.wallpaper === w,
@@ -413,7 +432,7 @@ export function ChatLookSheet({
       <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 15, fontWeight: '800' }}>
         {t('m.chat.look.colour')}
       </Text>
-      <View accessibilityRole="radiogroup" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+      <View accessibilityRole="radiogroup" accessibilityLabel={t('m.chat.look.colour')} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
         {CHAT_ACCENTS.map((a: ChatAccent) => {
           const colors = ACCENTS[a][c.theme];
           return swatch(

@@ -737,11 +737,16 @@ export default function ChatPage() {
               setEditingScheduled(s);
               setScheduleOpen(true);
             }}
+            // The focused button goes with the message: focus moves to the message box.
             onSent={(s, message) => {
               scheduled.setItems((cur) => cur.filter((x) => x.id !== s.id));
               addMessage(message);
+              composer.current?.focus();
             }}
-            onRemoved={(s) => scheduled.setItems((cur) => cur.filter((x) => x.id !== s.id))}
+            onRemoved={(s) => {
+              scheduled.setItems((cur) => cur.filter((x) => x.id !== s.id));
+              composer.current?.focus();
+            }}
           />
           {typing ? (
             <span className="muted" style={{ fontSize: 12 }}>

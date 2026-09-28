@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { AccessibilityInfo, Alert, FlatList, Platform, Pressable, RefreshControl, Text, View } from 'react-native';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import {
   ASK_ANSWER_MAX,
@@ -41,6 +41,10 @@ export default function Questions() {
   const [answering, setAnswering] = useState<InboxQuestion | null>(null);
   const [note, setNote] = useState<{ tone: 'info' | 'danger'; text: string } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // iOS has no live regions: read out what an action did ("Hidden", "Deleted") or why it failed.
+  useEffect(() => {
+    if (note && Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(note.text);
+  }, [note]);
 
   const load = useCallback(
     async (next?: string) => {

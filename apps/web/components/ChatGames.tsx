@@ -181,7 +181,16 @@ export function GameSheet({
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const statusId = useId();
+  const statusRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => setProblem(null), [game?.id, game?.moveNumber]);
+  // Forfeit and Rematch go away once used (the game ends, or the new one starts here): when the
+  // button that had focus is gone, focus goes to the line saying what happened.
+  useEffect(() => {
+    const el = statusRef.current;
+    if (!el) return;
+    const f = document.activeElement;
+    if (!f || f === document.body || !el.closest('[role="dialog"]')?.contains(f)) el.focus({ preventScroll: true });
+  }, [game?.id, game?.status]);
   if (!game) return null;
   const seat = game.players.findIndex((p) => p.id === meId);
   const out = seat >= 0 && game.state.out.includes(seat);
@@ -255,7 +264,7 @@ export function GameSheet({
           ))}
         </ul>
         {/* Read out when anyone moves or the game ends. */}
-        <p className="chat-game__live" id={statusId} role="status">
+        <p className="chat-game__live" id={statusId} role="status" ref={statusRef} tabIndex={-1}>
           {last ? `${last} ` : ''}
           <strong>{gameStatus(t, game, meId)}</strong>
         </p>

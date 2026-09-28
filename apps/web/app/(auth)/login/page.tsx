@@ -117,7 +117,7 @@ function LoginForm() {
         label={t('auth.email')}
         name="email"
         type="email"
-        autoComplete="username email"
+        autoComplete="username"
         inputMode="email"
         autoCapitalize="none"
         spellCheck={false}

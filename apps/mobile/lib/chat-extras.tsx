@@ -114,7 +114,8 @@ export function ReactionRow({ message, mine, onToggle }: { message: Message; min
           accessibilityState={{ selected: r.mine }}
           accessibilityLabel={t('m.chat.reactionA11y', { emoji: r.emoji, count: r.count })}
           onPress={() => onToggle(r.emoji, !r.mine)}
-          hitSlop={4}
+          // 28pt tall; the touch area still reaches 44pt.
+          hitSlop={8}
           style={{
             flexDirection: 'row',
             alignItems: 'center',
@@ -214,6 +215,7 @@ export function SystemLine({
         accessibilityRole={about?.available && onJump ? 'button' : 'text'}
         disabled={!about?.available || !onJump}
         onPress={() => onJump?.(s.messageId)}
+        hitSlop={6}
         style={{ alignSelf: 'center', flexDirection: 'row', gap: space[1], alignItems: 'center', maxWidth: '90%', paddingVertical: space[1], minHeight: 32 }}
       >
         <Icon name="notifications-outline" size={14} color={c.inkMuted} />
@@ -313,7 +315,7 @@ export function PinnedBar({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('m.chat.unpinA11y')}
-          hitSlop={8}
+          hitSlop={10}
           onPress={() => onUnpin(pin.message.id)}
           style={{ padding: space[1] }}
         >
@@ -435,7 +437,7 @@ export function SearchSheet({
               userText,
             ]}
           />
-          <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} hitSlop={8} onPress={onClose}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} hitSlop={10} onPress={onClose}>
             <Icon name="close" size={26} color={c.ink} />
           </Pressable>
         </View>

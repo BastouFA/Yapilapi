@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import { router, type Href } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Alert, Linking, Platform, Pressable, Text, View } from 'react-native';
+import { AccessibilityInfo, Alert, Linking, Platform, Pressable, Text, View } from 'react-native';
 import type { AccountInfo, InteractionSettings, PublicUser, UsernameCheck, UsernameStatus } from '../../../packages/shared/src/types';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import { usernameProblem } from '../../../packages/shared/src/usernames';
@@ -285,6 +285,11 @@ function ChangeUsername({ visible, onClose, onChanged }: { visible: boolean; onC
       : check.ok
         ? t('st.username.available', { name })
         : t(CHECK_TEXT[check.reason ?? 'taken']);
+  const answer = name && check.name === name && check.ok !== null ? message : '';
+  // iOS has no live regions: read the answer out when it comes ("@ada is available", "taken").
+  useEffect(() => {
+    if (answer && Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(answer);
+  }, [answer]);
   return (
     <BottomSheet visible={visible} title={t('st.username.changeTitle')} subtitle={t('st.username.changeDesc')} onClose={onClose}>
       {error ? <Notice tone="danger">{error}</Notice> : null}
@@ -303,9 +308,9 @@ function ChangeUsername({ visible, onClose, onChanged }: { visible: boolean; onC
         hint={check.ok === false ? undefined : message}
         error={check.ok === false && check.name === name ? message : null}
       />
-      {/* Read out when the answer comes, without moving focus. */}
-      <Text accessibilityLiveRegion="polite" style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
-        {name && check.name === name && check.ok !== null ? message : ''}
+      {/* Read out when the answer comes, without moving focus (Android; iOS is told above). */}
+      <Text accessibilityLiveRegion="polite" accessibilityElementsHidden style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
+        {answer}
       </Text>
       {confirming ? (
         <View style={{ gap: space[2] }}>

@@ -8370,7 +8370,7 @@ button.profile-song__play::after {
   font: 700 12px/18px var(--font-sans);
   cursor: pointer;
 }
-.chat-later__action:disabled {
+.chat-later__action[aria-disabled='true'] {
   opacity: 0.5;
   cursor: default;
 }
@@ -8416,9 +8416,17 @@ button.profile-song__play::after {
   font: 600 12px/16px var(--font-sans);
   cursor: pointer;
 }
-.chat-look__swatch[aria-checked='true'] {
+.chat-look__swatch[aria-pressed='true'] {
   border-color: var(--yapi);
   background: var(--yapi-soft);
+}
+.chat-look__swatch[aria-disabled='true'] {
+  cursor: progress;
+}
+.chat-look__swatch:focus-visible,
+.chat-later__action:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 .chat-look__sample {
   display: block;
@@ -8470,7 +8478,7 @@ button.profile-song__play::after {
   cursor: pointer;
   font: inherit;
 }
-.watch-picks__item:disabled {
+.watch-picks__item[aria-disabled='true'] {
   cursor: default;
   opacity: 0.55;
 }

@@ -185,7 +185,9 @@ export function ScheduledList({
   const { t, locale, toast } = useSession();
   const [busy, setBusy] = useState<string | null>(null);
   if (!items.length) return null;
+  // While one is being sent or cancelled its buttons stay focusable (aria-disabled), so focus isn't lost if it fails.
   const run = async (s: ScheduledMessage, action: () => Promise<void>) => {
+    if (busy === s.id) return;
     setBusy(s.id);
     try {
       await action();
@@ -199,21 +201,31 @@ export function ScheduledList({
     <section className="chat-later" aria-label={t('m.chat.later.list')}>
       {items.map((s) => (
         <div key={s.id} className={`chat-later__item${s.status === 'failed' ? ' chat-later__item--failed' : ''}`}>
-          <div className="yp-bubble yp-bubble--me chat-later__bubble" dir="auto">
+          {/* The buttons below are described by the message and its time, so "Cancel" says which one. */}
+          <div id={`later-${s.id}`} className="yp-bubble yp-bubble--me chat-later__bubble" dir="auto">
             {s.body}
           </div>
           <p className="chat-later__meta">
             <Icon name={s.status === 'failed' ? 'alert' : 'clock'} size={14} />
-            <span>{s.status === 'failed' ? t('m.chat.later.failed', { reason: s.failure ?? '' }) : sendsLabel(t, locale, s.sendAt)}</span>
+            <span id={`later-${s.id}-when`}>
+              {s.status === 'failed' ? t('m.chat.later.failed', { reason: s.failure ?? '' }) : sendsLabel(t, locale, s.sendAt)}
+            </span>
             <span aria-hidden>·</span>
-            <button type="button" className="chat-later__action" disabled={busy === s.id} onClick={() => onEdit(s)}>
+            <button
+              type="button"
+              className="chat-later__action"
+              aria-disabled={busy === s.id || undefined}
+              aria-describedby={`later-${s.id} later-${s.id}-when`}
+              onClick={() => busy !== s.id && onEdit(s)}
+            >
               {s.status === 'failed' ? t('m.chat.later.newTime') : t('m.chat.later.edit')}
             </button>
             <span aria-hidden>·</span>
             <button
               type="button"
               className="chat-later__action"
-              disabled={busy === s.id}
+              aria-disabled={busy === s.id || undefined}
+              aria-describedby={`later-${s.id} later-${s.id}-when`}
               onClick={() =>
                 void run(s, async () => {
                   const { message } = await api.scheduledMessages.sendNow(s.id);
@@ -227,9 +239,10 @@ export function ScheduledList({
             <button
               type="button"
               className="chat-later__action"
-              disabled={busy === s.id}
+              aria-disabled={busy === s.id || undefined}
+              aria-describedby={`later-${s.id} later-${s.id}-when`}
               onClick={() => {
-                if (s.status === 'scheduled' && !confirm(t('m.chat.later.cancelConfirm'))) return;
+                if (busy === s.id || (s.status === 'scheduled' && !confirm(t('m.chat.later.cancelConfirm')))) return;
                 void run(s, async () => {
                   await api.scheduledMessages.cancel(s.id);
                   onRemoved(s);
@@ -319,18 +332,19 @@ export function ChatLookSheet({
             <div className="yp-bubble yp-bubble--me">{t('m.chat.look.sampleMe')}</div>
           </div>
         </div>
+        {/* Toggle buttons in a fieldset, not radios: each change posts a line in the chat, so arrow keys must not pick.
+            They stay focusable (aria-disabled) while a change is saved, so focus isn't lost. */}
         <fieldset className="chat-look__group">
           <legend>{t('m.chat.look.wallpaper')}</legend>
-          <div className="chat-look__grid" role="radiogroup" aria-label={t('m.chat.look.wallpaper')}>
+          <div className="chat-look__grid">
             {CHAT_WALLPAPERS.map((w: ChatWallpaper) => (
               <button
                 key={w}
                 type="button"
-                role="radio"
-                aria-checked={current.wallpaper === w}
-                disabled={busy}
+                aria-pressed={current.wallpaper === w}
+                aria-disabled={busy || undefined}
                 className="chat-look__swatch"
-                onClick={() => current.wallpaper !== w && void pick({ wallpaper: w })}
+                onClick={() => !busy && current.wallpaper !== w && void pick({ wallpaper: w })}
               >
                 <span
                   className={`chat-look__sample ${chatThemeClass({ wallpaper: w, accent: current.accent })}`}
@@ -343,16 +357,15 @@ export function ChatLookSheet({
         </fieldset>
         <fieldset className="chat-look__group">
           <legend>{t('m.chat.look.colour')}</legend>
-          <div className="chat-look__grid" role="radiogroup" aria-label={t('m.chat.look.colour')}>
+          <div className="chat-look__grid">
             {CHAT_ACCENTS.map((a: ChatAccent) => (
               <button
                 key={a}
                 type="button"
-                role="radio"
-                aria-checked={current.accent === a}
-                disabled={busy}
+                aria-pressed={current.accent === a}
+                aria-disabled={busy || undefined}
                 className="chat-look__swatch"
-                onClick={() => current.accent !== a && void pick({ accent: a })}
+                onClick={() => !busy && current.accent !== a && void pick({ accent: a })}
               >
                 <span className="chat-look__dot chat-themed chat-accent" style={chatThemeVars({ wallpaper: current.wallpaper, accent: a })} />
                 <span>{t(`m.chat.accent.${a}` as MessageKey)}</span>

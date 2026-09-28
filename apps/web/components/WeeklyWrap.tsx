@@ -73,6 +73,14 @@ function dismissOtdToday() {
   }
 }
 
+/** Putting a card away removes the button that had focus: focus goes to the page's title instead of nowhere. */
+function focusPageTitle() {
+  const h1 = document.querySelector<HTMLElement>('main h1');
+  if (!h1) return;
+  if (!h1.hasAttribute('tabindex')) h1.tabIndex = -1;
+  h1.focus();
+}
+
 /**
  * The top of Pulse: this week's wrap (for a few days after Sunday, until put away) and "On this
  * day" (your own posts from this day in earlier years, hidden for the day on this device).
@@ -107,6 +115,7 @@ export function PulseCards() {
           card={wrap}
           onDismiss={async () => {
             setCards((c) => (c ? { ...c, wrap: null } : c));
+            requestAnimationFrame(focusPageTitle);
             try {
               await api.wraps.dismiss(wrap.id);
             } catch (e) {
@@ -124,6 +133,7 @@ export function PulseCards() {
           onDismiss={() => {
             dismissOtdToday();
             setOtdHidden(true);
+            requestAnimationFrame(focusPageTitle);
           }}
         />
       ) : null}
