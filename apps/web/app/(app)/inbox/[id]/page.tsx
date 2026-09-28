@@ -1047,6 +1047,7 @@ export default function ChatPage() {
           addMessage(m);
           setBoardFor(m.id);
         }}
+        onOpenGame={setBoardFor}
       />
       <GameSheet
         game={messages?.find((m) => m.id === boardFor)?.game ?? null}

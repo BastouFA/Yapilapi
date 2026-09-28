@@ -1301,6 +1301,7 @@ export default function Chat() {
           setMessages((cur) => (cur.some((x) => x.id === m.id) ? cur : [...cur, m]));
           setBoardFor(m.id);
         }}
+        onOpenGame={setBoardFor}
       />
       <GameSheet
         game={messages.find((m) => m.id === boardFor)?.game ?? null}

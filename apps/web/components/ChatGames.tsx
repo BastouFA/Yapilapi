@@ -655,16 +655,20 @@ export function StartGameSheet({
   conversation,
   meId,
   onSent,
+  onOpenGame,
 }: {
   open: boolean;
   onClose: () => void;
   conversation: Conversation | null;
   meId?: string;
   onSent: (m: Message) => void;
+  /** Open the board of a game already going here (by its card's message id). */
+  onOpenGame?: (messageId: string) => void;
 }) {
   const { t, toast } = useSession();
   const [kind, setKind] = useState<GameKind>('four_up');
   const [going, setGoing] = useState<GameKind[]>([]);
+  const [goingCards, setGoingCards] = useState<Partial<Record<GameKind, string>>>({});
   const [chosen, setChosen] = useState<string[]>([]);
   const [color, setColor] = useState<'white' | 'black' | 'random'>('white');
   const [busy, setBusy] = useState(false);
@@ -676,6 +680,7 @@ export function StartGameSheet({
       (r) => {
         const kinds = r.items.map((g) => g.kind);
         setGoing(kinds);
+        setGoingCards(Object.fromEntries(r.items.map((g) => [g.kind, g.messageId])));
         setKind((k) => (kinds.includes(k) ? (GAME_KINDS.find((x) => !kinds.includes(x)) ?? k) : k));
       },
       () => setGoing([]),
@@ -686,6 +691,7 @@ export function StartGameSheet({
   const others = conversation.members.filter((m) => m.id !== meId);
   const max = GAME_PLAYERS[kind].max - 1;
   const single = max === 1;
+  const allGoing = GAME_KINDS.every((k) => going.includes(k));
   const ready = !going.includes(kind) && (!group || (chosen.length >= 1 && chosen.length <= max));
 
   async function submit() {
@@ -722,6 +728,31 @@ export function StartGameSheet({
           <div className="stack" style={{ gap: 8 }}>
             {GAME_KINDS.map((k) => {
               const busyHere = going.includes(k);
+              const card = goingCards[k];
+              // A game already going here: no second one, but a way straight to it.
+              if (busyHere)
+                return (
+                  <div key={k} className="chat-game-option chat-game-option--going">
+                    <span className="stack" style={{ gap: 2, flex: 1 }}>
+                      <strong>{gameName(t, k)}</strong>
+                      <span className="chat-poll__status">{t('m.chat.game.going', { game: gameName(t, k) })}</span>
+                    </span>
+                    {card && onOpenGame ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        icon="game"
+                        aria-label={`${t('m.chat.game.open')}: ${gameName(t, k)}`}
+                        onClick={() => {
+                          onClose();
+                          onOpenGame(card);
+                        }}
+                      >
+                        {t('m.chat.game.open')}
+                      </Button>
+                    ) : null}
+                  </div>
+                );
               return (
                 <label key={k} className={`chat-game-option${kind === k ? ' chat-game-option--on' : ''}`}>
                   <input
@@ -794,13 +825,20 @@ export function StartGameSheet({
             </div>
           </fieldset>
         ) : null}
+        {allGoing ? (
+          <p className="chat-poll__status" role="note" style={{ margin: 0 }}>
+            {t('m.chat.game.allGoing')}
+          </p>
+        ) : null}
         <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
           <Button variant="ghost" onClick={onClose}>
-            {t('m.chat.cancel')}
+            {allGoing ? t('m.common.close') : t('m.chat.cancel')}
           </Button>
-          <Button type="submit" icon="game" loading={busy} disabled={!ready}>
-            {t('m.chat.game.startButton')}
-          </Button>
+          {allGoing ? null : (
+            <Button type="submit" icon="game" loading={busy} disabled={!ready}>
+              {t('m.chat.game.startButton')}
+            </Button>
+          )}
         </div>
       </form>
     </BottomSheet>

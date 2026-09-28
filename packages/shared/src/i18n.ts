@@ -5897,6 +5897,7 @@ const en = {
   'admin.regions.term': 'Term',
   'admin.regions.topic': 'Topic',
   'admin.regions.add': 'Add rule',
+  'm.chat.game.allGoing': 'A game of each kind is going here. Open one to carry on, or forfeit it to start a new one.',
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -11838,6 +11839,7 @@ const fr: Catalog = {
   'admin.regions.term': 'Terme',
   'admin.regions.topic': 'Sujet',
   'admin.regions.add': 'Ajouter la règle',
+  'm.chat.game.allGoing': 'Une partie de chaque jeu est en cours ici. Ouvre-en une pour continuer, ou abandonne-la pour en commencer une nouvelle.',
 };
 
 const ar: Catalog = {
@@ -17708,6 +17710,7 @@ const ar: Catalog = {
   'admin.regions.term': 'العبارة',
   'admin.regions.topic': 'الموضوع',
   'admin.regions.add': 'إضافة القاعدة',
+  'm.chat.game.allGoing': 'هناك لعبة من كل نوع جارية هنا. افتح واحدة لتكمل، أو انسحب منها لتبدأ لعبة جديدة.',
 };
 
 const es: Catalog = {
@@ -23625,6 +23628,7 @@ const es: Catalog = {
   'admin.regions.term': 'Término',
   'admin.regions.topic': 'Tema',
   'admin.regions.add': 'Añadir regla',
+  'm.chat.game.allGoing': 'Aquí hay una partida de cada juego en curso. Abre una para seguir, o abandónala para empezar otra.',
 };
 
 const pt: Catalog = {
@@ -29535,6 +29539,7 @@ const pt: Catalog = {
   'admin.regions.term': 'Termo',
   'admin.regions.topic': 'Tópico',
   'admin.regions.add': 'Adicionar regra',
+  'm.chat.game.allGoing': 'Há uma partida de cada jogo em andamento aqui. Abra uma para continuar, ou desista dela para começar outra.',
 };
 
 const sw: Catalog = {
@@ -35447,6 +35452,7 @@ const sw: Catalog = {
   'admin.regions.term': 'Neno',
   'admin.regions.topic': 'Mada',
   'admin.regions.add': 'Ongeza sheria',
+  'm.chat.game.allGoing': 'Kuna mchezo wa kila aina unaoendelea hapa. Fungua mmoja uendelee, au ujitoe ili uanze mpya.',
 };
 
 const yo: Catalog = {
@@ -41346,6 +41352,7 @@ const yo: Catalog = {
   'admin.regions.term': 'Ọ̀rọ̀',
   'admin.regions.topic': 'Kókó',
   'admin.regions.add': 'Ṣàfikún òfin',
+  'm.chat.game.allGoing': 'Eré kọ̀ọ̀kan ń lọ lọ́wọ́ níbí. Ṣí ọ̀kan láti tẹ̀síwájú, tàbí jáwọ́ nínú rẹ̀ láti bẹ̀rẹ̀ tuntun.',
 };
 
 const ha: Catalog = {
@@ -47263,6 +47270,7 @@ const ha: Catalog = {
   'admin.regions.term': 'Kalma',
   'admin.regions.topic': 'Batu',
   'admin.regions.add': 'Ƙara doka',
+  'm.chat.game.allGoing': 'Akwai wasa na kowane iri da ake yi a nan. Buɗe ɗaya don ci gaba, ko ka janye don fara sabo.',
 };
 
 export const CATALOGS: Record<string, Catalog> = { en, fr, ar, es, pt, sw, yo, ha };
