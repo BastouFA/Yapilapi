@@ -189,7 +189,8 @@ describe('sign-in alerts', () => {
     expect(mail.subject).toBe('New sign-in to your account');
     expect(mail.text).toContain('Device: Chrome on macOS');
     expect(mail.text).toContain('Approximate place: Nigeria');
-    expect(mail.text).toContain('Sun, 27 Sep 2026 20:00:00 GMT');
+    // The date and time in the reader's language, said to be UTC.
+    expect(mail.text).toMatch(/^When: Sunday, September 27, 2026 .*8:00\sPM UTC$/m);
     expect(mail.text).toContain("This wasn't me: https://yapilapi.test/settings/security?review=sign-in");
     expect(signInEmail('a@example.test', 'ada', 'https://y.test', { device: 'App on iOS', place: null, at: new Date() }).text).not.toContain(
       'Approximate place',

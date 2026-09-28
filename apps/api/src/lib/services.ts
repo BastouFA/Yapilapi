@@ -4,7 +4,7 @@ import type { RealtimeHub } from './realtime.ts';
 import { pushTextFor, type PushSender } from './push.ts';
 import { activeControls } from './family.ts';
 import { inQuietHours } from './interactions.ts';
-import { deliverable, securityEmail, SECURITY_EMAILS, type EmailSender } from './email.ts';
+import { deliverable, recipientLocale, securityEmail, SECURITY_EMAILS, type EmailSender } from './email.ts';
 
 type Q = Pool | PoolClient;
 
@@ -56,10 +56,14 @@ export function securityMailer(
 ): SecurityMailer {
   return (userId, type) => {
     void (async () => {
-      const { rows } = await deps.db.query<{ email: string }>(`SELECT email FROM users WHERE id = $1 AND status <> 'deleted'`, [userId]);
+      const { rows } = await deps.db.query<{ email: string; locale: string | null }>(
+        `SELECT u.email, pr.locale FROM users u LEFT JOIN profiles pr ON pr.user_id = u.id WHERE u.id = $1 AND u.status <> 'deleted'`,
+        [userId],
+      );
       const to = rows[0]?.email;
       if (!deliverable(to)) return;
-      const mail = securityEmail(type, to, deps.config.WEB_ORIGIN);
+      // In the account's own language.
+      const mail = securityEmail(type, to, deps.config.WEB_ORIGIN, new Date(), recipientLocale(rows[0]!.locale));
       if (mail) await deps.email.send(mail);
     })().catch((err: Error) => log.warn({ err: err.message, type }, 'security email not sent'));
   };
@@ -172,11 +176,12 @@ export async function notify(
   // Push to devices, except when the person is in focus mode. Fire and forget.
   // A supervised teen's quiet hours, and the person's own, hold pushes too; the notification still lands in the inbox.
   if (pushSender && !p?.focus_mode && !(n.category !== 'security' && ((await activeControls(db, n.userId))?.quietNow || (await inQuietHours(db, n.userId))))) {
-    const text = pushTextFor(
-      n.type,
-      n.actorId ? ((await db.query(`SELECT display_name FROM profiles WHERE user_id = $1`, [n.actorId])).rows[0]?.display_name ?? null) : null,
-      n.data,
+    // The recipient's language and the actor's name, in one query.
+    const who = await db.query<{ locale: string | null; actor: string | null }>(
+      `SELECT (SELECT locale FROM profiles WHERE user_id = $1) AS locale, (SELECT display_name FROM profiles WHERE user_id = $2) AS actor`,
+      [n.userId, n.actorId ?? null],
     );
+    const text = pushTextFor(n.type, who.rows[0]?.actor ?? null, n.data, recipientLocale(who.rows[0]?.locale));
     const data: Record<string, string> = { type: n.type };
     if (n.entityType) data.entityType = n.entityType;
     if (n.entityId) data.entityId = n.entityId;

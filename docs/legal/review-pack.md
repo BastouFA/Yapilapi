@@ -18,7 +18,7 @@ Some features are optional helpers that use a third-party AI model: summaries, s
 ## 2. Who it is for, and where
 
 - **Minimum age:** 13. People from 13 to 17 get extra protections (section 6). Selling, receiving money and payouts are 18 and over.
-- **Languages:** the app ships in English, French, Arabic, Spanish, Portuguese (Brazil), Swahili, Yorùbá and Hausa. Arabic is right-to-left.
+- **Languages:** the app ships in English, French, Arabic, Spanish, Portuguese (Brazil), Swahili, Yorùbá and Hausa. Arabic is right-to-left. Push notifications and emails (security notices, sign-in alerts, password reset, email confirmation, the account deletion note) go out in the person's app language.
 - **Likely markets:** Nigeria, Ghana, Kenya and South Africa. Paystack is wired for NGN, GHS, KES and ZAR, and Yorùbá, Hausa and Swahili are supported.
 - **Other markets the languages point to:**
   - French-speaking West and Central Africa, and France;

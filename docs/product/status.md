@@ -144,7 +144,7 @@ What exists for a public launch and store review, and what only the owner can do
   - A `username_changed` security event and audit entry. The export lists username changes; deleting the account removes them.
 - **Sign-in alerts** (`apps/api/src/lib/sign-in-alerts.ts`, `known_sign_ins`, `GET`/`PUT /v1/me/sign-in-alerts`):
   - Every sign-in (password, two-step, passkey) records the device: browser or app and system ("Chrome on macOS"), and the country when a trusted CDN header is configured (there is no GeoIP database, so without the header only the device counts).
-  - A device not seen before sends an in-app notification (`new_sign_in`, security category, so it can't be turned off and ignores pauses) and an email: "New sign-in to your account", device, time, approximate place when known, and a "This wasn't me" link to `/settings/security?review=sign-in`, where a note sits above the list of sessions to log out and the password card.
+  - A device not seen before sends an in-app notification (`new_sign_in`, security category, so it can't be turned off and ignores pauses) and an email: "New sign-in to your account", device, time, approximate place when known, and a "This wasn't me" link to `/settings/security?review=sign-in`, where a note sits above the list of sessions to log out and the password card. The email is in the account's language, the device and country names too (see "Pushes and emails in the reader's language").
   - Settings > Security has "Email me as well" (on by default); the notification in the app always comes. The sign-up itself never alerts, nor an account's first sign-in since alerts began.
 - **Send later** (`scheduled_messages`, `apps/api/src/modules/chat-later.ts`):
   - Web: a clock next to Send opens a sheet with the text, In 1 hour / Tonight / Tomorrow morning and a date and time field. Mobile: touch and hold Send (or the screen reader action "Send later") opens the date and time sheet (`lib/date-time.tsx`).
@@ -455,6 +455,15 @@ Other sentences the API wrote in English and the apps showed as they were now co
 - **Report sent** on the web uses the app's own thanks, like the phone.
 
 Still in English from the server: job-failure reasons in notifications, chat message bodies the server writes, device names, and the recap title. Push notifications and emails are being moved to the recipient's language separately.
+
+## Pushes and emails in the reader's language (2026-09-28, no migration, `apps/api/test/recipient-language.test.ts`)
+
+Pushes and emails used to be English for everyone. They are now written in the recipient's app language (`profiles.locale`), in all 8 languages, and in English when there is no catalog for it:
+
+- **Pushes** (`apps/api/src/lib/push.ts`): every push type has a sentence under `push.<type>` in each catalog, with plural pairs where a number appears (photos added to a Together, days left on a listing, Plus days). `notify()` gets the recipient's language in the same query as the actor's name, so a push costs no extra query. An anonymous actor is "Someone" in the reader's language. The payload the phone reads (title YAPILAPI, `url`, `tag`, `data.type`, `data.entityType`, `data.entityId`, the call options) is unchanged.
+- **Emails** (`email.<kind>` keys): the security notices, the sign-in alert, confirming the email address, the password reset link and the note after an account is deleted. The date is written in the reader's language and marked UTC. The address confirmation sent at sign-up uses the language the web or phone sent with the sign-up (it is stored before the email goes); the deletion note reads the language before the account is wiped.
+- **Sign-in alerts**: the email names the device ("Chrome sur macOS", "Unknown device" from the catalog) and the country in the reader's language (`Intl.DisplayNames`). The stored device name, the sign-in fingerprint and the notification's data stay in English, so a language change never sets off an alert.
+- Tests: a French and an Arabic reader get their language for a like, a comment and a Yap push, a security email, the password reset, the address confirmation, the deletion note and the sign-in alert with the country's name; an account whose language has no catalog gets English; every push type and security email has its sentence in every catalog, different from English, with every slot filled. Yorùbá and Hausa need a native-speaker review like the rest.
 
 ## Not built yet
 
