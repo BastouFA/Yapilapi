@@ -266,7 +266,7 @@ export function SafetyTips({ compact, tint }: { compact?: boolean; tint?: string
     return (
       <View style={{ flexDirection: 'row', gap: space[1], alignItems: 'flex-start' }}>
         <Icon name="shield-checkmark-outline" size={14} color={color} />
-        <Text style={{ color, fontSize: 12, lineHeight: 17, flex: 1, opacity: 0.9 }}>{t('m.market.safety.short')}</Text>
+        <Text style={{ color, fontSize: 12, lineHeight: 17, flexShrink: 1, opacity: 0.9 }}>{t('m.market.safety.short')}</Text>
       </View>
     );
   const tips: MessageKey[] = ['m.market.safety.public', 'm.market.safety.check', 'm.market.safety.advance', 'm.market.safety.inPerson'];

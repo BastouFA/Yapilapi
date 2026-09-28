@@ -124,7 +124,7 @@ export function PollCard({ message, meId, tint, onPoll }: { message: Message; me
                   size={20}
                   color={tint}
                 />
-                <Text style={[{ flex: 1, color: tint, fontSize: 15 }, userText]}>{o.text}</Text>
+                <Text style={[{ flexGrow: 1, flexShrink: 1, color: tint, fontSize: 15 }, userText]}>{o.text}</Text>
                 <Text style={{ color: tint, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{percent}%</Text>
               </View>
               {o.voters?.length ? (
