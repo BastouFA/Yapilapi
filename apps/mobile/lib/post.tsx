@@ -3,14 +3,14 @@ import { Fragment, memo, useEffect, useState } from 'react';
 import { Image, Platform, Pressable, ScrollView, Share, Text, View, type StyleProp, type TextStyle } from 'react-native';
 import type { Conversation, MediaItem, PhotoTag, Post, PublicUser } from '../../../packages/shared/src/types';
 import { formatBytes } from '../../../packages/shared/src/data-saver';
-import { postReasonText } from '../../../packages/shared/src/feed-reasons';
+import { postReasonText, whyReasonText } from '../../../packages/shared/src/feed-reasons';
 import { client, errorMessage, mediaUrl, webUrl } from './api';
 import { useDataSaver } from './data-saver';
 import { useBoards, type SaveChange } from './boards';
 import { useSession } from './session';
 import { useT, type Translate } from './i18n';
 import { radius, space } from './theme';
-import { type ActionSheetAction, Avatar, Button, Card, Icon, Notice, PlusBadge, useActionSheet, useColors, userText } from './ui';
+import { type ActionSheetAction, Avatar, BottomSheet, Button, Card, Icon, Notice, PlusBadge, useActionSheet, useColors, userText } from './ui';
 import { LockedPanel, TipButton } from './money';
 import { SensitiveCover } from './safety';
 import { EditPostSheet, HistorySheet } from './post-edit';
@@ -148,7 +148,7 @@ export const PostCard = memo(PostCardView);
 
 function PostCardView({ post: given, open = true }: { post: Post; open?: boolean }) {
   const c = useColors();
-  const { t, tp, number, timeAgo, dateTime } = useT();
+  const { t, tp, number, timeAgo, dateTime, locale } = useT();
   // The post as shown: the one given, or the version you just saved.
   const [post, setPost] = useState(given);
   useEffect(() => setPost(given), [given]);
@@ -246,6 +246,32 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
   const canReport = !!me && !isAuthor && !post.status && collab !== 'accepted';
   // Blocking the author from the report sheet folds the card away.
   const [blockedAuthor, setBlockedAuthor] = useState(false);
+
+  // Feed controls on someone else's post, as on the web: why it's here, less or more like it,
+  // not interested (folds the card), mute the author (folds it too).
+  const canTune = !!me && !isAuthor && !post.status;
+  const [why, setWhy] = useState<string[] | null>(null);
+  const [folded, setFolded] = useState<string | null>(null);
+  const [tuneNote, setTuneNote] = useState<string | null>(null);
+  async function tune(signal: 'more_like_this' | 'less_like_this' | 'not_interested' | 'mute_creator') {
+    try {
+      await (await client()).feedback({ signal, postId: post.id, ...(signal === 'mute_creator' ? { authorId: post.author.id } : {}) });
+      if (signal === 'not_interested') setFolded(t('postList.hidden'));
+      else if (signal === 'mute_creator') setFolded(t('postList.muted', { name: post.author.displayName }));
+      else setTuneNote(signal === 'more_like_this' ? t('postList.moreLikeThis') : t('postList.lessLikeThis'));
+    } catch (e) {
+      setTuneNote(errorMessage(e));
+    }
+  }
+  async function showWhy() {
+    try {
+      const r = await (await client()).posts.why(post.id);
+      // Each line in the reader's language; an older API only sends them in English.
+      setWhy(r.details ? r.details.map((d) => whyReasonText(d, { t, tp, locale })) : r.reasons);
+    } catch (e) {
+      setTuneNote(errorMessage(e));
+    }
+  }
   const report = useReport({ onBlocked: () => setBlockedAuthor(true) });
 
   /**
@@ -267,6 +293,11 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
     if (canRemember) actions.push({ label: t('m.mem.addToMemory'), icon: 'albums-outline', onPress: () => setRemembering(true) });
     if (collab === 'accepted') actions.push({ label: t('m.collab.leave'), icon: 'exit-outline', destructive: true, onPress: () => void leave() });
     if (myTag) actions.push({ label: t('m.tags.removeMine'), icon: 'pricetag-outline', onPress: () => void removeTag(myTag) });
+    if (canTune) {
+      actions.push({ label: t('post.why'), icon: 'help-circle-outline', onPress: () => void showWhy() });
+      actions.push({ label: t('post.notInterested'), icon: 'eye-off-outline', onPress: () => void tune('not_interested') });
+      actions.push({ label: t('post.muteCreator'), icon: 'volume-mute-outline', onPress: () => void tune('mute_creator') });
+    }
     if (canReport)
       actions.push({
         label: t('post.report'),
@@ -280,6 +311,15 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
       actions,
     });
   }
+
+  if (folded)
+    return (
+      <Card>
+        <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted, lineHeight: 20 }}>
+          {folded}
+        </Text>
+      </Card>
+    );
 
   if (blockedAuthor)
     return (
@@ -607,6 +647,23 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
       {menu.sheet}
       {watchTogether.sheet}
       {report.sheet}
+      {tuneNote ? (
+        <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted, fontSize: 13 }}>
+          {tuneNote}
+        </Text>
+      ) : null}
+      <BottomSheet visible={!!why} title={t('post.why')} onClose={() => setWhy(null)}>
+        {why?.map((r) => (
+          <View key={r} style={{ flexDirection: 'row', gap: space[2] }}>
+            <Text style={{ color: c.inkMuted }}>•</Text>
+            <Text style={{ color: c.ink, lineHeight: 20, flex: 1 }}>{r}</Text>
+          </View>
+        ))}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+          <Button label={t('post.lessLikeThis')} variant="secondary" size="sm" onPress={() => (setWhy(null), void tune('less_like_this'))} />
+          <Button label={t('post.moreLikeThis')} variant="ghost" size="sm" onPress={() => (setWhy(null), void tune('more_like_this'))} />
+        </View>
+      </BottomSheet>
     </Card>
   );
 }
