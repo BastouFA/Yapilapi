@@ -56,7 +56,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return (
       <main className="yp-shell__main" id="main">
         <div className="yp-shell__inner">
-          <EmptyState title={sessionError} action={<Button onClick={() => void refresh()}>{t('m.common.retry')}</Button>} />
+          <EmptyState level={1} title={sessionError} action={<Button onClick={() => void refresh()}>{t('m.common.retry')}</Button>} />
         </div>
       </main>
     );

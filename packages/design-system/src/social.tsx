@@ -1842,10 +1842,15 @@ export function AIPanel({
   );
 }
 
-export function EmptyState({ title, body, action }: { title: string; body?: string; action?: ReactNode }) {
+/**
+ * Nothing to show, or something that couldn't load. `level` 1 when it is all the page shows (a
+ * missing or failed page), so the page still has its one `h1`; 2 (the default) inside a page.
+ */
+export function EmptyState({ title, body, action, level = 2 }: { title: string; body?: string; action?: ReactNode; level?: 1 | 2 | 3 }) {
+  const Heading = `h${level}` as 'h1' | 'h2' | 'h3';
   return (
     <div className="yp-empty">
-      <h2>{title}</h2>
+      <Heading className="yp-empty__title">{title}</Heading>
       {body ? <p>{body}</p> : null}
       {action}
     </div>

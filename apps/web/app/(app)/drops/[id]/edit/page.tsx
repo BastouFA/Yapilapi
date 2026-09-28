@@ -13,13 +13,14 @@ export default function EditDropPage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useSession();
   const { drop, missing, loadError, reload, now } = useDrop(id);
-  if (missing) return <EmptyState title={t('m.drops.missing')} />;
-  if (!drop && loadError) return <EmptyState title={loadError} action={<Button onClick={() => void reload()}>{t('m.common.retry')}</Button>} />;
+  if (missing) return <EmptyState level={1} title={t('m.drops.missing')} />;
+  if (!drop && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={() => void reload()}>{t('m.common.retry')}</Button>} />;
   if (!drop) return <Skeleton height={320} />;
   const phase = dropPhase(drop, now);
   if (!drop.isSeller || (phase !== 'draft' && phase !== 'upcoming'))
     return (
       <EmptyState
+        level={1}
         title={t('m.drops.cantEdit')}
         action={
           <Link href={`/drops/${id}`} className="yp-btn yp-btn--secondary">

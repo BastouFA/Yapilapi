@@ -129,7 +129,7 @@ export default function BoardPage() {
   if (!detail && loadError)
     return (
       <div className="yp-shell__inner">
-        <EmptyState title={loadError} action={<Button onClick={() => void loadDetail()}>{t('m.common.retry')}</Button>} />
+        <EmptyState level={1} title={loadError} action={<Button onClick={() => void loadDetail()}>{t('m.common.retry')}</Button>} />
       </div>
     );
   if (!detail)

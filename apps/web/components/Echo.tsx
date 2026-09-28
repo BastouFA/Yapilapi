@@ -129,8 +129,8 @@ export function EchoComposer({ postId }: { postId: string }) {
     }
   };
 
-  if (missing) return <EmptyState title={t('echo.block.unavailable')} body={missing} />;
-  if (!options && loadError) return <EmptyState title={loadError} action={<Button onClick={loadOptions}>{t('m.common.retry')}</Button>} />;
+  if (missing) return <EmptyState level={1} title={t('echo.block.unavailable')} body={missing} />;
+  if (!options && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={loadOptions}>{t('m.common.retry')}</Button>} />;
   if (!options) return <Skeleton height={320} />;
 
   const name = options.original.author.username;

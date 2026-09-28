@@ -34,8 +34,8 @@ export default function RemixesPage() {
 
   const load = useCallback((cursor?: string) => api.posts.remixes(id, mode === 'all' ? undefined : mode, cursor), [id, mode]);
 
-  if (missing) return <EmptyState title={t('remixes.unavailable')} body={missing} />;
-  if (!original && loadError) return <EmptyState title={loadError} action={<Button onClick={loadOriginal}>{t('m.common.retry')}</Button>} />;
+  if (missing) return <EmptyState level={1} title={t('remixes.unavailable')} body={missing} />;
+  if (!original && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={loadOriginal}>{t('m.common.retry')}</Button>} />;
   if (!original) return <Skeleton height={200} />;
   const canRemix = !!me && original.allowRemix && original.visibility === 'public';
   const [introBefore = '', introAfter = ''] = (original.counts.remixes ? tp('remixes.introCount', original.counts.remixes) : t('remixes.intro')).split(

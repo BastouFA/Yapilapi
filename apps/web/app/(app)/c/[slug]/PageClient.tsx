@@ -86,8 +86,8 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
   const load = useCallback((cursor?: string) => api.communities.posts(slug, cursor), [slug]);
 
   if (signedOut && !isPublic) return <NeedsAccount title={t('communityPage.signIn.title')} body={t('communityPage.signIn.body')} />;
-  if (missing) return <EmptyState title={t('m.community.notFound.title')} body={t('m.community.notFound.body')} />;
-  if (!c && loadError) return <EmptyState title={loadError} action={<Button onClick={() => void reload()}>{t('m.common.retry')}</Button>} />;
+  if (missing) return <EmptyState level={1} title={t('m.community.notFound.title')} body={t('m.community.notFound.body')} />;
+  if (!c && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={() => void reload()}>{t('m.common.retry')}</Button>} />;
   if (!c) return <Skeleton height={200} />;
 
   const isMember = !!c.myRole;

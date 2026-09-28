@@ -7,11 +7,11 @@ YAPILAPI targets **WCAG 2.2 AA**. Two automated suites in `apps/web/e2e/` guard 
 The suites need a running API and web app. Use your own ports, the host `127.0.0.1` (so the audit's cookies stay apart from a `localhost` development session) and a scratch database, never the development one:
 
 ```bash
-# A scratch database, migrated, with the Memory feature on (memories, chapters and recaps are audited)
+# A scratch database, migrated, with the Memory and Together features on (memories, chapters, recaps and albums are audited)
 docker compose exec db psql -U postgres -c "CREATE DATABASE yapilapi_a11y"
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/yapilapi_a11y pnpm db:migrate
 docker compose exec db psql -U postgres -d yapilapi_a11y \
-  -c "INSERT INTO feature_flags (key, enabled) VALUES ('MEMORY', true) ON CONFLICT (key) DO UPDATE SET enabled = true"
+  -c "INSERT INTO feature_flags (key, enabled) VALUES ('MEMORY', true), ('REAL_TOGETHER', true) ON CONFLICT (key) DO UPDATE SET enabled = true"
 
 # API: APP_ENV=test lifts rate limits for the sign-ups; JOB_WORKER=true still runs the background
 # jobs (photo processing, the recap video), which APP_ENV=test otherwise leaves to the API tests.
@@ -46,7 +46,10 @@ node apps/web/e2e/summary.ts            # counts by project and rule (--details 
 - **profile style**: an accent with the cover photo header, pronouns, a city, a link, a profile song and a featured post (the friend has another accent and the gradient header);
 - **drops**: the friend's drop, scheduled, with you waiting for it, and your own draft drop from your own shop;
 - a second **chat** (with the third user) with a wallpaper and bubble colour, a message to **send later**, and one **game** of each kind (Four up, Noughts, Word ladder), your turn in each;
-- this week's **weekly wrap**, made through `POST /dev/weekly-wrap` (development and test only; wraps normally come on Sunday evening).
+- this week's **weekly wrap**, made through `POST /dev/weekly-wrap` (development and test only; wraps normally come on Sunday evening);
+- **Market**: a listing by Ben (you can write to him or make an offer) and one of yours; their words carry the run's code, since the same words listed again and again are held for review;
+- **tickets**: Ben's class, where you're going (so your wallet holds a ticket you can give to a friend), and your own tasting an hour from now, where Ben is checked in and Cleo isn't yet (the check-in screen);
+- a **Together** album started from a group chat with Ben and Cleo, with two of your photos and one of Ben's, one starred with a comment.
 
 Photos and the reel come from `e2e/fixtures/` (small generated files). **Audio rooms** are made fresh by each test that opens one (`liveRoom()`): the friend starts a live room in a new community of his and joins it as host. A community has one live room at a time and a room without its host ends after five minutes, so rooms are not shared between tests. **Watch together** sessions are asked for by each test that opens one (`watchSession()`): the third user starts one in the second chat with a reel queued, or joins the one still running (people whose player goes quiet leave after 45 seconds, and a session nobody watches ends).
 
@@ -54,9 +57,9 @@ Photos and the reel come from `e2e/fixtures/` (small generated files). **Audio r
 
 **`a11y.spec.ts`**: axe-core (`@axe-core/playwright` 4.13) with the `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa` and `best-practice` rule sets (contrast, names and labels, ARIA validity, landmarks, heading order, target size, document language and title…).
 
-**65 pages:** landing, login, signup, forgot password, legal, privacy policy, cookie notice; home, discover, create, inbox, a conversation, your profile, someone else's profile, community, event, place, settings and its sections (account, notifications, privacy, security, safety, appearance, help), studio, notifications (grouped), a single post, events, assistant, live, a business page, developers, memories, reels, a reel with highlights, search, search results, camera, a tag page, Plus, invite, drafts and scheduled posts, continue a draft, create a story, create a reel, saved, a board, circles, a circle, recaps, a recap (ready video), make a recap, a chapter, the story archive, a sound page; and, newer: past weekly wraps, a weekly wrap, questions (Ask me inbox), drops, a new drop, someone's drop, your draft drop, editing a drop, and a chat with a wallpaper, a scheduled message and four games.
+**79 pages:** landing, login, signup, forgot password, legal, privacy policy, cookie notice; home, discover, create, inbox, a conversation, your profile, someone else's profile, community, event, place, settings and its sections (account, notifications, privacy, security, safety, appearance, help), studio, notifications (grouped), a single post, events, assistant, live, a business page, developers, memories, reels, a reel with highlights, search, search results, camera, a tag page, Plus, invite, drafts and scheduled posts, continue a draft, create a story, create a reel, saved, a board, circles, a circle, recaps, a recap (ready video), make a recap, a chapter, the story archive, a sound page; and, newer: past weekly wraps, a weekly wrap, questions (Ask me inbox), drops, a new drop, someone's drop, your draft drop, editing a drop, and a chat with a wallpaper, a scheduled message and four games; and, newest: Market, selling something, someone's listing, your listing, your Market, editing a listing, an event you hold a ticket for, your tickets, check-in at the door, Together, an album, a new album, making an echo and a reel's echoes.
 
-**52 open states** (sheets, menus and other things that only show after an action; the page audit only sees them closed). Each is opened the way a person would, then the whole page is audited:
+**70 open states** (sheets, menus and other things that only show after an action; the page audit only sees them closed). Each is opened the way a person would, then the whole page is audited:
 
 - profile: the status sheet, the share sheet (QR code), the cover sheet, the followers and following lists;
 - chat: a message's menu, replying, editing, the reaction picker, search with results, the disappearing messages sheet;
@@ -68,15 +71,16 @@ Photos and the reel come from `e2e/fixtures/` (small generated files). **Audio r
 - settings: the Data saver card;
 - reels: details, the options sheet, the share sheet, comments with a moment, clear view;
 - an audio room before joining, and after joining with a hand raised;
-- newer: Pulse with the weekly wrap card and the drops row; your profile with its styled header, links and song chip; the Answers tab; someone's profile with the Ask card filled in; answering a question; your own drops; the watch together banner in a chat and the watch together page; the sheet to start a game and the board sheet of each game (Four up, Noughts, Word ladder, Chess); the wallpaper and colour sheet; the send later sheet; Settings > Account > Customise your profile (with a new link); the change username sheet with a name checked as free.
+- newer: Pulse with the weekly wrap card and the drops row; your profile with its styled header, links and song chip; the Answers tab; someone's profile with the Ask card filled in; answering a question; your own drops; the watch together banner in a chat and the watch together page; the sheet to start a game and the board sheet of each game (Four up, Noughts, Word ladder, Chess); the wallpaper and colour sheet; the send later sheet; Settings > Account > Customise your profile (with a new link); the change username sheet with a name checked as free;
+- newest: "Why am I seeing this?" from a post's menu; each game board in the 3D view; making an offer on a listing; marking your listing reserved; giving a ticket to a friend; a code at the door that isn't on the list; an album's photo viewer, its people and invite sheets, and adding photos; the echo screen with your video chosen; a board, a listing and an album that couldn't load (the connection dropped: the reason and Try again); and the call screen, from the audio call button in a chat's header (a silent tone stands in for the microphone; each project calls in a new group, since a chat has one call at a time).
 
 The newer pages and states (the last item and the newer pages above) are audited at **375px** wide in the mobile projects (the narrowest common phone), and each must also not scroll sideways there.
 
-Everything runs in four projects: **desktop** (1440×900) and **mobile** (Pixel 7, 412×915, touch) × **light** and **dark** color schemes. That is **468 audits** (117 × 4); each must have zero violations. The page is audited after network idle, after loading states (`aria-busy`) clear and after finite animations finish.
+Everything runs in four projects: **desktop** (1440×900) and **mobile** (Pixel 7, 412×915, touch) × **light** and **dark** color schemes. That is **596 audits** (149 × 4); each must have zero violations. The page is audited after network idle, after loading states (`aria-busy`) clear and after finite animations finish.
 
 **Right-to-left:** every signed-in page is loaded with `dir="rtl"` in all four projects and must not be wider than the viewport. (An offscreen skip link placed with `left: -9999px` once made every page scroll to blank space in RTL.) The design system uses logical properties (`inset-inline-*`, `margin-inline-*`, logical corner radii), mirrors directional icons, and marks user-written text with `dir="auto"` / `<bdi>` so mixed-direction names, handles, tags and messages read correctly.
 
-**`keyboard.spec.ts`** (desktop and mobile layouts, 14 tests):
+**`keyboard.spec.ts`** (desktop and mobile layouts, 19 tests):
 
 - The first Tab reaches a visible "Skip to content" link; following it puts the next Tab inside `main`. The primary navigation is reached next, in visual order, with `aria-current="page"` on the current destination.
 - Post options **menu**: Enter opens it on the first item, arrows/Home/End move with wrap-around, ArrowUp opens on the last item, Escape closes it and returns focus to the button, Tab closes it.
@@ -91,7 +95,40 @@ Everything runs in four projects: **desktop** (1440×900) and **mobile** (Pixel 
 - **Audio room**: Tab to "Join as a listener", Enter joins and focus moves to the room's title; Tab to "Raise hand", Space and Enter toggle it (`aria-pressed`, same name, focus stays), the raised hand shows in the listeners list; the room is audited with axe; "Leave quietly" leaves.
 - **Chat sheets**: "Start a game" (from the composer's menu, with the arrow keys), "Send later" (Tab from the message box) and "Wallpaper and colour" (from the chat's menu) each take focus, keep Tab inside, are audited with axe, and on Escape close and return focus to what opened them.
 - **Chess board**: the board is one tab stop, starting on your king; arrows move around the grid and every square says what's on it; Enter picks a piece up ("picked up") and marks where it can go ("move here"); Escape puts it back without closing the sheet (this was broken: the sheet closed, because it listens on the document, where React does too; fixed in `ChessBoard.tsx`); a second Escape closes the sheet and returns focus to "Your turn: Chess". No move is made, since the projects share the game.
+- **Newest sheets**: "Why am I seeing this?" (from the post menu with the arrow keys), the offer sheet on a listing, giving a ticket, and an album's people sheet each take focus, keep Tab inside, are audited with axe, and on Escape close and return focus to what opened them. The album's photo viewer does the same and returns focus to the photo. The **call screen** keeps Tab inside and, by design, stays open on Escape; Hang up ends the call and focus returns to "Audio call".
 - **Reels**: M and C toggle sound and clear view (`aria-pressed`), Space plays and pauses, the scrubber is a slider (Home, arrows a second at a time), the options sheet takes focus and returns it on Escape, and J/K move between reels with the address following.
+
+## Results (2026-09-29): Market, tickets and check-in, Together, echoes, 3D game boards, calls in the chat header, "Why am I seeing this?", Try again
+
+The suite first ran unchanged on the day's code (production build): all 468 audits, 14 keyboard tests and 232 right-to-left checks passed. The 14 new pages and 18 new states were then added and run before any fix, and everything again after the fixes (production build, 596 audits, 19 keyboard tests, 288 right-to-left checks, all passing).
+
+### Automated audit (new pages and states)
+
+| Project       | Before: violations (rule × page) | Before: elements | Before: sideways scroll at 375px | After |
+| ------------- | -------------------------------: | ---------------: | -------------------------------: | ----: |
+| desktop-light |                                4 |                4 |                                – |     0 |
+| desktop-dark  |                                4 |                4 |                                – |     0 |
+| mobile-light  |                                4 |                4 |                                2 |     0 |
+| mobile-dark   |                                4 |                4 |                                2 |     0 |
+| **Total**     |                           **16** |           **16** |                            **4** | **0** |
+
+| Rule / check | Impact | Elements | Pages | Fix |
+| --- | --- | ---: | --- | --- |
+| `page-has-heading-one` | moderate | 16 | a board, a listing and an album that couldn't load; a listing that isn't available | A page that is only an empty state ("isn't available", or a failed load with Try again) had no `h1`: `EmptyState`'s title was always an `h2`. `EmptyState` now takes `level`, and every page that shows only an empty state (missing, failed, signed out, not allowed; 31 files) passes `level={1}`. |
+| sideways scroll at 375px | – | 2 pages | the echo screen, with and without a video | "Echo @handle" didn't wrap: a long handle has no break points. Titles in `.yp-topbar` now break anywhere when they must (`overflow-wrap: anywhere`). |
+
+The listing first showed as not available because the seed's listing words were the same on every run, so Market held it for review as a repeat; the seed now adds the run's code to them.
+
+### Keyboard, focus and announcements
+
+Walked through with the keyboard (headless Chromium, 1440px and 375px) and covered by the new keyboard tests: the new sheets and dialogs (Why am I seeing this?, make an offer, mark reserved or sold, give a ticket, an album's viewer, people, invite and add sheets, a game in 3D) take focus, keep Tab inside, close on Escape and return focus to what opened them. The 3D view button is a toggle (`aria-pressed`) that keeps its name. The little board on a game card opens the game on click only; keyboards and screen readers use the card's button, so it stays `aria-hidden`.
+
+| Where | Before | After |
+| --- | --- | --- |
+| Call screen | "Calling…" and "Connecting…" were plain text, so a screen reader landing on Mute heard only "Call, dialog, Mute"; an incoming call showed an eye or a bell | The status is a `role="status"` line and describes the dialog while nobody has joined; an incoming call shows the phone or camera icon, like the header buttons. Escape still doesn't hang up (by design). |
+| Market listing | The seller's name link was 23px tall | 24px (WCAG 2.5.8). |
+
+Targets: the new pages were scanned at 375px for controls under 44 × 44. Everything under 44px is a shared design-system size used across the app (40px buttons, 34px segments, 38px header actions, 32px small buttons, the 40 × 24 switch whose whole row is its label, 18px checkboxes inside their labels); Together's window and audience chips are 44px with the radio inside them. Changing those sizes is a design-system decision, left for later (below).
 
 ## Results (2026-09-28): watch together, weekly wraps, Ask me, drops, games, chat looks, send later, profile style, usernames
 
@@ -233,7 +270,8 @@ The "before" run used the development server; the "after" run a production build
 ## Remaining known issues
 
 - **Newer features:** the start a game, send later, wallpaper and chess board checks are now in `keyboard.spec.ts` (run 2026-09-28, desktop and mobile, all passing); watch together is still checked by hand. A game move made by the other player while the board is open, and a drop opening while its page is open, are not exercised. The phone app was reviewed in code only, not with VoiceOver or TalkBack.
-- **Not audited automatically:** admin, real/together, onboarding, OAuth consent, password reset pages; the incoming-call and Mini App overlays (they need a second live session or a registered app); the video editor (it needs a real video decode in the browser); a room you host (speaking needs a microphone). They use the same components, but have not been run through axe.
+- **Target size:** WCAG 2.5.8 (24px) passes everywhere, but the 44px guideline doesn't hold for the design system's standard sizes: 40px buttons, 34px segments, 38px header icon buttons, 32px small buttons and the chat's scheduled-message actions (24px). Raising them is a design-system change for every page.
+- **Not audited automatically:** admin, real, onboarding, OAuth consent, password reset pages; the incoming-call and Mini App overlays (they need a second live session or a registered app); the video editor (it needs a real video decode in the browser); a room you host (speaking needs a microphone). They use the same components, but have not been run through axe.
 - **Color contrast** is checked by axe on rendered text only. Text over photos, video and gradients (moment rings, story text and stickers, the music sticker, profile covers) is reported as "needs review" by axe, not as pass or fail, and has not been checked by hand. Icon-only buttons' 3:1 non-text contrast isn't checked by axe either (chat message tools are dimmed to 70% on touch screens).
 - **Screen readers:** no manual pass with VoiceOver, TalkBack or NVDA yet. Toasts, chat search results, raised hands and loading lines use live regions; the conversation is a `role="log"` that announces new messages as they arrive (not yet confirmed with each screen reader).
 - **Reduced motion:** transitions respect `prefers-reduced-motion` in the design system, and the new animations were reviewed (above), but the Real capture countdown and live video are not covered.

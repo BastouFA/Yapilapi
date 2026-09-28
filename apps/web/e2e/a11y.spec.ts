@@ -94,6 +94,21 @@ const NEW_PAGES: [string, (d: SeedData) => string][] = [
   ['your drop', (d) => `/drops/${d.myDropId}`],
   ['edit drop', (d) => `/drops/${d.myDropId}/edit`],
   ['chat with games', (d) => `/inbox/${d.gamesChatId}`],
+  // Market, tickets and check-in, Together albums and echoes.
+  ['market', () => '/market'],
+  ['market: sell something', () => '/market/new'],
+  ['market listing', (d) => `/market/${d.listingId}`],
+  ['your market listing', (d) => `/market/${d.myListingId}`],
+  ['your market', () => '/market/mine'],
+  ['market: edit a listing', (d) => `/market/${d.myListingId}/edit`],
+  ['event with a ticket', (d) => `/events/${d.ticketEventId}`],
+  ['tickets', () => '/tickets'],
+  ['check-in', (d) => `/events/${d.hostEventId}/check-in`],
+  ['together', () => '/together'],
+  ['together album', (d) => `/together/${d.togetherId}`],
+  ['new together album', () => '/together/new'],
+  ['echo', (d) => `/reels/${d.reelId}/echo`],
+  ['echoes', (d) => `/reels/${d.reelId}/echoes`],
 ];
 
 const PHONE = { width: 375, height: 812 };
@@ -620,6 +635,122 @@ const NEW_STATES: [string, (page: Page, d: SeedData) => Promise<void>][] = [
     },
   ],
   [
+    'home: why am I seeing this',
+    async (page) => {
+      await open(page, '/home');
+      await page.getByRole('button', { name: 'Post options' }).first().click();
+      await page.getByRole('menuitem', { name: 'Why am I seeing this?' }).click();
+      await expect(page.getByRole('dialog', { name: 'Why am I seeing this?' }).getByRole('listitem').first()).toBeVisible();
+    },
+  ],
+  ...(['Four up', 'Noughts', 'Word ladder', 'Chess'] as const).map((game): [string, (page: Page, d: SeedData) => Promise<void>] => [
+    `chat: ${game} board in 3D`,
+    async (page, d) => {
+      await open(page, `/inbox/${d.gamesChatId}`);
+      await page.getByRole('button', { name: `Your turn: ${game}` }).click();
+      const view = page.getByRole('dialog', { name: game }).getByRole('button', { name: '3D view' });
+      await view.click();
+      await expect(view).toHaveAttribute('aria-pressed', 'true');
+    },
+  ]),
+  [
+    'market listing: make an offer',
+    async (page, d) => {
+      await open(page, `/market/${d.listingId}`);
+      await page.getByRole('button', { name: 'Make an offer' }).click();
+      await expect(page.getByRole('dialog', { name: 'Make an offer' })).toBeVisible();
+    },
+  ],
+  [
+    'your market listing: mark reserved',
+    async (page, d) => {
+      await open(page, `/market/${d.myListingId}`);
+      await page.getByRole('button', { name: 'Mark reserved' }).click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+    },
+  ],
+  [
+    'tickets: give to a friend',
+    async (page) => {
+      await open(page, '/tickets');
+      await page.getByRole('button', { name: 'Give to a friend' }).first().click();
+      await expect(page.getByRole('dialog', { name: 'Give this ticket to a friend' })).toBeVisible();
+    },
+  ],
+  [
+    'check-in: a code that is not on the list',
+    async (page, d) => {
+      await open(page, `/events/${d.hostEventId}/check-in`);
+      await page.getByRole('textbox', { name: 'Backup code' }).fill('ZZZZ99');
+      await page.getByRole('button', { name: 'Check in', exact: true }).first().click();
+      await expect(page.getByRole('status').or(page.getByRole('alert')).filter({ hasText: /\S/ }).first()).toBeVisible();
+    },
+  ],
+  [
+    'together album: viewer',
+    async (page, d) => {
+      await open(page, `/together/${d.togetherId}`);
+      await page
+        .getByRole('button', { name: /^Photo by/ })
+        .first()
+        .click();
+      await expect(page.getByRole('dialog', { name: /^Photos and videos in/ })).toBeVisible();
+    },
+  ],
+  [
+    'together album: people',
+    async (page, d) => {
+      await open(page, `/together/${d.togetherId}`);
+      await page
+        .getByRole('button', { name: /people/ })
+        .first()
+        .click();
+      await expect(page.getByRole('dialog', { name: 'People' })).toBeVisible();
+    },
+  ],
+  [
+    'together album: invite',
+    async (page, d) => {
+      await open(page, `/together/${d.togetherId}`);
+      await page.getByRole('button', { name: 'Invite', exact: true }).click();
+      await expect(page.getByRole('dialog', { name: 'Invite guests' })).toBeVisible();
+    },
+  ],
+  [
+    'together album: adding photos',
+    async (page, d) => {
+      await open(page, `/together/${d.togetherId}`);
+      await page.locator('input[type="file"]').first().setInputFiles(path.join(FIXTURES, 'market.jpg'));
+      await expect(page.getByRole('dialog', { name: /^Add to/ })).toBeVisible();
+    },
+  ],
+  [
+    'echo: with your video',
+    async (page, d) => {
+      await open(page, `/reels/${d.reelId}/echo`);
+      await page.locator('input[type="file"]').first().setInputFiles(path.join(FIXTURES, 'clip.mp4'));
+      await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
+    },
+  ],
+  // A page that couldn't load says why, with Try again (a dropped connection, not "not found").
+  ...(
+    [
+      ['board', (d: SeedData) => `/boards/${d.boardId}`, (d: SeedData) => `/v1/boards/${d.boardId}`],
+      ['market listing', (d: SeedData) => `/market/${d.listingId}`, (d: SeedData) => `/v1/market/listings/${d.listingId}`],
+      ['together album', (d: SeedData) => `/together/${d.togetherId}`, (d: SeedData) => `/v1/together/${d.togetherId}`],
+    ] as const
+  ).map(([what, url, api]): [string, (page: Page, d: SeedData) => Promise<void>] => [
+    `${what}: failed to load`,
+    async (page, d) => {
+      await page.route(
+        (u) => u.pathname === `/api${api(d)}`,
+        (r) => r.abort('internetdisconnected'),
+      );
+      await open(page, url(d));
+      await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+    },
+  ]),
+  [
     'settings: change username',
     async (page, d) => {
       await open(page, '/settings/account');
@@ -661,6 +792,38 @@ test.describe('open sheets, menus and states', () => {
     await hand.click();
     await expect(hand).toHaveAttribute('aria-pressed', 'true');
     await audit(page, 'room - listening', info.project.name);
+  });
+});
+
+/**
+ * The call screen, from the audio call button in a chat's header. A silent tone stands in for the
+ * microphone. A chat has one call at a time, so each project calls in a new group (you, Ben and
+ * Cleo); nobody answers, and the test hangs up.
+ */
+test.describe('a call', () => {
+  test.use({ storageState: STATE });
+  test('chat: calling', async ({ page }, info) => {
+    const d = data();
+    await page.addInitScript(() => {
+      navigator.mediaDevices.getUserMedia = async () => {
+        const audio = new AudioContext();
+        const out = audio.createMediaStreamDestination();
+        audio.createOscillator().connect(out);
+        return out.stream;
+      };
+    });
+    const group = await page.request.post('/api/v1/conversations', { data: { memberIds: [d.friendId, d.thirdId], title: 'Supper crew' } });
+    expect(group.ok(), await group.text()).toBe(true);
+    const { conversation } = await group.json();
+    await narrow(page, info.project.name);
+    await open(page, `/inbox/${conversation.id}`);
+    await page.getByRole('button', { name: 'Audio call' }).click();
+    const call = page.getByRole('dialog', { name: 'Call' });
+    await expect(call.getByRole('button', { name: 'Hang up' })).toBeVisible();
+    await audit(page, 'chat - calling', info.project.name);
+    await noSidewaysScroll(page, 'chat: calling');
+    await call.getByRole('button', { name: 'Hang up' }).click();
+    await expect(call).toBeHidden();
   });
 });
 

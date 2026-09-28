@@ -29,8 +29,8 @@ export default function DropPageClient({ isPublic }: { isPublic: boolean }) {
   const [reporting, setReporting] = useState(false);
 
   if (signedOut && !isPublic) return <NeedsAccount title={t('m.drops.signInTitle')} body={t('m.drops.signInBody')} />;
-  if (missing) return <EmptyState title={t('m.drops.missing')} body={t('m.drops.missingBody')} />;
-  if (!drop && loadError) return <EmptyState title={loadError} action={<Button onClick={() => void reload()}>{t('m.common.retry')}</Button>} />;
+  if (missing) return <EmptyState level={1} title={t('m.drops.missing')} body={t('m.drops.missingBody')} />;
+  if (!drop && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={() => void reload()}>{t('m.common.retry')}</Button>} />;
   if (!drop) return <Skeleton height={320} />;
 
   const phase = dropPhase(drop, now);

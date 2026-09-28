@@ -40,8 +40,8 @@ export default function MusicTrackPage() {
 
   const load = useCallback((cursor?: string) => api.music.posts(id, cursor), [id]);
 
-  if (missing) return <EmptyState title={t('music.track.missing')} body={missing} />;
-  if (!track && loadError) return <EmptyState title={loadError} action={<Button onClick={loadTrack}>{t('m.common.retry')}</Button>} />;
+  if (missing) return <EmptyState level={1} title={t('music.track.missing')} body={missing} />;
+  if (!track && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={loadTrack}>{t('m.common.retry')}</Button>} />;
   if (!track) return <Skeleton height={240} />;
 
   async function toggleSave() {

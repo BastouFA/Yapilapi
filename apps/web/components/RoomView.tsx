@@ -64,8 +64,8 @@ export function RoomView({ id }: { id: string }) {
     if (e.type === 'room.removed' && e.data?.roomId === id) setEnv((v) => (v ? { ...v, removed: true } : v));
   });
 
-  if (error && !env && gone) return <EmptyState title={t('rooms.notOpen')} body={error} />;
-  if (error && !env) return <EmptyState title={error} action={<Button onClick={() => void load()}>{t('m.common.retry')}</Button>} />;
+  if (error && !env && gone) return <EmptyState level={1} title={t('rooms.notOpen')} body={error} />;
+  if (error && !env) return <EmptyState level={1} title={error} action={<Button onClick={() => void load()}>{t('m.common.retry')}</Button>} />;
   if (!env || !me) return <Skeleton height={240} />;
 
   const joined = rooms.room?.id === id;

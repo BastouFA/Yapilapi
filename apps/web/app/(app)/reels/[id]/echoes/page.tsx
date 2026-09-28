@@ -33,8 +33,8 @@ export default function EchoesPage() {
 
   const load = useCallback((cursor?: string) => api.posts.echoes(id, cursor), [id]);
 
-  if (missing) return <EmptyState title={t('echo.block.unavailable')} body={missing} />;
-  if (!original && loadError) return <EmptyState title={loadError} action={<Button onClick={loadOriginal}>{t('m.common.retry')}</Button>} />;
+  if (missing) return <EmptyState level={1} title={t('echo.block.unavailable')} body={missing} />;
+  if (!original && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={loadOriginal}>{t('m.common.retry')}</Button>} />;
   if (!original) return <Skeleton height={200} />;
   const count = original.counts.echoes ?? 0;
 

@@ -180,10 +180,19 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
     <Ctx.Provider value={{ start }}>
       {children}
       {phase !== 'idle' && call ? (
-        <div className="call" role="dialog" aria-modal aria-label={phase === 'incoming' ? t('calls.incoming') : t('m.calls.call')} ref={overlay} tabIndex={-1}>
+        <div
+          className="call"
+          role="dialog"
+          aria-modal
+          aria-label={phase === 'incoming' ? t('calls.incoming') : t('m.calls.call')}
+          // "Calling…" or "Connecting…" is read with the dialog's name when focus moves in.
+          aria-describedby={phase !== 'incoming' && !Object.keys(remotes).length ? 'call-status' : undefined}
+          ref={overlay}
+          tabIndex={-1}
+        >
           {phase === 'incoming' ? (
             <div className="call__ring">
-              <Icon name={call.kind === 'video' ? 'eye' : 'bell'} size={40} />
+              <Icon name={call.kind === 'video' ? 'video' : 'phone'} size={40} />
               <p>{t(call.kind === 'video' ? 'm.calls.incoming.video' : 'm.calls.incoming.audio')}</p>
               <div className="row">
                 <Button onClick={answer}>{t('m.calls.answer')}</Button>
@@ -198,7 +207,11 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
                 {Object.entries(remotes).map(([uid, stream]) => (
                   <RemoteVideo key={uid} stream={stream} audioOnly={call.kind === 'audio'} />
                 ))}
-                {!Object.keys(remotes).length ? <p className="call__status">{phase === 'outgoing' ? t('m.calls.calling') : t('m.calls.connecting')}</p> : null}
+                {!Object.keys(remotes).length ? (
+                  <p className="call__status" id="call-status" role="status">
+                    {phase === 'outgoing' ? t('m.calls.calling') : t('m.calls.connecting')}
+                  </p>
+                ) : null}
               </div>
               {call.kind === 'video' ? <video ref={localVideo} className="call__self" autoPlay muted playsInline aria-label={t('m.calls.yourCamera')} /> : null}
               <div className="call__controls">

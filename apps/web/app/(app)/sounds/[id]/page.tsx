@@ -47,8 +47,8 @@ export default function SoundPage() {
 
   const load = useCallback((cursor?: string) => api.sounds.reels(id, sort, cursor), [id, sort]);
 
-  if (missing) return <EmptyState title={t('soundPage.unavailable')} body={missing} />;
-  if (!sound && loadError) return <EmptyState title={loadError} action={<Button onClick={loadSound}>{t('m.common.retry')}</Button>} />;
+  if (missing) return <EmptyState level={1} title={t('soundPage.unavailable')} body={missing} />;
+  if (!sound && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={loadSound}>{t('m.common.retry')}</Button>} />;
   if (!sound) return <Skeleton height={240} />;
 
   return (

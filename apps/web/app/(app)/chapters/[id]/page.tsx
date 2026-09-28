@@ -47,11 +47,11 @@ export default function ChapterPage() {
     void load();
   }, [load]);
 
-  if (missing) return <EmptyState title={t('chapters.unavailable')} body={t('chapters.unavailableBody')} />;
+  if (missing) return <EmptyState level={1} title={t('chapters.unavailable')} body={t('chapters.unavailableBody')} />;
   if (!data && loadError)
     return (
       <div className="yp-shell__inner">
-        <EmptyState title={loadError} action={<Button onClick={() => void load()}>{t('m.common.retry')}</Button>} />
+        <EmptyState level={1} title={loadError} action={<Button onClick={() => void load()}>{t('m.common.retry')}</Button>} />
       </div>
     );
   if (!data)

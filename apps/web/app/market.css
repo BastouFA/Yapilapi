@@ -458,6 +458,9 @@
   gap: var(--space-3);
 }
 .market-seller__name {
+  /* At least 24px tall, the smallest target WCAG 2.5.8 allows. */
+  min-height: 24px;
+  line-height: 24px;
   color: var(--ink);
   font-weight: 700;
   text-decoration: none;
