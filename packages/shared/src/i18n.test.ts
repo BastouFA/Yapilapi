@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CATALOGS, isRtl, SUPPORTED_LOCALES, t, tp, type MessageKey } from './i18n.ts';
+import { CATALOGS, gmtOffsetLabel, isRtl, SUPPORTED_LOCALES, t, tp, zoneOffsetMinutes, type MessageKey } from './i18n.ts';
 
 const en = CATALOGS.en!;
 const keys = Object.keys(en).sort();
@@ -67,5 +67,24 @@ describe('t and tp', () => {
     expect(isRtl('ar')).toBe(true);
     expect(isRtl('ar-EG')).toBe(true);
     expect(isRtl('fr')).toBe(false);
+  });
+});
+
+describe('time zone offsets', () => {
+  const summer = new Date('2026-09-28T17:10:00Z');
+  const winter = new Date('2026-01-15T12:00:00Z');
+
+  it('works out how far a zone is from UTC, summer time included', () => {
+    expect(zoneOffsetMinutes(summer, 'Europe/Brussels')).toBe(120);
+    expect(zoneOffsetMinutes(winter, 'Europe/Brussels')).toBe(60);
+    expect(zoneOffsetMinutes(summer, 'America/New_York')).toBe(-240);
+    expect(zoneOffsetMinutes(summer, 'UTC')).toBe(0);
+  });
+
+  it('names a zone by its offset when the phone has no name for it', () => {
+    expect(gmtOffsetLabel(summer, 'Europe/Brussels')).toBe('GMT+2');
+    expect(gmtOffsetLabel(summer, 'Asia/Kolkata')).toBe('GMT+5:30');
+    expect(gmtOffsetLabel(summer, 'America/St_Johns')).toBe('GMT-2:30');
+    expect(gmtOffsetLabel(winter, 'Europe/London')).toBe('GMT');
   });
 });

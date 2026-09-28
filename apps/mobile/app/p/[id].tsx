@@ -6,7 +6,7 @@ import type { MessageKey } from '../../../../packages/shared/src/i18n';
 import type { Comment, CommentPage, Post, PublicUser } from '../../../../packages/shared/src/types';
 import type { CommentPolicy, CommentSort } from '../../../../packages/shared/src/constants';
 import { formatReelTime } from '../../../../packages/shared/src/reels';
-import { client, errorMessage } from '../../lib/api';
+import { client, errorMessage, isGone } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { useAutocomplete } from '../../lib/autocomplete';
 import { PostCard } from '../../lib/post';
@@ -14,7 +14,7 @@ import { useReport } from '../../lib/report';
 import { TranslatableText } from '../../lib/translation';
 import { useSession } from '../../lib/session';
 import { elevation, radius, space } from '../../lib/theme';
-import { Avatar, Button, EmptyState, Icon, KeyboardAvoid, Loading, Notice, Segmented, useColors, userText } from '../../lib/ui';
+import { Avatar, Button, EmptyState, Icon, KeyboardAvoid, Loading, Notice, ScreenError, Segmented, useColors, userText } from '../../lib/ui';
 
 const POLICIES: { id: CommentPolicy; label: MessageKey }[] = [
   { id: 'everyone', label: 'comments.policy.everyone' },
@@ -69,6 +69,7 @@ export default function PostScreen() {
   const insets = useSafeAreaInsets();
   const { me } = useSession();
   const [post, setPost] = useState<Post | null | undefined>(undefined);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [sort, setSort] = useState<CommentSort>('top');
   const [controls, setControls] = useState<Controls | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -116,16 +117,18 @@ export default function PostScreen() {
     [id, sort],
   );
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const p = (await (await client()).posts.get(id)).post;
-        setPost(p);
-      } catch {
-        setPost(null);
-      }
-    })();
+  const loadPost = useCallback(async () => {
+    try {
+      setPost((await (await client()).posts.get(id)).post);
+      setLoadError(null);
+    } catch (e) {
+      if (isGone(e)) setPost(null);
+      else setLoadError(errorMessage(e));
+    }
   }, [id]);
+  useEffect(() => {
+    void loadPost();
+  }, [loadPost]);
 
   useEffect(() => {
     // Comments on a post for subscribers are for subscribers too.
@@ -158,7 +161,7 @@ export default function PostScreen() {
     [threads, meId, canReply, isPostAuthor, editing, likers],
   );
 
-  if (post === undefined) return <Loading />;
+  if (post === undefined) return loadError ? <ScreenError message={loadError} onRetry={loadPost} /> : <Loading />;
   if (post === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>

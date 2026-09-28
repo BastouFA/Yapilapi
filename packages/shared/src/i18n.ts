@@ -47392,6 +47392,34 @@ export function formatEventWhen(date: Date | string, locale: string, timeZone: s
   const d = new Date(date);
   // dateStyle/timeStyle can't be combined with timeZoneName, so the zone name is formatted separately.
   const main = new Intl.DateTimeFormat(locale, { dateStyle: 'full', timeStyle: 'short', timeZone: tz }).format(d);
-  const zone = new Intl.DateTimeFormat(locale, { timeZone: tz, timeZoneName: 'short' }).formatToParts(d).find((p) => p.type === 'timeZoneName')?.value;
+  let zone = new Intl.DateTimeFormat(locale, { timeZone: tz, timeZoneName: 'short' }).formatToParts(d).find((p) => p.type === 'timeZoneName')?.value;
+  // The phone's JavaScript engine calls every zone without a short English name "GMT"; say its offset instead.
+  if (zone && /^(GMT|UTC)$/.test(zone) && zoneOffsetMinutes(d, tz) !== 0) zone = gmtOffsetLabel(d, tz);
   return zone ? `${main} ${zone}` : main;
+}
+
+/** How far a time zone is from UTC at a moment, in minutes (Brussels in summer: 120). */
+export function zoneOffsetMinutes(date: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: safeTimeZone(timeZone),
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+  }).formatToParts(date);
+  const n = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  const wall = Date.UTC(n('year'), n('month') - 1, n('day'), n('hour') % 24, n('minute'), n('second'));
+  return Math.round((wall - Math.floor(date.getTime() / 1000) * 1000) / 60_000);
+}
+
+/** "GMT", "GMT+2", "GMT-3:30": a zone's offset at a moment, for when the runtime has no name for it. */
+export function gmtOffsetLabel(date: Date, timeZone: string): string {
+  const off = zoneOffsetMinutes(date, timeZone);
+  if (off === 0) return 'GMT';
+  const abs = Math.abs(off);
+  const mins = abs % 60;
+  return `GMT${off > 0 ? '+' : '-'}${Math.floor(abs / 60)}${mins ? `:${String(mins).padStart(2, '0')}` : ''}`;
 }

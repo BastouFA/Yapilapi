@@ -5,7 +5,7 @@ import type { Boost } from '../../../packages/api-client/src/index';
 import { BOOST_DAYS, BOOST_OPTIONS, currencyForCountry } from '../../../packages/shared/src/constants';
 import { formatMoney } from '../../../packages/shared/src/i18n';
 import type { Post } from '../../../packages/shared/src/types';
-import { client } from '../lib/api';
+import { client, errorMessage, isGone } from '../lib/api';
 import { SectionHeader } from '../lib/chips';
 import { BoostResult } from '../lib/creator';
 import { useFlag } from '../lib/flags';
@@ -15,7 +15,7 @@ import { useWebCheckout } from '../lib/money';
 import { useSession } from '../lib/session';
 import { ManagedOnWeb, useDigitalPurchases } from '../lib/store';
 import { space } from '../lib/theme';
-import { Button, Card, EmptyState, KeyboardAvoid, Loading, Notice, useColors, userText } from '../lib/ui';
+import { Button, Card, EmptyState, KeyboardAvoid, Loading, Notice, ScreenError, useColors, userText } from '../lib/ui';
 
 /** Countries offered for a boost audience, as on the web (apps/web/components/Boost.tsx). Yours is always first. */
 const COUNTRIES = ['NG', 'GH', 'KE', 'ZA', 'CI', 'SN', 'CM', 'UG', 'TZ', 'RW', 'ET', 'EG', 'MA', 'US', 'CA', 'GB', 'FR', 'DE', 'BR', 'IN'];
@@ -36,6 +36,7 @@ export default function BoostScreen() {
   const commerce = useFlag('COMMERCE');
   const offer = useDigitalPurchases();
   const [post, setPost] = useState<Post | null | undefined>(undefined);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [boosts, setBoosts] = useState<Boost[]>([]);
 
   const [currency, setCurrency] = useState<string>(() => {
@@ -56,8 +57,10 @@ export default function BoostScreen() {
       const p = (await api.posts.get(id)).post;
       setPost(p);
       setTopics((cur) => (cur.length ? cur : p.topics.slice(0, 3)));
-    } catch {
-      setPost(null);
+      setLoadError(null);
+    } catch (e) {
+      if (isGone(e)) setPost(null);
+      else setLoadError(errorMessage(e));
     }
     try {
       setBoosts((await api.boosts.forPost(id)).items);
@@ -79,7 +82,7 @@ export default function BoostScreen() {
     }
   }, [locale]);
 
-  if (post === undefined) return <Loading />;
+  if (post === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <Loading />;
   if (post === null || post.author.id !== me?.id)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>

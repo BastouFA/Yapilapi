@@ -4,12 +4,12 @@ import { Alert, Image, Pressable, ScrollView, Text, TextInput, View } from 'reac
 import type { ChapterDetail, GuestbookEntry } from '../../../../packages/api-client/src/index';
 import { CHAPTER_GUESTBOOK_MAX } from '../../../../packages/shared/src/constants';
 import type { PublicUser } from '../../../../packages/shared/src/types';
-import { client, errorMessage, mediaUrl } from '../../lib/api';
+import { client, errorMessage, isGone, mediaUrl } from '../../lib/api';
 import { ChapterCover, ChapterPlayer, isSealed, useChapterMeta } from '../../lib/chapters';
 import { useT } from '../../lib/i18n';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
-import { Avatar, Button, Card, EmptyState, Field, KeyboardAvoid, Loading, Notice, SwitchRow, Title, useColors, userText } from '../../lib/ui';
+import { Avatar, Button, Card, EmptyState, Field, KeyboardAvoid, Loading, Notice, ScreenError, SwitchRow, Title, useColors, userText } from '../../lib/ui';
 
 /**
  * A chapter: cover, audience, stories credited to whoever shared each one, the people adding to
@@ -24,6 +24,7 @@ export default function ChapterScreen() {
   const { me } = useSession();
   const meta = useChapterMeta();
   const [data, setData] = useState<ChapterDetail | null | undefined>(undefined);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [guestbook, setGuestbook] = useState<GuestbookEntry[]>([]);
   const [line, setLine] = useState('');
   const [note, setNote] = useState<string | null>(null);
@@ -34,16 +35,18 @@ export default function ChapterScreen() {
     try {
       const api = await client();
       setData(await api.chapters.get(id));
+      setLoadError(null);
       setGuestbook((await api.chapters.guestbook(id).catch(() => ({ items: [] as GuestbookEntry[] }))).items);
-    } catch {
-      setData(null);
+    } catch (e) {
+      if (isGone(e)) setData(null);
+      else setLoadError(errorMessage(e));
     }
   }, [id]);
   useEffect(() => {
     void load();
   }, [load]);
 
-  if (data === undefined) return <Loading />;
+  if (data === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <Loading />;
   if (data === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>
