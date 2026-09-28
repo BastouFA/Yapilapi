@@ -56,9 +56,19 @@ export async function assertRecapUse(
   userId: string,
   mediaIds: (string | null | undefined)[],
   target: 'post' | 'story' | 'chat',
+  opts: { echoId?: string } = {},
 ): Promise<{ recapId: string; soundId: string | null } | null> {
   const ids = mediaIds.filter((x): x is string => !!x);
   if (!ids.length) return null;
+  // An echo video holds someone else's reel: it goes out only as that echo (posted with `echo`,
+  // which checks the original is still there and may still be echoed, and shows the echo only to
+  // people who can see the original), never as a plain post, a story, a chat attachment or an edit.
+  const echoes = await db.query<{ id: string }>(
+    `SELECT id FROM echoes WHERE result_media_id = ANY($1::uuid[]) AND owner_id = $2 AND original_author_id IS DISTINCT FROM $2`,
+    [ids, userId],
+  );
+  if (echoes.rows.some((e) => e.id !== opts.echoId))
+    throw new AppError(403, 'echo_not_reusable', "This video is an echo of someone else's reel, so it can only be posted as that echo.");
   // Only the person's own recaps: someone else's media is refused by the usual ownership checks.
   const { rows } = await db.query<{ id: string; sound_id: string | null; status: string }>(
     `SELECT id, sound_id, status FROM recaps WHERE media_id = ANY($1::uuid[]) AND owner_id = $2 ORDER BY created_at LIMIT 10`,

@@ -87,6 +87,12 @@ export async function freshCode(c: Q, eventId: string): Promise<string> {
 export async function issueRsvpTicket(c: Q, eventId: string, userId: string): Promise<boolean> {
   const host = (await c.query<{ host_id: string }>(`SELECT host_id FROM events WHERE id = $1 AND deleted_at IS NULL`, [eventId])).rows[0];
   if (!host || host.host_id === userId) return false;
+  // An event that sells tickets lets people in with the tickets they bought: answering "going" there
+  // doesn't give a free one (a ticket given earlier, before the sale began, stays).
+  const selling = await c.query(`SELECT 1 FROM products WHERE event_id = $1 AND kind = 'ticket' AND status = 'active' AND deleted_at IS NULL LIMIT 1`, [
+    eventId,
+  ]);
+  if (selling.rowCount) return false;
   const cur = (
     await c.query<{ id: string; status: TicketStatus }>(
       `SELECT id, status FROM event_tickets WHERE event_id = $1 AND holder_id = $2 AND source = 'rsvp' FOR UPDATE`,

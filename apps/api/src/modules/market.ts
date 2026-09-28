@@ -58,6 +58,7 @@ import { notify, track } from '../lib/services.ts';
 import { assertMessagePace, isRestricted, restrictedError } from '../lib/spam.ts';
 import { ageOf, areFriends, isBlockedEitherWay } from '../lib/users.ts';
 import { requireVerified } from '../lib/verification.ts';
+import { notBlockedSql } from '../lib/visibility.ts';
 import { me, requireAuth, type AuthUser } from '../plugins/auth.ts';
 import { excerpt, publicAccountSql } from './public.ts';
 import type { ChatHelpers } from './chat-polls-lists.ts';
@@ -140,8 +141,9 @@ export default async function marketModule(app: FastifyInstance, ctx: AppContext
     if (row.seller_id === viewer) {
       const { rows } = await db.query(
         `SELECT pr.user_id AS id, pr.username, pr.display_name, pr.avatar_url, pr.mode FROM market_chats mc JOIN profiles pr ON pr.user_id = mc.buyer_id
-         JOIN users bu ON bu.id = mc.buyer_id WHERE mc.listing_id = $1 AND bu.status = 'active' ORDER BY mc.created_at DESC LIMIT 50`,
-        [id],
+         JOIN users bu ON bu.id = mc.buyer_id WHERE mc.listing_id = $1 AND bu.status = 'active' AND ${notBlockedSql('mc.buyer_id', '$2')}
+         ORDER BY mc.created_at DESC LIMIT 50`,
+        [id, viewer],
       );
       out.buyers = rows.map((b) => ({ id: b.id, username: b.username, displayName: b.display_name, avatarUrl: b.avatar_url, mode: b.mode }));
     }

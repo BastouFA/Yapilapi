@@ -91,6 +91,7 @@ export async function writePost(
     userId,
     input.media.map((m) => m.id),
     'post',
+    { echoId: input.echo },
   );
   if (recap) {
     if (input.format !== 'reel' || input.media.length !== 1) throw badRequest('A recap can be posted as a reel.');

@@ -7,8 +7,9 @@ import { as, signUp, testApp, type TestUser } from './helpers.ts';
 
 /**
  * Regression tests for the security review of drafts and post editing, chat,
- * boards, profiles, stories, recaps and rooms: each one pins a hole that was
- * open, so it stays closed.
+ * boards, profiles, stories, recaps and rooms, and of the features added on
+ * 2026-09-27 and 28 (docs/security/review-2026-09-28.md): each one pins a hole
+ * that was open, so it stays closed.
  */
 
 let t: BuiltApp;
@@ -341,5 +342,210 @@ describe('audio rooms', () => {
     expect((await preview(blocker)).sort()).toEqual([owner.id, kid.id].sort());
     await as(t.app, blocker).post(`/v1/users/${owner.id}/block`);
     expect(await preview(blocker)).toEqual([kid.id]);
+  });
+});
+
+// ── Review of the features added on 2026-09-27 and 28 (docs/security/review-2026-09-28.md) ──
+
+const inDays = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString();
+
+/** A fake connected device for `u`: every realtime event they get. */
+function listen(u: TestUser) {
+  const events: { type: string; data: any }[] = [];
+  const remove = t.ctx.realtime.add(u.id, { readyState: 1, send: (raw: string) => void events.push(JSON.parse(raw)) });
+  return { events, remove };
+}
+
+describe('developer keys and app tokens', () => {
+  it('refuses the export, sign-in sessions and account deletion however the path is spelled', async () => {
+    const dev = await adult();
+    const appId = (await as(t.app, dev).post('/v1/developer/apps', { name: 'Review app' })).body.app.id;
+    const secret = (await as(t.app, dev).post(`/v1/developer/apps/${appId}/keys`, { name: 'writer', scopes: ['read', 'write'] })).body.secret;
+    const key = { ...dev, token: secret };
+    for (const path of ['/v1/me/%65xport', '/v1/%6De/export', '/v1/%61uth/sessions', '/v1/%64eveloper/apps'])
+      expect((await as(t.app, key).get(path)).status, path).toBe(403);
+    expect((await as(t.app, key).del('/v1/%6De', { password: dev.password })).status).toBe(403);
+    expect((await db().query(`SELECT status FROM users WHERE id = $1`, [dev.id])).rows[0].status).toBe('active');
+    // The key still works where keys may go.
+    expect((await as(t.app, key).get('/v1/feed')).status).toBe(200);
+  });
+});
+
+describe('Together albums with people under 18', () => {
+  beforeAll(async () => {
+    await db().query(`INSERT INTO feature_flags (key, enabled) VALUES ('REAL_TOGETHER', true) ON CONFLICT (key) DO UPDATE SET enabled = true`);
+  });
+
+  it('keeps an adult and someone under 18 who aren’t friends out of the same album, however they would get in', async () => {
+    const host = await adult();
+    const kid = await teen();
+    const stranger = await adult();
+    await befriend(host, kid);
+    await befriend(host, stranger);
+    // Both picked at once.
+    const both = await as(t.app, host).post('/v1/together', { title: 'Trip', memberIds: [kid.id, stranger.id] });
+    expect(both.status).toBe(403);
+    expect(both.body.error.code).toBe('minor_protection');
+    // One now, the other later.
+    const album = await as(t.app, host).post('/v1/together', { title: 'Trip', memberIds: [kid.id], inviteLink: true });
+    expect(album.status).toBe(201);
+    const id = album.body.together.id;
+    const add = await as(t.app, host).post(`/v1/together/${id}/members`, { userIds: [stranger.id] });
+    expect(add.status).toBe(403);
+    expect(add.body.error.code).toBe('minor_protection');
+    // Nor by asking with the invite link and being let in.
+    const code = album.body.together.invite.code;
+    expect((await as(t.app, stranger).post(`/v1/together/invite/${code}/request`)).status).toBe(200);
+    const approve = await as(t.app, host).post(`/v1/together/${id}/requests/${stranger.id}`, { approve: true });
+    expect(approve.status).toBe(403);
+    expect((await db().query(`SELECT 1 FROM together_members WHERE together_id = $1 AND user_id = $2`, [id, stranger.id])).rowCount).toBe(0);
+    // Once they're friends it's fine.
+    await befriend(kid, stranger);
+    expect((await as(t.app, host).post(`/v1/together/${id}/members`, { userIds: [stranger.id] })).status).toBe(200);
+  });
+
+  it('skips people from an event who would be in an album with someone under 18 they don’t know', async () => {
+    const host = await adult();
+    const kid = await teen();
+    const guest = await adult();
+    await befriend(host, kid);
+    const event = (await as(t.app, host).post('/v1/events', { title: 'Picnic', startsAt: inDays(2) })).body.event.id;
+    for (const u of [kid, guest]) expect((await as(t.app, u).post(`/v1/events/${event}/rsvp`, { status: 'going' })).status).toBe(200);
+    const r = await as(t.app, host).post('/v1/together', { title: 'Picnic photos', eventId: event });
+    expect(r.status).toBe(201);
+    const ids = (await db().query(`SELECT user_id FROM together_members WHERE together_id = $1`, [r.body.together.id])).rows.map((x) => x.user_id);
+    expect(ids).toContain(host.id);
+    expect(ids.includes(kid.id) && ids.includes(guest.id)).toBe(false);
+    expect(r.body.skipped).toBeGreaterThanOrEqual(1);
+  });
+
+  it('doesn’t tell someone who blocked a member, live, that they added photos', async () => {
+    const host = await adult();
+    const friend = await adult();
+    await befriend(host, friend);
+    const id = (await as(t.app, host).post('/v1/together', { title: 'Weekend', memberIds: [friend.id] })).body.together.id;
+    await as(t.app, friend).post(`/v1/users/${host.id}/block`);
+    const device = listen(friend);
+    const m = await photo(host);
+    expect((await as(t.app, host).post(`/v1/together/${id}/items`, { items: [{ mediaId: m.id }] })).status).toBe(201);
+    device.remove();
+    expect(device.events.filter((e) => e.type === 'together.items')).toEqual([]);
+  });
+});
+
+describe('sharing where you are with someone under 18', () => {
+  it('stops a live share once the friendship it relied on ends', async () => {
+    const kid = await teen();
+    const grownUp = await adult();
+    await befriend(kid, grownUp);
+    const convo = (await as(t.app, kid).post('/v1/conversations', { memberIds: [grownUp.id] })).body.conversation.id;
+    const here = { lat: 6.4541, lng: 3.3947 };
+    const started = await as(t.app, kid).post(`/v1/conversations/${convo}/location`, { mode: 'live', minutes: 60, ...here });
+    expect(started.status, JSON.stringify(started.body)).toBe(201);
+    const shareId = started.body.message.location.id;
+    // While they're friends, a point sent too soon is only "too soon".
+    expect((await as(t.app, kid).post(`/v1/location-shares/${shareId}/point`, here)).body.error.code).toBe('location_too_soon');
+    const [a, b] = [kid.id, grownUp.id].sort();
+    await db().query(`DELETE FROM friendships WHERE user_a = $1 AND user_b = $2`, [a, b]);
+    const next = await as(t.app, kid).post(`/v1/location-shares/${shareId}/point`, here);
+    expect(next.status).toBe(409);
+    expect(next.body.error.code).toBe('share_ended');
+    const row = (await db().query(`SELECT lat, lng, stopped_at FROM location_shares WHERE id = $1`, [shareId])).rows[0];
+    expect(row.stopped_at).not.toBeNull();
+    expect([row.lat, row.lng]).toEqual([null, null]);
+    expect((await as(t.app, grownUp).get(`/v1/conversations/${convo}/location-shares`)).body.items).toEqual([]);
+  });
+});
+
+describe('event tickets', () => {
+  it('gives no free door ticket for answering "going" to an event that sells tickets', async () => {
+    const host = await adult();
+    const guest = await adult();
+    const event = (await as(t.app, host).post('/v1/events', { title: 'Concert', startsAt: inDays(4) })).body.event.id;
+    const product = await as(t.app, host).post('/v1/products', { kind: 'ticket', title: 'Standing', priceCents: 2500, eventId: event });
+    expect(product.status, JSON.stringify(product.body)).toBe(201);
+    expect((await as(t.app, guest).post(`/v1/events/${event}/rsvp`, { status: 'going' })).body.status).toBe('going');
+    expect((await as(t.app, guest).get('/v1/tickets')).body.items).toEqual([]);
+    expect((await db().query(`SELECT 1 FROM event_tickets WHERE event_id = $1 AND holder_id = $2`, [event, guest.id])).rowCount).toBe(0);
+    // An event with nothing for sale still gives one.
+    const free = (await as(t.app, host).post('/v1/events', { title: 'Picnic', startsAt: inDays(4) })).body.event.id;
+    await as(t.app, guest).post(`/v1/events/${free}/rsvp`, { status: 'going' });
+    expect((await as(t.app, guest).get('/v1/tickets')).body.items.map((x: any) => x.event.id)).toEqual([free]);
+  });
+});
+
+describe('Market', () => {
+  it('leaves people blocked either way out of the seller’s list of who wrote about a listing', async () => {
+    const seller = await adult();
+    const buyer = await adult();
+    const m = await photo(seller);
+    const listing = await as(t.app, seller).post('/v1/market/listings', {
+      title: 'Blue bicycle',
+      description: 'Rides well, new tyres',
+      category: 'bikes',
+      condition: 'good',
+      priceCents: 5000,
+      photos: [{ mediaId: m.id }],
+      area: 'Yaba',
+      delivery: ['pickup'],
+    });
+    expect(listing.status, JSON.stringify(listing.body)).toBe(201);
+    const id = listing.body.listing.id;
+    await db().query(`UPDATE users SET email_verified_at = now() WHERE id = $1`, [buyer.id]);
+    const wrote = await as(t.app, buyer).post(`/v1/market/listings/${id}/message`);
+    expect(wrote.status, JSON.stringify(wrote.body)).toBe(201);
+    expect((await as(t.app, seller).get(`/v1/market/listings/${id}`)).body.listing.buyers.map((b: any) => b.id)).toEqual([buyer.id]);
+    await as(t.app, buyer).post(`/v1/users/${seller.id}/block`);
+    expect((await as(t.app, seller).get(`/v1/market/listings/${id}`)).body.listing.buyers).toEqual([]);
+  });
+});
+
+describe('echoes', () => {
+  it('only lets an echo video out as that echo, never as a plain post, a story or into an album', async () => {
+    const maker = await adult();
+    const creator = await adult();
+    const video = (
+      await db().query(
+        `INSERT INTO media (owner_id, kind, url, mime, status, moderation, duration_ms, width, height)
+         VALUES ($1,'video','https://cdn.example.test/echo.mp4','video/mp4','ready','ok',8000,720,1280) RETURNING id, url`,
+        [maker.id],
+      )
+    ).rows[0];
+    await db().query(
+      `INSERT INTO echoes (owner_id, original_author_id, result_media_id, layout, their_audio, status) VALUES ($1,$2,$3,'side','mixed','ready')`,
+      [maker.id, creator.id, video.id],
+    );
+    const media = [{ id: video.id, url: video.url, kind: 'video' }];
+    const reel = await as(t.app, maker).post('/v1/posts', { body: 'all mine', format: 'reel', visibility: 'public', media });
+    expect(reel.status).toBe(403);
+    expect(reel.body.error.code).toBe('echo_not_reusable');
+    expect((await as(t.app, maker).post('/v1/posts', { body: 'later', draft: true, media })).body.error?.code).toBe('echo_not_reusable');
+    expect((await as(t.app, maker).post('/v1/moments', { mediaId: video.id, mediaKind: 'video' })).body.error?.code).toBe('echo_not_reusable');
+    await db().query(`INSERT INTO feature_flags (key, enabled) VALUES ('REAL_TOGETHER', true) ON CONFLICT (key) DO UPDATE SET enabled = true`);
+    const album = (await as(t.app, maker).post('/v1/together', { title: 'Reels', memberIds: [] })).body.together.id;
+    expect((await as(t.app, maker).post(`/v1/together/${album}/items`, { items: [{ mediaId: video.id }] })).body.error?.code).toBe('echo_not_reusable');
+    // An echo of your own reel holds nothing of anyone else's.
+    await db().query(`UPDATE echoes SET original_author_id = $1 WHERE result_media_id = $2`, [maker.id, video.id]);
+    expect((await as(t.app, maker).post(`/v1/together/${album}/items`, { items: [{ mediaId: video.id }] })).status).toBe(201);
+  });
+});
+
+describe('mixes shared into several chats', () => {
+  it('tells each person, live, only about the chats they are in', async () => {
+    const owner = await adult();
+    const [a, b] = [await adult(), await adult()];
+    await befriend(owner, a);
+    await befriend(owner, b);
+    const chatA = (await as(t.app, owner).post('/v1/conversations', { memberIds: [a.id] })).body.conversation.id;
+    const chatB = (await as(t.app, owner).post('/v1/conversations', { memberIds: [b.id] })).body.conversation.id;
+    const mix = await as(t.app, owner).post('/v1/mixes', { title: 'Road trip', visibility: 'friends' });
+    expect(mix.status, JSON.stringify(mix.body)).toBe(201);
+    for (const c of [chatA, chatB]) expect((await as(t.app, owner).post(`/v1/mixes/${mix.body.mix.id}/share`, { conversationId: c })).status).toBe(201);
+    const device = listen(a);
+    expect((await as(t.app, owner).patch(`/v1/mixes/${mix.body.mix.id}`, { title: 'Road trip again' })).status).toBe(200);
+    device.remove();
+    const updates = device.events.filter((e) => e.type === 'mix.updated');
+    expect(updates.length).toBeGreaterThan(0);
+    for (const u of updates) expect(u.data.conversationIds).toEqual([chatA]);
   });
 });

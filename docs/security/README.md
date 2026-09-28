@@ -28,6 +28,11 @@
 - Encryption at rest is delegated to the managed database and object store (enable it there).
 - Malware scanning of uploads and image/video content classification.
 - Content Security Policy on the web app (needs the final CDN and font origins).
+- Pinning the checked address when fetching webhooks and link icons (the address is checked, then looked up again; see the review below).
+
+## Reviews
+
+- [2026-09-28](review-2026-09-28.md): the features added on 2026-09-27 and 28 (live location, Market, tickets, Echo, collages, Together, Mixes, covers, games, Ask me, drops, the export and deletion).
 
 ## Rules for contributors
 

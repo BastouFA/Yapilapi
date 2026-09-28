@@ -41,6 +41,7 @@ import {
   manages,
   markBestOf,
   memberIds,
+  minorPairs,
   noticeAdded,
   SUMMARY_SELECT,
   toSummary,
@@ -121,6 +122,9 @@ const ADD_REFUSED: Record<Exclude<AddCheck, 'ok' | 'member'>, (name: string) => 
   blocked: (name) => new AppError(403, 'forbidden', `${name} can't be added to this album.`),
   minor: () => new AppError(403, 'minor_protection', 'To keep younger people safe, you can only add them once you are friends.'),
 };
+
+const MINORS_APART = () =>
+  new AppError(403, 'minor_protection', 'To keep younger people safe, adults and people under 18 can be in an album together only when they are friends.');
 
 /**
  * Together: shared albums (lib/together.ts and packages/shared/src/together.ts). Behind the
@@ -256,10 +260,29 @@ export function registerTogether(app: FastifyInstance, ctx: AppContext, h: ChatH
     let skipped = 0;
     const rest = [...new Set(bulk.filter((x) => x !== adder && !ids.includes(x)))];
     const bulkChecks = await addChecks(db, adder, host, albumId, rest);
+    const candidates: string[] = [];
     for (const id of rest) {
       const check = bulkChecks.get(id) ?? 'missing';
-      if (check === 'ok') ids.push(id);
+      if (check === 'ok') candidates.push(id);
       else if (check !== 'member') skipped++;
+    }
+    // Every pair in the album, not only the adder and the host: an adult and someone under 18 share
+    // one only as friends. People picked by name are refused; people from a chat or an event are skipped.
+    const present = albumId ? await memberIds(db, albumId) : [host];
+    const partners = new Map<string, string[]>();
+    for (const [a, b] of await minorPairs(db, [...present, ...ids, ...candidates])) {
+      partners.set(a, [...(partners.get(a) ?? []), b]);
+      partners.set(b, [...(partners.get(b) ?? []), a]);
+    }
+    const inIt = new Set([...present, ...ids]);
+    const clashes = (id: string) => (partners.get(id) ?? []).some((p) => inIt.has(p));
+    if (ids.some(clashes)) throw MINORS_APART();
+    for (const id of candidates) {
+      if (clashes(id)) skipped++;
+      else {
+        ids.push(id);
+        inIt.add(id);
+      }
     }
     return { ids, skipped };
   }
@@ -668,6 +691,7 @@ export function registerTogether(app: FastifyInstance, ctx: AppContext, h: ChatH
     if (approve) {
       const check = (await addChecks(db, u.id, r.creator_id, id, [userId])).get(userId) ?? 'missing';
       if (check !== 'ok' && check !== 'member') throw ADD_REFUSED[check]((await namesOf([userId])).get(userId) ?? 'This person');
+      if ((await minorPairs(db, [userId, ...(await memberIds(db, id))])).some((pair) => pair.includes(userId))) throw MINORS_APART();
       await assertRoom(id, 1);
       await db.query(`INSERT INTO together_members (together_id, user_id, role, added_by) VALUES ($1,$2,'member',$3) ON CONFLICT DO NOTHING`, [
         id,
@@ -741,8 +765,15 @@ export function registerTogether(app: FastifyInstance, ctx: AppContext, h: ChatH
       return out;
     });
     const videos = (await db.query(`SELECT count(*)::int AS n FROM media WHERE id = ANY($1::uuid[]) AND kind = 'video'`, [ids])).rows[0].n as number;
-    const people = (await memberIds(db, id)).filter((m) => m !== u.id);
-    await ctx.realtime.publish(people, { type: 'together.items', data: { togetherId: id, userId: u.id, count: added.length } });
+    // Live to the others, except anyone who blocked the person adding or was blocked by them (they never see these items).
+    const { rows: seeing } = await db.query<{ id: string }>(`SELECT x AS id FROM unnest($1::uuid[]) AS x WHERE ${notBlockedSql('x', '$2')}`, [
+      (await memberIds(db, id)).filter((m) => m !== u.id),
+      u.id,
+    ]);
+    await ctx.realtime.publish(
+      seeing.map((p) => p.id),
+      { type: 'together.items', data: { togetherId: id, userId: u.id, count: added.length } },
+    );
     await noticeAdded(db, ctx.realtime, { id, title: r.title }, u.id, { count: added.length, videos });
     track(db, u.id, 'together_items_added', { count: added.length, videos });
     reply.code(201);

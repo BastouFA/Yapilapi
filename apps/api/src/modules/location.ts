@@ -80,8 +80,14 @@ export function registerLocation(app: FastifyInstance, ctx: AppContext, h: ChatH
       [u.id, others],
     );
     if (blocks.rowCount) throw new AppError(403, 'location_blocked', 'You can’t share where you are in this chat.');
-    for (const other of others) if ((iAmMinor || minors.has(other)) && !(await trusted(u.id, other))) throw new AppError(403, 'minor_protection', MINOR_SHARE);
+    if (!(await minorsOk(u, others, minors, iAmMinor))) throw new AppError(403, 'minor_protection', MINOR_SHARE);
     return conv;
+  }
+
+  /** When anyone involved is under 18, everyone else in the chat is a friend (or family) of the person sharing. */
+  async function minorsOk(u: AuthUser, others: string[], minors: Set<string>, iAmMinor: boolean): Promise<boolean> {
+    for (const other of others) if ((iAmMinor || minors.has(other)) && !(await trusted(u.id, other))) return false;
+    return true;
   }
 
   /** The point as it's kept: snapped for approximate shares, with an accuracy that says so. */
@@ -190,6 +196,13 @@ export function registerLocation(app: FastifyInstance, ctx: AppContext, h: ChatH
     const share = await ownShare(id, u.id);
     if (!share.running) throw new AppError(409, 'share_ended', 'You’ve stopped sharing where you are here.');
     await h.assertMember(share.conversation_id, u.id);
+    // The rule for people under 18 holds for every point, not only at the start: once a friendship
+    // it relied on ends (or an adult or someone under 18 is in the chat without one), the share stops.
+    const { others, minors, iAmMinor } = await chatOf(u, share.conversation_id);
+    if (!(await minorsOk(u, others, minors, iAmMinor))) {
+      if (await stopShare(db, id, 'stopped')) await publishShare(deps, id);
+      throw new AppError(409, 'share_ended', `Sharing where you are here has stopped. ${MINOR_SHARE}`);
+    }
     const point = keptPoint(input, share.precision);
     const done = await db.query<{ point_at: Date }>(
       `UPDATE location_shares SET lat = $2, lng = $3, accuracy_m = $4, point_at = now()

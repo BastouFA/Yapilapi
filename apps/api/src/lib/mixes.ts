@@ -402,6 +402,8 @@ export async function publishMixChanged(deps: MixDeps, mixId: string, ownerId: s
      WHERE mc.mix_id = $1 AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = cm.user_id AND b.blocked_id = $2)`,
     [mixId, ownerId],
   );
-  const users = [...new Set([ownerId, ...rows.map((r) => r.user_id)])];
-  await deps.realtime.publish(users, { type: 'mix.updated', data: { mixId, conversationIds: [...new Set(rows.map((r) => r.conversation_id))] } });
+  // The owner hears about every chat it's shared into; everyone else only about the chats they're in.
+  const chatsOf = new Map<string, Set<string>>([[ownerId, new Set(rows.map((r) => r.conversation_id))]]);
+  for (const r of rows) if (r.user_id !== ownerId) chatsOf.set(r.user_id, (chatsOf.get(r.user_id) ?? new Set()).add(r.conversation_id));
+  for (const [user, chats] of chatsOf) await deps.realtime.publish([user], { type: 'mix.updated', data: { mixId, conversationIds: [...chats] } });
 }

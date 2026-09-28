@@ -236,6 +236,26 @@ export async function addChecks(db: Q, adder: string, host: string, albumId: str
   return out;
 }
 
+/**
+ * Pairs among these people that can't share an album: someone under 18 and an adult who aren't
+ * friends (or a teen and a guardian they accepted), as [minor, adult]. Everyone in an album sees
+ * everyone else's photos, names and comments, so the rule for groups in chats holds for every pair,
+ * not only for the person adding and the host.
+ */
+export async function minorPairs(db: Q, userIds: string[]): Promise<[string, string][]> {
+  const ids = [...new Set(userIds)];
+  if (ids.length < 2) return [];
+  const { rows } = await db.query<{ minor_id: string; adult_id: string }>(
+    `WITH m AS (SELECT u.id, coalesce(u.birth_date > current_date - interval '18 years', false) AS minor FROM users u WHERE u.id = ANY($1::uuid[]))
+     SELECT a.id AS minor_id, b.id AS adult_id FROM m a JOIN m b ON a.minor AND NOT b.minor
+     WHERE NOT EXISTS (SELECT 1 FROM friendships fr WHERE fr.user_a = LEAST(a.id, b.id) AND fr.user_b = GREATEST(a.id, b.id))
+       AND NOT EXISTS (SELECT 1 FROM family_links fl WHERE fl.status = 'active'
+                       AND ((fl.guardian_id = a.id AND fl.teen_id = b.id) OR (fl.guardian_id = b.id AND fl.teen_id = a.id)))`,
+    [ids],
+  );
+  return rows.map((r) => [r.minor_id, r.adult_id]);
+}
+
 /** Everyone in an album (active accounts), for realtime updates and notices. */
 export async function memberIds(db: Q, albumId: string): Promise<string[]> {
   const { rows } = await db.query<{ user_id: string }>(

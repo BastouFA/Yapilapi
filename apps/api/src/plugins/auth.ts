@@ -128,8 +128,17 @@ export function registerAuth(app: FastifyInstance, ctx: AppContext) {
     req.user = await resolveSession(ctx, sessionTokenOf(req));
     const key = req.user?.apiKey;
     if (!key) return;
-    const path = req.url.split('?')[0]!;
-    if (KEY_BLOCKED.some((r) => r.test(path)) || (req.method === 'DELETE' && path === '/v1/me'))
+    // Checked against the route that will run (its pattern) as well as the path as sent, decoded: the
+    // router decodes the path, so "/v1/me/%65xport" reaches the export and must be refused like it.
+    const raw = req.url.split('?')[0]!;
+    let decoded = raw;
+    try {
+      decoded = decodeURIComponent(raw);
+    } catch {
+      // A path that doesn't decode is checked as sent.
+    }
+    const paths = [raw, decoded, req.routeOptions.url].filter((p): p is string => !!p);
+    if (paths.some((p) => KEY_BLOCKED.some((r) => r.test(p)) || (req.method === 'DELETE' && p === '/v1/me')))
       throw forbidden('API keys cannot use this endpoint. Sign in to the app instead.');
     const needs = req.method === 'GET' || req.method === 'HEAD' ? 'read' : 'write';
     if (!key.scopes.includes(needs)) throw forbidden(`This API key needs the "${needs}" scope.`);

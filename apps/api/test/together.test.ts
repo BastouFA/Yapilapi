@@ -265,6 +265,8 @@ describe('Together: blocks and minors', () => {
     const kid = await teen();
     const kidFriend = await teen();
     for (const u of [b, c, d, kidFriend]) await befriend(host, u);
+    // Everyone in an album sees everyone else, so the adults in it are the teen's friends too.
+    for (const u of [b, c]) await befriend(kidFriend, u);
     await db().query(`INSERT INTO blocks (blocker_id, blocked_id) VALUES ($1,$2)`, [d.id, host.id]);
     expect((await as(t.app, host).post('/v1/together', { title: 'Party', memberIds: [d.id] })).status).toBe(403);
 
