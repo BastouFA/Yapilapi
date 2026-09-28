@@ -19,6 +19,12 @@ if (process.env.APP_ENV === 'production') {
 
 export const DEV_PASSWORD = 'dev-password-123';
 
+/**
+ * Features that are off by default everywhere but on in a development database, so they can be
+ * tried straight away. Production turns them on at /admin (see docs/product/status.md).
+ */
+const DEV_ON = new Set<string>(['REAL_TOGETHER']);
+
 const TOPICS = [
   'technology',
   'music',
@@ -78,8 +84,13 @@ async function main() {
   const pool = createPool(url!);
   const pw = await hashPassword(DEV_PASSWORD);
   await tx(pool, async (c) => {
+    // A flag someone already set here keeps its value; a new one takes its default, or on for DEV_ON.
     for (const [key, f] of Object.entries(FEATURE_FLAGS))
-      await c.query(`INSERT INTO feature_flags (key, enabled, description) VALUES ($1, $2, $3) ON CONFLICT (key) DO NOTHING`, [key, f.default, f.description]);
+      await c.query(`INSERT INTO feature_flags (key, enabled, description) VALUES ($1, $2, $3) ON CONFLICT (key) DO NOTHING`, [
+        key,
+        DEV_ON.has(key) || f.default,
+        f.description,
+      ]);
 
     for (const slug of TOPICS)
       await c.query(`INSERT INTO topics (slug, name) VALUES ($1, $2) ON CONFLICT (slug) DO NOTHING`, [slug, slug[0]!.toUpperCase() + slug.slice(1)]);

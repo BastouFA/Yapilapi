@@ -153,6 +153,19 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         `SELECT conversation_id, kind, status, winner_id = $1 AS won, created_at, ended_at FROM chat_games WHERE $1 = ANY(players) ORDER BY created_at DESC`,
       ),
       ...(await exportSections(db, u.id)),
+      // Together albums you're in, what you added to them (never where it was taken: that isn't kept),
+      // your stars, reactions and comments there, and your requests to join.
+      togetherAlbums: await q(
+        `SELECT t.id, t.title, t.description, m.role, m.joined_at, t.status, t.closes_at, t.created_at
+         FROM together_members m JOIN togethers t ON t.id = m.together_id WHERE m.user_id = $1 AND t.deleted_at IS NULL ORDER BY m.joined_at DESC`,
+      ),
+      togetherItems: await q(
+        `SELECT together_id, media_id, caption, captured_at, taken_source, created_at, deleted_at FROM together_contributions WHERE user_id = $1 ORDER BY created_at DESC`,
+      ),
+      togetherStars: await q(`SELECT item_id, created_at FROM together_stars WHERE user_id = $1 ORDER BY created_at DESC`),
+      togetherReactions: await q(`SELECT item_id, kind, created_at FROM together_reactions WHERE user_id = $1 ORDER BY created_at DESC`),
+      togetherComments: await q(`SELECT item_id, body, created_at FROM together_comments WHERE author_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC`),
+      togetherRequests: await q(`SELECT together_id, status, created_at, decided_at FROM together_requests WHERE user_id = $1 ORDER BY created_at DESC`),
     };
     await db.query(`INSERT INTO privacy_requests (user_id, kind, status, completed_at) VALUES ($1,'export','completed',now())`, [u.id]);
     reply.header('content-disposition', `attachment; filename="yapilapi-export-${u.id}.json"`);
@@ -203,6 +216,20 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         [u.id],
       );
       await c.query(`UPDATE messages SET deleted_at = now(), body = '', attachments = '[]' WHERE sender_id = $1 AND deleted_at IS NULL`, [u.id]);
+      // Together albums they started go on for everyone else, hosted by their longest-standing
+      // co-host (or member); an album with nobody else in it is deleted.
+      const hosted = await c.query<{ id: string }>(`SELECT id FROM togethers WHERE creator_id = $1 AND deleted_at IS NULL`, [u.id]);
+      for (const t of hosted.rows) {
+        const next = await c.query<{ user_id: string }>(
+          `SELECT m.user_id FROM together_members m JOIN users mu ON mu.id = m.user_id
+           WHERE m.together_id = $1 AND m.user_id <> $2 AND mu.status = 'active' ORDER BY (m.role = 'cohost') DESC, m.joined_at LIMIT 1`,
+          [t.id, u.id],
+        );
+        if (next.rows[0]) {
+          await c.query(`UPDATE togethers SET creator_id = $2, updated_at = now() WHERE id = $1`, [t.id, next.rows[0].user_id]);
+          await c.query(`UPDATE together_members SET role = 'creator' WHERE together_id = $1 AND user_id = $2`, [t.id, next.rows[0].user_id]);
+        } else await c.query(`UPDATE togethers SET deleted_at = now(), invite_enabled = false WHERE id = $1`, [t.id]);
+      }
       await c.query(`UPDATE moments SET deleted_at = coalesce(deleted_at, now()), body = '', media_url = NULL, location_text = NULL WHERE author_id = $1`, [
         u.id,
       ]);
@@ -236,6 +263,13 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         `WITH gone AS (DELETE FROM mix_likes WHERE user_id = $1 RETURNING mix_id)
          UPDATE mixes SET like_count = greatest(like_count - 1, 0) WHERE id IN (SELECT mix_id FROM gone)`,
         `DELETE FROM mix_saves WHERE user_id = $1`,
+        // What they added to Together albums, their stars, reactions and comments there, their places in albums and requests to join.
+        `UPDATE together_contributions SET deleted_at = coalesce(deleted_at, now()), caption = '' WHERE user_id = $1`,
+        `DELETE FROM together_stars WHERE user_id = $1`,
+        `DELETE FROM together_reactions WHERE user_id = $1`,
+        `DELETE FROM together_comments WHERE author_id = $1`,
+        `DELETE FROM together_requests WHERE user_id = $1`,
+        `DELETE FROM together_members WHERE user_id = $1`,
         `DELETE FROM media WHERE owner_id = $1`,
         `DELETE FROM share_videos sv USING posts p WHERE p.id = sv.post_id AND p.author_id = $1`,
         `UPDATE recaps SET deleted_at = coalesce(deleted_at, now()) WHERE owner_id = $1`,

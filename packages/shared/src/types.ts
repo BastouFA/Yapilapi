@@ -549,6 +549,12 @@ export type MessageSystemInfo =
       sessionId: string;
     }
   | {
+      /** The sender started a Together album for the people in this chat. Opens it for those in it. */
+      type: 'together';
+      togetherId: string;
+      title: string;
+    }
+  | {
       /**
        * A game in the chat ended. 'won': the sender won ("Ada won Four up"), by playing (in chess,
        * checkmate) or because the others forfeited (in chess, resigned). 'draw' and 'unfinished' (a day
@@ -931,11 +937,11 @@ export interface RecapCandidate {
   /** A small image for the picker (the poster frame for videos). */
   thumbUrl: string | null;
   durationMs: number | null;
-  /** Likes on the post it comes from (stories count 0). */
+  /** Likes on the post it comes from (stories count 0; in a Together album, its stars and reactions). */
   likes: number;
-  /** When it was shared (ISO). */
+  /** When it was shared (ISO); in a Together album, when it was taken. */
   takenAt: string;
-  from: 'post' | 'story';
+  from: 'post' | 'story' | 'together';
   fromId: string;
   /** Yours, rather than someone else's. */
   mine: boolean;
@@ -954,7 +960,7 @@ export interface RecapCandidates {
 export interface Recap {
   id: string;
   title: string;
-  source: 'memory' | 'on_this_day' | 'chapter';
+  source: 'memory' | 'on_this_day' | 'chapter' | 'together';
   sourceId: string | null;
   style: 'calm' | 'quick' | 'film';
   aspect: '9:16' | '1:1';

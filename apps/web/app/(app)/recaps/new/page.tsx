@@ -26,6 +26,7 @@ import { useSession } from '../../../providers';
 function backHref(source: RecapSource, sourceId: string | null): string {
   if (source === 'memory' && sourceId) return `/memories/${sourceId}`;
   if (source === 'chapter' && sourceId) return `/chapters/${sourceId}`;
+  if (source === 'together' && sourceId) return `/together/${sourceId}`;
   return '/memories';
 }
 
@@ -82,7 +83,7 @@ function Maker() {
   const [announce, setAnnounce] = useState('');
 
   useEffect(() => {
-    if (!source || flags.MEMORY === false) return;
+    if (!source || (source === 'together' ? flags.REAL_TOGETHER === false : flags.MEMORY === false)) return;
     if (source !== 'on_this_day' && !sourceId) return;
     let live = true;
     api.recaps.candidates(source, sourceId ?? undefined).then(
@@ -97,7 +98,7 @@ function Maker() {
     return () => {
       live = false;
     };
-  }, [source, sourceId, flags.MEMORY]);
+  }, [source, sourceId, flags.MEMORY, flags.REAL_TOGETHER]);
 
   const byId = useMemo(() => new Map((cand?.items ?? []).map((c) => [c.mediaId, c])), [cand]);
   const chosen = picked.map((id) => byId.get(id)).filter((c): c is RecapCandidate => !!c);
@@ -106,7 +107,11 @@ function Maker() {
   const remaining = cand?.remainingToday ?? 0;
   const hasOthers = chosen.some((c) => !c.mine);
 
-  if (flags.MEMORY === false || (loadError instanceof ApiError && loadError.code === 'feature_disabled')) return <FeatureOff name={t('m.recap.title')} />;
+  if (
+    (source === 'together' ? flags.REAL_TOGETHER === false : flags.MEMORY === false) ||
+    (loadError instanceof ApiError && loadError.code === 'feature_disabled')
+  )
+    return <FeatureOff name={t('m.recap.title')} />;
 
   const header = (
     <div className="yp-topbar">

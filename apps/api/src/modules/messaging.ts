@@ -49,6 +49,7 @@ import { mixCardsForMessages } from '../lib/mixes.ts';
 import { registerMixChats } from './mixes.ts';
 import { registerChatLater } from './chat-later.ts';
 import { registerWatch } from './watch.ts';
+import { registerTogether } from './together.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 
@@ -1117,6 +1118,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
   };
   registerChatPollsLists(app, ctx, chatHelpers);
   registerWatch(app, ctx, chatHelpers);
+  // Together albums (modules/together.ts): one started from a chat posts a card there.
+  registerTogether(app, ctx, chatHelpers);
 
   // Games in chats (modules/chat-games.ts).
   registerChatGames(app, ctx, {

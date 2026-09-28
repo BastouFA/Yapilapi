@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, SectionList, Text, View } from 'react-native';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import type { NotificationItem, PublicUser } from '../../../packages/shared/src/types';
+import { togetherNoticeText } from '../../../packages/shared/src/together';
 import { client, errorMessage } from '../lib/api';
 import { SectionHeader } from '../lib/chips';
 import { useT, type Translator } from '../lib/i18n';
@@ -127,6 +128,9 @@ function describe(g: Group, tr: Translator): string {
   const name = n.actor?.displayName ?? '';
   const title = typeof n.data.title === 'string' ? n.data.title : typeof n.data.name === 'string' ? n.data.name : '';
   if (g.actors.length > 1 && GROUP_TEXT[n.type]) return t(GROUP_TEXT[n.type]!, { names: names(g.actors, tr) });
+  // Together albums: whole sentences with the album's name ("Ada added 12 photos to Lagos weekend").
+  const together = togetherNoticeText(n, t, tp);
+  if (together) return together;
   // Likes on a comment and replies to it arrive batched: the newest person, and how many in all.
   const others = Math.max(0, Number(n.data.count ?? 1) - 1);
   if (n.type === 'comment_like' && n.actor) return others ? tp('comments.notif.likeOthers', others, { name }) : t('comments.notif.like', { name });

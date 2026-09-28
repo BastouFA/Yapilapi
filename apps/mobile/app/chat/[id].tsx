@@ -9,7 +9,7 @@ import {
   type AudioPlayer,
 } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Alert, FlatList, Image, Linking, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -51,6 +51,7 @@ import { GameCard, GameSheet, StartGameSheet } from '../../lib/chat-games';
 import { ChatMixCard, ShareMixHereSheet } from '../../lib/mixes';
 import { accentFor, ChatLookSheet, ChatWallpaperView, laterLimits, ScheduledList, useScheduled } from '../../lib/chat-later';
 import { DateTimeSheet } from '../../lib/date-time';
+import { useFlag } from '../../lib/flags';
 import { chatTheme, type AccentColors } from '../../../../packages/shared/src/chat-theme';
 import { chatTooBig, openWatch, startWatch, useChatWatch, WatchBanner, watchableChat } from '../../lib/watch';
 
@@ -110,6 +111,9 @@ export default function Chat() {
   // Watch together: the session running here (a banner and a Join on its line), or a way to start one.
   const { summary: watching } = useChatWatch(id);
   const canWatch = !!conversation && watchableChat(conversation) && !chatTooBig(conversation) && conversation.members.length > 1;
+  // A shared album for the people in this chat (a card goes in the chat).
+  const togetherOn = useFlag('REAL_TOGETHER') === true;
+  const canAlbum = togetherOn && !!conversation && (conversation.kind === 'direct' || conversation.kind === 'group');
   const patchMessage = (messageId: string, fn: (m: Message) => Message) => setMessages((cur) => cur.map((x) => (x.id === messageId ? fn(x) : x)));
   const loadPins = useCallback(async () => {
     try {
@@ -1073,6 +1077,9 @@ export default function Chat() {
           },
           ...(conversation?.smartReplies ? [{ label: t('smartReplies.label'), icon: 'sparkles-outline' as const, onPress: () => setSmartSettings(true) }] : []),
           { label: t('m.chat.look.title'), icon: 'color-palette-outline', onPress: () => setLookOpen(true) },
+          ...(canAlbum
+            ? [{ label: t('together.chat.start'), icon: 'images-outline' as const, onPress: () => router.push(`/together/new?chat=${encodeURIComponent(id)}`) }]
+            : []),
         ]}
       />
       <DateTimeSheet

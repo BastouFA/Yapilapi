@@ -831,7 +831,7 @@ export type CreateEventInput = z.infer<typeof createEventSchema>;
 export const createRecapSchema = z
   .object({
     source: z.enum(RECAP_SOURCES),
-    /** The memory or chapter. Not used for "On this day". */
+    /** The memory, chapter or Together album. Not used for "On this day". */
     sourceId: uuid.optional(),
     title: trimmed(RECAP_TITLE_MAX),
     mediaIds: z

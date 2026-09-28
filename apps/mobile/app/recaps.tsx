@@ -144,8 +144,7 @@ export default function Recaps() {
   if (!items) return <Loading />;
 
   const open = openId ? (items.find((r) => r.id === openId) ?? null) : null;
-  const make = (source: 'memory' | 'on_this_day' | 'chapter', sourceId?: string) =>
-    router.push({ pathname: '/recap-new', params: sourceId ? { source, sourceId } : { source } });
+  const make = (source: Recap['source'], sourceId?: string) => router.push({ pathname: '/recap-new', params: sourceId ? { source, sourceId } : { source } });
   const chevron = <Icon name="chevron-forward" size={18} color={c.inkMuted} directional />;
   const heading = (text: string) => (
     <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 17, fontWeight: '800' }}>

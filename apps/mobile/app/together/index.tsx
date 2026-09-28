@@ -1,35 +1,32 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, Text, View } from 'react-native';
-import type { YapilapiClient } from '../../../../packages/api-client/src/index';
-import { client, errorMessage } from '../../lib/api';
+import { Image, RefreshControl, ScrollView, Text, View } from 'react-native';
+import type { TogetherSummary } from '../../../../packages/shared/src/together';
+import { client, errorMessage, mediaUrl } from '../../lib/api';
 import { useFlag } from '../../lib/flags';
-import { FriendPicker, useFriends } from '../../lib/friend-picker';
 import { useT } from '../../lib/i18n';
-import { space } from '../../lib/theme';
-import { Button, Card, EmptyState, Field, KeyboardAvoid, Loading, Notice, Pill, useColors, userText } from '../../lib/ui';
-
-type TogetherItem = Awaited<ReturnType<YapilapiClient['together']['list']>>['items'][number];
+import { useRealtime } from '../../lib/session';
+import { radius, space } from '../../lib/theme';
+import { statusText } from '../../lib/together';
+import { Button, Card, EmptyState, Icon, Loading, Notice, useColors, userText } from '../../lib/ui';
 
 /**
- * Together: one moment, everyone's view. The Togethers you're in (only members see them), and
- * starting one with friends. Behind the REAL_TOGETHER flag.
+ * Together: the shared albums you're in (only their people see them), open ones first, and a
+ * way to start one. Behind the REAL_TOGETHER flag.
  */
 export default function TogetherList() {
   const c = useColors();
-  const { t, tp } = useT();
+  const tr = useT();
+  const { t, tp } = tr;
   const on = useFlag('REAL_TOGETHER');
-  const friends = useFriends();
-  const [items, setItems] = useState<TogetherItem[] | null>(null);
-  const [title, setTitle] = useState('');
-  const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [busy, setBusy] = useState(false);
+  const [items, setItems] = useState<TogetherSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
       setItems((await (await client()).together.list()).items);
+      setError(null);
     } catch (e) {
       setItems((cur) => cur ?? []);
       setError(errorMessage(e));
@@ -41,90 +38,117 @@ export default function TogetherList() {
       if (on) void load();
     }, [on, load]),
   );
+  useRealtime((e) => {
+    if (e.type === 'together.items' || e.type === 'together.updated' || e.type === 'together.requests') void load();
+  });
 
   if (on === undefined) return <Loading />;
   if (!on)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>
-        <EmptyState title={t('m.together.off')} />
+        <EmptyState title={t('together.off')} />
       </View>
     );
 
-  async function start() {
-    const name = title.trim();
-    if (!name || busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const r = await (await client()).together.create({ title: name, memberIds: [...picked] });
-      setTitle('');
-      setPicked(new Set());
-      router.push(`/together/${r.together.id}`);
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <KeyboardAvoid>
-      <ScrollView
-        style={{ backgroundColor: c.ground }}
-        contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={async () => {
-              setRefreshing(true);
-              await load();
-              setRefreshing(false);
-            }}
-          />
-        }
+  const open = items?.filter((a) => a.status === 'open') ?? [];
+  const closed = items?.filter((a) => a.status === 'closed') ?? [];
+  const card = (a: TogetherSummary) => {
+    const sub = `${tp('together.items', a.itemCount)} · ${tp('together.people', a.memberCount)}`;
+    const status = statusText(a, tr);
+    return (
+      <Card
+        key={a.id}
+        onPress={() => router.push(`/together/${a.id}`)}
+        label={`${a.title}, ${sub}, ${status}${a.requestCount ? `, ${tp('together.requests.count', a.requestCount)}` : ''}`}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], padding: space[2] }}
       >
-        <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('m.together.intro')}</Text>
-        {error ? <Notice tone="danger">{error}</Notice> : null}
-
-        <View style={{ gap: space[2] }}>
-          {items === null ? (
-            <Loading />
-          ) : items.length ? (
-            items.map((x) => {
-              const sub = `${tp('m.together.photos', x.contributions)} · ${tp('m.together.people', x.members)}`;
-              return (
-                <Card
-                  key={x.id}
-                  onPress={() => router.push(`/together/${x.id}`)}
-                  label={`${x.title}, ${sub}${x.status === 'closed' ? `, ${t('m.together.closed')}` : ''}`}
-                  style={{ gap: space[1] }}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
-                    <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 16, flex: 1 }, userText]} numberOfLines={2}>
-                      {x.title}
-                    </Text>
-                    {x.status === 'closed' ? <Pill text={t('m.together.closed')} /> : null}
-                  </View>
-                  <Text style={{ color: c.inkMuted, fontSize: 13 }}>{sub}</Text>
-                </Card>
-              );
-            })
+        <View
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: radius.md,
+            overflow: 'hidden',
+            backgroundColor: c.yapiSoft,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {a.cover?.thumbUrl ? (
+            <Image source={{ uri: mediaUrl(a.cover.thumbUrl) }} style={{ width: '100%', height: '100%' }} accessibilityIgnoresInvertColors />
           ) : (
-            <EmptyState title={t('m.together.empty')} body={t('m.together.emptyBody')} />
+            <Icon name="images-outline" size={28} color={c.yapi} />
           )}
         </View>
-
-        <Card style={{ gap: space[3] }}>
-          <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '800', fontSize: 17 }}>
-            {t('m.together.start')}
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={[{ color: c.ink, fontWeight: '800', fontSize: 16 }, userText]} numberOfLines={1}>
+            {a.title}
           </Text>
-          <Field label={t('m.together.what')} placeholder={t('m.together.placeholder')} value={title} onChangeText={setTitle} maxLength={120} />
-          <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.together.invite')}</Text>
-          <FriendPicker friends={friends} picked={picked} onChange={setPicked} empty={t('m.together.noFriends')} />
-          <Button label={t('m.together.start')} disabled={!title.trim() || busy} onPress={() => start()} />
-        </Card>
-      </ScrollView>
-    </KeyboardAvoid>
+          <Text style={{ color: c.inkMuted, fontSize: 13 }}>{sub}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {a.status === 'open' ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.success }} /> : null}
+            <Text style={{ color: c.inkMuted, fontSize: 13 }} numberOfLines={1}>
+              {status}
+            </Text>
+          </View>
+          {a.requestCount ? (
+            <Text
+              style={{
+                alignSelf: 'flex-start',
+                color: c.ink,
+                backgroundColor: c.saffronSoft,
+                borderRadius: radius.full,
+                paddingHorizontal: 8,
+                fontSize: 12,
+                fontWeight: '700',
+              }}
+            >
+              {tp('together.requests.count', a.requestCount)}
+            </Text>
+          ) : null}
+        </View>
+        <Icon name="chevron-forward" size={18} color={c.inkMuted} directional />
+      </Card>
+    );
+  };
+
+  return (
+    <ScrollView
+      style={{ backgroundColor: c.ground }}
+      contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: space[8] }}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={async () => {
+            setRefreshing(true);
+            await load();
+            setRefreshing(false);
+          }}
+        />
+      }
+    >
+      <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('together.intro')}</Text>
+      <Button label={t('together.new')} icon="add" onPress={() => router.push('/together/new')} />
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {items === null ? (
+        <Loading />
+      ) : items.length ? (
+        <>
+          {open.length ? (
+            <Text accessibilityRole="header" style={{ color: c.inkMuted, fontWeight: '700', fontSize: 13, marginTop: space[2] }}>
+              {t('together.list.open')}
+            </Text>
+          ) : null}
+          {open.map(card)}
+          {closed.length ? (
+            <Text accessibilityRole="header" style={{ color: c.inkMuted, fontWeight: '700', fontSize: 13, marginTop: space[2] }}>
+              {t('together.list.closed')}
+            </Text>
+          ) : null}
+          {closed.map(card)}
+        </>
+      ) : (
+        <EmptyState title={t('together.empty')} body={t('together.emptyBody')} />
+      )}
+    </ScrollView>
   );
 }

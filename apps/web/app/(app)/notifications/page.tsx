@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Avatar, Button, EmptyState, List, ListItem, Skeleton } from '@yapilapi/design-system';
-import { formatRelativeTime, type NotificationItem } from '@yapilapi/shared';
+import { formatRelativeTime, togetherNoticeText, type NotificationItem } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { useRealtime, useSession, type Session } from '../../providers';
@@ -118,6 +118,9 @@ function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): s
     return typeof n.data.place === 'string' && n.data.place ? t('m.notif.newSignInPlace', { device, place: n.data.place }) : t('m.notif.newSignIn', { device });
   }
   if (n.type === 'scheduled_message_failed') return t('m.notif.scheduledMessageFailed');
+  // Together albums: whole sentences with the album's name ("Ada added 12 photos to Lagos weekend").
+  const together = togetherNoticeText(n, t, tp);
+  if (together) return together;
   // Whole sentences in your language (the name, when there is one, is part of them).
   if (n.type === 'weekly_wrap') return t('wrap.notif');
   if (n.type === 'watch_invite') return t('watch.invite', { name: n.actor?.displayName ?? t('m.calls.someone') });

@@ -1,16 +1,13 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { tx } from '@yapilapi/database';
 import { z } from 'zod';
-import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
+import { AppError, badRequest, featureDisabled, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { hydratePosts } from '../lib/posts.ts';
-import { isEnabled, notify, track } from '../lib/services.ts';
-import { areFriends, publicUserFrom } from '../lib/users.ts';
-import { seesSensitiveMedia } from '../lib/interactions.ts';
+import { isEnabled, track } from '../lib/services.ts';
 import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
-import { assertRecapUse } from '../lib/recap-sharing.ts';
 import { requireVerified } from '../lib/verification.ts';
-import { eventVisibleSql, postVisibleSql } from '../lib/visibility.ts';
+import { postVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 import { langOf } from '../lib/translation.ts';
 
@@ -32,14 +29,14 @@ async function freshMedia(c: { query: AppContext['db']['query'] }, userId: strin
 
 /**
  * Real: unedited, just-captured moments (optionally front + back camera), labelled
- * with when they were taken. Real Together: several people add their own
- * perspectives of the same moment to one shared, members-only object.
+ * with when they were taken. Only Real keeps the camera-only rule; Together albums
+ * (modules/together.ts) take photos and videos from the library too.
  */
 export default async function realModule(app: FastifyInstance, ctx: AppContext) {
   const db = ctx.db;
-  const gate = (flag: 'REAL' | 'REAL_TOGETHER') => async (req: FastifyRequest) => {
+  const gate = (flag: 'REAL') => async (req: FastifyRequest) => {
     await requireAuth(req, undefined as never);
-    if (!(await isEnabled(db, flag))) throw featureDisabled(flag === 'REAL' ? 'Real' : 'Real Together');
+    if (!(await isEnabled(db, flag))) throw featureDisabled('Real');
   };
 
   // ── Real ──────────────────────────────────────────────────────────────
@@ -101,205 +98,5 @@ export default async function realModule(app: FastifyInstance, ctx: AppContext) 
         u.id,
       ),
     };
-  });
-
-  // ── Real Together ─────────────────────────────────────────────────────
-  async function loadTogether(id: string, userId: string) {
-    const { rows } = await db.query(
-      `SELECT t.*, (SELECT role FROM together_members m WHERE m.together_id = t.id AND m.user_id = $2) AS my_role FROM togethers t WHERE t.id = $1`,
-      [id, userId],
-    );
-    if (!rows[0] || !rows[0].my_role) throw notFound('Together');
-    const t = rows[0];
-    if (t.status === 'open' && t.closes_at && t.closes_at < new Date()) {
-      await db.query(`UPDATE togethers SET status = 'closed' WHERE id = $1`, [id]);
-      t.status = 'closed';
-    }
-    return t;
-  }
-
-  /** You can invite friends, or people going to the same event. */
-  async function canInvite(creatorId: string, userId: string, eventId: string | null) {
-    if (await areFriends(db, creatorId, userId)) return true;
-    if (!eventId) return false;
-    const r = await db.query(`SELECT 1 FROM event_attendees WHERE event_id = $1 AND user_id = $2 AND status = 'going'`, [eventId, userId]);
-    return !!r.rowCount;
-  }
-
-  app.post('/v1/together', { preHandler: gate('REAL_TOGETHER'), config: { rateLimit: { max: 20, timeWindow: '1 hour' } } }, async (req, reply) => {
-    const u = me(req);
-    const input = parse(
-      z.object({
-        title: z.string().trim().min(1).max(120),
-        memberIds: z.array(z.string().uuid()).max(50).default([]),
-        eventId: z.string().uuid().optional(),
-        closesInHours: z
-          .number()
-          .int()
-          .min(1)
-          .max(24 * 14)
-          .default(48),
-      }),
-      req.body,
-    );
-    if (input.eventId) {
-      const ev = await db.query(`SELECT 1 FROM events e WHERE e.id = $2 AND ${eventVisibleSql('$1')}`, [u.id, input.eventId]);
-      if (!ev.rowCount) throw notFound('Event');
-    }
-    const others = [...new Set(input.memberIds.filter((m) => m !== u.id))];
-    for (const m of others)
-      if (!(await canInvite(u.id, m, input.eventId ?? null))) throw forbidden('You can invite friends, or people going to the same event.');
-    const id = await tx(db, async (c) => {
-      const { rows } = await c.query(
-        `INSERT INTO togethers (creator_id, event_id, title, closes_at) VALUES ($1,$2,$3, now() + make_interval(hours => $4)) RETURNING id`,
-        [u.id, input.eventId ?? null, input.title, input.closesInHours],
-      );
-      await c.query(`INSERT INTO together_members (together_id, user_id, role) VALUES ($1,$2,'creator')`, [rows[0].id, u.id]);
-      if (others.length) await c.query(`INSERT INTO together_members (together_id, user_id) SELECT $1, unnest($2::uuid[])`, [rows[0].id, others]);
-      return rows[0].id as string;
-    });
-    for (const m of others)
-      await notify(db, ctx.realtime, {
-        userId: m,
-        category: 'friends',
-        type: 'together_invite',
-        actorId: u.id,
-        entityType: 'together',
-        entityId: id,
-        data: { title: input.title },
-      });
-    reply.code(201);
-    return { together: await detail(id, u.id) };
-  });
-
-  async function detail(id: string, userId: string) {
-    const t = await loadTogether(id, userId);
-    const members = await db.query(
-      `SELECT m.role, pr.user_id AS u_id, pr.username AS u_username, pr.display_name AS u_display_name, pr.avatar_url AS u_avatar_url, pr.mode AS u_mode
-       FROM together_members m JOIN profiles pr ON pr.user_id = m.user_id WHERE m.together_id = $1 ORDER BY m.joined_at`,
-      [id],
-    );
-    const contributions = await db.query(
-      `SELECT c.id, c.caption, c.captured_at, md.url, md.kind, md.alt_text, md.moderation,
-              pr.user_id AS u_id, pr.username AS u_username, pr.display_name AS u_display_name, pr.avatar_url AS u_avatar_url, pr.mode AS u_mode
-       FROM together_contributions c JOIN profiles pr ON pr.user_id = c.user_id LEFT JOIN media md ON md.id = c.media_id
-       WHERE c.together_id = $1 AND c.deleted_at IS NULL AND md.moderation IS DISTINCT FROM 'blocked'
-         AND (md.moderation IS DISTINCT FROM 'sensitive' OR $2) ORDER BY c.captured_at, c.created_at`,
-      [id, await seesSensitiveMedia(db, userId)],
-    );
-    return {
-      id: t.id,
-      title: t.title,
-      status: t.status,
-      eventId: t.event_id,
-      closesAt: t.closes_at,
-      myRole: t.my_role,
-      members: members.rows.map((m) => ({ user: publicUserFrom(m, 'u_'), role: m.role })),
-      contributions: contributions.rows.map((c) => ({
-        id: c.id,
-        caption: c.caption,
-        capturedAt: c.captured_at,
-        media: c.url ? { url: c.url, kind: c.kind, altText: c.alt_text, ...(c.moderation === 'sensitive' ? { sensitive: true } : {}) } : null,
-        author: publicUserFrom(c, 'u_'),
-      })),
-    };
-  }
-
-  app.get('/v1/together', { preHandler: gate('REAL_TOGETHER') }, async (req) => {
-    const { rows } = await db.query(
-      `SELECT t.id, t.title, t.status, t.closes_at, (SELECT count(*) FROM together_contributions c WHERE c.together_id = t.id AND c.deleted_at IS NULL) AS contributions,
-              (SELECT count(*) FROM together_members m2 WHERE m2.together_id = t.id) AS members
-       FROM togethers t JOIN together_members m ON m.together_id = t.id AND m.user_id = $1 ORDER BY t.created_at DESC LIMIT 100`,
-      [me(req).id],
-    );
-    return {
-      items: rows.map((r) => ({
-        id: r.id,
-        title: r.title,
-        status: r.status,
-        closesAt: r.closes_at,
-        contributions: Number(r.contributions),
-        members: Number(r.members),
-      })),
-    };
-  });
-
-  app.get('/v1/together/:id', { preHandler: gate('REAL_TOGETHER') }, async (req) => {
-    const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
-    return { together: await detail(id, me(req).id) };
-  });
-
-  app.post(
-    '/v1/together/:id/contributions',
-    { preHandler: gate('REAL_TOGETHER'), config: { rateLimit: { max: 60, timeWindow: '1 hour' } } },
-    async (req, reply) => {
-      const u = me(req);
-      const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
-      const input = parse(z.object({ mediaId: z.string().uuid(), caption: z.string().trim().max(300).default('') }), req.body);
-      const t = await loadTogether(id, u.id);
-      if (t.status !== 'open') throw badRequest('This Together is closed.');
-      await tx(db, async (c) => {
-        // Your own upload, not a view-once one; a recap only when it could be sent in a chat (members see it).
-        const r = await c.query(`UPDATE media SET used_at = now() WHERE id = $1 AND owner_id = $2 AND used_at IS NULL AND NOT private RETURNING id`, [
-          input.mediaId,
-          u.id,
-        ]);
-        if (!r.rowCount) throw notFound('Media');
-        await assertRecapUse(c, u.id, [input.mediaId], 'chat');
-        await c.query(`INSERT INTO together_contributions (together_id, user_id, media_id, caption) VALUES ($1,$2,$3,$4)`, [
-          id,
-          u.id,
-          input.mediaId,
-          input.caption,
-        ]);
-      });
-      const members = (
-        await db.query<{ user_id: string }>(`SELECT user_id FROM together_members WHERE together_id = $1 AND user_id <> $2`, [id, u.id])
-      ).rows.map((r) => r.user_id);
-      await ctx.realtime.publish(members, { type: 'together.contribution', data: { togetherId: id, userId: u.id } });
-      reply.code(201);
-      return { together: await detail(id, u.id) };
-    },
-  );
-
-  app.delete('/v1/together/:id/contributions/:cid', { preHandler: gate('REAL_TOGETHER') }, async (req) => {
-    const u = me(req);
-    const { id, cid } = parse(z.object({ id: z.string().uuid(), cid: z.string().uuid() }), req.params);
-    const t = await loadTogether(id, u.id);
-    const r = await db.query(
-      `UPDATE together_contributions SET deleted_at = now() WHERE id = $1 AND together_id = $2 AND (user_id = $3 OR $4) AND deleted_at IS NULL`,
-      [cid, id, u.id, t.my_role === 'creator'],
-    );
-    if (!r.rowCount) throw notFound('Contribution');
-    return { ok: true };
-  });
-
-  app.post('/v1/together/:id/members', { preHandler: gate('REAL_TOGETHER') }, async (req) => {
-    const u = me(req);
-    const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
-    const { userIds } = parse(z.object({ userIds: z.array(z.string().uuid()).min(1).max(50) }), req.body);
-    const t = await loadTogether(id, u.id);
-    if (t.my_role !== 'creator') throw forbidden('Only the creator can invite people.');
-    for (const m of userIds) if (!(await canInvite(u.id, m, t.event_id))) throw forbidden('You can invite friends, or people going to the same event.');
-    await db.query(`INSERT INTO together_members (together_id, user_id) SELECT $1, unnest($2::uuid[]) ON CONFLICT DO NOTHING`, [id, userIds]);
-    return { together: await detail(id, u.id) };
-  });
-
-  app.post('/v1/together/:id/leave', { preHandler: gate('REAL_TOGETHER') }, async (req) => {
-    const u = me(req);
-    const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
-    const t = await loadTogether(id, u.id);
-    if (t.my_role === 'creator') throw badRequest('Close it instead: you created it.');
-    await db.query(`DELETE FROM together_members WHERE together_id = $1 AND user_id = $2`, [id, u.id]);
-    return { ok: true };
-  });
-
-  app.post('/v1/together/:id/close', { preHandler: gate('REAL_TOGETHER') }, async (req) => {
-    const u = me(req);
-    const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
-    const t = await loadTogether(id, u.id);
-    if (t.my_role !== 'creator') throw forbidden();
-    await db.query(`UPDATE togethers SET status = 'closed' WHERE id = $1`, [id]);
-    return { together: await detail(id, u.id) };
   });
 }
