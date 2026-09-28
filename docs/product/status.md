@@ -70,6 +70,8 @@ What exists for a public launch and store review, and what only the owner can do
   - The privacy policy is written from what the code collects.
   - Company name, address, governing law and contact addresses come from `LEGAL_*` and `*_EMAIL` settings.
   - In development, a banner says the pages are templates.
+  - On 2026-09-27 the pages were rewritten to match the product: watch together, weekly wraps, On this day, Ask me (the asker is always known to moderators), drops, games and send later in chats, wallpapers, username changes, sign-in alerts, profile style, the AI helpers, music licences, Plus, boosts and business insights.
+  - For the lawyer: `docs/legal/review-pack.md` has the data inventory, processors, minors, moderation, payments, AI and music, findings and 40 open questions. `docs/legal/placeholders.md` lists every placeholder to fill in.
 - **Sign-up consent:** web and phone say that creating an account accepts the Terms and confirms reading the Privacy policy, with links. A date of birth is required (see below).
 - **Account deletion and data download in the phone app:**
   - Settings > Your data (`apps/mobile/app/your-data.tsx`): "Download my data" saves the export as a JSON file through the share sheet.

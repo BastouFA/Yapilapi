@@ -29,7 +29,7 @@ export async function legalContacts(): Promise<LegalContacts> {
   return {
     entity: e.LEGAL_ENTITY_NAME || '[Company legal name]',
     address: e.LEGAL_ADDRESS || '[Registered address]',
-    jurisdiction: e.LEGAL_JURISDICTION || '[the laws of your country]',
+    jurisdiction: e.LEGAL_JURISDICTION || '[Governing law]',
     support: e.SUPPORT_EMAIL || '[support email address]',
     privacy: e.PRIVACY_EMAIL || '[privacy email address]',
     copyright: e.COPYRIGHT_EMAIL || '[copyright email address]',
