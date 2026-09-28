@@ -22,7 +22,7 @@ import {
 } from '../../../packages/shared/src/market';
 import { client, errorMessage, mediaUrl } from '../lib/api';
 import { Chip, ChipRow } from '../lib/chips';
-import { ChoiceField, FieldError } from '../lib/forms';
+import { ChoiceField, FieldError, useScrollToError } from '../lib/forms';
 import { useT } from '../lib/i18n';
 import {
   CATEGORY_KEYS,
@@ -38,7 +38,7 @@ import {
 } from '../lib/market';
 import { pickOne, uploadPicked } from '../lib/media';
 import { radius, space } from '../lib/theme';
-import { Button, Field, Icon, KeyboardAvoid, Loading, Notice, SwitchRow, useColors } from '../lib/ui';
+import { Button, Field, Icon, Loading, Notice, SwitchRow, useColors } from '../lib/ui';
 
 type Photo = { key: string; uri: string; mediaId: string | null; alt: string; progress: number | null; failed: boolean };
 /** A place: unchanged (editing), a new approximate one, or taken off. */
@@ -77,6 +77,7 @@ export default function MarketEdit() {
   const [photoDenied, setPhotoDenied] = useState(false);
   const [busy, setBusy] = useState(false);
   const keys = useRef(0);
+  const form = useScrollToError();
   const canPlace = !!marketGeolocation();
 
   // Changing a listing: start from what it says now.
@@ -164,6 +165,7 @@ export default function MarketEdit() {
     setFields(f);
     setError(null);
     if (Object.keys(f).length) {
+      form.toFirst(f);
       AccessibilityInfo.announceForAccessibility(Object.values(f)[0]!);
       return;
     }
@@ -203,8 +205,10 @@ export default function MarketEdit() {
       } else if (e instanceof ApiError && e.code === 'adults_only') setBlocked('adults_only');
       else if (e instanceof ApiError && e.code === 'birth_date_required') setBlocked('birth_date_required');
       else if (e instanceof ApiError && e.code === 'market_daily_limit') setError(t('m.market.form.dailyLimit'));
-      else if (e instanceof ApiError && e.fields && Object.keys(e.fields).length) setFields(e.fields);
-      else setError(errorMessage(e));
+      else if (e instanceof ApiError && e.fields && Object.keys(e.fields).length) {
+        setFields(e.fields);
+        form.toFirst(e.fields);
+      } else setError(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -232,11 +236,13 @@ export default function MarketEdit() {
   const full = photos.length >= MARKET_MAX_PHOTOS;
 
   return (
-    <KeyboardAvoid>
+    <View style={{ flex: 1 }}>
       <ScrollView
+        ref={form.ref}
         style={{ backgroundColor: c.ground }}
         contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
       >
         <Stack.Screen options={{ title: editing ? t('m.market.editTitle') : t('m.market.sell') }} />
         <Notice>{t('m.market.form.inPerson')}</Notice>
@@ -244,7 +250,7 @@ export default function MarketEdit() {
           <Text style={{ color: c.inkMuted, fontSize: 13 }}>{tp('m.market.leftToday', me.listingsLeftToday)}</Text>
         ) : null}
 
-        <View style={{ gap: space[2] }}>
+        <View onLayout={form.at('photos')} style={{ gap: space[2] }}>
           <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.market.photos')}</Text>
           <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('m.market.photosHint', { max: MARKET_MAX_PHOTOS })}</Text>
           {photos.map((p, i) => (
@@ -296,9 +302,11 @@ export default function MarketEdit() {
           <FieldError text={fields.photos} />
         </View>
 
-        <Field label={t('m.market.form.title')} value={title} onChangeText={setTitle} maxLength={MARKET_TITLE_MAX} error={fields.title} />
+        <View onLayout={form.at('title')}>
+          <Field label={t('m.market.form.title')} value={title} onChangeText={setTitle} maxLength={MARKET_TITLE_MAX} error={fields.title} />
+        </View>
 
-        <View style={{ gap: space[2] }}>
+        <View onLayout={form.at('price')} style={{ gap: space[2] }}>
           <SwitchRow label={t('m.market.form.free')} value={free} onValueChange={setFree} />
           {!free ? (
             <Field
@@ -320,7 +328,7 @@ export default function MarketEdit() {
           options={MARKET_CONDITIONS.map((k) => ({ id: k, label: t(CONDITION_KEYS[k]) }))}
         />
 
-        <View style={{ gap: space[2] }}>
+        <View onLayout={form.at('category')} style={{ gap: space[2] }}>
           <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.market.form.category')}</Text>
           <ChipRow radios label={t('m.market.form.category')}>
             {MARKET_CATEGORIES.map((k) => (
@@ -330,26 +338,30 @@ export default function MarketEdit() {
           <FieldError text={fields.category} />
         </View>
 
-        <Field
-          label={t('m.market.form.description')}
-          value={description}
-          onChangeText={setDescription}
-          maxLength={MARKET_DESCRIPTION_MAX}
-          multiline
-          style={{ minHeight: 110, paddingTop: space[2], textAlignVertical: 'top' }}
-          error={fields.description}
-        />
+        <View onLayout={form.at('description')}>
+          <Field
+            label={t('m.market.form.description')}
+            value={description}
+            onChangeText={setDescription}
+            maxLength={MARKET_DESCRIPTION_MAX}
+            multiline
+            style={{ minHeight: 110, paddingTop: space[2], textAlignVertical: 'top' }}
+            error={fields.description}
+          />
+        </View>
 
-        <Field
-          label={t('m.market.form.area')}
-          hint={t('m.market.form.areaHint')}
-          value={area}
-          onChangeText={setArea}
-          maxLength={MARKET_AREA_MAX}
-          error={fields.area}
-        />
+        <View onLayout={form.at('area')}>
+          <Field
+            label={t('m.market.form.area')}
+            hint={t('m.market.form.areaHint')}
+            value={area}
+            onChangeText={setArea}
+            maxLength={MARKET_AREA_MAX}
+            error={fields.area}
+          />
+        </View>
 
-        <View style={{ gap: space[2] }}>
+        <View onLayout={form.at('place')} style={{ gap: space[2] }}>
           {canPlace ? (
             place.kind === 'none' ? (
               <>
@@ -375,7 +387,7 @@ export default function MarketEdit() {
           <FieldError text={fields.place} />
         </View>
 
-        <View style={{ gap: space[2] }}>
+        <View onLayout={form.at('delivery')} style={{ gap: space[2] }}>
           <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.market.form.delivery')}</Text>
           <ChipRow label={t('m.market.form.delivery')}>
             {MARKET_DELIVERY.map((k) => {
@@ -414,11 +426,12 @@ export default function MarketEdit() {
         ) : null}
 
         {error ? <Notice tone="danger">{error}</Notice> : null}
+        {Object.keys(fields).some((k) => k !== 'place') ? <FieldError text={t('m.common.fixAbove')} /> : null}
         {!prohibited ? (
           <Button label={busy ? t('m.common.saving') : editing ? t('common.save') : t('m.market.form.publish')} disabled={busy} onPress={() => submit(false)} />
         ) : null}
         {!editing ? <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('m.market.form.reviewNote')}</Text> : null}
       </ScrollView>
-    </KeyboardAvoid>
+    </View>
   );
 }

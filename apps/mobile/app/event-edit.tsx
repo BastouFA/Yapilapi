@@ -7,7 +7,7 @@ import type { Community, EventItem } from '../../../packages/shared/src/types';
 import { client, errorMessage } from '../lib/api';
 import { canOrganize } from '../lib/community-roles';
 import { DateField } from '../lib/date-time';
-import { ChoiceField, FieldError, isWebLink } from '../lib/forms';
+import { ChoiceField, FieldError, isWebLink, useScrollToError } from '../lib/forms';
 import { useT } from '../lib/i18n';
 import { space } from '../lib/theme';
 import { deviceTimeZone, TimeZoneField } from '../lib/time-zone';
@@ -47,6 +47,7 @@ export default function EventEdit() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
+  const form = useScrollToError();
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: editing ? t('m.eventForm.editTitle') : t('events.create') });
@@ -136,6 +137,7 @@ export default function EventEdit() {
     } catch (e) {
       setError(errorMessage(e));
       if (e instanceof ApiError && e.fields) setFields(e.fields);
+      form.toTop();
     } finally {
       setBusy(false);
     }
@@ -145,6 +147,7 @@ export default function EventEdit() {
   return (
     <KeyboardAvoid>
       <ScrollView
+        ref={form.ref}
         style={{ backgroundColor: c.ground }}
         contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
         keyboardShouldPersistTaps="handled"

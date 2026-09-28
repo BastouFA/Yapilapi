@@ -122,7 +122,6 @@ function Details({ community, onSaved }: { community: Community; onSaved: (c: Co
 
   return (
     <View style={{ gap: space[3] }}>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
       <Card style={{ gap: space[3] }}>
         <Field label={t('m.communityForm.name')} value={name} onChangeText={setName} maxLength={80} />
         <FieldError text={fields.name} />
@@ -157,6 +156,7 @@ function Details({ community, onSaved }: { community: Community; onSaved: (c: Co
         <FieldError text={fields.rules ?? fields['rules.0']} />
       </Card>
       {note ? <Notice>{note}</Notice> : null}
+      {error ? <Notice tone="danger">{error}</Notice> : null}
       <Button label={busy ? t('m.common.saving') : t('common.save')} disabled={!name.trim() || busy} onPress={() => save()} />
     </View>
   );
