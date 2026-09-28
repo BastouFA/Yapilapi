@@ -37,6 +37,18 @@ function catalogCode(locale: string): string | null {
   return SUPPORTED_LOCALES.includes(base) ? base : null;
 }
 
+/**
+ * The first of a visitor's preferred languages (the browser's `navigator.languages`, most wanted
+ * first) that the app has, by base language (fr-CA → fr), or English.
+ */
+export function preferredLocale(tags: readonly (string | null | undefined)[]): string {
+  for (const tag of tags) {
+    const base = (tag ?? '').replace(/_/g, '-').split('-')[0]!.toLowerCase();
+    if (base && SUPPORTED_LOCALES.includes(base)) return base;
+  }
+  return 'en';
+}
+
 /** Make a catalog available to t() (`./i18n.ts` registers them all). */
 export function registerLocale(code: string, catalog: Catalog): void {
   loaded.set(code, catalog);

@@ -117,6 +117,50 @@ h3 {
   font-size: 14px;
   color: var(--ink-muted);
 }
+.auth__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* The language picker on signed-out pages (components/LanguagePicker.tsx) */
+.lang-pick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-muted);
+}
+.lang-pick > svg {
+  position: absolute;
+  inset-inline-start: 12px;
+  pointer-events: none;
+}
+.lang-pick__select {
+  min-height: 44px;
+  max-width: 100%;
+  padding-block: 0;
+  padding-inline: 38px 12px;
+  font: 500 14px/20px var(--font-sans);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.lang-pick__select:hover {
+  border-color: var(--ink-muted);
+}
+.lang-pick__select:focus-visible {
+  outline: none;
+  border-color: var(--yapi);
+  box-shadow: var(--focus-ring);
+}
+/* Until a page's language has loaded (lib/locale-script.ts), it stays hidden rather than show English first. */
+html[data-locale-pending] body {
+  visibility: hidden;
+}
 
 /* Landing */
 .grad-text {
@@ -8196,6 +8240,15 @@ button.yp-chip[aria-pressed='true'] {
   text-align: center;
   font-size: 13px;
   color: var(--ink-muted);
+}
+.legal-foot__lang {
+  display: flex;
+  width: fit-content;
+  margin: 0 auto var(--space-3);
+}
+.landing__lang {
+  flex-basis: 100%;
+  margin-bottom: var(--space-2);
 }
 .site-legal {
   display: flex;

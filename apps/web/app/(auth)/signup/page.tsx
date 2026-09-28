@@ -10,7 +10,7 @@ import { PasswordField } from '@/components/PasswordField';
 import { useSession } from '../../providers';
 
 function SignupForm() {
-  const { setMe, t } = useSession();
+  const { setMe, locale, t } = useSession();
   const router = useRouter();
   // From an invite link (/join/<code>): the code comes along, and we show who invited you.
   const params = useSearchParams();
@@ -55,7 +55,8 @@ function SignupForm() {
         username: String(f.get('username')),
         displayName: String(f.get('displayName')),
         birthDate,
-        locale: navigator.language,
+        // The language this page is in (the browser's, or the one picked here) becomes the account's.
+        locale,
         inviteCode: String(f.get('inviteCode') ?? '').trim() || undefined,
         website: String(f.get('website') ?? '') || undefined,
       });

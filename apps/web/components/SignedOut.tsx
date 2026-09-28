@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import { EmptyState } from '@yapilapi/design-system';
 import { useSession } from '@/app/providers';
+import { LanguagePicker } from './LanguagePicker';
 import { LegalLinks } from './Legal';
 
 /**
@@ -73,6 +74,7 @@ export function SignedOutShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       <footer className="legal-foot">
+        <LanguagePicker className="legal-foot__lang" />
         <LegalLinks />
       </footer>
     </div>

@@ -16,7 +16,7 @@ import {
 } from '@yapilapi/shared';
 import { ApiError } from '@yapilapi/api-client';
 import { api, errorMessage, sharedRequest, WS_URL } from '@/lib/api';
-import { readLocaleHint, writeLocaleHint } from '@/lib/locale-script';
+import { revealLocale, startLocale, visitorLocale, writeLocaleChoice, writeLocaleHint } from '@/lib/locale-script';
 import {
   connectionHints,
   dataSaverActive,
@@ -49,6 +49,8 @@ export interface Session {
   /** Plural-aware: picks `<key>.one` or `<key>.other` for `count`, which is also passed as {count}. */
   tp: (key: PluralKey, count: number, vars?: Record<string, string | number>) => string;
   locale: string;
+  /** Without an account: show the site in this language, and remember it on this browser. */
+  chooseLocale: (locale: string) => Promise<void>;
   dataSaver: DataSaverState;
 }
 
@@ -91,11 +93,9 @@ function isolate(locale: string, vars?: Record<string, string | number>): Record
 }
 
 // Only English comes with the page; other languages are fetched on demand (packages/shared/src/i18n-core.ts).
-// A returning reader's language starts downloading as the page's code runs, alongside the account.
-if (typeof window !== 'undefined') {
-  const hint = readLocaleHint();
-  if (hint) void loadLocale(hint);
-}
+// The language the page starts in (a returning reader's, or a visitor's) starts downloading as the
+// page's code runs, alongside the account.
+if (typeof window !== 'undefined') void loadLocale(startLocale());
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [me, setMe] = useState<Me | null>(null);
@@ -150,9 +150,26 @@ export function Providers({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // The language on screen: the account's once it is here. Before that, the one the page started in
+  // (lib/locale-script.ts), and without an account the visitor's: chosen here, else the browser's.
+  // Both are read after hydration, so the first render matches the server's English page (which
+  // stays hidden until its language is ready, when it isn't English).
+  const [start, setStart] = useState<string | null>(null);
+  const [visitor, setVisitor] = useState('en');
+  useLayoutEffect(() => {
+    setStart(startLocale());
+    setVisitor(visitorLocale());
+  }, []);
+  const chooseLocale = useCallback(async (code: string) => {
+    writeLocaleChoice(code);
+    // Switches once the language is here, so nothing shows in English on the way.
+    await loadLocale(code);
+    setVisitor(code);
+  }, []);
+
   // The reader's language, when it isn't loaded yet (signing in, switching accounts): the app waits
   // for it as it waits for the account. A catalog that can't be fetched leaves the text in English.
-  const locale = me?.locale ?? 'en';
+  const locale = me?.locale ?? (meLoading ? (start ?? 'en') : visitor);
   const [fetched, setFetched] = useState<string | null>(null);
   const ready = localeReady(locale) || fetched === locale;
   useEffect(() => {
@@ -174,8 +191,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   // <html lang> and dir follow the language on screen, before the browser paints it (so Arabic never
-  // shows left to right first), and this browser remembers it for the next page load
-  // (lib/locale-script.ts). Signed out, pages are in English again.
+  // shows left to right first), and this browser remembers a signed-in reader's for the next page
+  // load (lib/locale-script.ts). Signed out, pages follow the visitor's language.
   const signedIn = !!me;
   useLayoutEffect(() => {
     if (loading) return;
@@ -183,6 +200,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     document.documentElement.dir = isRtl(locale) ? 'rtl' : 'ltr';
     writeLocaleHint(signedIn ? locale : null);
   }, [loading, locale, signedIn]);
+  // The page's first language is ready and rendered: show the page (hidden until then when it isn't English).
+  useLayoutEffect(() => {
+    if (start !== null && ready) revealLocale();
+  }, [start, ready]);
 
   // Unread counts, then realtime updates. The socket reconnects with backoff.
   useEffect(() => {
@@ -279,6 +300,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         t,
         tp,
         locale,
+        chooseLocale,
         dataSaver: { account: accountSaver, device: deviceSaver, mode: saverMode, active: saverOn, hints, setDevice },
       }}
     >
