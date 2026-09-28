@@ -679,10 +679,12 @@ h3 {
 /*
  * The composer (and on phones the navigation) stays at the bottom over the messages.
  * Scrolling to the newest message, or to a message's buttons with Tab, stops above
- * them so nothing focused or tappable sits underneath (WCAG 2.4.11, 2.5.8).
+ * them so nothing focused or tappable sits underneath (WCAG 2.4.11, 2.5.8). On phones
+ * that is the navigation's 88px plus the composer, whose text box has a row of its own
+ * over the buttons (about 96px).
  */
 :root:has(.chat-page) {
-  scroll-padding-bottom: calc(160px + env(safe-area-inset-bottom, 0px));
+  scroll-padding-bottom: calc(200px + env(safe-area-inset-bottom, 0px));
 }
 @media (min-width: 900px) {
   :root:has(.chat-page) {

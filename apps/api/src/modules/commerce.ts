@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import type { Pool } from 'pg';
 import { tx } from '@yapilapi/database';
 import { createBusinessSchema, createOrderSchema, createPlaceSchema, createProductSchema, PLACE_CATEGORIES } from '@yapilapi/shared';
 import { z } from 'zod';
@@ -16,7 +17,7 @@ import { eventVisibleSql, liveVisibleSql } from '../lib/visibility.ts';
 import { liveChatAudience } from '../lib/live.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
 import { grantPlus } from '../lib/plus.ts';
-import { refundOrder, startPayment } from '../lib/checkout.ts';
+import { refundOrder, revokeRefundedOrder, startPayment } from '../lib/checkout.ts';
 import { assertDigitalCheckoutAllowed } from '../lib/store-purchases.ts';
 import { confirmDropOrder, dropGateSql, publishDropChange, releaseDropOrder, takeDropStock } from '../lib/drops.ts';
 import { issueOrderTickets, publishDoor } from '../lib/tickets.ts';
@@ -463,15 +464,18 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       return { error: { code: 'bad_signature', message: 'Webhook signature is invalid.' } };
     }
     if (!event) return { ok: true, ignored: true };
-    const fresh = await db.query(`INSERT INTO payment_webhook_events (id, provider, type, payload) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`, [
-      event.id,
-      provider,
-      event.type,
-      event,
-    ]);
-    if (!fresh.rowCount) return { ok: true, duplicate: true };
+    let duplicate = false;
     let ticketEvents: string[] = [];
     await tx(db, async (c) => {
+      // Recorded with its effects in one transaction: if handling it fails, nothing is kept and the provider's retry runs it again.
+      const fresh = await c.query(
+        `INSERT INTO payment_webhook_events (id, provider, type, payload, processed_at) VALUES ($1,$2,$3,$4,now()) ON CONFLICT DO NOTHING`,
+        [event.id, provider, event.type, event],
+      );
+      if (!fresh.rowCount) {
+        duplicate = true;
+        return;
+      }
       const pay = await c.query(`SELECT id, order_id, amount_cents, currency, status FROM payments WHERE provider = $1 AND provider_ref = $2 FOR UPDATE`, [
         provider,
         event.providerRef,
@@ -505,6 +509,20 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
           await refundOrder(c, ctx.paymentProviders, p.order_id, null, 'The drop items were no longer available when the payment arrived');
           return;
         }
+        // Stock is only taken once an order is paid, so it can sell out while a payment is on its way: that money goes straight back.
+        await c.query(
+          `SELECT 1 FROM products WHERE id IN (SELECT product_id FROM order_items WHERE order_id = $1) AND inventory IS NOT NULL ORDER BY id FOR UPDATE`,
+          [p.order_id],
+        );
+        const short = await c.query(
+          `SELECT 1 FROM order_items oi JOIN products pd ON pd.id = oi.product_id
+           WHERE oi.order_id = $1 AND pd.inventory IS NOT NULL GROUP BY pd.id, pd.inventory HAVING pd.inventory < sum(oi.quantity)`,
+          [p.order_id],
+        );
+        if (short.rowCount) {
+          await refundOrder(c, ctx.paymentProviders, p.order_id, null, 'Sold out before the payment arrived');
+          return;
+        }
         await c.query(
           `UPDATE products pd SET inventory = pd.inventory - oi.quantity FROM order_items oi WHERE oi.order_id = $1 AND oi.product_id = pd.id AND pd.inventory IS NOT NULL`,
           [p.order_id],
@@ -512,10 +530,15 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
         const o = (await c.query(`SELECT buyer_id, purpose, payee_id FROM orders WHERE id = $1`, [p.order_id])).rows[0];
         track(db, o.buyer_id, 'order_paid', { purpose: o.purpose });
         if (o.purpose === 'subscription') {
-          await c.query(
+          const started = await c.query(
             `UPDATE creator_subscriptions SET status = 'active', current_period_end = now() + interval '30 days' WHERE order_id = $1 AND status = 'pending'`,
             [p.order_id],
           );
+          // Cancelled (or replaced by a new one) before this payment arrived: the money goes straight back.
+          if (!started.rowCount) {
+            await refundOrder(c, ctx.paymentProviders, p.order_id, null, 'The subscription was cancelled before the payment arrived');
+            return;
+          }
           await notify(c, ctx.realtime, {
             userId: o.payee_id,
             category: 'creators',
@@ -591,14 +614,24 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
           .rows;
         await releaseDropOrder(c, p.order_id);
         for (const d of drops) await publishDropChange(c, ctx.realtime, d.drop_id);
+      } else if (event.type === 'refund.succeeded' || event.type === 'payment.disputed') {
+        // The money went back outside the app (from the provider's dashboard, or a chargeback): undo what it paid for, as a refund here does.
+        // A refund made here arrives too, but its order is already refunded and nothing happens.
+        const reason = event.type === 'payment.disputed' ? 'The buyer disputed the payment' : 'Refunded at the payment provider';
+        if (await revokeRefundedOrder(c, p.order_id, reason)) {
+          await audit(c, { action: 'order.refunded_outside', entityType: 'order', entityId: p.order_id, metadata: { type: event.type } });
+          ticketEvents = (await c.query<{ event_id: string }>(`SELECT DISTINCT event_id FROM event_tickets WHERE order_id = $1`, [p.order_id])).rows.map(
+            (r) => r.event_id,
+          );
+        }
       }
     });
-    await db.query(`UPDATE payment_webhook_events SET processed_at = now() WHERE id = $1`, [event.id]);
+    if (duplicate) return { ok: true, duplicate: true };
     for (const eventId of ticketEvents) await publishDoor(db, ctx.realtime, eventId);
     return { ok: true };
   });
 
-  /** Refund workflow: the seller or a platform admin can refund a paid order. */
+  /** Refund workflow: the seller (when everything in the order is theirs) or a platform admin can refund a paid order. */
   app.post('/v1/orders/:id/refund', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
@@ -606,7 +639,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     const done = await tx(db, async (c) => {
       const o = await c.query(
         `SELECT o.id, o.status,
-                EXISTS (SELECT 1 FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id AND p.seller_id = $2) AS is_seller
+                coalesce((SELECT bool_and(p.seller_id = $2) FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id), false) AS is_seller
          FROM orders o WHERE o.id = $1 AND EXISTS (SELECT 1 FROM payments pay WHERE pay.order_id = o.id) FOR UPDATE OF o`,
         [id, u.id],
       );
@@ -626,27 +659,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
 
   /** Seller earnings and payout requests. Payouts need verification before they are paid. */
   app.get('/v1/me/earnings', { preHandler: requireAuth }, async (req) => {
-    const u = me(req);
-    const { rows } = await db.query(
-      `SELECT currency, sum(gross) AS gross, sum(fees) AS fees FROM (
-         SELECT o.currency, oi.quantity * oi.unit_cents AS gross, round(oi.quantity * oi.unit_cents * ${PLATFORM_FEE_BPS} / 10000.0) AS fees
-         FROM order_items oi JOIN orders o ON o.id = oi.order_id JOIN products p ON p.id = oi.product_id
-         WHERE p.seller_id = $1 AND o.status = 'paid'
-         UNION ALL
-         SELECT o.currency, o.total_cents, o.platform_fee_cents FROM orders o WHERE o.payee_id = $1 AND o.status = 'paid' AND o.purpose IN ('subscription', 'tip')
-       ) x GROUP BY currency`,
-      [u.id],
-    );
-    const payouts = await db.query(`SELECT currency, sum(amount_cents) AS paid FROM payouts WHERE user_id = $1 AND status <> 'failed' GROUP BY currency`, [
-      u.id,
-    ]);
-    return {
-      balances: rows.map((r) => {
-        const net = Number(r.gross) - Number(r.fees);
-        const paid = Number(payouts.rows.find((p) => p.currency === r.currency)?.paid ?? 0);
-        return { currency: r.currency, grossCents: Number(r.gross), feeCents: Number(r.fees), availableCents: net - paid };
-      }),
-    };
+    return { balances: await earnings(db, me(req).id) };
   });
 
   app.post('/v1/me/payouts', { preHandler: requireAuth }, async (req, reply) => {
@@ -654,19 +667,28 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     const input = parse(z.object({ amountCents: z.number().int().positive(), currency: z.string().length(3).toUpperCase() }), req.body);
     if (!u.emailVerified) throw forbidden('Verify your email before requesting a payout.');
     await assertAdultForMoney(db, u.id);
-    const { rows } = await db.query(`INSERT INTO payouts (user_id, amount_cents, currency) VALUES ($1,$2,$3) RETURNING id, status`, [
-      u.id,
-      input.amountCents,
-      input.currency,
-    ]);
-    await audit(db, { actorId: u.id, action: 'payout.request', entityType: 'payout', entityId: rows[0].id, metadata: input });
+    const payout = await tx(db, async (c) => {
+      // One request at a time per person, so two at once can't both spend the same balance.
+      await c.query(`SELECT pg_advisory_xact_lock(hashtext('payout:' || $1))`, [u.id]);
+      const available = (await earnings(c, u.id)).find((b) => b.currency === input.currency)?.availableCents ?? 0;
+      if (input.amountCents > available) throw badRequest('That is more than you have available to pay out.', { availableCents: Math.max(0, available) });
+      return (
+        await c.query(`INSERT INTO payouts (user_id, amount_cents, currency) VALUES ($1,$2,$3) RETURNING id, status`, [u.id, input.amountCents, input.currency])
+      ).rows[0];
+    });
+    await audit(db, { actorId: u.id, action: 'payout.request', entityType: 'payout', entityId: payout.id, metadata: input });
     reply.code(201);
-    return { payout: rows[0], message: 'Payout requested. It will be paid after verification.' };
+    return { payout, message: 'Payout requested. It will be paid after verification.' };
   });
 
   app.get('/v1/admin/payouts', { preHandler: requireRole('admin') }, async () => {
     const { rows } = await db.query(`SELECT id, user_id, amount_cents, currency, status, created_at FROM payouts WHERE status = 'pending' ORDER BY created_at`);
-    return { items: rows };
+    // What each person still has in that currency with their pending payouts taken off: below zero means refunds have left it uncovered.
+    const balances = new Map<string, Awaited<ReturnType<typeof earnings>>>();
+    for (const r of rows) if (!balances.has(r.user_id)) balances.set(r.user_id, await earnings(db, r.user_id));
+    return {
+      items: rows.map((r) => ({ ...r, available_cents: balances.get(r.user_id)!.find((b) => b.currency === r.currency)?.availableCents ?? 0 })),
+    };
   });
 
   app.post('/v1/admin/payouts/:id/verify', { preHandler: requireRole('admin') }, async (req) => {
@@ -675,10 +697,43 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     if (!payout) throw notFound('Payout');
     // Payouts only go to adults, whatever was requested before the rule.
     await assertAdultForMoney(db, payout.user_id, false);
-    const r = await db.query(`UPDATE payouts SET status = 'verified' WHERE id = $1 AND status = 'pending'`, [id]);
-    if (!r.rowCount) throw notFound('Payout');
+    await tx(db, async (c) => {
+      await c.query(`SELECT pg_advisory_xact_lock(hashtext('payout:' || $1))`, [payout.user_id]);
+      const p = (await c.query(`SELECT currency FROM payouts WHERE id = $1 AND status = 'pending' FOR UPDATE`, [id])).rows[0];
+      if (!p) throw notFound('Payout');
+      // Refunds since the request can leave less than was asked for (pending payouts already count as spent).
+      const available = (await earnings(c, payout.user_id)).find((b) => b.currency === p.currency)?.availableCents ?? 0;
+      if (available < 0) throw badRequest('Refunds since this request leave the person without enough earnings to cover it.');
+      await c.query(`UPDATE payouts SET status = 'verified' WHERE id = $1`, [id]);
+    });
     await audit(db, { actorId: me(req).id, action: 'payout.verify', entityType: 'payout', entityId: id });
     return { status: 'verified' };
+  });
+}
+
+/** What someone earned per currency, after the platform fee, and what's left once payouts (other than failed ones) are taken off. */
+async function earnings(q: Pick<Pool, 'query'>, userId: string) {
+  const { rows } = await q.query(
+    `SELECT currency, sum(gross) AS gross, sum(fees) AS fees FROM (
+       SELECT o.currency, oi.quantity * oi.unit_cents AS gross, round(oi.quantity * oi.unit_cents * ${PLATFORM_FEE_BPS} / 10000.0) AS fees
+       FROM order_items oi JOIN orders o ON o.id = oi.order_id JOIN products p ON p.id = oi.product_id
+       WHERE p.seller_id = $1 AND o.status = 'paid'
+       UNION ALL
+       SELECT o.currency, o.total_cents, o.platform_fee_cents FROM orders o WHERE o.payee_id = $1 AND o.status = 'paid' AND o.purpose IN ('subscription', 'tip')
+     ) x GROUP BY currency`,
+    [userId],
+  );
+  const payouts = await q.query(`SELECT currency, sum(amount_cents) AS paid FROM payouts WHERE user_id = $1 AND status <> 'failed' GROUP BY currency`, [
+    userId,
+  ]);
+  // Payouts count even in a currency with nothing earned any more (refunded since), which leaves less than nothing available.
+  const currencies = [...new Set<string>([...rows.map((r) => r.currency), ...payouts.rows.map((p) => p.currency)])];
+  return currencies.map((currency) => {
+    const r = rows.find((x) => x.currency === currency);
+    const gross = Number(r?.gross ?? 0);
+    const fees = Number(r?.fees ?? 0);
+    const paid = Number(payouts.rows.find((p) => p.currency === currency)?.paid ?? 0);
+    return { currency, grossCents: gross, feeCents: fees, availableCents: gross - fees - paid };
   });
 }
 

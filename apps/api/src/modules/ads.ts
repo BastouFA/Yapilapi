@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
 import { z } from 'zod';
+import { CURRENCIES, CURRENCY_SCALE, type Currency } from '@yapilapi/shared';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { hydratePosts } from '../lib/posts.ts';
@@ -16,6 +17,13 @@ import { startPayment } from '../lib/checkout.ts';
 import { assertDigitalCheckoutAllowed } from '../lib/store-purchases.ts';
 
 const FREQUENCY_CAP_PER_DAY = 3;
+
+/** How many hundredths of a currency are worth one US cent, roughly; 1 for a currency we don't list. */
+const scaleOf = (currency: string) => CURRENCY_SCALE[currency.trim().toUpperCase() as Currency] ?? 1;
+/** The same in SQL for a campaign `c`, so bids in different currencies are compared at about their real worth. */
+const SCALE_SQL = `(CASE upper(trim(c.currency)) ${Object.entries(CURRENCY_SCALE)
+  .map(([k, v]) => `WHEN '${k}' THEN ${v}`)
+  .join(' ')} ELSE 1 END)`;
 
 /**
  * Sponsored posts. An advertiser promotes one of their own public posts and
@@ -79,8 +87,9 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
       )
       .max(20)
       .default([]),
-    cpmCents: z.number().int().min(100).max(10_000).default(500),
-    currency: z.string().length(3).toUpperCase().default('USD'),
+    /** The price of 1,000 impressions in the campaign's currency; limits and the default scale with it (see CURRENCY_SCALE). */
+    cpmCents: z.number().int().positive().optional(),
+    currency: z.enum(CURRENCIES).default('USD'),
     startsAt: z.coerce.date().optional(),
     endsAt: z.coerce.date().optional(),
     /** Run the campaign for one of your businesses; its insights then show these ads. */
@@ -92,6 +101,11 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
     const u = me(req);
     const input = parse(campaignInput, req.body);
     if (input.startsAt && input.endsAt && input.endsAt <= input.startsAt) throw badRequest('The end must be after the start.');
+    // Bids are in the campaign's currency, so the limits are about the same in every currency ($1 to $100 per 1,000 impressions).
+    const scale = CURRENCY_SCALE[input.currency];
+    const cpmCents = input.cpmCents ?? 500 * scale;
+    if (cpmCents < 100 * scale || cpmCents > 10_000 * scale)
+      throw badRequest(`The price of 1,000 impressions must be between ${100 * scale} and ${10_000 * scale} hundredths of ${input.currency}.`);
     const post = (await db.query(`SELECT author_id, visibility, moderation_status, deleted_at, status FROM posts WHERE id = $1`, [input.postId])).rows[0];
     if (!post || post.deleted_at || post.status !== 'published') throw notFound('Post');
     if (post.author_id !== u.id) throw forbidden('You can only promote your own posts.');
@@ -110,7 +124,7 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
         input.name,
         input.topics,
         input.locales,
-        input.cpmCents,
+        cpmCents,
         input.currency,
         input.startsAt ?? null,
         input.endsAt ?? null,
@@ -196,8 +210,12 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
     assertDigitalCheckoutAllowed(req, ctx.config, 'ad_budget');
     const u = me(req);
     const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
-    const input = parse(z.object({ amountCents: z.number().int().min(500).max(1_000_000), idempotencyKey: z.string().min(8).max(100) }), req.body);
+    const input = parse(z.object({ amountCents: z.number().int().positive(), idempotencyKey: z.string().min(8).max(100) }), req.body);
     const c = await mine(id, u.id);
+    // $5 to $10,000, in the campaign's currency.
+    const scale = scaleOf(c.currency);
+    if (input.amountCents < 500 * scale || input.amountCents > 1_000_000 * scale)
+      throw badRequest(`A budget must be between ${500 * scale} and ${1_000_000 * scale} hundredths of ${c.currency.trim()}.`);
     if (c.status === 'ended' || c.status === 'rejected') throw new AppError(409, 'conflict', 'This campaign has finished.');
     const result = await tx(db, async (q) => {
       const { rows } = await q.query(
@@ -276,7 +294,7 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
          AND p.visibility = 'public' AND p.moderation_status = 'normal' AND ${postVisibleSql('$1')}
          AND NOT EXISTS (SELECT 1 FROM ad_events e WHERE e.campaign_id = c.id AND e.user_id = $1 AND e.kind = 'hide')
          AND (SELECT count(*) FROM ad_events e WHERE e.campaign_id = c.id AND e.user_id = $1 AND e.kind = 'impression' AND e.created_at > now() - interval '1 day') < ${FREQUENCY_CAP_PER_DAY}
-       ORDER BY c.cpm_cents DESC, random() LIMIT 5`,
+       ORDER BY c.cpm_cents::numeric / ${SCALE_SQL} DESC, random() LIMIT 5`,
       [u.id],
     );
     for (const cand of rows) {
