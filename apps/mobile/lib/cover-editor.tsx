@@ -402,7 +402,7 @@ export function CoverEditor({
               </>
             )}
           </ScrollView>
-          <Text style={{ color: c.inkMuted, fontSize: 12 }}>{t('m.editor.previewNote')}</Text>
+          <Text style={{ color: c.inkMuted, fontSize: 12 }}>{t('coverEditor.saveNote')}</Text>
         </View>
       </View>
     </Modal>

@@ -4465,6 +4465,7 @@ const en = {
   'together.notif.request': '{name} asked to join {title}',
   'together.notif.approved': "You're in {title}",
   'm.report.title.togetherItem': 'Report this photo or video',
+  'coverEditor.saveNote': 'The preview is close to the result. Your edits are applied when you save.',
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -8960,6 +8961,7 @@ const fr: Catalog = {
   'together.notif.request': '{name} a demandé à rejoindre {title}',
   'together.notif.approved': 'Tu fais partie de {title}',
   'm.report.title.togetherItem': 'Signaler cette photo ou vidéo',
+  'coverEditor.saveNote': 'L’aperçu est proche du résultat. Tes modifications sont appliquées à l’enregistrement.',
 };
 
 const ar: Catalog = {
@@ -13401,6 +13403,7 @@ const ar: Catalog = {
   'together.notif.request': 'طلب {name} الانضمام إلى {title}',
   'together.notif.approved': 'أصبحت في {title}',
   'm.report.title.togetherItem': 'الإبلاغ عن هذه الصورة أو الفيديو',
+  'coverEditor.saveNote': 'المعاينة قريبة من النتيجة. تُطبَّق تعديلاتك عند الحفظ.',
 };
 
 const es: Catalog = {
@@ -17877,6 +17880,7 @@ const es: Catalog = {
   'together.notif.request': '{name} pidió unirse a {title}',
   'together.notif.approved': 'Ya estás en {title}',
   'm.report.title.togetherItem': 'Denunciar esta foto o vídeo',
+  'coverEditor.saveNote': 'La vista previa se parece al resultado. Tus cambios se aplican al guardar.',
 };
 
 const pt: Catalog = {
@@ -22345,6 +22349,7 @@ const pt: Catalog = {
   'together.notif.request': '{name} pediu para entrar em {title}',
   'together.notif.approved': 'Você está em {title}',
   'm.report.title.togetherItem': 'Denunciar esta foto ou vídeo',
+  'coverEditor.saveNote': 'A prévia é próxima do resultado. Suas edições são aplicadas ao salvar.',
 };
 
 const sw: Catalog = {
@@ -26819,6 +26824,7 @@ const sw: Catalog = {
   'together.notif.request': '{name} ameomba kujiunga na {title}',
   'together.notif.approved': 'Uko ndani ya {title}',
   'm.report.title.togetherItem': 'Ripoti picha au video hii',
+  'coverEditor.saveNote': 'Muonekano huu unakaribiana na matokeo. Mabadiliko yako yanatumika unapohifadhi.',
 };
 
 const yo: Catalog = {
@@ -31281,6 +31287,7 @@ const yo: Catalog = {
   'together.notif.request': '{name} béèrè láti darapọ̀ mọ́ {title}',
   'together.notif.approved': 'O ti wà nínú {title}',
   'm.report.title.togetherItem': 'Fi ẹjọ́ fọ́tò tàbí fídíò yìí sùn',
+  'coverEditor.saveNote': 'Àwòtẹ́lẹ̀ yìí sún mọ́ àbájáde. A ó lo àtúnṣe rẹ nígbà tí o bá fi pamọ́.',
 };
 
 const ha: Catalog = {
@@ -35756,6 +35763,7 @@ const ha: Catalog = {
   'together.notif.request': '{name} ya nemi shiga {title}',
   'together.notif.approved': 'Ka shiga {title}',
   'm.report.title.togetherItem': 'Kai rahoton wannan hoto ko bidiyo',
+  'coverEditor.saveNote': 'Samfoti ya kusa da sakamakon. Ana amfani da gyaran ka idan ka adana.',
 };
 
 export const CATALOGS: Record<string, Catalog> = { en, fr, ar, es, pt, sw, yo, ha };

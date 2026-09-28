@@ -1,7 +1,20 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, Platform, Pressable, RefreshControl, Share, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Platform,
+  Pressable,
+  RefreshControl,
+  Share,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import type { Post, Profile } from '../../../packages/shared/src/types';
 import type { ProfileTab } from '../../../packages/shared/src/profile-style';
 import { client, errorMessage, mediaUrl, webUrl } from './api';
@@ -652,6 +665,9 @@ function Cover({
 }) {
   const c = useColors();
   const { t, number } = useT();
+  // The band spans the screen edge to edge (the page has space[4] padding on each side). Sized from the
+  // window rather than aspectRatio, which made it wider than the screen and pushed its button off it.
+  const { width: screenWidth } = useWindowDimensions();
   // 'cover': the photo, or the accent gradient without one. 'gradient': always the gradient. 'clean': no band.
   const header = profile.style?.header ?? 'cover';
   if (header === 'clean' && !upload) return null;
@@ -661,7 +677,8 @@ function Cover({
     <View
       style={{
         // Cover photos are 8:3 (COVER_RATIO), as on the web, so the band shows what was framed in the editor.
-        ...(uri ? { aspectRatio: COVER_RATIO } : { height: 104 }),
+        width: screenWidth,
+        height: uri ? Math.round(screenWidth / COVER_RATIO) : 104,
         marginHorizontal: -space[4],
         marginTop: -space[4],
         backgroundColor: c.surfaceSunken,
