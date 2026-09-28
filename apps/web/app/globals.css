@@ -10521,3 +10521,157 @@ button.profile-song__play::after {
   border-radius: var(--radius-md);
   background: var(--surface-sunken);
 }
+
+/* ── Sharing where you are (components/ChatLocation.tsx) ─────────────────── */
+.chat-location {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: min(260px, 64vw);
+  white-space: normal;
+}
+/* The map sits on its own panel, so it reads the same in anyone's bubble colour and in dark mode. */
+.location-map {
+  display: block;
+  inline-size: 100%;
+  max-inline-size: 320px;
+  block-size: auto;
+  aspect-ratio: 2 / 1;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.location-map__ground {
+  fill: var(--surface-sunken);
+}
+.location-map__park {
+  fill: var(--success-soft);
+}
+.location-map__road {
+  stroke: var(--line);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.location-map__road--major {
+  stroke: var(--line-strong);
+  stroke-width: 6;
+}
+.location-map__area {
+  fill: var(--yapi-soft);
+  fill-opacity: 0.7;
+  stroke: var(--yapi);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+.location-map__pin path {
+  fill: var(--yapi);
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+.location-map__pin circle {
+  fill: var(--surface);
+}
+.location-map--ended .location-map__pin path {
+  fill: var(--ink-muted);
+}
+.location-map--ended .location-map__road,
+.location-map--ended .location-map__park {
+  opacity: 0.6;
+}
+.location-map__you line {
+  stroke: var(--ink-muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+}
+.location-map__you circle {
+  fill: var(--ink);
+  stroke: var(--surface);
+  stroke-width: 2.5;
+}
+.location-map__you text {
+  fill: var(--ink);
+  font: 700 10px/1 var(--font-sans);
+  paint-order: stroke;
+  stroke: var(--surface-sunken);
+  stroke-width: 3px;
+}
+.chat-location__status {
+  margin: 0;
+  font: 600 13px/18px var(--font-sans);
+}
+.chat-location__distance {
+  margin: 0;
+  font: 700 14px/20px var(--font-sans);
+}
+.chat-location__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.location-choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.location-choice {
+  align-items: center;
+}
+@media (max-width: 360px) {
+  .location-choices {
+    grid-template-columns: 1fr;
+  }
+}
+.location-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 20px;
+}
+.location-problem {
+  margin: 0;
+  color: var(--danger);
+  font-size: 14px;
+  line-height: 20px;
+}
+/* "You're sharing where you are until 14:30", with Stop: stays at the top of the chat while you share. */
+.location-banner {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--yapi);
+  border-radius: var(--radius-lg);
+  background: var(--yapi-soft);
+  color: var(--ink);
+}
+.location-banner__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--yapi);
+  color: var(--on-yapi);
+}
+.location-banner__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  line-height: 20px;
+}
+.location-banner .yp-btn {
+  min-height: 44px;
+}

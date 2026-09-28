@@ -82,6 +82,9 @@ import type {
   ChatPoll,
   ChatReminder,
   ChatGame,
+  LocationDuration,
+  LocationPrecision,
+  LocationShare,
   DrawAction,
   GameKind,
   GameMove,
@@ -776,6 +779,26 @@ export function createClient(opts: ClientOptions) {
         post<{ message: Message }>(`/v1/conversations/${id}/games`, input),
       /** The games going in this chat (one of each kind at most). */
       games: (id: string) => get<{ items: ChatGame[] }>(`/v1/conversations/${id}/games`),
+      /**
+       * Share where you are with this chat: live for `minutes` (15, 60 or 480), or once. Approximate points
+       * should already be snapped on the device (pointFor); the server snaps them again.
+       */
+      shareLocation: (
+        id: string,
+        input: {
+          mode: 'live' | 'once';
+          minutes?: LocationDuration;
+          precision: LocationPrecision;
+          lat: number;
+          lng: number;
+          accuracy?: number;
+          clientId?: string;
+        },
+      ) => post<{ message: Message }>(`/v1/conversations/${id}/location`, input),
+      /** Live shares running in this chat that you can see, yours included. */
+      locationShares: (id: string) => get<{ items: LocationShare[] }>(`/v1/conversations/${id}/location-shares`),
+      /** Ask the others here where they are (a line with a button to share; each person chooses). */
+      askLocation: (id: string) => post<{ message: Message }>(`/v1/conversations/${id}/location/request`),
       createPlan: (id: string, title: string, details: Record<string, unknown>) => post(`/v1/conversations/${id}/plans`, { title, details }),
       plans: (id: string) => get<{ items: { id: string; title: string; details: Record<string, unknown>; status: string }[] }>(`/v1/conversations/${id}/plans`),
       /** Your messages waiting to be sent here (and ones that couldn't be), soonest first. Only you see them. */
@@ -813,6 +836,21 @@ export function createClient(opts: ClientOptions) {
       /** Share it as a post (its card), with your words or its name. */
       post: (id: string, b: { body?: string; visibility?: 'public' | 'followers' | 'friends' }) =>
         post<{ post: Post; moderation?: { status: string; message: string } }>(`/v1/mixes/${id}/post`, b),
+    },
+    location: {
+      /** A new point on your live share: at most one every 10 seconds (429 `location_too_soon` otherwise). */
+      update: (id: string, point: { lat: number; lng: number; accuracy?: number }) =>
+        post<{ location: LocationShare }>(`/v1/location-shares/${id}/point`, point),
+      /** Stop sharing now; the point is deleted. */
+      stop: (id: string) => post<{ location: LocationShare }>(`/v1/location-shares/${id}/stop`),
+      /** Stop as the page closes: the request is sent even as the page goes away (no answer is read). */
+      stopOnPageClose: (id: string) => {
+        const headers: Record<string, string> = { 'content-type': 'application/json', ...(opts.headers?.() ?? {}) };
+        if (opts.token) headers.authorization = `Bearer ${opts.token}`;
+        void f(`${opts.baseUrl}/v1/location-shares/${id}/stop`, { method: 'POST', headers, body: '{}', credentials: 'include', keepalive: true }).catch(
+          () => {},
+        );
+      },
     },
     games: {
       get: (id: string) => get<{ game: ChatGame }>(`/v1/games/${id}`),

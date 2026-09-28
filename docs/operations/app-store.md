@@ -435,6 +435,7 @@ The fuller, table-by-table inventory, with retention periods and processors, is 
   - post and story views, reel resume position, feed feedback, ad events;
   - daily minutes (`usage_days`).
 - **Country:** from the CDN header, used for regional rules and ads. The app never asks for GPS location.
+- **Location shared in chats:** today only the web asks for it (when someone taps "Share where I am"); this phone build has no location permission and can only show shared locations. When `expo-location` is added (docs/product/status.md), update this page before submitting: foreground-only location permissions (`ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`; iOS `NSLocationWhenInUseUsageDescription`, never "Always"), "Users can share their location: Yes" in the content rating, and "Precise location" (App functionality, linked to the person, not used for tracking) in the privacy label and data safety form.
 - **Push:** Expo push tokens and web push endpoints.
 - **Contacts:** SHA-256 of salted email addresses, computed on the device. Only email is matched, and the hashes aren't stored.
 - **Payments:**

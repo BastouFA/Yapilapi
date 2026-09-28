@@ -194,7 +194,10 @@ export class AiGateway {
       if (!member.rowCount) throw notFound('Conversation');
       const { rows } = await this.db.query<{ name: string; body: string }>(
         `SELECT p.display_name AS name, m.body FROM messages m JOIN profiles p ON p.user_id = m.sender_id
-         WHERE m.conversation_id = $1 AND m.deleted_at IS NULL ORDER BY m.created_at DESC LIMIT 200`,
+         WHERE m.conversation_id = $1 AND m.deleted_at IS NULL
+           -- Shared locations are left out: a summary never mentions where anyone is.
+           AND NOT EXISTS (SELECT 1 FROM location_shares ls WHERE ls.message_id = m.id)
+         ORDER BY m.created_at DESC LIMIT 200`,
         [req.conversationId],
       );
       return {

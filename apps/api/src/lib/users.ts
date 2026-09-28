@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { ADULT_AGE, type PublicUser } from '@yapilapi/shared';
 import { AppError } from './errors.ts';
+import { stopSharesOnBlock } from './location.ts';
 
 type Q = Pool | PoolClient;
 
@@ -47,9 +48,11 @@ export async function isBlockedEitherWay(db: Q, a: string, b: string): Promise<b
 
 /**
  * Block someone: blocking cuts every connection both ways (follows, friendship, friend requests)
- * and ends co-authoring and photo tags between the two, on either one's posts. Call inside a transaction.
+ * and ends co-authoring and photo tags between the two, on either one's posts, and either one sharing where
+ * they are with a chat the other is in. Call inside a transaction; returns the location shares it stopped,
+ * to announce once it's done (publishShares in lib/location.ts).
  */
-export async function blockUser(c: PoolClient, blocker: string, blocked: string): Promise<void> {
+export async function blockUser(c: PoolClient, blocker: string, blocked: string): Promise<string[]> {
   await c.query(`INSERT INTO blocks (blocker_id, blocked_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [blocker, blocked]);
   await c.query(`DELETE FROM follows WHERE (follower_id = $1 AND followee_id = $2) OR (follower_id = $2 AND followee_id = $1)`, [blocker, blocked]);
   const [a, b] = [blocker, blocked].sort();
@@ -67,6 +70,7 @@ export async function blockUser(c: PoolClient, blocker: string, blocked: string)
     `DELETE FROM photo_tags t USING posts p WHERE p.id = t.post_id AND ((p.author_id = $1 AND t.user_id = $2) OR (p.author_id = $2 AND t.user_id = $1))`,
     [blocker, blocked],
   );
+  return stopSharesOnBlock(c, blocker, blocked);
 }
 
 export async function areFriends(db: Q, a: string, b: string): Promise<boolean> {
