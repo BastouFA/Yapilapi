@@ -20,6 +20,7 @@ import {
   videoSrc,
   formatRelativeTime,
   isRtl,
+  postReasonText,
   safeTimeZone,
   smallAvatarUrl,
   splitRichText,
@@ -1101,6 +1102,8 @@ export function PostCard({
   onHistory,
 }: PostCardProps) {
   const tt = (k: MessageKey) => t(k, locale);
+  // Why it's in your feed, in your language.
+  const reason = postReasonText(post, { t: (k, vars) => tr(k, locale, vars) });
   /** "Like, 12": an action's name and its count, for screen readers. */
   const counted = (label: string, n: number) => `${label}${tt('m.collab.joinSep')}${new Intl.NumberFormat(locale).format(n)}`;
   const coauthors = post.collaborators ?? [];
@@ -1379,12 +1382,12 @@ export function PostCard({
         </div>
       ) : null}
 
-      {post.reason || post.aiAssisted || post.real ? (
+      {reason || post.aiAssisted || post.real ? (
         <div className="yp-post__reason">
-          {post.reason ? (
+          {reason ? (
             <>
               <Icon name="info" size={14} />
-              {post.reason}
+              {reason}
             </>
           ) : null}
           {post.aiAssisted ? <Badge tone="neutral">{tt('post.aiAssisted')}</Badge> : null}

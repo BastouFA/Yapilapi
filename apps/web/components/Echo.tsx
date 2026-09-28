@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Alert, Avatar, Button, EmptyState, Select, Skeleton, Switch, TextField } from '@yapilapi/design-system';
 import {
+  noticeText,
   ECHO_BALANCE_DEFAULT,
   ECHO_BLOCK_KEYS,
   ECHO_CUT_MAX_MS,
@@ -189,7 +190,7 @@ export function EchoComposer({ postId }: { postId: string }) {
         media: [{ id: render.media.id, url: render.media.url, kind: 'video' }],
         echo: render.id,
       });
-      toast(moderation?.message ?? t('echo.posted'));
+      toast(noticeText(moderation, t) ?? t('echo.posted'));
       router.push(`/reels?start=${created.id}`);
     } catch (e) {
       toast(errorMessage(e));

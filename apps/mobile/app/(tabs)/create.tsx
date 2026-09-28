@@ -38,6 +38,7 @@ import { clipMax, draftMusic, MusicField, musicInput, soundAsTrack, type DraftMu
 import { SchedulePicker } from '../../lib/post-edit';
 import { CaptionIdeasPanel, SuggestAltText } from '../../lib/ai-helpers';
 import { useFlag } from '../../lib/flags';
+import { noticeText } from '../../../../packages/shared/src/server-text';
 
 const VISIBILITY = [
   { id: 'public', label: 'visibility.public' },
@@ -576,11 +577,11 @@ export default function Create() {
       const r = draftId ? (await api.drafts.save(draftId, content()), await api.drafts.publish(draftId)) : await api.posts.create(content());
       clear();
       if (kind === 'reel') {
-        if (r.moderation) Alert.alert(r.moderation.message);
+        if (r.moderation) Alert.alert(noticeText(r.moderation, t) ?? r.moderation.message);
         router.push({ pathname: '/reels', params: { start: r.post.id } });
         return;
       }
-      if (r.moderation) setNote(r.moderation.message);
+      if (r.moderation) setNote(noticeText(r.moderation, t) ?? r.moderation.message);
       // Home shows the new post at the top, whatever the feed's ranking.
       else router.navigate({ pathname: '/', params: { posted: r.post.id } });
     } catch (e) {

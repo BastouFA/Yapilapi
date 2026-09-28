@@ -17,6 +17,7 @@ import {
   type MenuAction,
 } from '@yapilapi/design-system';
 import {
+  noticeText,
   ASK_ANSWER_MAX,
   ASK_FILTERS,
   ASK_SHARE_VISIBILITIES,
@@ -241,7 +242,7 @@ export default function QuestionsPage() {
                     const r = await api.questions.answer(q.id, answer, share);
                     setAnswering(null);
                     settle(r.question, q.id);
-                    toast(r.moderation?.message ?? t('ask.answer.done'));
+                    toast(noticeText(r.moderation, t) ?? t('ask.answer.done'));
                   }}
                 />
               ) : null}

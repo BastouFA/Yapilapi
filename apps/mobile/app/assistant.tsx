@@ -7,6 +7,7 @@ import { client, errorMessage } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { space } from '../lib/theme';
 import { Button, Card, Field, Notice, Row, Screen, Segmented, useColors, userText } from '../lib/ui';
+import { agentActionLabel, agentSubtitle } from '../../../packages/shared/src/server-text';
 
 const KINDS: { id: AgentKind; label: MessageKey; placeholder: MessageKey }[] = [
   { id: 'discover', label: 'm.assistant.kind.discover', placeholder: 'm.assistant.placeholder.discover' },
@@ -33,7 +34,7 @@ const route = (href: string) => (/^\/(c|p)\//.test(href) ? href : null);
  */
 export default function Assistant() {
   const c = useColors();
-  const { t, dateTime } = useT();
+  const { t, tp, dateTime } = useT();
   const [kind, setKind] = useState<AgentKind>('discover');
   const [prompt, setPrompt] = useState('');
   const [busy, setBusy] = useState(false);
@@ -100,19 +101,19 @@ export default function Assistant() {
               <Row
                 key={`${r.type}:${r.id}`}
                 title={r.title}
-                subtitle={`${TYPE_LABEL[r.type] ? t(TYPE_LABEL[r.type]!) : r.type}${r.startsAt ? ` · ${dateTime(r.startsAt)}` : ''}${r.subtitle ? ` · ${r.subtitle}` : ''}\n${r.reason}`}
+                subtitle={`${TYPE_LABEL[r.type] ? t(TYPE_LABEL[r.type]!) : r.type}${r.startsAt ? ` · ${dateTime(r.startsAt)}` : ''}${agentSubtitle(r, tp) ? ` · ${agentSubtitle(r, tp)}` : ''}\n${r.reason}`}
                 onPress={route(r.href) ? () => router.push(route(r.href) as never) : undefined}
               />
             ))}
             {res.actions.map((a) =>
               a.kind === 'book' || a.kind === 'buy' ? (
                 <Text key={a.target.id} style={{ color: c.inkMuted, fontSize: 13 }}>
-                  {t('m.assistant.finishOnWeb', { action: a.label })}
+                  {t('m.assistant.finishOnWeb', { action: agentActionLabel(a, t) })}
                 </Text>
               ) : (
                 <Button
                   key={a.target.id}
-                  label={done[a.target.id] ? t('m.common.done') : a.label}
+                  label={done[a.target.id] ? t('m.common.done') : agentActionLabel(a, t)}
                   variant={done[a.target.id] ? 'secondary' : 'primary'}
                   disabled={done[a.target.id]}
                   onPress={() => act(a)}

@@ -226,6 +226,80 @@ export interface CaptionTrackRef {
   url: string;
 }
 
+/**
+ * Why a post is in your feed: your own post, a friend's or someone you follow (or a co-author
+ * who is), reposted by someone you follow, from a community you're in, in a topic you like,
+ * popular in a public community, or popular on YAPILAPI. The apps put it into words.
+ */
+export type PostReasonCode = 'own' | 'friend' | 'follow' | 'reposted' | 'community_member' | 'interest' | 'community_popular' | 'popular';
+
+/** The names a feed reason mentions: `name` a person, `community` a community's name, `topic` a topic. */
+export interface PostReasonParams {
+  name?: string;
+  community?: string;
+  topic?: string;
+}
+
+/**
+ * One line of "Why am I seeing this?": personalization is off, a friend's post or someone you
+ * follow, from a community you joined, in topics you follow, people are engaging with it, or
+ * the fallback (recent and public).
+ */
+export type WhyReasonCode = 'personalization_off' | 'friend' | 'follow' | 'community' | 'topics' | 'engagement' | 'fallback';
+
+export interface WhyReason {
+  code: WhyReasonCode;
+  /** `name` a person, `community` a community's name, `topics` the topics you follow that it's in. */
+  params?: { name?: string; community?: string; topics?: string[] };
+}
+
+/** GET /v1/posts/:id/why. */
+export interface PostWhy {
+  /** The same lines in English, kept for older apps. */
+  reasons: string[];
+  /** Each line as a code, put into words in the reader's language (whyReasonText). */
+  details: WhyReason[];
+  controls: string[];
+}
+
+/**
+ * What the app says after you publish something that waits for review: your account is limited,
+ * or your post, answer, question, listing or message is held until someone has looked at it.
+ * The apps put the code into words (noticeText); the English text stays for older apps.
+ */
+export type NoticeCode = 'post_limited' | 'post_held' | 'answer_held' | 'question_held' | 'listing_held' | 'message_held';
+
+/** Sent as `moderation` after publishing a post, reel, answer or mix that isn't shown to everyone yet. */
+export interface ModerationNotice {
+  status: string;
+  code: NoticeCode;
+  /** The same in English, for older apps. */
+  message: string;
+}
+
+/** One line of "Why am I seeing this ad?": you turned ads on, its topics, your language, your country. */
+export type AdWhyCode = 'opted_in' | 'topics' | 'language' | 'country';
+
+export interface AdWhy {
+  code: AdWhyCode;
+  /** `topics`: the campaign's topics named in the line. */
+  params?: { topics?: string[] };
+}
+
+/** Why someone is suggested to you: people you follow follow them, shared interests, they post about your interests or post reels, or they're popular. */
+export type SuggestionReasonCode = 'mutual' | 'shared_interests' | 'topical' | 'reels' | 'popular';
+
+/** GET /v1/me/suggestions. */
+export interface PeopleSuggestion {
+  user: PublicUser;
+  bio: string;
+  /** In English, for older apps. Newer ones put `reasonCode` into words (suggestionReasonText). */
+  reason: string;
+  reasonCode?: SuggestionReasonCode;
+  /** `count`: how many people you follow, or how many interests you share. */
+  reasonParams?: { count?: number };
+}
+
 export interface Post {
   id: string;
   kind: PostKind;
@@ -308,8 +382,12 @@ export interface Post {
   question?: QuotedQuestion | null;
   /** A mix shared as a post: its card, or a note that it isn't there for this viewer. */
   mix?: MixCard | null;
-  /** Why this post is in the viewer's feed (recommendation explanation). */
+  /** Why this post is in the viewer's feed, in English: kept for older apps. Newer ones put `reasonCode` into words. */
   reason?: string;
+  /** Why this post is in the viewer's feed, as a code the apps put into words in the reader's language (postReasonText). */
+  reasonCode?: PostReasonCode;
+  /** The names the reason mentions: a person, a community or a topic. */
+  reasonParams?: PostReasonParams;
   /** Only on the author's own posts: countries where regional rules withhold it. */
   withheldIn?: string[];
   /** Reels only: whether the viewer can save it as a video to share (the creator allows downloads). */

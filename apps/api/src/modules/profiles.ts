@@ -23,6 +23,8 @@ import {
   type Profile,
   type ProfileLink,
   type ProfileTab,
+  suggestionReasonText,
+  type PeopleSuggestion,
 } from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, badRequest, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
@@ -33,7 +35,7 @@ import { emitWebhook } from '../lib/webhooks.ts';
 import { ageOf, areFriends, blockUser, isBlockedEitherWay, PUBLIC_USER_COLS, toPublicUser, usernameMatchSql, type PublicUserRow } from '../lib/users.ts';
 import { notBlockedSql, postVisibleSql } from '../lib/visibility.ts';
 import { hostsWithIcons, iconHost, queueLinkIcons } from '../lib/link-icons.ts';
-import { hydratePosts } from '../lib/posts.ts';
+import { ENGLISH_REASONS, hydratePosts } from '../lib/posts.ts';
 import { soundVisibleSql } from '../lib/sounds.ts';
 import { trackMusic, tracksByIds, viewerCountries, type StoredPart } from '../lib/music/view.ts';
 import { messagesAllowedSql } from '../lib/interactions.ts';
@@ -625,21 +627,22 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       // $3: Personalization. Off, shared interests, people you follow and your topics are left out: popular people come first.
       [u.id, q.limit, await personalizationAllowed(db, u.id)],
     );
+    const reasonOf = (r: Record<string, any>): Pick<PeopleSuggestion, 'reasonCode' | 'reasonParams'> =>
+      Number(r.mutual) > 0
+        ? { reasonCode: 'mutual', reasonParams: { count: Number(r.mutual) } }
+        : Number(r.shared) > 0
+          ? { reasonCode: 'shared_interests', reasonParams: { count: Number(r.shared) } }
+          : creators && Number(r.topical) > 0
+            ? { reasonCode: 'topical', reasonParams: {} }
+            : creators && Number(r.reels) > 0
+              ? { reasonCode: 'reels', reasonParams: {} }
+              : { reasonCode: 'popular', reasonParams: {} };
     return {
-      items: rows.map((r) => ({
-        user: toPublicUser(r as PublicUserRow),
-        bio: r.bio,
-        reason:
-          r.mutual > 0
-            ? `Followed by ${r.mutual} people you follow`
-            : r.shared > 0
-              ? `${r.shared} shared interest${r.shared > 1 ? 's' : ''}`
-              : creators && r.topical > 0
-                ? 'Posts about your interests'
-                : creators && r.reels > 0
-                  ? 'Posts reels'
-                  : 'Popular on YAPILAPI',
-      })),
+      items: rows.map((r): PeopleSuggestion => {
+        const why = reasonOf(r);
+        // The apps put the code into words; the English stays for older apps.
+        return { user: toPublicUser(r as PublicUserRow), bio: r.bio, reason: suggestionReasonText(why, ENGLISH_REASONS), ...why };
+      }),
     };
   });
 

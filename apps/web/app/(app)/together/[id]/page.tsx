@@ -21,6 +21,7 @@ import {
   type MenuAction,
 } from '@yapilapi/design-system';
 import {
+  noticeText,
   CHAPTER_AUDIENCES,
   TOGETHER_DESCRIPTION_MAX,
   TOGETHER_POST_MAX,
@@ -434,7 +435,7 @@ function PostSheet({ album, open, onClose }: { album: TogetherDetail; open: bool
                 visibility,
                 media: chosen.map((i) => ({ id: i.media.id, url: new URL(i.media.url, location.origin).toString(), kind: i.media.kind })),
               });
-              toast(r.moderation ? r.moderation.message : t('together.post.done'));
+              toast(noticeText(r.moderation, t) ?? t('together.post.done'));
               onClose();
             } catch (err) {
               toast(errorMessage(err));

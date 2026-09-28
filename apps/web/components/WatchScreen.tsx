@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Avatar, Badge, Button, CaptionTracks, ChatBubble, EmptyState, Icon, Segments, Skeleton, videoCrossOrigin } from '@yapilapi/design-system';
 import {
+  noticeText,
   betterClock,
   clockSample,
   driftFix,
@@ -620,9 +621,10 @@ function WatchChat({ conversationId, group }: { conversationId: string; group: b
     setMessages((cur) => [...(cur ?? []), optimistic]);
     setBody('');
     try {
-      const { message, notice } = await api.conversations.send(conversationId, text, clientId);
+      const { message, notice, noticeCode } = await api.conversations.send(conversationId, text, clientId);
       setMessages((cur) => cur?.map((x) => (x.clientId === clientId ? message : x)) ?? cur);
-      if (notice) toast(notice);
+      const note = noticeText({ code: noticeCode, message: notice }, t);
+      if (note) toast(note);
     } catch (err) {
       setMessages((cur) => cur?.filter((x) => x.clientId !== clientId) ?? cur);
       setBody(text);

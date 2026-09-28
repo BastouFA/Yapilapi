@@ -440,6 +440,22 @@ A review of the features added on 2026-09-27 and 28, written up in `docs/securit
 
 Each message catalog is its own module in `packages/shared/src/locales/`. The web loads English with the page and the reader's language on demand (`loadLocale()`), instead of all eight on every page: about 630 kB gzip less JavaScript on every route (Home 977 → 348 kB, a profile 1,008 → 379, Settings 954 → 325), plus 86 to 97 kB once for a non-English reader. The app waits for the reader's language as it waits for the account, so nothing shows in English first; `<html lang>`/`dir` are set before paint (Arabic no longer paints one frame left to right), and a returning reader's language is on `<html>` before anything paints. Switching language in Settings still happens in place. The phone and the API import `packages/shared/src/i18n.ts` (`@yapilapi/shared/i18n`), which loads every catalog up front as before. New keys go in every file in `locales/`. Details and measurements: `docs/architecture/performance.md`.
 
+## Feed reasons in the reader's language (2026-09-28, no migration, `apps/api/test/feed-reasons.test.ts`, `packages/shared/src/feed-reasons.test.ts`)
+
+Why a post is in your feed ("Your post", "You follow Ada", "Popular in Film Club") and the lines of "Why am I seeing this?" used to come from the API in English. Posts now carry `reasonCode` and `reasonParams` (the person, community or topic named), and `GET /v1/posts/:id/why` returns `details` (a code and its names for each line) next to its English `reasons`. The web post card, the web "Why am I seeing this?" sheet and the phone's post header put them into words with `packages/shared/src/feed-reasons.ts` (16 new messages in all 8 languages, "topic"/"topics" as a plural pair, topic lists joined for the language). The English `reason` and `reasons` stay for older apps and come from the same messages.
+
+## More server sentences in the reader's language (2026-09-28, no migration, `packages/shared/src/server-text.test.ts`, API tests in `ask`, `market`, `spam`, `faq-ads-family`, `launch-gaps`, `agents`)
+
+Other sentences the API wrote in English and the apps showed as they were now come as codes, put into words by `packages/shared/src/server-text.ts` (24 new messages in all 8 languages); the English fields stay for older apps and come from the same messages:
+
+- **Notes after publishing something held for review**: `moderation.code` (`post_limited`, `post_held`, `answer_held`) on posts, reels, drafts, echoes, recaps, Together albums, mixes and answers, and `noticeCode` (`question_held`, `listing_held`, `message_held`) beside `notice` on questions, Market listings and messages. Every web and phone screen that showed the English now shows the reader's language. On the phone a held listing is now said on screen, not only to screen readers, and a held message shows a note in the chat, which ignored it before.
+- **Why am I seeing this ad?**: `whyDetails` (`opted_in`, `topics` with the topics joined for the language, `language`, `country`), and the "Sponsored" badge is the app's own word.
+- **Why someone is suggested** (Home, the side column, onboarding, the phone's empty Pulse): `reasonCode` (`mutual` and `shared_interests` with a count and a plural, `topical`, `reels`, `popular`). The English now says "Followed by 1 person you follow" for one.
+- **Assistant cards and buttons**: action buttons are built from their kind ("Join: Film Club"), and communities carry `memberCount` for "12 members".
+- **Report sent** on the web uses the app's own thanks, like the phone.
+
+Still in English from the server: job-failure reasons in notifications, chat message bodies the server writes, device names, and the recap title. Push notifications and emails are being moved to the recipient's language separately.
+
 ## Not built yet
 
 - Mainstream music: needs a licensing deal (docs/operations/music.md). Reporting song use to a licensing partner is not built.

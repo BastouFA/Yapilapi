@@ -4,12 +4,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Avatar, Button } from '@yapilapi/design-system';
-import type { EventItem, PublicUser } from '@yapilapi/shared';
+import { suggestionReasonText, type EventItem, type PeopleSuggestion } from '@yapilapi/shared';
 import type { LiveSummary } from '@yapilapi/api-client';
 import { api, errorMessage, sharedRequest } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
-type Suggestion = { user: PublicUser; bio: string; reason: string };
+type Suggestion = PeopleSuggestion;
 
 /** Desktop right column: search, what's live, who to follow, trending topics. Every panel hides itself when it has nothing real to show. */
 export function Sidebar() {
@@ -131,7 +131,7 @@ export function Sidebar() {
                 <Link href={`/u/${s.user.username}`} className="yp-aside-row__title" style={{ color: 'inherit', textDecoration: 'none' }}>
                   {s.user.displayName}
                 </Link>
-                <span className="yp-aside-row__meta">{s.reason || `@${s.user.username}`}</span>
+                <span className="yp-aside-row__meta">{suggestionReasonText(s, { t, tp }) || `@${s.user.username}`}</span>
               </span>
               <Button
                 size="sm"

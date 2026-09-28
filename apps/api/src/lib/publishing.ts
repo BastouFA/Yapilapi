@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { tx } from '@yapilapi/database';
-import { SCHEDULE_MAX_DAYS, SCHEDULE_MIN_MINUTES, type CreatePostInput } from '@yapilapi/shared';
+import { SCHEDULE_MAX_DAYS, SCHEDULE_MIN_MINUTES, type CreatePostInput, type ModerationNotice } from '@yapilapi/shared';
+import { moderationOf } from './notices.ts';
 import type { AppContext } from './context.ts';
 import { AppError, badRequest, forbidden, notFound } from './errors.ts';
 import { enqueueAt, type JobHandler } from './jobs.ts';
@@ -346,11 +347,9 @@ export async function recordFlags(c: PoolClient, realtime: Deps['realtime'], use
 }
 
 /** What to tell the author when their post isn't out for everyone yet. */
-export function moderationNotice(s: Screening, limitedNow: boolean): { status: string; message: string } | undefined {
+export function moderationNotice(s: Screening, limitedNow: boolean): ModerationNotice | undefined {
   if (s.status === 'normal') return undefined;
-  return s.spam.restricted || limitedNow
-    ? { status: s.status, message: 'Your account is limited while our team reviews some recent activity, so new posts are visible only to you for now.' }
-    : { status: s.status, message: 'Your post is published to you only until it has been reviewed.' };
+  return moderationOf(s.status, s.spam.restricted || limitedNow ? 'post_limited' : 'post_held');
 }
 
 /**
@@ -429,7 +428,7 @@ export async function announcePost(
  * have changed since it was saved are checked again (community membership,
  * subscription plan, whether a reel can still be remixed, blocked media).
  */
-export async function publishDraft(deps: Deps, postId: string, authorId: string): Promise<{ notice?: { status: string; message: string } }> {
+export async function publishDraft(deps: Deps, postId: string, authorId: string): Promise<{ notice?: ModerationNotice }> {
   const { db } = deps;
   const d = (
     await db.query(

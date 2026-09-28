@@ -9,6 +9,7 @@ import { SchedulePicker } from '../lib/post-edit';
 import { useSession } from '../lib/session';
 import { space } from '../lib/theme';
 import { Button, EmptyState, Loading, Notice, Screen, useColors } from '../lib/ui';
+import { noticeText } from '../../../packages/shared/src/server-text';
 
 /**
  * Your drafts and scheduled posts, only ever seen by you. Scheduled posts come
@@ -115,7 +116,7 @@ export default function Drafts() {
                   void run(`publish-${p.id}`, async () => {
                     const r = await (await client()).drafts.publish(p.id);
                     drop(p.id);
-                    return r.moderation ? r.moderation.message : t('m.drafts.published');
+                    return noticeText(r.moderation, t) ?? t('m.drafts.published');
                   })
                 }
               />

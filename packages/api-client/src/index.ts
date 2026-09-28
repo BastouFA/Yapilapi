@@ -1,4 +1,9 @@
 import type {
+  PostWhy,
+  AdWhy,
+  ModerationNotice,
+  NoticeCode,
+  PeopleSuggestion,
   CheckInResult,
   CheckInCounts,
   DoorSummary,
@@ -304,8 +309,7 @@ export function createClient(opts: ClientOptions) {
       /** `steps` is recorded (counts only) in the onboarding_completed analytics event. */
       completeOnboarding: (b: { platform?: 'web' | 'mobile'; steps?: OnboardingStep[] } = {}) => post('/v1/me/onboarding/complete', b),
       /** `kind: 'creators'` suggests people who post publicly, for onboarding. */
-      suggestions: (o: { kind?: 'people' | 'creators'; limit?: number } = {}) =>
-        get<{ items: { user: PublicUser; bio: string; reason: string }[] }>(`/v1/me/suggestions${qs(o)}`),
+      suggestions: (o: { kind?: 'people' | 'creators'; limit?: number } = {}) => get<{ items: PeopleSuggestion[] }>(`/v1/me/suggestions${qs(o)}`),
       sharing: () => get<{ settings: SharingSettings }>('/v1/me/sharing'),
       setSharing: (b: Partial<Pick<SharingSettings, 'findableByContacts' | 'allowDownload'>>) => put<{ settings: SharingSettings }>('/v1/me/sharing', b),
       /** Who may tag you in photos. */
@@ -390,12 +394,12 @@ export function createClient(opts: ClientOptions) {
       setBox: (b: Partial<Pick<AskBoxSettings, 'enabled' | 'prompt' | 'audience' | 'allowHiddenNames'>>) => put<{ box: AskBoxSettings }>('/v1/me/ask-box', b),
       /** `notice` is set when the question waits for a moderator before it reaches them. */
       ask: (userId: string, body: string, hideName = false) =>
-        post<{ question: { id: string }; notice?: string }>(`/v1/users/${userId}/questions`, { body, hideName }),
+        post<{ question: { id: string }; notice?: string; noticeCode?: NoticeCode }>(`/v1/users/${userId}/questions`, { body, hideName }),
       inbox: (filter: AskFilter = 'new', cursor?: string) =>
         get<Page<InboxQuestion> & { counts: Record<AskFilter, number> }>(`/v1/me/questions${qs({ filter, cursor })}`),
       /** Answer; with `share`, the answer is also posted, quoting the question. */
       answer: (id: string, answer: string, share?: { visibility: AskShareVisibility }) =>
-        post<{ question: InboxQuestion; post?: Post; moderation?: { status: string; message: string } }>(`/v1/questions/${id}/answer`, { answer, share }),
+        post<{ question: InboxQuestion; post?: Post; moderation?: ModerationNotice }>(`/v1/questions/${id}/answer`, { answer, share }),
       hide: (id: string) => post<{ question: InboxQuestion }>(`/v1/questions/${id}/hide`),
       unhide: (id: string) => del<{ question: InboxQuestion }>(`/v1/questions/${id}/hide`),
       remove: (id: string) => del<{ ok: true }>(`/v1/questions/${id}`),
@@ -418,11 +422,11 @@ export function createClient(opts: ClientOptions) {
     feed: (mode: FeedMode, cursor?: string) => get<Page<Post> & { mode: FeedMode }>(`/v1/feed${qs({ mode, cursor })}`),
     feedback: (b: { signal: string; postId?: string; authorId?: string; topic?: string }) => post('/v1/feed/feedback', b),
     posts: {
-      create: (b: Record<string, unknown>) => post<{ post: Post; moderation?: { status: string; message: string } }>('/v1/posts', b),
+      create: (b: Record<string, unknown>) => post<{ post: Post; moderation?: ModerationNotice }>('/v1/posts', b),
       get: (id: string) => get<{ post: Post }>(`/v1/posts/${id}`),
       remove: (id: string) => del(`/v1/posts/${id}`),
       /** Change your post's text, who can see it, or its photo descriptions. */
-      edit: (id: string, b: EditPostInput) => patch<{ post: Post; moderation?: { status: string; message: string } }>(`/v1/posts/${id}`, b),
+      edit: (id: string, b: EditPostInput) => patch<{ post: Post; moderation?: ModerationNotice }>(`/v1/posts/${id}`, b),
       /** Every version of an edited post's text, newest first. */
       history: (id: string) => get<{ items: PostVersion[] }>(`/v1/posts/${id}/history`),
       like: (id: string) => put<{ liked: boolean; likes: number }>(`/v1/posts/${id}/reaction`, { kind: 'like' }),
@@ -441,7 +445,7 @@ export function createClient(opts: ClientOptions) {
       /** Your private note on a save (saves the post if needed). An empty note clears it. */
       setSaveNote: (id: string, note: string) => put<{ saved: true; note: string }>(`/v1/posts/${id}/save/note`, { note }),
       vote: (id: string, optionId: string) => post<{ poll: Post['poll'] }>(`/v1/posts/${id}/vote`, { optionId }),
-      why: (id: string) => get<{ reasons: string[] }>(`/v1/posts/${id}/why`),
+      why: (id: string) => get<PostWhy>(`/v1/posts/${id}/why`),
       /** Top-level comments, Top (default) or Newest; the pinned one first. Replies: comments.replies. */
       comments: (id: string, cursor?: string, sort?: CommentSort) => get<CommentPage>(`/v1/posts/${id}/comments${qs({ sort, cursor })}`),
       /** Comment, or reply with `parentId` (a reply to a reply joins the top-level thread). */
@@ -515,7 +519,7 @@ export function createClient(opts: ClientOptions) {
       get: (id: string) => get<DraftDetail>(`/v1/drafts/${id}`),
       /** Save what the composer has now; `scheduledAt` also moves it to that time. */
       save: (id: string, b: Record<string, unknown>) => put<{ post: Post }>(`/v1/drafts/${id}`, b),
-      publish: (id: string) => post<{ post: Post; moderation?: { status: string; message: string } }>(`/v1/drafts/${id}/publish`),
+      publish: (id: string) => post<{ post: Post; moderation?: ModerationNotice }>(`/v1/drafts/${id}/publish`),
       schedule: (id: string, scheduledAt: string) => put<{ post: Post }>(`/v1/drafts/${id}/schedule`, { scheduledAt }),
       /** Cancel a scheduled post: it goes back to your drafts. */
       unschedule: (id: string) => del<{ post: Post }>(`/v1/drafts/${id}/schedule`),
@@ -787,7 +791,7 @@ export function createClient(opts: ClientOptions) {
         clientId?: string,
         attachments: { mediaId: string; name?: string }[] = [],
         o: { kind?: 'message' | 'yap'; viewOnce?: boolean; replyToId?: string } = {},
-      ) => post<{ message: Message; notice?: string }>(`/v1/conversations/${id}/messages`, { body, clientId, attachments, ...o }),
+      ) => post<{ message: Message; notice?: string; noticeCode?: NoticeCode }>(`/v1/conversations/${id}/messages`, { body, clientId, attachments, ...o }),
       /** Text search in this chat (messages you can see, since you joined), newest first. */
       search: (id: string, q: string, cursor?: string) => get<Page<Message>>(`/v1/conversations/${id}/search${qs({ q, cursor })}`),
       /** Pinned messages (up to 3). */
@@ -885,7 +889,7 @@ export function createClient(opts: ClientOptions) {
       unshare: (id: string, conversationId: string) => del<{ mix: MixDetail }>(`/v1/mixes/${id}/chats/${conversationId}`),
       /** Share it as a post (its card), with your words or its name. */
       post: (id: string, b: { body?: string; visibility?: 'public' | 'followers' | 'friends' }) =>
-        post<{ post: Post; moderation?: { status: string; message: string } }>(`/v1/mixes/${id}/post`, b),
+        post<{ post: Post; moderation?: ModerationNotice }>(`/v1/mixes/${id}/post`, b),
     },
     location: {
       /** A new point on your live share: at most one every 10 seconds (429 `location_too_soon` otherwise). */
@@ -1574,7 +1578,7 @@ export function createClient(opts: ClientOptions) {
         place?: { lat: number; lng: number } | null;
         delivery: MarketDelivery[];
         notProhibited?: boolean;
-      }) => post<{ listing: MarketListing; notice?: string }>('/v1/market/listings', b),
+      }) => post<{ listing: MarketListing; notice?: string; noticeCode?: NoticeCode }>('/v1/market/listings', b),
       update: (
         id: string,
         b: {
@@ -1589,7 +1593,7 @@ export function createClient(opts: ClientOptions) {
           delivery?: MarketDelivery[];
           notProhibited?: boolean;
         },
-      ) => patch<{ listing: MarketListing; notice?: string }>(`/v1/market/listings/${id}`, b),
+      ) => patch<{ listing: MarketListing; notice?: string; noticeCode?: NoticeCode }>(`/v1/market/listings/${id}`, b),
       /** Available, reserved or sold; `buyerId` is one of the people who wrote to you about it (ratings open after a sale to them). */
       setStatus: (id: string, status: 'available' | 'reserved' | 'sold', buyerId?: string | null) =>
         put<{ listing: MarketListing }>(`/v1/market/listings/${id}/status`, { status, buyerId }),
@@ -2032,7 +2036,10 @@ export interface SponsoredAd {
   campaignId: string;
   label: 'Sponsored';
   post: Post;
+  /** In English, for older apps. */
   why: string[];
+  /** Each line of `why` as a code, put into words in the reader's language (adWhyText). */
+  whyDetails?: AdWhy[];
 }
 
 export interface AdCampaign {
@@ -2092,6 +2099,8 @@ export interface AgentEntity {
   title: string;
   subtitle?: string;
   startsAt?: string;
+  /** Communities: the member count (`subtitle` says it in English). */
+  memberCount?: number;
   href: string;
 }
 

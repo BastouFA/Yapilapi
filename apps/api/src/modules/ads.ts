@@ -1,10 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
 import { z } from 'zod';
-import { CURRENCIES, CURRENCY_SCALE, type Currency } from '@yapilapi/shared';
+import { adWhyText, CURRENCIES, CURRENCY_SCALE, type AdWhy, type Currency } from '@yapilapi/shared';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
-import { hydratePosts } from '../lib/posts.ts';
+import { ENGLISH_REASONS, hydratePosts } from '../lib/posts.ts';
 import { refundUnspentBudget } from '../lib/ad-refunds.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { audit, isEnabled } from '../lib/services.ts';
@@ -307,11 +307,13 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
       await db.query(`INSERT INTO ad_events (campaign_id, user_id, kind) VALUES ($1,$2,'impression')`, [cand.id, u.id]);
       const [post] = await hydratePosts(db, [cand.post_id], u.id);
       if (!post) continue;
-      const why = ['You turned on advertising in your privacy settings.'];
-      if (cand.topic_match) why.push(`It's about ${cand.topics.slice(0, 2).join(' and ')}, which you follow.`);
-      if (cand.locales.length) why.push('It matches your language.');
-      if (cand.countries.length) why.push("It's shown to people in your country.");
-      return { ad: { campaignId: cand.id, label: 'Sponsored', post, why } };
+      // Each line as a code the apps put into words, and in English for older apps.
+      const whyDetails: AdWhy[] = [{ code: 'opted_in' }];
+      if (cand.topic_match) whyDetails.push({ code: 'topics', params: { topics: cand.topics.slice(0, 2) } });
+      if (cand.locales.length) whyDetails.push({ code: 'language' });
+      if (cand.countries.length) whyDetails.push({ code: 'country' });
+      const why = whyDetails.map((w) => adWhyText(w, { ...ENGLISH_REASONS, locale: 'en' }));
+      return { ad: { campaignId: cand.id, label: 'Sponsored', post, why, whyDetails } };
     }
     return { ad: null };
   });

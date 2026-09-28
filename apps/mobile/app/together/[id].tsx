@@ -55,6 +55,7 @@ import {
   userText,
   type ActionSheetAction,
 } from '../../lib/ui';
+import { noticeText } from '../../../../packages/shared/src/server-text';
 
 type Sheet = 'invite' | 'people' | 'edit' | 'reopen' | 'post' | 'chapter' | null;
 
@@ -907,7 +908,7 @@ function PostSheet({ album, visible, onClose }: { album: TogetherDetail; visible
                   visibility,
                   media: items.map((i) => ({ id: i.media.id, url: mediaUrl(i.media.url), kind: i.media.kind })),
                 });
-                setMsg({ tone: 'info', text: r.moderation ? r.moderation.message : t('together.post.done') });
+                setMsg({ tone: 'info', text: noticeText(r.moderation, t) ?? t('together.post.done') });
               } catch (e) {
                 setMsg({ tone: 'danger', text: errorMessage(e) });
               }

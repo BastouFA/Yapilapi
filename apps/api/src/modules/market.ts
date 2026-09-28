@@ -53,6 +53,7 @@ import {
   type ListingRow,
 } from '../lib/market.ts';
 import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
+import { heldNotice } from '../lib/notices.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { notify, track } from '../lib/services.ts';
 import { assertMessagePace, isRestricted, restrictedError } from '../lib/spam.ts';
@@ -244,8 +245,6 @@ export default async function marketModule(app: FastifyInstance, ctx: AppContext
       ]);
   }
 
-  const HELD = 'Your listing will show once we’ve had a quick look at it. This usually takes less than a day, and you’ll see it under Your listings meanwhile.';
-
   app.get('/v1/market/me', { preHandler: requireAuth }, async (req) => ({ market: await marketMe(me(req)) }));
 
   /**
@@ -382,7 +381,7 @@ export default async function marketModule(app: FastifyInstance, ctx: AppContext
     track(db, u.id, 'market_listing_created', { held: made.held });
     const [listing] = await presentListings(db, [(await listingRow(db, made.id, u.id))!], u.id);
     reply.code(201);
-    return { listing, ...(made.held ? { notice: HELD } : {}) };
+    return { listing, ...(made.held ? heldNotice('listing_held') : {}) };
   });
 
   app.patch('/v1/market/listings/:id', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (req) => {
@@ -437,7 +436,7 @@ export default async function marketModule(app: FastifyInstance, ctx: AppContext
     });
     const [listing] = await presentListings(db, [(await listingRow(db, id, u.id))!], u.id);
     await publishListingCards(deps, id);
-    return { listing, ...(held ? { notice: HELD } : {}) };
+    return { listing, ...(held ? heldNotice('listing_held') : {}) };
   });
 
   /**

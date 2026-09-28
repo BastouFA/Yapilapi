@@ -118,6 +118,9 @@ describe('sponsored posts', () => {
     expect(served.body.ad.post.id).toBe(post.id);
     expect(served.body.ad.why[0]).toMatch(/advertising/);
     expect(served.body.ad.why[1]).toMatch(new RegExp(topic));
+    // The same lines as codes, which the apps put into words.
+    expect(served.body.ad.whyDetails.slice(0, 2)).toEqual([{ code: 'opted_in' }, { code: 'topics', params: { topics: [topic] } }]);
+    expect(served.body.ad.why[1]).toBe(`It's about ${topic}, which you follow.`);
     expect((await as(t.app, optedIn).post(`/v1/ads/${id}/click`)).status).toBe(200);
     expect((await as(t.app, noConsent).post(`/v1/ads/${id}/click`)).status).toBe(404); // never shown to them
 

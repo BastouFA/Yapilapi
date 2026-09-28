@@ -23,6 +23,7 @@ import { useT } from '../../lib/i18n';
 import { pickOne, uploadPicked, type Picked } from '../../lib/media';
 import { radius, space } from '../../lib/theme';
 import { Avatar, Button, EmptyState, Field, KeyboardAvoid, Loading, Notice, ScreenError, Segmented, SwitchRow, useColors, userText } from '../../lib/ui';
+import { noticeText } from '../../../../packages/shared/src/server-text';
 
 const LAYOUT_KEYS: Record<EchoLayout, { label: MessageKey; hint: MessageKey }> = {
   side: { label: 'echo.layout.side', hint: 'echo.layout.sideHint' },
@@ -203,7 +204,7 @@ export default function EchoScreen() {
         media: [{ id: render.media.id, url: render.media.url, kind: 'video' }],
         echo: render.id,
       });
-      Alert.alert(moderation?.message ?? t('echo.posted'));
+      Alert.alert(noticeText(moderation, t) ?? t('echo.posted'));
       router.replace({ pathname: '/reels', params: { start: created.id } });
     } catch (e) {
       Alert.alert(errorMessage(e));

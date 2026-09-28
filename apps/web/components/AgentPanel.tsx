@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { AIPanel, Button, Icon } from '@yapilapi/design-system';
 import type { AgentKind, AgentResult } from '@yapilapi/api-client';
-import type { MessageKey } from '@yapilapi/shared';
+import { agentActionLabel, agentSubtitle, type MessageKey } from '@yapilapi/shared';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
@@ -47,7 +47,7 @@ export const AGENTS: Record<AgentKind, { title: MessageKey; placeholder: Message
  * with the reason it was picked; suggested actions only happen when you tap them.
  */
 export function AgentPanel({ kind, businessId, compact = false }: { kind: AgentKind; businessId?: string; compact?: boolean }) {
-  const { toast, locale, t } = useSession();
+  const { toast, locale, t, tp } = useSession();
   const router = useRouter();
   const [prompt, setPrompt] = useState('');
   const [busy, setBusy] = useState(false);
@@ -135,11 +135,11 @@ export function AgentPanel({ kind, businessId, compact = false }: { kind: AgentK
                     <Link href={r.href} className="agent__card">
                       <span className="agent__type">{TYPE_LABEL[r.type] ? t(TYPE_LABEL[r.type]) : r.type}</span>
                       <strong>{r.title}</strong>
-                      {r.startsAt || r.subtitle ? (
+                      {r.startsAt || agentSubtitle(r, tp) ? (
                         <span className="muted">
                           {[
                             r.startsAt ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(r.startsAt)) : null,
-                            r.subtitle,
+                            agentSubtitle(r, tp),
                           ]
                             .filter(Boolean)
                             .join(' · ')}
@@ -161,7 +161,7 @@ export function AgentPanel({ kind, businessId, compact = false }: { kind: AgentK
                     disabled={done.has(x.target.id)}
                     onClick={() => act(x)}
                   >
-                    {done.has(x.target.id) ? t('m.common.done') : x.label}
+                    {done.has(x.target.id) ? t('m.common.done') : agentActionLabel(x, t)}
                   </Button>
                 ))}
               </div>

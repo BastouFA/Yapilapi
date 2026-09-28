@@ -1,6 +1,6 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Image, Linking, Pressable, ScrollView, Text, View } from 'react-native';
+import { AccessibilityInfo, Alert, Image, Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { ApiError } from '../../../packages/api-client/src/index';
 import type { LatLng } from '../../../packages/shared/src/location';
 import {
@@ -39,6 +39,7 @@ import {
 import { pickOne, uploadPicked } from '../lib/media';
 import { radius, space } from '../lib/theme';
 import { Button, Field, Icon, Loading, Notice, ScreenError, SwitchRow, useColors } from '../lib/ui';
+import { noticeText } from '../../../packages/shared/src/server-text';
 
 type Photo = { key: string; uri: string; mediaId: string | null; alt: string; progress: number | null; failed: boolean };
 /** A place: unchanged (editing), a new approximate one, or taken off. */
@@ -200,7 +201,9 @@ export default function MarketEdit() {
       };
       const placeBody = place.kind === 'set' ? { place: place.point } : place.kind === 'none' && loaded?.hasPlace ? { place: null } : {};
       const r = editing ? await api.market.update(editing, { ...body, ...placeBody }) : await api.market.create({ ...body, ...placeBody });
-      if (r.notice) AccessibilityInfo.announceForAccessibility(r.notice);
+      // Held for a quick look: say so where everyone sees it, not only to screen readers.
+      const held = noticeText({ code: r.noticeCode, message: r.notice }, t);
+      if (held) Alert.alert(held);
       router.replace(`/market/${r.listing.id}`);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'prohibited_item') {

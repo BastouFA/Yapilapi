@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Checkbox, EmptyState, Icon, Select, Skeleton, TextField } from '@yapilapi/design-system';
 import {
+  noticeText,
   IMAGE_ACCEPT,
   MARKET_AREA_MAX,
   MARKET_CATEGORIES,
@@ -165,7 +166,10 @@ export function ListingForm({ listing }: { listing?: MarketListing }) {
       };
       const r = listing ? await api.market.update(listing.id, body) : await api.market.create(body);
       forgetMarketMe();
-      toast(r.notice ?? (r.listing.moderation === 'review' ? t('market.review.saved') : listing ? t('market.form.saved') : t('market.form.published')));
+      toast(
+        noticeText({ code: r.noticeCode, message: r.notice }, t) ??
+          (r.listing.moderation === 'review' ? t('market.review.saved') : listing ? t('market.form.saved') : t('market.form.published')),
+      );
       router.push(`/market/${r.listing.id}`);
     } catch (err) {
       if (err instanceof ApiError && err.code === 'prohibited_item') {
