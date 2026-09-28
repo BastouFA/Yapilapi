@@ -30,7 +30,7 @@ import { useDataSaver } from './data-saver';
 import { useT } from './i18n';
 import { RichText } from './post';
 import { gradient, radius, space } from './theme';
-import { ActionSheet, Avatar, Icon, KeyboardAvoid, Segmented, SwitchRow, useColors, userText } from './ui';
+import { ActionSheet, Avatar, Icon, KeyboardAvoid, Segmented, SwitchRow, useColors, userText, useScreenFocused } from './ui';
 import { useReport } from './report';
 import { SensitiveCover } from './safety';
 import { AddToChapterSheet } from './chapters';
@@ -144,9 +144,10 @@ export function StoryViewer({
 }) {
   // Android's back button closes a panel open over the story (who saw it, share) before the stories.
   const back = useRef<(() => boolean) | null>(null);
+  const focused = useScreenFocused();
   return (
     <Modal
-      visible={start !== null}
+      visible={start !== null && focused}
       animationType="fade"
       presentationStyle="fullScreen"
       onRequestClose={() => {

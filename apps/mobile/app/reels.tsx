@@ -11,6 +11,7 @@ import {
   Alert,
   ActivityIndicator,
   Animated,
+  BackHandler,
   Easing,
   FlatList,
   I18nManager,
@@ -121,6 +122,14 @@ export default function Reels() {
   const loading = useRef(false);
   const list = useRef<FlatList<Post>>(null);
   const [preparing, setPreparing] = useState<string | null>(null);
+  // Leaving Reels while a video is being prepared stops waiting for it, so a share sheet never pops up later over another screen.
+  const alive = useRef(true);
+  useEffect(
+    () => () => {
+      alive.current = false;
+    },
+    [],
+  );
 
   useEffect(() => {
     void SecureStore.getItemAsync(SOUND_HINT_KEY).then(
@@ -329,10 +338,12 @@ export default function Reels() {
       let state = await api.posts.shareVideo(p.id);
       for (let i = 0; i < 90 && (state.status === 'queued' || state.status === 'processing'); i++) {
         await new Promise((r) => setTimeout(r, 2000));
+        if (!alive.current) return;
         state = await api.posts.shareVideoStatus(p.id);
       }
       if (state.status !== 'ready' || !state.url) throw new Error(t('share.video.failed'));
       const file = await File.downloadFileAsync(mediaUrl(state.url), new File(Paths.cache, state.fileName), { idempotent: true });
+      if (!alive.current) return;
       if (!(await Sharing.isAvailableAsync())) throw new Error(t('share.video.failed'));
       await Sharing.shareAsync(file.uri, { mimeType: 'video/mp4', UTI: 'public.mpeg-4', dialogTitle: t('share.video') });
     } catch (e) {
@@ -802,6 +813,15 @@ function Reel({
     }
     wasVisible.current = visible;
   }, [visible, sendResume]);
+  // Android's back button closes the details first, as their close button does, before leaving Reels.
+  useEffect(() => {
+    if (!details || !visible) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setDetails(false);
+      return true;
+    });
+    return () => sub.remove();
+  }, [details, visible]);
   // A ref, so the reel re-rendering with its time doesn't restart the 10-second timer.
   const sendResumeRef = useRef(sendResume);
   sendResumeRef.current = sendResume;

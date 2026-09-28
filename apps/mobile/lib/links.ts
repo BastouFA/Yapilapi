@@ -167,6 +167,8 @@ export function appPath(link: string): string {
   if (first === 'communities' && second === 'new') return '/community-new';
   if (first === 'events' && second === 'new') return `/event-edit${q}`;
   if (first === 'events' && second && parts[2] === 'edit') return `/event-edit?id=${encodeURIComponent(second)}`;
+  // An event's door list is its own screen in the app.
+  if (first === 'events' && second && parts[2] === 'check-in') return `/check-in/${encodeURIComponent(second)}`;
   if (first === 'c' && second && parts[2] === 'settings') return `/community-settings?slug=${encodeURIComponent(second)}`;
   if (first === 'plus') return '/plus';
   // Market: selling and changing a listing have their own screen; your listings and saved ones keep their paths.
@@ -185,8 +187,13 @@ export function appPath(link: string): string {
   if (profileName && params.product) return `/product?username=${encodeURIComponent(profileName)}&id=${encodeURIComponent(params.product)}`;
   if ((first === 'p' || first === 'post' || first === 'posts') && second && parts[2] === 'insights') return `/insights/${encodeURIComponent(second)}`;
   if ((first === 'p' || first === 'post' || first === 'posts') && second && params.boost !== undefined) return `/boost?id=${encodeURIComponent(second)}`;
-  // A reel's remixes open the reel itself; the phone app has no remixes page yet.
+  // A reel's echoes have their own screen; its remixes open the reel itself (the phone app has no remixes page yet).
+  if ((first === 'reels' || first === 'reel') && second && parts[2] === 'echoes') return `/echoes/${encodeURIComponent(second)}`;
   if ((first === 'reels' || first === 'reel') && second) return `/reels?start=${encodeURIComponent(second)}`;
+  // Settings pages that are screens of their own in the app, and the legal pages (each opens on the web from the list).
+  if (first === 'settings' && second === 'your-data') return '/your-data';
+  if (first === 'settings' && second === 'purchases') return '/purchases';
+  if (first === 'legal') return '/legal';
   if (first.startsWith('@') && first.length > 1) return `/u/${first.slice(1)}`;
   const renamed = RENAMED[first];
   if (renamed && second) return `/${renamed}/${parts.slice(1).join('/')}${q}`;

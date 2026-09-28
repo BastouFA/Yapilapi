@@ -32,7 +32,7 @@ import {
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import { useT, type Translator } from './i18n';
 import { radius, space } from './theme';
-import { Button, Icon, useColors } from './ui';
+import { Button, Icon, useColors, useScreenFocused } from './ui';
 
 export type PickerMode = 'date' | 'datetime';
 /** A shortcut shown as a chip at the top of the sheet. Ones outside the limits are hidden. */
@@ -112,6 +112,7 @@ export interface DateTimeSheetProps {
  * hours-then-minutes order, as it is written in every language the app has.
  */
 export function DateTimeSheet({ visible, title, value, min, max, mode = 'datetime', presets, quick, hint, confirmLabel, onClose, onPick }: DateTimeSheetProps) {
+  const focused = useScreenFocused();
   const c = useColors();
   const insets = useSafeAreaInsets();
   const cal = useCalendarLocale();
@@ -177,7 +178,7 @@ export function DateTimeSheet({ visible, title, value, min, max, mode = 'datetim
   const summary = whenText(draft, tr, mode, now, cal.hour12);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible && focused} transparent animationType="slide" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: c.overlay, justifyContent: 'flex-end' }}>
         <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} style={{ flex: 1 }} onPress={onClose} />
         <View

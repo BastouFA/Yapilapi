@@ -14,7 +14,7 @@ import { pickOne, uploadPicked } from '../lib/media';
 import { registerForPush } from '../lib/push';
 import { useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
-import { Avatar, Button, Field, Icon, Notice, Skeleton, Title, useColors, userText } from '../lib/ui';
+import { Avatar, Button, Field, Icon, KeyboardAvoid, Notice, Skeleton, Title, useColors, userText } from '../lib/ui';
 
 type Suggestion = { user: PublicUser; reason: string };
 /** How many suggested creators start ticked. */
@@ -119,65 +119,68 @@ export default function Onboarding() {
     );
 
   return (
-    <ScrollView
-      ref={scroll}
-      style={{ backgroundColor: c.ground }}
-      contentContainerStyle={{ padding: space[4], paddingTop: insets.top + space[2], paddingBottom: insets.bottom + space[8], gap: space[4] }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={{ gap: space[2] }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44 }}>
-          {step > 0 ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('m.common.back')}
-              onPress={back}
-              hitSlop={8}
-              style={{ width: 44, height: 44, justifyContent: 'center' }}
-            >
-              <Icon name="chevron-back" size={24} color={c.ink} directional />
-            </Pressable>
-          ) : null}
-          <Text style={{ color: c.inkMuted, fontSize: 13, flex: 1 }}>{t('onboarding.step', { step: step + 1, total: STEPS.length })}</Text>
+    // Your name is typed low on the profile step: the keyboard makes room so Continue stays reachable.
+    <KeyboardAvoid offset={0} style={{ backgroundColor: c.ground }}>
+      <ScrollView
+        ref={scroll}
+        style={{ backgroundColor: c.ground }}
+        contentContainerStyle={{ padding: space[4], paddingTop: insets.top + space[2], paddingBottom: insets.bottom + space[8], gap: space[4] }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={{ gap: space[2] }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44 }}>
+            {step > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('m.common.back')}
+                onPress={back}
+                hitSlop={8}
+                style={{ width: 44, height: 44, justifyContent: 'center' }}
+              >
+                <Icon name="chevron-back" size={24} color={c.ink} directional />
+              </Pressable>
+            ) : null}
+            <Text style={{ color: c.inkMuted, fontSize: 13, flex: 1 }}>{t('onboarding.step', { step: step + 1, total: STEPS.length })}</Text>
+          </View>
+          <View
+            accessible
+            accessibilityRole="progressbar"
+            accessibilityLabel={t('m.onb.progress')}
+            accessibilityValue={{ min: 1, max: STEPS.length, now: step + 1 }}
+            style={{ flexDirection: 'row', gap: 4 }}
+          >
+            {STEPS.map((s, i) => (
+              <View key={s} style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: i <= step ? c.yapi : c.surfaceSunken }} />
+            ))}
+          </View>
         </View>
-        <View
-          accessible
-          accessibilityRole="progressbar"
-          accessibilityLabel={t('m.onb.progress')}
-          accessibilityValue={{ min: 1, max: STEPS.length, now: step + 1 }}
-          style={{ flexDirection: 'row', gap: 4 }}
-        >
-          {STEPS.map((s, i) => (
-            <View key={s} style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: i <= step ? c.yapi : c.surfaceSunken }} />
-          ))}
-        </View>
-      </View>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+        {error ? <Notice tone="danger">{error}</Notice> : null}
 
-      {id === 'language' ? (
-        <LanguageStep onNext={next} setError={setError} />
-      ) : id === 'interests' ? (
-        <InterestsStep picked={picked} setPicked={setPicked} record={record} onNext={next} setError={setError} />
-      ) : id === 'follow' ? (
-        <FollowStep record={record} onNext={next} setError={setError} />
-      ) : id === 'friends' ? (
-        <>
-          <Title>{t('friends.title')}</Title>
-          <FriendsFinder onChecked={(r) => record({ step: 'friends', skipped: false, count: r.found })} />
-          <Button
-            label={t('onboarding.continue')}
-            onPress={() => {
-              if (!log.some((x) => x.step === 'friends')) record({ step: 'friends', skipped: true, count: 0 });
-              next();
-            }}
-          />
-        </>
-      ) : id === 'profile' ? (
-        <ProfileStep onNext={next} setError={setError} />
-      ) : (
-        <NotificationsStep busy={busy} onFinish={() => void finish()} />
-      )}
-    </ScrollView>
+        {id === 'language' ? (
+          <LanguageStep onNext={next} setError={setError} />
+        ) : id === 'interests' ? (
+          <InterestsStep picked={picked} setPicked={setPicked} record={record} onNext={next} setError={setError} />
+        ) : id === 'follow' ? (
+          <FollowStep record={record} onNext={next} setError={setError} />
+        ) : id === 'friends' ? (
+          <>
+            <Title>{t('friends.title')}</Title>
+            <FriendsFinder onChecked={(r) => record({ step: 'friends', skipped: false, count: r.found })} />
+            <Button
+              label={t('onboarding.continue')}
+              onPress={() => {
+                if (!log.some((x) => x.step === 'friends')) record({ step: 'friends', skipped: true, count: 0 });
+                next();
+              }}
+            />
+          </>
+        ) : id === 'profile' ? (
+          <ProfileStep onNext={next} setError={setError} />
+        ) : (
+          <NotificationsStep busy={busy} onFinish={() => void finish()} />
+        )}
+      </ScrollView>
+    </KeyboardAvoid>
   );
 }
 

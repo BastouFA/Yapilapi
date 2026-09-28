@@ -1,6 +1,6 @@
 import { CameraView, useCameraPermissions, useMicrophonePermissions, type CameraType } from 'expo-camera';
 import { File } from 'expo-file-system';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { createVideoPlayer } from 'expo-video';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -54,7 +54,8 @@ const WHITE = '#FFFFFF';
 const SHUTTER = 84;
 const RING = 5;
 /** Width of one entry in the mode switcher. */
-const MODE_WIDTH = 96;
+// Wide enough for the longest mode name ("Publication", "Publicação") at a readable size.
+const MODE_WIDTH = 112;
 /** Shorter recordings often come out empty: stopping waits until the video is at least this long. */
 const MIN_RECORDING_MS = 700;
 
@@ -169,10 +170,28 @@ export default function Camera() {
   useEffect(
     () => () => {
       mounted.current = false;
-      if (recordingRef.current) camera.current?.stopRecording();
+      try {
+        if (recordingRef.current) camera.current?.stopRecording();
+      } catch {
+        // The camera went with the screen.
+      }
     },
     [],
   );
+
+  // Another screen on top (a notification tapped): the camera turns off, and a video being recorded
+  // stops and is let go rather than carrying on out of sight (or pulling you back when it ends).
+  const focused = useIsFocused();
+  const focusedRef = useRef(focused);
+  focusedRef.current = focused;
+  useEffect(() => {
+    if (focused || !recordingRef.current) return;
+    try {
+      camera.current?.stopRecording();
+    } catch {
+      // Already stopped.
+    }
+  }, [focused]);
 
   // Android's back button: while the two photos are being checked, it goes back to the camera
   // (like Retake) instead of leaving the screen.
@@ -433,7 +452,7 @@ export default function Camera() {
       progress.setValue(0);
       if (!mounted.current) return;
       setRecording(null);
-      if (uri) {
+      if (uri && focusedRef.current) {
         setBusy(true);
         busyRef.current = true;
         const asset = await recordedVideo(uri, ms);
@@ -490,6 +509,7 @@ export default function Camera() {
       {granted ? (
         <CameraView
           ref={camera}
+          active={focused}
           style={StyleSheet.absoluteFill}
           facing={facing}
           mode={mode === 'reel' || videoMode ? 'video' : 'picture'}
@@ -639,7 +659,7 @@ export default function Camera() {
                   onPress={() => choose(m.id)}
                   style={s.mode}
                 >
-                  <Text style={[s.modeText, on && s.modeTextOn]} numberOfLines={1} adjustsFontSizeToFit>
+                  <Text style={[s.modeText, on && s.modeTextOn]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
                     {t(m.label)}
                   </Text>
                 </Pressable>
@@ -746,7 +766,7 @@ const s = StyleSheet.create({
   modes: { height: 40, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   modeRow: { flexDirection: 'row' },
   mode: { width: MODE_WIDTH, height: 40, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[1] },
-  modeText: { color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
+  modeText: { color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
   modeTextOn: { color: WHITE },
   dualToggle: {
     alignSelf: 'center',

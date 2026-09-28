@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { I18nManager, Image, Linking, PanResponder, Pressable, Text, TextInput, View, type LayoutChangeEvent } from 'react-native';
 import type { Story } from '../../../packages/api-client/src/index';
 import type { StoryCard, StorySticker, StoryStickerInput } from '../../../packages/shared/src/stories';
-import { client, errorMessage, mediaUrl, webUrl } from './api';
+import { client, errorMessage, mediaUrl } from './api';
 import { DateField } from './date-time';
 import { useT, type Translator } from './i18n';
 import { radius, space } from './theme';
@@ -154,8 +154,7 @@ function Sticker({
     case 'link':
       return <Chip a11y="link" icon="link" label={s.label ? `${s.label} · ${s.domain}` : s.domain} onPress={() => void Linking.openURL(s.url)} />;
     case 'place':
-      // Place pages live on the web for now.
-      return <Chip a11y="link" icon="location" label={s.name} onPress={() => void Linking.openURL(`${webUrl}/places/${s.placeId}`)} />;
+      return <Chip a11y="link" icon="location" label={s.name} onPress={() => router.push(`/place/${encodeURIComponent(s.placeId)}`)} />;
     case 'poll': {
       const shown = s.results !== undefined;
       return (
