@@ -236,7 +236,8 @@ describe('recaps', () => {
     await drain();
     const failed = (await as(t.app, alice).get(`/v1/recaps/${gone.body.recap.id}`)).body.recap;
     expect(failed).toMatchObject({ status: 'failed', video: null });
-    expect(failed.error).toMatch(/available/);
+    // As a code the app says in her language, with its English for older apps.
+    expect(failed).toMatchObject({ errorCode: 'items_unavailable', error: 'None of the photos or videos you chose are available to you any more.' });
     expect((await t.ctx.db.query(`SELECT type FROM notifications WHERE user_id = $1 AND entity_id = $2`, [alice.id, failed.id])).rows).toEqual([
       { type: 'recap_failed' },
     ]);

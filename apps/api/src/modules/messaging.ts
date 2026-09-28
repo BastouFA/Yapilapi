@@ -212,9 +212,10 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
          (SELECT count(*) FROM messages m WHERE m.conversation_id = c.id AND m.created_at > cm.last_read_at AND m.sender_id <> $1 AND m.deleted_at IS NULL
             AND m.moderation_status = 'normal' AND m.kind <> 'system') AS unread,
          (SELECT array_agg(user_id) FROM conversation_members WHERE conversation_id = c.id AND left_at IS NULL) AS member_ids,
-         lm.id AS lm_id, lm.body AS lm_body, lm.created_at AS lm_created_at, lm.sender_id AS lm_sender, lm.attachments AS lm_attachments, lm.story_id
+         lm.id AS lm_id, lm.body AS lm_body, lm.created_at AS lm_created_at, lm.sender_id AS lm_sender, lm.attachments AS lm_attachments, lm.story_id,
+         lm.meta->'storyReply' AS lm_story_reply
        FROM conversation_members cm JOIN conversations c ON c.id = cm.conversation_id
-       LEFT JOIN LATERAL (SELECT x.id, x.body, x.created_at, x.sender_id, x.attachments, x.story_id FROM messages x
+       LEFT JOIN LATERAL (SELECT x.id, x.body, x.created_at, x.sender_id, x.attachments, x.story_id, x.meta FROM messages x
                           WHERE x.conversation_id = c.id AND x.deleted_at IS NULL AND x.kind <> 'system'
                             AND (x.moderation_status = 'normal' OR (x.moderation_status = 'review' AND x.sender_id = $1))
                             AND (x.expires_at IS NULL OR x.expires_at > now())
@@ -244,6 +245,12 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       ),
       userId,
     );
+    // Each last message's one-line preview: what it is (a location, a game, an offer, a story reply), for the apps to say in the reader's language.
+    const previews = await messagePreviews(
+      db,
+      rows.flatMap((r) => (r.lm_id ? [r.lm_id as string] : [])),
+      userId,
+    );
     return withLast.map((r) => ({
       id: r.id,
       kind: r.kind,
@@ -258,6 +265,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
             replyToId: null,
             attachments: r.attachments ?? [],
             ...(r.story ? { story: r.story } : {}),
+            ...(r.lm_story_reply ? { storyReply: { quote: r.lm_story_reply.quote ?? null } } : {}),
+            ...(previews.get(r.lm_id)?.available ? { preview: previews.get(r.lm_id) } : {}),
             createdAt: r.lm_created_at.toISOString(),
           }
         : null,
@@ -512,6 +521,17 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     if (yap && (await recentYaps(db, u.id)) >= YAP_PER_MINUTE) throw yapRateError();
     // A shared story must be one you can see yourself.
     if (input.storyId && !(await canSeeStory(db, input.storyId, u.id))) throw notFound('Story');
+    // A reply to the other person's story in your one-to-one chat. The story's words go with it (the
+    // body is only the reply), and the apps say "Replied to your story" in the reader's language.
+    let storyReply: { storyId: string; quote: string | null } | null = null;
+    if (input.storyReplyTo) {
+      const story = (await db.query<{ author_id: string; body: string | null }>(`SELECT author_id, body FROM moments WHERE id = $1`, [input.storyReplyTo]))
+        .rows[0];
+      const other = conv.kind === 'direct' ? members.find((m) => m !== u.id) : undefined;
+      if (!story || !other || story.author_id !== other || !(await canSeeStory(db, input.storyReplyTo, u.id))) throw notFound('Story');
+      const words = story.body?.trim() ?? '';
+      storyReply = { storyId: input.storyReplyTo, quote: words ? `${words.slice(0, 80)}${words.length > 80 ? '…' : ''}` : null };
+    }
     const analysis = analyzeText(input.body);
     if (analysis.risk === 'escalate') {
       await db.query(
@@ -573,10 +593,10 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       }
       const { rows } = await c
         .query(
-          `INSERT INTO messages (conversation_id, sender_id, body, reply_to_id, attachments, client_id, moderation_status, kind, view_once, view_once_media_id, story_id, expires_at, lang)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now() + make_interval(secs => $12::int), $13)
+          `INSERT INTO messages (conversation_id, sender_id, body, reply_to_id, attachments, client_id, moderation_status, kind, view_once, view_once_media_id, story_id, expires_at, lang, meta)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now() + make_interval(secs => $12::int), $13, $14)
            ON CONFLICT (sender_id, client_id) WHERE client_id IS NOT NULL DO UPDATE SET client_id = EXCLUDED.client_id
-           RETURNING id, conversation_id, body, lang, reply_to_id, attachments, created_at, client_id, moderation_status, kind, view_once, story_id, expires_at, (xmax = 0) AS inserted`,
+           RETURNING id, conversation_id, body, lang, reply_to_id, attachments, created_at, client_id, moderation_status, kind, view_once, story_id, expires_at, meta, (xmax = 0) AS inserted`,
           [
             id,
             u.id,
@@ -592,6 +612,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
             // Disappearing messages: deleted this long after sending (NULL when off).
             conv.disappearing_seconds ?? null,
             langOf(input.body),
+            storyReply ? { storyReply } : null,
           ],
         )
         .catch((e: { code?: string; constraint?: string }) => {
@@ -632,6 +653,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       ...(row.moderation_status === 'review' ? { moderation: 'review' as const } : {}),
       ...(row.kind === 'yap' ? { kind: 'yap' as const } : {}),
       ...(row.expires_at ? { expiresAt: row.expires_at.toISOString() } : {}),
+      ...storyReplyOf(row),
     };
     if (row.reply_to_id) message.replyTo = (await messagePreviews(db, [row.reply_to_id], u.id)).get(row.reply_to_id) ?? null;
     if (row.view_once) {
@@ -1228,6 +1250,12 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
 
 const yapRateError = () => new AppError(429, 'yap_rate_limited', `You can send up to ${YAP_PER_MINUTE} Yaps a minute. Wait a moment, then try again.`);
 
+/** A reply to a story says so (and quotes it); the apps put "Replied to your story" into the reader's words. */
+function storyReplyOf(r: { kind?: string; meta?: { storyReply?: { quote?: string | null } } | null }): Pick<Message, 'storyReply'> {
+  const reply = r.kind !== 'system' ? r.meta?.storyReply : undefined;
+  return reply ? { storyReply: { quote: reply.quote ?? null } } : {};
+}
+
 function toMessage(r: Record<string, any>): Message {
   return {
     id: r.id,
@@ -1242,6 +1270,7 @@ function toMessage(r: Record<string, any>): Message {
     ...(r.moderation_status === 'review' ? { moderation: 'review' as const } : {}),
     ...(r.kind === 'yap' || r.kind === 'system' ? { kind: r.kind as 'yap' | 'system' } : {}),
     ...(r.kind === 'system' && r.meta ? { system: r.meta } : {}),
+    ...storyReplyOf(r),
     ...(r.story ? { story: r.story } : {}),
     ...(r.edited_at ? { editedAt: r.edited_at.toISOString() } : {}),
     ...(r.unsent_at ? { unsent: true } : {}),

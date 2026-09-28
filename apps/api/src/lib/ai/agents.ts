@@ -6,6 +6,14 @@ import { searchAll } from '../../modules/search.ts';
 import { EVENT_SELECT, toEvent } from '../../modules/events.ts';
 import { eventVisibleSql } from '../visibility.ts';
 import type { AgentTool, AiProvider } from './providers.ts';
+import { agentSubtitle, t, tp } from '@yapilapi/shared';
+
+/** For the English lines older apps show. */
+const ENGLISH = {
+  t: (k: Parameters<typeof t>[0], v?: Record<string, string | number>) => t(k, 'en', v),
+  tp: (k: Parameters<typeof tp>[0], n: number, v?: Record<string, string | number>) => tp(k, n, 'en', v),
+  locale: 'en',
+};
 
 export const AGENT_KINDS = ['discover', 'travel', 'shopping', 'business'] as const;
 export type AgentKind = (typeof AGENT_KINDS)[number];
@@ -20,6 +28,10 @@ export interface Entity {
   startsAt?: string;
   /** Communities: how many members, for the app to say in the viewer's language (`subtitle` has it in English). */
   memberCount?: number;
+  /** Products: the price and what kind it is (a PRODUCT_KINDS code), for the app to write in the viewer's language. */
+  priceCents?: number;
+  currency?: string;
+  productKind?: string;
   href: string;
 }
 export interface Recommendation extends Entity {
@@ -125,7 +137,11 @@ export async function runAgent(
           type: 'product',
           id: p.id,
           title: p.title,
-          subtitle: `${(p.priceCents / 100).toFixed(2)} ${p.currency} · ${p.kind}`,
+          // In English for older apps; newer ones write the price and kind in the viewer's language (agentSubtitle).
+          subtitle: agentSubtitle({ type: 'product', priceCents: p.priceCents, currency: p.currency, productKind: p.kind }, ENGLISH),
+          priceCents: p.priceCents,
+          currency: p.currency,
+          productKind: p.kind,
           href: `/discover?q=${encodeURIComponent(p.title)}`,
         }),
       );

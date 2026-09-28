@@ -53,7 +53,11 @@ export async function messagePreviews(db: Q, ids: string[], readerId: string): P
                  WHEN m.kind = 'message' AND m.meta ? 'listingId' THEN 'listing'
                  WHEN m.kind = 'message' AND m.meta ? 'offerId' THEN 'offer'
                  WHEN EXISTS (SELECT 1 FROM location_shares s WHERE s.message_id = m.id) THEN 'location' END AS rich_kind,
-            (SELECT g.kind FROM chat_games g WHERE g.message_id = m.id) AS game_kind
+            (SELECT g.kind FROM chat_games g WHERE g.message_id = m.id) AS game_kind,
+            (SELECT s.mode FROM location_shares s WHERE s.message_id = m.id LIMIT 1) AS location_mode,
+            (SELECT json_build_object('amountCents', o.amount_cents, 'currency', trim(o.currency), 'counter', o.counter_of IS NOT NULL)
+               FROM market_offers o WHERE o.message_id = m.id) AS offer,
+            m.meta->'storyReply' AS story_reply
      FROM messages m WHERE m.id = ANY($1::uuid[])`,
     [unique, readerId],
   );
@@ -78,6 +82,10 @@ export async function messagePreviews(db: Q, ids: string[], readerId: string): P
             attachmentKind: r.attachment_kind ?? null,
             ...(r.rich_kind ? { kind: r.rich_kind } : {}),
             ...(r.game_kind ? { gameKind: r.game_kind } : {}),
+            // What the apps need to say a location, an offer or a story reply in the reader's language.
+            ...(r.rich_kind === 'location' ? { live: r.location_mode === 'live' } : {}),
+            ...(r.rich_kind === 'offer' && r.offer ? { offer: { ...r.offer, amountCents: Number(r.offer.amountCents) } } : {}),
+            ...(r.story_reply ? { storyReply: { quote: r.story_reply.quote ?? null } } : {}),
           },
     );
   }

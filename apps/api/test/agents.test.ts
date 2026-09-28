@@ -85,6 +85,33 @@ describe('AI agents', () => {
     expect(res.actions).toEqual([expect.objectContaining({ kind: 'join', label: `Join: ${word} singers` })]);
   });
 
+  it('sends a product’s price and kind for the apps to write, with the English for older apps', async () => {
+    const seller = await signUp(t.app);
+    const me = await signUp(t.app);
+    const word = `lamp${tag()}`;
+    const product = (await as(t.app, seller).post('/v1/products', { kind: 'digital', title: `${word} pattern`, priceCents: 1250, currency: 'USD' })).body
+      .product;
+    const provider: AiProvider = {
+      name: 'scripted',
+      model: 'scripted-1',
+      complete: async () => ({ text: '', provider: 'scripted', model: 'scripted-1' }),
+      agent: async ({ tools }) => {
+        const tool = (n: string) => tools.find((x) => x.name === n)!;
+        await tool('search').run({ query: word, type: 'products' });
+        await tool('recommend').run({ type: 'product', id: product.id, reason: 'You make things.' });
+        return { text: 'Here.', provider: 'scripted', model: 'scripted-1' };
+      },
+    };
+    const res = await runAgent(t.ctx.db, provider, me.id, 'shopping', word);
+    expect(res.recommendations[0]).toMatchObject({
+      type: 'product',
+      priceCents: 1250,
+      currency: 'USD',
+      productKind: 'digital',
+      subtitle: '$12.50 · Download',
+    });
+  });
+
   it('withholds unsafe output', async () => {
     const me = await signUp(t.app);
     const provider: AiProvider = {

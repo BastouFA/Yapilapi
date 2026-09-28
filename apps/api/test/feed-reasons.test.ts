@@ -160,7 +160,8 @@ describe('"Why am I seeing this?" as codes', () => {
       { code: 'topics', params: { topics: expect.arrayContaining([a, b]) } },
     ]);
     expect(both.reasons[0]).toBe("You're friends with Femi.");
-    expect(both.reasons[1]).toMatch(new RegExp(`^You follow the topics (${a}, ${b}|${b}, ${a})\\.$`));
+    // Joined with the catalog's own words ("a and b"), as the phone does without list formatting.
+    expect(both.reasons[1]).toMatch(new RegExp(`^You follow the topics (${a} and ${b}|${b} and ${a})\\.$`));
     expect(both.controls).toContain('more_like_this');
 
     const single = await why(viewer, one.id);

@@ -66,6 +66,14 @@ export function recipientLocale(locale: string | null | undefined): string {
   return SUPPORTED_LOCALES.includes(base) ? base : 'en';
 }
 
+/** The language to write to this account in (see recipientLocale): for text the server itself makes, like a title or a credit. */
+export async function userLocale(
+  db: { query: (sql: string, params: unknown[]) => Promise<{ rows: { locale: string | null }[] }> },
+  userId: string,
+): Promise<string> {
+  return recipientLocale((await db.query(`SELECT locale FROM profiles WHERE user_id = $1`, [userId])).rows[0]?.locale);
+}
+
 /** "When: Sunday 27 September 2026 at 20:00 UTC", the date and time in the reader's language, always in UTC. */
 export function whenLine(at: Date, locale: string): string {
   // Fields rather than dateStyle/timeStyle: Yorùbá's short time style drops a digit ("20:0").

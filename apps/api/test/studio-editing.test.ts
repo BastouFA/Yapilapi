@@ -395,4 +395,48 @@ describe('automatic captions', () => {
       t.ctx.transcription = null;
     }
   }, 120_000);
+
+  it('says why automatic captions failed as a code, never with what the provider said', async () => {
+    // English finds no speech; French fails inside the provider.
+    t.ctx.transcription = {
+      name: 'test',
+      async transcribe({ language }) {
+        if (language === 'fr') throw new Error('provider said: quota key sk-123 exceeded');
+        return 'WEBVTT\n\n';
+      },
+    };
+    try {
+      const owner = await signUp(t.app);
+      const id = await uploadVideo(owner);
+      expect((await as(t.app, owner).post(`/v1/media/${id}/captions/transcribe`, { lang: 'en', label: 'English' })).status).toBe(202);
+      expect((await as(t.app, owner).post(`/v1/media/${id}/captions/transcribe`, { lang: 'fr', label: 'Français' })).status).toBe(202);
+      await drain();
+      const items = (await as(t.app, owner).get(`/v1/media/${id}/captions`)).body.items as { lang: string; errorCode: string; error: string }[];
+      expect(items.find((x) => x.lang === 'en')).toMatchObject({ status: 'failed', errorCode: 'no_speech', error: 'No speech was found in this video.' });
+      const fr = items.find((x) => x.lang === 'fr')!;
+      expect(fr).toMatchObject({ status: 'failed', errorCode: 'failed' });
+      expect(JSON.stringify(fr)).not.toContain('sk-123');
+    } finally {
+      t.ctx.transcription = null;
+    }
+  }, 120_000);
+});
+
+describe('failed trims and clips', () => {
+  it('say why as a code; one stored before codes keeps only our own words', async () => {
+    const owner = await signUp(t.app);
+    const id = await uploadVideo(owner);
+    const edit = (error: string | null) =>
+      t.ctx.db.query(`INSERT INTO media_edits (source_media_id, owner_id, kind, start_ms, end_ms, status, error) VALUES ($1,$2,'trim',0,1000,'failed',$3)`, [
+        id,
+        owner.id,
+        error,
+      ]);
+    await edit('source_missing');
+    await edit("We couldn't render this part of the video. ffmpeg exited with code 1: Invalid data found");
+    const items = (await as(t.app, owner).get(`/v1/media/${id}/edits`)).body.items as { errorCode: string; error: string }[];
+    expect(items.map((e) => e.errorCode).sort()).toEqual(['render_failed', 'source_missing']);
+    expect(items.find((e) => e.errorCode === 'render_failed')!.error).toBe("We couldn't make this part of the video. Try a different start or end.");
+    expect(JSON.stringify(items)).not.toContain('ffmpeg');
+  });
 });

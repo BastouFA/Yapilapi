@@ -15,6 +15,7 @@ import {
 import { z } from 'zod';
 import type { AppContext } from '../lib/context.ts';
 import { AppError, badRequest, notFound, parse } from '../lib/errors.ts';
+import { messageFailure, messageFailureCode, messageFailureEnglish } from '../lib/failures.ts';
 import { enqueue, enqueueAt } from '../lib/jobs.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { messageVisibleSql } from '../lib/chat.ts';
@@ -49,6 +50,12 @@ const idParam = z.object({ id: z.string().uuid() });
 
 const SCHEDULED_COLS = `id, conversation_id, body, reply_to_id, send_at, status, failure, message_id, created_at`;
 
+/** Why it wasn't sent: the code (stored since codes began), with its English for older apps. */
+function failureOf(stored: string | null): Pick<ScheduledMessage, 'failure' | 'failureCode'> {
+  const f = messageFailure(stored);
+  return f ? { failure: f.english, ...(f.code ? { failureCode: f.code } : {}) } : {};
+}
+
 function toScheduled(r: Record<string, any>): ScheduledMessage {
   return {
     id: r.id,
@@ -57,7 +64,7 @@ function toScheduled(r: Record<string, any>): ScheduledMessage {
     replyToId: r.reply_to_id ?? null,
     sendAt: r.send_at.toISOString(),
     status: r.status,
-    ...(r.failure ? { failure: r.failure } : {}),
+    ...failureOf(r.failure),
     ...(r.message_id ? { messageId: r.message_id } : {}),
     createdAt: r.created_at.toISOString(),
   };
@@ -149,9 +156,11 @@ export function registerChatLater(app: FastifyInstance, ctx: AppContext, h: Chat
         await enqueue(db, SEND_LATER_JOB, { id }, 60);
         return;
       }
+      // Stored as a code, said in the sender's language by the apps.
+      const code = messageFailureCode(e);
       const failed = await db.query(
         `UPDATE scheduled_messages SET status = 'failed', failure = $2, updated_at = now() WHERE id = $1 AND status = 'scheduled' RETURNING id, conversation_id, status`,
-        [id, e.message.slice(0, 300)],
+        [id, code],
       );
       if (!failed.rows[0]) return;
       await changed(s.sender_id, failed.rows[0]);
@@ -161,7 +170,7 @@ export function registerChatLater(app: FastifyInstance, ctx: AppContext, h: Chat
         type: 'scheduled_message_failed',
         entityType: 'conversation',
         entityId: s.conversation_id,
-        data: { scheduledId: id, reason: e.message.slice(0, 300) },
+        data: { scheduledId: id, code, reason: messageFailureEnglish(code) },
       });
     }
   };

@@ -93,7 +93,8 @@ describe('stories', () => {
     const r = await as(t.app, friend).post(`/v1/moments/${s.id}/reply`, { body: 'Looks great' });
     expect(r.status).toBe(201);
     const msgs = await as(t.app, author).get(`/v1/conversations/${r.body.conversationId}/messages`);
-    expect(msgs.body.items.at(-1).body).toBe('Replied to “New studio”: Looks great');
+    // The body is the reply; what it answers comes beside it, for the apps to say in the reader's language.
+    expect(msgs.body.items.at(-1)).toMatchObject({ body: 'Looks great', storyReply: { quote: 'New studio' } });
     expect((await as(t.app, author).post(`/v1/moments/${s.id}/reply`, { body: 'me' })).status).toBe(400);
   });
 });

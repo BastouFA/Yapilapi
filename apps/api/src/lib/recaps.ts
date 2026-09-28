@@ -15,7 +15,12 @@ import {
   type RecapCandidate,
   type RecapSource,
   type RecapStyle,
+  type RecapErrorCode,
 } from '@yapilapi/shared';
+// Every language, loaded up front: the "On this day" title is in its maker's.
+import { t } from '@yapilapi/shared/i18n';
+import { userLocale } from './email.ts';
+import type { JobLog } from './failures.ts';
 import ffmpegPath from './ffmpeg-path.ts';
 import { tx } from '@yapilapi/database';
 import { AppError, notFound } from './errors.ts';
@@ -186,8 +191,8 @@ export async function recapCandidates(db: Q, viewer: string, ref: SourceRef): Pr
       [viewer, t.id],
     ]);
   } else {
-    // Your own posts and stories from this day in earlier years.
-    title = 'On this day';
+    // Your own posts and stories from this day in earlier years, titled in your language.
+    title = t('m.recap.onThisDay', await userLocale(db, viewer));
     const sameDay = (col: string) =>
       `extract(month FROM ${col}) = extract(month FROM now()) AND extract(day FROM ${col}) = extract(day FROM now()) AND ${col} < date_trunc('year', now())`;
     queries.push(
@@ -729,6 +734,7 @@ export interface RecapDeps {
   storage: MediaStorage;
   realtime: RealtimeHub;
   moderator?: MediaModerator;
+  log?: JobLog;
 }
 
 /** The storage key of a video's processed web MP4, when it has one. */
@@ -756,7 +762,12 @@ export function yearSpan(dates: string[]): string | null {
   return lo === hi ? String(lo) : `${lo} – ${hi}`;
 }
 
-class RecapFailure extends Error {}
+/** A failure the maker is told about, by its code (job-failures.ts). */
+class RecapFailure extends Error {
+  constructor(public code: RecapErrorCode) {
+    super(code);
+  }
+}
 
 /** Every file a stored video has: the upload, its web MP4, posters and HLS playlist and segments. */
 export function recapStoredKeys(key: string, durationMs: number | null): string[] {
@@ -807,14 +818,14 @@ export async function renderRecapJob(deps: RecapDeps, recapId: string): Promise<
     try {
       candidates = (await recapCandidates(db, r.owner_id, { source: r.source_type, sourceId: r.source_id })).items;
     } catch {
-      throw new RecapFailure("This memory, chapter or album isn't available to you any more.");
+      throw new RecapFailure('source_unavailable');
     }
     const byId = new Map(candidates.map((c) => [c.mediaId, c]));
     const chosen = (r.items as { mediaId: string }[])
       .map((it) => byId.get(it.mediaId))
       .filter((c): c is CandidateMedia => !!c && (c.sizeBytes == null || c.sizeBytes <= RECAP_MAX_SOURCE_BYTES))
       .slice(0, RECAP_MAX_ITEMS);
-    if (!chosen.length) throw new RecapFailure('None of the photos or videos you chose are available to you any more.');
+    if (!chosen.length) throw new RecapFailure('items_unavailable');
 
     // Copy each file here; one that can't be read is left out.
     const files = new Map<number, string>();
@@ -829,7 +840,7 @@ export async function renderRecapJob(deps: RecapDeps, recapId: string): Promise<
       }
     }
     const usable = chosen.filter((_, i) => files.has(i));
-    if (!usable.length) throw new RecapFailure("We couldn't read the photos or videos you chose. Try again later.");
+    if (!usable.length) throw new RecapFailure('items_unreadable');
     const usableFiles = new Map<number, string>();
     let k = 0;
     for (const [i] of chosen.entries()) if (files.has(i)) usableFiles.set(k++, files.get(i)!);
@@ -882,9 +893,9 @@ export async function renderRecapJob(deps: RecapDeps, recapId: string): Promise<
         posterFile,
       ));
     } catch (e) {
-      throw new RecapFailure(
-        `We couldn't make this recap. Try again with fewer or different photos and videos. (${String((e as Error).message).slice(0, 120)})`,
-      );
+      // What ffmpeg said stays in the logs; the maker hears what they can do about it.
+      deps.log?.warn({ recapId, err: String((e as Error).message).slice(0, 500) }, 'recap render failed');
+      throw new RecapFailure('render_failed');
     }
 
     // Stored like any upload, then processed like any video.
@@ -924,11 +935,10 @@ export async function renderRecapJob(deps: RecapDeps, recapId: string): Promise<
     }).catch(() => {});
   } catch (e) {
     if (mediaId) await removeRecapMedia(deps, mediaId).catch(() => false);
-    const message = e instanceof RecapFailure ? e.message : "We couldn't make this recap. Try again later.";
-    const failed = await db.query(`UPDATE recaps SET status = 'failed', error = $2, finished_at = now() WHERE id = $1 AND deleted_at IS NULL`, [
-      recapId,
-      message,
-    ]);
+    if (!(e instanceof RecapFailure)) deps.log?.warn({ recapId, err: String((e as Error).message).slice(0, 500) }, 'recap failed');
+    // The code is stored; the apps say it in the maker's language (recapFailure() reads it back).
+    const code: RecapErrorCode = e instanceof RecapFailure ? e.code : 'failed';
+    const failed = await db.query(`UPDATE recaps SET status = 'failed', error = $2, finished_at = now() WHERE id = $1 AND deleted_at IS NULL`, [recapId, code]);
     if (failed.rowCount)
       await notify(db, deps.realtime, {
         userId: r.owner_id,

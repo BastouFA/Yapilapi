@@ -4,6 +4,7 @@ import { SCHEDULE_MAX_DAYS, SCHEDULE_MIN_MINUTES, type CreatePostInput, type Mod
 import { moderationOf } from './notices.ts';
 import type { AppContext } from './context.ts';
 import { AppError, badRequest, forbidden, notFound } from './errors.ts';
+import { scheduledPostFailureCode, scheduledPostFailureEnglish } from './failures.ts';
 import { enqueueAt, type JobHandler } from './jobs.ts';
 import { analyzeText, statusForRisk, type Analysis } from './moderation.ts';
 import { notifyMentions } from './mentions.ts';
@@ -444,11 +445,11 @@ export async function publishDraft(deps: Deps, postId: string, authorId: string)
   if (d.blocked_media || d.moderation_status === 'removed') throw new AppError(422, 'media_blocked', MEDIA_BLOCKED_MESSAGE);
   if (d.community_id) {
     const m = await db.query(`SELECT role FROM community_members WHERE community_id = $1 AND user_id = $2 AND status = 'active'`, [d.community_id, authorId]);
-    if (!m.rows[0] || m.rows[0].role === 'guest') throw forbidden('Join the community to post in it.');
+    if (!m.rows[0] || m.rows[0].role === 'guest') throw new AppError(403, 'forbidden', 'Join the community to post in it.', { failure: 'community' });
   }
   if (d.visibility === 'subscribers') {
     const plan = await db.query(`SELECT 1 FROM creator_plans WHERE creator_id = $1 AND active LIMIT 1`, [authorId]);
-    if (!plan.rowCount) throw badRequest('Add a subscription plan in Studio before posting for subscribers.');
+    if (!plan.rowCount) throw badRequest('Add a subscription plan in Studio before posting for subscribers.', { failure: 'no_plan' });
   }
   const remixAuthor = d.format === 'reel' && d.remix_of_post_id ? (await assertRemixable(db, d.remix_of_post_id, authorId)).authorId : null;
   // Music: the song's licence (and the author's account type and country) or the sound are checked again as it goes out.
@@ -552,6 +553,8 @@ export function scheduledPostJobHandlers(deps: Deps): Record<string, JobHandler>
           `UPDATE posts SET status = 'draft', scheduled_at = NULL, updated_at = now() WHERE id = $1 AND status = 'scheduled' AND deleted_at IS NULL`,
           [postId],
         );
+        // Why, as a code the apps say in the author's language (and its English for older apps).
+        const code = scheduledPostFailureCode(e);
         if (back.rowCount)
           await notify(deps.db, deps.realtime, {
             userId: due.author_id,
@@ -559,7 +562,7 @@ export function scheduledPostJobHandlers(deps: Deps): Record<string, JobHandler>
             type: 'scheduled_post_failed',
             entityType: 'draft',
             entityId: postId,
-            data: { reason: e.message },
+            data: { code, reason: scheduledPostFailureEnglish(code) },
           });
       }
     },

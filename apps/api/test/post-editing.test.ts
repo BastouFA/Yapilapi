@@ -347,6 +347,22 @@ describe('drafts and scheduled posts', () => {
     const row = (await t.ctx.db.query(`SELECT status, scheduled_at FROM posts WHERE id = $1`, [post.id])).rows[0];
     expect(row).toMatchObject({ status: 'draft', scheduled_at: null });
     expect(await notes(author.id, 'scheduled_post_failed', post.id)).toBe(1);
+    // Why, as a code the apps say in the author's language, and its English for older apps.
+    const data = (await t.ctx.db.query(`SELECT data FROM notifications WHERE user_id = $1 AND type = 'scheduled_post_failed'`, [author.id])).rows[0].data;
+    expect(data).toEqual({ code: 'content_blocked', reason: "It can't be published because it may put someone at risk." });
+  });
+
+  it('says a scheduled post in a community you left needs you to join again', async () => {
+    const author = await adult();
+    const slug = `sched-${Date.now().toString(36)}`;
+    const c = (await as(t.app, author).post('/v1/communities', { name: 'Morning runs', slug, visibility: 'public' })).body.community;
+    const post = (await as(t.app, author).post('/v1/posts', { body: 'Run at six', communityId: c.id, scheduledAt: inMinutes(15) })).body.post;
+    await t.ctx.db.query(`DELETE FROM community_members WHERE community_id = $1 AND user_id = $2`, [c.id, author.id]);
+    await arrive(post.id);
+    const data = (
+      await t.ctx.db.query(`SELECT data FROM notifications WHERE user_id = $1 AND type = 'scheduled_post_failed' AND entity_id = $2`, [author.id, post.id])
+    ).rows[0]?.data;
+    expect(data).toEqual({ code: 'community', reason: 'Join the community again to post in it.' });
   });
 
   it('checks the time and what can be saved', async () => {
