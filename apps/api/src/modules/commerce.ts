@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Pool } from 'pg';
 import { tx } from '@yapilapi/database';
-import { createBusinessSchema, createOrderSchema, createPlaceSchema, createProductSchema, PLACE_CATEGORIES } from '@yapilapi/shared';
+import { createBusinessSchema, createOrderSchema, createPlaceSchema, createProductSchema, EARNINGS_HOLD_DAYS, PLACE_CATEGORIES } from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
@@ -506,7 +506,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
           return;
         }
         await c.query(`UPDATE payments SET status = 'succeeded', updated_at = now() WHERE id = $1`, [p.id]);
-        await c.query(`UPDATE orders SET status = 'paid', updated_at = now() WHERE id = $1`, [p.order_id]);
+        await c.query(`UPDATE orders SET status = 'paid', paid_at = now(), updated_at = now() WHERE id = $1`, [p.order_id]);
         // Paid after its hold in a drop ended and the units went to someone else (or the drop closed): the money goes straight back.
         if (!(await confirmDropOrder(c, p.order_id))) {
           await refundOrder(c, ctx.paymentProviders, p.order_id, null, 'The drop items were no longer available when the payment arrived');
@@ -714,17 +714,22 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
   });
 }
 
-/** What someone earned per currency, after the platform fee, and what's left once payouts (other than failed ones) are taken off. */
+/**
+ * What someone earned per currency after the platform fee. A sale's share is held for EARNINGS_HOLD_DAYS
+ * after it was paid (heldCents); what's left once payouts (other than failed ones) are taken off can be
+ * paid out (availableCents).
+ */
 async function earnings(q: Pick<Pool, 'query'>, userId: string) {
   const { rows } = await q.query(
-    `SELECT currency, sum(gross) AS gross, sum(fees) AS fees FROM (
-       SELECT o.currency, oi.quantity * oi.unit_cents AS gross, round(oi.quantity * oi.unit_cents * ${PLATFORM_FEE_BPS} / 10000.0) AS fees
+    `SELECT currency, sum(gross) AS gross, sum(fees) AS fees, sum(gross - fees) FILTER (WHERE held) AS held FROM (
+       SELECT o.currency, oi.quantity * oi.unit_cents AS gross, round(oi.quantity * oi.unit_cents * ${PLATFORM_FEE_BPS} / 10000.0) AS fees, o.paid_at > now() - make_interval(days => $2) AS held
        FROM order_items oi JOIN orders o ON o.id = oi.order_id JOIN products p ON p.id = oi.product_id
        WHERE p.seller_id = $1 AND o.status = 'paid'
        UNION ALL
-       SELECT o.currency, o.total_cents, o.platform_fee_cents FROM orders o WHERE o.payee_id = $1 AND o.status = 'paid' AND o.purpose IN ('subscription', 'tip')
+       SELECT o.currency, o.total_cents, o.platform_fee_cents, o.paid_at > now() - make_interval(days => $2) FROM orders o
+       WHERE o.payee_id = $1 AND o.status = 'paid' AND o.purpose IN ('subscription', 'tip')
      ) x GROUP BY currency`,
-    [userId],
+    [userId, EARNINGS_HOLD_DAYS],
   );
   const payouts = await q.query(`SELECT currency, sum(amount_cents) AS paid FROM payouts WHERE user_id = $1 AND status <> 'failed' GROUP BY currency`, [
     userId,
@@ -735,8 +740,9 @@ async function earnings(q: Pick<Pool, 'query'>, userId: string) {
     const r = rows.find((x) => x.currency === currency);
     const gross = Number(r?.gross ?? 0);
     const fees = Number(r?.fees ?? 0);
+    const held = Number(r?.held ?? 0);
     const paid = Number(payouts.rows.find((p) => p.currency === currency)?.paid ?? 0);
-    return { currency, grossCents: gross, feeCents: fees, availableCents: gross - fees - paid };
+    return { currency, grossCents: gross, feeCents: fees, heldCents: held, availableCents: gross - fees - held - paid };
   });
 }
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button, EmptyState, List, ListItem, Select, Skeleton, Stat, TextField } from '@yapilapi/design-system';
-import { CURRENCIES, currencyForCountry, formatMoney, formatRelativeTime } from '@yapilapi/shared';
+import { CURRENCIES, currencyForCountry, EARNINGS_HOLD_DAYS, formatMoney, formatRelativeTime } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { Campaigns } from '@/components/Campaigns';
 import { VideoEditor } from '@/components/VideoEditor';
@@ -14,7 +14,7 @@ export default function Studio() {
   const { locale, t, tp } = useSession();
   const [data, setData] = useState<Awaited<ReturnType<typeof api.creator.analytics>> | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
-  const [earnings, setEarnings] = useState<{ currency: string; grossCents: number; feeCents: number; availableCents: number }[]>([]);
+  const [earnings, setEarnings] = useState<{ currency: string; grossCents: number; feeCents: number; heldCents: number; availableCents: number }[]>([]);
   const loadAnalytics = () => {
     setFailed(null);
     api.creator.analytics().then(setData, (e) => setFailed(errorMessage(e)));
@@ -81,7 +81,12 @@ export default function Studio() {
                 key={e.currency}
                 label={t('m.studio.available', { currency: e.currency })}
                 value={formatMoney(e.availableCents, e.currency, locale)}
-                delta={t('m.studio.earningsLine', { gross: formatMoney(e.grossCents, e.currency, locale), fees: formatMoney(e.feeCents, e.currency, locale) })}
+                delta={[
+                  t('m.studio.earningsLine', { gross: formatMoney(e.grossCents, e.currency, locale), fees: formatMoney(e.feeCents, e.currency, locale) }),
+                  e.heldCents > 0 ? t('m.studio.earningsHeld', { amount: formatMoney(e.heldCents, e.currency, locale), days: EARNINGS_HOLD_DAYS }) : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               />
             ))}
           </div>

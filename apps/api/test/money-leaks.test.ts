@@ -61,8 +61,15 @@ describe('payouts', () => {
 
     const o = await order(buyer, [{ productId: await product(seller) }]);
     expect((await webhook(o, 'payment.succeeded')).status).toBe(200);
-    // $10 less the 5% fee.
-    expect((await as(t.app, seller).get('/v1/me/earnings')).body.balances).toEqual([{ currency: 'USD', grossCents: 1000, feeCents: 50, availableCents: 950 }]);
+    // $10 less the 5% fee, held for a week after the sale so an early refund or chargeback comes out of it.
+    expect((await as(t.app, seller).get('/v1/me/earnings')).body.balances).toEqual([
+      { currency: 'USD', grossCents: 1000, feeCents: 50, heldCents: 950, availableCents: 0 },
+    ]);
+    expect((await as(t.app, seller).post('/v1/me/payouts', { amountCents: 950, currency: 'USD' })).status).toBe(400);
+    await db().query(`UPDATE orders SET paid_at = now() - interval '7 days 1 minute' WHERE id = $1`, [o]);
+    expect((await as(t.app, seller).get('/v1/me/earnings')).body.balances).toEqual([
+      { currency: 'USD', grossCents: 1000, feeCents: 50, heldCents: 0, availableCents: 950 },
+    ]);
     expect((await as(t.app, seller).post('/v1/me/payouts', { amountCents: 951, currency: 'USD' })).status).toBe(400);
     // Two requests at once can't both spend the same balance.
     const both = await Promise.all([1, 2].map(() => as(t.app, seller).post('/v1/me/payouts', { amountCents: 950, currency: 'USD' })));
