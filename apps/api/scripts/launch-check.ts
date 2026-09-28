@@ -210,6 +210,12 @@ async function main() {
     cfg.VAPID_PUBLIC_KEY ? 'VAPID keys set' : 'run: npx web-push generate-vapid-keys',
   );
 
+  // Buying digital goods (Plus, tips, boosts) in the phone apps: docs/operations/in-app-purchases.md
+  const ios = cfg.IOS_DIGITAL_PURCHASES === 'external_link' ? `web link in ${cfg.IOS_EXTERNAL_LINK_COUNTRIES.join(', ')}` : cfg.IOS_DIGITAL_PURCHASES;
+  const android =
+    cfg.ANDROID_DIGITAL_PURCHASES === 'user_choice' ? `web link in ${cfg.ANDROID_USER_CHOICE_COUNTRIES.join(', ')}` : cfg.ANDROID_DIGITAL_PURCHASES;
+  add('Phone app purchases', 'ready', `iPhone: ${ios}; Android: ${android} (section 6)`);
+
   // Addresses the world sees
   const local = (u: string) => /localhost|127\.0\.0\.1|\.local\b/.test(u);
   add(
