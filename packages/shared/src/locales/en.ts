@@ -5921,6 +5921,32 @@ export const en = {
   'feed.why.topics.other': 'You follow the topics {topics}.',
   'feed.why.engagement': 'People are engaging with it.',
   'feed.why.fallback': "It's recent and public, and we're still learning what you like.",
+  'notice.postLimited': 'Your account is limited while our team reviews some recent activity, so new posts are visible only to you for now.',
+  'notice.postHeld': 'Your post is published to you only until it has been reviewed.',
+  'notice.answerHeld': 'Your answer is visible only to you until it has been reviewed.',
+  'notice.questionHeld': 'Your question will reach them once our team has reviewed it.',
+  'notice.listingHeld':
+    'Your listing will show once we’ve had a quick look at it. This usually takes less than a day, and you’ll see it under Your listings meanwhile.',
+  'notice.messageHeld':
+    'We’re holding this message for a quick check before it’s delivered. This sometimes happens with messages to people you aren’t friends with yet.',
+  'ads.sponsored': 'Sponsored',
+  'ads.why.optedIn': 'You turned on advertising in your privacy settings.',
+  'ads.why.topics': "It's about {topics}, which you follow.",
+  'ads.why.language': 'It matches your language.',
+  'ads.why.country': "It's shown to people in your country.",
+  'suggest.reason.mutual.one': 'Followed by {count} person you follow',
+  'suggest.reason.mutual.other': 'Followed by {count} people you follow',
+  'suggest.reason.sharedInterests.one': '{count} shared interest',
+  'suggest.reason.sharedInterests.other': '{count} shared interests',
+  'suggest.reason.topical': 'Posts about your interests',
+  'suggest.reason.reels': 'Posts reels',
+  'suggest.reason.popular': 'Popular on YAPILAPI',
+  'agent.action.rsvp': 'RSVP: {title}',
+  'agent.action.book': 'Request a booking: {title}',
+  'agent.action.buy': 'Buy: {title}',
+  'agent.action.follow': 'Follow: {title}',
+  'agent.action.join': 'Join: {title}',
+  'report.thanks': "Thanks for telling us. We'll review this and let you know what we decide.",
 } as const;
 
 export type MessageKey = keyof typeof en;

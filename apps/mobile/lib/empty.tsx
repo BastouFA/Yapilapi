@@ -5,13 +5,14 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import type { TrendingTag } from '../../../packages/api-client/src/index';
 import type { FeedMode } from '../../../packages/shared/src/constants';
-import type { PublicUser } from '../../../packages/shared/src/types';
+import type { PeopleSuggestion, PublicUser } from '../../../packages/shared/src/types';
 import { client, errorMessage } from './api';
 import { useT } from './i18n';
 import { radius, space } from './theme';
 import { Avatar, Button, Card, EmptyState, Notice, Skeleton, useColors, userText } from './ui';
+import { suggestionReasonText } from '../../../packages/shared/src/server-text';
 
-type Suggestion = { user: PublicUser; reason: string };
+type Suggestion = PeopleSuggestion;
 
 /** A person with a reason and one button, for the lists below. */
 function PersonRow({ user, sub, action }: { user: PublicUser; sub?: string; action: ReactNode }) {
@@ -62,7 +63,7 @@ function PeopleSkeleton() {
  */
 export function PulseEmpty({ mode, onFollowed, onShowForYou }: { mode: FeedMode; onFollowed: () => void; onShowForYou?: () => void }) {
   const c = useColors();
-  const { t } = useT();
+  const { t, tp } = useT();
   const [people, setPeople] = useState<Suggestion[] | null>(null);
   const [tags, setTags] = useState<TrendingTag[]>([]);
   const [following, setFollowing] = useState<Set<string>>(new Set());
@@ -128,7 +129,7 @@ export function PulseEmpty({ mode, onFollowed, onShowForYou }: { mode: FeedMode;
                 <PersonRow
                   key={p.user.id}
                   user={p.user}
-                  sub={p.reason || undefined}
+                  sub={suggestionReasonText(p, { t, tp }) || undefined}
                   action={
                     <Button
                       size="sm"

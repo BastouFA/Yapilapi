@@ -20,6 +20,8 @@ import {
 } from '@yapilapi/design-system';
 import type { SponsoredAd } from '@yapilapi/api-client';
 import {
+  adWhyText,
+  noticeText,
   MAX_COLLABORATORS,
   REPORT_REASONS,
   whyReasonText,
@@ -322,7 +324,7 @@ export function PostList({
   const renderAd = (slotAd: SponsoredAd) => (
     <section className="yp-sponsored" aria-label={t('postList.sponsoredPost')}>
       <div className="yp-sponsored__bar">
-        <Badge tone="neutral">{slotAd.label}</Badge>
+        <Badge tone="neutral">{t('ads.sponsored')}</Badge>
         <span className="yp-spacer" />
         <Button size="sm" variant="ghost" onClick={() => setAdWhy(true)}>
           {t('postList.whyAd')}
@@ -494,7 +496,7 @@ export function PostList({
 
       <BottomSheet open={adWhy && !!ad} onClose={() => setAdWhy(false)} title={t('postList.whyAdTitle')}>
         <ul className="stack-sm" style={{ paddingInlineStart: 20, margin: 0 }}>
-          {ad?.why.map((r) => (
+          {(ad?.whyDetails ? ad.whyDetails.map((w) => adWhyText(w, { t, locale })) : (ad?.why ?? [])).map((r) => (
             <li key={r}>{r}</li>
           ))}
         </ul>
@@ -575,7 +577,7 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
               ...(changedAlts.length ? { media: changedAlts.map((m) => ({ id: m.id, altText: (alts[m.id] ?? '').trim() })) } : {}),
             });
             onSaved(r.post);
-            toast(r.moderation ? r.moderation.message : t('m.post.updated'));
+            toast(noticeText(r.moderation, t) ?? t('m.post.updated'));
             onClose();
           } catch (err) {
             setError(errorMessage(err));
@@ -812,7 +814,8 @@ export function ReportSheet({ target, onClose }: { target: { type: string; id: s
           if (!target) return;
           setBusy(true);
           try {
-            toast((await api.reports.create({ targetType: target.type, targetId: target.id, reason, details: details || undefined })).message);
+            await api.reports.create({ targetType: target.type, targetId: target.id, reason, details: details || undefined });
+            toast(t('report.thanks'));
             onClose();
           } catch (err) {
             toast(errorMessage(err));

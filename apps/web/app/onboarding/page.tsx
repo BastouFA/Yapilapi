@@ -4,12 +4,12 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Alert, Avatar, Button, Skeleton } from '@yapilapi/design-system';
 import type { OnboardingStep } from '@yapilapi/api-client';
-import type { PublicUser } from '@yapilapi/shared';
+import { suggestionReasonText, type PeopleSuggestion } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { FindFriends } from '@/components/FindFriends';
 import { useSession } from '../providers';
 
-type Suggestion = { user: PublicUser; reason: string; bio: string };
+type Suggestion = PeopleSuggestion;
 const STEPS = 3;
 /** How many suggested creators start ticked. */
 const PRESELECTED = 5;
@@ -21,7 +21,7 @@ const PRESELECTED = 5;
  * 3. find friends from a pasted list of emails (optional).
  */
 export default function Onboarding() {
-  const { me, loading, refresh, t } = useSession();
+  const { me, loading, refresh, t, tp } = useSession();
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [topics, setTopics] = useState<{ slug: string; name: string }[] | null>(null);
@@ -185,7 +185,7 @@ export default function Onboarding() {
                           <Avatar name={p.user.displayName} src={p.user.avatarUrl} />
                           <span className="onboarding__who">
                             <bdi className="onboarding__name">{p.user.displayName}</bdi>
-                            <span className="muted">{p.reason}</span>
+                            <span className="muted">{suggestionReasonText(p, { t, tp })}</span>
                           </span>
                         </label>
                       </li>

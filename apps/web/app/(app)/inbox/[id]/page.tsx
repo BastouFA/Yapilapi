@@ -1,6 +1,6 @@
 'use client';
 
-import { isVideoFile, MEDIA_ACCEPT, MESSAGE_EDIT_MINUTES, WATCH_MAX_MEMBERS, type PinnedMessage } from '@yapilapi/shared';
+import { noticeText, isVideoFile, MEDIA_ACCEPT, MESSAGE_EDIT_MINUTES, WATCH_MAX_MEMBERS, type PinnedMessage } from '@yapilapi/shared';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -316,9 +316,10 @@ export default function ChatPage() {
     try {
       const { media } = await api.media.upload(file, undefined, { viewOnce: o.viewOnce });
       const clientId = crypto.randomUUID();
-      const { message, notice } = await api.conversations.send(id, '', clientId, [{ mediaId: media.id }], o);
+      const { message, notice, noticeCode } = await api.conversations.send(id, '', clientId, [{ mediaId: media.id }], o);
       setMessages((cur) => (cur?.some((x) => x.id === message.id) ? cur : [...(cur ?? []), message]));
-      if (notice) toast(notice);
+      const note = noticeText({ code: noticeCode, message: notice }, t);
+      if (note) toast(note);
     } catch (e) {
       toast(errorMessage(e));
     } finally {
@@ -376,9 +377,10 @@ export default function ChatPage() {
     setBody('');
     setReplyTo(null);
     try {
-      const { message, notice } = await api.conversations.send(id, text, clientId, [], quoting ? { replyToId: quoting.id } : {});
+      const { message, notice, noticeCode } = await api.conversations.send(id, text, clientId, [], quoting ? { replyToId: quoting.id } : {});
       setMessages((cur) => cur?.map((x) => (x.clientId === clientId ? message : x)) ?? cur);
-      if (notice) toast(notice);
+      const note = noticeText({ code: noticeCode, message: notice }, t);
+      if (note) toast(note);
     } catch (e) {
       setMessages((cur) => cur?.filter((x) => x.clientId !== clientId) ?? cur);
       setBody(text);

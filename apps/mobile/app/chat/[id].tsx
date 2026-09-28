@@ -57,6 +57,7 @@ import { DateTimeSheet } from '../../lib/date-time';
 import { useFlag } from '../../lib/flags';
 import { chatTheme, type AccentColors } from '../../../../packages/shared/src/chat-theme';
 import { chatTooBig, openWatch, startWatch, useChatWatch, WatchBanner, watchableChat } from '../../lib/watch';
+import { noticeText } from '../../../../packages/shared/src/server-text';
 
 /** Voice messages shorter than this are treated as a slip of the finger and not sent. */
 const MIN_VOICE_MS = 1000;
@@ -81,6 +82,8 @@ export default function Chat() {
   // While you type, the voice bar and suggested replies step aside so more of the chat shows.
   const typing = useKeyboardVisible();
   const [error, setError] = useState<string | null>(null);
+  // A sent message held for a quick check before it's delivered.
+  const [held, setHeld] = useState<string | null>(null);
   const [needsVerify, setNeedsVerify] = useState(false);
   const list = useRef<FlatList<Message>>(null);
   // Whether the newest messages are on screen (then growth at the bottom keeps them in view).
@@ -354,7 +357,8 @@ export default function Chat() {
     try {
       const media = await uploadFile(uri, `voice-${Date.now()}.m4a`, VOICE_MIME);
       const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const { message } = await (await client()).conversations.send(id, '', clientId, [{ mediaId: media.id }]);
+      const { message, notice, noticeCode } = await (await client()).conversations.send(id, '', clientId, [{ mediaId: media.id }]);
+      setHeld(noticeText({ code: noticeCode, message: notice }, t) ?? null);
       setMessages((cur) => (cur.some((x) => x.id === message.id) ? cur : [...cur, message]));
     } catch (e) {
       setError(errorMessage(e));
@@ -425,7 +429,8 @@ export default function Chat() {
     try {
       const media = await uploadFile(uri, `yap-${Date.now()}.m4a`, VOICE_MIME);
       const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const { message } = await (await client()).conversations.send(id, '', clientId, [{ mediaId: media.id }], { kind: 'yap' });
+      const { message, notice, noticeCode } = await (await client()).conversations.send(id, '', clientId, [{ mediaId: media.id }], { kind: 'yap' });
+      setHeld(noticeText({ code: noticeCode, message: notice }, t) ?? null);
       setMessages((cur) => (cur.some((x) => x.id === message.id) ? cur : [...cur, message]));
     } catch (e) {
       fail(e);
@@ -461,7 +466,8 @@ export default function Chat() {
       const type = asset.mimeType ?? (video ? 'video/mp4' : 'image/jpeg');
       const media = await uploadFile(asset.uri, asset.fileName ?? `view-once.${video ? 'mp4' : 'jpg'}`, type, undefined, { viewOnce: true });
       const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const { message } = await (await client()).conversations.send(id, '', clientId, [{ mediaId: media.id }], { viewOnce: true });
+      const { message, notice, noticeCode } = await (await client()).conversations.send(id, '', clientId, [{ mediaId: media.id }], { viewOnce: true });
+      setHeld(noticeText({ code: noticeCode, message: notice }, t) ?? null);
       setMessages((cur) => (cur.some((x) => x.id === message.id) ? cur : [...cur, message]));
     } catch (e) {
       fail(e);
@@ -516,7 +522,8 @@ export default function Chat() {
     try {
       const media = await uploadPicked(asset);
       const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const { message } = await (await client()).conversations.send(id, '', clientId, [{ mediaId: media.id }]);
+      const { message, notice, noticeCode } = await (await client()).conversations.send(id, '', clientId, [{ mediaId: media.id }]);
+      setHeld(noticeText({ code: noticeCode, message: notice }, t) ?? null);
       setMessages((cur) => (cur.some((x) => x.id === message.id) ? cur : [...cur, message]));
     } catch (e) {
       fail(e);
@@ -544,7 +551,8 @@ export default function Chat() {
     setReplyTo(null);
     const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     try {
-      const { message } = await (await client()).conversations.send(id, text, clientId, [], quoting ? { replyToId: quoting.id } : {});
+      const { message, notice, noticeCode } = await (await client()).conversations.send(id, text, clientId, [], quoting ? { replyToId: quoting.id } : {});
+      setHeld(noticeText({ code: noticeCode, message: notice }, t) ?? null);
       setMessages((cur) => (cur.some((x) => x.id === message.id) ? cur : [...cur, message]));
     } catch (e) {
       setBody(text);
@@ -839,6 +847,11 @@ export default function Chat() {
       {error ? (
         <View style={{ padding: space[3] }}>
           <Notice tone="danger">{error}</Notice>
+        </View>
+      ) : null}
+      {held ? (
+        <View style={{ padding: space[3] }}>
+          <Notice>{held}</Notice>
         </View>
       ) : null}
       {micDenied ? (

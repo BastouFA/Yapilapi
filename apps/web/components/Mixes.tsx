@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BottomSheet, Button, EmptyState, Icon, MixMosaic, MixTile, Select, Skeleton, TextField } from '@yapilapi/design-system';
 import {
+  noticeText,
   MIX_DESCRIPTION_MAX,
   MIX_TITLE_MAX,
   MIX_VISIBILITIES,
@@ -605,7 +606,7 @@ export function PostMixSheet({ mix, open, onClose }: { mix: Mix; open: boolean; 
           setBusy(true);
           try {
             const r = await api.mixes.post(mix.id, { body: body.trim(), visibility });
-            toast(r.moderation?.message ?? t('mixes.post.done'));
+            toast(noticeText(r.moderation, t) ?? t('mixes.post.done'));
             onClose();
           } catch (err) {
             toast(errorMessage(err));

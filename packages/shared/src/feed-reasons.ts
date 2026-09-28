@@ -51,7 +51,8 @@ export function postReasonText(
   return tr.t(key, { name: p.name ?? '', community: p.community ?? '', topic: p.topic ?? '' });
 }
 
-function joinList(items: string[], locale: string | undefined): string {
+/** "a, b and c" in the language of `locale`; without one (or without list formatting on the device), "a, b, c". */
+export function formatList(items: string[], locale: string | undefined): string {
   if (locale) {
     try {
       return new Intl.ListFormat(locale, { type: 'conjunction' }).format(items);
@@ -67,7 +68,7 @@ export function whyReasonText(reason: WhyReason, tr: ReasonTranslator): string {
   const p = reason.params ?? {};
   if (reason.code === 'topics') {
     const topics = p.topics ?? [];
-    return tr.tp(WHY_REASON_KEYS.topics, topics.length, { topics: joinList(topics, tr.locale) });
+    return tr.tp(WHY_REASON_KEYS.topics, topics.length, { topics: formatList(topics, tr.locale) });
   }
   const key = WHY_REASON_KEYS[reason.code];
   return key ? tr.t(key, { name: p.name ?? '', community: p.community ?? '' }) : '';

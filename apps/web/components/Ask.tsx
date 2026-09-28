@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, Card, Checkbox, EmptyState, QuestionQuote, Skeleton, Switch, TextField } from '@yapilapi/design-system';
 import {
+  noticeText,
   ASK_PROMPT_MAX,
   ASK_QUESTION_MAX,
   formatRelativeTime,
@@ -107,7 +108,7 @@ export function AskCard({ profile, onChanged }: { profile: Profile; onChanged: (
     setError(undefined);
     try {
       const r = await api.questions.ask(profile.id, body.trim(), hideName && !!box?.hiddenNamesAllowed);
-      toast(r.notice ?? t('ask.card.sent'));
+      toast(noticeText({ code: r.noticeCode, message: r.notice }, t) ?? t('ask.card.sent'));
       setBody('');
       setHideName(false);
     } catch (err) {

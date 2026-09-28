@@ -25,6 +25,7 @@ import { MusicPicker, openMusic } from './music';
 import { useSession } from './session';
 import { radius, space } from './theme';
 import { BottomSheet, Button, EmptyState, Field, Icon, Segmented, useColors, userText } from './ui';
+import { noticeText } from '../../../packages/shared/src/server-text';
 
 type T = ReturnType<typeof useT>['t'];
 
@@ -712,7 +713,7 @@ export function PostMixSheet({ mix, visible, onClose, onDone }: { mix: Mix; visi
           try {
             const api = await client();
             const r = await api.mixes.post(mix.id, { body: body.trim(), visibility });
-            onDone(r.moderation?.message ?? t('mixes.post.done'));
+            onDone(noticeText(r.moderation, t) ?? t('mixes.post.done'));
             onClose();
           } catch (e) {
             setError(errorMessage(e));

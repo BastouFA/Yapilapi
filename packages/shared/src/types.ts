@@ -262,6 +262,44 @@ export interface PostWhy {
   controls: string[];
 }
 
+/**
+ * What the app says after you publish something that waits for review: your account is limited,
+ * or your post, answer, question, listing or message is held until someone has looked at it.
+ * The apps put the code into words (noticeText); the English text stays for older apps.
+ */
+export type NoticeCode = 'post_limited' | 'post_held' | 'answer_held' | 'question_held' | 'listing_held' | 'message_held';
+
+/** Sent as `moderation` after publishing a post, reel, answer or mix that isn't shown to everyone yet. */
+export interface ModerationNotice {
+  status: string;
+  code: NoticeCode;
+  /** The same in English, for older apps. */
+  message: string;
+}
+
+/** One line of "Why am I seeing this ad?": you turned ads on, its topics, your language, your country. */
+export type AdWhyCode = 'opted_in' | 'topics' | 'language' | 'country';
+
+export interface AdWhy {
+  code: AdWhyCode;
+  /** `topics`: the campaign's topics named in the line. */
+  params?: { topics?: string[] };
+}
+
+/** Why someone is suggested to you: people you follow follow them, shared interests, they post about your interests or post reels, or they're popular. */
+export type SuggestionReasonCode = 'mutual' | 'shared_interests' | 'topical' | 'reels' | 'popular';
+
+/** GET /v1/me/suggestions. */
+export interface PeopleSuggestion {
+  user: PublicUser;
+  bio: string;
+  /** In English, for older apps. Newer ones put `reasonCode` into words (suggestionReasonText). */
+  reason: string;
+  reasonCode?: SuggestionReasonCode;
+  /** `count`: how many people you follow, or how many interests you share. */
+  reasonParams?: { count?: number };
+}
+
 export interface Post {
   id: string;
   kind: PostKind;

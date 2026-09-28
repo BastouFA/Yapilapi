@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { OnboardingStep } from '../../../packages/api-client/src/index';
 import { SUPPORTED_LOCALES, type MessageKey } from '../../../packages/shared/src/i18n';
 import { languageName, TRANSLATION_LANGUAGES } from '../../../packages/shared/src/translation';
-import type { Community, PublicUser } from '../../../packages/shared/src/types';
+import type { Community, PeopleSuggestion } from '../../../packages/shared/src/types';
 import { client, errorMessage, mediaUrl } from '../lib/api';
 import { FriendsFinder } from '../lib/friends';
 import { useT } from '../lib/i18n';
@@ -15,8 +15,9 @@ import { registerForPush } from '../lib/push';
 import { useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
 import { Avatar, Button, Field, Icon, KeyboardAvoid, Notice, Skeleton, Title, useColors, userText } from '../lib/ui';
+import { suggestionReasonText } from '../../../packages/shared/src/server-text';
 
-type Suggestion = { user: PublicUser; reason: string };
+type Suggestion = PeopleSuggestion;
 /** How many suggested creators start ticked. */
 const PRESELECTED = 5;
 /** Communities offered on the follow step. */
@@ -380,7 +381,7 @@ function InterestsStep({
 /** People who post about what you picked (the top five ticked) and communities to join. */
 function FollowStep({ record, onNext, setError }: StepProps & { record: (s: OnboardingStep) => void }) {
   const c = useColors();
-  const { t, number } = useT();
+  const { t, tp, number } = useT();
   const [people, setPeople] = useState<Suggestion[] | null>(null);
   const [ticked, setTicked] = useState<Set<string>>(new Set());
   const [communities, setCommunities] = useState<Community[]>([]);
@@ -464,12 +465,13 @@ function FollowStep({ record, onNext, setError }: StepProps & { record: (s: Onbo
           </Text>
           {people.map((p) => {
             const on = ticked.has(p.user.id);
+            const reason = suggestionReasonText(p, { t, tp });
             return (
               <Pressable
                 key={p.user.id}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: on }}
-                accessibilityLabel={p.reason ? `${p.user.displayName}, ${p.reason}` : p.user.displayName}
+                accessibilityLabel={reason ? `${p.user.displayName}, ${reason}` : p.user.displayName}
                 onPress={() => setTicked((s) => flip(s, p.user.id))}
                 style={rowStyle}
               >
@@ -480,7 +482,7 @@ function FollowStep({ record, onNext, setError }: StepProps & { record: (s: Onbo
                     {p.user.displayName}
                   </Text>
                   <Text style={{ color: c.inkMuted, fontSize: 13 }} numberOfLines={1}>
-                    {p.reason}
+                    {reason}
                   </Text>
                 </View>
               </Pressable>

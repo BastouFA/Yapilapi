@@ -63,6 +63,28 @@ describe('AI agents', () => {
     expect(res.contextScopes).toContain('search');
   });
 
+  it('sends what the apps put into words: the member count and the kind of action', async () => {
+    const owner = await signUp(t.app);
+    const me = await signUp(t.app);
+    const word = `choir${tag()}`;
+    const c = (await as(t.app, owner).post('/v1/communities', { name: `${word} singers`, slug: `${word}-singers`, visibility: 'public' })).body.community;
+    const provider: AiProvider = {
+      name: 'scripted',
+      model: 'scripted-1',
+      complete: async () => ({ text: '', provider: 'scripted', model: 'scripted-1' }),
+      agent: async ({ tools }) => {
+        const tool = (n: string) => tools.find((x) => x.name === n)!;
+        await tool('search').run({ query: word, type: 'communities' });
+        await tool('recommend').run({ type: 'community', id: c.id, reason: 'You sing.' });
+        await tool('propose_action').run({ type: 'community', id: c.id });
+        return { text: 'Try this.', provider: 'scripted', model: 'scripted-1' };
+      },
+    };
+    const res = await runAgent(t.ctx.db, provider, me.id, 'discover', word);
+    expect(res.recommendations[0]).toMatchObject({ type: 'community', id: c.id, memberCount: 1, subtitle: '1 members' });
+    expect(res.actions).toEqual([expect.objectContaining({ kind: 'join', label: `Join: ${word} singers` })]);
+  });
+
   it('withholds unsafe output', async () => {
     const me = await signUp(t.app);
     const provider: AiProvider = {

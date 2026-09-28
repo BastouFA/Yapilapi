@@ -78,7 +78,7 @@ describe('sign-up risk scoring', () => {
     expect((await signals(u.id)).map((x) => x.kind)).toEqual(['disposable_email']);
     const r = await as(t.app, u).post('/v1/posts', { body: 'My first post here', visibility: 'public' });
     expect(r.status).toBe(201);
-    expect(r.body.moderation.status).toBe('review');
+    expect(r.body.moderation).toEqual({ status: 'review', code: 'post_held', message: 'Your post is published to you only until it has been reviewed.' });
     const kase = (await db().query(`SELECT signals FROM moderation_cases WHERE target_type = 'post' AND target_id = $1`, [r.body.post.id])).rows[0];
     expect(kase.signals.signals).toContain('risky_account');
     // Friends-only posts aren't held.
@@ -201,6 +201,7 @@ describe('link spam and repeated text', () => {
     expect(r.status).toBe(201);
     expect(r.body.message.moderation).toBe('review');
     expect(r.body.notice).toMatch(/quick check/);
+    expect(r.body.noticeCode).toBe('message_held');
     // The sender sees it; the recipient doesn't, yet.
     expect((await as(t.app, sender).get(`/v1/conversations/${conv.id}/messages`)).body.items.map((m: any) => m.id)).toContain(r.body.message.id);
     expect((await as(t.app, stranger).get(`/v1/conversations/${conv.id}/messages`)).body.items).toEqual([]);
@@ -253,7 +254,7 @@ describe('repeated flags', () => {
 
     // While limited: new posts are visible only to their author, and no messages to people who aren't friends.
     const held = await as(t.app, u).post('/v1/posts', { body: 'A normal post' });
-    expect(held.body.moderation).toMatchObject({ status: 'restricted' });
+    expect(held.body.moderation).toMatchObject({ status: 'restricted', code: 'post_limited' });
     expect(held.body.moderation.message).toMatch(/limited/);
     expect((await as(t.app, stranger).get(`/v1/posts/${held.body.post.id}`)).status).toBe(404);
     const dm = await as(t.app, u).post('/v1/conversations', { memberIds: [stranger.id] });

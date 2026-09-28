@@ -18,6 +18,7 @@ import { useReport } from '../lib/report';
 import { useSession } from '../lib/session';
 import { space } from '../lib/theme';
 import { BottomSheet, Button, Card, EmptyState, Field, Icon, Loading, Notice, Screen, Segmented, SwitchRow, useActionSheet, useColors } from '../lib/ui';
+import { noticeText } from '../../../packages/shared/src/server-text';
 
 const FILTER_LABEL: Record<AskFilter, MessageKey> = { new: 'ask.inbox.new', answered: 'ask.inbox.answered', hidden: 'ask.inbox.hidden' };
 const EMPTY: Record<AskFilter, MessageKey> = { new: 'ask.inbox.empty.new', answered: 'ask.inbox.empty.answered', hidden: 'ask.inbox.empty.hidden' };
@@ -345,7 +346,7 @@ function AnswerSheet({
           setError(null);
           try {
             const r = await (await client()).questions.answer(question.id, answer.trim(), share ? { visibility } : undefined);
-            onAnswered(r.question, r.moderation?.message ?? t('ask.answer.done'));
+            onAnswered(r.question, noticeText(r.moderation, t) ?? t('ask.answer.done'));
           } catch (e) {
             setError(errorMessage(e));
           }

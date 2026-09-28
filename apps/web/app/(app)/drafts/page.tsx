@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { BottomSheet, Button, EmptyState, formatScheduled, PostCard, Skeleton, TextField } from '@yapilapi/design-system';
-import { SCHEDULE_MAX_DAYS, SCHEDULE_MIN_MINUTES, type Post } from '@yapilapi/shared';
+import { noticeText, SCHEDULE_MAX_DAYS, SCHEDULE_MIN_MINUTES, type Post } from '@yapilapi/shared';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { localInput, nextHour, scheduleBounds } from '@/lib/schedule';
@@ -68,7 +68,7 @@ export default function DraftsPage() {
             run(`publish-${p.id}`, async () => {
               const r = await api.drafts.publish(p.id);
               drop(p.id);
-              toast(r.moderation ? r.moderation.message : t('create.published'));
+              toast(noticeText(r.moderation, t) ?? t('create.published'));
             })
           }
         >

@@ -136,7 +136,8 @@ describe('Selling on Market', () => {
     const held = await list(ada, { photos: [{ mediaId: await photo(ada, 'sensitive') }] });
     expect(held.status).toBe(201);
     expect(held.body.listing).toMatchObject({ moderation: 'review', reviewReason: 'photos' });
-    expect(held.body.notice).toBeTruthy();
+    expect(held.body.noticeCode).toBe('listing_held');
+    expect(held.body.notice).toMatch(/^Your listing will show once/);
     expect((await as(t.app, bola).get(`/v1/market/listings/${held.body.listing.id}`)).status).toBe(404);
   });
 

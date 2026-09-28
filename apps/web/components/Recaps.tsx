@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Avatar, AvatarGroup, BottomSheet, Button, Select, TextField } from '@yapilapi/design-system';
-import type { Conversation, MessageKey, Recap, RecapStatus } from '@yapilapi/shared';
+import { noticeText, type Conversation, type MessageKey, type Recap, type RecapStatus } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '../app/providers';
 
@@ -72,7 +72,7 @@ export function RecapPostForm({ recap, onDone, onCancel }: { recap: Recap; onDon
             media: [{ id: recap.video.mediaId, url: new URL(recap.video.url, location.origin).toString(), kind: 'video' }],
             ...(recap.sound ? { soundId: recap.sound.id } : {}),
           });
-          toast(r.moderation ? r.moderation.message : t('m.recap.posted'));
+          toast(noticeText(r.moderation, t) ?? t('m.recap.posted'));
           onDone(r.post.id);
         } catch (err) {
           toast(errorMessage(err));
@@ -170,7 +170,7 @@ export function RecapSendSheet({ recap, open, onClose }: { recap: Recap; open: b
                       setSending(c.id);
                       try {
                         const r = await api.conversations.send(c.id, '', crypto.randomUUID(), [{ mediaId: recap.video.mediaId }]);
-                        toast(r.notice ?? t('m.recap.sent', { name }));
+                        toast(noticeText({ code: r.noticeCode, message: r.notice }, t) ?? t('m.recap.sent', { name }));
                         onClose();
                       } catch (e) {
                         toast(errorMessage(e));

@@ -425,7 +425,7 @@ describe('moderation and accounts', () => {
     await openBox(ada);
     const r = await ask(bola, ada, 'Why are you such an idiot?');
     expect(r.status).toBe(201);
-    expect(r.body.notice).toBeTruthy();
+    expect(r.body).toMatchObject({ noticeCode: 'question_held', notice: 'Your question will reach them once our team has reviewed it.' });
     expect((await inbox(ada)).items).toEqual([]);
     expect((await as(t.app, ada).get('/v1/notifications')).body.items.some((n: any) => n.type === 'question_received')).toBe(false);
     const c = (await as(t.app, mod).get('/v1/admin/moderation/cases')).body.items.find((x: any) => x.target_id === r.body.question.id);
@@ -445,7 +445,7 @@ describe('moderation and accounts', () => {
     const id = (await ask(bola, ada)).body.question.id;
     const a = await as(t.app, ada).post(`/v1/questions/${id}/answer`, { answer: 'Only an idiot would ask.' });
     expect(a.body.question.held).toBe(true);
-    expect(a.body.moderation.status).toBe('review');
+    expect(a.body.moderation).toEqual({ status: 'review', code: 'answer_held', message: 'Your answer is visible only to you until it has been reviewed.' });
     expect((await as(t.app, ada).get(`/v1/users/${ada.id}/answers`)).body.items[0]).toMatchObject({ id, held: true });
     expect((await as(t.app, cat).get(`/v1/users/${ada.id}/answers`)).body.items).toEqual([]);
     expect((await as(t.app, bola).get('/v1/notifications')).body.items.some((n: any) => n.type === 'question_answered')).toBe(false);

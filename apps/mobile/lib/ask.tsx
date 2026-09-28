@@ -20,6 +20,7 @@ import { useReport } from './report';
 import { useSession } from './session';
 import { radius, space } from './theme';
 import { BottomSheet, Button, Card, EmptyState, Field, Icon, Notice, SkeletonList, SwitchRow, Title, useColors, userText, type Tint } from './ui';
+import { noticeText } from '../../../packages/shared/src/server-text';
 
 const REFUSAL: Partial<Record<AskRefusal, MessageKey>> = {
   audience: 'ask.refusal.audience',
@@ -236,7 +237,7 @@ function AskSheet({
             const r = await (await client()).questions.ask(profile.id, body.trim(), hideName && allowed);
             setBody('');
             setHideName(false);
-            onSent(r.notice ?? t('ask.card.sent'));
+            onSent(noticeText({ code: r.noticeCode, message: r.notice }, t) ?? t('ask.card.sent'));
           } catch (e) {
             setError(errorMessage(e));
           }

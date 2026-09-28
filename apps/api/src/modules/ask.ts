@@ -22,6 +22,7 @@ import { ANSWER_FROM, answerCards, answerVisibleSql, checkAsk, inboxQuestions, o
 import { hasHiddenWord, hiddenWordsOf } from '../lib/comments.ts';
 import { analyzeText, statusForRisk } from '../lib/moderation.ts';
 import { announcePost, moderationNotice, recordFlags, screenPost, writePost } from '../lib/publishing.ts';
+import { heldNotice, moderationOf } from '../lib/notices.ts';
 import { hydratePosts } from '../lib/posts.ts';
 import { notify, track } from '../lib/services.ts';
 import { assessQuestion, flagContent, isRestricted, recordSignals } from '../lib/spam.ts';
@@ -183,7 +184,7 @@ export default async function askModule(app: FastifyInstance, ctx: AppContext) {
     reply.code(201);
     return {
       question: { id: questionId },
-      ...(status === 'normal' ? {} : { notice: 'Your question will reach them once our team has reviewed it.' }),
+      ...(status === 'normal' ? {} : heldNotice('question_held')),
     };
   });
 
@@ -340,11 +341,7 @@ export default async function askModule(app: FastifyInstance, ctx: AppContext) {
     return {
       question: await one(id, u.id),
       ...(sharedPost ? { post: sharedPost } : {}),
-      ...(status !== 'normal'
-        ? { moderation: { status, message: 'Your answer is visible only to you until it has been reviewed.' } }
-        : screening
-          ? { moderation: moderationNotice(screening, limitedNow) }
-          : {}),
+      ...(status !== 'normal' ? { moderation: moderationOf(status, 'answer_held') } : screening ? { moderation: moderationNotice(screening, limitedNow) } : {}),
     };
   });
 

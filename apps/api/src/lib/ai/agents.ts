@@ -18,6 +18,8 @@ export interface Entity {
   subtitle?: string;
   /** Events: when it starts (ISO), for the app to format in the viewer's locale. */
   startsAt?: string;
+  /** Communities: how many members, for the app to say in the viewer's language (`subtitle` has it in English). */
+  memberCount?: number;
   href: string;
 }
 export interface Recommendation extends Entity {
@@ -27,6 +29,7 @@ export interface Recommendation extends Entity {
 export interface ProposedAction {
   kind: 'rsvp' | 'book' | 'buy' | 'follow' | 'join';
   target: Entity;
+  /** In English, for older apps; newer ones build it from `kind` and the target's title. */
   label: string;
 }
 export interface AgentResult {
@@ -111,7 +114,9 @@ export async function runAgent(
       out.push(remember({ type: 'place', id: p.id, title: p.name, subtitle: [p.category, p.city].filter(Boolean).join(' · '), href: `/places/${p.id}` }));
     for (const c of r.communities ?? [])
       if (c.visibility === 'public')
-        out.push(remember({ type: 'community', id: c.id, title: c.name, subtitle: `${c.memberCount} members`, href: `/c/${c.slug}` }));
+        out.push(
+          remember({ type: 'community', id: c.id, title: c.name, subtitle: `${c.memberCount} members`, memberCount: c.memberCount, href: `/c/${c.slug}` }),
+        );
     for (const u of r.people ?? [])
       out.push(remember({ type: 'person', id: u.id, title: u.displayName, subtitle: `@${u.username}`, href: `/u/${u.username}` }));
     for (const p of r.products ?? [])

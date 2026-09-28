@@ -14,6 +14,7 @@ import {
   yapSettingsSchema,
   type Conversation,
   type Message,
+  type NoticeCode,
   type PinnedMessage,
   type YapEvent,
 } from '@yapilapi/shared';
@@ -33,6 +34,7 @@ import { smartRepliesEverywhereSql, smartRepliesState } from '../lib/ai/assists.
 import { ageOf, areFriends, isBlockedEitherWay, publicUserFrom, usersByIds } from '../lib/users.ts';
 import { messagesAllowed, seesSensitiveMedia, seesSensitiveSql } from '../lib/interactions.ts';
 import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
+import { heldNotice } from '../lib/notices.ts';
 import { assertMessagePace, assessMessage, flagContent, isRestricted, restrictedError } from '../lib/spam.ts';
 import { requireVerified } from '../lib/verification.ts';
 import { me, requireAuth, resolveSession, sessionTokenOf } from '../plugins/auth.ts';
@@ -478,7 +480,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
    * chat's disappearing timer. Used when you press Send and when a message scheduled for later
    * goes out.
    */
-  async function sendMessage(u: Sender, id: string, input: SendInput): Promise<{ message: Message; notice?: string }> {
+  async function sendMessage(u: Sender, id: string, input: SendInput): Promise<{ message: Message; notice?: string; noticeCode?: NoticeCode }> {
     await assertMember(id, u.id);
     const members = await memberIds(id);
     const conv = (await db.query(`SELECT kind, disappearing_seconds FROM conversations WHERE id = $1`, [id])).rows[0];
@@ -642,11 +644,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     if (row.moderation_status === 'review') {
       // Held: only the sender sees it until a moderator lets it through.
       await ctx.realtime.publish([u.id], { type: 'message.created', data: message });
-      return {
-        message: await ownCopy(message),
-        notice:
-          'We’re holding this message for a quick check before it’s delivered. This sometimes happens with messages to people you aren’t friends with yet.',
-      };
+      return { message: await ownCopy(message), ...heldNotice('message_held') };
     }
     // Sensitive attachments are marked for adults and replaced for everyone else.
     const adults = new Set(

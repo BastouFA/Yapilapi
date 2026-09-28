@@ -344,11 +344,24 @@ describe('analytics and personalization consents', () => {
     const alike = await signUp(t.app);
     for (const u of [viewer, alike]) await as(t.app, u).put('/v1/me/interests', { topics: [topic] });
     const on = await as(t.app, viewer).get('/v1/me/suggestions?limit=30');
-    expect(on.body.items.find((s: { user: { id: string } }) => s.user.id === alike.id)?.reason).toBe('1 shared interest');
+    expect(on.body.items.find((s: { user: { id: string } }) => s.user.id === alike.id)).toMatchObject({
+      reason: '1 shared interest',
+      reasonCode: 'shared_interests',
+      reasonParams: { count: 1 },
+    });
+    // Someone a person you follow follows: counted, with the English for older apps.
+    const middle = await signUp(t.app);
+    const friendOfFriend = await signUp(t.app);
+    await as(t.app, viewer).post(`/v1/users/${middle.id}/follow`);
+    await as(t.app, middle).post(`/v1/users/${friendOfFriend.id}/follow`);
+    const mutual = (await as(t.app, viewer).get('/v1/me/suggestions?limit=30')).body.items.find(
+      (s: { user: { id: string } }) => s.user.id === friendOfFriend.id,
+    );
+    expect(mutual).toMatchObject({ reason: 'Followed by 1 person you follow', reasonCode: 'mutual', reasonParams: { count: 1 } });
 
     await as(t.app, viewer).put('/v1/me/consents', { purpose: 'personalization', granted: false });
     const off = await as(t.app, viewer).get('/v1/me/suggestions?limit=30');
-    for (const s of off.body.items as { reason: string }[]) expect(s.reason).toBe('Popular on YAPILAPI');
+    for (const s of off.body.items) expect(s).toMatchObject({ reason: 'Popular on YAPILAPI', reasonCode: 'popular', reasonParams: {} });
   });
 });
 

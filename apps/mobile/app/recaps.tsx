@@ -15,6 +15,7 @@ import { isMaking, isRecapsOff, RECAP_STATUS, recapError, recapRatio } from '../
 import { useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
 import { Avatar, Button, Card, EmptyState, Field, Icon, Loading, Notice, Row, Segmented, Title, useColors, useRefresh, userText } from '../lib/ui';
+import { noticeText } from '../../../packages/shared/src/server-text';
 
 type Note = { tone: 'info' | 'danger'; text: string };
 
@@ -467,7 +468,7 @@ function PostPanel({ recap: r, onPosted }: { recap: Recap; onPosted: (postId: st
         media: [{ id: v.mediaId, url: v.url, kind: 'video' }],
         ...(r.sound ? { soundId: r.sound.id } : {}),
       });
-      onPosted(res.post.id, res.moderation?.message ?? t('m.recap.posted'));
+      onPosted(res.post.id, noticeText(res.moderation, t) ?? t('m.recap.posted'));
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -530,7 +531,7 @@ function SendPanel({ recap: r, onSent }: { recap: Recap; onSent: (text: string) 
     try {
       const res = await (await client()).conversations.send(chat.id, '', undefined, [{ mediaId: v.mediaId }]);
       setSent((cur) => [...cur, chat.id]);
-      onSent(res.notice ?? t('m.recap.sent', { name: conversationTitle(chat, me?.id, t) }));
+      onSent(noticeText({ code: res.noticeCode, message: res.notice }, t) ?? t('m.recap.sent', { name: conversationTitle(chat, me?.id, t) }));
     } catch (e) {
       setError(errorMessage(e));
     } finally {

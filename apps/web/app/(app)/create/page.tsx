@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  noticeText,
   COLLAGE_MAX_PHOTOS,
   COLLAGE_MIN_PHOTOS,
   COMMENT_POLICIES,
@@ -497,11 +498,11 @@ function Create() {
       // A draft is saved with what's here now, then published through the same checks as a new post.
       const r = draftId ? (await api.drafts.save(draftId, postContent()), await api.drafts.publish(draftId)) : await api.posts.create(postContent());
       if (kind === 'reel') {
-        toast(r.moderation ? r.moderation.message : t('compose.reelPublished'));
+        toast(noticeText(r.moderation, t) ?? t('compose.reelPublished'));
         router.push(`/reels?start=${r.post.id}`);
         return;
       }
-      toast(r.moderation ? r.moderation.message : t('create.published'));
+      toast(noticeText(r.moderation, t) ?? t('create.published'));
       router.push(communityId ? `/c/${communities.find((c) => c.id === communityId)?.slug ?? ''}` : '/home');
     } catch (err) {
       if (isVerificationError(err)) setNeedsVerify(true);

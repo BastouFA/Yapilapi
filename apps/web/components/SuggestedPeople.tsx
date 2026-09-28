@@ -3,15 +3,15 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Avatar, Button, Icon } from '@yapilapi/design-system';
-import type { PublicUser } from '@yapilapi/shared';
+import { suggestionReasonText, type PeopleSuggestion } from '@yapilapi/shared';
 import { api, errorMessage, sharedRequest } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
-type Suggestion = { user: PublicUser; bio: string; reason: string };
+type Suggestion = PeopleSuggestion;
 
 /** A row of people you might want to follow, with why each is suggested. Dismissed people stay hidden on this device. */
 export function SuggestedPeople() {
-  const { toast, t } = useSession();
+  const { toast, t, tp } = useSession();
   const [items, setItems] = useState<Suggestion[] | null>(null);
   const [followed, setFollowed] = useState<Set<string>>(new Set());
 
@@ -46,7 +46,9 @@ export function SuggestedPeople() {
         {t('suggested.title')}
       </h2>
       <ul className="suggested__row">
-        {items.map(({ user, reason }) => {
+        {items.map((s) => {
+          const { user } = s;
+          const reason = suggestionReasonText(s, { t, tp });
           const on = followed.has(user.id);
           return (
             <li key={user.id} className="suggested__card">
