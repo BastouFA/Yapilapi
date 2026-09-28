@@ -142,19 +142,20 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       ],
     );
     reply.code(201);
-    return { place: await loadPlace(rows[0].id) };
+    return { place: await loadPlace(rows[0].id, u.id) };
   });
 
-  async function loadPlace(id: string) {
+  /** A place, with its business; `business.mine` tells its owner apart (only they can read its bookings). */
+  async function loadPlace(id: string, viewer: string | null) {
     const { rows } = await db.query(
       `SELECT pl.id, pl.name, pl.category, pl.description, pl.address, pl.city, pl.country, pl.lat, pl.lng, pl.hours,
-              b.slug AS business_slug, b.name AS business_name
+              b.slug AS business_slug, b.name AS business_name, (b.owner_id = $2) AS business_mine
        FROM places pl LEFT JOIN businesses b ON b.id = pl.business_id WHERE pl.id = $1 AND pl.deleted_at IS NULL`,
-      [id],
+      [id, viewer],
     );
     if (!rows[0]) throw notFound('Place');
-    const r = rows[0];
-    return { ...r, business: r.business_slug ? { slug: r.business_slug, name: r.business_name } : null, business_slug: undefined, business_name: undefined };
+    const { business_slug, business_name, business_mine, ...r } = rows[0];
+    return { ...r, business: business_slug ? { slug: business_slug, name: business_name, mine: business_mine === true } : null };
   }
 
   app.get('/v1/places', async (req) => {
@@ -193,7 +194,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
   app.get('/v1/places/:id', async (req) => {
     const viewer = req.user?.id ?? null;
     const { id } = parse(idParam, req.params);
-    const place = await loadPlace(id);
+    const place = await loadPlace(id, viewer);
     if (viewer)
       void db
         .query(

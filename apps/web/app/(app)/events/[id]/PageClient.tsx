@@ -7,6 +7,7 @@ import { Avatar, AvatarGroup, Badge, Button, EmptyState, Icon, Segments, Skeleto
 import type { EventItem, PublicUser } from '@yapilapi/shared';
 import { formatEventWhen, safeTimeZone } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
+import { copyText } from '@/lib/clipboard';
 import { JoinNote, NeedsAccount, useSignIn } from '@/components/SignedOut';
 import { useSession } from '../../../providers';
 
@@ -140,7 +141,7 @@ export default function EventPageClient({ isPublic }: { isPublic: boolean }) {
           Share a post about this event
         </Link>
       )}
-      <Button variant="ghost" onClick={() => navigator.clipboard?.writeText(location.href).then(() => toast('Link copied'))}>
+      <Button variant="ghost" onClick={async () => toast((await copyText(location.href)) ? t('invite.copied') : t('story.copyFailed'))}>
         Copy link
       </Button>
     </div>

@@ -11,16 +11,36 @@ import { useSession } from '../../providers';
 
 /** Creator Studio: how your content performs over the last 28 days, and what you've earned. */
 export default function Studio() {
-  const { locale } = useSession();
+  const { locale, t } = useSession();
   const [data, setData] = useState<Awaited<ReturnType<typeof api.creator.analytics>> | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
   const [earnings, setEarnings] = useState<{ currency: string; grossCents: number; feeCents: number; availableCents: number }[]>([]);
+  const loadAnalytics = () => {
+    setFailed(null);
+    api.creator.analytics().then(setData, (e) => setFailed(errorMessage(e)));
+  };
   useEffect(() => {
-    api.creator.analytics().then(setData);
+    loadAnalytics();
     api.raw
       .get<{ balances: typeof earnings }>('/v1/me/earnings')
       .then((r) => setEarnings(r.balances))
       .catch(() => {});
   }, []);
+  // A failed load says so, with a way to try again, instead of loading for ever.
+  if (failed && !data)
+    return (
+      <div className="yp-shell__inner">
+        <EmptyState
+          title={t('error.generic')}
+          body={failed}
+          action={
+            <Button variant="secondary" onClick={loadAnalytics}>
+              {t('m.common.retry')}
+            </Button>
+          }
+        />
+      </div>
+    );
   if (!data) return <Skeleton height={240} />;
   const growth = data.followerGrowth.map((d) => Number(d.new_followers));
   const max = Math.max(1, ...growth);

@@ -225,12 +225,18 @@ export function PurchasesCard() {
       () => setItems([]),
     );
   }, []);
-  if (!items?.length) return null;
+  if (!items) return null;
   return (
     <section className="yp-card stack-sm" style={{ padding: 16 }}>
       <h2 className="section-title" style={{ margin: 0 }}>
         {t('shop.purchases.title')}
       </h2>
+      {/* This card is the whole Purchases page: it says so when there's nothing yet, rather than leaving it blank. */}
+      {!items.length ? (
+        <p className="muted" style={{ margin: 0 }}>
+          {t('m.purchases.noDownloads')}
+        </p>
+      ) : null}
       {items.map((p) => (
         <div key={p.productId} className="row" style={{ justifyContent: 'space-between' }}>
           <span>

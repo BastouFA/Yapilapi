@@ -1740,6 +1740,10 @@ h3 {
   gap: var(--space-2);
   padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
 }
+/* The viewer is dark in both themes: the light theme's brand red is too dark on it (3.7:1). */
+.story__foot .yp-btn--ghost {
+  color: #ff5c7a;
+}
 .story__reply {
   flex: 1;
   min-width: 0;
@@ -5659,12 +5663,26 @@ button.yp-chip[aria-pressed='true'] {
     gap: 2px;
     padding-inline-start: var(--space-2);
   }
-  .yp-composer > .yp-action {
+  .yp-composer > .yp-action,
+  .yp-composer > .yp-menu > .yp-action {
     width: 36px;
     min-width: 36px;
+    padding-inline: 0;
+    justify-content: center;
   }
   .yp-composer > .yp-btn {
     padding-inline: 12px;
+  }
+  .yp-composer textarea {
+    min-width: 0;
+    padding-inline: 4px;
+  }
+  /* With every button in the row the box is narrow: the hint stays on one line (cut short where
+     the browser supports it) instead of wrapping into a second line the one-line box hides. */
+  .yp-composer textarea::placeholder {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .chat-send__label {
     position: absolute;
@@ -6278,9 +6296,13 @@ button.yp-chip[aria-pressed='true'] {
   margin-top: var(--space-3);
 }
 
-/* Pulse header: search, Reels and the notifications bell sit together on the right. */
+/* Pulse header: search, Reels and the notifications bell sit together on the right. With every
+   shortcut turned on they don't fit beside the title on a phone: they wrap (right-aligned) rather
+   than widen the page. */
 .home__actions {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
   gap: var(--space-1);
 }
 .home__bell {
@@ -7838,6 +7860,9 @@ button.yp-chip[aria-pressed='true'] {
   border-bottom: 1px solid var(--line);
   text-align: start;
   vertical-align: top;
+  /* "anywhere" (from .legal-body) lets a table squeeze a column down to one letter per line on a
+     phone ("Nam/e", "ypl_/se/ssi/on"); break-word only breaks a word that can't fit at all. */
+  overflow-wrap: break-word;
 }
 .legal-index {
   list-style: none;

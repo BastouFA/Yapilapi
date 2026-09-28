@@ -366,6 +366,25 @@ Person-to-person selling near you, separate from the creator shop (`apps/api/src
 
 **Not done in this round:** in-app payment and delivery tracking (by design for now); a map view; alerts for new listings matching a search; nearby sorting on the phone, which needs `expo-location` (the same one step for the owner as for sharing where you are, above): until then the phone browses by country, search and filters, and listings made on the phone have an area but no place unless the platform offers `navigator.geolocation`.
 
+## Bug hunt 2026-09-28 (no migration, `apps/api/test/bug-hunt.test.ts`, `packages/shared/src/initials.test.ts`, `packages/shared/src/drops.test.ts`)
+
+A headless crawler (kept out of the repo) signed in as the seeded "[Dev data]" people, with every feature flag on, and opened all 91 pages in `apps/web/app` plus a few more states (116 in all, real ids from the dev database; the sign-in, legal and shared pages also signed out) at 1280 and 375 pixels, light and dark. On each it recorded console and page errors, failed requests, hydration warnings, sideways scrolling and content cut off on phones, images without descriptions, unnamed buttons, links and fields, text spilling out of its box, raw message keys, unfilled `{placeholders}`, "undefined", "NaN" and "[object Object]", and ran axe (WCAG 2.2 AA); then it opened menus, tabs, sheets and other safe buttons on each page (over 1,500 clicks across the runs, as three different people) and checked again. Contact sheets of every page were looked over by eye. Scripts also compared every `t()`/`tp()` key in the web app, the phone app and the packages (template keys expanded from their types, plural pairs, and the `{placeholders}` each call fills) with the English catalog, every path the api-client and the apps call with `docs/api/routes.md` (613 calls, all present) and every query parameter the api-client sends with what its route reads, and looked at loosely typed rows (`any`) in the files added in the last 30 commits. None of those scans found a bug. Found and fixed:
+
+- **Pulse header on phones**: with every shortcut on (Reels, Real, Together) the header was wider than the screen, so the whole page scrolled sideways and the bottom bar spread out. The shortcuts now wrap under each other instead.
+- **Chat box on phones**: with all its buttons the text box was 75 pixels wide and "Write a message" wrapped onto a hidden second line. The buttons in menus tighten like the others, and the hint stays on one line.
+- **Cookie notice on phones**: the cookie table squeezed its first column to one letter per line ("ypl_/se/ssi/on"); words in the table now only break when they can't fit at all.
+- **Purchases** (Settings): a blank page when you hadn't bought anything; it now says downloads you buy show up there.
+- **Studio**: if the numbers didn't load, the page stayed on its loading shape for ever (and the error went unhandled); it now says so with Try again. The shop list's load error is shown too, and the admin tabs report theirs.
+- **Places**: every visitor's browser asked for the place's booking requests, which only the owner may read, and logged an error each time. The place now says whether its business is yours (`business.mine`), and only the owner's page asks.
+- **Copy link** on drops and events, and copying a new app secret or recovery codes: when the browser refused, nothing happened and the error went unhandled. It now says it couldn't copy (a new `common.copyFailed` message in every language).
+- **Drop countdown**: "Opens Wednesday · in 1 day" on a Monday when it was 47 hours away. Days are now counted by the calendar, like the day it names ("in 2 days"), on the web and the phone.
+- **Initials in place of a photo** (web, phone, design system): the first UTF-16 unit of each word was used, so a name starting with an emoji showed half a character and "[Dev data] Cooks" showed "[". A shared `initialsOf` reads whole characters, skips punctuation and symbols, and keeps accents with their letter.
+- **Story viewer**: Delete on your own story was the light theme's dark red on the always-dark viewer (3.7:1); it now uses the viewer's own lighter red.
+- **Links without their token**: "Confirm your email" and "Choose a new password" opened without a token sent it anyway and showed "Check the highlighted fields"; they now say the link is incomplete and what to do.
+- **Accessibility test**: the cover sheet check still looked for "Change cover", renamed "Edit cover" when cover editing arrived; it failed in every project.
+
+**Not done in this round:** Studio, places, the admin area and the sign-in pages still have English text that isn't in the catalogs (not a crash or a raw key, but not translated either). The phone app was type-checked and its keys scanned, not run on a device. A catalogue song's page (`/music/:id`) couldn't be opened without a music provider configured.
+
 ## Not built yet
 
 - Mainstream music: needs a licensing deal (docs/operations/music.md). Reporting song use to a licensing partner is not built.

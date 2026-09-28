@@ -27,8 +27,8 @@ export function ShopManager() {
     setItems((await api.shop.list(me.id)).items);
   }, [me]);
   useEffect(() => {
-    void load();
-  }, [load]);
+    load().catch((e) => toast(errorMessage(e)));
+  }, [load, toast]);
 
   return (
     <section className="stack-sm" id="shop">

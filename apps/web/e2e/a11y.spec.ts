@@ -227,7 +227,7 @@ const STATES: [string, (page: Page, d: SeedData) => Promise<void>][] = [
     'profile: cover sheet',
     async (page, d) => {
       await open(page, `/u/${d.username}`);
-      await page.getByRole('button', { name: 'Change cover' }).click();
+      await page.getByRole('button', { name: 'Edit cover' }).click();
       await expect(page.getByRole('dialog', { name: 'Cover photo' })).toBeVisible();
     },
   ],
