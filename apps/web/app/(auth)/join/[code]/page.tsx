@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { Avatar, PlusBadge, Skeleton } from '@yapilapi/design-system';
+import { useCallback, useEffect, useState } from 'react';
+import { Avatar, Button, EmptyState, PlusBadge, Skeleton } from '@yapilapi/design-system';
 import type { PublicUser } from '@yapilapi/shared';
-import { api } from '@/lib/api';
+import { api, ApiError, errorMessage, isGone } from '@/lib/api';
 import { useSession } from '../../../providers';
 
 /** An invite link: shows who invited you and carries their code into sign up. */
@@ -14,13 +14,19 @@ export default function JoinPage() {
   const { t, me } = useSession();
   const [inviter, setInviter] = useState<PublicUser | null>(null);
   const [invalid, setInvalid] = useState(false);
+  // Why it couldn't load, when that isn't because the code is wrong.
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoadError(null);
     api.invites.preview(code).then(
       (r) => setInviter(r.inviter),
-      () => setInvalid(true),
+      (e) => (isGone(e) || (e instanceof ApiError && e.status === 400) ? setInvalid(true) : setLoadError(errorMessage(e))),
     );
   }, [code]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   if (invalid)
     return (
@@ -36,6 +42,7 @@ export default function JoinPage() {
       </div>
     );
 
+  if (!inviter && loadError) return <EmptyState title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />;
   if (!inviter) return <Skeleton height={200} />;
 
   return (

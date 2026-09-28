@@ -1,7 +1,7 @@
 import { createHmac, randomBytes } from 'node:crypto';
-import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import type { Pool, PoolClient } from 'pg';
+import { checkOutboundUrl, isPrivateIp, safeFetch, systemResolve, type Resolve, type SafeFetchDeps } from './safe-fetch.ts';
 
 type Q = Pool | PoolClient;
 
@@ -34,60 +34,20 @@ export async function emitWebhook(db: Q, ownerId: string, event: WebhookEvent, d
   }
 }
 
-/** Addresses that aren't on the public internet: loopback, private, link-local, shared, reserved and multicast. */
-export function isPrivateIp(ip: string): boolean {
-  if (ip.includes(':')) {
-    const l = ip.toLowerCase();
-    // IPv4 written as IPv6 (::ffff:10.0.0.1): check the IPv4 part.
-    const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(l);
-    if (mapped) return isPrivateIp(mapped[1]!);
-    return (
-      l === '::1' ||
-      l === '::' ||
-      l.startsWith('fc') ||
-      l.startsWith('fd') ||
-      l.startsWith('fe80') ||
-      l.startsWith('ff') ||
-      l.startsWith('::ffff:') ||
-      l.startsWith('64:ff9b:') ||
-      l.startsWith('2001:db8')
-    );
-  }
-  const [a, b] = ip.split('.').map(Number) as [number, number];
-  return (
-    a === 10 ||
-    a === 127 ||
-    a === 0 ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168) ||
-    (a === 192 && b === 0) ||
-    (a === 198 && (b === 18 || b === 19)) ||
-    (a === 100 && b >= 64 && b <= 127) ||
-    a >= 224
-  );
-}
-
 /**
- * SSRF guard. Production: https only and the host must resolve to public addresses.
- * Development/test: http to localhost is allowed so developers can test locally.
+ * Checked when a subscription is made, so a developer hears at once about a URL that can't work:
+ * https only and every address the host resolves to must be public. Development/test: http to
+ * localhost is allowed so developers can test locally. Delivery checks again, on the connection
+ * itself (lib/safe-fetch.ts), since DNS can change in between.
  */
 export async function assertSafeWebhookUrl(
   raw: string,
   allowLocal: boolean,
   /** Looks up a host's addresses (tests pass a fake). */
-  resolve: (host: string) => Promise<string[]> = async (host) => (await lookup(host, { all: true }).catch(() => [])).map((a) => a.address),
+  resolve: Resolve = systemResolve,
 ): Promise<URL> {
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    throw new Error('Enter a full URL, like https://example.com/webhooks.');
-  }
-  const local = ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
-  if (allowLocal && local) return url;
-  if (url.protocol !== 'https:') throw new Error('Webhook URLs must use https.');
-  if (url.username || url.password) throw new Error('Webhook URLs cannot contain credentials.');
+  const { url, local } = checkOutboundUrl(raw, { allowLocal, label: 'Webhook URLs' });
+  if (local) return url;
   const host = url.hostname.replace(/^\[|\]$/g, '');
   const addrs = isIP(host) ? [host] : await resolve(host).catch(() => []);
   if (!addrs.length) throw new Error("That host doesn't resolve.");
@@ -97,10 +57,11 @@ export async function assertSafeWebhookUrl(
 
 /**
  * Deliver due webhooks. Safe to run on several instances at once (SKIP LOCKED).
- * Retries with exponential backoff (1, 2, 4 … minutes) and gives up after 8 attempts.
+ * Retries with exponential backoff (1, 2, 4 … minutes) and gives up after 8 attempts. Each delivery
+ * goes through safeFetch: the connection goes only to addresses checked as public, and redirects
+ * are not followed (a 3xx counts as a failure).
  */
-export async function processWebhooks(db: Pool, opts: { allowLocal: boolean; fetchImpl?: typeof fetch; batch?: number }): Promise<number> {
-  const f = opts.fetchImpl ?? fetch;
+export async function processWebhooks(db: Pool, opts: { allowLocal: boolean; deps?: SafeFetchDeps; batch?: number }): Promise<number> {
   const client = await db.connect();
   let n = 0;
   try {
@@ -118,19 +79,25 @@ export async function processWebhooks(db: Pool, opts: { allowLocal: boolean; fet
       let code: number | null = null;
       let error: string | null = null;
       try {
-        await assertSafeWebhookUrl(d.url, opts.allowLocal);
-        const res = await f(d.url, {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            'user-agent': 'YAPILAPI-Webhooks/1',
-            'x-yapilapi-event': d.event,
-            'x-yapilapi-signature': signWebhook(d.secret, body),
+        const res = await safeFetch(
+          d.url,
+          {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              'user-agent': 'YAPILAPI-Webhooks/1',
+              'x-yapilapi-event': d.event,
+              'x-yapilapi-signature': signWebhook(d.secret, body),
+            },
+            body,
+            maxRedirects: 0,
+            allowLocal: opts.allowLocal,
+            label: 'Webhook URLs',
+            signal: AbortSignal.timeout(10_000),
           },
-          body,
-          redirect: 'manual',
-          signal: AbortSignal.timeout(10_000),
-        });
+          opts.deps,
+        );
+        await res.body?.cancel().catch(() => {});
         code = res.status;
         if (res.status < 200 || res.status >= 300) error = `HTTP ${res.status}`;
       } catch (e) {

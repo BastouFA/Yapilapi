@@ -1,12 +1,12 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import type { TogetherInvitePreview } from '../../../../../packages/shared/src/together';
-import { client, errorMessage } from '../../../lib/api';
+import { client, errorMessage, isGone } from '../../../lib/api';
 import { useFlag } from '../../../lib/flags';
 import { useT } from '../../../lib/i18n';
 import { radius, space } from '../../../lib/theme';
-import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, useColors, userText } from '../../../lib/ui';
+import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, ScreenError, useColors, userText } from '../../../lib/ui';
 
 /**
  * An invite link to a Together album (or its QR code at the event): what it is and who hosts
@@ -19,17 +19,23 @@ export default function JoinTogether() {
   const on = useFlag('REAL_TOGETHER');
   const [invite, setInvite] = useState<TogetherInvitePreview | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  // Why it couldn't load, when that isn't because the invite is gone.
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!on) return;
+  const load = useCallback(() => {
+    setLoadError(null);
     void client()
       .then((api) => api.together.invite(code))
       .then(
         (r) => setInvite(r.invite),
-        () => setInvite(null),
+        (e) => (isGone(e) ? setInvite(null) : setLoadError(errorMessage(e))),
       );
-  }, [code, on]);
+  }, [code]);
+  useEffect(() => {
+    if (on) load();
+  }, [load, on]);
 
+  if (on && invite === undefined && loadError) return <ScreenError message={loadError} onRetry={load} />;
   if (on === undefined || (on && invite === undefined)) return <Loading />;
   if (!on)
     return (

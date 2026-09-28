@@ -5,7 +5,7 @@
  */
 import { router } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import type { AiSettings, CaptionIdeas, CatchUp, CatchUpOffer, SmartReplies } from '../../../packages/shared/src/types';
 import { client, errorMessage } from './api';
@@ -177,23 +177,33 @@ export function SmartReplyChips({
   }, [conversationId, lastMessageId, enabled, on]);
   if (!replies?.suggestions.length) return null;
   return (
+    // One row: the label stays put and the replies scroll sideways, so longer ones (or languages)
+    // never push the message box up.
     <View
       accessibilityRole="toolbar"
       accessibilityLabel={`${t('smartReplies.label')}, ${t('ai.label')}`}
-      style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space[2], paddingHorizontal: space[3], paddingTop: space[2] }}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], paddingStart: space[3], paddingTop: space[2] }}
     >
       <Text style={{ color: c.inkMuted, fontSize: 11, fontWeight: '600' }}>{t('ai.label')}</Text>
-      {replies.suggestions.map((s) => (
-        <Chip
-          key={s}
-          label={s}
-          a11yHint={t('smartReplies.hint')}
-          onPress={() => {
-            onPick(s);
-            setReplies(null);
-          }}
-        />
-      ))}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        style={{ flex: 1 }}
+        contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: space[2], paddingEnd: space[3] }}
+      >
+        {replies.suggestions.map((s) => (
+          <Chip
+            key={s}
+            label={s}
+            a11yHint={t('smartReplies.hint')}
+            onPress={() => {
+              onPick(s);
+              setReplies(null);
+            }}
+          />
+        ))}
+      </ScrollView>
     </View>
   );
 }

@@ -6,6 +6,20 @@ const bool = z
   .optional()
   .transform((v) => v === 'true' || v === '1');
 
+/** TRUST_PROXY as Fastify takes it: true/false, the addresses and ranges to trust, or (for a number) the nearest that many hops. */
+export function trustProxySetting(v: string): boolean | string[] | ((address: string, hop: number) => boolean) {
+  const t = v.trim();
+  if (t === 'true' || t === 'false') return t === 'true';
+  if (/^\d+$/.test(t)) {
+    const hops = Number(t);
+    return (_address, hop) => hop < hops;
+  }
+  return t
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
 const schema = z.object({
   NODE_ENV: z.string().default('development'),
   APP_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
@@ -96,6 +110,16 @@ const schema = z.object({
   TRANSCRIBE_API_KEY: z.string().optional().default(''),
   TRANSCRIBE_MODEL: z.string().default('whisper-1'),
   RATE_LIMIT_MAX: z.coerce.number().default(300),
+  /**
+   * Which proxies may say who the caller is (X-Forwarded-For). The default trusts only proxies on
+   * this machine and private networks (Render's, Docker's), so an address a client writes into the
+   * header itself is never taken as theirs: rate limits and sign-in alerts see the real one. Set a
+   * number of hops, "true", or a comma-separated list of addresses and ranges for other hosts.
+   */
+  TRUST_PROXY: z
+    .string()
+    .default('loopback,linklocal,uniquelocal')
+    .transform((v) => trustProxySetting(v)),
   /** "See translation": how many translations one person can ask for in an hour (answers from the cache count too). */
   TRANSLATE_PER_HOUR: z.coerce.number().int().positive().default(300),
   /**

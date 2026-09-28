@@ -51,6 +51,9 @@ export const mediaUrl = (url: string) => (/^https?:\/\//.test(url) ? url : `${ba
 export const errorMessage = (e: unknown) =>
   e instanceof ApiError && e.code === 'network' ? tr('error.network') : e instanceof Error && e.message ? e.message : tr('error.generic');
 
+/** What was asked for is gone or isn't for you, as opposed to a dropped connection or a fault that trying again can fix. */
+export const isGone = (e: unknown) => e instanceof ApiError && (e.status === 403 || e.status === 404 || e.status === 410);
+
 export type SignInResult = { user: Me } | { challengeToken: string };
 
 /** Log in with email and password. Accounts with two-step verification get a challenge to answer with verifyTwoStep. */

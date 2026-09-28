@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { EmptyState, Skeleton } from '@yapilapi/design-system';
+import { Button, EmptyState, Skeleton } from '@yapilapi/design-system';
 import { dropPhase } from '@yapilapi/shared';
 import { DropEditor } from '@/components/DropEditor';
 import { useDrop } from '@/components/Drops';
@@ -12,8 +12,9 @@ import { useSession } from '../../../../providers';
 export default function EditDropPage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useSession();
-  const { drop, missing, now } = useDrop(id);
+  const { drop, missing, loadError, reload, now } = useDrop(id);
   if (missing) return <EmptyState title={t('m.drops.missing')} />;
+  if (!drop && loadError) return <EmptyState title={loadError} action={<Button onClick={() => void reload()}>{t('m.common.retry')}</Button>} />;
   if (!drop) return <Skeleton height={320} />;
   const phase = dropPhase(drop, now);
   if (!drop.isSeller || (phase !== 'draft' && phase !== 'upcoming'))

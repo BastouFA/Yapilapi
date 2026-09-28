@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CATALOGS, isRtl, SUPPORTED_LOCALES, t, tp, type MessageKey } from './i18n.ts';
+import { CATALOGS, gmtOffsetLabel, isRtl, SUPPORTED_LOCALES, t, tp, zoneOffsetMinutes, type MessageKey } from './i18n.ts';
 
 const en = CATALOGS.en!;
 const keys = Object.keys(en).sort();
@@ -8,6 +8,8 @@ const placeholders = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1
 describe('message catalogs', () => {
   it('has the 8 supported languages', () => {
     expect([...SUPPORTED_LOCALES].sort()).toEqual(['ar', 'en', 'es', 'fr', 'ha', 'pt', 'sw', 'yo']);
+    // The phone and the API load every catalog up front: the same languages the web loads on demand.
+    expect(Object.keys(CATALOGS).sort()).toEqual([...SUPPORTED_LOCALES].sort());
   });
 
   for (const locale of SUPPORTED_LOCALES) {
@@ -42,6 +44,14 @@ describe('message catalogs', () => {
     });
   }
 
+  it('gives the rows of listing details different names in every language', () => {
+    const rows = ['condition', 'category', 'delivery', 'where', 'status'].map((k) => `m.market.details.${k}` as MessageKey);
+    for (const locale of SUPPORTED_LOCALES) {
+      const names = rows.map((k) => t(k, locale));
+      expect(new Set(names).size, locale).toBe(names.length);
+    }
+  });
+
   it('comes with both halves of every plural pair', () => {
     // `.other` alone can be an ordinary key (m.notif.other); a `.one` always needs its `.other`.
     const lonely = keys.filter((k) => k.endsWith('.one') && !(k.replace(/\.one$/, '.other') in en));
@@ -67,5 +77,24 @@ describe('t and tp', () => {
     expect(isRtl('ar')).toBe(true);
     expect(isRtl('ar-EG')).toBe(true);
     expect(isRtl('fr')).toBe(false);
+  });
+});
+
+describe('time zone offsets', () => {
+  const summer = new Date('2026-09-28T17:10:00Z');
+  const winter = new Date('2026-01-15T12:00:00Z');
+
+  it('works out how far a zone is from UTC, summer time included', () => {
+    expect(zoneOffsetMinutes(summer, 'Europe/Brussels')).toBe(120);
+    expect(zoneOffsetMinutes(winter, 'Europe/Brussels')).toBe(60);
+    expect(zoneOffsetMinutes(summer, 'America/New_York')).toBe(-240);
+    expect(zoneOffsetMinutes(summer, 'UTC')).toBe(0);
+  });
+
+  it('names a zone by its offset when the phone has no name for it', () => {
+    expect(gmtOffsetLabel(summer, 'Europe/Brussels')).toBe('GMT+2');
+    expect(gmtOffsetLabel(summer, 'Asia/Kolkata')).toBe('GMT+5:30');
+    expect(gmtOffsetLabel(summer, 'America/St_Johns')).toBe('GMT-2:30');
+    expect(gmtOffsetLabel(winter, 'Europe/London')).toBe('GMT');
   });
 });

@@ -4,7 +4,7 @@ import { Alert, Linking, Platform, Pressable, RefreshControl, ScrollView, Share,
 import { formatEventWhen, safeTimeZone } from '../../../../packages/shared/src/i18n';
 import { timeZoneLabel } from '../../../../packages/shared/src/scheduling';
 import type { EventItem, PublicUser } from '../../../../packages/shared/src/types';
-import { client, errorMessage, webUrl } from '../../lib/api';
+import { client, errorMessage, isGone, webUrl } from '../../lib/api';
 import { isWebLink } from '../../lib/forms';
 import { useT } from '../../lib/i18n';
 import { useReport } from '../../lib/report';
@@ -12,7 +12,7 @@ import { RichText } from '../../lib/post';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
 import { deviceTimeZone } from '../../lib/time-zone';
-import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, Segmented, useActionSheet, useColors, userText } from '../../lib/ui';
+import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, ScreenError, Segmented, useActionSheet, useColors, userText } from '../../lib/ui';
 
 type Rsvp = 'going' | 'interested' | 'not_going';
 
@@ -26,6 +26,8 @@ export default function EventScreen() {
   const { t, tp, locale } = useT();
   const { me } = useSession();
   const [event, setEvent] = useState<EventItem | null | undefined>(undefined);
+  // Why it couldn't load, when that isn't because it's gone; an event already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [going, setGoing] = useState<PublicUser[]>([]);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -39,12 +41,14 @@ export default function EventScreen() {
     try {
       const api = await client();
       setEvent((await api.events.get(id)).event);
+      setLoadError(null);
       api.events.attendees(id).then(
         (r) => setGoing(r.items.filter((a) => a.status === 'going').map((a) => a.user)),
         () => {},
       );
-    } catch {
-      setEvent(null);
+    } catch (e) {
+      if (isGone(e)) setEvent(null);
+      else setLoadError(errorMessage(e));
     }
   }, [id]);
 
@@ -55,7 +59,7 @@ export default function EventScreen() {
     }, [load]),
   );
 
-  if (event === undefined) return <Loading />;
+  if (event === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <Loading />;
   if (event === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>

@@ -9,6 +9,8 @@ import { Redis } from 'ioredis';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { createPool } from '@yapilapi/database';
+// Every message catalog, loaded up front, so anything the API writes can be in any language at once.
+import '@yapilapi/shared/i18n';
 import { runInRequest, withRequestContext } from './lib/request-context.ts';
 import type { Config } from './config.ts';
 import type { AppContext } from './lib/context.ts';
@@ -137,7 +139,7 @@ export async function buildApp(
             mixin: traceLogMixin(),
           },
     genReqId: (req) => (req.headers['x-request-id'] as string) || randomUUID(),
-    trustProxy: true,
+    trustProxy: config.TRUST_PROXY,
     bodyLimit: 1_000_000,
   });
   if (opts.onRoute) app.addHook('onRoute', opts.onRoute);
@@ -459,7 +461,7 @@ export async function buildApp(
     ...locationJobHandlers({ db, realtime: ctx.realtime }),
     // Scheduled posts go out at their time.
     ...scheduledPostJobHandlers(ctx),
-    // Site icons for profile links, fetched through the SSRF guard.
+    // Site icons for profile links, fetched through safeFetch (lib/safe-fetch.ts).
     ...linkIconJobHandlers(db),
     // Jobs the modules added (messages sent later).
     ...ctx.jobs,

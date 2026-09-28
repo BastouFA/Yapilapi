@@ -3,12 +3,12 @@ import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Image, Pressable, Text, View } from 'react-native';
 import type { Post, Sound } from '../../../../packages/shared/src/types';
-import { client, errorMessage, mediaUrl } from '../../lib/api';
+import { client, errorMessage, isGone, mediaUrl } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { clock } from '../../lib/media';
 import { useSession } from '../../lib/session';
 import { gradient, radius, space } from '../../lib/theme';
-import { Avatar, Button, EmptyState, ErrorState, Icon, Loading, Segmented, useColors, useRefresh, userText } from '../../lib/ui';
+import { Avatar, Button, EmptyState, ErrorState, Icon, Loading, ScreenError, Segmented, useColors, useRefresh, userText } from '../../lib/ui';
 import { LinearGradient } from 'expo-linear-gradient';
 
 /** A sound: play it, who made it, the reels that use it (most recent or top), and "Use this sound". */
@@ -18,6 +18,8 @@ export default function SoundScreen() {
   const { t, tp } = useT();
   const { me } = useSession();
   const [sound, setSound] = useState<Sound | null | undefined>(undefined);
+  // Why it couldn't load, when that isn't because it's gone; a sound already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [sort, setSort] = useState<'recent' | 'top'>('recent');
   const [reels, setReels] = useState<Post[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -27,8 +29,10 @@ export default function SoundScreen() {
     try {
       const r = await (await client()).sounds.get(id);
       setSound(r.sound);
-    } catch {
-      setSound((cur) => cur ?? null);
+      setLoadError(null);
+    } catch (e) {
+      if (isGone(e)) setSound(null);
+      else setLoadError(errorMessage(e));
     }
   }, [id]);
   useEffect(() => {
@@ -59,7 +63,7 @@ export default function SoundScreen() {
   }, [loadList]);
   const refresh = useRefresh(() => Promise.all([loadOne(), loadList()]));
 
-  if (sound === undefined) return <Loading />;
+  if (sound === undefined) return loadError ? <ScreenError message={loadError} onRetry={loadOne} /> : <Loading />;
   if (sound === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>

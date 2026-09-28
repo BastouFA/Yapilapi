@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
 import {
@@ -16,13 +16,13 @@ import {
   type EchoRender,
 } from '../../../../packages/shared/src/echoes';
 import { formatReelTime } from '../../../../packages/shared/src/reels';
-import { client, errorMessage, mediaUrl } from '../../lib/api';
+import { client, errorMessage, isGone, mediaUrl } from '../../lib/api';
 import { onEchoAsset, takeEchoAsset } from '../../lib/create-sheet';
 import { Slider } from '../../lib/editor';
 import { useT } from '../../lib/i18n';
 import { pickOne, uploadPicked, type Picked } from '../../lib/media';
 import { radius, space } from '../../lib/theme';
-import { Avatar, Button, EmptyState, Field, KeyboardAvoid, Loading, Notice, Segmented, SwitchRow, useColors, userText } from '../../lib/ui';
+import { Avatar, Button, EmptyState, Field, KeyboardAvoid, Loading, Notice, ScreenError, Segmented, SwitchRow, useColors, userText } from '../../lib/ui';
 
 const LAYOUT_KEYS: Record<EchoLayout, { label: MessageKey; hint: MessageKey }> = {
   side: { label: 'echo.layout.side', hint: 'echo.layout.sideHint' },
@@ -84,6 +84,8 @@ export default function EchoScreen() {
   const { t } = useT();
   const [options, setOptions] = useState<EchoOptions | null>(null);
   const [missing, setMissing] = useState<string | null>(null);
+  // Why it couldn't load, when that isn't because the reel is gone or private.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [asset, setAsset] = useState<Picked | null>(null);
   const [uploaded, setUploaded] = useState<{ id: string; uri: string } | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
@@ -99,18 +101,23 @@ export default function EchoScreen() {
   const [failed, setFailed] = useState<string | null>(null);
   const alive = useRef(true);
 
+  const loadOptions = useCallback(async () => {
+    setLoadError(null);
+    try {
+      const o = await (await client()).posts.echoOptions(id);
+      if (!alive.current) return;
+      setOptions(o);
+      if (o.original.durationMs) setCut({ startMs: 0, endMs: Math.min(o.original.durationMs, 5000) });
+    } catch (e) {
+      if (!alive.current) return;
+      if (isGone(e)) setMissing(errorMessage(e));
+      else setLoadError(errorMessage(e));
+    }
+  }, [id]);
+
   useEffect(() => {
     alive.current = true;
-    void (async () => {
-      try {
-        const o = await (await client()).posts.echoOptions(id);
-        if (!alive.current) return;
-        setOptions(o);
-        if (o.original.durationMs) setCut({ startMs: 0, endMs: Math.min(o.original.durationMs, 5000) });
-      } catch (e) {
-        if (alive.current) setMissing(errorMessage(e));
-      }
-    })();
+    void loadOptions();
     // A video recorded with the camera for this echo (now, or when the camera closes).
     const take = () => {
       const a = takeEchoAsset(id);
@@ -142,7 +149,7 @@ export default function EchoScreen() {
   }
 
   if (missing) return <EmptyState title={t('echo.block.unavailable')} body={missing} />;
-  if (!options) return <Loading />;
+  if (!options) return loadError ? <ScreenError message={loadError} onRetry={loadOptions} /> : <Loading />;
 
   const name = options.original.author.username;
   const theirMedia = options.original.media;

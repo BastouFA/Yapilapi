@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Avatar, AvatarGroup, Badge, BottomSheet, Button, EmptyState, List, ListItem, Segments, Skeleton, type MenuAction } from '@yapilapi/design-system';
 import { BOARD_COLLABORATORS_MAX, type BoardDetail, type Post, type PublicUser, type SavedFilter } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { JoinNote, NeedsAccount } from '@/components/SignedOut';
 import {
@@ -57,6 +57,8 @@ export default function BoardPage() {
   const router = useRouter();
   const [detail, setDetail] = useState<BoardDetail | null>(null);
   const [missing, setMissing] = useState(false);
+  // Why it couldn't load, when that isn't because it's gone or private; a board already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [filter, setFilter] = useState<SavedFilter>('all');
   const [editing, setEditing] = useState(false);
   const [people, setPeople] = useState(false);
@@ -69,14 +71,13 @@ export default function BoardPage() {
   const [moved, setMoved] = useState('');
   const refocus = useRef<string | null>(null);
 
-  const loadDetail = useCallback(
-    () =>
-      api.boards.get(id).then(
-        (d) => setDetail(d),
-        () => setMissing(true),
-      ),
-    [id],
-  );
+  const loadDetail = useCallback(() => {
+    setLoadError(null);
+    return api.boards.get(id).then(
+      (d) => setDetail(d),
+      (e) => (isGone(e) ? setMissing(true) : setLoadError(errorMessage(e))),
+    );
+  }, [id]);
   useEffect(() => {
     void loadDetail();
   }, [loadDetail]);
@@ -124,6 +125,12 @@ export default function BoardPage() {
       </div>
     ) : (
       <NeedsAccount title={t('boards.signInTitle')} body={t('boards.signInBody')} />
+    );
+  if (!detail && loadError)
+    return (
+      <div className="yp-shell__inner">
+        <EmptyState title={loadError} action={<Button onClick={() => void loadDetail()}>{t('m.common.retry')}</Button>} />
+      </div>
     );
   if (!detail)
     return (
@@ -408,7 +415,9 @@ export default function BoardPage() {
       ) : (
         <>
           <Segments label={t('m.saved.filter')} value={filter} onChange={setFilter} options={savedFilterOptions(t)} />
-          {items.items === null ? (
+          {items.items === null && items.loadError ? (
+            <EmptyState title={items.loadError} action={<Button onClick={() => items.reload()}>{t('m.common.retry')}</Button>} />
+          ) : items.items === null ? (
             <Skeleton height={320} />
           ) : items.items.length ? (
             <>

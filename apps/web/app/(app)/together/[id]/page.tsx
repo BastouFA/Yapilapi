@@ -51,7 +51,7 @@ import {
   windowClosesAt,
 } from '@/components/Together';
 import { ScreenLoading } from '@/components/Loading';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { useRealtime, useSession } from '../../../providers';
 
 // The full-screen viewer and the slideshow download when one of them opens.
@@ -545,6 +545,8 @@ export default function TogetherPage() {
   const { flags, t, tp, toast, locale } = useSession();
   const [album, setAlbum] = useState<TogetherDetail | null>(null);
   const [missing, setMissing] = useState(false);
+  // Why it couldn't load, when that isn't because it's gone or private; an album already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [view, setView] = useState<TogetherView>('moments');
   const [open, setOpen] = useState<string | null>(null);
   const [show, setShow] = useState(false);
@@ -555,14 +557,13 @@ export default function TogetherPage() {
   const [making, setMaking] = useState(false);
 
   useEffect(() => setView(readView()), []);
-  const load = useCallback(
-    () =>
-      api.together.get(id).then(
-        (r) => (setAlbum(r.together), setMissing(false)),
-        () => setMissing(true),
-      ),
-    [id],
-  );
+  const load = useCallback(() => {
+    setLoadError(null);
+    return api.together.get(id).then(
+      (r) => (setAlbum(r.together), setMissing(false)),
+      (e) => (isGone(e) ? setMissing(true) : setLoadError(errorMessage(e))),
+    );
+  }, [id]);
   useEffect(() => {
     if (flags.REAL_TOGETHER) void load();
   }, [load, flags.REAL_TOGETHER]);
@@ -603,6 +604,12 @@ export default function TogetherPage() {
             </Link>
           }
         />
+      </div>
+    );
+  if (!album && loadError)
+    return (
+      <div className="yp-shell__inner">
+        <EmptyState title={loadError} action={<Button onClick={() => void load()}>{t('m.common.retry')}</Button>} />
       </div>
     );
   if (!album)

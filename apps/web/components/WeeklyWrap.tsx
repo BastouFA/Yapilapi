@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Avatar, Button, EmptyState, Icon, Skeleton } from '@yapilapi/design-system';
 import type { OnThisDayCard, PluralKey, Post, PulseCards as PulseCardsData, WeeklyWrap, WeeklyWrapCard, WeeklyWrapCounts } from '@yapilapi/shared';
-import { api, ApiError, errorMessage } from '@/lib/api';
+import { api, ApiError, errorMessage, isGone } from '@/lib/api';
 import { useSession } from '@/app/providers';
 import { postThumb } from '@/components/WatchTogether';
 
@@ -319,6 +319,9 @@ export function WrapView({ id }: { id: string }) {
   const router = useRouter();
   const [wrap, setWrap] = useState<WeeklyWrap | null>(null);
   const [missing, setMissing] = useState(false);
+  // Why it couldn't load, when that isn't because it's gone or private.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [card, setCard] = useState<File | null>(null);
   const [busy, setBusy] = useState<'share' | 'delete' | null>(null);
 
@@ -326,10 +329,12 @@ export function WrapView({ id }: { id: string }) {
     let live = true;
     setWrap(null);
     setMissing(false);
+    setLoadError(null);
     api.wraps.get(id).then(
       (r) => live && setWrap(r.wrap),
       (e) => {
         if (!live) return;
+        if (!isGone(e)) return setLoadError(errorMessage(e));
         setMissing(true);
         if (!(e instanceof ApiError && e.status === 404)) toast(errorMessage(e));
       },
@@ -337,7 +342,7 @@ export function WrapView({ id }: { id: string }) {
     return () => {
       live = false;
     };
-  }, [id, toast]);
+  }, [id, toast, attempt]);
 
   // Where the system can share files, have the card ready so sharing happens right on the press.
   const loaded = !!wrap;
@@ -364,6 +369,12 @@ export function WrapView({ id }: { id: string }) {
             </Link>
           }
         />
+      </div>
+    );
+  if (!wrap && loadError)
+    return (
+      <div className="yp-shell__inner">
+        <EmptyState title={loadError} action={<Button onClick={() => setAttempt((n) => n + 1)}>{t('m.common.retry')}</Button>} />
       </div>
     );
   if (!wrap)

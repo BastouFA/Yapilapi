@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Avatar, AvatarGroup, Badge, Button, EmptyState, Icon, Segments, Skeleton } from '@yapilapi/design-system';
 import type { EventItem, PublicUser } from '@yapilapi/shared';
 import { formatEventWhen, safeTimeZone } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { JoinNote, NeedsAccount, useSignIn } from '@/components/SignedOut';
 import { useSession } from '../../../providers';
@@ -19,22 +19,33 @@ export default function EventPageClient({ isPublic }: { isPublic: boolean }) {
   const signedOut = !me;
   const [ev, setEv] = useState<EventItem | null>(null);
   const [missing, setMissing] = useState(false);
+  // Why it couldn't load, when that isn't because it's gone or private.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [attendees, setAttendees] = useState<{ user: PublicUser; status: string }[]>([]);
 
-  useEffect(() => {
-    if (signedOut && !isPublic) return;
-    api.events.get(id).then(
-      (r) => setEv(r.event),
-      () => setMissing(true),
-    );
+  const loadAttendees = useCallback(() => {
     api.events
       .attendees(id)
       .then((r) => setAttendees(r.items))
       .catch(() => {});
-  }, [id, signedOut, isPublic]);
+  }, [id]);
+  const load = useCallback(() => {
+    setLoadError(null);
+    api.events.get(id).then(
+      (r) => setEv(r.event),
+      (e) => (isGone(e) ? setMissing(true) : setLoadError(errorMessage(e))),
+    );
+    loadAttendees();
+  }, [id, loadAttendees]);
+
+  useEffect(() => {
+    if (signedOut && !isPublic) return;
+    load();
+  }, [load, signedOut, isPublic]);
 
   if (signedOut && !isPublic) return <NeedsAccount title={t('eventPage.signIn.title')} body={t('eventPage.signIn.body')} />;
   if (missing) return <EmptyState title={t('m.event.notFound')} body={t('eventPage.notFoundBody')} />;
+  if (!ev && loadError) return <EmptyState title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />;
   if (!ev) return <Skeleton height={240} />;
 
   const tz = safeTimeZone(ev.timezone);
@@ -81,6 +92,7 @@ export default function EventPageClient({ isPublic }: { isPublic: boolean }) {
               try {
                 const r = await api.events.rsvp(id, status);
                 setEv(r.event);
+                loadAttendees();
                 toast(r.status === 'waitlist' ? t('m.event.waitlist') : t('eventPage.rsvpSaved'));
               } catch (e) {
                 toast(errorMessage(e));

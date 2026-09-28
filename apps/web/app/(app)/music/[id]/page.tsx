@@ -3,9 +3,9 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { EmptyState, Icon, Skeleton } from '@yapilapi/design-system';
+import { Button, EmptyState, Icon, Skeleton } from '@yapilapi/design-system';
 import type { MessageKey, MusicTrack } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { PostList } from '@/components/PostList';
 import { SoundPlayButton, soundLength } from '@/components/SoundPicker';
 import { useMusicCredit } from '@/components/StoryMusic';
@@ -22,19 +22,26 @@ export default function MusicTrackPage() {
   const credit = useMusicCredit();
   const [track, setTrack] = useState<MusicTrack | null>(null);
   const [missing, setMissing] = useState<string | null>(null);
+  // Why it couldn't load, when that isn't because it's gone.
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setTrack(null);
+  const loadTrack = useCallback(() => {
     setMissing(null);
+    setLoadError(null);
     api.music.track(id).then(
       (r) => setTrack(r.track),
-      (e) => setMissing(errorMessage(e)),
+      (e) => (isGone(e) ? setMissing(errorMessage(e)) : setLoadError(errorMessage(e))),
     );
   }, [id]);
+  useEffect(() => {
+    setTrack(null);
+    loadTrack();
+  }, [loadTrack]);
 
   const load = useCallback((cursor?: string) => api.music.posts(id, cursor), [id]);
 
   if (missing) return <EmptyState title={t('music.track.missing')} body={missing} />;
+  if (!track && loadError) return <EmptyState title={loadError} action={<Button onClick={loadTrack}>{t('m.common.retry')}</Button>} />;
   if (!track) return <Skeleton height={240} />;
 
   async function toggleSave() {

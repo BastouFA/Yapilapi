@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Avatar, Badge, Button, EmptyState, Menu, PlusBadge, Segments, Skeleton } from '@yapilapi/design-system';
 import { FollowList } from '@/components/FollowList';
 import type { Profile, ProfileTab } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { PostList, ReportSheet } from '@/components/PostList';
 import { SupportCreator, TipSheet } from '@/components/SupportCreator';
 import { Shop } from '@/components/Shop';
@@ -35,6 +35,8 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [missing, setMissing] = useState(false);
+  // Why it couldn't load, when that isn't because it's gone; a profile already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [reporting, setReporting] = useState(false);
   const [sheet, setSheet] = useState<'cover' | 'status' | 'share' | null>(null);
   const [list, setList] = useState<'followers' | 'following' | null>(null);
@@ -73,21 +75,20 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
   }, [intent, profile]);
   const compact = new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 });
 
-  const reload = useCallback(
-    () =>
-      api.users.get(username).then(
-        (r) => {
-          // An old username (changed in the last 14 days) found the profile: move to its address now.
-          if (r.profile.username.toLowerCase() !== decodeURIComponent(username).toLowerCase()) {
-            router.replace(`/u/${encodeURIComponent(r.profile.username)}${window.location.search}`);
-            return;
-          }
-          setProfile(r.profile);
-        },
-        () => setMissing(true),
-      ),
-    [username, router],
-  );
+  const reload = useCallback(() => {
+    setLoadError(null);
+    return api.users.get(username).then(
+      (r) => {
+        // An old username (changed in the last 14 days) found the profile: move to its address now.
+        if (r.profile.username.toLowerCase() !== decodeURIComponent(username).toLowerCase()) {
+          router.replace(`/u/${encodeURIComponent(r.profile.username)}${window.location.search}`);
+          return;
+        }
+        setProfile(r.profile);
+      },
+      (e) => (isGone(e) ? setMissing(true) : setLoadError(errorMessage(e))),
+    );
+  }, [username, router]);
   useEffect(() => {
     if (signedOut && !isPublic) return;
     void reload();
@@ -106,6 +107,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
 
   if (signedOut && !isPublic) return <NeedsAccount title={t('profilePage.signIn.title')} body={t('profilePage.signIn.body')} />;
   if (missing) return <EmptyState title={t('profilePage.missing.title')} body={t('profilePage.missing.body')} />;
+  if (!profile && loadError) return <EmptyState title={loadError} action={<Button onClick={() => void reload()}>{t('m.common.retry')}</Button>} />;
   if (!profile)
     return (
       <div className="yp-shell__inner">

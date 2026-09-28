@@ -28,7 +28,7 @@ import {
   type Post,
   type SavedFilter,
 } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
 /** The session's translators, for helpers used outside a component. */
@@ -710,6 +710,8 @@ export function SaveGrid({
 export function usePaged(load: (cursor?: string) => Promise<Page<Post>>, key: string) {
   const { toast } = useSession();
   const [items, setItems] = useState<Post[] | null>(null);
+  // Why the first page couldn't load, when that isn't because it's gone or private (which shows as empty).
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const loadRef = useRef(load);
@@ -718,6 +720,7 @@ export function usePaged(load: (cursor?: string) => Promise<Page<Post>>, key: st
   const reload = useCallback(() => {
     let live = true;
     setItems(null);
+    setLoadError(null);
     loadRef.current().then(
       (p) => {
         if (!live) return;
@@ -726,8 +729,9 @@ export function usePaged(load: (cursor?: string) => Promise<Page<Post>>, key: st
       },
       (e) => {
         if (!live) return;
-        setItems([]);
         setCursor(null);
+        if (!isGone(e)) return setLoadError(errorMessage(e));
+        setItems([]);
         toast(errorMessage(e));
       },
     );
@@ -752,7 +756,7 @@ export function usePaged(load: (cursor?: string) => Promise<Page<Post>>, key: st
     }
   }, [cursor, loadingMore, toast]);
 
-  return { items, setItems, cursor, more, loadingMore, reload };
+  return { items, setItems, loadError, cursor, more, loadingMore, reload };
 }
 
 /** "Show more" under a grid, which also loads by itself as the reader nears it. */

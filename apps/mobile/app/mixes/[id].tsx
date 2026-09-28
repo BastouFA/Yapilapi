@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mixPlayMs, type MixDetail } from '../../../../packages/shared/src/mixes';
-import { client, errorMessage } from '../../lib/api';
+import { client, errorMessage, isGone } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import {
   AddSongs,
@@ -20,7 +20,7 @@ import {
 import { useReport } from '../../lib/report';
 import { useRealtime, useSession } from '../../lib/session';
 import { space } from '../../lib/theme';
-import { Avatar, Button, EmptyState, Icon, Loading, Notice, useActionSheet, useColors, userText, type ActionSheetAction } from '../../lib/ui';
+import { Avatar, Button, EmptyState, Icon, Loading, Notice, ScreenError, useActionSheet, useColors, userText, type ActionSheetAction } from '../../lib/ui';
 
 /**
  * A mix: its cover, name and who made it, its songs in order, and a mini player that plays each
@@ -34,6 +34,8 @@ export default function MixScreen() {
   const { me } = useSession();
   const insets = useSafeAreaInsets();
   const [mix, setMix] = useState<MixDetail | null | undefined>(undefined);
+  // Why it couldn't load, when that isn't because it's gone or private; a mix already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [sheet, setSheet] = useState<'edit' | 'chat' | 'post' | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -45,8 +47,10 @@ export default function MixScreen() {
   const load = useCallback(async () => {
     try {
       setMix((await (await client()).mixes.get(id)).mix);
-    } catch {
-      setMix((cur) => cur ?? null);
+      setLoadError(null);
+    } catch (e) {
+      if (isGone(e)) setMix(null);
+      else setLoadError(errorMessage(e));
     }
   }, [id]);
   useFocusEffect(
@@ -59,7 +63,7 @@ export default function MixScreen() {
     if (e.type === 'mix.updated' && (e.data as { mixId?: string } | undefined)?.mixId === id) void load();
   });
 
-  if (mix === undefined) return <Loading />;
+  if (mix === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <Loading />;
   if (mix === null) return <EmptyState icon="list" title={t('mixes.missing.title')} body={t('mixes.missing.body')} />;
   const own = mix.role === 'owner';
 

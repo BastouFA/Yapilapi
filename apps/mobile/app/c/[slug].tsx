@@ -4,7 +4,7 @@ import { FlatList, Pressable, Text, View } from 'react-native';
 import type { FaqEntry } from '../../../../packages/api-client/src/index';
 import { ROOM_TITLE_MAX } from '../../../../packages/shared/src/constants';
 import type { Community, EventItem, Post, PublicUser, RoomSummary } from '../../../../packages/shared/src/types';
-import { client, errorMessage } from '../../lib/api';
+import { client, errorMessage, isGone } from '../../lib/api';
 import { DateField } from '../../lib/date-time';
 import { canManage, canOrganize, roleName } from '../../lib/community-roles';
 import { useT } from '../../lib/i18n';
@@ -20,6 +20,7 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  ScreenError,
   feedListProps,
   Field,
   Icon,
@@ -63,6 +64,8 @@ export default function CommunityScreen() {
   const [events, setEvents] = useState<EventItem[] | null>(null);
   const [chatId, setChatId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Why it couldn't load, when that isn't because it's gone; a community already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -70,8 +73,10 @@ export default function CommunityScreen() {
       const r = await (await client()).communities.get(slug);
       setCommunity(r.community);
       setChatId(r.chatConversationId);
-    } catch {
-      setCommunity((cur) => cur ?? null);
+      setLoadError(null);
+    } catch (e) {
+      if (isGone(e)) setCommunity(null);
+      else setLoadError(errorMessage(e));
     }
   }, [slug]);
   // Again on coming back, so changes from the settings screen (name, description) show.
@@ -163,7 +168,7 @@ export default function CommunityScreen() {
   }, [reload]);
   const refresh = useRefresh(refreshAll);
 
-  if (community === undefined) return <Loading />;
+  if (community === undefined) return loadError ? <ScreenError message={loadError} onRetry={reload} /> : <Loading />;
   if (community === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>

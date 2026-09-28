@@ -735,6 +735,16 @@ export function ErrorState({ message, onRetry, style }: { message: string; onRet
   );
 }
 
+/** A whole screen that could not load (not one that is gone): the reason and a button to try again. */
+export function ScreenError({ message, onRetry }: { message: string; onRetry: () => unknown }) {
+  const c = useColors();
+  return (
+    <View style={{ flex: 1, backgroundColor: c.ground, padding: space[4] }}>
+      <ErrorState message={message} onRetry={onRetry} />
+    </View>
+  );
+}
+
 /**
  * Whether this screen is the one in front; true outside a navigator (the root layout). A modal a
  * screen shows (a sheet, a viewer) hides while another screen is on top, or that screen opens behind it.

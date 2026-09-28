@@ -5,7 +5,7 @@ import type { ShopItem } from '../../../packages/api-client/src/index';
 import { formatBytes } from '../../../packages/shared/src/data-saver';
 import { formatMoney } from '../../../packages/shared/src/i18n';
 import type { Post } from '../../../packages/shared/src/types';
-import { client, webUrl } from './api';
+import { client, errorMessage, isGone, webUrl } from './api';
 import { useFlag } from './flags';
 import { useT } from './i18n';
 import { ManagedOnWeb, useDigitalPurchases } from './store';
@@ -214,18 +214,22 @@ type PlansData = Awaited<ReturnType<Awaited<ReturnType<typeof client>>['economy'
 /** A creator's plans and whether you're subscribed, loaded again after checkout on the web. */
 export function usePlans(userId: string | undefined) {
   const [data, setData] = useState<PlansData | null | undefined>(undefined);
+  // Why they couldn't load, when that isn't because they're gone or not for you; plans already showing stay.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const load = useCallback(async () => {
     if (!userId) return;
     try {
       setData(await (await client()).economy.plans(userId));
-    } catch {
-      setData(null);
+      setLoadError(null);
+    } catch (e) {
+      if (isGone(e)) setData(null);
+      else setLoadError(errorMessage(e));
     }
   }, [userId]);
   useEffect(() => {
     void load();
   }, [load]);
-  return { data, load };
+  return { data, loadError, load };
 }
 
 /**

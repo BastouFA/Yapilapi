@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { NavBar, Skeleton, type NavEntry } from '@yapilapi/design-system';
+import { Button, EmptyState, NavBar, Skeleton, type NavEntry } from '@yapilapi/design-system';
 import { NextLink } from '@/lib/link';
 import { RailAccountButton } from '@/components/AccountMenu';
 import { BirthDateGate } from '@/components/BirthDateGate';
@@ -35,7 +35,7 @@ function currentTab(path: string, username?: string): NavEntry['id'] | undefined
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { me, loading, unread, locale } = useSession();
+  const { me, loading, unread, locale, sessionError, refresh, t } = useSession();
   const router = useRouter();
   const path = usePathname();
 
@@ -44,12 +44,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading) return;
+    if (!me && sessionError) return;
     if (!me) {
       // Back to the same place after logging in, query and all (a settings section, a search).
       if (!openWithoutAccount) router.replace(`/login?next=${encodeURIComponent(path + location.search + location.hash)}`);
     } else if (!me.onboarded && !path.startsWith('/onboarding')) router.replace('/onboarding');
-  }, [loading, me, path, router, openWithoutAccount]);
+  }, [loading, me, path, router, openWithoutAccount, sessionError]);
 
+  // The account couldn't be checked: say why rather than treat it as signed out.
+  if (!loading && !me && sessionError)
+    return (
+      <main className="yp-shell__main" id="main">
+        <div className="yp-shell__inner">
+          <EmptyState title={sessionError} action={<Button onClick={() => void refresh()}>{t('m.common.retry')}</Button>} />
+        </div>
+      </main>
+    );
   if (!loading && !me && openWithoutAccount) return <SignedOutShell>{children}</SignedOutShell>;
   // An account made before a date of birth was required gives it once, before anything else.
   if (!loading && me?.needsBirthDate) return <BirthDateGate />;

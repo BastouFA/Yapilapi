@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Avatar, Badge, BottomSheet, Button, EmptyState, Icon, Skeleton, Switch } from '@yapilapi/design-system';
 import type { ChapterDetail, GuestbookEntry } from '@yapilapi/api-client';
 import { CHAPTER_GUESTBOOK_MAX, formatRelativeTime, type PublicUser } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { AUDIENCE_LABEL, ChapterCover, ChapterEditor, ChapterPlayer, chapterMeta, formatDay, isSealed } from '@/components/Chapters';
 import { useSession } from '../../../providers';
 
@@ -23,6 +23,8 @@ export default function ChapterPage() {
   const router = useRouter();
   const [data, setData] = useState<ChapterDetail | null>(null);
   const [missing, setMissing] = useState(false);
+  // Why it couldn't load, when that isn't because it's gone or private; a chapter already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [guestbook, setGuestbook] = useState<GuestbookEntry[]>([]);
   const [line, setLine] = useState('');
   const [playing, setPlaying] = useState<number | null>(null);
@@ -33,10 +35,12 @@ export default function ChapterPage() {
     try {
       const d = await api.chapters.get(id);
       setData(d);
+      setLoadError(null);
       const g = await api.chapters.guestbook(id).catch(() => ({ items: [] as GuestbookEntry[], open: false }));
       setGuestbook(g.items);
-    } catch {
-      setMissing(true);
+    } catch (e) {
+      if (isGone(e)) setMissing(true);
+      else setLoadError(errorMessage(e));
     }
   }, [id]);
   useEffect(() => {
@@ -44,6 +48,12 @@ export default function ChapterPage() {
   }, [load]);
 
   if (missing) return <EmptyState title={t('chapters.unavailable')} body={t('chapters.unavailableBody')} />;
+  if (!data && loadError)
+    return (
+      <div className="yp-shell__inner">
+        <EmptyState title={loadError} action={<Button onClick={() => void load()}>{t('m.common.retry')}</Button>} />
+      </div>
+    );
   if (!data)
     return (
       <div className="yp-shell__inner">

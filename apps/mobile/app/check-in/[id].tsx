@@ -12,12 +12,27 @@ import {
   type DoorSummary,
   type TicketGuest,
 } from '../../../../packages/shared/src/tickets';
-import { client, errorMessage } from '../../lib/api';
+import { client, errorMessage, isGone } from '../../lib/api';
 import { FriendPicker, useFriends } from '../../lib/friend-picker';
 import { useT } from '../../lib/i18n';
 import { useRealtime, useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
-import { Avatar, BottomSheet, Button, Card, EmptyState, Field, Icon, Loading, Notice, Segmented, SwitchRow, useColors, userText } from '../../lib/ui';
+import {
+  Avatar,
+  BottomSheet,
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  Icon,
+  Loading,
+  Notice,
+  ScreenError,
+  Segmented,
+  SwitchRow,
+  useColors,
+  userText,
+} from '../../lib/ui';
 
 type Filter = 'all' | 'in' | 'waiting';
 
@@ -49,6 +64,8 @@ export default function CheckInScreen() {
   const { t, locale } = useT();
   const { me } = useSession();
   const [door, setDoor] = useState<DoorSummary | null | undefined>(undefined);
+  // Why the door couldn't load, when that isn't because the event is gone or not yours to run.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [counts, setCounts] = useState<CheckInCounts | null>(null);
   const [last, setLast] = useState<CheckInResult | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -70,7 +87,8 @@ export default function CheckInScreen() {
   const tz = door ? safeTimeZone(door.event.timezone) : 'UTC';
   const time = useCallback((iso: string) => new Intl.DateTimeFormat(locale, { timeStyle: 'short', timeZone: tz }).format(new Date(iso)), [locale, tz]);
 
-  useEffect(() => {
+  const loadDoor = useCallback(() => {
+    setLoadError(null);
     client()
       .then((api) => api.events.door(id))
       .then(
@@ -78,9 +96,12 @@ export default function CheckInScreen() {
           setDoor(d);
           setCounts(d.counts);
         },
-        () => setDoor(null),
+        (e) => (isGone(e) ? setDoor(null) : setLoadError(errorMessage(e))),
       );
   }, [id]);
+  useEffect(() => {
+    loadDoor();
+  }, [loadDoor]);
 
   useEffect(() => {
     const timer = setTimeout(
@@ -158,6 +179,7 @@ export default function CheckInScreen() {
     [id, t, say],
   );
 
+  if (door === undefined && loadError) return <ScreenError message={loadError} onRetry={loadDoor} />;
   if (door === undefined || (door && !counts)) return <Loading />;
   if (door === null)
     return (

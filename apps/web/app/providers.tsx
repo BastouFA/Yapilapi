@@ -1,9 +1,11 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { DataSaverProvider, Toast, TranslationProvider, type ToastAction, type TranslationContextValue } from '@yapilapi/design-system';
 import {
   isRtl,
+  loadLocale,
+  localeReady,
   t as translate,
   tp as translatePlural,
   type ConnectionHints,
@@ -12,7 +14,9 @@ import {
   type MessageKey,
   type PluralKey,
 } from '@yapilapi/shared';
-import { api, sharedRequest, WS_URL } from '@/lib/api';
+import { ApiError } from '@yapilapi/api-client';
+import { api, errorMessage, sharedRequest, WS_URL } from '@/lib/api';
+import { readLocaleHint, writeLocaleHint } from '@/lib/locale-script';
 import {
   connectionHints,
   dataSaverActive,
@@ -29,7 +33,10 @@ type Listener = (event: { type: string; data: any }) => void;
 
 export interface Session {
   me: Me | null;
+  /** True until the account (or that nobody is signed in) and its language are both here. */
   loading: boolean;
+  /** Why the account couldn't be checked (the API didn't answer), as opposed to being signed out. */
+  sessionError: string | null;
   refresh: () => Promise<Me | null>;
   setMe: (me: Me | null) => void;
   flags: Record<string, boolean>;
@@ -83,9 +90,17 @@ function isolate(locale: string, vars?: Record<string, string | number>): Record
   return out;
 }
 
+// Only English comes with the page; other languages are fetched on demand (packages/shared/src/i18n-core.ts).
+// A returning reader's language starts downloading as the page's code runs, alongside the account.
+if (typeof window !== 'undefined') {
+  const hint = readLocaleHint();
+  if (hint) void loadLocale(hint);
+}
+
 export function Providers({ children }: { children: React.ReactNode }) {
   const [me, setMe] = useState<Me | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [meLoading, setMeLoading] = useState(true);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [flags, setFlags] = useState<Record<string, boolean>>({});
   const [unread, setUnreadState] = useState({ notifications: 0, messages: 0 });
   const [toastState, setToastState] = useState<{ id: number; message: string; action?: ToastAction } | null>(null);
@@ -116,15 +131,39 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     try {
       const { user } = await api.auth.me();
+      // The account arrives with its language ready, so nothing shows in English first and a
+      // language just chosen in Settings switches in one step.
+      await loadLocale(user.locale);
       setMe(user);
+      setSessionError(null);
       return user;
-    } catch {
-      setMe(null);
+    } catch (e) {
+      // Only the API saying so signs you out here; a dropped connection or a restart keeps the
+      // account already showing, and before one has loaded the app says why with Try again.
+      if (e instanceof ApiError && e.status === 401) {
+        setMe(null);
+        setSessionError(null);
+      } else setSessionError(errorMessage(e));
       return null;
     } finally {
-      setLoading(false);
+      setMeLoading(false);
     }
   }, []);
+
+  // The reader's language, when it isn't loaded yet (signing in, switching accounts): the app waits
+  // for it as it waits for the account. A catalog that can't be fetched leaves the text in English.
+  const locale = me?.locale ?? 'en';
+  const [fetched, setFetched] = useState<string | null>(null);
+  const ready = localeReady(locale) || fetched === locale;
+  useEffect(() => {
+    if (localeReady(locale)) return;
+    let live = true;
+    void loadLocale(locale).then(() => live && setFetched(locale));
+    return () => {
+      live = false;
+    };
+  }, [locale]);
+  const loading = meLoading || !ready;
 
   useEffect(() => {
     void refresh();
@@ -134,12 +173,16 @@ export function Providers({ children }: { children: React.ReactNode }) {
       .catch(() => {});
   }, [refresh]);
 
-  useEffect(() => {
-    if (me?.locale) {
-      document.documentElement.lang = me.locale;
-      document.documentElement.dir = ['ar', 'he', 'fa', 'ur'].includes(me.locale.split('-')[0]!) ? 'rtl' : 'ltr';
-    }
-  }, [me?.locale]);
+  // <html lang> and dir follow the language on screen, before the browser paints it (so Arabic never
+  // shows left to right first), and this browser remembers it for the next page load
+  // (lib/locale-script.ts). Signed out, pages are in English again.
+  const signedIn = !!me;
+  useLayoutEffect(() => {
+    if (loading) return;
+    document.documentElement.lang = locale;
+    document.documentElement.dir = isRtl(locale) ? 'rtl' : 'ltr';
+    writeLocaleHint(signedIn ? locale : null);
+  }, [loading, locale, signedIn]);
 
   // Unread counts, then realtime updates. The socket reconnects with backoff.
   useEffect(() => {
@@ -199,7 +242,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
     return () => void listeners.current.delete(fn);
   }, []);
   const setUnread = useCallback((u: Partial<{ notifications: number; messages: number }>) => setUnreadState((s) => ({ ...s, ...u })), []);
-  const locale = me?.locale ?? 'en';
   const t = useCallback((key: MessageKey, vars?: Record<string, string | number>) => translate(key, locale, isolate(locale, vars)), [locale]);
   const tp = useCallback(
     (key: PluralKey, count: number, vars?: Record<string, string | number>) => translatePlural(key, count, locale, isolate(locale, vars)),
@@ -226,6 +268,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       value={{
         me,
         loading,
+        sessionError,
         refresh,
         setMe,
         flags,
@@ -239,10 +282,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
         dataSaver: { account: accountSaver, device: deviceSaver, mode: saverMode, active: saverOn, hints, setDevice },
       }}
     >
-      {/* First thing a keyboard reaches on every page, in the reader's language. */}
-      <a href="#main" className="skip-link">
-        {t('nav.skipToContent')}
-      </a>
+      {/* First thing a keyboard reaches on every page, in the reader's language (so not before it has loaded). */}
+      {loading ? null : (
+        <a href="#main" className="skip-link">
+          {t('nav.skipToContent')}
+        </a>
+      )}
       <DataSaverProvider on={saverOn}>
         <TranslationProvider value={translation}>{children}</TranslationProvider>
       </DataSaverProvider>

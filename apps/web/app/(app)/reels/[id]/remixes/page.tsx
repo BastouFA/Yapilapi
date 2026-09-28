@@ -3,9 +3,9 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { EmptyState, Segments, Skeleton } from '@yapilapi/design-system';
+import { Button, EmptyState, Segments, Skeleton } from '@yapilapi/design-system';
 import type { Post } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { ReelGrid } from '@/components/ReelGrid';
 import { useSession } from '../../../../providers';
 
@@ -15,20 +15,27 @@ export default function RemixesPage() {
   const { me, t, tp } = useSession();
   const [original, setOriginal] = useState<Post | null>(null);
   const [missing, setMissing] = useState<string | null>(null);
+  // Why it couldn't load, when that isn't because it's gone or private.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [mode, setMode] = useState<'all' | 'duet' | 'remix'>('all');
 
-  useEffect(() => {
-    setOriginal(null);
+  const loadOriginal = useCallback(() => {
     setMissing(null);
+    setLoadError(null);
     api.posts.get(id).then(
       (r) => setOriginal(r.post),
-      (e) => setMissing(errorMessage(e)),
+      (e) => (isGone(e) ? setMissing(errorMessage(e)) : setLoadError(errorMessage(e))),
     );
   }, [id]);
+  useEffect(() => {
+    setOriginal(null);
+    loadOriginal();
+  }, [loadOriginal]);
 
   const load = useCallback((cursor?: string) => api.posts.remixes(id, mode === 'all' ? undefined : mode, cursor), [id, mode]);
 
   if (missing) return <EmptyState title={t('remixes.unavailable')} body={missing} />;
+  if (!original && loadError) return <EmptyState title={loadError} action={<Button onClick={loadOriginal}>{t('m.common.retry')}</Button>} />;
   if (!original) return <Skeleton height={200} />;
   const canRemix = !!me && original.allowRemix && original.visibility === 'public';
   const [introBefore = '', introAfter = ''] = (original.counts.remixes ? tp('remixes.introCount', original.counts.remixes) : t('remixes.intro')).split(

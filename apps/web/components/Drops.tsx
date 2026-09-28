@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Icon, Select } from '@yapilapi/design-system';
 import { dropCountdown, dropDay, dropPhase, formatMoney, type Drop } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { useRealtime, useSession, type Session } from '@/app/providers';
 import { useCheckout } from './Checkout';
 
@@ -180,6 +180,8 @@ export function FollowingDrops() {
 export function useDrop(id: string, enabled = true) {
   const [drop, setDrop] = useState<Drop | null>(null);
   const [missing, setMissing] = useState(false);
+  // Why it couldn't load, when that isn't because it's gone; a drop already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const now = useNow(15_000);
   const load = useCallback(
     () =>
@@ -187,8 +189,9 @@ export function useDrop(id: string, enabled = true) {
         (r) => {
           setDrop(r.drop);
           setMissing(false);
+          setLoadError(null);
         },
-        () => setMissing(true),
+        (e) => (isGone(e) ? setMissing(true) : setLoadError(errorMessage(e))),
       ),
     [id],
   );
@@ -202,7 +205,7 @@ export function useDrop(id: string, enabled = true) {
   useEffect(() => {
     if (opening) void load();
   }, [opening, now, load]);
-  return { drop, setDrop, missing, reload: load, now };
+  return { drop, setDrop, missing, loadError, reload: load, now };
 }
 
 /**

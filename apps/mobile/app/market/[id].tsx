@@ -4,7 +4,7 @@ import { AccessibilityInfo, Alert, Image, Platform, Pressable, RefreshControl, S
 import { ApiError } from '../../../../packages/api-client/src/index';
 import { MARKET_LISTING_DAYS, marketDaysLeft, type MarketListingDetail, type MarketPhoto } from '../../../../packages/shared/src/market';
 import type { PublicUser } from '../../../../packages/shared/src/types';
-import { client, errorMessage, mediaUrl, webUrl } from '../../lib/api';
+import { client, errorMessage, isGone, mediaUrl, webUrl } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import {
   AmountSheet,
@@ -23,7 +23,7 @@ import {
 import { useReport } from '../../lib/report';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
-import { Button, EmptyState, Icon, Loading, Notice, useActionSheet, useColors, userText } from '../../lib/ui';
+import { Button, EmptyState, Icon, Loading, Notice, ScreenError, useActionSheet, useColors, userText } from '../../lib/ui';
 
 /**
  * A Market listing: its photos (with the seller's descriptions for screen readers), price,
@@ -39,6 +39,8 @@ export default function ListingScreen() {
   const { t, tp, date } = tr;
   const { me } = useSession();
   const [listing, setListing] = useState<MarketListingDetail | null | undefined>(undefined);
+  // Why it couldn't load, when that isn't because it's gone; a listing already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -51,12 +53,10 @@ export default function ListingScreen() {
     try {
       const near = currentNear();
       setListing((await (await client()).market.get(id, near ?? undefined)).listing);
+      setLoadError(null);
     } catch (e) {
-      if (e instanceof ApiError && (e.status === 404 || e.status === 403)) setListing(null);
-      else {
-        setListing((cur) => cur ?? null);
-        setError(errorMessage(e));
-      }
+      if (isGone(e)) setListing(null);
+      else setLoadError(errorMessage(e));
     }
   }, [id]);
   useFocusEffect(
@@ -70,7 +70,7 @@ export default function ListingScreen() {
     if (said) AccessibilityInfo.announceForAccessibility(said);
   }, [said]);
 
-  if (listing === undefined) return <Loading />;
+  if (listing === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <Loading />;
   if (listing === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>
@@ -183,12 +183,12 @@ export default function ListingScreen() {
         : l.contactBlock === 'unavailable'
           ? t('m.market.contact.unavailable')
           : null;
-  const details: [string, string][] = [
-    [t('m.market.details.condition'), t(CONDITION_KEYS[l.condition])],
-    [t('m.market.details.category'), t(CATEGORY_KEYS[l.category])],
-    [t('m.market.details.delivery'), l.delivery.map((d) => t(DELIVERY_KEYS[d])).join(', ')],
-    [t('m.market.details.where'), l.where.distanceKm !== null ? `${l.where.area} · ${whereText(tr, l.where)}` : l.where.area],
-    [t('m.market.details.status'), l.expired ? t('m.market.ended') : t(STATUS_KEYS[l.status])],
+  const details: [key: string, label: string, value: string][] = [
+    ['condition', t('m.market.details.condition'), t(CONDITION_KEYS[l.condition])],
+    ['category', t('m.market.details.category'), t(CATEGORY_KEYS[l.category])],
+    ['delivery', t('m.market.details.delivery'), l.delivery.map((d) => t(DELIVERY_KEYS[d])).join(', ')],
+    ['where', t('m.market.details.where'), l.where.distanceKm !== null ? `${l.where.area} · ${whereText(tr, l.where)}` : l.where.area],
+    ['status', t('m.market.details.status'), l.expired ? t('m.market.ended') : t(STATUS_KEYS[l.status])],
   ];
 
   return (
@@ -362,8 +362,8 @@ export default function ListingScreen() {
       ) : null}
 
       <View style={{ gap: space[1], padding: space[3], borderRadius: radius.md, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line }}>
-        {details.map(([label, value]) => (
-          <View key={label} accessible accessibilityLabel={`${label}: ${value}`} style={{ flexDirection: 'row', gap: space[3], paddingVertical: space[1] }}>
+        {details.map(([key, label, value]) => (
+          <View key={key} accessible accessibilityLabel={`${label}: ${value}`} style={{ flexDirection: 'row', gap: space[3], paddingVertical: space[1] }}>
             <Text style={{ color: c.inkMuted, width: 120 }}>{label}</Text>
             <Text style={[{ color: c.ink, fontWeight: '600', flex: 1 }, userText]}>{value}</Text>
           </View>

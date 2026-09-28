@@ -49,6 +49,8 @@ If a service name is already taken on Render, it gets a different hostname. In t
 - on `yapilapi-api`: `WEB_ORIGIN`, `PUBLIC_API_URL`, `WEBAUTHN_RP_ID` and `WEBAUTHN_ORIGIN`;
 - on `yapilapi-web`: `API_INTERNAL_URL`, `NEXT_PUBLIC_WS_URL` and `SITE_URL`.
 
+**Check the API sees real addresses.** Sign in from a phone on mobile data, then open Settings > Security on the web: under "Login alerts and activity", that sign-in should show the phone's public address, not a `10.x` address or the web server's address for every device. If it shows a private address, Render's proxy isn't on a private network for your service: set `TRUST_PROXY` on `yapilapi-api` to the number of proxies in front of it (usually `1`) and redeploy. Never set it to `true`; that lets anyone choose the address the API sees.
+
 ## Your own domain
 
 Add `yapilapi.com` (or yours) to `yapilapi-web` and `api.yapilapi.com` to `yapilapi-api` under Settings > Custom Domains. Then:

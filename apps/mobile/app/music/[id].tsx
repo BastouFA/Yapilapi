@@ -4,14 +4,14 @@ import { FlatList, Image, Linking, Pressable, Text, View } from 'react-native';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
 import type { MusicTrack } from '../../../../packages/shared/src/music';
 import type { Post } from '../../../../packages/shared/src/types';
-import { client, errorMessage, mediaUrl } from '../../lib/api';
+import { client, errorMessage, isGone, mediaUrl } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { clock } from '../../lib/media';
 import { useMusicCredit, useMusicLoop } from '../../lib/music';
 import { PostCard } from '../../lib/post';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
-import { Button, EmptyState, ErrorState, feedListProps, Icon, Loading, useColors, useRefresh, userText } from '../../lib/ui';
+import { Button, EmptyState, ErrorState, ScreenError, feedListProps, Icon, Loading, useColors, useRefresh, userText } from '../../lib/ui';
 
 /**
  * A song from the music catalogue: play the preview, its licence and the credit it asks for, save it,
@@ -25,6 +25,8 @@ export default function MusicTrackScreen() {
   const { me } = useSession();
   const credit = useMusicCredit();
   const [track, setTrack] = useState<MusicTrack | null | undefined>(undefined);
+  // Why it couldn't load, when that isn't because it's gone; a track already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [posts, setPosts] = useState<Post[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,8 +39,10 @@ export default function MusicTrackScreen() {
     try {
       const r = await (await client()).music.track(id);
       setTrack(r.track);
-    } catch {
-      setTrack((cur) => cur ?? null);
+      setLoadError(null);
+    } catch (e) {
+      if (isGone(e)) setTrack(null);
+      else setLoadError(errorMessage(e));
     }
   }, [id]);
   useEffect(() => {
@@ -69,7 +73,7 @@ export default function MusicTrackScreen() {
   }, [loadList]);
   const refresh = useRefresh(() => Promise.all([loadOne(), loadList()]));
 
-  if (track === undefined) return <Loading />;
+  if (track === undefined) return loadError ? <ScreenError message={loadError} onRetry={loadOne} /> : <Loading />;
   if (track === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>

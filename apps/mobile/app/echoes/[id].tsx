@@ -2,10 +2,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Image, Pressable, Text, View } from 'react-native';
 import type { Post } from '../../../../packages/shared/src/types';
-import { client, errorMessage, mediaUrl } from '../../lib/api';
+import { client, errorMessage, isGone, mediaUrl } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { radius, space } from '../../lib/theme';
-import { Button, EmptyState, ErrorState, Icon, Loading, useColors, useRefresh, userText } from '../../lib/ui';
+import { Button, EmptyState, ErrorState, Icon, Loading, ScreenError, useColors, useRefresh, userText } from '../../lib/ui';
 
 /** Echoes of one reel that you can see, newest first, with a way to add yours. */
 export default function EchoesScreen() {
@@ -13,6 +13,8 @@ export default function EchoesScreen() {
   const c = useColors();
   const { t, tp, number } = useT();
   const [original, setOriginal] = useState<Post | null | undefined>(undefined);
+  // Why it couldn't load, when that isn't because it's gone or private; a reel already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [items, setItems] = useState<Post[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -20,8 +22,10 @@ export default function EchoesScreen() {
   const loadOriginal = useCallback(async () => {
     try {
       setOriginal((await (await client()).posts.get(id)).post);
-    } catch {
-      setOriginal((cur) => cur ?? null);
+      setLoadError(null);
+    } catch (e) {
+      if (isGone(e)) setOriginal(null);
+      else setLoadError(errorMessage(e));
     }
   }, [id]);
   const load = useCallback(
@@ -44,7 +48,7 @@ export default function EchoesScreen() {
   }, [loadOriginal, load]);
   const refresh = useRefresh(() => Promise.all([loadOriginal(), load()]));
 
-  if (original === undefined) return <Loading />;
+  if (original === undefined) return loadError ? <ScreenError message={loadError} onRetry={loadOriginal} /> : <Loading />;
   if (original === null)
     return <EmptyState title={t('echo.block.unavailable')} action={{ label: t('m.common.retry'), icon: 'refresh', onPress: () => void loadOriginal() }} />;
   const count = original.counts.echoes ?? 0;

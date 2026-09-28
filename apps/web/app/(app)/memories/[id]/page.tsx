@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { AIPanel, Avatar, BottomSheet, Button, Checkbox, EmptyState, EventCard, Icon, PostCard, Skeleton } from '@yapilapi/design-system';
 import type { PublicUser } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { useSession } from '../../../providers';
 
@@ -20,13 +20,20 @@ export default function MemoryPage() {
   const [friends, setFriends] = useState<PublicUser[]>([]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
-  const load = () => api.memories.get(id).then(setData, () => setMissing(true));
+  // Why it couldn't load, when that isn't because it's gone; a memory already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = () => {
+    setLoadError(null);
+    return api.memories.get(id).then(setData, (e) => (isGone(e) ? setMissing(true) : setLoadError(errorMessage(e))));
+  };
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   if (missing) return <EmptyState title={t('memories.notFound')} />;
+  if (!data && loadError) return <EmptyState title={loadError} action={<Button onClick={() => void load()}>{t('m.common.retry')}</Button>} />;
   if (!data) return <Skeleton height={240} />;
   const m = data.memory;
 

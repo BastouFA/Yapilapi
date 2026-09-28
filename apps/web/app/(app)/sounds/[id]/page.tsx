@@ -3,9 +3,9 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { Avatar, EmptyState, Icon, Segments, Skeleton } from '@yapilapi/design-system';
+import { Avatar, Button, EmptyState, Icon, Segments, Skeleton } from '@yapilapi/design-system';
 import type { Sound } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { ReelGrid } from '@/components/ReelGrid';
 import { SoundPlayButton, soundLength } from '@/components/SoundPicker';
 import { useSession } from '../../../providers';
@@ -16,6 +16,8 @@ export default function SoundPage() {
   const { me, locale, t, tp } = useSession();
   const [sound, setSound] = useState<Sound | null>(null);
   const [missing, setMissing] = useState<string | null>(null);
+  // Why it couldn't load, when that isn't because it's gone or private.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [sort, setSort] = useState<'recent' | 'top'>('recent');
   const n = new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 });
   // "{number} reels" with the number in bold, in whatever order the language puts them.
@@ -30,18 +32,23 @@ export default function SoundPage() {
     );
   };
 
-  useEffect(() => {
-    setSound(null);
+  const loadSound = useCallback(() => {
     setMissing(null);
+    setLoadError(null);
     api.sounds.get(id).then(
       (r) => setSound(r.sound),
-      (e) => setMissing(errorMessage(e)),
+      (e) => (isGone(e) ? setMissing(errorMessage(e)) : setLoadError(errorMessage(e))),
     );
   }, [id]);
+  useEffect(() => {
+    setSound(null);
+    loadSound();
+  }, [loadSound]);
 
   const load = useCallback((cursor?: string) => api.sounds.reels(id, sort, cursor), [id, sort]);
 
   if (missing) return <EmptyState title={t('soundPage.unavailable')} body={missing} />;
+  if (!sound && loadError) return <EmptyState title={loadError} action={<Button onClick={loadSound}>{t('m.common.retry')}</Button>} />;
   if (!sound) return <Skeleton height={240} />;
 
   return (

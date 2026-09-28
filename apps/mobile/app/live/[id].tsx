@@ -18,7 +18,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { LiveChatMessage, LiveSummary } from '../../../../packages/api-client/src/index';
 import { formatMoney } from '../../../../packages/shared/src/i18n';
-import { client, errorMessage, mediaUrl } from '../../lib/api';
+import { client, errorMessage, isGone, mediaUrl } from '../../lib/api';
 import { useFlag } from '../../lib/flags';
 import { useT } from '../../lib/i18n';
 import { openOnWeb } from '../../lib/money';
@@ -36,6 +36,7 @@ import {
   Loading,
   Notice,
   Pill,
+  ScreenError,
   Segmented,
   useActionSheet,
   useColors,
@@ -62,6 +63,8 @@ export default function LiveScreen() {
   // Tickets and gifts are digital goods: only offered where a link out is allowed (lib/store.tsx).
   const offer = useDigitalPurchases();
   const [live, setLive] = useState<LiveSummary | null | undefined>(undefined);
+  // Why it couldn't load, when that isn't because it's gone or private; a live already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [chat, setChat] = useState<LiveChatMessage[]>([]);
   const [tab, setTab] = useState<Tab>('chat');
   const [body, setBody] = useState('');
@@ -98,6 +101,7 @@ export default function LiveScreen() {
         }
       }
       setLive(l);
+      setLoadError(null);
       if (l.status === 'live' && l.playbackUrl) setPlayUrl((cur) => cur ?? mediaUrl(l.playbackUrl!));
       if (l.status !== 'live') setPlayUrl(null);
       if (access)
@@ -105,8 +109,9 @@ export default function LiveScreen() {
           (r) => setChat(r.items),
           () => {},
         );
-    } catch {
-      setLive((cur) => cur ?? null);
+    } catch (e) {
+      if (isGone(e)) setLive(null);
+      else setLoadError(errorMessage(e));
     }
   }, [id]);
 
@@ -141,7 +146,7 @@ export default function LiveScreen() {
     if (nearBottom.current) requestAnimationFrame(() => scroller.current?.scrollToEnd({ animated: !reduceMotion }));
   }, [chat.length, reduceMotion]);
 
-  if (live === undefined) return <Loading />;
+  if (live === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <Loading />;
   if (live === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>

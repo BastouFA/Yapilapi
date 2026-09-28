@@ -1,13 +1,13 @@
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, Text, View } from 'react-native';
 import type { CircleKind } from '../../../../packages/shared/src/constants';
 import type { Circle, PublicUser } from '../../../../packages/shared/src/types';
-import { client, errorMessage } from '../../lib/api';
+import { client, errorMessage, isGone } from '../../lib/api';
 import { CIRCLE_NAME_MAX, KindPicker } from '../../lib/circles';
 import { useT } from '../../lib/i18n';
 import { space } from '../../lib/theme';
-import { Avatar, Button, Card, EmptyState, Field, KeyboardAvoid, Loading, Notice, Title, useColors, userText } from '../../lib/ui';
+import { Avatar, Button, Card, EmptyState, Field, KeyboardAvoid, Loading, Notice, ScreenError, Title, useColors, userText } from '../../lib/ui';
 
 /**
  * One circle: rename it, change its kind, add and remove people (suggestions come from your
@@ -19,6 +19,8 @@ export default function CircleScreen() {
   const { t, tp } = useT();
   const navigation = useNavigation();
   const [circle, setCircle] = useState<Circle | null | undefined>(undefined);
+  // Why it couldn't load, when that isn't because it's gone or not yours.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [members, setMembers] = useState<PublicUser[]>([]);
   const [name, setName] = useState('');
   const [kind, setKind] = useState<CircleKind | null>(null);
@@ -28,21 +30,24 @@ export default function CircleScreen() {
   const [error, setError] = useState<string | null>(null);
   const req = useRef(0);
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const api = await client();
-        const [r, m] = await Promise.all([api.circles.get(id), api.circles.members(id)]);
-        setCircle(r.circle);
-        setName(r.circle.name);
-        setKind(r.circle.kind);
-        setMembers(m.items);
-      } catch (e) {
-        setCircle(null);
-        setError(errorMessage(e));
-      }
-    })();
+  const load = useCallback(async () => {
+    try {
+      const api = await client();
+      const [r, m] = await Promise.all([api.circles.get(id), api.circles.members(id)]);
+      setCircle(r.circle);
+      setName(r.circle.name);
+      setKind(r.circle.kind);
+      setMembers(m.items);
+      setLoadError(null);
+    } catch (e) {
+      if (!isGone(e)) return setLoadError(errorMessage(e));
+      setCircle(null);
+      setError(errorMessage(e));
+    }
   }, [id]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: circle?.name ?? t('m.circles.title') });
@@ -63,7 +68,7 @@ export default function CircleScreen() {
     return () => clearTimeout(timer);
   }, [q]);
 
-  if (circle === undefined) return <Loading />;
+  if (circle === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <Loading />;
   if (circle === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground, padding: space[4], gap: space[3] }}>

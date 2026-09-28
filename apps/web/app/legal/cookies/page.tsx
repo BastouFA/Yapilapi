@@ -43,7 +43,9 @@ export default async function CookiesPage() {
         on other websites.
       </p>
       <ul>
-        <li>Your light or dark appearance choice, when you chose one other than your system’s.</li>
+        <li>
+          Your light or dark appearance choice, when you chose one other than your system’s, and your language while you are signed in, so pages open in it.
+        </li>
         <li>Your Data saver choice for this browser, your Reels sound and caption preferences, and whether you have hidden people suggestions.</li>
         <li>Your recent searches and recently used story music, so you can find them again.</li>
         <li>Whether Yaps are on, and whether you put away today’s “On this day” card.</li>

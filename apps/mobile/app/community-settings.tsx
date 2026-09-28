@@ -4,14 +4,14 @@ import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { ApiError, type FaqEntry } from '../../../packages/api-client/src/index';
 import { COMMUNITY_ROLE_RANK, type CommunityRole } from '../../../packages/shared/src/constants';
 import type { Community, PublicUser } from '../../../packages/shared/src/types';
-import { client, errorMessage } from '../lib/api';
+import { client, errorMessage, isGone } from '../lib/api';
 import { Chip, ChipRow } from '../lib/chips';
 import { ChoiceField, FieldError, Pill, splitRules, TopicsField } from '../lib/forms';
 import { ROLE_LABEL, roleName, roleRank as rank } from '../lib/community-roles';
 import { useT } from '../lib/i18n';
 import { useSession } from '../lib/session';
 import { space } from '../lib/theme';
-import { Avatar, Button, Card, EmptyState, Field, Icon, KeyboardAvoid, Loading, Notice, Title, useColors, userText } from '../lib/ui';
+import { Avatar, Button, Card, EmptyState, Field, Icon, KeyboardAvoid, Loading, Notice, ScreenError, Title, useColors, userText } from '../lib/ui';
 
 type Section = 'details' | 'members' | 'requests' | 'banned' | 'faq';
 type Member = { user: PublicUser; role: string; joinedAt?: string };
@@ -29,20 +29,23 @@ export default function CommunitySettings() {
   const c = useColors();
   const { t } = useT();
   const [community, setCommunity] = useState<Community | null | undefined>(undefined);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [section, setSection] = useState<Section | null>(null);
 
   const load = useCallback(async () => {
     try {
       setCommunity((await (await client()).communities.get(slug)).community);
-    } catch {
-      setCommunity(null);
+      setLoadError(null);
+    } catch (e) {
+      if (isGone(e)) setCommunity(null);
+      else setLoadError(errorMessage(e));
     }
   }, [slug]);
   useEffect(() => {
     void load();
   }, [load]);
 
-  if (community === undefined) return <Loading />;
+  if (community === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <Loading />;
   const myRank = rank(community?.myRole);
   if (!community || myRank < COMMUNITY_ROLE_RANK.moderator)
     return (
