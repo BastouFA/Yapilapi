@@ -2,10 +2,12 @@ import type { FastifyInstance } from 'fastify';
 import { SESSION_COOKIE, verifyPassword } from '@yapilapi/auth';
 import { tx } from '@yapilapi/database';
 import { consentSchema } from '@yapilapi/shared';
+// Every language, loaded up front: the last email is written in the account's.
+import { t } from '@yapilapi/shared/i18n';
 import { z } from 'zod';
 import { badRequest, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
-import { deliverable } from '../lib/email.ts';
+import { deliverable, recipientLocale } from '../lib/email.ts';
 import { EXPORT_README, exportSections, usernameOf } from '../lib/data-export.ts';
 import { collectAccountFiles, removeAccountFiles } from '../lib/media-files.ts';
 import { refundUnspentBudget } from '../lib/ad-refunds.ts';
@@ -194,7 +196,15 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
     // view-once files, live recordings, recap and shared-reel videos (not the private files of digital
     // products they sold, which buyers paid for). Removed from storage once the account is gone.
     const files = await collectAccountFiles(db, u.id);
-    const address = (await db.query<{ email: string }>(`SELECT email FROM users WHERE id = $1`, [u.id])).rows[0]?.email;
+    // The address and language for the last email, read before the account is wiped.
+    const last = (
+      await db.query<{ email: string; locale: string | null }>(
+        `SELECT u.email, pr.locale FROM users u LEFT JOIN profiles pr ON pr.user_id = u.id WHERE u.id = $1`,
+        [u.id],
+      )
+    ).rows[0];
+    const address = last?.email;
+    const locale = recipientLocale(last?.locale);
     let endedCampaigns: string[] = [];
     await tx(db, async (c) => {
       await c.query(
@@ -482,8 +492,8 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       await ctx.email
         .send({
           to: address,
-          subject: 'Your YAPILAPI account was deleted',
-          text: 'Your YAPILAPI account and what you shared were deleted, as you asked. Nothing else will be sent to this address.\n\nIf you didn’t delete your account, reply to this email or contact support straight away.',
+          subject: t('email.deleted.subject', locale),
+          text: `${t('email.deleted.body', locale)}\n\n${t('email.deleted.notYou', locale)}`,
         })
         .catch((err: Error) => req.log.warn({ err: err.message }, 'account deletion email not sent'));
     reply.clearCookie(SESSION_COOKIE, { path: '/' });

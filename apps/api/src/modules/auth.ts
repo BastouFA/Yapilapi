@@ -25,9 +25,12 @@ import {
   USERNAME_PROBLEM_MESSAGES,
   usernameProblem,
 } from '@yapilapi/shared';
+// Every language, loaded up front: emails are written in their reader's.
+import { t } from '@yapilapi/shared/i18n';
 import { z } from 'zod';
 import { AppError, badRequest, conflict, notFound, parse, unauthorized } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
+import { recipientLocale } from '../lib/email.ts';
 import { audit, securityEvent, track } from '../lib/services.ts';
 import { applyMinorDefaults, checkBirthDate } from '../lib/users.ts';
 import { announceReferral, applyReferral, inviterByCode, qualifyReferral } from '../lib/invites.ts';
@@ -126,12 +129,14 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
       userId,
       hash,
     ]);
+    // In the account's language: at sign-up, the one the web or phone sent (register stores it before this).
+    const locale = recipientLocale((await ctx.db.query<{ locale: string }>(`SELECT locale FROM profiles WHERE user_id = $1`, [userId])).rows[0]?.locale);
     // A mail server that is down must not fail the sign-up: "Send the link again" in Settings retries.
     await ctx.email
       .send({
         to: email,
-        subject: 'Confirm your email for YAPILAPI',
-        text: `Confirm your email: ${webOrigin}/verify-email?token=${token}`,
+        subject: t('email.verify.subject', locale),
+        text: t('email.verify.body', locale, { url: `${webOrigin}/verify-email?token=${token}` }),
       })
       .catch((err: Error) => app.log.error({ err: err.message }, 'verification email not sent'));
   }
@@ -163,10 +168,10 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
                 (SELECT 1 FROM username_history WHERE lower(old_username) = lower($2) AND held_until > now() LIMIT 1) AS held`,
         [input.email, input.username],
       );
-      const t = taken.rows[0];
-      if (t.email)
+      const clash = taken.rows[0];
+      if (clash.email)
         throw new AppError(409, 'conflict', 'An account with that email already exists. Log in instead.', { fields: { email: 'Already registered.' } });
-      if (t.username || t.held) throw new AppError(409, 'conflict', 'That username is taken. Try another.', { fields: { username: 'Taken.' } });
+      if (clash.username || clash.held) throw new AppError(409, 'conflict', 'That username is taken. Try another.', { fields: { username: 'Taken.' } });
       const inviter = input.inviteCode ? await inviterByCode(c, input.inviteCode) : null;
       if (input.inviteCode && !inviter)
         throw new AppError(400, 'invalid_invite', "That invite code doesn't work. Check it, or leave it empty.", {
@@ -351,8 +356,12 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
   // Always answers the same way so it can't be used to discover accounts.
   app.post('/v1/auth/password/forgot', { config: authLimit }, async (req) => {
     const { email } = parse(forgotPasswordSchema, req.body);
-    const { rows } = await ctx.db.query<{ id: string }>(`SELECT id FROM users WHERE lower(email) = $1 AND status = 'active' AND deleted_at IS NULL`, [email]);
+    const { rows } = await ctx.db.query<{ id: string; locale: string | null }>(
+      `SELECT u.id, pr.locale FROM users u LEFT JOIN profiles pr ON pr.user_id = u.id WHERE lower(u.email) = $1 AND u.status = 'active' AND u.deleted_at IS NULL`,
+      [email],
+    );
     if (rows[0]) {
+      const locale = recipientLocale(rows[0].locale);
       const { token, hash } = newToken();
       await ctx.db.query(`INSERT INTO auth_tokens (user_id, purpose, token_hash, expires_at) VALUES ($1,'reset_password',$2, now() + interval '1 hour')`, [
         rows[0].id,
@@ -362,8 +371,8 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
       await ctx.email
         .send({
           to: email,
-          subject: 'Reset your YAPILAPI password',
-          text: `Reset your password: ${webOrigin}/reset-password?token=${token} (valid for 1 hour). If you didn't ask for this, you can ignore this email.`,
+          subject: t('email.reset.subject', locale),
+          text: t('email.reset.body', locale, { url: `${webOrigin}/reset-password?token=${token}` }),
         })
         .catch((err: Error) => req.log.error({ err: err.message }, 'password reset email not sent'));
       await securityEvent(ctx.db, rows[0].id, 'password_reset_requested', req.ip);

@@ -1,5 +1,7 @@
 import webpush from 'web-push';
 import type { Pool } from 'pg';
+// Every language, loaded up front: a push is written in its recipient's.
+import { t, tp, type MessageKey } from '@yapilapi/shared/i18n';
 import type { Config } from '../config.ts';
 
 export interface PushMessage {
@@ -52,109 +54,134 @@ export function createPushSender(db: Pool, config: Config, fetchImpl: typeof fet
   };
 }
 
-/** A Together album's title, in quotes. */
-const album = (d: Record<string, unknown>) => `“${String(d.title ?? '')}”`;
+type Data = Record<string, unknown>;
+type Text = (name: string, d: Data, locale: string) => string;
 
-/** "12 photos", "a video", "5 photos and videos": what someone added to a Together album. */
-function addedWhat(d: Record<string, unknown>): string {
-  const n = Math.max(1, Number(d.count ?? 1));
-  const videos = Number(d.videos ?? 0);
-  if (!videos) return n === 1 ? 'a photo' : `${n} photos`;
-  if (videos >= n) return n === 1 ? 'a video' : `${n} videos`;
-  return `${n} photos and videos`;
+/** A sentence from the catalog with the person's name ({name}) and nothing else to fill in. */
+const say =
+  (key: MessageKey): Text =>
+  (name, _d, locale) =>
+    t(key, locale, { name });
+
+/** A Together album's title ({title}; each catalog puts it in its language's own quotes). */
+const albumTitle = (d: Data) => String(d.title ?? '');
+
+/** "Ada added 12 photos to “Lagos weekend”", "a video", "5 photos and videos": what someone added to a Together album. */
+function addedText(name: string, d: Data, locale: string): string {
+  const count = Math.max(1, Number(d.count ?? 1) || 1);
+  const videos = Number(d.videos ?? 0) || 0;
+  const vars = { name, title: albumTitle(d) };
+  if (!videos) return tp('push.together_added.photos', count, locale, vars);
+  if (videos >= count) return tp('push.together_added.videos', count, locale, vars);
+  return t('push.together_added', locale, { ...vars, count });
 }
 
-const TEXT: Record<string, (actor: string, data: Record<string, unknown>) => string> = {
-  follow: (a) => `${a} started following you`,
-  friend_request: (a) => `${a} sent you a friend request`,
-  friend_accepted: (a) => `${a} accepted your friend request`,
-  post_reaction: (a) => `${a} liked your post`,
-  post_comment: (a) => `${a} commented on your post`,
-  event_rsvp: (a) => `${a} is going to your event`,
-  event_updated: (a) => `${a} changed the time or place of an event you're going to`,
-  ticket_received: (a) => `${a} gave you a ticket. It's in your Tickets.`,
-  event_cohost: (a) => `${a} made you a co-host of their event`,
-  call_incoming: (a) => `${a} is calling you`,
-  live_started: (a) => `${a} is live now`,
-  room_live: () => 'A room you asked about has started',
-  together_invite: (a, d) => (d.title ? `${a} added you to the shared album ${album(d)}` : `${a} invited you to a Together`),
+/** A Market listing's title, or a stand-in when a notification has none. */
+function listing(d: Data, fallback: MessageKey, locale: string): string {
+  return typeof d.title === 'string' && d.title ? d.title : t(fallback, locale);
+}
+/** The stand-in at the start of a sentence ("Your listing ends in 3 days"). */
+const capitalized = (s: string, locale: string) => (s ? s[0]!.toLocaleUpperCase(locale) + s.slice(1) : s);
+
+const TEXT: Record<string, Text> = {
+  follow: say('push.follow'),
+  friend_request: say('push.friend_request'),
+  friend_accepted: say('push.friend_accepted'),
+  post_reaction: say('push.post_reaction'),
+  post_comment: say('push.post_comment'),
+  event_rsvp: say('push.event_rsvp'),
+  event_updated: say('push.event_updated'),
+  ticket_received: say('push.ticket_received'),
+  event_cohost: say('push.event_cohost'),
+  call_incoming: say('push.call_incoming'),
+  live_started: say('push.live_started'),
+  room_live: say('push.room_live'),
+  together_invite: (name, d, locale) =>
+    d.title ? t('push.together_invite.album', locale, { name, title: albumTitle(d) }) : t('push.together_invite', locale, { name }),
   // Together albums: additions are coalesced (lib/together.ts, noticeAdded) and stars batched, so each pushes once.
-  together_added: (a, d) => `${a} added ${addedWhat(d)} to ${album(d)}`,
-  together_starred: (a, d) => `${a} starred your photo in ${album(d)}`,
-  together_closing: (_a, d) => `${album(d)} closes in an hour. Add your last photos`,
-  together_closed: (_a, d) => `${album(d)} is closed. Look back at the best of it`,
-  together_request: (a, d) => `${a} asked to join ${album(d)}`,
-  together_approved: (_a, d) => `You're in ${album(d)}`,
-  order_paid: () => 'You have a new paid order',
-  booking_request: (a) => `${a} asked to book`,
-  booking_decided: () => 'Your booking was updated',
-  tip_received: (a) => `${a} sent you a tip`,
-  post_repost: (a) => `${a} reposted your post`,
-  reel_duet: (a) => `${a} made a duet with your reel`,
-  reel_remix: (a) => `${a} remixed your reel`,
+  together_added: addedText,
+  together_starred: (name, d, locale) => t('push.together_starred', locale, { name, title: albumTitle(d) }),
+  together_closing: (_n, d, locale) => t('push.together_closing', locale, { title: albumTitle(d) }),
+  together_closed: (_n, d, locale) => t('push.together_closed', locale, { title: albumTitle(d) }),
+  together_request: (name, d, locale) => t('push.together_request', locale, { name, title: albumTitle(d) }),
+  together_approved: (_n, d, locale) => t('push.together_approved', locale, { title: albumTitle(d) }),
+  order_paid: say('push.order_paid'),
+  booking_request: say('push.booking_request'),
+  booking_decided: say('push.booking_decided'),
+  tip_received: say('push.tip_received'),
+  post_repost: say('push.post_repost'),
+  reel_duet: say('push.reel_duet'),
+  reel_remix: say('push.reel_remix'),
   // Echoes of one reel are batched (lib/echoes.ts), so this pushes for the first one only.
-  reel_echo: (a) => `${a} echoed your reel`,
-  post_mention: (a) => `${a} mentioned you in a post`,
-  comment_mention: (a) => `${a} mentioned you in a comment`,
-  comment_like: (a) => `${a} liked your comment`,
-  comment_reply: (a) => `${a} replied to your comment`,
-  collab_invite: (a) => `${a} invited you to co-author a post`,
-  collab_accepted: (a) => `${a} accepted your invite to co-author your post`,
-  photo_tag: (a) => `${a} tagged you in a photo`,
-  story_mention: (a) => `${a} mentioned you in their story`,
-  story_reshare: (a) => `${a} added your story to theirs`,
-  story_countdown: () => 'A countdown you asked about has ended',
-  family_invite: (a) => `${a} asked to supervise your account`,
-  ad_approved: () => 'Your ad was approved',
-  ad_rejected: () => "Your ad wasn't approved",
-  family_accepted: (a) => `${a} accepted your family link`,
-  family_ended: (a) => `${a} ended your family link`,
-  family_controls_changed: (a) => `${a} changed your family settings`,
-  subscription_started: (a) => `${a} subscribed to you`,
-  invite_joined: (a) => `${a} joined YAPILAPI with your invite`,
-  plus_referral_reward: () => 'You have 30 more days of YAPILAPI Plus, thanks to friends you invited',
-  media_blocked: () => "A photo or video you shared wasn't posted. Our team will check it",
-  media_restored: () => 'Your photo or video is back up after review',
-  account_limited: () => 'Your account is limited while our team reviews some recent activity',
-  account_review: () => 'Our team finished reviewing your account',
+  reel_echo: say('push.reel_echo'),
+  post_mention: say('push.post_mention'),
+  comment_mention: say('push.comment_mention'),
+  comment_like: say('push.comment_like'),
+  comment_reply: say('push.comment_reply'),
+  collab_invite: say('push.collab_invite'),
+  collab_accepted: say('push.collab_accepted'),
+  photo_tag: say('push.photo_tag'),
+  story_mention: say('push.story_mention'),
+  story_reshare: say('push.story_reshare'),
+  story_countdown: say('push.story_countdown'),
+  family_invite: say('push.family_invite'),
+  ad_approved: say('push.ad_approved'),
+  ad_rejected: say('push.ad_rejected'),
+  family_accepted: say('push.family_accepted'),
+  family_ended: say('push.family_ended'),
+  family_controls_changed: say('push.family_controls_changed'),
+  subscription_started: say('push.subscription_started'),
+  invite_joined: say('push.invite_joined'),
+  plus_referral_reward: (_n, d, locale) => tp('push.plus_referral_reward', Number(d.days) || 30, locale),
+  media_blocked: say('push.media_blocked'),
+  media_restored: say('push.media_restored'),
+  account_limited: say('push.account_limited'),
+  account_review: say('push.account_review'),
   // What happened is in the app, in the reader's language; the push only says there's an answer.
-  report_outcome: () => 'We finished reviewing something you reported',
-  chapter_invite: (a) => `${a} invited you to add stories to a chapter`,
+  report_outcome: say('push.report_outcome'),
+  chapter_invite: say('push.chapter_invite'),
   // Posts added to a shared board are batched in the inbox and never pushed.
-  board_invite: (a) => `${a} invited you to add to a board`,
-  chapter_opened: () => 'A time capsule you are part of has opened',
-  yap_received: (a) => `${a} sent you a Yap`,
-  view_once_screenshot: (a) => `${a} took a screenshot of your view-once photo or video`,
+  board_invite: say('push.board_invite'),
+  chapter_opened: say('push.chapter_opened'),
+  yap_received: say('push.yap_received'),
+  view_once_screenshot: say('push.view_once_screenshot'),
   // A reminder you set yourself on a chat message (there is no one else in it).
-  chat_reminder: () => 'You asked to be reminded about a message',
-  scheduled_post_failed: () => "A scheduled post couldn't be published. It's back in your drafts",
-  scheduled_message_failed: () => "A message you scheduled couldn't be sent",
-  new_sign_in: () => 'New sign-in to your account from a device we haven’t seen before',
-  recap_ready: () => 'Your recap video is ready',
-  recap_failed: () => "We couldn't make your recap video",
-  watch_invite: (a) => `${a} wants to watch together`,
+  chat_reminder: say('push.chat_reminder'),
+  scheduled_post_failed: say('push.scheduled_post_failed'),
+  scheduled_message_failed: say('push.scheduled_message_failed'),
+  new_sign_in: say('push.new_sign_in'),
+  recap_ready: say('push.recap_ready'),
+  recap_failed: say('push.recap_failed'),
+  watch_invite: say('push.watch_invite'),
   // Quiet: no sound, like every push but calls. Never says where.
-  location_shared: (a) => `${a} is sharing where they are with you`,
+  location_shared: say('push.location_shared'),
   // Market (never an amount on a lock screen).
-  market_offer: (a, d) => `${a} made an offer on ${d.title ?? 'your listing'}`,
-  market_offer_accepted: (a, d) => `${a} accepted your offer on ${d.title ?? 'a listing'}`,
-  market_offer_declined: (a, d) => `${a} declined your offer on ${d.title ?? 'a listing'}`,
-  market_offer_countered: (a, d) => `${a} made a counter-offer on ${d.title ?? 'a listing'}`,
-  market_sold_to_you: (a, d) => `${a} marked ${d.title ?? 'a listing'} as sold to you. You can rate them now.`,
-  market_rated: (a, d) => `${a} rated you after ${d.title ?? 'a sale'}`,
-  market_expiring: (_a, d) => `${d.title ?? 'Your listing'} ends in ${d.days ?? 3} days. Renew it to keep it listed.`,
-  market_expired: (_a, d) => `${d.title ?? 'Your listing'} has ended. Renew it to list it again.`,
-  weekly_wrap: () => 'Your week in YAPILAPI is ready to look back on',
+  market_offer: (name, d, locale) => t('push.market_offer', locale, { name, title: listing(d, 'push.market.yourListing', locale) }),
+  market_offer_accepted: (name, d, locale) => t('push.market_offer_accepted', locale, { name, title: listing(d, 'push.market.aListing', locale) }),
+  market_offer_declined: (name, d, locale) => t('push.market_offer_declined', locale, { name, title: listing(d, 'push.market.aListing', locale) }),
+  market_offer_countered: (name, d, locale) => t('push.market_offer_countered', locale, { name, title: listing(d, 'push.market.aListing', locale) }),
+  market_sold_to_you: (name, d, locale) => t('push.market_sold_to_you', locale, { name, title: listing(d, 'push.market.aListing', locale) }),
+  market_rated: (name, d, locale) => t('push.market_rated', locale, { name, title: listing(d, 'push.market.aSale', locale) }),
+  market_expiring: (_n, d, locale) =>
+    tp('push.market_expiring', Number(d.days ?? 3), locale, { title: capitalized(listing(d, 'push.market.yourListing', locale), locale) }),
+  market_expired: (_n, d, locale) => t('push.market_expired', locale, { title: capitalized(listing(d, 'push.market.yourListing', locale), locale) }),
+  weekly_wrap: say('push.weekly_wrap'),
   // Questions asked without a name have no actor, so they read "Someone asked you a question".
-  question_received: (a) => `${a} asked you a question`,
-  question_answered: (a) => `${a} answered your question`,
-  drop_opened: (a) => `A drop from ${a} you asked about is open`,
-  drop_cancelled: (a) => `${a} cancelled a drop you were waiting for`,
-  drop_sold_out: () => 'Everything in your drop has sold',
+  question_received: say('push.question_received'),
+  question_answered: say('push.question_answered'),
+  drop_opened: say('push.drop_opened'),
+  drop_cancelled: say('push.drop_cancelled'),
+  drop_sold_out: say('push.drop_sold_out'),
 };
 
-/** Human text for a notification type, or null for types that shouldn't push. `data` is the notification's data. */
-export function pushTextFor(type: string, actorName: string | null, data: object = {}): string | null {
+/** Every notification type that pushes. */
+export const PUSH_TYPES: readonly string[] = Object.keys(TEXT);
+
+/**
+ * Human text for a notification type in the recipient's language (English when there's no catalog
+ * for it), or null for types that shouldn't push. `data` is the notification's data.
+ */
+export function pushTextFor(type: string, actorName: string | null, data: object = {}, locale = 'en'): string | null {
   const f = TEXT[type];
-  return f ? f(actorName ?? 'Someone', data as Record<string, unknown>) : null;
+  return f ? f(actorName ?? t('push.someone', locale), data as Data, locale) : null;
 }

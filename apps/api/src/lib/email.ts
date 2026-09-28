@@ -1,5 +1,7 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { createTransport, type SendMailOptions } from 'nodemailer';
+// Every language, loaded up front: an email is written in its recipient's.
+import { SUPPORTED_LOCALES, t, type MessageKey } from '@yapilapi/shared/i18n';
 
 export interface Email {
   to: string;
@@ -56,63 +58,65 @@ export function deliverable(address: string | null | undefined): address is stri
 }
 
 /**
+ * The language to write to someone in: their app language (`profiles.locale`) when there is a
+ * catalog for it (or for its base language: fr-CA → fr), else English.
+ */
+export function recipientLocale(locale: string | null | undefined): string {
+  const base = locale?.split(/[-_]/)[0]?.toLowerCase() ?? '';
+  return SUPPORTED_LOCALES.includes(base) ? base : 'en';
+}
+
+/** "When: Sunday 27 September 2026 at 20:00 UTC", the date and time in the reader's language, always in UTC. */
+export function whenLine(at: Date, locale: string): string {
+  // Fields rather than dateStyle/timeStyle: Yorùbá's short time style drops a digit ("20:0").
+  const date = new Intl.DateTimeFormat(recipientLocale(locale), {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+  }).format(at);
+  return t('email.when', locale, { date });
+}
+
+/** The web app's address for links in emails (the first origin when several are allowed). */
+export const linkOrigin = (webOrigin: string) => webOrigin.split(',')[0]!.replace(/\/+$/, '');
+
+/**
  * Security notices: sent to the account's email address whenever one of these happens, so
  * someone who didn't do it can act (reset the password, sign out other devices).
- * Keyed by the security event type (lib/services.ts securityEvent).
+ * Keyed by the security event type (lib/services.ts securityEvent); the text is in the catalogs
+ * under `email.security.<type>`.
  */
-export const SECURITY_EMAILS: Record<string, { subject: string; body: string }> = {
-  password_changed: {
-    subject: 'Your YAPILAPI password was changed',
-    body: 'The password for your YAPILAPI account was just changed, and your other devices were signed out.',
-  },
-  password_reset: {
-    subject: 'Your YAPILAPI password was reset',
-    body: 'The password for your YAPILAPI account was just reset with a link sent to this address, and every device was signed out.',
-  },
-  mfa_enabled: {
-    subject: 'Two-step verification is on',
-    body: 'Two-step verification was just turned on for your YAPILAPI account.',
-  },
-  mfa_disabled: {
-    subject: 'Two-step verification is off',
-    body: 'Two-step verification was just turned off for your YAPILAPI account.',
-  },
-  mfa_recovery_codes_regenerated: {
-    subject: 'New recovery codes for YAPILAPI',
-    body: 'New recovery codes were just made for your YAPILAPI account. The old ones no longer work.',
-  },
-  passkey_added: {
-    subject: 'A passkey was added to your YAPILAPI account',
-    body: 'A new passkey was just added to your YAPILAPI account. It can be used to sign in without your password.',
-  },
-  passkey_removed: {
-    subject: 'A passkey was removed from your YAPILAPI account',
-    body: 'A passkey was just removed from your YAPILAPI account.',
-  },
-  phone_verified: {
-    subject: 'A phone number was added to your YAPILAPI account',
-    body: 'A phone number was just confirmed on your YAPILAPI account.',
-  },
-  phone_removed: {
-    subject: 'A phone number was removed from your YAPILAPI account',
-    body: 'The phone number on your YAPILAPI account was just removed.',
-  },
-};
+export const SECURITY_EMAILS: Record<string, { subject: MessageKey; body: MessageKey }> = Object.fromEntries(
+  [
+    'password_changed',
+    'password_reset',
+    'mfa_enabled',
+    'mfa_disabled',
+    'mfa_recovery_codes_regenerated',
+    'passkey_added',
+    'passkey_removed',
+    'phone_verified',
+    'phone_removed',
+  ].map((type) => [type, { subject: `email.security.${type}.subject` as MessageKey, body: `email.security.${type}.body` as MessageKey }]),
+);
 
-/** The text of a security notice, with what to do if it wasn't you. */
-export function securityEmail(type: string, to: string, webOrigin: string, when = new Date()): Email | null {
+/** The text of a security notice in the reader's language, with what to do if it wasn't you. */
+export function securityEmail(type: string, to: string, webOrigin: string, when = new Date(), locale = 'en'): Email | null {
   const e = SECURITY_EMAILS[type];
   if (!e) return null;
-  const origin = webOrigin.split(',')[0]!.replace(/\/+$/, '');
   return {
     to,
-    subject: e.subject,
+    subject: t(e.subject, locale),
     text: [
-      e.body,
-      `When: ${when.toUTCString()}`,
+      t(e.body, locale),
+      whenLine(when, locale),
       '',
-      'If this was you, there is nothing to do.',
-      `If it wasn't, reset your password now at ${origin}/forgot-password and check the devices signed in to your account in Settings.`,
+      t('email.nothingToDo', locale),
+      t('email.security.ifNot', locale, { url: `${linkOrigin(webOrigin)}/forgot-password` }),
     ].join('\n'),
   };
 }

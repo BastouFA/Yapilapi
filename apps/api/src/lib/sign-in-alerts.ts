@@ -1,13 +1,14 @@
 import type { Pool, PoolClient } from 'pg';
 import type { RealtimeHub } from './realtime.ts';
-import { deliverable, type EmailSender } from './email.ts';
+// Every language, loaded up front: the alert email is written in its reader's.
+import { t } from '@yapilapi/shared/i18n';
+import { deliverable, linkOrigin, recipientLocale, whenLine, type EmailSender } from './email.ts';
 import { notify } from './services.ts';
 
 type Q = Pool | PoolClient;
 
-/** "Chrome on macOS", "App on iOS": the browser (or our app) and the system, from a user agent. */
-export function deviceName(ua: string | null | undefined): string {
-  if (!ua) return 'Unknown device';
+/** The browser and the system named in a user agent; null for either when it isn't one we know (our app, an unknown system). */
+function deviceParts(ua: string): { browser: string | null; os: string | null } {
   const os = /iPhone|iPad/.test(ua)
     ? 'iOS'
     : /Android/.test(ua)
@@ -18,9 +19,27 @@ export function deviceName(ua: string | null | undefined): string {
           ? 'Windows'
           : /Linux/.test(ua)
             ? 'Linux'
-            : 'Unknown OS';
-  const browser = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'App';
-  return `${browser} on ${os}`;
+            : null;
+  const browser = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : null;
+  return { browser, os };
+}
+
+/**
+ * "Chrome on macOS", "App on iOS": the browser (or our app) and the system, from a user agent.
+ * Always English: it is the stored device name and part of the sign-in fingerprint, so it must not
+ * change with anyone's language (emails use deviceLabel()).
+ */
+export function deviceName(ua: string | null | undefined): string {
+  if (!ua) return 'Unknown device';
+  const { browser, os } = deviceParts(ua);
+  return `${browser ?? 'App'} on ${os ?? 'Unknown OS'}`;
+}
+
+/** The same as deviceName(), in the reader's language ("Chrome sur macOS"). */
+export function deviceLabel(ua: string | null | undefined, locale: string): string {
+  if (!ua) return t('email.device.unknown', locale);
+  const { browser, os } = deviceParts(ua);
+  return t('email.device.name', locale, { browser: browser ?? t('email.device.app', locale), os: os ?? t('email.device.unknownOs', locale) });
 }
 
 /**
@@ -32,11 +51,11 @@ export function signInFingerprint(device: string, country: string | null | undef
   return `${device.toLowerCase()}|${country && /^[A-Z]{2}$/.test(country) ? country : ''}`;
 }
 
-/** The country's name in English ("Nigeria"), or null when there is none. */
-export function placeName(country: string | null | undefined): string | null {
+/** The country's name in the reader's language ("Nigeria", "Nigéria", "نيجيريا"), or null when there is none. */
+export function placeName(country: string | null | undefined, locale = 'en'): string | null {
   if (!country || !/^[A-Z]{2}$/.test(country)) return null;
   try {
-    return new Intl.DisplayNames(['en'], { type: 'region' }).of(country) ?? country;
+    return new Intl.DisplayNames([recipientLocale(locale)], { type: 'region' }).of(country) ?? country;
   } catch {
     return country;
   }
@@ -81,41 +100,50 @@ export async function recordSignIn(
     entityId: s.sessionId,
     data: { device, place, country: s.country, at: at.toISOString() },
   });
-  void emailAlert(deps, s.userId, { device, place, at }).catch((err: Error) => deps.log?.warn({ err: err.message }, 'sign-in alert email not sent'));
+  void emailAlert(deps, s.userId, { userAgent: s.userAgent, country: s.country, at }).catch((err: Error) =>
+    deps.log?.warn({ err: err.message }, 'sign-in alert email not sent'),
+  );
   return true;
 }
 
-async function emailAlert(deps: { db: Q; email: EmailSender; webOrigin: string }, userId: string, a: { device: string; place: string | null; at: Date }) {
-  const { rows } = await deps.db.query<{ email: string; username: string; on: boolean }>(
-    `SELECT u.email, pr.username, coalesce(up.sign_in_email_alerts, true) AS on
+async function emailAlert(
+  deps: { db: Q; email: EmailSender; webOrigin: string },
+  userId: string,
+  a: { userAgent: string | null | undefined; country: string | null; at: Date },
+) {
+  const { rows } = await deps.db.query<{ email: string; username: string; locale: string | null; on: boolean }>(
+    `SELECT u.email, pr.username, pr.locale, coalesce(up.sign_in_email_alerts, true) AS on
      FROM users u JOIN profiles pr ON pr.user_id = u.id LEFT JOIN user_preferences up ON up.user_id = u.id
      WHERE u.id = $1 AND u.status <> 'deleted'`,
     [userId],
   );
   const r = rows[0];
   if (!r || !r.on || !deliverable(r.email)) return;
-  await deps.email.send(signInEmail(r.email, r.username, deps.webOrigin, a));
+  // In the account's own language: the device, the country's name and the date too.
+  const locale = recipientLocale(r.locale);
+  await deps.email.send(
+    signInEmail(r.email, r.username, deps.webOrigin, { device: deviceLabel(a.userAgent, locale), place: placeName(a.country, locale), at: a.at }, locale),
+  );
 }
 
-/** The email about a sign-in from a new device, with where to go if it wasn't you. */
-export function signInEmail(to: string, username: string, webOrigin: string, a: { device: string; place: string | null; at: Date }) {
-  const origin = webOrigin.split(',')[0]!.replace(/\/+$/, '');
+/** The email about a sign-in from a new device, with where to go if it wasn't you. `device` and `place` are already in `locale`. */
+export function signInEmail(to: string, username: string, webOrigin: string, a: { device: string; place: string | null; at: Date }, locale = 'en') {
   return {
     to,
-    subject: 'New sign-in to your account',
+    subject: t('email.signIn.subject', locale),
     text: [
-      `Someone just signed in to your YAPILAPI account @${username} from a device we haven't seen before.`,
+      t('email.signIn.intro', locale, { username }),
       '',
-      `Device: ${a.device}`,
-      `When: ${a.at.toUTCString()}`,
-      ...(a.place ? [`Approximate place: ${a.place}`] : []),
+      t('email.signIn.device', locale, { device: a.device }),
+      whenLine(a.at, locale),
+      ...(a.place ? [t('email.signIn.place', locale, { place: a.place })] : []),
       '',
-      'If this was you, there is nothing to do.',
+      t('email.nothingToDo', locale),
       '',
-      `This wasn't me: ${origin}/settings/security?review=sign-in`,
-      'There you can log out the devices you don’t recognise and change your password.',
+      t('email.signIn.notMe', locale, { url: `${linkOrigin(webOrigin)}/settings/security?review=sign-in` }),
+      t('email.signIn.notMeHint', locale),
       '',
-      'You can turn these emails off in Settings, under Security. You will still get a notification in the app.',
+      t('email.signIn.turnOff', locale),
     ].join('\n'),
   };
 }
