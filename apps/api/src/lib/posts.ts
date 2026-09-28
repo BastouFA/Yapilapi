@@ -11,17 +11,36 @@ import { soundVisibleSql } from './sounds.ts';
 import { trackMusic, viewerCountries, type StoredPart, type TrackRow } from './music/view.ts';
 import { quotedQuestions } from './ask.ts';
 import { mixCards } from './mixes.ts';
-import type { EchoRef, PostMusic, ReelHighlight } from '@yapilapi/shared';
+import type { EchoRef, PostMusic, PostReasonCode, PostReasonParams, ReelHighlight } from '@yapilapi/shared';
+import { postReasonText, type ReasonTranslator } from '@yapilapi/shared';
+import { t, tp } from '@yapilapi/shared/i18n';
 import { echoAllowedSql, echoPermissionSql } from './echoes.ts';
 
 type Q = Pool | PoolClient;
+
+/** Why a post is in someone's feed: a code and the names it mentions (the apps put it into words). */
+export interface FeedReason {
+  code: PostReasonCode;
+  params?: PostReasonParams;
+}
+
+/** English, for the `reason` and `reasons` older apps show as they are. */
+export const ENGLISH_REASONS: ReasonTranslator = { t: (key, vars) => t(key, 'en', vars), tp: (key, n, vars) => tp(key, n, 'en', vars) };
+
+/** A post's reason fields: the code and its names, and the same in English for older apps. */
+function reasonOf(reasons: Map<string, FeedReason> | undefined, id: string): Pick<Post, 'reason' | 'reasonCode' | 'reasonParams'> {
+  const r = reasons?.get(id);
+  if (!r) return {};
+  const params = r.params ?? {};
+  return { reason: postReasonText({ reasonCode: r.code, reasonParams: params }, ENGLISH_REASONS) ?? undefined, reasonCode: r.code, reasonParams: params };
+}
 
 /**
  * Load full Post DTOs for ids (already authorized by the caller), preserving order.
  * Subscriber-only posts the viewer can't open come back locked: no text, media,
  * poll, link, topics or attachments, only a blurred preview (see Post.locked).
  */
-export async function hydratePosts(db: Q, ids: string[], viewer: string | null, reasons?: Map<string, string>): Promise<Post[]> {
+export async function hydratePosts(db: Q, ids: string[], viewer: string | null, reasons?: Map<string, FeedReason>): Promise<Post[]> {
   if (!ids.length) return [];
   // Media the automated check marked sensitive is never sent to people under 18 (or whose age we don't know); blocked media to nobody.
   const adult = await seesSensitiveMedia(db, viewer);
@@ -125,7 +144,7 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
   return posts;
 }
 
-function toPost(r: Record<string, any>, originals: Map<string, NonNullable<RemixRef['post']>>, reasons?: Map<string, string>): Post {
+function toPost(r: Record<string, any>, originals: Map<string, NonNullable<RemixRef['post']>>, reasons?: Map<string, FeedReason>): Post {
   return {
     id: r.id,
     kind: r.kind,
@@ -172,7 +191,7 @@ function toPost(r: Record<string, any>, originals: Map<string, NonNullable<Remix
           ...(r.allow_echoes ? { allowEchoes: r.allow_echoes } : {}),
         }
       : {}),
-    reason: reasons?.get(r.id),
+    ...reasonOf(reasons, r.id),
     ...(r.withheld_in ? { withheldIn: r.withheld_in.map((c: string) => c.trim()) } : {}),
     ...(r.downloadable === null ? {} : { downloadable: !!r.downloadable }),
     ...(r.boost ? { boost: r.boost } : {}),
@@ -240,7 +259,7 @@ function draftFields(r: Record<string, any>): Pick<Post, 'editedAt' | 'status' |
 }
 
 /** What someone who isn't subscribed sees of a subscriber-only post: who posted it and when, never what it says or shows. */
-function lockedPost(r: Record<string, any>, reasons?: Map<string, string>): Post {
+function lockedPost(r: Record<string, any>, reasons?: Map<string, FeedReason>): Post {
   return {
     id: r.id,
     kind: r.kind,
@@ -261,7 +280,7 @@ function lockedPost(r: Record<string, any>, reasons?: Map<string, string>): Post
     createdAt: r.created_at.toISOString(),
     ...draftFields(r),
     format: r.format ?? 'post',
-    reason: reasons?.get(r.id),
+    ...reasonOf(reasons, r.id),
     locked: { placeholder: r.cover_placeholder ?? null, mediaCount: r.media_count ?? 0 },
   };
 }

@@ -3,6 +3,7 @@ import { Fragment, memo, useEffect, useState } from 'react';
 import { Image, Platform, Pressable, ScrollView, Share, Text, View, type StyleProp, type TextStyle } from 'react-native';
 import type { Conversation, MediaItem, PhotoTag, Post, PublicUser } from '../../../packages/shared/src/types';
 import { formatBytes } from '../../../packages/shared/src/data-saver';
+import { postReasonText } from '../../../packages/shared/src/feed-reasons';
 import { client, errorMessage, mediaUrl, webUrl } from './api';
 import { useDataSaver } from './data-saver';
 import { useBoards, type SaveChange } from './boards';
@@ -151,6 +152,8 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
   // The post as shown: the one given, or the version you just saved.
   const [post, setPost] = useState(given);
   useEffect(() => setPost(given), [given]);
+  // Why it's in your feed ("Your post", "You follow Ada"), in your language.
+  const reason = postReasonText(post, { t });
   const [editing, setEditing] = useState(false);
   const [history, setHistory] = useState(false);
   const [liked, setLiked] = useState(post.viewer.liked);
@@ -325,7 +328,7 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
                   </Text>
                 </>
               ) : null}
-              {post.reason ? ` · ${post.reason}` : ''}
+              {reason ? ` · ${reason}` : ''}
             </Text>
           </View>
         </View>
@@ -359,7 +362,7 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
                   </Text>
                 </>
               ) : null}
-              {post.reason ? ` · ${post.reason}` : ''}
+              {reason ? ` · ${reason}` : ''}
             </Text>
           </View>
         </Pressable>

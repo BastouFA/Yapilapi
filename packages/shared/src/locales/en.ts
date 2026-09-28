@@ -5905,6 +5905,22 @@ export const en = {
   'admin.regions.term': 'Term',
   'admin.regions.topic': 'Topic',
   'admin.regions.add': 'Add rule',
+  'feed.reason.own': 'Your post',
+  'feed.reason.friend': "You're friends with {name}",
+  'feed.reason.follow': 'You follow {name}',
+  'feed.reason.reposted': '{name} reposted',
+  'feed.reason.communityMember': "From {community}, a community you're in",
+  'feed.reason.interest': "You're interested in {topic}",
+  'feed.reason.communityPopular': 'Popular in {community}',
+  'feed.reason.popular': 'Popular with people on YAPILAPI right now',
+  'feed.why.personalizationOff': 'Personalization is off in your settings, so this is ranked by how recent it is and how many people engage with it.',
+  'feed.why.friend': "You're friends with {name}.",
+  'feed.why.follow': 'You follow {name}.',
+  'feed.why.community': 'This is from {community}, a community you joined.',
+  'feed.why.topics.one': 'You follow the topic {topics}.',
+  'feed.why.topics.other': 'You follow the topics {topics}.',
+  'feed.why.engagement': 'People are engaging with it.',
+  'feed.why.fallback': "It's recent and public, and we're still learning what you like.",
 } as const;
 
 export type MessageKey = keyof typeof en;

@@ -440,6 +440,10 @@ A review of the features added on 2026-09-27 and 28, written up in `docs/securit
 
 Each message catalog is its own module in `packages/shared/src/locales/`. The web loads English with the page and the reader's language on demand (`loadLocale()`), instead of all eight on every page: about 630 kB gzip less JavaScript on every route (Home 977 → 348 kB, a profile 1,008 → 379, Settings 954 → 325), plus 86 to 97 kB once for a non-English reader. The app waits for the reader's language as it waits for the account, so nothing shows in English first; `<html lang>`/`dir` are set before paint (Arabic no longer paints one frame left to right), and a returning reader's language is on `<html>` before anything paints. Switching language in Settings still happens in place. The phone and the API import `packages/shared/src/i18n.ts` (`@yapilapi/shared/i18n`), which loads every catalog up front as before. New keys go in every file in `locales/`. Details and measurements: `docs/architecture/performance.md`.
 
+## Feed reasons in the reader's language (2026-09-28, no migration, `apps/api/test/feed-reasons.test.ts`, `packages/shared/src/feed-reasons.test.ts`)
+
+Why a post is in your feed ("Your post", "You follow Ada", "Popular in Film Club") and the lines of "Why am I seeing this?" used to come from the API in English. Posts now carry `reasonCode` and `reasonParams` (the person, community or topic named), and `GET /v1/posts/:id/why` returns `details` (a code and its names for each line) next to its English `reasons`. The web post card, the web "Why am I seeing this?" sheet and the phone's post header put them into words with `packages/shared/src/feed-reasons.ts` (16 new messages in all 8 languages, "topic"/"topics" as a plural pair, topic lists joined for the language). The English `reason` and `reasons` stay for older apps and come from the same messages.
+
 ## Not built yet
 
 - Mainstream music: needs a licensing deal (docs/operations/music.md). Reporting song use to a licensing partner is not built.

@@ -1,4 +1,5 @@
 import type {
+  PostWhy,
   CheckInResult,
   CheckInCounts,
   DoorSummary,
@@ -441,7 +442,7 @@ export function createClient(opts: ClientOptions) {
       /** Your private note on a save (saves the post if needed). An empty note clears it. */
       setSaveNote: (id: string, note: string) => put<{ saved: true; note: string }>(`/v1/posts/${id}/save/note`, { note }),
       vote: (id: string, optionId: string) => post<{ poll: Post['poll'] }>(`/v1/posts/${id}/vote`, { optionId }),
-      why: (id: string) => get<{ reasons: string[] }>(`/v1/posts/${id}/why`),
+      why: (id: string) => get<PostWhy>(`/v1/posts/${id}/why`),
       /** Top-level comments, Top (default) or Newest; the pinned one first. Replies: comments.replies. */
       comments: (id: string, cursor?: string, sort?: CommentSort) => get<CommentPage>(`/v1/posts/${id}/comments${qs({ sort, cursor })}`),
       /** Comment, or reply with `parentId` (a reply to a reply joins the top-level thread). */

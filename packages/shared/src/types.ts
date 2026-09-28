@@ -226,6 +226,42 @@ export interface CaptionTrackRef {
   url: string;
 }
 
+/**
+ * Why a post is in your feed: your own post, a friend's or someone you follow (or a co-author
+ * who is), reposted by someone you follow, from a community you're in, in a topic you like,
+ * popular in a public community, or popular on YAPILAPI. The apps put it into words.
+ */
+export type PostReasonCode = 'own' | 'friend' | 'follow' | 'reposted' | 'community_member' | 'interest' | 'community_popular' | 'popular';
+
+/** The names a feed reason mentions: `name` a person, `community` a community's name, `topic` a topic. */
+export interface PostReasonParams {
+  name?: string;
+  community?: string;
+  topic?: string;
+}
+
+/**
+ * One line of "Why am I seeing this?": personalization is off, a friend's post or someone you
+ * follow, from a community you joined, in topics you follow, people are engaging with it, or
+ * the fallback (recent and public).
+ */
+export type WhyReasonCode = 'personalization_off' | 'friend' | 'follow' | 'community' | 'topics' | 'engagement' | 'fallback';
+
+export interface WhyReason {
+  code: WhyReasonCode;
+  /** `name` a person, `community` a community's name, `topics` the topics you follow that it's in. */
+  params?: { name?: string; community?: string; topics?: string[] };
+}
+
+/** GET /v1/posts/:id/why. */
+export interface PostWhy {
+  /** The same lines in English, kept for older apps. */
+  reasons: string[];
+  /** Each line as a code, put into words in the reader's language (whyReasonText). */
+  details: WhyReason[];
+  controls: string[];
+}
+
 export interface Post {
   id: string;
   kind: PostKind;
@@ -308,8 +344,12 @@ export interface Post {
   question?: QuotedQuestion | null;
   /** A mix shared as a post: its card, or a note that it isn't there for this viewer. */
   mix?: MixCard | null;
-  /** Why this post is in the viewer's feed (recommendation explanation). */
+  /** Why this post is in the viewer's feed, in English: kept for older apps. Newer ones put `reasonCode` into words. */
   reason?: string;
+  /** Why this post is in the viewer's feed, as a code the apps put into words in the reader's language (postReasonText). */
+  reasonCode?: PostReasonCode;
+  /** The names the reason mentions: a person, a community or a topic. */
+  reasonParams?: PostReasonParams;
   /** Only on the author's own posts: countries where regional rules withhold it. */
   withheldIn?: string[];
   /** Reels only: whether the viewer can save it as a video to share (the creator allows downloads). */

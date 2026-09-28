@@ -14,14 +14,17 @@ import {
   reelHighlightsSchema,
   reelResumeSchema,
   resumeWorthKeeping,
+  whyReasonText,
   type PostVersion,
+  type PostWhy,
+  type WhyReason,
 } from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, encodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
 import { analyzeText, statusForRisk } from '../lib/moderation.ts';
-import { hydratePosts } from '../lib/posts.ts';
+import { ENGLISH_REASONS, hydratePosts, type FeedReason } from '../lib/posts.ts';
 import { attachSaveNotes, savedFilterSql } from '../lib/saves.ts';
 import { notifyMentions } from '../lib/mentions.ts';
 import { coAuthoredIdsSql } from '../lib/collabs.ts';
@@ -591,7 +594,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
         c ? [u.id, q.limit + 1, c.t, c.id] : [u.id, q.limit + 1],
       );
       const page = rows.slice(0, q.limit);
-      const reasons = new Map<string, string>(page.filter((r) => r.by).map((r) => [r.id as string, `${r.by_name} reposted`]));
+      const reasons = new Map<string, FeedReason>(page.filter((r) => r.by).map((r) => [r.id as string, { code: 'reposted', params: { name: r.by_name } }]));
       return {
         mode,
         items: await hydratePosts(
@@ -723,27 +726,27 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       perAuthor.set(r.author_id, n + 1);
       picked.push(r);
     }
-    const reasons = new Map<string, string>();
+    const reasons = new Map<string, FeedReason>();
     for (const r of picked)
       reasons.set(
         r.id,
         r.author_id === userId
-          ? 'Your post'
+          ? { code: 'own' }
           : r.friend
-            ? `You're friends with ${r.display_name}`
+            ? { code: 'friend', params: { name: r.display_name } }
             : r.collab_friend
-              ? `You're friends with ${r.collab_name}`
+              ? { code: 'friend', params: { name: r.collab_name } }
               : r.followed
-                ? `You follow ${r.display_name}`
+                ? { code: 'follow', params: { name: r.display_name } }
                 : r.collab_name
-                  ? `You follow ${r.collab_name}`
+                  ? { code: 'follow', params: { name: r.collab_name } }
                   : r.community_name && r.member
-                    ? `From ${r.community_name}, a community you're in`
+                    ? { code: 'community_member', params: { community: r.community_name } }
                     : r.matched_topic
-                      ? `You're interested in ${r.matched_topic}`
+                      ? { code: 'interest', params: { topic: r.matched_topic } }
                       : r.community_name
-                        ? `Popular in ${r.community_name}`
-                        : 'Popular with people on YAPILAPI right now',
+                        ? { code: 'community_popular', params: { community: r.community_name } }
+                        : { code: 'popular' },
       );
     const more = rows.length > consumed;
     return {
@@ -797,10 +800,14 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       perAuthor.set(r.author_id, n + 1);
       picked.push(r);
     }
-    const reasons = new Map<string, string>(
+    const reasons = new Map<string, FeedReason>(
       picked.map((r) => [
         r.id as string,
-        r.author_id === userId ? 'Your post' : r.community_name ? `Popular in ${r.community_name}` : 'Popular with people on YAPILAPI right now',
+        r.author_id === userId
+          ? { code: 'own' }
+          : r.community_name
+            ? { code: 'community_popular', params: { community: r.community_name } }
+            : { code: 'popular' },
       ]),
     );
     return {
@@ -849,18 +856,20 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       [u.id, id],
     );
     const r = rows[0];
-    const reasons: string[] = [];
+    const details: WhyReason[] = [];
+    // Each line as a code the apps put into words, and in English for older apps.
+    const answer = (controls: string[]): PostWhy => ({ reasons: details.map((d) => whyReasonText(d, ENGLISH_REASONS)), details, controls });
     if (!(await personalizationAllowed(db, u.id))) {
-      reasons.push('Personalization is off in your settings, so this is ranked by how recent it is and how many people engage with it.');
-      return { reasons, controls: ['not_interested', 'mute_topic', 'mute_creator'] };
+      details.push({ code: 'personalization_off' });
+      return answer(['not_interested', 'mute_topic', 'mute_creator']);
     }
-    if (r.friend) reasons.push(`You're friends with ${r.display_name}.`);
-    else if (r.followed) reasons.push(`You follow ${r.display_name}.`);
-    if (r.member) reasons.push(`This is from ${r.community}, a community you joined.`);
-    if (r.matched.length) reasons.push(`You follow the topic${r.matched.length > 1 ? 's' : ''} ${r.matched.join(', ')}.`);
-    if (r.like_count + r.comment_count > 5) reasons.push('People are engaging with it.');
-    if (!reasons.length) reasons.push("It's recent and public, and we're still learning what you like.");
-    return { reasons, controls: ['more_like_this', 'less_like_this', 'not_interested', 'mute_topic', 'mute_creator'] };
+    if (r.friend) details.push({ code: 'friend', params: { name: r.display_name } });
+    else if (r.followed) details.push({ code: 'follow', params: { name: r.display_name } });
+    if (r.member) details.push({ code: 'community', params: { community: r.community } });
+    if (r.matched.length) details.push({ code: 'topics', params: { topics: r.matched } });
+    if (r.like_count + r.comment_count > 5) details.push({ code: 'engagement' });
+    if (!details.length) details.push({ code: 'fallback' });
+    return answer(['more_like_this', 'less_like_this', 'not_interested', 'mute_topic', 'mute_creator']);
   });
 
   // ── Reactions, saves, polls ───────────────────────────────────────────
