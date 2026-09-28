@@ -426,7 +426,7 @@ test('chat: start a game, send later and wallpaper sheets', async ({ page }) => 
   await page.waitForLoadState('networkidle');
 
   // Start a game: from the composer's menu.
-  const add = page.getByRole('button', { name: 'Add a poll, a list or a game' });
+  const add = page.getByRole('button', { name: 'Add to this chat' });
   await add.focus();
   await page.keyboard.press('Enter');
   await tabUntil(page, isFocused(page.getByRole('menuitem', { name: 'Play a game' })), 8, 'ArrowDown');

@@ -275,10 +275,11 @@ function AccountSignals() {
 }
 
 function Overview() {
+  const { toast } = useSession();
   const [data, setData] = useState<Awaited<ReturnType<typeof api.admin.summary>> | null>(null);
   useEffect(() => {
-    api.admin.summary().then(setData);
-  }, []);
+    api.admin.summary().then(setData, (e) => toast(errorMessage(e)));
+  }, [toast]);
   if (!data) return null;
   return (
     <div className="stack">
@@ -317,8 +318,11 @@ function Flags() {
   const { toast } = useSession();
   const [flags, setFlags] = useState<Record<string, boolean>>({});
   useEffect(() => {
-    api.flags().then((r) => setFlags(r.flags));
-  }, []);
+    api.flags().then(
+      (r) => setFlags(r.flags),
+      (e) => toast(errorMessage(e)),
+    );
+  }, [toast]);
   return (
     <Card title="Feature flags" subtitle="Changes apply to everyone immediately and are recorded in the audit log.">
       <div className="stack-sm">
@@ -349,7 +353,10 @@ function Flags() {
 function PhonePurchases() {
   const [policy, setPolicy] = useState<StorePurchasePolicy | null>(null);
   useEffect(() => {
-    api.flags().then((r) => setPolicy(r.purchases ?? null));
+    api.flags().then(
+      (r) => setPolicy(r.purchases ?? null),
+      () => setPolicy(null),
+    );
   }, []);
   const ios = {
     hidden: 'Hidden: no buy buttons or prices for digital goods, only a line that they are managed on the web.',
@@ -395,10 +402,14 @@ function PhonePurchases() {
 }
 
 function Audit() {
+  const { toast } = useSession();
   const [items, setItems] = useState<Record<string, any>[]>([]);
   useEffect(() => {
-    api.admin.auditLogs().then((r) => setItems(r.items));
-  }, []);
+    api.admin.auditLogs().then(
+      (r) => setItems(r.items),
+      (e) => toast(errorMessage(e)),
+    );
+  }, [toast]);
   return (
     <div className="table-wrap">
       <table className="table">

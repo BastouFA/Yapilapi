@@ -9,5 +9,5 @@ import { ProfileView } from '../../lib/profile';
 export default function UserScreen() {
   const { username, tab } = useLocalSearchParams<{ username: string; tab?: string }>();
   const onMoved = useCallback((next: string) => router.setParams({ username: next }), []);
-  return <ProfileView username={username} onMoved={onMoved} initialTab={tab === 'answers' ? 'answers' : undefined} />;
+  return <ProfileView username={username} onMoved={onMoved} initialTab={tab === 'answers' || tab === 'market' ? tab : undefined} />;
 }

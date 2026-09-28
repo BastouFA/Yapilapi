@@ -38,9 +38,10 @@ export type ProfileHeaderStyle = (typeof PROFILE_HEADER_STYLES)[number];
  * Tabs a profile can show, in their default order. At least one stays on. Answers (the question
  * box) shows only while the box is on or has answers; turning the box on adds it to a saved list.
  * Mixes shows while the viewer may see at least one of the person's mixes; making a first mix adds
- * it to a saved list. New tabs go at the end, so saved orders keep working.
+ * it to a saved list. Market shows while the person has listings for sale or Market ratings; a first
+ * listing adds it to a saved list. New tabs go at the end, so saved orders keep working.
  */
-export const PROFILE_TABS = ['posts', 'reels', 'reposts', 'tagged', 'boards', 'chapters', 'shop', 'answers', 'mixes'] as const;
+export const PROFILE_TABS = ['posts', 'reels', 'reposts', 'tagged', 'boards', 'chapters', 'shop', 'answers', 'mixes', 'market'] as const;
 export type ProfileTab = (typeof PROFILE_TABS)[number];
 
 export const MAX_PROFILE_LINKS = 5;

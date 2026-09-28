@@ -52,6 +52,8 @@ import { registerWatch } from './watch.ts';
 import { registerTogether } from './together.ts';
 import { sharesFor, stopSharesOnJoin, stopSharesOnLeave } from '../lib/location.ts';
 import { registerLocation } from './location.ts';
+import { marketCardsFor, offersFor } from '../lib/market.ts';
+import { registerMarketChats } from './market.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 
@@ -398,6 +400,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const games = await gamesFor(db, live);
     const locations = await sharesFor(db, live, reader);
     const mixes = await mixCardsForMessages(db, live, reader);
+    const market = await marketCardsFor(db, live, reader);
+    const offers = await offersFor(db, live, reader);
     const reminders = await myReminders(db, live, reader);
     return items.map((m) => {
       const out: Message = { ...m };
@@ -413,6 +417,10 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       if (location) out.location = location;
       const mix = mixes.get(m.id);
       if (mix) out.mix = mix;
+      const card = market.get(m.id);
+      if (card) out.market = card;
+      const offer = offers.get(m.id);
+      if (offer) out.offer = offer;
       if (reminders.has(m.id)) out.reminder = reminders.get(m.id);
       const reminded = remindedOf(m);
       if (reminded && m.system?.type === 'reminder') out.system = { ...m.system, message: previews.get(reminded) ?? null };
@@ -442,7 +450,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
                 (created_at > now() - make_interval(mins => $2)) AS editable,
                 EXISTS (SELECT 1 FROM chat_polls p WHERE p.message_id = messages.id) OR EXISTS (SELECT 1 FROM chat_lists l WHERE l.message_id = messages.id)
                   OR EXISTS (SELECT 1 FROM chat_games g WHERE g.message_id = messages.id) OR (messages.meta ? 'mixId')
-                  OR EXISTS (SELECT 1 FROM location_shares s WHERE s.message_id = messages.id) AS rich
+                  OR EXISTS (SELECT 1 FROM location_shares s WHERE s.message_id = messages.id)
+                  OR (messages.meta ? 'listingId') OR (messages.meta ? 'offerId') AS rich
          FROM messages WHERE id = $1`,
         [messageId, MESSAGE_EDIT_MINUTES],
       )
@@ -1161,6 +1170,9 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     messageFor: (messageId, userId) => messageFor(messageId, userId),
     loadMessage,
   });
+
+  // Writing to sellers about Market listings, and offers (modules/market.ts).
+  registerMarketChats(app, ctx, chatHelpers);
 
   // Send later, and chat wallpapers and colours (modules/chat-later.ts).
   registerChatLater(app, ctx, { assertMember, memberIds, loadMessage, sendMessage });

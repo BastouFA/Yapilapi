@@ -6,9 +6,12 @@
 import type { Metadata } from 'next';
 import {
   formatEventWhen,
+  formatMoney,
+  type MarketCondition,
   type PublicCommunityPreview,
   type PublicDropPreview,
   type PublicEventPreview,
+  type PublicListingPreview,
   type PublicPostPreview,
   type PublicProfilePreview,
 } from '@yapilapi/shared';
@@ -173,5 +176,38 @@ export async function dropMetadata(d: PublicDropPreview): Promise<Metadata> {
     alternates: { canonical: path },
     openGraph: { siteName: SITE_NAME, type: 'website', url: path, title, description },
     twitter: { card: 'summary_large_image', title, description },
+  };
+}
+
+const CONDITION_WORDS: Record<MarketCondition, string> = { new: 'New', like_new: 'Like new', good: 'Good', fair: 'Fair' };
+
+/** A listing's price for link previews: the amount, or Free. */
+export function listingPrice(l: PublicListingPreview): string {
+  if (l.priceCents === null) return 'Free';
+  try {
+    return formatMoney(l.priceCents, l.currency, 'en');
+  } catch {
+    return `${(l.priceCents / 100).toFixed(2)} ${l.currency}`;
+  }
+}
+
+/** A Market listing: its price, condition and area (never a place), with its first photo when it has one. */
+export async function listingMetadata(l: PublicListingPreview): Promise<Metadata> {
+  const origin = await siteOrigin();
+  const title = `${l.title} · ${listingPrice(l)}`;
+  const status = l.status === 'reserved' ? 'Reserved' : l.status === 'sold' ? 'Sold' : null;
+  const description = [status, CONDITION_WORDS[l.condition], l.area, l.excerpt, l.seller ? `Sold by ${l.seller.displayName}` : 'On Market']
+    .filter(Boolean)
+    .join(' · ');
+  const path = `/market/${l.id}`;
+  const image = absolute(l.imageUrl, origin);
+  const images = image ? [{ url: image, alt: l.title }] : [{ url: '/opengraph-image', width: 1200, height: 630 }];
+  return {
+    metadataBase: new URL(origin),
+    title: { absolute: `${title} on ${SITE_NAME}` },
+    description,
+    alternates: { canonical: path },
+    openGraph: { siteName: SITE_NAME, type: 'website', url: path, title, description, images },
+    twitter: { card: 'summary_large_image', title, description, images: images.map((i) => i.url) },
   };
 }

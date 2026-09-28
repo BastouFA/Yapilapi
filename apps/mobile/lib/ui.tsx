@@ -29,6 +29,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { smallAvatarUrl } from '../../../packages/shared/src/data-saver';
+import { initialsOf } from '../../../packages/shared/src/initials';
 import { mediaUrl } from './api';
 import { useDataSaver } from './data-saver';
 import { useT } from './i18n';
@@ -360,13 +361,7 @@ export function Avatar({ name, url, size = 40 }: { name: string; url?: string | 
         style={{ width: size, height: size, borderRadius: size / 2 }}
       />
     );
-  const initials =
-    name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((w) => w[0]!.toUpperCase())
-      .join('') || '?';
+  const initials = initialsOf(name);
   return (
     <LinearGradient {...gradient(c)} style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center' }}>
       <Text style={{ color: c.onYapi, fontWeight: '700', fontSize: size * 0.38 }}>{initials}</Text>

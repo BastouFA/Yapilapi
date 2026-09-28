@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card, Checkbox, EmptyState, List, ListItem, TextField } from '@yapilapi/design-system';
 import { formatRelativeTime } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
+import { copyText } from '@/lib/clipboard';
 import { useSession } from '../../providers';
 
 type App = Awaited<ReturnType<typeof api.developer.apps>>['items'][number];
@@ -77,7 +78,7 @@ export default function Developers() {
 }
 
 function AppDetail({ appId, initialRedirects, onDeleted }: { appId: string; initialRedirects: string[]; onDeleted: () => void }) {
-  const { toast, locale } = useSession();
+  const { toast, locale, t } = useSession();
   const [keys, setKeys] = useState<Awaited<ReturnType<typeof api.developer.keys>>['items']>([]);
   const [hooks, setHooks] = useState<Awaited<ReturnType<typeof api.developer.webhooks>> | null>(null);
   const [secret, setSecret] = useState<{ label: string; value: string } | null>(null);
@@ -101,7 +102,7 @@ function AppDetail({ appId, initialRedirects, onDeleted }: { appId: string; init
         <Alert tone="warning" title={secret.label} onDismiss={() => setSecret(null)} locale={locale}>
           Copy it now. It won't be shown again.
           <pre style={{ fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: '8px 0' }}>{secret.value}</pre>
-          <Button size="sm" variant="secondary" onClick={() => navigator.clipboard?.writeText(secret.value).then(() => toast('Copied'))}>
+          <Button size="sm" variant="secondary" onClick={async () => toast((await copyText(secret.value)) ? 'Copied' : t('common.copyFailed'))}>
             Copy
           </Button>
         </Alert>

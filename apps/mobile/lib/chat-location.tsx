@@ -1,10 +1,13 @@
+import * as Location from 'expo-location';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Linking, Platform, Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
+import { AccessibilityInfo, Alert, AppState, Linking, Platform, Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
 import {
   bearingDegrees,
   clockTime,
   distanceMetres,
   isLive,
+  LOCATION_DURATIONS,
+  LOCATION_UPDATE_SECONDS,
   locationAlt,
   locationFromYou,
   locationStatus,
@@ -12,9 +15,11 @@ import {
   mapsUrl,
   pointFor,
   type LatLng,
+  type LocationDuration,
   type LocationPrecision,
   type LocationShare,
 } from '../../../packages/shared/src/location';
+import type { MessageKey } from '../../../packages/shared/src/i18n';
 import type { Message } from '../../../packages/shared/src/types';
 import { client, errorMessage } from './api';
 import { useT } from './i18n';
@@ -22,10 +27,9 @@ import { radius, space } from './theme';
 import { BottomSheet, Button, Icon, Notice, useColors, userText } from './ui';
 
 /**
- * Sharing where you are in a chat (mobile). This app build has no location module (expo-location
- * isn't installed), so the phone shows shared locations, stops your own live share, and sends a
- * pin once only where the platform itself offers a position (navigator.geolocation); otherwise it
- * says sharing needs the next app update. See docs/product/status.md for the one install step.
+ * Sharing where you are in a chat (mobile): live for a set time, or a pin once. The position is read
+ * with expo-location, only after you tap share (the permission prompt comes then, never before), and
+ * only while this chat is open: leaving the chat stops a live share started here.
  *
  * The card draws its own small map (no map tiles, no outside services). Distance and direction from
  * you are worked out on this phone only, from your own live share in the chat; "Open in maps" asks
@@ -33,30 +37,16 @@ import { BottomSheet, Button, Icon, Notice, useColors, userText } from './ui';
  */
 
 type Fix = LatLng & { accuracy?: number };
-type Geo = {
-  getCurrentPosition: (
-    ok: (p: { coords: { latitude: number; longitude: number; accuracy: number } }) => void,
-    fail: (e: { code: number }) => void,
-    o?: object,
-  ) => void;
-};
-
-/** The platform's own position reader, when this build has one (React Native doesn't by default). */
-function geolocation(): Geo | null {
-  const nav = (globalThis as { navigator?: { geolocation?: Geo } }).navigator;
-  return nav?.geolocation && typeof nav.geolocation.getCurrentPosition === 'function' ? nav.geolocation : null;
-}
-
-function readPosition(): Promise<Fix> {
-  return new Promise((resolve, reject) => {
-    const geo = geolocation();
-    if (!geo) return reject('unsupported');
-    geo.getCurrentPosition(
-      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }),
-      (e) => reject(e.code === 1 ? 'denied' : 'unavailable'),
-      { enableHighAccuracy: true, timeout: 20_000, maximumAge: 10_000 },
-    );
-  });
+/** Where you are now, asking for permission first (only when you've tapped share). */
+async function readPosition(): Promise<Fix> {
+  const perm = await Location.requestForegroundPermissionsAsync().catch(() => null);
+  if (!perm || perm.status !== 'granted') throw 'denied';
+  try {
+    const p = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+    return { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy ?? undefined };
+  } catch {
+    throw 'unavailable';
+  }
 }
 
 /** The time now, moving on every few seconds while `active`, for "Updated 20 s ago". */
@@ -71,7 +61,7 @@ function useNow(active: boolean, every = 5_000): number {
   return now;
 }
 
-/** Your live share in this chat (started on the web), kept current by live updates, with Stop. */
+/** Your live share in this chat, kept current by live updates, with Stop. */
 export function useLocationSharing(conversationId: string, meId: string | undefined) {
   const [mine, setMine] = useState<LocationShare | null>(null);
   const [viewer, setViewer] = useState<LatLng | null>(null);
@@ -112,43 +102,95 @@ export function useLocationSharing(conversationId: string, meId: string | undefi
     return r.location;
   }
 
+  // A live share started on this phone: follow where you are while the chat is open and the app is in
+  // front, sending a point at most every LOCATION_UPDATE_SECONDS; leaving the chat stops it.
+  const [startedHere, setStartedHere] = useState<string | null>(null);
+  const startedHereRef = useRef<string | null>(null);
+  startedHereRef.current = startedHere;
+  const started = useCallback((share: LocationShare) => {
+    setMine(share);
+    setStartedHere(share.id);
+  }, []);
+  useEffect(() => {
+    if (!startedHere || mine?.id !== startedHere) return;
+    const share = mine;
+    let sub: Location.LocationSubscription | null = null;
+    let lastSent = Date.now();
+    let cancelled = false;
+    const watch = async () => {
+      sub?.remove();
+      sub = null;
+      if (AppState.currentState !== 'active') return;
+      sub = await Location.watchPositionAsync({ accuracy: Location.Accuracy.High, timeInterval: LOCATION_UPDATE_SECONDS * 1000, distanceInterval: 10 }, (p) => {
+        if (cancelled || Date.now() - lastSent < LOCATION_UPDATE_SECONDS * 1000) return;
+        lastSent = Date.now();
+        const point = pointFor({ lat: p.coords.latitude, lng: p.coords.longitude }, share.precision);
+        void client()
+          .then((api) => api.location.update(share.id, { ...point, accuracy: p.coords.accuracy ?? undefined }))
+          .then(
+            (r) => setMine((cur) => (cur?.id === share.id ? r.location : cur)),
+            () => {},
+          );
+      }).catch(() => null);
+      if (cancelled) sub?.remove();
+    };
+    void watch();
+    const app = AppState.addEventListener('change', () => void watch());
+    return () => {
+      cancelled = true;
+      app.remove();
+      sub?.remove();
+    };
+  }, [startedHere, mine?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Leaving the chat ends a share started here (as closing the page does on the web).
+  useEffect(
+    () => () => {
+      const share = mineRef.current;
+      if (share && share.id === startedHereRef.current && isLive(share)) void client().then((api) => api.location.stop(share.id).catch(() => {}));
+    },
+    [],
+  );
+
   const you = viewer ?? (mine?.point ? { lat: mine.point.lat, lng: mine.point.lng } : null);
-  return { mine, viewer: you, setViewer, apply, stop };
+  return { mine, viewer: you, setViewer, apply, stop, started, startedHere: !!startedHere && mine?.id === startedHere };
 }
 
 // ─── Starting ───────────────────────────────────────────────────────────
 
-/**
- * "Share where I am" on the phone: a pin once where this build can read a position; live sharing
- * (and everything else, where it can't) waits for the next app update.
- */
+/** "Share where I am": live for 15 minutes, an hour or 8 hours, or a pin once; precise or approximate. */
 export function ShareLocationSheet({
   visible,
   onClose,
   conversationId,
   onSent,
+  onStarted,
 }: {
   visible: boolean;
   onClose: () => void;
   conversationId: string;
   onSent: (m: Message) => void;
+  /** A live share started here: the chat keeps its point current while it stays open. */
+  onStarted?: (share: LocationShare) => void;
 }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const c = useColors();
   const [precision, setPrecision] = useState<LocationPrecision>('precise');
-  const [busy, setBusy] = useState(false);
+  const [minutes, setMinutes] = useState<LocationDuration>(60);
+  const [busy, setBusy] = useState<'live' | 'once' | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const canOnce = !!geolocation();
+  const durationName = (m: LocationDuration) => t(`location.duration.${m}` as MessageKey);
 
-  async function once() {
-    setBusy(true);
+  async function share(mode: 'live' | 'once') {
+    setBusy(mode);
     setProblem(null);
     try {
       const here = await readPosition();
       const p = pointFor(here, precision);
       const api = await client();
       const { message } = await api.conversations.shareLocation(conversationId, {
-        mode: 'once',
+        mode,
+        ...(mode === 'live' ? { minutes } : {}),
         precision,
         lat: p.lat,
         lng: p.lng,
@@ -156,82 +198,100 @@ export function ShareLocationSheet({
         clientId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       });
       onSent(message);
+      if (mode === 'live' && message.location) {
+        onStarted?.(message.location);
+        if (message.location.endsAt)
+          AccessibilityInfo.announceForAccessibility(t('location.startedToast', { time: clockTime(message.location.endsAt, locale) }));
+      }
       onClose();
     } catch (e) {
-      setProblem(
-        e === 'denied'
-          ? t('location.denied')
-          : e === 'unavailable'
-            ? t('location.unavailable')
-            : e === 'unsupported'
-              ? t('location.needsUpdate')
-              : errorMessage(e),
-      );
+      setProblem(e === 'denied' ? t('location.denied') : e === 'unavailable' ? t('location.unavailable') : errorMessage(e));
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
+  const choice = (on: boolean) => ({
+    minHeight: 44,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: space[2],
+    padding: space[3],
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: on ? c.yapi : c.line,
+    backgroundColor: on ? c.yapiSoft : 'transparent',
+  });
+
   return (
     <BottomSheet visible={visible} onClose={onClose} title={t('location.sheet.title')}>
-      <Notice tone="info" title={t('location.needsUpdate')}>
-        <Text style={{ color: c.ink, lineHeight: 20 }}>{t('location.needsUpdateHint')}</Text>
-      </Notice>
-      {canOnce ? (
-        <View style={{ gap: space[3] }}>
-          <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t('location.sheet.intro')}</Text>
-          <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '700', fontSize: 15 }}>
-            {t('location.precision')}
-          </Text>
-          {(['precise', 'approximate'] as const).map((p) => {
-            const on = precision === p;
+      <View style={{ gap: space[3] }}>
+        <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t('location.sheet.intro')}</Text>
+        <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '700', fontSize: 15 }}>
+          {t('location.duration')}
+        </Text>
+        <View accessibilityRole="radiogroup" style={{ flexDirection: 'row', gap: space[2] }}>
+          {LOCATION_DURATIONS.map((m) => {
+            const on = minutes === m;
             return (
               <Pressable
-                key={p}
+                key={m}
                 accessibilityRole="radio"
                 accessibilityState={{ checked: on }}
-                onPress={() => setPrecision(p)}
-                style={{
-                  minHeight: 44,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: space[2],
-                  padding: space[3],
-                  borderRadius: radius.md,
-                  borderWidth: 1,
-                  borderColor: on ? c.yapi : c.line,
-                  backgroundColor: on ? c.yapiSoft : 'transparent',
-                }}
+                onPress={() => setMinutes(m)}
+                style={[choice(on), { flex: 1, justifyContent: 'center' }]}
               >
-                <Icon name={on ? 'radio-button-on' : 'radio-button-off'} size={20} color={on ? c.yapi : c.inkMuted} />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: c.ink, fontWeight: '700' }}>
-                    {t(p === 'precise' ? 'location.precision.precise' : 'location.precision.approximate')}
-                  </Text>
-                  <Text style={{ color: c.inkMuted, fontSize: 13 }}>
-                    {t(p === 'precise' ? 'location.precision.preciseHint' : 'location.precision.approximateHint')}
-                  </Text>
-                </View>
+                <Text style={{ color: c.ink, fontWeight: on ? '700' : '600' }}>{durationName(m)}</Text>
               </Pressable>
             );
           })}
-          <Button label={t('location.once')} icon="location-outline" disabled={busy} onPress={once} />
-          <Text style={{ color: c.inkMuted, fontSize: 13, textAlign: 'center' }}>{t('location.onceHint')}</Text>
         </View>
-      ) : null}
-      {problem ? (
-        <Text accessibilityLiveRegion="polite" style={{ color: c.danger, lineHeight: 20 }}>
-          {problem}
+        <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '700', fontSize: 15 }}>
+          {t('location.precision')}
         </Text>
-      ) : null}
+        {(['precise', 'approximate'] as const).map((p) => {
+          const on = precision === p;
+          return (
+            <Pressable key={p} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => setPrecision(p)} style={choice(on)}>
+              <Icon name={on ? 'radio-button-on' : 'radio-button-off'} size={20} color={on ? c.yapi : c.inkMuted} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: c.ink, fontWeight: '700' }}>{t(p === 'precise' ? 'location.precision.precise' : 'location.precision.approximate')}</Text>
+                <Text style={{ color: c.inkMuted, fontSize: 13 }}>
+                  {t(p === 'precise' ? 'location.precision.preciseHint' : 'location.precision.approximateHint')}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
+        <Button
+          label={busy === 'live' ? t('location.locating') : t('location.start', { time: durationName(minutes) })}
+          icon="navigate-outline"
+          disabled={!!busy}
+          onPress={() => void share('live')}
+        />
+        <Text style={{ color: c.inkMuted, fontSize: 13, textAlign: 'center' }}>{t('location.phoneNote')}</Text>
+        <Button
+          label={busy === 'once' ? t('location.locating') : t('location.once')}
+          icon="location-outline"
+          variant="secondary"
+          disabled={!!busy}
+          onPress={() => void share('once')}
+        />
+        <Text style={{ color: c.inkMuted, fontSize: 13, textAlign: 'center' }}>{t('location.onceHint')}</Text>
+        {problem ? (
+          <Text accessibilityLiveRegion="polite" style={{ color: c.danger, lineHeight: 20 }}>
+            {problem}
+          </Text>
+        ) : null}
+      </View>
     </BottomSheet>
   );
 }
 
 // ─── While you share ────────────────────────────────────────────────────
 
-/** "You're sharing where you are until 14:30" (started on the web), with Stop. */
-export function SharingBanner({ share, onStop }: { share: LocationShare | null; onStop: () => Promise<unknown> }) {
+/** "You're sharing where you are until 14:30", with Stop (and where it keeps going). */
+export function SharingBanner({ share, onStop, here = false }: { share: LocationShare | null; onStop: () => Promise<unknown>; here?: boolean }) {
   const c = useColors();
   const { t, locale } = useT();
   if (!share?.endsAt) return null;
@@ -253,7 +313,7 @@ export function SharingBanner({ share, onStop }: { share: LocationShare | null; 
       <Icon name="location" size={20} color={c.yapi} />
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={{ color: c.ink, fontWeight: '700', fontSize: 14 }}>{t('location.banner', { time: clockTime(share.endsAt, locale) })}</Text>
-        <Text style={{ color: c.inkMuted, fontSize: 12 }}>{t('location.bannerElsewhere')}</Text>
+        <Text style={{ color: c.inkMuted, fontSize: 12 }}>{t(here ? 'location.phoneNote' : 'location.bannerElsewhere')}</Text>
       </View>
       <Button label={t('location.stop')} size="sm" variant="danger" onPress={onStop} />
     </View>
@@ -288,7 +348,7 @@ export function LocationCard({
   const point = share.point && (share.mode === 'once' || live) ? share.point : null;
   const from = !own && point && viewer ? viewer : null;
   const alt = locationAlt(w, share, meId, from, now);
-  const canFind = !!geolocation();
+  const canFind = true;
 
   function openMaps() {
     if (!point) return;

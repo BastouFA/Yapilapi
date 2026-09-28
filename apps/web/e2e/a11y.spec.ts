@@ -227,7 +227,7 @@ const STATES: [string, (page: Page, d: SeedData) => Promise<void>][] = [
     'profile: cover sheet',
     async (page, d) => {
       await open(page, `/u/${d.username}`);
-      await page.getByRole('button', { name: 'Change cover' }).click();
+      await page.getByRole('button', { name: 'Edit cover' }).click();
       await expect(page.getByRole('dialog', { name: 'Cover photo' })).toBeVisible();
     },
   ],
@@ -580,7 +580,7 @@ const NEW_STATES: [string, (page: Page, d: SeedData) => Promise<void>][] = [
     'chat: start a game',
     async (page, d) => {
       await open(page, `/inbox/${d.gamesChatId}`);
-      await page.getByRole('button', { name: 'Add a poll, a list or a game' }).click();
+      await page.getByRole('button', { name: 'Add to this chat' }).click();
       await page.getByRole('menuitem', { name: 'Play a game' }).click();
       await expect(page.getByRole('dialog', { name: 'Start a game' })).toBeVisible();
     },

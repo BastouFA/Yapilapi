@@ -5,6 +5,7 @@ import { startRegistration } from '@simplewebauthn/browser';
 import { Alert, Button, Card, Dialog, Icon, List, ListItem, Switch, TextField } from '@yapilapi/design-system';
 import { formatRelativeTime, type MessageKey } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
+import { copyText } from '@/lib/clipboard';
 import { disableBrowserPush } from '@/lib/push';
 import { PasswordField } from '@/components/PasswordField';
 import { useSession } from '@/app/providers';
@@ -253,7 +254,7 @@ export function TwoStepCard() {
               <Button
                 size="sm"
                 variant="secondary"
-                onClick={() => navigator.clipboard?.writeText(codes.join('\n')).then(() => toast(t('settings.twoStep.copied')))}
+                onClick={async () => toast((await copyText(codes.join('\n'))) ? t('settings.twoStep.copied') : t('common.copyFailed'))}
               >
                 {t('settings.twoStep.copy')}
               </Button>

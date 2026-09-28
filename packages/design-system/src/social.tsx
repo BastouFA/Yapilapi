@@ -15,6 +15,7 @@ import {
   formatBytes,
   formatMoney,
   imageSrc,
+  initialsOf,
   videoPoster,
   videoSrc,
   formatRelativeTime,
@@ -111,8 +112,7 @@ const NAV_GLYPH: Record<Exclude<NavEntry['id'], 'profile'>, IconName> = { home: 
 function NavAvatar({ name, src }: { name: string; src?: string | null }) {
   const small = smallAvatarUrl(src);
   const [failed, setFailed] = useState<string | null>(null);
-  const parts = name.trim().split(/\s+/);
-  const initials = ((parts[0]?.[0] ?? '') + (parts.length > 1 ? (parts.at(-1)?.[0] ?? '') : '')).toUpperCase() || '?';
+  const initials = initialsOf(name);
   // Initials come from CSS (data-initials) so they stay out of the link's text: its name is "You".
   return (
     <span className="yp-nav__you" data-initials={src ? undefined : initials}>
@@ -1663,7 +1663,7 @@ export function CommunityCard({
   return (
     <div className="yp-ccard">
       <L href={href} className="yp-ccard__mark" aria-label={community.name}>
-        {community.name.slice(0, 1).toUpperCase()}
+        {initialsOf(community.name, 1)}
       </L>
       <L href={href}>
         <h3 className="yp-ccard__title">{community.name}</h3>

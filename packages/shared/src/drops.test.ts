@@ -54,6 +54,17 @@ describe('drop timing words', () => {
     expect(dropCountdown(inMin(-1), now)).toBeNull();
   });
 
+  it('counts days by the calendar, so it agrees with the day it names', () => {
+    const tz = 'UTC';
+    // Thursday noon to Saturday 11:30 is 47.5 hours: "Saturday · in 2 days", not "in 1 day".
+    expect(dropCountdown('2026-10-03T11:30:00Z', now, tz)).toEqual({ value: 2, unit: 'day' });
+    expect(dropDay('2026-10-03T11:30:00Z', 'en-US', now, tz).day).toBe('Saturday');
+    // Friday 23:00 is 35 hours away: tomorrow, in 1 day.
+    expect(dropCountdown('2026-10-02T23:00:00Z', now, tz)).toEqual({ value: 1, unit: 'day' });
+    // Under a day it still counts hours.
+    expect(dropCountdown('2026-10-02T09:00:00Z', now, tz)).toEqual({ value: 21, unit: 'hour' });
+  });
+
   it('knows a drop that is about to open', () => {
     expect(dropPhase({ status: 'scheduled', startsAt: inMin(10) }, now)).toBe('upcoming');
     expect(dropPhase({ status: 'scheduled', startsAt: inMin(-1) }, now)).toBe('opening');

@@ -133,6 +133,17 @@ import type {
   AskShareVisibility,
   InboxQuestion,
   StorePurchasePolicy,
+  MarketCategory,
+  MarketCondition,
+  MarketDelivery,
+  MarketListing,
+  MarketListingDetail,
+  MarketMe,
+  MarketOffer,
+  MarketProfile,
+  MarketRadius,
+  MarketRating,
+  PublicListingPreview,
 } from '@yapilapi/shared';
 
 export class ApiError extends Error {
@@ -141,6 +152,8 @@ export class ApiError extends Error {
     public code: string,
     message: string,
     public fields?: Record<string, string>,
+    /** The rest of the error's details, e.g. `kind` on a Market `prohibited_item`. */
+    public details?: Record<string, unknown>,
   ) {
     super(message);
   }
@@ -184,7 +197,7 @@ export function createClient(opts: ClientOptions) {
       throw new ApiError(0, 'network', "Can't reach YAPILAPI. Check your connection and try again.");
     }
     const text = await res.text();
-    let json: { error?: { code?: string; message?: string; details?: { fields?: Record<string, string> } } } | null = null;
+    let json: { error?: { code?: string; message?: string; details?: { fields?: Record<string, string> } & Record<string, unknown> } } | null = null;
     try {
       json = text ? JSON.parse(text) : null;
     } catch {
@@ -193,7 +206,7 @@ export function createClient(opts: ClientOptions) {
     }
     if (!res.ok) {
       const e = json?.error ?? {};
-      throw new ApiError(res.status, e.code ?? 'error', e.message ?? 'Something went wrong. Try again.', e.details?.fields);
+      throw new ApiError(res.status, e.code ?? 'error', e.message ?? 'Something went wrong. Try again.', e.details?.fields, e.details ?? undefined);
     }
     return json as T;
   }
@@ -1218,6 +1231,8 @@ export function createClient(opts: ClientOptions) {
       event: (id: string) => get<{ event: PublicEventPreview }>(`/v1/public/events/${encodeURIComponent(id)}`),
       community: (slug: string) => get<{ community: PublicCommunityPreview }>(`/v1/public/communities/${encodeURIComponent(slug)}`),
       drop: (id: string) => get<{ drop: PublicDropPreview }>(`/v1/public/drops/${encodeURIComponent(id)}`),
+      /** A Market listing's preview for shared links: only while it's for sale and nothing about it waits for review. */
+      listing: (id: string) => get<{ listing: PublicListingPreview }>(`/v1/public/market/${encodeURIComponent(id)}`),
       sitemap: () => get<PublicSitemap>('/v1/public/sitemap'),
     },
     passkeys: {
@@ -1516,6 +1531,91 @@ export function createClient(opts: ClientOptions) {
             idempotencyKey,
           },
         ),
+    },
+    /**
+     * Market: selling and buying used and local things, person to person (apps/api/src/modules/market.ts).
+     * Nothing is paid in the app. Places travel only in request bodies and are snapped to about a
+     * kilometre; nobody is ever sent a listing's place, only a rounded distance.
+     */
+    market: {
+      /** Your currency for prices, and whether you can sell (18 and over). */
+      me: () => get<{ market: MarketMe }>('/v1/market/me'),
+      /** Browse and search. With `near`, listings within `radiusKm` come nearest first; without it, the newest in your country. */
+      search: (b: {
+        near?: { lat: number; lng: number };
+        radiusKm?: MarketRadius;
+        q?: string;
+        category?: MarketCategory;
+        conditions?: MarketCondition[];
+        minPriceCents?: number;
+        maxPriceCents?: number;
+        freeOnly?: boolean;
+        cursor?: string;
+        limit?: number;
+      }) => post<{ items: MarketListing[]; nextCursor: string | null }>('/v1/market/search', b),
+      /** A listing with its seller card. `near` (in the body, never the URL) adds how far away it is. */
+      get: (id: string, near?: { lat: number; lng: number }) =>
+        near
+          ? post<{ listing: MarketListingDetail }>(`/v1/market/listings/${id}/view`, { near })
+          : get<{ listing: MarketListingDetail }>(`/v1/market/listings/${id}`),
+      /**
+       * Publish a listing. 422 `prohibited_item` (with `details.kind`) when its words look like something Market doesn't allow:
+       * send it again with `notProhibited: true` if it isn't, and it waits for a moderator first. `notice` says when it waits.
+       */
+      create: (b: {
+        title: string;
+        description?: string;
+        category: MarketCategory;
+        condition: MarketCondition;
+        priceCents: number | null;
+        photos: { mediaId: string; altText?: string }[];
+        area: string;
+        place?: { lat: number; lng: number } | null;
+        delivery: MarketDelivery[];
+        notProhibited?: boolean;
+      }) => post<{ listing: MarketListing; notice?: string }>('/v1/market/listings', b),
+      update: (
+        id: string,
+        b: {
+          title?: string;
+          description?: string;
+          category?: MarketCategory;
+          condition?: MarketCondition;
+          priceCents?: number | null;
+          photos?: { mediaId: string; altText?: string }[];
+          area?: string;
+          place?: { lat: number; lng: number } | null;
+          delivery?: MarketDelivery[];
+          notProhibited?: boolean;
+        },
+      ) => patch<{ listing: MarketListing; notice?: string }>(`/v1/market/listings/${id}`, b),
+      /** Available, reserved or sold; `buyerId` is one of the people who wrote to you about it (ratings open after a sale to them). */
+      setStatus: (id: string, status: 'available' | 'reserved' | 'sold', buyerId?: string | null) =>
+        put<{ listing: MarketListing }>(`/v1/market/listings/${id}/status`, { status, buyerId }),
+      /** Another 30 days, once it has a week or less left or has ended. */
+      renew: (id: string) => post<{ listing: MarketListing }>(`/v1/market/listings/${id}/renew`),
+      remove: (id: string) => del<{ ok: true }>(`/v1/market/listings/${id}`),
+      save: (id: string) => put<{ saved: true }>(`/v1/market/listings/${id}/save`),
+      unsave: (id: string) => del<{ saved: false }>(`/v1/market/listings/${id}/save`),
+      saved: (cursor?: string) => get<{ items: MarketListing[]; nextCursor: string | null }>(`/v1/market/saved${qs({ cursor })}`),
+      /** Your own listings: for sale (available or reserved), sold, or ended. */
+      mine: (status: 'active' | 'sold' | 'expired' = 'active') => get<{ items: MarketListing[] }>(`/v1/market/mine${qs({ status })}`),
+      /** Open (or start) your one-to-one chat with the seller, with the listing's card at the top. */
+      message: (id: string) => post<{ conversationId: string; message: Message }>(`/v1/market/listings/${id}/message`),
+      /** Offer an amount (in hundredths of the listing's currency); it goes in your chat with the seller as a card. */
+      offer: (id: string, amountCents: number) =>
+        post<{ conversationId: string; offer: MarketOffer; message: Message }>(`/v1/market/listings/${id}/offers`, { amountCents }),
+      acceptOffer: (id: string) => post<{ offer: MarketOffer }>(`/v1/market/offers/${id}/accept`),
+      declineOffer: (id: string) => post<{ offer: MarketOffer }>(`/v1/market/offers/${id}/decline`),
+      withdrawOffer: (id: string) => post<{ offer: MarketOffer }>(`/v1/market/offers/${id}/withdraw`),
+      /** Answer an offer with another amount: a new card in the chat. */
+      counterOffer: (id: string, amountCents: number) => post<{ offer: MarketOffer; message: Message }>(`/v1/market/offers/${id}/counter`, { amountCents }),
+      /** After a sale to a buyer from the chat, the buyer and the seller can each rate the other once. */
+      rate: (listingId: string, b: { stars: number; body?: string }) => post<{ rating: MarketRating }>(`/v1/market/listings/${listingId}/ratings`, b),
+      /** Someone's Market tab: listings for sale, their seller card and recent ratings. */
+      profile: (userId: string) => get<{ market: MarketProfile }>(`/v1/market/sellers/${userId}`),
+      ratings: (userId: string, cursor?: string) =>
+        get<{ items: MarketRating[]; nextCursor: string | null }>(`/v1/market/sellers/${userId}/ratings${qs({ cursor })}`),
     },
     /** Drops: product launches announced ahead of time (see apps/api/src/modules/drops.ts). */
     drops: {

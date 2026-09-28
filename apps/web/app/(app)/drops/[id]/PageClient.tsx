@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Avatar, Badge, Button, EmptyState, Skeleton, Stat } from '@yapilapi/design-system';
 import { dropPhase, formatMoney, type Drop } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
+import { copyText } from '@/lib/clipboard';
 import { DropBuy, DropCover, dropStatusText, useDrop } from '@/components/Drops';
 import { ReportSheet } from '@/components/PostList';
 import { JoinNote, NeedsAccount, useSignIn } from '@/components/SignedOut';
@@ -234,7 +235,7 @@ export default function DropPageClient({ isPublic }: { isPublic: boolean }) {
           </Button>
         ) : null}
         {drop.status !== 'draft' ? (
-          <Button variant="ghost" icon="link" onClick={() => navigator.clipboard?.writeText(location.href).then(() => toast(t('m.drops.linkCopied')))}>
+          <Button variant="ghost" icon="link" onClick={async () => toast((await copyText(location.href)) ? t('m.drops.linkCopied') : t('story.copyFailed'))}>
             {t('m.drops.copyLink')}
           </Button>
         ) : null}

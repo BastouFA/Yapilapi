@@ -81,7 +81,7 @@ export default function PlacePage() {
         </section>
       ) : null}
       {place.business ? <BookTable placeId={place.id} /> : null}
-      <ManageBookings placeId={place.id} />
+      {place.business?.mine ? <ManageBookings placeId={place.id} /> : null}
       <PlaceReviews placeId={place.id} />
     </div>
   );

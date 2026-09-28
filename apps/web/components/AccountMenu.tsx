@@ -93,6 +93,7 @@ function AccountMenuBody({ onClose, onLogout }: { onClose: () => void; onLogout:
     { href: '/tickets', icon: 'ticket', label: t('tickets.title') },
     { href: '/drops', icon: 'bag', label: t('m.drops.yours') },
     { href: '/mixes', icon: 'mix', label: t('mixes.yours') },
+    { href: '/market/mine', icon: 'bag', label: t('market.yours') },
   ];
   const more: { href: string; icon: IconName; label: string }[] = [
     { href: '/settings/language', icon: 'globe', label: t('settings.language') },

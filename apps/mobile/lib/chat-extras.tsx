@@ -65,7 +65,11 @@ export function previewOf(m: Message): MessagePreview {
             ? { kind: 'mix' as const }
             : m.location
               ? { kind: 'location' as const }
-              : {}),
+              : m.market
+                ? { kind: 'listing' as const }
+                : m.offer
+                  ? { kind: 'offer' as const }
+                  : {}),
   };
 }
 

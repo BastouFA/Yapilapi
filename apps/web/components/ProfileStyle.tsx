@@ -72,6 +72,7 @@ const TAB_LABELS: Record<ProfileTab, MessageKey> = {
   shop: 'm.shop.tab',
   answers: 'ask.tab',
   mixes: 'mixes.tab',
+  market: 'market.tab',
 };
 export const tabLabel = (tab: ProfileTab): MessageKey => TAB_LABELS[tab];
 
