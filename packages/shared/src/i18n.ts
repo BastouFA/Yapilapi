@@ -2622,7 +2622,7 @@ const en = {
   'translate.max': 'You can choose up to {count} languages.',
   'translate.saved': 'Translation settings saved.',
   // Chats: polls, shared lists and reminders.
-  'm.chat.addMenu': 'Add a poll, a list or a game',
+  'm.chat.addMenu': 'Add to this chat',
   'm.chat.poll.new': 'Poll',
   'm.chat.list.new': 'List',
   'm.chat.poll.create': 'New poll',
@@ -7935,7 +7935,7 @@ const fr: Catalog = {
   'translate.max': 'Tu peux choisir jusqu’à {count} langues.',
   'translate.saved': 'Réglages de traduction enregistrés.',
   // Chats: polls, shared lists and reminders.
-  'm.chat.addMenu': 'Ajouter un sondage, une liste ou un jeu',
+  'm.chat.addMenu': 'Ajouter à cette discussion',
   'm.chat.poll.new': 'Sondage',
   'm.chat.list.new': 'Liste',
   'm.chat.poll.create': 'Nouveau sondage',
@@ -13220,7 +13220,7 @@ const ar: Catalog = {
   'translate.max': 'يمكنك اختيار ما يصل إلى {count} لغة.',
   'translate.saved': 'تم حفظ إعدادات الترجمة.',
   // Chats: polls, shared lists and reminders.
-  'm.chat.addMenu': 'إضافة استطلاع أو قائمة أو لعبة',
+  'm.chat.addMenu': 'إضافة إلى هذه الدردشة',
   'm.chat.poll.new': 'استطلاع',
   'm.chat.list.new': 'قائمة',
   'm.chat.poll.create': 'استطلاع جديد',
@@ -18505,7 +18505,7 @@ const es: Catalog = {
   'translate.max': 'Puedes elegir hasta {count} idiomas.',
   'translate.saved': 'Ajustes de traducción guardados.',
   // Chats: polls, shared lists and reminders.
-  'm.chat.addMenu': 'Añadir una encuesta, una lista o un juego',
+  'm.chat.addMenu': 'Añadir a este chat',
   'm.chat.poll.new': 'Encuesta',
   'm.chat.list.new': 'Lista',
   'm.chat.poll.create': 'Nueva encuesta',
@@ -23807,7 +23807,7 @@ const pt: Catalog = {
   'translate.max': 'Você pode escolher até {count} idiomas.',
   'translate.saved': 'Configurações de tradução salvas.',
   // Chats: polls, shared lists and reminders.
-  'm.chat.addMenu': 'Adicionar uma enquete, uma lista ou um jogo',
+  'm.chat.addMenu': 'Adicionar a esta conversa',
   'm.chat.poll.new': 'Enquete',
   'm.chat.list.new': 'Lista',
   'm.chat.poll.create': 'Nova enquete',
@@ -29107,7 +29107,7 @@ const sw: Catalog = {
   'translate.max': 'Unaweza kuchagua hadi lugha {count}.',
   'translate.saved': 'Mipangilio ya tafsiri imehifadhiwa.',
   // Chats: polls, shared lists and reminders.
-  'm.chat.addMenu': 'Ongeza kura ya maoni, orodha au mchezo',
+  'm.chat.addMenu': 'Ongeza kwenye mazungumzo haya',
   'm.chat.poll.new': 'Kura ya maoni',
   'm.chat.list.new': 'Orodha',
   'm.chat.poll.create': 'Kura mpya ya maoni',
@@ -34402,7 +34402,7 @@ const yo: Catalog = {
   'translate.max': 'O lè yan tó èdè {count}.',
   'translate.saved': 'A ti fi ètò ìtumọ̀ pamọ́.',
   // Chats: polls, shared lists and reminders.
-  'm.chat.addMenu': 'Ṣafikun ìbò èrò, àkójọ tàbí eré',
+  'm.chat.addMenu': 'Ṣafikun sí ìjíròrò yìí',
   'm.chat.poll.new': 'Ìbò èrò',
   'm.chat.list.new': 'Àkójọ',
   'm.chat.poll.create': 'Ìbò èrò tuntun',
@@ -39698,7 +39698,7 @@ const ha: Catalog = {
   'translate.max': 'Za ka iya zaɓar harsuna har {count}.',
   'translate.saved': 'An adana saitunan fassara.',
   // Chats: polls, shared lists and reminders.
-  'm.chat.addMenu': 'Ƙara ƙuri’ar jin ra’ayi, jeri ko wasa',
+  'm.chat.addMenu': 'Ƙara zuwa wannan hira',
   'm.chat.poll.new': 'Ƙuri’ar jin ra’ayi',
   'm.chat.list.new': 'Jeri',
   'm.chat.poll.create': 'Sabuwar ƙuri’ar jin ra’ayi',
