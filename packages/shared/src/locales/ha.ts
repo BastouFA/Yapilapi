@@ -916,6 +916,8 @@ export const ha: Catalog = {
   'm.chat.sendVoice': 'Aika saƙon murya',
   'm.chat.cancelVoice': 'Soke naɗi',
   'm.chat.micPermission': 'Don naɗa saƙon murya, ba da damar amfani da makirufo a saitunan wayarka.',
+  'm.chat.empty.title': 'Babu saƙonni tukuna',
+  'm.chat.empty.body': 'Gai da {names}.',
   'm.chat.voiceTooShort': 'Naɗin ya yi gajarta sosai don aikawa.',
   'm.chat.playVoice': 'Kunna saƙon murya',
   'm.chat.pauseVoice': 'Dakatar da saƙon murya',

@@ -915,6 +915,8 @@ export const yo: Catalog = {
   'm.chat.sendVoice': 'Fi ohùn ránṣẹ́',
   'm.chat.cancelVoice': 'Fagilé ìgbàsílẹ̀',
   'm.chat.micPermission': 'Láti gba ohùn sílẹ̀, gba ààyè fún gbohùngbohùn nínú ètò fóònù rẹ.',
+  'm.chat.empty.title': 'Kò sí ìfiránṣẹ́ kankan síbẹ̀',
+  'm.chat.empty.body': 'Kí {names}.',
   'm.chat.voiceTooShort': 'Ìgbàsílẹ̀ náà kúrú jù láti fi ránṣẹ́.',
   'm.chat.playVoice': 'Ṣí ohùn náà',
   'm.chat.pauseVoice': 'Dá ohùn náà dúró',

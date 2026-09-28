@@ -51,15 +51,18 @@ export function postReasonText(
   return tr.t(key, { name: p.name ?? '', community: p.community ?? '', topic: p.topic ?? '' });
 }
 
-/** "a, b and c" in the language of `locale`; without one (or without list formatting on the device), "a, b, c". */
-export function formatList(items: string[], locale: string | undefined): string {
+/** "a, b and c" in the language of `locale`, or with the catalog's own words (`t`) where the device has no list formatting; "a, b, c" with neither. */
+export function formatList(items: string[], locale: string | undefined, t?: (key: 'm.collab.joinSep' | 'm.collab.joinLast') => string): string {
   if (locale) {
     try {
-      return new Intl.ListFormat(locale, { type: 'conjunction' }).format(items);
+      const LF = (Intl as unknown as { ListFormat?: new (l: string, o: object) => { format: (x: string[]) => string } }).ListFormat;
+      if (LF) return new LF(locale, { type: 'conjunction' }).format(items);
     } catch {
-      // No list formatting on this device or for this tag: commas below.
+      // No list formatting for this tag: the words below.
     }
   }
+  // The phone's JavaScript engine has no list formatting: "A, B and C" from the catalog's own words.
+  if (t) return items.map((x, i) => (i === 0 ? '' : i === items.length - 1 ? t('m.collab.joinLast') : t('m.collab.joinSep')) + x).join('');
   return items.join(', ');
 }
 
@@ -68,7 +71,7 @@ export function whyReasonText(reason: WhyReason, tr: ReasonTranslator): string {
   const p = reason.params ?? {};
   if (reason.code === 'topics') {
     const topics = p.topics ?? [];
-    return tr.tp(WHY_REASON_KEYS.topics, topics.length, { topics: formatList(topics, tr.locale) });
+    return tr.tp(WHY_REASON_KEYS.topics, topics.length, { topics: formatList(topics, tr.locale, (k) => tr.t(k)) });
   }
   const key = WHY_REASON_KEYS[reason.code];
   return key ? tr.t(key, { name: p.name ?? '', community: p.community ?? '' }) : '';

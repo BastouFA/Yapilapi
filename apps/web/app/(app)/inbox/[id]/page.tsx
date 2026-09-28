@@ -1,11 +1,11 @@
 'use client';
 
-import { noticeText, isVideoFile, MEDIA_ACCEPT, MESSAGE_EDIT_MINUTES, WATCH_MAX_MEMBERS, type PinnedMessage } from '@yapilapi/shared';
+import { formatList, noticeText, isVideoFile, MEDIA_ACCEPT, MESSAGE_EDIT_MINUTES, WATCH_MAX_MEMBERS, type PinnedMessage } from '@yapilapi/shared';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { AIPanel, BottomSheet, Button, ChatBubble, Icon, Menu, Skeleton, Switch, TranslatableText, type MenuAction } from '@yapilapi/design-system';
+import { AIPanel, BottomSheet, Button, ChatBubble, EmptyState, Icon, Menu, Skeleton, Switch, TranslatableText, type MenuAction } from '@yapilapi/design-system';
 import type { ChatGame, Conversation, Message, ScheduledMessage } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { ReportSheet } from '@/components/PostList';
@@ -710,6 +710,18 @@ export default function ChatPage() {
             >
               {t('chat.loadEarlier')}
             </Button>
+          ) : null}
+          {/* A new chat: who is in it, so the first message has somewhere to start. */}
+          {!messages.length && conv ? (
+            <EmptyState
+              title={t('m.chat.empty.title')}
+              body={t('m.chat.empty.body', {
+                names: formatList(
+                  others.map((o) => o.displayName),
+                  locale,
+                ),
+              })}
+            />
           ) : null}
           {messages.map((m) => {
             const day = new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(m.createdAt));

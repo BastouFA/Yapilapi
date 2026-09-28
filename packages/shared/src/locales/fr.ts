@@ -921,6 +921,8 @@ export const fr: Catalog = {
   'm.chat.sendVoice': 'Envoyer le message vocal',
   'm.chat.cancelVoice': "Annuler l'enregistrement",
   'm.chat.micPermission': "Pour enregistrer des messages vocaux, autorise l'accès au micro dans les réglages du téléphone.",
+  'm.chat.empty.title': 'Pas encore de messages',
+  'm.chat.empty.body': 'Dis bonjour à {names}.',
   'm.chat.voiceTooShort': 'Cet enregistrement était trop court pour être envoyé.',
   'm.chat.playVoice': 'Écouter le message vocal',
   'm.chat.pauseVoice': 'Mettre en pause le message vocal',

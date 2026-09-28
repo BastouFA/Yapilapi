@@ -916,6 +916,8 @@ export const sw: Catalog = {
   'm.chat.sendVoice': 'Tuma ujumbe wa sauti',
   'm.chat.cancelVoice': 'Ghairi kurekodi',
   'm.chat.micPermission': 'Ili kurekodi ujumbe wa sauti, ruhusu maikrofoni katika mipangilio ya simu yako.',
+  'm.chat.empty.title': 'Bado hakuna ujumbe',
+  'm.chat.empty.body': 'Msalimie {names}.',
   'm.chat.voiceTooShort': 'Rekodi hiyo ilikuwa fupi mno kutumwa.',
   'm.chat.playVoice': 'Cheza ujumbe wa sauti',
   'm.chat.pauseVoice': 'Sitisha ujumbe wa sauti',

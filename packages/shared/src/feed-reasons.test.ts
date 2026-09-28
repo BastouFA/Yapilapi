@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CATALOGS, SUPPORTED_LOCALES, t, tp, type MessageKey } from './i18n.ts';
-import { POST_REASON_KEYS, WHY_REASON_KEYS, postReasonText, whyReasonText, type ReasonTranslator } from './feed-reasons.ts';
+import { formatList, POST_REASON_KEYS, WHY_REASON_KEYS, postReasonText, whyReasonText, type ReasonTranslator } from './feed-reasons.ts';
 import type { PostReasonCode, WhyReason, WhyReasonCode } from './types.ts';
 
 const tr = (locale: string): ReasonTranslator => ({ t: (k, v) => t(k, locale, v), tp: (k, n, v) => tp(k, n, locale, v), locale });
@@ -66,7 +66,10 @@ describe('feed reasons', () => {
     const two: WhyReason = { code: 'topics', params: { topics: ['jazz', 'film'] } };
     expect(whyReasonText(one, tr('en'))).toBe('You follow the topic jazz.');
     expect(whyReasonText(two, tr('en'))).toBe('You follow the topics jazz and film.');
-    expect(whyReasonText(two, { ...tr('en'), locale: undefined })).toBe('You follow the topics jazz, film.');
+    // Where the device can't format lists (the phone), the catalog's own words join them.
+    expect(whyReasonText(two, { ...tr('en'), locale: undefined })).toBe('You follow the topics jazz and film.');
+    expect(formatList(['a', 'b', 'c'], undefined, (k) => t(k, 'fr'))).toBe('a, b et c');
+    expect(formatList(['a', 'b'], undefined)).toBe('a, b');
     expect(whyReasonText(two, tr('fr'))).toBe('Tu suis les sujets jazz et film.');
     expect(whyReasonText({ code: 'friend', params: { name: 'Femi' } }, tr('en'))).toBe("You're friends with Femi.");
     expect(whyReasonText({ code: 'fallback' }, tr('pt'))).toBe(t('feed.why.fallback', 'pt'));

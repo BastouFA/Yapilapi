@@ -914,6 +914,8 @@ export const ar: Catalog = {
   'm.chat.sendVoice': 'أرسل الرسالة الصوتية',
   'm.chat.cancelVoice': 'ألغِ التسجيل',
   'm.chat.micPermission': 'لتسجيل الرسائل الصوتية، اسمح بالوصول إلى الميكروفون من إعدادات هاتفك.',
+  'm.chat.empty.title': 'لا رسائل بعد',
+  'm.chat.empty.body': 'ألقِ التحية على {names}.',
   'm.chat.voiceTooShort': 'كان التسجيل قصيرًا جدًا لإرساله.',
   'm.chat.playVoice': 'شغّل الرسالة الصوتية',
   'm.chat.pauseVoice': 'أوقف الرسالة الصوتية مؤقتًا',

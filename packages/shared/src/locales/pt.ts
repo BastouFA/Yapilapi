@@ -916,6 +916,8 @@ export const pt: Catalog = {
   'm.chat.sendVoice': 'Enviar mensagem de voz',
   'm.chat.cancelVoice': 'Cancelar gravação',
   'm.chat.micPermission': 'Para gravar mensagens de voz, permita o acesso ao microfone nas configurações do telefone.',
+  'm.chat.empty.title': 'Ainda não há mensagens',
+  'm.chat.empty.body': 'Diga olá para {names}.',
   'm.chat.voiceTooShort': 'A gravação era curta demais para enviar.',
   'm.chat.playVoice': 'Reproduzir mensagem de voz',
   'm.chat.pauseVoice': 'Pausar mensagem de voz',

@@ -918,6 +918,8 @@ export const en = {
   'm.chat.sendVoice': 'Send voice message',
   'm.chat.cancelVoice': 'Cancel recording',
   'm.chat.micPermission': 'To record voice messages, allow microphone access in your phone settings.',
+  'm.chat.empty.title': 'No messages yet',
+  'm.chat.empty.body': 'Say hello to {names}.',
   'm.chat.voiceTooShort': 'That recording was too short to send.',
   'm.chat.playVoice': 'Play voice message',
   'm.chat.pauseVoice': 'Pause voice message',

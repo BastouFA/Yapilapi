@@ -41,7 +41,7 @@ export const AD_WHY_KEYS: Record<AdWhyCode, MessageKey> = {
 /** One line of "Why am I seeing this ad?", topics joined for the language. */
 export function adWhyText(w: AdWhy, tr: Pick<ReasonTranslator, 't' | 'locale'>): string {
   const key = AD_WHY_KEYS[w.code];
-  return key ? tr.t(key, { topics: formatList(w.params?.topics ?? [], tr.locale) }) : '';
+  return key ? tr.t(key, { topics: formatList(w.params?.topics ?? [], tr.locale, (k) => tr.t(k)) }) : '';
 }
 
 /** Counted reasons come in `.one` / `.other` pairs. */

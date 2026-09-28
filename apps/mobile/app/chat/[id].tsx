@@ -25,8 +25,21 @@ import { conversationTitle } from '../../lib/post';
 import { isVerificationError, SensitiveCover, UnavailableMedia, VerifyPrompt } from '../../lib/safety';
 import { useRealtime, useSession } from '../../lib/session';
 import { elevation, gradient, radius, space } from '../../lib/theme';
-import { ActionSheet, BottomSheet, ErrorState, Icon, KeyboardAvoid, Notice, SwitchRow, useColors, useKeyboardVisible, userText } from '../../lib/ui';
+import {
+  ActionSheet,
+  BottomSheet,
+  EmptyState,
+  ErrorState,
+  Icon,
+  KeyboardAvoid,
+  Notice,
+  SwitchRow,
+  useColors,
+  useKeyboardVisible,
+  userText,
+} from '../../lib/ui';
 import { onBackOnline } from '../../lib/network';
+import { formatList } from '../../../../packages/shared/src/feed-reasons';
 import { ViewOnceBubble } from '../../lib/view-once';
 import { useMicInUse, Waveform, YAP_MAX_MS, YAP_MIN_MS } from '../../lib/yaps';
 import { SmartRepliesSwitch, SmartReplyChips } from '../../lib/ai-helpers';
@@ -72,7 +85,7 @@ const MAX_VOICE_MS = 5 * 60 * 1000;
 export default function Chat() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const c = useColors();
-  const { t } = useT();
+  const { t, locale } = useT();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { me } = useSession();
@@ -924,6 +937,22 @@ export default function Chat() {
           ref={list}
           data={messages}
           keyExtractor={(m) => m.id}
+          // A new chat: who is in it, so the first message has somewhere to start.
+          ListEmptyComponent={
+            conversation ? (
+              <EmptyState
+                icon="chatbubbles-outline"
+                title={t('m.chat.empty.title')}
+                body={t('m.chat.empty.body', {
+                  names: formatList(
+                    conversation.members.filter((m) => m.id !== me?.id).map((m) => m.displayName),
+                    locale,
+                    t,
+                  ),
+                })}
+              />
+            ) : null
+          }
           contentContainerStyle={{ padding: space[4], gap: space[2] }}
           onContentSizeChange={() => {
             const last = messages.at(-1)?.id ?? null;

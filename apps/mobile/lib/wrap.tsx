@@ -19,6 +19,7 @@ import { useT, type Translator } from './i18n';
 import { radius, space } from './theme';
 import { Avatar, Button, Card, Icon, Loading, Notice, SwitchRow, Title, useColors, userText } from './ui';
 import { postThumb } from './watch';
+import { formatList } from '../../../packages/shared/src/feed-reasons';
 
 /**
  * The weekly wrap (a private look back at your week) and "On this day" on the phone: the gentle
@@ -28,17 +29,6 @@ import { postThumb } from './watch';
 
 /** A week's date (YYYY-MM-DD) in the app's language, e.g. "22 Sept". Read as UTC so it never moves a day. */
 export const wrapDate = (date: Translator['date'], ymd: string) => date(`${ymd}T00:00:00Z`, { day: 'numeric', month: 'short', timeZone: 'UTC' });
-
-/** "2023, 2021 and 2019" in the app's language (a plain comma list where the phone can't format lists). */
-function listOf(items: string[], locale: string): string {
-  const LF = (Intl as unknown as { ListFormat?: new (l: string, o: object) => { format: (x: string[]) => string } }).ListFormat;
-  try {
-    if (LF) return new LF(locale, { style: 'long', type: 'conjunction' }).format(items);
-  } catch {
-    // Fall through to the plain list.
-  }
-  return items.join(', ');
-}
 
 /** The counts shown under a wrap, in order, with their labels (the labels carry no number: it's drawn beside them). */
 const STATS: [keyof WeeklyWrapCounts, PluralKey][] = [
@@ -208,7 +198,7 @@ function OnThisDay({ card, onDismiss }: { card: OnThisDayCard; onDismiss: () => 
       <View style={{ gap: 2 }}>
         <Text style={{ color: c.ink, fontSize: 14, lineHeight: 20 }}>{tp('otd.body', card.count)}</Text>
         {card.years.length ? (
-          <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('otd.years', { years: listOf(card.years.map(String), locale) })}</Text>
+          <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('otd.years', { years: formatList(card.years.map(String), locale, t) })}</Text>
         ) : null}
       </View>
       {thumbs.length ? (
