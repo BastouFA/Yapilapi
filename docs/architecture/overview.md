@@ -32,7 +32,17 @@ flowchart LR
 3. Handler: `parse(schema, input)` with shared zod schemas, business rules, database work in transactions.
 4. `onSend`: security headers and `x-request-id`. `onResponse`: metrics.
    With `OTEL_EXPORTER_OTLP_ENDPOINT` set, every step above is also a span in one trace (see [observability](observability.md)).
-5. Errors map to `{ error: { code, message, details, requestId } }`.
+5. Errors map to `{ error: { code, message, details, requestId } }`, with `message` and each message in `details.fields` in the reader's language (below).
+
+### Error messages in the reader's language
+
+Code throws errors in English (`badRequest('Add a title.')`, `` tooMany(`Wait ${n} seconds.`) ``, zod messages in schemas). The error handler in `app.ts` puts them into the reader's language on the way out (`apps/api/src/lib/error-language.ts`); `code`, `status` and the rest of `details` never change, so apps keep branching on codes.
+
+- **Which language**: a signed-in person's `profiles.locale` (read with the session row, no extra query), else the app's `x-locale` header (the web and the phone send their current language through `packages/api-client`, so signing in, signing up and password resets are covered), else `Accept-Language`, else English. API keys and OAuth tokens go by the headers.
+- **Tables**: `packages/shared/src/locales/errors/<lang>.ts` (fr, ar, es, pt, sw, yo, ha), keyed by the English message; only the API imports them (`@yapilapi/shared/error-messages`), so the web and phone bundles don't carry them. A message with no entry goes out in English.
+- **Messages made from values**: a template literal is keyed by its template, a `{name}` slot for each value named after the expression (`` `Only ${left} are left.` `` → `Only {left} are left.`). At run time the English message is matched against the templates (longest fixed text first) and the translation gets the same values; a value that is itself a message in the table is translated too ("Line 3: …" around a caption file's error). Call sites stay plain English; a condition between two strings (`n === 1 ? 'Only 1 is left.' : …`) gives both messages, and numeric constants are written in (`up to ${MAX} a day` with `MAX = 5` is `up to 5 a day`).
+- **Coverage**: `apps/api/test/error-messages.ts` reads every message the API can send from the source with the TypeScript compiler, like a lint rule: `new AppError(…)` and every function that builds one from its arguments (`badRequest`, `notFound('Post')` → "Post doesn't exist or isn't visible to you.", a module's own `tooMany`), `fields` in details, `{ error: { code, message } }` sent directly, zod messages in the API and `packages/shared`, zod's own default messages, and the messages of errors the API passes on (`SmsError`, `BlockedUrlError`, `VttError`). `apps/api/test/error-translations.test.ts` fails when a message has no entry in every table, when a table keeps a message the API no longer sends, when a translation's `{slots}` differ, or when the collector meets a message it can't read. So: after adding or changing an error message, add it to the seven tables.
+- **Still English**: messages from Fastify itself for malformed requests (a body that isn't JSON), which the apps never send.
 
 ## Data
 

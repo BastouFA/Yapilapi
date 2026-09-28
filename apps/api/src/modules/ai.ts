@@ -73,9 +73,7 @@ export default async function aiModule(app: FastifyInstance, ctx: AppContext) {
     const { content } = parse(z.object({ content: z.string().trim().min(1).max(1000) }), req.body);
     const consent = await db.query(`SELECT granted FROM consents WHERE user_id = $1 AND purpose = 'ai_processing'`, [u.id]);
     if (!consent.rows[0]?.granted)
-      return reply
-        .code(403)
-        .send({ error: { code: 'consent_required', message: 'Turn on AI processing in the Privacy center to let the assistant remember things.' } });
+      throw new AppError(403, 'consent_required', 'Turn on AI processing in the Privacy center to let the assistant remember things.');
     const { rows } = await db.query(`INSERT INTO ai_memories (user_id, content, source) VALUES ($1,$2,'user') RETURNING id, content, source, created_at`, [
       u.id,
       content,

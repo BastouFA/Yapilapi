@@ -1,7 +1,7 @@
 import { createHmac, randomBytes } from 'node:crypto';
 import { isIP } from 'node:net';
 import type { Pool, PoolClient } from 'pg';
-import { checkOutboundUrl, isPrivateIp, safeFetch, systemResolve, type Resolve, type SafeFetchDeps } from './safe-fetch.ts';
+import { BlockedUrlError, checkOutboundUrl, isPrivateIp, safeFetch, systemResolve, type Resolve, type SafeFetchDeps } from './safe-fetch.ts';
 
 type Q = Pool | PoolClient;
 
@@ -50,8 +50,8 @@ export async function assertSafeWebhookUrl(
   if (local) return url;
   const host = url.hostname.replace(/^\[|\]$/g, '');
   const addrs = isIP(host) ? [host] : await resolve(host).catch(() => []);
-  if (!addrs.length) throw new Error("That host doesn't resolve.");
-  if (addrs.some(isPrivateIp)) throw new Error('Webhook URLs must point to a public address.');
+  if (!addrs.length) throw new BlockedUrlError("That host doesn't resolve.");
+  if (addrs.some(isPrivateIp)) throw new BlockedUrlError('Webhook URLs must point to a public address.');
   return url;
 }
 

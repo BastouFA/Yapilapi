@@ -5,7 +5,7 @@ import { ApiError, createClient } from '../../../packages/api-client/src/index';
 import type { Me } from '../../../packages/shared/src/types';
 import { MAX_DEVICE_ACCOUNTS, parseDeviceAccounts, upsertDeviceAccount, withoutDeviceAccount, type DeviceAccount } from '../../../packages/shared/src/accounts';
 import { dataSaverHeaders } from './data-saver-state';
-import { tr } from './locale';
+import { currentTranslator, tr } from './locale';
 import { setProbeUrl, trackedFetch } from './network';
 
 const TOKEN_KEY = 'ypl_session';
@@ -32,11 +32,17 @@ const platformHeaders = (): Record<string, string> => ({
 export async function client() {
   // On Data saver every request says Save-Data: on, so responses leave out large photo sizes.
   // Requests go through trackedFetch, so a connection that drops shows the offline banner.
-  return createClient({ baseUrl, token: await getToken(), headers: platformHeaders, fetch: trackedFetch });
+  return createClient({ baseUrl, token: await getToken(), headers: platformHeaders, locale: appLocale, fetch: trackedFetch });
 }
 
+/**
+ * The app's language, sent with every request so error messages come back in it. Signed in, the
+ * API uses the person's language setting anyway; this covers signing up, signing in and resets.
+ */
+const appLocale = () => currentTranslator().locale;
+
 /** For signing up and logging in: no token yet. */
-const authClient = () => createClient({ baseUrl, headers: platformHeaders, fetch: trackedFetch });
+const authClient = () => createClient({ baseUrl, headers: platformHeaders, locale: appLocale, fetch: trackedFetch });
 
 /** The realtime socket URL (same endpoint as the web app). The token goes in a header, not the URL. */
 export const realtimeUrl = () => `${baseUrl.replace(/^http/, 'ws')}/v1/realtime`;
@@ -44,17 +50,16 @@ export const realtimeUrl = () => `${baseUrl.replace(/^http/, 'ws')}/v1/realtime`
 /** Media URLs from the API may be relative to the API origin. */
 export const mediaUrl = (url: string) => (/^https?:\/\//.test(url) ? url : `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`);
 
-/**
- * Messages from the API are shown as they come (in English today); ours are translated. Not
- * reaching the API at all gets the translated "check your connection" message.
- */
 const OWN_ERRORS: Record<string, 'error.network' | 'error.processingFailed' | 'error.editFailed' | 'error.slow'> = {
   network: 'error.network',
   processing_failed: 'error.processingFailed',
   edit_failed: 'error.editFailed',
   timeout: 'error.slow',
 };
-/** Errors the app itself raises (no connection, a file that didn't process) are in the reader's language. */
+/**
+ * Messages from the API are shown as they come: the API writes them in the reader's language.
+ * Errors the app itself raises (no connection, a file that didn't process) are translated here.
+ */
 export const errorMessage = (e: unknown) => {
   const own = e instanceof ApiError ? OWN_ERRORS[e.code] : undefined;
   return own ? tr(own) : e instanceof Error && e.message ? e.message : tr('error.generic');

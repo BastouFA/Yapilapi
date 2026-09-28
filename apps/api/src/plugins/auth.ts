@@ -11,6 +11,8 @@ export interface AuthUser {
   email: string;
   emailVerified: boolean;
   birthDate: Date | null;
+  /** The person's language setting (profiles.locale); errors are sent in it. Not set for API keys. */
+  locale?: string;
   /** Set when the request authenticated with a developer API key instead of a session. */
   apiKey?: { id: string; appId: string; scopes: string[] };
 }
@@ -101,9 +103,10 @@ export async function resolveSession(ctx: AppContext, token: string | undefined)
     email_verified_at: Date | null;
     birth_date: Date | null;
     last_seen_at: Date;
+    locale: string | null;
   }>(
-    `SELECT s.id AS session_id, u.id AS user_id, u.role, u.email, u.email_verified_at, u.birth_date, s.last_seen_at
-     FROM sessions s JOIN users u ON u.id = s.user_id
+    `SELECT s.id AS session_id, u.id AS user_id, u.role, u.email, u.email_verified_at, u.birth_date, s.last_seen_at, p.locale
+     FROM sessions s JOIN users u ON u.id = s.user_id LEFT JOIN profiles p ON p.user_id = u.id
      WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > now() AND u.status = 'active'`,
     [hashToken(token)],
   );
@@ -119,6 +122,7 @@ export async function resolveSession(ctx: AppContext, token: string | undefined)
     email: r.email,
     emailVerified: !!r.email_verified_at,
     birthDate: r.birth_date,
+    locale: r.locale ?? undefined,
   };
 }
 

@@ -15,6 +15,7 @@ import { runInRequest, withRequestContext } from './lib/request-context.ts';
 import type { Config } from './config.ts';
 import type { AppContext } from './lib/context.ts';
 import { AppError } from './lib/errors.ts';
+import { requestLocale, translateDetails, translateMessage } from './lib/error-language.ts';
 import { RealtimeHub } from './lib/realtime.ts';
 import { AiGateway } from './lib/ai/gateway.ts';
 import { anthropicProvider, devProvider } from './lib/ai/providers.ts';
@@ -310,21 +311,34 @@ export async function buildApp(
     metrics.set(key, m);
   });
 
+  // Messages go out in the reader's language (lib/error-language.ts); code, status and the rest of
+  // details stay as they are.
   app.setErrorHandler((err, req, reply) => {
+    const locale = requestLocale(req);
+    const say = (message: string) => translateMessage(message, locale);
     if (err instanceof AppError)
-      return reply.code(err.status).send({ error: { code: err.code, message: err.message, details: err.details, requestId: req.id } });
+      return reply
+        .code(err.status)
+        .send({ error: { code: err.code, message: say(err.message), details: translateDetails(err.details, locale), requestId: req.id } });
     const e = err as { statusCode?: number; code?: string; message: string };
-    if (e.statusCode === 429) return reply.code(429).send(err);
+    if (e.statusCode === 429) {
+      // The rate limiter's own response (errorResponseBuilder above).
+      const limited = err as { error?: { message?: string } };
+      if (typeof limited.error?.message === 'string') limited.error.message = say(limited.error.message);
+      return reply.code(429).send(err);
+    }
     if (e.code === 'FST_REQ_FILE_TOO_LARGE')
-      return reply.code(413).send({ error: { code: 'too_large', message: 'Files can be up to 50 MB.', requestId: req.id } });
+      return reply.code(413).send({ error: { code: 'too_large', message: say('Files can be up to 50 MB.'), requestId: req.id } });
     if (e.statusCode && e.statusCode < 500)
       return reply.code(e.statusCode).send({ error: { code: e.code ?? 'bad_request', message: e.message, requestId: req.id } });
     req.log.error({ err }, 'unhandled error');
-    return reply.code(500).send({ error: { code: 'internal', message: 'Something went wrong on our side. Try again.', requestId: req.id } });
+    return reply.code(500).send({ error: { code: 'internal', message: say('Something went wrong on our side. Try again.'), requestId: req.id } });
   });
 
   app.setNotFoundHandler((req, reply) =>
-    reply.code(404).send({ error: { code: 'not_found', message: `No route for ${req.method} ${req.url}.`, requestId: req.id } }),
+    reply
+      .code(404)
+      .send({ error: { code: 'not_found', message: translateMessage(`No route for ${req.method} ${req.url}.`, requestLocale(req)), requestId: req.id } }),
   );
 
   // ── Health ────────────────────────────────────────────────────────────
