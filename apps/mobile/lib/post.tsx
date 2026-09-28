@@ -23,6 +23,7 @@ import { AddToMemorySheet } from './memories';
 import { useReport } from './report';
 import { canWatch, useWatchStart } from './watch';
 import { QuestionQuoteView } from './ask';
+import { MixTile } from './mixes';
 
 export { RichText };
 
@@ -444,6 +445,7 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
         </Pressable>
       ) : null}
       {post.music ? <PostMusicChip music={post.music} /> : null}
+      {post.mix ? <MixTile mix={post.mix} /> : null}
 
       {post.format === 'reel' && !post.locked && post.media.some((m) => m.kind === 'video') ? <ReelPreview post={post} saver={saver} /> : null}
       {post.format !== 'reel' && gallery.length ? <MediaGallery media={gallery} tags={tags} meId={me?.id} onRemoveTag={(tag) => void removeTag(tag)} /> : null}

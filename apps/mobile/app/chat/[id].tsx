@@ -11,7 +11,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Alert, FlatList, Image, Linking, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, Alert, FlatList, Image, Linking, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Conversation, Message, PinnedMessage } from '../../../../packages/shared/src/types';
 import { MESSAGE_EDIT_MINUTES } from '../../../../packages/shared/src/constants';
@@ -48,6 +48,7 @@ import { TranslatableText } from '../../lib/translation';
 import { useReport } from '../../lib/report';
 import { ListCard, ListComposer, PollCard, PollComposer, ReminderNote, ReminderPicker } from '../../lib/chat-polls';
 import { GameCard, GameSheet, StartGameSheet } from '../../lib/chat-games';
+import { ChatMixCard, ShareMixHereSheet } from '../../lib/mixes';
 import { accentFor, ChatLookSheet, ChatWallpaperView, laterLimits, ScheduledList, useScheduled } from '../../lib/chat-later';
 import { DateTimeSheet } from '../../lib/date-time';
 import { chatTheme, type AccentColors } from '../../../../packages/shared/src/chat-theme';
@@ -96,6 +97,8 @@ export default function Chat() {
   // Games: the sheet to start one, and the board that's open (by its card's message id, so live updates show in it).
   const [gameStartOpen, setGameStartOpen] = useState(false);
   const [boardFor, setBoardFor] = useState<string | null>(null);
+  // Mixes: the sheet to share one of yours here.
+  const [mixShareOpen, setMixShareOpen] = useState(false);
   const [remindFor, setRemindFor] = useState<{ message: Message; scope: 'me' | 'group' } | null>(null);
   // Send later (touch and hold Send), your messages waiting here, and the chat's wallpaper and colour.
   const scheduled = useScheduled(id);
@@ -187,6 +190,18 @@ export default function Chat() {
     // A move, a forfeit or the end of a game: the card and any open board follow. An older update arriving late never winds the board back.
     if (e.type === 'game.updated' && e.data?.conversationId === id)
       patchMessage(e.data.id, (x) => (x.unsent || (x.game && x.game.moveNumber > e.data.game.moveNumber) ? x : { ...x, game: e.data.game }));
+    // "Ada added 3 songs": more adds raise the line's count.
+    if (e.type === 'message.system' && e.data?.conversationId === id) patchMessage(e.data.id, (x) => ({ ...x, system: e.data.system }));
+    // A mix shared here changed: its cards show it as it is now (or that it's gone).
+    if (e.type === 'mix.updated' && (e.data?.conversationIds as string[] | undefined)?.includes(id)) {
+      const mixId = e.data.mixId as string;
+      void client()
+        .then((api) => api.mixes.get(mixId))
+        .then(
+          (r) => setMessages((cur) => cur.map((x) => (x.mix?.id === mixId ? { ...x, mix: { available: true as const, ...r.mix } } : x))),
+          () => setMessages((cur) => cur.map((x) => (x.mix?.id === mixId ? { ...x, mix: { id: mixId, available: false as const } } : x))),
+        );
+    }
     if (e.type === 'message.reminder' && e.data?.conversationId === id) patchMessage(e.data.id, (x) => ({ ...x, reminder: e.data.reminder ?? undefined }));
     if (e.type === 'conversation.updated' && e.data?.id === id)
       setConversation((cur) => (cur ? { ...cur, disappearingSeconds: e.data.disappearingSeconds } : cur));
@@ -532,6 +547,7 @@ export default function Chat() {
       !m.poll &&
       !m.list &&
       !m.game &&
+      !m.mix &&
       !m.unsent &&
       Date.now() - new Date(m.createdAt).getTime() < MESSAGE_EDIT_MINUTES * 60_000;
     const out: SheetAction[] = [];
@@ -647,8 +663,8 @@ export default function Chat() {
   }
 
   // Stable handlers for the memoised rows; they call this render's functions.
-  const latest = useRef({ jumpTo, setActionsFor, startReply, react, patchMessage, replaceMessage, setBoardFor });
-  latest.current = { jumpTo, setActionsFor, startReply, react, patchMessage, replaceMessage, setBoardFor };
+  const latest = useRef({ jumpTo, setActionsFor, startReply, react, patchMessage, replaceMessage, setBoardFor, setError });
+  latest.current = { jumpTo, setActionsFor, startReply, react, patchMessage, replaceMessage, setBoardFor, setError };
   const rowHandlers = useMemo<RowHandlers>(
     () => ({
       jumpTo: (mid) => void latest.current.jumpTo(mid),
@@ -658,6 +674,8 @@ export default function Chat() {
       patchMessage: (mid, fn) => latest.current.patchMessage(mid, fn),
       replaceMessage: (m) => latest.current.replaceMessage(m),
       openGame: (mid) => latest.current.setBoardFor(mid),
+      // Adding a song from a mix card: a problem shows at the top; a song added is read out.
+      note: (text, failed) => (failed ? latest.current.setError(text) : AccessibilityInfo.announceForAccessibility(text)),
     }),
     [],
   );
@@ -1115,9 +1133,18 @@ export default function Chat() {
           { label: t('m.chat.poll.new'), icon: 'stats-chart-outline', onPress: () => setPollOpen(true) },
           { label: t('m.chat.list.new'), icon: 'checkbox-outline', onPress: () => setListOpen(true) },
           ...(conversation && conversation.kind !== 'community'
-            ? [{ label: t('m.chat.game.new'), icon: 'game-controller-outline' as const, onPress: () => setGameStartOpen(true) }]
+            ? [
+                { label: t('m.chat.game.new'), icon: 'game-controller-outline' as const, onPress: () => setGameStartOpen(true) },
+                { label: t('mixes.shareHere'), icon: 'list-outline' as const, onPress: () => setMixShareOpen(true) },
+              ]
             : []),
         ]}
+      />
+      <ShareMixHereSheet
+        visible={mixShareOpen}
+        onClose={() => setMixShareOpen(false)}
+        conversationId={id}
+        onSent={(m) => setMessages((cur) => (cur.some((x) => x.id === m.id) ? cur : [...cur, m]))}
       />
       <StartGameSheet
         open={gameStartOpen}
@@ -1196,6 +1223,7 @@ interface RowHandlers {
   patchMessage: (id: string, fn: (m: Message) => Message) => void;
   replaceMessage: (m: Message) => void;
   openGame: (messageId: string) => void;
+  note: (text: string, failed?: boolean) => void;
 }
 
 /** One message: its bubble (yours at the end edge), reactions, and swipe to reply. */
@@ -1222,7 +1250,7 @@ const MessageRow = memo(function MessageRow({
   const c = useColors();
   const { t } = useT();
   if (item.kind === 'system') return <SystemLine message={item} meId={meId} onJump={h.jumpTo} watchLive={watchLive} />;
-  const rich = !item.unsent && (item.poll || item.list || item.game);
+  const rich = !item.unsent && (item.poll || item.list || item.game || item.mix);
   const text = item.unsent
     ? t(mine ? 'm.chat.unsentMine' : 'm.chat.unsent')
     : rich
@@ -1239,6 +1267,8 @@ const MessageRow = memo(function MessageRow({
     <ListCard message={item} meId={meId} tint={tint} onList={(l) => h.patchMessage(item.id, (x) => ({ ...x, list: l }))} />
   ) : item.game ? (
     <GameCard message={item} meId={meId} tint={tint} onOpen={() => h.openGame(item.id)} />
+  ) : item.mix ? (
+    <ChatMixCard mix={item.mix} onMix={(mix) => h.patchMessage(item.id, (x) => ({ ...x, mix }))} onNote={h.note} />
   ) : item.viewOnce ? (
     <ViewOnceBubble message={item} mine={mine} tint={tint} onChange={h.replaceMessage} />
   ) : (

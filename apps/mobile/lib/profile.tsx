@@ -35,6 +35,7 @@ import { ProfileMenu } from './profile-menu';
 import { FeaturedRow, ProfileAbout, ProfileLinks, ProfileSongChip, tabLabel, useTint } from './profile-style';
 import type { Tint } from './ui';
 import { AnswersList, AskCard } from './ask';
+import { ProfileMixes } from './mixes';
 
 /**
  * A profile: name, bio, counts, Follow and Message for other people, and
@@ -471,6 +472,8 @@ export function ProfileView({
       ListEmptyComponent={
         current === 'answers' ? (
           <AnswersList profile={profile} />
+        ) : current === 'mixes' ? (
+          <ProfileMixes username={profile.username} isSelf={rel.isSelf} />
         ) : current === 'shop' ? (
           <ShopList userId={profile.id} username={profile.username} isSelf={rel.isSelf} />
         ) : current === 'boards' ? (

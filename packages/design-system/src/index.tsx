@@ -45,6 +45,8 @@ export {
   MediaGrid,
   MediaViewer,
   Menu,
+  MixMosaic,
+  MixTile,
   MomentsStrip,
   NavBar,
   PostCard,

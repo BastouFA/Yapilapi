@@ -11,6 +11,7 @@ import { applyMediaDecision } from '../lib/media-moderation.ts';
 import { notifyReleasedPosts } from '../lib/collabs.ts';
 import { syncCommentCounts } from '../lib/comments.ts';
 import { answerCards } from '../lib/ask.ts';
+import { MIX_FROM, mixVisibleSql } from '../lib/mixes.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -41,6 +42,7 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       question: `SELECT asker_id AS uid FROM ask_questions WHERE id = $1 AND deleted_at IS NULL`,
       answer: `SELECT recipient_id AS uid FROM ask_questions WHERE id = $1 AND answered_at IS NOT NULL AND deleted_at IS NULL`,
       drop: `SELECT seller_id AS uid FROM drops WHERE id = $1 AND status <> 'draft' AND deleted_at IS NULL`,
+      mix: `SELECT owner_id AS uid FROM mixes WHERE id = $1 AND deleted_at IS NULL`,
     };
     const r = await db.query(q[type]!, [id]);
     return r.rows[0]?.uid ?? null;
@@ -66,6 +68,11 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       if (!ok.rowCount) throw notFound('The item you reported');
     }
     if (input.targetType === 'answer' && !(await answerCards(db, [input.targetId], u.id)).length) throw notFound('The item you reported');
+    // A mix, only by someone who may see it.
+    if (input.targetType === 'mix') {
+      const ok = await db.query(`SELECT 1 ${MIX_FROM} WHERE mx.id = $2 AND ${mixVisibleSql('$1')}`, [u.id, input.targetId]);
+      if (!ok.rowCount) throw notFound('The item you reported');
+    }
     const report = await tx(db, async (c) => {
       const r = await c.query(
         `INSERT INTO reports (reporter_id, target_type, target_id, reason, details) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING id`,
@@ -118,6 +125,7 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
                              WHEN 'message' THEN (SELECT body FROM messages WHERE id = mc.target_id)
                              WHEN 'question' THEN (SELECT body FROM ask_questions WHERE id = mc.target_id)
                              WHEN 'answer' THEN (SELECT 'Q: ' || body || E'\nA: ' || coalesce(answer, '') FROM ask_questions WHERE id = mc.target_id)
+                             WHEN 'mix' THEN (SELECT title || E'\n' || description FROM mixes WHERE id = mc.target_id)
                              WHEN 'ad_campaign' THEN (SELECT p.body FROM ad_campaigns a JOIN posts p ON p.id = a.post_id WHERE a.id = mc.target_id) END AS excerpt,
          CASE WHEN mc.target_type = 'media' THEN (SELECT json_build_object('kind', m.kind, 'url', coalesce(m.variants->>'medium', m.poster_url, m.url), 'moderation', m.moderation)
                                                     FROM media m WHERE m.id = mc.target_id) END AS media
@@ -221,7 +229,8 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     decision: string,
   ) {
     // A question and its answer are one row: a decision on either applies to the card.
-    const table: Record<string, string> = { post: 'posts', comment: 'comments', question: 'ask_questions', answer: 'ask_questions' };
+    // A restricted mix is seen by its owner alone; a removed one by nobody.
+    const table: Record<string, string> = { post: 'posts', comment: 'comments', question: 'ask_questions', answer: 'ask_questions', mix: 'mixes' };
     const t = table[mc.target_type];
     if (decision === 'no_action' && t) await c.query(`UPDATE ${t} SET moderation_status = 'normal' WHERE id = $1`, [mc.target_id]);
     // A held message is delivered once a moderator lets it through.

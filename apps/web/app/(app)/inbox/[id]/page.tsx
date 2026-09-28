@@ -33,6 +33,7 @@ import { ListSheet, ListView, PollSheet, PollView, ReminderNote, ReminderSheet }
 import { ChatLookSheet, chatThemeClass, chatThemeVars, ScheduledList, ScheduleSheet, useScheduled } from '@/components/ChatLater';
 import { useChatWatch, WatchBanner } from '@/components/WatchTogether';
 import { GameCard, GameSheet, StartGameSheet } from '@/components/ChatGames';
+import { ChatMixCard, ShareMixHereSheet } from '@/components/Mixes';
 
 type Pending = Message & { pending?: boolean };
 
@@ -91,6 +92,8 @@ export default function ChatPage() {
   // Games: the sheet to start one, and the board that's open (by its card's message id, so live updates show in it).
   const [gameStartOpen, setGameStartOpen] = useState(false);
   const [boardFor, setBoardFor] = useState<string | null>(null);
+  // Mixes: the sheet to share one of yours here.
+  const [mixShareOpen, setMixShareOpen] = useState(false);
 
   const loadPins = () =>
     api.conversations.pins(id).then(
@@ -218,6 +221,16 @@ export default function ChatPage() {
         // An older update arriving late never winds the board back.
         x.unsent || (x.game && x.game.moveNumber > e.data.game.moveNumber) ? x : { ...x, game: e.data.game },
       );
+    // "Ada added 3 songs": more adds raise the line's count.
+    if (e.type === 'message.system' && e.data.conversationId === id) patchMessage(e.data.id, (x) => ({ ...x, system: e.data.system }));
+    // A mix shared here changed: its cards show it as it is now (or that it's gone).
+    if (e.type === 'mix.updated' && (e.data.conversationIds as string[] | undefined)?.includes(id)) {
+      const mixId = e.data.mixId as string;
+      api.mixes.get(mixId).then(
+        (r) => setMessages((cur) => cur?.map((x) => (x.mix?.id === mixId ? { ...x, mix: { available: true as const, ...r.mix } } : x)) ?? cur),
+        () => setMessages((cur) => cur?.map((x) => (x.mix?.id === mixId ? { ...x, mix: { id: mixId, available: false as const } } : x)) ?? cur),
+      );
+    }
     if (e.type === 'message.reminder' && e.data.conversationId === id) patchMessage(e.data.id, (x) => ({ ...x, reminder: e.data.reminder ?? undefined }));
     if (e.type === 'conversation.updated' && e.data.id === id) setConv((c) => (c ? { ...c, disappearingSeconds: e.data.disappearingSeconds } : c));
     // Someone changed the wallpaper or bubble colour: everyone sees the same.
@@ -406,6 +419,7 @@ export default function ChatPage() {
       !m.poll &&
       !m.list &&
       !m.game &&
+      !m.mix &&
       !m.unsent &&
       !m.pending &&
       Date.now() - new Date(m.createdAt).getTime() < MESSAGE_EDIT_MINUTES * 60_000;
@@ -632,6 +646,8 @@ export default function ChatPage() {
               <ListView message={m} meId={me?.id} mine={mine} onList={(list) => patchMessage(m.id, (x) => ({ ...x, list }))} />
             ) : m.game ? (
               <GameCard message={m} meId={me?.id} mine={mine} onOpen={() => setBoardFor(m.id)} />
+            ) : m.mix ? (
+              <ChatMixCard mix={m.mix} onMix={(mix) => patchMessage(m.id, (x) => ({ ...x, mix }))} />
             ) : m.viewOnce ? (
               <>
                 <ViewOnceMessage message={m} mine={mine} onChange={(next) => setMessages((cur) => cur?.map((x) => (x.id === next.id ? next : x)) ?? cur)} />
@@ -786,7 +802,9 @@ export default function ChatPage() {
                         ? { kind: 'list' as const }
                         : replyTo.game
                           ? { kind: 'game' as const, gameKind: replyTo.game.kind }
-                          : {}),
+                          : replyTo.mix
+                            ? { kind: 'mix' as const }
+                            : {}),
                   })}
                 </span>
               ) : null}
@@ -834,6 +852,7 @@ export default function ChatPage() {
             { label: t('m.chat.poll.new'), icon: 'poll', onSelect: () => setPollOpen(true) },
             { label: t('m.chat.list.new'), icon: 'check-circle', onSelect: () => setListOpen(true) },
             ...(conv && conv.kind !== 'community' ? [{ label: t('m.chat.game.new'), icon: 'game' as const, onSelect: () => setGameStartOpen(true) }] : []),
+            ...(conv && conv.kind !== 'community' ? [{ label: t('mixes.shareHere'), icon: 'mix' as const, onSelect: () => setMixShareOpen(true) }] : []),
           ]}
         />
         <button type="button" className="yp-action" aria-label={t('m.chat.sendPhoto')} disabled={!!uploading} onClick={() => fileInput.current?.click()}>
@@ -940,6 +959,7 @@ export default function ChatPage() {
       <ReportSheet target={reportId ? { type: 'message', id: reportId } : null} onClose={() => setReportId(null)} />
       <PollSheet open={pollOpen} onClose={() => setPollOpen(false)} conversationId={id} onSent={addMessage} />
       <ListSheet open={listOpen} onClose={() => setListOpen(false)} conversationId={id} onSent={addMessage} />
+      <ShareMixHereSheet open={mixShareOpen} onClose={() => setMixShareOpen(false)} conversationId={id} onSent={addMessage} />
       <StartGameSheet
         open={gameStartOpen}
         onClose={() => setGameStartOpen(false)}
