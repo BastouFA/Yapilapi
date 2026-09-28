@@ -177,6 +177,21 @@ export function SystemLine({
   const { t } = useSession();
   const who = message.sender.id === meId ? t('m.chat.you') : message.sender.displayName;
   const s = message.system;
+  if (s?.type === 'together') {
+    // "Ada started a shared album: Lagos weekend", with a way in (people not in it see that it's not for them).
+    const text =
+      message.sender.id === meId
+        ? t('together.chat.cardYou', { title: s.title })
+        : t('together.chat.card', { name: message.sender.displayName, title: s.title });
+    return (
+      <p className="chat-system" role="note">
+        <Icon name="image" size={14} /> <bdi>{text}</bdi>{' '}
+        <Link href={`/together/${s.togetherId}`} className="chat-system__join">
+          {t('together.chat.open')}
+        </Link>
+      </p>
+    );
+  }
   if (s?.type === 'watch') {
     const text = message.sender.id === meId ? t('watch.system.startedYou') : t('watch.system.started', { name: message.sender.displayName });
     return (

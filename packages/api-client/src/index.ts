@@ -89,6 +89,14 @@ import type {
   UsernameCheck,
   UsernameStatus,
   PulseCards,
+  TogetherAddResult,
+  TogetherComment,
+  TogetherDetail,
+  TogetherInvitePreview,
+  TogetherItem,
+  TogetherJoinRequest,
+  TogetherReaction,
+  TogetherSummary,
   WatchPlayback,
   WatchQueueResult,
   WatchReaction,
@@ -1135,13 +1143,59 @@ export function createClient(opts: ClientOptions) {
       feed: () => get<{ items: Post[] }>('/v1/real'),
       create: (b: { mediaIds: string[]; caption?: string; visibility?: string }) => post<{ post: Post }>('/v1/real', b),
     },
+    /** Together: shared albums (packages/shared/src/together.ts). Only the people in one ever see it. */
     together: {
-      list: () => get<{ items: { id: string; title: string; status: string; closesAt: string; contributions: number; members: number }[] }>('/v1/together'),
+      list: () => get<{ items: TogetherSummary[] }>('/v1/together'),
       get: (id: string) => get<{ together: TogetherDetail }>(`/v1/together/${id}`),
-      create: (b: { title: string; memberIds: string[]; eventId?: string }) => post<{ together: TogetherDetail }>('/v1/together', b),
-      contribute: (id: string, mediaId: string, caption: string) =>
-        post<{ together: TogetherDetail }>(`/v1/together/${id}/contributions`, { mediaId, caption }),
+      /** `closesAt` null: open until a host closes it. `conversationId` adds everyone in that chat (a card goes there); `eventId` everyone going. */
+      create: (b: {
+        title: string;
+        description?: string;
+        closesAt: string | null;
+        memberIds?: string[];
+        cohostIds?: string[];
+        conversationId?: string;
+        eventId?: string;
+        inviteLink?: boolean;
+      }) => post<{ together: TogetherDetail } & TogetherAddResult>('/v1/together', b),
+      update: (id: string, b: { title?: string; description?: string; coverItemId?: string | null; closesAt?: string | null }) =>
+        patch<{ together: TogetherDetail }>(`/v1/together/${id}`, b),
       close: (id: string) => post<{ together: TogetherDetail }>(`/v1/together/${id}/close`),
+      reopen: (id: string, closesAt: string | null) => post<{ together: TogetherDetail }>(`/v1/together/${id}/reopen`, { closesAt }),
+      remove: (id: string) => del<{ ok: true }>(`/v1/together/${id}`),
+      leave: (id: string) => post<{ ok: true }>(`/v1/together/${id}/leave`),
+      addMembers: (id: string, b: { userIds?: string[]; fromChat?: boolean; fromEvent?: boolean }) =>
+        post<{ together: TogetherDetail } & TogetherAddResult>(`/v1/together/${id}/members`, b),
+      setRole: (id: string, userId: string, role: 'cohost' | 'member') =>
+        put<{ together: TogetherDetail }>(`/v1/together/${id}/members/${userId}/role`, { role }),
+      removeMember: (id: string, userId: string) => del<{ together: TogetherDetail }>(`/v1/together/${id}/members/${userId}`),
+      setInvite: (id: string, enabled: boolean, reset = false) =>
+        post<{ invite: { code: string; enabled: boolean } }>(`/v1/together/${id}/invite`, { enabled, reset }),
+      invite: (code: string) => get<{ invite: TogetherInvitePreview }>(`/v1/together/invite/${encodeURIComponent(code)}`),
+      requestToJoin: (code: string) => post<{ invite: TogetherInvitePreview }>(`/v1/together/invite/${encodeURIComponent(code)}/request`),
+      requests: (id: string) => get<{ items: TogetherJoinRequest[] }>(`/v1/together/${id}/requests`),
+      decide: (id: string, userId: string, approve: boolean) => post<{ ok: true }>(`/v1/together/${id}/requests/${userId}`, { approve }),
+      /** Up to 20 of your uploads at a time, each with an optional caption and the time the file says it was taken. */
+      addItems: (id: string, items: { mediaId: string; caption?: string; takenAt?: string }[]) =>
+        post<{ items: TogetherItem[] }>(`/v1/together/${id}/items`, { items }),
+      item: (id: string, itemId: string) => get<{ item: TogetherItem }>(`/v1/together/${id}/items/${itemId}`),
+      setCaption: (id: string, itemId: string, caption: string) => patch<{ item: TogetherItem }>(`/v1/together/${id}/items/${itemId}`, { caption }),
+      removeItem: (id: string, itemId: string) => del<{ ok: true }>(`/v1/together/${id}/items/${itemId}`),
+      star: (id: string, itemId: string, on: boolean) =>
+        on ? put<{ item: TogetherItem }>(`/v1/together/${id}/items/${itemId}/star`) : del<{ item: TogetherItem }>(`/v1/together/${id}/items/${itemId}/star`),
+      react: (id: string, itemId: string, kind: TogetherReaction | null) =>
+        kind
+          ? put<{ item: TogetherItem }>(`/v1/together/${id}/items/${itemId}/reaction`, { kind })
+          : del<{ item: TogetherItem }>(`/v1/together/${id}/items/${itemId}/reaction`),
+      comments: (id: string, itemId: string) => get<{ items: TogetherComment[] }>(`/v1/together/${id}/items/${itemId}/comments`),
+      comment: (id: string, itemId: string, body: string) => post<{ items: TogetherComment[] }>(`/v1/together/${id}/items/${itemId}/comments`, { body }),
+      removeComment: (id: string, itemId: string, commentId: string) =>
+        del<{ items: TogetherComment[] }>(`/v1/together/${id}/items/${itemId}/comments/${commentId}`),
+      /** One tap: a recap video of the best of (it's yours alone; watch it under Recaps). */
+      recap: (id: string, title?: string) => post<{ recap: { id: string } }>(`/v1/together/${id}/recap`, title ? { title } : {}),
+      /** A chapter from your own photos in the album (the best of yours unless you pick). */
+      chapter: (id: string, b: { title?: string; audience?: string; itemIds?: string[] } = {}) =>
+        post<{ chapter: { id: string; stories: number } }>(`/v1/together/${id}/chapter`, b),
     },
     oauth: {
       consent: (query: string) =>
@@ -1505,22 +1559,8 @@ export interface CallInfo {
   participants: string[];
 }
 
-export interface TogetherDetail {
-  id: string;
-  title: string;
-  status: 'open' | 'closed';
-  eventId: string | null;
-  closesAt: string | null;
-  myRole: 'creator' | 'member';
-  members: { user: PublicUser; role: string }[];
-  contributions: {
-    id: string;
-    caption: string;
-    capturedAt: string;
-    media: { url: string; kind: string; altText: string | null; sensitive?: boolean } | null;
-    author: PublicUser;
-  }[];
-}
+/** Together shapes live in @yapilapi/shared (together.ts); re-exported for older imports. */
+export type { TogetherDetail } from '@yapilapi/shared';
 
 export interface VerificationStatus {
   email: { address: string; verified: boolean };

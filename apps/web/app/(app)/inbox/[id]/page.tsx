@@ -38,7 +38,7 @@ type Pending = Message & { pending?: boolean };
 
 export default function ChatPage() {
   const { id } = useParams<{ id: string }>();
-  const { me, t, toast, locale, setUnread, unread } = useSession();
+  const { me, t, toast, locale, setUnread, unread, flags } = useSession();
   const [conv, setConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Pending[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -512,6 +512,10 @@ export default function ChatPage() {
               { label: t('m.chat.search'), icon: 'search', onSelect: () => setSearchOpen(true) },
               { label: t('m.chat.disappearing'), icon: 'info', onSelect: () => setDisappearingOpen(true) },
               { label: t('m.chat.look.title'), icon: 'palette', onSelect: () => setLookOpen(true) },
+              // A shared album for the people in this chat (a card goes in the chat).
+              ...(flags.REAL_TOGETHER && (conv?.kind === 'direct' || conv?.kind === 'group')
+                ? [{ label: t('together.chat.start'), icon: 'image' as const, onSelect: () => router.push(`/together/new?chat=${id}`) }]
+                : []),
               ...(others.length === 1
                 ? [
                     {

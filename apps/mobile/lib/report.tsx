@@ -52,6 +52,7 @@ const TITLE_KEYS: Record<ReportTargetType, MessageKey> = {
   question: 'm.report.title.question',
   answer: 'm.report.title.answer',
   drop: 'm.report.title.drop',
+  together_item: 'm.report.title.togetherItem',
 };
 
 type Done = { already: boolean; blocked: boolean; blockError?: string };

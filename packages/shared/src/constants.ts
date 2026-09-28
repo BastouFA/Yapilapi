@@ -114,7 +114,7 @@ export const REPORT_REASONS = [
 /**
  * What can be reported. A story is a moment; a live is a live session; a room is an audio room. A
  * question (by whoever asked it) and an answer (the card, by the person who answered) share an id. A drop is a
- * seller's launch.
+ * seller's launch. A together_item is a photo or video in a Together album (only its members can report it).
  */
 export const REPORT_TARGETS = [
   'user',
@@ -130,6 +130,7 @@ export const REPORT_TARGETS = [
   'question',
   'answer',
   'drop',
+  'together_item',
 ] as const;
 
 export const FEEDBACK_SIGNALS = ['more_like_this', 'less_like_this', 'not_interested', 'mute_topic', 'mute_creator'] as const;
@@ -303,7 +304,7 @@ export const RECAP_STYLES = ['calm', 'quick', 'film'] as const;
 export type RecapStyle = (typeof RECAP_STYLES)[number];
 export const RECAP_ASPECTS = ['9:16', '1:1'] as const;
 export type RecapAspect = (typeof RECAP_ASPECTS)[number];
-export const RECAP_SOURCES = ['memory', 'on_this_day', 'chapter'] as const;
+export const RECAP_SOURCES = ['memory', 'on_this_day', 'chapter', 'together'] as const;
 export type RecapSource = (typeof RECAP_SOURCES)[number];
 export const RECAP_MAX_ITEMS = 30;
 export const RECAP_MAX_SECONDS = 60;

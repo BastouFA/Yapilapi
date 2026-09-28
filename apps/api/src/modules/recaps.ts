@@ -1,14 +1,11 @@
 import type { FastifyInstance } from 'fastify';
-import { tx } from '@yapilapi/database';
-import { createRecapSchema, RECAP_DAILY_LIMIT, RECAP_SOURCES, type Recap, type RecapCandidates } from '@yapilapi/shared';
+import { createRecapSchema, RECAP_SOURCES, type Recap, type RecapCandidates, type RecapSource } from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, featureDisabled, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
-import { enqueue } from '../lib/jobs.ts';
 import { recapSharing } from '../lib/recap-sharing.ts';
-import { preselect, RECAP_JOB, RECAP_MAX_PENDING, recapCandidates, recapsLeftToday, removeRecapMedia } from '../lib/recaps.ts';
+import { preselect, recapCandidates, recapsLeftToday, removeRecapMedia, startRecap } from '../lib/recaps.ts';
 import { isEnabled, track } from '../lib/services.ts';
-import { assertSoundUsable } from '../lib/sounds.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -38,11 +35,17 @@ function fileName(title: string, id: string): string {
  */
 export default async function recapsModule(app: FastifyInstance, ctx: AppContext) {
   const db = ctx.db;
-  const memoryOn = async () => {
-    if (!(await isEnabled(db, 'MEMORY'))) throw featureDisabled('Memory');
+  // Recaps come from Memories and Chapters (the Memory feature) and from Together albums (Real Together).
+  const recapsOn = async () => {
+    if (!(await isEnabled(db, 'MEMORY')) && !(await isEnabled(db, 'REAL_TOGETHER'))) throw featureDisabled('Memory');
   };
-  // Signed in, and the Memory feature is on.
-  const gate = [requireAuth, memoryOn];
+  /** Each source needs its own feature on. */
+  const sourceOn = async (source: RecapSource) => {
+    if (source === 'together' ? !(await isEnabled(db, 'REAL_TOGETHER')) : !(await isEnabled(db, 'MEMORY')))
+      throw featureDisabled(source === 'together' ? 'Real Together' : 'Memory');
+  };
+  // Signed in, and Memory or Together is on.
+  const gate = [requireAuth, recapsOn];
 
   async function dtos(rows: Record<string, any>[]): Promise<Recap[]> {
     const sharing = await recapSharing(
@@ -107,6 +110,7 @@ export default async function recapsModule(app: FastifyInstance, ctx: AppContext
     const u = me(req);
     const q = parse(z.object({ source: z.enum(RECAP_SOURCES), sourceId: z.string().uuid().optional() }), req.query);
     if (q.source !== 'on_this_day' && !q.sourceId) throw new AppError(400, 'validation_failed', 'Choose a memory or chapter.');
+    await sourceOn(q.source);
     const { title, items } = await recapCandidates(db, u.id, q);
     const pub = items.map(({ storageKey: _k, hasWebMp4: _w, sizeBytes: _s, ...c }) => c);
     return { title, items: pub, preselected: preselect(pub), remainingToday: await recapsLeftToday(db, u.id) };
@@ -119,40 +123,8 @@ export default async function recapsModule(app: FastifyInstance, ctx: AppContext
   app.post('/v1/recaps', { preHandler: gate, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
     const u = me(req);
     const input = parse(createRecapSchema, req.body);
-    const sourceId = input.source === 'on_this_day' ? null : input.sourceId!;
-    const { items } = await recapCandidates(db, u.id, { source: input.source, sourceId });
-    const byId = new Map(items.map((c) => [c.mediaId, c]));
-    const missing = input.mediaIds.filter((id) => !byId.has(id));
-    if (missing.length)
-      throw new AppError(404, 'not_found', "Some of these photos or videos aren't in this memory or chapter, or aren't visible to you.", { mediaIds: missing });
-    if (input.soundId) await assertSoundUsable(db, input.soundId, u.id);
-    const recap = await tx(db, async (c) => {
-      // One at a time per person, so the counts below can't both pass.
-      await c.query(`SELECT pg_advisory_xact_lock(hashtext('recaps:' || $1::text))`, [u.id]);
-      if ((await recapsLeftToday(c, u.id)) <= 0)
-        throw new AppError(429, 'recap_limit', `You can make up to ${RECAP_DAILY_LIMIT} recaps a day. Try again tomorrow.`);
-      const pending = (
-        await c.query(`SELECT count(*)::int AS n FROM recaps WHERE owner_id = $1 AND status IN ('queued', 'rendering') AND deleted_at IS NULL`, [u.id])
-      ).rows[0].n as number;
-      if (pending >= RECAP_MAX_PENDING) throw new AppError(429, 'recap_busy', 'A few of your recaps are still being made. Try again when they are ready.');
-      const { rows } = await c.query(
-        `INSERT INTO recaps (owner_id, source_type, source_id, title, style, aspect, sound_id, length_seconds, items)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
-        [
-          u.id,
-          input.source,
-          sourceId,
-          input.title,
-          input.style,
-          input.aspect,
-          input.soundId ?? null,
-          input.lengthSeconds ?? null,
-          JSON.stringify(input.mediaIds.map((id) => ({ mediaId: id, from: byId.get(id)!.from, fromId: byId.get(id)!.fromId }))),
-        ],
-      );
-      await enqueue(c, RECAP_JOB, { recapId: rows[0].id });
-      return rows[0].id as string;
-    });
+    await sourceOn(input.source);
+    const recap = await startRecap(db, u.id, input);
     track(db, u.id, 'recap_created', { source: input.source, style: input.style, aspect: input.aspect, items: input.mediaIds.length, sound: !!input.soundId });
     reply.code(202);
     const [dto] = await dtos([await own(recap, u.id)]);

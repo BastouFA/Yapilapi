@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, FlatList, I18nManager, Modal, PanResponder, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -170,6 +171,22 @@ export function SystemLine({
   const { t } = useT();
   const name = message.sender.id === meId ? t('m.chat.you') : message.sender.displayName;
   const s = message.system;
+  if (s?.type === 'together') {
+    // "Ada started a shared album: Lagos weekend", with a way in (people not in it see that it isn't for them).
+    const text =
+      message.sender.id === meId
+        ? t('together.chat.cardYou', { title: s.title })
+        : t('together.chat.card', { name: message.sender.displayName, title: s.title });
+    return (
+      <View style={{ alignSelf: 'center', alignItems: 'center', gap: space[1], maxWidth: '90%', paddingVertical: space[1] }}>
+        <View style={{ flexDirection: 'row', gap: space[1], alignItems: 'center' }}>
+          <Icon name="images-outline" size={14} color={c.inkMuted} />
+          <Text style={[{ color: c.inkMuted, fontSize: 13, textAlign: 'center', lineHeight: 18 }, userText]}>{text}</Text>
+        </View>
+        <Button label={t('together.chat.open')} size="sm" variant="secondary" icon="images-outline" onPress={() => router.push(`/together/${s.togetherId}`)} />
+      </View>
+    );
+  }
   if (s?.type === 'watch') {
     const text = message.sender.id === meId ? t('watch.system.startedYou') : t('watch.system.started', { name: message.sender.displayName });
     return (

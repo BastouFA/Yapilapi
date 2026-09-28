@@ -52,7 +52,19 @@ export function createPushSender(db: Pool, config: Config, fetchImpl: typeof fet
   };
 }
 
-const TEXT: Record<string, (actor: string) => string> = {
+/** A Together album's title, in quotes. */
+const album = (d: Record<string, unknown>) => `“${String(d.title ?? '')}”`;
+
+/** "12 photos", "a video", "5 photos and videos": what someone added to a Together album. */
+function addedWhat(d: Record<string, unknown>): string {
+  const n = Math.max(1, Number(d.count ?? 1));
+  const videos = Number(d.videos ?? 0);
+  if (!videos) return n === 1 ? 'a photo' : `${n} photos`;
+  if (videos >= n) return n === 1 ? 'a video' : `${n} videos`;
+  return `${n} photos and videos`;
+}
+
+const TEXT: Record<string, (actor: string, data: Record<string, unknown>) => string> = {
   follow: (a) => `${a} started following you`,
   friend_request: (a) => `${a} sent you a friend request`,
   friend_accepted: (a) => `${a} accepted your friend request`,
@@ -63,7 +75,14 @@ const TEXT: Record<string, (actor: string) => string> = {
   call_incoming: (a) => `${a} is calling you`,
   live_started: (a) => `${a} is live now`,
   room_live: () => 'A room you asked about has started',
-  together_invite: (a) => `${a} invited you to a Together`,
+  together_invite: (a, d) => (d.title ? `${a} added you to the shared album ${album(d)}` : `${a} invited you to a Together`),
+  // Together albums: additions are coalesced (lib/together.ts, noticeAdded) and stars batched, so each pushes once.
+  together_added: (a, d) => `${a} added ${addedWhat(d)} to ${album(d)}`,
+  together_starred: (a, d) => `${a} starred your photo in ${album(d)}`,
+  together_closing: (_a, d) => `${album(d)} closes in an hour. Add your last photos`,
+  together_closed: (_a, d) => `${album(d)} is closed. Look back at the best of it`,
+  together_request: (a, d) => `${a} asked to join ${album(d)}`,
+  together_approved: (_a, d) => `You're in ${album(d)}`,
   order_paid: () => 'You have a new paid order',
   booking_request: (a) => `${a} asked to book`,
   booking_decided: () => 'Your booking was updated',
@@ -117,8 +136,8 @@ const TEXT: Record<string, (actor: string) => string> = {
   drop_sold_out: () => 'Everything in your drop has sold',
 };
 
-/** Human text for a notification type, or null for types that shouldn't push. */
-export function pushTextFor(type: string, actorName: string | null): string | null {
+/** Human text for a notification type, or null for types that shouldn't push. `data` is the notification's data. */
+export function pushTextFor(type: string, actorName: string | null, data: object = {}): string | null {
   const f = TEXT[type];
-  return f ? f(actorName ?? 'Someone') : null;
+  return f ? f(actorName ?? 'Someone', data as Record<string, unknown>) : null;
 }

@@ -24,7 +24,15 @@ function statusLine(r: Recap, t: T): string {
 }
 
 function sourceLabel(r: Recap, t: T): string {
-  return t(r.source === 'on_this_day' ? 'm.recap.onThisDay' : r.source === 'chapter' ? 'recaps.source.chapter' : 'recaps.source.memory');
+  return t(
+    r.source === 'on_this_day'
+      ? 'm.recap.onThisDay'
+      : r.source === 'chapter'
+        ? 'recaps.source.chapter'
+        : r.source === 'together'
+          ? 'recaps.source.together'
+          : 'recaps.source.memory',
+  );
 }
 
 function Recaps() {
@@ -50,9 +58,9 @@ function Recaps() {
   }, [toast]);
 
   useEffect(() => {
-    if (flags.MEMORY === false) return;
+    if (flags.MEMORY === false && flags.REAL_TOGETHER === false) return;
     void load();
-  }, [load, flags.MEMORY]);
+  }, [load, flags.MEMORY, flags.REAL_TOGETHER]);
 
   // A recap opened from a link or a notification may not be in the list yet (or may be gone).
   const loaded = items !== null;
@@ -98,7 +106,8 @@ function Recaps() {
 
   const open = (id: string | null) => router.replace(id ? `/recaps?open=${id}` : '/recaps', { scroll: false });
 
-  if (flags.MEMORY === false || off) return <FeatureOff name={t('m.recap.title')} />;
+  // Recaps come from Memories and Chapters, and from Together albums.
+  if ((flags.MEMORY === false && flags.REAL_TOGETHER === false) || off) return <FeatureOff name={t('m.recap.title')} />;
 
   const current = openId ? (items?.find((r) => r.id === openId) ?? null) : null;
 

@@ -17,7 +17,9 @@ import {
   type RecapStyle,
 } from '@yapilapi/shared';
 import ffmpegPath from './ffmpeg-path.ts';
-import { notFound } from './errors.ts';
+import { tx } from '@yapilapi/database';
+import { AppError, notFound } from './errors.ts';
+import { enqueue } from './jobs.ts';
 import { mediaJobHandlers, probe } from './media-processing.ts';
 import type { MediaModerator } from './media-moderation.ts';
 import type { RealtimeHub } from './realtime.ts';
@@ -26,12 +28,13 @@ import { assertSoundUsable } from './sounds.ts';
 import type { MediaStorage } from './storage.ts';
 import { postUnlockedSql, postVisibleSql } from './visibility.ts';
 import { chapterVisibleSql, SEALED, storyVisibleSql } from '../modules/chapters.ts';
+import { itemVisibleSql } from './together.ts';
 
 type Q = Pool | PoolClient;
 
 /**
  * Recap videos: a short video made from photos and clips in a memory, "On this
- * day" or one of your own chapters.
+ * day", one of your own chapters or a Together album you're in.
  *
  * Only media the maker can see right now can go in, checked when it's asked for
  * and again when the job renders it (anything no longer visible is left out).
@@ -163,6 +166,25 @@ export async function recapCandidates(db: Q, viewer: string, ref: SourceRef): Pr
        ORDER BY m.created_at DESC LIMIT ${CANDIDATES_MAX}`,
       [viewer, ch.id],
     ]);
+  } else if (ref.source === 'together') {
+    // A Together album you're in: everything in it you can see, yours and other people's. Stars
+    // count three times a reaction in the suggested pick, as in the album's best of.
+    const t = (
+      await db.query(
+        `SELECT t.id, t.title FROM togethers t JOIN together_members m ON m.together_id = t.id AND m.user_id = $1 WHERE t.id = $2 AND t.deleted_at IS NULL`,
+        [viewer, ref.sourceId],
+      )
+    ).rows[0];
+    if (!t) throw notFound('Together');
+    title = t.title;
+    queries.push([
+      `SELECT ${MEDIA_COLS}, 'together' AS from_type, c.id AS from_id, c.captured_at AS taken_at, 0 AS pos,
+              ((SELECT count(*) FROM together_stars s WHERE s.item_id = c.id) * 3 + (SELECT count(*) FROM together_reactions r WHERE r.item_id = c.id))::int AS likes
+       FROM together_contributions c JOIN media md ON md.id = c.media_id JOIN users au ON au.id = c.user_id
+       WHERE c.together_id = $2 AND ${itemVisibleSql('$1')} AND ${mediaOkSql('$1')}
+       ORDER BY c.captured_at DESC LIMIT ${CANDIDATES_MAX}`,
+      [viewer, t.id],
+    ]);
   } else {
     // Your own posts and stories from this day in earlier years.
     title = 'On this day';
@@ -224,6 +246,62 @@ export function preselect(items: RecapCandidate[], max = RECAP_MAX_ITEMS): strin
   }
   const order = new Map(items.map((c, i) => [c.mediaId, i]));
   return [...picked].sort((a, b) => order.get(a)! - order.get(b)!);
+}
+
+/** What a new recap is made of (createRecapSchema, parsed). */
+export interface StartRecapInput {
+  source: RecapSource;
+  sourceId?: string | null;
+  title: string;
+  mediaIds: string[];
+  style: RecapStyle;
+  aspect: RecapAspect;
+  soundId?: string | null;
+  lengthSeconds?: number;
+}
+
+/**
+ * Start a recap. Each photo or video must be one the maker can see in the source now; the
+ * sound follows the same rules as for reels. Within the daily limit and a few waiting at a
+ * time. The video is rendered in the background; returns the recap's id.
+ */
+export async function startRecap(db: Pool, userId: string, input: StartRecapInput): Promise<string> {
+  const sourceId = input.source === 'on_this_day' ? null : input.sourceId!;
+  const { items } = await recapCandidates(db, userId, { source: input.source, sourceId });
+  const byId = new Map(items.map((c) => [c.mediaId, c]));
+  const missing = input.mediaIds.filter((id) => !byId.has(id));
+  if (missing.length)
+    throw new AppError(404, 'not_found', "Some of these photos or videos aren't in this memory, chapter or album, or aren't visible to you.", {
+      mediaIds: missing,
+    });
+  if (input.soundId) await assertSoundUsable(db, input.soundId, userId);
+  return tx(db, async (c) => {
+    // One at a time per person, so the counts below can't both pass.
+    await c.query(`SELECT pg_advisory_xact_lock(hashtext('recaps:' || $1::text))`, [userId]);
+    if ((await recapsLeftToday(c, userId)) <= 0)
+      throw new AppError(429, 'recap_limit', `You can make up to ${RECAP_DAILY_LIMIT} recaps a day. Try again tomorrow.`);
+    const pending = (
+      await c.query(`SELECT count(*)::int AS n FROM recaps WHERE owner_id = $1 AND status IN ('queued', 'rendering') AND deleted_at IS NULL`, [userId])
+    ).rows[0].n as number;
+    if (pending >= RECAP_MAX_PENDING) throw new AppError(429, 'recap_busy', 'A few of your recaps are still being made. Try again when they are ready.');
+    const { rows } = await c.query(
+      `INSERT INTO recaps (owner_id, source_type, source_id, title, style, aspect, sound_id, length_seconds, items)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+      [
+        userId,
+        input.source,
+        sourceId,
+        input.title,
+        input.style,
+        input.aspect,
+        input.soundId ?? null,
+        input.lengthSeconds ?? null,
+        JSON.stringify(input.mediaIds.map((id) => ({ mediaId: id, from: byId.get(id)!.from, fromId: byId.get(id)!.fromId }))),
+      ],
+    );
+    await enqueue(c, RECAP_JOB, { recapId: rows[0].id });
+    return rows[0].id as string;
+  });
 }
 
 /** Recaps a person can still start today: failed ones don't count, deleted ones do. */
@@ -729,7 +807,7 @@ export async function renderRecapJob(deps: RecapDeps, recapId: string): Promise<
     try {
       candidates = (await recapCandidates(db, r.owner_id, { source: r.source_type, sourceId: r.source_id })).items;
     } catch {
-      throw new RecapFailure("This memory or chapter isn't available to you any more.");
+      throw new RecapFailure("This memory, chapter or album isn't available to you any more.");
     }
     const byId = new Map(candidates.map((c) => [c.mediaId, c]));
     const chosen = (r.items as { mediaId: string }[])

@@ -173,13 +173,14 @@ describe('Real and Real Together', () => {
     const created = await as(t.app, a).post('/v1/together', { title: 'Concert night', memberIds: [b.id] });
     expect(created.status).toBe(201);
     const id = created.body.together.id;
-    await as(t.app, a).post(`/v1/together/${id}/contributions`, { mediaId: await insertMedia(a.id), caption: 'From the front' });
-    const r = await as(t.app, b).post(`/v1/together/${id}/contributions`, { mediaId: await insertMedia(b.id), caption: 'From the back' });
-    expect(r.body.together.contributions.map((c: { caption: string }) => c.caption)).toEqual(['From the front', 'From the back']);
+    await as(t.app, a).post(`/v1/together/${id}/items`, { items: [{ mediaId: await insertMedia(a.id), caption: 'From the front' }] });
+    await as(t.app, b).post(`/v1/together/${id}/items`, { items: [{ mediaId: await insertMedia(b.id), caption: 'From the back' }] });
+    const r = await as(t.app, b).get(`/v1/together/${id}`);
+    expect(r.body.together.items.map((c: { caption: string }) => c.caption)).toEqual(['From the front', 'From the back']);
     expect((await as(t.app, stranger).get(`/v1/together/${id}`)).status).toBe(404);
-    expect((await as(t.app, b).post(`/v1/together/${id}/contributions`, { mediaId: await insertMedia(a.id) })).status).toBe(404);
+    expect((await as(t.app, b).post(`/v1/together/${id}/items`, { items: [{ mediaId: await insertMedia(a.id) }] })).status).toBe(404);
     await as(t.app, a).post(`/v1/together/${id}/close`);
-    expect((await as(t.app, b).post(`/v1/together/${id}/contributions`, { mediaId: await insertMedia(b.id) })).status).toBe(400);
+    expect((await as(t.app, b).post(`/v1/together/${id}/items`, { items: [{ mediaId: await insertMedia(b.id) }] })).status).toBe(400);
   });
 });
 

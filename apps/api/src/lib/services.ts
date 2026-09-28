@@ -175,6 +175,7 @@ export async function notify(
     const text = pushTextFor(
       n.type,
       n.actorId ? ((await db.query(`SELECT display_name FROM profiles WHERE user_id = $1`, [n.actorId])).rows[0]?.display_name ?? null) : null,
+      n.data,
     );
     const data: Record<string, string> = { type: n.type };
     if (n.entityType) data.entityType = n.entityType;

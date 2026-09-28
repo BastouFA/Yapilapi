@@ -120,12 +120,12 @@ describe('files stored here go by their id', () => {
     const together = await as(t.app, maker).post('/v1/together', { title: 'Weekend', memberIds: [] });
     expect(together.status).toBe(201);
     const tid = together.body.together.id;
-    const r = await as(t.app, maker).post(`/v1/together/${tid}/contributions`, { mediaId: video });
+    const r = await as(t.app, maker).post(`/v1/together/${tid}/items`, { items: [{ mediaId: video }] });
     expect(r.status).toBe(403);
     expect(r.body.error.code).toBe('recap_not_sendable');
     const once = (await db().query(`INSERT INTO media (owner_id, kind, url, status, private) VALUES ($1,'image','','ready',true) RETURNING id`, [maker.id]))
       .rows[0].id;
-    expect((await as(t.app, maker).post(`/v1/together/${tid}/contributions`, { mediaId: once })).status).toBe(404);
+    expect((await as(t.app, maker).post(`/v1/together/${tid}/items`, { items: [{ mediaId: once }] })).status).toBe(404);
   });
 });
 

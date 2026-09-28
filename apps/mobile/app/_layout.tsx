@@ -120,6 +120,8 @@ function Screens() {
         <Stack.Screen name="memories/[id]" options={{ title: t('memories.title') }} />
         <Stack.Screen name="together/index" options={{ title: t('m.together.title') }} />
         <Stack.Screen name="together/[id]" options={{ title: t('m.together.title') }} />
+        <Stack.Screen name="together/new" options={{ title: t('together.create.title') }} />
+        <Stack.Screen name="together/join/[code]" options={{ title: t('together.join.title') }} />
         <Stack.Screen name="live/index" options={{ title: t('m.live.title') }} />
         <Stack.Screen name="live/[id]" options={{ title: t('m.live.title') }} />
         <Stack.Screen name="assistant" options={{ title: t('m.title.assistant') }} />

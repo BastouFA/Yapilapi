@@ -78,6 +78,7 @@ import { createPushSender } from './lib/push.ts';
 import { securityMailer, setPushSender, setSecurityMailer, unsetSecurityMailer } from './lib/services.ts';
 import { processWebhooks } from './lib/webhooks.ts';
 import { processJobs } from './lib/jobs.ts';
+import { sweepTogethers } from './lib/together.ts';
 import { mediaJobHandlers } from './lib/media-processing.ts';
 import { studioJobHandlers } from './lib/studio.ts';
 import { editorJobHandlers } from './lib/media-edit.ts';
@@ -459,6 +460,8 @@ export async function buildApp(
       await endExpiredCampaigns(db, ctx.paymentProviders).catch((e) => app.log.warn({ err: e.message }, 'ad expiry'));
       // Time capsules whose date has come: tell the owner and contributors.
       await openDueChapters(db, ctx.realtime).catch((e) => app.log.warn({ err: e.message }, 'chapter capsules'));
+      // Together albums: close those whose time has come, and tell members an hour before and when they close.
+      await sweepTogethers({ db, realtime: ctx.realtime }).catch((e) => app.log.warn({ err: e.message }, 'together sweep'));
       // Once a minute: delete view-once files everyone has seen, 14-day-old ones and those of deleted messages.
       if (Date.now() - lastViewOnceSweep > 60_000) {
         lastViewOnceSweep = Date.now();

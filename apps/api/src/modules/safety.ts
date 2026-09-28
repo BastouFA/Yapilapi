@@ -41,6 +41,8 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       question: `SELECT asker_id AS uid FROM ask_questions WHERE id = $1 AND deleted_at IS NULL`,
       answer: `SELECT recipient_id AS uid FROM ask_questions WHERE id = $1 AND answered_at IS NOT NULL AND deleted_at IS NULL`,
       drop: `SELECT seller_id AS uid FROM drops WHERE id = $1 AND status <> 'draft' AND deleted_at IS NULL`,
+      // A photo or video in a Together album is the person who added it.
+      together_item: `SELECT user_id AS uid FROM together_contributions WHERE id = $1 AND deleted_at IS NULL`,
     };
     const r = await db.query(q[type]!, [id]);
     return r.rows[0]?.uid ?? null;
@@ -66,6 +68,15 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       if (!ok.rowCount) throw notFound('The item you reported');
     }
     if (input.targetType === 'answer' && !(await answerCards(db, [input.targetId], u.id)).length) throw notFound('The item you reported');
+    // Albums are for their members: only someone in it (who can see the item) can report what's in it.
+    if (input.targetType === 'together_item') {
+      const ok = await db.query(
+        `SELECT 1 FROM together_contributions c JOIN togethers t ON t.id = c.together_id AND t.deleted_at IS NULL
+         JOIN together_members m ON m.together_id = c.together_id AND m.user_id = $2 WHERE c.id = $1`,
+        [input.targetId, u.id],
+      );
+      if (!ok.rowCount) throw notFound('The item you reported');
+    }
     const report = await tx(db, async (c) => {
       const r = await c.query(
         `INSERT INTO reports (reporter_id, target_type, target_id, reason, details) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING id`,
@@ -118,9 +129,12 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
                              WHEN 'message' THEN (SELECT body FROM messages WHERE id = mc.target_id)
                              WHEN 'question' THEN (SELECT body FROM ask_questions WHERE id = mc.target_id)
                              WHEN 'answer' THEN (SELECT 'Q: ' || body || E'\nA: ' || coalesce(answer, '') FROM ask_questions WHERE id = mc.target_id)
+                             WHEN 'together_item' THEN (SELECT caption FROM together_contributions WHERE id = mc.target_id)
                              WHEN 'ad_campaign' THEN (SELECT p.body FROM ad_campaigns a JOIN posts p ON p.id = a.post_id WHERE a.id = mc.target_id) END AS excerpt,
          CASE WHEN mc.target_type = 'media' THEN (SELECT json_build_object('kind', m.kind, 'url', coalesce(m.variants->>'medium', m.poster_url, m.url), 'moderation', m.moderation)
-                                                    FROM media m WHERE m.id = mc.target_id) END AS media
+                                                    FROM media m WHERE m.id = mc.target_id)
+              WHEN mc.target_type = 'together_item' THEN (SELECT json_build_object('kind', m.kind, 'url', coalesce(m.variants->>'medium', m.poster_url, m.url), 'moderation', m.moderation)
+                                                    FROM together_contributions tc JOIN media m ON m.id = tc.media_id WHERE tc.id = mc.target_id) END AS media
        FROM moderation_cases mc LEFT JOIN profiles pr ON pr.user_id = mc.subject_user_id
        WHERE mc.status = $1 ORDER BY CASE mc.risk WHEN 'escalate' THEN 0 WHEN 'restrict' THEN 1 ELSE 2 END, mc.created_at LIMIT 100`,
       [q.status],
@@ -247,6 +261,8 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
           [mc.target_id],
         );
       if (mc.target_type === 'story') await c.query(`UPDATE moments SET deleted_at = coalesce(deleted_at, now()) WHERE id = $1`, [mc.target_id]);
+      if (mc.target_type === 'together_item')
+        await c.query(`UPDATE together_contributions SET deleted_at = coalesce(deleted_at, now()) WHERE id = $1`, [mc.target_id]);
       // A removed room or live ends now; its history stays for the case.
       if (mc.target_type === 'room')
         await c.query(`UPDATE rooms SET status = 'ended', ended_at = coalesce(ended_at, now()) WHERE id = $1 AND status IN ('scheduled', 'live')`, [

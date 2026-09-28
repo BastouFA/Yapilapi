@@ -1,97 +1,86 @@
 'use client';
 
-import { FeatureOff } from '@/components/FeatureOff';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Avatar, Badge, Button, Checkbox, EmptyState, TextField } from '@yapilapi/design-system';
-import type { PublicUser } from '@yapilapi/shared';
+import { EmptyState, Icon, Skeleton } from '@yapilapi/design-system';
+import type { TogetherSummary } from '@yapilapi/shared';
+import { FeatureOff } from '@/components/FeatureOff';
+import { AlbumCard } from '@/components/Together';
 import { api, errorMessage } from '@/lib/api';
-import { useSession } from '../../providers';
+import { useRealtime, useSession } from '../../providers';
 
+/** Together: the shared albums you're in, open ones first. Behind the REAL_TOGETHER flag. */
 export default function TogetherList() {
-  const { flags, me, toast } = useSession();
-  const router = useRouter();
-  const [items, setItems] = useState<Awaited<ReturnType<typeof api.together.list>>['items']>([]);
-  const [friends, setFriends] = useState<PublicUser[]>([]);
-  const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [title, setTitle] = useState('');
+  const { flags, me, t, toast } = useSession();
+  const [items, setItems] = useState<TogetherSummary[] | null>(null);
 
-  useEffect(() => {
-    if (!flags.REAL_TOGETHER || !me) return;
+  const load = () =>
     api.together.list().then(
       (r) => setItems(r.items),
-      () => {},
+      (e) => {
+        setItems((cur) => cur ?? []);
+        toast(errorMessage(e));
+      },
     );
-    api.raw.get<{ items: PublicUser[] }>(`/v1/users/${me.id}/friends`).then(
-      (r) => setFriends(r.items),
-      () => {},
-    );
-  }, [flags.REAL_TOGETHER, me]);
+  useEffect(() => {
+    if (flags.REAL_TOGETHER && me) void load();
+  }, [flags.REAL_TOGETHER, me]); // eslint-disable-line react-hooks/exhaustive-deps
+  useRealtime((e) => {
+    if (e.type === 'together.items' || e.type === 'together.updated' || e.type === 'together.requests') void load();
+  });
 
-  if (!flags.REAL_TOGETHER) return <FeatureOff name="Real Together" />;
+  if (!flags.REAL_TOGETHER) return <FeatureOff name="Together" />;
+  const open = items?.filter((a) => a.status === 'open') ?? [];
+  const closed = items?.filter((a) => a.status === 'closed') ?? [];
 
   return (
-    <div className="yp-shell__inner">
+    <div className="yp-shell__inner tg-page">
       <div className="yp-topbar">
-        <h1>Together</h1>
-      </div>
-      <p className="muted" style={{ margin: 0 }}>
-        One moment, everyone's view. Friends at the same place add what they see, and only the people in it can look.
-      </p>
-      <form
-        className="stack-sm yp-card"
-        style={{ padding: 16 }}
-        onSubmit={async (e) => {
-          e.preventDefault();
-          try {
-            const r = await api.together.create({ title, memberIds: [...picked] });
-            router.push(`/together/${r.together.id}`);
-          } catch (err) {
-            toast(errorMessage(err));
-          }
-        }}
-      >
-        <TextField label="What's the moment?" placeholder="Saturday football" value={title} onChange={(e) => setTitle(e.currentTarget.value)} maxLength={120} />
-        {friends.length ? (
-          <div className="stack-sm">
-            <span className="yp-field__label">Invite friends</span>
-            {friends.map((f) => (
-              <Checkbox
-                key={f.id}
-                label={
-                  <span className="row">
-                    <Avatar name={f.displayName} src={f.avatarUrl} size="sm" /> {f.displayName}
-                  </span>
-                }
-                checked={picked.has(f.id)}
-                onChange={(e) => {
-                  const on = e.currentTarget.checked;
-                  setPicked((s) => {
-                    const n = new Set(s);
-                    if (on) n.add(f.id);
-                    else n.delete(f.id);
-                    return n;
-                  });
-                }}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="muted">Add friends first to invite them.</p>
-        )}
-        <Button type="submit" disabled={!title.trim()}>
-          Start a Together
-        </Button>
-      </form>
-      {items.map((t) => (
-        <Link key={t.id} href={`/together/${t.id}`} className="yp-ccard">
-          <h3 className="yp-ccard__title">{t.title}</h3>
-          <span className="yp-ccard__meta">
-            {t.contributions} perspectives · {t.members} people {t.status === 'closed' ? <Badge tone="neutral">Closed</Badge> : null}
-          </span>
+        <h1>{t('together.title')}</h1>
+        <Link href="/together/new" className="yp-btn yp-btn--primary yp-btn--sm">
+          <Icon name="plus" /> {t('together.new')}
         </Link>
-      ))}
+      </div>
+      <p className="tg-intro">{t('together.intro')}</p>
+      {items === null ? (
+        <div className="stack-sm">
+          <Skeleton height={88} />
+          <Skeleton height={88} />
+        </div>
+      ) : items.length ? (
+        <>
+          {open.length ? (
+            <section className="tg-list" aria-labelledby="tg-open">
+              <h2 id="tg-open" className="tg-list__title">
+                {t('together.list.open')}
+              </h2>
+              {open.map((a) => (
+                <AlbumCard key={a.id} album={a} />
+              ))}
+            </section>
+          ) : null}
+          {closed.length ? (
+            <section className="tg-list" aria-labelledby="tg-closed">
+              <h2 id="tg-closed" className="tg-list__title">
+                {t('together.list.closed')}
+              </h2>
+              {closed.map((a) => (
+                <AlbumCard key={a.id} album={a} />
+              ))}
+            </section>
+          ) : null}
+        </>
+      ) : (
+        <EmptyState
+          title={t('together.empty')}
+          body={t('together.emptyBody')}
+          action={
+            <Link href="/together/new" className="yp-btn yp-btn--primary">
+              {t('together.new')}
+            </Link>
+          }
+        />
+      )}
     </div>
   );
 }
