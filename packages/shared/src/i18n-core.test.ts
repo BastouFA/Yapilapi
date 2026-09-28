@@ -6,7 +6,10 @@ import { en } from './locales/en.ts';
 
 describe('languages loaded on demand', () => {
   it('has a loader for every catalog in locales/', () => {
-    const files = readdirSync(new URL('./locales/', import.meta.url)).map((f) => f.replace(/\.ts$/, ''));
+    // The files, not locales/errors/ (the API's error messages, which only the API loads).
+    const files = readdirSync(new URL('./locales/', import.meta.url))
+      .filter((f) => f.endsWith('.ts'))
+      .map((f) => f.replace(/\.ts$/, ''));
     expect([...SUPPORTED_LOCALES].sort()).toEqual(files.sort());
   });
 
