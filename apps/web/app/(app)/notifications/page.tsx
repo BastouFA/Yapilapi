@@ -3,78 +3,91 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Avatar, Button, EmptyState, List, ListItem, Skeleton } from '@yapilapi/design-system';
-import { echoNoticeText, formatRelativeTime, reportOutcomeText, togetherNoticeText, type NotificationItem } from '@yapilapi/shared';
+import { echoNoticeText, formatRelativeTime, reportOutcomeText, togetherNoticeText, type MessageKey, type NotificationItem } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { useRealtime, useSession, type Session } from '../../providers';
 
-const TEXT: Record<string, (n: NotificationItem) => string> = {
-  follow: () => 'started following you',
-  friend_request: () => 'sent you a friend request',
-  friend_accepted: () => 'accepted your friend request',
-  post_reaction: () => 'liked your post',
-  post_comment: () => 'commented on your post',
-  post_repost: () => 'reposted your post',
-  reel_duet: () => 'made a duet with your reel',
-  reel_remix: () => 'remixed your reel',
-  post_mention: () => 'mentioned you in a post',
-  comment_mention: () => 'mentioned you in a comment',
-  story_mention: () => 'mentioned you in their story. You can add it to yours.',
-  story_reshare: () => 'added your story to theirs',
-  story_countdown: (n) => `The countdown “${String(n.data.title ?? '')}” has ended`,
-  join_request: () => 'asked to join your community',
-  join_approved: () => 'approved your request to join',
-  event_rsvp: () => 'is going to your event',
-  event_cancelled: () => 'cancelled an event you were going to',
-  event_updated: () => "changed the time or place of an event you're going to",
-  order_paid: () => 'paid for an order',
-  enforcement: (n) => `A moderator took action on your content (${String(n.data.decision).replace('_', ' ')}). You can appeal from Settings.`,
-  tip_received: () => 'sent you a tip',
-  subscription_started: () => 'subscribed to you',
-  invite_joined: () => 'joined YAPILAPI with your invite',
-  plus_referral_reward: (n) => `You have ${Number(n.data.days ?? 30)} more days of YAPILAPI Plus, thanks to friends you invited.`,
-  live_started: () => 'is live now',
-  room_live: (n) => `started the room “${String(n.data.title ?? '')}” you asked about`,
-  booking_request: () => 'asked to book',
-  booking_decided: () => 'Your booking was updated',
-  call_incoming: () => 'called you',
-  together_invite: () => 'invited you to a Together',
-  collab_invite: () => 'invited you to co-author a post',
-  collab_accepted: () => 'accepted your invite to co-author your post',
-  photo_tag: () => 'tagged you in a photo',
-  family_invite: () => 'asked to supervise your account. You can accept or decline in Settings.',
-  family_accepted: () => 'accepted your family link',
-  family_ended: () => 'ended your family link',
-  family_controls_changed: () => 'changed your family settings',
-  ad_approved: (n) => `Your ad "${String(n.data.name ?? '')}" was approved and is running.`,
-  ad_rejected: (n) => `Your ad "${String(n.data.name ?? '')}" wasn't approved: ${String(n.data.note ?? 'see Studio for details')}`,
-  mfa_enabled: () => 'Two-step verification was turned on for your account.',
-  mfa_disabled: () => 'Two-step verification was turned off for your account.',
-  mfa_recovery_code_used: () => 'A recovery code was used to sign in to your account.',
-  passkey_added: () => 'A passkey was added to your account.',
-  media_blocked: () =>
-    'A photo or video you shared looks like it goes against our community rules, so it isn’t shown for now. Someone on our team will check it, and we’ll let you know.',
-  media_restored: () => 'We checked your photo or video and it’s back up. Sorry for the trouble.',
-  yap_received: () => 'sent you a Yap',
-  view_once_screenshot: () => 'took a screenshot of your view-once photo or video',
-  chat_reminder: () => 'You asked to be reminded about a message in a chat.',
-  scheduled_post_failed: (n) => `A scheduled post couldn't be published, so it's back in your drafts. ${String(n.data.reason ?? '')}`.trim(),
-  account_limited: () =>
-    'Some of your recent posts or messages were flagged, so your account is limited while our team takes a look. You can still post for yourself and message friends.',
-  chapter_invite: (n) => `invited you to add your stories to the chapter "${String(n.data.title ?? '')}"`,
-  board_invite: (n) => `invited you to add to the board “${String(n.data.name ?? '')}”`,
-  board_item_added: (n) => {
-    const count = Number(n.data.count ?? 1);
-    return `added ${count === 1 ? '1 post' : `${count} posts`} to “${String(n.data.name ?? '')}”`;
-  },
-  chapter_opened: (n) => `The time capsule "${String(n.data.title ?? '')}" has opened.`,
-  recap_ready: (n) => `Your recap video “${String(n.data.title ?? '')}” is ready.`,
-  recap_failed: (n) => `We couldn't make your recap video “${String(n.data.title ?? '')}”.`,
-  account_review: (n) =>
-    n.data.outcome === 'cleared'
-      ? 'We reviewed your account and lifted the limit. Held posts and messages are now shared.'
-      : 'We reviewed your account. It stays limited for now. You can see decisions and appeal from Settings.',
+/**
+ * Whole sentences for each kind of notification, in the viewer's language. `name` is who did it
+ * (for grouped rows, "Ada, Tunde and 2 others"); a notification about your own account ignores it.
+ */
+type TextFn = (n: NotificationItem, name: string, t: Session['t'], tp: Session['tp']) => string;
+const TEXT: Record<string, TextFn> = {
+  follow: (_n, name, t) => t('m.notif.group.follow', { names: name }),
+  friend_request: (_n, name, t) => t('m.notif.friendRequest', { name }),
+  friend_accepted: (_n, name, t) => t('m.notif.friendAccepted', { name }),
+  post_reaction: (_n, name, t) => t('m.notif.group.like', { names: name }),
+  post_comment: (_n, name, t) => t('m.notif.group.comment', { names: name }),
+  post_repost: (_n, name, t) => t('m.notif.group.repost', { names: name }),
+  reel_duet: (_n, name, t) => t('m.notif.reelDuet', { name }),
+  reel_remix: (_n, name, t) => t('m.notif.reelRemix', { name }),
+  post_mention: (_n, name, t) => t('m.notif.postMention', { name }),
+  comment_mention: (_n, name, t) => t('m.notif.commentMention', { name }),
+  story_mention: (_n, name, t) => t('notifList.storyMention', { name }),
+  story_reshare: (_n, name, t) => t('m.notif.storyReshare', { name }),
+  story_countdown: (n, _name, t) => t('m.notif.countdownEnded', { title: String(n.data.title ?? '') }),
+  join_request: (_n, name, t) => t('m.notif.joinRequest', { name }),
+  join_approved: (_n, name, t) => t('m.notif.joinApproved', { name }),
+  event_rsvp: (_n, name, t) => t('m.notif.eventRsvp', { name }),
+  event_cancelled: (_n, name, t) => t('m.notif.eventCancelled', { name }),
+  event_updated: (_n, name, t) => t('m.notif.eventUpdated', { name }),
+  order_paid: (_n, name, t) => t('m.notif.orderPaid', { name }),
+  enforcement: (n, _name, t) => t('notifList.enforcement', { decision: decisionLabel(n.data.decision, t) }),
+  tip_received: (_n, name, t) => t('m.notif.tip', { name }),
+  subscription_started: (_n, name, t) => t('m.notif.subscribed', { name }),
+  invite_joined: (_n, name, t) => t('m.notif.inviteJoined', { name }),
+  plus_referral_reward: (n, _name, _t, tp) => tp('m.notif.plusReward', Number(n.data.days ?? 30)),
+  live_started: (_n, name, t) => t('m.notif.liveStarted', { name }),
+  room_live: (n, name, t) => t('notifList.roomLive', { name, title: String(n.data.title ?? '') }),
+  booking_request: (_n, name, t) => t('m.notif.bookingRequest', { name }),
+  booking_decided: (_n, _name, t) => t('m.notif.bookingDecided'),
+  call_incoming: (_n, name, t) => t('m.notif.called', { name }),
+  together_invite: (_n, name, t) => t('m.notif.togetherInvite', { name }),
+  collab_invite: (_n, name, t) => t('m.notif.collabInvite', { name }),
+  collab_accepted: (_n, name, t) => t('m.notif.collabAccepted', { name }),
+  photo_tag: (_n, name, t) => t('m.notif.photoTag', { name }),
+  family_invite: (_n, name, t) => t('notifList.familyInvite', { name }),
+  family_accepted: (_n, name, t) => t('m.notif.familyAccepted', { name }),
+  family_ended: (_n, name, t) => t('m.notif.familyEnded', { name }),
+  family_controls_changed: (_n, name, t) => t('m.notif.familyChanged', { name }),
+  ad_approved: (n, _name, t) => t('m.notif.adApproved', { title: String(n.data.name ?? '') }),
+  ad_rejected: (n, _name, t) =>
+    n.data.note
+      ? t('notifList.adRejected', { title: String(n.data.name ?? ''), note: String(n.data.note) })
+      : t('notifList.adRejectedNoNote', { title: String(n.data.name ?? '') }),
+  mfa_enabled: (_n, _name, t) => t('m.notif.mfaOn'),
+  mfa_disabled: (_n, _name, t) => t('m.notif.mfaOff'),
+  mfa_recovery_code_used: (_n, _name, t) => t('m.notif.recoveryCodeUsed'),
+  passkey_added: (_n, _name, t) => t('m.notif.passkeyAdded'),
+  media_blocked: (_n, _name, t) => t('notifList.mediaBlocked'),
+  media_restored: (_n, _name, t) => t('notifList.mediaRestored'),
+  yap_received: (_n, name, t) => t('m.notif.yap', { name }),
+  view_once_screenshot: (_n, name, t) => t('m.notif.viewOnceScreenshot', { name }),
+  chat_reminder: (_n, _name, t) => t('m.notif.chatReminder'),
+  // The reason, when there is one, comes from the server as its own sentence.
+  scheduled_post_failed: (n, _name, t) => `${t('m.notif.scheduledFailed')} ${String(n.data.reason ?? '')}`.trim(),
+  account_limited: (_n, _name, t) => t('notifList.accountLimited'),
+  chapter_invite: (n, name, t) => t('m.notif.chapterInvite', { name, title: String(n.data.title ?? '') }),
+  board_invite: (n, name, t) => t('m.notif.boardInvite', { name, board: String(n.data.name ?? '') }),
+  board_item_added: (n, name, _t, tp) => tp('m.notif.boardItemAdded', Number(n.data.count ?? 1), { name, board: String(n.data.name ?? '') }),
+  chapter_opened: (n, _name, t) => t('m.notif.capsuleOpened', { title: String(n.data.title ?? '') }),
+  recap_ready: (n, _name, t) => t('notifList.recapReady', { title: String(n.data.title ?? '') }),
+  recap_failed: (n, _name, t) => t('notifList.recapFailed', { title: String(n.data.title ?? '') }),
+  account_review: (n, _name, t) => (n.data.outcome === 'cleared' ? t('notifList.reviewCleared') : t('notifList.reviewLimited')),
 };
+
+/** A moderation decision in plain words (the server sends a code like `suspend_user`). */
+const DECISIONS: Record<string, MessageKey> = {
+  no_action: 'notifList.decision.noAction',
+  restrict: 'notifList.decision.restrict',
+  remove: 'notifList.decision.remove',
+  suspend_user: 'notifList.decision.suspendUser',
+};
+function decisionLabel(decision: unknown, t: Session['t']): string {
+  const key = DECISIONS[String(decision)];
+  return key ? t(key) : String(decision ?? '').replace(/_/g, ' ');
+}
 
 function hrefFor(n: NotificationItem, meUsername?: string): string | undefined {
   if (n.type === 'new_sign_in') return '/settings/security?review=sign-in';
@@ -172,14 +185,16 @@ function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): s
 const GROUPED = new Set(['post_reaction', 'post_comment', 'post_repost', 'follow']);
 
 type Group = { key: string; items: NotificationItem[] };
+type Bucket = 'today' | 'thisWeek' | 'earlier';
+const BUCKET_TITLE: Record<Bucket, MessageKey> = { today: 'm.notif.today', thisWeek: 'm.notif.thisWeek', earlier: 'm.notif.earlier' };
 
-function bucket(iso: string): 'Today' | 'This week' | 'Earlier' {
+function bucket(iso: string): Bucket {
   const age = Date.now() - new Date(iso).getTime();
-  return age < 86_400_000 ? 'Today' : age < 7 * 86_400_000 ? 'This week' : 'Earlier';
+  return age < 86_400_000 ? 'today' : age < 7 * 86_400_000 ? 'thisWeek' : 'earlier';
 }
 
-function group(items: NotificationItem[]): { title: string; groups: Group[] }[] {
-  const sections: { title: string; groups: Group[] }[] = [];
+function group(items: NotificationItem[]): { title: Bucket; groups: Group[] }[] {
+  const sections: { title: Bucket; groups: Group[] }[] = [];
   for (const n of items) {
     const title = bucket(n.createdAt);
     let section = sections.at(-1);
@@ -192,12 +207,11 @@ function group(items: NotificationItem[]): { title: string; groups: Group[] }[] 
   return sections;
 }
 
-function names(g: Group): string {
+function names(g: Group, t: Session['t'], tp: Session['tp']): string {
   const people = [...new Map(g.items.filter((n) => n.actor).map((n) => [n.actor!.id, n.actor!.displayName])).values()];
-  if (people.length <= 1) return people[0] ?? '';
-  if (people.length === 2) return `${people[0]} and ${people[1]}`;
-  const others = people.length - 2;
-  return `${people[0]}, ${people[1]} and ${others} ${others === 1 ? 'other' : 'others'}`;
+  if (people.length <= 1) return people[0] ?? t('m.calls.someone');
+  if (people.length === 2) return t('m.notif.names.two', { first: people[0]!, second: people[1]! });
+  return tp('m.notif.names.many', people.length - 2, { first: people[0]!, second: people[1]! });
 }
 
 export default function Notifications() {
@@ -255,7 +269,7 @@ export default function Notifications() {
             setItems((cur) => cur?.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })) ?? cur);
           }}
         >
-          Mark all read
+          {t('notifList.markAllRead')}
         </Button>
       </div>
       {items === null ? (
@@ -265,7 +279,7 @@ export default function Notifications() {
           {group(items).map((section) => (
             <section key={section.title} className="stack-sm" aria-labelledby={`n-${section.title}`}>
               <h2 id={`n-${section.title}`} className="section-title">
-                {section.title}
+                {t(BUCKET_TITLE[section.title])}
               </h2>
               <List>
                 {section.groups.map((g) => {
@@ -276,12 +290,12 @@ export default function Notifications() {
                   const batched = batchedText(n, t, tp);
                   const text = (
                     <span style={{ fontWeight: unread ? 600 : 400, whiteSpace: 'normal' }}>
-                      {batched ?? (
-                        <>
-                          {n.actor && n.type !== 'enforcement' && n.type !== 'story_countdown' ? `${names(g)} ` : ''}
-                          {(TEXT[n.type] ?? (() => n.type.replace(/_/g, ' ')))(n)}
-                        </>
-                      )}
+                      {batched ??
+                        (TEXT[n.type]
+                          ? TEXT[n.type]!(n, names(g, t, tp), t, tp)
+                          : n.actor
+                            ? t('m.notif.other', { name: names(g, t, tp) })
+                            : t('m.notif.otherNoActor'))}
                     </span>
                   );
                   const start = actors.length ? (
@@ -294,7 +308,7 @@ export default function Notifications() {
                   const when = (
                     <>
                       {formatRelativeTime(n.createdAt, locale)}
-                      {unread ? <span className="yp-unread" aria-label="Unread" style={{ minWidth: 8, height: 8, padding: 0 }} /> : null}
+                      {unread ? <span className="yp-unread" aria-label={t('m.notif.unread')} style={{ minWidth: 8, height: 8, padding: 0 }} /> : null}
                     </>
                   );
                   if (n.type === 'collab_invite' && n.entityId) {
@@ -313,15 +327,15 @@ export default function Notifications() {
                         end={
                           outcome ? (
                             <span className="muted" role="status">
-                              {outcome === 'accepted' ? "You're a co-author now" : 'Declined'}
+                              {outcome === 'accepted' ? t('m.collab.acceptedNote') : t('postList.collabDeclined')}
                             </span>
                           ) : (
                             <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
                               <Button size="sm" loading={answering === postId} disabled={!!answering} onClick={() => answer(postId, true)}>
-                                Accept
+                                {t('m.common.accept')}
                               </Button>
                               <Button size="sm" variant="ghost" disabled={!!answering} onClick={() => answer(postId, false)}>
-                                Decline
+                                {t('m.common.decline')}
                               </Button>
                             </span>
                           )
@@ -345,15 +359,15 @@ export default function Notifications() {
                         end={
                           outcome ? (
                             <span className="muted" role="status">
-                              {outcome === 'accepted' ? 'You can add to it now' : 'Declined'}
+                              {outcome === 'accepted' ? t('notifList.boardJoined') : t('postList.collabDeclined')}
                             </span>
                           ) : (
                             <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
                               <Button size="sm" loading={answering === boardId} disabled={!!answering} onClick={() => answerBoard(boardId, true)}>
-                                Accept
+                                {t('m.common.accept')}
                               </Button>
                               <Button size="sm" variant="ghost" disabled={!!answering} onClick={() => answerBoard(boardId, false)}>
-                                Decline
+                                {t('m.common.decline')}
                               </Button>
                             </span>
                           )
@@ -378,7 +392,7 @@ export default function Notifications() {
                             setFollowed((f) => new Set(f).add(actors[0]!.id));
                             try {
                               await api.users.follow(actors[0]!.id);
-                              toast(`You follow ${actors[0]!.displayName} now`);
+                              toast(t('m.notif.nowFollowing', { name: actors[0]!.displayName }));
                             } catch (e) {
                               setFollowed((f) => {
                                 const next = new Set(f);
@@ -389,7 +403,7 @@ export default function Notifications() {
                             }
                           }}
                         >
-                          Follow back
+                          {t('m.notif.followBack')}
                         </Button>
                       }
                     />
@@ -402,7 +416,7 @@ export default function Notifications() {
           ))}
         </div>
       ) : (
-        <EmptyState title="You're all caught up" body="Likes, comments, follows and event updates show up here." />
+        <EmptyState title={t('m.notif.caughtUp')} body={t('m.notif.caughtUpBody')} />
       )}
     </div>
   );

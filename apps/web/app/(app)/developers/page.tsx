@@ -2,16 +2,23 @@
 
 import { useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card, Checkbox, EmptyState, List, ListItem, TextField } from '@yapilapi/design-system';
-import { formatRelativeTime } from '@yapilapi/shared';
+import { formatRelativeTime, type MessageKey } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { useSession } from '../../providers';
+
+/** Webhook delivery states from the server; anything else shows as it comes. */
+const DELIVERY_STATUS = {
+  pending: 'dev.deliveries.pending',
+  delivered: 'dev.deliveries.delivered',
+  failed: 'dev.deliveries.failed',
+} as const satisfies Record<string, MessageKey>;
 
 type App = Awaited<ReturnType<typeof api.developer.apps>>['items'][number];
 
 /** Developer console: apps, API keys, webhooks and delivery logs. */
 export default function Developers() {
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   const [apps, setApps] = useState<App[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -27,11 +34,10 @@ export default function Developers() {
   return (
     <div className="yp-shell__inner yp-shell__inner--wide">
       <div className="yp-topbar">
-        <h1>Developers</h1>
+        <h1>{t('settings.dev.title')}</h1>
       </div>
       <p className="muted" style={{ margin: 0 }}>
-        API keys act as you. Read keys can only fetch; write keys can post and change things. Keys can never manage your account, other keys, exports or
-        payouts.
+        {t('dev.intro')}
       </p>
       <form
         className="row"
@@ -47,9 +53,9 @@ export default function Developers() {
           }
         }}
       >
-        <TextField label="New app name" value={name} onChange={(e) => setName(e.currentTarget.value)} maxLength={60} style={{ minWidth: 240 }} />
+        <TextField label={t('dev.newAppName')} value={name} onChange={(e) => setName(e.currentTarget.value)} maxLength={60} style={{ minWidth: 240 }} />
         <Button type="submit" disabled={!name.trim()} style={{ alignSelf: 'flex-end' }}>
-          Create app
+          {t('dev.createApp')}
         </Button>
       </form>
       {apps?.length ? (
@@ -71,7 +77,7 @@ export default function Developers() {
           ) : null}
         </>
       ) : apps ? (
-        <EmptyState title="No apps yet" body="Create an app to get API keys and webhooks." />
+        <EmptyState title={t('dev.noApps.title')} body={t('dev.noApps.body')} />
       ) : null}
     </div>
   );
@@ -100,21 +106,18 @@ function AppDetail({ appId, initialRedirects, onDeleted }: { appId: string; init
     <div className="stack">
       {secret ? (
         <Alert tone="warning" title={secret.label} onDismiss={() => setSecret(null)} locale={locale}>
-          Copy it now. It won't be shown again.
+          {t('dev.secret.copyNow')}
           <pre style={{ fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: '8px 0' }}>{secret.value}</pre>
-          <Button size="sm" variant="secondary" onClick={async () => toast((await copyText(secret.value)) ? 'Copied' : t('common.copyFailed'))}>
-            Copy
+          <Button size="sm" variant="secondary" onClick={async () => toast((await copyText(secret.value)) ? t('dev.copied') : t('common.copyFailed'))}>
+            {t('dev.copy')}
           </Button>
         </Alert>
       ) : null}
 
-      <Card
-        title="Sign in with YAPILAPI (OAuth)"
-        subtitle="Authorization code flow with PKCE. Client ID is the app ID below. Redirect addresses must match exactly."
-      >
+      <Card title={t('dev.oauth.title')} subtitle={t('dev.oauth.subtitle')}>
         <div className="stack-sm">
           <code style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>client_id = {appId}</code>
-          <TextField label="Redirect addresses (one per line)" multiline value={redirects} onChange={(e) => setRedirects(e.currentTarget.value)} />
+          <TextField label={t('dev.oauth.redirects')} multiline value={redirects} onChange={(e) => setRedirects(e.currentTarget.value)} />
           <Button
             size="sm"
             onClick={async () => {
@@ -127,17 +130,17 @@ function AppDetail({ appId, initialRedirects, onDeleted }: { appId: string; init
                     .filter(Boolean),
                 );
                 setRedirects(r.redirectUris.join('\n'));
-                toast('Redirect addresses saved');
+                toast(t('dev.oauth.saved'));
               } catch (err) {
                 toast(errorMessage(err));
               }
             }}
           >
-            Save redirect addresses
+            {t('dev.oauth.save')}
           </Button>
         </div>
       </Card>
-      <Card title="API keys" subtitle="Send as: Authorization: Bearer <key>">
+      <Card title={t('dev.keys.title')} subtitle={t('dev.keys.subtitle', { header: 'Authorization: Bearer <key>' })}>
         <div className="stack-sm">
           {keys.length ? (
             <List>
@@ -149,13 +152,17 @@ function AppDetail({ appId, initialRedirects, onDeleted }: { appId: string; init
                       {k.name} <code style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{k.prefix}_…</code>
                     </>
                   }
-                  secondary={`${k.scopes.join(' + ')} · ${k.last_used_at ? `used ${formatRelativeTime(k.last_used_at, locale)}` : 'never used'}`}
+                  secondary={`${k.scopes.join(' + ')} · ${k.last_used_at ? t('settings.passkeys.used', { time: formatRelativeTime(k.last_used_at, locale) }) : t('dev.keys.neverUsed')}`}
                   end={
                     k.revoked_at ? (
-                      <Badge tone="neutral">Revoked</Badge>
+                      <Badge tone="neutral">{t('dev.keys.revoked')}</Badge>
                     ) : (
-                      <Button size="sm" variant="ghost" onClick={async () => (await api.developer.revokeKey(appId, k.id), await load(), toast('Key revoked'))}>
-                        Revoke
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={async () => (await api.developer.revokeKey(appId, k.id), await load(), toast(t('dev.keys.revokedToast')))}
+                      >
+                        {t('dev.keys.revoke')}
                       </Button>
                     )
                   }
@@ -169,7 +176,7 @@ function AppDetail({ appId, initialRedirects, onDeleted }: { appId: string; init
               e.preventDefault();
               try {
                 const r = await api.developer.createKey(appId, { name: keyName, scopes: write ? ['read', 'write'] : ['read'] });
-                setSecret({ label: 'Your new API key', value: r.secret });
+                setSecret({ label: t('dev.keys.newSecret'), value: r.secret });
                 setKeyName('');
                 await load();
               } catch (err) {
@@ -177,16 +184,19 @@ function AppDetail({ appId, initialRedirects, onDeleted }: { appId: string; init
               }
             }}
           >
-            <TextField label="Key name" value={keyName} onChange={(e) => setKeyName(e.currentTarget.value)} maxLength={60} />
-            <Checkbox label="Allow writes" checked={write} onChange={(e) => setWrite(e.currentTarget.checked)} />
+            <TextField label={t('dev.keys.name')} value={keyName} onChange={(e) => setKeyName(e.currentTarget.value)} maxLength={60} />
+            <Checkbox label={t('dev.keys.allowWrites')} checked={write} onChange={(e) => setWrite(e.currentTarget.checked)} />
             <Button type="submit" size="sm" disabled={!keyName.trim()}>
-              Create key
+              {t('dev.keys.create')}
             </Button>
           </form>
         </div>
       </Card>
 
-      <Card title="Webhooks" subtitle="We POST signed JSON. Verify x-yapilapi-signature: t=<time>,v1=HMAC-SHA256(secret, t + '.' + body).">
+      <Card
+        title={t('dev.hooks.title')}
+        subtitle={t('dev.hooks.subtitle', { header: "x-yapilapi-signature: t=<time>,v1=HMAC-SHA256(secret, t + '.' + body)" })}
+      >
         <div className="stack-sm">
           {hooks?.items
             .filter((h) => h.active)
@@ -199,12 +209,12 @@ function AppDetail({ appId, initialRedirects, onDeleted }: { appId: string; init
                   <Button
                     size="sm"
                     variant="secondary"
-                    onClick={async () => (await api.developer.ping(appId, h.id), toast('Test event queued'), setTimeout(load, 6000))}
+                    onClick={async () => (await api.developer.ping(appId, h.id), toast(t('dev.hooks.testQueued')), setTimeout(load, 6000))}
                   >
-                    Send test
+                    {t('dev.hooks.sendTest')}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={async () => (await api.developer.deleteWebhook(appId, h.id), await load())}>
-                    Remove
+                    {t('m.common.remove')}
                   </Button>
                 </span>
               </div>
@@ -215,7 +225,7 @@ function AppDetail({ appId, initialRedirects, onDeleted }: { appId: string; init
               e.preventDefault();
               try {
                 const r = await api.developer.createWebhook(appId, url, events);
-                setSecret({ label: 'Webhook signing secret', value: r.secret });
+                setSecret({ label: t('dev.hooks.secret'), value: r.secret });
                 setUrl('');
                 await load();
               } catch (err) {
@@ -223,7 +233,7 @@ function AppDetail({ appId, initialRedirects, onDeleted }: { appId: string; init
               }
             }}
           >
-            <TextField label="Endpoint URL" placeholder="https://example.com/yapilapi" value={url} onChange={(e) => setUrl(e.currentTarget.value)} />
+            <TextField label={t('dev.hooks.url')} placeholder="https://example.com/yapilapi" value={url} onChange={(e) => setUrl(e.currentTarget.value)} />
             <div className="row">
               {hooks?.events
                 .filter((ev) => ev !== 'ping')
@@ -237,7 +247,7 @@ function AppDetail({ appId, initialRedirects, onDeleted }: { appId: string; init
                 ))}
             </div>
             <Button type="submit" size="sm" disabled={!url || !events.length}>
-              Add webhook
+              {t('dev.hooks.add')}
             </Button>
           </form>
           {hooks?.deliveries.length ? (
@@ -245,11 +255,11 @@ function AppDetail({ appId, initialRedirects, onDeleted }: { appId: string; init
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Event</th>
-                    <th>Status</th>
-                    <th>Attempts</th>
-                    <th>Response</th>
-                    <th>When</th>
+                    <th>{t('dev.deliveries.event')}</th>
+                    <th>{t('dev.deliveries.status')}</th>
+                    <th>{t('dev.deliveries.attempts')}</th>
+                    <th>{t('dev.deliveries.response')}</th>
+                    <th>{t('dev.deliveries.when')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -257,7 +267,9 @@ function AppDetail({ appId, initialRedirects, onDeleted }: { appId: string; init
                     <tr key={d.id}>
                       <td>{d.event}</td>
                       <td>
-                        <Badge tone={d.status === 'delivered' ? 'success' : d.status === 'failed' ? 'danger' : 'warning'}>{d.status}</Badge>
+                        <Badge tone={d.status === 'delivered' ? 'success' : d.status === 'failed' ? 'danger' : 'warning'}>
+                          {d.status in DELIVERY_STATUS ? t(DELIVERY_STATUS[d.status as keyof typeof DELIVERY_STATUS]) : d.status}
+                        </Badge>
                       </td>
                       <td>{d.attempts}</td>
                       <td>{d.response_code ?? '—'}</td>
@@ -276,11 +288,11 @@ function AppDetail({ appId, initialRedirects, onDeleted }: { appId: string; init
         size="sm"
         onClick={async () => {
           await api.developer.deleteApp(appId);
-          toast('App deleted and its keys revoked');
+          toast(t('dev.appDeleted'));
           onDeleted();
         }}
       >
-        Delete app
+        {t('dev.deleteApp')}
       </Button>
     </div>
   );

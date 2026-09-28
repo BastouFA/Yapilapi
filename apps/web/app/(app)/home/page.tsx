@@ -46,12 +46,12 @@ export default function Home() {
           </Link>
           {flags.REAL ? (
             <Link href="/real" className="yp-btn yp-btn--ghost yp-btn--sm">
-              Real
+              {t('m.title.real')}
             </Link>
           ) : null}
           {flags.REAL_TOGETHER ? (
             <Link href="/together" className="yp-btn yp-btn--ghost yp-btn--sm">
-              Together
+              {t('together.title')}
             </Link>
           ) : null}
           <Link
@@ -81,7 +81,7 @@ export default function Home() {
       <FollowingDrops />
 
       <Segments
-        label="Feed"
+        label={t('m.feed.label')}
         value={mode}
         onChange={setMode}
         options={(['for_you', 'following', 'friends', 'communities', 'local'] as FeedMode[]).map((m) => ({ id: m, label: t(`feed.${m}`) }))}

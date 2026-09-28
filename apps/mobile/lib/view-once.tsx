@@ -1,14 +1,14 @@
 import { File, Paths } from 'expo-file-system';
 import * as ScreenCapture from 'expo-screen-capture';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Message } from '../../../packages/shared/src/types';
 import { client, errorMessage, getToken, mediaUrl } from './api';
 import { useT } from './i18n';
 import { space } from './theme';
-import { Icon, userText } from './ui';
+import { Icon, useScreenFocused, userText } from './ui';
 
 const EXT: Record<string, string> = {
   'image/png': 'png',
@@ -121,6 +121,14 @@ function Viewer({ message, uri, kind, onClose }: { message: Message; uri: string
   const { t } = useT();
   const insets = useSafeAreaInsets();
   const [shot, setShot] = useState(false);
+  // Another screen coming on top (a notification tapped) ends the viewing, as closing it does,
+  // rather than leaving it over the screen that opened.
+  const focused = useScreenFocused();
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    if (!focused) closeRef.current();
+  }, [focused]);
 
   useEffect(() => {
     const key = `view-once-${message.id}`;

@@ -3,18 +3,18 @@
 import { useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card, List, ListItem, Select, TextField } from '@yapilapi/design-system';
 import type { AdCampaign } from '@yapilapi/api-client';
-import { formatMoney, type Post } from '@yapilapi/shared';
+import { formatMoney, type MessageKey, type Post } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 import { useCheckout } from './Checkout';
 
-const STATUS_LABEL: Record<AdCampaign['status'], string> = {
-  active: 'Running',
-  draft: 'Draft',
-  pending_review: 'In review',
-  paused: 'Paused',
-  ended: 'Ended',
-  rejected: 'Not approved',
+const STATUS_LABEL: Record<AdCampaign['status'], MessageKey> = {
+  active: 'm.boost.status.active',
+  draft: 'm.drafts.draft',
+  pending_review: 'm.boost.status.pending_review',
+  paused: 'm.boost.status.paused',
+  ended: 'm.boost.status.ended',
+  rejected: 'm.boost.status.rejected',
 };
 
 const STATUS_TONE: Record<AdCampaign['status'], 'success' | 'neutral' | 'warning' | 'danger'> = {
@@ -31,7 +31,7 @@ const STATUS_TONE: Record<AdCampaign['status'], 'success' | 'neutral' | 'warning
  * is charged at your CPM. Ads only reach adults who turned advertising on.
  */
 export function Campaigns() {
-  const { me, toast, locale, flags } = useSession();
+  const { me, toast, locale, flags, t, tp } = useSession();
   const checkout = useCheckout();
   const [items, setItems] = useState<AdCampaign[] | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -75,7 +75,7 @@ export function Campaigns() {
   };
 
   return (
-    <Card title="Promote" subtitle="Sponsored posts are labelled, reach only adults who turned advertising on, and can always be hidden.">
+    <Card title={t('ads.promote')} subtitle={t('ads.promoteBody')}>
       <div className="stack">
         {items.length ? (
           <List>
@@ -88,16 +88,22 @@ export function Campaigns() {
                 }}
                 primary={
                   <span className="row">
-                    {c.name} <Badge tone={STATUS_TONE[c.status]}>{STATUS_LABEL[c.status]}</Badge>
+                    {c.name} <Badge tone={STATUS_TONE[c.status]}>{t(STATUS_LABEL[c.status])}</Badge>
                   </span>
                 }
-                secondary={`${c.impressions.toLocaleString(locale)} impressions · ${c.clicks} clicks · ${c.ctr}% · ${formatMoney(c.spentCents, c.currency, locale)} of ${formatMoney(c.budgetCents, c.currency, locale)}${c.refundedCents ? ` · ${formatMoney(c.refundedCents, c.currency, locale)} refunded` : ''}`}
+                secondary={[
+                  tp('ads.impressions', c.impressions, { number: c.impressions.toLocaleString(locale) }),
+                  tp('ads.clicks', c.clicks, { number: c.clicks.toLocaleString(locale) }),
+                  `${c.ctr}%`,
+                  t('m.boost.spentOf', { spent: formatMoney(c.spentCents, c.currency, locale), budget: formatMoney(c.budgetCents, c.currency, locale) }),
+                  ...(c.refundedCents ? [t('m.boost.refunded', { amount: formatMoney(c.refundedCents, c.currency, locale) })] : []),
+                ].join(' · ')}
               />
             ))}
           </List>
         ) : (
           <p className="muted" style={{ margin: 0 }}>
-            No campaigns yet.
+            {t('ads.none')}
           </p>
         )}
 
@@ -106,18 +112,26 @@ export function Campaigns() {
             <strong>{stats.campaign.name}</strong>
             {stats.campaign.status === 'pending_review' ? (
               <p className="muted" style={{ margin: 0 }}>
-                A moderator checks every new ad, and any ad whose post was edited, before it runs. You&apos;ll get a notification.
+                {t('ads.pendingNote')}
               </p>
             ) : null}
             {stats.campaign.status === 'rejected' && stats.campaign.reviewNote ? (
-              <Alert tone="danger" title="Not approved">
+              <Alert tone="danger" title={t('m.boost.status.rejected')}>
                 {stats.campaign.reviewNote}
               </Alert>
             ) : null}
             {stats.days.length ? (
-              <div className="usage" aria-label="Impressions per day">
+              <div className="usage" aria-label={t('ads.perDay')}>
                 {stats.days.slice(-14).map((d) => (
-                  <div key={d.day} className="usage__day" title={`${d.impressions} impressions, ${d.clicks} clicks, ${d.reach} people`}>
+                  <div
+                    key={d.day}
+                    className="usage__day"
+                    title={[
+                      tp('ads.impressions', d.impressions, { number: d.impressions.toLocaleString(locale) }),
+                      tp('ads.clicks', d.clicks, { number: d.clicks.toLocaleString(locale) }),
+                      tp('ads.people', d.reach, { number: d.reach.toLocaleString(locale) }),
+                    ].join(', ')}
+                  >
                     <span
                       className="usage__bar"
                       style={{ height: `${Math.max(4, (d.impressions / Math.max(1, ...stats.days.map((x) => x.impressions))) * 64)}px` }}
@@ -128,7 +142,7 @@ export function Campaigns() {
               </div>
             ) : (
               <p className="muted" style={{ margin: 0 }}>
-                No impressions yet.
+                {t('ads.noImpressions')}
               </p>
             )}
             <div className="row">
@@ -142,7 +156,7 @@ export function Campaigns() {
                       orderId: r.payment.orderId,
                       clientSecret: r.payment.clientSecret,
                       provider: r.payment.provider,
-                      label: `Ad budget for ${stats.campaign.name}, ${formatMoney(2000, stats.campaign.currency, locale)}`,
+                      label: t('ads.fundLabel', { name: stats.campaign.name, amount: formatMoney(2000, stats.campaign.currency, locale) }),
                       onPaid: async () => {
                         await load();
                         setStats(await api.ads.stats(open));
@@ -151,11 +165,11 @@ export function Campaigns() {
                   })
                 }
               >
-                Add {formatMoney(2000, stats.campaign.currency, locale)}
+                {t('ads.addAmount', { amount: formatMoney(2000, stats.campaign.currency, locale) })}
               </Button>
               {stats.campaign.status === 'active' ? (
-                <Button size="sm" variant="secondary" onClick={() => act(() => api.ads.setStatus(open, 'paused'), 'Paused')}>
-                  Pause
+                <Button size="sm" variant="secondary" onClick={() => act(() => api.ads.setStatus(open, 'paused'), t('m.boost.status.paused'))}>
+                  {t('m.common.pause')}
                 </Button>
               ) : stats.campaign.status === 'draft' || stats.campaign.status === 'paused' ? (
                 <Button
@@ -164,18 +178,22 @@ export function Campaigns() {
                     act(async () => {
                       const r = await api.ads.setStatus(open, 'active');
                       toast(
-                        r.campaign.status === 'pending_review' ? 'Sent for review' : r.campaign.status === 'rejected' ? 'Not approved' : 'Campaign started',
+                        r.campaign.status === 'pending_review'
+                          ? t('ads.sentForReview')
+                          : r.campaign.status === 'rejected'
+                            ? t('m.boost.status.rejected')
+                            : t('ads.started'),
                       );
                       setStats(await api.ads.stats(open));
                     })
                   }
                 >
-                  {stats.campaign.approvedAt ? 'Resume' : 'Submit for review'}
+                  {stats.campaign.approvedAt ? t('ads.resume') : t('ads.submit')}
                 </Button>
               ) : null}
               {stats.campaign.status !== 'ended' && stats.campaign.status !== 'rejected' ? (
-                <Button size="sm" variant="ghost" onClick={() => act(() => api.ads.setStatus(open, 'ended'), 'Campaign ended')}>
-                  End campaign
+                <Button size="sm" variant="ghost" onClick={() => act(() => api.ads.setStatus(open, 'ended'), t('ads.ended'))}>
+                  {t('ads.end')}
                 </Button>
               ) : null}
             </div>
@@ -198,21 +216,21 @@ export function Campaigns() {
                     .map((t) => t.trim().replace(/^#/, ''))
                     .filter(Boolean),
                 }),
-              'Campaign created. Add budget to start it.',
+              t('ads.created'),
             ).then(() => setName(''));
           }}
         >
-          <Select label="Post to promote" value={postId} onChange={(e) => setPostId(e.currentTarget.value)} required>
-            <option value="">Choose a public post</option>
+          <Select label={t('ads.post')} value={postId} onChange={(e) => setPostId(e.currentTarget.value)} required>
+            <option value="">{t('ads.choosePost')}</option>
             {posts.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.body.slice(0, 60) || 'Photo post'}
+                {p.body.slice(0, 60) || t('ads.photoPost')}
               </option>
             ))}
           </Select>
           {businesses.length ? (
-            <Select label="For" value={businessId} onChange={(e) => setBusinessId(e.currentTarget.value)} hint="A business's insights show the ads run for it.">
-              <option value="">Just me</option>
+            <Select label={t('ads.for')} value={businessId} onChange={(e) => setBusinessId(e.currentTarget.value)} hint={t('ads.forHint')}>
+              <option value="">{t('ads.justMe')}</option>
               {businesses.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}
@@ -220,14 +238,9 @@ export function Campaigns() {
               ))}
             </Select>
           ) : null}
-          <TextField label="Campaign name" value={name} onChange={(e) => setName(e.currentTarget.value)} maxLength={80} required />
-          <TextField
-            label="Topics (optional)"
-            hint="Only show it to people who follow these topics, separated by commas."
-            value={topics}
-            onChange={(e) => setTopics(e.currentTarget.value)}
-          />
-          <Select label="Price per 1,000 views" value={cpm} onChange={(e) => setCpm(e.currentTarget.value)}>
+          <TextField label={t('ads.name')} value={name} onChange={(e) => setName(e.currentTarget.value)} maxLength={80} required />
+          <TextField label={t('compose.topics')} hint={t('ads.topicsHint')} value={topics} onChange={(e) => setTopics(e.currentTarget.value)} />
+          <Select label={t('ads.cpm')} value={cpm} onChange={(e) => setCpm(e.currentTarget.value)}>
             {[300, 500, 1000, 2000].map((c) => (
               <option key={c} value={c}>
                 {formatMoney(c, 'USD', locale)}
@@ -235,7 +248,7 @@ export function Campaigns() {
             ))}
           </Select>
           <Button type="submit" size="sm" disabled={!postId || !name.trim()}>
-            Create campaign
+            {t('ads.create')}
           </Button>
         </form>
       </div>

@@ -27,7 +27,7 @@ export function MiniAppsSheet({
   surfaceId: string;
   onSend?: (text: string) => Promise<void>;
 }) {
-  const { toast, flags } = useSession();
+  const { toast, flags, t } = useSession();
   const [installed, setInstalled] = useState<Installed[]>([]);
   const [directory, setDirectory] = useState<{ id: string; name: string; description: string }[]>([]);
   const [running, setRunning] = useState<Installed | null>(null);
@@ -52,19 +52,19 @@ export function MiniAppsSheet({
 
   return (
     <>
-      <BottomSheet open={open && !running} onClose={onClose} title="Apps">
+      <BottomSheet open={open && !running} onClose={onClose} title={t('chat.apps')}>
         <div className="stack">
           {installed.length ? (
-            <List label="Added here">
+            <List label={t('miniApps.added')}>
               {installed.map((a) => (
                 <ListItem key={a.id} onClick={() => setRunning(a)} primary={a.name} secondary={a.description} />
               ))}
             </List>
           ) : (
-            <p className="muted">No apps added here yet.</p>
+            <p className="muted">{t('miniApps.none')}</p>
           )}
           {notInstalled.length ? (
-            <List label="Add an app">
+            <List label={t('miniApps.addApp')}>
               {notInstalled.map((a) => (
                 <ListItem
                   key={a.id}
@@ -82,7 +82,7 @@ export function MiniAppsSheet({
                         }
                       }}
                     >
-                      Add
+                      {t('settings.add')}
                     </Button>
                   }
                 />
@@ -112,6 +112,7 @@ function MiniAppFrame({
   const frame = useRef<HTMLIFrameElement>(null);
   const overlay = useRef<HTMLDivElement>(null);
   const [pending, setPending] = useState<string | null>(null);
+  const { t } = useSession();
   useModalFocus(overlay, true, onClose);
   const origin = new URL(app.entryUrl).origin;
 
@@ -150,19 +151,19 @@ function MiniAppFrame({
         style={{ width: '100%', height: '100%', border: '1px solid var(--line)', borderRadius: 8, background: '#fff' }}
       />
       <div className="call__controls">
-        <span className="muted">{app.name} is made by another developer.</span>
+        <span className="muted">{t('miniApps.otherDeveloper', { name: app.name })}</span>
         <Button variant="secondary" onClick={onClose}>
-          Close
+          {t('m.common.close')}
         </Button>
       </div>
       <Dialog
         open={pending !== null}
         onClose={() => setPending(null)}
-        title={`${app.name} wants to send a message`}
+        title={t('miniApps.wantsToSend', { name: app.name })}
         footer={
           <>
             <Button variant="secondary" onClick={() => setPending(null)}>
-              Don't send
+              {t('miniApps.dontSend')}
             </Button>
             <Button
               onClick={async () => {
@@ -170,7 +171,7 @@ function MiniAppFrame({
                 setPending(null);
               }}
             >
-              Send as me
+              {t('miniApps.sendAsMe')}
             </Button>
           </>
         }

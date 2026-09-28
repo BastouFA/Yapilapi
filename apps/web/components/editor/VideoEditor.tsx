@@ -25,6 +25,7 @@ import {
   useHistory,
   VignetteOverlay,
 } from './parts';
+import { useSession } from '@/app/providers';
 
 interface VideoState {
   /** Seconds on the original's timeline. */
@@ -84,7 +85,7 @@ export function VideoEditor({
   file,
   maxSeconds,
   mustFit = false,
-  title = 'Edit video',
+  title,
   onDone,
   onCancel,
 }: {
@@ -97,6 +98,7 @@ export function VideoEditor({
   onDone: (edits: EditorParamsInput | null) => void;
   onCancel: () => void;
 }) {
+  const { t, locale } = useSession();
   const [url, setUrl] = useState<string | null>(null);
   const [duration, setDuration] = useState(0);
   const [size, setSize] = useState({ w: 16, h: 9 });
@@ -176,9 +178,9 @@ export function VideoEditor({
   const tools = (
     <Tabs
       value={tab}
-      onChange={(t) => {
-        setTab(t);
-        if (t === 'cover' && s.cover !== null) {
+      onChange={(id) => {
+        setTab(id);
+        if (id === 'cover' && s.cover !== null) {
           videoRef.current?.pause();
           seek(s.cover);
         }
@@ -186,7 +188,7 @@ export function VideoEditor({
       tabs={[
         {
           id: 'trim',
-          label: 'Trim',
+          label: t('m.editor.tab.trim'),
           content: (
             <div className="stack-sm">
               <div className="ed__strip" style={{ ['--from' as string]: pct(s.start), ['--to' as string]: pct(s.end) }}>
@@ -198,7 +200,7 @@ export function VideoEditor({
                 <div className="yp-scrubber ed__scrubber">
                   <input
                     type="range"
-                    aria-label="Start"
+                    aria-label={t('m.editor.start')}
                     aria-valuetext={clock(s.start)}
                     min={0}
                     max={duration}
@@ -208,7 +210,7 @@ export function VideoEditor({
                   />
                   <input
                     type="range"
-                    aria-label="End"
+                    aria-label={t('m.editor.end')}
                     aria-valuetext={clock(s.end)}
                     min={0}
                     max={duration}
@@ -220,43 +222,48 @@ export function VideoEditor({
               </div>
               <div className="row">
                 <Button variant="secondary" size="sm" onClick={() => setStart(videoRef.current?.currentTime ?? 0)}>
-                  Start here
+                  {t('videoEditor.startHere')}
                 </Button>
                 <Button variant="secondary" size="sm" onClick={() => setEnd(videoRef.current?.currentTime ?? duration)}>
-                  End here
+                  {t('videoEditor.endHere')}
                 </Button>
               </div>
               <p className="muted ed__hint" role="status">
-                {`Keeping ${clock(s.start)} to ${clock(s.end)}, ${length.toFixed(1)} seconds of ${clock(duration)}.`}
-                {tooLong
-                  ? mustFit
-                    ? ` Reels can be up to ${Math.round(maxSeconds / 60)} minutes, so choose the part to keep.`
-                    : ` Edited videos can be up to ${Math.round(maxSeconds / 60)} minutes. Without edits, the whole video is posted.`
-                  : ''}
+                {t('videoEditor.keeping', {
+                  start: clock(s.start),
+                  end: clock(s.end),
+                  length: length.toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+                  total: clock(duration),
+                })}
+                {tooLong ? ` ${t(mustFit ? 'm.editor.tooLongReel' : 'm.editor.tooLongEdit', { minutes: Math.round(maxSeconds / 60) })}` : ''}
               </p>
             </div>
           ),
         },
         {
           id: 'filters',
-          label: 'Filters',
+          label: t('m.editor.tab.filters'),
           content: <FilterStrip thumb={frames[0] ?? null} value={s.filter} onChange={(filter) => h.set((cur) => ({ ...cur, filter }))} />,
         },
         {
           id: 'adjust',
-          label: 'Adjust',
+          label: t('m.editor.tab.adjust'),
           content: (
             <AdjustPanel value={s.adjustments} onChange={(k, v) => h.set((cur) => ({ ...cur, adjustments: { ...cur.adjustments, [k]: v } }), `adj-${k}`)} />
           ),
         },
-        { id: 'text', label: 'Text', content: <TextPanel text={s.text} onChange={(text, group) => h.set((cur) => ({ ...cur, text }), group ?? null)} /> },
+        {
+          id: 'text',
+          label: t('m.post.text'),
+          content: <TextPanel text={s.text} onChange={(text, group) => h.set((cur) => ({ ...cur, text }), group ?? null)} />,
+        },
         {
           id: 'cover',
-          label: 'Cover',
+          label: t('m.chapters.cover'),
           content: (
             <div className="stack-sm">
               <div className="ed__slider">
-                <label htmlFor={`${sharpenId}-cover`}>Cover frame</label>
+                <label htmlFor={`${sharpenId}-cover`}>{t('m.editor.cover')}</label>
                 <input
                   id={`${sharpenId}-cover`}
                   type="range"
@@ -266,10 +273,10 @@ export function VideoEditor({
                   value={s.cover ?? s.start}
                   aria-valuetext={clock(s.cover ?? s.start)}
                   onChange={(e) => {
-                    const t = Number(e.currentTarget.value);
+                    const at = Number(e.currentTarget.value);
                     videoRef.current?.pause();
-                    seek(t);
-                    h.set((cur) => ({ ...cur, cover: t }), 'cover');
+                    seek(at);
+                    h.set((cur) => ({ ...cur, cover: at }), 'cover');
                   }}
                 />
                 <output className="ed__value">{clock(s.cover ?? s.start)}</output>
@@ -279,29 +286,29 @@ export function VideoEditor({
                   variant="secondary"
                   size="sm"
                   onClick={() => {
-                    const t = round(Math.min(s.end, Math.max(s.start, videoRef.current?.currentTime ?? s.start)));
-                    h.set((cur) => ({ ...cur, cover: t }));
+                    const at = round(Math.min(s.end, Math.max(s.start, videoRef.current?.currentTime ?? s.start)));
+                    h.set((cur) => ({ ...cur, cover: at }));
                   }}
                 >
-                  Use this frame
+                  {t('videoEditor.cover.useFrame')}
                 </Button>
                 {s.cover !== null ? (
                   <Button variant="ghost" size="sm" onClick={() => h.set((cur) => ({ ...cur, cover: null }))}>
-                    Use the default
+                    {t('videoEditor.cover.useDefault')}
                   </Button>
                 ) : null}
               </div>
-              <p className="muted ed__hint">The cover shows before your video plays. It gets the same look and text.</p>
+              <p className="muted ed__hint">{t('videoEditor.cover.hint')}</p>
             </div>
           ),
         },
         {
           id: 'sound',
-          label: 'Sound',
+          label: t('m.reels.sound'),
           content: (
             <div className="stack-sm">
-              <Switch label="Mute the original sound" checked={s.muted} onChange={(muted) => h.set((cur) => ({ ...cur, muted }))} />
-              <p className="muted ed__hint">Your video is posted without its sound.</p>
+              <Switch label={t('m.editor.mute')} checked={s.muted} onChange={(muted) => h.set((cur) => ({ ...cur, muted }))} />
+              <p className="muted ed__hint">{t('videoEditor.sound.hint')}</p>
             </div>
           ),
         },
@@ -311,17 +318,17 @@ export function VideoEditor({
 
   return (
     <EditorShell
-      title={title}
+      title={title ?? t('m.editor.videoTitle')}
       onCancel={onCancel}
       onDone={done}
-      doneLabel={h.changed || (mustFit && tooLong) ? 'Done' : 'Use video'}
+      doneLabel={h.changed || (mustFit && tooLong) ? t('m.common.done') : t('videoEditor.useVideo')}
       canUndo={h.canUndo}
       onUndo={h.undo}
       onReset={h.reset}
       tools={tools}
       stage={
         failed ? (
-          <p className="ed__notice">This video can&apos;t be played here. Cancel to use it as it is.</p>
+          <p className="ed__notice">{t('videoEditor.cantPlay')}</p>
         ) : (
           <div className="ed__video">
             <SharpenFilterDef id={sharpenId} amount={sharpenAmount(effectiveAdjustments(s.filter, s.adjustments))} />
@@ -334,7 +341,7 @@ export function VideoEditor({
                     playsInline
                     preload="auto"
                     muted={s.muted}
-                    aria-label="Preview of your edited video"
+                    aria-label={t('videoEditor.previewEdited')}
                     style={{ width: '100%', height: '100%', filter: filterCss }}
                     onLoadedMetadata={(e) => {
                       const v = e.currentTarget;
@@ -379,7 +386,7 @@ export function VideoEditor({
                   } else v.pause();
                 }}
               >
-                {playing ? 'Pause' : 'Play'}
+                {playing ? t('m.common.pause') : t('m.common.play')}
               </Button>
               <span className="muted" aria-live="off">
                 {clock(now)} / {clock(duration)}

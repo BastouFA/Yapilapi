@@ -8,6 +8,7 @@ import type { RoomDetail, RoomMediaSession, RoomSummary } from '../../../package
 import { client, errorMessage } from './api';
 import { tr, type Translate } from './locale';
 import { useRealtime, useSession } from './session';
+import { useMicInUse } from './yaps';
 import type { IconName } from './ui';
 import { audio, rtc } from './webrtc';
 
@@ -69,6 +70,8 @@ export function useRoom(roomId: string) {
   const [env, setEnv] = useState<RoomEnvelope | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [joined, setJoined] = useState(false);
+  // Yaps don't play out loud while you're in a room.
+  useMicInUse(joined);
   const [joining, setJoining] = useState(false);
   const [speaking, setSpeaking] = useState<ReadonlySet<string>>(new Set());
   const [reactions, setReactions] = useState<Floating[]>([]);

@@ -621,7 +621,7 @@ export default function ChatPage() {
                   <Button
                     size="sm"
                     onClick={async () => {
-                      await api.conversations.createPlan(id, String(ai.plan!.destination ?? 'New plan'), ai.plan!);
+                      await api.conversations.createPlan(id, String(ai.plan!.destination ?? t('chat.ai.newPlan')), ai.plan!);
                       toast(t('chat.ai.planSaved'));
                       setAi(null);
                     }}
@@ -1047,6 +1047,7 @@ export default function ChatPage() {
           addMessage(m);
           setBoardFor(m.id);
         }}
+        onOpenGame={setBoardFor}
       />
       <GameSheet
         game={messages?.find((m) => m.id === boardFor)?.game ?? null}

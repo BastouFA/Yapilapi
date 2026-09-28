@@ -23,7 +23,7 @@ export function SupportCreator({
   /** Called once a subscription is paid (e.g. to reload posts for subscribers). */
   onSubscribed?: () => void;
 }) {
-  const { toast, locale, flags } = useSession();
+  const { toast, locale, flags, t } = useSession();
   const checkout = useCheckout();
   const [data, setData] = useState<Awaited<ReturnType<typeof api.economy.plans>> | null>(null);
   const [tipping, setTipping] = useState(false);
@@ -36,16 +36,16 @@ export function SupportCreator({
   const sub = data.mySubscription;
 
   return (
-    <Card title={`Support ${name}`} subtitle="A 5% platform fee applies. You can cancel a subscription any time.">
+    <Card title={t('m.money.supportTitle', { name })} subtitle={t('support.subtitle')}>
       <div className="stack-sm">
         {data.items.map((p) => (
           <div key={p.id} className="row" style={{ justifyContent: 'space-between' }}>
             <span>
-              <strong>{p.name}</strong> · {formatMoney(p.priceCents, p.currency, locale)} a month
+              <strong>{p.name}</strong> · {t('m.money.perMonth', { price: formatMoney(p.priceCents, p.currency, locale) })}
               {p.description ? <span className="muted"> · {p.description}</span> : null}
             </span>
             {sub?.plan_id === p.id ? (
-              <span className="muted">{sub.status === 'active' ? 'Subscribed' : 'Waiting for payment'}</span>
+              <span className="muted">{sub.status === 'active' ? t('m.money.subscribed') : t('m.money.waitingPayment')}</span>
             ) : (
               <Button
                 size="sm"
@@ -57,7 +57,7 @@ export function SupportCreator({
                       orderId: r.payment.orderId,
                       clientSecret: r.payment.clientSecret,
                       provider: r.payment.provider,
-                      label: `${p.name} for ${name}, ${formatMoney(p.priceCents, p.currency, locale)} a month`,
+                      label: t('support.planLabel', { plan: p.name, name, price: formatMoney(p.priceCents, p.currency, locale) }),
                       onPaid: async () => {
                         setData(await api.economy.plans(userId));
                         onSubscribed?.();
@@ -69,13 +69,13 @@ export function SupportCreator({
                   }
                 }}
               >
-                Subscribe
+                {t('support.subscribe')}
               </Button>
             )}
           </div>
         ))}
         <Button variant="secondary" size="sm" onClick={() => setTipping(true)}>
-          Send a tip
+          {t('m.money.tip')}
         </Button>
       </div>
       <TipSheet open={tipping} onClose={() => setTipping(false)} userId={userId} name={name} />
@@ -100,13 +100,13 @@ export function TipSheet({
   /** A tip for one of their posts. */
   postId?: string;
 }) {
-  const { toast, locale } = useSession();
+  const { toast, locale, t } = useSession();
   const checkout = useCheckout();
   const [amount, setAmount] = useState('300');
   const [currency, setCurrency] = useState('USD');
   const [message, setMessage] = useState('');
   return (
-    <BottomSheet open={open} onClose={onClose} title={liveId ? `Send ${name} a gift` : `Tip ${name}`}>
+    <BottomSheet open={open} onClose={onClose} title={liveId ? t('support.giftTitle', { name }) : t('support.tipTitle', { name })}>
       <form
         className="stack-sm"
         onSubmit={async (e) => {
@@ -122,35 +122,36 @@ export function TipSheet({
             });
             setMessage('');
             onClose();
+            const price = formatMoney(Math.round(Number(amount)), currency, locale);
             checkout({
               orderId: r.payment.orderId,
               clientSecret: r.payment.clientSecret,
               provider: r.payment.provider,
-              label: `${liveId ? 'Gift' : 'Tip'} for ${name}, ${formatMoney(Math.round(Number(amount)), currency, locale)}`,
-              onPaid: () => toast(liveId ? 'Your gift is in the chat.' : 'Tip sent. Thank you.'),
+              label: liveId ? t('support.giftLabel', { name, amount: price }) : t('support.tipLabel', { name, amount: price }),
+              onPaid: () => toast(liveId ? t('support.giftSent') : t('support.tipSent')),
             });
           } catch (err) {
             toast(errorMessage(err));
           }
         }}
       >
-        <Select label="Amount" value={amount} onChange={(e) => setAmount(e.currentTarget.value)}>
+        <Select label={t('support.amount')} value={amount} onChange={(e) => setAmount(e.currentTarget.value)}>
           {[100, 300, 500, 1000, 2000].map((c) => (
             <option key={c} value={c}>
               {formatMoney(c, currency, locale)}
             </option>
           ))}
         </Select>
-        <Select label="Currency" value={currency} onChange={(e) => setCurrency(e.currentTarget.value)}>
+        <Select label={t('m.drops.form.currency')} value={currency} onChange={(e) => setCurrency(e.currentTarget.value)}>
           {CURRENCIES.map((c) => (
             <option key={c}>{c}</option>
           ))}
         </Select>
-        <TextField label="Message (optional)" value={message} onChange={(e) => setMessage(e.currentTarget.value)} maxLength={200} />
+        <TextField label={t('support.messageOptional')} value={message} onChange={(e) => setMessage(e.currentTarget.value)} maxLength={200} />
         <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-          A 5% platform fee applies.
+          {t('m.money.fee')}
         </p>
-        <Button type="submit">Continue to payment</Button>
+        <Button type="submit">{t('shop.continuePayment')}</Button>
       </form>
     </BottomSheet>
   );

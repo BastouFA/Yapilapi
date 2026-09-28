@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Alert, Badge, Button, ChatBubble, EmptyState, Menu, Segments, Skeleton } from '@yapilapi/design-system';
 import type { LiveChatMessage, LiveSummary } from '@yapilapi/api-client';
 import { api, errorMessage } from '@/lib/api';
@@ -13,9 +13,21 @@ import { useCheckout } from '@/components/Checkout';
 import { LiveClips } from '@/components/LiveClips';
 import { formatMoney } from '@yapilapi/shared';
 
+/** A translated sentence with an element (a name, a code sample) in place of one placeholder. */
+function around(template: string, placeholder: string, node: ReactNode) {
+  const [before = '', after = ''] = template.split(placeholder);
+  return (
+    <>
+      {before}
+      {node}
+      {after}
+    </>
+  );
+}
+
 export default function LivePage() {
   const { id } = useParams<{ id: string }>();
-  const { me, toast, locale, flags } = useSession();
+  const { me, toast, locale, flags, t, tp } = useSession();
   const [live, setLive] = useState<LiveSummary | null>(null);
   const [waitingForTicket, setWaitingForTicket] = useState(false);
   const checkout = useCheckout();
@@ -41,8 +53,8 @@ export default function LivePage() {
     try {
       const r = await api.ai.assist({ task: 'translate', input: text, targetLanguage: locale });
       const out = (r.output as { translated?: string | null } | null)?.translated;
-      if (out) setTranslated((t) => ({ ...t, [id]: out }));
-      else toast(r.notice ?? (r.output as { notice?: string } | null)?.notice ?? "This message couldn't be translated.");
+      if (out) setTranslated((cur) => ({ ...cur, [id]: out }));
+      else toast(r.notice ?? (r.output as { notice?: string } | null)?.notice ?? t('live.translateFailed'));
     } catch (e) {
       toast(errorMessage(e));
     }
@@ -83,12 +95,12 @@ export default function LivePage() {
     if (e.type === 'live.chat_deleted' && e.data.liveId === id) setChat((c) => c.filter((m) => m.id !== e.data.messageId));
     if (e.type === 'live.viewers' && e.data.id === id) setLive((l) => (l ? { ...l, viewers: e.data.viewers } : l));
     if (e.type === 'live.status' && e.data.id === id) {
-      if (e.data.status === 'removed') toast('You were removed from this live.');
+      if (e.data.status === 'removed') toast(t('m.live.removedYou'));
       setLive((l) => (l ? { ...l, status: 'ended' } : l));
     }
   });
 
-  if (missing) return <EmptyState title="This live isn't available" />;
+  if (missing) return <EmptyState title={t('m.live.missing')} />;
   if (!live) return <Skeleton height={320} />;
 
   return (
@@ -96,13 +108,13 @@ export default function LivePage() {
       <div className="yp-topbar">
         <h1 style={{ fontSize: 22 }}>{live.title}</h1>
         {live.status === 'live' ? (
-          <Badge tone="danger">Live · {live.viewers} watching</Badge>
+          <Badge tone="danger">{tp('live.badgeWatching', live.viewers)}</Badge>
         ) : (
-          <Badge tone="neutral">{live.status === 'ended' ? 'Ended' : 'Scheduled'}</Badge>
+          <Badge tone="neutral">{live.status === 'ended' ? t('m.live.ended') : t('m.live.scheduled')}</Badge>
         )}
       </div>
       <p className="muted" style={{ margin: 0 }}>
-        Hosted by {live.host.displayName}
+        {t('m.live.hostedBy', { name: live.host.displayName })}
       </p>
 
       <div
@@ -118,19 +130,15 @@ export default function LivePage() {
         }}
       >
         {live.status === 'live' && live.playbackUrl ? (
-          <HlsVideo src={live.playbackUrl} live label="Live video" />
+          <HlsVideo src={live.playbackUrl} live label={t('live.video')} />
         ) : (
-          <span>{live.status === 'ended' ? 'This live has ended.' : 'Waiting for the host to go live.'}</span>
+          <span>{live.status === 'ended' ? t('m.live.endedBody') : t('m.live.waiting')}</span>
         )}
       </div>
 
       {live.ticket && !live.ticket.hasTicket ? (
         <Alert tone="warning" title={`${live.ticket.title}: ${formatMoney(live.ticket.priceCents, live.ticket.currency, locale)}`}>
-          <p style={{ margin: '0 0 8px' }}>
-            {waitingForTicket
-              ? 'Waiting for your payment to be confirmed. The video starts here as soon as it is.'
-              : 'This live needs a ticket. Once your payment is confirmed, the video starts here.'}
-          </p>
+          <p style={{ margin: '0 0 8px' }}>{waitingForTicket ? t('live.ticket.waiting') : t('live.ticket.body')}</p>
           <Button
             size="sm"
             loading={waitingForTicket}
@@ -150,7 +158,7 @@ export default function LivePage() {
               }
             }}
           >
-            Buy ticket
+            {t('live.ticket.buy')}
           </Button>
         </Alert>
       ) : null}
@@ -161,39 +169,37 @@ export default function LivePage() {
       {isHost ? (
         <div className="stack-sm">
           {ingest && live.status !== 'ended' ? (
-            <Alert tone="info" title="Streaming software settings">
-              Server: <code>{ingest.url}</code>
+            <Alert tone="info" title={t('live.ingest.title')}>
+              {around(t('live.ingest.server'), '{url}', <code>{ingest.url}</code>)}
               <br />
-              Stream key: <code style={{ wordBreak: 'break-all' }}>{ingest.streamKey}</code>
+              {around(t('live.ingest.key'), '{key}', <code style={{ wordBreak: 'break-all' }}>{ingest.streamKey}</code>)}
               <br />
-              Keep the key private. Video delivery needs a live-video provider in production.
+              {t('live.ingest.note')}
             </Alert>
           ) : null}
           <div className="row">
             {live.status === 'scheduled' ? (
               <Button onClick={async () => setLive((await api.live.start(id)).live)} icon="send">
-                Go live
+                {t('live.start')}
               </Button>
             ) : null}
             {live.status === 'live' ? (
               <Button variant="danger" onClick={async () => setLive((await api.live.end(id)).live)}>
-                End live
+                {t('m.live.end')}
               </Button>
             ) : null}
           </div>
         </div>
       ) : null}
 
-      <section className="stack-sm" aria-label="Live chat">
-        <h2 className="section-title">Chat</h2>
+      <section className="stack-sm" aria-label={t('live.chat')}>
+        <h2 className="section-title">{t('m.live.chat')}</h2>
         <div className="yp-chat" aria-live="polite" style={{ maxHeight: 360, overflowY: 'auto' }}>
           {chat.map((m) =>
             m.kind === 'gift' ? (
               <div key={m.id} className="live-gift" role="status">
                 <span className="live-gift__amount">{formatMoney(m.amountCents ?? 0, m.currency ?? 'USD', locale)}</span>
-                <span>
-                  <strong>{m.author.displayName}</strong> sent a gift{m.body ? `: ${m.body}` : ''}
-                </span>
+                <span>{around(m.body ? t('live.giftWithNote', { note: m.body }) : t('live.gift'), '{name}', <strong>{m.author.displayName}</strong>)}</span>
               </div>
             ) : (
               <div key={m.id} className="row" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}>
@@ -201,28 +207,28 @@ export default function LivePage() {
                   <ChatBubble
                     mine={m.author.id === me?.id}
                     sender={m.author.displayName}
-                    body={`${m.kind === 'question' ? 'Question: ' : ''}${translated[m.id] ?? m.body}`}
+                    body={m.kind === 'question' ? t('live.questionBody', { text: translated[m.id] ?? m.body }) : (translated[m.id] ?? m.body)}
                   />
                   {flags.AI_TRANSLATION && m.author.id !== me?.id && !translated[m.id] ? (
                     <button type="button" className="live-translate" onClick={() => translate(m.id, m.body)}>
-                      Translate
+                      {t('live.translate')}
                     </button>
                   ) : null}
                 </div>
                 {canModerate && m.author.id !== me?.id ? (
                   <Menu
-                    label="Moderate"
+                    label={t('live.moderate')}
                     actions={[
                       {
-                        label: 'Remove message',
+                        label: t('m.live.removeMessage'),
                         icon: 'trash',
                         onSelect: () => api.raw.del(`/v1/live/${id}/chat/${m.id}`).catch((e) => toast(errorMessage(e))),
                       },
                       {
-                        label: `Remove ${m.author.displayName}`,
+                        label: t('live.removePerson', { name: m.author.displayName }),
                         icon: 'shield',
                         danger: true,
-                        onSelect: () => api.live.ban(id, m.author.id).then(() => toast('Removed from the live')),
+                        onSelect: () => api.live.ban(id, m.author.id).then(() => toast(t('m.live.removed'))),
                       },
                     ]}
                   />
@@ -248,16 +254,16 @@ export default function LivePage() {
             }}
           >
             <Segments
-              label="Message type"
+              label={t('live.messageType')}
               value={kind}
               onChange={setKind}
               options={[
-                { id: 'chat', label: 'Chat' },
-                { id: 'question', label: 'Question' },
+                { id: 'chat', label: t('m.live.chat') },
+                { id: 'question', label: t('m.live.question') },
               ]}
             />
             <label htmlFor="live-msg" className="yp-visually-hidden">
-              Message
+              {t('m.live.message')}
             </label>
             <textarea
               id="live-msg"
@@ -265,17 +271,17 @@ export default function LivePage() {
               value={body}
               maxLength={500}
               onChange={(e) => setBody(e.currentTarget.value)}
-              placeholder={kind === 'question' ? 'Ask the host a question' : 'Say something'}
+              placeholder={kind === 'question' ? t('m.live.ask') : t('m.live.say')}
             />
             <Button type="submit" disabled={!body.trim()}>
-              Send
+              {t('m.live.send')}
             </Button>
           </form>
         ) : null}
         {live.status === 'live' && !isHost && flags.COMMERCE !== false ? (
           <>
             <Button variant="secondary" icon="sparkle" onClick={() => setGifting(true)}>
-              Send a gift
+              {t('live.sendGift')}
             </Button>
             <TipSheet open={gifting} onClose={() => setGifting(false)} userId={live.host.id} name={live.host.displayName} liveId={live.id} />
           </>

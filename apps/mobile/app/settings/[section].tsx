@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, Stack, useLocalSearchParams } from 'expo-router';
 import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { useT } from '../../lib/i18n';
@@ -36,7 +36,7 @@ import { Advertising, DataSaver, Family, HiddenWords, Sharing, Tagging, Translat
 import { space } from '../../lib/theme';
 import { AiHelpersSettings } from '../../lib/ai-helpers';
 import { AskBoxSettings } from '../../lib/ask';
-import { Loading, Notice, useColors } from '../../lib/ui';
+import { EmptyState, Loading, Notice, useColors } from '../../lib/ui';
 
 /** Each section's settings, in the order they appear. */
 function Content({ section }: { section: SectionId }): ReactNode {
@@ -143,12 +143,26 @@ export default function SettingsSection() {
   const { section } = useLocalSearchParams<{ section: string }>();
   const s = SECTIONS[section as SectionId];
   if (me === undefined) return <Loading />;
-  if (!me || !s)
+  if (!me)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground, padding: space[4] }}>
         <Notice>{t('m.common.signedOut')}</Notice>
       </View>
     );
+  // A link to a section that doesn't exist (an old or mistyped one): not a sign-in problem.
+  if (!s)
+    return (
+      <View style={{ flex: 1, backgroundColor: c.ground }}>
+        <EmptyState
+          icon="settings-outline"
+          title={t('m.notFound.title')}
+          body={t('m.notFound.body')}
+          action={{ label: t('m.title.settings'), onPress: () => router.replace('/settings') }}
+        />
+      </View>
+    );
+  // Your data and Purchases are screens of their own (their settings links go there).
+  if (typeof s.href === 'string') return <Redirect href={s.href} />;
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.ground }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={100}>
       <Stack.Screen options={{ title: t(s.title) }} />

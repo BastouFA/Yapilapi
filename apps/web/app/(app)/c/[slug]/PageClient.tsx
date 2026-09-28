@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { AIPanel, Alert, Avatar, Badge, Button, EmptyState, EventCard, List, ListItem, Skeleton, Tabs } from '@yapilapi/design-system';
-import type { Community, EventItem, PublicUser, RoomSummary } from '@yapilapi/shared';
+import type { Community, EventItem, MessageKey, PublicUser, RoomSummary } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { PostList } from '@/components/PostList';
@@ -13,10 +13,27 @@ import { CommunityRooms } from '@/components/Rooms';
 import { JoinNote, NeedsAccount, useSignIn } from '@/components/SignedOut';
 import { useSession } from '../../../providers';
 
+/** Community roles with a name in the catalog; any other role shows as it comes. */
+const ROLE_LABEL: Record<string, MessageKey> = {
+  owner: 'm.role.owner',
+  admin: 'm.role.admin',
+  moderator: 'm.role.moderator',
+  organizer: 'm.role.organizer',
+  member: 'm.role.member',
+  guest: 'm.role.guest',
+};
+/** "You're a moderator" and so on, one whole sentence per role. */
+const YOU_ARE: Record<string, MessageKey> = {
+  owner: 'communityPage.youAre.owner',
+  admin: 'communityPage.youAre.admin',
+  moderator: 'communityPage.youAre.moderator',
+  organizer: 'communityPage.youAre.organizer',
+};
+
 /** A community. Without an account, a public community's posts and events are readable and joining leads to sign in. */
 export default function CommunityPageClient({ isPublic }: { isPublic: boolean }) {
   const { slug } = useParams<{ slug: string }>();
-  const { t, toast, locale, me } = useSession();
+  const { t, tp, toast, locale, me } = useSession();
   const signIn = useSignIn();
   const signedOut = !me;
   const [c, setC] = useState<(Community & { membershipStatus: string | null }) | null>(null);
@@ -67,12 +84,13 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
   }, [c, slug, signedOut]);
   const load = useCallback((cursor?: string) => api.communities.posts(slug, cursor), [slug]);
 
-  if (signedOut && !isPublic) return <NeedsAccount title="Sign in to see this community" body="Private communities are only open to their members." />;
-  if (missing) return <EmptyState title="Community not found" body="It may have been removed or renamed." />;
+  if (signedOut && !isPublic) return <NeedsAccount title={t('communityPage.signIn.title')} body={t('communityPage.signIn.body')} />;
+  if (missing) return <EmptyState title={t('m.community.notFound.title')} body={t('m.community.notFound.body')} />;
   if (!c) return <Skeleton height={200} />;
 
   const isMember = !!c.myRole;
   const canOrganize = ['owner', 'admin', 'moderator', 'organizer'].includes(c.myRole ?? '');
+  const roleLabel = (role: string) => (ROLE_LABEL[role] ? t(ROLE_LABEL[role]) : role);
 
   return (
     <div className="yp-shell__inner">
@@ -81,7 +99,7 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
           <h1 className="profile__name">{c.name}</h1>
           {isMember ? (
             c.myRole === 'owner' ? (
-              <Badge tone="success">Owner</Badge>
+              <Badge tone="success">{t('m.role.owner')}</Badge>
             ) : (
               <Button
                 size="sm"
@@ -95,7 +113,7 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
               </Button>
             )
           ) : c.membershipStatus === 'pending' ? (
-            <Badge tone="warning">Request sent</Badge>
+            <Badge tone="warning">{t('profile.requestSent')}</Badge>
           ) : (
             <Button
               size="sm"
@@ -103,31 +121,31 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
                 if (signedOut) return signIn();
                 try {
                   const r = await api.communities.join(slug);
-                  toast(r.status === 'pending' ? 'Request sent to the moderators' : `Welcome to ${c.name}`);
+                  toast(r.status === 'pending' ? t('m.community.requestSent') : t('m.community.welcome', { name: c.name }));
                   await reload();
                 } catch (e) {
                   toast(errorMessage(e));
                 }
               }}
             >
-              {c.visibility === 'private' ? 'Request to join' : t('communities.join')}
+              {c.visibility === 'private' ? t('m.community.requestJoin') : t('communities.join')}
             </Button>
           )}
         </div>
         <span className="muted">
-          {c.memberCount.toLocaleString()} {t('communities.members')} · {c.visibility === 'private' ? 'Private' : 'Public'}
-          {c.myRole && c.myRole !== 'member' ? ` · You're ${/^[aeiou]/.test(c.myRole) ? 'an' : 'a'} ${c.myRole}` : ''}
+          {c.memberCount.toLocaleString()} {t('communities.members')} · {c.visibility === 'private' ? t('m.community.private') : t('m.community.public')}
+          {c.myRole && c.myRole !== 'member' ? ` · ${YOU_ARE[c.myRole] ? t(YOU_ARE[c.myRole]) : roleLabel(c.myRole)}` : ''}
         </span>
         {c.description ? <p style={{ margin: 0 }}>{c.description}</p> : null}
         <div className="row">
           {isMember ? (
             <Link href={`/create?community=${c.id}`} className="yp-btn yp-btn--primary yp-btn--sm">
-              Post here
+              {t('communityPage.postHere')}
             </Link>
           ) : null}
           {chatId ? (
             <Link href={`/inbox/${chatId}`} className="yp-btn yp-btn--secondary yp-btn--sm">
-              Community chat
+              {t('communityPage.chat')}
             </Link>
           ) : null}
           {canOrganize ? (
@@ -159,7 +177,7 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
         </div>
         {c.rules.length ? (
           <details>
-            <summary>Community rules</summary>
+            <summary>{t('communityPage.rules')}</summary>
             <ol>
               {c.rules.map((r) => (
                 <li key={r}>{r}</li>
@@ -169,7 +187,7 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
         ) : null}
       </div>
 
-      {signedOut ? <JoinNote text={`Join YAPILAPI to join ${c.name}, post and meet the people in it.`} /> : null}
+      {signedOut ? <JoinNote text={t('communityPage.joinNote', { name: c.name })} /> : null}
 
       {summary ? (
         <AIPanel
@@ -188,9 +206,9 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
 
       {liveRoom && tab !== 'rooms' ? (
         <Link href={`/rooms/${liveRoom.id}`} className="room-banner">
-          <Badge tone="danger">Live</Badge>
+          <Badge tone="danger">{t('m.rooms.live')}</Badge>
           <span className="room-banner__title">{liveRoom.title}</span>
-          <span className="muted">{liveRoom.listenerCount} listening</span>
+          <span className="muted">{tp('m.rooms.listening', liveRoom.listenerCount)}</span>
         </Link>
       ) : null}
 
@@ -200,29 +218,29 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
         value={tab}
         onChange={setTab}
         tabs={[
-          { id: 'posts', label: 'Posts' },
-          { id: 'faq', label: 'FAQ' },
-          { id: 'rooms', label: 'Rooms' },
-          { id: 'events', label: 'Events' },
-          ...(signedOut ? [] : [{ id: 'members', label: 'Members', count: c.memberCount }]),
+          { id: 'posts', label: t('profile.posts') },
+          { id: 'faq', label: t('m.community.faq') },
+          { id: 'rooms', label: t('m.rooms.tab') },
+          { id: 'events', label: t('events.title') },
+          ...(signedOut ? [] : [{ id: 'members', label: t('m.community.membersTab'), count: c.memberCount }]),
         ]}
       />
       <div role="tabpanel" id="community-panel" aria-labelledby={`community-tabs-${tab}`}>
         {tab === 'posts' ? (
           c.visibility === 'private' && !isMember ? (
-            <Alert tone="info">Join this private community to see its posts.</Alert>
+            <Alert tone="info">{t('m.community.locked.posts')}</Alert>
           ) : (
-            <PostList load={load} reloadKey={slug} empty="No posts yet. Start the first discussion." />
+            <PostList load={load} reloadKey={slug} empty={t('communityPage.noPosts')} />
           )
         ) : tab === 'faq' ? (
           c.visibility === 'private' && !isMember ? (
-            <Alert tone="info">Join this private community to see its FAQ.</Alert>
+            <Alert tone="info">{t('m.community.locked.faq')}</Alert>
           ) : (
             <CommunityFaq slug={slug} />
           )
         ) : tab === 'rooms' ? (
           signedOut ? (
-            <Alert tone="info">Sign in and join this community to listen to its rooms.</Alert>
+            <Alert tone="info">{t('communityPage.roomsSignIn')}</Alert>
           ) : (
             <CommunityRooms slug={slug} isMember={isMember} />
           )
@@ -236,7 +254,7 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
               ))}
             </div>
           ) : (
-            <p className="muted">No upcoming events.</p>
+            <p className="muted">{t('communityPage.noEvents')}</p>
           )
         ) : members === null ? (
           <Skeleton height={120} />
@@ -249,7 +267,7 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
                 linkAs={NextLink}
                 start={<Avatar name={m.user.displayName} src={m.user.avatarUrl} size="sm" />}
                 primary={m.user.displayName}
-                end={m.role !== 'member' ? <Badge tone="neutral">{m.role}</Badge> : null}
+                end={m.role !== 'member' ? <Badge tone="neutral">{roleLabel(m.role)}</Badge> : null}
               />
             ))}
           </List>

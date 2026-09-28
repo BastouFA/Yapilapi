@@ -46,9 +46,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body className="yp-root">
-        <a href="#main" className="skip-link">
-          Skip to content
-        </a>
         <Providers>{children}</Providers>
       </body>
     </html>

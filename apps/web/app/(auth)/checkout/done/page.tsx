@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { Alert, Skeleton } from '@yapilapi/design-system';
 import { api } from '@/lib/api';
+import { useSession } from '../../../providers';
 
 /**
  * Where Paystack sends people after paying (callback_url). The order is only
@@ -13,6 +14,7 @@ import { api } from '@/lib/api';
  * the other window shows the result.
  */
 function Done() {
+  const { t } = useSession();
   const reference = useSearchParams().get('reference') ?? '';
   // Our references are "ypl-<order id>".
   const orderId = /^ypl-([0-9a-f-]{36})$/.exec(reference)?.[1] ?? null;
@@ -40,23 +42,23 @@ function Done() {
 
   return (
     <div className="stack">
-      <h1>Payment</h1>
+      <h1>{t('payment.done.title')}</h1>
       {status === 'paid' ? (
-        <Alert tone="success" title="Paid">
-          Your payment went through. You can close this window.
+        <Alert tone="success" title={t('m.drops.purchase.paid')}>
+          {t('payment.done.paid')}
         </Alert>
       ) : status === 'waiting' ? (
         <>
           <Skeleton height={48} />
           <p className="muted" style={{ margin: 0 }}>
-            Waiting for Paystack to confirm your payment. For mobile money, approve the request on your phone.
+            {t('payment.done.waiting')}
           </p>
         </>
       ) : (
-        <Alert tone="info">Your payment is still being confirmed. You&apos;ll get a notification when it is.</Alert>
+        <Alert tone="info">{t('payment.done.pending')}</Alert>
       )}
       <Link href="/home" className="yp-btn yp-btn--primary yp-btn--block">
-        Go to Home
+        {t('onboarding.finish')}
       </Link>
     </div>
   );

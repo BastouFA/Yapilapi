@@ -1,5 +1,5 @@
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { router } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
@@ -93,6 +93,18 @@ export function useMixPlayer(songs: MixSong[]) {
     const end = (part.startMs + part.durationMs) / 1000;
     if (status.didJustFinish || (status.isLoaded && status.currentTime >= end - 0.1)) advance();
   }, [status.currentTime, status.didJustFinish, status.isLoaded, index, playing, advance]);
+
+  // Opening a song's page, a profile or anything else on top pauses it (Play carries on from there).
+  const focused = useIsFocused();
+  useEffect(() => {
+    if (focused || !playing) return;
+    try {
+      player.pause();
+    } catch {
+      // Already released.
+    }
+    setPlaying(false);
+  }, [focused, playing, player]);
 
   // Leaving the screen stops it.
   useEffect(

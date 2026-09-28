@@ -40,7 +40,7 @@ export function ReelGrid({ load, reloadKey, empty }: { load: (cursor?: string) =
   }, [reloadKey]);
 
   if (items === null) return <Skeleton height={320} />;
-  if (!items.length) return <EmptyState title="Nothing here yet" body={empty} />;
+  if (!items.length) return <EmptyState title={t('m.feed.empty.title')} body={empty} />;
 
   return (
     <div className="stack">
@@ -67,7 +67,7 @@ export function ReelGrid({ load, reloadKey, empty }: { load: (cursor?: string) =
                 ) : p.remixOf ? (
                   <span className="reel-grid__badge">
                     <Icon name="duet" size={12} />
-                    {p.remixOf.mode === 'duet' ? 'Duet' : 'Remix'}
+                    {p.remixOf.mode === 'duet' ? t('reelGrid.duet') : t('reelGrid.remix')}
                   </span>
                 ) : null}
                 <span className="reel-grid__meta">
@@ -98,7 +98,7 @@ export function ReelGrid({ load, reloadKey, empty }: { load: (cursor?: string) =
             }
           }}
         >
-          Show more
+          {t('boards.showMore')}
         </Button>
       ) : null}
     </div>

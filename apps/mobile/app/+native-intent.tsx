@@ -9,7 +9,9 @@ import { appPath } from '../lib/links';
  * (?community=…), events/5/edit, c/<slug>/settings and plus. Creators and money: studio, a
  * creator's plans (u/<name>?subscribe=1, plans/<name>), one thing from a shop
  * (u/<name>?shop=1&product=<id>), boosting a post (p/<id>?boost=1) and its insights
- * (p/<id>/insights, insights/<id>). Anything unexpected opens as it came.
+ * (p/<id>/insights, insights/<id>). An event's check-in (events/<id>/check-in), a reel's echoes
+ * (reels/<id>/echoes), settings/your-data, settings/purchases and the legal pages open their screens.
+ * Anything unexpected opens as it came, and a path with no screen shows app/+not-found.tsx.
  */
 export function redirectSystemPath({ path }: { path: string; initial: boolean }) {
   try {

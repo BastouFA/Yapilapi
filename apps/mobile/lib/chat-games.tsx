@@ -666,17 +666,21 @@ export function StartGameSheet({
   conversation,
   meId,
   onSent,
+  onOpenGame,
 }: {
   open: boolean;
   onClose: () => void;
   conversation: Conversation | null;
   meId?: string;
   onSent: (m: Message) => void;
+  /** Open the board of a game already going here (by its card's message id). */
+  onOpenGame?: (messageId: string) => void;
 }) {
   const { t } = useT();
   const c = useColors();
   const [kind, setKind] = useState<GameKind>('four_up');
   const [going, setGoing] = useState<GameKind[]>([]);
+  const [goingCards, setGoingCards] = useState<Partial<Record<GameKind, string>>>({});
   const [chosen, setChosen] = useState<string[]>([]);
   const [color, setColor] = useState<'white' | 'black' | 'random'>('white');
   const [error, setError] = useState<string | null>(null);
@@ -691,6 +695,7 @@ export function StartGameSheet({
         (r) => {
           const kinds = r.items.map((g) => g.kind);
           setGoing(kinds);
+          setGoingCards(Object.fromEntries(r.items.map((g) => [g.kind, g.messageId])));
           setKind((k) => (kinds.includes(k) ? (GAME_KINDS.find((x) => !kinds.includes(x)) ?? k) : k));
         },
         () => setGoing([]),
@@ -701,6 +706,7 @@ export function StartGameSheet({
   const others = conversation.members.filter((m) => m.id !== meId);
   const max = GAME_PLAYERS[kind].max - 1;
   const single = max === 1;
+  const allGoing = GAME_KINDS.every((k) => going.includes(k));
   const ready = !going.includes(kind) && (!group || (chosen.length >= 1 && chosen.length <= max));
 
   async function submit() {
@@ -730,6 +736,40 @@ export function StartGameSheet({
         {GAME_KINDS.map((k) => {
           const busyHere = going.includes(k);
           const on = kind === k;
+          const card = goingCards[k];
+          // A game already going here: no second one, but a way straight to it.
+          if (busyHere)
+            return (
+              <View
+                key={k}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: space[2],
+                  padding: space[3],
+                  minHeight: 44,
+                  borderRadius: radius.md,
+                  borderWidth: 1,
+                  borderColor: c.line,
+                }}
+              >
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={{ color: c.ink, fontSize: 15, fontWeight: '700' }}>{gameName(t, k)}</Text>
+                  <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('m.chat.game.going', { game: gameName(t, k) })}</Text>
+                </View>
+                {card && onOpenGame ? (
+                  <Button
+                    label={t('m.chat.game.open')}
+                    size="sm"
+                    variant="secondary"
+                    onPress={() => {
+                      onClose();
+                      onOpenGame(card);
+                    }}
+                  />
+                ) : null}
+              </View>
+            );
           return (
             <Pressable
               key={k}
@@ -832,7 +872,11 @@ export function StartGameSheet({
           {error}
         </Text>
       ) : null}
-      <Button label={t('m.chat.game.startButton')} icon="game-controller-outline" disabled={!ready} onPress={submit} />
+      {allGoing ? (
+        <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t('m.chat.game.allGoing')}</Text>
+      ) : (
+        <Button label={t('m.chat.game.startButton')} icon="game-controller-outline" disabled={!ready} onPress={submit} />
+      )}
     </BottomSheet>
   );
 }

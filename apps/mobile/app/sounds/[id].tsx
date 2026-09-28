@@ -1,5 +1,5 @@
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Image, Pressable, Text, View } from 'react-native';
 import type { Post, Sound } from '../../../../packages/shared/src/types';
@@ -197,6 +197,16 @@ function PlayButton({ url }: { url: string }) {
   useEffect(() => {
     if (status.didJustFinish) void player.seekTo(0);
   }, [status.didJustFinish, player]);
+  // Opening a reel made with it (or anything else on top) pauses it, so the two don't play at once.
+  const focused = useIsFocused();
+  useEffect(() => {
+    if (focused) return;
+    try {
+      player.pause();
+    } catch {
+      // Already released.
+    }
+  }, [focused, player]);
   return (
     <Pressable
       accessibilityRole="button"

@@ -1,5 +1,5 @@
 import { useEventListener } from 'expo';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -464,6 +464,19 @@ function LivePlayer({ url, label }: { url: string; label: string }) {
     player.replace({ uri: url, contentType: 'hls' });
     player.play();
   }, [attempt, player, url]);
+  // A profile or anything else opened from the live covers it: the stream waits, and picks up again when you're back.
+  const focused = useIsFocused();
+  const wasFocused = useRef(focused);
+  useEffect(() => {
+    if (wasFocused.current === focused) return;
+    wasFocused.current = focused;
+    try {
+      if (focused) player.play();
+      else player.pause();
+    } catch {
+      // Already released.
+    }
+  }, [focused, player]);
   if (failed)
     return (
       <View style={{ alignItems: 'center', gap: space[2], padding: space[4] }}>

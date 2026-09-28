@@ -9,7 +9,7 @@ import { BuyButton } from './BuyButton';
 
 /** Products the host shows during a live. Viewers buy them without leaving; the host pins and unpins. */
 export function LiveShop({ liveId, isHost, hostId }: { liveId: string; isHost: boolean; hostId: string }) {
-  const { toast, locale, flags } = useSession();
+  const { toast, locale, flags, t } = useSession();
   const [items, setItems] = useState<LiveProduct[]>([]);
   const [mine, setMine] = useState<LiveProduct[]>([]);
   const [pick, setPick] = useState('');
@@ -36,8 +36,8 @@ export function LiveShop({ liveId, isHost, hostId }: { liveId: string; isHost: b
   if (flags.COMMERCE === false || (!items.length && !isHost)) return null;
   const unpinned = mine.filter((p) => !items.some((i) => i.id === p.id));
   return (
-    <section className="stack-sm" aria-label="Shop this live">
-      <h2 className="section-title">Shop this live</h2>
+    <section className="stack-sm" aria-label={t('liveShop.title')}>
+      <h2 className="section-title">{t('liveShop.title')}</h2>
       {items.length ? (
         <div className="live-shop">
           {items.map((p) => (
@@ -48,7 +48,7 @@ export function LiveShop({ liveId, isHost, hostId }: { liveId: string; isHost: b
               action={
                 isHost ? (
                   <Button size="sm" variant="secondary" onClick={() => api.live.unpin(liveId, p.id).catch((e) => toast(errorMessage(e)))}>
-                    Stop showing
+                    {t('liveShop.stop')}
                   </Button>
                 ) : (
                   <BuyButton productId={p.id} />
@@ -59,7 +59,7 @@ export function LiveShop({ liveId, isHost, hostId }: { liveId: string; isHost: b
         </div>
       ) : (
         <p className="muted" style={{ margin: 0 }}>
-          Show products you sell to everyone watching.
+          {t('liveShop.empty')}
         </p>
       )}
       {isHost && unpinned.length ? (
@@ -77,8 +77,8 @@ export function LiveShop({ liveId, isHost, hostId }: { liveId: string; isHost: b
           }}
         >
           <div style={{ flex: 1, minWidth: 200 }}>
-            <Select label="Show a product" value={pick} onChange={(e) => setPick(e.currentTarget.value)}>
-              <option value="">Choose one of your products</option>
+            <Select label={t('liveShop.pick')} value={pick} onChange={(e) => setPick(e.currentTarget.value)}>
+              <option value="">{t('liveShop.choose')}</option>
               {unpinned.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.title}
@@ -87,7 +87,7 @@ export function LiveShop({ liveId, isHost, hostId }: { liveId: string; isHost: b
             </Select>
           </div>
           <Button type="submit" size="sm" disabled={!pick}>
-            Show
+            {t('liveShop.show')}
           </Button>
         </form>
       ) : null}

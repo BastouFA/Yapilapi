@@ -42,15 +42,16 @@ export function boostChoicesFrom(q: URLSearchParams): BoostChoices {
  * paid through checkout, then reviewed like any ad before it runs.
  */
 export function BoostSheet({ post, onClose, onDone, choices }: { post: Post | null; onClose: () => void; onDone?: () => void; choices?: BoostChoices }) {
+  const { t } = useSession();
   return (
-    <BottomSheet open={!!post} onClose={onClose} title="Boost this post">
+    <BottomSheet open={!!post} onClose={onClose} title={t('m.boost.title')}>
       {post ? <BoostForm key={post.id} post={post} onClose={onClose} onDone={onDone} choices={choices} /> : null}
     </BottomSheet>
   );
 }
 
 function BoostForm({ post, onClose, onDone, choices }: { post: Post; onClose: () => void; onDone?: () => void; choices?: BoostChoices }) {
-  const { me, toast, locale } = useSession();
+  const { me, toast, locale, t, tp } = useSession();
   const checkout = useCheckout();
   const [currency, setCurrency] = useState<string>(() => {
     if (choices?.currency && BOOST_OPTIONS[choices.currency]) return choices.currency;
@@ -90,7 +91,7 @@ function BoostForm({ post, onClose, onDone, choices }: { post: Post; onClose: ()
         e.preventDefault();
         setError(null);
         if (audience === 'interests' && !topicList.length) {
-          setError('Add at least one interest, like food or music.');
+          setError(t('boost.needInterest'));
           return;
         }
         setBusy(true);
@@ -107,9 +108,9 @@ function BoostForm({ post, onClose, onDone, choices }: { post: Post; onClose: ()
             orderId: r.payment.orderId,
             clientSecret: r.payment.clientSecret,
             provider: r.payment.provider,
-            label: `Boost for ${days} ${days === 1 ? 'day' : 'days'}, ${formatMoney(budget, currency, locale)}`,
+            label: tp('boost.checkoutLabel', days, { price: formatMoney(budget, currency, locale) }),
             onPaid: () => {
-              toast('Paid. Your boost starts once it has been reviewed.');
+              toast(t('boost.paid'));
               onDone?.();
             },
           });
@@ -124,7 +125,7 @@ function BoostForm({ post, onClose, onDone, choices }: { post: Post; onClose: ()
       {error ? <Alert tone="danger">{error}</Alert> : null}
       <div className="row">
         <Select
-          label="Currency"
+          label={t('m.boost.currency')}
           value={currency}
           onChange={(e) => {
             const c = e.currentTarget.value;
@@ -136,32 +137,32 @@ function BoostForm({ post, onClose, onDone, choices }: { post: Post; onClose: ()
             <option key={c}>{c}</option>
           ))}
         </Select>
-        <Select label="Budget" value={String(budget)} onChange={(e) => setBudget(Number(e.currentTarget.value))}>
+        <Select label={t('m.boost.budget')} value={String(budget)} onChange={(e) => setBudget(Number(e.currentTarget.value))}>
           {options.budgets.map((b) => (
             <option key={b} value={b}>
               {formatMoney(b, currency, locale)}
             </option>
           ))}
         </Select>
-        <Select label="How long" value={String(days)} onChange={(e) => setDays(Number(e.currentTarget.value))}>
+        <Select label={t('m.boost.howLong')} value={String(days)} onChange={(e) => setDays(Number(e.currentTarget.value))}>
           {BOOST_DAYS.map((d) => (
             <option key={d} value={d}>
-              {d === 1 ? '1 day' : `${d} days`}
+              {tp('m.boost.days', d)}
             </option>
           ))}
         </Select>
       </div>
       <Segments
-        label="Who sees it"
+        label={t('m.boost.who')}
         value={audience}
         onChange={setAudience}
         options={[
-          { id: 'country', label: 'People in a country' },
-          { id: 'interests', label: 'People with an interest' },
+          { id: 'country', label: t('m.boost.country') },
+          { id: 'interests', label: t('m.boost.interests') },
         ]}
       />
       {audience === 'country' ? (
-        <Select label="Country" value={country} onChange={(e) => setCountry(e.currentTarget.value)}>
+        <Select label={t('m.boost.countryLabel')} value={country} onChange={(e) => setCountry(e.currentTarget.value)}>
           {countries.map((c) => (
             <option key={c} value={c}>
               {regionNames?.of(c) ?? c}
@@ -170,19 +171,18 @@ function BoostForm({ post, onClose, onDone, choices }: { post: Post; onClose: ()
         </Select>
       ) : (
         <TextField
-          label="Interests"
-          hint="Separate them with commas, for example: food, music, lagos"
+          label={t('m.boost.interestsLabel')}
+          hint={t('boost.interestsHint')}
           value={topics}
           onChange={(e) => setTopics(e.currentTarget.value)}
           maxLength={300}
         />
       )}
       <p className="muted" style={{ margin: 0, fontSize: 13 }}>
-        About {new Intl.NumberFormat(locale).format(reach)} views for {formatMoney(budget, currency, locale)}. Shown as a sponsored post to adults who chose to
-        see ads. It starts once a moderator has reviewed it, runs for {days === 1 ? '1 day' : `${days} days`}, and anything it doesn&apos;t spend is refunded.
+        {tp('boost.summary', days, { views: new Intl.NumberFormat(locale).format(reach), price: formatMoney(budget, currency, locale) })}
       </p>
       <Button type="submit" loading={busy}>
-        Continue to payment
+        {t('shop.continuePayment')}
       </Button>
     </form>
   );

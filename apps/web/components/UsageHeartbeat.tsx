@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Button, Dialog } from '@yapilapi/design-system';
 import { api } from '@/lib/api';
+import { useSession } from '@/app/providers';
 
 const shownKey = () => `ypl_break_${new Date().toDateString()}`;
 
@@ -11,6 +12,7 @@ const shownKey = () => `ypl_break_${new Date().toDateString()}`;
  * for a supervised teen past their daily reminder, shows a break prompt once a day.
  */
 export function UsageHeartbeat() {
+  const { t } = useSession();
   const [prompt, setPrompt] = useState<number | null>(null);
   useEffect(() => {
     const beat = async () => {
@@ -43,10 +45,13 @@ export function UsageHeartbeat() {
   }, []);
 
   return (
-    <Dialog open={prompt !== null} onClose={() => setPrompt(null)} title="Time for a break?" footer={<Button onClick={() => setPrompt(null)}>Close</Button>}>
-      <p style={{ margin: 0 }}>
-        You've spent {prompt} minutes on YAPILAPI today, which is past the daily reminder your family set. Everything will still be here later.
-      </p>
+    <Dialog
+      open={prompt !== null}
+      onClose={() => setPrompt(null)}
+      title={t('m.break.title')}
+      footer={<Button onClick={() => setPrompt(null)}>{t('m.common.close')}</Button>}
+    >
+      <p style={{ margin: 0 }}>{t('m.break.body', { minutes: prompt ?? 0 })}</p>
     </Dialog>
   );
 }

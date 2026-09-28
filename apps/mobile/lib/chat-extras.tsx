@@ -9,7 +9,7 @@ import { chessDrawReason } from '../../../packages/shared/src/games/index';
 import { client, errorMessage } from './api';
 import { useT } from './i18n';
 import { radius, space } from './theme';
-import { ActionSheet, BottomSheet, Button, Icon, useColors, userText } from './ui';
+import { ActionSheet, BottomSheet, Button, Icon, useColors, userText, useScreenFocused } from './ui';
 import { openWatch } from './watch';
 
 /**
@@ -428,6 +428,7 @@ export function SearchSheet({
   onClose: () => void;
   onJump: (id: string) => void;
 }) {
+  const focused = useScreenFocused();
   const c = useColors();
   const { t, dateTime } = useT();
   const insets = useSafeAreaInsets();
@@ -456,7 +457,7 @@ export function SearchSheet({
   }, [q, conversationId]);
 
   return (
-    <Modal visible={open} animationType="slide" onRequestClose={onClose}>
+    <Modal visible={open && focused} animationType="slide" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: c.ground, paddingTop: insets.top + space[2] }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], paddingHorizontal: space[3], paddingBottom: space[2] }}>
           <TextInput

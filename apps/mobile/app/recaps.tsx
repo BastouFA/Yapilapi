@@ -222,7 +222,7 @@ export default function Recaps() {
           </>
         )}
       </ScrollView>
-      <Modal visible={!!open} animationType="slide" presentationStyle="pageSheet" onRequestClose={close}>
+      <Modal visible={!!open && focused} animationType="slide" presentationStyle="pageSheet" onRequestClose={close}>
         {open ? (
           <RecapViewer
             key={open.id}

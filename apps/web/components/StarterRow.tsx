@@ -56,7 +56,7 @@ export function StarterRow() {
             const media = p.media.find((m) => m.kind === 'video') ?? p.media[0];
             return (
               <li key={p.id}>
-                <Link href={`/reels?start=${p.id}`} className="starter__reel" aria-label={`Reel by ${p.author.displayName}`}>
+                <Link href={`/reels?start=${p.id}`} className="starter__reel" aria-label={t('m.reels.by', { name: p.author.displayName })}>
                   {media?.posterUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={media.posterUrl} alt="" loading="lazy" />

@@ -39,6 +39,7 @@ const PAYSTACK_CHECKOUT = /^https:\/\/checkout\.paystack\.com\//;
 export function CheckoutProvider({ children }: { children: ReactNode }) {
   const [req, setReq] = useState<PayRequest | null>(null);
   const [config, setConfig] = useState<PaymentsConfig | null>(null);
+  const { t } = useSession();
   useEffect(() => {
     api.payments.config().then(setConfig, () => setConfig({ provider: 'unavailable' }));
   }, []);
@@ -46,7 +47,7 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={open}>
       {children}
-      <BottomSheet open={!!req} onClose={() => setReq(null)} title="Checkout">
+      <BottomSheet open={!!req} onClose={() => setReq(null)} title={t('checkout.title')}>
         {req && config ? <CheckoutBody key={req.orderId} req={req} config={config} onClose={() => setReq(null)} /> : null}
       </BottomSheet>
     </Ctx.Provider>
@@ -54,6 +55,7 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
 }
 
 function CheckoutBody({ req, config, onClose }: { req: PayRequest; config: PaymentsConfig; onClose: () => void }) {
+  const { t } = useSession();
   const provider = req.provider ?? config.provider;
   const [state, setState] = useState<'ready' | 'confirming' | 'paid' | 'error'>('ready');
   const [error, setError] = useState<string | null>(null);
@@ -82,17 +84,17 @@ function CheckoutBody({ req, config, onClose }: { req: PayRequest; config: Payme
     }
     if (!stop.current) {
       setState('error');
-      setError('Your payment is still being confirmed. You will get a notification when it is; you can close this.');
+      setError(t('checkout.stillConfirming'));
     }
-  }, [req, provider]);
+  }, [req, provider, t]);
 
   if (state === 'paid')
     return (
       <div className="stack-sm">
-        <Alert tone="success" title="Paid">
+        <Alert tone="success" title={t('m.drops.purchase.paid')}>
           {req.label}
         </Alert>
-        <Button onClick={onClose}>Done</Button>
+        <Button onClick={onClose}>{t('m.common.done')}</Button>
       </div>
     );
 
@@ -108,8 +110,8 @@ function CheckoutBody({ req, config, onClose }: { req: PayRequest; config: Payme
         </Elements>
       ) : provider === 'dev' ? (
         <>
-          <Alert tone="info" title="Test payment">
-            This server uses the development payment provider. No money moves and no card is needed.
+          <Alert tone="info" title={t('checkout.testTitle')}>
+            {t('checkout.testBody')}
           </Alert>
           <Button
             loading={state === 'confirming'}
@@ -124,11 +126,11 @@ function CheckoutBody({ req, config, onClose }: { req: PayRequest; config: Payme
               }
             }}
           >
-            Pay (test)
+            {t('checkout.payTest')}
           </Button>
         </>
       ) : (
-        <Alert tone="danger">Payments aren&apos;t available right now. Try again later.</Alert>
+        <Alert tone="danger">{t('checkout.unavailable')}</Alert>
       )}
     </div>
   );
@@ -140,17 +142,18 @@ function CheckoutBody({ req, config, onClose }: { req: PayRequest; config: Payme
  * link still works.
  */
 function PaystackStep({ url, waiting, onOpened }: { url: string; waiting: boolean; onOpened: () => void }) {
-  if (!PAYSTACK_CHECKOUT.test(url)) return <Alert tone="danger">Payments aren&apos;t available right now. Try again later.</Alert>;
+  const { t } = useSession();
+  if (!PAYSTACK_CHECKOUT.test(url)) return <Alert tone="danger">{t('checkout.unavailable')}</Alert>;
   return (
     <>
       <p className="muted" style={{ margin: 0 }}>
-        You&apos;ll pay on Paystack&apos;s secure page with a card, bank transfer or mobile money. Come back here when you&apos;re done.
+        {t('checkout.paystackIntro')}
       </p>
       {waiting ? (
-        <Alert tone="info" title="Waiting for Paystack">
-          We&apos;ll confirm here as soon as Paystack tells us the payment went through. For mobile money, approve the request on your phone.{' '}
+        <Alert tone="info" title={t('checkout.paystackWaitingTitle')}>
+          {t('checkout.paystackWaiting')}{' '}
           <a href={url} target="_blank" rel="noopener noreferrer">
-            Open Paystack again
+            {t('checkout.paystackReopen')}
           </a>
         </Alert>
       ) : (
@@ -162,7 +165,7 @@ function PaystackStep({ url, waiting, onOpened }: { url: string; waiting: boolea
             onOpened();
           }}
         >
-          Continue to Paystack
+          {t('checkout.paystackContinue')}
         </Button>
       )}
     </>
@@ -172,7 +175,7 @@ function PaystackStep({ url, waiting, onOpened }: { url: string; waiting: boolea
 function StripeForm({ busy, onPaid, onError }: { busy: boolean; onPaid: () => void; onError: (m: string | null) => void }) {
   const stripe = useStripe();
   const elements = useElements();
-  const { toast } = useSession();
+  const { toast, t } = useSession();
   return (
     <form
       className="stack-sm"
@@ -182,16 +185,16 @@ function StripeForm({ busy, onPaid, onError }: { busy: boolean; onPaid: () => vo
         onError(null);
         const { error } = await stripe.confirmPayment({ elements, redirect: 'if_required', confirmParams: { return_url: window.location.href } });
         if (error) {
-          onError(error.message ?? "The payment didn't go through.");
+          onError(error.message ?? t('checkout.failed'));
           return;
         }
-        toast('Payment sent');
+        toast(t('checkout.sent'));
         onPaid();
       }}
     >
       <PaymentElement />
       <Button type="submit" loading={busy} disabled={!stripe || !elements}>
-        Pay
+        {t('checkout.pay')}
       </Button>
     </form>
   );

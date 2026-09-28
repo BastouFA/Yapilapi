@@ -26,7 +26,7 @@ import { CaptionOverlay, useCaptionCues } from './captions';
 import { useDataSaver } from './data-saver';
 import { useT } from './i18n';
 import { radius, space } from './theme';
-import { Icon, userText } from './ui';
+import { Icon, userText, useScreenFocused } from './ui';
 
 const WHITE = '#FFFFFF';
 const SCRIM = 'rgba(5,6,11,0.55)';
@@ -68,6 +68,7 @@ const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(mi
  * on a photo hides or shows it with the top bar.
  */
 export function MediaViewer({ media, index, onClose }: { media: MediaItem[]; index: number; onClose: () => void }) {
+  const focused = useScreenFocused();
   const { t, number } = useT();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -136,7 +137,7 @@ export function MediaViewer({ media, index, onClose }: { media: MediaItem[]; ind
 
   return (
     <Modal
-      visible
+      visible={focused}
       transparent
       animationType={reduce ? 'none' : 'fade'}
       statusBarTranslucent

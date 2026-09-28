@@ -1,27 +1,15 @@
 import { CameraView, useCameraPermissions, type CameraType } from 'expo-camera';
-import { router } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
-import Constants from 'expo-constants';
 import { client } from '../lib/api';
-import { tr } from '../lib/locale';
+import { uploadFile } from '../lib/media';
 import { useT } from '../lib/i18n';
 import { space } from '../lib/theme';
-import { Button, Field, Screen, useColors } from '../lib/ui';
+import { Button, Field, KeyboardAvoid, Screen, useColors } from '../lib/ui';
 
-const baseUrl = (Constants.expoConfig?.extra?.apiUrl as string | undefined) ?? 'http://localhost:4000';
-
-/** Upload a just-taken photo with the same multipart endpoint the web app uses. */
-async function upload(uri: string): Promise<string> {
-  const token = await SecureStore.getItemAsync('ypl_session');
-  const form = new FormData();
-  form.append('file', { uri, name: 'real.jpg', type: 'image/jpeg' } as unknown as Blob);
-  const res = await fetch(`${baseUrl}/v1/media`, { method: 'POST', body: form, headers: token ? { authorization: `Bearer ${token}` } : {} });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json?.error?.message ?? tr('m.real.uploadFailed'));
-  return json.media.id;
-}
+/** Upload a just-taken photo the way every other upload goes (with its failure messages). */
+const upload = async (uri: string) => (await uploadFile(uri, 'real.jpg', 'image/jpeg')).id;
 
 /**
  * Real: take a photo with the back camera, then the front one, and share both. Only Real keeps
@@ -31,11 +19,15 @@ export default function Real() {
   const c = useColors();
   const { t } = useT();
   const [permission, requestPermission] = useCameraPermissions();
+  // The camera is off while another screen is on top (after sharing, or a notification tapped).
+  const focused = useIsFocused();
   const camera = useRef<CameraView>(null);
   const [facing, setFacing] = useState<CameraType>('back');
   const [shots, setShots] = useState<string[]>([]);
   const [caption, setCaption] = useState('');
   const [status, setStatus] = useState<string | null>(null);
+  // While it uploads, neither button can share it a second time.
+  const [sharing, setSharing] = useState(false);
 
   if (!permission) return <Screen>{null}</Screen>;
   if (!permission.granted)
@@ -47,6 +39,8 @@ export default function Real() {
     );
 
   async function share(uris: string[]) {
+    if (sharing) return;
+    setSharing(true);
     setStatus(t('m.real.sharing'));
     try {
       const ids = [];
@@ -58,29 +52,41 @@ export default function Real() {
       router.navigate('/');
     } catch (e) {
       setStatus((e as Error).message);
+    } finally {
+      setSharing(false);
     }
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: c.ground }}>
-      <CameraView ref={camera} style={{ flex: 1 }} facing={facing} />
+    // The caption sits under the camera: the keyboard pushes it (and the buttons) up rather than covering them.
+    <KeyboardAvoid style={{ backgroundColor: c.ground }}>
+      <CameraView ref={camera} active={focused} style={{ flex: 1 }} facing={facing} />
       <View style={{ padding: space[4], gap: space[2] }}>
-        {status ? <Text style={{ color: c.ink }}>{status}</Text> : null}
+        {status ? (
+          <Text accessibilityLiveRegion="polite" style={{ color: c.ink }}>
+            {status}
+          </Text>
+        ) : null}
         <Field label={t('m.real.caption')} value={caption} onChangeText={setCaption} maxLength={300} />
         <Button
           label={shots.length === 0 ? t('m.real.captureFirst') : t('m.real.captureFront')}
+          disabled={sharing}
           onPress={async () => {
-            const photo = await camera.current?.takePictureAsync({ quality: 0.85, exif: false });
+            // The camera can refuse (not ready yet, or taken by another app): say so instead of failing silently.
+            const photo = await camera.current?.takePictureAsync({ quality: 0.85, exif: false }).catch(() => {
+              setStatus(t('m.camera.photoFailed'));
+              return null;
+            });
             if (!photo) return;
             const next = [...shots, photo.uri];
             if (next.length === 1) {
               setShots(next);
               setFacing(facing === 'back' ? 'front' : 'back');
-            } else void share(next);
+            } else await share(next);
           }}
         />
-        {shots.length === 1 ? <Button label={t('m.real.shareOne')} variant="secondary" onPress={() => share(shots)} /> : null}
+        {shots.length === 1 ? <Button label={t('m.real.shareOne')} variant="secondary" disabled={sharing} onPress={() => share(shots)} /> : null}
       </View>
-    </View>
+    </KeyboardAvoid>
   );
 }

@@ -12,31 +12,34 @@ import { useSession } from '../../../providers';
 
 export default function BusinessPage() {
   const { slug } = useParams<{ slug: string }>();
-  const { locale, me } = useSession();
+  const { locale, me, t } = useSession();
   const [data, setData] = useState<Awaited<ReturnType<typeof api.businesses.get>> | null>(null);
   const [missing, setMissing] = useState(false);
   useEffect(() => {
     api.businesses.get(slug).then(setData, () => setMissing(true));
   }, [slug]);
-  if (missing) return <EmptyState title="Business not found" />;
+  if (missing) return <EmptyState title={t('bizPage.notFound')} />;
   if (!data) return <Skeleton height={240} />;
   const { business, places, products } = data;
+  const [runBefore, runAfter = ''] = t('bizPage.runBy').split('{name}');
   return (
     <div className="yp-shell__inner">
       <div className="stack-sm">
         <div className="row">
           <Badge tone="neutral">{business.category}</Badge>
-          {business.verified ? <Badge tone="success">Verified</Badge> : null}
+          {business.verified ? <Badge tone="success">{t('bizPage.verified')}</Badge> : null}
         </div>
         <h1 className="profile__name">{business.name}</h1>
         {business.description ? <p style={{ margin: 0 }}>{business.description}</p> : null}
         <span className="muted">
-          Run by <Link href={`/u/${business.owner.username}`}>{business.owner.displayName}</Link>
+          {runBefore}
+          <Link href={`/u/${business.owner.username}`}>{business.owner.displayName}</Link>
+          {runAfter}
           {business.website ? (
             <>
               {' · '}
               <a href={business.website} target="_blank" rel="noopener noreferrer nofollow">
-                Website
+                {t('bizPage.website')}
               </a>
             </>
           ) : null}
@@ -44,13 +47,13 @@ export default function BusinessPage() {
       </div>
       {me?.id === business.owner.id ? <BusinessInsights businessId={business.id} /> : null}
       {places.length ? (
-        <List label="Locations">
+        <List label={t('bizPage.locations')}>
           {places.map((p) => (
             <ListItem key={p.id} href={`/places/${p.id}`} linkAs={NextLink} primary={p.name} secondary={[p.address, p.city].filter(Boolean).join(', ')} />
           ))}
         </List>
       ) : null}
-      {products.length ? <h2 className="section-title">Products and services</h2> : null}
+      {products.length ? <h2 className="section-title">{t('bizPage.products')}</h2> : null}
       <div className="yp-grid">
         {products.map((p) => (
           <ProductCard key={p.id} product={p as never} locale={locale} action={<BuyButton productId={p.id} />} />

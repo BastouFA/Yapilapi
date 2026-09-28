@@ -8,7 +8,7 @@ import { BookPlace, ManageBookings, MyBookings, PlaceReviews, RatingLine, usePla
 import { SectionHeader } from '../../lib/chips';
 import { useT } from '../../lib/i18n';
 import { space } from '../../lib/theme';
-import { Button, Card, EmptyState, Icon, Loading, Row, useColors, useRefresh, userText } from '../../lib/ui';
+import { Button, Card, EmptyState, Icon, KeyboardAvoid, Loading, Row, useColors, useRefresh, userText } from '../../lib/ui';
 
 type PlaceData = { place: Record<string, any>; events: EventItem[]; products: Record<string, any>[] };
 
@@ -63,92 +63,95 @@ export default function PlaceScreen() {
   const hasMap = typeof place.lat === 'number' && typeof place.lng === 'number';
 
   return (
-    <ScrollView
-      keyboardShouldPersistTaps="handled"
-      refreshControl={refresh}
-      style={{ backgroundColor: c.ground }}
-      contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
-    >
-      <Card style={{ gap: space[2] }}>
-        {place.category ? (
-          <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '700', textTransform: 'capitalize' }}>{String(place.category)}</Text>
-        ) : null}
-        <Text accessibilityRole="header" style={[{ color: c.ink, fontSize: 24, fontWeight: '800', letterSpacing: -0.4 }, userText]}>
-          {String(place.name)}
-        </Text>
-        <RatingLine data={reviews} />
-        {address ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
-            <Icon name="location-outline" size={16} color={c.inkMuted} />
-            <Text style={[{ color: c.inkMuted, flex: 1 }, userText]}>{address}</Text>
+    // A review and a booking note are typed low on the page: the keyboard makes room for them.
+    <KeyboardAvoid style={{ backgroundColor: c.ground }}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        refreshControl={refresh}
+        style={{ backgroundColor: c.ground }}
+        contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
+      >
+        <Card style={{ gap: space[2] }}>
+          {place.category ? (
+            <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '700', textTransform: 'capitalize' }}>{String(place.category)}</Text>
+          ) : null}
+          <Text accessibilityRole="header" style={[{ color: c.ink, fontSize: 24, fontWeight: '800', letterSpacing: -0.4 }, userText]}>
+            {String(place.name)}
+          </Text>
+          <RatingLine data={reviews} />
+          {address ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+              <Icon name="location-outline" size={16} color={c.inkMuted} />
+              <Text style={[{ color: c.inkMuted, flex: 1 }, userText]}>{address}</Text>
+            </View>
+          ) : null}
+          {place.description ? <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 22 }, userText]}>{String(place.description)}</Text> : null}
+          {hasMap ? (
+            <Button
+              label={t('m.place.openMap')}
+              icon="map-outline"
+              variant="secondary"
+              size="sm"
+              style={{ alignSelf: 'flex-start' }}
+              onPress={() => Linking.openURL(`https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lng}#map=17/${place.lat}/${place.lng}`)}
+            />
+          ) : null}
+        </Card>
+
+        {owner.bookings ? <ManageBookings items={owner.bookings} reload={owner.reload} /> : null}
+
+        {hasBusiness && owner.bookings === false ? (
+          <View style={{ gap: space[2] }}>
+            <SectionHeader title={t('m.booking.title')} />
+            <BookPlace placeId={id} hours={(place.hours ?? null) as Record<string, unknown> | null} onBooked={() => setBooked((n) => n + 1)} />
           </View>
         ) : null}
-        {place.description ? <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 22 }, userText]}>{String(place.description)}</Text> : null}
-        {hasMap ? (
-          <Button
-            label={t('m.place.openMap')}
-            icon="map-outline"
-            variant="secondary"
-            size="sm"
-            style={{ alignSelf: 'flex-start' }}
-            onPress={() => Linking.openURL(`https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lng}#map=17/${place.lat}/${place.lng}`)}
-          />
+        {hasBusiness ? <MyBookings placeId={id} version={booked} /> : null}
+
+        {hours.length ? (
+          <View style={{ gap: space[2] }}>
+            <SectionHeader title={t('m.place.hours')} />
+            <Card style={{ gap: space[1] }}>
+              {hours.map(([day, h]) => (
+                <View key={day} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space[3] }}>
+                  <Text style={{ color: c.ink, fontWeight: '600', textTransform: 'capitalize' }}>{day}</Text>
+                  <Text style={{ color: c.inkMuted }}>{h}</Text>
+                </View>
+              ))}
+            </Card>
+          </View>
         ) : null}
-      </Card>
 
-      {owner.bookings ? <ManageBookings items={owner.bookings} reload={owner.reload} /> : null}
-
-      {hasBusiness && owner.bookings === false ? (
-        <View style={{ gap: space[2] }}>
-          <SectionHeader title={t('m.booking.title')} />
-          <BookPlace placeId={id} hours={(place.hours ?? null) as Record<string, unknown> | null} onBooked={() => setBooked((n) => n + 1)} />
-        </View>
-      ) : null}
-      {hasBusiness ? <MyBookings placeId={id} version={booked} /> : null}
-
-      {hours.length ? (
-        <View style={{ gap: space[2] }}>
-          <SectionHeader title={t('m.place.hours')} />
-          <Card style={{ gap: space[1] }}>
-            {hours.map(([day, h]) => (
-              <View key={day} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space[3] }}>
-                <Text style={{ color: c.ink, fontWeight: '600', textTransform: 'capitalize' }}>{day}</Text>
-                <Text style={{ color: c.inkMuted }}>{h}</Text>
-              </View>
+        {events.length ? (
+          <View style={{ gap: space[2] }}>
+            <SectionHeader title={t('m.place.upcoming')} />
+            {events.map((e) => (
+              <Row
+                key={e.id}
+                title={e.title}
+                subtitle={dateTime(e.startsAt)}
+                start={<Icon name="calendar-outline" size={22} color={c.yapi} />}
+                onPress={() => router.push(`/event/${e.id}`)}
+              />
             ))}
-          </Card>
-        </View>
-      ) : null}
+          </View>
+        ) : null}
 
-      {events.length ? (
-        <View style={{ gap: space[2] }}>
-          <SectionHeader title={t('m.place.upcoming')} />
-          {events.map((e) => (
-            <Row
-              key={e.id}
-              title={e.title}
-              subtitle={dateTime(e.startsAt)}
-              start={<Icon name="calendar-outline" size={22} color={c.yapi} />}
-              onPress={() => router.push(`/event/${e.id}`)}
-            />
-          ))}
-        </View>
-      ) : null}
+        {products.length ? (
+          <View style={{ gap: space[2] }}>
+            <SectionHeader title={t('m.place.offers')} />
+            {products.map((p) => (
+              <Row
+                key={String(p.id)}
+                title={String(p.title)}
+                subtitle={typeof p.priceCents === 'number' && p.currency ? formatMoney(p.priceCents, String(p.currency), locale) : undefined}
+              />
+            ))}
+          </View>
+        ) : null}
 
-      {products.length ? (
-        <View style={{ gap: space[2] }}>
-          <SectionHeader title={t('m.place.offers')} />
-          {products.map((p) => (
-            <Row
-              key={String(p.id)}
-              title={String(p.title)}
-              subtitle={typeof p.priceCents === 'number' && p.currency ? formatMoney(p.priceCents, String(p.currency), locale) : undefined}
-            />
-          ))}
-        </View>
-      ) : null}
-
-      <PlaceReviews placeId={id} data={reviews} reload={loadReviews} isOwner={!!owner.bookings} />
-    </ScrollView>
+        <PlaceReviews placeId={id} data={reviews} reload={loadReviews} isOwner={!!owner.bookings} />
+      </ScrollView>
+    </KeyboardAvoid>
   );
 }

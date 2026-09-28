@@ -29,7 +29,7 @@ import { SuggestAltText } from './ai-helpers';
 import { useT } from './i18n';
 import { useReducedMotion } from './motion';
 import { radius, space } from './theme';
-import { Avatar, Button, Field, Icon, Notice, Segmented, useColors, userText } from './ui';
+import { Avatar, Button, Field, Icon, KeyboardAvoid, Notice, Segmented, useColors, userText } from './ui';
 
 /**
  * The cover editor on the phone: frame the photo in the cover's 8:3 band (drag, pinch, or the
@@ -245,7 +245,8 @@ export function CoverEditor({
 
   return (
     <Modal animationType={reduceMotion ? 'none' : 'slide'} presentationStyle="fullScreen" onRequestClose={busy ? () => undefined : onCancel}>
-      <View style={{ flex: 1, backgroundColor: c.ground, paddingTop: insets.top, paddingBottom: insets.bottom }}>
+      {/* The description field is at the bottom of the tools: the keyboard makes room instead of covering it. */}
+      <KeyboardAvoid offset={0} style={{ backgroundColor: c.ground, paddingTop: insets.top, paddingBottom: insets.bottom }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], paddingHorizontal: space[3], paddingVertical: space[2] }}>
           <Button label={t('common.cancel')} variant="ghost" size="sm" onPress={onCancel} disabled={busy} />
           <Text accessibilityRole="header" numberOfLines={1} style={{ flex: 1, color: c.ink, fontWeight: '700', fontSize: 16, textAlign: 'center' }}>
@@ -404,7 +405,7 @@ export function CoverEditor({
           </ScrollView>
           <Text style={{ color: c.inkMuted, fontSize: 12 }}>{t('coverEditor.saveNote')}</Text>
         </View>
-      </View>
+      </KeyboardAvoid>
     </Modal>
   );
 }

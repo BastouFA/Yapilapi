@@ -4,9 +4,18 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { LegalLinks } from '@/components/Legal';
+import type { MessageKey } from '@yapilapi/shared';
 import { useSession } from './providers';
 
-const JOURNEY = ['Discover', 'Connect', 'Communicate', 'Participate', 'Buy & book', 'Experience', 'Remember'];
+const JOURNEY = [
+  'landing.journey.discover',
+  'landing.journey.connect',
+  'landing.journey.communicate',
+  'landing.journey.participate',
+  'landing.journey.buyBook',
+  'landing.journey.experience',
+  'landing.journey.remember',
+] as const satisfies readonly MessageKey[];
 
 export default function Landing() {
   const { me, loading, t } = useSession();
@@ -37,18 +46,15 @@ export default function Landing() {
       <main className="landing__hero" id="main">
         <div className="stack" style={{ gap: 'var(--space-6)' }}>
           <span className="landing__eyebrow">
-            <b>NEW</b> Live, Real Together and Mini Apps
+            <b style={{ textTransform: 'uppercase' }}>{t('landing.new')}</b> {t('landing.eyebrow')}
           </span>
           <h1>
             {head} {tail ? <span className="grad-text">{tail}</span> : null}
           </h1>
-          <p>
-            People, communities, events, places and the things you love, in one place you control. No endless scroll by design: you choose what your feed shows,
-            and you can always see why.
-          </p>
-          <ul className="landing__journey" aria-label="What you can do">
+          <p>{t('landing.intro')}</p>
+          <ul className="landing__journey" aria-label={t('landing.journeyLabel')}>
             {JOURNEY.map((j) => (
-              <li key={j}>{j}</li>
+              <li key={j}>{t(j)}</li>
             ))}
           </ul>
           <div className="row" style={{ gap: 'var(--space-3)' }}>
@@ -82,16 +88,16 @@ export default function Landing() {
           </div>
           <div className="phone phone--b">
             <div className="phone__live" />
-            <div className="phone__bubble">Are you coming tonight?</div>
-            <div className="phone__bubble phone__bubble--me">On my way, saving you a seat</div>
-            <div className="phone__bubble">Bring the playlist</div>
-            <div className="phone__bubble phone__bubble--me">Already on it</div>
+            <div className="phone__bubble">{t('landing.demo.coming')}</div>
+            <div className="phone__bubble phone__bubble--me">{t('landing.demo.onMyWay')}</div>
+            <div className="phone__bubble">{t('landing.demo.playlist')}</div>
+            <div className="phone__bubble phone__bubble--me">{t('landing.demo.onIt')}</div>
           </div>
           <div className="float-chip float-chip--1">
-            <span /> You choose your feed
+            <span /> {t('landing.chip.feed')}
           </div>
           <div className="float-chip float-chip--2">
-            <span /> See why every post is here
+            <span /> {t('landing.chip.why')}
           </div>
         </div>
       </main>

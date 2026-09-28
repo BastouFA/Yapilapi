@@ -17,5 +17,3 @@ export function nextHour(): string {
   d.setMinutes(0, 0, 0);
   return localInput(d);
 }
-
-export const SCHEDULE_HINT = `Between ${SCHEDULE_MIN_MINUTES} minutes and ${SCHEDULE_MAX_DAYS} days from now, in your time zone. Until then, only you can see it, in Drafts.`;

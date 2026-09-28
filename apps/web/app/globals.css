@@ -4164,6 +4164,10 @@ span.cam__icon {
   border-radius: 12px;
   cursor: pointer;
 }
+.chat-game-option--going {
+  align-items: center;
+  cursor: default;
+}
 .chat-game-option--on {
   border-color: var(--yapi);
   background: var(--yapi-soft);
@@ -5673,9 +5677,25 @@ button.yp-chip[aria-pressed='true'] {
   .yp-composer > .yp-btn {
     padding-inline: 12px;
   }
+  /* The text box gets its own row across the top; the buttons sit in a row under it, with the
+     schedule and send buttons at the end. */
+  .yp-composer {
+    flex-wrap: wrap;
+    row-gap: 2px;
+    border-radius: var(--radius-lg);
+  }
+  .yp-composer .chat-compose-context {
+    order: -2;
+  }
   .yp-composer textarea {
+    order: -1;
+    flex: 1 0 100%;
     min-width: 0;
     padding-inline: 4px;
+  }
+  .yp-composer textarea + .yp-action,
+  .yp-composer textarea + .yp-btn {
+    margin-inline-start: auto;
   }
   /* With every button in the row the box is narrow: the hint stays on one line (cut short where
      the browser supports it) instead of wrapping into a second line the one-line box hides. */
@@ -10699,4 +10719,26 @@ button.profile-song__play::after {
 }
 .location-banner .yp-btn {
   min-height: 44px;
+}
+
+/* The chat message box: never squeezed below a readable width (the row wraps first), grows with
+   what you write up to its maximum height, and shows no scrollbar until it needs one. */
+.yp-composer textarea {
+  field-sizing: content;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+@media (min-width: 521px) {
+  .yp-composer {
+    flex-wrap: wrap;
+  }
+  .yp-composer textarea {
+    flex: 1 1 12rem;
+    min-width: min(100%, 12rem);
+  }
+}
+.yp-composer textarea::placeholder {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

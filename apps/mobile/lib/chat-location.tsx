@@ -117,29 +117,52 @@ export function useLocationSharing(conversationId: string, meId: string | undefi
     let sub: Location.LocationSubscription | null = null;
     let lastSent = Date.now();
     let cancelled = false;
-    const watch = async () => {
-      sub?.remove();
+    // The app can go back and forth while a watch is still starting: only the latest one is kept, so
+    // an earlier one can never go on following you unseen.
+    let run = 0;
+    const stopWatching = () => {
+      try {
+        sub?.remove();
+      } catch {
+        /* already stopped */
+      }
       sub = null;
+    };
+    const watch = async () => {
+      const mineRun = ++run;
+      stopWatching();
       if (AppState.currentState !== 'active') return;
-      sub = await Location.watchPositionAsync({ accuracy: Location.Accuracy.High, timeInterval: LOCATION_UPDATE_SECONDS * 1000, distanceInterval: 10 }, (p) => {
-        if (cancelled || Date.now() - lastSent < LOCATION_UPDATE_SECONDS * 1000) return;
-        lastSent = Date.now();
-        const point = pointFor({ lat: p.coords.latitude, lng: p.coords.longitude }, share.precision);
-        void client()
-          .then((api) => api.location.update(share.id, { ...point, accuracy: p.coords.accuracy ?? undefined }))
-          .then(
-            (r) => setMine((cur) => (cur?.id === share.id ? r.location : cur)),
-            () => {},
-          );
-      }).catch(() => null);
-      if (cancelled) sub?.remove();
+      const next = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.High, timeInterval: LOCATION_UPDATE_SECONDS * 1000, distanceInterval: 10 },
+        (p) => {
+          if (cancelled || Date.now() - lastSent < LOCATION_UPDATE_SECONDS * 1000) return;
+          lastSent = Date.now();
+          const point = pointFor({ lat: p.coords.latitude, lng: p.coords.longitude }, share.precision);
+          void client()
+            .then((api) => api.location.update(share.id, { ...point, accuracy: p.coords.accuracy ?? undefined }))
+            .then(
+              (r) => setMine((cur) => (cur?.id === share.id ? r.location : cur)),
+              () => {},
+            );
+        },
+      ).catch(() => null);
+      if (cancelled || mineRun !== run || AppState.currentState !== 'active') {
+        try {
+          next?.remove();
+        } catch {
+          /* already stopped */
+        }
+        return;
+      }
+      sub = next;
     };
     void watch();
     const app = AppState.addEventListener('change', () => void watch());
     return () => {
       cancelled = true;
+      run++;
       app.remove();
-      sub?.remove();
+      stopWatching();
     };
   }, [startedHere, mine?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
