@@ -103,6 +103,7 @@ import type {
   AskFilter,
   AskShareVisibility,
   InboxQuestion,
+  StorePurchasePolicy,
 } from '@yapilapi/shared';
 
 export class ApiError extends Error {
@@ -1008,7 +1009,8 @@ export function createClient(opts: ClientOptions) {
       /** Paid tips you got or sent; ones sent during a live are gifts. */
       tips: (direction: 'received' | 'sent' = 'received') => get<{ direction: 'received' | 'sent'; items: TipRecord[] }>(`/v1/me/tips${qs({ direction })}`),
     },
-    flags: () => get<{ flags: Record<string, boolean> }>('/v1/flags'),
+    /** Feature flags, and how the phone apps offer digital goods (`purchases`; missing from older servers). */
+    flags: () => get<{ flags: Record<string, boolean>; purchases?: StorePurchasePolicy }>('/v1/flags'),
     /** What anyone can see of a shared link without an account (link previews, signed-out views). */
     public: {
       post: (id: string) => get<{ post: PublicPostPreview }>(`/v1/public/posts/${encodeURIComponent(id)}`),

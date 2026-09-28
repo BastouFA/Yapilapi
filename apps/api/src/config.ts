@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ANDROID_DIGITAL_PURCHASE_MODES, IOS_DIGITAL_PURCHASE_MODES, parseCountryList } from '@yapilapi/shared';
 
 const bool = z
   .string()
@@ -37,6 +38,20 @@ const schema = z.object({
   /** YAPILAPI Plus: the price of one month (30 days), in hundredths of PLUS_CURRENCY. */
   PLUS_PRICE_CENTS: z.coerce.number().int().min(50).max(100_000).default(499),
   PLUS_CURRENCY: z.string().length(3).toUpperCase().default('USD'),
+  /**
+   * How the phone apps offer digital goods (Plus, creator subscriptions, tips, boosts, downloads,
+   * tickets to lives); see docs/operations/in-app-purchases.md. Physical goods and real-world
+   * services are not affected, and the web checkout always works.
+   * iPhone: hidden (no buy buttons or prices), external_link (a link to the web checkout in the
+   * countries listed in IOS_EXTERNAL_LINK_COUNTRIES) or iap (Apple In-App Purchase, once the app
+   * has a StoreKit module; until then like hidden).
+   */
+  IOS_DIGITAL_PURCHASES: z.enum(IOS_DIGITAL_PURCHASE_MODES).default('hidden'),
+  /** Storefront countries where the iPhone app may link to the web checkout, e.g. "US" or "US,GB". */
+  IOS_EXTERNAL_LINK_COUNTRIES: z.string().default('US').transform(parseCountryList),
+  /** Android: play_billing_required (like hidden) or user_choice (a link to the web checkout in ANDROID_USER_CHOICE_COUNTRIES). */
+  ANDROID_DIGITAL_PURCHASES: z.enum(ANDROID_DIGITAL_PURCHASE_MODES).default('play_billing_required'),
+  ANDROID_USER_CHOICE_COUNTRIES: z.string().default('US').transform(parseCountryList),
   // 32 bytes, base64. Encrypts TOTP secrets at rest. Development falls back to a fixed dev key.
   MFA_ENCRYPTION_KEY: z.string().optional().default(''),
   // Passkeys: the site's domain and origin. Default to WEB_ORIGIN.

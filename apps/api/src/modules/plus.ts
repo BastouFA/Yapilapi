@@ -7,6 +7,7 @@ import { MAX_RESUMABLE_BYTES, PLUS_DAYS, PLUS_MAX_AHEAD_DAYS, PLUS_MAX_RESUMABLE
 import { isEnabled, track } from '../lib/services.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 import { startPayment } from '../lib/checkout.ts';
+import { assertDigitalCheckoutAllowed } from '../lib/store-purchases.ts';
 
 const MB = 1024 * 1024;
 
@@ -63,6 +64,7 @@ export default async function plusModule(app: FastifyInstance, ctx: AppContext) 
   /** Start paying for a month of Plus. The days are added when the payment provider confirms it. */
   app.post('/v1/plus/checkout', { preHandler: requireAuth, config: { rateLimit: { max: 20, timeWindow: '1 hour' } } }, async (req, reply) => {
     if (!(await isEnabled(db, 'COMMERCE'))) throw featureDisabled('Payments');
+    assertDigitalCheckoutAllowed(req, ctx.config, 'plus');
     const u = me(req);
     const { idempotencyKey } = parse(z.object({ idempotencyKey: z.string().min(8).max(100) }), req.body);
     const result = await tx(db, async (c) => {

@@ -16,6 +16,7 @@ import { eventVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
 import { grantPlus } from '../lib/plus.ts';
 import { refundOrder, startPayment } from '../lib/checkout.ts';
+import { assertDigitalCheckoutAllowed } from '../lib/store-purchases.ts';
 import { confirmDropOrder, dropGateSql, publishDropChange, releaseDropOrder, takeDropStock } from '../lib/drops.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -316,6 +317,9 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
         [ids, u.id],
       );
       if (products.length !== new Set(ids).size) throw notFound('One of those products');
+      // Downloads and tickets to a live are digital goods: the phone apps may not sell them with a card checkout.
+      if (products.some((p) => p.kind === 'digital')) assertDigitalCheckoutAllowed(req, ctx.config, 'digital_download');
+      if (input.liveSessionId) assertDigitalCheckoutAllowed(req, ctx.config, 'live_ticket');
       for (const p of products) {
         // A download is sold once per buyer, and only once the seller has uploaded the file.
         if (p.kind === 'digital' && !p.has_file) throw new AppError(409, 'not_ready', "This download isn't ready yet. Try again later.");

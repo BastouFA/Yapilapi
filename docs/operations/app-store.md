@@ -13,6 +13,8 @@ Order of work:
 
 Store listing text (English and French) is in [store-listing.md](store-listing.md).
 
+How the phone apps sell digital goods (Plus, creator subscriptions, tips, boosts, downloads, tickets to lives) is a decision for you. The options, the fees, the risks and our recommendation are in [in-app-purchases.md](in-app-purchases.md). Whatever you choose is a setting on the API, so no new app build is needed to change it.
+
 ## 1. Before you submit
 
 ### The legal pages are templates
@@ -61,10 +63,13 @@ These come from checking the code against the store rules and the privacy policy
 
 | Issue | Where | Why it matters |
 | --- | --- | --- |
-| **Digital purchases in the iOS app go to web checkout.** Plus, creator subscriptions and tips open the web. | `apps/mobile/lib/money.tsx`, `apps/mobile/app/plus.tsx` | Apple guideline 3.1.1: digital content and features bought inside an iOS app must use In-App Purchase. Tips are only exempt when 100% goes to the creator, and a 5% fee is taken. Physical goods, event tickets and real-world services (3.1.3(e), 3.1.5) may use Stripe or Paystack. Choose one of these for the first iOS release: hide Plus, subscriptions and tips in the iOS app; move them to In-App Purchase; or, for the U.S. storefront only, use Apple's external purchase link rules. Google Play has similar rules (Payments policy); check them for Android too. |
 | **Digital products after a seller deletes their account.** Their private files are kept so buyers keep their downloads. | `apps/api/src/lib/media-files.ts` (`collectAccountFiles`) | Decide whether buyers keep access, and say so in the creator terms. |
 | **Files uploaded before 2026-09-27 still carry their metadata.** Stripping happens at upload, and nothing rewrites the files stored before then. | `apps/api/src/lib/media-formats.ts` | Only matters if real people uploaded before this change. If they did, run a one-off job that rewrites those originals. |
 | **Periods to confirm.** The retention periods are in `RETENTION` (`apps/api/src/lib/retention.ts`) and in section 5 of the privacy policy. Payment records, and reports with their moderation decisions, have no period yet. | `apps/web/app/legal/privacy/page.tsx` | This is a legal decision. Change the code and the policy together. |
+
+#### Closed on 2026-09-28
+
+- **Digital purchases in the phone apps.** Before, Plus, creator subscriptions, tips, boosts, downloads and live tickets all opened the web checkout from the app, which Apple guideline 3.1.1 and Google Play's Payments policy don't allow for digital goods outside the US. Now a server setting decides (`IOS_DIGITAL_PURCHASES`, `ANDROID_DIGITAL_PURCHASES`). By default the apps show no buy buttons or prices for digital goods, only a plain line such as "You can manage Plus on the web", and the API refuses to start a digital checkout from a phone. Physical products, drops of physical products, services and event tickets keep their checkout. The decision memo is [in-app-purchases.md](in-app-purchases.md). Tests: `apps/api/test/store-purchases.test.ts`, `packages/shared/src/store-purchases.test.ts`.
 
 #### Closed on 2026-09-27
 
@@ -318,7 +323,7 @@ Review notes to paste. Replace the placeholders.
 > Account deletion: Settings > Your data > Delete account (asks for the password; deletion is immediate).
 > Minimum age 13. Under-18 accounts are private and can only be messaged by friends.
 > Calls need the microphone (and camera for video). Contacts are only read when you tap "Find friends", and only coded email addresses leave the phone.
-> Purchases: [describe what you decided for 3.1.1, for example "Plus, subscriptions and tips are not offered in the iOS app"].
+> Purchases: [match what `IOS_DIGITAL_PURCHASES` is set to; see in-app-purchases.md. With the default (hidden): "Plus, creator subscriptions, tips, boosts, digital downloads and tickets to live streams are not sold in the iOS app; the app shows no prices or links for them. Physical products, in-person event tickets and real-world services are paid with Stripe or Paystack under 3.1.3(e)."].
 
 ### Content rating (Apple age rating and Google's IARC questionnaire)
 
@@ -327,7 +332,7 @@ Review notes to paste. Replace the placeholders.
 | User-generated content / users can interact | Yes | Posts, comments, chats, calls, live, rooms |
 | Users can share their location | No for GPS. Posts can carry a place name the author types | No location permission is used |
 | Unrestricted web access | No | Links open in the system browser |
-| Digital purchases | Yes | Plus, subscriptions, tips, digital downloads (web checkout today; see 3.1.1 above) |
+| Digital purchases | Depends on the setting | Plus, subscriptions, tips, boosts, digital downloads, live tickets. Not offered in the app with the default setting (see [in-app-purchases.md](in-app-purchases.md)) |
 | Gambling, simulated gambling | No | |
 | Violence, sexual content, profanity, drugs, horror (made by you) | None | Only what users post, which the guidelines limit |
 | Mature or suggestive themes (Apple): Infrequent or mild | Choose "Infrequent/Mild" for user-generated content | Apple wants UGC apps to reflect what users could see |

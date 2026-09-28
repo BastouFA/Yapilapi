@@ -187,6 +187,33 @@ Four up (connect four on a 7 by 6 board, two players), Noughts (noughts and cros
 
 **Not done in this round:** games in community chats; choosing the words for a Word ladder; leaving a group doesn't forfeit your games (they end after a day without a move instead). The phone screens are type-checked but not run on a device.
 
+## Digital purchases in the phone apps (2026-09-28, no migration, `apps/api/test/store-purchases.test.ts`)
+
+The app stores want digital goods bought in their apps paid through their own billing. The owner hasn't decided how to handle that yet, so the apps now follow a server setting (decision memo: `docs/operations/in-app-purchases.md`). The rules are one pure file shared by the API and the phone (`packages/shared/src/store-purchases.ts`, tested).
+
+- **Settings** (API environment, sent to the phone with `GET /v1/flags` as `purchases`):
+  - `IOS_DIGITAL_PURCHASES`: `hidden` (default), `external_link` or `iap`.
+  - `IOS_EXTERNAL_LINK_COUNTRIES`: the countries for `external_link`, default `US`.
+  - `ANDROID_DIGITAL_PURCHASES`: `play_billing_required` (default) or `user_choice`.
+  - `ANDROID_USER_CHOICE_COUNTRIES`: the countries for `user_choice`, default `US`.
+  - The web admin console shows the current values under Feature flags.
+- **Digital goods**: Plus, subscriptions to creators, tips and live gifts, boosts and ad budget, downloads, and tickets to lives.
+  - When hidden, the phone shows no buy button and no price for them, only a plain line with no link, such as "You can manage Plus on the web".
+  - Owned downloads still open, and past purchases, Plus status and boost results still show.
+- **Link modes**: the existing "on the web" buttons appear, but only when every country the phone knows is in the list. That means the phone's region, the account's country, and later the App Store country.
+- **`iap`**: a typed StoreKit seam (`StoreBilling` in `apps/mobile/lib/store.tsx`) with a `TODO(iap)`. Nothing is installed. Until a module exists, `iap` behaves like hidden.
+- **Physical goods and real-world services keep their checkout everywhere**: shop products, drops of physical products, booked services and tickets to events in a real place.
+- **API**:
+  - The phone now sends `x-client-platform: ios|android` on every request. Sessions from either are listed as a phone.
+  - A digital checkout (`/v1/plus/checkout`, tips, creator subscriptions, boosts, ad budget, and orders with a download or a live ticket) from a phone whose setting doesn't allow it gets 403 `store_purchase_required`, before any order is made.
+  - Requests from the web are never refused.
+
+**Not done in this round:**
+
+- The StoreKit and Google Play Billing modules.
+- Apple's link-out entitlement for countries outside the US.
+- A test on a real device.
+
 ## Not built yet
 
 - Mainstream music: needs a licensing deal (docs/operations/music.md). Reporting song use to a licensing partner is not built.

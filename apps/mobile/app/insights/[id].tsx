@@ -9,6 +9,7 @@ import { BoostResult, DayBars, StatGrid } from '../../lib/creator';
 import { useFlag } from '../../lib/flags';
 import { useT } from '../../lib/i18n';
 import { useSession } from '../../lib/session';
+import { ManagedOnWeb, useDigitalPurchases } from '../../lib/store';
 import { space } from '../../lib/theme';
 import { Button, Card, EmptyState, ErrorState, Loading, Notice, useColors, userText } from '../../lib/ui';
 
@@ -24,6 +25,7 @@ export default function InsightsScreen() {
   const { me } = useSession();
   const ads = useFlag('ADS');
   const commerce = useFlag('COMMERCE');
+  const offer = useDigitalPurchases();
   const [data, setData] = useState<{ insights: PostInsights; post: Post | null; boosts: Boost[] } | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -73,7 +75,10 @@ export default function InsightsScreen() {
   const running = data.boosts.some((b) => ['pending_review', 'active', 'paused'].includes(b.status));
   // Only the author boosts a post; co-authors see the numbers.
   const own = !!data.post && data.post.author.id === me?.id;
-  const canBoost = ads === true && commerce !== false && !!data.post && data.post.visibility === 'public' && !running;
+  const boostable = ads === true && commerce !== false && !!data.post && data.post.visibility === 'public' && !running;
+  // A boost is a digital good: offered only where the app store rules allow a link out (lib/store.tsx).
+  const canBoost = boostable && offer === 'link';
+  const boostHidden = boostable && offer !== 'link';
 
   return (
     <ScrollView
@@ -120,7 +125,7 @@ export default function InsightsScreen() {
         <DayBars values={perDay} summary={t('m.insights.viewsA11y', { total: number(recent), peak: number(Math.max(0, ...perDay)) })} />
       </View>
 
-      {own && (data.boosts.length || canBoost) ? (
+      {own && (data.boosts.length || canBoost || boostHidden) ? (
         <View style={{ gap: space[2] }}>
           <SectionHeader title={t('m.studio.boosts')} />
           {data.boosts.map((b) => (
@@ -128,6 +133,8 @@ export default function InsightsScreen() {
           ))}
           {canBoost ? (
             <Button label={t('m.boost.cta')} icon="rocket-outline" onPress={() => router.push({ pathname: '/boost', params: { id: s.postId } })} />
+          ) : boostHidden ? (
+            <ManagedOnWeb text={t('m.store.boost')} />
           ) : running ? (
             <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('m.boost.running')}</Text>
           ) : data.post && data.post.visibility !== 'public' && ads === true ? (

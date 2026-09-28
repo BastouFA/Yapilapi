@@ -70,6 +70,16 @@ envVarGroups:
         sync: false
       - key: PAYSTACK_PUBLIC_KEY
         sync: false
+      # How the phone apps offer digital goods (docs/operations/in-app-purchases.md). Changing these
+      # needs no new app release: the phone reads them from /v1/flags.
+      - key: IOS_DIGITAL_PURCHASES
+        value: hidden
+      - key: IOS_EXTERNAL_LINK_COUNTRIES
+        value: US
+      - key: ANDROID_DIGITAL_PURCHASES
+        value: play_billing_required
+      - key: ANDROID_USER_CHOICE_COUNTRIES
+        value: US
       # Optional: music catalogue sources (docs/operations/music.md). Each is off until set.
       - key: JAMENDO_CLIENT_ID
         sync: false

@@ -6,19 +6,22 @@ import { client } from '../lib/api';
 import { useFlag } from '../lib/flags';
 import { useT } from '../lib/i18n';
 import { PlanList, usePlans, useWebCheckout, webCheckout } from '../lib/money';
+import { ManagedOnWeb, useDigitalPurchases } from '../lib/store';
 import { space } from '../lib/theme';
 import { Avatar, Button, Card, EmptyState, Loading, Notice, useColors, userText } from '../lib/ui';
 
 /**
  * A creator's plans (`plans?username=`, and web links to /u/<name>?subscribe=1): each plan's
  * price and perks, and whether you're subscribed. Subscribing and tipping are paid on the web;
- * coming back shows the new subscription.
+ * coming back shows the new subscription. Where the app store rules don't allow a link out
+ * (lib/store.tsx), prices and buttons are left out.
  */
 export default function PlansScreen() {
   const { username } = useLocalSearchParams<{ username: string }>();
   const c = useColors();
   const { t } = useT();
   const commerce = useFlag('COMMERCE');
+  const offer = useDigitalPurchases();
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [refreshing, setRefreshing] = useState(false);
   useEffect(() => {
@@ -71,8 +74,14 @@ export default function PlansScreen() {
       </Card>
       {commerce === false ? <Notice>{t('shop.unavailable')}</Notice> : null}
       <Text style={{ color: c.ink, lineHeight: 22 }}>{t('m.money.plansIntro')}</Text>
-      {data!.items.length ? <PlanList plans={data!.items} mine={sub} /> : <EmptyState title={t('m.money.noPlans', { name: profile.displayName })} />}
-      {self || commerce === false ? null : (
+      {data!.items.length ? (
+        <PlanList plans={data!.items} mine={sub} hidePrices={offer !== 'link'} />
+      ) : (
+        <EmptyState title={t('m.money.noPlans', { name: profile.displayName })} />
+      )}
+      {self || commerce === false ? null : offer !== 'link' ? (
+        <ManagedOnWeb text={t('m.store.support')} />
+      ) : (
         <View style={{ gap: space[2] }}>
           {data!.items.length && !sub ? (
             <Button label={t('m.money.subscribeOnWeb')} icon="open-outline" onPress={() => open(webCheckout.subscribe(profile.username))} />

@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import { ApiError, createClient } from '../../../packages/api-client/src/index';
 import type { Me } from '../../../packages/shared/src/types';
 import { MAX_DEVICE_ACCOUNTS, parseDeviceAccounts, upsertDeviceAccount, withoutDeviceAccount, type DeviceAccount } from '../../../packages/shared/src/accounts';
@@ -17,18 +18,25 @@ export const getToken = async () => (await SecureStore.getItemAsync(TOKEN_KEY)) 
 // The offline banner checks this light endpoint to notice the connection is back.
 setProbeUrl(`${baseUrl}/health/live`);
 
+/**
+ * Every request says which phone it comes from (`ios` or `android`): the API lists the session as a
+ * phone under "Where you're signed in", and applies the app store rules for digital goods
+ * (docs/operations/in-app-purchases.md).
+ */
+const platformHeaders = (): Record<string, string> => ({
+  ...dataSaverHeaders(),
+  'x-client-platform': Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'mobile',
+});
+
 /** Mobile uses a Bearer session token kept in the OS keychain (never AsyncStorage). */
 export async function client() {
   // On Data saver every request says Save-Data: on, so responses leave out large photo sizes.
   // Requests go through trackedFetch, so a connection that drops shows the offline banner.
-  return createClient({ baseUrl, token: await getToken(), headers: dataSaverHeaders, fetch: trackedFetch });
+  return createClient({ baseUrl, token: await getToken(), headers: platformHeaders, fetch: trackedFetch });
 }
 
-/**
- * For signing up and logging in: no token yet, and the API is told the session is for the phone
- * app (it lists it as a phone under "Where you're signed in").
- */
-const authClient = () => createClient({ baseUrl, headers: () => ({ ...dataSaverHeaders(), 'x-client-platform': 'mobile' }), fetch: trackedFetch });
+/** For signing up and logging in: no token yet. */
+const authClient = () => createClient({ baseUrl, headers: platformHeaders, fetch: trackedFetch });
 
 /** The realtime socket URL (same endpoint as the web app). The token goes in a header, not the URL. */
 export const realtimeUrl = () => `${baseUrl.replace(/^http/, 'ws')}/v1/realtime`;
