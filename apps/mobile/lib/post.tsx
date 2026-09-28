@@ -925,11 +925,24 @@ function ReelPreview({ post, saver }: { post: Post; saver: boolean }) {
           <Icon name="play" size={26} color="#FFFFFF" />
         </View>
       </View>
-      <View style={{ position: 'absolute', bottom: space[2], start: space[3], flexDirection: 'row', alignItems: 'center', gap: 6 }} pointerEvents="none">
+      {/* On its own dark pill, so it reads on any frame (a light or busy poster, a logo in the corner). */}
+      <View
+        style={{
+          position: 'absolute',
+          bottom: space[2],
+          start: space[2],
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          paddingHorizontal: space[2],
+          paddingVertical: 4,
+          borderRadius: radius.full,
+          backgroundColor: 'rgba(5,6,11,0.62)',
+        }}
+        pointerEvents="none"
+      >
         <Icon name="sparkles-outline" size={14} color="#FFFFFF" />
-        <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 4 }}>
-          {t('reel.card.watch')}
-        </Text>
+        <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>{t('reel.card.watch')}</Text>
       </View>
       <View
         style={{ position: 'absolute', top: 0, start: 0, end: 0, bottom: 0, borderRadius: radius.md, borderWidth: 1, borderColor: c.line }}
