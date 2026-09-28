@@ -4,13 +4,14 @@ import { approximatePoint } from '@yapilapi/shared';
 import { AiGateway } from '../src/lib/ai/gateway.ts';
 import type { AiProvider } from '../src/lib/ai/providers.ts';
 import { expireShares, LOCATION_EXPIRE_JOB, locationJobHandlers } from '../src/lib/location.ts';
-import { processJobs } from '../src/lib/jobs.ts';
 import type { BuiltApp } from '../src/app.ts';
-import { as, signUp, testApp, type TestUser } from './helpers.ts';
+import { as, signUp, testApp, jobRunner, type JobRunner, type TestUser } from './helpers.ts';
 
 let t: BuiltApp;
+let runJobs: JobRunner;
 beforeAll(async () => {
   t = await testApp();
+  runJobs = await jobRunner(t.ctx.db);
 });
 afterAll(async () => {
   await t.close();
@@ -192,7 +193,7 @@ describe('Sharing where you are', () => {
     const before = (await as(t.app, b).get(`/v1/conversations/${convo}/messages`)).body.items.find((x: any) => x.id === m.id);
     expect(before.location).toMatchObject({ live: false, point: null, stopReason: 'expired' });
     await db().query(`UPDATE jobs SET run_at = now() WHERE kind = $1 AND payload->>'shareId' = $2`, [LOCATION_EXPIRE_JOB, m.location.id]);
-    await processJobs(db(), locationJobHandlers({ db: db(), realtime: t.ctx.realtime }), 50);
+    await runJobs(locationJobHandlers({ db: db(), realtime: t.ctx.realtime }), 50);
     expect(await row(m.location.id)).toMatchObject({ lat: null, lng: null, point_at: null, stop_reason: 'expired' });
     expect(lb.of('location.updated').at(-1)?.data.location).toMatchObject({ live: false, stopReason: 'expired' });
 

@@ -4,18 +4,19 @@ import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { allowsDerivatives, echoFrame, echoNoticeText, echoVolumes, t as tr, tp as trp, type MusicTrack } from '@yapilapi/shared';
 import ffmpegPath from '../src/lib/ffmpeg-path.ts';
-import { processJobs } from '../src/lib/jobs.ts';
 import { mediaJobHandlers, probe, run } from '../src/lib/media-processing.ts';
 import { planEcho, shiftCues } from '../src/lib/echoes.ts';
 import { saveCaptionTrack } from '../src/lib/studio.ts';
-import { as, signUp, testApp, type TestUser } from './helpers.ts';
+import { as, signUp, testApp, jobRunner, type JobRunner, type TestUser } from './helpers.ts';
 import type { BuiltApp } from '../src/app.ts';
 
 const UPLOADS = '/tmp/ypl-test-uploads';
 let t: BuiltApp;
+let runJobs: JobRunner;
 
 beforeAll(async () => {
   t = await testApp();
+  runJobs = await jobRunner(t.ctx.db);
 });
 afterAll(async () => {
   await t.close();
@@ -23,7 +24,7 @@ afterAll(async () => {
 
 const handlers = () => ({ ...mediaJobHandlers({ db: t.ctx.db, storage: t.ctx.storage }), ...t.ctx.jobs });
 async function drain() {
-  for (let i = 0; i < 20; i++) if (!(await processJobs(t.ctx.db, handlers()))) return;
+  for (let i = 0; i < 20; i++) if (!(await runJobs(handlers()))) return;
 }
 
 let n = 0;
