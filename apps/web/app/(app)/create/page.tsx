@@ -1,6 +1,8 @@
 'use client';
 
 import {
+  COLLAGE_MAX_PHOTOS,
+  COLLAGE_MIN_PHOTOS,
   COMMENT_POLICIES,
   extractHashtags,
   formatBytes,
@@ -8,6 +10,7 @@ import {
   MEDIA_ACCEPT,
   VIDEO_ACCEPT,
   type CaptionIdeas,
+  type CollageShape,
   type CommentPolicy,
 } from '@yapilapi/shared';
 import Link from 'next/link';
@@ -38,6 +41,7 @@ import { isVerificationError, VerifyPrompt } from '@/components/Verification';
 import { SimilarQuestions } from '@/components/CommunityExtras';
 import { CaptionIdeasPanel, SuggestAltText } from '@/components/AiHelpers';
 import { PhotoEditor } from '@/components/editor/PhotoEditor';
+import { CollageEditor, type CollagePhoto } from '@/components/Collage';
 import { VideoEditor } from '@/components/editor/VideoEditor';
 import { onPendingMedia, takePendingMedia } from '@/lib/pending-media';
 import { PeoplePicker } from '@/components/PeoplePicker';
@@ -133,6 +137,9 @@ function Create() {
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<'publish' | 'draft' | 'schedule' | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // The collage editor, with the photos going into it; stories pick theirs with their own file input.
+  const [collage, setCollage] = useState<{ photos: CollagePhoto[]; shape: CollageShape } | null>(null);
+  const collageRef = useRef<HTMLInputElement>(null);
   // A draft opened from Drafts: saving, scheduling or publishing works on it instead of starting a new post.
   const draftId = params.get('draft');
   const [draftLoaded, setDraftLoaded] = useState(!draftId);
@@ -319,6 +326,36 @@ function Create() {
         if (!pendingUploads.current) setUploading(false);
       }
     });
+  }
+
+  /** A post's photos (up to 9) go into a collage; it takes the place of the first of them. */
+  function openCollage() {
+    const photos = media.filter((m) => m.kind === 'image').slice(0, COLLAGE_MAX_PHOTOS);
+    if (photos.length < COLLAGE_MIN_PHOTOS) return toast(t('collage.needPhotos', { min: COLLAGE_MIN_PHOTOS, max: COLLAGE_MAX_PHOTOS }));
+    setCollage({ photos: photos.map((m) => ({ id: m.id, url: m.url })), shape: 'square' });
+  }
+
+  /** A story's collage: the photos are picked and uploaded as they are (no editor), then put together. */
+  async function collageFromFiles(files: FileList | null) {
+    // Copied before the input is cleared: clearing it empties its live FileList.
+    const all = Array.from(files ?? []);
+    const picked = all.filter((f) => f.type.startsWith('image/') && f.type !== 'image/gif').slice(0, COLLAGE_MAX_PHOTOS);
+    if (collageRef.current) collageRef.current.value = '';
+    if (!all.length) return;
+    if (picked.length < COLLAGE_MIN_PHOTOS) return toast(t('collage.needPhotos', { min: COLLAGE_MIN_PHOTOS, max: COLLAGE_MAX_PHOTOS }));
+    setUploading(true);
+    try {
+      const photos: CollagePhoto[] = [];
+      for (const f of picked) {
+        const { media: m } = await api.media.upload(f);
+        photos.push({ id: m.id, url: m.url });
+      }
+      setCollage({ photos, shape: 'story' });
+    } catch (e) {
+      toast(errorMessage(e));
+    } finally {
+      if (!pendingUploads.current) setUploading(false);
+    }
   }
 
   /** Caption ideas from what's written and the photos (and hashtags people use); nothing changes until one is picked. */
@@ -650,6 +687,19 @@ function Create() {
                   ? t('m.cover.uploading', { progress: new Intl.NumberFormat(locale, { style: 'percent' }).format(progress / 100) })
                   : t(kind === 'reel' ? (media.length ? 'm.create.replaceVideo' : 'm.create.chooseVideo') : 'm.create.choosePhotoVideo')}
             </Button>
+            {kind === 'post' && media.filter((m) => m.kind === 'image').length >= COLLAGE_MIN_PHOTOS ? (
+              <Button size="sm" variant="secondary" icon="image" disabled={uploading} onClick={openCollage}>
+                {t('collage.make')}
+              </Button>
+            ) : null}
+            {kind === 'story' ? (
+              <>
+                <input ref={collageRef} type="file" accept="image/*" multiple hidden onChange={(e) => collageFromFiles(e.currentTarget.files)} />
+                <Button size="sm" variant="secondary" icon="image" disabled={uploading} onClick={() => collageRef.current?.click()}>
+                  {t('collage.fromPhotos')}
+                </Button>
+              </>
+            ) : null}
             {kind === 'post' && !poll ? (
               <Button size="sm" variant="secondary" icon="poll" onClick={() => setPoll(['', ''])}>
                 {t('m.sticker.kind.poll')}
@@ -906,6 +956,25 @@ function Create() {
             onCancel={nextInQueue}
           />
         )
+      ) : null}
+      {collage ? (
+        <CollageEditor
+          photos={collage.photos}
+          shape={collage.shape}
+          onCancel={() => setCollage(null)}
+          onDone={(made) => {
+            const used = new Set(collage.photos.map((p) => p.id));
+            const item: Uploaded = { id: made.id, kind: 'image', url: made.url, altText: made.altText ?? '', tags: [] };
+            setMedia((cur) => {
+              if (kind === 'story') return [item];
+              const at = cur.findIndex((m) => used.has(m.id));
+              const rest = cur.filter((m) => !used.has(m.id));
+              rest.splice(at < 0 ? rest.length : Math.min(at, rest.length), 0, item);
+              return rest;
+            });
+            setCollage(null);
+          }}
+        />
       ) : null}
       <BottomSheet open={!!tagging} onClose={() => setTaggingId(null)} title={t('m.tags.add')}>
         {tagging ? (

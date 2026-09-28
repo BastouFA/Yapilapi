@@ -107,6 +107,10 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
          FROM ask_questions WHERE recipient_id = $1 AND deleted_at IS NULL AND (moderation_status = 'normal' OR answered_at IS NOT NULL) ORDER BY created_at DESC`,
       ),
       questionBlocks: await q(`SELECT question_id, created_at FROM ask_blocks WHERE recipient_id = $1 ORDER BY created_at DESC`),
+      // Collages you made: the layout and settings, which photos went in them, and the photo it became.
+      collages: await q(
+        `SELECT media_id, source_ids, spec, created_at FROM media_collages WHERE owner_id = $1 AND media_id IS NOT NULL ORDER BY created_at DESC`,
+      ),
       chatGames: await q(
         `SELECT conversation_id, kind, status, winner_id = $1 AS won, created_at, ended_at FROM chat_games WHERE $1 = ANY(players) ORDER BY created_at DESC`,
       ),
@@ -179,6 +183,8 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         `DELETE FROM ask_questions WHERE asker_id = $1 OR recipient_id = $1`,
         `DELETE FROM ask_boxes WHERE user_id = $1`,
         `DELETE FROM ask_blocks WHERE recipient_id = $1 OR asker_id = $1`,
+        // Collages go with their photos (and so does any half-made one).
+        `DELETE FROM media_collages WHERE owner_id = $1`,
         `DELETE FROM media WHERE owner_id = $1`,
         `DELETE FROM share_videos sv USING posts p WHERE p.id = sv.post_id AND p.author_id = $1`,
         `UPDATE recaps SET deleted_at = coalesce(deleted_at, now()) WHERE owner_id = $1`,

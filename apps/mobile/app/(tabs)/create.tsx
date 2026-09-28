@@ -24,6 +24,8 @@ import {
   type Uploaded,
 } from '../../lib/media';
 import { PhotoEditor, VideoEditor } from '../../lib/editor';
+import { CollageEditor, pickCollagePhotos, type CollagePhoto } from '../../lib/collage';
+import { COLLAGE_MAX_PHOTOS, COLLAGE_MIN_PHOTOS, type CollageShape } from '../../../../packages/shared/src/collage';
 import { useSession } from '../../lib/session';
 import { formatBytes } from '../../../../packages/shared/src/data-saver';
 import { listQueuedVideos, queuedAsAsset, queueVideo, removeQueuedVideo, useDataSaver, type QueuedVideo } from '../../lib/data-saver';
@@ -128,6 +130,8 @@ export default function Create() {
   // Posting for subscribers needs a subscription plan (set up in Studio on the web).
   const [hasPlans, setHasPlans] = useState(false);
   const [editing, setEditing] = useState<Picked | null>(null);
+  // The collage editor, with the photos picked and uploaded for it.
+  const [collage, setCollage] = useState<{ photos: CollagePhoto[]; shape: CollageShape } | null>(null);
   const [applying, setApplying] = useState(false);
   // Data saver: a video picked on Data saver waits here, with what it costs to upload, until the
   // person chooses Upload now or Upload later on Wi-Fi. Videos saved for later are listed below.
@@ -367,6 +371,32 @@ export default function Create() {
     // Photos (not GIFs) and videos open in the editor first.
     if (asset.type === 'video' || (asset.type === 'image' && asset.mimeType !== 'image/gif')) setEditing(asset);
     else void upload(asset, null);
+  }
+
+  /** Pick 2 to 9 photos, upload them as they are, then open the collage editor. */
+  async function makeCollage() {
+    setError(null);
+    const picked = await pickCollagePhotos().catch((e: unknown) => {
+      setError(errorMessage(e));
+      return null;
+    });
+    if (picked === 'denied') return setDenied(true);
+    setDenied(false);
+    if (!picked) return;
+    if (picked.length < COLLAGE_MIN_PHOTOS) return setError(t('collage.needPhotos', { min: COLLAGE_MIN_PHOTOS, max: COLLAGE_MAX_PHOTOS }));
+    setProgress(0);
+    try {
+      const photos: CollagePhoto[] = [];
+      for (const [i, asset] of picked.entries()) {
+        const m = await uploadPicked(asset, (f) => setProgress((i + f) / picked.length));
+        photos.push({ id: m.id, url: m.url });
+      }
+      setCollage({ photos, shape: kind === 'story' ? 'story' : 'square' });
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setProgress(null);
+    }
   }
 
   /** Upload the picked (or edited) file, then have the server apply the look, trim and the rest. */
@@ -683,6 +713,17 @@ export default function Create() {
               onPress={() => choose()}
               style={{ alignSelf: 'flex-start' }}
             />
+            {kind !== 'reel' ? (
+              <Button
+                label={t(kind === 'story' ? 'collage.fromPhotos' : 'collage.make')}
+                icon="grid-outline"
+                variant="secondary"
+                size="sm"
+                disabled={uploading || busy}
+                onPress={makeCollage}
+                style={{ alignSelf: 'flex-start' }}
+              />
+            ) : null}
             {confirmVideo ? (
               <Notice tone="warn" title={t('dataSaver.title')}>
                 <Text style={{ color: c.ink, lineHeight: 20 }}>
@@ -904,6 +945,20 @@ export default function Create() {
         </Card>
         <SchedulePicker visible={scheduling} onClose={() => setScheduling(false)} onPick={(at) => void keep(at)} />
         {kind === 'post' ? <Button label={t('m.real.capture')} icon="camera-outline" variant="secondary" onPress={() => router.push('/real')} /> : null}
+        {collage ? (
+          <CollageEditor
+            photos={collage.photos}
+            shape={collage.shape}
+            onCancel={() => setCollage(null)}
+            onDone={(made) => {
+              setCollage(null);
+              // The collage keeps its description (a draft's is restored the same way).
+              restoredAlt.current = true;
+              setAltText(made.altText ?? '');
+              setMedia({ id: made.id, kind: 'image', url: made.url, local: mediaUrl(made.url), seconds: null });
+            }}
+          />
+        ) : null}
         {editing?.type === 'video' ? (
           <VideoEditor
             asset={editing}

@@ -8,7 +8,7 @@ import sharp from 'sharp';
 import type { Pool } from 'pg';
 import type { MediaStorage } from './storage.ts';
 import type { RealtimeHub } from './realtime.ts';
-import { recordVerdict, type MediaFrame, type MediaModerator } from './media-moderation.ts';
+import { inheritedVerdict, recordVerdict, worst, type MediaFrame, type MediaModerator } from './media-moderation.ts';
 
 /** Image sizes served to clients. Metadata (including GPS) is stripped from every derivative. */
 const IMAGE_SIZES = { thumb: 320, medium: 1080, large: 2048 } as const;
@@ -33,7 +33,13 @@ interface MediaRow {
 /** Run the moderator on the frames and store its verdict. Errors propagate so the job retries. */
 async function moderate(deps: ProcessDeps, m: MediaRow, frames: MediaFrame[]) {
   if (!deps.moderator || deps.moderator.name === 'none' || !frames.length) return;
-  const result = await deps.moderator.moderate(frames, { mediaId: m.id, kind: m.kind, filename: m.filename });
+  const checked = await deps.moderator.moderate(frames, { mediaId: m.id, kind: m.kind, filename: m.filename });
+  // A collage keeps the verdict of the photos it was made from when that is more severe.
+  const inherited = await inheritedVerdict(deps.db, m.id);
+  const result =
+    worst(checked.verdict, inherited) === checked.verdict
+      ? checked
+      : { verdict: inherited, labels: [...checked.labels, { name: 'Made from a photo marked sensitive or blocked', confidence: 100 }] };
   await recordVerdict(deps.db, deps.realtime, { id: m.id, ownerId: m.ownerId, kind: m.kind }, deps.moderator.name, result);
 }
 
