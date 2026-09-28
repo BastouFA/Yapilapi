@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
-import { BOOST_DAYS, BOOST_OPTIONS, CURRENCIES } from '@yapilapi/shared';
+import { BOOST_DAYS, BOOST_OPTIONS, CURRENCIES, PLATFORM_FEE_BPS } from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
@@ -17,7 +17,6 @@ import { dropGateSql } from '../lib/drops.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
-const PLATFORM_FEE_BPS = 500;
 /** How long a download link works. Long enough to start a download on a slow connection, short enough not to be shared around. */
 const DOWNLOAD_LINK_MINUTES = 10;
 

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
 import { z } from 'zod';
-import { CURRENCIES, CURRENCY_SCALE } from '@yapilapi/shared';
+import { CURRENCIES, CURRENCY_SCALE, PLATFORM_FEE_BPS } from '@yapilapi/shared';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import { liveVisibleSql } from '../lib/visibility.ts';
 import type { AppContext } from '../lib/context.ts';
@@ -11,8 +11,6 @@ import { assertAdultForMoney, isBlockedEitherWay, publicUserFrom } from '../lib/
 import { me, requireAuth } from '../plugins/auth.ts';
 import { refundOrder, startPayment } from '../lib/checkout.ts';
 import { assertDigitalCheckoutAllowed } from '../lib/store-purchases.ts';
-
-const PLATFORM_FEE_BPS = 500;
 
 /**
  * Creator economy: monthly subscriptions and tips, plus place reviews and
