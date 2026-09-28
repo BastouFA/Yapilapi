@@ -3,7 +3,8 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { base32Decode, totp } from '@yapilapi/auth';
-import { processWebhooks } from '../src/lib/webhooks.ts';
+import { assertSafeWebhookUrl, emitWebhook, processWebhooks } from '../src/lib/webhooks.ts';
+import { fakeWeb } from './fake-web.ts';
 import { as, signUp, testApp, type TestUser } from './helpers.ts';
 import type { BuiltApp } from '../src/app.ts';
 
@@ -149,6 +150,44 @@ describe('developer platform', () => {
     expect(createHmac('sha256', secret).update(`${ts}.${last.body}`).digest('hex')).toBe(v1);
     expect(JSON.parse(last.body)).toMatchObject({ type: 'post.created', data: { kind: 'text' } });
     expect((await as(t.app, dev).get(`/v1/developer/apps/${appId}/webhooks`)).body.deliveries[0].status).toBe('delivered');
+  });
+
+  it('delivers only to the address checked on the connection, so a host that turns private later gets nothing', async () => {
+    let answer = ['93.184.216.34'];
+    const web = await fakeWeb({ 'hooks.rebind.example/in': () => ({ status: 204 }) }, () => answer);
+    try {
+      // When the developer saved it, the host was public.
+      await assertSafeWebhookUrl('https://hooks.rebind.example/in', false, web.deps.resolve);
+      const sub = await t.ctx.db.query(`INSERT INTO webhook_subscriptions (app_id, url, events, secret) VALUES ($1, $2, '{ping}', 'whsec_test') RETURNING id`, [
+        appId,
+        'https://hooks.rebind.example/in',
+      ]);
+      const delivery = async () =>
+        (await t.ctx.db.query(`SELECT status, attempts, response_code, last_error FROM webhook_deliveries WHERE subscription_id = $1`, [sub.rows[0].id]))
+          .rows[0];
+
+      // By delivery time its DNS says loopback: nothing is sent and the attempt counts as failed.
+      answer = ['127.0.0.1'];
+      await emitWebhook(t.ctx.db, dev.id, 'ping', {});
+      await processWebhooks(t.ctx.db, { allowLocal: true, deps: web.deps });
+      expect(await delivery()).toMatchObject({ status: 'pending', attempts: 1, response_code: null, last_error: expect.stringMatching(/public internet/) });
+      answer = ['::ffff:10.0.0.1'];
+      await t.ctx.db.query(`UPDATE webhook_deliveries SET next_attempt_at = now() WHERE subscription_id = $1`, [sub.rows[0].id]);
+      await processWebhooks(t.ctx.db, { allowLocal: true, deps: web.deps });
+      expect(await delivery()).toMatchObject({ status: 'pending', attempts: 2 });
+      expect(web.hits).toEqual([]);
+
+      // Public again: the retry goes to the checked address, signed as usual.
+      answer = ['93.184.216.34'];
+      await t.ctx.db.query(`UPDATE webhook_deliveries SET next_attempt_at = now() WHERE subscription_id = $1`, [sub.rows[0].id]);
+      await processWebhooks(t.ctx.db, { allowLocal: true, deps: web.deps });
+      expect(await delivery()).toMatchObject({ status: 'delivered', attempts: 3, response_code: 204 });
+      expect(web.hits).toEqual(['POST hooks.rebind.example/in']);
+      expect(web.requests[0]!.headers['x-yapilapi-signature']).toMatch(/^t=\d+,v1=[0-9a-f]{64}$/);
+      expect(web.connections).toEqual([{ host: 'hooks.rebind.example', addresses: ['93.184.216.34'], servername: 'hooks.rebind.example' }]);
+    } finally {
+      await web.close();
+    }
   });
 });
 
