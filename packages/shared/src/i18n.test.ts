@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CATALOGS, gmtOffsetLabel, isRtl, SUPPORTED_LOCALES, t, tp, zoneOffsetMinutes, type MessageKey } from './i18n.ts';
+import { CATALOGS, gmtOffsetLabel, isRtl, pluralIsOne, SUPPORTED_LOCALES, t, tp, zoneOffsetMinutes, type MessageKey } from './i18n.ts';
 
 const en = CATALOGS.en!;
 const keys = Object.keys(en).sort();
@@ -96,5 +96,21 @@ describe('time zone offsets', () => {
     expect(gmtOffsetLabel(summer, 'Asia/Kolkata')).toBe('GMT+5:30');
     expect(gmtOffsetLabel(summer, 'America/St_Johns')).toBe('GMT-2:30');
     expect(gmtOffsetLabel(winter, 'Europe/London')).toBe('GMT');
+  });
+});
+
+describe('plurals without Intl.PluralRules (the phone)', () => {
+  it('follows each language’s own rule', () => {
+    const real = Intl.PluralRules;
+    (Intl as unknown as { PluralRules?: unknown }).PluralRules = undefined;
+    try {
+      expect([0, 1, 2].map((n) => pluralIsOne('en', n))).toEqual([false, true, false]);
+      expect([0, 1, 2].map((n) => pluralIsOne('fr', n))).toEqual([true, true, false]);
+      expect(pluralIsOne('pt-BR', 0)).toBe(true);
+      expect(pluralIsOne('yo', 1)).toBe(false);
+      expect(tp('m.poll.votes', 0, 'fr')).toBe(t('m.poll.votes.one', 'fr', { count: 0 }));
+    } finally {
+      (Intl as unknown as { PluralRules?: unknown }).PluralRules = real;
+    }
   });
 });

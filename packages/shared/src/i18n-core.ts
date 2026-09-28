@@ -83,15 +83,30 @@ type PluralBase<K> = K extends `${infer B}.one` ? (`${B}.other` extends MessageK
 /** Keys that come in `.one` / `.other` pairs, without the suffix. */
 export type PluralKey = PluralBase<MessageKey>;
 
+/**
+ * Whether `count` takes the `.one` form, by the language's own rule. The runtime's Intl.PluralRules
+ * when it has one; the phone's JavaScript engine doesn't, so the rules for the app's languages are
+ * written out here (CLDR "one": French and Portuguese count 0 and 1 as one, Yoruba has no plural).
+ */
+export function pluralIsOne(locale: string, count: number): boolean {
+  const PR = (Intl as unknown as { PluralRules?: typeof Intl.PluralRules }).PluralRules;
+  if (PR) {
+    try {
+      return new PR(locale).select(count) === 'one';
+    } catch {
+      // An unknown locale tag: the rules below.
+    }
+  }
+  const lang = locale.split('-')[0]?.toLowerCase() ?? 'en';
+  const whole = Number.isInteger(count);
+  if (lang === 'fr' || lang === 'pt') return Math.floor(Math.abs(count)) <= 1;
+  if (lang === 'yo') return false;
+  return whole && count === 1;
+}
+
 /** Plural-aware t(): picks `<key>.one` or `<key>.other` for `count`, which is also passed as {count}. */
 export function tp(key: PluralKey, count: number, locale = 'en', vars?: Record<string, string | number>): string {
-  let one = count === 1;
-  try {
-    one = new Intl.PluralRules(locale).select(count) === 'one';
-  } catch {
-    // An unknown locale tag: English rules.
-  }
-  return t(`${key}.${one ? 'one' : 'other'}` as MessageKey, locale, { ...vars, count });
+  return t(`${key}.${pluralIsOne(locale, count) ? 'one' : 'other'}` as MessageKey, locale, { ...vars, count });
 }
 
 export function isRtl(locale: string): boolean {

@@ -6,6 +6,7 @@ import type { AccountInfo, InteractionSettings, PublicUser, UsernameCheck, Usern
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import { usernameProblem } from '../../../packages/shared/src/usernames';
 import { SUPPORTED_LOCALES } from '../../../packages/shared/src/i18n';
+import { languageName } from '../../../packages/shared/src/translation';
 import { LEGAL_DOCS } from '../../../packages/shared/src/legal';
 import { checkNewUsername, client, errorMessage, webUrl } from './api';
 import { AppearanceSegments, goHome } from './account-menu';
@@ -1063,7 +1064,8 @@ export function AppLanguage() {
       <View accessibilityRole="radiogroup" accessibilityLabel={t('settings.language')}>
         {SUPPORTED_LOCALES.map((l) => {
           const on = current === l;
-          const name = new Intl.DisplayNames([l], { type: 'language' }).of(l) ?? l;
+          // Each language in itself; the phone has no Intl.DisplayNames, so the table's own names are the fallback.
+          const name = languageName(l, l);
           return (
             <Pressable
               key={l}
