@@ -73,6 +73,9 @@ const RELOAD_KEY = 'ypl_direction_reload';
  *   expo-updates here), falling back to `DevSettings.reload()` in development.
  * - If the direction still differs after that reload (a host that ignores forceRTL, such as
  *   Expo Go on some versions), don't reload again: it applies on the next cold start.
+ * - Known limit: after that reload, the native back arrow in iOS headers keeps the old direction
+ *   until the app is next opened (react-native-screens sets it through UIAppearance, once per
+ *   process). Everything else, including the layout and swipe-back, switches straight away.
  */
 async function needsDirectionReload(rtl: boolean): Promise<boolean> {
   I18nManager.allowRTL(rtl);
