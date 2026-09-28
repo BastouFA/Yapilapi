@@ -4,7 +4,11 @@ import { legalContacts, legalMetadata, Mail } from '@/lib/legal';
 
 export const generateMetadata = () => legalMetadata('safety');
 
-/** Safety and minors: what the code does for people under 18 (apps/api: auth, visibility, messaging, family). A template. */
+/**
+ * Safety and minors: what the code does for people under 18 (apps/api: auth, lib/users.ts
+ * applyMinorDefaults, visibility, messaging, ask, rooms, boards, family). Not legal advice: see
+ * docs/legal/review-pack.md, which also lists the gaps (for example lives).
+ */
 export default async function SafetyPage() {
   const c = await legalContacts();
   return (
@@ -19,12 +23,18 @@ export default async function SafetyPage() {
       <ul>
         <li>Their accounts are private, and can’t be made public: only followers they approve see their posts.</li>
         <li>
-          Their content never appears without an account: not in link previews, search engines or our sitemap. Their reels can’t be downloaded, and they can’t
-          be found by people who have their email address.
+          Their content never appears without an account: not in link previews, search engines or our sitemap. Their reels can’t be downloaded, their boards
+          can’t be public, the city on their profile isn’t shown to others, and they can’t be found by people who have their email address.
         </li>
-        <li>Adults can only message a teen they are friends with. A guardian can limit messages further.</li>
+        <li>
+          Adults can only message a teen, send them a question or invite them to speak in an audio room if they are friends. A guardian can limit messages
+          further. Teens never receive questions asked without a name.
+        </li>
+        <li>In audio rooms, their connection goes through our relay server when one is set up, so other people don’t see their IP address.</li>
         <li>Photos and videos marked sensitive, and posts waiting for a moderator, are not shown to them.</li>
-        <li>They see no ads.</li>
+        <li>They see no ads, and ad personalization is off.</li>
+        <li>Suggested replies in chats are off unless they turn them on.</li>
+        <li>They can’t sell, take paid subscriptions, receive tips or ask for payouts.</li>
         <li>Reports about the safety of a minor hide the content right away while a moderator looks at it.</li>
       </ul>
 
@@ -42,23 +52,38 @@ export default async function SafetyPage() {
 
       <h2>Tools for everyone</h2>
       <ul>
-        <li>Report posts, reels, profiles and messages from their menus. Reports are confidential.</li>
-        <li>Block someone: they can’t see your profile or contact you, and you won’t see them.</li>
-        <li>Mute people or topics in your feed, hide comments with words you choose, and choose who can tag you.</li>
-        <li>Sign out devices you don’t recognise, and turn on two-step verification or a passkey.</li>
+        <li>
+          Report posts, reels, stories, comments, profiles, messages, questions and answers, communities, audio rooms, lives, events, products and drops from
+          their menus. Reports are confidential.
+        </li>
+        <li>
+          Block someone: they can’t see your profile or contact you, and you won’t see them. For a question asked without a name, you can block whoever asked it
+          without learning who they are.
+        </li>
+        <li>
+          Choose who can message, comment on, mention and tag you, mute people or topics in your feed, hide comments and questions with words you choose, and
+          set quiet hours for notifications.
+        </li>
+        <li>
+          We tell you when your account is signed in from a new device. Sign out devices you don’t recognise, and turn on two-step verification or a passkey.
+        </li>
       </ul>
+      <p>
+        A question asked without a name is not anonymous to us: we store who asked it, our moderators see it when they review a report, and limits and blocks
+        apply to the person who asked.
+      </p>
 
       <h2>Child sexual abuse material</h2>
       <p>
         We have zero tolerance. We remove it, keep what the law requires for investigators, end the accounts involved and report it to the authorities and to
-        organisations that fight child sexual abuse, such as the National Center for Missing &amp; Exploited Children (NCMEC) [adjust for your country]. Report
-        it in the app with “Minor safety”, or at <Mail to={c.safety} />.
+        organisations that fight child sexual abuse, such as [Child safety reporting organisations, for example NCMEC]. Report it in the app with “Minor
+        safety”, or at <Mail to={c.safety} />.
       </p>
 
       <h2>If someone is in danger</h2>
       <p>
-        Contact your local emergency services first. Then report the content in the app so we can act, or write to <Mail to={c.safety} />. [List helplines for
-        the countries you launch in, for example crisis lines and child helplines.]
+        Contact your local emergency services first. Then report the content in the app so we can act, or write to <Mail to={c.safety} />. [Helplines for each
+        launch country.]
       </p>
 
       <h2>For law enforcement</h2>

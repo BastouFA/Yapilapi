@@ -4,15 +4,19 @@ import { legalContacts, legalMetadata, Mail } from '@/lib/legal';
 
 export const generateMetadata = () => legalMetadata('guidelines');
 
-/** Community guidelines. A template: a lawyer and a trust and safety lead must review it before launch. */
+/**
+ * Community guidelines. Written from what moderation does today (apps/api: lib/moderation.ts, spam.ts,
+ * media-moderation.ts, modules/safety.ts). A lawyer and a trust and safety lead must review it before
+ * launch: see docs/legal/review-pack.md.
+ */
 export default async function GuidelinesPage() {
   const c = await legalContacts();
   return (
     <LegalDoc slug="guidelines">
       <p>
         YAPILAPI is for sharing your life with the people and communities you care about. These guidelines apply to everything on YAPILAPI: posts, reels,
-        stories, comments, messages, profiles, communities, events, rooms, live videos, shops and ads. They are part of the{' '}
-        <Link href="/legal/terms">Terms of service</Link>.
+        stories, comments, messages, questions and answers, profiles, communities, events, rooms, live videos, games and watch together sessions in chats,
+        shops, drops and ads. They are part of the <Link href="/legal/terms">Terms of service</Link>.
       </p>
 
       <h2>Be respectful</h2>
@@ -58,6 +62,13 @@ export default async function GuidelinesPage() {
         <li>Label content made or heavily changed with AI when it could mislead people about something real.</li>
       </ul>
 
+      <h2>Questions</h2>
+      <p>
+        Asking without your name shown is for shy questions, not for saying what you wouldn’t say with your name. It isn’t anonymous to us: we know who asked,
+        our moderators see it, and these guidelines and the law apply exactly as they do to anything else you post. Questions that break them are refused or
+        held for a moderator, and the person asked can block whoever asked without learning who it was.
+      </p>
+
       <h2>Respect privacy</h2>
       <p>
         Don’t share other people’s private information (home address, phone number, documents, private messages) without their permission, and don’t film or
@@ -73,7 +84,8 @@ export default async function GuidelinesPage() {
       <h2>Selling and advertising</h2>
       <p>
         Don’t sell or advertise weapons, drugs, tobacco and vaping products, alcohol to people under the legal age, counterfeit goods, stolen goods, animals
-        protected by law, human remains, or anything illegal where you or the buyer are. Sponsored posts are reviewed before they run. The{' '}
+        protected by law, human remains, or anything illegal where you or the buyer are. Describe what you sell and what a drop offers honestly, including how
+        many there are, and don’t announce drops you don’t intend to hold. Sponsored posts are reviewed before they run. The{' '}
         <Link href="/legal/creators">Creator and seller terms</Link> have the details.
       </p>
 
@@ -81,15 +93,16 @@ export default async function GuidelinesPage() {
       <p>
         Depending on how serious it is and whether it has happened before, we may: remove the content, limit who sees it or blur it, hold it for review,
         withhold it in a country where it is illegal, remove features such as live video or messaging, limit your account for a while, or end it. Serious harm,
-        like child sexual abuse or credible threats, ends the account on the first time. We tell you what we did and why, and you can appeal in Settings; a
-        person reviews every appeal.
+        like child sexual abuse or credible threats, ends the account on the first time. Our software checks text as it is posted and can refuse it or hold it
+        for a moderator; photos and videos can be checked automatically too. We tell you what we did and why, and you can appeal each decision once in Settings;
+        a moderator reviews every appeal.
       </p>
 
       <h2>How to report</h2>
       <p>
-        Use Report in the menu of a post, reel, profile or message. Reports are confidential: the person is not told who reported them. You can also block
-        someone, mute people and topics, and hide comments with words you choose. Reports about the safety of someone under 18 hide the content while we look at
-        it. For anything else, write to <Mail to={c.safety} />.
+        Use Report in the menu of a post, reel, story, comment, profile, message, question, answer, community, room, live, event, product or drop. Reports are
+        confidential: the person is not told who reported them. You can also block someone, mute people and topics, and hide comments with words you choose.
+        Reports about the safety of someone under 18 hide the content while we look at it. For anything else, write to <Mail to={c.safety} />.
       </p>
     </LegalDoc>
   );

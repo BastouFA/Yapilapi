@@ -30,10 +30,19 @@ The web app has these public pages. They need no sign-in and are linked from the
 | Copyright and takedowns | `/legal/copyright` | `/copyright`, `/dmca` |
 | Cookie notice | `/legal/cookies` | `/cookies` |
 
-**They are templates written from what the code does. They are not legal advice.** Before launch:
+**They are templates written from what the code does. They are not legal advice.** The pages were brought up to date with the product on 2026-09-27. For the lawyer, the [legal review pack](../legal/review-pack.md) has:
+
+- the full data inventory and the processors;
+- minors, moderation, payments, AI and music;
+- where the code and the texts don't match yet;
+- a numbered list of open questions.
+
+Every placeholder to fill in is in [placeholders.md](../legal/placeholders.md).
+
+Before launch:
 
 - [ ] Have a lawyer in your main market review every page and adapt it to your company, your countries (for example Nigeria's NDPA, Kenya's Data Protection Act, South Africa's POPIA, the GDPR and UK GDPR if you serve Europe, COPPA and state laws in the United States) and your payment set-up.
-- [ ] Replace every `[bracketed note]` in the page source (`apps/web/app/legal/*/page.tsx`). These notes are for decisions only you can make: hosting providers and region, retention periods, payout method and timing, fee details, helplines, and the U.S. copyright agent.
+- [ ] Replace every `[bracketed note]` in the page source (`apps/web/app/legal/*/page.tsx`). Each one is listed, with what to decide, in [placeholders.md](../legal/placeholders.md). These notes are for decisions only you can make: hosting and other providers, the server region, retention periods, refunds, payout method and timing, fee details, helplines, and the U.S. copyright agent.
 - [ ] Set these environment variables on the web service (`render.yaml` lists them). The pages read them on each request, so no rebuild is needed.
   - `LEGAL_ENTITY_NAME`: the company that runs YAPILAPI.
   - `LEGAL_ADDRESS`: its registered address.
@@ -403,6 +412,8 @@ Both stores require the following. Here is where each one is today.
 ## Privacy inventory (what the code collects)
 
 This is the basis for the privacy policy and the two forms above. It was checked against the code on 2026-09-27.
+
+The fuller, table-by-table inventory, with retention periods and processors, is in the [legal review pack](../legal/review-pack.md#4-data-inventory).
 
 - **Account:**
   - email, scrypt password hash, username, display name;

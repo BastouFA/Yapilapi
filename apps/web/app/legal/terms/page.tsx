@@ -4,7 +4,10 @@ import { legalContacts, legalMetadata, Mail } from '@/lib/legal';
 
 export const generateMetadata = () => legalMetadata('terms');
 
-/** Terms of service. A template: a lawyer must review it before launch (docs/operations/app-store.md). */
+/**
+ * Terms of service. Written from what the code does; a lawyer must review it before launch
+ * (docs/legal/review-pack.md). Every [bracketed placeholder] is listed in docs/legal/placeholders.md.
+ */
 export default async function TermsPage() {
   const c = await legalContacts();
   return (
@@ -34,7 +37,12 @@ export default async function TermsPage() {
       <h2>2. Your account</h2>
       <p>
         Keep your password safe and don’t share your account. You are responsible for what happens on it. You can turn on two-step verification and passkeys in
-        Settings, and see and sign out the devices signed in to your account. Tell us at <Mail to={c.support} /> if you think someone else is using it.
+        Settings, and see and sign out the devices signed in to your account. We tell you when your account is signed in from a new device. Tell us at{' '}
+        <Mail to={c.support} /> if you think someone else is using it.
+      </p>
+      <p>
+        Usernames are 3 to 30 letters, numbers or underscores, and some names are reserved. You can change yours once every 14 days. Your old name is held for
+        you for 14 days, during which old links and @mentions still lead to you; after that anyone can take it and old links stop working.
       </p>
 
       <h2>3. Your content</h2>
@@ -51,6 +59,13 @@ export default async function TermsPage() {
       <p>
         Who sees your content depends on the audience you choose. Content you share with everyone from a public account of someone 18 or older can appear in
         link previews, without an account, and in search engines.
+      </p>
+      <p>
+        Some features send things for you or with you: a message you schedule with “Send later” is sent in your name at the time you chose, unless it can no
+        longer be sent (for example because of a block); a scheduled post is published at its time; a game or a watch together session in a chat is seen by
+        everyone in that chat. A question you ask “without your name shown” hides your name from the person you ask and from everyone else, but not from us: we
+        store who asked, our moderators can see it, and we can disclose it when the law requires it. You are responsible for your questions as for anything else
+        you post.
       </p>
 
       <h2>4. What you may not do</h2>
@@ -75,14 +90,18 @@ export default async function TermsPage() {
       <p>
         We use automated tools and people to find content and behaviour that break these terms. We may remove or restrict content, hold it for review, withhold
         it in a country where the law requires it, limit features, or suspend or end accounts. When we act on your content or account we tell you why, in the
-        app, and you can appeal from Settings. We may also report content to the authorities where the law requires it, for example child sexual abuse material.
+        app, and you can appeal each decision once from Settings; a moderator reviews every appeal. We may also report content to the authorities where the law
+        requires it, for example child sexual abuse material.
       </p>
 
       <h2>6. AI features</h2>
       <p>
-        Some features use artificial intelligence: caption and plan suggestions, summaries, search, the assistants, “See translation” and automatic captions.
-        They are optional. What they produce can be wrong, so check it before you rely on it or post it; you are responsible for what you post. Posts made with
-        AI help can be labelled as such. The <Link href="/legal/privacy">Privacy policy</Link> says what is sent to the companies that provide these features.
+        Some features use artificial intelligence: Catch me up summaries, suggested replies in chats, suggested photo descriptions, caption and hashtag ideas,
+        plan suggestions, summaries of chats and memories, search, the assistants, “See translation” and automatic captions. They are optional, and nothing they
+        produce is posted or sent without you choosing to. Everything they produce is labelled as made with AI. What they produce can be wrong, so check it
+        before you rely on it or post it; you are responsible for what you post. A post made with a caption idea is marked as made with AI assistance. The
+        assistants only suggest actions, which you confirm. The <Link href="/legal/privacy#ai">Privacy policy</Link> says what is sent to the companies that
+        provide these features.
       </p>
 
       <h2>7. Paid features</h2>
@@ -91,12 +110,25 @@ export default async function TermsPage() {
           Prices are shown before you pay. Payments are processed by our payment providers (Stripe, and Paystack in some countries); we never see your full card
           number.
         </li>
-        <li>YAPILAPI Plus costs the price shown for 30 days and does not renew on its own.</li>
         <li>
-          Buying from creators, businesses and sellers (products, tickets, bookings, downloads, subscriptions and tips) is also covered by the{' '}
-          <Link href="/legal/creators">Creator and seller terms</Link>. The seller is responsible for what they sell.
+          YAPILAPI Plus costs the price shown (4.99 US dollars today) for 30 days and does not renew on its own. It removes sponsored posts, allows longer reels
+          and larger uploads, and adds a Plus badge. Inviting people who join and confirm their account can also give you Plus for free (30 days for every 3, up
+          to 12 times). [Refund rules for Plus.]
         </li>
-        <li>Refunds follow the law where you live and the rules in the Creator and seller terms. Your statutory rights as a consumer are not affected.</li>
+        <li>
+          Buying from creators, businesses and sellers (products, drops, tickets, bookings, downloads, subscriptions, tips and live gifts) is also covered by
+          the <Link href="/legal/creators">Creator and seller terms</Link>. The seller is responsible for what they sell.
+        </li>
+        <li>
+          Drops open at the time the seller announced. Asking to be reminded costs nothing and commits you to nothing. When you order from an open drop, the
+          units are held for you for 15 minutes while you pay; if the payment doesn’t arrive in time they go back on sale, and a payment that arrives after they
+          have sold out is refunded.
+        </li>
+        <li>Boosting a post is paid in advance. Budget that isn’t spent, including when the boost is refused in review, is refunded automatically.</li>
+        <li>
+          Refunds follow the law where you live and the rules in the Creator and seller terms. Your statutory rights as a consumer, including any right to
+          cancel a purchase made at a distance, are not affected. [Consumer cancellation rights and how to exercise them, by country.]
+        </li>
       </ul>
 
       <h2>8. Other people’s services</h2>
@@ -104,6 +136,12 @@ export default async function TermsPage() {
         YAPILAPI can link to or include things made by others: apps you connect with “Sign in with YAPILAPI”, mini apps, music from licensed catalogues, and
         links to maps and websites. Their own terms apply to them, and we aren’t responsible for them. You choose what a connected app can access and can remove
         it in Settings.
+      </p>
+      <p>
+        Music in the music picker comes with a licence from its source (for example a Creative Commons licence from Jamendo, or a licensing partner’s deal) that
+        says who can use it, where and for how long. You may use it only on YAPILAPI, in the ways the picker allows. Business accounts can only use music
+        cleared for commercial use. When a licence ends or a song is withdrawn, posts that used it stay up but play without it, and in countries a song isn’t
+        licensed for it doesn’t play. Credits are shown as the licence requires.
       </p>
 
       <h2>9. Our rights</h2>
