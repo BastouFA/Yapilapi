@@ -1,12 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { as, signUp, testApp, type TestUser } from './helpers.ts';
+import { as, signUp, testApp, type TestUser, jobRunner, type JobRunner } from './helpers.ts';
 import type { BuiltApp } from '../src/app.ts';
-import { processJobs } from '../src/lib/jobs.ts';
 import { PUBLISH_JOB, scheduledPostJobHandlers } from '../src/lib/publishing.ts';
 
 let t: BuiltApp;
+let runJobs: JobRunner;
 beforeAll(async () => {
   t = await testApp();
+  runJobs = await jobRunner(t.ctx.db);
 });
 afterAll(async () => {
   await t.close();
@@ -29,7 +30,7 @@ async function arrive(postId: string) {
     PUBLISH_JOB,
     postId,
   ]);
-  await processJobs(t.ctx.db, scheduledPostJobHandlers(t.ctx), 50);
+  await runJobs(scheduledPostJobHandlers(t.ctx), 50);
 }
 const ids = (items: { id: string }[]) => items.map((p) => p.id);
 
@@ -297,7 +298,7 @@ describe('drafts and scheduled posts', () => {
     const post = (await as(t.app, author).post('/v1/posts', { body: `Out soon, @${mentioned.username}`, scheduledAt: inMinutes(10) })).body.post;
 
     // Not yet due: nothing happens.
-    await processJobs(t.ctx.db, scheduledPostJobHandlers(t.ctx), 50);
+    await runJobs(scheduledPostJobHandlers(t.ctx), 50);
     expect(ids((await as(t.app, follower).get('/v1/feed?mode=following')).body.items)).not.toContain(post.id);
 
     await arrive(post.id);
@@ -310,7 +311,7 @@ describe('drafts and scheduled posts', () => {
 
     // Running the job again doesn't publish or notify twice.
     await t.ctx.db.query(`INSERT INTO jobs (kind, payload, run_at) VALUES ($1, $2, now() - interval '1 second')`, [PUBLISH_JOB, { postId: post.id }]);
-    await processJobs(t.ctx.db, scheduledPostJobHandlers(t.ctx), 50);
+    await runJobs(scheduledPostJobHandlers(t.ctx), 50);
     expect(await notes(mentioned.id, 'post_mention', post.id)).toBe(1);
   });
 
@@ -323,7 +324,7 @@ describe('drafts and scheduled posts', () => {
     expect(new Date(moved.body.post.scheduledAt).getTime()).toBeGreaterThan(Date.now() + 100 * 60_000);
     // The first job comes due but the post has moved: it stays scheduled.
     await t.ctx.db.query(`UPDATE jobs SET run_at = now() - interval '1 second' WHERE kind = $1 AND payload->>'postId' = $2`, [PUBLISH_JOB, post.id]);
-    await processJobs(t.ctx.db, scheduledPostJobHandlers(t.ctx), 50);
+    await runJobs(scheduledPostJobHandlers(t.ctx), 50);
     expect((await t.ctx.db.query(`SELECT status FROM posts WHERE id = $1`, [post.id])).rows[0].status).toBe('scheduled');
 
     const cancelled = await as(t.app, author).del(`/v1/drafts/${post.id}/schedule`);

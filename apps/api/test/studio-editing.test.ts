@@ -4,18 +4,19 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import ffmpegPath from '../src/lib/ffmpeg-path.ts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { processJobs } from '../src/lib/jobs.ts';
 import { mediaJobHandlers, probe } from '../src/lib/media-processing.ts';
 import { studioJobHandlers } from '../src/lib/studio.ts';
 import type { TranscriptionProvider } from '../src/lib/transcription.ts';
 import { parseVtt, sanitizeCueText, serializeVtt, VttError } from '../src/lib/webvtt.ts';
-import { as, signUp, testApp, type TestUser } from './helpers.ts';
+import { as, signUp, testApp, type TestUser, jobRunner, type JobRunner } from './helpers.ts';
 import type { BuiltApp } from '../src/app.ts';
 
 let t: BuiltApp;
+let runJobs: JobRunner;
 let clip: Buffer;
 beforeAll(async () => {
   t = await testApp();
+  runJobs = await jobRunner(t.ctx.db);
   // A 6 second test video with sound, like the processing tests use.
   const dir = mkdtempSync(path.join(tmpdir(), 'ypl-studio-'));
   const src = path.join(dir, 'clip.mp4');
@@ -52,7 +53,7 @@ const handlers = () => ({
 
 /** Run jobs until the queue has nothing due. */
 async function drain() {
-  for (let i = 0; i < 50; i++) if (!(await processJobs(t.ctx.db, handlers()))) return;
+  for (let i = 0; i < 50; i++) if (!(await runJobs(handlers()))) return;
 }
 
 async function uploadVideo(owner: TestUser, processed = true) {

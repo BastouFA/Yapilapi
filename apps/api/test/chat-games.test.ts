@@ -3,13 +3,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chessFromFen } from '@yapilapi/shared';
 import { chatJobHandlers } from '../src/lib/chat.ts';
 import { GAME_IDLE_JOB } from '../src/lib/chat-games.ts';
-import { processJobs } from '../src/lib/jobs.ts';
 import type { BuiltApp } from '../src/app.ts';
-import { as, signUp, testApp, type TestUser } from './helpers.ts';
+import { as, signUp, testApp, type TestUser, jobRunner, type JobRunner } from './helpers.ts';
 
 let t: BuiltApp;
+let runJobs: JobRunner;
 beforeAll(async () => {
   t = await testApp();
+  runJobs = await jobRunner(t.ctx.db);
 });
 afterAll(async () => {
   await t.close();
@@ -75,7 +76,7 @@ const handlers = () => chatJobHandlers({ db: db(), config: t.ctx.config, storage
 async function aDayLater(gameId: string) {
   await db().query(`UPDATE chat_games SET last_move_at = last_move_at - interval '25 hours' WHERE id = $1`, [gameId]);
   await db().query(`UPDATE jobs SET run_at = now() WHERE kind = $1 AND payload->>'gameId' = $2 AND status = 'queued'`, [GAME_IDLE_JOB, gameId]);
-  for (let i = 0; i < 10; i++) if (!(await processJobs(db(), handlers(), 20))) return;
+  for (let i = 0; i < 10; i++) if (!(await runJobs(handlers(), 20))) return;
 }
 
 describe('Starting a game', () => {
@@ -355,7 +356,7 @@ describe('Membership, time-outs and removal', () => {
       GAME_IDLE_JOB,
       game.id,
     ]);
-    for (let i = 0; i < 5; i++) if (!(await processJobs(db(), handlers(), 20))) break;
+    for (let i = 0; i < 5; i++) if (!(await runJobs(handlers(), 20))) break;
     expect((await as(t.app, a).get(`/v1/games/${game.id}`)).body.game.status).toBe('active');
 
     await aDayLater(game.id);

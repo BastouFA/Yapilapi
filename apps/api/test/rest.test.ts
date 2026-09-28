@@ -35,7 +35,7 @@ async function processedMedia(owner: string, kind: 'image' | 'video', data: Buff
     stored.key,
   ]);
   const job = await enqueue(t.ctx.db, 'media.process', { mediaId: rows[0].id });
-  await processJobs(t.ctx.db, mediaJobHandlers({ db: t.ctx.db, storage: t.ctx.storage }), 1, [job]);
+  await processJobs(t.ctx.db, mediaJobHandlers({ db: t.ctx.db, storage: t.ctx.storage }), 1, { ids: [job] });
   const done = (await t.ctx.db.query(`SELECT status, last_error FROM jobs WHERE id = $1`, [job])).rows[0];
   expect(done).toEqual({ status: 'done', last_error: null });
   return rows[0].id as string;

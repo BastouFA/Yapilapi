@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
+import type { Pool } from 'pg';
 import { buildApp, type BuiltApp } from '../src/app.ts';
 import { loadConfig } from '../src/config.ts';
+import { processJobs, type JobHandler } from '../src/lib/jobs.ts';
 
 /** A test app. `env` overrides configuration; `opts` passes build options (e.g. a fake fetch for Paystack). */
 export async function testApp(env: Record<string, string> = {}, opts: Parameters<typeof buildApp>[1] = {}): Promise<BuiltApp> {
@@ -18,6 +20,18 @@ export async function testApp(env: Record<string, string> = {}, opts: Parameters
   });
   return buildApp(config, { logger: false, ...opts });
 }
+
+/**
+ * Runs due jobs like processJobs, but only those queued after this call. Test files share one
+ * database and some leave jobs queued; a plain processJobs would run those too, taking up the
+ * batch or waiting on another file's videos. Make one in beforeAll.
+ */
+export async function jobRunner(db: Pool) {
+  const { rows } = await db.query(`SELECT coalesce(max(id), 0)::text AS id FROM jobs`);
+  const after = rows[0].id as string;
+  return (handlers: Record<string, JobHandler>, batch?: number) => processJobs(db, handlers, batch, { after });
+}
+export type JobRunner = Awaited<ReturnType<typeof jobRunner>>;
 
 export interface TestUser {
   id: string;

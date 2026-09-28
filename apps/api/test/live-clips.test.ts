@@ -4,16 +4,17 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import ffmpegPath from '../src/lib/ffmpeg-path.ts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { processJobs } from '../src/lib/jobs.ts';
 import { liveRecordingJobHandlers, pickHighlights, recordingSegments, timelineMapper } from '../src/lib/live-recording.ts';
 import { mediaJobHandlers } from '../src/lib/media-processing.ts';
 import { studioJobHandlers } from '../src/lib/studio.ts';
-import { as, signUp, testApp } from './helpers.ts';
+import { as, signUp, testApp, jobRunner, type JobRunner } from './helpers.ts';
 import type { BuiltApp } from '../src/app.ts';
 
 let t: BuiltApp;
+let runJobs: JobRunner;
 beforeAll(async () => {
   t = await testApp();
+  runJobs = await jobRunner(t.ctx.db);
   await t.ctx.db.query(`INSERT INTO feature_flags (key, enabled) VALUES ('LIVE', true) ON CONFLICT (key) DO UPDATE SET enabled = true`);
 });
 afterAll(async () => {
@@ -116,7 +117,7 @@ describe('live recording and auto-clips', () => {
       ...studioJobHandlers({ ...deps, transcription: null }),
       ...liveRecordingJobHandlers({ ...deps, recordingsDir: dir }),
     };
-    for (let i = 0; i < 6; i++) await processJobs(t.ctx.db, handlers);
+    for (let i = 0; i < 6; i++) await runJobs(handlers);
 
     const clips = await as(t.app, host).get(`/v1/live/${live.id}/clips`);
     expect(clips.status).toBe(200);

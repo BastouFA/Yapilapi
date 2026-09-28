@@ -1,12 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chatJobHandlers } from '../src/lib/chat.ts';
-import { processJobs } from '../src/lib/jobs.ts';
 import type { BuiltApp } from '../src/app.ts';
-import { as, signUp, testApp, type TestUser } from './helpers.ts';
+import { as, signUp, testApp, type TestUser, jobRunner, type JobRunner } from './helpers.ts';
 
 let t: BuiltApp;
+let runJobs: JobRunner;
 beforeAll(async () => {
   t = await testApp();
+  runJobs = await jobRunner(t.ctx.db);
 });
 afterAll(async () => {
   await t.close();
@@ -66,7 +67,7 @@ const handlers = () => chatJobHandlers({ db: db(), config: t.ctx.config, storage
 /** Make the queued jobs of a kind (for this payload key and value) due now, and run them. */
 async function runDue(kind: string, key: string, value: string) {
   await db().query(`UPDATE jobs SET run_at = now() WHERE kind = $1 AND payload->>$2 = $3 AND status = 'queued'`, [kind, key, value]);
-  for (let i = 0; i < 10; i++) if (!(await processJobs(db(), handlers(), 20))) return;
+  for (let i = 0; i < 10; i++) if (!(await runJobs(handlers(), 20))) return;
 }
 
 describe('Polls', () => {
