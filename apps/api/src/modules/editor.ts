@@ -160,7 +160,8 @@ export default async function editorModule(app: FastifyInstance, ctx: AppContext
         height: m.height,
         durationMs: m.duration_ms,
         editOf: m.edit_of,
-        error: m.status === 'failed' ? (m.edit_error ?? "We couldn't process this file.") : null,
+        // English for older apps; an edit that didn't render stores the code edit_failed (older rows hold English plus the renderer's words, never shown now).
+        error: m.status === 'failed' ? (m.edit_error ? "We couldn't apply your edits." : "We couldn't process this file.") : null,
         // The media job has made its sizes and (when automated checks are on) checked it: a collage can use it.
         processed: m.status === 'ready' && Object.keys(m.variants ?? {}).length > 0 && (ctx.mediaModerator.name === 'none' || m.moderation !== 'pending'),
       },

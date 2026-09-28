@@ -450,7 +450,7 @@ export async function buildApp(
   const jobHandlers = {
     ...mediaJobHandlers({ db, storage, moderator: ctx.mediaModerator, realtime: ctx.realtime }),
     ...studioJobHandlers({ db, storage, transcription: ctx.transcription, log: app.log }),
-    ...editorJobHandlers({ db, storage }),
+    ...editorJobHandlers({ db, storage, log: app.log }),
     ...liveRecordingJobHandlers({ db, storage, recordingsDir: config.LIVE_RECORDINGS_DIR }),
     ...shareVideoJobHandlers({ db, storage }),
     // Recap videos from Memories and Chapters.

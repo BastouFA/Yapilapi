@@ -9,13 +9,24 @@ export { ApiError };
 
 export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:4000/v1/realtime';
 
+const OWN_ERRORS: Record<string, 'error.network' | 'error.processingFailed' | 'error.editFailed' | 'error.slow'> = {
+  network: 'error.network',
+  processing_failed: 'error.processingFailed',
+  edit_failed: 'error.editFailed',
+  timeout: 'error.slow',
+};
+
 /**
  * What went wrong, for showing to people. Messages from the API are shown as they come (the API
  * speaks English); ours are in the reader's language, which the app puts on <html lang>.
  */
 export function errorMessage(e: unknown): string {
   const locale = typeof document === 'undefined' ? 'en' : document.documentElement.lang || 'en';
-  if (e instanceof ApiError) return e.code === 'network' ? t('error.network', locale) : e.message;
+  if (e instanceof ApiError) {
+    // Errors the app itself raises while waiting on a file: in the reader's language.
+    const own = OWN_ERRORS[e.code];
+    return own ? t(own, locale) : e.message;
+  }
   return t('error.generic', locale);
 }
 

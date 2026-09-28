@@ -48,8 +48,17 @@ export const mediaUrl = (url: string) => (/^https?:\/\//.test(url) ? url : `${ba
  * Messages from the API are shown as they come (in English today); ours are translated. Not
  * reaching the API at all gets the translated "check your connection" message.
  */
-export const errorMessage = (e: unknown) =>
-  e instanceof ApiError && e.code === 'network' ? tr('error.network') : e instanceof Error && e.message ? e.message : tr('error.generic');
+const OWN_ERRORS: Record<string, 'error.network' | 'error.processingFailed' | 'error.editFailed' | 'error.slow'> = {
+  network: 'error.network',
+  processing_failed: 'error.processingFailed',
+  edit_failed: 'error.editFailed',
+  timeout: 'error.slow',
+};
+/** Errors the app itself raises (no connection, a file that didn't process) are in the reader's language. */
+export const errorMessage = (e: unknown) => {
+  const own = e instanceof ApiError ? OWN_ERRORS[e.code] : undefined;
+  return own ? tr(own) : e instanceof Error && e.message ? e.message : tr('error.generic');
+};
 
 /** What was asked for is gone or isn't for you, as opposed to a dropped connection or a fault that trying again can fix. */
 export const isGone = (e: unknown) => e instanceof ApiError && (e.status === 403 || e.status === 404 || e.status === 410);

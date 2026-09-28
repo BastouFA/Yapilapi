@@ -25,6 +25,7 @@ import {
 } from '@yapilapi/shared';
 import type { MediaStorage } from './storage.ts';
 import { mediaJobHandlers, probe, run } from './media-processing.ts';
+import type { JobLog } from './failures.ts';
 
 /**
  * The photo and video editor's renderer. A look (filter) and the colour adjustments are one
@@ -38,6 +39,8 @@ import { mediaJobHandlers, probe, run } from './media-processing.ts';
 export interface EditDeps {
   db: Pool;
   storage: MediaStorage;
+  /** Where the renderer's own message goes; people only see that the edit didn't work. */
+  log?: JobLog;
 }
 
 /** Photos are rendered up to this long edge; bigger ones are scaled down first. */
@@ -436,10 +439,9 @@ export async function renderEditorJob(deps: EditDeps, renderId: string): Promise
     }
     await deps.db.query(`UPDATE media_editor_renders SET status = 'done', finished_at = now() WHERE id = $1`, [renderId]);
   } catch (err) {
-    await deps.db.query(`UPDATE media_editor_renders SET status = 'failed', error = $2, finished_at = now() WHERE id = $1`, [
-      renderId,
-      `We couldn't apply your edits. ${String((err as Error).message).slice(0, 200)}`,
-    ]);
+    // A code, not the renderer's words: the apps say it in the reader's language (edit_failed).
+    deps.log?.warn({ renderId, err: String((err as Error).message).slice(0, 500) }, 'photo edit render failed');
+    await deps.db.query(`UPDATE media_editor_renders SET status = 'failed', error = 'edit_failed', finished_at = now() WHERE id = $1`, [renderId]);
     await deps.db.query(`UPDATE media SET status = 'failed' WHERE id = $1`, [resultId]);
   }
 }
