@@ -138,9 +138,13 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         [u.id],
       );
       await c.query(
-        `UPDATE profiles SET username = 'deleted_' || substr(replace(user_id::text, '-', ''), 1, 12), display_name = 'Deleted account', bio = '', avatar_url = NULL, cover_url = NULL, cover_media_id = NULL, cover_alt = NULL, links = '[]', is_private = true WHERE user_id = $1`,
+        `UPDATE profiles SET username = 'deleted_' || substr(replace(user_id::text, '-', ''), 1, 12), display_name = 'Deleted account', bio = '', avatar_url = NULL, cover_url = NULL, cover_media_id = NULL, cover_alt = NULL, links = '[]', is_private = true,
+           country = NULL, country_source = NULL, cdn_country = NULL, pinned_post_id = NULL, accent = NULL, header_style = 'cover', pronouns = NULL, city = NULL,
+           tabs = NULL, featured_post_ids = '{}', song_sound_id = NULL, song_track_id = NULL, song_part = NULL
+         WHERE user_id = $1`,
         [u.id],
       );
+      await c.query(`DELETE FROM profile_statuses WHERE user_id = $1`, [u.id]);
       await c.query(`UPDATE posts SET deleted_at = now(), body = '' WHERE author_id = $1 AND deleted_at IS NULL`, [u.id]);
       // Problems they reported stay (they may describe a bug), without their words or who sent them.
       await c.query(`UPDATE problem_reports SET user_id = NULL, body = '', page = NULL WHERE user_id = $1`, [u.id]);

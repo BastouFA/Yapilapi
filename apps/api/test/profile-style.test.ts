@@ -321,3 +321,40 @@ describe('profile song', () => {
     await db().query(`UPDATE music_tracks SET status = 'active' WHERE id = $1`, [morning]);
   });
 });
+
+describe('deleting an account', () => {
+  it('clears the profile style, the about details, the song and the Now status', async () => {
+    const ada = await adult();
+    const post = await newPost(ada);
+    expect(
+      (await patch(ada, { accent: 'teal', headerStyle: 'gradient', pronouns: 'she/her', city: 'Lagos', tabs: ['posts', 'reels'], featuredPostIds: [post] }))
+        .status,
+    ).toBe(200);
+    expect((await as(t.app, ada).put('/v1/me/status', { text: 'At the market' })).status).toBe(200);
+    await db().query(`UPDATE profiles SET country = 'NG', pinned_post_id = $2 WHERE user_id = $1`, [ada.id, post]);
+
+    expect((await as(t.app, ada).del('/v1/me', { password: ada.password })).status).toBe(200);
+
+    const row = (
+      await db().query(
+        `SELECT accent, header_style, pronouns, city, tabs, featured_post_ids, song_sound_id, song_track_id, song_part, country, pinned_post_id
+         FROM profiles WHERE user_id = $1`,
+        [ada.id],
+      )
+    ).rows[0];
+    expect(row).toEqual({
+      accent: null,
+      header_style: 'cover',
+      pronouns: null,
+      city: null,
+      tabs: null,
+      featured_post_ids: [],
+      song_sound_id: null,
+      song_track_id: null,
+      song_part: null,
+      country: null,
+      pinned_post_id: null,
+    });
+    expect((await db().query(`SELECT 1 FROM profile_statuses WHERE user_id = $1`, [ada.id])).rowCount).toBe(0);
+  });
+});
