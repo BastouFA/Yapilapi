@@ -788,7 +788,7 @@ export default function Chat() {
         </View>
       ) : null}
       {watching ? <WatchBanner summary={watching} /> : null}
-      <SharingBanner share={sharing.mine} onStop={stopSharing} />
+      <SharingBanner share={sharing.mine} onStop={stopSharing} here={sharing.startedHere} />
       <PinnedBar
         pins={pins}
         canManage={canManage}
@@ -1234,6 +1234,7 @@ export default function Chat() {
         onClose={() => setLocationOpen(false)}
         conversationId={id}
         onSent={(m) => setMessages((cur) => (cur.some((x) => x.id === m.id) ? cur : [...cur, m]))}
+        onStarted={sharing.started}
       />
       <ShareMixHereSheet
         visible={mixShareOpen}

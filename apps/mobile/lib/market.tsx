@@ -1,3 +1,4 @@
+import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
@@ -31,10 +32,9 @@ import { Avatar, BottomSheet, Button, EmptyState, Field, Icon, Notice, SkeletonL
  * plain safety tips. The screens are app/market/* and app/market-edit.tsx; the chat cards are in
  * lib/chat-market.tsx.
  *
- * Places: this build has no location module (expo-location isn't installed). Where the platform
- * itself offers a position (navigator.geolocation), "Nearby" reads it once when asked, snaps it to
- * about a kilometre on the phone (approximatePoint) and keeps it in memory only for this session;
- * otherwise browsing is by newest in your country and listings carry their area text.
+ * Places: "Nearby" reads where you are once when asked (expo-location, permission asked then),
+ * snaps it to about a kilometre on the phone (approximatePoint) and keeps it in memory only for this
+ * session; until then browsing is by newest in your country and listings carry their area text.
  */
 
 // ── Words ───────────────────────────────────────────────────────────────
@@ -118,34 +118,26 @@ export function parseAmount(text: string): number | null {
 
 // ── Where you are (in memory only) ──────────────────────────────────────
 
-type Geo = {
-  getCurrentPosition: (ok: (p: { coords: { latitude: number; longitude: number } }) => void, fail: (e: { code: number }) => void, o?: object) => void;
-};
-
-/** The platform's own position reader, when this build has one (React Native doesn't by default). */
-export function marketGeolocation(): Geo | null {
-  const nav = (globalThis as { navigator?: { geolocation?: Geo } }).navigator;
-  return nav?.geolocation && typeof nav.geolocation.getCurrentPosition === 'function' ? nav.geolocation : null;
+/** Kept for the screens that ask whether "Nearby" is offered: it always is now. */
+export function marketGeolocation(): true {
+  return true;
 }
 
 /** Your approximate place for this session: never saved on the phone, gone when the app closes. */
 let approximateHere: LatLng | null = null;
 export const currentNear = () => approximateHere;
 
-/** Read the position once, snap it to about a kilometre, and keep it in memory. Rejects with 'unsupported', 'denied' or 'unavailable'. */
-export function readApproximatePlace(): Promise<LatLng> {
-  return new Promise((resolve, reject) => {
-    const geo = marketGeolocation();
-    if (!geo) return reject('unsupported');
-    geo.getCurrentPosition(
-      (p) => {
-        approximateHere = approximatePoint({ lat: p.coords.latitude, lng: p.coords.longitude });
-        resolve(approximateHere);
-      },
-      (e) => reject(e.code === 1 ? 'denied' : 'unavailable'),
-      { enableHighAccuracy: false, timeout: 20_000, maximumAge: 60_000 },
-    );
-  });
+/** Read the position once, snap it to about a kilometre, and keep it in memory. Rejects with 'denied' or 'unavailable'. */
+export async function readApproximatePlace(): Promise<LatLng> {
+  const perm = await Location.requestForegroundPermissionsAsync().catch(() => null);
+  if (!perm || perm.status !== 'granted') throw 'denied';
+  try {
+    const p = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+    approximateHere = approximatePoint({ lat: p.coords.latitude, lng: p.coords.longitude });
+    return approximateHere;
+  } catch {
+    throw 'unavailable';
+  }
 }
 
 /** What went wrong reading the position, in words. */

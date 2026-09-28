@@ -213,7 +213,7 @@ The app uses HTTPS (the system's own encryption) and WebRTC calls, which are enc
 
 **Declared:** `CAMERA`, `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS`, `ACCESS_NETWORK_STATE`, `BLUETOOTH_CONNECT` (headsets in calls), `WAKE_LOCK` (calls) and `READ_CONTACTS` (find friends, only when asked). Expo adds `INTERNET`, and notification permissions (`POST_NOTIFICATIONS`, `VIBRATE`, `RECEIVE_BOOT_COMPLETED`).
 
-**Blocked:** `WRITE_CONTACTS`, `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO`, `READ_MEDIA_AUDIO` and every location permission.
+**Blocked:** `WRITE_CONTACTS`, `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO`, `READ_MEDIA_AUDIO` and `ACCESS_BACKGROUND_LOCATION`. `ACCESS_FINE_LOCATION` and `ACCESS_COARSE_LOCATION` are requested only when someone taps "Share where I am" in a chat or "Nearby" in Market, and are used only while the app is open (expo-location, no background location).
 
 - The app picks photos with the system photo picker, which needs no permission.
 - Blocking the media permissions keeps you out of Google Play's photo and video permissions declaration.
@@ -330,7 +330,7 @@ Review notes to paste. Replace the placeholders.
 | Question (short) | Answer | Why |
 | --- | --- | --- |
 | User-generated content / users can interact | Yes | Posts, comments, chats, calls, live, rooms |
-| Users can share their location | No for GPS. Posts can carry a place name the author types | No location permission is used |
+| Users can share their location | Yes | In a chat, for 15 minutes to 8 hours or once, only when they choose; precise or about 1 km; stops when they stop or leave the chat |
 | Unrestricted web access | No | Links open in the system browser |
 | Digital purchases | Depends on the setting | Plus, subscriptions, tips, boosts, digital downloads, live tickets. Not offered in the app with the default setting (see [in-app-purchases.md](in-app-purchases.md)) |
 | Gambling, simulated gambling | No | |
@@ -435,7 +435,7 @@ The fuller, table-by-table inventory, with retention periods and processors, is 
   - post and story views, reel resume position, feed feedback, ad events;
   - daily minutes (`usage_days`).
 - **Country:** from the CDN header, used for regional rules and ads. The app never asks for GPS location.
-- **Location shared in chats:** today only the web asks for it (when someone taps "Share where I am"); this phone build has no location permission and can only show shared locations. When `expo-location` is added (docs/product/status.md), update this page before submitting: foreground-only location permissions (`ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`; iOS `NSLocationWhenInUseUsageDescription`, never "Always"), "Users can share their location: Yes" in the content rating, and "Precise location" (App functionality, linked to the person, not used for tracking) in the privacy label and data safety form.
+- **Location shared in chats, and Market nearby:** asked for only when someone taps "Share where I am" or "Nearby", on web and phone. Phone permissions are foreground only (`ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`; iOS `NSLocationWhenInUseUsageDescription`, never "Always"). A live share keeps only its latest point, deleted when it ends; Market sends the position snapped to about 1 km and keeps nothing. Privacy label and data safety form: add "Precise location" (App functionality, linked to the person, not used for tracking).
 - **Push:** Expo push tokens and web push endpoints.
 - **Contacts:** SHA-256 of salted email addresses, computed on the device. Only email is matched, and the hashes aren't stored.
 - **Payments:**

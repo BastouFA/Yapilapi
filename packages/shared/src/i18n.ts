@@ -5290,6 +5290,7 @@ const en = {
   'market.status.ended': 'Ended',
   'market.status.reserved': 'Reserved',
   'market.status.sold': 'Sold',
+  'location.phoneNote': 'Sharing keeps going while this chat is open, and stops when you leave it.',
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -10614,6 +10615,7 @@ const fr: Catalog = {
   'market.status.ended': 'Terminée',
   'market.status.reserved': 'Réservé',
   'market.status.sold': 'Vendu',
+  'location.phoneNote': 'Le partage continue tant que cette discussion est ouverte, et s’arrête quand tu la quittes.',
 };
 
 const ar: Catalog = {
@@ -15879,6 +15881,7 @@ const ar: Catalog = {
   'market.status.ended': 'منتهٍ',
   'market.status.reserved': 'محجوز',
   'market.status.sold': 'مُباع',
+  'location.phoneNote': 'تستمر المشاركة ما دامت هذه الدردشة مفتوحة، وتتوقف عند مغادرتها.',
 };
 
 const es: Catalog = {
@@ -21182,6 +21185,7 @@ const es: Catalog = {
   'market.status.ended': 'Terminado',
   'market.status.reserved': 'Reservado',
   'market.status.sold': 'Vendido',
+  'location.phoneNote': 'Se sigue compartiendo mientras este chat esté abierto y se detiene al salir.',
 };
 
 const pt: Catalog = {
@@ -26478,6 +26482,7 @@ const pt: Catalog = {
   'market.status.ended': 'Encerrado',
   'market.status.reserved': 'Reservado',
   'market.status.sold': 'Vendido',
+  'location.phoneNote': 'O compartilhamento continua enquanto esta conversa estiver aberta e para quando você sair.',
 };
 
 const sw: Catalog = {
@@ -31778,6 +31783,7 @@ const sw: Catalog = {
   'market.status.ended': 'Limeisha',
   'market.status.reserved': 'Kimehifadhiwa',
   'market.status.sold': 'Kimeuzwa',
+  'location.phoneNote': 'Kushiriki kunaendelea wakati mazungumzo haya yako wazi, na kunakoma ukiyaacha.',
 };
 
 const yo: Catalog = {
@@ -37066,6 +37072,7 @@ const yo: Catalog = {
   'market.status.ended': 'Ó ti parí',
   'market.status.reserved': 'A ti fi pamọ́',
   'market.status.sold': 'A ti tà á',
+  'location.phoneNote': 'Pípín ń bá a lọ nígbà tí ìjíròrò yìí ṣí sílẹ̀, ó sì dúró nígbà tí o bá kúrò.',
 };
 
 const ha: Catalog = {
@@ -42373,6 +42380,7 @@ const ha: Catalog = {
   'market.status.ended': 'Ya ƙare',
   'market.status.reserved': 'An ajiye',
   'market.status.sold': 'An sayar',
+  'location.phoneNote': 'Rabawa na ci gaba yayin da wannan hira take a buɗe, kuma tana tsayawa idan ka bar ta.',
 };
 
 export const CATALOGS: Record<string, Catalog> = { en, fr, ar, es, pt, sw, yo, ha };
