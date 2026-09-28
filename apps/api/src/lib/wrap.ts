@@ -2,8 +2,6 @@ import type { Pool, PoolClient } from 'pg';
 import sharp, { type OverlayOptions } from 'sharp';
 import {
   isEmptyWeek,
-  t,
-  tp,
   WRAP_CARD_DAYS,
   WRAP_HOUR,
   type OnThisDayCard,
@@ -14,6 +12,8 @@ import {
   type WeeklyWrapCounts,
   type WeeklyWrapSong,
 } from '@yapilapi/shared';
+// Every language, loaded up front: the card is drawn in its owner's.
+import { t, tp } from '@yapilapi/shared/i18n';
 import { hydratePosts } from './posts.ts';
 import type { RealtimeHub } from './realtime.ts';
 import { RECAP_FONTS } from './recaps.ts';

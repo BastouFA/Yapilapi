@@ -1,4 +1,4 @@
-import type { MessageKey, PluralKey } from './i18n.ts';
+import type { MessageKey, PluralKey } from './i18n-core.ts';
 import type { MediaItem, PublicUser } from './types.ts';
 
 /**

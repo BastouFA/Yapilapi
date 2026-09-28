@@ -436,6 +436,10 @@ A code review of `apps/mobile` for crashes and misbehaviour that can't be seen w
 
 A review of the features added on 2026-09-27 and 28, written up in `docs/security/review-2026-09-28.md`. Fixed: developer keys and app tokens reached the export, sign-in sessions and account deletion through percent-encoded paths (the check now uses the matched route); Together albums keep the minor rule for every pair of members; a live location share stops when the friendship that let someone under 18 share ends; "going" to an event that sells tickets no longer gives a free door ticket; an echo's video can't be reused outside its echo; and three small leaks in live updates and a seller's list of buyers. Left for later: pinning the checked address when fetching link icons and webhooks.
 
+## One language per reader on the web (2026-09-28, no migration, `packages/shared/src/i18n.test.ts`, `packages/shared/src/i18n-core.test.ts`)
+
+Each message catalog is its own module in `packages/shared/src/locales/`. The web loads English with the page and the reader's language on demand (`loadLocale()`), instead of all eight on every page: about 630 kB gzip less JavaScript on every route (Home 977 → 348 kB, a profile 1,008 → 379, Settings 954 → 325), plus 86 to 97 kB once for a non-English reader. The app waits for the reader's language as it waits for the account, so nothing shows in English first; `<html lang>`/`dir` are set before paint (Arabic no longer paints one frame left to right), and a returning reader's language is on `<html>` before anything paints. Switching language in Settings still happens in place. The phone and the API import `packages/shared/src/i18n.ts` (`@yapilapi/shared/i18n`), which loads every catalog up front as before. New keys go in every file in `locales/`. Details and measurements: `docs/architecture/performance.md`.
+
 ## Not built yet
 
 - Mainstream music: needs a licensing deal (docs/operations/music.md). Reporting song use to a licensing partner is not built.

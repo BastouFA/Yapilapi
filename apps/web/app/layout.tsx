@@ -10,6 +10,7 @@ import './echo.css';
 import './tickets.css';
 import './market.css';
 import { Providers } from './providers';
+import { LOCALE_SCRIPT } from '@/lib/locale-script';
 import { THEME_SCRIPT } from '@/lib/theme-script';
 
 // Fonts are downloaded when the app is built and served from our own domain: visitors' browsers never contact Google.
@@ -44,6 +45,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         {/* A chosen Light or Dark appearance applies before the first paint (lib/theme.ts). */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        {/* So does a returning reader's language and its direction (lib/locale-script.ts). */}
+        <script dangerouslySetInnerHTML={{ __html: LOCALE_SCRIPT }} />
       </head>
       <body className="yp-root">
         <Providers>{children}</Providers>
