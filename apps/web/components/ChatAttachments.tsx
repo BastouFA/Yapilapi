@@ -27,12 +27,14 @@ export function MessageAttachments({ items }: { items: Attachment[] }) {
           </p>
         ) : a.sensitive && !revealed.includes(i) && (a.kind === 'image' || a.kind === 'video') ? (
           <div key={i} className="chat-att__media chat-att__sensitive">
-            {a.kind === 'image' || a.posterUrl ? <img src={a.kind === 'image' ? a.url : a.posterUrl!} alt="" aria-hidden className="yp-blurred" /> : null}
+            {a.kind === 'image' || a.posterUrl ? (
+              <img src={a.kind === 'image' ? a.url : a.posterUrl!} alt="" aria-hidden className="yp-blurred" loading="lazy" decoding="async" />
+            ) : null}
             <SensitiveCover compact locale={locale} onReveal={() => setRevealed((r) => [...r, i])} />
           </div>
         ) : a.kind === 'image' ? (
           <a key={i} href={a.url} target="_blank" rel="noopener noreferrer" className="chat-att__media">
-            <img src={a.url} alt={a.name || t('m.post.photo')} loading="lazy" />
+            <img src={a.url} alt={a.name || t('m.post.photo')} loading="lazy" decoding="async" />
           </a>
         ) : a.kind === 'video' ? (
           <video

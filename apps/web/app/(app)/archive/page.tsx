@@ -88,9 +88,9 @@ export default function ArchivePage() {
                 <li key={s.id} className="story-tile">
                   <div className="story-tile__media" role="img" aria-label={s.body || t('m.create.mode.story')}>
                     {s.mediaKind === 'image' && s.mediaUrl ? (
-                      <img src={s.mediaUrl} alt="" className={s.sensitive ? 'yp-blurred' : undefined} />
+                      <img src={s.mediaUrl} alt="" loading="lazy" decoding="async" className={s.sensitive ? 'yp-blurred' : undefined} />
                     ) : s.posterUrl ? (
-                      <img src={s.posterUrl} alt="" className={s.sensitive ? 'yp-blurred' : undefined} />
+                      <img src={s.posterUrl} alt="" loading="lazy" decoding="async" className={s.sensitive ? 'yp-blurred' : undefined} />
                     ) : (
                       <p dir="auto">{s.blocked ? t('archive.unavailable') : s.body}</p>
                     )}

@@ -1,6 +1,7 @@
 'use client';
 
 import { isVideoFile, MEDIA_ACCEPT, MESSAGE_EDIT_MINUTES, WATCH_MAX_MEMBERS, type PinnedMessage } from '@yapilapi/shared';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -32,10 +33,14 @@ import { SmartReplyChips } from '@/components/AiHelpers';
 import { ListSheet, ListView, PollSheet, PollView, ReminderNote, ReminderSheet } from '@/components/ChatPolls';
 import { ChatLookSheet, chatThemeClass, chatThemeVars, ScheduledList, ScheduleSheet, useScheduled } from '@/components/ChatLater';
 import { useChatWatch, WatchBanner } from '@/components/WatchTogether';
-import { GameCard, GameSheet, StartGameSheet } from '@/components/ChatGames';
+import { GameCard } from '@/components/ChatGames';
 import { ChatMixCard, ShareMixHereSheet } from '@/components/Mixes';
 import { LocationCard, LocationRequestLine, ShareLocationSheet, SharingBanner, useLocationSharing } from '@/components/ChatLocation';
 import { MarketListingChat, MarketOfferChat } from '@/components/MarketChat';
+
+// The game boards and the sheet to start a game load after the chat itself; both stay closed until asked for.
+const GameSheet = dynamic(() => import('@/components/ChatGameSheets').then((m) => m.GameSheet), { ssr: false });
+const StartGameSheet = dynamic(() => import('@/components/ChatGameSheets').then((m) => m.StartGameSheet), { ssr: false });
 
 type Pending = Message & { pending?: boolean };
 

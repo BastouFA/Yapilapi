@@ -133,3 +133,157 @@ Two new scenarios. Tag queries match with `p.topics @> ARRAY[$tag]` so `posts_to
 | notifications list | `GET /v1/notifications` | 4.7 | 100 |
 
 If trending ever gets close to its budget, cache it for a minute: it is the same for everyone.
+
+## 2026-09-28: launch pass (database, API, web, phone)
+
+### How it was measured
+
+- **Dataset.** A development database migrated and seeded as usual, plus bulk rows written by a SQL script, every one marked "[Dev data]": 5,006 people, 105,009 posts (a tenth of them reels, one person with 5,000 posts and 30 collabs), 500,045 reactions, 297,761 follows, 50,061 friendships, 100,000 comments, 150,000 uploads, 20,001 chats holding 500,000 messages (one chat of 100,000), 300,000 notifications, 20,000 Market listings, 300 events with 6,149 tickets, 2,902 Together albums (one with 1,620 photos), 20,000 tips, 4,000 chat games with 80,000 moves. 728 MB on disk.
+- **Flows.** A script builds the API in-process (as `load:explain` does), signs in as 13 of those people and, three times over, opens For you and Following, a profile and its posts, followers and following, the chat list, a chat and three older pages of it, post and people search, notifications, reels, stories, Market browse, search and saved, the Together list and the big album, the tickets wallet and, once each, the data export. It times every request and every SQL statement (keeping the parameters of the slowest call) and prints `EXPLAIN (ANALYZE, BUFFERS)` for the slowest statements.
+- **pg_stat_statements** is not in `shared_preload_libraries` in the Docker Postgres, and the shared container was not restarted to add it, so statement timings came from the in-process wrapper above, which sees the same statements with their parameters. For production, start Postgres with `shared_preload_libraries=pg_stat_statements`, run `CREATE EXTENSION pg_stat_statements`, and read `SELECT calls, mean_exec_time, query FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20`.
+- **Every lookup by one value.** A script listed every `column = $1` lookup in the API's SQL and every foreign key whose column leads no index, and each was checked against the indexes that exist.
+
+Same laptop as above (Apple M4, Postgres 16 in Docker Desktop), with other work running (load average 4 to 6), so compare the before and after columns rather than the absolute numbers.
+
+### Flows, before and after
+
+p50 and p95 in ms per request, 39 requests each (3 for the album and the export).
+
+| Flow | p50 before | p50 after | p95 before | p95 after |
+| --- | ---: | ---: | ---: | ---: |
+| Feed, For you | 27.2 | 29.8 | 42.1 | 55.0 |
+| Feed, Following | 34.0 | 16.1 | 44.9 | 36.5 |
+| Profile | 36.3 | 4.1 | 41.1 | 5.8 |
+| Profile posts | 77.9 | 12.3 | 84.7 | 15.3 |
+| Profile posts, creator with 5,000 posts | about 80 | 15.3 | about 85 | 17.3 |
+| Reels | 39.6 | 22.7 | 44.6 | 33.1 |
+| Stories | 13.0 | 5.7 | 15.4 | 8.5 |
+| Market browse | 18.2 | 2.8 | 21.1 | 5.1 |
+| Market search ("bike") | 20.5 | 2.7 | 23.9 | 12.2 |
+| Chat list | 3.7 | 3.0 | 17.4 | 16.5 |
+| Chat, newest page | 6.0 | 4.7 | 8.0 | 7.2 |
+| Notifications | 2.4 | 1.6 | 4.1 | 3.4 |
+| Post search | 25.9 | 29.1 | 31.8 | 41.3 |
+| People search | 15.9 | 17.3 | 17.2 | 21.8 |
+| Together album | 31.7 | 26.5 | 36.5 | 35.1 |
+| Tickets | 1.5 | 1.1 | 2.2 | 2.1 |
+| Data export | 86.9 | 63.4 | 217.7 | 212.1 |
+
+For you, the searches and the album were not changed; their differences are the machine's load. The heavy creator's row was added to the script after the first fix; before it, every profile's post list scanned the whole posts table, so it cost what any profile did.
+
+### Statements, before and after the new indexes
+
+`EXPLAIN (ANALYZE)` execution time in ms on the same dataset, inside a transaction that was rolled back.
+
+| Statement | Before | After |
+| --- | ---: | ---: |
+| Someone's uploads, newest first (`media.owner_id`) | 24.4 | 0.7 |
+| Their view-once views (`message_views.user_id`) | 7.4 | 0.2 |
+| Erase their business page views (`business_views.viewer_id`) | 5.0 | 0.2 |
+| Their live chat (`live_chat.user_id`) | 6.7 | 0.2 |
+| Their chat game moves (`chat_game_moves.player_id`) | 5.3 | 0.2 |
+| Tips received, Me → Tips (`tips.to_id`) | 2.6 | 0.2 |
+| Duplicate-comment check, on every comment (`comments.author_id`) | 9.2 | 0.2 |
+| Unpin a deleted or hidden comment (`posts.pinned_comment_id`) | 51.7 | 0.01 |
+| Erase notifications to and from someone (`notifications.actor_id`) | 25.8 | 0.5 |
+| Delete 20 expired messages (foreign key checks: `messages.reply_to_id` and five others) | 410.5 | 2.3 |
+| Delete someone's 30 uploads (foreign key checks: `post_media.media_id` and ten others) | 77.7 | 3.8 |
+| Market text search (`ILIKE '%bike%'` on title, description, area) | 15.4 | 1.3 |
+
+The message delete matters most: disappearing messages are deleted one at a time as they expire, and every delete scanned the whole messages table for replies to it.
+
+### What changed
+
+**Migration `0062_performance_indexes.sql`** adds 69 indexes, in four groups:
+
+1. The lookups the data export and erasure work had already found: `media (owner_id, created_at DESC)`, `message_views (user_id)`, `business_views (viewer_id)`, `live_chat (user_id)`, `chat_game_moves (player_id)`, and for tips `from_id` and `to_id` (each with `created_at DESC`), `order_id`, and partial ones on `post_id` and `live_id`.
+2. Hot paths the flows found: `comments (author_id, created_at DESC)` for the duplicate-comment check; a tiny partial `media (id) WHERE moderation IN ('blocked', 'sensitive')` that the stories, chapters and reels filters use instead of scanning every upload; a trigram GIN index over Market titles, descriptions and areas; `market_listings (created_at DESC, id DESC)` for listed listings; `posts (pinned_comment_id)`; incoming friend requests; events you're going to; plans in a chat; a creator's plans, subscribers, sales and payouts; board notifications.
+3. Per-person lookups used by the export and by erasure on tables that grow with activity (notifications by actor, chat reactions, poll votes, story responses, live participants and more).
+4. Foreign keys that point at rows really deleted (expired messages, cleaned-up uploads, erased listings and Together photos, sounds, orders). Deleting a row makes Postgres look for rows that point at it, which was a full scan per deleted row without these.
+
+Where the column is often empty the index is partial (`WHERE … IS NOT NULL`), and the Market ones repeat the listed-listing condition, so they stay small.
+
+**Queries rewritten** (each covered by `apps/api/test/performance-queries.test.ts`, which passes against both the old and the new queries):
+
+- **Profile post count and profile posts.** "By this person or co-authored by them" was `author_id = $u OR EXISTS (a collab row)`, which Postgres can only answer by checking every post on the platform. The co-authored posts are now an array computed once, `p.id = ANY(ARRAY(SELECT post_id FROM post_collaborators …))` (`coAuthoredIdsSql` in `lib/collabs.ts`), which next to `author_id = $u` becomes one bitmap scan of `posts_author_idx` and the primary key. The profile's post list reads the person's own posts and their collabs as two ordered queries and merges them. Profile 36 → 4 ms, profile posts 78 → 12 ms.
+- **Following feed.** Posts are now joined through "you and the people you follow" (`posts_author_idx`) instead of testing every post for a follow; collabs and reposts the same way. 34 → 16 ms. The Friends feed uses the same pattern.
+- **Reels.** The feed ranked every reel on the platform on each request. It now ranks the newest 2,000 reels (`REEL_CANDIDATES` in `modules/posts.ts`) plus the last 30 days of reels from people you follow and friends, the way For you already works, and builds your follows, friends and interests once. Same ranking inside that set. 40 → 23 ms at 10,000 reels, and it no longer grows with the number of reels.
+- **Market browse.** "Your country first, then newest" sorted every listing. It now reads your country's listings and everyone else's as two date-ordered index scans that stop after the pages asked for, then merges them. 18 → 3 ms. One visible difference: a listing with no country is now counted with "everywhere else", after your country's listings, where before Postgres put it first (NULL sorts first in a descending order).
+
+**N+1 queries fixed:**
+
+- Market listings seen by someone under 18: whether they may write to each seller was one query per seller on the page; now one query for the page (`trustedAmong` in `lib/market.ts`).
+- `GET /v1/orders`: one query per order (up to 50) is now one query.
+- `GET /v1/wraps`: each wrap loaded its moment with its own `hydratePosts` call; now one call for all of them.
+
+The other loops that query per row send notifications to each person involved (fan-out on write) or are one-off jobs; they were left as they are.
+
+**Lists capped** that had no limit and grow with use: incoming friend requests (newest 200), blocked, muted and restricted people (1,000), plans in a chat (newest 100). Every other list endpoint already had a `LIMIT` or a page size.
+
+### Adding indexes in production
+
+Migrations run inside a transaction (`packages/database/src/migrate.ts`), where `CREATE INDEX CONCURRENTLY` is not allowed, so a migration's `CREATE INDEX` locks its table against writes while it builds. That is fine on small tables and at launch. Once tables are large, build the indexes by hand first, then deploy; the migration's `IF NOT EXISTS` then skips each one:
+
+```bash
+# Every CREATE INDEX in the migration, rewritten as CONCURRENTLY, one statement each.
+awk 'BEGIN { RS = ";" } { gsub(/--[^\n]*/, ""); if ($0 ~ /CREATE INDEX IF NOT EXISTS/) {
+  sub(/CREATE INDEX IF NOT EXISTS/, "CREATE INDEX CONCURRENTLY IF NOT EXISTS"); print $0 ";" } }' \
+  packages/database/migrations/0062_performance_indexes.sql > /tmp/0062-concurrently.sql
+# psql runs each statement in its own transaction unless told otherwise, which CONCURRENTLY needs.
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f /tmp/0062-concurrently.sql
+# A concurrent build that fails leaves an invalid index, which IF NOT EXISTS would then skip.
+psql "$DATABASE_URL" -c "SELECT indexrelid::regclass FROM pg_index WHERE NOT indisvalid"
+# Drop any it lists (DROP INDEX CONCURRENTLY name), run the file again, then deploy.
+```
+
+This is why index migrations keep semicolons out of their comments. Build at a quiet hour: a concurrent build still reads the whole table twice.
+
+### Web bundles
+
+Next 16 no longer prints route sizes in `next build`, so first-load JS per route was computed from the build manifests: the shared root chunks plus each route's client entry chunks (root layout, group layout, page), gzip level 9, before and after, from the same build command.
+
+| | Before | After |
+| --- | ---: | ---: |
+| Mean first-load JS per route (100 routes) | 933.9 kB | 924.3 kB |
+| Largest route (`/inbox/[id]`) | 1,026.2 kB | 992.7 kB |
+
+| Route | Before (kB) | After (kB) | Change (kB) |
+| --- | ---: | ---: | ---: |
+| `/together/[id]` | 993.7 | 941.9 | −51.8 |
+| `/together` | 972.5 | 932.7 | −39.8 |
+| `/u/[username]` | 1,020.6 | 984.1 | −36.5 |
+| `/inbox/[id]` | 1,026.2 | 992.7 | −33.5 |
+| `/home` | 983.6 | 953.6 | −30.0 |
+| `/t/[tag]` | 976.6 | 948.2 | −28.4 |
+| `/tickets` | 956.1 | 935.0 | −21.1 |
+| `/market/[id]` | 975.3 | 954.7 | −20.6 |
+| `/reels` | 980.7 | 963.0 | −17.7 |
+| `/create` | 968.8 | 951.5 | −17.3 |
+| `/market` | 943.2 | 933.1 | −10.1 |
+
+Every signed-in page is at least 7.4 kB lighter, because the Stripe form and the room screen left the app layout. What changed:
+
+- **Loaded when needed** (`next/dynamic`, client only, with a placeholder the size of what it replaces, announced as "Loading"): the Stripe payment form (opens with a checkout), the room screen, the watch-together screen (the feed only needs its picker), the Market listing form, the drop editor, the Together photo viewer and slideshow, the chat game boards and "start a game" sheet, the profile cover editor, the photo, video and collage editors on Create, and the story viewer on Home and tag pages. The QR code encoder is imported the first time a code is drawn. The chess board stays in the first load because the in-chat card shows it.
+- **Images:** list and grid images got `loading="lazy"` and `decoding="async"`; images at the top of a page (the listing gallery, a drop's cover, the wrap card, the profile cover) stay eager.
+- **Duplicate requests on load:** the unread counts and the inbox page asked for the chat list at the same time, and the same for notifications; the sidebar and Home both asked for people suggestions; two admin cards both loaded the flags; the sidebar loaded its suggestions twice when Live was on. Callers asking for the same thing at the same moment now share one request (`sharedRequest` in `apps/web/lib/api.ts`, which keeps nothing once the request settles).
+
+The biggest remaining cost is not in the web app: the root layout chunk (782 kB gzip, on every route) is about 616 kB of the seven non-English message catalogs plus 80 kB of English, all imported through `packages/shared/src/i18n.ts`. Putting each locale in its own module and loading the reader's one after sign-in would take about 600 kB, around 65%, off every route. That is the next web task.
+
+### Phone lists
+
+Every long list already had id-based `keyExtractor`s, the feeds shared tuned `windowSize`, batch sizes and `removeClippedSubviews` on Android, and reels had a fixed-height `getItemLayout`. What changed is re-rendering:
+
+- **Reels:** each reel is a memoised row whose buttons call the screen's latest actions through a ref, so opening a sheet or a status change no longer re-renders every mounted video.
+- **Chat:** `renderItem` is stable, so typing no longer re-renders every visible message.
+- **Comments, notifications, the chat list, followers and following:** rows are memoised components with stable handlers. The notifications separator was an inline component, remounted on every render.
+- **Feed:** `renderItem` is a module-level function, and reaching the end of the list fetches each page once (it could ask for the same cursor twice before a page arrived).
+- **Market:** the listing grid and tiles are memoised, so typing in the search box no longer re-renders every photo.
+
+Left as they are: the Market list and search results stay a `ScrollView` (they load a page at a time with a button, with the search box in the same scroll), and no `getItemLayout` was added where row heights vary.
+
+### Known limits (added)
+
+- **Hashtag suggestions in search** count the tags of every public post of the last 90 days on each keystroke (15 ms at 100,000 posts). Sampling the newest posts did not help at this size; once posts reach the millions, count tags in a table kept by a job instead.
+- **Post search** ranks every match of a common word before taking the first page (12,500 matches for "sunset" here, 11 to 25 ms). It is inside the 250 ms budget; a search engine is the fix at a much larger size.
+- **A Together album** returns up to 1,000 photos in one response (12 ms of SQL here); page it if albums get much bigger.
+- **For you** is unchanged at 20 to 30 ms; the "posts on your interests" candidates are most of it.

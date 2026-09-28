@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Avatar, Button, Icon } from '@yapilapi/design-system';
 import type { PublicUser } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, sharedRequest } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
 type Suggestion = { user: PublicUser; bio: string; reason: string };
@@ -22,7 +22,8 @@ export function SuggestedPeople() {
     } catch {
       // Storage can be unavailable; show everyone.
     }
-    api.me.suggestions().then(
+    // The desktop sidebar asks for the same list at the same time.
+    sharedRequest('suggestions', () => api.me.suggestions()).then(
       (r) => setItems(r.items.filter((s) => !hidden.includes(s.user.id))),
       () => setItems([]),
     );

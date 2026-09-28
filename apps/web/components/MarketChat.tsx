@@ -33,7 +33,7 @@ function ListingSummary({ listing }: { listing: MarketListingCard }) {
       {listing.photoUrl && listing.available ? (
         // The title is right beside it: the photo is decoration here.
         // eslint-disable-next-line @next/next/no-img-element
-        <img className="market-chat__photo" src={listing.photoUrl} alt="" />
+        <img className="market-chat__photo" src={listing.photoUrl} alt="" loading="lazy" decoding="async" />
       ) : (
         <span className="market-chat__photo market-chat__photo--none" aria-hidden>
           <Icon name="bag" size={22} />

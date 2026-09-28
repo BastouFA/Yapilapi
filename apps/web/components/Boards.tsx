@@ -82,7 +82,7 @@ export function BoardCover({ board }: { board: Board }) {
   if (c?.imageUrl)
     return (
       <span className="board-cover" aria-hidden style={placeholder ? { backgroundImage: `url(${placeholder})` } : undefined}>
-        <img src={c.imageUrl} alt="" loading="lazy" />
+        <img src={c.imageUrl} alt="" loading="lazy" decoding="async" />
       </span>
     );
   if (c?.text)
@@ -593,7 +593,7 @@ function TileMedia({ post }: { post: Post }) {
     return (
       <>
         {src ? (
-          <img src={src} alt="" loading="lazy" className={m.sensitive ? 'yp-blurred' : undefined} />
+          <img src={src} alt="" loading="lazy" decoding="async" className={m.sensitive ? 'yp-blurred' : undefined} />
         ) : (
           <video src={m.variants?.mp4 ?? m.url} muted playsInline preload="metadata" aria-hidden className={m.sensitive ? 'yp-blurred' : undefined} />
         )}

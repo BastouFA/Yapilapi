@@ -12,7 +12,7 @@ import {
   type MessageKey,
   type PluralKey,
 } from '@yapilapi/shared';
-import { api, WS_URL } from '@/lib/api';
+import { api, sharedRequest, WS_URL } from '@/lib/api';
 import {
   connectionHints,
   dataSaverActive,
@@ -147,13 +147,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
     let stopped = false;
     let ws: WebSocket | null = null;
     let attempt = 0;
+    // Shared with the inbox and notifications pages, which ask for the same lists as they open.
     const loadCounts = () => {
-      api.notifications
-        .list()
+      sharedRequest('notifications', () => api.notifications.list())
         .then((r) => setUnreadState((u) => ({ ...u, notifications: r.unread })))
         .catch(() => {});
-      api.conversations
-        .list()
+      sharedRequest('conversations', () => api.conversations.list())
         .then((r) => setUnreadState((u) => ({ ...u, messages: r.items.reduce((s, c) => s + c.unreadCount, 0) })))
         .catch(() => {});
     };

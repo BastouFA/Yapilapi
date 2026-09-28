@@ -23,9 +23,19 @@ export function coAuthoredSql(u: string, p = 'p'): string {
   return `EXISTS (SELECT 1 FROM post_collaborators pc WHERE pc.post_id = ${p}.id AND pc.user_id = ${u} AND pc.status = 'accepted')`;
 }
 
+/**
+ * Ids of the posts `u` co-authors (accepted the invite), as an array computed once per `u`.
+ * Written as `p.id = ANY(ARRAY(...))` rather than a per-post EXISTS so that, next to
+ * `p.author_id = u`, Postgres can combine posts_author_idx and the primary key in one
+ * bitmap scan instead of checking every post on the platform.
+ */
+export function coAuthoredIdsSql(u: string): string {
+  return `ARRAY(SELECT pc.post_id FROM post_collaborators pc WHERE pc.user_id = ${u} AND pc.status = 'accepted')`;
+}
+
 /** Posts aliased `p`: by `u`, as the original author or an accepted co-author. Used for profiles and stats. */
 export function byOrWithSql(u: string, p = 'p'): string {
-  return `(${p}.author_id = ${u} OR ${coAuthoredSql(u, p)})`;
+  return `(${p}.author_id = ${u} OR ${p}.id = ANY(${coAuthoredIdsSql(u)}))`;
 }
 
 /**

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Avatar, AvatarGroup, BottomSheet, Button, EmptyState, List, ListItem, Skeleton, TextField } from '@yapilapi/design-system';
 import { formatRelativeTime, type Conversation, type MessageKey, type PublicUser } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, sharedRequest } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { useRealtime, useSession } from '../../providers';
@@ -26,7 +26,7 @@ export default function Inbox() {
   const [newGroup, setNewGroup] = useState(false);
 
   const load = () =>
-    api.conversations.list().then(
+    sharedRequest('conversations', () => api.conversations.list()).then(
       (r) => setItems(r.items),
       (e) => toast(errorMessage(e)),
     );

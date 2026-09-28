@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { EmptyState, Skeleton } from '@yapilapi/design-system';
 import type { MarketListing } from '@yapilapi/shared';
 import { api } from '@/lib/api';
-import { ListingForm } from '@/components/Market';
+import { ListingForm } from '@/components/MarketForm';
 import { useSession } from '../../../../providers';
 
 /** Change one of your listings. */

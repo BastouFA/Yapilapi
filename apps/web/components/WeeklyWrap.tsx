@@ -145,7 +145,9 @@ function WrapPulseCard({ card, onDismiss }: { card: WeeklyWrapCard; onDismiss: (
   const { t, locale } = useSession();
   return (
     <section className="pulse-card" aria-labelledby={`pulse-wrap-${card.id}`}>
-      <span className="pulse-card__thumb">{card.thumbUrl ? <img src={card.thumbUrl} alt="" loading="lazy" /> : <Icon name="sparkle" size={24} />}</span>
+      <span className="pulse-card__thumb">
+        {card.thumbUrl ? <img src={card.thumbUrl} alt="" loading="lazy" decoding="async" /> : <Icon name="sparkle" size={24} />}
+      </span>
       <div className="pulse-card__body">
         <h2 id={`pulse-wrap-${card.id}`} className="pulse-card__title">
           {t('wrap.cardTitle')}
@@ -203,7 +205,7 @@ function OnThisDay({
         {thumbs.length ? (
           <div className="pulse-card__thumbs" aria-hidden>
             {thumbs.map((x) => (
-              <img key={x.id} src={x.src!} alt="" loading="lazy" className={x.sensitive ? 'yp-blurred' : undefined} />
+              <img key={x.id} src={x.src!} alt="" loading="lazy" decoding="async" className={x.sensitive ? 'yp-blurred' : undefined} />
             ))}
           </div>
         ) : null}
@@ -250,7 +252,9 @@ export function WrapList() {
           {items.map((w) => (
             <li key={w.id}>
               <Link href={`/wraps/${w.id}`} className="wrap-row">
-                <span className="wrap-row__thumb">{w.thumbUrl ? <img src={w.thumbUrl} alt="" loading="lazy" /> : <Icon name="sparkle" size={20} />}</span>
+                <span className="wrap-row__thumb">
+                  {w.thumbUrl ? <img src={w.thumbUrl} alt="" loading="lazy" decoding="async" /> : <Icon name="sparkle" size={20} />}
+                </span>
                 <span className="wrap-row__text">
                   <strong>{t('wrap.dates', { start: wrapDate(w.weekStart, locale), end: wrapDate(w.weekEnd, locale) })}</strong>
                   <WrapStats counts={w.counts} />
@@ -279,7 +283,7 @@ function PostTile({ post }: { post: Post }) {
     <Link href={postHref(post)} className="wrap-post">
       <span className="wrap-post__thumb">
         {thumb ? (
-          <img src={thumb} alt="" loading="lazy" className={post.media.some((m) => m.sensitive) ? 'yp-blurred' : undefined} />
+          <img src={thumb} alt="" loading="lazy" decoding="async" className={post.media.some((m) => m.sensitive) ? 'yp-blurred' : undefined} />
         ) : (
           <Icon name="message" size={20} />
         )}

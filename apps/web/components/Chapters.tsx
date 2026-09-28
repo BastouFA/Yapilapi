@@ -103,7 +103,7 @@ function CoverPreview({
 }) {
   return (
     <span className="chapter-cover" style={{ width: size, height: size, background: gradientCss(gradient) }} aria-hidden>
-      {image ? <img src={image} alt="" /> : <Icon name={(symbol ?? 'star') as IconName} size={Math.round(size * 0.4)} />}
+      {image ? <img src={image} alt="" loading="lazy" decoding="async" /> : <Icon name={(symbol ?? 'star') as IconName} size={Math.round(size * 0.4)} />}
       {locked ? (
         <span className="chapter-cover__lock">
           <Icon name="lock" size={Math.max(12, Math.round(size * 0.18))} />

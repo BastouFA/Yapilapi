@@ -1,12 +1,18 @@
 'use client';
 
-import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
-import { loadStripe, type Stripe } from '@stripe/stripe-js';
+import dynamic from 'next/dynamic';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Alert, BottomSheet, Button } from '@yapilapi/design-system';
 import type { PaymentsConfig } from '@yapilapi/api-client';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
+import { LoadingBlock } from './Loading';
+
+// Stripe's form downloads when a Stripe payment opens; the stand-in is about the card form's height.
+const StripeStep = dynamic(() => import('./CheckoutStripe').then((m) => m.StripeStep), {
+  ssr: false,
+  loading: () => <LoadingBlock height={240} />,
+});
 
 interface PayRequest {
   orderId: string;
@@ -21,8 +27,6 @@ interface PayRequest {
 const Ctx = createContext<(r: PayRequest) => void>(() => {});
 /** Open checkout for an order the API just created. */
 export const useCheckout = () => useContext(Ctx);
-
-let stripePromise: Promise<Stripe | null> | null = null;
 
 /** Paystack's hosted checkout. Anything else in clientSecret is not opened. */
 const PAYSTACK_CHECKOUT = /^https:\/\/checkout\.paystack\.com\//;
@@ -105,9 +109,7 @@ function CheckoutBody({ req, config, onClose }: { req: PayRequest; config: Payme
       {provider === 'paystack' ? (
         <PaystackStep url={req.clientSecret} waiting={state === 'confirming'} onOpened={confirm} />
       ) : provider === 'stripe' && config.provider === 'stripe' && config.publishableKey ? (
-        <Elements stripe={(stripePromise ??= loadStripe(config.publishableKey))} options={{ clientSecret: req.clientSecret }}>
-          <StripeForm busy={state === 'confirming'} onPaid={confirm} onError={setError} />
-        </Elements>
+        <StripeStep publishableKey={config.publishableKey} clientSecret={req.clientSecret} busy={state === 'confirming'} onPaid={confirm} onError={setError} />
       ) : provider === 'dev' ? (
         <>
           <Alert tone="info" title={t('checkout.testTitle')}>
@@ -169,33 +171,5 @@ function PaystackStep({ url, waiting, onOpened }: { url: string; waiting: boolea
         </Button>
       )}
     </>
-  );
-}
-
-function StripeForm({ busy, onPaid, onError }: { busy: boolean; onPaid: () => void; onError: (m: string | null) => void }) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const { toast, t } = useSession();
-  return (
-    <form
-      className="stack-sm"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        if (!stripe || !elements) return;
-        onError(null);
-        const { error } = await stripe.confirmPayment({ elements, redirect: 'if_required', confirmParams: { return_url: window.location.href } });
-        if (error) {
-          onError(error.message ?? t('checkout.failed'));
-          return;
-        }
-        toast(t('checkout.sent'));
-        onPaid();
-      }}
-    >
-      <PaymentElement />
-      <Button type="submit" loading={busy} disabled={!stripe || !elements}>
-        {t('checkout.pay')}
-      </Button>
-    </form>
   );
 }

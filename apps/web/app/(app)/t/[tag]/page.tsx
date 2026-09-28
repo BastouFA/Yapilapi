@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -8,8 +9,14 @@ import type { StoryGroup, TagSummary } from '@yapilapi/api-client';
 import { normalizeTag } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { PostList } from '@/components/PostList';
-import { StoryViewer } from '@/components/StoryViewer';
+import { ScreenLoading } from '@/components/Loading';
 import { useSession } from '../../../providers';
+
+// The story viewer opens full screen when a story is tapped, so it downloads then.
+const StoryViewer = dynamic(() => import('@/components/StoryViewer').then((m) => m.StoryViewer), {
+  ssr: false,
+  loading: () => <ScreenLoading className="story" />,
+});
 
 /**
  * One hashtag: how many people use it, related tags, public stories with it right now, and its recent or top posts.

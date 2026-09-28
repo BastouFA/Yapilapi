@@ -266,6 +266,7 @@ export default async function marketModule(app: FastifyInstance, ctx: AppContext
     const where = [listingListedSql('$1')];
     let distance = 'NULL::float8';
     let order = 'l.created_at DESC, l.id DESC';
+    let home: string | null = null;
     if (q.near) {
       const at = approximatePoint(q.near);
       const radius = q.radiusKm ?? MARKET_DEFAULT_RADIUS_KM;
@@ -281,7 +282,7 @@ export default async function marketModule(app: FastifyInstance, ctx: AppContext
       order = `${distance} ASC, l.created_at DESC, l.id DESC`;
     } else {
       const mine = (await db.query<{ c: string | null }>(`SELECT coalesce(country, cdn_country) AS c FROM profiles WHERE user_id = $1`, [u.id])).rows[0]?.c;
-      if (mine) order = `(l.country = ${p(mine)}) DESC, l.created_at DESC, l.id DESC`;
+      if (mine) home = p(mine);
     }
     if (q.q) {
       const like = `%${q.q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
@@ -298,9 +299,19 @@ export default async function marketModule(app: FastifyInstance, ctx: AppContext
       if (q.minPriceCents) where.push(`coalesce(l.price_cents, 0) >= ${p(q.minPriceCents)}`);
       if (q.maxPriceCents !== undefined) where.push(`coalesce(l.price_cents, 0) <= ${p(q.maxPriceCents)}`);
     }
+    const listed = (extra = '') => `SELECT ${LISTING_COLS}, ${distance} AS distance_km${extra} ${LISTING_FROM} WHERE ${where.join(' AND ')}`;
+    // Listings in your country come first, then the rest, newest first in each. Each part is read in
+    // date order from its index and stops after the pages asked for, instead of sorting every listing.
+    const upTo = home ? p(offset + q.limit + 1) : '';
     const { rows } = await db.query<ListingRow>(
-      `SELECT ${LISTING_COLS}, ${distance} AS distance_km ${LISTING_FROM} WHERE ${where.join(' AND ')}
-       ORDER BY ${order} LIMIT ${p(q.limit + 1)} OFFSET ${p(offset)}`,
+      home
+        ? `SELECT * FROM (
+             (${listed(', 0 AS part')} AND l.country = ${home} ORDER BY l.created_at DESC, l.id DESC LIMIT ${upTo})
+             UNION ALL
+             (${listed(', 1 AS part')} AND l.country IS DISTINCT FROM ${home} ORDER BY l.created_at DESC, l.id DESC LIMIT ${upTo})
+           ) x
+           ORDER BY part, created_at DESC, id DESC LIMIT ${p(q.limit + 1)} OFFSET ${p(offset)}`
+        : `${listed()} ORDER BY ${order} LIMIT ${p(q.limit + 1)} OFFSET ${p(offset)}`,
       params,
     );
     const page = rows.slice(0, q.limit);
