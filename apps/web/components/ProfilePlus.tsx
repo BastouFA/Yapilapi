@@ -8,6 +8,8 @@ import {
   NOW_STATUS_ICONS,
   NOW_STATUS_MAX,
   profileQrInk,
+  type CoverPhoto,
+  type CoverRecipe,
   type MessageKey,
   type NowStatus,
   type NowStatusAudience,
@@ -16,6 +18,8 @@ import {
 } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
+import { CoverEditor, type CoverEditorTab } from './editor/CoverEditor';
+import { SuggestAltText } from './AiHelpers';
 
 // ── Cover ───────────────────────────────────────────────────────────────
 /**
@@ -38,59 +42,123 @@ export function ProfileCover({ profile, onEdit }: { profile: Profile; onEdit?: (
       <span className="profile__cover-fade" aria-hidden />
       {onEdit && header === 'cover' ? (
         <Button size="sm" variant="secondary" icon="image" className="profile__cover-edit" onClick={onEdit}>
-          {profile.coverUrl ? t('profilePlus.changeCover') : t('profilePlus.addCover')}
+          {profile.coverUrl ? t('m.cover.edit') : t('profilePlus.addCover')}
         </Button>
       ) : null}
     </div>
   );
 }
 
-/** Choose, describe or remove your cover photo. Photos go through the usual upload and processing. */
+/** What the cover editor is open on: a new file, one of your uploads, or your cover's original. */
+type CoverSource =
+  { kind: 'file'; file: File; src: string } | { kind: 'media'; mediaId: string; src: string; initial: CoverRecipe | null; tab: CoverEditorTab };
+
+/**
+ * Choose, edit, describe or remove your cover photo. A new photo or one of your recent ones opens
+ * the cover editor; "Edit cover" and "Adjust position" open your cover's original with the edits
+ * you made. The server renders the cover from the original (PUT /v1/me/cover with the recipe).
+ */
 export function CoverSheet({ open, onClose, profile, onSaved }: { open: boolean; onClose: () => void; profile: Profile; onSaved: (p: Profile) => void }) {
-  const { toast, t } = useSession();
+  const { toast, t, locale } = useSession();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
   const [alt, setAlt] = useState(profile.coverAlt ?? '');
-  const [busy, setBusy] = useState<'save' | 'remove' | null>(null);
+  const [busy, setBusy] = useState<'save' | 'remove' | 'edit' | null>(null);
+  const [recent, setRecent] = useState<CoverPhoto[] | null>(null);
+  const [editing, setEditing] = useState<CoverSource | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
   const [stage, setStage] = useState<string | null>(null);
+  const edit = profile.coverEdit ?? null;
 
   useEffect(() => {
     if (!open) return;
-    setFile(null);
     setAlt(profile.coverAlt ?? '');
+    setEditError(null);
     setStage(null);
+    let live = true;
+    api.me
+      .coverPhotos()
+      .then((r) => live && setRecent(r.items))
+      .catch(() => live && setRecent([]));
+    return () => {
+      live = false;
+    };
   }, [open, profile.coverAlt]);
+  // A new file's address lives only while the editor is open on it.
   useEffect(() => {
-    if (!file) return setPreview(null);
-    const url = URL.createObjectURL(file);
-    setPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
+    if (editing?.kind !== 'file') return;
+    const src = editing.src;
+    return () => URL.revokeObjectURL(src);
+  }, [editing]);
 
-  async function save() {
+  async function saveDescription() {
     setBusy('save');
     try {
-      let saved: Profile;
-      if (file) {
-        setStage(t('profilePlus.uploading'));
-        const { media } = await api.media.upload(file, alt.trim() || undefined);
-        if (media.kind !== 'image') throw new Error(t('profilePlus.photoOnly'));
-        setStage(t('m.cover.preparing'));
-        saved = (await api.me.setCoverWhenReady(media.id, alt.trim() || undefined)).profile;
-      } else {
-        saved = (await api.me.updateProfile({ coverAlt: alt.trim() || null })).profile;
-      }
-      onSaved(saved);
-      toast(file ? t('profilePlus.coverUpdated') : t('profilePlus.descriptionSaved'));
+      onSaved((await api.me.updateProfile({ coverAlt: alt.trim() || null })).profile);
+      toast(t('profilePlus.descriptionSaved'));
       onClose();
     } catch (e) {
-      toast(e instanceof Error && !('status' in e) ? e.message : errorMessage(e));
+      toast(errorMessage(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function saveEdit(recipe: CoverRecipe) {
+    if (!editing) return;
+    setBusy('edit');
+    setEditError(null);
+    try {
+      let saved: Profile;
+      const description = alt.trim() || undefined;
+      if (editing.kind === 'file') {
+        setStage(t('profilePlus.uploading'));
+        const { media } = await api.media.upload(editing.file, description);
+        if (media.kind !== 'image') throw new Error(t('profilePlus.photoOnly'));
+        setStage(t('m.cover.preparing'));
+        saved = (await api.me.setCoverWhenReady(media.id, description, { edit: recipe })).profile;
+      } else {
+        setStage(t('coverEditor.saving'));
+        saved = (await api.me.setCover(editing.mediaId, description, recipe)).profile;
+      }
+      onSaved(saved);
+      toast(t('profilePlus.coverUpdated'));
+      setEditing(null);
+      onClose();
+    } catch (e) {
+      setEditError(e instanceof Error && !('status' in e) ? e.message : errorMessage(e));
     } finally {
       setBusy(null);
       setStage(null);
     }
   }
+
+  const openEdit = (tab: CoverEditorTab) => edit && setEditing({ kind: 'media', mediaId: edit.mediaId, src: edit.url, initial: edit.recipe, tab });
+  const dateOf = (iso: string) => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(iso));
+
+  if (editing)
+    return (
+      <>
+        <CoverEditor
+          src={editing.src}
+          profile={profile}
+          initial={editing.kind === 'media' ? editing.initial : null}
+          initialTab={editing.kind === 'media' ? editing.tab : 'frame'}
+          title={editing.kind === 'media' && editing.tab === 'frame' && edit?.mediaId === editing.mediaId ? t('coverEditor.adjustPosition') : t('m.cover.edit')}
+          busy={busy === 'edit'}
+          error={editError}
+          onDone={saveEdit}
+          onCancel={() => {
+            setEditing(null);
+            setEditError(null);
+          }}
+        />
+        {stage ? (
+          <p className="yp-visually-hidden" role="status">
+            {stage}
+          </p>
+        ) : null}
+      </>
+    );
 
   async function remove() {
     setBusy('remove');
@@ -105,18 +173,27 @@ export function CoverSheet({ open, onClose, profile, onSaved }: { open: boolean;
     }
   }
 
-  const shown = preview ?? profile.coverUrl;
   return (
     <BottomSheet open={open} onClose={onClose} title={t('profilePlus.coverTitle')}>
       <div className="stack">
         <div className="cover-sheet__preview">
-          {shown ? (
+          {profile.coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={shown} alt="" />
+            <img src={profile.coverUrl} alt="" />
           ) : (
             <span className="muted">{t('profilePlus.noCover')}</span>
           )}
         </div>
+        {edit ? (
+          <div className="cover-sheet__actions">
+            <Button variant="secondary" icon="edit" onClick={() => openEdit('look')} disabled={!!busy}>
+              {t('m.cover.edit')}
+            </Button>
+            <Button variant="secondary" onClick={() => openEdit('frame')} disabled={!!busy}>
+              {t('coverEditor.adjustPosition')}
+            </Button>
+          </div>
+        ) : null}
         <input
           ref={fileRef}
           type="file"
@@ -124,13 +201,40 @@ export function CoverSheet({ open, onClose, profile, onSaved }: { open: boolean;
           hidden
           onChange={(e) => {
             const f = e.currentTarget.files?.[0];
-            if (f) setFile(f);
+            if (f) setEditing({ kind: 'file', file: f, src: URL.createObjectURL(f) });
             e.currentTarget.value = '';
           }}
         />
-        <Button variant="secondary" icon="image" onClick={() => fileRef.current?.click()} disabled={!!busy}>
-          {shown ? t('profilePlus.chooseDifferent') : t('m.cover.choose')}
+        <Button variant={edit ? 'ghost' : 'secondary'} icon="image" onClick={() => fileRef.current?.click()} disabled={!!busy}>
+          {t('coverEditor.upload')}
         </Button>
+        {recent?.length ? (
+          <section className="stack-sm" aria-labelledby="cover-recent-title">
+            <h3 id="cover-recent-title" className="yp-field__label" style={{ margin: 0 }}>
+              {t('coverEditor.recent')}
+            </h3>
+            <ul className="cover-sheet__recent">
+              {recent.map((p) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    className="cover-sheet__photo"
+                    disabled={!!busy}
+                    aria-label={
+                      p.altText
+                        ? `${p.altText}. ${t('coverEditor.photoFrom', { date: dateOf(p.createdAt) })}`
+                        : t('coverEditor.photoFrom', { date: dateOf(p.createdAt) })
+                    }
+                    onClick={() => setEditing({ kind: 'media', mediaId: p.id, src: p.url, initial: null, tab: 'frame' })}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={p.thumbUrl} alt="" loading="lazy" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
         <TextField
           label={t('profilePlus.describe')}
           hint={t('profilePlus.describeHint')}
@@ -138,11 +242,7 @@ export function CoverSheet({ open, onClose, profile, onSaved }: { open: boolean;
           maxLength={300}
           onChange={(e) => setAlt(e.currentTarget.value)}
         />
-        {stage ? (
-          <p className="muted" role="status" style={{ margin: 0, fontSize: 14 }}>
-            {stage}
-          </p>
-        ) : null}
+        {edit ? <SuggestAltText mediaId={edit.mediaId} index={0} onSuggested={(text) => setAlt(text.slice(0, 300))} /> : null}
         <div className="row" style={{ justifyContent: 'space-between' }}>
           {profile.coverUrl ? (
             <Button variant="ghost" icon="trash" loading={busy === 'remove'} disabled={!!busy} onClick={remove}>
@@ -151,9 +251,11 @@ export function CoverSheet({ open, onClose, profile, onSaved }: { open: boolean;
           ) : (
             <span />
           )}
-          <Button loading={busy === 'save'} disabled={!!busy || (!file && !profile.coverUrl)} onClick={save}>
-            {t('common.save')}
-          </Button>
+          {profile.coverUrl ? (
+            <Button loading={busy === 'save'} disabled={!!busy || alt.trim() === (profile.coverAlt ?? '')} onClick={saveDescription}>
+              {t('coverEditor.saveDescription')}
+            </Button>
+          ) : null}
         </div>
       </div>
     </BottomSheet>

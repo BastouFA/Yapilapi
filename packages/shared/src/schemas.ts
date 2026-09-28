@@ -5,6 +5,8 @@ import { GAME_KINDS, GAME_PLAYERS } from './games/types.ts';
 import { USERNAME_PROBLEM_MESSAGES, usernameProblem } from './usernames.ts';
 import { REEL_LONGEST_MS, reelHighlightsSchema } from './reels.ts';
 import { MAX_UNDERSTOOD_LANGUAGES, TRANSLATABLE_KINDS, TRANSLATION_LANGUAGE_CODES } from './translation.ts';
+import { cropSchema, mediaEditSchema } from './filters.ts';
+import { COVER_MAX_STRAIGHTEN } from './cover.ts';
 import {
   CIRCLE_KINDS,
   COMMENT_POLICIES,
@@ -420,11 +422,28 @@ export const circleUpdateSchema = z
   .refine((v) => v.name !== undefined || v.kind !== undefined, { message: 'Nothing to change.' });
 export const circleMembersSchema = z.object({ userIds: z.array(uuid).min(1).max(200) });
 
-/** Set your cover photo: one of your own uploaded photos (POST /v1/media or /v1/uploads). */
+/**
+ * How a cover is made from its original photo (cover.ts): the photo editor's look (with a
+ * strength), adjustments, turns and flips, plus a straighten and the crop, which the server checks
+ * has the cover's shape. No text: a cover sits behind the profile's own name.
+ */
+export const coverEditSchema = mediaEditSchema
+  .pick({ filter: true, adjustments: true, rotate: true, flipH: true, flipV: true })
+  .extend({
+    filterStrength: z.number().finite().min(0).max(100).default(100),
+    straighten: z.number().finite().min(-COVER_MAX_STRAIGHTEN).max(COVER_MAX_STRAIGHTEN).default(0),
+    crop: cropSchema,
+  })
+  .strict();
+export type CoverEditInput = z.input<typeof coverEditSchema>;
+
+/** Set your cover photo: one of your own uploaded photos (POST /v1/media or /v1/uploads), optionally edited. */
 export const setCoverSchema = z.object({
   mediaId: uuid,
   /** Describes the photo for people using screen readers. Defaults to the upload's own description. */
   altText: z.string().trim().max(300).optional(),
+  /** Framing, look and adjustments; without it the whole photo is used as it is. */
+  edit: coverEditSchema.optional(),
 });
 
 /** Set your "Now" status. It ends after 24 hours. */

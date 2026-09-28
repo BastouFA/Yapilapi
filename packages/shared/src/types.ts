@@ -7,6 +7,7 @@ import type { ProfileStyle, ProfileTab } from './profile-style.ts';
 import type { ChatTheme } from './chat-theme.ts';
 import type { ProfileAskBox, QuotedQuestion } from './ask.ts';
 import type { GameKind, GameState } from './games/types.ts';
+import type { CoverRecipe } from './cover.ts';
 import type {
   BoardVisibility,
   CircleKind,
@@ -107,6 +108,11 @@ export interface Profile extends PublicUser {
   coverUrl: string | null;
   /** Describes the cover photo for screen readers. */
   coverAlt: string | null;
+  /**
+   * Only on your own profile: the original photo behind your cover and how it was edited, so
+   * "Edit cover" can open it again as you left it. `recipe` is null for a cover set without editing.
+   */
+  coverEdit?: CoverEditState | null;
   /** Their current "Now" status, when there is one and you're in its audience. */
   nowStatus: NowStatus | null;
   /** Up to 5 web links. `iconUrl` is the site's icon, fetched and checked on the server (null: show a generic icon). */
@@ -139,6 +145,30 @@ export interface Profile extends PublicUser {
     blocked: boolean;
     muted: boolean;
   };
+}
+
+/** Your cover's original photo (a processed size to edit on) and the recipe it was made with. */
+export interface CoverEditState {
+  mediaId: string;
+  url: string;
+  /** The original's upright size, in pixels. */
+  width: number | null;
+  height: number | null;
+  altText: string | null;
+  recipe: CoverRecipe | null;
+}
+
+/** One of your recent photos that can be a cover (GET /v1/me/cover/photos). */
+export interface CoverPhoto {
+  id: string;
+  /** A small size, for the picker. */
+  thumbUrl: string;
+  /** A size big enough to frame the cover on. */
+  url: string;
+  width: number | null;
+  height: number | null;
+  altText: string | null;
+  createdAt: string;
 }
 
 export interface MediaItem {

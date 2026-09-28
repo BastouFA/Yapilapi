@@ -6,7 +6,9 @@ import type { Post, Profile } from '../../../packages/shared/src/types';
 import type { ProfileTab } from '../../../packages/shared/src/profile-style';
 import { client, errorMessage, mediaUrl, webUrl } from './api';
 import { useT } from './i18n';
-import { pickOne, uploadPicked } from './media';
+import { pickOne, uploadPicked, type Picked } from './media';
+import { CoverEditor, CoverPhotoPicker, type CoverEditorTab } from './cover-editor';
+import { COVER_RATIO, type CoverRecipe } from '../../../packages/shared/src/cover';
 import { liveStatus, NowStatusLine, onStatusChanged } from './now-status';
 import { PostCard, RichText } from './post';
 import { radius, space } from './theme';
@@ -78,6 +80,17 @@ export function ProfileView({
   const tint = useTint(profile?.style?.accent);
   // A new cover photo on its way: the phone's copy shows while it uploads and is prepared.
   const [coverUpload, setCoverUpload] = useState<{ local: string; progress: number | null } | null>(null);
+  // The cover editor, open on a new photo from the phone or one of your uploads (your cover's original, or a recent photo).
+  const [coverEditing, setCoverEditing] = useState<
+    | ({ uri: string; width: number | null; height: number | null; initial: CoverRecipe | null; tab: CoverEditorTab } & (
+        { kind: 'asset'; asset: Picked } | { kind: 'media'; mediaId: string }
+      ))
+    | null
+  >(null);
+  const [coverPicker, setCoverPicker] = useState(false);
+  const [coverAlt, setCoverAlt] = useState('');
+  const [coverBusy, setCoverBusy] = useState(false);
+  const [coverError, setCoverError] = useState<string | null>(null);
 
   // Your status, set or cleared in the status sheet, shows here as soon as you come back.
   useEffect(() => onStatusChanged((nowStatus) => setProfile((p) => (p && p.relationship.isSelf ? { ...p, nowStatus } : p))), []);
@@ -186,7 +199,10 @@ export function ProfileView({
     }
   }
 
-  async function changeCover() {
+  const coverFrom = (p: Profile) => ({ coverUrl: p.coverUrl, coverAlt: p.coverAlt, coverEdit: p.coverEdit ?? null });
+
+  /** A new photo from the phone opens the cover editor; it is uploaded once you save. */
+  async function uploadCover() {
     setError(null);
     const asset = await pickOne(['images']).catch((e: unknown) => {
       setError(errorMessage(e));
@@ -194,18 +210,51 @@ export function ProfileView({
     });
     if (asset === 'denied') return setError(t('m.create.photosPermission'));
     if (!asset) return;
+    setCoverAlt('');
+    setCoverEditing({ kind: 'asset', asset, uri: asset.uri, width: asset.width, height: asset.height, initial: null, tab: 'frame' });
+  }
+
+  /** Save the cover editor's recipe: straight away for one of your uploads, after uploading a new photo. */
+  async function saveCover(recipe: CoverRecipe) {
+    const e = coverEditing;
+    if (!e) return;
+    const alt = coverAlt.trim() || undefined;
+    setCoverError(null);
+    if (e.kind === 'media') {
+      setCoverBusy(true);
+      try {
+        const r = await (await client()).me.setCover(e.mediaId, alt, recipe);
+        setProfile((p) => (p ? { ...p, ...coverFrom(r.profile) } : p));
+        setCoverEditing(null);
+      } catch (err) {
+        setCoverError(errorMessage(err));
+      } finally {
+        setCoverBusy(false);
+      }
+      return;
+    }
+    const asset = e.asset;
+    setCoverEditing(null);
+    setError(null);
     setCoverUpload({ local: asset.uri, progress: 0 });
     try {
       const m = await uploadPicked(asset, (progress) => setCoverUpload({ local: asset.uri, progress }));
-      // Uploaded: the server now prepares the sizes, and the cover is set once they're ready.
+      // Uploaded: the server now prepares the sizes, then renders the cover from the original with your edits.
       setCoverUpload({ local: asset.uri, progress: null });
-      const r = await (await client()).me.setCoverWhenReady(m.id);
-      setProfile((p) => (p ? { ...p, coverUrl: r.profile.coverUrl, coverAlt: r.profile.coverAlt } : p));
-    } catch (e) {
-      setError(errorMessage(e));
+      const r = await (await client()).me.setCoverWhenReady(m.id, alt, { edit: recipe });
+      setProfile((p) => (p ? { ...p, ...coverFrom(r.profile) } : p));
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
       setCoverUpload(null);
     }
+  }
+
+  function openCoverEdit(tab: CoverEditorTab) {
+    const edit = profile?.coverEdit;
+    if (!edit) return;
+    setCoverAlt(profile?.coverAlt ?? '');
+    setCoverEditing({ kind: 'media', mediaId: edit.mediaId, uri: mediaUrl(edit.url), width: edit.width, height: edit.height, initial: edit.recipe, tab });
   }
 
   function removeCover() {
@@ -218,7 +267,7 @@ export function ProfileView({
           setError(null);
           try {
             const r = await (await client()).me.removeCover();
-            setProfile((p) => (p ? { ...p, coverUrl: r.profile.coverUrl, coverAlt: r.profile.coverAlt } : p));
+            setProfile((p) => (p ? { ...p, ...coverFrom(r.profile) } : p));
           } catch (e) {
             setError(errorMessage(e));
           }
@@ -228,11 +277,18 @@ export function ProfileView({
   }
 
   function editCover() {
-    if (!profile?.coverUrl) return void changeCover();
+    if (!profile?.coverUrl) return setCoverPicker(true);
+    const editable = !!profile.coverEdit;
     coverMenu.show({
       title: t('m.cover.edit'),
       actions: [
-        { label: t('m.cover.choose'), icon: 'image-outline', onPress: () => void changeCover() },
+        ...(editable
+          ? [
+              { label: t('m.cover.edit'), icon: 'color-wand-outline' as const, onPress: () => openCoverEdit('look') },
+              { label: t('coverEditor.adjustPosition'), icon: 'move-outline' as const, onPress: () => openCoverEdit('frame') },
+            ]
+          : []),
+        { label: t('m.cover.choose'), icon: 'image-outline', onPress: () => setCoverPicker(true) },
         { label: t('m.cover.remove'), icon: 'trash-outline', destructive: true, onPress: removeCover },
       ],
     });
@@ -425,6 +481,46 @@ export function ProfileView({
       )}
       {needsVerify ? <VerifyPrompt action="message" /> : null}
       {coverMenu.sheet}
+      {rel.isSelf ? (
+        <CoverPhotoPicker
+          visible={coverPicker}
+          onClose={() => setCoverPicker(false)}
+          onUpload={() => {
+            setCoverPicker(false);
+            // The system picker can't open over a sheet that is still closing.
+            setTimeout(() => void uploadCover(), 450);
+          }}
+          onPick={(p) => {
+            setCoverPicker(false);
+            setCoverAlt(p.altText ?? '');
+            setTimeout(
+              () => setCoverEditing({ kind: 'media', mediaId: p.id, uri: mediaUrl(p.url), width: p.width, height: p.height, initial: null, tab: 'frame' }),
+              450,
+            );
+          }}
+        />
+      ) : null}
+      {coverEditing ? (
+        <CoverEditor
+          uri={coverEditing.uri}
+          width={coverEditing.width}
+          height={coverEditing.height}
+          profile={profile}
+          initial={coverEditing.initial}
+          initialTab={coverEditing.tab}
+          title={coverEditing.tab === 'frame' && coverEditing.initial ? t('coverEditor.adjustPosition') : t('m.cover.edit')}
+          altText={coverAlt}
+          onAltText={setCoverAlt}
+          describeMediaId={coverEditing.kind === 'media' ? coverEditing.mediaId : null}
+          busy={coverBusy}
+          error={coverError}
+          onDone={(recipe) => void saveCover(recipe)}
+          onCancel={() => {
+            setCoverEditing(null);
+            setCoverError(null);
+          }}
+        />
+      ) : null}
     </View>
   );
 
@@ -557,7 +653,16 @@ function Cover({
   const photoOk = header === 'cover' || !!upload;
   const uri = upload?.local ?? (photoOk && profile.coverUrl ? mediaUrl(profile.coverUrl) : null);
   return (
-    <View style={{ height: uri ? 176 : 104, marginHorizontal: -space[4], marginTop: -space[4], backgroundColor: c.surfaceSunken, overflow: 'hidden' }}>
+    <View
+      style={{
+        // Cover photos are 8:3 (COVER_RATIO), as on the web, so the band shows what was framed in the editor.
+        ...(uri ? { aspectRatio: COVER_RATIO } : { height: 104 }),
+        marginHorizontal: -space[4],
+        marginTop: -space[4],
+        backgroundColor: c.surfaceSunken,
+        overflow: 'hidden',
+      }}
+    >
       {uri ? null : (
         <LinearGradient colors={[tint.accentStrong, tint.accent, tint.gradEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
       )}

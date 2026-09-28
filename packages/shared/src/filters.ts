@@ -150,12 +150,24 @@ export const filterPreset = (id: FilterId | string | null | undefined): FilterPr
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const round3 = (v: number) => Math.round(v * 1000) / 1000;
 
-/** The person's adjustments plus the look's own extras, each kept in range. */
-export function effectiveAdjustments(filter: FilterId | string, adjustments: Partial<Adjustments> = {}): Adjustments {
+/**
+ * The person's adjustments plus the look's own extras, each kept in range. `strength` (0–1) is
+ * how much of the look to use: its extras scale with it, the person's own adjustments don't.
+ */
+export function effectiveAdjustments(filter: FilterId | string, adjustments: Partial<Adjustments> = {}, strength = 1): Adjustments {
   const extra = filterPreset(filter).extra ?? {};
+  const s = clamp(strength, 0, 1);
   const out = { ...NEUTRAL_ADJUSTMENTS };
-  for (const k of ADJUSTMENT_KEYS) out[k] = clamp((adjustments[k] ?? 0) + (extra[k] ?? 0), ADJUSTMENT_RANGES[k].min, ADJUSTMENT_RANGES[k].max);
+  for (const k of ADJUSTMENT_KEYS) out[k] = clamp((adjustments[k] ?? 0) + (extra[k] ?? 0) * s, ADJUSTMENT_RANGES[k].min, ADJUSTMENT_RANGES[k].max);
   return out;
+}
+
+/** A look's filter functions at part strength (0–1): each one moved that far from "no change". */
+export function scaleFilterOps(ops: readonly FilterOp[], strength: number): FilterOp[] {
+  const s = clamp(strength, 0, 1);
+  if (s === 1) return [...ops];
+  if (s === 0) return [];
+  return ops.map(([name, v]): FilterOp => [name, name === 'brightness' || name === 'contrast' || name === 'saturate' ? 1 + (v - 1) * s : v * s]);
 }
 
 /** The colour adjustments as CSS filter functions (vignette and sharpen are not colour). */
@@ -174,16 +186,16 @@ function adjustmentOps(a: Adjustments): FilterOp[] {
   return ops;
 }
 
-/** The whole colour chain for a look plus adjustments. */
-export function filterOps(filter: FilterId | string, adjustments: Partial<Adjustments> = {}): FilterOp[] {
-  return [...filterPreset(filter).ops, ...adjustmentOps(effectiveAdjustments(filter, adjustments))];
+/** The whole colour chain for a look (at `strength`, 0–1) plus adjustments. */
+export function filterOps(filter: FilterId | string, adjustments: Partial<Adjustments> = {}, strength = 1): FilterOp[] {
+  return [...scaleFilterOps(filterPreset(filter).ops, strength), ...adjustmentOps(effectiveAdjustments(filter, adjustments, strength))];
 }
 
 const cssOp = ([name, v]: FilterOp) => (name === 'hue-rotate' ? `hue-rotate(${round3(v)}deg)` : `${name}(${round3(v)})`);
 
 /** A CSS `filter` value for live previews on the web. "none" when nothing changes. */
-export function cssFilter(filter: FilterId | string, adjustments: Partial<Adjustments> = {}): string {
-  const ops = filterOps(filter, adjustments);
+export function cssFilter(filter: FilterId | string, adjustments: Partial<Adjustments> = {}, strength = 1): string {
+  const ops = filterOps(filter, adjustments, strength);
   return ops.length ? ops.map(cssOp).join(' ') : 'none';
 }
 
@@ -286,8 +298,8 @@ function compose(prev: ColorMatrix, next: ColorMatrix): ColorMatrix {
 }
 
 /** The colour chain folded into one matrix, for sharp, ffmpeg and canvas. */
-export function colorMatrix(filter: FilterId | string, adjustments: Partial<Adjustments> = {}): ColorMatrix {
-  return filterOps(filter, adjustments).reduce((acc, op) => compose(acc, opMatrix(op)), IDENTITY_MATRIX);
+export function colorMatrix(filter: FilterId | string, adjustments: Partial<Adjustments> = {}, strength = 1): ColorMatrix {
+  return filterOps(filter, adjustments, strength).reduce((acc, op) => compose(acc, opMatrix(op)), IDENTITY_MATRIX);
 }
 
 export function isIdentityMatrix(cm: ColorMatrix, eps = 1e-4): boolean {

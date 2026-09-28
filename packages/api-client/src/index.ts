@@ -1,4 +1,6 @@
 import type {
+  CoverEditInput,
+  CoverPhoto,
   AiSettings,
   AltTextSuggestion,
   CaptionIdeas,
@@ -292,14 +294,17 @@ export function createClient(opts: ClientOptions) {
       /** Everything you saved, newest first, with your notes (post.viewer.note). */
       saved: (filter?: SavedFilter, cursor?: string) => get<Page<Post>>(`/v1/me/saved${qs({ filter, cursor })}`),
       circles: () => get<{ items: Circle[] }>('/v1/me/circles'),
-      /** Make one of your uploaded photos your cover. Refused (409 media_processing) until the photo has been prepared. */
-      setCover: (mediaId: string, altText?: string) => put<{ profile: Profile }>('/v1/me/cover', { mediaId, altText }),
+      /**
+       * Make one of your uploaded photos your cover. Refused (409 media_processing) until the photo has been prepared.
+       * `edit` (framing in the cover shape, straighten, look, adjustments) is rendered by the server from the original.
+       */
+      setCover: (mediaId: string, altText?: string, edit?: CoverEditInput) => put<{ profile: Profile }>('/v1/me/cover', { mediaId, altText, edit }),
       /** setCover, trying again while the photo is still being prepared (up to about a minute). */
-      setCoverWhenReady: async (mediaId: string, altText?: string, o: { intervalMs?: number; timeoutMs?: number } = {}) => {
+      setCoverWhenReady: async (mediaId: string, altText?: string, o: { intervalMs?: number; timeoutMs?: number; edit?: CoverEditInput } = {}) => {
         const started = Date.now();
         for (;;) {
           try {
-            return await put<{ profile: Profile }>('/v1/me/cover', { mediaId, altText });
+            return await put<{ profile: Profile }>('/v1/me/cover', { mediaId, altText, edit: o.edit });
           } catch (e) {
             if (!(e instanceof ApiError) || e.code !== 'media_processing' || Date.now() - started > (o.timeoutMs ?? 60_000)) throw e;
           }
@@ -307,6 +312,8 @@ export function createClient(opts: ClientOptions) {
         }
       },
       removeCover: () => del<{ profile: Profile }>('/v1/me/cover'),
+      /** Your recent photos that can be a cover, newest first. */
+      coverPhotos: () => get<{ items: CoverPhoto[] }>('/v1/me/cover/photos'),
       /** Your "Now" status, with who it's for, or null. */
       status: () => get<{ status: NowStatus | null }>('/v1/me/status'),
       /** Set your "Now" status (up to 60 characters). It ends after 24 hours. */

@@ -45,8 +45,8 @@ const hex = (v: number) =>
  * soft-light tint taken from what the look does to mid grey, a white layer for lifted blacks
  * (fade), and the same radial vignette the web and the server draw.
  */
-export function lookLayers(filter: FilterId, adjustments: Adjustments) {
-  const { m, o } = colorMatrix(filter, adjustments);
+export function lookLayers(filter: FilterId, adjustments: Adjustments, strength = 1) {
+  const { m, o } = colorMatrix(filter, adjustments, strength);
   const apply = (c: number[]) => [0, 1, 2].map((i) => clamp01(m[i * 3]! * c[0]! + m[i * 3 + 1]! * c[1]! + m[i * 3 + 2]! * c[2]! + o[i]!));
   const lum = (c: number[]) => 0.2126 * c[0]! + 0.7152 * c[1]! + 0.0722 * c[2]!;
   const chroma = (c: number[]) => Math.hypot(c[0]! - lum(c), c[1]! - lum(c), c[2]! - lum(c));
@@ -64,7 +64,7 @@ export function lookLayers(filter: FilterId, adjustments: Adjustments) {
   if (ratio < 0.97) layers.push({ backgroundColor: '#808080', mixBlendMode: 'saturation', opacity: clamp01(1 - ratio) });
   if (tint.some((v) => Math.abs(v - 0.5) > 0.01)) layers.push({ backgroundColor: `#${tint.map(hex).join('')}`, mixBlendMode: 'soft-light' });
   if (lift > 0.01) layers.push({ backgroundColor: '#ffffff', opacity: lift });
-  const alpha = vignetteAlpha(effectiveAdjustments(filter, adjustments));
+  const alpha = vignetteAlpha(effectiveAdjustments(filter, adjustments, strength));
   if (alpha > 0) layers.push({ experimental_backgroundImage: vignetteCss(alpha) });
   return layers;
 }
@@ -73,18 +73,21 @@ export function lookLayers(filter: FilterId, adjustments: Adjustments) {
 export function LookPreview({
   filter,
   adjustments,
+  strength = 1,
   children,
   style,
 }: {
   filter: FilterId;
   adjustments: Adjustments;
+  /** How much of the look, 0–1. */
+  strength?: number;
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
   return (
     <View style={[{ overflow: 'hidden', isolation: 'isolate' }, style]}>
       {children}
-      {lookLayers(filter, adjustments).map((l, i) => (
+      {lookLayers(filter, adjustments, strength).map((l, i) => (
         <View key={i} pointerEvents="none" style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, l]} />
       ))}
     </View>
@@ -190,7 +193,7 @@ const ADJUST_LABELS: Record<AdjustmentKey, MessageKey> = {
   sharpen: 'm.editor.adjust.sharpen',
 };
 
-function FilterChips({ value, onChange, thumb }: { value: FilterId; onChange: (f: FilterId) => void; thumb?: string | null }) {
+export function FilterChips({ value, onChange, thumb }: { value: FilterId; onChange: (f: FilterId) => void; thumb?: string | null }) {
   const c = useColors();
   const { t } = useT();
   return (
@@ -244,7 +247,7 @@ function SampleSwatch() {
   );
 }
 
-function AdjustSliders({ value, onChange }: { value: Adjustments; onChange: (k: AdjustmentKey, v: number) => void }) {
+export function AdjustSliders({ value, onChange }: { value: Adjustments; onChange: (k: AdjustmentKey, v: number) => void }) {
   const { t } = useT();
   return (
     <View style={{ gap: space[2] }}>

@@ -410,7 +410,10 @@ h3 {
   background-size: cover;
   background-position: center;
 }
+/* Cover photos are 8:3 everywhere (COVER_RATIO), so the band shows what was framed in the editor. */
 .profile__cover--photo {
+  height: auto;
+  aspect-ratio: 8 / 3;
   background: var(--surface-sunken);
 }
 .profile__cover-img {
@@ -441,7 +444,7 @@ h3 {
 .cover-sheet__preview {
   display: grid;
   place-items: center;
-  height: 140px;
+  aspect-ratio: 8 / 3;
   overflow: hidden;
   border-radius: var(--radius-md);
   background: var(--surface-sunken);
@@ -450,6 +453,86 @@ h3 {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.cover-sheet__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.cover-sheet__recent {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cover-sheet__photo {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  aspect-ratio: 1;
+  padding: 0;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  cursor: pointer;
+}
+.cover-sheet__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cover-sheet__photo:hover {
+  border-color: var(--line);
+}
+.cover-sheet__photo:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+/* The cover editor: the photo moves under a fixed 8:3 band. */
+.cover-view {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+  background: #000;
+  touch-action: none;
+  user-select: none;
+}
+.cover-view__frame {
+  position: absolute;
+}
+.cover-view--stage {
+  cursor: grab;
+}
+.cover-view--stage:active {
+  cursor: grabbing;
+}
+.cover-view--stage:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+.cover-preview__band {
+  position: relative;
+}
+.cover-preview__fade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.cover-preview__head {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: -28px;
+  padding: 0 10px 8px;
+}
+.cover-preview__avatar {
+  display: inline-flex;
+  border-radius: 50%;
 }
 .now-status {
   display: inline-flex;
