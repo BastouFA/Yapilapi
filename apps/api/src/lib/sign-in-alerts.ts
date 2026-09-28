@@ -7,8 +7,14 @@ import { notify } from './services.ts';
 
 type Q = Pool | PoolClient;
 
-/** The browser and the system named in a user agent; null for either when it isn't one we know (our app, an unknown system). */
+/**
+ * The browser (or our app, "App") and the system named in a user agent; null for either when it
+ * isn't one we know. Our iPhone app sends "YAPILAPI/<build> CFNetwork/… Darwin/…" and our Android
+ * app "okhttp/…", which name no system, so they are recognised here.
+ */
 function deviceParts(ua: string): { browser: string | null; os: string | null } {
+  if (/^YAPILAPI\//.test(ua) && /CFNetwork|Darwin/.test(ua)) return { browser: 'App', os: 'iOS' };
+  if (/^okhttp\//.test(ua) || (/^YAPILAPI\//.test(ua) && /Android/.test(ua))) return { browser: 'App', os: 'Android' };
   const os = /iPhone|iPad/.test(ua)
     ? 'iOS'
     : /Android/.test(ua)
@@ -32,6 +38,8 @@ function deviceParts(ua: string): { browser: string | null; os: string | null } 
 export function deviceName(ua: string | null | undefined): string {
   if (!ua) return 'Unknown device';
   const { browser, os } = deviceParts(ua);
+  // Neither a browser nor our app, on no system we know (a script, a tool): nothing to name.
+  if (!browser && !os) return 'Unknown device';
   return `${browser ?? 'App'} on ${os ?? 'Unknown OS'}`;
 }
 
@@ -39,6 +47,7 @@ export function deviceName(ua: string | null | undefined): string {
 export function deviceLabel(ua: string | null | undefined, locale: string): string {
   if (!ua) return t('email.device.unknown', locale);
   const { browser, os } = deviceParts(ua);
+  if (!browser && !os) return t('email.device.unknown', locale);
   return t('email.device.name', locale, { browser: browser ?? t('email.device.app', locale), os: os ?? t('email.device.unknownOs', locale) });
 }
 
@@ -48,7 +57,8 @@ export function deviceLabel(ua: string | null | undefined, locale: string): stri
  * is shown as it is.
  */
 export function deviceNameLabel(name: string | null | undefined, locale: string): string {
-  if (!name || name === 'Unknown device') return t('email.device.unknown', locale);
+  // "App on Unknown OS" is what a script or tool used to be called (and our phone app, before it was recognised).
+  if (!name || name === 'Unknown device' || name === 'App on Unknown OS') return t('email.device.unknown', locale);
   const m = /^(.+) on (.+)$/.exec(name);
   if (!m) return name;
   const browser = m[1] === 'App' ? t('email.device.app', locale) : m[1]!;

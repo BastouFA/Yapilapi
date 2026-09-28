@@ -195,11 +195,8 @@ describe('a sign-in from a new device', () => {
   it('names each signed-in device in the reader’s language, keeping the stored name', async () => {
     const fr = await adult({ locale: 'fr' });
     const [s] = (await as(t0.app, fr).get('/v1/auth/sessions')).body.items;
-    // The test client names no browser or system.
-    expect(s).toMatchObject({
-      device: 'App on Unknown OS',
-      deviceLabel: t('email.device.name', 'fr', { browser: t('email.device.app', 'fr'), os: t('email.device.unknownOs', 'fr') }),
-    });
+    // The test client names no browser or system: an unknown device.
+    expect(s).toMatchObject({ device: 'Unknown device', deviceLabel: t('email.device.unknown', 'fr') });
   });
 });
 

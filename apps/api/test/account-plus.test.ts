@@ -176,6 +176,10 @@ describe('sign-in alerts', () => {
     expect(deviceName(CHROME_MAC)).toBe('Chrome on macOS');
     expect(deviceName(FIREFOX_WIN)).toBe('Firefox on Windows');
     expect(deviceName(null)).toBe('Unknown device');
+    // Our own apps, whose user agents name no system, and tools that name nothing.
+    expect(deviceName('YAPILAPI/1 CFNetwork/3896.100.1.2.1 Darwin/25.6.0')).toBe('App on iOS');
+    expect(deviceName('okhttp/4.12.0')).toBe('App on Android');
+    expect(deviceName('curl/8.7.1')).toBe('Unknown device');
     expect(signInFingerprint('Chrome on macOS', 'NG')).toBe('chrome on macos|NG');
     expect(signInFingerprint('Chrome on macOS', null)).toBe('chrome on macos|');
     expect(signInFingerprint('Chrome on macOS', 'bad')).toBe('chrome on macos|');
