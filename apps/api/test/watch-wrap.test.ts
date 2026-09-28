@@ -400,7 +400,8 @@ describe('weekly wrap', () => {
     // A friend blocked since then drops out of it.
     await as(t.app, me).post(`/v1/users/${friend.id}/block`);
     expect((await as(t.app, me).get(`/v1/wraps/${id}`)).body.wrap.newFriends).toEqual([]);
-  });
+    // Draws the card image with sharp: slow when the whole suite runs at once.
+  }, 90_000);
 
   it('sends nothing for a quiet week, or when turned off, and holds the notification when asked', async () => {
     const [quiet, off, silent] = [await adult(), await adult(), await adult()];
