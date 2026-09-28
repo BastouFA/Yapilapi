@@ -3961,6 +3961,7 @@ span.cam__icon {
 }
 /* The board picture sits on its own panel, so it reads the same in anyone's bubble colour. */
 .chat-game__preview {
+  cursor: pointer;
   padding: 8px;
   border: 1px solid var(--line);
   border-radius: 12px;

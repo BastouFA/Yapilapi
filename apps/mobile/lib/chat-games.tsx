@@ -163,14 +163,25 @@ export function GameCard({ message, meId, tint, onOpen }: { message: Message; me
       <Text accessibilityRole="header" style={{ color: tint, fontSize: 16, fontWeight: '700' }}>
         {gameName(t, game.kind)}
       </Text>
-      {/* The board picture sits on its own panel, so it reads the same in anyone's bubble colour. */}
-      <View
+      {/* The board picture sits on its own panel, so it reads the same in anyone's bubble colour.
+          Tapping it opens the game too; screen readers use the button below. */}
+      <Pressable
+        accessible={false}
         importantForAccessibility="no-hide-descendants"
         accessibilityElementsHidden
-        style={{ alignSelf: 'flex-start', padding: space[2], borderRadius: radius.md, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line }}
+        onPress={onOpen}
+        style={({ pressed }) => ({
+          alignSelf: 'flex-start',
+          padding: space[2],
+          borderRadius: radius.md,
+          backgroundColor: c.surface,
+          borderWidth: 1,
+          borderColor: c.line,
+          opacity: pressed ? 0.85 : 1,
+        })}
       >
         <MiniBoard game={game} meId={meId} />
-      </View>
+      </Pressable>
       <Text style={[{ color: tint, fontSize: 12, opacity: 0.85 }, userText]}>{t('m.chat.game.playersList', { names })}</Text>
       <Text style={{ color: tint, fontSize: 14, fontWeight: '700' }}>{gameStatus(t, game, meId)}</Text>
       <Pressable

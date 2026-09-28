@@ -120,7 +120,8 @@ export function GameCard({ message, meId, mine, onOpen }: { message: Message; me
         <Icon name="game" size={14} /> {t('m.chat.game.label')}
       </span>
       <strong className="chat-game__name">{gameName(t, game.kind)}</strong>
-      <div className="chat-game__preview" aria-hidden>
+      {/* Clicking the picture opens the game too; keyboards and screen readers use the button below. */}
+      <div className="chat-game__preview" aria-hidden onClick={onOpen}>
         <MiniBoard game={game} meId={meId} />
       </div>
       <p className="chat-poll__status">{t('m.chat.game.playersList', { names })}</p>
