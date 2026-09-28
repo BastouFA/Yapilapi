@@ -50,7 +50,7 @@ export default function DropPageClient({ isPublic }: { isPublic: boolean }) {
 
   return (
     <div className="yp-shell__inner drop">
-      <DropCover drop={drop} className="drop-cover drop-cover--wide" />
+      <DropCover drop={drop} className="drop-cover drop-cover--wide" eager />
       <header className="stack-sm">
         <h1 className="profile__name" dir="auto">
           {drop.title}

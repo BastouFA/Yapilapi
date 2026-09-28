@@ -22,3 +22,18 @@ export function errorMessage(e: unknown): string {
 export function fieldErrors(e: unknown): Record<string, string> {
   return e instanceof ApiError && e.fields ? e.fields : {};
 }
+
+const inFlight = new Map<string, Promise<unknown>>();
+
+/**
+ * One request for callers that ask for the same thing at the same moment (the session's unread
+ * counts and the inbox page, the sidebar and the home page's suggestions). Once it settles, the
+ * next call asks again, so nothing is kept longer than the request itself.
+ */
+export function sharedRequest<T>(key: string, run: () => Promise<T>): Promise<T> {
+  const pending = inFlight.get(key) as Promise<T> | undefined;
+  if (pending) return pending;
+  const p = run().finally(() => inFlight.delete(key));
+  inFlight.set(key, p);
+  return p;
+}

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { EmptyState } from '@yapilapi/design-system';
-import { DropEditor } from '@/components/Drops';
+import { DropEditor } from '@/components/DropEditor';
 import { useSession } from '../../../providers';
 
 /** Announce a launch: a new drop, saved as a draft or published. */

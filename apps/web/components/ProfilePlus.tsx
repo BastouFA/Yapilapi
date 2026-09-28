@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import qrcode from 'qrcode-generator';
+import dynamic from 'next/dynamic';
+import { useEffect, useId, useRef, useState } from 'react';
 import { BottomSheet, Button, Icon, Segments, TextField } from '@yapilapi/design-system';
 import {
   IMAGE_ACCEPT,
@@ -18,8 +18,12 @@ import {
 } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
-import { CoverEditor, type CoverEditorTab } from './editor/CoverEditor';
+import type { CoverEditorTab } from './editor/CoverEditor';
 import { SuggestAltText } from './AiHelpers';
+import { EditorLoading } from './Loading';
+
+// The cover editor downloads when you open it on your own profile.
+const CoverEditor = dynamic(() => import('./editor/CoverEditor').then((m) => m.CoverEditor), { ssr: false, loading: () => <EditorLoading /> });
 
 // ── Cover ───────────────────────────────────────────────────────────────
 /**
@@ -228,7 +232,7 @@ export function CoverSheet({ open, onClose, profile, onSaved }: { open: boolean;
                     onClick={() => setEditing({ kind: 'media', mediaId: p.id, src: p.url, initial: null, tab: 'frame' })}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={p.thumbUrl} alt="" loading="lazy" />
+                    <img src={p.thumbUrl} alt="" loading="lazy" decoding="async" />
                   </button>
                 </li>
               ))}
@@ -422,21 +426,41 @@ export function NowStatusSheet({
 /**
  * A QR code for `value`, drawn as SVG in the browser. Always dark on light so phone cameras can read
  * it: `ink` is the profile's accent, deepened to at least 7:1 against the white card (profileQrInk).
+ * The encoder downloads the first time a code is shown; until then the white square holds its place.
  */
 export function QrCode({ value, label, size = 208, ink = '#0E1020' }: { value: string; label: string; size?: number; ink?: string }) {
-  const { path, count } = useMemo(() => {
-    const qr = qrcode(0, 'M');
-    qr.addData(value);
-    qr.make();
-    const n = qr.getModuleCount();
-    let d = '';
-    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c + 4} ${r + 4}h1v1h-1z`;
-    return { path: d, count: n + 8 };
+  const [code, setCode] = useState<{ value: string; path: string; count: number } | null>(null);
+  useEffect(() => {
+    let live = true;
+    void import('qrcode-generator').then(({ default: qrcode }) => {
+      if (!live) return;
+      const qr = qrcode(0, 'M');
+      qr.addData(value);
+      qr.make();
+      const n = qr.getModuleCount();
+      let d = '';
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c + 4} ${r + 4}h1v1h-1z`;
+      setCode({ value, path: d, count: n + 8 });
+    });
+    return () => {
+      live = false;
+    };
   }, [value]);
+  const ready = code?.value === value ? code : null;
+  const count = ready?.count ?? 1;
   return (
-    <svg className="qr-code" width={size} height={size} viewBox={`0 0 ${count} ${count}`} role="img" aria-label={label} shapeRendering="crispEdges">
+    <svg
+      className="qr-code"
+      width={size}
+      height={size}
+      viewBox={`0 0 ${count} ${count}`}
+      role="img"
+      aria-label={label}
+      aria-busy={!ready}
+      shapeRendering="crispEdges"
+    >
       <rect width={count} height={count} fill="#FFFFFF" />
-      <path d={path} fill={ink} />
+      {ready ? <path d={ready.path} fill={ink} /> : null}
     </svg>
   );
 }

@@ -1,11 +1,11 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Icon, MomentsStrip, Segments } from '@yapilapi/design-system';
 import type { StoryGroup } from '@yapilapi/api-client';
 import { useRouter } from 'next/navigation';
-import { StoryViewer } from '@/components/StoryViewer';
 import type { FeedMode } from '@yapilapi/shared';
 import { api } from '@/lib/api';
 import { PostList } from '@/components/PostList';
@@ -14,7 +14,14 @@ import { CatchUpCard } from '@/components/AiHelpers';
 import { SuggestedPeople } from '@/components/SuggestedPeople';
 import { PulseCards } from '@/components/WeeklyWrap';
 import { FollowingDrops } from '@/components/Drops';
+import { ScreenLoading } from '@/components/Loading';
 import { useSession } from '../../providers';
+
+// The story viewer opens full screen when a story is tapped, so it downloads then.
+const StoryViewer = dynamic(() => import('@/components/StoryViewer').then((m) => m.StoryViewer), {
+  ssr: false,
+  loading: () => <ScreenLoading className="story" />,
+});
 
 export default function Home() {
   const { t, unread, flags, locale } = useSession();

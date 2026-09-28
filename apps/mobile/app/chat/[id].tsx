@@ -808,6 +808,28 @@ export default function Chat() {
     }),
     [],
   );
+  // The same between renders (typing in the message box included), so the list leaves its rows
+  // alone unless something they show changes.
+  const meId = me?.id;
+  const showSender = !!conversation && conversation.members.length > 2;
+  const watchingId = watching?.id ?? null;
+  const viewer = sharing.viewer;
+  const renderMessage = useCallback(
+    ({ item }: { item: Message }) => (
+      <MessageRow
+        item={item}
+        mine={item.sender.id === meId}
+        meId={meId}
+        showSender={showSender}
+        highlighted={highlight === item.id}
+        accent={accent}
+        watchLive={!!watchingId && item.system?.type === 'watch' && item.system.sessionId === watchingId}
+        viewer={item.location ? viewer : null}
+        h={rowHandlers}
+      />
+    ),
+    [meId, showSender, highlight, accent, watchingId, viewer, rowHandlers],
+  );
 
   // Follow the newest message, not when earlier ones are loaded above it.
   const followed = useRef<string | null>(null);
@@ -887,19 +909,7 @@ export default function Chat() {
             list.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
             setTimeout(() => list.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: true }), 100);
           }}
-          renderItem={({ item }) => (
-            <MessageRow
-              item={item}
-              mine={item.sender.id === me?.id}
-              meId={me?.id}
-              showSender={!!conversation && conversation.members.length > 2}
-              highlighted={highlight === item.id}
-              accent={accent}
-              watchLive={!!watching && item.system?.type === 'watch' && item.system.sessionId === watching.id}
-              viewer={item.location ? sharing.viewer : null}
-              h={rowHandlers}
-            />
-          )}
+          renderItem={renderMessage}
           // Your messages waiting to be sent: only you see them, after the newest message.
           ListFooterComponent={
             <ScheduledList

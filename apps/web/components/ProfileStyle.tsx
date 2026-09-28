@@ -123,7 +123,7 @@ export function ProfileLinks({ links }: { links: ProfileLink[] }) {
               <span className={l.iconUrl ? 'profile-link__icon profile-link__icon--site' : 'profile-link__icon'} aria-hidden>
                 {l.iconUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={l.iconUrl} alt="" width={20} height={20} loading="lazy" referrerPolicy="no-referrer" />
+                  <img src={l.iconUrl} alt="" width={20} height={20} loading="lazy" decoding="async" referrerPolicy="no-referrer" />
                 ) : (
                   <Icon name="link" size={16} />
                 )}
@@ -171,7 +171,7 @@ export function ProfileSongChip({ song }: { song: PostMusic }) {
         )}
         {song.coverUrl && !dataSaver.active ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img className="profile-song__cover" src={song.coverUrl} alt="" width={24} height={24} loading="lazy" />
+          <img className="profile-song__cover" src={song.coverUrl} alt="" width={24} height={24} loading="lazy" decoding="async" />
         ) : null}
         <Link href={musicHref(song)} className="profile-song__name" aria-label={t('music.open', { title: song.title })}>
           <span className="yp-visually-hidden">{`${t('ps.song.title')}: `}</span>
@@ -201,7 +201,7 @@ function PostThumb({ post, saver, small }: { post: Post; saver: boolean; small?:
     : null;
   return src ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img className="featured__img" src={src} alt={m?.altText ?? ''} loading="lazy" />
+    <img className="featured__img" src={src} alt={m?.altText ?? ''} loading="lazy" decoding="async" />
   ) : small ? (
     <Icon name="edit" size={18} />
   ) : (

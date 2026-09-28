@@ -5,7 +5,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as Sharing from 'expo-sharing';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState, type ComponentProps } from 'react';
 import {
   AccessibilityInfo,
   Alert,
@@ -79,6 +79,24 @@ const SHEET_SWAP_MS = 420;
 
 /** What the reel on screen lets the sheets do: read where it is, and go to a moment. */
 type ReelControls = { currentMs: () => number; seek: (ms: number) => void };
+/** What a reel's buttons do; the screen keeps the latest ones in a ref (see ReelRow). */
+type ReelActions = {
+  toggleMute: () => void;
+  soundHintSeen: () => void;
+  toggleClear: () => void;
+  like: (p: Post, force?: boolean) => void;
+  follow: (p: Post) => void;
+  comments: (p: Post, atMs: number | null) => void;
+  share: (p: Post) => void;
+  options: (p: Post) => void;
+  save: (p: Post) => void;
+  saveTo: (p: Post) => void;
+  go: (index: number) => void;
+  resumeSaved: (p: Post, ms: number | null) => void;
+  keepEchoPrivate: (p: Post) => void;
+  deleteEcho: (p: Post) => void;
+};
+const NO_MOMENTS: ReelMoment[] = [];
 
 function useReducedMotion() {
   const [reduce, setReduce] = useState(false);
@@ -432,6 +450,58 @@ export default function Reels() {
     list.current?.scrollToIndex({ index: to, animated: true });
   };
 
+  // What a reel's buttons do, kept in a ref: the rows' props stay the same between renders, so a
+  // reel (with its players) renders again only when something about it changes.
+  const rowActions: ReelActions = {
+    toggleMute: () => {
+      setMuted((m) => !m);
+      hintSeen();
+    },
+    soundHintSeen: hintSeen,
+    toggleClear: () => setClear((v) => !v),
+    like: (p, force) => void like(p, force),
+    follow: (p) => void follow(p),
+    comments: (p, atMs) => router.push({ pathname: '/p/[id]', params: { id: p.id, ...(atMs !== null ? { atMs: String(atMs) } : {}) } }),
+    share: (p) => setSheet({ kind: 'share', post: p }),
+    options: (p) => setSheet({ kind: 'options', post: p }),
+    save: (p) => void save(p),
+    saveTo: (p) => boards.openSaveSheet(p, syncSaved(p.id)),
+    go,
+    resumeSaved: (p, ms) => patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, resumeMs: ms ?? undefined } })),
+    keepEchoPrivate: (p) => void keepEchoPrivate(p),
+    deleteEcho: (p) => deleteEcho(p),
+  };
+  const actions = useRef(rowActions);
+  actions.current = rowActions;
+  const holdId = sheet?.kind === 'highlights' ? sheet.post.id : null;
+  const signedIn = !!me;
+  const renderReel = useCallback(
+    ({ item, index }: { item: Post; index: number }) => (
+      <ReelRow
+        post={item}
+        index={index}
+        height={height}
+        visible={index === active}
+        focused={focused}
+        muted={muted}
+        clear={clear}
+        speed={speed}
+        big={big}
+        captions={captions}
+        hold={holdId === item.id}
+        controls={controls.current}
+        moments={moments[item.id] ?? NO_MOMENTS}
+        startAt={index === 0 && item.id === start && at ? Number(at) : undefined}
+        showSoundHint={soundHint}
+        following={!!followed[item.author.id]}
+        mine={item.author.id === me?.id}
+        signedIn={signedIn}
+        actions={actions}
+      />
+    ),
+    [height, active, focused, muted, clear, speed, big, captions, holdId, moments, start, at, soundHint, followed, me?.id, signedIn],
+  );
+
   const back = (color: string) => (
     <Pressable
       accessibilityRole="button"
@@ -482,44 +552,7 @@ export default function Reels() {
           maxToRenderPerBatch={2}
           viewabilityConfig={VIEWABILITY}
           onViewableItemsChanged={onViewable}
-          renderItem={({ item, index }) => (
-            <Reel
-              post={item}
-              height={height}
-              visible={index === active}
-              focused={focused}
-              muted={muted}
-              clear={clear}
-              speed={speed}
-              big={big}
-              captions={captions}
-              hold={sheet?.kind === 'highlights' && sheet.post.id === item.id}
-              controls={controls.current}
-              moments={moments[item.id] ?? []}
-              startAt={index === 0 && item.id === start && at ? Number(at) : undefined}
-              showSoundHint={soundHint}
-              following={!!followed[item.author.id]}
-              mine={item.author.id === me?.id}
-              onToggleMute={() => {
-                setMuted((m) => !m);
-                hintSeen();
-              }}
-              onSoundHintSeen={hintSeen}
-              onToggleClear={() => setClear((v) => !v)}
-              onLike={(force) => void like(item, force)}
-              onFollow={() => void follow(item)}
-              onComments={(atMs) => router.push({ pathname: '/p/[id]', params: { id: item.id, ...(atMs !== null ? { atMs: String(atMs) } : {}) } })}
-              onShare={() => setSheet({ kind: 'share', post: item })}
-              onOptions={() => setSheet({ kind: 'options', post: item })}
-              onSave={() => void save(item)}
-              onSaveTo={me ? () => boards.openSaveSheet(item, syncSaved(item.id)) : undefined}
-              onNext={() => go(index + 1)}
-              onPrevious={() => go(index - 1)}
-              onResumeSaved={(ms) => patch(item.id, (x) => ({ ...x, viewer: { ...x.viewer, resumeMs: ms ?? undefined } }))}
-              onKeepEchoPrivate={() => void keepEchoPrivate(item)}
-              onDeleteEcho={() => deleteEcho(item)}
-            />
-          )}
+          renderItem={renderReel}
           ListFooterComponent={
             !cursor ? (
               <View style={{ height, alignItems: 'center', justifyContent: 'center', padding: space[6], gap: space[3] }}>
@@ -641,6 +674,40 @@ export default function Reels() {
     </View>
   );
 }
+
+type ReelRowProps = Omit<ComponentProps<typeof Reel>, `on${string}`> & {
+  index: number;
+  signedIn: boolean;
+  actions: { current: ReelActions };
+};
+
+/**
+ * A reel in the list. Memoised, with its buttons reading the screen's latest actions when pressed,
+ * so scrolling, a status line or a sheet opening doesn't render the reels around it again.
+ */
+const ReelRow = memo(function ReelRow({ index, signedIn, actions, ...props }: ReelRowProps) {
+  const { post } = props;
+  return (
+    <Reel
+      {...props}
+      onToggleMute={() => actions.current.toggleMute()}
+      onSoundHintSeen={() => actions.current.soundHintSeen()}
+      onToggleClear={() => actions.current.toggleClear()}
+      onLike={(force) => actions.current.like(post, force)}
+      onFollow={() => actions.current.follow(post)}
+      onComments={(atMs) => actions.current.comments(post, atMs)}
+      onShare={() => actions.current.share(post)}
+      onOptions={() => actions.current.options(post)}
+      onSave={() => actions.current.save(post)}
+      onSaveTo={signedIn ? () => actions.current.saveTo(post) : undefined}
+      onNext={() => actions.current.go(index + 1)}
+      onPrevious={() => actions.current.go(index - 1)}
+      onResumeSaved={(ms) => actions.current.resumeSaved(post, ms)}
+      onKeepEchoPrivate={() => actions.current.keepEchoPrivate(post)}
+      onDeleteEcho={() => actions.current.deleteEcho(post)}
+    />
+  );
+});
 
 function Reel({
   post,

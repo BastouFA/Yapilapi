@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Alert, findNodeHandle, FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
@@ -31,6 +31,28 @@ const CLOSED: Record<CommentPolicy, MessageKey> = {
 
 type Thread = { open: boolean; items: Comment[]; cursor: string | null; loading: boolean };
 type Controls = Omit<CommentPage, 'items' | 'nextCursor'>;
+type Editing = { id: string; body: string; busy: boolean };
+type Likers = { id: string; items: PublicUser[] | null };
+/** What a comment row's buttons do; the screen keeps the latest ones in a ref. */
+type CommentHandlers = {
+  like: (x: Comment) => void;
+  reply: (x: Comment) => void;
+  replyButton: (commentId: string, v: View | null) => void;
+  edit: (x: Comment) => void;
+  editText: (body: string) => void;
+  saveEdit: () => void;
+  cancelEdit: () => void;
+  pin: (x: Comment) => void;
+  showLikers: (x: Comment) => void;
+  remove: (x: Comment) => void;
+  report: (x: Comment) => void;
+  toggleThread: (x: Comment, more?: boolean) => void;
+};
+
+/** The edit box or likers list, for the row it's about: the comment itself or one of its replies. */
+function forRow<T extends { id: string }>(value: T | null, x: Comment, th: Thread | undefined): T | null {
+  return value && (value.id === x.id || th?.items.some((r) => r.id === value.id)) ? value : null;
+}
 
 /**
  * A single post with its comments (link target for notifications, search and the feed):
@@ -43,7 +65,7 @@ export default function PostScreen() {
   const momentMs = atParam !== undefined && /^\d+$/.test(atParam) ? Number(atParam) : null;
   const [pointAt, setPointAt] = useState(false);
   const c = useColors();
-  const { t, tp, timeAgo } = useT();
+  const { t, tp } = useT();
   const insets = useSafeAreaInsets();
   const { me } = useSession();
   const [post, setPost] = useState<Post | null | undefined>(undefined);
@@ -54,8 +76,8 @@ export default function PostScreen() {
   const [threads, setThreads] = useState<Record<string, Thread>>({});
   const [body, setBody] = useState('');
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
-  const [editing, setEditing] = useState<{ id: string; body: string; busy: boolean } | null>(null);
-  const [likers, setLikers] = useState<{ id: string; items: PublicUser[] | null } | null>(null);
+  const [editing, setEditing] = useState<Editing | null>(null);
+  const [likers, setLikers] = useState<Likers | null>(null);
   const [hidden, setHidden] = useState<Comment[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -109,6 +131,32 @@ export default function PostScreen() {
     // Comments on a post for subscribers are for subscribers too.
     if (post && !post.locked) void loadComments().catch((e) => setError(errorMessage(e)));
   }, [post?.id, post?.locked, loadComments]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The rows call the screen's latest handlers through this ref (filled in below), so a memoised
+  // row keeps the same props while you type a comment and only renders again when it changes.
+  const latest = useRef<CommentHandlers | null>(null);
+  const meId = me?.id;
+  const canReply = !!me && !!controls?.canComment;
+  const isPostAuthor = !!controls?.isPostAuthor;
+  const renderTop = useCallback(
+    ({ item }: { item: Comment }) => {
+      const th = threads[item.id];
+      return (
+        <CommentRow
+          x={item}
+          reply={false}
+          meId={meId}
+          canReply={canReply}
+          isPostAuthor={isPostAuthor}
+          thread={th}
+          editing={forRow(editing, item, th)}
+          likers={forRow(likers, item, th)}
+          h={latest}
+        />
+      );
+    },
+    [threads, meId, canReply, isPostAuthor, editing, likers],
+  );
 
   if (post === undefined) return <Loading />;
   if (post === null)
@@ -291,190 +339,21 @@ export default function PostScreen() {
       await loadComments();
     });
 
-  const linkStyle = { color: c.inkMuted, fontWeight: '700', fontSize: 12 } as const;
-  const action = (label: string, onPress: () => void, extra?: { a11y?: string; ref?: (v: View | null) => void }) => (
-    <Pressable
-      ref={extra?.ref}
-      accessibilityRole="button"
-      accessibilityLabel={extra?.a11y ?? label}
-      onPress={onPress}
-      hitSlop={8}
-      style={{ minHeight: 32, justifyContent: 'center' }}
-    >
-      <Text style={linkStyle}>{label}</Text>
-    </Pressable>
-  );
-
-  const renderComment = (x: Comment, reply: boolean) => {
-    const name = x.author.displayName;
-    const own = me?.id === x.author.id;
-    const th = threads[x.id];
-    return (
-      <View key={x.id} style={{ gap: space[2] }}>
-        <View style={{ flexDirection: 'row', gap: space[2] }}>
-          <Pressable accessibilityRole="link" accessibilityLabel={name} onPress={() => router.push(`/u/${x.author.username}`)}>
-            <Avatar name={name} url={x.author.avatarUrl} size={reply ? 28 : 32} />
-          </Pressable>
-          <View style={{ flex: 1, gap: 4 }}>
-            <View style={[{ backgroundColor: c.surface, borderRadius: radius.md, padding: space[3], gap: 2 }, elevation(c)]}>
-              {x.pinned ? (
-                <Text style={{ color: c.inkMuted, fontSize: 12, fontWeight: '700' }} accessibilityRole="text">
-                  {t('comments.pinned')}
-                </Text>
-              ) : null}
-              <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 13 }, userText]}>
-                {name}{' '}
-                <Text style={{ color: c.inkMuted, fontWeight: '400' }}>
-                  · {timeAgo(x.createdAt)}
-                  {x.editedAt ? ` · ${t('comments.edited')}` : ''}
-                </Text>
-              </Text>
-              {x.atMs !== null && x.atMs !== undefined ? (
-                // A moment comment: plays the reel from that moment.
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t('reel.moment.seek', { time: formatReelTime(x.atMs) })}
-                  hitSlop={10}
-                  onPress={() => router.push({ pathname: '/reels', params: { start: x.postId, at: String(x.atMs) } })}
-                  style={{
-                    alignSelf: 'flex-start',
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 4,
-                    minHeight: 28,
-                    paddingHorizontal: 8,
-                    borderRadius: 8,
-                    backgroundColor: c.yapiSoft,
-                  }}
-                >
-                  <Icon name="play" size={11} color={c.ink} />
-                  <Text style={{ color: c.ink, fontWeight: '700', fontSize: 12, fontVariant: ['tabular-nums'] }}>
-                    {t('reel.moment.at', { time: formatReelTime(x.atMs) })}
-                  </Text>
-                </Pressable>
-              ) : null}
-              {editing?.id === x.id ? (
-                <View style={{ gap: space[2] }}>
-                  <TextInput
-                    accessibilityLabel={t('comments.editLabel')}
-                    value={editing.body}
-                    onChangeText={(v) => setEditing((cur) => (cur ? { ...cur, body: v } : cur))}
-                    multiline
-                    autoFocus
-                    maxLength={2000}
-                    style={[
-                      { minHeight: 44, borderRadius: radius.md, borderWidth: 1, borderColor: c.line, color: c.ink, padding: space[2], fontSize: 15 },
-                      userText,
-                    ]}
-                  />
-                  <View style={{ flexDirection: 'row', gap: space[2] }}>
-                    <Button
-                      label={editing.busy ? t('m.common.saving') : t('common.save')}
-                      size="sm"
-                      disabled={editing.busy || !editing.body.trim()}
-                      onPress={() => saveEdit()}
-                    />
-                    <Button label={t('common.cancel')} size="sm" variant="secondary" onPress={() => setEditing(null)} />
-                  </View>
-                </View>
-              ) : (
-                <TranslatableText
-                  kind="comment"
-                  id={x.id}
-                  text={x.body}
-                  lang={x.lang}
-                  own={x.author.id === me?.id}
-                  style={{ color: c.ink, fontSize: 15, lineHeight: 21 }}
-                />
-              )}
-            </View>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[3], paddingStart: space[2] }}>
-              <Pressable
-                accessibilityRole="togglebutton"
-                accessibilityState={{ checked: x.viewer.liked, disabled: !me }}
-                accessibilityLabel={`${t('comments.likeLabel', { name })}, ${tp('comments.likes', x.likes)}`}
-                disabled={!me}
-                onPress={() => void like(x)}
-                hitSlop={8}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 32 }}
-              >
-                <Icon name={x.viewer.liked ? 'heart' : 'heart-outline'} size={16} color={x.viewer.liked ? c.yapi : c.inkMuted} />
-                {x.likes > 0 ? <Text style={{ color: x.viewer.liked ? c.yapi : c.inkMuted, fontSize: 12, fontWeight: '700' }}>{x.likes}</Text> : null}
-              </Pressable>
-              {me && controls?.canComment
-                ? action(t('comments.reply'), () => startReply(x), {
-                    a11y: t('comments.replyTo', { name }),
-                    ref: (v) => {
-                      replyButtons.current[x.id] = v;
-                    },
-                  })
-                : null}
-              {x.viewer.canEdit && editing?.id !== x.id ? action(t('comments.edit'), () => setEditing({ id: x.id, body: x.body, busy: false })) : null}
-              {controls?.isPostAuthor && !reply ? action(t(x.pinned ? 'comments.unpin' : 'comments.pin'), () => void pin(x)) : null}
-              {own && x.likes > 0 ? action(t('comments.likers.show'), () => void showLikers(x)) : null}
-              {x.viewer.canDelete ? action(t('m.common.delete'), () => remove(x)) : null}
-              {me && !own
-                ? action(t('post.report'), () => report.open({ type: 'comment', id: x.id, authorId: x.author.id, authorName: name }), {
-                    a11y: t('m.report.commentBy', { name }),
-                  })
-                : null}
-              {x.likedByAuthor ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Icon name="heart" size={12} color={c.yapi} />
-                  <Text style={{ color: c.inkMuted, fontSize: 12 }}>{t('comments.likedByAuthor')}</Text>
-                </View>
-              ) : null}
-            </View>
-            {likers?.id === x.id ? (
-              <View style={{ backgroundColor: c.surfaceSunken, borderRadius: radius.md, padding: space[3], gap: space[2] }}>
-                <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '700' }}>
-                  {t('comments.likers.title')}
-                </Text>
-                {likers.items === null ? (
-                  <Loading />
-                ) : likers.items.length ? (
-                  likers.items.map((u) => (
-                    <Pressable
-                      key={u.id}
-                      accessibilityRole="link"
-                      onPress={() => router.push(`/u/${u.username}`)}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: 36 }}
-                    >
-                      <Avatar name={u.displayName} url={u.avatarUrl} size={28} />
-                      <Text style={[{ color: c.ink }, userText]}>{u.displayName}</Text>
-                    </Pressable>
-                  ))
-                ) : (
-                  <Text style={{ color: c.inkMuted }}>{t('comments.likers.none')}</Text>
-                )}
-              </View>
-            ) : null}
-            {!reply && (x.replies > 0 || th?.items.length) ? (
-              <View style={{ gap: space[2] }}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ expanded: !!th?.open }}
-                  onPress={() => void toggleThread(x)}
-                  hitSlop={6}
-                  style={{ minHeight: 32, justifyContent: 'center', paddingStart: space[2] }}
-                >
-                  <Text style={{ color: c.yapi, fontWeight: '700', fontSize: 12 }}>
-                    {th?.open ? t('comments.hideReplies') : tp('comments.viewReplies', Math.max(x.replies, th?.items.length ?? 0))}
-                  </Text>
-                </Pressable>
-                {th?.open ? (
-                  <View style={{ gap: space[2], paddingStart: space[2], borderStartWidth: 2, borderStartColor: c.line }}>
-                    {th.items.map((r) => renderComment(r, true))}
-                    {th.loading ? <Loading /> : null}
-                    {th.cursor && !th.loading ? action(t('comments.moreReplies'), () => void toggleThread(x, true)) : null}
-                  </View>
-                ) : null}
-              </View>
-            ) : null}
-          </View>
-        </View>
-      </View>
-    );
+  latest.current = {
+    like: (x) => void like(x),
+    reply: startReply,
+    replyButton: (commentId, v) => {
+      replyButtons.current[commentId] = v;
+    },
+    edit: (x) => setEditing({ id: x.id, body: x.body, busy: false }),
+    editText: (v) => setEditing((cur) => (cur ? { ...cur, body: v } : cur)),
+    saveEdit: () => void saveEdit(),
+    cancelEdit: () => setEditing(null),
+    pin: (x) => void pin(x),
+    showLikers: (x) => void showLikers(x),
+    remove: (x) => remove(x),
+    report: (x) => report.open({ type: 'comment', id: x.id, authorId: x.author.id, authorName: x.author.displayName }),
+    toggleThread: (x, more) => void toggleThread(x, more),
   };
 
   const header = (
@@ -549,8 +428,8 @@ export default function PostScreen() {
                           style={{ color: c.ink, fontSize: 15 }}
                         />
                         <View style={{ flexDirection: 'row', columnGap: space[3] }}>
-                          {action(t('comments.hidden.unhide'), () => void unhide(x))}
-                          {action(t('m.common.delete'), () => remove(x, true))}
+                          <LinkAction label={t('comments.hidden.unhide')} onPress={() => void unhide(x)} />
+                          <LinkAction label={t('m.common.delete')} onPress={() => remove(x, true)} />
                         </View>
                       </View>
                     ))
@@ -587,7 +466,7 @@ export default function PostScreen() {
         keyboardShouldPersistTaps="handled"
         // Scrolling tucks the keyboard away, so the whole conversation is readable again.
         keyboardDismissMode="on-drag"
-        renderItem={({ item }) => renderComment(item, false)}
+        renderItem={renderTop}
       />
       {me ? (
         <View
@@ -674,3 +553,221 @@ export default function PostScreen() {
     </KeyboardAvoid>
   );
 }
+
+/** A small text button under a comment (Reply, Edit, Pin, Delete…). */
+function LinkAction({ label, onPress, a11y, buttonRef }: { label: string; onPress: () => void; a11y?: string; buttonRef?: (v: View | null) => void }) {
+  const c = useColors();
+  return (
+    <Pressable
+      ref={buttonRef}
+      accessibilityRole="button"
+      accessibilityLabel={a11y ?? label}
+      onPress={onPress}
+      hitSlop={8}
+      style={{ minHeight: 32, justifyContent: 'center' }}
+    >
+      <Text style={{ color: c.inkMuted, fontWeight: '700', fontSize: 12 }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/**
+ * One comment, with its thread of replies under it when open. Memoised: typing a comment renders
+ * the box you type in, not the comments above it. `editing` and `likers` are only passed to the
+ * row they're about (a reply's go to its top-level comment).
+ */
+const CommentRow = memo(function CommentRow({
+  x,
+  reply,
+  meId,
+  canReply,
+  isPostAuthor,
+  thread: th,
+  editing,
+  likers,
+  h,
+}: {
+  x: Comment;
+  reply: boolean;
+  meId: string | undefined;
+  /** Signed in, and comments are open to you. */
+  canReply: boolean;
+  isPostAuthor: boolean;
+  thread: Thread | undefined;
+  editing: Editing | null;
+  likers: Likers | null;
+  h: { current: CommentHandlers | null };
+}) {
+  const c = useColors();
+  const { t, tp, timeAgo } = useT();
+  const name = x.author.displayName;
+  const own = meId === x.author.id;
+  return (
+    <View style={{ gap: space[2] }}>
+      <View style={{ flexDirection: 'row', gap: space[2] }}>
+        <Pressable accessibilityRole="link" accessibilityLabel={name} onPress={() => router.push(`/u/${x.author.username}`)}>
+          <Avatar name={name} url={x.author.avatarUrl} size={reply ? 28 : 32} />
+        </Pressable>
+        <View style={{ flex: 1, gap: 4 }}>
+          <View style={[{ backgroundColor: c.surface, borderRadius: radius.md, padding: space[3], gap: 2 }, elevation(c)]}>
+            {x.pinned ? (
+              <Text style={{ color: c.inkMuted, fontSize: 12, fontWeight: '700' }} accessibilityRole="text">
+                {t('comments.pinned')}
+              </Text>
+            ) : null}
+            <Text style={[{ color: c.ink, fontWeight: '700', fontSize: 13 }, userText]}>
+              {name}{' '}
+              <Text style={{ color: c.inkMuted, fontWeight: '400' }}>
+                · {timeAgo(x.createdAt)}
+                {x.editedAt ? ` · ${t('comments.edited')}` : ''}
+              </Text>
+            </Text>
+            {x.atMs !== null && x.atMs !== undefined ? (
+              // A moment comment: plays the reel from that moment.
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('reel.moment.seek', { time: formatReelTime(x.atMs) })}
+                hitSlop={10}
+                onPress={() => router.push({ pathname: '/reels', params: { start: x.postId, at: String(x.atMs) } })}
+                style={{
+                  alignSelf: 'flex-start',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  minHeight: 28,
+                  paddingHorizontal: 8,
+                  borderRadius: 8,
+                  backgroundColor: c.yapiSoft,
+                }}
+              >
+                <Icon name="play" size={11} color={c.ink} />
+                <Text style={{ color: c.ink, fontWeight: '700', fontSize: 12, fontVariant: ['tabular-nums'] }}>
+                  {t('reel.moment.at', { time: formatReelTime(x.atMs) })}
+                </Text>
+              </Pressable>
+            ) : null}
+            {editing?.id === x.id ? (
+              <View style={{ gap: space[2] }}>
+                <TextInput
+                  accessibilityLabel={t('comments.editLabel')}
+                  value={editing.body}
+                  onChangeText={(v) => h.current?.editText(v)}
+                  multiline
+                  autoFocus
+                  maxLength={2000}
+                  style={[
+                    { minHeight: 44, borderRadius: radius.md, borderWidth: 1, borderColor: c.line, color: c.ink, padding: space[2], fontSize: 15 },
+                    userText,
+                  ]}
+                />
+                <View style={{ flexDirection: 'row', gap: space[2] }}>
+                  <Button
+                    label={editing.busy ? t('m.common.saving') : t('common.save')}
+                    size="sm"
+                    disabled={editing.busy || !editing.body.trim()}
+                    onPress={() => h.current?.saveEdit()}
+                  />
+                  <Button label={t('common.cancel')} size="sm" variant="secondary" onPress={() => h.current?.cancelEdit()} />
+                </View>
+              </View>
+            ) : (
+              <TranslatableText kind="comment" id={x.id} text={x.body} lang={x.lang} own={own} style={{ color: c.ink, fontSize: 15, lineHeight: 21 }} />
+            )}
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[3], paddingStart: space[2] }}>
+            <Pressable
+              accessibilityRole="togglebutton"
+              accessibilityState={{ checked: x.viewer.liked, disabled: !meId }}
+              accessibilityLabel={`${t('comments.likeLabel', { name })}, ${tp('comments.likes', x.likes)}`}
+              disabled={!meId}
+              onPress={() => h.current?.like(x)}
+              hitSlop={8}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 32 }}
+            >
+              <Icon name={x.viewer.liked ? 'heart' : 'heart-outline'} size={16} color={x.viewer.liked ? c.yapi : c.inkMuted} />
+              {x.likes > 0 ? <Text style={{ color: x.viewer.liked ? c.yapi : c.inkMuted, fontSize: 12, fontWeight: '700' }}>{x.likes}</Text> : null}
+            </Pressable>
+            {canReply ? (
+              <LinkAction
+                label={t('comments.reply')}
+                onPress={() => h.current?.reply(x)}
+                a11y={t('comments.replyTo', { name })}
+                buttonRef={(v) => h.current?.replyButton(x.id, v)}
+              />
+            ) : null}
+            {x.viewer.canEdit && editing?.id !== x.id ? <LinkAction label={t('comments.edit')} onPress={() => h.current?.edit(x)} /> : null}
+            {isPostAuthor && !reply ? <LinkAction label={t(x.pinned ? 'comments.unpin' : 'comments.pin')} onPress={() => h.current?.pin(x)} /> : null}
+            {own && x.likes > 0 ? <LinkAction label={t('comments.likers.show')} onPress={() => h.current?.showLikers(x)} /> : null}
+            {x.viewer.canDelete ? <LinkAction label={t('m.common.delete')} onPress={() => h.current?.remove(x)} /> : null}
+            {meId && !own ? <LinkAction label={t('post.report')} onPress={() => h.current?.report(x)} a11y={t('m.report.commentBy', { name })} /> : null}
+            {x.likedByAuthor ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Icon name="heart" size={12} color={c.yapi} />
+                <Text style={{ color: c.inkMuted, fontSize: 12 }}>{t('comments.likedByAuthor')}</Text>
+              </View>
+            ) : null}
+          </View>
+          {likers?.id === x.id ? (
+            <View style={{ backgroundColor: c.surfaceSunken, borderRadius: radius.md, padding: space[3], gap: space[2] }}>
+              <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '700' }}>
+                {t('comments.likers.title')}
+              </Text>
+              {likers.items === null ? (
+                <Loading />
+              ) : likers.items.length ? (
+                likers.items.map((u) => (
+                  <Pressable
+                    key={u.id}
+                    accessibilityRole="link"
+                    onPress={() => router.push(`/u/${u.username}`)}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: 36 }}
+                  >
+                    <Avatar name={u.displayName} url={u.avatarUrl} size={28} />
+                    <Text style={[{ color: c.ink }, userText]}>{u.displayName}</Text>
+                  </Pressable>
+                ))
+              ) : (
+                <Text style={{ color: c.inkMuted }}>{t('comments.likers.none')}</Text>
+              )}
+            </View>
+          ) : null}
+          {!reply && (x.replies > 0 || th?.items.length) ? (
+            <View style={{ gap: space[2] }}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: !!th?.open }}
+                onPress={() => h.current?.toggleThread(x)}
+                hitSlop={6}
+                style={{ minHeight: 32, justifyContent: 'center', paddingStart: space[2] }}
+              >
+                <Text style={{ color: c.yapi, fontWeight: '700', fontSize: 12 }}>
+                  {th?.open ? t('comments.hideReplies') : tp('comments.viewReplies', Math.max(x.replies, th?.items.length ?? 0))}
+                </Text>
+              </Pressable>
+              {th?.open ? (
+                <View style={{ gap: space[2], paddingStart: space[2], borderStartWidth: 2, borderStartColor: c.line }}>
+                  {th.items.map((r) => (
+                    <CommentRow
+                      key={r.id}
+                      x={r}
+                      reply
+                      meId={meId}
+                      canReply={canReply}
+                      isPostAuthor={isPostAuthor}
+                      thread={undefined}
+                      editing={editing?.id === r.id ? editing : null}
+                      likers={likers?.id === r.id ? likers : null}
+                      h={h}
+                    />
+                  ))}
+                  {th.loading ? <Loading /> : null}
+                  {th.cursor && !th.loading ? <LinkAction label={t('comments.moreReplies')} onPress={() => h.current?.toggleThread(x, true)} /> : null}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+      </View>
+    </View>
+  );
+});

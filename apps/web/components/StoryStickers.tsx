@@ -371,10 +371,10 @@ export function StoryCardView({ card, label, action }: { card: StoryCard; label?
     <Link href={`/s/${card.id}`} className="story-card" aria-label={t('story.card.viewFrom', { name: card.author.displayName })}>
       <span className="story-card__preview" aria-hidden>
         {card.mediaKind === 'image' && card.mediaUrl ? (
-          <img src={card.mediaUrl} alt="" />
+          <img src={card.mediaUrl} alt="" loading="lazy" decoding="async" />
         ) : card.mediaKind === 'video' && (card.posterUrl || card.mediaUrl) ? (
           card.posterUrl ? (
-            <img src={card.posterUrl} alt="" />
+            <img src={card.posterUrl} alt="" loading="lazy" decoding="async" />
           ) : (
             <video src={card.mediaUrl!} muted preload="metadata" />
           )

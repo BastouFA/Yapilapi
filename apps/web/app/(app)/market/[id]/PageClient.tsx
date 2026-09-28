@@ -400,7 +400,7 @@ function Gallery({ photos, title }: { photos: MarketPhoto[]; title: string }) {
                 onClick={() => setIndex(n)}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.thumbUrl || p.url} alt="" loading="lazy" />
+                <img src={p.thumbUrl || p.url} alt="" loading="lazy" decoding="async" />
               </button>
             </li>
           ))}

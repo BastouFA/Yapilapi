@@ -24,7 +24,7 @@ import { analyzeText, statusForRisk } from '../lib/moderation.ts';
 import { hydratePosts } from '../lib/posts.ts';
 import { attachSaveNotes, savedFilterSql } from '../lib/saves.ts';
 import { notifyMentions } from '../lib/mentions.ts';
-import { coAuthoredSql } from '../lib/collabs.ts';
+import { coAuthoredIdsSql } from '../lib/collabs.ts';
 import { topicsFor } from './tags.ts';
 import { notify, personalizationAllowed, track } from '../lib/services.ts';
 import { plusCol, publicUserFrom } from '../lib/users.ts';
@@ -55,6 +55,8 @@ const UNLOCKED = postUnlockedSql('$1');
 const RECENT_CANDIDATES = 1000;
 /** …and up to this many of the newest posts on the viewer's interests. */
 const INTEREST_CANDIDATES = 300;
+/** Reels ranks the newest this-many reels plus a month of reels from your follows and friends. */
+const REEL_CANDIDATES = 2000;
 const POST_FROM = `FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id`;
 
 /** The stricter of two moderation states. */
@@ -91,15 +93,31 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       asOf: ((await db.query<{ t: Date }>(`SELECT now() AS t`)).rows[0]!.t as Date).toISOString(),
       o: 0,
     };
+    // Candidates: the newest REEL_CANDIDATES reels plus the last month of reels from people you follow
+    // and friends, so the ranking below costs the same however many reels the platform holds. Your
+    // follows, friends and interests are built once instead of looked up for every reel.
     const { rows } = await db.query(
-      `SELECT p.id ${POST_FROM}
-       WHERE p.format = 'reel' AND ${VISIBLE} AND p.moderation_status = 'normal' AND p.created_at <= $2::timestamptz
+      `WITH followed AS (SELECT followee_id AS id FROM follows WHERE follower_id = $1),
+       friends AS (SELECT user_b AS id FROM friendships WHERE user_a = $1 UNION ALL SELECT user_a FROM friendships WHERE user_b = $1),
+       me AS (SELECT coalesce(array_agg(tp.slug), '{}') AS interests FROM user_interests ui JOIN topics tp ON tp.id = ui.topic_id WHERE ui.user_id = $1),
+       candidates AS (
+         (SELECT id FROM posts
+          WHERE format = 'reel' AND deleted_at IS NULL AND status = 'published' AND created_at <= $2::timestamptz
+          ORDER BY created_at DESC, id DESC LIMIT ${REEL_CANDIDATES})
+         UNION
+         SELECT p.id FROM (SELECT id FROM followed UNION SELECT id FROM friends) a
+         JOIN posts p ON p.author_id = a.id
+         WHERE p.format = 'reel' AND p.deleted_at IS NULL AND p.status = 'published'
+           AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '30 days'
+       )
+       SELECT p.id ${POST_FROM} CROSS JOIN me
+       WHERE p.id IN (SELECT id FROM candidates) AND p.format = 'reel' AND ${VISIBLE} AND p.moderation_status = 'normal' AND p.created_at <= $2::timestamptz
          AND ($5 OR NOT EXISTS (SELECT 1 FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id AND m.moderation = 'sensitive'))
        ORDER BY (
            -- People you're close to and your interests only count with Personalization on ($6).
-           CASE WHEN $6 AND EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = p.author_id) OR (fr.user_b = $1 AND fr.user_a = p.author_id)) THEN 3 ELSE 0 END
-         + CASE WHEN $6 AND EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = p.author_id) THEN 2 ELSE 0 END
-         + (SELECT count(*) FROM unnest(p.topics) t WHERE $6 AND t IN (SELECT tp.slug FROM user_interests ui JOIN topics tp ON tp.id = ui.topic_id WHERE ui.user_id = $1)) * 1.2
+           CASE WHEN $6 AND p.author_id IN (SELECT id FROM friends) THEN 3 ELSE 0 END
+         + CASE WHEN $6 AND p.author_id IN (SELECT id FROM followed) THEN 2 ELSE 0 END
+         + (SELECT count(*) FROM unnest(p.topics) t WHERE $6 AND t = ANY(me.interests)) * 1.2
          + ln(1 + p.like_count + 2 * p.comment_count) * 0.6
          + 4.0 * exp(-extract(epoch FROM ($2::timestamptz - p.created_at)) / 86400.0)
        ) DESC, p.created_at DESC, p.id DESC
@@ -357,15 +375,23 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
         ? null
         : (await db.query(`SELECT p.id ${POST_FROM} WHERE lower(ap.username) = lower($2) AND p.id = ap.pinned_post_id AND ${VISIBLE}`, [viewer, username]))
             .rows[0]?.id;
+    // Their own posts and their collabs are read separately, each newest first and stopping after a
+    // page (posts_author_idx walks only this person's posts), then merged.
+    const branch = (whose: string) =>
+      `(SELECT p.id, p.created_at ${POST_FROM}
+        CROSS JOIN (SELECT pr.user_id AS id, pr.is_private, pr.pinned_post_id FROM profiles pr WHERE lower(pr.username) = lower($2)) o
+        WHERE ${whose}
+          AND p.community_id IS NULL AND ${VISIBLE} AND (${format ? `p.format = 'reel'` : 'p.id IS DISTINCT FROM o.pinned_post_id'})
+          ${c ? 'AND (p.created_at, p.id) < ($4::timestamptz, $5::uuid)' : ''}
+        ORDER BY p.created_at DESC, p.id DESC LIMIT $3)`;
     const { rows } = await db.query(
-      `SELECT p.id, p.created_at ${POST_FROM}
-       CROSS JOIN (SELECT pr.user_id AS id, pr.is_private, pr.pinned_post_id FROM profiles pr WHERE lower(pr.username) = lower($2)) o
-       WHERE (p.author_id = o.id
-              OR (${coAuthoredSql('o.id')}
-                  AND (NOT o.is_private OR o.id = $1 OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = o.id))))
-         AND p.community_id IS NULL AND ${VISIBLE} AND (${format ? `p.format = 'reel'` : 'p.id IS DISTINCT FROM o.pinned_post_id'})
-         ${c ? 'AND (p.created_at, p.id) < ($4::timestamptz, $5::uuid)' : ''}
-       ORDER BY p.created_at DESC, p.id DESC LIMIT $3`,
+      `SELECT id, created_at FROM (
+         ${branch('p.author_id = o.id')}
+         UNION
+         ${branch(`p.id = ANY(${coAuthoredIdsSql('o.id')})
+                   AND (NOT o.is_private OR o.id = $1 OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = o.id))`)}
+       ) x
+       ORDER BY created_at DESC, id DESC LIMIT $3`,
       c ? [req.user?.id ?? null, username, q.limit + 1, c.t, c.id] : [req.user?.id ?? null, username, q.limit + 1],
     );
     const page = rows.slice(0, q.limit);
@@ -532,7 +558,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
 
     const scope: Record<string, string> = {
       following: `(p.author_id = $1 OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = p.author_id)) AND p.community_id IS NULL`,
-      friends: `EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = p.author_id) OR (fr.user_b = $1 AND fr.user_a = p.author_id)) AND p.community_id IS NULL`,
+      friends: `p.author_id IN (SELECT user_b FROM friendships WHERE user_a = $1 UNION ALL SELECT user_a FROM friendships WHERE user_b = $1) AND p.community_id IS NULL`,
       communities: `EXISTS (SELECT 1 FROM community_members cm WHERE cm.community_id = p.community_id AND cm.user_id = $1 AND cm.status = 'active')`,
       local: `p.event_id IS NOT NULL AND EXISTS (SELECT 1 FROM events e JOIN places pl ON pl.id = e.place_id WHERE e.id = p.event_id AND pl.city IS NOT NULL
                AND pl.city = (SELECT pl2.city FROM event_attendees ea JOIN events e2 ON e2.id = ea.event_id JOIN places pl2 ON pl2.id = e2.place_id
@@ -542,17 +568,19 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     if (mode === 'following') {
       // Posts by people you follow, and posts they reposted (placed at the time of the repost, newest per post).
       const { rows } = await db.query(
-        `WITH items AS (
-           SELECT p.id, p.created_at AS at, NULL::uuid AS by FROM posts p
-           WHERE (p.author_id = $1 OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = p.author_id)) AND p.community_id IS NULL
+        `WITH followed AS (SELECT followee_id AS id FROM follows WHERE follower_id = $1),
+         -- You and the people you follow, joined to posts by author (posts_author_idx) rather than
+         -- checking every post on the platform against your follows.
+         people AS (SELECT $1::uuid AS id UNION SELECT id FROM followed),
+         items AS (
+           SELECT p.id, p.created_at AS at, NULL::uuid AS by FROM people a JOIN posts p ON p.author_id = a.id
+           WHERE p.deleted_at IS NULL AND p.community_id IS NULL
            UNION ALL
            -- Collabs reach every co-author's followers (and the co-authors), still only where they can see them.
-           SELECT p.id, p.created_at, NULL::uuid FROM post_collaborators pc JOIN posts p ON p.id = pc.post_id
+           SELECT p.id, p.created_at, NULL::uuid FROM people a JOIN post_collaborators pc ON pc.user_id = a.id JOIN posts p ON p.id = pc.post_id
            WHERE pc.status = 'accepted' AND p.community_id IS NULL
-             AND (pc.user_id = $1 OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = pc.user_id))
            UNION ALL
-           SELECT r.post_id, r.created_at, r.user_id FROM post_reposts r
-           WHERE EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = r.user_id)
+           SELECT r.post_id, r.created_at, r.user_id FROM followed a JOIN post_reposts r ON r.user_id = a.id
          ), latest AS (
            SELECT DISTINCT ON (id) id, at, by FROM items ORDER BY id, at DESC
          )

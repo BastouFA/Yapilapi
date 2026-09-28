@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { EmptyState, Skeleton } from '@yapilapi/design-system';
 import { dropPhase } from '@yapilapi/shared';
-import { DropEditor, useDrop } from '@/components/Drops';
+import { DropEditor } from '@/components/DropEditor';
+import { useDrop } from '@/components/Drops';
 import { useSession } from '../../../../providers';
 
 /** Change a draft, or a published drop before it opens. */

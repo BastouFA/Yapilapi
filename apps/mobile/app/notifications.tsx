@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, SectionList, Text, View } from 'react-native';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import type { NotificationItem, PublicUser } from '../../../packages/shared/src/types';
@@ -177,8 +177,7 @@ function describe(g: Group, tr: Translator): string {
  */
 export default function Notifications() {
   const c = useColors();
-  const tr = useT();
-  const { t, timeAgo } = tr;
+  const { t } = useT();
   const { me } = useSession();
   const [items, setItems] = useState<NotificationItem[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -211,7 +210,8 @@ export default function Notifications() {
 
   const sections = useMemo(() => (items ? arrange(items, t) : []), [items, t]);
 
-  async function answer(n: NotificationItem, accept: boolean) {
+  // Stable, so the memoised rows only render again when their own notification or answer changes.
+  const answer = useCallback(async (n: NotificationItem, accept: boolean) => {
     if (!n.entityId) return;
     setBusy(n.id);
     setError(null);
@@ -225,9 +225,9 @@ export default function Notifications() {
     } finally {
       setBusy(null);
     }
-  }
+  }, []);
 
-  async function followBack(user: PublicUser) {
+  const followBack = useCallback(async (user: PublicUser) => {
     setFollowed((f) => new Set(f).add(user.id));
     setError(null);
     try {
@@ -240,7 +240,25 @@ export default function Notifications() {
       });
       setError(errorMessage(e));
     }
-  }
+  }, []);
+
+  const renderGroup = useCallback(
+    ({ item: g }: { item: Group }) => {
+      const n = g.items[0]!;
+      const single = g.actors.length === 1 ? g.actors[0]! : null;
+      return (
+        <NotificationRow
+          g={g}
+          answered={answers[n.id]}
+          busy={busy === n.id}
+          nowFollowing={!!single && followed.has(single.id)}
+          onAnswer={answer}
+          onFollowBack={followBack}
+        />
+      );
+    },
+    [answers, busy, followed, answer, followBack],
+  );
 
   if (me === null)
     return (
@@ -270,7 +288,7 @@ export default function Notifications() {
           <SectionHeader title={section.title} />
         </View>
       )}
-      ItemSeparatorComponent={() => <View style={{ height: space[2] }} />}
+      ItemSeparatorComponent={Gap}
       onEndReached={() => cursor && void load(cursor)}
       onEndReachedThreshold={0.5}
       refreshControl={
@@ -283,62 +301,85 @@ export default function Notifications() {
           }}
         />
       }
-      renderItem={({ item: g }) => {
-        const n = g.items[0]!;
-        const unread = g.items.some((x) => !x.readAt);
-        const text = describe(g, tr);
-        const href = notificationHref(n);
-        const answered = answers[n.id];
-        const boardInvite = n.type === 'board_invite';
-        const invite = (n.type === 'collab_invite' || boardInvite) && !!n.entityId;
-        const single = g.actors.length === 1 ? g.actors[0]! : null;
-        const canFollowBack = n.type === 'follow' && !!single && !n.followsActor;
-        const nowFollowing = !!single && followed.has(single.id);
-        return (
-          <View style={{ backgroundColor: c.surface, borderRadius: radius.md, padding: space[3], gap: space[2] }}>
-            <Pressable
-              accessibilityRole={href ? 'link' : undefined}
-              accessibilityLabel={`${text}. ${timeAgo(n.createdAt)}${unread ? `. ${t('m.notif.unread')}` : ''}`}
-              disabled={!href}
-              onPress={() => href && router.push(href as never)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44 }}
-            >
-              <Faces actors={g.actors} />
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 20, fontWeight: unread ? '600' : '400' }, userText]}>{text}</Text>
-                <Text style={{ color: c.inkMuted, fontSize: 12 }}>{timeAgo(n.createdAt)}</Text>
-              </View>
-              {unread ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.yapi }} /> : null}
-            </Pressable>
-            {canFollowBack && single ? (
-              <View style={{ flexDirection: 'row' }}>
-                {nowFollowing ? (
-                  <Text style={{ color: c.inkMuted, fontSize: 13 }} accessibilityLiveRegion="polite">
-                    {t('m.notif.nowFollowing', { name: single.displayName })}
-                  </Text>
-                ) : (
-                  <Button label={t('m.notif.followBack')} size="sm" onPress={() => followBack(single)} />
-                )}
-              </View>
-            ) : null}
-            {invite ? (
-              answered ? (
-                <Text style={{ color: c.inkMuted, fontSize: 13 }} accessibilityLiveRegion="polite">
-                  {answered === 'accepted' ? (boardInvite ? t('m.boards.joined') : t('m.collab.acceptedNote')) : t('m.collab.declinedNote')}
-                </Text>
-              ) : (
-                <View style={{ flexDirection: 'row', gap: space[2] }}>
-                  <Button label={t('m.collab.accept')} size="sm" disabled={busy === n.id} onPress={() => answer(n, true)} />
-                  <Button label={t('m.collab.decline')} size="sm" variant="secondary" disabled={busy === n.id} onPress={() => answer(n, false)} />
-                </View>
-              )
-            ) : null}
-          </View>
-        );
-      }}
+      renderItem={renderGroup}
     />
   );
 }
+
+/** The space between rows: one component for the list's life, so separators aren't remounted on every render. */
+function Gap() {
+  return <View style={{ height: space[2] }} />;
+}
+
+/** One row: a notification (or a group of them), with Follow back or an invite's answer when there is one. Memoised. */
+const NotificationRow = memo(function NotificationRow({
+  g,
+  answered,
+  busy,
+  nowFollowing,
+  onAnswer,
+  onFollowBack,
+}: {
+  g: Group;
+  answered: Answer | undefined;
+  busy: boolean;
+  nowFollowing: boolean;
+  onAnswer: (n: NotificationItem, accept: boolean) => void;
+  onFollowBack: (user: PublicUser) => void;
+}) {
+  const c = useColors();
+  const tr = useT();
+  const { t, timeAgo } = tr;
+  const n = g.items[0]!;
+  const unread = g.items.some((x) => !x.readAt);
+  const text = describe(g, tr);
+  const href = notificationHref(n);
+  const boardInvite = n.type === 'board_invite';
+  const invite = (n.type === 'collab_invite' || boardInvite) && !!n.entityId;
+  const single = g.actors.length === 1 ? g.actors[0]! : null;
+  const canFollowBack = n.type === 'follow' && !!single && !n.followsActor;
+  return (
+    <View style={{ backgroundColor: c.surface, borderRadius: radius.md, padding: space[3], gap: space[2] }}>
+      <Pressable
+        accessibilityRole={href ? 'link' : undefined}
+        accessibilityLabel={`${text}. ${timeAgo(n.createdAt)}${unread ? `. ${t('m.notif.unread')}` : ''}`}
+        disabled={!href}
+        onPress={() => href && router.push(href as never)}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44 }}
+      >
+        <Faces actors={g.actors} />
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 20, fontWeight: unread ? '600' : '400' }, userText]}>{text}</Text>
+          <Text style={{ color: c.inkMuted, fontSize: 12 }}>{timeAgo(n.createdAt)}</Text>
+        </View>
+        {unread ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.yapi }} /> : null}
+      </Pressable>
+      {canFollowBack && single ? (
+        <View style={{ flexDirection: 'row' }}>
+          {nowFollowing ? (
+            <Text style={{ color: c.inkMuted, fontSize: 13 }} accessibilityLiveRegion="polite">
+              {t('m.notif.nowFollowing', { name: single.displayName })}
+            </Text>
+          ) : (
+            <Button label={t('m.notif.followBack')} size="sm" onPress={() => onFollowBack(single)} />
+          )}
+        </View>
+      ) : null}
+      {invite ? (
+        answered ? (
+          <Text style={{ color: c.inkMuted, fontSize: 13 }} accessibilityLiveRegion="polite">
+            {answered === 'accepted' ? (boardInvite ? t('m.boards.joined') : t('m.collab.acceptedNote')) : t('m.collab.declinedNote')}
+          </Text>
+        ) : (
+          <View style={{ flexDirection: 'row', gap: space[2] }}>
+            <Button label={t('m.collab.accept')} size="sm" disabled={busy} onPress={() => onAnswer(n, true)} />
+            <Button label={t('m.collab.decline')} size="sm" variant="secondary" disabled={busy} onPress={() => onAnswer(n, false)} />
+          </View>
+        )
+      ) : null}
+    </View>
+  );
+});
 
 /** One face, or up to three overlapping for a grouped row. */
 function Faces({ actors }: { actors: PublicUser[] }) {

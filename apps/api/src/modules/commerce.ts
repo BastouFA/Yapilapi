@@ -385,30 +385,33 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     return { order: await loadOrder(order.orderId, u.id), payment: { provider: order.provider, clientSecret: order.clientSecret, orderId: order.orderId } };
   });
 
-  async function loadOrder(id: string, userId: string) {
-    const { rows } = await db.query(
-      `SELECT o.id, o.status, o.total_cents, o.platform_fee_cents, o.currency, o.created_at,
+  const ORDER_SELECT = `SELECT o.id, o.status, o.total_cents, o.platform_fee_cents, o.currency, o.created_at,
          (SELECT json_agg(json_build_object('productId', oi.product_id, 'title', p.title, 'quantity', oi.quantity, 'unitCents', oi.unit_cents))
           FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) AS items
-       FROM orders o WHERE o.id = $1 AND (o.buyer_id = $2 OR EXISTS (SELECT 1 FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id AND p.seller_id = $2))`,
+       FROM orders o`;
+  const toOrder = (r: Record<string, any>) => ({
+    id: r.id,
+    status: r.status,
+    totalCents: r.total_cents,
+    platformFeeCents: r.platform_fee_cents,
+    currency: r.currency,
+    items: r.items,
+    createdAt: r.created_at,
+  });
+
+  async function loadOrder(id: string, userId: string) {
+    const { rows } = await db.query(
+      `${ORDER_SELECT} WHERE o.id = $1 AND (o.buyer_id = $2 OR EXISTS (SELECT 1 FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id AND p.seller_id = $2))`,
       [id, userId],
     );
     if (!rows[0]) throw notFound('Order');
-    const r = rows[0];
-    return {
-      id: r.id,
-      status: r.status,
-      totalCents: r.total_cents,
-      platformFeeCents: r.platform_fee_cents,
-      currency: r.currency,
-      items: r.items,
-      createdAt: r.created_at,
-    };
+    return toOrder(rows[0]);
   }
 
+  // Your last 50 orders in one query (not one more query per order).
   app.get('/v1/orders', { preHandler: requireAuth }, async (req) => {
-    const { rows } = await db.query(`SELECT id FROM orders WHERE buyer_id = $1 ORDER BY created_at DESC LIMIT 50`, [me(req).id]);
-    return { items: await Promise.all(rows.map((r) => loadOrder(r.id, me(req).id))) };
+    const { rows } = await db.query(`${ORDER_SELECT} WHERE o.buyer_id = $1 ORDER BY o.created_at DESC LIMIT 50`, [me(req).id]);
+    return { items: rows.map(toOrder) };
   });
 
   app.get('/v1/orders/:id', { preHandler: requireAuth }, async (req) => {

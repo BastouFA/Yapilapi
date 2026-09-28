@@ -13,6 +13,7 @@ import {
   type CollageShape,
   type CommentPolicy,
 } from '@yapilapi/shared';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AutocompleteText } from '@/components/Autocomplete';
@@ -42,9 +43,8 @@ import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { isVerificationError, VerifyPrompt } from '@/components/Verification';
 import { SimilarQuestions } from '@/components/CommunityExtras';
 import { CaptionIdeasPanel, SuggestAltText } from '@/components/AiHelpers';
-import { PhotoEditor } from '@/components/editor/PhotoEditor';
-import { CollageEditor, type CollagePhoto } from '@/components/Collage';
-import { VideoEditor } from '@/components/editor/VideoEditor';
+import type { CollagePhoto } from '@/components/Collage';
+import { EditorLoading } from '@/components/Loading';
 import { onPendingMedia, takePendingMedia } from '@/lib/pending-media';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { PhotoTagger, type DraftTag } from '@/components/PhotoTags';
@@ -52,6 +52,11 @@ import { StoryStickerEditor, type DraftSticker } from '@/components/StorySticker
 import { clipMax, draftMusic, MusicField, musicInput, soundAsTrack, type DraftMusic } from '@/components/MusicPicker';
 import { localInput, nextHour, scheduleBounds } from '@/lib/schedule';
 import { useSession } from '../../providers';
+
+// The editors open full screen once photos or a video are picked, so they download then.
+const PhotoEditor = dynamic(() => import('@/components/editor/PhotoEditor').then((m) => m.PhotoEditor), { ssr: false, loading: () => <EditorLoading /> });
+const VideoEditor = dynamic(() => import('@/components/editor/VideoEditor').then((m) => m.VideoEditor), { ssr: false, loading: () => <EditorLoading /> });
+const CollageEditor = dynamic(() => import('@/components/Collage').then((m) => m.CollageEditor), { ssr: false, loading: () => <EditorLoading /> });
 
 type Uploaded = { id: string; kind: 'image' | 'video' | 'audio'; url: string; altText: string; tags: DraftTag[] };
 

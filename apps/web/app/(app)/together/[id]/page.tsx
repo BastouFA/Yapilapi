@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -44,15 +45,24 @@ import {
   MomentsView,
   PeopleView,
   Section,
-  Slideshow,
   statusText,
   thumbOf,
-  Viewer,
   WindowPicker,
   windowClosesAt,
 } from '@/components/Together';
+import { ScreenLoading } from '@/components/Loading';
 import { api, errorMessage } from '@/lib/api';
 import { useRealtime, useSession } from '../../../providers';
+
+// The full-screen viewer and the slideshow download when one of them opens.
+const Viewer = dynamic(() => import('@/components/TogetherViewer').then((m) => m.Viewer), {
+  ssr: false,
+  loading: () => <ScreenLoading className="tg-viewer" />,
+});
+const Slideshow = dynamic(() => import('@/components/TogetherViewer').then((m) => m.Slideshow), {
+  ssr: false,
+  loading: () => <ScreenLoading className="tg-show" />,
+});
 
 const VIEW_KEY = 'yp.together.view';
 
@@ -343,6 +353,8 @@ function EditSheet({ album, open, onClose, onSaved }: { album: TogetherDetail; o
                   <img
                     src={thumbOf(p) ?? ''}
                     alt={t(p.media.kind === 'video' ? 'together.tile.video' : 'together.tile.photo', { name: p.author.displayName, time: '' })}
+                    loading="lazy"
+                    decoding="async"
                   />
                 </label>
               ))}
@@ -447,6 +459,8 @@ function PostSheet({ album, open, onClose }: { album: TogetherDetail; open: bool
                   />
                   <img
                     src={thumbOf(p) ?? ''}
+                    loading="lazy"
+                    decoding="async"
                     alt={p.caption || t(p.media.kind === 'video' ? 'together.tile.video' : 'together.tile.photo', { name: p.author.displayName, time: '' })}
                   />
                 </label>

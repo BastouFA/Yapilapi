@@ -1,6 +1,6 @@
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import { formatMoney } from '../../../packages/shared/src/i18n';
@@ -196,8 +196,8 @@ export function StatusBadge({ status, expired }: { status: MarketStatus; expired
   );
 }
 
-/** One listing in a grid: photo, price (or Free), title, how far or where, and Reserved/Sold. Opens the listing. */
-export function ListingTile({ listing, width }: { listing: MarketListing; width: number }) {
+/** One listing in a grid: photo, price (or Free), title, how far or where, and Reserved/Sold. Opens the listing. Memoised. */
+export const ListingTile = memo(function ListingTile({ listing, width }: { listing: MarketListing; width: number }) {
   const c = useColors();
   const tr = useT();
   const { t } = tr;
@@ -243,10 +243,13 @@ export function ListingTile({ listing, width }: { listing: MarketListing; width:
       </Text>
     </Pressable>
   );
-}
+});
 
-/** Listings in two columns, filling the width it's given (start to end, so it follows right-to-left). */
-export function ListingGrid({ items }: { items: MarketListing[] }) {
+/**
+ * Listings in two columns, filling the width it's given (start to end, so it follows right-to-left).
+ * Memoised: typing in the search box above renders the screen, not every tile, until new results arrive.
+ */
+export const ListingGrid = memo(function ListingGrid({ items }: { items: MarketListing[] }) {
   const [width, setWidth] = useState(0);
   const gap = space[3];
   const tile = width ? Math.floor((width - gap) / 2) : 0;
@@ -255,7 +258,7 @@ export function ListingGrid({ items }: { items: MarketListing[] }) {
       {tile ? items.map((l) => <ListingTile key={l.id} listing={l} width={tile} />) : null}
     </View>
   );
-}
+});
 
 /** The safety tips: in full on the listing page, as one line in a chat card. */
 export function SafetyTips({ compact, tint }: { compact?: boolean; tint?: string }) {

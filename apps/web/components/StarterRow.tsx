@@ -59,7 +59,7 @@ export function StarterRow() {
                 <Link href={`/reels?start=${p.id}`} className="starter__reel" aria-label={t('m.reels.by', { name: p.author.displayName })}>
                   {media?.posterUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={media.posterUrl} alt="" loading="lazy" />
+                    <img src={media.posterUrl} alt="" loading="lazy" decoding="async" />
                   ) : (
                     <span className="starter__play" aria-hidden>
                       <Icon name="play" size={28} />
