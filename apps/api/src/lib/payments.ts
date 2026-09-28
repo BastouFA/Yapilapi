@@ -10,7 +10,7 @@ export interface PaymentIntent {
 
 export interface WebhookEvent {
   id: string;
-  type: 'payment.succeeded' | 'payment.failed' | 'refund.succeeded';
+  type: 'payment.succeeded' | 'payment.failed' | 'refund.succeeded' | 'payment.disputed';
   providerRef: string;
   amountCents?: number;
   /** ISO 4217, upper case. When present it must match the payment's currency. */
@@ -70,6 +70,8 @@ export function signDevWebhook(secret: string, body: string): string {
 
 /** Currencies Stripe charges in whole units (no minor unit). Our amounts are always in hundredths. */
 const ZERO_DECIMAL = new Set(['BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA', 'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF']);
+/** Whether a currency has no minor unit (amounts are still stored in hundredths, so they must be multiples of 100). */
+export const isZeroDecimal = (currency: string) => ZERO_DECIMAL.has(currency.trim().toUpperCase());
 const toStripeAmount = (cents: number, currency: string) => (ZERO_DECIMAL.has(currency.toUpperCase()) ? Math.round(cents / 100) : cents);
 const fromStripeAmount = (amount: number, currency: string) => (ZERO_DECIMAL.has(currency.toUpperCase()) ? amount * 100 : amount);
 
@@ -115,10 +117,17 @@ export function stripePaymentProvider(opts: { secretKey: string; webhookSecret: 
           currency: pi.currency.toUpperCase(),
         };
       }
-      if (event.type === 'charge.refunded') {
+      // Only a full refund undoes the order; a partial one (a goodwill gesture) leaves it in place.
+      if (event.type === 'charge.refunded' && event.data.object.refunded) {
         const ch = event.data.object;
         const ref = typeof ch.payment_intent === 'string' ? ch.payment_intent : ch.payment_intent?.id;
         return ref ? { id: event.id, type: 'refund.succeeded', providerRef: ref } : null;
+      }
+      // A chargeback takes the money back straight away, whatever the dispute's outcome later.
+      if (event.type === 'charge.dispute.created') {
+        const d = event.data.object;
+        const ref = typeof d.payment_intent === 'string' ? d.payment_intent : d.payment_intent?.id;
+        return ref ? { id: event.id, type: 'payment.disputed', providerRef: ref } : null;
       }
       return null;
     },

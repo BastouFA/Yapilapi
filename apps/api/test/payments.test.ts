@@ -54,8 +54,13 @@ describe('Stripe provider', () => {
   it('converts zero-decimal currencies back to hundredths and ignores other events', () => {
     const xof = event('payment_intent.succeeded', { id: 'pi_2', object: 'payment_intent', amount: 5000, amount_received: 5000, currency: 'xof' });
     expect(provider.verifyWebhook(xof, { 'stripe-signature': sign(xof) })?.amountCents).toBe(500_000);
-    const refund = event('charge.refunded', { id: 'ch_1', object: 'charge', payment_intent: 'pi_2' });
+    const refund = event('charge.refunded', { id: 'ch_1', object: 'charge', payment_intent: 'pi_2', refunded: true });
     expect(provider.verifyWebhook(refund, { 'stripe-signature': sign(refund) })).toMatchObject({ type: 'refund.succeeded', providerRef: 'pi_2' });
+    // A partial refund leaves the order alone; a chargeback undoes it.
+    const partial = event('charge.refunded', { id: 'ch_2', object: 'charge', payment_intent: 'pi_3', refunded: false });
+    expect(provider.verifyWebhook(partial, { 'stripe-signature': sign(partial) })).toBeNull();
+    const dispute = event('charge.dispute.created', { id: 'dp_1', object: 'dispute', payment_intent: 'pi_4' });
+    expect(provider.verifyWebhook(dispute, { 'stripe-signature': sign(dispute) })).toMatchObject({ type: 'payment.disputed', providerRef: 'pi_4' });
     const other = event('customer.created', { id: 'cus_1', object: 'customer' });
     expect(provider.verifyWebhook(other, { 'stripe-signature': sign(other) })).toBeNull();
   });

@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
-import type { PaymentRegistry } from './payments.ts';
+import { badRequest } from './errors.ts';
+import { isZeroDecimal, type PaymentRegistry } from './payments.ts';
 import { revokePlusForOrder } from './plus.ts';
 import { releaseDropOrder } from './drops.ts';
 import { refundOrderTickets } from './tickets.ts';
@@ -17,6 +18,8 @@ export async function startPayment(
   payments: PaymentRegistry,
   input: { orderId: string; buyerId: string; amountCents: number; currency: string; idempotencyKey: string },
 ): Promise<{ provider: string; clientSecret: string }> {
+  // Currencies without a minor unit are charged in whole units: an amount between them would be rounded at the provider and never match.
+  if (isZeroDecimal(input.currency) && input.amountCents % 100 !== 0) throw badRequest(`${input.currency.toUpperCase()} amounts must be whole units.`);
   const provider = payments.forCurrency(input.currency);
   const email = (await c.query<{ email: string }>(`SELECT email FROM users WHERE id = $1`, [input.buyerId])).rows[0]?.email;
   const intent = await provider.createIntent({
@@ -67,11 +70,40 @@ export async function refundOrder(
     actorId,
   ]);
   if (result.status !== 'succeeded') return 'failed';
+  await undoPaidOrder(c, orderId, r.payment_id, r.amount_cents);
+  return 'succeeded';
+}
+
+/**
+ * The money for a paid order went back to the buyer outside the app (a refund from the provider's
+ * dashboard, or a dispute): record it and undo what the order paid for, as refundOrder does.
+ * Returns false when the order was not paid (already refunded here, for one).
+ */
+export async function revokeRefundedOrder(c: PoolClient, orderId: string, reason: string): Promise<boolean> {
+  const r = (
+    await c.query(
+      `SELECT o.status, pay.id AS payment_id, pay.amount_cents
+       FROM orders o JOIN payments pay ON pay.order_id = o.id WHERE o.id = $1 ORDER BY pay.created_at DESC LIMIT 1 FOR UPDATE OF o`,
+      [orderId],
+    )
+  ).rows[0];
+  if (!r || r.status !== 'paid') return false;
+  await c.query(`INSERT INTO refunds (payment_id, amount_cents, reason, status, requested_by) VALUES ($1,$2,$3,'succeeded',NULL)`, [
+    r.payment_id,
+    r.amount_cents,
+    reason,
+  ]);
+  await undoPaidOrder(c, orderId, r.payment_id, r.amount_cents);
+  return true;
+}
+
+/** Undo what a refunded order paid for and mark it and its payment refunded. */
+async function undoPaidOrder(c: PoolClient, orderId: string, paymentId: string, amountCents: number) {
   // Refunding ad budget takes back what the campaign hasn't spent yet.
   await c.query(
     `UPDATE ad_campaigns SET budget_millicents = greatest(spent_millicents, budget_millicents - $2::bigint * 1000)
      FROM orders o WHERE o.id = $1 AND o.purpose = 'ad_budget' AND ad_campaigns.id = o.campaign_id`,
-    [orderId, r.amount_cents],
+    [orderId, amountCents],
   );
   // Refunding a Plus month takes those days back.
   await revokePlusForOrder(c, orderId);
@@ -91,6 +123,5 @@ export async function refundOrder(
   // Event tickets it bought stop working, with whoever holds them now.
   await refundOrderTickets(c, orderId);
   await c.query(`UPDATE orders SET status = 'refunded', updated_at = now() WHERE id = $1`, [orderId]);
-  await c.query(`UPDATE payments SET status = 'refunded', updated_at = now() WHERE id = $1`, [r.payment_id]);
-  return 'succeeded';
+  await c.query(`UPDATE payments SET status = 'refunded', updated_at = now() WHERE id = $1`, [paymentId]);
 }
