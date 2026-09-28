@@ -14,7 +14,7 @@ import { clipSeconds, countryList, httpUrl, ProviderError, type MusicProvider, t
  *   { "id", "title", "artist", "album"?, "durationMs"?, "artworkUrl"?, "previewUrl",
  *     "status"?: "active" | "withdrawn",
  *     "licence": { "name"?, "commercialUse", "territories": ["NG", ...] | null, "excludedTerritories"?,
- *                  "maxClipSeconds", "attribution"?, "expiresAt"?, "cacheAllowed"? } }
+ *                  "maxClipSeconds", "attribution"?, "expiresAt"?, "cacheAllowed"?, "derivatives"? } }
  * A partner whose API looks different is mapped here, in `toTrack` and the three calls, and nowhere else.
  * `previewUrl` is the partner's clip or stream address: players load it directly and play only the
  * licensed part, so nothing is proxied or stored here.
@@ -89,6 +89,8 @@ function toTrack(raw: unknown): ProviderTrack | null {
       typeof l.attribution === 'string' && l.attribution.trim() ? l.attribution.trim().slice(0, 300) : musicCredit({ title, artist, licenceName: name }),
     expiresAt: expires,
     cacheAllowed: l.cacheAllowed === true,
+    // Echoes of a reel keep the song only when the partner says so.
+    derivatives: l.derivatives === true,
   };
   const ms = Number(r.durationMs);
   return {

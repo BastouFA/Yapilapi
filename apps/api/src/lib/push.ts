@@ -90,6 +90,8 @@ const TEXT: Record<string, (actor: string, data: Record<string, unknown>) => str
   post_repost: (a) => `${a} reposted your post`,
   reel_duet: (a) => `${a} made a duet with your reel`,
   reel_remix: (a) => `${a} remixed your reel`,
+  // Echoes of one reel are batched (lib/echoes.ts), so this pushes for the first one only.
+  reel_echo: (a) => `${a} echoed your reel`,
   post_mention: (a) => `${a} mentioned you in a post`,
   comment_mention: (a) => `${a} mentioned you in a comment`,
   comment_like: (a) => `${a} liked your comment`,

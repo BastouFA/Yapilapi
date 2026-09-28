@@ -8,6 +8,7 @@ import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
+  Alert,
   ActivityIndicator,
   Animated,
   Easing,
@@ -55,6 +56,7 @@ import { openMusic, useMusicCredit, useMusicLoop } from '../lib/music';
 import { CaptionOverlay, useCaptionCues } from '../lib/captions';
 import { canWatch, useWatchStart } from '../lib/watch';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
+import { ECHO_PERMISSIONS, type EchoPermission } from '../../../packages/shared/src/echoes';
 
 /** What a reel plays: on Data saver the lowest MP4, or the 360p stream for videos processed before it existed. */
 const reelSource = (m: MediaItem, saver: boolean) =>
@@ -95,7 +97,7 @@ function useReducedMotion() {
  */
 export default function Reels() {
   const c = useColors();
-  const { t } = useT();
+  const { t, number } = useT();
   const insets = useSafeAreaInsets();
   const focused = useIsFocused();
   const { start, at } = useLocalSearchParams<{ start?: string; at?: string }>();
@@ -355,6 +357,47 @@ export default function Reels() {
     setTimeout(() => reporter.open({ type: 'post', id: p.id, authorId: p.author.id, authorName: p.author.displayName }), SHEET_SWAP_MS);
   };
 
+  async function setAllowEchoes(p: Post, allowEchoes: EchoPermission) {
+    const before = p.allowEchoes;
+    patch(p.id, (x) => ({ ...x, allowEchoes }));
+    try {
+      await (await client()).posts.setAllowEchoes(p.id, allowEchoes);
+      setStatus(t('echo.settings.saved'));
+    } catch (e) {
+      patch(p.id, (x) => ({ ...x, allowEchoes: before }));
+      setError(errorMessage(e));
+    }
+  }
+
+  /** An echo whose original is gone: its author keeps it to themselves, or deletes it. */
+  async function keepEchoPrivate(p: Post) {
+    try {
+      const r = await (await client()).posts.edit(p.id, { visibility: 'private' });
+      patch(p.id, () => r.post);
+      setStatus(t('echo.keptPrivate'));
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  }
+  function deleteEcho(p: Post) {
+    Alert.alert(t('echo.deleteConfirm'), undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('echo.delete'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await (await client()).posts.remove(p.id);
+            setItems((cur) => cur?.filter((x) => x.id !== p.id) ?? cur);
+            setStatus(t('echo.deleted'));
+          } catch (e) {
+            setError(errorMessage(e));
+          }
+        },
+      },
+    ]);
+  }
+
   async function setAllowRemix(p: Post, allowRemix: boolean) {
     patch(p.id, (x) => ({ ...x, allowRemix }));
     try {
@@ -462,6 +505,8 @@ export default function Reels() {
               onNext={() => go(index + 1)}
               onPrevious={() => go(index - 1)}
               onResumeSaved={(ms) => patch(item.id, (x) => ({ ...x, viewer: { ...x.viewer, resumeMs: ms ?? undefined } }))}
+              onKeepEchoPrivate={() => void keepEchoPrivate(item)}
+              onDeleteEcho={() => deleteEcho(item)}
             />
           )}
           ListFooterComponent={
@@ -507,6 +552,20 @@ export default function Reels() {
                 label={sheetPost.viewer.reposted ? t('reel.share.undoRepost') : t('reel.share.repost')}
                 selected={sheetPost.viewer.reposted}
                 onPress={() => (setSheet(null), void repost(sheetPost))}
+              />
+            ) : null}
+            {me && sheetPost.viewer.canEcho ? (
+              <SheetItem
+                icon="git-compare-outline"
+                label={t('echo.action')}
+                onPress={() => (setSheet(null), router.push({ pathname: '/echo/[id]', params: { id: sheetPost.id } }))}
+              />
+            ) : null}
+            {sheetPost.counts.echoes ? (
+              <SheetItem
+                icon="albums-outline"
+                label={`${t('echo.see')} (${number(sheetPost.counts.echoes)})`}
+                onPress={() => (setSheet(null), router.push({ pathname: '/echoes/[id]', params: { id: sheetPost.id } }))}
               />
             ) : null}
             {me && sheetPost.allowRemix && sheetPost.visibility === 'public' ? (
@@ -555,6 +614,7 @@ export default function Reels() {
         onReport={report}
         onDownload={(p) => void shareVideo(p)}
         onAllowRemix={(p, v) => void setAllowRemix(p, v)}
+        onAllowEchoes={(p, v) => void setAllowEchoes(p, v)}
       />
       {reporter.sheet}
       {watchTogether.sheet}
@@ -601,6 +661,8 @@ function Reel({
   onNext,
   onPrevious,
   onResumeSaved,
+  onKeepEchoPrivate,
+  onDeleteEcho,
 }: {
   post: Post;
   height: number;
@@ -638,6 +700,9 @@ function Reel({
   onNext: () => void;
   onPrevious: () => void;
   onResumeSaved: (ms: number | null) => void;
+  /** Your echo whose original is gone: keep it to yourself, or delete it. */
+  onKeepEchoPrivate: () => void;
+  onDeleteEcho: () => void;
 }) {
   const c = useColors();
   const { t, tp, number } = useT();
@@ -678,6 +743,9 @@ function Reel({
   const sound = useAudioPlayer(visible && !waiting ? borrowed : null);
   // A catalogue song plays its part in a loop instead of the reel's own sound (only with sound on, so nothing loads before).
   const song = !original && !borrowed && post.music?.audioUrl ? post.music : null;
+  // An echo keeping the original's song plays it with the echo's own sound (their voice and yours).
+  const songWithVideo = !!song && !!post.echoOf;
+  const echoGone = !!post.echoOf && !post.echoOf.post;
   const highlights = post.highlights ?? [];
 
   // Only the reel on screen plays; scrolling away clears a tap-to-pause (it continues from where it was next time).
@@ -699,13 +767,13 @@ function Reel({
   }, [speed, fast, player, originalPlayer, originalSrc]);
   useEffect(() => {
     // With a borrowed sound the reel's own audio stays off.
-    player.muted = muted || !!borrowed || !!song;
+    player.muted = muted || !!borrowed || (!!song && !songWithVideo);
     if (originalSrc) originalPlayer.muted = muted;
     if (borrowed) {
       sound.muted = muted;
       sound.loop = true;
     }
-  }, [muted, player, originalPlayer, originalSrc, borrowed, sound, song]);
+  }, [muted, player, originalPlayer, originalSrc, borrowed, sound, song, songWithVideo]);
   useMusicLoop(song ? { sound: { audioUrl: song.audioUrl }, startMs: song.startMs, durationMs: song.durationMs } : null, playing && !muted);
 
   // Where the viewer stopped: sent when they leave the reel and every 10 seconds while it plays.
@@ -1063,6 +1131,25 @@ function Reel({
               <Text style={s.more}>{t('reel.more')}</Text>
             </Pressable>
           </View>
+          {post.echoOf?.post ? (
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={t('echo.ofLabel', { name: post.echoOf.post.author.displayName })}
+              hitSlop={6}
+              onPress={() => router.push({ pathname: '/reels', params: { start: post.echoOf!.post!.id } })}
+              style={s.chip}
+            >
+              <Icon name="git-compare-outline" size={13} color={WHITE} />
+              <Text style={[s.chipText, userText]} numberOfLines={1}>
+                {t('echo.of', { name: post.echoOf.post.author.username })}
+              </Text>
+            </Pressable>
+          ) : echoGone && mine ? (
+            <Pressable accessibilityRole="button" hitSlop={6} onPress={() => setDetails(true)} style={s.chip}>
+              <Icon name="git-compare-outline" size={13} color={WHITE} />
+              <Text style={s.chipText}>{t('echo.title')}</Text>
+            </Pressable>
+          ) : null}
           {post.sound || post.music ? (
             <Pressable
               accessibilityRole="link"
@@ -1132,6 +1219,22 @@ function Reel({
               </Pressable>
             ) : post.remixOf ? (
               <Text style={{ color: '#C9CDE0', fontSize: 12 }}>{t('m.reels.remixUnavailable')}</Text>
+            ) : null}
+            {echoGone && mine ? (
+              <View accessibilityRole="summary" style={s.echoGone}>
+                <Text style={{ color: WHITE, fontSize: 14, lineHeight: 20 }}>{t('echo.unavailable')}</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+                  {post.visibility !== 'private' ? <Button size="sm" variant="secondary" label={t('echo.keepPrivate')} onPress={onKeepEchoPrivate} /> : null}
+                  <Button size="sm" variant="danger" label={t('echo.delete')} onPress={onDeleteEcho} />
+                </View>
+              </View>
+            ) : null}
+            {post.echoOf?.theirAudio === 'dropped' ? <Text style={{ color: '#C9CDE0', fontSize: 12 }}>{t('echo.audioDropped')}</Text> : null}
+            {post.counts.echoes ? (
+              <Pressable accessibilityRole="link" onPress={() => router.push({ pathname: '/echoes/[id]', params: { id: post.id } })} style={s.chip}>
+                <Icon name="git-compare-outline" size={14} color={WHITE} />
+                <Text style={s.chipText}>{tp('echo.count', post.counts.echoes, { count: number(post.counts.echoes) })}</Text>
+              </Pressable>
             ) : null}
             {post.topics.length ? (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
@@ -1493,7 +1596,7 @@ function SheetItem({ icon, label, onPress, danger, selected }: { icon: IconName;
 
 /**
  * The "…" sheet: how to watch (speed, captions) and what to do with the reel (copy link,
- * download, highlights and remix settings for the creator, not interested, report).
+ * download, highlights, remix and echo settings for the creator, not interested, report).
  */
 function OptionsSheet({
   post,
@@ -1511,6 +1614,7 @@ function OptionsSheet({
   onReport,
   onDownload,
   onAllowRemix,
+  onAllowEchoes,
 }: {
   post: Post | null;
   mine: boolean;
@@ -1527,6 +1631,7 @@ function OptionsSheet({
   onReport: (p: Post) => void;
   onDownload: (p: Post) => void;
   onAllowRemix: (p: Post, allow: boolean) => void;
+  onAllowEchoes: (p: Post, allow: EchoPermission) => void;
 }) {
   const c = useColors();
   const { t, number } = useT();
@@ -1552,6 +1657,18 @@ function OptionsSheet({
             <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t('reel.captions.none')}</Text>
           )}
           <SwitchRow label={t('reel.captions.bigger')} value={big} onValueChange={onBig} />
+          {mine && post.allowEchoes && !post.echoOf ? (
+            <>
+              <Text style={{ color: c.inkMuted, fontWeight: '700', fontSize: 13, marginTop: space[2] }}>{t('echo.settings')}</Text>
+              <Segmented
+                label={t('echo.settings')}
+                value={post.allowEchoes}
+                onChange={(v) => onAllowEchoes(post, v)}
+                options={ECHO_PERMISSIONS.map((p) => ({ id: p, label: t(`echo.settings.${p}`) }))}
+              />
+              <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('echo.settings.hint')}</Text>
+            </>
+          ) : null}
           <View style={{ height: space[2] }} />
           {post.visibility !== 'private' ? <SheetItem icon="link-outline" label={t('reel.share.copy')} onPress={done(() => onCopy(post))} /> : null}
           {post.downloadable ? <SheetItem icon="download-outline" label={t('share.video.download')} onPress={done(() => onDownload(post))} /> : null}
@@ -1831,6 +1948,7 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(5,6,11,0.42)',
   },
   chipText: { color: WHITE, fontSize: 12, fontWeight: '700', flexShrink: 1 },
+  echoGone: { gap: space[2], padding: space[3], borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.12)' },
   sheetItem: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 52, paddingHorizontal: space[2], borderRadius: radius.md },
   sheetIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   preparing: {

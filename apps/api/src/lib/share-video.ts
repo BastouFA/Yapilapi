@@ -125,7 +125,7 @@ export interface ShareVideoDeps {
 }
 
 /** The storage key of the best source for a video: the processed web MP4 when there is one, else the upload. */
-function sourceKey(m: { storage_key: string | null; variants: Record<string, string> | null }): string | null {
+export function sourceKey(m: { storage_key: string | null; variants: Record<string, string> | null }): string | null {
   if (!m.storage_key) return null;
   if (m.variants?.mp4) return `${m.storage_key.replace(/\.[^.]+$/, '')}_web.mp4`;
   return m.storage_key;

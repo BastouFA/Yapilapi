@@ -11,7 +11,8 @@ import { soundVisibleSql } from './sounds.ts';
 import { trackMusic, viewerCountries, type StoredPart, type TrackRow } from './music/view.ts';
 import { quotedQuestions } from './ask.ts';
 import { mixCards } from './mixes.ts';
-import type { PostMusic, ReelHighlight } from '@yapilapi/shared';
+import type { EchoRef, PostMusic, ReelHighlight } from '@yapilapi/shared';
+import { echoAllowedSql, echoPermissionSql } from './echoes.ts';
 
 type Q = Pool | PoolClient;
 
@@ -49,6 +50,12 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
             CASE WHEN p.visibility = 'circle' AND p.author_id IS NOT DISTINCT FROM $2
                  THEN (SELECT json_build_object('id', ci.id, 'name', ci.name) FROM circles ci WHERE ci.id = p.circle_id) END AS own_circle,
             CASE WHEN p.format = 'reel' THEN (SELECT count(*) FROM posts rx WHERE rx.remix_of_post_id = p.id AND rx.deleted_at IS NULL AND rx.status = 'published')::int END AS remix_count,
+            -- Echoes: how many are up, whether the viewer may echo it, the author's own setting, and (on an echo) what it answers.
+            CASE WHEN p.format = 'reel' AND NOT p.is_echo THEN (SELECT count(*) FROM posts ex WHERE ex.echo_of_post_id = p.id AND ex.is_echo AND ex.deleted_at IS NULL
+                                                                   AND ex.status = 'published' AND ex.moderation_status = 'normal')::int END AS echo_count,
+            CASE WHEN p.format = 'reel' THEN coalesce(${echoAllowedSql('$2', 'pr')}, false) END AS can_echo,
+            CASE WHEN p.format = 'reel' AND p.author_id IS NOT DISTINCT FROM $2 THEN ${echoPermissionSql('p', 'pr', 'au')} END AS allow_echoes,
+            p.is_echo, p.echo_of_post_id, (SELECT json_build_object('layout', ec.layout, 'theirAudio', ec.their_audio) FROM echoes ec WHERE ec.post_id = p.id) AS echo_info,
             s.id AS s_id, s.title AS s_title, s.source_post_id AS s_source, coalesce(s.duration_ms, sm.duration_ms) AS s_duration,
             coalesce(sm.variants->>'mp4', sm.url) AS s_audio, so.display_name AS s_artist, sm.poster_url AS s_cover,
             -- Music on a photo or text post: its part, and the sound (while the viewer can see it) or the catalogue song.
@@ -83,7 +90,7 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
     db,
     rows
       .filter((r) => r.unlocked)
-      .map((r) => r.remix_of_post_id as string | null)
+      .flatMap((r) => [r.remix_of_post_id as string | null, r.is_echo ? (r.echo_of_post_id as string | null) : null])
       .filter((x): x is string => !!x),
     viewer,
   );
@@ -139,6 +146,7 @@ function toPost(r: Record<string, any>, originals: Map<string, NonNullable<Remix
       reposts: r.repost_count ?? 0,
       views: r.view_count ?? 0,
       ...(r.remix_count === null ? {} : { remixes: r.remix_count }),
+      ...(r.echo_count === null || r.echo_count === undefined ? {} : { echoes: r.echo_count }),
     },
     commentPolicy: r.comment_policy,
     viewer: {
@@ -147,6 +155,7 @@ function toPost(r: Record<string, any>, originals: Map<string, NonNullable<Remix
       reposted: r.reposted,
       canComment: r.can_comment,
       ...(r.resume_ms === null || r.resume_ms === undefined ? {} : { resumeMs: r.resume_ms }),
+      ...(r.can_echo === null || r.can_echo === undefined ? {} : { canEcho: !!r.can_echo }),
     },
     aiAssisted: !!r.ai_provenance?.assisted,
     real: r.real ?? null,
@@ -159,6 +168,8 @@ function toPost(r: Record<string, any>, originals: Map<string, NonNullable<Remix
           remixOf: r.remix_mode ? { mode: r.remix_mode, post: (r.remix_of_post_id && originals.get(r.remix_of_post_id)) || null } : null,
           sound: r.s_id ? { id: r.s_id, title: r.s_title, durationMs: r.s_duration ?? null, audioUrl: r.s_audio ?? null, original: r.s_source === r.id } : null,
           ...(Array.isArray(r.highlights) && r.highlights.length ? { highlights: r.highlights as ReelHighlight[] } : {}),
+          ...(r.is_echo ? { echoOf: echoRefOf(r, originals) } : {}),
+          ...(r.allow_echoes ? { allowEchoes: r.allow_echoes } : {}),
         }
       : {}),
     reason: reasons?.get(r.id),
@@ -167,6 +178,20 @@ function toPost(r: Record<string, any>, originals: Map<string, NonNullable<Remix
     ...(r.boost ? { boost: r.boost } : {}),
     ...(r.own_circle_post ? { circle: r.own_circle ?? null } : {}),
   } satisfies Post;
+}
+
+/**
+ * What an echo answers. Viewers other than its author only get the echo while they can see the
+ * original (echoShownSql), so `post: null` reaches the echo's author alone: the original was
+ * deleted or is no longer shared with them, and the echo is hidden from everyone else.
+ */
+function echoRefOf(r: Record<string, any>, originals: Map<string, NonNullable<RemixRef['post']>>): EchoRef {
+  const o = r.echo_of_post_id ? originals.get(r.echo_of_post_id) : undefined;
+  return {
+    post: o ? { id: o.id, author: o.author } : null,
+    layout: r.echo_info?.layout ?? 'side',
+    theirAudio: r.echo_info?.theirAudio ?? 'mixed',
+  };
 }
 
 /** A post's music for this viewer: left out when there is none, or when it is a sound the viewer can't see. */

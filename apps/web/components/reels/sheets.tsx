@@ -3,11 +3,13 @@
 import { useState } from 'react';
 import { BottomSheet, Button, Icon, Segments, Switch, type IconName } from '@yapilapi/design-system';
 import {
+  ECHO_PERMISSIONS,
   formatReelTime,
   REEL_HIGHLIGHT_GAP_MS,
   REEL_HIGHLIGHT_LABEL_MAX,
   REEL_HIGHLIGHTS_MAX,
   REEL_SPEEDS,
+  type EchoPermission,
   type Post,
   type ReelHighlight,
   type ReelSpeed,
@@ -31,8 +33,8 @@ function SheetItem({ icon, label, onClick, danger, pressed }: { icon: IconName; 
 
 /**
  * Share: the link first (the system share sheet, or copied), then more ways to share: watch it
- * together in a chat, repost, duet side by side, remix with the sound, the reel's duets and
- * remixes, a video to share elsewhere, a board.
+ * together in a chat, repost, echo it with your own video, duet side by side, remix with the
+ * sound, the reel's echoes, duets and remixes, a video to share elsewhere, a board.
  */
 export function ShareSheet({
   post,
@@ -45,6 +47,8 @@ export function ShareSheet({
   onDownload,
   onSaveTo,
   onWatch,
+  onEcho,
+  onEchoes,
 }: {
   post: Post | null;
   mine: boolean;
@@ -57,6 +61,9 @@ export function ShareSheet({
   onSaveTo: (p: Post) => void;
   /** Watch it together with people in a chat. */
   onWatch?: (p: Post) => void;
+  /** Answer it with your own video, and see the echoes of it. */
+  onEcho?: (p: Post) => void;
+  onEchoes?: (p: Post) => void;
 }) {
   const { t, toast, locale } = useSession();
   if (!post) return null;
@@ -76,6 +83,8 @@ export function ShareSheet({
   const canShare = typeof navigator !== 'undefined' && !!navigator.share;
   const publicReel = post.visibility === 'public';
   const remixes = post.counts.remixes ?? 0;
+  const echoes = post.counts.echoes ?? 0;
+  const compact = new Intl.NumberFormat(locale, { notation: 'compact' });
   return (
     <BottomSheet open onClose={onClose} title={t('reel.share.title')}>
       <ul className="reel-sheet__list">
@@ -98,19 +107,15 @@ export function ShareSheet({
             onClick={done(() => onRepost(post))}
           />
         ) : null}
+        {signedIn && onEcho && post.viewer.canEcho ? <SheetItem icon="repost" label={t('echo.action')} onClick={done(() => onEcho(post))} /> : null}
+        {echoes && onEchoes ? <SheetItem icon="repost" label={`${t('echo.see')} (${compact.format(echoes)})`} onClick={done(() => onEchoes(post))} /> : null}
         {post.allowRemix && publicReel && signedIn ? (
           <>
             <SheetItem icon="duet" label={t('reel.share.duet')} onClick={done(() => onRemix(post, 'duet'))} />
             <SheetItem icon="music" label={t('reel.share.remix')} onClick={done(() => onRemix(post, 'remix'))} />
           </>
         ) : null}
-        {remixes ? (
-          <SheetItem
-            icon="repost"
-            label={`${t('reel.share.remixes')} (${new Intl.NumberFormat(locale, { notation: 'compact' }).format(remixes)})`}
-            onClick={done(() => onRemixes(post))}
-          />
-        ) : null}
+        {remixes ? <SheetItem icon="repost" label={`${t('reel.share.remixes')} (${compact.format(remixes)})`} onClick={done(() => onRemixes(post))} /> : null}
         {post.downloadable ? <SheetItem icon="download" label={t('share.video.download')} onClick={done(() => onDownload(post))} /> : null}
         {signedIn ? <SheetItem icon="bookmark" label={t('m.boards.saveTo')} onClick={done(() => onSaveTo(post))} /> : null}
       </ul>
@@ -120,8 +125,8 @@ export function ShareSheet({
 
 /**
  * The "…" sheet: how to watch (speed, captions, quality) and what to do with the reel
- * (picture in picture, not interested, copy link, download, highlights and remix settings for
- * the creator, leave as co-author, report).
+ * (picture in picture, not interested, copy link, download, highlights, remix and echo settings
+ * for the creator, leave as co-author, report).
  */
 export function OptionsSheet({
   post,
@@ -136,6 +141,7 @@ export function OptionsSheet({
   onDownload,
   onHighlights,
   onAllowRemix,
+  onAllowEchoes,
   onLeaveCollab,
   onReport,
 }: {
@@ -152,6 +158,8 @@ export function OptionsSheet({
   onDownload: (p: Post) => void;
   onHighlights: (p: Post) => void;
   onAllowRemix: (p: Post, allow: boolean) => void;
+  /** The creator: who may echo the reel. */
+  onAllowEchoes?: (p: Post, allow: EchoPermission) => void;
   onLeaveCollab: (p: Post) => void;
   onReport: (p: Post) => void;
 }) {
@@ -198,6 +206,18 @@ export function OptionsSheet({
             ]}
           />
         </div>
+        {mine && onAllowEchoes && post.allowEchoes && !post.echoOf ? (
+          <div className="reel-sheet__group">
+            <span className="reel-sheet__label">{t('echo.settings')}</span>
+            <Segments
+              label={t('echo.settings')}
+              value={post.allowEchoes}
+              onChange={(v) => onAllowEchoes(post, v)}
+              options={ECHO_PERMISSIONS.map((p) => ({ id: p, label: t(`echo.settings.${p}`) }))}
+            />
+            <span className="muted reel-sheet__note">{t('echo.settings.hint')}</span>
+          </div>
+        ) : null}
         <ul className="reel-sheet__list">
           {pip ? <SheetItem icon="image" label={t('reel.pip')} onClick={done(onPip)} /> : null}
           <SheetItem icon="link" label={t('reel.share.copy')} onClick={done(() => onCopy(post))} />

@@ -53,3 +53,21 @@ export function onPendingMedia(fn: () => void): () => void {
   window.addEventListener(EVENT, fn);
   return () => window.removeEventListener(EVENT, fn);
 }
+
+/**
+ * A video recorded in the in-app camera for an echo (/camera?mode=reel&echo=<reel id>), handed back to
+ * the Echo page rather than to Create.
+ */
+let pendingEcho: { postId: string; file: File } | null = null;
+
+export function deliverEchoMedia(postId: string, file: File) {
+  pendingEcho = { postId, file };
+}
+
+/** The video recorded for an echo of `postId`, once. */
+export function takeEchoMedia(postId: string): File | null {
+  if (pendingEcho?.postId !== postId) return null;
+  const f = pendingEcho.file;
+  pendingEcho = null;
+  return f;
+}

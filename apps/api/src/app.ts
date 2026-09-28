@@ -64,6 +64,7 @@ import familyModule from './modules/family.ts';
 import studioModule from './modules/studio.ts';
 import editorModule from './modules/editor.ts';
 import collagesModule from './modules/collages.ts';
+import echoesModule from './modules/echoes.ts';
 import tagsModule from './modules/tags.ts';
 import collabsModule from './modules/collabs.ts';
 import soundsModule from './modules/sounds.ts';
@@ -407,6 +408,7 @@ export async function buildApp(
     studioModule,
     editorModule,
     collagesModule,
+    echoesModule,
     plusModule,
     invitesModule,
     growthModule,

@@ -7,7 +7,7 @@ import { Icon, useModalFocus } from '@yapilapi/design-system';
 import { isVideoFile, MEDIA_ACCEPT, VIDEO_ACCEPT, type DualCorner, type MessageKey } from '@yapilapi/shared';
 import { DualReview, type DualShots } from '@/components/DualReview';
 import { canvasBlob, composeDual, grabFrame } from '@/lib/dual-photo';
-import { deliverPendingMedia, type CreateMode } from '@/lib/pending-media';
+import { deliverEchoMedia, deliverPendingMedia, type CreateMode } from '@/lib/pending-media';
 import { useSession } from '../../providers';
 
 const MODES: { id: CreateMode; label: MessageKey }[] = [
@@ -34,7 +34,9 @@ function Camera() {
   const router = useRouter();
   const params = useSearchParams();
   const { me, toast, t } = useSession();
-  const initial = (['post', 'reel', 'story'] as const).find((m) => m === params.get('mode')) ?? 'post';
+  // Recording for an echo (/camera?echo=<reel id>): a reel-style video, handed back to the Echo page.
+  const echoOf = /^[0-9a-f-]{36}$/i.test(params.get('echo') ?? '') ? params.get('echo') : null;
+  const initial = echoOf ? 'reel' : ((['post', 'reel', 'story'] as const).find((m) => m === params.get('mode')) ?? 'post');
   const [mode, setMode] = useState<CreateMode>(initial);
   const [facing, setFacing] = useState<'user' | 'environment'>('environment');
   const [status, setStatus] = useState<'starting' | 'ready' | 'denied' | 'none'>('starting');
@@ -101,10 +103,15 @@ function Camera() {
 
   const finish = useCallback(
     (files: File[], as: CreateMode) => {
+      if (echoOf && files[0]) {
+        deliverEchoMedia(echoOf, files[0]);
+        router.replace(`/reels/${echoOf}/echo`);
+        return;
+      }
       deliverPendingMedia(files, as);
       router.replace(as === 'post' ? '/create' : `/create?mode=${as}`);
     },
-    [router],
+    [router, echoOf],
   );
 
   const takePhoto = () => {
@@ -247,7 +254,7 @@ function Camera() {
 
   /** Choose a mode with the keyboard; `focus` moves focus to its tab (when the tabs have it). */
   const pickMode = (to: number, focus: boolean) => {
-    if (recording || dualBusy) return;
+    if (recording || dualBusy || echoOf) return;
     const next = MODES[(to + MODES.length) % MODES.length]!;
     setMode(next.id);
     if (focus) modeTabs.current[next.id]?.focus();
@@ -393,25 +400,27 @@ function Camera() {
             )}
           </span>
         </div>
-        <div className="cam__modes" role="tablist" aria-label={t('m.create.mode')} onKeyDown={onTabsKey}>
-          {MODES.map((m) => (
-            <button
-              key={m.id}
-              ref={(el) => {
-                modeTabs.current[m.id] = el;
-              }}
-              type="button"
-              role="tab"
-              aria-selected={m.id === mode}
-              tabIndex={m.id === mode ? 0 : -1}
-              disabled={recording || dualBusy}
-              className="cam__mode"
-              onClick={() => setMode(m.id)}
-            >
-              {t(m.label)}
-            </button>
-          ))}
-        </div>
+        {echoOf ? null : (
+          <div className="cam__modes" role="tablist" aria-label={t('m.create.mode')} onKeyDown={onTabsKey}>
+            {MODES.map((m) => (
+              <button
+                key={m.id}
+                ref={(el) => {
+                  modeTabs.current[m.id] = el;
+                }}
+                type="button"
+                role="tab"
+                aria-selected={m.id === mode}
+                tabIndex={m.id === mode ? 0 : -1}
+                disabled={recording || dualBusy}
+                className="cam__mode"
+                onClick={() => setMode(m.id)}
+              >
+                {t(m.label)}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {dualShots ? (

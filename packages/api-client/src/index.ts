@@ -93,6 +93,10 @@ import type {
   StoryStickerInput,
   DualComposeInput,
   CollageInput,
+  EchoCreateInput,
+  EchoOptions,
+  EchoPermission,
+  EchoRender,
   ChatTheme,
   ScheduledMessage,
   UsernameCheck,
@@ -443,6 +447,18 @@ export function createClient(opts: ClientOptions) {
       remixes: (id: string, mode?: 'duet' | 'remix', cursor?: string) => get<Page<Post>>(`/v1/posts/${id}/remixes${qs({ mode, cursor })}`),
       /** Allow or stop duets and remixes of your reel. */
       setAllowRemix: (id: string, allowRemix: boolean) => put<{ allowRemix: boolean }>(`/v1/posts/${id}/remix-settings`, { allowRemix }),
+      /** Whether you can echo a reel (and why not), and what would be heard of it in your echo. */
+      echoOptions: (id: string) => get<EchoOptions>(`/v1/posts/${id}/echo`),
+      /**
+       * Make an echo of a reel from one of your videos (a layout, an optional cut of theirs to play
+       * first, the balance of the two sounds). Wait for it with echoes.waitUntilReady, then post it
+       * with posts.create({ format: 'reel', echo: id, media: [its video] }).
+       */
+      echo: (id: string, b: EchoCreateInput) => post<{ echo: EchoRender }>(`/v1/posts/${id}/echoes`, b),
+      /** Echoes of a reel that you can see, newest first. */
+      echoes: (id: string, cursor?: string) => get<Page<Post>>(`/v1/posts/${id}/echoes${qs({ cursor })}`),
+      /** Who may echo your reel (new echoes only; the ones already posted stay). */
+      setAllowEchoes: (id: string, allowEchoes: EchoPermission) => put<{ allowEchoes: EchoPermission }>(`/v1/posts/${id}/echo-settings`, { allowEchoes }),
       /** Ask for a reel as a watermarked video to share elsewhere; poll shareVideoStatus until it's ready. */
       shareVideo: (id: string) => post<ShareVideoState>(`/v1/posts/${id}/share-video`),
       shareVideoStatus: (id: string) => get<ShareVideoState>(`/v1/posts/${id}/share-video`),
@@ -651,6 +667,22 @@ export function createClient(opts: ClientOptions) {
           const { media } = await get<{ media: MediaItemStatus }>(`/v1/media/${id}`);
           if (media.status === 'ready') return media;
           if (media.status === 'failed') throw new ApiError(422, 'edit_failed', media.error ?? "We couldn't apply your edits.");
+          if (Date.now() - started > (o.timeoutMs ?? 10 * 60_000)) throw new ApiError(0, 'timeout', 'This is taking longer than usual. Try again in a moment.');
+          await new Promise((r) => setTimeout(r, o.intervalMs ?? 1500));
+        }
+      },
+    },
+    /** Echo videos you asked for (posts.echo), while they're made. */
+    echoes: {
+      get: (id: string) => get<{ echo: EchoRender }>(`/v1/echoes/${id}`),
+      /** Poll until the echo video is made (resolves) or couldn't be (rejects). */
+      waitUntilReady: async (id: string, o: { intervalMs?: number; timeoutMs?: number; signal?: AbortSignal } = {}) => {
+        const started = Date.now();
+        for (;;) {
+          if (o.signal?.aborted) throw new ApiError(0, 'aborted', 'Stopped waiting.');
+          const { echo } = await get<{ echo: EchoRender }>(`/v1/echoes/${id}`);
+          if (echo.status === 'ready') return echo;
+          if (echo.status === 'failed') throw new ApiError(422, 'echo_failed', echo.error ?? "We couldn't make your echo.");
           if (Date.now() - started > (o.timeoutMs ?? 10 * 60_000)) throw new ApiError(0, 'timeout', 'This is taking longer than usual. Try again in a moment.');
           await new Promise((r) => setTimeout(r, o.intervalMs ?? 1500));
         }

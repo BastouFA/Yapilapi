@@ -46,6 +46,7 @@ import {
 } from '../lib/publishing.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 import { langOf } from '../lib/translation.ts';
+import { checkEchoSong } from '../lib/echoes.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 const VISIBLE = postVisibleSql('$1');
@@ -158,6 +159,8 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     });
     // A song is checked again at publish time: still offered, and its licence allows this author, country and part.
     const music = await prepareMusic(ctx, u.id, input);
+    // So is the song an echo keeps from the reel it answers.
+    if (input.echo) await checkEchoSong(ctx, u.id, input.echo);
     let limitedNow = false;
     const written = await tx(db, async (c) => {
       const w = await writePost(c, u.id, input, { state: 'published', moderationStatus: screening.status, music });
@@ -177,6 +180,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       remixAuthor: written.remixAuthor,
       remixOf: input.remixOf,
       remixMode: input.remixMode,
+      echo: written.echo,
     });
     reply.code(201);
     const [post] = await hydratePosts(db, [written.id], u.id);
@@ -211,7 +215,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     const input = parse(editPostSchema, req.body);
     const post = (
       await db.query(
-        `SELECT p.author_id, p.visibility, p.community_id, p.link_url, p.moderation_status,
+        `SELECT p.author_id, p.visibility, p.community_id, p.link_url, p.moderation_status, p.is_echo,
                 EXISTS (SELECT 1 FROM post_media pm WHERE pm.post_id = p.id) AS has_media,
                 EXISTS (SELECT 1 FROM poll_options o WHERE o.post_id = p.id) AS has_poll,
                 EXISTS (SELECT 1 FROM post_collaborators pc WHERE pc.post_id = p.id AND pc.status IN ('pending', 'accepted')) AS has_collabs,
@@ -229,6 +233,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       if (post.community_id) throw badRequest('Posts in a community are shared with its members.');
       if (post.has_collabs && !['public', 'followers', 'friends'].includes(visibility))
         throw badRequest('Posts with co-authors can be shared publicly, with followers or with friends.');
+      if (visibility === 'subscribers' && post.is_echo) throw badRequest("An echo can't be for subscribers only: it shows someone else's reel.");
       if (visibility === 'subscribers') {
         const plan = await db.query(`SELECT 1 FROM creator_plans WHERE creator_id = $1 AND active LIMIT 1`, [u.id]);
         if (!plan.rowCount) throw badRequest('Add a subscription plan in Studio before posting for subscribers.');
