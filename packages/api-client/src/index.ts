@@ -179,6 +179,12 @@ export interface ClientOptions {
    */
   headers?: () => Record<string, string>;
   /**
+   * The app's language (`fr`, `pt-BR`), read on every request and sent as `x-locale`, so error
+   * messages come back in it. For a signed-in person the API uses their language setting; this
+   * covers signing in, signing up and resetting a password.
+   */
+  locale?: () => string | undefined;
+  /**
    * Runs on every file before media.upload and uploads.resumable send it. The web
    * app makes photos smaller here on Data saver.
    */
@@ -188,9 +194,16 @@ export interface ClientOptions {
 /** Typed client for the YAPILAPI API, shared by web, mobile and admin. */
 export function createClient(opts: ClientOptions) {
   const f = opts.fetch ?? fetch;
+  /** The app's own headers, and its language. */
+  const baseHeaders = (): Record<string, string> => {
+    const headers = { ...(opts.headers?.() ?? {}) };
+    const locale = opts.locale?.();
+    if (locale) headers['x-locale'] = locale;
+    return headers;
+  };
 
   async function once<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const headers: Record<string, string> = { ...(opts.headers?.() ?? {}) };
+    const headers = baseHeaders();
     if (body !== undefined && !(body instanceof FormData)) headers['content-type'] = 'application/json';
     if (opts.token) headers.authorization = `Bearer ${opts.token}`;
     let res: Response;

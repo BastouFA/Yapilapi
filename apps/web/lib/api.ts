@@ -3,8 +3,10 @@ import { t } from '@yapilapi/shared';
 import { dataSaverHeaders, prepareUpload } from './data-saver';
 
 // On Data saver every request says Save-Data: on, so the API leaves out large photo sizes,
-// and photos are made smaller in the browser before they upload.
-export const api = createClient({ baseUrl: '/api', headers: dataSaverHeaders, prepareUpload });
+// and photos are made smaller in the browser before they upload. Every request also says the
+// page's language (<html lang>), so errors come back in it before anyone has signed in.
+const pageLocale = () => (typeof document === 'undefined' ? undefined : document.documentElement.lang || undefined);
+export const api = createClient({ baseUrl: '/api', headers: dataSaverHeaders, locale: pageLocale, prepareUpload });
 export { ApiError };
 
 export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:4000/v1/realtime';
@@ -17,8 +19,9 @@ const OWN_ERRORS: Record<string, 'error.network' | 'error.processingFailed' | 'e
 };
 
 /**
- * What went wrong, for showing to people. Messages from the API are shown as they come (the API
- * speaks English); ours are in the reader's language, which the app puts on <html lang>.
+ * What went wrong, for showing to people. Messages from the API are shown as they come: the API
+ * writes them in the reader's language (their language setting, or the page's before signing in).
+ * Ours are in the reader's language too, which the app puts on <html lang>.
  */
 export function errorMessage(e: unknown): string {
   const locale = typeof document === 'undefined' ? 'en' : document.documentElement.lang || 'en';
