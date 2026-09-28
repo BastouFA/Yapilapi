@@ -47,7 +47,21 @@ import { REACTION_ICON, REACTION_LABEL } from './rooms';
 import { SensitiveCover } from './safety';
 import { useRealtime } from './session';
 import { radius, space } from './theme';
-import { ActionSheet, Avatar, BottomSheet, Button, Field, Icon, Notice, useColors, userText, type ActionSheetAction } from './ui';
+import {
+  ActionSheet,
+  Avatar,
+  BottomSheet,
+  Button,
+  Field,
+  Icon,
+  KeyboardAvoid,
+  Notice,
+  useColors,
+  useKeyboardVisible,
+  userText,
+  useScreenFocused,
+  type ActionSheetAction,
+} from './ui';
 
 /*
  * Together on the phone: shared albums (packages/shared/src/together.ts). The album screen
@@ -576,7 +590,10 @@ export function Viewer({
   const [error, setError] = useState<string | null>(null);
   const list = useRef<FlatList<TogetherItem>>(null);
   const item = items[Math.min(index, items.length - 1)];
-  const stageH = Math.round(height * 0.62);
+  // While the caption is being edited the photo steps back, so the field and Save stay above the keyboard.
+  const typing = useKeyboardVisible();
+  const stageH = Math.round(height * (typing ? 0.28 : 0.62));
+  const focused = useScreenFocused();
 
   const onViewable = useRef(({ viewableItems }: { viewableItems: ViewToken<TogetherItem>[] }) => {
     const first = viewableItems.find((v) => v.isViewable);
@@ -652,9 +669,15 @@ export function Viewer({
   const shown = (x: TogetherItem) => !x.media.sensitive || revealed.has(x.id);
 
   return (
-    <Modal visible transparent={false} animationType={reduce ? 'none' : 'fade'} onRequestClose={onClose} supportedOrientations={['portrait', 'landscape']}>
+    <Modal
+      visible={focused}
+      transparent={false}
+      animationType={reduce ? 'none' : 'fade'}
+      onRequestClose={onClose}
+      supportedOrientations={['portrait', 'landscape']}
+    >
       <StatusBar style="light" />
-      <View style={{ flex: 1, backgroundColor: DARK }}>
+      <KeyboardAvoid offset={0} style={{ backgroundColor: DARK }}>
         <View style={{ paddingTop: insets.top + space[1], paddingHorizontal: space[3], flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
           <Text accessibilityLiveRegion="polite" style={{ flex: 1, color: MUTED_ON_DARK }}>
             {t('together.viewer.position', { index: index + 1, total: items.length })}
@@ -706,6 +729,7 @@ export function Viewer({
         <ScrollView
           style={{ flex: 1, backgroundColor: PANEL }}
           contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: insets.bottom + space[4] }}
+          keyboardShouldPersistTaps="handled"
         >
           {error ? <Notice tone="danger">{error}</Notice> : null}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
@@ -810,7 +834,7 @@ export function Viewer({
             <Text style={{ color: ON_DARK, fontWeight: '700' }}>{tp('together.viewer.commentsCount', item.comments)}</Text>
           </Pressable>
         </ScrollView>
-      </View>
+      </KeyboardAvoid>
       <ActionSheet visible={menu} title={t('together.viewer.more')} actions={actions} onClose={() => setMenu(false)} />
       <CommentsSheet
         album={album}
@@ -862,6 +886,7 @@ const SLIDE_MS = 6_000;
  * can play as they arrive, and screen readers hear how many came in.
  */
 export function Slideshow({ album, onClose }: { album: TogetherDetail; onClose: () => void }) {
+  const focused = useScreenFocused();
   const tr = useT();
   const { t, tp } = tr;
   const insets = useSafeAreaInsets();
@@ -914,7 +939,7 @@ export function Slideshow({ album, onClose }: { album: TogetherDetail; onClose: 
   });
 
   return (
-    <Modal visible animationType={reduce ? 'none' : 'fade'} onRequestClose={onClose} supportedOrientations={['portrait', 'landscape']}>
+    <Modal visible={focused} animationType={reduce ? 'none' : 'fade'} onRequestClose={onClose} supportedOrientations={['portrait', 'landscape']}>
       <StatusBar hidden />
       <View style={{ flex: 1, backgroundColor: '#000' }} accessibilityLabel={t('together.show.label', { title: album.title })}>
         {current ? (

@@ -232,31 +232,48 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     let ws: WebSocket | null = null;
     let attempt = 0;
     let retry: ReturnType<typeof setTimeout> | undefined;
-    let ping: ReturnType<typeof setInterval> | undefined;
+    // Reading the token takes a moment: a second connect in the meantime (the app coming to the front
+    // just as it starts) would open a second socket, delivering every event twice.
+    let connecting = false;
 
     const connect = async () => {
-      if (stopped || ws) return;
-      const token = await getToken();
-      if (!token || stopped) return;
+      if (stopped || ws || connecting) return;
+      connecting = true;
+      const token = await getToken()
+        .catch(() => undefined)
+        .finally(() => (connecting = false));
+      if (!token || stopped || ws) return;
       const socket = new (WebSocket as unknown as RNWebSocketCtor)(realtimeUrl(), null, { headers: { authorization: `Bearer ${token}` } });
       ws = socket;
+      // Each socket keeps its own ping, so an old one closing late never stops the new one's.
+      let ping: ReturnType<typeof setInterval> | undefined;
       socket.onopen = () => {
         attempt = 0;
+        clearInterval(ping);
         ping = setInterval(() => socket.readyState === 1 && socket.send(JSON.stringify({ type: 'ping' })), 25_000);
       };
       socket.onmessage = (ev: MessageEvent) => {
+        let event: RealtimeEvent;
         try {
-          const event = JSON.parse(String(ev.data)) as RealtimeEvent;
-          if (event.type === 'ready') ready.current = true;
-          listeners.current.forEach((l) => l(event));
+          event = JSON.parse(String(ev.data)) as RealtimeEvent;
         } catch {
-          /* ignore malformed frames */
+          return; // a malformed frame
         }
+        if (event.type === 'ready') ready.current = true;
+        // One screen's handler failing doesn't keep the event from the others.
+        listeners.current.forEach((l) => {
+          try {
+            l(event);
+          } catch {
+            /* that handler's problem */
+          }
+        });
       };
       socket.onclose = () => {
         clearInterval(ping);
+        if (ws !== socket && ws) return; // an old socket closing after a new one opened
         ready.current = false;
-        if (ws === socket) ws = null;
+        ws = null;
         if (stopped || (AppState.currentState !== 'active' && !keepAlive.current)) return;
         attempt++;
         retry = setTimeout(connect, Math.min(30_000, 1000 * 2 ** attempt));
@@ -264,7 +281,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
     const disconnect = () => {
       clearTimeout(retry);
-      clearInterval(ping);
+      // Closing it stops its ping (onclose).
       ws?.close();
       ws = null;
     };
@@ -274,7 +291,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (s === 'active') {
         attempt = 0;
         void connect();
-        listeners.current.forEach((l) => l({ type: 'app.foreground' }));
+        listeners.current.forEach((l) => {
+          try {
+            l({ type: 'app.foreground' });
+          } catch {
+            /* that handler's problem */
+          }
+        });
       } else if (s === 'background' && !keepAlive.current) disconnect();
     });
     return () => {
@@ -282,7 +305,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       sub.remove();
       disconnect();
     };
-  }, [me]);
+    // The account, not the profile object: refreshing your profile (a new name, a setting) keeps the connection.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.id]);
 
   const subscribe = useCallback((fn: Listener) => {
     listeners.current.add(fn);

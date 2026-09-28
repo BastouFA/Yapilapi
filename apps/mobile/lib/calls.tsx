@@ -10,6 +10,7 @@ import { useT } from './i18n';
 import { tr } from './locale';
 import { configureCallNotifications } from './push';
 import { useRealtime, useSession } from './session';
+import { useMicInUse } from './yaps';
 import { gradient, radius, space } from './theme';
 import { Avatar, Icon, useColors, userText, type IconName } from './ui';
 import { audio, callsSupported, rtc } from './webrtc';
@@ -57,6 +58,8 @@ export function CallsProvider({ children }: { children: ReactNode }) {
   const { t, lang } = useT();
   const [call, setCall] = useState<CallInfo | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
+  // Yaps don't play out loud during a call (or while one rings).
+  useMicInUse(phase !== 'idle');
   const [local, setLocal] = useState<MediaStream | null>(null);
   const [remotes, setRemotes] = useState<Record<string, MediaStream>>({});
   const [muted, setMuted] = useState(false);
@@ -258,7 +261,11 @@ export function CallsProvider({ children }: { children: ReactNode }) {
     }
     const cur = callRef.current;
     if (e.type === 'call.incoming') {
-      if (cur) return void (await client()).calls.decline(e.data.id).catch(() => {}); // busy
+      if (cur)
+        return void client().then(
+          (api) => api.calls.decline(e.data.id).catch(() => {}),
+          () => {},
+        ); // busy
       ringIncoming(e.data);
       return;
     }
@@ -352,8 +359,11 @@ export function CallsProvider({ children }: { children: ReactNode }) {
         flash(tr('m.calls.over'));
       }
     };
-    void Notifications.getLastNotificationResponseAsync().then(handle);
-    const sub = Notifications.addNotificationResponseReceivedListener((r) => void handle(r));
+    // Offline or signed out in the meantime: nothing to open (and no unhandled failure).
+    void Notifications.getLastNotificationResponseAsync()
+      .then(handle)
+      .catch(() => {});
+    const sub = Notifications.addNotificationResponseReceivedListener((r) => void handle(r).catch(() => {}));
     return () => sub.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, flash, ringIncoming]);

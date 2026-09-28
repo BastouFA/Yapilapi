@@ -62,6 +62,13 @@ export default function PostScreen() {
   const ac = useAutocomplete(body, setBody);
   // The Reply buttons, so focus can go back to the one used once the reply is sent.
   const replyButtons = useRef<Record<string, View | null>>({});
+  // The list, to bring a comment you just posted into view (it goes near the top, after the pinned ones).
+  const list = useRef<FlatList<Comment>>(null);
+  const retried = useRef(false);
+  const showComment = (index: number) => {
+    retried.current = false;
+    requestAnimationFrame(() => list.current?.scrollToIndex({ index, viewPosition: 0.3 }));
+  };
   // Report a comment; blocking its writer from there too hides their comments here.
   const report = useReport({
     onBlocked: (userId) => {
@@ -171,7 +178,11 @@ export default function PostScreen() {
             return { ...cur, [parentId]: { ...th, open: true, items: [...th.items, comment] } };
           });
           update(parentId, (x) => ({ ...x, replies: x.replies + 1 }));
-        } else setComments((cur) => [...cur.filter((x) => x.pinned), comment, ...cur.filter((x) => !x.pinned)]);
+        } else {
+          setComments((cur) => [...cur.filter((x) => x.pinned), comment, ...cur.filter((x) => !x.pinned)]);
+          // Scrolled down reading the others, you'd otherwise not see it arrive.
+          showComment(comments.filter((x) => x.pinned).length);
+        }
         bump(1);
         setBody('');
         const answered = replyTo?.id;
@@ -559,8 +570,16 @@ export default function PostScreen() {
   return (
     <KeyboardAvoid style={{ backgroundColor: c.ground }}>
       <FlatList
+        ref={list}
         data={comments}
         keyExtractor={(x) => x.id}
+        onScrollToIndexFailed={(info) => {
+          // Not laid out yet (far from where you are): get close, then try once more.
+          list.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+          if (retried.current) return;
+          retried.current = true;
+          setTimeout(() => list.current?.scrollToIndex({ index: info.index, viewPosition: 0.3 }), 100);
+        }}
         contentContainerStyle={{ padding: space[4], gap: space[3] }}
         ListHeaderComponent={header}
         ListEmptyComponent={<Text style={{ color: c.inkMuted }}>{t('m.comment.none')}</Text>}

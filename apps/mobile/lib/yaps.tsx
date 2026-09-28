@@ -15,6 +15,23 @@ export const YAP_MAX_MS = 60_000;
 /** Shorter than this is a slip of the finger: not sent. */
 export const YAP_MIN_MS = 400;
 
+/** How many things are using the microphone now (a voice message or yap being recorded, a call, a room). */
+let micUsers = 0;
+
+/**
+ * While `on`, this screen is using the microphone: yaps don't play out loud meanwhile (switching the
+ * audio to play one would cut the recording or the call short); they wait in the chat.
+ */
+export function useMicInUse(on: boolean) {
+  useEffect(() => {
+    if (!on) return;
+    micUsers++;
+    return () => {
+      micUsers--;
+    };
+  }, [on]);
+}
+
 /**
  * Plays incoming yaps out loud, one after another, while the app is in the foreground and
  * the server said this person allows it (`autoplay`). Shows "Yap from Name" with a moving
@@ -28,9 +45,15 @@ export function YapPlayer() {
   const router = useRouter();
   const queue = useRef<YapEvent[]>([]);
   const player = useRef<AudioPlayer | null>(null);
+  // Getting the next one ready takes a moment: a second yap arriving meanwhile waits its turn
+  // instead of starting a second player over the first.
+  const starting = useRef(false);
+  // A yap that never loads (gone, offline) or never reports its end doesn't hold up the rest.
+  const giveUp = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [now, setNow] = useState<YapEvent | null>(null);
 
   const stop = () => {
+    clearTimeout(giveUp.current);
     const p = player.current;
     player.current = null;
     if (p) {
@@ -44,7 +67,12 @@ export function YapPlayer() {
   };
 
   const next = async () => {
-    if (player.current) return;
+    if (player.current || starting.current) return;
+    if (micUsers > 0) {
+      queue.current = [];
+      setNow(null);
+      return;
+    }
     const e = queue.current.shift();
     if (!e) {
       setNow(null);
@@ -52,10 +80,27 @@ export function YapPlayer() {
     }
     const url = e.message.attachments[0]?.url;
     if (!url) return void next();
+    starting.current = true;
     await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).catch(() => {});
-    const p = createAudioPlayer(mediaUrl(url));
+    let p: AudioPlayer | null = null;
+    // Gone to the background meanwhile: it waits in the chat.
+    if (AppState.currentState === 'active') {
+      try {
+        p = createAudioPlayer(mediaUrl(url));
+      } catch {
+        // This one can't play: on to the next.
+      }
+    }
+    starting.current = false;
+    if (AppState.currentState !== 'active') return;
+    if (!p) return void next();
     player.current = p;
     setNow(e);
+    giveUp.current = setTimeout(() => {
+      if (player.current !== p) return;
+      stop();
+      void next();
+    }, YAP_MAX_MS + 15_000);
     // AudioPlayer is a SharedObject with events; its base type doesn't resolve in this install, so it's spelled out.
     const events = p as unknown as { addListener(event: 'playbackStatusUpdate', fn: (s: AudioStatus) => void): { remove(): void } };
     events.addListener('playbackStatusUpdate', (s) => {
@@ -75,7 +120,7 @@ export function YapPlayer() {
     if (e.type !== 'yap' || !me) return;
     const y = e.data as YapEvent;
     // Only while the app is open in front of you; otherwise it waits in the chat.
-    if (!y.autoplay || y.message.sender.id === me.id || AppState.currentState !== 'active') return;
+    if (!y.autoplay || y.message.sender.id === me.id || AppState.currentState !== 'active' || micUsers > 0) return;
     queue.current.push(y);
     void next();
   });

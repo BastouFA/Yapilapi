@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { timeZoneLabel, timeZoneList } from '../../../packages/shared/src/scheduling';
 import { useT } from './i18n';
 import { radius, space } from './theme';
-import { Field, Icon, useColors } from './ui';
+import { Field, Icon, useColors, useScreenFocused } from './ui';
 
 /** The phone's own time zone, or UTC when it can't say. */
 export function deviceTimeZone(): string {
@@ -17,6 +17,7 @@ export function deviceTimeZone(): string {
 
 /** A field showing a time zone that opens a searchable list of them. */
 export function TimeZoneField({ label, value, onChange }: { label: string; value: string; onChange: (tz: string) => void }) {
+  const focused = useScreenFocused();
   const c = useColors();
   const { t } = useT();
   const insets = useSafeAreaInsets();
@@ -57,7 +58,7 @@ export function TimeZoneField({ label, value, onChange }: { label: string; value
         <Icon name="chevron-down" size={16} color={c.inkMuted} />
       </Pressable>
       {value !== device ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('m.tz.notYours', { zone: timeZoneLabel(device) })}</Text> : null}
-      <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>
+      <Modal visible={open && focused} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>
         <View style={{ flex: 1, backgroundColor: c.ground, paddingTop: space[4], paddingBottom: insets.bottom }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[4], gap: space[2] }}>
             <Text accessibilityRole="header" style={{ flex: 1, color: c.ink, fontSize: 18, fontWeight: '800' }}>

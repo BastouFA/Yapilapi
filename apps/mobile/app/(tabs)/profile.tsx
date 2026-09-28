@@ -88,7 +88,8 @@ function Shortcut({ label, icon, href }: { label: string; icon: IconName; href: 
       <View style={{ width: 52, height: 52, borderRadius: radius.lg, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }}>
         <Icon name={icon} size={24} color={c.yapi} />
       </View>
-      <Text style={{ color: c.ink, fontSize: 12, fontWeight: '600', textAlign: 'center' }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+      {/* Two lines rather than shrinking a long label (in French or Swahili, say) to a size nobody can read. */}
+      <Text style={{ color: c.ink, fontSize: 12, lineHeight: 15, fontWeight: '600', textAlign: 'center' }} numberOfLines={2}>
         {label}
       </Text>
     </Pressable>

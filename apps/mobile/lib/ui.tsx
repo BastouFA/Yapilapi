@@ -716,8 +716,11 @@ export function ErrorState({ message, onRetry, style }: { message: string; onRet
   );
 }
 
-/** Whether this screen is the one in front; true outside a navigator (the root layout). */
-function useScreenFocused() {
+/**
+ * Whether this screen is the one in front; true outside a navigator (the root layout). A modal a
+ * screen shows (a sheet, a viewer) hides while another screen is on top, or that screen opens behind it.
+ */
+export function useScreenFocused() {
   const navigation = useContext(NavigationContext);
   const [focused, setFocused] = useState(() => navigation?.isFocused() ?? true);
   useEffect(() => {

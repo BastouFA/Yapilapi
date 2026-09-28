@@ -22,7 +22,7 @@ import { Slider } from '../../lib/editor';
 import { useT } from '../../lib/i18n';
 import { pickOne, uploadPicked, type Picked } from '../../lib/media';
 import { radius, space } from '../../lib/theme';
-import { Avatar, Button, EmptyState, Field, Loading, Notice, Segmented, SwitchRow, useColors, userText } from '../../lib/ui';
+import { Avatar, Button, EmptyState, Field, KeyboardAvoid, Loading, Notice, Segmented, SwitchRow, useColors, userText } from '../../lib/ui';
 
 const LAYOUT_KEYS: Record<EchoLayout, { label: MessageKey; hint: MessageKey }> = {
   side: { label: 'echo.layout.side', hint: 'echo.layout.sideHint' },
@@ -215,188 +215,191 @@ export default function EchoScreen() {
   const label = (text: string) => <Text style={{ color: c.ink, fontWeight: '700', fontSize: 16 }}>{text}</Text>;
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: c.ground }}
-      contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={{ gap: space[1] }}>
-        <Text accessibilityRole="header" style={[{ color: c.ink, fontSize: 22, fontWeight: '800' }, userText]}>
-          {t('echo.heading', { name })}
-        </Text>
-        <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t('echo.intro', { name })}</Text>
-      </View>
-      <Pressable
-        accessibilityRole="link"
-        onPress={() => router.push({ pathname: '/reels', params: { start: options.original.id } })}
-        style={[s.original, { backgroundColor: c.surfaceSunken }]}
+    // The caption is typed near the end: the keyboard makes room for it and the buttons under it.
+    <KeyboardAvoid style={{ backgroundColor: c.ground }}>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: c.ground }}
+        contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
+        keyboardShouldPersistTaps="handled"
       >
-        <Avatar name={options.original.author.displayName} url={options.original.author.avatarUrl} size={32} />
-        <View style={{ flex: 1 }}>
-          <Text style={[{ color: c.ink, fontWeight: '700' }, userText]} numberOfLines={1}>
-            {t('echo.theirReel', { name: options.original.author.displayName })}
+        <View style={{ gap: space[1] }}>
+          <Text accessibilityRole="header" style={[{ color: c.ink, fontSize: 22, fontWeight: '800' }, userText]}>
+            {t('echo.heading', { name })}
           </Text>
-          {options.original.body ? (
-            <Text style={[{ color: c.inkMuted, fontSize: 13 }, userText]} numberOfLines={1}>
-              {options.original.body}
+          <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t('echo.intro', { name })}</Text>
+        </View>
+        <Pressable
+          accessibilityRole="link"
+          onPress={() => router.push({ pathname: '/reels', params: { start: options.original.id } })}
+          style={[s.original, { backgroundColor: c.surfaceSunken }]}
+        >
+          <Avatar name={options.original.author.displayName} url={options.original.author.avatarUrl} size={32} />
+          <View style={{ flex: 1 }}>
+            <Text style={[{ color: c.ink, fontWeight: '700' }, userText]} numberOfLines={1}>
+              {t('echo.theirReel', { name: options.original.author.displayName })}
             </Text>
-          ) : null}
-        </View>
-      </Pressable>
-
-      {!options.canEcho && options.reason ? (
-        <Notice tone="warn">{t(ECHO_BLOCK_KEYS[options.reason])}</Notice>
-      ) : ready ? (
-        <View style={{ gap: space[3] }}>
-          <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '800', fontSize: 18 }}>
-            {t('echo.preview')}
-          </Text>
-          <Text style={{ color: c.inkMuted, fontSize: 14 }}>{t('echo.ready')}</Text>
-          <ResultVideo uri={mediaUrl(ready.url)} ratio={(ready.width ?? 9) / (ready.height ?? 16)} label={t('echo.preview')} />
-          {render?.theirAudio === 'dropped' ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('echo.audioDropped')}</Text> : null}
-          <Field label={t('echo.caption')} value={body} onChangeText={setBody} placeholder={t('echo.captionPlaceholder')} multiline maxLength={5000} />
-          <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('create.visibility')}</Text>
-          <Segmented
-            label={t('create.visibility')}
-            value={visibility}
-            onChange={setVisibility}
-            options={AUDIENCES.map((a) => ({ id: a, label: t(`visibility.${a}`) }))}
-          />
-          <Button label={t('echo.post')} icon="paper-plane-outline" onPress={post} />
-          <Button label={t('echo.startOver')} variant="ghost" onPress={() => setRender(null)} />
-        </View>
-      ) : (
-        <>
-          {/* The preview: their reel and yours in the chosen layout. */}
-          <View style={[s.stage, { aspectRatio: frame.width / frame.height }]} accessible={false}>
-            {theirUri ? (
-              <PreviewVideo
-                uri={theirUri}
-                label={t('echo.theirReel', { name: options.original.author.displayName })}
-                style={[place(layout, 'theirs'), layout === 'corner' && { zIndex: 1, borderWidth: 3, borderColor: '#FFFFFF' }]}
-              />
+            {options.original.body ? (
+              <Text style={[{ color: c.inkMuted, fontSize: 13 }, userText]} numberOfLines={1}>
+                {options.original.body}
+              </Text>
             ) : null}
-            {asset ? (
-              <PreviewVideo key={asset.uri} uri={asset.uri} label={t('echo.yourVideo')} style={place(layout, 'yours')} />
-            ) : (
-              <View style={[place(layout, 'yours'), s.slot]}>
-                <Text style={{ color: '#FFFFFF', fontSize: 13, textAlign: 'center' }}>{t('echo.noVideo')}</Text>
-              </View>
-            )}
-            <View style={s.credit} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-              <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '700' }}>{t('echo.of', { name })}</Text>
-            </View>
           </View>
+        </Pressable>
 
-          <View style={{ gap: space[2] }}>
-            {label(t('echo.yourVideo'))}
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-              <Button
-                label={t('echo.record')}
-                icon="videocam-outline"
-                variant="secondary"
-                onPress={() => router.push({ pathname: '/camera', params: { mode: 'reel', echo: id } })}
-              />
-              <Button label={asset ? t('echo.replace') : t('echo.pick')} icon="images-outline" variant="secondary" onPress={pick} />
-            </View>
-          </View>
-
-          <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel={t('echo.layout')}>
-            {label(t('echo.layout'))}
-            {ECHO_LAYOUTS.map((l) => {
-              const on = l === layout;
-              const f = echoFrame(l);
-              return (
-                <Pressable
-                  key={l}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: on }}
-                  accessibilityLabel={t(LAYOUT_KEYS[l].label)}
-                  accessibilityHint={t(LAYOUT_KEYS[l].hint)}
-                  onPress={() => setLayout(l)}
-                  style={[s.layout, { borderColor: on ? c.yapi : c.line, backgroundColor: c.surface }, on && { borderWidth: 2 }]}
-                >
-                  <View style={[s.glyph, { aspectRatio: f.width / f.height, backgroundColor: c.surfaceSunken, borderColor: c.line }]}>
-                    <View style={[place(l, 'yours'), { backgroundColor: c.yapiSoft, borderWidth: 1, borderColor: c.yapi }]} />
-                    <View style={[place(l, 'theirs'), { backgroundColor: c.inkMuted }]} />
-                  </View>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={{ color: c.ink, fontWeight: '700', fontSize: 15 }}>{t(LAYOUT_KEYS[l].label)}</Text>
-                    <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t(LAYOUT_KEYS[l].hint)}</Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {durationMs >= ECHO_CUT_MIN_MS ? (
-            <View style={{ gap: space[2] }}>
-              {label(t('echo.after'))}
-              <SwitchRow label={t('echo.afterHint')} value={after} onValueChange={setAfter} />
-              {after ? (
-                <>
-                  <Slider
-                    label={t('echo.after.start')}
-                    value={cut.startMs}
-                    min={0}
-                    max={Math.max(0, durationMs - ECHO_CUT_MIN_MS)}
-                    step={100}
-                    onChange={setStart}
-                    format={formatReelTime}
-                  />
-                  <Slider
-                    label={t('echo.after.end')}
-                    value={cut.endMs}
-                    min={ECHO_CUT_MIN_MS}
-                    max={durationMs}
-                    step={100}
-                    onChange={setEnd}
-                    format={formatReelTime}
-                  />
-                  <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted, fontSize: 13 }}>
-                    {t('echo.after.summary', { start: formatReelTime(cut.startMs), end: formatReelTime(cut.endMs) })}
-                  </Text>
-                </>
-              ) : null}
-            </View>
-          ) : null}
-
-          <View style={{ gap: space[2] }}>
-            {label(t('echo.sound'))}
-            {options.theirAudio === 'mixed' ? (
-              <>
-                {muteTheirs ? null : (
-                  <Slider
-                    label={t('echo.balance')}
-                    value={balance}
-                    min={0}
-                    max={100}
-                    step={5}
-                    onChange={setBalance}
-                    format={(v) => t('echo.balance.value', { theirs: 100 - v, yours: v })}
-                  />
-                )}
-                <SwitchRow label={t('echo.muteTheirs')} value={muteTheirs} onValueChange={setMuteTheirs} />
-              </>
-            ) : (
-              <>
-                {audioNote ? <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{audioNote}</Text> : null}
-                {options.theirAudio === 'song' ? <SwitchRow label={t('echo.muteTheirs')} value={muteTheirs} onValueChange={setMuteTheirs} /> : null}
-              </>
-            )}
-            {theirMedia?.captions?.length ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('echo.captionsNote')}</Text> : null}
-          </View>
-
-          {failed ? <Notice tone="danger">{failed}</Notice> : null}
-          {making ? (
-            <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted, fontSize: 14 }}>
-              {progress !== null ? t('echo.uploading') : t('echo.making')}
+        {!options.canEcho && options.reason ? (
+          <Notice tone="warn">{t(ECHO_BLOCK_KEYS[options.reason])}</Notice>
+        ) : ready ? (
+          <View style={{ gap: space[3] }}>
+            <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '800', fontSize: 18 }}>
+              {t('echo.preview')}
             </Text>
-          ) : null}
-          <Button label={t('echo.make')} icon="git-compare-outline" onPress={make} disabled={!asset || making} />
-        </>
-      )}
-    </ScrollView>
+            <Text style={{ color: c.inkMuted, fontSize: 14 }}>{t('echo.ready')}</Text>
+            <ResultVideo uri={mediaUrl(ready.url)} ratio={(ready.width ?? 9) / (ready.height ?? 16)} label={t('echo.preview')} />
+            {render?.theirAudio === 'dropped' ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('echo.audioDropped')}</Text> : null}
+            <Field label={t('echo.caption')} value={body} onChangeText={setBody} placeholder={t('echo.captionPlaceholder')} multiline maxLength={5000} />
+            <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('create.visibility')}</Text>
+            <Segmented
+              label={t('create.visibility')}
+              value={visibility}
+              onChange={setVisibility}
+              options={AUDIENCES.map((a) => ({ id: a, label: t(`visibility.${a}`) }))}
+            />
+            <Button label={t('echo.post')} icon="paper-plane-outline" onPress={post} />
+            <Button label={t('echo.startOver')} variant="ghost" onPress={() => setRender(null)} />
+          </View>
+        ) : (
+          <>
+            {/* The preview: their reel and yours in the chosen layout. */}
+            <View style={[s.stage, { aspectRatio: frame.width / frame.height }]} accessible={false}>
+              {theirUri ? (
+                <PreviewVideo
+                  uri={theirUri}
+                  label={t('echo.theirReel', { name: options.original.author.displayName })}
+                  style={[place(layout, 'theirs'), layout === 'corner' && { zIndex: 1, borderWidth: 3, borderColor: '#FFFFFF' }]}
+                />
+              ) : null}
+              {asset ? (
+                <PreviewVideo key={asset.uri} uri={asset.uri} label={t('echo.yourVideo')} style={place(layout, 'yours')} />
+              ) : (
+                <View style={[place(layout, 'yours'), s.slot]}>
+                  <Text style={{ color: '#FFFFFF', fontSize: 13, textAlign: 'center' }}>{t('echo.noVideo')}</Text>
+                </View>
+              )}
+              <View style={s.credit} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+                <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '700' }}>{t('echo.of', { name })}</Text>
+              </View>
+            </View>
+
+            <View style={{ gap: space[2] }}>
+              {label(t('echo.yourVideo'))}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+                <Button
+                  label={t('echo.record')}
+                  icon="videocam-outline"
+                  variant="secondary"
+                  onPress={() => router.push({ pathname: '/camera', params: { mode: 'reel', echo: id } })}
+                />
+                <Button label={asset ? t('echo.replace') : t('echo.pick')} icon="images-outline" variant="secondary" onPress={pick} />
+              </View>
+            </View>
+
+            <View style={{ gap: space[2] }} accessibilityRole="radiogroup" accessibilityLabel={t('echo.layout')}>
+              {label(t('echo.layout'))}
+              {ECHO_LAYOUTS.map((l) => {
+                const on = l === layout;
+                const f = echoFrame(l);
+                return (
+                  <Pressable
+                    key={l}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: on }}
+                    accessibilityLabel={t(LAYOUT_KEYS[l].label)}
+                    accessibilityHint={t(LAYOUT_KEYS[l].hint)}
+                    onPress={() => setLayout(l)}
+                    style={[s.layout, { borderColor: on ? c.yapi : c.line, backgroundColor: c.surface }, on && { borderWidth: 2 }]}
+                  >
+                    <View style={[s.glyph, { aspectRatio: f.width / f.height, backgroundColor: c.surfaceSunken, borderColor: c.line }]}>
+                      <View style={[place(l, 'yours'), { backgroundColor: c.yapiSoft, borderWidth: 1, borderColor: c.yapi }]} />
+                      <View style={[place(l, 'theirs'), { backgroundColor: c.inkMuted }]} />
+                    </View>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={{ color: c.ink, fontWeight: '700', fontSize: 15 }}>{t(LAYOUT_KEYS[l].label)}</Text>
+                      <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t(LAYOUT_KEYS[l].hint)}</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {durationMs >= ECHO_CUT_MIN_MS ? (
+              <View style={{ gap: space[2] }}>
+                {label(t('echo.after'))}
+                <SwitchRow label={t('echo.afterHint')} value={after} onValueChange={setAfter} />
+                {after ? (
+                  <>
+                    <Slider
+                      label={t('echo.after.start')}
+                      value={cut.startMs}
+                      min={0}
+                      max={Math.max(0, durationMs - ECHO_CUT_MIN_MS)}
+                      step={100}
+                      onChange={setStart}
+                      format={formatReelTime}
+                    />
+                    <Slider
+                      label={t('echo.after.end')}
+                      value={cut.endMs}
+                      min={ECHO_CUT_MIN_MS}
+                      max={durationMs}
+                      step={100}
+                      onChange={setEnd}
+                      format={formatReelTime}
+                    />
+                    <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted, fontSize: 13 }}>
+                      {t('echo.after.summary', { start: formatReelTime(cut.startMs), end: formatReelTime(cut.endMs) })}
+                    </Text>
+                  </>
+                ) : null}
+              </View>
+            ) : null}
+
+            <View style={{ gap: space[2] }}>
+              {label(t('echo.sound'))}
+              {options.theirAudio === 'mixed' ? (
+                <>
+                  {muteTheirs ? null : (
+                    <Slider
+                      label={t('echo.balance')}
+                      value={balance}
+                      min={0}
+                      max={100}
+                      step={5}
+                      onChange={setBalance}
+                      format={(v) => t('echo.balance.value', { theirs: 100 - v, yours: v })}
+                    />
+                  )}
+                  <SwitchRow label={t('echo.muteTheirs')} value={muteTheirs} onValueChange={setMuteTheirs} />
+                </>
+              ) : (
+                <>
+                  {audioNote ? <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{audioNote}</Text> : null}
+                  {options.theirAudio === 'song' ? <SwitchRow label={t('echo.muteTheirs')} value={muteTheirs} onValueChange={setMuteTheirs} /> : null}
+                </>
+              )}
+              {theirMedia?.captions?.length ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('echo.captionsNote')}</Text> : null}
+            </View>
+
+            {failed ? <Notice tone="danger">{failed}</Notice> : null}
+            {making ? (
+              <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted, fontSize: 14 }}>
+                {progress !== null ? t('echo.uploading') : t('echo.making')}
+              </Text>
+            ) : null}
+            <Button label={t('echo.make')} icon="git-compare-outline" onPress={make} disabled={!asset || making} />
+          </>
+        )}
+      </ScrollView>
+    </KeyboardAvoid>
   );
 }
 

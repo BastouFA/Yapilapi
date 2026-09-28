@@ -9,7 +9,7 @@ import {
   type AudioPlayer,
 } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useLocalSearchParams, useNavigation } from 'expo-router';
+import { router, useIsFocused, useLocalSearchParams, useNavigation } from 'expo-router';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Alert, FlatList, Image, Linking, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,7 +27,7 @@ import { useRealtime, useSession } from '../../lib/session';
 import { elevation, gradient, radius, space } from '../../lib/theme';
 import { ActionSheet, BottomSheet, Icon, KeyboardAvoid, Notice, SwitchRow, useColors, useKeyboardVisible, userText } from '../../lib/ui';
 import { ViewOnceBubble } from '../../lib/view-once';
-import { Waveform, YAP_MAX_MS, YAP_MIN_MS } from '../../lib/yaps';
+import { useMicInUse, Waveform, YAP_MAX_MS, YAP_MIN_MS } from '../../lib/yaps';
 import { SmartRepliesSwitch, SmartReplyChips } from '../../lib/ai-helpers';
 import {
   applyReaction,
@@ -244,6 +244,8 @@ export default function Chat() {
   const yaps = conversation?.yaps;
   const [yapSettings, setYapSettings] = useState(false);
   const [smartSettings, setSmartSettings] = useState(false);
+  // A setting that didn't save says so in its sheet, not behind it.
+  const [settingsError, setSettingsError] = useState<string | null>(null);
 
   const canCall = !!conversation && conversation.kind !== 'community' && conversation.members.length <= 8 && conversation.members.length > 1;
   // One-to-one chats: the other person's "Now" status, small and muted under their name.
@@ -268,7 +270,12 @@ export default function Chat() {
             <Icon name="ellipsis-horizontal-circle-outline" size={24} color={c.yapi} />
           </Pressable>
           {yaps?.available ? (
-            <Pressable accessibilityRole="button" accessibilityLabel={t('m.yap.settings')} hitSlop={10} onPress={() => setYapSettings(true)}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('m.yap.settings')}
+              hitSlop={10}
+              onPress={() => (setSettingsError(null), setYapSettings(true))}
+            >
               <Icon name={yaps.paused ? 'volume-mute-outline' : 'volume-high-outline'} size={22} color={c.yapi} />
             </Pressable>
           ) : null}
@@ -312,12 +319,18 @@ export default function Chat() {
     } catch (e) {
       setRecordingOn(false);
       setError(errorMessage(e));
+      void setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
     }
   }
 
   /** Stop recording; send it unless cancelled or too short. */
   async function stopVoice(send: boolean) {
-    const ms = recorder.getStatus().durationMillis;
+    let ms = 0;
+    try {
+      ms = recorder.getStatus().durationMillis;
+    } catch {
+      // Released: nothing was kept.
+    }
     setRecordingOn(false);
     try {
       await recorder.stop();
@@ -326,8 +339,9 @@ export default function Chat() {
     }
     // Back to normal playback (the loudspeaker on iOS).
     await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
+    if (!send) return;
     const uri = recorder.uri;
-    if (!send || !uri) return;
+    if (!uri) return;
     if (ms < MIN_VOICE_MS) {
       setError(t('m.chat.voiceTooShort'));
       return;
@@ -371,13 +385,18 @@ export default function Chat() {
       if (!yapHeld.current) return;
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       await recorder.prepareToRecordAsync();
-      if (!yapHeld.current) return;
+      if (!yapHeld.current) {
+        // Let go while it got ready: back to normal playback.
+        void setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
+        return;
+      }
       recorder.record();
       setYapping(true);
     } catch (e) {
       yapHeld.current = false;
       setYapping(false);
       setError(errorMessage(e));
+      void setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
     }
   }
 
@@ -410,6 +429,9 @@ export default function Chat() {
       setSending(false);
     }
   }
+
+  // No yap plays out loud over a recording (it would switch the audio away from the microphone).
+  useMicInUse(recordingOn || yapping);
 
   // Yaps stop at 60 seconds and send.
   useEffect(() => {
@@ -446,6 +468,7 @@ export default function Chat() {
 
   // Leaving the conversation while recording discards it. The recorder may already be released
   // by the time this runs (the hook cleans up first), and then reading it throws: nothing to stop.
+  // Either way the phone goes back to normal playback, or everything after plays quietly from the earpiece.
   useEffect(
     () => () => {
       try {
@@ -453,9 +476,29 @@ export default function Chat() {
       } catch {
         // Already released.
       }
+      void setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
     },
     [recorder],
   );
+
+  // Another screen on top (a link, a notification) while recording: stop and discard it, rather than
+  // keep the microphone on out of sight (and a yap sending itself at its limit).
+  const focused = useIsFocused();
+  useEffect(() => {
+    if (focused) return;
+    if (recordingOn) void stopVoice(false);
+    if (yapHeld.current || yapping) {
+      yapHeld.current = false;
+      setYapping(false);
+      try {
+        if (recorder.isRecording) void recorder.stop().catch(() => {});
+      } catch {
+        // Already released.
+      }
+      void setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focused]);
 
   /** Pick a photo or video, upload it and send it as its own message. */
   async function sendMedia() {
@@ -1086,16 +1129,18 @@ export default function Chat() {
       </View>
       {yaps ? (
         <BottomSheet visible={yapSettings} title={t('m.yap.settings')} onClose={() => setYapSettings(false)} done gap={space[4]}>
+          {settingsError ? <Notice tone="danger">{settingsError}</Notice> : null}
           <SwitchRow
             label={t('m.yap.outLoud')}
             hint={yaps.playOutLoud === null ? t(conversation?.kind === 'direct' ? 'm.yap.defaultDirect' : 'm.yap.defaultGroup') : t('m.yap.outLoudHint')}
             value={yaps.playOutLoud ?? yaps.defaultOutLoud}
             onValueChange={async (on) => {
+              setSettingsError(null);
               try {
                 const r = await (await client()).conversations.setYaps(id, on);
                 setConversation((cur) => (cur ? { ...cur, yaps: r.yaps } : cur));
               } catch (e) {
-                setError(errorMessage(e));
+                setSettingsError(errorMessage(e));
               }
             }}
           />
@@ -1104,11 +1149,12 @@ export default function Chat() {
             hint={t('m.yap.quietNote')}
             value={yaps.paused}
             onValueChange={async (paused) => {
+              setSettingsError(null);
               try {
                 await (await client()).yaps.setPaused(paused);
                 setConversation((cur) => (cur?.yaps ? { ...cur, yaps: { ...cur.yaps, paused } } : cur));
               } catch (e) {
-                setError(errorMessage(e));
+                setSettingsError(errorMessage(e));
               }
             }}
           />
@@ -1116,14 +1162,16 @@ export default function Chat() {
       ) : null}
       {conversation?.smartReplies ? (
         <BottomSheet visible={smartSettings} title={t('smartReplies.label')} onClose={() => setSmartSettings(false)} done gap={space[4]}>
+          {settingsError ? <Notice tone="danger">{settingsError}</Notice> : null}
           <SmartRepliesSwitch
             state={conversation.smartReplies}
             onChange={async (on) => {
+              setSettingsError(null);
               try {
                 const r = await (await client()).conversations.setSmartReplies(id, on);
                 setConversation((cur) => (cur ? { ...cur, smartReplies: r.smartReplies } : cur));
               } catch (e) {
-                setError(errorMessage(e));
+                setSettingsError(errorMessage(e));
               }
             }}
           />
@@ -1155,7 +1203,9 @@ export default function Chat() {
             icon: 'timer-outline',
             onPress: () => setDisappearingOpen(true),
           },
-          ...(conversation?.smartReplies ? [{ label: t('smartReplies.label'), icon: 'sparkles-outline' as const, onPress: () => setSmartSettings(true) }] : []),
+          ...(conversation?.smartReplies
+            ? [{ label: t('smartReplies.label'), icon: 'sparkles-outline' as const, onPress: () => (setSettingsError(null), setSmartSettings(true)) }]
+            : []),
           { label: t('m.chat.look.title'), icon: 'color-palette-outline', onPress: () => setLookOpen(true) },
           ...(canAlbum
             ? [{ label: t('together.chat.start'), icon: 'images-outline' as const, onPress: () => router.push(`/together/new?chat=${encodeURIComponent(id)}`) }]

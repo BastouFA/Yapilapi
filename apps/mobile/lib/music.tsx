@@ -23,7 +23,7 @@ import { clock } from './media';
 import { useSession } from './session';
 import { Placed } from './story-stickers';
 import { radius, space } from './theme';
-import { Button, Field, Icon, Notice, Segmented, useColors, userText } from './ui';
+import { Button, Field, Icon, Notice, Segmented, useColors, userText, useScreenFocused } from './ui';
 
 const INK = '#14151F';
 const CARD = '#FFFFFF';
@@ -305,6 +305,7 @@ function useSourceLabel() {
  * commercial use.
  */
 export function MusicPicker({ visible, onClose, onPick }: { visible: boolean; onClose: () => void; onPick: (t: MusicTrack) => void }) {
+  const focused = useScreenFocused();
   const c = useColors();
   const { t } = useT();
   const { me } = useSession();
@@ -359,7 +360,7 @@ export function MusicPicker({ visible, onClose, onPick }: { visible: boolean; on
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={close}>
+    <Modal visible={visible && focused} animationType="slide" presentationStyle="pageSheet" onRequestClose={close}>
       <View style={{ flex: 1, backgroundColor: c.ground, padding: space[4], paddingBottom: insets.bottom + space[4], gap: space[3] }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 18, fontWeight: '800' }}>

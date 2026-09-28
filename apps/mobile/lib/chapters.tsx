@@ -12,7 +12,7 @@ import { useT } from './i18n';
 import { SensitiveCover } from './safety';
 import { useSession } from './session';
 import { radius, space } from './theme';
-import { Avatar, BottomSheet, Button, Field, Icon, type IconName, KeyboardAvoid, useColors, userText } from './ui';
+import { Avatar, BottomSheet, Button, Field, Icon, type IconName, KeyboardAvoid, useColors, userText, useScreenFocused } from './ui';
 
 const PHOTO_MS = 5000;
 const WHITE = '#FFFFFF';
@@ -193,8 +193,9 @@ export function ChaptersRow({
  * short line in the guestbook.
  */
 export function ChapterPlayer({ detail, start = 0, onClose }: { detail: ChapterDetail | null; start?: number; onClose: () => void }) {
+  const focused = useScreenFocused();
   return (
-    <Modal visible={!!detail} animationType="fade" presentationStyle="fullScreen" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={!!detail && focused} animationType="fade" presentationStyle="fullScreen" onRequestClose={onClose} statusBarTranslucent>
       {detail ? <Player detail={detail} start={start} onClose={onClose} /> : null}
     </Modal>
   );

@@ -1,5 +1,5 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, FlatList, Text, View } from 'react-native';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
@@ -55,6 +55,8 @@ export default function CheckInScreen() {
   const [code, setCode] = useState('');
   const [scanning, setScanning] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
+  // The scanner's camera is off while another screen is on top.
+  const focused = useIsFocused();
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [guests, setGuests] = useState<TicketGuest[] | null>(null);
@@ -250,6 +252,7 @@ export default function CheckInScreen() {
         {scanning ? (
           <View style={{ gap: space[2] }}>
             <CameraView
+              active={focused}
               style={{ height: 300, borderRadius: radius.md, overflow: 'hidden' }}
               facing="back"
               barcodeScannerSettings={{ barcodeTypes: ['qr'] }}

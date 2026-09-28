@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Image, Linking, Pressable, Text, View } from 'react-native';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
@@ -29,7 +29,9 @@ export default function MusicTrackScreen() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
-  useMusicLoop(track?.previewUrl ? { sound: { audioUrl: track.previewUrl }, startMs: 0, durationMs: track.maxClipMs } : null, playing);
+  // It waits while another screen is on top (a reel using it), and carries on when you're back.
+  const focused = useIsFocused();
+  useMusicLoop(track?.previewUrl ? { sound: { audioUrl: track.previewUrl }, startMs: 0, durationMs: track.maxClipMs } : null, playing && focused);
 
   const loadOne = useCallback(async () => {
     try {
