@@ -497,7 +497,8 @@ export const chatListItemPatchSchema = z.object({ done: z.boolean() });
 export const chatListOrderSchema = z.object({ itemIds: z.array(uuid).min(1).max(CHAT_LIST_MAX_ITEMS) });
 /**
  * A game in a chat. In a one-to-one chat you play the other person; in a group you choose who
- * plays with you (one person for Four up and Noughts, up to five for Word ladder).
+ * plays with you (one person for Four up, Noughts and Chess, up to five for Word ladder). In chess
+ * you choose to play white, black, or either at random (white by default).
  */
 export const createChatGameSchema = z.object({
   kind: z.enum(GAME_KINDS),
@@ -505,6 +506,7 @@ export const createChatGameSchema = z.object({
     .array(uuid)
     .max(GAME_PLAYERS.word_ladder.max - 1)
     .default([]),
+  color: z.enum(['white', 'black', 'random']).optional(),
   clientId: z.string().max(64).optional(),
 });
 /**
@@ -519,8 +521,17 @@ export const chatGameMoveSchema = z.object({
     z.object({ cell: z.number().int().min(0).max(8) }).strict(),
     z.object({ word: z.string().trim().min(1).max(20) }).strict(),
     z.object({ pass: z.literal(true) }).strict(),
+    z
+      .object({
+        from: z.string().regex(/^[a-h][1-8]$/),
+        to: z.string().regex(/^[a-h][1-8]$/),
+        promotion: z.enum(['q', 'r', 'b', 'n']).optional(),
+      })
+      .strict(),
   ]),
 });
+/** Chess: offer a draw, or accept or decline the other player's offer. */
+export const chatGameDrawSchema = z.object({ action: z.enum(['offer', 'accept', 'decline']) });
 /** "Remind me" (just you) or "Remind the group" (group admins), at a time from a minute to a year ahead. */
 export const chatReminderSchema = z.object({
   at: z.string().datetime({ offset: true }),

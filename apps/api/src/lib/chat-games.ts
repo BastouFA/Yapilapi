@@ -107,7 +107,8 @@ export async function scheduleIdleEnd(c: Q, gameId: string, moveNumber: number):
 }
 
 /**
- * The line in the chat when a game ends: "Ada won Four up", "Noughts ended in a draw". Its sender
+ * The line in the chat when a game ends: "Ada won Four up", "Noughts ended in a draw", "Chess ended in a
+ * draw by stalemate" (a chess draw carries its reason). Its sender
  * is the winner, or (draw, unfinished) whoever moved last. It follows the chat's disappearing setting
  * like any new message. Returns the line's id, or null when the game is still going.
  */
@@ -124,7 +125,9 @@ export async function insertEndLine(
   const meta: MessageSystemInfo =
     result.type === 'win'
       ? { type: 'game', gameId: game.id, kind: game.kind, outcome: 'won', by: result.by }
-      : { type: 'game', gameId: game.id, kind: game.kind, outcome: result.type === 'draw' ? 'draw' : 'unfinished' };
+      : result.type === 'draw'
+        ? { type: 'game', gameId: game.id, kind: game.kind, outcome: 'draw', ...(result.reason ? { reason: result.reason } : {}) }
+        : { type: 'game', gameId: game.id, kind: game.kind, outcome: 'unfinished' };
   const seconds: number | null =
     (await c.query(`SELECT disappearing_seconds FROM conversations WHERE id = $1`, [game.conversation_id])).rows[0]?.disappearing_seconds ?? null;
   const { rows } = await c.query<{ id: string }>(

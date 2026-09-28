@@ -3,8 +3,10 @@ import { randomInt } from 'node:crypto';
 import { tx } from '@yapilapi/database';
 import {
   applyMove,
+  chatGameDrawSchema,
   chatGameMoveSchema,
   createChatGameSchema,
+  drawAction,
   forfeit,
   GAME_NAMES,
   GAME_PLAYERS,
@@ -42,13 +44,21 @@ const MOVE_ERRORS: Record<GameError, [number, string]> = {
   not_a_word: [400, 'That word isn’t in our word list.'],
   not_one_letter: [400, 'Change exactly one letter of the last word.'],
   word_used: [400, 'That word is already on the ladder.'],
+  bad_square: [400, 'Choose squares on the board.'],
+  not_your_piece: [400, 'Move one of your own pieces.'],
+  illegal_move: [400, 'That move isn’t allowed.'],
+  promotion_needed: [400, 'Choose what the pawn becomes.'],
+  bad_promotion: [400, 'A pawn can become a queen, rook, bishop or knight, and only on the last rank.'],
+  no_draw_offer: [409, 'There’s no draw offer to answer.'],
+  draw_offered: [409, 'A draw offer is already waiting for an answer.'],
+  draw_too_soon: [409, 'You can offer a draw again after your next move.'],
 };
 const moveError = (code: GameError) => new AppError(MOVE_ERRORS[code][0], code, MOVE_ERRORS[code][1]);
 const inProgress = (kind: GameKind, gameId?: string) =>
   new AppError(409, 'game_in_progress', `A game of ${GAME_NAMES[kind]} is already going in this chat. Finish it first.`, gameId ? { gameId } : undefined);
 
 /**
- * Games in chats: Four up, Noughts and Word ladder, turn by turn, in one-to-one chats and groups.
+ * Games in chats: Four up, Noughts, Word ladder and Chess, turn by turn, in one-to-one chats and groups.
  * A game is a message whose card shows the board; only people in the chat who are playing can
  * move, every move is checked with the shared rules (packages/shared/src/games), and the board goes
  * live to everyone in the chat. No pushes, no scores beyond a quiet tally in the chat.
@@ -103,11 +113,19 @@ export function registerChatGames(app: FastifyInstance, ctx: AppContext, h: Chat
    * Start a game: its card goes in the chat as a message from `u`, and the board is new. A retry with
    * the same clientId returns the first one. One game of each kind at a time per chat.
    */
-  async function startGame(u: AuthUser, conversationId: string, kind: GameKind, players: string[], clientId: string | undefined, rematchOf?: string) {
+  async function startGame(
+    u: AuthUser,
+    conversationId: string,
+    kind: GameKind,
+    players: string[],
+    clientId: string | undefined,
+    options: { rematchOf?: string; white?: number } = {},
+  ) {
+    const { rematchOf } = options;
     await assertMessagePace(db, ctx.config, u.id);
     const conv = (await db.query(`SELECT disappearing_seconds FROM conversations WHERE id = $1`, [conversationId])).rows[0];
     const seconds: number | null = conv?.disappearing_seconds ?? null;
-    const state = newGame(kind, players.length, randomInt(2 ** 31 - 1));
+    const state = newGame(kind, players.length, randomInt(2 ** 31 - 1), { white: options.white ?? 0 });
     const messageId = await tx(db, async (c) => {
       const { rows } = await c.query(
         `INSERT INTO messages (conversation_id, sender_id, body, client_id, kind, expires_at)
@@ -198,7 +216,9 @@ export function registerChatGames(app: FastifyInstance, ctx: AppContext, h: Chat
     const input = parse(createChatGameSchema, req.body);
     await h.assertMember(id, u.id);
     const players = await playersFor(u, id, input.kind, input.playerIds);
-    const message = await startGame(u, id, input.kind, players, input.clientId);
+    // Chess: whoever starts chooses a colour (seat 0 is them), or leaves it to chance.
+    const white = input.color === 'black' ? 1 : input.color === 'random' ? randomInt(2) : 0;
+    const message = await startGame(u, id, input.kind, players, input.clientId, { white });
     reply.code(201);
     return { message };
   });
@@ -257,7 +277,30 @@ export function registerChatGames(app: FastifyInstance, ctx: AppContext, h: Chat
     return { game };
   });
 
-  /** Give up. With one player left they win; in a bigger Word ladder the others play on. */
+  /**
+   * Chess draws: offer one, or accept or decline the other player's offer, on either player's turn.
+   * An offer lapses after the offerer's next move; accepting ends the game in a draw. Each counts as
+   * a move for the board's move number, so a move made against a board without the offer is refused.
+   */
+  app.post('/v1/games/:id/draw', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const { action } = parse(chatGameDrawSchema, req.body);
+    const visible = await visibleGame(id, u.id);
+    await assertCanPlay(u.id, visible.conversation_id);
+    const line = await tx(db, async (c) => {
+      const { g, seat } = await lockGame(c, id, u.id);
+      if (g.status !== 'active') throw moveError('game_over');
+      const r = drawAction(g.state, seat, action);
+      if (!r.ok) throw moveError(r.error);
+      return saveMove(c, g, u.id, r.state, { draw: action }, null);
+    });
+    const game = await publishGame(deps, id);
+    if (line) await publishLine(deps, line);
+    return { game };
+  });
+
+  /** Give up (in chess, resign). With one player left they win; in a bigger Word ladder the others play on. */
   app.post('/v1/games/:id/forfeit', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
@@ -302,16 +345,13 @@ export function registerChatGames(app: FastifyInstance, ctx: AppContext, h: Chat
       g.kind,
       order.filter((p) => p !== u.id),
     );
+    const seats = order.filter((p) => players.includes(p));
+    // Chess: colours swap, so whoever played black plays white.
+    const black = g.state.kind === 'chess' ? g.players[1 - g.state.white] : undefined;
+    const white = black ? Math.max(0, seats.indexOf(black)) : 0;
     let message: Message;
     try {
-      message = await startGame(
-        u,
-        g.conversation_id,
-        g.kind,
-        order.filter((p) => players.includes(p)),
-        undefined,
-        id,
-      );
+      message = await startGame(u, g.conversation_id, g.kind, seats, undefined, { rematchOf: id, white });
     } catch (e) {
       const again = e instanceof AppError && e.code === 'rematch_exists' ? await existing() : null;
       if (again) return { message: again };

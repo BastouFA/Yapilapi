@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { BottomSheet, Button, Icon } from '@yapilapi/design-system';
-import { chatTheme, DISAPPEARING_SECONDS, type Message, type MessageKey, type MessagePreview, type PinnedMessage } from '@yapilapi/shared';
+import { chatTheme, chessDrawReason, DISAPPEARING_SECONDS, type Message, type MessageKey, type MessagePreview, type PinnedMessage } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
@@ -212,11 +212,23 @@ export function SystemLine({
   }
   if (s?.type === 'game') {
     const game = t(`m.chat.game.kind.${s.kind}` as MessageKey);
+    const chess = s.kind === 'chess';
     const text =
       s.outcome === 'won'
-        ? t(s.by === 'forfeit' ? 'm.chat.systemGameForfeit' : 'm.chat.systemGameWon', { name: who, game })
+        ? t(
+            s.by === 'forfeit'
+              ? chess
+                ? 'm.chat.systemChessResigned'
+                : 'm.chat.systemGameForfeit'
+              : chess
+                ? 'm.chat.systemChessMate'
+                : 'm.chat.systemGameWon',
+            { name: who, game },
+          )
         : s.outcome === 'draw'
-          ? t('m.chat.systemGameDraw', { game })
+          ? s.reason
+            ? t('m.chat.systemChessDraw', { game, reason: chessDrawReason(t, s.reason) })
+            : t('m.chat.systemGameDraw', { game })
           : t('m.chat.systemGameUnfinished', { game });
     return (
       <p className="chat-system" role="note">

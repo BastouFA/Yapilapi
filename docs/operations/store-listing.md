@@ -59,7 +59,7 @@ What you won't find elsewhere:
 - Rooms. Live audio rooms for your community, with hosts, speakers and listeners. Schedule one or start it now.
 - Recaps. Turn a trip, a week or an event into a short video to keep or share.
 - Watch together. Play reels and videos in sync with a chat, react as you watch, and talk in the chat at the same time.
-- Games in chats. Four up, Noughts and Word ladder, turn by turn, right inside a conversation.
+- Games in chats. Four up, Noughts, Word ladder and Chess, turn by turn, right inside a conversation.
 - Ask me. Turn on a question box on your profile and answer the questions you choose to.
 - Data saver. Photos load small until you ask for more, videos wait for a tap, and uploads are made smaller on your phone. It turns on by itself on slow connections if you want.
 - 8 languages. English, French, Arabic, Spanish, Portuguese, Swahili, Yorùbá and Hausa, with right-to-left support. "See translation" translates posts, comments and messages written in a language you don't read.

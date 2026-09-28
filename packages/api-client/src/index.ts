@@ -75,6 +75,7 @@ import type {
   ChatPoll,
   ChatReminder,
   ChatGame,
+  DrawAction,
   GameKind,
   GameMove,
   StickerResults,
@@ -696,8 +697,11 @@ export function createClient(opts: ClientOptions) {
         post<{ message: Message }>(`/v1/conversations/${id}/lists`, input),
       /** Your reminders waiting in this chat. */
       reminders: (id: string) => get<{ items: ChatReminder[] }>(`/v1/conversations/${id}/reminders`),
-      /** Start a game. One-to-one: you play the other person. Groups: `playerIds` are who plays with you. */
-      startGame: (id: string, input: { kind: GameKind; playerIds?: string[]; clientId?: string }) =>
+      /**
+       * Start a game. One-to-one: you play the other person. Groups: `playerIds` are who plays with you.
+       * Chess: `color` is the side you play (white by default, or random).
+       */
+      startGame: (id: string, input: { kind: GameKind; playerIds?: string[]; color?: 'white' | 'black' | 'random'; clientId?: string }) =>
         post<{ message: Message }>(`/v1/conversations/${id}/games`, input),
       /** The games going in this chat (one of each kind at most). */
       games: (id: string) => get<{ items: ChatGame[] }>(`/v1/conversations/${id}/games`),
@@ -719,7 +723,10 @@ export function createClient(opts: ClientOptions) {
        */
       move: (id: string, moveNumber: number, move: GameMove, clientMoveId: string) =>
         post<{ game: ChatGame; duplicate?: boolean }>(`/v1/games/${id}/moves`, { moveNumber, clientMoveId, move }),
+      /** Give up (in chess, resign). */
       forfeit: (id: string) => post<{ game: ChatGame }>(`/v1/games/${id}/forfeit`),
+      /** Chess: offer a draw, or accept or decline the other player's offer. */
+      draw: (id: string, action: DrawAction) => post<{ game: ChatGame }>(`/v1/games/${id}/draw`, { action }),
       /** Play again with the same people; everyone asking gets the same rematch. */
       rematch: (id: string) => post<{ message: Message }>(`/v1/games/${id}/rematch`),
     },
