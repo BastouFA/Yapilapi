@@ -397,7 +397,7 @@ export class MusicCatalog {
   // ── Keeping metadata current ───────────────────────────────────────────
 
   /**
-   * Read songs in use (on posts, reels and stories, or saved) again from their providers once their
+   * Read songs in use (on posts, reels and stories, saved, or in mixes) again from their providers once their
    * metadata is a day old. A song the provider no longer has is marked withdrawn: posts keep going,
    * silently, with a note. Songs whose provider is switched off here are paused, and come back when
    * it's on again. Run by the job worker.
@@ -408,7 +408,8 @@ export class MusicCatalog {
        WHERE t.status <> 'withdrawn' AND (t.status = 'paused' OR t.fetched_at < now() - make_interval(secs => $2::double precision / 1000))
          AND (EXISTS (SELECT 1 FROM posts p WHERE p.music_track_id = t.id AND p.deleted_at IS NULL)
               OR EXISTS (SELECT 1 FROM moments m WHERE m.music_track_id = t.id AND m.deleted_at IS NULL)
-              OR EXISTS (SELECT 1 FROM music_saves s WHERE s.track_id = t.id))
+              OR EXISTS (SELECT 1 FROM music_saves s WHERE s.track_id = t.id)
+              OR EXISTS (SELECT 1 FROM mix_songs ms WHERE ms.track_id = t.id))
        ORDER BY t.fetched_at LIMIT $1`,
       [opts.limit ?? 100, opts.olderThanMs ?? TRACK_REFRESH_MS],
     );

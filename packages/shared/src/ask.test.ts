@@ -26,7 +26,7 @@ describe('ask me', () => {
   });
 
   it('adds Answers to the profile tabs without breaking saved lists', () => {
-    expect(PROFILE_TABS.at(-1)).toBe('answers');
+    expect(PROFILE_TABS.indexOf('answers')).toBe(7);
     expect(profileTabs(['posts', 'shop'])).toEqual(['posts', 'shop']);
     expect(updateProfileSchema.safeParse({ tabs: [...PROFILE_TABS] }).success).toBe(true);
   });

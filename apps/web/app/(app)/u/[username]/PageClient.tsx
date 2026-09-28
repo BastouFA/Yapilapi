@@ -19,6 +19,7 @@ import { ProfileAccountActions } from '@/components/AccountMenu';
 import { ReelGrid } from '@/components/ReelGrid';
 import { AccentScope, FeaturedRow, ProfileAbout, ProfileLinks, ProfileSongChip, Pronouns, tabLabel } from '@/components/ProfileStyle';
 import { AnswersTab, AskCard } from '@/components/Ask';
+import { ProfileMixes } from '@/components/Mixes';
 import { useSession } from '../../../providers';
 
 /**
@@ -350,6 +351,8 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
         <Shop userId={profile.id} name={profile.displayName} isSelf={rel.isSelf} focusId={focus.product} />
       ) : current === 'answers' ? (
         <AnswersTab profile={profile} />
+      ) : current === 'mixes' ? (
+        <ProfileMixes username={profile.username} isSelf={rel.isSelf} />
       ) : (
         <PostList
           load={loadReposts}

@@ -6,6 +6,7 @@ const PATHS = {
   check: ['M5 12.5l4.5 4.5L19 7.5'],
   x: ['M6 6l12 12', 'M18 6L6 18'],
   'chevron-down': ['M6 9l6 6 6-6'],
+  'chevron-up': ['M6 15l6-6 6 6'],
   'chevron-right': ['M9 6l6 6-6 6'],
   'chevron-left': ['M15 6l-6 6 6 6'],
   'arrow-left': ['M19 12H5', 'M11 6l-6 6 6 6'],
@@ -56,6 +57,11 @@ const PATHS = {
   duet: ['M3.5 5h7.5v14H3.5z', 'M13 5h7.5v14H13z'],
   play: ['M8 5v14l11-7z'],
   pause: ['M8 5h3v14H8z', 'M13 5h3v14h-3z'],
+  // Next and previous in a mix: a triangle against a bar.
+  'skip-next': ['M6 6v12l8.5-6z', 'M17 6v12'],
+  'skip-previous': ['M18 6v12l-8.5-6z', 'M7 6v12'],
+  // A mix: lines of a list with a note.
+  mix: ['M4 6h11', 'M4 11h11', 'M4 16h7', 'M18 17.5V8l3-1', 'M18 17.5a2 2 0 1 1-2-2 2 2 0 0 1 2 2z'],
   calendar: ['M4 6h16v14H4z', 'M4 10h16', 'M8 3v4', 'M16 3v4'],
   'map-pin': ['M12 21s-6.5-6-6.5-11a6.5 6.5 0 1 1 13 0c0 5-6.5 11-6.5 11z', 'M12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z'],
   sparkle: ['M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z', 'M19 16l.7 1.8 1.8.7-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7L19 16z'],

@@ -48,7 +48,8 @@ export async function messagePreviews(db: Q, ids: string[], readerId: string): P
             EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $2 AND b.blocked_id = m.sender_id) AS blocked,
             CASE WHEN EXISTS (SELECT 1 FROM chat_polls p WHERE p.message_id = m.id) THEN 'poll'
                  WHEN EXISTS (SELECT 1 FROM chat_lists l WHERE l.message_id = m.id) THEN 'list'
-                 WHEN EXISTS (SELECT 1 FROM chat_games g WHERE g.message_id = m.id) THEN 'game' END AS rich_kind,
+                 WHEN EXISTS (SELECT 1 FROM chat_games g WHERE g.message_id = m.id) THEN 'game'
+                 WHEN m.kind = 'message' AND m.meta ? 'mixId' THEN 'mix' END AS rich_kind,
             (SELECT g.kind FROM chat_games g WHERE g.message_id = m.id) AS game_kind
      FROM messages m WHERE m.id = ANY($1::uuid[])`,
     [unique, readerId],

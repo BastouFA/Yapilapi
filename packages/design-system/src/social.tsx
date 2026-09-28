@@ -27,6 +27,7 @@ import {
   type EventItem,
   type MediaItem,
   type MessageKey,
+  type MixCard,
   type PhotoTag,
   type PluralKey,
   type Post,
@@ -969,6 +970,55 @@ export function PostMusicChip({ music, locale = 'en', linkAs: L = A }: { music: 
 }
 
 /**
+ * A mix's cover: a mosaic of the first four song covers (one cover fills it; none, or Data saver,
+ * shows the mix symbol). Nothing loads on Data saver.
+ */
+export function MixMosaic({ covers, size = 64 }: { covers: string[]; size?: number }) {
+  const saver = useDataSaver();
+  const tiles = saver ? [] : covers.slice(0, 4);
+  return (
+    <span className={cx('yp-mix-mosaic', tiles.length >= 4 && 'yp-mix-mosaic--four')} style={{ width: size, height: size }} aria-hidden>
+      {tiles.length === 0 ? (
+        <Icon name="mix" size={Math.round(size / 2.4)} />
+      ) : (
+        (tiles.length >= 4 ? tiles : tiles.slice(0, 1)).map((url, i) => <img key={i} src={url} alt="" loading="lazy" decoding="async" />)
+      )}
+    </span>
+  );
+}
+
+/**
+ * A mix as a card (on a post that shares it, or in a chat): its mosaic, name, who made it and how
+ * many songs, opening the mix. A mix the viewer can't see any more says so.
+ */
+export function MixTile({ mix, locale = 'en', linkAs: L = A, children }: { mix: MixCard; locale?: string; linkAs?: LinkLike; children?: ReactNode }) {
+  if (!mix.available)
+    return (
+      <p className="yp-mix-tile yp-mix-tile--gone" role="note">
+        <Icon name="mix" size={18} />
+        <span>{tr('mixes.card.gone', locale)}</span>
+      </p>
+    );
+  return (
+    <div className="yp-mix-tile">
+      <L href={`/mixes/${mix.id}`} className="yp-mix-tile__link" aria-label={tr('mixes.card.open', locale, { title: mix.title, name: mix.owner.displayName })}>
+        <MixMosaic covers={mix.covers} />
+        <span className="yp-mix-tile__text">
+          <span className="yp-mix-tile__kind">
+            <Icon name="mix" size={12} /> {tr('mixes.card.kind', locale)}
+          </span>
+          <bdi className="yp-mix-tile__title">{mix.title}</bdi>
+          <span className="yp-mix-tile__meta">
+            <bdi>{mix.owner.displayName}</bdi> · {trp('mixes.songs', mix.songCount, locale)}
+          </span>
+        </span>
+      </L>
+      {children}
+    </div>
+  );
+}
+
+/**
  * A question from someone's question box ("Ask me"), quoted: on the Answers tab above its answer,
  * and on a post that shares the answer. "Asked by @name" links to the asker; a question asked
  * without a name says so and never carries who asked.
@@ -1228,6 +1278,11 @@ export function PostCard({
       ) : null}
 
       {post.music ? <PostMusicChip music={post.music} locale={locale} linkAs={L} /> : null}
+      {post.mix ? (
+        <div className="yp-post__mix">
+          <MixTile mix={post.mix} locale={locale} linkAs={L} />
+        </div>
+      ) : null}
 
       {post.poll ? (
         <div className="yp-poll" role="group" aria-label={tt('m.sticker.kind.poll')}>

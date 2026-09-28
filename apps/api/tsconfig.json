@@ -1,5 +1,8 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "types": ["node"] },
-  "include": ["src", "test", "load"]
+  "include": ["src", "test", "load"],
+  // This test drives the browser API client, whose types need the DOM library; it is checked with
+  // the web and phone apps instead, and still runs with the rest of the tests.
+  "exclude": ["test/api-client-network.test.ts"]
 }

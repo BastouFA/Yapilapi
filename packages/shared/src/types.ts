@@ -7,6 +7,7 @@ import type { ProfileStyle, ProfileTab } from './profile-style.ts';
 import type { ChatTheme } from './chat-theme.ts';
 import type { ProfileAskBox, QuotedQuestion } from './ask.ts';
 import type { GameKind, GameState } from './games/types.ts';
+import type { MixCard } from './mixes.ts';
 import type {
   BoardVisibility,
   CircleKind,
@@ -261,6 +262,8 @@ export interface Post {
   scheduledAt?: string | null;
   /** An answer shared from the author's question box: the question it answers (the post's text is the answer). */
   question?: QuotedQuestion | null;
+  /** A mix shared as a post: its card, or a note that it isn't there for this viewer. */
+  mix?: MixCard | null;
   /** Why this post is in the viewer's feed (recommendation explanation). */
   reason?: string;
   /** Only on the author's own posts: countries where regional rules withhold it. */
@@ -471,8 +474,8 @@ export interface MessagePreview {
   /** The first attachment's kind ('image', 'video', 'audio'), for "Photo" or "Voice message". */
   attachmentKind: string | null;
   createdAt: string | null;
-  /** A poll (body is its question), a shared list (body is its title) or a game (see `gameKind`). */
-  kind?: 'poll' | 'list' | 'game';
+  /** A poll (body is its question), a shared list (body is its title), a game (see `gameKind`) or a mix (body is its title). */
+  kind?: 'poll' | 'list' | 'game' | 'mix';
   /** Which game, when `kind` is 'game'. */
   gameKind?: GameKind;
 }
@@ -525,6 +528,17 @@ export type MessageSystemInfo =
       kind: GameKind;
       outcome: 'won' | 'draw' | 'unfinished';
       by?: 'play' | 'forfeit';
+    }
+  | {
+      /**
+       * The sender added songs to a mix shared in this chat ("Ada added 3 songs to Road trip"). Adds
+       * by the same person within MIX_LINE_WINDOW_MINUTES share one line, whose count goes up.
+       */
+      type: 'mix';
+      mixId: string;
+      /** The mix's name when the line was written. */
+      title: string;
+      count: number;
     };
 
 /** One option of a poll in a chat. */
@@ -706,6 +720,8 @@ export interface Message {
   list?: ChatList;
   /** A game: the message is its card in the chat. */
   game?: ChatGame;
+  /** A mix shared into the chat: everyone here can add and reorder songs. Body is its name. */
+  mix?: MixCard;
   /** Your earliest waiting "Remind me" on this message. */
   reminder?: { id: string; remindAt: string };
 }

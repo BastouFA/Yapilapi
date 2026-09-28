@@ -38,6 +38,7 @@ import { byOrWithSql, canInviteSql, canTagSql } from '../lib/collabs.ts';
 import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
 import { nowStatusesFor, ownNowStatus } from '../lib/now-status.ts';
 import { hasAnswersTab, profileAskBox } from '../lib/ask.ts';
+import { hasMixesTab } from '../lib/mixes.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -192,12 +193,15 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     };
   }
 
-  /** The tabs they chose; Answers only while their question box is on or has answers (never leaving none). */
-  async function tabsOf(userId: string, saved: string[] | null): Promise<ProfileTab[]> {
-    const tabs = profileTabs(saved);
-    if (!tabs.includes('answers') || (await hasAnswersTab(db, userId))) return tabs;
-    const rest = tabs.filter((t) => t !== 'answers');
-    return rest.length ? rest : ['posts'];
+  /**
+   * The tabs they chose; Answers only while their question box is on or has answers, Mixes only
+   * while the viewer may see one of their mixes (never leaving none).
+   */
+  async function tabsOf(userId: string, saved: string[] | null, viewer: string | null): Promise<ProfileTab[]> {
+    let tabs = profileTabs(saved);
+    if (tabs.includes('answers') && !(await hasAnswersTab(db, userId))) tabs = tabs.filter((t) => t !== 'answers');
+    if (tabs.includes('mixes') && !(await hasMixesTab(db, userId, viewer))) tabs = tabs.filter((t) => t !== 'mixes');
+    return tabs.length ? tabs : ['posts'];
   }
 
   async function loadProfile(userId: string, viewer: string | null): Promise<Profile> {
@@ -240,7 +244,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       // A city on an under-18's account is only ever shown to them.
       city: r.city && (isSelf || !r.is_minor) ? r.city : null,
       joinedAt: new Date(r.joined_at).toISOString(),
-      tabs: await tabsOf(userId, r.tabs),
+      tabs: await tabsOf(userId, r.tabs, viewer),
       featured: await featuredOut(userId, r.featured_post_ids ?? [], viewer),
       song: await songOut(r, viewer),
       ask: await profileAskBox(db, userId, viewer),

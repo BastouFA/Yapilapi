@@ -30,6 +30,7 @@ import profilesModule from './modules/profiles.ts';
 import postsModule from './modules/posts.ts';
 import commentsModule from './modules/comments.ts';
 import askModule from './modules/ask.ts';
+import mixesModule from './modules/mixes.ts';
 import draftsModule from './modules/drafts.ts';
 import messagingModule from './modules/messaging.ts';
 import communitiesModule from './modules/communities.ts';
@@ -390,6 +391,7 @@ export async function buildApp(
     collabsModule,
     soundsModule,
     musicModule,
+    mixesModule,
     liveModule,
     uploadsModule,
     callsModule,

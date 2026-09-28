@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, FlatList, I18nManager, Modal, PanResponder, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,6 +35,7 @@ export function previewText(t: T, p: MessagePreview): string {
   if (p.unsent) return t('m.chat.unsent');
   if (p.kind === 'poll') return t('m.chat.poll.preview', { question: p.body });
   if (p.kind === 'list') return t('m.chat.list.preview', { title: p.body });
+  if (p.kind === 'mix') return t('mixes.preview', { title: p.body });
   if (p.kind === 'game') return t('m.chat.game.preview', { game: p.gameKind ? t(`m.chat.game.kind.${p.gameKind}` as MessageKey) : p.body });
   if (p.body) return p.body;
   if (p.attachmentKind === 'image') return t('m.post.photo');
@@ -51,7 +53,15 @@ export function previewOf(m: Message): MessagePreview {
     body: m.body.slice(0, 200),
     attachmentKind: m.attachments[0]?.kind ?? m.viewOnce?.kind ?? null,
     createdAt: m.createdAt,
-    ...(m.poll ? { kind: 'poll' as const } : m.list ? { kind: 'list' as const } : m.game ? { kind: 'game' as const, gameKind: m.game.kind } : {}),
+    ...(m.poll
+      ? { kind: 'poll' as const }
+      : m.list
+        ? { kind: 'list' as const }
+        : m.game
+          ? { kind: 'game' as const, gameKind: m.game.kind }
+          : m.mix
+            ? { kind: 'mix' as const }
+            : {}),
   };
 }
 
@@ -167,7 +177,7 @@ export function SystemLine({
   watchLive?: boolean;
 }) {
   const c = useColors();
-  const { t } = useT();
+  const { t, tp } = useT();
   const name = message.sender.id === meId ? t('m.chat.you') : message.sender.displayName;
   const s = message.system;
   if (s?.type === 'watch') {
@@ -180,6 +190,20 @@ export function SystemLine({
         </View>
         {watchLive ? <Button label={t('watch.join')} size="sm" variant="secondary" icon="play" onPress={() => openWatch(s.sessionId)} /> : null}
       </View>
+    );
+  }
+  // "Ada added 3 songs to Road trip": several adds by one person within ten minutes share the line.
+  if (s?.type === 'mix') {
+    const text = tp('mixes.line', s.count, { name, title: s.title });
+    return (
+      <Pressable
+        accessibilityRole="link"
+        onPress={() => router.push({ pathname: '/mixes/[id]', params: { id: s.mixId } })}
+        style={{ alignSelf: 'center', flexDirection: 'row', gap: space[1], alignItems: 'center', maxWidth: '90%', paddingVertical: space[1], minHeight: 44 }}
+      >
+        <Icon name="list-outline" size={14} color={c.inkMuted} />
+        <Text style={[{ color: c.inkMuted, fontSize: 13, textAlign: 'center', lineHeight: 18, textDecorationLine: 'underline' }, userText]}>{text}</Text>
+      </Pressable>
     );
   }
   if (s?.type === 'reminder') {

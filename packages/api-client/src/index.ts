@@ -1,4 +1,9 @@
 import type {
+  Mix,
+  MixDetail,
+  MixFilter,
+  MixSongRef,
+  MixVisibility,
   AiSettings,
   AltTextSuggestion,
   CaptionIdeas,
@@ -761,6 +766,34 @@ export function createClient(opts: ClientOptions) {
         post<{ scheduled: ScheduledMessage }>(`/v1/conversations/${id}/scheduled`, input),
       /** The chat's wallpaper and bubble colour, the same for everyone; a line in the chat says who changed it. */
       setTheme: (id: string, theme: Partial<ChatTheme>) => put<{ theme: ChatTheme; message: Message | null }>(`/v1/conversations/${id}/theme`, theme),
+    },
+    mixes: {
+      /** Your mixes: the ones you made ('own'), the ones shared with you in chats ('shared'), or saved ('saved'). */
+      mine: (filter: MixFilter = 'own') => get<{ items: Mix[] }>(`/v1/me/mixes${qs({ filter })}`),
+      /** The Mixes tab on a profile: the mixes you may see. */
+      forUser: (username: string) => get<{ items: Mix[] }>(`/v1/users/${encodeURIComponent(username)}/mixes`),
+      /** A mix and its songs in order, each with the part that plays for you (or why it doesn't). */
+      get: (id: string) => get<{ mix: MixDetail }>(`/v1/mixes/${id}`),
+      create: (b: { title: string; description?: string; visibility?: MixVisibility; songs?: MixSongRef[] }) => post<{ mix: MixDetail }>('/v1/mixes', b),
+      /** Owner only. */
+      update: (id: string, b: { title?: string; description?: string; visibility?: MixVisibility }) => patch<{ mix: MixDetail }>(`/v1/mixes/${id}`, b),
+      /** Owner only. */
+      remove: (id: string) => del<{ ok: true }>(`/v1/mixes/${id}`),
+      /** Add songs from the picker (owner, or someone in a chat it's shared into). Songs already on it are skipped. */
+      addSongs: (id: string, songs: MixSongRef[]) => post<{ added: number; mix: MixDetail }>(`/v1/mixes/${id}/songs`, { songs }),
+      removeSong: (id: string, songId: string) => del<{ mix: MixDetail }>(`/v1/mixes/${id}/songs/${songId}`),
+      /** Every song on the mix in its new order (409 `mix_changed` when it changed since you loaded it). */
+      reorder: (id: string, songIds: string[]) => put<{ mix: MixDetail }>(`/v1/mixes/${id}/order`, { songIds }),
+      like: (id: string, on: boolean) => (on ? put : del)<{ liked: boolean; likeCount: number }>(`/v1/mixes/${id}/like`),
+      save: (id: string, on: boolean) => (on ? put : del)<{ saved: boolean }>(`/v1/mixes/${id}/save`),
+      /** Share it into a chat: everyone there can then add and reorder songs. Owner only. */
+      share: (id: string, conversationId: string, clientId?: string) =>
+        post<{ message: Message; alreadyShared?: boolean }>(`/v1/mixes/${id}/share`, { conversationId, clientId }),
+      /** Stop sharing with a chat (the card stays). Owner only. */
+      unshare: (id: string, conversationId: string) => del<{ mix: MixDetail }>(`/v1/mixes/${id}/chats/${conversationId}`),
+      /** Share it as a post (its card), with your words or its name. */
+      post: (id: string, b: { body?: string; visibility?: 'public' | 'followers' | 'friends' }) =>
+        post<{ post: Post; moderation?: { status: string; message: string } }>(`/v1/mixes/${id}/post`, b),
     },
     games: {
       get: (id: string) => get<{ game: ChatGame }>(`/v1/games/${id}`),

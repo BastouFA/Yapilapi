@@ -45,6 +45,8 @@ import { listsFor, myReminders, pollsFor } from '../lib/chat-polls.ts';
 import { registerChatPollsLists } from './chat-polls-lists.ts';
 import { gamesFor } from '../lib/chat-games.ts';
 import { registerChatGames } from './chat-games.ts';
+import { mixCardsForMessages } from '../lib/mixes.ts';
+import { registerMixChats } from './mixes.ts';
 import { registerChatLater } from './chat-later.ts';
 import { registerWatch } from './watch.ts';
 
@@ -387,6 +389,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const polls = await pollsFor(db, live, [reader]);
     const lists = await listsFor(db, live, [reader]);
     const games = await gamesFor(db, live);
+    const mixes = await mixCardsForMessages(db, live, reader);
     const reminders = await myReminders(db, live, reader);
     return items.map((m) => {
       const out: Message = { ...m };
@@ -398,6 +401,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       if (list) out.list = list;
       const game = games.get(m.id);
       if (game) out.game = game;
+      const mix = mixes.get(m.id);
+      if (mix) out.mix = mix;
       if (reminders.has(m.id)) out.reminder = reminders.get(m.id);
       const reminded = remindedOf(m);
       if (reminded && m.system?.type === 'reminder') out.system = { ...m.system, message: previews.get(reminded) ?? null };
@@ -426,7 +431,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
         `SELECT id, conversation_id, sender_id, kind, body, attachments, story_id, view_once, created_at, deleted_at, unsent_at, moderation_status, expires_at,
                 (created_at > now() - make_interval(mins => $2)) AS editable,
                 EXISTS (SELECT 1 FROM chat_polls p WHERE p.message_id = messages.id) OR EXISTS (SELECT 1 FROM chat_lists l WHERE l.message_id = messages.id)
-                  OR EXISTS (SELECT 1 FROM chat_games g WHERE g.message_id = messages.id) AS rich
+                  OR EXISTS (SELECT 1 FROM chat_games g WHERE g.message_id = messages.id) OR (messages.meta ? 'mixId') AS rich
          FROM messages WHERE id = $1`,
         [messageId, MESSAGE_EDIT_MINUTES],
       )
@@ -744,9 +749,11 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       await c.query(`DELETE FROM message_edits WHERE message_id = $1`, [messageId]);
       await c.query(`DELETE FROM message_reactions WHERE message_id = $1`, [messageId]);
       // A poll, list or game goes with it (votes, items and moves too), and nobody gets reminded about it.
+      // A mix's card ends the sharing: the mix stays with its owner.
       await c.query(`DELETE FROM chat_polls WHERE message_id = $1`, [messageId]);
       await c.query(`DELETE FROM chat_lists WHERE message_id = $1`, [messageId]);
       await c.query(`DELETE FROM chat_games WHERE message_id = $1`, [messageId]);
+      await c.query(`DELETE FROM mix_chats WHERE message_id = $1`, [messageId]);
       await c.query(`DELETE FROM chat_reminders WHERE message_id = $1 AND sent_at IS NULL`, [messageId]);
       return (await c.query(`DELETE FROM conversation_pins WHERE message_id = $1`, [messageId])).rowCount ?? 0;
     });
@@ -1113,6 +1120,17 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
 
   // Games in chats (modules/chat-games.ts).
   registerChatGames(app, ctx, {
+    assertMember,
+    memberIds,
+    notBlocking,
+    assertCanMessage,
+    assertGroupSafe,
+    messageFor: (messageId, userId) => messageFor(messageId, userId),
+    loadMessage,
+  });
+
+  // Mixes shared into chats (modules/mixes.ts).
+  registerMixChats(app, ctx, {
     assertMember,
     memberIds,
     notBlocking,

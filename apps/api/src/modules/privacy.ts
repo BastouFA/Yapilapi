@@ -111,6 +111,25 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       collages: await q(
         `SELECT media_id, source_ids, spec, created_at FROM media_collages WHERE owner_id = $1 AND media_id IS NOT NULL ORDER BY created_at DESC`,
       ),
+      // Your mixes with their songs in order (who added each), the songs you added to other people's
+      // mixes, and the mixes you liked or saved.
+      mixes: await q(
+        `SELECT mx.id, mx.title, mx.description, mx.visibility, mx.created_at, mx.updated_at,
+                (SELECT coalesce(json_agg(json_build_object('trackId', ms.track_id, 'soundId', ms.sound_id,
+                          'title', coalesce(mt.title, s.title), 'artist', mt.artist, 'addedBy', ms.added_by, 'addedAt', ms.created_at)
+                        ORDER BY ms.position, ms.id), '[]')
+                 FROM mix_songs ms LEFT JOIN music_tracks mt ON mt.id = ms.track_id LEFT JOIN sounds s ON s.id = ms.sound_id
+                 WHERE ms.mix_id = mx.id) AS songs,
+                (SELECT coalesce(array_agg(mc.conversation_id), '{}') FROM mix_chats mc WHERE mc.mix_id = mx.id) AS shared_in_chats
+         FROM mixes mx WHERE mx.owner_id = $1 AND mx.deleted_at IS NULL ORDER BY mx.created_at DESC`,
+      ),
+      mixSongsAdded: await q(
+        `SELECT ms.mix_id, ms.track_id, ms.sound_id, coalesce(mt.title, s.title) AS title, ms.created_at
+         FROM mix_songs ms JOIN mixes mx ON mx.id = ms.mix_id LEFT JOIN music_tracks mt ON mt.id = ms.track_id LEFT JOIN sounds s ON s.id = ms.sound_id
+         WHERE ms.added_by = $1 AND mx.owner_id <> $1 ORDER BY ms.created_at DESC`,
+      ),
+      mixLikes: await q(`SELECT mix_id, created_at FROM mix_likes WHERE user_id = $1 ORDER BY created_at DESC`),
+      mixSaves: await q(`SELECT mix_id, created_at FROM mix_saves WHERE user_id = $1 ORDER BY created_at DESC`),
       chatGames: await q(
         `SELECT conversation_id, kind, status, winner_id = $1 AS won, created_at, ended_at FROM chat_games WHERE $1 = ANY(players) ORDER BY created_at DESC`,
       ),
@@ -189,6 +208,13 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         `DELETE FROM ask_blocks WHERE recipient_id = $1 OR asker_id = $1`,
         // Collages go with their photos (and so does any half-made one).
         `DELETE FROM media_collages WHERE owner_id = $1`,
+        // Their mixes go (with their songs, likes, saves and sharing). Songs they added to other people's
+        // mixes stay there, "added by a former member"; their likes come off the counts.
+        `DELETE FROM mixes WHERE owner_id = $1`,
+        `UPDATE mix_songs SET added_by = NULL WHERE added_by = $1`,
+        `WITH gone AS (DELETE FROM mix_likes WHERE user_id = $1 RETURNING mix_id)
+         UPDATE mixes SET like_count = greatest(like_count - 1, 0) WHERE id IN (SELECT mix_id FROM gone)`,
+        `DELETE FROM mix_saves WHERE user_id = $1`,
         `DELETE FROM media WHERE owner_id = $1`,
         `DELETE FROM share_videos sv USING posts p WHERE p.id = sv.post_id AND p.author_id = $1`,
         `UPDATE recaps SET deleted_at = coalesce(deleted_at, now()) WHERE owner_id = $1`,

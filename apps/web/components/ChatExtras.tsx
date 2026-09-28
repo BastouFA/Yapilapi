@@ -25,6 +25,7 @@ export function previewText(t: T, p: MessagePreview): string {
   if (p.unsent) return t('m.chat.unsent');
   if (p.kind === 'poll') return t('m.chat.poll.preview', { question: p.body });
   if (p.kind === 'list') return t('m.chat.list.preview', { title: p.body });
+  if (p.kind === 'mix') return t('mixes.preview', { title: p.body });
   if (p.kind === 'game') return t('m.chat.game.preview', { game: p.gameKind ? t(`m.chat.game.kind.${p.gameKind}` as MessageKey) : p.body });
   if (p.body) return p.body;
   switch (p.attachmentKind) {
@@ -174,9 +175,19 @@ export function SystemLine({
   /** The watch together session running in this chat now: its line gets a Join link. */
   watchSessionId?: string | null;
 }) {
-  const { t } = useSession();
+  const { t, tp } = useSession();
   const who = message.sender.id === meId ? t('m.chat.you') : message.sender.displayName;
   const s = message.system;
+  // "Ada added 3 songs to Road trip": several adds by one person within ten minutes share the line.
+  if (s?.type === 'mix')
+    return (
+      <p className="chat-system" role="note">
+        <Icon name="mix" size={14} />{' '}
+        <Link href={`/mixes/${s.mixId}`} className="chat-system__join">
+          <bdi>{tp('mixes.line', s.count, { name: who, title: s.title })}</bdi>
+        </Link>
+      </p>
+    );
   if (s?.type === 'watch') {
     const text = message.sender.id === meId ? t('watch.system.startedYou') : t('watch.system.started', { name: message.sender.displayName });
     return (
