@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ScrollView, Text } from 'react-native';
 import { ApiError } from '../../../packages/api-client/src/index';
 import { client, errorMessage, webUrl } from '../lib/api';
-import { autoSlug, ChoiceField, FieldError, splitRules, TopicsField } from '../lib/forms';
+import { autoSlug, ChoiceField, FieldError, splitRules, TopicsField, useScrollToError } from '../lib/forms';
 import { useT } from '../lib/i18n';
 import { space } from '../lib/theme';
 import { Button, Card, Field, KeyboardAvoid, Notice, useColors } from '../lib/ui';
@@ -25,6 +25,7 @@ export default function NewCommunity() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
+  const form = useScrollToError();
 
   async function create() {
     setBusy(true);
@@ -38,6 +39,7 @@ export default function NewCommunity() {
     } catch (e) {
       setError(errorMessage(e));
       if (e instanceof ApiError && e.fields) setFields(e.fields);
+      form.toTop();
     } finally {
       setBusy(false);
     }
@@ -47,6 +49,7 @@ export default function NewCommunity() {
   return (
     <KeyboardAvoid>
       <ScrollView
+        ref={form.ref}
         style={{ backgroundColor: c.ground }}
         contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
         keyboardShouldPersistTaps="handled"

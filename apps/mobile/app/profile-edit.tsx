@@ -9,6 +9,7 @@ import { languageName } from '../../../packages/shared/src/translation';
 import { ApiError } from '../../../packages/api-client/src/index';
 import { client, errorMessage, mediaUrl } from '../lib/api';
 import { Chip, ChipRow } from '../lib/chips';
+import { useScrollToError } from '../lib/forms';
 import { useT } from '../lib/i18n';
 import { pickOne, uploadPicked } from '../lib/media';
 import { MusicField, draftMusic, musicInput, type DraftMusic } from '../lib/music';
@@ -38,6 +39,7 @@ export default function ProfileEdit() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
+  const form = useScrollToError();
   const [accent, setAccent] = useState<ProfileAccent>('yapi');
   const [header, setHeader] = useState<ProfileHeaderStyle>('cover');
   const [pronouns, setPronouns] = useState('');
@@ -128,6 +130,7 @@ export default function ProfileEdit() {
     } catch (e) {
       setError(errorMessage(e));
       if (e instanceof ApiError && e.fields) setFields(e.fields);
+      form.toTop();
     } finally {
       setBusy(false);
     }
@@ -138,6 +141,7 @@ export default function ProfileEdit() {
   return (
     <KeyboardAvoid>
       <ScrollView
+        ref={form.ref}
         style={{ backgroundColor: c.ground }}
         contentContainerStyle={{ padding: space[4], gap: space[4], paddingBottom: space[8] }}
         keyboardShouldPersistTaps="handled"

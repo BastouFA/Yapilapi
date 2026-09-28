@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { Pressable, ScrollView, Text, View, type LayoutChangeEvent } from 'react-native';
 import { Chip, ChipRow } from './chips';
 import { useT } from './i18n';
 import { radius, space } from './theme';
@@ -36,6 +36,26 @@ export function FieldError({ text }: { text?: string | null }) {
       {text}
     </Text>
   );
+}
+
+/**
+ * Takes a long form to its first problem when sending fails the checks, so an error far above the
+ * button isn't missed. Put `ref` on the ScrollView and `at('name')` as the onLayout of each field
+ * the ScrollView holds directly, named like the keys of the errors; then call `toFirst(errors)`.
+ * Forms that show a failed save in a notice at the top call `toTop()` instead.
+ */
+export function useScrollToError() {
+  const ref = useRef<ScrollView>(null);
+  const tops = useRef(new Map<string, number>());
+  const at = useCallback((name: string) => (e: LayoutChangeEvent) => void tops.current.set(name, e.nativeEvent.layout.y), []);
+  const toFirst = useCallback((errors: Record<string, string>) => {
+    const ys = Object.keys(errors)
+      .map((k) => tops.current.get(k))
+      .filter((y): y is number => y !== undefined);
+    if (ys.length) ref.current?.scrollTo({ y: Math.max(0, Math.min(...ys) - 16), animated: true });
+  }, []);
+  const toTop = useCallback(() => ref.current?.scrollTo({ y: 0, animated: true }), []);
+  return { ref, at, toFirst, toTop };
 }
 
 /** A form's label with the choices under it as radio chips (one of several). */
