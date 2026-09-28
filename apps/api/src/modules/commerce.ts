@@ -19,6 +19,7 @@ import { grantPlus } from '../lib/plus.ts';
 import { refundOrder, startPayment } from '../lib/checkout.ts';
 import { assertDigitalCheckoutAllowed } from '../lib/store-purchases.ts';
 import { confirmDropOrder, dropGateSql, publishDropChange, releaseDropOrder, takeDropStock } from '../lib/drops.ts';
+import { issueOrderTickets, publishDoor } from '../lib/tickets.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 const PLATFORM_FEE_BPS = 500; // 5%
@@ -468,6 +469,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       event,
     ]);
     if (!fresh.rowCount) return { ok: true, duplicate: true };
+    let ticketEvents: string[] = [];
     await tx(db, async (c) => {
       const pay = await c.query(`SELECT id, order_id, amount_cents, currency, status FROM payments WHERE provider = $1 AND provider_ref = $2 FOR UPDATE`, [
         provider,
@@ -534,6 +536,8 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
           await announceLiveGift(c, p.order_id);
         }
         if (o.purpose === 'plus') await grantPlus(c, o.buyer_id, 'purchase', { orderId: p.order_id });
+        // Tickets for an event go into the buyer's Tickets wallet, and the door's count goes up.
+        ticketEvents = await issueOrderTickets(c, p.order_id);
         // A paid service booking goes to the seller to confirm.
         const booked = await c.query(
           `UPDATE bookings bk SET status = 'requested' FROM products pd
@@ -589,6 +593,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       }
     });
     await db.query(`UPDATE payment_webhook_events SET processed_at = now() WHERE id = $1`, [event.id]);
+    for (const eventId of ticketEvents) await publishDoor(db, ctx.realtime, eventId);
     return { ok: true };
   });
 
@@ -597,7 +602,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     const u = me(req);
     const { id } = parse(idParam, req.params);
     const { reason } = parse(z.object({ reason: z.string().max(500).optional() }), req.body ?? {});
-    return tx(db, async (c) => {
+    const done = await tx(db, async (c) => {
       const o = await c.query(
         `SELECT o.id, o.status,
                 EXISTS (SELECT 1 FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id AND p.seller_id = $2) AS is_seller
@@ -612,6 +617,10 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       await audit(c, { actorId: u.id, action: 'order.refund', entityType: 'order', entityId: id, metadata: { status: result } });
       return { status: result };
     });
+    // Refunded event tickets leave the door's count.
+    const events = await db.query<{ event_id: string }>(`SELECT DISTINCT event_id FROM event_tickets WHERE order_id = $1`, [id]);
+    for (const e of events.rows) await publishDoor(db, ctx.realtime, e.event_id);
+    return done;
   });
 
   /** Seller earnings and payout requests. Payouts need verification before they are paid. */

@@ -40,6 +40,9 @@ export function notificationHref(n: NotificationTarget): string | null {
   if (n.type === 'question_received') return '/questions';
   if (n.type === 'question_answered') return n.actor ? `/u/${encodeURIComponent(n.actor.username)}?tab=answers` : '/notifications';
   if (n.type === 'subscription_started' || n.type === 'order_paid' || n.type === 'booking_request') return '/studio';
+  // A ticket a friend gave you opens your Tickets; being made a co-host opens the event's check-in.
+  if (n.type === 'ticket_received') return '/tickets';
+  if (n.type === 'event_cohost') return id ? `/check-in/${id}` : null;
   switch (n.entityType) {
     case 'chapter':
       return id ? `/chapter/${id}` : null;

@@ -87,6 +87,9 @@ function hrefFor(n: NotificationItem): string | undefined {
     return Number(n.data.count ?? 1) > 1 && typeof n.data.originalId === 'string' ? `/reels/${n.data.originalId}/echoes` : `/reels?start=${n.entityId}`;
   if (n.type === 'weekly_wrap' || n.entityType === 'wrap') return n.entityId ? `/wraps/${n.entityId}` : '/wraps';
   if (n.type === 'watch_invite' || n.entityType === 'watch') return n.entityId ? `/watch/${n.entityId}` : '/inbox';
+  // A ticket a friend gave you opens your Tickets; being made a co-host opens the event's check-in.
+  if (n.type === 'ticket_received') return '/tickets';
+  if (n.type === 'event_cohost' && n.entityId) return `/events/${n.entityId}/check-in`;
   if (n.entityType === 'chapter') return `/chapters/${n.entityId}`;
   if (n.entityType === 'drop') return `/drops/${n.entityId}`;
   if (n.entityType === 'recap' || n.type === 'recap_ready' || n.type === 'recap_failed') return n.entityId ? `/recaps?open=${n.entityId}` : '/recaps';
@@ -135,6 +138,8 @@ function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): s
   if (n.type === 'watch_invite') return t('watch.invite', { name: n.actor?.displayName ?? t('m.calls.someone') });
   // Someone started sharing where they are with a chat you're in (it opens the chat).
   if (n.type === 'location_shared') return t('location.notif', { name: n.actor?.displayName ?? t('m.calls.someone') });
+  if (n.type === 'ticket_received') return t('tickets.notif.received', { name: n.actor?.displayName ?? t('m.calls.someone') });
+  if (n.type === 'event_cohost') return t('tickets.notif.cohost', { name: n.actor?.displayName ?? t('m.calls.someone') });
   // A question asked without a name has no actor: it never says who.
   if (n.type === 'question_received') return n.actor ? t('ask.notif.received', { name: n.actor.displayName }) : t('ask.notif.receivedHidden');
   if (n.type === 'question_answered') return t('ask.notif.answered', { name: n.actor?.displayName ?? '' });

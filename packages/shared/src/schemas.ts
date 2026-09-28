@@ -630,6 +630,8 @@ export const createEventSchema = z
     capacity: z.number().int().positive().max(1_000_000).optional(),
     visibility: z.enum(['public', 'followers', 'friends', 'private']).default('public'),
     online: z.boolean().default(false),
+    /** Whether people can give their ticket to a friend. */
+    ticketTransfers: z.boolean().default(true),
   })
   .refine((v) => !v.endsAt || new Date(v.endsAt) > new Date(v.startsAt), { message: 'The end must be after the start.', path: ['endsAt'] });
 /**
@@ -648,6 +650,7 @@ export const updateEventSchema = z.object({
   capacity: z.number().int().positive().max(1_000_000).nullable().optional(),
   visibility: z.enum(['public', 'followers', 'friends', 'private']).optional(),
   online: z.boolean().optional(),
+  ticketTransfers: z.boolean().optional(),
 });
 export const rsvpSchema = z.object({ status: z.enum(RSVP_STATUSES) });
 

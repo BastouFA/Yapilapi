@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Avatar, AvatarGroup, Badge, Button, EmptyState, Segments, Skeleton } from '@yapilapi/design-system';
+import { Avatar, AvatarGroup, Badge, Button, EmptyState, Icon, Segments, Skeleton } from '@yapilapi/design-system';
 import type { EventItem, PublicUser } from '@yapilapi/shared';
 import { formatEventWhen, safeTimeZone } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
@@ -93,6 +93,23 @@ export default function EventPageClient({ isPublic }: { isPublic: boolean }) {
       ) : (
         <Badge tone="success">You're hosting</Badge>
       )}
+
+      {ev.canCheckIn || (ev.myRsvp === 'going' && ev.host.id !== me?.id) ? (
+        <div className="row">
+          {ev.canCheckIn ? (
+            <Link href={`/events/${id}/check-in`} className="yp-btn yp-btn--primary">
+              <Icon name="scan" />
+              {t('checkin.open')}
+            </Link>
+          ) : null}
+          {ev.myRsvp === 'going' && ev.host.id !== me?.id ? (
+            <Link href="/tickets" className="yp-btn yp-btn--secondary">
+              <Icon name="ticket" />
+              {t('tickets.yourTicket')}
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
       {ev.description ? <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{ev.description}</p> : null}
 

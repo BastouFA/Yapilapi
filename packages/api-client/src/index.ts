@@ -1,4 +1,9 @@
 import type {
+  CheckInResult,
+  CheckInCounts,
+  DoorSummary,
+  EventTicket,
+  TicketGuest,
   Mix,
   MixDetail,
   MixFilter,
@@ -1087,6 +1092,26 @@ export function createClient(opts: ClientOptions) {
       cancel: (id: string) => del<{ ok: true }>(`/v1/events/${id}`),
       rsvp: (id: string, status: 'going' | 'interested' | 'not_going') => post<{ status: string; event: EventItem }>(`/v1/events/${id}/rsvp`, { status }),
       attendees: (id: string) => get<{ items: { user: PublicUser; status: string }[] }>(`/v1/events/${id}/attendees`),
+      /** The check-in screen (host and co-hosts only): the event, your role, the counts and the co-hosts. */
+      door: (id: string) => get<DoorSummary>(`/v1/events/${id}/check-in`),
+      /** The guest list (host and co-hosts only). `q` finds a name, username or backup code. */
+      guests: (id: string, params: { q?: string; filter?: 'all' | 'in' | 'waiting'; offset?: number; limit?: number } = {}) =>
+        get<{ items: TicketGuest[]; total: number; nextOffset: number | null }>(`/v1/events/${id}/guests${qs(params)}`),
+      /** Check someone in: a scanned token, a typed code, or a ticket from the list. Offline check-ins send clientRef and scannedAt. */
+      checkIn: (id: string, b: { token?: string; code?: string; ticketId?: string; clientRef?: string; scannedAt?: string }) =>
+        post<CheckInResult>(`/v1/events/${id}/check-in`, b),
+      undoCheckIn: (id: string, ticketId: string) => post<{ guest: TicketGuest; counts: CheckInCounts }>(`/v1/events/${id}/check-in/${ticketId}/undo`),
+      cohosts: (id: string) => get<{ items: PublicUser[] }>(`/v1/events/${id}/cohosts`),
+      /** The host adds a friend as a co-host. */
+      addCohost: (id: string, userId: string) => post<{ ok: true }>(`/v1/events/${id}/cohosts`, { userId }),
+      /** The host removes a co-host, or a co-host steps down. */
+      removeCohost: (id: string, userId: string) => del<{ ok: true }>(`/v1/events/${id}/cohosts/${userId}`),
+    },
+    /** Your event tickets: upcoming ones, past ones, and giving one to a friend. */
+    tickets: {
+      list: (when: 'upcoming' | 'past' = 'upcoming') => get<{ items: EventTicket[] }>(`/v1/tickets${qs({ when })}`),
+      get: (id: string) => get<{ ticket: EventTicket }>(`/v1/tickets/${id}`),
+      transfer: (id: string, userId: string) => post<{ ok: true }>(`/v1/tickets/${id}/transfer`, { userId }),
     },
     places: {
       list: (params: Record<string, unknown> = {}) => get<{ items: Record<string, any>[] }>(`/v1/places${qs(params)}`),

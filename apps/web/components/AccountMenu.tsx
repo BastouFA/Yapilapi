@@ -90,6 +90,7 @@ function AccountMenuBody({ onClose, onLogout }: { onClose: () => void; onLogout:
     { href: '/settings', icon: 'settings', label: t('settings.title') },
     { href: '/saved', icon: 'bookmark', label: t('m.saved.title') },
     { href: '/drafts', icon: 'edit', label: t('m.drafts.title') },
+    { href: '/tickets', icon: 'ticket', label: t('tickets.title') },
     { href: '/drops', icon: 'bag', label: t('m.drops.yours') },
     { href: '/mixes', icon: 'mix', label: t('mixes.yours') },
   ];

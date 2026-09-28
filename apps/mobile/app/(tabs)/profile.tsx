@@ -40,6 +40,7 @@ export default function ProfileScreen() {
     { label: t('m.circles.title'), icon: 'ellipse-outline', href: '/circles' },
     { label: t('m.closeFriends.title'), icon: 'star-outline', href: '/close-friends' },
     { label: t('events.title'), icon: 'calendar-outline', href: '/events' },
+    { label: t('tickets.title'), icon: 'ticket-outline', href: '/tickets' },
     { label: t('communities.title'), icon: 'people-circle-outline', href: '/communities' },
     { label: t('m.together.title'), icon: 'aperture-outline', href: '/together', on: together === true },
     { label: t('m.live.title'), icon: 'radio-outline', href: '/live', on: live === true },

@@ -123,7 +123,7 @@ export function mediaVisibleSql(v: string): string {
   )`;
 }
 
-/** Events aliased `e`. */
+/** Events aliased `e`. Co-hosts, and people holding a ticket (a friend may have given it to them), see it too. */
 export function eventVisibleSql(v: string): string {
   return `(
     e.deleted_at IS NULL
@@ -134,6 +134,8 @@ export function eventVisibleSql(v: string): string {
       OR (e.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${v} AND f.followee_id = e.host_id))
       OR (e.visibility = 'friends' AND EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = ${v} AND fr.user_b = e.host_id) OR (fr.user_b = ${v} AND fr.user_a = e.host_id)))
       OR EXISTS (SELECT 1 FROM event_attendees ea WHERE ea.event_id = e.id AND ea.user_id = ${v})
+      OR EXISTS (SELECT 1 FROM event_cohosts ec WHERE ec.event_id = e.id AND ec.user_id = ${v})
+      OR EXISTS (SELECT 1 FROM event_tickets et WHERE et.event_id = e.id AND et.holder_id = ${v} AND et.status = 'valid')
     )
     AND (e.community_id IS NULL OR EXISTS (SELECT 1 FROM communities c WHERE c.id = e.community_id AND (
       c.visibility = 'public' OR EXISTS (SELECT 1 FROM community_members cm WHERE cm.community_id = c.id AND cm.user_id = ${v} AND cm.status = 'active'))))

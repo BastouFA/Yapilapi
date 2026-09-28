@@ -59,6 +59,11 @@ export default async function PrivacyPage() {
           are seen only by you until they are published. Earlier versions of edited posts and comments are kept, and people who can see the post can open them.
         </li>
         <li>
+          Event tickets: your tickets (from saying you’re going or buying one), who gave you one or whom you gave one to, and when you were checked in at the
+          door and by whom. An event’s host and the co-hosts they choose see your name, ticket type and check-in time on its guest list; someone under 18 who
+          isn’t their friend shows by first name only. The QR code on a ticket holds a code our server signs, not your details.
+        </li>
+        <li>
           Messages and calls: we store your chats, voice messages, attachments, polls, shared lists, reminders and games in chats on our servers so we can
           deliver them. They are not end-to-end encrypted. Earlier versions of edited messages are kept so reports about them can be checked. View-once media is
           deleted once everyone has seen it, or after 14 days; disappearing messages are deleted when they expire (24 hours, 7 days or 90 days, as the chat
@@ -323,6 +328,10 @@ export default async function PrivacyPage() {
               because of them.
             </li>
             <li>Call history: 12 months. Games in chats: 12 months after they end. Watch together sessions: 90 days after they end.</li>
+            <li>
+              Event tickets, and who gave a ticket to whom: 12 months after the event ended or was cancelled. The door’s log of scans and typed codes at an
+              event: 90 days.
+            </li>
             <li>An earlier username: 30 days after the 14 days it is held for you end.</li>
             <li>The devices remembered for sign-in alerts and the devices you signed in on: 13 months after they were last used.</li>
             <li>

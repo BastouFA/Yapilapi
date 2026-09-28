@@ -812,6 +812,10 @@ export interface EventItem {
   online: boolean;
   counts: { going: number; interested: number };
   myRsvp: 'going' | 'interested' | 'not_going' | null;
+  /** Whether people can give their ticket to a friend (the host's choice, on by default). */
+  ticketTransfers: boolean;
+  /** You host or co-host it: you see the guest list and check people in. */
+  canCheckIn: boolean;
 }
 
 export interface NotificationItem {

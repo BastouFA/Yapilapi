@@ -8,17 +8,19 @@ import { notify, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
 import { PUBLIC_USER_COLS, publicUserFrom, toPublicUser, type PublicUserRow } from '../lib/users.ts';
 import { eventVisibleSql } from '../lib/visibility.ts';
+import { cancelEventTickets, cancelRsvpTicket, issueRsvpTicket, publishDoor } from '../lib/tickets.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 
 export const EVENT_SELECT = `
-  SELECT e.id, e.title, e.description, e.starts_at, e.ends_at, e.timezone, e.location_text, e.capacity, e.visibility, e.online,
+  SELECT e.id, e.title, e.description, e.starts_at, e.ends_at, e.timezone, e.location_text, e.capacity, e.visibility, e.online, e.ticket_transfers,
          pr.user_id AS h_id, pr.username AS h_username, pr.display_name AS h_display_name, pr.avatar_url AS h_avatar_url, pr.mode AS h_mode,
          pl.id AS pl_id, pl.name AS pl_name, c.id AS c_id, c.slug AS c_slug, c.name AS c_name,
          (SELECT count(*) FROM event_attendees WHERE event_id = e.id AND status = 'going') AS going,
          (SELECT count(*) FROM event_attendees WHERE event_id = e.id AND status = 'interested') AS interested,
-         (SELECT status FROM event_attendees WHERE event_id = e.id AND user_id = $1) AS my_rsvp
+         (SELECT status FROM event_attendees WHERE event_id = e.id AND user_id = $1) AS my_rsvp,
+         coalesce(e.host_id = $1 OR EXISTS (SELECT 1 FROM event_cohosts ec WHERE ec.event_id = e.id AND ec.user_id = $1), false) AS can_check_in
   FROM events e JOIN profiles pr ON pr.user_id = e.host_id
   LEFT JOIN places pl ON pl.id = e.place_id LEFT JOIN communities c ON c.id = e.community_id`;
 
@@ -39,6 +41,8 @@ export function toEvent(r: Record<string, any>): EventItem {
     online: r.online,
     counts: { going: r.going, interested: r.interested },
     myRsvp: r.my_rsvp === 'waitlist' ? 'interested' : r.my_rsvp,
+    ticketTransfers: r.ticket_transfers,
+    canCheckIn: !!r.can_check_in,
   };
 }
 
@@ -66,8 +70,8 @@ export default async function eventsModule(app: FastifyInstance, ctx: AppContext
     }
     const id = await tx(db, async (c) => {
       const { rows } = await c.query<{ id: string }>(
-        `INSERT INTO events (host_id, community_id, place_id, title, description, starts_at, ends_at, timezone, location_text, online, capacity, visibility)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
+        `INSERT INTO events (host_id, community_id, place_id, title, description, starts_at, ends_at, timezone, location_text, online, capacity, visibility, ticket_transfers)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
         [
           u.id,
           input.communityId ?? null,
@@ -81,6 +85,7 @@ export default async function eventsModule(app: FastifyInstance, ctx: AppContext
           input.online,
           input.capacity ?? null,
           input.visibility,
+          input.ticketTransfers,
         ],
       );
       await c.query(`INSERT INTO event_attendees (event_id, user_id, status) VALUES ($1,$2,'going')`, [rows[0]!.id, u.id]);
@@ -143,8 +148,12 @@ export default async function eventsModule(app: FastifyInstance, ctx: AppContext
         `INSERT INTO event_attendees (event_id, user_id, status) VALUES ($1,$2,$3) ON CONFLICT (event_id, user_id) DO UPDATE SET status = EXCLUDED.status, updated_at = now()`,
         [id, u.id, s],
       );
+      // Going comes with a ticket in the wallet; anything else takes it back.
+      if (s === 'going') await issueRsvpTicket(c, id, u.id);
+      else await cancelRsvpTicket(c, id, u.id);
       return s;
     });
+    await publishDoor(db, ctx.realtime, id);
     if (stored === 'going') {
       await notify(db, ctx.realtime, { userId: ev.h_id, category: 'events', type: 'event_rsvp', actorId: u.id, entityType: 'event', entityId: id });
       track(db, u.id, 'event_rsvp_going');
@@ -200,6 +209,7 @@ export default async function eventsModule(app: FastifyInstance, ctx: AppContext
     if (input.capacity !== undefined) set('capacity', input.capacity);
     if (input.visibility !== undefined) set('visibility', input.visibility);
     if (input.online !== undefined) set('online', input.online);
+    if (input.ticketTransfers !== undefined) set('ticket_transfers', input.ticketTransfers);
     if (sets.length) await db.query(`UPDATE events SET ${sets.join(', ')}, updated_at = now() WHERE id = $1`, params);
     const moved =
       (input.startsAt !== undefined && new Date(input.startsAt).getTime() !== (cur.starts_at as Date).getTime()) ||
@@ -222,6 +232,8 @@ export default async function eventsModule(app: FastifyInstance, ctx: AppContext
     const { id } = parse(idParam, req.params);
     const r = await db.query(`UPDATE events SET deleted_at = now() WHERE id = $1 AND host_id = $2 AND deleted_at IS NULL RETURNING id`, [id, u.id]);
     if (!r.rowCount) throw notFound('Event');
+    // Every ticket for it stops working (the wallet shows it as cancelled).
+    await cancelEventTickets(db, id);
     const attendees = await db.query<{ user_id: string }>(
       `SELECT user_id FROM event_attendees WHERE event_id = $1 AND status IN ('going','interested','waitlist')`,
       [id],

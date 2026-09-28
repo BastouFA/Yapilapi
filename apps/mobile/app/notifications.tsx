@@ -54,6 +54,8 @@ const TEXT: Record<string, MessageKey> = {
   chapter_invite: 'm.notif.chapterInvite',
   watch_invite: 'watch.invite',
   location_shared: 'location.notif',
+  ticket_received: 'tickets.notif.received',
+  event_cohost: 'tickets.notif.cohost',
   drop_opened: 'm.notif.dropOpened',
   drop_cancelled: 'm.notif.dropCancelled',
 };
