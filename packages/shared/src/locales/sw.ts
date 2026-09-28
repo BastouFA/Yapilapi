@@ -1909,6 +1909,8 @@ export const sw: Catalog = {
   'yap.dismiss': 'Ondoa',
   'calls.allowToCall': 'Ruhusu kamera na maikrofoni ili upige simu.',
   'calls.allowToAnswer': 'Ruhusu kamera na maikrofoni ili upokee simu.',
+  'calls.allowMicToCall': 'Ruhusu maikrofoni ili upige simu.',
+  'calls.allowMicToAnswer': 'Ruhusu maikrofoni ili upokee simu.',
   'calls.incoming': 'Simu inaingia',
   'calls.participant': 'Mshiriki',
   'camera.shutterPhoto': 'Piga picha, au shikilia ili kurekodi video',

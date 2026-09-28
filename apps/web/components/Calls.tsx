@@ -74,14 +74,19 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
 
   const start = useCallback(
     async (conversationId: string, kind: 'audio' | 'video') => {
+      // Microphone (and camera) first, as on the phone: the other person's phone only rings once
+      // we can actually talk. Anything failing after the call exists ends it for them too.
+      let started: string | null = null;
       try {
+        await getMedia(kind);
         const r = await api.calls.start(conversationId, kind);
+        started = r.call.id;
         ice.current = r.iceServers;
         setCall(r.call);
         setPhase('outgoing');
-        await getMedia(kind);
       } catch (e) {
-        toast(e instanceof DOMException ? t('calls.allowToCall') : errorMessage(e));
+        toast(e instanceof DOMException ? t(kind === 'video' ? 'calls.allowToCall' : 'calls.allowMicToCall') : errorMessage(e));
+        if (started) await api.calls.end(started).catch(() => {});
         cleanup();
       }
     },
@@ -98,7 +103,7 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
       ice.current = r.iceServers;
       setPhase('active');
     } catch (e) {
-      toast(e instanceof DOMException ? t('calls.allowToAnswer') : errorMessage(e));
+      toast(e instanceof DOMException ? t(call.kind === 'video' ? 'calls.allowToAnswer' : 'calls.allowMicToAnswer') : errorMessage(e));
       await api.calls.decline(call.id).catch(() => {});
       cleanup();
     }

@@ -1920,6 +1920,8 @@ export const fr: Catalog = {
   'yap.dismiss': 'Ignorer',
   'calls.allowToCall': 'Autorise l’accès à la caméra et au micro pour appeler.',
   'calls.allowToAnswer': 'Autorise l’accès à la caméra et au micro pour répondre.',
+  'calls.allowMicToCall': 'Autorise l’accès au micro pour appeler.',
+  'calls.allowMicToAnswer': 'Autorise l’accès au micro pour répondre.',
   'calls.incoming': 'Appel entrant',
   'calls.participant': 'Participant',
   'camera.shutterPhoto': 'Prendre une photo, ou maintenir pour filmer une vidéo',

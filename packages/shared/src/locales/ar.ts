@@ -1899,6 +1899,8 @@ export const ar: Catalog = {
   'yap.dismiss': 'تجاهل',
   'calls.allowToCall': 'اسمح بالوصول إلى الكاميرا والميكروفون لإجراء المكالمة.',
   'calls.allowToAnswer': 'اسمح بالوصول إلى الكاميرا والميكروفون للرد.',
+  'calls.allowMicToCall': 'اسمح بالوصول إلى الميكروفون لإجراء المكالمة.',
+  'calls.allowMicToAnswer': 'اسمح بالوصول إلى الميكروفون للرد.',
   'calls.incoming': 'مكالمة واردة',
   'calls.participant': 'مشارك',
   'camera.shutterPhoto': 'التقط صورة، أو اضغط مطولًا لتسجيل فيديو',

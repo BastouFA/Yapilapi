@@ -1908,6 +1908,8 @@ export const es: Catalog = {
   'yap.dismiss': 'Descartar',
   'calls.allowToCall': 'Permite el acceso a la cámara y al micrófono para llamar.',
   'calls.allowToAnswer': 'Permite el acceso a la cámara y al micrófono para contestar.',
+  'calls.allowMicToCall': 'Permite el acceso al micrófono para llamar.',
+  'calls.allowMicToAnswer': 'Permite el acceso al micrófono para contestar.',
   'calls.incoming': 'Llamada entrante',
   'calls.participant': 'Participante',
   'camera.shutterPhoto': 'Hacer una foto, o mantener pulsado para grabar un video',

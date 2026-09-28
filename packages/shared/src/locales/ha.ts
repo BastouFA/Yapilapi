@@ -1909,6 +1909,8 @@ export const ha: Catalog = {
   'yap.dismiss': 'Yi watsi',
   'calls.allowToCall': 'Ba da izinin kyamara da makirufo don yin kira.',
   'calls.allowToAnswer': 'Ba da izinin kyamara da makirufo don amsa kira.',
+  'calls.allowMicToCall': 'Ba da izinin makirufo don yin kira.',
+  'calls.allowMicToAnswer': 'Ba da izinin makirufo don amsa kira.',
   'calls.incoming': 'Kira mai shigowa',
   'calls.participant': 'Mahalarci',
   'camera.shutterPhoto': 'Ɗauki hoto, ko ka riƙe don ɗaukar bidiyo',

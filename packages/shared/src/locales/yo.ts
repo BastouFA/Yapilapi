@@ -1905,6 +1905,8 @@ export const yo: Catalog = {
   'yap.dismiss': 'Yọ kúrò',
   'calls.allowToCall': 'Gba kámẹ́rà àti gbohùngbohùn láàyè láti pe.',
   'calls.allowToAnswer': 'Gba kámẹ́rà àti gbohùngbohùn láàyè láti gbé ìpè.',
+  'calls.allowMicToCall': 'Gba gbohùngbohùn láàyè láti pe.',
+  'calls.allowMicToAnswer': 'Gba gbohùngbohùn láàyè láti gbé ìpè.',
   'calls.incoming': 'Ìpè ń wọlé',
   'calls.participant': 'Olùkópa',
   'camera.shutterPhoto': 'Ya fọ́tò, tàbí tẹ̀ ẹ́ mọ́lẹ̀ láti gba fídíò sílẹ̀',

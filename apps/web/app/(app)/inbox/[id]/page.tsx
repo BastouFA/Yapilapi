@@ -527,6 +527,7 @@ export default function ChatPage() {
   }
 
   const others = conv?.members.filter((m) => m.id !== me?.id) ?? [];
+  const canCall = !!conv && conv.kind !== 'community' && conv.members.length > 1 && conv.members.length <= 8;
   const title = conv ? conv.title || others.map((m) => m.displayName).join(', ') : '';
   // Watch together: one-to-one chats and groups of up to 8 people.
   const watchable = !!conv && (conv.kind === 'direct' || conv.kind === 'group') && conv.members.length <= WATCH_MAX_MEMBERS;
@@ -560,12 +561,33 @@ export default function ChatPage() {
               <Icon name="play" />
             </button>
           ) : null}
+          {/* Calls sit in the header, as on the phone: chats of 2 to 8 people, not communities. */}
+          {canCall ? (
+            <>
+              <button
+                type="button"
+                className="yp-action"
+                aria-label={t('chat.audioCall')}
+                title={t('chat.audioCall')}
+                onClick={() => void calls.start(id, 'audio')}
+              >
+                <Icon name="phone" />
+              </button>
+              <button
+                type="button"
+                className="yp-action"
+                aria-label={t('chat.videoCall')}
+                title={t('chat.videoCall')}
+                onClick={() => void calls.start(id, 'video')}
+              >
+                <Icon name="video" />
+              </button>
+            </>
+          ) : null}
           <Menu
             label={t('chat.options')}
             actions={[
-              { label: t('chat.videoCall'), icon: 'eye', onSelect: () => void calls.start(id, 'video') },
               { label: t('chat.apps'), icon: 'create', onSelect: () => setAppsOpen(true) },
-              { label: t('chat.audioCall'), icon: 'bell', onSelect: () => void calls.start(id, 'audio') },
               { label: t('inbox.summarize'), icon: 'sparkle', onSelect: () => assist('summarize_conversation') },
               { label: t('chat.ai.draftPlan'), icon: 'calendar', onSelect: () => assist('plan_from_message') },
               { label: t('m.chat.search'), icon: 'search', onSelect: () => setSearchOpen(true) },

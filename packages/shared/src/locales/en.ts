@@ -1907,6 +1907,8 @@ export const en = {
   'yap.dismiss': 'Dismiss',
   'calls.allowToCall': 'Allow camera and microphone access to call.',
   'calls.allowToAnswer': 'Allow camera and microphone access to answer.',
+  'calls.allowMicToCall': 'Allow microphone access to call.',
+  'calls.allowMicToAnswer': 'Allow microphone access to answer.',
   'calls.incoming': 'Incoming call',
   'calls.participant': 'Participant',
   // Web: compose
