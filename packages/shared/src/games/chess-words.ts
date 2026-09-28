@@ -1,4 +1,4 @@
-import type { MessageKey } from '../i18n.ts';
+import type { MessageKey } from '../i18n-core.ts';
 import { chessBoard, chessInCheck, chessSquareName } from './chess.ts';
 import type { ChessColor, ChessPieceType, ChessState, DrawReason } from './types.ts';
 

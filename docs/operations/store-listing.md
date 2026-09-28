@@ -179,7 +179,7 @@ Première version de YAPILAPI. Partage des publications, des reels et des storie
 
 ## Notes for the owner
 
-- **Names in the app:** the listing uses the names each language's catalog uses (`packages/shared/src/i18n.ts`). In English: Pulse, Wander, Spark, Yap, You, Chapters, Boards, Rooms, Recap videos. In French: Pouls, Balade, Étincelle, Yap, Toi, Chapitres, Tableaux, Salons, Vidéos récap. If a catalog changes before submission, change the listing to match.
+- **Names in the app:** the listing uses the names each language's catalog uses (`packages/shared/src/locales/`). In English: Pulse, Wander, Spark, Yap, You, Chapters, Boards, Rooms, Recap videos. In French: Pouls, Balade, Étincelle, Yap, Toi, Chapitres, Tableaux, Salons, Vidéos récap. If a catalog changes before submission, change the listing to match.
 - **"Real":** a photo taken with both cameras at once. Keep it capitalised, like in the app.
 - **Screenshots:** sizes and a suggested order are in app-store.md.
 - **Localised listings:** add Arabic, Spanish, Portuguese, Swahili, Yorùbá and Hausa listings later, from the same text. The app itself is already translated. Google Play can machine-translate listings, but a person should review them.

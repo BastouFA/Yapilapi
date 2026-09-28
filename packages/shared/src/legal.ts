@@ -1,4 +1,4 @@
-import type { MessageKey } from './i18n.ts';
+import type { MessageKey } from './i18n-core.ts';
 
 /**
  * The legal and policy pages, in the order they are listed. The web app serves

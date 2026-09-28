@@ -1,4 +1,4 @@
-import type { MessageKey } from './i18n.ts';
+import type { MessageKey } from './i18n-core.ts';
 import { contrastRatio } from './profile-style.ts';
 
 /**

@@ -8,6 +8,8 @@ const placeholders = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1
 describe('message catalogs', () => {
   it('has the 8 supported languages', () => {
     expect([...SUPPORTED_LOCALES].sort()).toEqual(['ar', 'en', 'es', 'fr', 'ha', 'pt', 'sw', 'yo']);
+    // The phone and the API load every catalog up front: the same languages the web loads on demand.
+    expect(Object.keys(CATALOGS).sort()).toEqual([...SUPPORTED_LOCALES].sort());
   });
 
   for (const locale of SUPPORTED_LOCALES) {

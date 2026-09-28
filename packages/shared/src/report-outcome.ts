@@ -1,4 +1,4 @@
-import type { MessageKey } from './i18n.ts';
+import type { MessageKey } from './i18n-core.ts';
 
 /**
  * Telling people what happened to something they reported.

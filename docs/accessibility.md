@@ -185,7 +185,7 @@ The 16 new pages (and the tag page, now on a tag with posts) and 30 states, befo
 | Drafts | Publishing or deleting a draft removed the focused button | Focus moves to the page title. |
 | `Button` | Couldn't take a `ref` | Takes a `ref` (to move focus to it). |
 
-All these names and announcements go through `t()`/`tp()`: the new ones (`m.music.useTitle`, `m.chat.reactionCount`, `m.chat.searchFound`, `m.chat.searchFoundMore`, `follow.titleFollowers`, `follow.titleFollowing`, `follow.followName`, `follow.followingName`, `m.reels.sound`) are in all 8 catalogs in `packages/shared/src/i18n.ts`, and toggles use the existing key for their one name (for example `m.rooms.raiseHand`, `post.like`, `m.reels.repost`).
+All these names and announcements go through `t()`/`tp()`: the new ones (`m.music.useTitle`, `m.chat.reactionCount`, `m.chat.searchFound`, `m.chat.searchFoundMore`, `follow.titleFollowers`, `follow.titleFollowing`, `follow.followName`, `follow.followingName`, `m.reels.sound`) are in all 8 catalogs in `packages/shared/src/locales/`, and toggles use the existing key for their one name (for example `m.rooms.raiseHand`, `post.like`, `m.reels.repost`).
 
 Reduced motion was reviewed for the new animations: the music sticker's bars stop (`prefers-reduced-motion`), room reactions fade in place instead of floating, the speaking ring's transition uses the design-system durations (0 with reduced motion) and now changes less often (above). Headings: each new page has one `h1` and `h2` sections in order (axe `heading-order` passes on all of them).
 

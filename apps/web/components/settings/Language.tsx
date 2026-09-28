@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button, Card, Select } from '@yapilapi/design-system';
-import { SUPPORTED_LOCALES, t as translate } from '@yapilapi/shared';
+import { loadLocale, SUPPORTED_LOCALES, t as translate } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 import { Anchor } from './Shell';
@@ -20,11 +20,14 @@ export function LanguageCard() {
           onSubmit={async (e) => {
             e.preventDefault();
             const f = new FormData(e.currentTarget);
+            const chosen = String(f.get('locale'));
             const country = f.get('country') ? String(f.get('country')) : null;
             setBusy(true);
+            // Fetch the new language while the choice saves; refresh() waits for it before switching.
+            void loadLocale(chosen);
             try {
               await api.me.updateProfile({
-                locale: String(f.get('locale')),
+                locale: chosen,
                 // Only when changed: saving the language mustn't turn a detected country into a chosen one.
                 ...(country !== (me.country ?? null) ? { country } : {}),
               });

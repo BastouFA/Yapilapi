@@ -267,7 +267,7 @@ Every signed-in page is at least 7.4 kB lighter, because the Stripe form and the
 - **Images:** list and grid images got `loading="lazy"` and `decoding="async"`; images at the top of a page (the listing gallery, a drop's cover, the wrap card, the profile cover) stay eager.
 - **Duplicate requests on load:** the unread counts and the inbox page asked for the chat list at the same time, and the same for notifications; the sidebar and Home both asked for people suggestions; two admin cards both loaded the flags; the sidebar loaded its suggestions twice when Live was on. Callers asking for the same thing at the same moment now share one request (`sharedRequest` in `apps/web/lib/api.ts`, which keeps nothing once the request settles).
 
-The biggest remaining cost is not in the web app: the root layout chunk (782 kB gzip, on every route) is about 616 kB of the seven non-English message catalogs plus 80 kB of English, all imported through `packages/shared/src/i18n.ts`. Putting each locale in its own module and loading the reader's one after sign-in would take about 600 kB, around 65%, off every route. That is the next web task.
+The biggest remaining cost is not in the web app: the root layout chunk (782 kB gzip, on every route) is about 616 kB of the seven non-English message catalogs plus 80 kB of English, all imported through `packages/shared/src/i18n.ts`. Putting each locale in its own module and loading the reader's one after sign-in would take about 600 kB, around 65%, off every route. Done since: see "One language per reader on the web" below.
 
 ### Phone lists
 
@@ -287,3 +287,36 @@ Left as they are: the Market list and search results stay a `ScrollView` (they l
 - **Post search** ranks every match of a common word before taking the first page (12,500 matches for "sunset" here, 11 to 25 ms). It is inside the 250 ms budget; a search engine is the fix at a much larger size.
 - **A Together album** returns up to 1,000 photos in one response (12 ms of SQL here); page it if albums get much bigger.
 - **For you** is unchanged at 20 to 30 ms; the "posts on your interests" candidates are most of it.
+
+## 2026-09-28: one language per reader on the web
+
+Every web page shipped all eight message catalogs, because they lived in one module (`packages/shared/src/i18n.ts`) that the root layout imports through `t()`. Each catalog is now its own module in `packages/shared/src/locales/`. `@yapilapi/shared` carries English and the helpers (`i18n-core.ts`); the other seven load with `import()` through `loadLocale()`, so the build makes one chunk per language and a reader downloads theirs only.
+
+### First-load JS, before and after
+
+Measured the same way as "Web bundles" above: `pnpm --filter @yapilapi/web build`, then the root main files plus each route's client entry chunks from the build manifests, gzip level 9.
+
+| Route | Before (kB) | After (kB) | Change (kB) |
+| --- | ---: | ---: | ---: |
+| `/home` (feed) | 977.2 | 347.6 | −629.6 |
+| `/u/[username]` (profile) | 1,008.4 | 378.7 | −629.7 |
+| `/settings` | 954.4 | 324.7 | −629.7 |
+| `/inbox/[id]` (largest) | 1,017.2 | 387.6 | −629.6 |
+| `/` (landing) | 935.6 | 306.0 | −629.6 |
+| Mean of 100 routes | 947.2 | 323.9 | −623.3 |
+
+The chunk that held every catalog was 796 kB gzip; the one left in the first load (English with the code it shares a chunk with) is 166 kB. A reader in another language downloads one more chunk, once, then the browser keeps it: French 92.6 kB, Arabic 96.7, Spanish 89.1, Portuguese 88.4, Swahili 86.7, Yorùbá 93.9, Hausa 86.0. So a French reader's first visit to Home is about 440 kB instead of 977, and an English reader's 348.
+
+### No English first
+
+- `Providers` (`apps/web/app/providers.tsx`) waits for the reader's catalog as it waits for the account: `refresh()` loads the language before setting the account, and `loading` stays true while a language is fetched (signing in, switching accounts). Signed-in pages show their skeleton until then, as they already did while the account loaded, so the first text a reader sees is in their language. A catalog that can't be fetched leaves the text in English rather than blocking.
+- `<html lang>` and `dir` are set in a layout effect, before the browser paints the app. Before, a plain effect set them after the first paint, so an Arabic reader saw one frame of the app left to right.
+- The browser remembers the signed-in reader's language (`ypl_locale` in local storage, cleared once nobody is signed in). A script in `<head>` (`apps/web/lib/locale-script.ts`, like the theme's) puts it on `<html>` before anything paints, and the catalog starts downloading as the page's code runs, alongside the account request instead of after it.
+- The skip link waits for the language too, so it is never read out in English to a French reader.
+- Switching language in Settings fetches the new catalog while the choice saves; the app switches in place, with no reload, and the "saved" message is in the new language.
+
+Pages stay static: reading a cookie in the root layout to render the language on the server would make all 63 static routes dynamic, for pages whose content comes from the browser anyway. Signed-out pages are English, as before.
+
+The phone and the API keep every catalog loaded up front: they import `packages/shared/src/i18n.ts` (the API as `@yapilapi/shared/i18n`, in `app.ts` and for the weekly wrap card), which registers all eight. `i18n.test.ts` still checks every catalog against English; `i18n-core.test.ts` checks that every file in `locales/` has a loader and loads.
+
+Checked with headless Chromium against a production build (web on 127.0.0.1:3310, API on 4310, own database): a French, an Arabic and an English reader, each in a new browser and again with the language remembered, on Home, Settings and their profile. A recorder in the page logged every change of text and of `<html lang>`/`dir` from the first moment. No frame had English text for the French or Arabic reader, the first frame with the app in it was in their language, Arabic was right to left in every frame, each reader downloaded only their own catalog chunk (none for English), and there were no hydration errors. Switching an English reader to Arabic in Settings changed the language and direction without a reload.

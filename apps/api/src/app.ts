@@ -9,6 +9,8 @@ import { Redis } from 'ioredis';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { createPool } from '@yapilapi/database';
+// Every message catalog, loaded up front, so anything the API writes can be in any language at once.
+import '@yapilapi/shared/i18n';
 import { runInRequest, withRequestContext } from './lib/request-context.ts';
 import type { Config } from './config.ts';
 import type { AppContext } from './lib/context.ts';
