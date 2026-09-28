@@ -281,8 +281,11 @@ export function Segmented<T extends string>({
     lastTap.current = { id, at: now };
     onChange(id);
   };
-  // More than four: a row that scrolls sideways, every label at full size, the chosen one kept in view.
-  const scrolls = options.length > 4;
+  // More than four, or labels too long to fit at full size (roughly 8pt a character at 14pt, plus
+  // padding): a row that scrolls sideways, every label at full size, the chosen one kept in view.
+  const [rowWidth, setRowWidth] = useState(0);
+  const needed = options.reduce((sum, o) => sum + o.label.length * 8 + 28 + (o.count !== undefined ? 20 : 0), 0) + 4 * (options.length + 1);
+  const scrolls = options.length > 4 || (rowWidth > 0 && needed > rowWidth);
   const row = useRef<ScrollView>(null);
   const spots = useRef(new Map<T, number>());
   useEffect(() => {
@@ -319,14 +322,24 @@ export function Segmented<T extends string>({
   });
   if (scrolls)
     return (
-      <View accessibilityRole="tablist" accessibilityLabel={label} style={{ borderRadius: radius.full, overflow: 'hidden', backgroundColor: c.surfaceSunken }}>
+      <View
+        accessibilityRole="tablist"
+        accessibilityLabel={label}
+        onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}
+        style={{ borderRadius: radius.full, overflow: 'hidden', backgroundColor: c.surfaceSunken }}
+      >
         <ScrollView ref={row} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.segmented}>
           {items}
         </ScrollView>
       </View>
     );
   return (
-    <View accessibilityRole="tablist" accessibilityLabel={label} style={[s.segmented, { backgroundColor: c.surfaceSunken }]}>
+    <View
+      accessibilityRole="tablist"
+      accessibilityLabel={label}
+      onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}
+      style={[s.segmented, { backgroundColor: c.surfaceSunken }]}
+    >
       {items}
     </View>
   );

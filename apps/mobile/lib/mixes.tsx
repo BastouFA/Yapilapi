@@ -95,7 +95,17 @@ export function useMixPlayer(songs: MixSong[]) {
   }, [status.currentTime, status.didJustFinish, status.isLoaded, index, playing, advance]);
 
   // Leaving the screen stops it.
-  useEffect(() => () => player.pause(), [player]);
+  useEffect(
+    () => () => {
+      // The player may already be released when the screen goes (or reloads); nothing left to stop then.
+      try {
+        player.pause();
+      } catch {
+        /* already gone */
+      }
+    },
+    [player],
+  );
 
   return {
     index,
@@ -384,6 +394,8 @@ export function AddSongs({
         visible={open}
         onClose={() => setOpen(false)}
         onPick={async (track) => {
+          // Back to the mix, where the note says it was added (behind the picker nobody would see it).
+          setOpen(false);
           try {
             const api = await client();
             const r = await api.mixes.addSongs(mix.id, [songRef(track)]);
