@@ -14,7 +14,8 @@ import {
   type MessageKey,
   type PluralKey,
 } from '@yapilapi/shared';
-import { api, sharedRequest, WS_URL } from '@/lib/api';
+import { ApiError } from '@yapilapi/api-client';
+import { api, errorMessage, sharedRequest, WS_URL } from '@/lib/api';
 import { readLocaleHint, writeLocaleHint } from '@/lib/locale-script';
 import {
   connectionHints,
@@ -34,6 +35,8 @@ export interface Session {
   me: Me | null;
   /** True until the account (or that nobody is signed in) and its language are both here. */
   loading: boolean;
+  /** Why the account couldn't be checked (the API didn't answer), as opposed to being signed out. */
+  sessionError: string | null;
   refresh: () => Promise<Me | null>;
   setMe: (me: Me | null) => void;
   flags: Record<string, boolean>;
@@ -97,6 +100,7 @@ if (typeof window !== 'undefined') {
 export function Providers({ children }: { children: React.ReactNode }) {
   const [me, setMe] = useState<Me | null>(null);
   const [meLoading, setMeLoading] = useState(true);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [flags, setFlags] = useState<Record<string, boolean>>({});
   const [unread, setUnreadState] = useState({ notifications: 0, messages: 0 });
   const [toastState, setToastState] = useState<{ id: number; message: string; action?: ToastAction } | null>(null);
@@ -131,9 +135,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
       // language just chosen in Settings switches in one step.
       await loadLocale(user.locale);
       setMe(user);
+      setSessionError(null);
       return user;
-    } catch {
-      setMe(null);
+    } catch (e) {
+      // Only the API saying so signs you out here; a dropped connection or a restart keeps the
+      // account already showing, and before one has loaded the app says why with Try again.
+      if (e instanceof ApiError && e.status === 401) {
+        setMe(null);
+        setSessionError(null);
+      } else setSessionError(errorMessage(e));
       return null;
     } finally {
       setMeLoading(false);
@@ -258,6 +268,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       value={{
         me,
         loading,
+        sessionError,
         refresh,
         setMe,
         flags,
