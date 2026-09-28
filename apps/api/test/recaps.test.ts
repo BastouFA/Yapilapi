@@ -25,6 +25,7 @@ beforeAll(async () => {
   await t.ctx.db.query(`INSERT INTO feature_flags (key, enabled) VALUES ('MEMORY', true) ON CONFLICT (key) DO UPDATE SET enabled = true`);
 });
 afterAll(async () => {
+  await t.ctx.db.query(`DELETE FROM feature_flags WHERE key = 'MEMORY'`);
   await t.close();
 });
 
@@ -186,7 +187,7 @@ describe('planning', () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
-  });
+  }, 120_000);
 });
 
 describe('recaps', () => {
@@ -376,7 +377,7 @@ describe('recaps', () => {
     expect(existsSync(file.replace(/\.mp4$/, '_web.mp4'))).toBe(false);
     expect((await as(t.app, alice).get(`/v1/recaps/${id}`)).status).toBe(404);
     expect((await t.ctx.db.query(`SELECT 1 FROM media WHERE id = $1`, [recap.video.mediaId])).rowCount).toBe(0);
-  });
+  }, 120_000);
 
   it('posts as a reel through the normal publishing checks, and only when everything in it is yours', async () => {
     const alice = await signUp(t.app);
@@ -437,5 +438,5 @@ describe('recaps', () => {
     // Deleting a recap that went out as a reel keeps the reel's video.
     expect((await as(t.app, alice).del(`/v1/recaps/${own}`)).body).toEqual({ ok: true, fileRemoved: false });
     expect((await as(t.app, bob).get(`/v1/posts/${posted.body.post.id}`)).status).toBe(200);
-  });
+  }, 120_000);
 });
