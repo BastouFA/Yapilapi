@@ -336,7 +336,7 @@ function Preview({
       }}
     >
       {header === 'clean' ? null : photo ? (
-        <Image source={{ uri: photo }} style={{ height: 36 }} resizeMode="cover" accessibilityIgnoresInvertColors />
+        <Image source={{ uri: photo }} style={{ aspectRatio: 8 / 3 }} resizeMode="cover" accessibilityIgnoresInvertColors />
       ) : (
         <LinearGradient colors={[tint.accentStrong, tint.accent, tint.gradEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ height: 36 }} />
       )}

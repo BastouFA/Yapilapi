@@ -99,7 +99,7 @@ export async function unusedMedia(db: Q, ids: string[]): Promise<string[]> {
        AND NOT EXISTS (SELECT 1 FROM moments mo WHERE mo.media_id = m.id AND mo.deleted_at IS NULL)
        AND NOT EXISTS (SELECT 1 FROM messages x WHERE x.view_once_media_id = m.id AND x.deleted_at IS NULL)
        AND NOT EXISTS (SELECT 1 FROM messages x WHERE x.deleted_at IS NULL AND x.attachments @> jsonb_build_array(jsonb_build_object('mediaId', m.id::text)))
-       AND NOT EXISTS (SELECT 1 FROM profiles pr WHERE pr.cover_media_id = m.id)
+       AND NOT EXISTS (SELECT 1 FROM profiles pr WHERE pr.cover_media_id = m.id OR pr.cover_render_media_id = m.id)
        AND NOT EXISTS (SELECT 1 FROM profiles pr WHERE pr.avatar_url IS NOT NULL AND (pr.avatar_url = m.url OR pr.avatar_url IN (SELECT value FROM jsonb_each_text(coalesce(m.variants, '{}'::jsonb)))))
        -- A sound made from it counts while a post still uses that sound.
        AND NOT EXISTS (SELECT 1 FROM sounds s JOIN posts sp ON sp.sound_id = s.id WHERE s.media_id = m.id AND sp.deleted_at IS NULL)

@@ -16,6 +16,9 @@ import {
   usernameSchema,
   profileAccent,
   profileTabs,
+  type CoverEditState,
+  type CoverPhoto,
+  type CoverRecipe,
   type PostMusic,
   type Profile,
   type ProfileLink,
@@ -36,6 +39,8 @@ import { trackMusic, tracksByIds, viewerCountries, type StoredPart } from '../li
 import { messagesAllowedSql } from '../lib/interactions.ts';
 import { byOrWithSql, canInviteSql, canTagSql } from '../lib/collabs.ts';
 import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
+import { clearCovers, retireCoverRender } from '../lib/covers.ts';
+import { coverRecipeProblem, editSize, renderCover } from '../lib/cover-render.ts';
 import { nowStatusesFor, ownNowStatus } from '../lib/now-status.ts';
 import { hasAnswersTab, profileAskBox } from '../lib/ask.ts';
 import { hasMixesTab } from '../lib/mixes.ts';
@@ -204,9 +209,25 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     return tabs.length ? tabs : ['posts'];
   }
 
+  /** The original behind your cover, as a processed size to edit on, and the recipe; null when it can't be edited again. */
+  async function coverEditOf(mediaId: string | null, recipe: CoverRecipe | null, ownerId: string): Promise<CoverEditState | null> {
+    if (!mediaId) return null;
+    const { rows } = await db.query(
+      `SELECT id, url, variants, width, height, alt_text FROM media
+       WHERE id = $1 AND owner_id = $2 AND kind = 'image' AND NOT private AND deleted_at IS NULL AND storage_key IS NOT NULL`,
+      [mediaId, ownerId],
+    );
+    const m = rows[0];
+    if (!m) return null;
+    const variants = (m.variants ?? {}) as Record<string, string>;
+    const url = variants.large ?? variants.medium;
+    if (!url) return null;
+    return { mediaId: m.id, url, width: m.width, height: m.height, altText: m.alt_text, recipe: recipe ?? null };
+  }
+
   async function loadProfile(userId: string, viewer: string | null): Promise<Profile> {
     const { rows } = await db.query(
-      `SELECT ${PUBLIC_USER_COLS}, pr.bio, pr.cover_url, pr.cover_alt, pr.links, pr.is_private,
+      `SELECT ${PUBLIC_USER_COLS}, pr.bio, pr.cover_url, pr.cover_alt, pr.cover_media_id, pr.cover_edit, pr.links, pr.is_private,
         pr.accent, pr.header_style, pr.pronouns, pr.city, pr.tabs, pr.featured_post_ids, pr.song_sound_id, pr.song_track_id, pr.song_part,
         coalesce(u.created_at, pr.created_at) AS joined_at,
         coalesce(u.birth_date > current_date - interval '18 years', false) AS is_minor,
@@ -234,6 +255,8 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       bio: r.bio,
       coverUrl: r.cover_url,
       coverAlt: r.cover_url ? (r.cover_alt ?? null) : null,
+      // The original and the recipe are for editing: only you get them.
+      ...(isSelf ? { coverEdit: r.cover_url ? await coverEditOf(r.cover_media_id, r.cover_edit, userId) : null } : {}),
       nowStatus: status,
       links: await linksOut(r.links),
       isPrivate: r.is_private,
@@ -346,8 +369,8 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     if (input.country !== undefined) sets.push(input.country === null ? `country_source = NULL` : `country_source = 'user'`);
     // A cover photo is set from your own uploads (PUT /v1/me/cover); here it can only be removed.
     if (input.coverUrl) throw badRequest('Choose a cover photo from your own uploads.', { fields: { coverUrl: 'Upload a photo first.' } });
-    if (input.coverUrl === null) sets.push(`cover_url = NULL, cover_media_id = NULL, cover_alt = NULL`);
     if (sets.length) await db.query(`UPDATE profiles SET ${sets.join(', ')} WHERE user_id = $1`, vals);
+    if (input.coverUrl === null) await clearCovers(db, `user_id = $1`, [u.id]);
     // Site icons for the links are fetched in the background, never while you wait.
     if (input.links?.length)
       await queueLinkIcons(
@@ -382,37 +405,125 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
   });
 
   // ── Cover photo ───────────────────────────────────────────────────────
+  const coverSensitive = () => new AppError(422, 'media_sensitive', 'This photo may be sensitive, so it can’t be a cover. Choose another one.');
+
   /**
    * Set your cover photo from one of your own uploads (POST /v1/media or
    * /v1/uploads). It must be a photo that finished processing, not marked
    * sensitive or blocked by the automated check. The profile shows a
    * processed size, never the original file.
+   *
+   * With `edit` (framing in the cover shape, straighten, a look and its
+   * strength, adjustments), the server renders a new copy from the original
+   * (lib/cover-render.ts) and keeps the recipe, so you can edit it again from
+   * the original later. Sending the same photo and edit again changes nothing
+   * but the description.
    */
   app.put('/v1/me/cover', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (req) => {
     const u = me(req);
     const input = parse(setCoverSchema, req.body);
     const { rows } = await db.query(
-      `SELECT kind, status, moderation, variants, url, alt_text FROM media
-       WHERE id = $1 AND owner_id = $2 AND NOT private AND deleted_at IS NULL`,
+      `SELECT m.kind, m.status, m.moderation, m.variants, m.url, m.alt_text, m.mime, m.storage_key,
+              EXISTS (SELECT 1 FROM profiles pr WHERE pr.cover_render_media_id = m.id) AS is_render
+       FROM media m WHERE m.id = $1 AND m.owner_id = $2 AND NOT m.private AND m.deleted_at IS NULL`,
       [input.mediaId, u.id],
     );
     const m = rows[0];
     if (!m) throw notFound('That photo');
     if (m.kind !== 'image') throw badRequest('Choose a photo for your cover.');
+    // A cover is always made from an original, never from an earlier edited copy.
+    if (m.is_render) throw badRequest('Edit your cover from its original photo.');
     if (m.moderation === 'blocked') throw new AppError(422, 'media_blocked', MEDIA_BLOCKED_MESSAGE);
-    if (m.moderation === 'sensitive') throw new AppError(422, 'media_sensitive', 'This photo may be sensitive, so it can’t be a cover. Choose another one.');
+    if (m.moderation === 'sensitive') throw coverSensitive();
+    if (input.edit && m.mime === 'image/gif') throw new AppError(415, 'unsupported_media', 'Animated GIFs cannot be edited.');
     const variants = (m.variants ?? {}) as Record<string, string>;
     const url = variants.large ?? variants.medium;
     if (m.status !== 'ready' || !url) throw new AppError(409, 'media_processing', 'Your photo is still being prepared. Try again in a moment.');
     const alt = input.altText || m.alt_text || null;
-    await db.query(`UPDATE profiles SET cover_url = $2, cover_media_id = $3, cover_alt = $4 WHERE user_id = $1`, [u.id, url, input.mediaId, alt]);
-    await db.query(`UPDATE media SET used_at = coalesce(used_at, now()) WHERE id = $1`, [input.mediaId]);
+
+    let cover: { url: string; renderId: string | null; recipe: CoverRecipe | null } = { url, renderId: null, recipe: null };
+    if (input.edit) {
+      const recipe = input.edit as CoverRecipe;
+      if (!m.storage_key) throw badRequest('This photo was not uploaded here, so it cannot be edited.');
+      // The same photo with the same edit: nothing to render again.
+      const same = await db.query(
+        `UPDATE profiles SET cover_alt = $4 WHERE user_id = $1 AND cover_media_id = $2 AND cover_edit = $3::jsonb AND cover_render_media_id IS NOT NULL RETURNING 1`,
+        [u.id, input.mediaId, JSON.stringify(recipe), alt],
+      );
+      if (same.rowCount) return { profile: await loadProfile(u.id, u.id) };
+      const original = await ctx.storage.read(m.storage_key);
+      const size = await editSize(original);
+      if (!size) throw badRequest("We couldn't read this photo. Choose another one.");
+      const problem = coverRecipeProblem(recipe, size.width, size.height);
+      if (problem) throw new AppError(400, 'validation_failed', 'Check the highlighted fields.', { fields: { 'edit.crop': problem } });
+      const rendered = await renderCover({ db, storage: ctx.storage }, u.id, original, recipe, m.moderation).catch((err) => {
+        req.log.warn({ err }, 'cover render failed');
+        throw new AppError(422, 'edit_failed', 'We couldn’t apply your edits to this photo. Try again, or choose another photo.');
+      });
+      cover = { url: rendered.url, renderId: rendered.mediaId, recipe };
+    }
+
+    const refused = await tx(db, async (c) => {
+      const prev = await c.query(`SELECT cover_render_media_id FROM profiles WHERE user_id = $1 FOR UPDATE`, [u.id]);
+      // The automated check may have finished while the cover was rendering.
+      const verdict = (await c.query(`SELECT moderation FROM media WHERE id = $1 FOR SHARE`, [input.mediaId])).rows[0]?.moderation as string | undefined;
+      if (verdict === 'blocked' || verdict === 'sensitive') return verdict;
+      await retireCoverRender(c, prev.rows[0]?.cover_render_media_id, cover.renderId);
+      await c.query(`UPDATE profiles SET cover_url = $2, cover_media_id = $3, cover_alt = $4, cover_edit = $5, cover_render_media_id = $6 WHERE user_id = $1`, [
+        u.id,
+        cover.url,
+        input.mediaId,
+        alt,
+        cover.recipe ? JSON.stringify(cover.recipe) : null,
+        cover.renderId,
+      ]);
+      await c.query(`UPDATE media SET used_at = coalesce(used_at, now()) WHERE id = $1`, [input.mediaId]);
+      return null;
+    }).catch(async (err) => {
+      await retireCoverRender(db, cover.renderId);
+      throw err;
+    });
+    if (refused) {
+      await retireCoverRender(db, cover.renderId);
+      throw refused === 'blocked' ? new AppError(422, 'media_blocked', MEDIA_BLOCKED_MESSAGE) : coverSensitive();
+    }
     return { profile: await loadProfile(u.id, u.id) };
+  });
+
+  /**
+   * Your recent photos that can be a cover: your own, finished, not marked sensitive or blocked,
+   * not view-once and not an earlier cover's edited copy. Newest first.
+   */
+  app.get('/v1/me/cover/photos', { preHandler: requireAuth }, async (req) => {
+    const { rows } = await db.query(
+      `SELECT m.id, m.url, m.variants, m.width, m.height, m.alt_text, m.created_at FROM media m
+       WHERE m.owner_id = $1 AND m.kind = 'image' AND m.status = 'ready' AND NOT m.private AND m.deleted_at IS NULL
+         AND m.moderation IN ('pending', 'ok') AND m.storage_key IS NOT NULL AND m.mime <> 'image/gif'
+         AND NOT EXISTS (SELECT 1 FROM profiles pr WHERE pr.cover_render_media_id = m.id)
+       ORDER BY m.created_at DESC LIMIT 30`,
+      [me(req).id],
+    );
+    const items: CoverPhoto[] = [];
+    for (const r of rows) {
+      const v = (r.variants ?? {}) as Record<string, string>;
+      const url = v.large ?? v.medium;
+      if (!url) continue;
+      items.push({
+        id: r.id,
+        thumbUrl: v.thumb ?? v.medium ?? url,
+        url,
+        width: r.width,
+        height: r.height,
+        altText: r.alt_text,
+        createdAt: new Date(r.created_at).toISOString(),
+      });
+    }
+    return { items };
   });
 
   app.delete('/v1/me/cover', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
-    await db.query(`UPDATE profiles SET cover_url = NULL, cover_media_id = NULL, cover_alt = NULL WHERE user_id = $1`, [u.id]);
+    await clearCovers(db, `user_id = $1`, [u.id]);
     return { profile: await loadProfile(u.id, u.id) };
   });
 

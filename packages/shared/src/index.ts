@@ -33,3 +33,4 @@ export * from './games/index.ts';
 export * from './store-purchases.ts';
 export * from './mixes.ts';
 export * from './mix-schemas.ts';
+export * from './cover.ts';

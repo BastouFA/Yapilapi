@@ -271,7 +271,7 @@ function Preview({
           className="style-preview__band"
           style={
             photo
-              ? { backgroundImage: `url("${profile.coverUrl}")`, backgroundSize: 'cover', backgroundPosition: 'center' }
+              ? { backgroundImage: `url("${profile.coverUrl}")`, backgroundSize: 'cover', backgroundPosition: 'center', height: 'auto', aspectRatio: '8 / 3' }
               : { background: `linear-gradient(135deg, ${c.accentStrong}, ${c.accent} 50%, ${c.gradEnd})` }
           }
         />

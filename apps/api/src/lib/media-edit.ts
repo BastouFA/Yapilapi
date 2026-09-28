@@ -13,6 +13,7 @@ import {
   effectiveAdjustments,
   isIdentityMatrix,
   sharpenAmount,
+  straightenScale,
   textBoxColor,
   VIGNETTE_INNER,
   vignetteAlpha,
@@ -115,8 +116,33 @@ export function drawtextFilter(t: TextOverlay, width: number, textFile: string):
   );
 }
 
-/** Render an edited photo: turn, flip, crop, colour, sharpen, vignette, text. Returns a JPEG. */
-export async function renderPhoto(input: Buffer, p: EditorParams): Promise<{ data: Buffer; width: number; height: number }> {
+/** Steps only some photos use (covers): a straighten in degrees, and how much of the look (0–100, default all of it). */
+export interface PhotoExtras {
+  straighten?: number;
+  filterStrength?: number;
+}
+
+/** The output: JPEG by default, or WebP; `maxWidth` scales the cropped picture down before the colour work. */
+export interface PhotoOutput {
+  maxWidth?: number;
+  format?: 'jpeg' | 'webp';
+}
+
+/**
+ * Turn the picture by a few degrees and keep its middle, enlarged just enough (straightenScale)
+ * that no empty corner shows. The result has the picture's shape, so a crop's fractions still fit.
+ */
+async function straightenRaw(r: Raw, degrees: number): Promise<Raw> {
+  const { width: W, height: H } = r.info;
+  const s = straightenScale(W, H, degrees);
+  const turned = await toRaw(fromRaw(r).rotate(degrees, { background: { r: 255, g: 255, b: 255, alpha: 1 } }));
+  const w = Math.max(1, Math.min(turned.info.width, Math.floor(W / s)));
+  const h = Math.max(1, Math.min(turned.info.height, Math.floor(H / s)));
+  return toRaw(fromRaw(turned).extract({ left: Math.floor((turned.info.width - w) / 2), top: Math.floor((turned.info.height - h) / 2), width: w, height: h }));
+}
+
+/** Render an edited photo: turn, flip, straighten, crop, colour, sharpen, vignette, text. Returns a JPEG (or WebP). */
+export async function renderPhoto(input: Buffer, p: EditorParams & PhotoExtras, o: PhotoOutput = {}): Promise<{ data: Buffer; width: number; height: number }> {
   // Upright, flattened onto white, capped in size, with an opaque alpha channel for the recombination.
   let r = await toRaw(
     sharp(input, { failOn: 'none' })
@@ -132,10 +158,13 @@ export async function renderPhoto(input: Buffer, p: EditorParams): Promise<{ dat
     if (p.flipV) s = s.flip();
     r = await toRaw(s);
   }
+  if (p.straighten) r = await straightenRaw(r, p.straighten);
   if (p.crop) r = await toRaw(fromRaw(r).extract(cropBox(p.crop, r.info.width, r.info.height)));
-  const cm = colorMatrix(p.filter, p.adjustments);
+  if (o.maxWidth && r.info.width > o.maxWidth) r = await toRaw(fromRaw(r).resize({ width: o.maxWidth }));
+  const strength = (p.filterStrength ?? 100) / 100;
+  const cm = colorMatrix(p.filter, p.adjustments, strength);
   if (!isIdentityMatrix(cm)) r = await toRaw(fromRaw(r).recomb(recombMatrix(cm)));
-  const adj = effectiveAdjustments(p.filter, p.adjustments);
+  const adj = effectiveAdjustments(p.filter, p.adjustments, strength);
   const sharpen = sharpenAmount(adj);
   if (sharpen > 0) r = await toRaw(fromRaw(r).sharpen({ sigma: 0.5 + sharpen, m1: 1, m2: 2 }));
   const { width, height } = r.info;
@@ -155,7 +184,7 @@ export async function renderPhoto(input: Buffer, p: EditorParams): Promise<{ dat
     });
     out = sharp(png);
   }
-  const data = await out.jpeg({ quality: 90, mozjpeg: true }).toBuffer();
+  const data = o.format === 'webp' ? await out.webp({ quality: 84 }).toBuffer() : await out.jpeg({ quality: 90, mozjpeg: true }).toBuffer();
   return { data, width, height };
 }
 

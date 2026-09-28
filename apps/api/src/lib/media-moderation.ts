@@ -5,6 +5,7 @@ import type { RealtimeHub } from './realtime.ts';
 import { signV4 } from './sigv4.ts';
 import { audit, notify } from './services.ts';
 import { notifyReleasedPosts } from './collabs.ts';
+import { clearCovers } from './covers.ts';
 
 type Q = Pool | PoolClient;
 
@@ -233,8 +234,8 @@ export async function recordVerdict(
       provider,
     ]);
     // Covers are seen by everyone who sees the profile, people under 18 included, so a sensitive photo can't stay one.
-    if (result.verdict === 'sensitive')
-      await c.query(`UPDATE profiles SET cover_url = NULL, cover_media_id = NULL, cover_alt = NULL WHERE cover_media_id = $1`, [media.id]);
+    // An edited cover goes with its original.
+    if (result.verdict === 'sensitive') await clearCovers(c, `cover_media_id = $1 OR cover_render_media_id = $1`, [media.id]);
     if (result.verdict !== 'blocked' || prev.rows[0]?.moderation === 'blocked') return;
     await blockMedia(c, realtime, media, provider, result.labels);
   });
@@ -253,7 +254,7 @@ async function blockMedia(
     [media.id],
   );
   // A blocked photo comes off the profile it covers too.
-  await c.query(`UPDATE profiles SET cover_url = NULL, cover_media_id = NULL, cover_alt = NULL WHERE cover_media_id = $1`, [media.id]);
+  await clearCovers(c, `cover_media_id = $1 OR cover_render_media_id = $1`, [media.id]);
   const stories = await c.query<{ id: string }>(`SELECT id FROM moments WHERE media_id = $1 AND deleted_at IS NULL`, [media.id]);
   const messages = await c.query<{ id: string }>(`SELECT id FROM messages WHERE sender_id = $1 AND deleted_at IS NULL AND attachments @> $2::jsonb`, [
     media.ownerId,
@@ -299,6 +300,8 @@ export async function applyMediaDecision(
   }
   if (decision !== 'no_action' && decision !== 'restrict') return;
   await c.query(`UPDATE media SET moderation = $2, moderated_at = now() WHERE id = $1`, [mc.target_id, decision === 'restrict' ? 'sensitive' : 'ok']);
+  // Kept up but blurred is still no cover: everyone who sees the profile sees it.
+  if (decision === 'restrict') await clearCovers(c, `cover_media_id = $1 OR cover_render_media_id = $1`, [mc.target_id]);
   const posts = mc.signals?.posts ?? [];
   if (posts.length) {
     const restored = await c.query<{ id: string }>(
