@@ -6,6 +6,7 @@ import { Fragment } from 'react';
 import { Alert, Card } from '@yapilapi/design-system';
 import { LEGAL_DOCS, LEGAL_UPDATED, type LegalSlug } from '@yapilapi/shared';
 import { useSession } from '@/app/providers';
+import { LanguagePicker } from './LanguagePicker';
 
 /**
  * The legal and policy pages (/legal/*): public, no sign-in. The chrome is
@@ -62,6 +63,7 @@ export function LegalShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       <footer className="legal-foot">
+        <LanguagePicker className="legal-foot__lang" />
         <LegalLinks /> · © {new Date().getFullYear()} YAPILAPI
       </footer>
     </div>

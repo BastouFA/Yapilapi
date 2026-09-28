@@ -1,7 +1,7 @@
 import { readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 // Only the core, as the web loads it: English is here, the other languages load on demand.
-import { loadLocale, localeReady, SUPPORTED_LOCALES, t, tp } from './i18n-core.ts';
+import { loadLocale, localeReady, preferredLocale, SUPPORTED_LOCALES, t, tp } from './i18n-core.ts';
 import { en } from './locales/en.ts';
 
 describe('languages loaded on demand', () => {
@@ -45,5 +45,20 @@ describe('languages loaded on demand', () => {
       const catalog = (await import(`./locales/${code}.ts`))[code] as Record<string, string>;
       expect(t('app.tagline', code)).toBe(catalog['app.tagline']);
     }
+  });
+});
+
+describe("a visitor's language", () => {
+  it('takes the first preferred language the app has, by base language', () => {
+    expect(preferredLocale(['fr-CA', 'en-US'])).toBe('fr');
+    expect(preferredLocale(['de-DE', 'de', 'ar-EG'])).toBe('ar');
+    expect(preferredLocale(['pt_BR'])).toBe('pt');
+    expect(preferredLocale(['SW-ke'])).toBe('sw');
+  });
+
+  it('is English when none of them is available', () => {
+    expect(preferredLocale(['de', 'ja'])).toBe('en');
+    expect(preferredLocale([])).toBe('en');
+    expect(preferredLocale(['', null, undefined])).toBe('en');
   });
 });

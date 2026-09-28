@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { LanguagePicker } from '@/components/LanguagePicker';
 import { LegalLinks } from '@/components/Legal';
 import type { MessageKey } from '@yapilapi/shared';
 import { useSession } from './providers';
@@ -102,6 +103,7 @@ export default function Landing() {
         </div>
       </main>
       <footer className="landing__foot site-legal">
+        <LanguagePicker className="landing__lang" />
         <LegalLinks /> <span>© {new Date().getFullYear()} YAPILAPI</span>
       </footer>
     </div>
