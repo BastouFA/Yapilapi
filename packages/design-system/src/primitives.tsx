@@ -1,4 +1,6 @@
 import {
+  createContext,
+  useContext,
   useEffect,
   useId,
   useRef,
@@ -46,6 +48,29 @@ function inertOutside(node: HTMLElement): () => void {
 }
 
 /**
+ * The element focused before the one focused now. A field with `autoFocus` inside a modal takes
+ * focus before the modal's effect runs, so the effect can't just read `document.activeElement`
+ * to know where to return focus: it takes the one before instead.
+ */
+let focusedNow: HTMLElement | null = null;
+let focusedBefore: HTMLElement | null = null;
+let tracking = false;
+function trackFocus() {
+  if (tracking || typeof document === 'undefined') return;
+  tracking = true;
+  focusedNow = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  document.addEventListener(
+    'focusin',
+    (e) => {
+      if (!(e.target instanceof HTMLElement) || e.target === focusedNow) return;
+      focusedBefore = focusedNow;
+      focusedNow = e.target;
+    },
+    true,
+  );
+}
+
+/**
  * Modal focus handling for dialogs, sheets and overlays: moves focus into the
  * container (give it tabIndex={-1}), keeps Tab and Shift+Tab inside it, closes
  * on Escape, makes the rest of the page inert while it's open, and returns focus
@@ -54,10 +79,13 @@ function inertOutside(node: HTMLElement): () => void {
 export function useModalFocus(ref: RefObject<HTMLElement | null>, active: boolean, onEscape?: () => void) {
   const escape = useRef(onEscape);
   escape.current = onEscape;
+  trackFocus();
   useEffect(() => {
     const node = ref.current;
     if (!active || !node) return;
-    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const now = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    // Focus already inside (a field with autoFocus): return it to what had it before that.
+    const previous = now && node.contains(now) ? (focusedBefore && !node.contains(focusedBefore) ? focusedBefore : null) : now;
     modalStack.push(node);
     const restore = inertOutside(node);
     if (!node.contains(document.activeElement)) node.focus({ preventScroll: true });
@@ -124,9 +152,13 @@ export function Button({
     <button
       type={type}
       className={cx('yp-btn', `yp-btn--${variant}`, size !== 'md' && `yp-btn--${size}`, block && 'yp-btn--block', className)}
-      disabled={disabled || loading}
+      disabled={disabled}
+      // While loading it stays focusable (a disabled button drops focus to the page): marked busy
+      // and unavailable, and clicks do nothing (a submit button doesn't submit again).
+      aria-disabled={loading || undefined}
       aria-busy={loading || undefined}
       {...rest}
+      onClick={loading ? (e) => e.preventDefault() : rest.onClick}
     >
       {loading ? <span className="yp-btn__spin" aria-hidden /> : icon ? <Icon name={icon} /> : null}
       {children}
@@ -294,6 +326,17 @@ export function Alert({
   );
 }
 
+/** The heading level cards inside take by default (see CardHeadings). */
+const CardLevelContext = createContext<2 | 3>(3);
+
+/**
+ * Cards inside take this heading level unless they say otherwise: 2 on pages made of cards
+ * directly under the page's h1 (Settings), so headings don't skip a level.
+ */
+export function CardHeadings({ level, children }: { level: 2 | 3; children: ReactNode }) {
+  return <CardLevelContext.Provider value={level}>{children}</CardLevelContext.Provider>;
+}
+
 export function Card({
   title,
   subtitle,
@@ -303,9 +346,9 @@ export function Card({
   onClick,
   children,
   className,
-  level = 3,
+  level: levelProp,
 }: {
-  /** Heading level of the title: 2 for cards directly under a page's h1. */
+  /** Heading level of the title: 2 for cards directly under a page's h1 (default: 3, or what CardHeadings says). */
   level?: 2 | 3;
   title?: ReactNode;
   subtitle?: ReactNode;
@@ -316,6 +359,8 @@ export function Card({
   children?: ReactNode;
   className?: string;
 }) {
+  const inherited = useContext(CardLevelContext);
+  const level = levelProp ?? inherited;
   return (
     <section className={cx('yp-card', raised && 'yp-card--raised', onClick && 'yp-card--interactive', className)} onClick={onClick}>
       {title || subtitle || action ? (

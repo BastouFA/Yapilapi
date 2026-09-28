@@ -14,6 +14,7 @@ export {
   Badge,
   Button,
   Card,
+  CardHeadings,
   Checkbox,
   cx,
   Dialog,

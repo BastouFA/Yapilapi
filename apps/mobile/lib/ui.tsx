@@ -134,7 +134,10 @@ export function Button({
   const content = (
     <>
       {icon ? <Icon name={icon} size={size === 'sm' ? 16 : 18} color={fg} /> : null}
-      <Text style={{ color: fg, fontWeight: '700', fontSize: size === 'sm' ? 13 : 15 }}>{label}</Text>
+      {/* Buttons are a fixed height: the label grows with the text size up to twice, which still fits (larger would be cut off). */}
+      <Text maxFontSizeMultiplier={2} style={{ color: fg, fontWeight: '700', fontSize: size === 'sm' ? 13 : 15 }}>
+        {label}
+      </Text>
     </>
   );
   return (

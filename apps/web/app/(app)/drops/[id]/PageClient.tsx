@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Avatar, Badge, Button, EmptyState, Skeleton, Stat } from '@yapilapi/design-system';
 import { dropPhase, formatMoney, type Drop } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
@@ -55,11 +55,17 @@ export default function DropPageClient({ isPublic }: { isPublic: boolean }) {
           {drop.title}
         </h1>
         <Link href={`/u/${drop.seller.username}`} className="row drop__seller">
-          <Avatar name={drop.seller.displayName} src={drop.seller.avatarUrl} size="sm" /> {t('m.drops.by', { name: drop.seller.displayName })}
+          {/* The link says the name once: the picture is decoration here. */}
+          <span aria-hidden>
+            <Avatar name={drop.seller.displayName} src={drop.seller.avatarUrl} size="sm" />
+          </span>{' '}
+          {t('m.drops.by', { name: drop.seller.displayName })}
         </Link>
-        <p className="drop__when" aria-live="polite">
+        {/* Not a live region: "in 5 minutes" changes every minute. What's said out loud is when it opens, sells out or ends. */}
+        <p className="drop__when">
           <strong>{dropStatusText(t, locale, drop, now)}</strong>
         </p>
+        <PhaseNote phase={phase} text={dropStatusText(t, locale, drop, now)} />
         {drop.description ? (
           <p className="drop__description" dir="auto">
             {drop.description}
@@ -74,47 +80,41 @@ export default function DropPageClient({ isPublic }: { isPublic: boolean }) {
       {upcoming && !drop.isSeller ? (
         <section className="stack-sm drop__remind">
           {drop.reminded ? (
-            <>
-              <p style={{ margin: 0 }}>
-                <Badge tone="success">{t('m.drops.notifying')}</Badge>
-              </p>
-              <Button
-                variant="secondary"
-                loading={busy === 'remind'}
-                onClick={() =>
-                  run(
-                    'remind',
-                    async () => {
-                      await api.drops.unremind(drop.id);
-                      setDrop({ ...drop, reminded: false });
-                    },
-                    t('m.drops.notifyOff'),
-                  )
-                }
-              >
-                {t('m.drops.stopNotifying')}
-              </Button>
-            </>
-          ) : (
+            <p style={{ margin: 0 }}>
+              <Badge tone="success">{t('m.drops.notifying')}</Badge>
+            </p>
+          ) : null}
+          {/* One button that changes, so focus stays on it (the toast says what happened). */}
+          <div>
             <Button
-              icon="bell"
+              variant={drop.reminded ? 'secondary' : 'primary'}
+              icon={drop.reminded ? undefined : 'bell'}
               loading={busy === 'remind'}
               onClick={() =>
                 signedOut
                   ? signIn()
-                  : run(
-                      'remind',
-                      async () => {
-                        await api.drops.remind(drop.id);
-                        setDrop({ ...drop, reminded: true });
-                      },
-                      t('m.drops.notifyOn'),
-                    )
+                  : drop.reminded
+                    ? run(
+                        'remind',
+                        async () => {
+                          await api.drops.unremind(drop.id);
+                          setDrop({ ...drop, reminded: false });
+                        },
+                        t('m.drops.notifyOff'),
+                      )
+                    : run(
+                        'remind',
+                        async () => {
+                          await api.drops.remind(drop.id);
+                          setDrop({ ...drop, reminded: true });
+                        },
+                        t('m.drops.notifyOn'),
+                      )
               }
             >
-              {t('m.drops.notifyMe')}
+              {drop.reminded ? t('m.drops.stopNotifying') : t('m.drops.notifyMe')}
             </Button>
-          )}
+          </div>
           <p className="muted" style={{ margin: 0 }}>
             {t('m.drops.notifyNote')}
           </p>
@@ -248,5 +248,21 @@ export default function DropPageClient({ isPublic }: { isPublic: boolean }) {
       {signedOut ? <JoinNote text={t('m.drops.join')} /> : null}
       <ReportSheet target={reporting ? { type: 'drop', id: drop.id } : null} onClose={() => setReporting(false)} />
     </div>
+  );
+}
+
+/** Says the drop's status out loud when it opens, sells out or ends while you're here (not on every tick of the clock). */
+function PhaseNote({ phase, text }: { phase: string; text: string }) {
+  const seen = useRef(phase);
+  const [said, setSaid] = useState('');
+  useEffect(() => {
+    if (phase === seen.current) return;
+    seen.current = phase;
+    setSaid(text);
+  }, [phase, text]);
+  return (
+    <span className="yp-visually-hidden" role="status">
+      {said}
+    </span>
   );
 }

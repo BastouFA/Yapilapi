@@ -194,7 +194,11 @@ function MiniBoard({ game }: { game: ChatGame }) {
                 key={col}
                 style={{ width: size, height: size, borderRadius: 6, backgroundColor: c.surfaceSunken, alignItems: 'center', justifyContent: 'center' }}
               >
-                {v !== null ? <Text style={{ color: v === 0 ? c.yapi : c.ink, fontWeight: '800', fontSize: 16 }}>{v === 0 ? 'X' : 'O'}</Text> : null}
+                {v !== null ? (
+                  <Text maxFontSizeMultiplier={1.3} style={{ color: v === 0 ? c.yapi : c.ink, fontWeight: '800', fontSize: 16 }}>
+                    {v === 0 ? 'X' : 'O'}
+                  </Text>
+                ) : null}
               </View>
             );
           })}
@@ -302,8 +306,10 @@ export function GameSheet({
     <BottomSheet visible onClose={onClose} title={gameName(t, game.kind)} maxHeight="92%">
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
         {game.players.map((p, i) => (
+          // One stop per player for screen readers: "X, Ada".
           <View
             key={p.id}
+            accessible
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -394,7 +400,12 @@ export function GameSheet({
                       justifyContent: 'center',
                     }}
                   >
-                    {v !== null ? <Text style={{ color: v === 0 ? c.yapi : c.ink, fontSize: 40, fontWeight: '800' }}>{v === 0 ? 'X' : 'O'}</Text> : null}
+                    {/* The squares are a fixed size, so the mark grows with the text size only so far (the label says it anyway). */}
+                    {v !== null ? (
+                      <Text maxFontSizeMultiplier={1.3} style={{ color: v === 0 ? c.yapi : c.ink, fontSize: 40, fontWeight: '800' }}>
+                        {v === 0 ? 'X' : 'O'}
+                      </Text>
+                    ) : null}
                   </Pressable>
                 );
               })}

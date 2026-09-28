@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { Avatar, Button, Card, Icon, List, ListItem, type IconName } from '@yapilapi/design-system';
+import { Avatar, Button, Card, CardHeadings, Icon, List, ListItem, type IconName } from '@yapilapi/design-system';
 import type { MessageKey } from '@yapilapi/shared';
 import { errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
@@ -44,7 +44,10 @@ export function SettingsPage({ section, children }: { section: SectionId; childr
         </div>
       </div>
       <p className="muted settings-page__desc">{t(s.desc)}</p>
-      <div className="stack">{children}</div>
+      {/* Cards sit right under the page's h1, so their titles are h2. */}
+      <div className="stack">
+        <CardHeadings level={2}>{children}</CardHeadings>
+      </div>
     </div>
   );
 }

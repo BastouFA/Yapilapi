@@ -453,4 +453,17 @@ describe('weekly wrap', () => {
     expect(otd.posts.map((x: any) => x.id)).toEqual([old]);
     await db().query(`DELETE FROM feature_flags WHERE key = 'MEMORY'`);
   });
+
+  it('can be made for this week on demand in development and tests (for the accessibility audit), for yourself only', async () => {
+    const [u, other] = [await adult(), await adult()];
+    await as(t.app, u).post('/v1/posts', { body: 'Made this week' });
+    expect((await as(t.app, other).post('/dev/weekly-wrap')).body.items).toEqual([]);
+    const r = await as(t.app, u).post('/dev/weekly-wrap');
+    expect(r.status).toBe(200);
+    expect(r.body.items).toHaveLength(1);
+    expect(r.body.items[0].counts).toMatchObject({ posts: 1 });
+    // Once a week: asking again changes nothing.
+    expect((await as(t.app, u).post('/dev/weekly-wrap')).body.items).toHaveLength(1);
+    expect((await db().query(`SELECT 1 FROM weekly_wraps WHERE user_id = $1`, [other.id])).rowCount).toBe(1);
+  });
 });

@@ -51,6 +51,13 @@ const STATS: [keyof WeeklyWrapCounts, PluralKey][] = [
   ['songs', 'wrap.stat.songs'],
 ];
 
+/** The week's counts that aren't zero, in words ("3 posts, 1 new friend"), for a screen reader label. */
+export function wrapStatsText(counts: WeeklyWrapCounts, { tp, number }: Pick<Translator, 'tp' | 'number'>): string {
+  return STATS.filter(([k]) => counts[k] > 0)
+    .map(([k, label]) => `${number(counts[k])} ${tp(label, counts[k])}`)
+    .join(', ');
+}
+
 /** The week's counts that aren't zero, as small number-and-label pairs. */
 export function WrapStats({ counts }: { counts: WeeklyWrapCounts }) {
   const c = useColors();
@@ -273,7 +280,7 @@ function WrapPost({ post, big }: { post: Post; big?: boolean }) {
   return (
     <Pressable
       accessibilityRole="link"
-      accessibilityLabel={post.body ? post.body : t('m.title.post')}
+      accessibilityLabel={`${post.body || t('m.title.post')}, ${dateTime(post.createdAt)}`}
       onPress={() => router.push(`/p/${post.id}`)}
       style={({ pressed }) => ({ flexDirection: 'row', gap: space[3], alignItems: 'center', minHeight: 48, opacity: pressed ? 0.85 : 1 })}
     >
@@ -342,7 +349,7 @@ export function WrapSections({ wrap }: { wrap: WeeklyWrap }) {
       {wrap.newFriends.length ? (
         <Section title={t('wrap.newFriends')}>
           {wrap.newFriends.map((u) => (
-            <Pressable key={u.id} accessibilityRole="link" onPress={() => router.push(`/u/${u.username}`)} style={row}>
+            <Pressable key={u.id} accessibilityRole="link" accessibilityLabel={u.displayName} onPress={() => router.push(`/u/${u.username}`)} style={row}>
               <Avatar name={u.displayName} url={u.avatarUrl} size={36} />
               <Text numberOfLines={1} style={[line, userText, { flexShrink: 1 }]}>
                 {u.displayName}
@@ -354,7 +361,7 @@ export function WrapSections({ wrap }: { wrap: WeeklyWrap }) {
       {wrap.communities.length ? (
         <Section title={t('wrap.communities')}>
           {wrap.communities.map((x) => (
-            <Pressable key={x.id} accessibilityRole="link" onPress={() => router.push(`/c/${x.slug}`)} style={row}>
+            <Pressable key={x.id} accessibilityRole="link" accessibilityLabel={x.name} onPress={() => router.push(`/c/${x.slug}`)} style={row}>
               <Icon name="people-outline" size={20} color={c.yapi} />
               <Text numberOfLines={1} style={[line, userText, { flexShrink: 1 }]}>
                 {x.name}
@@ -381,7 +388,7 @@ export function WrapSections({ wrap }: { wrap: WeeklyWrap }) {
       {wrap.places.length ? (
         <Section title={t('wrap.places')}>
           {wrap.places.map((x) => (
-            <Pressable key={x.id} accessibilityRole="link" onPress={() => router.push(`/place/${x.id}`)} style={row}>
+            <Pressable key={x.id} accessibilityRole="link" accessibilityLabel={x.name} onPress={() => router.push(`/place/${x.id}`)} style={row}>
               <Icon name="location-outline" size={20} color={c.yapi} />
               <Text numberOfLines={1} style={[line, userText, { flexShrink: 1 }]}>
                 {x.name}
@@ -417,10 +424,17 @@ export function WrapSections({ wrap }: { wrap: WeeklyWrap }) {
 /** A past week in the list: its dates and counts. */
 export function WrapRow({ wrap }: { wrap: WeeklyWrapCard }) {
   const c = useColors();
-  const { t, date } = useT();
+  const tr = useT();
+  const { t, date } = tr;
   const dates = t('wrap.dates', { start: wrapDate(date, wrap.weekStart), end: wrapDate(date, wrap.weekEnd) });
+  // The card's label is all a screen reader hears of it, so it carries the counts too.
+  const stats = wrapStatsText(wrap.counts, tr);
   return (
-    <Card onPress={() => router.push({ pathname: '/wraps/[id]', params: { id: wrap.id } })} label={dates} style={{ gap: space[2] }}>
+    <Card
+      onPress={() => router.push({ pathname: '/wraps/[id]', params: { id: wrap.id } })}
+      label={stats ? `${dates}, ${stats}` : dates}
+      style={{ gap: space[2] }}
+    >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
         {wrap.thumbUrl ? (
           <Image source={{ uri: mediaUrl(wrap.thumbUrl) }} style={{ width: 48, height: 48, borderRadius: radius.md }} accessibilityIgnoresInvertColors />

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { badRequest, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { isEnabled } from '../lib/services.ts';
-import { currentWrapCard, isKnownTimeZone, listWraps, onThisDay, renderWrapCard, TIMEZONE_SQL, wrapFor } from '../lib/wrap.ts';
+import { currentWrapCard, isKnownTimeZone, listWraps, onThisDay, renderWrapCard, sweepWeeklyWraps, TIMEZONE_SQL, wrapFor } from '../lib/wrap.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -109,4 +109,18 @@ export default async function wrapsModule(app: FastifyInstance, ctx: AppContext)
     await db.query(`DELETE FROM notifications WHERE user_id = $1 AND entity_type = 'wrap' AND entity_id = $2`, [me(req).id, id]);
     return { ok: true };
   });
+
+  // Development and tests only: make your wrap for this week now, as if Sunday evening had come in
+  // your time zone (the accessibility audit and manual checks need one on any day of the week).
+  if (ctx.config.APP_ENV === 'development' || ctx.config.APP_ENV === 'test')
+    app.post('/dev/weekly-wrap', { preHandler: requireAuth }, async (req) => {
+      const u = me(req);
+      const { rows } = await db.query<{ at: Date }>(
+        `SELECT (date_trunc('week', now() AT TIME ZONE tz) + interval '6 days 20 hours') AT TIME ZONE tz AS at
+         FROM (SELECT ${TIMEZONE_SQL('up')} AS tz FROM users u LEFT JOIN user_preferences up ON up.user_id = u.id WHERE u.id = $1) x`,
+        [u.id],
+      );
+      await sweepWeeklyWraps({ db, realtime: ctx.realtime }, { now: rows[0]!.at, userIds: [u.id] });
+      return { items: await listWraps(db, u.id) };
+    });
 }

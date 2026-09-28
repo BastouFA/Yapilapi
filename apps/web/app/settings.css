@@ -27,7 +27,8 @@
   scroll-margin-top: 96px;
   border-radius: var(--radius-lg);
 }
-.settings-target > * {
+/* Not a dialog opened from the setting: the flash would replace its fade-in, and ending it would fade the dialog in again. */
+.settings-target > :not(.yp-dialog__backdrop) {
   animation: settings-flash 2.2s ease-out;
 }
 @keyframes settings-flash {
@@ -39,7 +40,7 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .settings-target > * {
+  .settings-target > :not(.yp-dialog__backdrop) {
     animation: none;
   }
 }

@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { AccessibilityInfo, Platform, Pressable, Text, View } from 'react-native';
 import type { Profile } from '../../../packages/shared/src/types';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import {
@@ -33,6 +33,13 @@ const AUDIENCE_LABEL: Record<AskAudience, MessageKey> = {
   following: 'ask.audience.following',
   friends: 'ask.audience.friends',
 };
+
+/** Read a note out on iOS when it appears; the live region around it covers Android. */
+function useSayOnIos(text: string | null | undefined) {
+  useEffect(() => {
+    if (text && Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(text);
+  }, [text]);
+}
 
 /**
  * A quoted question: the question, then "Asked by @name" (which opens their profile) or "Asked
@@ -103,13 +110,18 @@ export function AskCard({ profile, tint, onChanged }: { profile: Profile; tint: 
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState<{ tone: 'info' | 'danger'; text: string } | null>(null);
   const box = profile.ask;
+  useSayOnIos(note?.text);
 
   if (profile.relationship.isSelf) {
     if (!box?.enabled)
       return (
         <Card style={{ gap: space[2] }}>
           <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t('ask.card.self')}</Text>
-          {note ? <Notice tone={note.tone}>{note.text}</Notice> : null}
+          {note ? (
+            <View accessibilityLiveRegion="polite">
+              <Notice tone={note.tone}>{note.text}</Notice>
+            </View>
+          ) : null}
           <Button
             label={t('ask.card.turnOn')}
             size="sm"
@@ -301,6 +313,7 @@ export function AskBoxSettings() {
   const [box, setBox] = useState<AskBoxSettings | null>(null);
   const [prompt, setPrompt] = useState('');
   const [note, setNote] = useState<{ tone: 'info' | 'danger'; text: string } | null>(null);
+  useSayOnIos(note?.text);
   useEffect(() => {
     client()
       .then((api) => api.questions.box())

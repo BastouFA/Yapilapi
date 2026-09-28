@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Linking, Pressable, Text, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Image, Linking, Platform, Pressable, Text, View } from 'react-native';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import type { MusicTrack, PostMusic } from '../../../packages/shared/src/music';
 import {
@@ -180,7 +180,12 @@ export function ProfileSongChip({ song, tint }: { song: PostMusic; tint: Tint })
             <Icon name={playing ? 'pause' : 'play'} size={14} color={tint.onAccent} />
           </Pressable>
         ) : (
-          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }}>
+          // Only a picture: the line under the chip says why it can't play.
+          <View
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }}
+          >
             <Icon name="volume-mute-outline" size={14} color={c.inkMuted} />
           </View>
         )}
@@ -191,6 +196,8 @@ export function ProfileSongChip({ song, tint }: { song: PostMusic; tint: Tint })
           accessibilityRole="link"
           accessibilityLabel={`${t('ps.song.title')}: ${t('music.open', { title: song.title })}`}
           onPress={() => openMusic(song)}
+          // 32pt tall inside the chip; the touch area still reaches 44pt.
+          hitSlop={6}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, minHeight: 32 }}
         >
           <Icon name={playing && !reduce ? 'musical-notes' : 'musical-note'} size={14} color={tint.accentStrong} />
@@ -536,7 +543,10 @@ export function TabsEditor({
     const next = [...order];
     [next[i], next[j]] = [next[j]!, next[i]!];
     onChange(next, shown);
-    setStatus(t('ps.tabs.moved', { tab: t(TAB_LABELS[next[j]!]), position: j + 1 }));
+    const moved = t('ps.tabs.moved', { tab: t(TAB_LABELS[next[j]!]), position: j + 1 });
+    setStatus(moved);
+    // The hidden live region below covers Android; iOS has none.
+    if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(moved);
   };
   return (
     <View style={{ gap: space[2] }}>
@@ -598,7 +608,7 @@ export function TabsEditor({
           </View>
         );
       })}
-      <Text accessibilityLiveRegion="polite" style={{ height: 0, opacity: 0 }}>
+      <Text accessibilityLiveRegion="polite" accessibilityElementsHidden style={{ height: 0, opacity: 0 }}>
         {status}
       </Text>
     </View>
@@ -704,7 +714,9 @@ export function FeaturedEditor({
                         justifyContent: 'center',
                       }}
                     >
-                      <Text style={{ color: tint.onAccent, fontWeight: '800', fontSize: 12 }}>{value.findIndex((x) => x.id === p.id) + 1}</Text>
+                      <Text maxFontSizeMultiplier={1.3} style={{ color: tint.onAccent, fontWeight: '800', fontSize: 12 }}>
+                        {value.findIndex((x) => x.id === p.id) + 1}
+                      </Text>
                     </View>
                   ) : null}
                 </Pressable>

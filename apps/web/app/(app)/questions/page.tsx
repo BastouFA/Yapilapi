@@ -205,7 +205,7 @@ export default function QuestionsPage() {
                 {q.askerBlocked ? <Badge tone="neutral">{t('ask.blocked.note')}</Badge> : null}
                 <span className="yp-spacer" />
                 {q.state === 'new' && answering !== q.id ? (
-                  <Button size="sm" onClick={() => setAnswering(q.id)} disabled={busy === q.id}>
+                  <Button id={`answer-${q.id}`} size="sm" onClick={() => setAnswering(q.id)} disabled={busy === q.id}>
                     {t('ask.action.answer')}
                   </Button>
                 ) : null}
@@ -232,7 +232,11 @@ export default function QuestionsPage() {
               </div>
               {answering === q.id ? (
                 <AnswerForm
-                  onCancel={() => setAnswering(null)}
+                  onCancel={() => {
+                    setAnswering(null);
+                    // Back to the Answer button the form replaced.
+                    requestAnimationFrame(() => document.getElementById(`answer-${q.id}`)?.focus());
+                  }}
                   onSend={async (answer, share) => {
                     const r = await api.questions.answer(q.id, answer, share);
                     setAnswering(null);

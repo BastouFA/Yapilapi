@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Avatar, Button, Card, Checkbox, Icon, TextField } from '@yapilapi/design-system';
 import {
   CITY_MAX,
@@ -356,6 +356,8 @@ export function ProfileCustomizeCard() {
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
+  const linkList = useRef<HTMLOListElement>(null);
+  const addLink = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!me) return;
@@ -423,9 +425,9 @@ export function ProfileCustomizeCard() {
       <div className="stack customize">
         {/* Style, with a live preview in both themes */}
         <section className="stack-sm" aria-labelledby="ps-style">
-          <h4 id="ps-style" className="customize__heading">
+          <h3 id="ps-style" className="customize__heading">
             {t('ps.style.title')}
-          </h4>
+          </h3>
           <div className="style-previews" aria-hidden>
             <Preview theme="light" accent={accent} header={header} profile={profile} pronouns={pronouns} />
             <Preview theme="dark" accent={accent} header={header} profile={profile} pronouns={pronouns} />
@@ -453,9 +455,10 @@ export function ProfileCustomizeCard() {
           </fieldset>
           <fieldset className="header-picker">
             <legend className="yp-field__label">{t('ps.header.label')}</legend>
-            <div className="yp-segments" role="radiogroup" aria-label={t('ps.header.label')}>
+            {/* Toggle buttons like Segments (a radio can't also be "pressed"); the fieldset names the group. */}
+            <div className="yp-segments">
               {PROFILE_HEADER_STYLES.map((h) => (
-                <button key={h} type="button" role="radio" aria-checked={header === h} aria-pressed={header === h} onClick={() => setHeader(h)}>
+                <button key={h} type="button" aria-pressed={header === h} onClick={() => setHeader(h)}>
                   {t(HEADER_LABELS[h])}
                 </button>
               ))}
@@ -468,9 +471,9 @@ export function ProfileCustomizeCard() {
 
         {/* About */}
         <section className="stack-sm" aria-labelledby="ps-about">
-          <h4 id="ps-about" className="customize__heading">
+          <h3 id="ps-about" className="customize__heading">
             {t('ps.about')}
-          </h4>
+          </h3>
           <div className="customize__pair">
             <TextField
               label={t('ps.pronouns')}
@@ -494,13 +497,13 @@ export function ProfileCustomizeCard() {
 
         {/* Links */}
         <section className="stack-sm" aria-labelledby="ps-links">
-          <h4 id="ps-links" className="customize__heading">
+          <h3 id="ps-links" className="customize__heading">
             {t('ps.links.title')}
-          </h4>
+          </h3>
           <p className="muted" style={{ margin: 0, fontSize: 14 }}>
             {t('ps.links.hint', { max: MAX_PROFILE_LINKS })}
           </p>
-          <ol className="link-editor">
+          <ol className="link-editor" ref={linkList}>
             {links.map((l, i) => (
               <li key={i} className="link-editor__row">
                 <TextField
@@ -532,7 +535,11 @@ export function ProfileCustomizeCard() {
                   variant="ghost"
                   icon="trash"
                   aria-label={t('ps.links.remove', { n: i + 1 })}
-                  onClick={() => setLinks((ls) => ls.filter((_, j) => j !== i))}
+                  onClick={() => {
+                    setLinks((ls) => ls.filter((_, j) => j !== i));
+                    // The button goes with its row: focus moves to "Add a link".
+                    requestAnimationFrame(() => addLink.current?.focus());
+                  }}
                 />
               </li>
             ))}
@@ -543,8 +550,13 @@ export function ProfileCustomizeCard() {
               size="sm"
               variant="secondary"
               icon="plus"
+              ref={addLink}
               disabled={links.length >= MAX_PROFILE_LINKS}
-              onClick={() => setLinks((ls) => [...ls, { label: '', url: '' }])}
+              onClick={() => {
+                setLinks((ls) => [...ls, { label: '', url: '' }]);
+                // Straight to the new link's name.
+                requestAnimationFrame(() => linkList.current?.querySelector<HTMLInputElement>('li:last-child input')?.focus());
+              }}
             >
               {t('ps.links.add')}
             </Button>
@@ -553,9 +565,9 @@ export function ProfileCustomizeCard() {
 
         {/* Song */}
         <section className="stack-sm" aria-labelledby="ps-song">
-          <h4 id="ps-song" className="customize__heading">
+          <h3 id="ps-song" className="customize__heading">
             {t('ps.song.title')}
-          </h4>
+          </h3>
           <p className="muted" style={{ margin: 0, fontSize: 14 }}>
             {t('ps.song.hint')}
           </p>
@@ -572,9 +584,9 @@ export function ProfileCustomizeCard() {
 
         {/* Tabs */}
         <section className="stack-sm" aria-labelledby="ps-tabs">
-          <h4 id="ps-tabs" className="customize__heading">
+          <h3 id="ps-tabs" className="customize__heading">
             {t('ps.tabs.title')}
-          </h4>
+          </h3>
           <p className="muted" style={{ margin: 0, fontSize: 14 }}>
             {t('ps.tabs.hint')}
           </p>
@@ -659,14 +671,15 @@ function FeaturedPicker({ username, value, onChange, error }: { username: string
     );
   }, [open, items, username]);
   const chosen = useMemo(() => new Set(value.map((p) => p.id)), [value]);
+  const pickButton = useRef<HTMLButtonElement>(null);
   // Only posts other people can see, and not ones in a community.
   const choosable = (items ?? []).filter((p) => p.visibility !== 'private' && !p.community && !p.status);
 
   return (
     <section className="stack-sm" aria-labelledby="ps-featured">
-      <h4 id="ps-featured" className="customize__heading">
+      <h3 id="ps-featured" className="customize__heading">
         {t('ps.featured.title')}
-      </h4>
+      </h3>
       <p className="muted" style={{ margin: 0, fontSize: 14 }}>
         {t('ps.featured.hint', { max: MAX_FEATURED_POSTS })}
       </p>
@@ -685,7 +698,10 @@ function FeaturedPicker({ username, value, onChange, error }: { username: string
                 variant="ghost"
                 icon="x"
                 aria-label={t('ps.featured.remove', { n: i + 1 })}
-                onClick={() => onChange(value.filter((x) => x.id !== p.id))}
+                onClick={() => {
+                  onChange(value.filter((x) => x.id !== p.id));
+                  requestAnimationFrame(() => pickButton.current?.focus());
+                }}
               />
             </li>
           ))}
@@ -697,7 +713,7 @@ function FeaturedPicker({ username, value, onChange, error }: { username: string
       )}
       {error ? <span className="yp-field__error">{error}</span> : null}
       <div className="row">
-        <Button size="sm" variant="secondary" icon={open ? 'chevron-down' : 'plus'} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <Button ref={pickButton} size="sm" variant="secondary" icon={open ? 'chevron-down' : 'plus'} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
           {open ? t('ps.featured.done') : t('ps.featured.pick')}
         </Button>
       </div>

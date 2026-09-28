@@ -1,7 +1,20 @@
 import { VideoView } from 'expo-video';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Alert, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import {
+  AccessibilityInfo,
+  Alert,
+  FlatList,
+  Image,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Message, Post, PublicUser } from '../../../../packages/shared/src/types';
 import { WATCH_REACTIONS, type WatchQueueItem, type WatchSkipReason } from '../../../../packages/shared/src/watch';
@@ -69,6 +82,16 @@ export default function WatchScreen() {
     shownSkipped.current = true;
     flashSkipped(skipped.split(',').filter(Boolean) as WatchSkipReason[]);
   }, [skipped, flashSkipped]);
+
+  // iOS has no live regions: say it when the video jumps to catch up, and read the notes out
+  // (who hosts now, what went in the queue). Android reads the live regions below.
+  const { syncing, notice } = w;
+  useEffect(() => {
+    if (syncing && Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(t('watch.syncing'));
+  }, [syncing, t]);
+  useEffect(() => {
+    if (notice && Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(notice);
+  }, [notice]);
 
   /** Back to the chat: to the chat screen already open underneath, or it takes this screen's place. Either way this one closes (and leaves). */
   const backToChat = () => {
@@ -185,22 +208,14 @@ export default function WatchScreen() {
             <Text style={{ color: WHITE, fontSize: 13, textAlign: 'center', lineHeight: 18 }}>{t('watch.dataSaverNote')}</Text>
           </View>
         ) : null}
-        {w.syncing ? (
-          <View
-            accessibilityLiveRegion="polite"
-            style={{
-              position: 'absolute',
-              top: space[2],
-              start: space[2],
-              backgroundColor: SCRIM,
-              borderRadius: radius.full,
-              paddingHorizontal: space[3],
-              paddingVertical: 4,
-            }}
-          >
-            <Text style={{ color: WHITE, fontSize: 12, fontWeight: '600' }}>{t('watch.syncing')}</Text>
-          </View>
-        ) : null}
+        {/* Always there (empty when in sync), so Android reads the pill as it appears. */}
+        <View accessibilityLiveRegion="polite" pointerEvents="none" style={{ position: 'absolute', top: space[2], start: space[2] }}>
+          {w.syncing ? (
+            <View style={{ backgroundColor: SCRIM, borderRadius: radius.full, paddingHorizontal: space[3], paddingVertical: 4 }}>
+              <Text style={{ color: WHITE, fontSize: 12, fontWeight: '600' }}>{t('watch.syncing')}</Text>
+            </View>
+          ) : null}
+        </View>
         <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={StyleSheet.absoluteFill}>
           {w.reactions.map((r) => (
             <FloatingReaction key={r.id} kind={r.kind} x={r.x} reduce={reduce} />
@@ -394,7 +409,8 @@ function SideChat({ conversationId, meId }: { conversationId: string; meId: stri
           const mine = m.sender.id === meId;
           const text = m.unsent ? t('m.chat.unsent') : previewText(t, previewOf(m));
           return (
-            <View style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '85%', gap: 2 }}>
+            // One stop per message for screen readers: who wrote it, then what they wrote.
+            <View accessible style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '85%', gap: 2 }}>
               {!mine ? <Text style={[{ color: c.inkMuted, fontSize: 12, fontWeight: '600' }, userText]}>{m.sender.displayName}</Text> : null}
               <View style={{ backgroundColor: mine ? c.yapi : c.surface, borderRadius: radius.lg, paddingHorizontal: space[3], paddingVertical: space[2] }}>
                 <Text style={[{ color: mine ? c.onYapi : c.ink, fontSize: 15, lineHeight: 20, fontStyle: m.unsent ? 'italic' : 'normal' }, userText]}>
@@ -623,8 +639,8 @@ function Queue({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={caption ? `${q.post.author.displayName}: ${caption}` : q.post.author.displayName}
-              accessibilityHint={on ? undefined : t('watch.play')}
-              accessibilityState={{ selected: on }}
+              accessibilityHint={on ? undefined : t('watch.playNow')}
+              accessibilityState={{ selected: on, disabled: on }}
               disabled={on}
               onPress={() => onJump(q.id)}
               style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44 }}
@@ -659,7 +675,8 @@ function Queue({
             {canRemove ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={t('watch.remove')}
+                // Several of these in a list: say which video each one takes out.
+                accessibilityLabel={`${t('watch.remove')}: ${caption || q.post.author.displayName}`}
                 hitSlop={6}
                 onPress={() => onRemove(q.id)}
                 style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}

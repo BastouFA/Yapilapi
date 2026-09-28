@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { DATA, liveRoom, STATE, type SeedData } from './global-setup';
+import { DATA, liveRoom, STATE, watchSession, type SeedData } from './global-setup';
 
 /**
  * axe-core over the main pages, and over open sheets, menus and other states,
@@ -14,6 +14,7 @@ import { DATA, liveRoom, STATE, type SeedData } from './global-setup';
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'];
 
 const data = (): SeedData => JSON.parse(readFileSync(DATA, 'utf8'));
+const BASE = process.env.A11Y_BASE_URL ?? 'http://127.0.0.1:3100';
 const FIXTURES = path.join(import.meta.dirname, 'fixtures');
 
 const PUBLIC_PAGES: [string, string][] = [
@@ -77,6 +78,35 @@ const APP_PAGES: [string, (d: SeedData) => string][] = [
   ['sound', (d) => `/sounds/${d.soundId}`],
   ['reel with highlights', (d) => `/reels?start=${d.reel2Id}`],
 ];
+
+/**
+ * Newer pages: weekly wraps, Ask me, drops, and a chat with a wallpaper, a scheduled message and
+ * games. On phones these (and the newer states below) are also audited at 375px wide, the
+ * narrowest common phone, and must not scroll sideways there.
+ */
+const NEW_PAGES: [string, (d: SeedData) => string][] = [
+  ['wraps', () => '/wraps'],
+  ['wrap', (d) => (d.wrapId ? `/wraps/${d.wrapId}` : '/wraps')],
+  ['questions', () => '/questions'],
+  ['drops', () => '/drops'],
+  ['new drop', () => '/drops/new'],
+  ['drop', (d) => `/drops/${d.dropId}`],
+  ['your drop', (d) => `/drops/${d.myDropId}`],
+  ['edit drop', (d) => `/drops/${d.myDropId}/edit`],
+  ['chat with games', (d) => `/inbox/${d.gamesChatId}`],
+];
+
+const PHONE = { width: 375, height: 812 };
+
+/** On phones, a 375px-wide screen (the Pixel 7 projects are 412px). */
+async function narrow(page: Page, project: string) {
+  if (project.startsWith('mobile')) await page.setViewportSize(PHONE);
+}
+
+async function noSidewaysScroll(page: Page, name: string) {
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow, `${name} is ${overflow}px wider than the screen`).toBeLessThanOrEqual(1);
+}
 
 /** Wait for content, then for finite animations (so contrast isn't measured mid-fade). */
 async function settle(page: Page) {
@@ -161,6 +191,13 @@ test.describe('signed-in pages', () => {
     test(name, async ({ page }, info) => {
       await open(page, url(data()));
       await audit(page, name, info.project.name);
+    });
+  for (const [name, url] of NEW_PAGES)
+    test(name, async ({ page }, info) => {
+      await narrow(page, info.project.name);
+      await open(page, url(data()));
+      await audit(page, name, info.project.name);
+      await noSidewaysScroll(page, name);
     });
 });
 
@@ -474,12 +511,139 @@ const STATES: [string, (page: Page, d: SeedData) => Promise<void>][] = [
   ],
 ];
 
+/** Newer states (audited at 375px on phones, like NEW_PAGES). */
+const NEW_STATES: [string, (page: Page, d: SeedData) => Promise<void>][] = [
+  [
+    'home: pulse cards and drops',
+    async (page, d) => {
+      await open(page, '/home');
+      if (d.wrapId) await expect(page.getByRole('link', { name: 'Look back' })).toBeVisible();
+      await expect(page.getByRole('link', { name: /Friday bake/ }).first()).toBeVisible();
+    },
+  ],
+  [
+    'profile: styled header, links and song',
+    async (page, d) => {
+      await open(page, `/u/${d.username}`);
+      await expect(page.getByRole('list', { name: 'Links' })).toBeVisible();
+      await expect(page.getByRole('link', { name: /Oven timer beats/ }).first()).toBeVisible();
+    },
+  ],
+  [
+    'profile: answers tab',
+    async (page, d) => {
+      await open(page, `/u/${d.username}`);
+      await page.getByRole('group', { name: 'Tabs' }).getByRole('button', { name: 'Answers' }).click();
+      await expect(page.getByText('Lentil and lemon, done in thirty minutes.')).toBeVisible();
+    },
+  ],
+  [
+    'other profile: ask card',
+    async (page, d) => {
+      await open(page, `/u/${d.friendUsername}`);
+      await page.getByRole('textbox', { name: 'Your question' }).fill('What flour do you use?');
+    },
+  ],
+  [
+    'questions: answering',
+    async (page) => {
+      await open(page, '/questions');
+      await page.getByRole('button', { name: 'Answer', exact: true }).first().click();
+      await page.getByRole('textbox', { name: 'Your answer' }).fill('The one by the station, on Saturdays.');
+    },
+  ],
+  [
+    'drops: yours',
+    async (page) => {
+      await open(page, '/drops');
+      await page.getByRole('button', { name: 'Yours', exact: true }).click();
+      await expect(page.getByRole('link', { name: /Summer jam/ })).toBeVisible();
+    },
+  ],
+  [
+    'chat: watch together banner',
+    async (page, d) => {
+      await watchSession(BASE);
+      await open(page, `/inbox/${d.gamesChatId}`);
+      await expect(page.getByRole('region', { name: 'Watching together now' })).toBeVisible();
+    },
+  ],
+  [
+    'watch together',
+    async (page) => {
+      const id = await watchSession(BASE);
+      await open(page, `/watch/${id}`);
+      await expect(page.getByRole('heading', { level: 1, name: 'Watch together' })).toBeVisible();
+    },
+  ],
+  [
+    'chat: start a game',
+    async (page, d) => {
+      await open(page, `/inbox/${d.gamesChatId}`);
+      await page.getByRole('button', { name: 'Add a poll, a list or a game' }).click();
+      await page.getByRole('menuitem', { name: 'Play a game' }).click();
+      await expect(page.getByRole('dialog', { name: 'Start a game' })).toBeVisible();
+    },
+  ],
+  ...(['Four up', 'Noughts', 'Word ladder'] as const).map((game): [string, (page: Page, d: SeedData) => Promise<void>] => [
+    `chat: ${game} board`,
+    async (page, d) => {
+      await open(page, `/inbox/${d.gamesChatId}`);
+      await page.getByRole('button', { name: `Your turn: ${game}` }).click();
+      await expect(page.getByRole('dialog', { name: game })).toBeVisible();
+    },
+  ]),
+  [
+    'chat: wallpaper and colour',
+    async (page, d) => {
+      await open(page, `/inbox/${d.gamesChatId}`);
+      await page.getByRole('button', { name: 'Conversation options' }).click();
+      await page.getByRole('menuitem', { name: 'Wallpaper and colour' }).click();
+      await expect(page.getByRole('dialog', { name: 'Wallpaper and colour' })).toBeVisible();
+    },
+  ],
+  [
+    'chat: send later',
+    async (page, d) => {
+      await open(page, `/inbox/${d.gamesChatId}`);
+      await page.getByRole('textbox', { name: /message/i }).fill('See you at the market');
+      await page.getByRole('button', { name: 'Send later' }).click();
+      await expect(page.getByRole('dialog', { name: 'Send later' })).toBeVisible();
+    },
+  ],
+  [
+    'settings: customise your profile',
+    async (page) => {
+      await open(page, '/settings/account#customise');
+      await page.getByRole('button', { name: 'Add a link' }).click();
+      await expect(page.getByRole('heading', { name: 'Customise your profile' })).toBeVisible();
+    },
+  ],
+  [
+    'settings: change username',
+    async (page, d) => {
+      await open(page, '/settings/account');
+      await page.getByRole('button', { name: 'Change username' }).click();
+      const sheet = page.getByRole('dialog', { name: 'Change your username' });
+      await sheet.getByRole('textbox', { name: 'New username' }).fill(`${d.username.slice(0, 24)}_new`);
+      await expect(sheet.getByRole('status')).toHaveText(/is available/);
+    },
+  ],
+];
+
 test.describe('open sheets, menus and states', () => {
   test.use({ storageState: STATE });
   for (const [name, run] of STATES)
     test(name, async ({ page }, info) => {
       await run(page, data());
       await audit(page, name.replace(/[:/]/g, ' -'), info.project.name);
+    });
+  for (const [name, run] of NEW_STATES)
+    test(name, async ({ page }, info) => {
+      await narrow(page, info.project.name);
+      await run(page, data());
+      await audit(page, name.replace(/[:/]/g, ' -'), info.project.name);
+      await noSidewaysScroll(page, name);
     });
 
   test('room: before joining', async ({ page }, info) => {
@@ -507,7 +671,7 @@ test.describe('open sheets, menus and states', () => {
  */
 test.describe('right-to-left layout', () => {
   test.use({ storageState: STATE });
-  for (const [name, url] of APP_PAGES)
+  for (const [name, url] of [...APP_PAGES, ...NEW_PAGES])
     test(`${name} has no horizontal overflow in RTL`, async ({ page }) => {
       await page.goto(url(data()));
       await expect(page.locator('main#main')).toBeVisible();
