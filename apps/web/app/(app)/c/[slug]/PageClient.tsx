@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { AIPanel, Alert, Avatar, Badge, Button, EmptyState, EventCard, List, ListItem, Skeleton, Tabs } from '@yapilapi/design-system';
 import type { Community, EventItem, MessageKey, PublicUser, RoomSummary } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { PostList } from '@/components/PostList';
 import { CommunityFaq } from '@/components/CommunityExtras';
@@ -39,6 +39,8 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
   const [c, setC] = useState<(Community & { membershipStatus: string | null }) | null>(null);
   const [chatId, setChatId] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
+  // Why it couldn't load, when that isn't because it's gone; a community already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [members, setMembers] = useState<{ user: PublicUser; role: string }[] | null>(null);
   const [events, setEvents] = useState<EventItem[] | null>(null);
   const [summary, setSummary] = useState<{ text: string; dev: boolean } | null>(null);
@@ -46,17 +48,16 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
   const [tab, setTab] = useState('posts');
   const [liveRoom, setLiveRoom] = useState<RoomSummary | null>(null);
 
-  const reload = useCallback(
-    () =>
-      api.communities.get(slug).then(
-        (r) => {
-          setC(r.community);
-          setChatId(r.chatConversationId);
-        },
-        () => setMissing(true),
-      ),
-    [slug],
-  );
+  const reload = useCallback(() => {
+    setLoadError(null);
+    return api.communities.get(slug).then(
+      (r) => {
+        setC(r.community);
+        setChatId(r.chatConversationId);
+      },
+      (e) => (isGone(e) ? setMissing(true) : setLoadError(errorMessage(e))),
+    );
+  }, [slug]);
   useEffect(() => {
     if (signedOut && !isPublic) return;
     void reload();
@@ -86,6 +87,7 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
 
   if (signedOut && !isPublic) return <NeedsAccount title={t('communityPage.signIn.title')} body={t('communityPage.signIn.body')} />;
   if (missing) return <EmptyState title={t('m.community.notFound.title')} body={t('m.community.notFound.body')} />;
+  if (!c && loadError) return <EmptyState title={loadError} action={<Button onClick={() => void reload()}>{t('m.common.retry')}</Button>} />;
   if (!c) return <Skeleton height={200} />;
 
   const isMember = !!c.myRole;

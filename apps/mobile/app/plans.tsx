@@ -1,14 +1,14 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import type { Profile } from '../../../packages/shared/src/types';
-import { client } from '../lib/api';
+import { client, errorMessage, isGone } from '../lib/api';
 import { useFlag } from '../lib/flags';
 import { useT } from '../lib/i18n';
 import { PlanList, usePlans, useWebCheckout, webCheckout } from '../lib/money';
 import { ManagedOnWeb, useDigitalPurchases } from '../lib/store';
 import { space } from '../lib/theme';
-import { Avatar, Button, Card, EmptyState, Loading, Notice, useColors, userText } from '../lib/ui';
+import { Avatar, Button, Card, EmptyState, Loading, Notice, ScreenError, useColors, userText } from '../lib/ui';
 
 /**
  * A creator's plans (`plans?username=`, and web links to /u/<name>?subscribe=1): each plan's
@@ -23,18 +23,26 @@ export default function PlansScreen() {
   const commerce = useFlag('COMMERCE');
   const offer = useDigitalPurchases();
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
+  // Why the profile couldn't load, when that isn't because it's gone or private.
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  useEffect(() => {
+  const loadProfile = useCallback(() => {
+    setProfileError(null);
     void client()
       .then((api) => api.users.get(username))
       .then(
         (r) => setProfile(r.profile),
-        () => setProfile(null),
+        (e) => (isGone(e) ? setProfile(null) : setProfileError(errorMessage(e))),
       );
   }, [username]);
-  const { data, load } = usePlans(profile?.id);
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
+  const { data, loadError, load } = usePlans(profile?.id);
   const { open, opened } = useWebCheckout(() => void load());
 
+  if (profile === undefined && profileError) return <ScreenError message={profileError} onRetry={loadProfile} />;
+  if (profile && data === undefined && loadError) return <ScreenError message={loadError} onRetry={load} />;
   if (profile === undefined || (profile && data === undefined)) return <Loading />;
   if (profile === null || data === null)
     return (

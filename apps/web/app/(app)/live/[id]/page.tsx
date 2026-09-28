@@ -1,10 +1,10 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Alert, Badge, Button, ChatBubble, EmptyState, Menu, Segments, Skeleton } from '@yapilapi/design-system';
 import type { LiveChatMessage, LiveSummary } from '@yapilapi/api-client';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { useRealtime, useSession } from '../../../providers';
 import { HlsVideo } from '@/components/HlsVideo';
 import { TipSheet } from '@/components/SupportCreator';
@@ -44,6 +44,8 @@ export default function LivePage() {
     return () => clearInterval(timer);
   }, [waitingForTicket, id]);
   const [missing, setMissing] = useState(false);
+  // Why it couldn't load, when that isn't because it's gone or private.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [chat, setChat] = useState<LiveChatMessage[]>([]);
   const [body, setBody] = useState('');
   const [kind, setKind] = useState<'chat' | 'question'>('chat');
@@ -65,13 +67,8 @@ export default function LivePage() {
   const isHost = live?.myRole === 'host';
   const canModerate = live?.myRole === 'host' || live?.myRole === 'cohost' || live?.myRole === 'moderator';
 
-  useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem(`ypl-ingest-${id}`);
-      if (raw) setIngest(JSON.parse(raw));
-    } catch {
-      /* storage may be unavailable */
-    }
+  const load = useCallback(() => {
+    setLoadError(null);
     api.live.get(id).then(
       async (r) => {
         setLive(r.live);
@@ -81,10 +78,19 @@ export default function LivePage() {
           .then((c) => setChat(c.items))
           .catch(() => {});
       },
-      () => setMissing(true),
+      (e) => (isGone(e) ? setMissing(true) : setLoadError(errorMessage(e))),
     );
-    return () => void api.live.leave(id).catch(() => {});
   }, [id]);
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(`ypl-ingest-${id}`);
+      if (raw) setIngest(JSON.parse(raw));
+    } catch {
+      /* storage may be unavailable */
+    }
+    load();
+    return () => void api.live.leave(id).catch(() => {});
+  }, [id, load]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' });
@@ -101,6 +107,7 @@ export default function LivePage() {
   });
 
   if (missing) return <EmptyState title={t('m.live.missing')} />;
+  if (!live && loadError) return <EmptyState title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />;
   if (!live) return <Skeleton height={320} />;
 
   return (

@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { Badge, EmptyState, EventCard, Skeleton } from '@yapilapi/design-system';
+import { useCallback, useEffect, useState } from 'react';
+import { Badge, Button, EmptyState, EventCard, Skeleton } from '@yapilapi/design-system';
 import type { EventItem } from '@yapilapi/shared';
-import { api } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { BuyButton } from '@/components/BuyButton';
 import { BookTable, ManageBookings, PlaceReviews } from '@/components/PlaceExtras';
@@ -17,10 +17,17 @@ export default function PlacePage() {
   const { locale, t } = useSession();
   const [data, setData] = useState<{ place: Record<string, any>; events: EventItem[]; products: Record<string, any>[] } | null>(null);
   const [missing, setMissing] = useState(false);
-  useEffect(() => {
-    api.places.get(id).then(setData, () => setMissing(true));
+  // Why it couldn't load, when that isn't because it's gone.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const load = useCallback(() => {
+    setLoadError(null);
+    api.places.get(id).then(setData, (e) => (isGone(e) ? setMissing(true) : setLoadError(errorMessage(e))));
   }, [id]);
+  useEffect(() => {
+    load();
+  }, [load]);
   if (missing) return <EmptyState title={t('m.place.notFound')} />;
+  if (!data && loadError) return <EmptyState title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />;
   if (!data) return <Skeleton height={240} />;
   const { place, events, products } = data;
   const hours = Object.entries(place.hours ?? {}) as [string, string][];

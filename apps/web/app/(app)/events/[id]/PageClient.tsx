@@ -6,8 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Avatar, AvatarGroup, Badge, Button, EmptyState, Icon, Segments, Skeleton } from '@yapilapi/design-system';
 import type { EventItem, PublicUser } from '@yapilapi/shared';
 import { formatEventWhen, safeTimeZone } from '@yapilapi/shared';
-import { ApiError } from '@yapilapi/api-client';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { JoinNote, NeedsAccount, useSignIn } from '@/components/SignedOut';
 import { useSession } from '../../../providers';
@@ -34,7 +33,7 @@ export default function EventPageClient({ isPublic }: { isPublic: boolean }) {
     setLoadError(null);
     api.events.get(id).then(
       (r) => setEv(r.event),
-      (e) => (e instanceof ApiError && [403, 404, 410].includes(e.status) ? setMissing(true) : setLoadError(errorMessage(e))),
+      (e) => (isGone(e) ? setMissing(true) : setLoadError(errorMessage(e))),
     );
     loadAttendees();
   }, [id, loadAttendees]);

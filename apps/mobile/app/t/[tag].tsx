@@ -1,16 +1,16 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
-import type { StoryGroup, TagSummary } from '../../../../packages/api-client/src/index';
+import { ApiError, type StoryGroup, type TagSummary } from '../../../../packages/api-client/src/index';
 import { normalizeTag } from '../../../../packages/shared/src/hashtags';
 import type { Post } from '../../../../packages/shared/src/types';
-import { client, errorMessage } from '../../lib/api';
+import { client, errorMessage, isGone } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { PostCard } from '../../lib/post';
 import { StoriesStrip, StoryViewer } from '../../lib/stories';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
-import { Button, EmptyState, ErrorState, feedListProps, Loading, Segmented, useColors, useRefresh, userText } from '../../lib/ui';
+import { Button, EmptyState, ErrorState, ScreenError, feedListProps, Loading, Segmented, useColors, useRefresh, userText } from '../../lib/ui';
 import { router } from 'expo-router';
 
 /** A hashtag: how many people use it, related tags, public stories with it now, recent or top posts, and following it. */
@@ -21,6 +21,8 @@ export default function TagScreen() {
   const { t, tp } = useT();
   const { me } = useSession();
   const [info, setInfo] = useState<TagSummary | null | undefined>(undefined);
+  // Why it couldn't load, when that isn't because the tag is invalid; a tag already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [sort, setSort] = useState<'recent' | 'top'>('recent');
   const [posts, setPosts] = useState<Post[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -38,8 +40,11 @@ export default function TagScreen() {
       );
     try {
       setInfo((await (await client()).tags.get(tag)) as TagSummary);
-    } catch {
-      setInfo((cur) => cur ?? null);
+      setLoadError(null);
+    } catch (e) {
+      // An invalid tag is a 400.
+      if (isGone(e) || (e instanceof ApiError && e.status === 400)) setInfo(null);
+      else setLoadError(errorMessage(e));
     }
   }, [tag]);
   useEffect(() => {
@@ -69,7 +74,7 @@ export default function TagScreen() {
   }, [loadPosts]);
   const refresh = useRefresh(() => Promise.all([loadInfo(), loadPosts()]));
 
-  if (info === undefined) return <Loading />;
+  if (info === undefined) return loadError ? <ScreenError message={loadError} onRetry={loadInfo} /> : <Loading />;
   if (info === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>

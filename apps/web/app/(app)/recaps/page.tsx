@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, EmptyState, Icon, Skeleton } from '@yapilapi/design-system';
 import type { MessageKey, Recap } from '@yapilapi/shared';
-import { api, ApiError, errorMessage } from '@/lib/api';
+import { api, ApiError, errorMessage, isGone } from '@/lib/api';
 import { FeatureOff } from '@/components/FeatureOff';
 import { RECAP_STATUS_LABEL, RecapPostForm, RecapSendSheet, clipLength, downloadRecap, isPending } from '@/components/Recaps';
 import { useRealtime, useSession } from '../../providers';
@@ -44,6 +44,9 @@ function Recaps() {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [off, setOff] = useState(false);
   const [missing, setMissing] = useState(false);
+  // Why the linked recap couldn't load, when that isn't because it's gone; Try again asks again.
+  const [openError, setOpenError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -67,16 +70,17 @@ function Recaps() {
   const listed = !!openId && !!items?.some((r) => r.id === openId);
   useEffect(() => {
     setMissing(false);
+    setOpenError(null);
     if (!openId || !loaded || listed) return;
     let live = true;
     api.recaps.get(openId).then(
       ({ recap }) => live && setItems((cur) => (cur && !cur.some((r) => r.id === recap.id) ? [recap, ...cur] : cur)),
-      () => live && setMissing(true),
+      (e) => live && (isGone(e) ? setMissing(true) : setOpenError(errorMessage(e))),
     );
     return () => {
       live = false;
     };
-  }, [openId, loaded, listed]);
+  }, [openId, loaded, listed, attempt]);
 
   // While any is waiting or being made, check on those every 2 seconds.
   const pendingIds = (items ?? [])
@@ -137,6 +141,13 @@ function Recaps() {
       ) : openId && missing ? (
         <p className="muted" role="status">
           {t('recaps.missing')}
+        </p>
+      ) : openId && openError ? (
+        <p className="muted row" role="status">
+          {openError}
+          <Button size="sm" variant="secondary" onClick={() => setAttempt((n) => n + 1)}>
+            {t('m.common.retry')}
+          </Button>
         </p>
       ) : null}
 

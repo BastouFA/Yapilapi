@@ -17,7 +17,7 @@ import {
   type TogetherView,
   type TogetherWindow,
 } from '../../../../packages/shared/src/together';
-import { client, errorMessage, mediaUrl, webUrl } from '../../lib/api';
+import { client, errorMessage, isGone, mediaUrl, webUrl } from '../../lib/api';
 import { FriendPicker, useFriends } from '../../lib/friend-picker';
 import { useT } from '../../lib/i18n';
 import type { Picked } from '../../lib/media';
@@ -47,6 +47,7 @@ import {
   Icon,
   Loading,
   Notice,
+  ScreenError,
   Segmented,
   SwitchRow,
   useActionSheet,
@@ -71,6 +72,8 @@ export default function TogetherScreen() {
   const { me } = useSession();
   const menu = useActionSheet();
   const [album, setAlbum] = useState<TogetherDetail | null | undefined>(undefined);
+  // Why it couldn't load, when that isn't because it's gone or private; an album already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [view, setView] = useState<TogetherView>('moments');
   const [open, setOpen] = useState<string | null>(null);
   const [show, setShow] = useState(false);
@@ -88,10 +91,12 @@ export default function TogetherScreen() {
       const api = await client();
       const r = await api.together.get(id);
       setAlbum(r.together);
+      setLoadError(null);
       if (r.together.canManage && r.together.requestCount) setRequests((await api.together.requests(id)).items);
       else setRequests([]);
-    } catch {
-      setAlbum((cur) => cur ?? null);
+    } catch (e) {
+      if (isGone(e)) setAlbum(null);
+      else setLoadError(errorMessage(e));
     }
   }, [id]);
 
@@ -156,7 +161,7 @@ export default function TogetherScreen() {
     return out;
   }, [album, view, columns, t, tp, tr]);
 
-  if (album === undefined) return <Loading />;
+  if (album === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <Loading />;
   if (album === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>

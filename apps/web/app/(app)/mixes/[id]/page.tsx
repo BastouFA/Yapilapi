@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Avatar, Button, EmptyState, Icon, Menu, Skeleton, type MenuAction } from '@yapilapi/design-system';
 import { mixPlayMs, type MixDetail } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
 import {
   AddSongs,
   MIX_VISIBILITY_LABEL,
@@ -31,14 +31,18 @@ export default function MixPage() {
   const { t, tp, me, toast } = useSession();
   const [mix, setMix] = useState<MixDetail | null>(null);
   const [missing, setMissing] = useState(false);
+  // Why it couldn't load, when that isn't because it's gone or private; a mix already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [sheet, setSheet] = useState<'edit' | 'chat' | 'post' | 'report' | null>(null);
   const player = useMixPlayer(mix?.songs ?? []);
 
-  const load = () =>
-    api.mixes.get(id).then(
+  const load = () => {
+    setLoadError(null);
+    return api.mixes.get(id).then(
       (r) => setMix(r.mix),
-      () => setMissing(true),
+      (e) => (isGone(e) ? setMissing(true) : setLoadError(errorMessage(e))),
     );
+  };
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -49,6 +53,7 @@ export default function MixPage() {
   });
 
   if (missing) return <EmptyState title={t('mixes.missing.title')} body={t('mixes.missing.body')} />;
+  if (!mix && loadError) return <EmptyState title={loadError} action={<Button onClick={() => void load()}>{t('m.common.retry')}</Button>} />;
   if (!mix) return <Skeleton height={200} />;
   const own = mix.role === 'owner';
 

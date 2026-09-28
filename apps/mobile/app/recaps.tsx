@@ -7,7 +7,7 @@ import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, Text, us
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Chapter, MemorySummary } from '../../../packages/api-client/src/index';
 import type { Conversation, Recap } from '../../../packages/shared/src/types';
-import { client, errorMessage, mediaUrl } from '../lib/api';
+import { client, errorMessage, isGone, mediaUrl } from '../lib/api';
 import { ChapterCover, useChapterMeta } from '../lib/chapters';
 import { useT } from '../lib/i18n';
 import { conversationTitle } from '../lib/post';
@@ -86,7 +86,7 @@ export default function Recaps() {
         ({ recap }) => setItems((cur) => (cur && !cur.some((x) => x.id === recap.id) ? [recap, ...cur] : cur)),
         (e) => {
           setOpenId(null);
-          setNote({ tone: 'danger', text: isRecapsOff(e) ? t('m.recap.off') : t('m.recap.missing') });
+          setNote({ tone: 'danger', text: isRecapsOff(e) ? t('m.recap.off') : isGone(e) ? t('m.recap.missing') : errorMessage(e) });
         },
       )
       .finally(() => {

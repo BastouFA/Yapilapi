@@ -1,5 +1,5 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Image, Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { ApiError } from '../../../packages/api-client/src/index';
 import type { LatLng } from '../../../packages/shared/src/location';
@@ -20,7 +20,7 @@ import {
   type MarketListing,
   type MarketProhibited,
 } from '../../../packages/shared/src/market';
-import { client, errorMessage, mediaUrl } from '../lib/api';
+import { client, errorMessage, isGone, mediaUrl } from '../lib/api';
 import { Chip, ChipRow } from '../lib/chips';
 import { ChoiceField, FieldError, useScrollToError } from '../lib/forms';
 import { useT } from '../lib/i18n';
@@ -38,7 +38,7 @@ import {
 } from '../lib/market';
 import { pickOne, uploadPicked } from '../lib/media';
 import { radius, space } from '../lib/theme';
-import { Button, Field, Icon, Loading, Notice, SwitchRow, useColors } from '../lib/ui';
+import { Button, Field, Icon, Loading, Notice, ScreenError, SwitchRow, useColors } from '../lib/ui';
 
 type Photo = { key: string; uri: string; mediaId: string | null; alt: string; progress: number | null; failed: boolean };
 /** A place: unchanged (editing), a new approximate one, or taken off. */
@@ -58,6 +58,8 @@ export default function MarketEdit() {
   const { t, tp } = useT();
   const { me } = useMarketMe();
   const [loaded, setLoaded] = useState<MarketListing | null | undefined>(editing ? undefined : null);
+  // Why the listing couldn't load, when that isn't because it's gone or not yours.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
@@ -81,8 +83,9 @@ export default function MarketEdit() {
   const canPlace = !!marketGeolocation();
 
   // Changing a listing: start from what it says now.
-  useEffect(() => {
+  const loadListing = useCallback(() => {
     if (!editing) return;
+    setLoadError(null);
     void client()
       .then((api) => api.market.get(editing))
       .then(
@@ -108,9 +111,12 @@ export default function MarketEdit() {
           setPlace(listing.hasPlace ? { kind: 'keep' } : { kind: 'none' });
           setLoaded(listing);
         },
-        () => setLoaded(null),
+        (e) => (isGone(e) ? setLoaded(null) : setLoadError(errorMessage(e))),
       );
   }, [editing]);
+  useEffect(() => {
+    loadListing();
+  }, [loadListing]);
 
   const currency = loaded?.currency ?? me?.currency ?? '';
   const sellBlock = blocked ?? (me && !me.canSell && !editing ? me.sellBlock : null);
@@ -214,7 +220,7 @@ export default function MarketEdit() {
     }
   }
 
-  if (loaded === undefined) return <Loading />;
+  if (loaded === undefined) return loadError ? <ScreenError message={loadError} onRetry={loadListing} /> : <Loading />;
   if (editing && loaded === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground, padding: space[4] }}>

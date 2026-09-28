@@ -2,13 +2,13 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, RefreshControl, ScrollView, Text, View } from 'react-native';
 import type { YapilapiClient } from '../../../../packages/api-client/src/index';
-import { client, errorMessage, mediaUrl } from '../../lib/api';
+import { client, errorMessage, isGone, mediaUrl } from '../../lib/api';
 import { FriendPicker, useFriends } from '../../lib/friend-picker';
 import { useT } from '../../lib/i18n';
 import { RecapCta, useMemoryMeta } from '../../lib/memories';
 import { PostCard } from '../../lib/post';
 import { radius, space } from '../../lib/theme';
-import { BottomSheet, Button, Card, EmptyState, Field, Icon, Loading, Notice, Row, useColors, userText } from '../../lib/ui';
+import { BottomSheet, Button, Card, EmptyState, Field, Icon, Loading, Notice, Row, ScreenError, useColors, userText } from '../../lib/ui';
 
 type MemoryData = Awaited<ReturnType<YapilapiClient['memories']['get']>>;
 type Note = { tone: 'info' | 'danger'; text: string };
@@ -24,6 +24,8 @@ export default function MemoryScreen() {
   const { t, tp, dateTime } = useT();
   const meta = useMemoryMeta();
   const [data, setData] = useState<MemoryData | null | undefined>(undefined);
+  // Why it couldn't load, when that isn't because it's gone; a memory already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [note, setNote] = useState<Note | null>(null);
   const [recapping, setRecapping] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -33,8 +35,10 @@ export default function MemoryScreen() {
   const load = useCallback(async () => {
     try {
       setData(await (await client()).memories.get(id));
-    } catch {
-      setData((cur) => (cur ? cur : null));
+      setLoadError(null);
+    } catch (e) {
+      if (isGone(e)) setData(null);
+      else setLoadError(errorMessage(e));
     }
   }, [id]);
 
@@ -42,7 +46,7 @@ export default function MemoryScreen() {
     void load();
   }, [load]);
 
-  if (data === undefined) return <Loading />;
+  if (data === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <Loading />;
   if (data === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>

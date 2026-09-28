@@ -3,12 +3,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { Linking, ScrollView, Text, View } from 'react-native';
 import { formatMoney } from '../../../../packages/shared/src/i18n';
 import type { EventItem } from '../../../../packages/shared/src/types';
-import { client } from '../../lib/api';
+import { client, errorMessage, isGone } from '../../lib/api';
 import { BookPlace, ManageBookings, MyBookings, PlaceReviews, RatingLine, usePlaceOwner, type ReviewData } from '../../lib/place-extras';
 import { SectionHeader } from '../../lib/chips';
 import { useT } from '../../lib/i18n';
 import { space } from '../../lib/theme';
-import { Button, Card, EmptyState, Icon, KeyboardAvoid, Loading, Row, useColors, useRefresh, userText } from '../../lib/ui';
+import { Button, Card, EmptyState, Icon, KeyboardAvoid, Loading, Row, ScreenError, useColors, useRefresh, userText } from '../../lib/ui';
 
 type PlaceData = { place: Record<string, any>; events: EventItem[]; products: Record<string, any>[] };
 
@@ -22,6 +22,8 @@ export default function PlaceScreen() {
   const c = useColors();
   const { t, locale, dateTime } = useT();
   const [data, setData] = useState<PlaceData | null | undefined>(undefined);
+  // Why it couldn't load, when that isn't because it's gone; a place already showing stays.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [reviews, setReviews] = useState<ReviewData | null>(null);
   const [booked, setBooked] = useState(0);
   const hasBusiness = !!data?.place.business;
@@ -30,8 +32,10 @@ export default function PlaceScreen() {
   const load = useCallback(async () => {
     try {
       setData(await (await client()).places.get(id));
-    } catch {
-      setData((cur) => cur ?? null);
+      setLoadError(null);
+    } catch (e) {
+      if (isGone(e)) setData(null);
+      else setLoadError(errorMessage(e));
     }
   }, [id]);
   useEffect(() => {
@@ -49,7 +53,7 @@ export default function PlaceScreen() {
   }, [loadReviews]);
   const refresh = useRefresh(() => Promise.all([load(), loadReviews()]));
 
-  if (data === undefined) return <Loading />;
+  if (data === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <Loading />;
   if (data === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>
