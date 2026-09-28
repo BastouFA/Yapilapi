@@ -76,6 +76,7 @@ import publicModule from './modules/public.ts';
 import growthModule from './modules/growth.ts';
 import moneyModule from './modules/money.ts';
 import dropsModule from './modules/drops.ts';
+import marketModule from './modules/market.ts';
 import musicModule from './modules/music.ts';
 import { musicCatalogFromConfig } from './lib/music/index.ts';
 import { createPushSender } from './lib/push.ts';
@@ -102,6 +103,7 @@ import { sweepRooms } from './lib/rooms.ts';
 import { sweepWatch } from './lib/watch.ts';
 import { sweepWeeklyWraps } from './lib/wrap.ts';
 import { maybeRunRetention } from './lib/retention.ts';
+import { sweepMarket } from './lib/market.ts';
 
 export interface BuiltApp {
   app: FastifyInstance;
@@ -418,6 +420,7 @@ export async function buildApp(
     publicModule,
     moneyModule,
     dropsModule,
+    marketModule,
     phoneModule,
   ])
     await mod(app, ctx);
@@ -493,6 +496,8 @@ export async function buildApp(
       if (Date.now() - lastWrapSweep > 60_000) {
         lastWrapSweep = Date.now();
         await sweepWeeklyWraps({ db, realtime: ctx.realtime }).catch((e) => app.log.warn({ err: e.message }, 'weekly wraps'));
+        // Market listings: a reminder before one ends, and a note when it has (lib/market.ts).
+        await sweepMarket({ db, realtime: ctx.realtime }).catch((e) => app.log.warn({ err: e.message }, 'market sweep'));
       }
       // Every 10 minutes: songs in use are read again from their providers (withdrawn ones play silently with a note).
       if (Date.now() - lastMusicRefresh > 10 * 60_000) {

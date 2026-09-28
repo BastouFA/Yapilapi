@@ -43,6 +43,17 @@ export function notificationHref(n: NotificationTarget): string | null {
   // A ticket a friend gave you opens your Tickets; being made a co-host opens the event's check-in.
   if (n.type === 'ticket_received') return '/tickets';
   if (n.type === 'event_cohost') return id ? `/check-in/${id}` : null;
+  // Market: offers and answers open the chat (entity 'conversation', below); a sale to you, a rating and a listing ending open the listing.
+  if (
+    n.entityType === 'listing' ||
+    n.type === 'market_sold_to_you' ||
+    n.type === 'market_rated' ||
+    n.type === 'market_expiring' ||
+    n.type === 'market_expired'
+  ) {
+    const listing = id ?? (typeof n.data?.listingId === 'string' ? encodeURIComponent(n.data.listingId) : null);
+    return listing ? `/market/${listing}` : '/market';
+  }
   switch (n.entityType) {
     case 'chapter':
       return id ? `/chapter/${id}` : null;
@@ -158,6 +169,9 @@ export function appPath(link: string): string {
   if (first === 'events' && second && parts[2] === 'edit') return `/event-edit?id=${encodeURIComponent(second)}`;
   if (first === 'c' && second && parts[2] === 'settings') return `/community-settings?slug=${encodeURIComponent(second)}`;
   if (first === 'plus') return '/plus';
+  // Market: selling and changing a listing have their own screen; your listings and saved ones keep their paths.
+  if (first === 'market' && second === 'new') return '/market-edit';
+  if (first === 'market' && second && parts[2] === 'edit') return `/market-edit?id=${encodeURIComponent(second)}`;
   // Making or changing a drop happens on the web; the phone opens your drops.
   if (first === 'drops' && (second === 'new' || parts[2] === 'edit')) return '/drops';
   // A friend's invite link opens sign-up with their code filled in.

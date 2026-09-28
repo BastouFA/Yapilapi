@@ -50,6 +50,8 @@ export async function messagePreviews(db: Q, ids: string[], readerId: string): P
                  WHEN EXISTS (SELECT 1 FROM chat_lists l WHERE l.message_id = m.id) THEN 'list'
                  WHEN EXISTS (SELECT 1 FROM chat_games g WHERE g.message_id = m.id) THEN 'game'
                  WHEN m.kind = 'message' AND m.meta ? 'mixId' THEN 'mix'
+                 WHEN m.kind = 'message' AND m.meta ? 'listingId' THEN 'listing'
+                 WHEN m.kind = 'message' AND m.meta ? 'offerId' THEN 'offer'
                  WHEN EXISTS (SELECT 1 FROM location_shares s WHERE s.message_id = m.id) THEN 'location' END AS rich_kind,
             (SELECT g.kind FROM chat_games g WHERE g.message_id = m.id) AS game_kind
      FROM messages m WHERE m.id = ANY($1::uuid[])`,

@@ -27,6 +27,9 @@ export function previewText(t: T, p: MessagePreview): string {
   if (p.kind === 'list') return t('m.chat.list.preview', { title: p.body });
   if (p.kind === 'mix') return t('mixes.preview', { title: p.body });
   if (p.kind === 'location') return t('location.pin');
+  // A Market listing (body is its title) or an offer on one (body is like "Offer · ₦5,000.00").
+  if (p.kind === 'listing') return t('market.preview.listing', { title: p.body });
+  if (p.kind === 'offer') return p.body || t('market.preview.offer');
   if (p.kind === 'game') return t('m.chat.game.preview', { game: p.gameKind ? t(`m.chat.game.kind.${p.gameKind}` as MessageKey) : p.body });
   if (p.body) return p.body;
   switch (p.attachmentKind) {

@@ -17,7 +17,9 @@ const followsSql = (follower: string, followee: string) => `EXISTS (SELECT 1 FRO
 /**
  * Whether `sender` may message `recipient` under the recipient's "Who can message you": everyone,
  * people they follow, or friends only. Friends always can, and so can someone the recipient has
- * already written to in a one-to-one chat (so a chat the recipient started can always be answered).
+ * already written to in a one-to-one chat (so a chat the recipient started can always be answered),
+ * and someone who wrote to the recipient about something they're selling on Market (listing it
+ * invites that; modules/market.ts applies the other rules when the chat starts).
  */
 export function messagesAllowedSql(sender: string, recipient: string): string {
   const setting = pref('messages_from', recipient, 'everyone');
@@ -26,7 +28,9 @@ export function messagesAllowedSql(sender: string, recipient: string): string {
     OR (${setting} = 'following' AND ${followsSql(recipient, sender)})
     OR EXISTS (SELECT 1 FROM messages m JOIN conversations c ON c.id = m.conversation_id AND c.kind = 'direct'
                JOIN conversation_members cm ON cm.conversation_id = c.id AND cm.user_id = ${sender}
-               WHERE m.sender_id = ${recipient} AND m.deleted_at IS NULL))`;
+               WHERE m.sender_id = ${recipient} AND m.deleted_at IS NULL)
+    OR EXISTS (SELECT 1 FROM market_chats mc JOIN market_listings ml ON ml.id = mc.listing_id
+               WHERE mc.buyer_id = ${sender} AND ml.seller_id = ${recipient} AND ml.deleted_at IS NULL))`;
 }
 
 export async function messagesAllowed(db: Q, sender: string, recipient: string): Promise<boolean> {

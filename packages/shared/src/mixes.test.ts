@@ -33,8 +33,8 @@ describe('mixes', () => {
     expect(reorderMixSchema.safeParse({ songIds: [id, id] }).success).toBe(false);
   });
 
-  it('adds Mixes at the end of the profile tabs, and mixes to what can be reported', () => {
-    expect(PROFILE_TABS.at(-1)).toBe('mixes');
+  it('adds Mixes to the end of the profile tabs (before later tabs), and mixes to what can be reported', () => {
+    expect(PROFILE_TABS.indexOf('mixes')).toBe(PROFILE_TABS.indexOf('answers') + 1);
     expect(profileTabs(['answers', 'posts'])).toEqual(['answers', 'posts']);
     expect(REPORT_TARGETS).toContain('mix');
     expect(REPORT_TARGETS).toContain('drop');

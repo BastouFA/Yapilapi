@@ -20,6 +20,7 @@ import { ReelGrid } from '@/components/ReelGrid';
 import { AccentScope, FeaturedRow, ProfileAbout, ProfileLinks, ProfileSongChip, Pronouns, tabLabel } from '@/components/ProfileStyle';
 import { AnswersTab, AskCard } from '@/components/Ask';
 import { ProfileMixes } from '@/components/Mixes';
+import { ProfileMarket } from '@/components/Market';
 import { useSession } from '../../../providers';
 
 /**
@@ -54,7 +55,9 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
       return v && /^[0-9a-f-]{36}$/i.test(v) ? v : undefined;
     };
     // From a notification about an answer: open the Answers tab.
+    // From a notification about an answer, or a Market rating: open that tab.
     if (q.get('tab') === 'answers') setTab('answers');
+    if (q.get('tab') === 'market') setTab('market');
     if (q.has('subscribe')) setIntent('subscribe');
     else if (q.has('tip')) {
       setIntent('tip');
@@ -353,6 +356,8 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
         <AnswersTab profile={profile} />
       ) : current === 'mixes' ? (
         <ProfileMixes username={profile.username} isSelf={rel.isSelf} />
+      ) : current === 'market' ? (
+        <ProfileMarket userId={profile.id} isSelf={rel.isSelf} />
       ) : (
         <PostList
           load={loadReposts}
