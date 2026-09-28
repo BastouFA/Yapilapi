@@ -140,7 +140,7 @@ export interface ClientOptions {
 export function createClient(opts: ClientOptions) {
   const f = opts.fetch ?? fetch;
 
-  async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
+  async function once<T>(method: string, path: string, body?: unknown): Promise<T> {
     const headers: Record<string, string> = { ...(opts.headers?.() ?? {}) };
     if (body !== undefined && !(body instanceof FormData)) headers['content-type'] = 'application/json';
     if (opts.token) headers.authorization = `Bearer ${opts.token}`;
@@ -156,12 +156,30 @@ export function createClient(opts: ClientOptions) {
       throw new ApiError(0, 'network', "Can't reach YAPILAPI. Check your connection and try again.");
     }
     const text = await res.text();
-    const json = text ? JSON.parse(text) : null;
+    let json: { error?: { code?: string; message?: string; details?: { fields?: Record<string, string> } } } | null = null;
+    try {
+      json = text ? JSON.parse(text) : null;
+    } catch {
+      // Not our API answering (a proxy or gateway error page while the API restarts or is down).
+      throw new ApiError(res.status || 503, 'unavailable', "YAPILAPI can't be reached right now. Try again in a moment.");
+    }
     if (!res.ok) {
       const e = json?.error ?? {};
       throw new ApiError(res.status, e.code ?? 'error', e.message ?? 'Something went wrong. Try again.', e.details?.fields);
     }
     return json as T;
+  }
+
+  /** Reading is retried once after a short pause when the API couldn't be reached; changes never are. */
+  async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
+    try {
+      return await once<T>(method, path, body);
+    } catch (e) {
+      const unreachable = e instanceof ApiError && (e.code === 'network' || e.code === 'unavailable');
+      if (method !== 'GET' || !unreachable) throw e;
+      await new Promise((r) => setTimeout(r, 800));
+      return once<T>(method, path, body);
+    }
   }
 
   const get = <T>(p: string) => req<T>('GET', p);
