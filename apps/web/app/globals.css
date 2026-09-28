@@ -5120,6 +5120,13 @@ button.yp-chip[aria-pressed='true'] {
   letter-spacing: 0.04em;
   opacity: 0.8;
 }
+/* "Replied to your story" above a reply to a story. */
+.chat-story-reply {
+  display: block;
+  font-size: 12px;
+  opacity: 0.8;
+  margin-bottom: 2px;
+}
 @media (prefers-reduced-motion: reduce) {
   .yap-btn--live {
     animation: none;

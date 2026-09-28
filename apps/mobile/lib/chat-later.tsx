@@ -18,6 +18,7 @@ import {
 import { SCHEDULED_MESSAGE_MAX_DAYS } from '../../../packages/shared/src/constants';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import type { Message, ScheduledMessage } from '../../../packages/shared/src/types';
+import { scheduledFailureText } from '../../../packages/shared/src/job-failures';
 import { client, errorMessage } from './api';
 import { DateTimeSheet } from './date-time';
 import { useT } from './i18n';
@@ -182,7 +183,7 @@ export function ScheduledList({
                 <Icon name={failed ? 'alert-circle-outline' : 'time-outline'} size={13} color={failed ? c.danger : c.inkMuted} />
               </View>
               <Text style={{ color: failed ? c.danger : c.inkMuted, fontSize: 12 }}>
-                {failed ? t('m.chat.later.failed', { reason: s.failure ?? '' }) : sendsLabel(s.sendAt)}
+                {failed ? t('m.chat.later.failed', { reason: scheduledFailureText(s, t) ?? '' }) : sendsLabel(s.sendAt)}
               </Text>
               <Dot color={c.inkMuted} />
               {failed ? action(t('m.chat.later.newTime'), () => setEditTime(s)) : action(t('m.chat.later.edit'), () => edit(s))}

@@ -16,6 +16,7 @@ import { useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
 import { Avatar, Button, Card, EmptyState, Field, Icon, Loading, Notice, Row, Segmented, Title, useColors, useRefresh, userText } from '../lib/ui';
 import { noticeText } from '../../../packages/shared/src/server-text';
+import { recapErrorText } from '../../../packages/shared/src/job-failures';
 
 type Note = { tone: 'info' | 'danger'; text: string };
 
@@ -371,7 +372,7 @@ function RecapViewer({
         ) : null}
         {r.status === 'failed' ? (
           <>
-            <Notice tone="danger">{r.error || t('m.recap.failedBody')}</Notice>
+            <Notice tone="danger">{recapErrorText(r, t) || t('m.recap.failedBody')}</Notice>
             <Button variant="secondary" icon="refresh" label={t('m.recap.tryAgain')} onPress={onRemake} style={{ alignSelf: 'flex-start' }} />
           </>
         ) : null}

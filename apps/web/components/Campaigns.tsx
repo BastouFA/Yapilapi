@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card, List, ListItem, Select, TextField } from '@yapilapi/design-system';
 import type { AdCampaign } from '@yapilapi/api-client';
-import { formatMoney, type MessageKey, type Post } from '@yapilapi/shared';
+import { campaignName, formatMoney, type MessageKey, type Post } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 import { useCheckout } from './Checkout';
@@ -88,7 +88,7 @@ export function Campaigns() {
                 }}
                 primary={
                   <span className="row">
-                    {c.name} <Badge tone={STATUS_TONE[c.status]}>{t(STATUS_LABEL[c.status])}</Badge>
+                    {campaignName(c, t)} <Badge tone={STATUS_TONE[c.status]}>{t(STATUS_LABEL[c.status])}</Badge>
                   </span>
                 }
                 secondary={[
@@ -109,7 +109,7 @@ export function Campaigns() {
 
         {open && stats ? (
           <div className="family-controls">
-            <strong>{stats.campaign.name}</strong>
+            <strong>{campaignName(stats.campaign, t)}</strong>
             {stats.campaign.status === 'pending_review' ? (
               <p className="muted" style={{ margin: 0 }}>
                 {t('ads.pendingNote')}
@@ -156,7 +156,7 @@ export function Campaigns() {
                       orderId: r.payment.orderId,
                       clientSecret: r.payment.clientSecret,
                       provider: r.payment.provider,
-                      label: t('ads.fundLabel', { name: stats.campaign.name, amount: formatMoney(2000, stats.campaign.currency, locale) }),
+                      label: t('ads.fundLabel', { name: campaignName(stats.campaign, t), amount: formatMoney(2000, stats.campaign.currency, locale) }),
                       onPaid: async () => {
                         await load();
                         setStats(await api.ads.stats(open));

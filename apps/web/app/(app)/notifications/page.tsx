@@ -3,7 +3,16 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Avatar, Button, EmptyState, List, ListItem, Skeleton } from '@yapilapi/design-system';
-import { echoNoticeText, formatRelativeTime, reportOutcomeText, togetherNoticeText, type MessageKey, type NotificationItem } from '@yapilapi/shared';
+import {
+  echoNoticeText,
+  formatRelativeTime,
+  reportOutcomeText,
+  scheduledPostFailedText,
+  signInNoticeText,
+  togetherNoticeText,
+  type MessageKey,
+  type NotificationItem,
+} from '@yapilapi/shared';
 import { api, errorMessage, sharedRequest } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { useRealtime, useSession, type Session } from '../../providers';
@@ -65,8 +74,8 @@ const TEXT: Record<string, TextFn> = {
   yap_received: (_n, name, t) => t('m.notif.yap', { name }),
   view_once_screenshot: (_n, name, t) => t('m.notif.viewOnceScreenshot', { name }),
   chat_reminder: (_n, _name, t) => t('m.notif.chatReminder'),
-  // The reason, when there is one, comes from the server as its own sentence.
-  scheduled_post_failed: (n, _name, t) => `${t('m.notif.scheduledFailed')} ${String(n.data.reason ?? '')}`.trim(),
+  // With the reason, when there is one, in your language.
+  scheduled_post_failed: (n, _name, t) => scheduledPostFailedText(n, t),
   account_limited: (_n, _name, t) => t('notifList.accountLimited'),
   chapter_invite: (n, name, t) => t('m.notif.chapterInvite', { name, title: String(n.data.title ?? '') }),
   board_invite: (n, name, t) => t('m.notif.boardInvite', { name, board: String(n.data.name ?? '') }),
@@ -135,10 +144,8 @@ function hrefFor(n: NotificationItem, meUsername?: string): string | undefined {
  */
 function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): string | null {
   // About your own account, in your language: a sign-in from a new device, a scheduled message that couldn't go out.
-  if (n.type === 'new_sign_in') {
-    const device = String(n.data.device ?? '');
-    return typeof n.data.place === 'string' && n.data.place ? t('m.notif.newSignInPlace', { device, place: n.data.place }) : t('m.notif.newSignIn', { device });
-  }
+  const signIn = signInNoticeText(n, t);
+  if (signIn) return signIn;
   if (n.type === 'scheduled_message_failed') return t('m.notif.scheduledMessageFailed');
   // What happened to something you reported, in plain words.
   const report = reportOutcomeText(n, t);

@@ -2,6 +2,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, Text, View } from 'react-native';
 import type { Conversation, PublicUser } from '../../../../packages/shared/src/types';
+import { messagePreviewOf, messagePreviewText } from '../../../../packages/shared/src/message-preview';
 import { client, errorMessage } from '../../lib/api';
 import { YapEmpty } from '../../lib/empty';
 import { onBackOnline } from '../../lib/network';
@@ -183,13 +184,15 @@ export default function Inbox() {
 /** A conversation in the list. Memoised: pulling to refresh or a new friend request leaves the rows alone. */
 const ConversationRow = memo(function ConversationRow({ item, meId }: { item: Conversation; meId: string | undefined }) {
   const c = useColors();
-  const { t, timeAgo } = useT();
+  const { t, timeAgo, locale } = useT();
   const title = conversationTitle(item, meId, t);
+  // Said from what it is (a location, a game, an offer, a story reply), in your language.
+  const last = item.lastMessage ? messagePreviewText(item.lastMessage.preview ?? messagePreviewOf(item.lastMessage), { t, locale, meId }) : null;
   const other = item.members.find((m) => m.id !== meId);
   return (
     <Row
       title={title}
-      subtitle={item.lastMessage ? `${item.lastMessage.body || t('m.message.attachment')} · ${timeAgo(item.lastMessage.createdAt)}` : t('m.inbox.noMessages')}
+      subtitle={item.lastMessage ? `${last} · ${timeAgo(item.lastMessage.createdAt)}` : t('m.inbox.noMessages')}
       start={<Avatar name={title} url={item.kind === 'direct' ? (other?.avatarUrl ?? null) : null} size={44} />}
       end={
         item.unreadCount ? (

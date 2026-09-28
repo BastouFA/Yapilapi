@@ -10,6 +10,7 @@ import {
   quickChoices,
   sameDay,
   SCHEDULED_MESSAGE_MAX_DAYS,
+  scheduledFailureText,
   WALLPAPERS,
   type ChatAccent,
   type ChatTheme,
@@ -208,7 +209,7 @@ export function ScheduledList({
           <p className="chat-later__meta">
             <Icon name={s.status === 'failed' ? 'alert' : 'clock'} size={14} />
             <span id={`later-${s.id}-when`}>
-              {s.status === 'failed' ? t('m.chat.later.failed', { reason: s.failure ?? '' }) : sendsLabel(t, locale, s.sendAt)}
+              {s.status === 'failed' ? t('m.chat.later.failed', { reason: scheduledFailureText(s, t) ?? '' }) : sendsLabel(t, locale, s.sendAt)}
             </span>
             <span aria-hidden>·</span>
             <button

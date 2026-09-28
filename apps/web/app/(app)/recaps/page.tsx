@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Badge, Button, EmptyState, Icon, Skeleton } from '@yapilapi/design-system';
-import type { MessageKey, Recap } from '@yapilapi/shared';
+import { recapErrorText, type MessageKey, type Recap } from '@yapilapi/shared';
 import { api, ApiError, errorMessage, isGone } from '@/lib/api';
 import { FeatureOff } from '@/components/FeatureOff';
 import { RECAP_STATUS_LABEL, RecapPostForm, RecapSendSheet, clipLength, downloadRecap, isPending } from '@/components/Recaps';
@@ -15,7 +15,10 @@ const STATUS_TONE = { queued: 'neutral', rendering: 'neutral', ready: 'success',
 type T = (key: MessageKey, vars?: Record<string, string | number>) => string;
 
 function statusLine(r: Recap, t: T): string {
-  if (r.status === 'failed') return r.error ? t('recaps.statusFailedError', { error: r.error }) : t(RECAP_STATUS_LABEL.failed);
+  if (r.status === 'failed') {
+    const error = recapErrorText(r, t);
+    return error ? t('recaps.statusFailedError', { error }) : t(RECAP_STATUS_LABEL.failed);
+  }
   if (r.status === 'ready') {
     const len = clipLength(r.durationMs);
     return len ? t('recaps.statusReadyLength', { length: len }) : t(RECAP_STATUS_LABEL.ready);
@@ -172,7 +175,7 @@ function Recaps() {
                   </span>
                   <span className="recap-row__status">
                     <Badge tone={STATUS_TONE[r.status]}>{t(RECAP_STATUS_LABEL[r.status])}</Badge>
-                    {r.status === 'failed' && r.error ? <span className="muted">{r.error}</span> : null}
+                    {r.status === 'failed' && recapErrorText(r, t) ? <span className="muted">{recapErrorText(r, t)}</span> : null}
                   </span>
                 </span>
               </button>
@@ -239,7 +242,7 @@ function RecapDetail({ recap: r, onClose, onDeleted }: { recap: Recap; onClose: 
             <>
               <Icon name="alert" size={28} />
               <strong>{t(RECAP_STATUS_LABEL.failed)}</strong>
-              {r.error ? <span>{r.error}</span> : null}
+              {recapErrorText(r, t) ? <span>{recapErrorText(r, t)}</span> : null}
             </>
           ) : (
             <>

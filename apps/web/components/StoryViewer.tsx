@@ -18,8 +18,17 @@ import {
   useTranslatable,
 } from '@yapilapi/design-system';
 import type { Story, StoryGroup } from '@yapilapi/api-client';
-import { formatRelativeTime, isRtl, type MessageKey, type PublicUser, type StickerResults, type StorySticker } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import {
+  formatRelativeTime,
+  isRtl,
+  storySendFailureText,
+  type MessageFailureCode,
+  type MessageKey,
+  type PublicUser,
+  type StickerResults,
+  type StorySticker,
+} from '@yapilapi/shared';
+import { api, ApiError, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 import { AddToChapter } from '@/components/Chapters';
 import { PeoplePicker } from '@/components/PeoplePicker';
@@ -522,14 +531,16 @@ function ShareSheet({
                   const r = await api.moments.send(story.id, { userIds: to.map((p) => p.id), body: note.trim() });
                   toast(
                     r.failed.length
-                      ? t('story.sentWithError', { message: r.failed[0]!.message })
+                      ? t('story.sentWithError', { message: storySendFailureText(r.failed[0]!, t) ?? '' })
                       : to.length === 1
                         ? t('m.stories.sent', { name: to[0]!.displayName })
                         : t('m.stories.sentMany', { count: to.length }),
                   );
                   onClose();
                 } catch (e) {
-                  toast(errorMessage(e));
+                  // Not sent to anyone: why, in your language.
+                  const reason = e instanceof ApiError && e.code === 'not_sent' ? (e.details?.reason as MessageFailureCode | undefined) : undefined;
+                  toast(reason ? (storySendFailureText({ code: reason }, t) ?? errorMessage(e)) : errorMessage(e));
                 } finally {
                   setBusy(false);
                 }

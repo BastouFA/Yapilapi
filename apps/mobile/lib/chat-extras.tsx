@@ -6,8 +6,10 @@ import type { Message, MessagePreview, PinnedMessage } from '../../../packages/s
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import { chatTheme } from '../../../packages/shared/src/chat-theme';
 import { chessDrawReason } from '../../../packages/shared/src/games/index';
+import { messagePreviewOf, messagePreviewText } from '../../../packages/shared/src/message-preview';
 import { client, errorMessage } from './api';
 import { useT } from './i18n';
+import { useSession } from './session';
 import { radius, space } from './theme';
 import { ActionSheet, BottomSheet, Button, Icon, useColors, userText, useScreenFocused } from './ui';
 import { openWatch } from './watch';
@@ -30,48 +32,16 @@ export function disappearingText(t: T, seconds: number | null | undefined): stri
   return t('m.chat.off');
 }
 
-/** One line describing a quoted message. */
-export function previewText(t: T, p: MessagePreview): string {
-  if (!p.available) return t('m.chat.quoteUnavailable');
-  if (p.unsent) return t('m.chat.unsent');
-  if (p.kind === 'poll') return t('m.chat.poll.preview', { question: p.body });
-  if (p.kind === 'list') return t('m.chat.list.preview', { title: p.body });
-  if (p.kind === 'mix') return t('mixes.preview', { title: p.body });
-  if (p.kind === 'location') return t('location.pin');
-  if (p.kind === 'game') return t('m.chat.game.preview', { game: p.gameKind ? t(`m.chat.game.kind.${p.gameKind}` as MessageKey) : p.body });
-  if (p.body) return p.body;
-  if (p.attachmentKind === 'image') return t('m.post.photo');
-  if (p.attachmentKind === 'video') return t('m.chat.video');
-  if (p.attachmentKind === 'audio') return t('m.chat.voiceMessage');
-  return t('m.chat.attachment');
+/**
+ * One line describing a quoted message, in the reader's language (messagePreviewText in
+ * packages/shared). `meId` says whose story a story reply answered; `locale` formats amounts.
+ */
+export function previewText(t: T, p: MessagePreview, o: { meId?: string; locale?: string } = {}): string {
+  return messagePreviewText(p, { t, ...o });
 }
 
 /** A message as a quote, for the reply bar before sending. */
-export function previewOf(m: Message): MessagePreview {
-  return {
-    id: m.id,
-    available: true,
-    sender: m.sender,
-    body: m.body.slice(0, 200),
-    attachmentKind: m.attachments[0]?.kind ?? m.viewOnce?.kind ?? null,
-    createdAt: m.createdAt,
-    ...(m.poll
-      ? { kind: 'poll' as const }
-      : m.list
-        ? { kind: 'list' as const }
-        : m.game
-          ? { kind: 'game' as const, gameKind: m.game.kind }
-          : m.mix
-            ? { kind: 'mix' as const }
-            : m.location
-              ? { kind: 'location' as const }
-              : m.market
-                ? { kind: 'listing' as const }
-                : m.offer
-                  ? { kind: 'offer' as const }
-                  : {}),
-  };
-}
+export const previewOf = messagePreviewOf;
 
 /** Adds or removes one reaction on a message locally. */
 export function applyReaction(m: Message, emoji: string, byMe: boolean, removed: boolean): Message {
@@ -89,9 +59,9 @@ export function applyReaction(m: Message, emoji: string, byMe: boolean, removed:
 
 /** The quoted original inside a reply bubble; tapping it goes to the original. */
 export function Quote({ preview, tint, meId, onJump }: { preview: MessagePreview; tint: string; meId?: string; onJump: (id: string) => void }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const who = !preview.available ? null : preview.sender?.id === meId ? t('m.chat.you') : (preview.sender?.displayName ?? null);
-  const text = previewText(t, preview);
+  const text = previewText(t, preview, { meId, locale });
   return (
     <Pressable
       accessibilityRole="button"
@@ -233,7 +203,7 @@ export function SystemLine({
   }
   if (s?.type === 'reminder') {
     const about = s.message;
-    const text = about?.available ? t('m.chat.systemReminder', { name, text: previewText(t, about) }) : t('m.chat.systemReminderGone', { name });
+    const text = about?.available ? t('m.chat.systemReminder', { name, text: previewText(t, about, { meId }) }) : t('m.chat.systemReminderGone', { name });
     return (
       <Pressable
         accessibilityRole={about?.available && onJump ? 'button' : 'text'}
@@ -311,7 +281,8 @@ export function PinnedBar({
   onUnpin: (id: string) => void;
 }) {
   const c = useColors();
-  const { t } = useT();
+  const { t, locale } = useT();
+  const { me } = useSession();
   const [i, setI] = useState(0);
   if (!pins.length) return null;
   const at = Math.min(i, pins.length - 1);
@@ -344,7 +315,7 @@ export function PinnedBar({
         </Text>
         <Text numberOfLines={1} style={[{ color: c.ink, fontSize: 14 }, userText]}>
           {pin.message.sender ? `${pin.message.sender.displayName}: ` : ''}
-          {previewText(t, pin.message)}
+          {previewText(t, pin.message, { meId: me?.id, locale })}
         </Text>
       </Pressable>
       {canManage ? (
