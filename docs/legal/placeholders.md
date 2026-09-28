@@ -36,7 +36,6 @@ Replace these in `apps/web/app/legal/*/page.tsx`. They have no settings behind t
 | `[Data protection officer and EU or UK representative, if required.]` | Privacy, section 11 | Their names and contact details, or remove the note if none is required |
 | `[Refund rules for Plus.]` | Terms, section 7 | Whether and when Plus is refunded |
 | `[Consumer cancellation rights and how to exercise them, by country.]` | Terms, section 7 | Withdrawal or cooling-off rights and how a buyer uses them (review pack, question 15) |
-| `[Whether payment processing costs are included in the fee.]` | Creator terms, section 3 | Whether the 5% fee includes Stripe and Paystack costs or they are deducted as well |
 | `[How long buyers keep access after a seller leaves.]` | Creator terms, section 7 | Same decision as "Owner to confirm how long" in the privacy policy |
 | `[Minimum refund rules sellers must offer.]` | Creator terms, section 8 | Any refund rules every seller must follow, beyond the law |
 | `[Payout method, currencies, minimum amount and timing.]` | Creator terms, section 9 | How payouts are paid, in which currencies, the minimum and how long they take |
@@ -52,7 +51,8 @@ These aren't placeholders, but if you change them, change the text too.
 | Value | Where it comes from | Pages |
 | --- | --- | --- |
 | Plus: 4.99 US dollars for 30 days | `PLUS_PRICE_CENTS`, `PLUS_CURRENCY` (API settings) | Terms, section 7 |
-| Platform fee 5% | `PLATFORM_FEE_PERCENT` in `packages/shared/src/legal.ts` (and `PLATFORM_FEE_BPS` in the API) | Creator terms |
+| Platform fee 5% | `PLATFORM_FEE_PERCENT` in `packages/shared/src/legal.ts` (and `PLATFORM_FEE_BPS` in `packages/shared/src/constants.ts`) | Creator terms |
+| Payment processing on top of the fee (decided 2026-09-28) | `PROCESSING_FEES` in `packages/shared/src/constants.ts` (the providers' standard rates) | Creator terms, section 3 |
 | Retention periods | `RETENTION` in `apps/api/src/lib/retention.ts` (payment records: `FINANCIAL_RECORDS_YEARS`) | Privacy, section 5 |
 | Drop hold of 15 minutes | `DROP_HOLD_MINUTES` in `packages/shared/src/drops.ts` | Terms, creator terms, privacy |
 | Session cookie of 30 days | `SESSION_TTL_DAYS` | Cookie notice |

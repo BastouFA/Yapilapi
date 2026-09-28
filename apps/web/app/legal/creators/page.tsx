@@ -7,8 +7,8 @@ export const generateMetadata = () => legalMetadata('creators');
 
 /**
  * Creator and seller terms: selling, drops, subscriptions, tips and gifts, lives, boosts, payouts and
- * the platform fee (PLATFORM_FEE_BPS in apps/api money.ts, economy.ts, commerce.ts; drops in
- * lib/drops.ts). Not legal advice: see docs/legal/review-pack.md and docs/legal/placeholders.md.
+ * the platform fee and payment processing (PLATFORM_FEE_BPS and PROCESSING_FEES in
+ * packages/shared/src/constants.ts). Not legal advice: see docs/legal/review-pack.md and docs/legal/placeholders.md.
  */
 export default async function CreatorsPage() {
   const c = await legalContacts();
@@ -42,8 +42,9 @@ export default async function CreatorsPage() {
       <ul>
         <li>You set your prices. Buyers pay through YAPILAPI’s checkout, processed by Stripe or, for some currencies in Africa, Paystack.</li>
         <li>
-          YAPILAPI keeps a platform fee of <strong>{fee}</strong> of each sale, booking, subscription payment, tip and gift. The fee is shown in Studio with
-          each sale. [Whether payment processing costs are included in the fee.]
+          YAPILAPI keeps a platform fee of <strong>{fee}</strong> of each sale, booking, subscription payment, tip and gift. The cost of processing the payment
+          is taken off as well: what the payment provider charges for it, such as a share of the amount plus a small fixed amount for cards. Both are shown in
+          Studio with each sale, and a payment can&apos;t cost you more than it brought in.
         </li>
         <li>You are responsible for the taxes on what you earn, unless the law makes us collect them, in which case we show them at checkout.</li>
       </ul>

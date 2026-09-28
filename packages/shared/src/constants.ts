@@ -178,6 +178,32 @@ export type Currency = (typeof CURRENCIES)[number];
  */
 export const CURRENCY_SCALE: Record<Currency, number> = { USD: 1, EUR: 1, GBP: 1, NGN: 1000, GHS: 10, KES: 100, ZAR: 10, XOF: 500 };
 
+/**
+ * About what the payment provider charges for one payment in each currency: a share (basis points) plus a
+ * fixed amount in hundredths, up to an optional cap. Creators and sellers pay it on top of the platform fee
+ * (creator terms, section 3), so a small tip never costs more to take than the platform keeps. These are
+ * Stripe's and Paystack's standard rates; what a given card costs can differ a little either way.
+ */
+export const PROCESSING_FEES: Record<Currency, { bps: number; fixedCents: number; fixedFromCents?: number; capCents?: number }> = {
+  USD: { bps: 290, fixedCents: 30 },
+  EUR: { bps: 290, fixedCents: 25 },
+  GBP: { bps: 290, fixedCents: 20 },
+  // Paystack: 1.5%, plus ₦100 from ₦2,500 up, at most ₦2,000.
+  NGN: { bps: 150, fixedCents: 10_000, fixedFromCents: 250_000, capCents: 200_000 },
+  GHS: { bps: 195, fixedCents: 0 },
+  KES: { bps: 150, fixedCents: 0 },
+  ZAR: { bps: 290, fixedCents: 100 },
+  XOF: { bps: 290, fixedCents: 20_000 },
+};
+
+/** The processing cost of one payment of `amountCents`, never more than the payment itself. */
+export function processingFeeCents(amountCents: number, currency: string): number {
+  if (amountCents <= 0) return 0;
+  const f = PROCESSING_FEES[currency.trim().toUpperCase() as Currency] ?? PROCESSING_FEES.USD;
+  const fee = Math.round((amountCents * f.bps) / 10_000) + (amountCents >= (f.fixedFromCents ?? 0) ? f.fixedCents : 0);
+  return Math.min(amountCents, f.capCents ?? Infinity, fee);
+}
+
 /** A sensible default currency for someone's country (ISO 3166-1 alpha-2). */
 export function currencyForCountry(country: string | null | undefined): Currency {
   switch ((country ?? '').toUpperCase()) {

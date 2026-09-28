@@ -343,6 +343,7 @@ export async function exportSections(db: Q, userId: string) {
   const sales = await q(
     `SELECT o.id, o.purpose, o.status, o.currency, o.created_at, ${un('o.buyer_id')} AS buyer,
             CASE WHEN o.payee_id = $1 THEN o.total_cents END AS total_cents, CASE WHEN o.payee_id = $1 THEN o.platform_fee_cents END AS platform_fee_cents,
+            CASE WHEN o.payee_id = $1 THEN o.processing_fee_cents END AS processing_fee_cents,
             coalesce((SELECT json_agg(json_build_object('product_id', p.id, 'title', p.title, 'quantity', i.quantity, 'unit_cents', i.unit_cents))
                       FROM order_items i JOIN products p ON p.id = i.product_id WHERE i.order_id = o.id AND p.seller_id = $1), '[]') AS items
      FROM orders o

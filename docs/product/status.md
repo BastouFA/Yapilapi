@@ -62,7 +62,7 @@ What exists for a public launch and store review, and what only the owner can do
 **Built:**
 
 - **Legal and policy pages:**
-  - public at `/legal`, no sign-in: terms, privacy, community guidelines, safety and minors, creator and seller terms (5% platform fee), copyright and takedowns, cookie notice;
+  - public at `/legal`, no sign-in: terms, privacy, community guidelines, safety and minors, creator and seller terms (5% platform fee plus payment processing), copyright and takedowns, cookie notice;
   - short links `/terms`, `/privacy`, `/guidelines`, `/cookies`, `/copyright`, `/dmca`;
   - linked from the landing page, sign-in and sign-up, shared pages, the sidebar and Settings on the web, and from sign-up and Settings in the phone app (they open in the browser).
 - **How the legal pages are written:**

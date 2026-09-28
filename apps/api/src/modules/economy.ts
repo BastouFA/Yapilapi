@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
 import { z } from 'zod';
-import { CURRENCIES, CURRENCY_SCALE, PLATFORM_FEE_BPS } from '@yapilapi/shared';
+import { CURRENCIES, CURRENCY_SCALE, PLATFORM_FEE_BPS, processingFeeCents } from '@yapilapi/shared';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import { liveVisibleSql } from '../lib/visibility.ts';
 import type { AppContext } from '../lib/context.ts';
@@ -34,8 +34,9 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
   ) {
     const fee = Math.round((amountCents * PLATFORM_FEE_BPS) / 10_000);
     const { rows } = await c.query(
-      `INSERT INTO orders (buyer_id, total_cents, platform_fee_cents, currency, idempotency_key, purpose, payee_id) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-      [buyerId, amountCents, fee, currency, idempotencyKey, purpose, payeeId],
+      `INSERT INTO orders (buyer_id, total_cents, platform_fee_cents, processing_fee_cents, currency, idempotency_key, purpose, payee_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+      [buyerId, amountCents, fee, Math.min(processingFeeCents(amountCents, currency), amountCents - fee), currency, idempotencyKey, purpose, payeeId],
     );
     const orderId = rows[0].id as string;
     const pay = await startPayment(c, ctx.paymentProviders, { orderId, buyerId, amountCents, currency, idempotencyKey });
@@ -58,6 +59,9 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
     // Paid plans are for adults (creator terms).
     await assertAdultForMoney(db, u.id);
     if (input.priceCents > 100_000 * CURRENCY_SCALE[input.currency]) throw badRequest('That price is higher than plans can be.');
+    // About $1 at least in every currency, so what's left after the fee and processing is worth having.
+    if (input.priceCents < 100 * CURRENCY_SCALE[input.currency])
+      throw badRequest(`A plan costs at least ${100 * CURRENCY_SCALE[input.currency]} hundredths of ${input.currency}.`);
     const count = await db.query(`SELECT count(*) AS n FROM creator_plans WHERE creator_id = $1 AND active`, [u.id]);
     if (Number(count.rows[0].n) >= 5) throw new AppError(409, 'conflict', 'You can have up to 5 plans.');
     const { rows } = await db.query(`INSERT INTO creator_plans (creator_id, name, description, price_cents, currency) VALUES ($1,$2,$3,$4,$5) RETURNING *`, [
@@ -174,6 +178,9 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
     );
     if (id === u.id) throw badRequest("You can't tip yourself.");
     if (input.amountCents > 50_000 * CURRENCY_SCALE[input.currency]) throw badRequest('That tip is higher than tips can be.');
+    // About $1 at least in every currency: processing alone would eat a smaller tip, and tiny payments are how stolen cards get tested.
+    if (input.amountCents < 100 * CURRENCY_SCALE[input.currency])
+      throw badRequest(`A tip is at least ${100 * CURRENCY_SCALE[input.currency]} hundredths of ${input.currency}.`);
     if (await isBlockedEitherWay(db, u.id, id)) throw forbidden();
     // Only adults can receive tips.
     await assertAdultForMoney(db, id, false);
