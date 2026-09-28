@@ -52,14 +52,16 @@ type T = Session['t'];
 
 // ── Words ───────────────────────────────────────────────────────────────
 
-/** "Sat 04:00", or with the date when it's more than a week away. */
+/** "Sat 04:00", or with the date when it's more than a week away (and the year when it's another year). */
 export function whenShort(iso: string, locale: string): string {
   const at = new Date(iso);
   const far = Math.abs(at.getTime() - Date.now()) > 6 * 86_400_000;
+  // Another year gets the year too, so an old photo doesn't read as this year's.
+  const year = at.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' as const } : {};
   try {
     return new Intl.DateTimeFormat(
       locale,
-      far ? { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' } : { weekday: 'short', hour: 'numeric', minute: '2-digit' },
+      far ? { day: 'numeric', month: 'short', ...year, hour: 'numeric', minute: '2-digit' } : { weekday: 'short', hour: 'numeric', minute: '2-digit' },
     ).format(at);
   } catch {
     return at.toLocaleString();
