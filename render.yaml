@@ -27,6 +27,9 @@ envVarGroups:
         generateValue: true
       - key: LIVE_HOOK_SECRET
         generateValue: true
+      # Signs the QR codes on event tickets. Changing it makes every ticket's code show "not valid" until the wallet reloads.
+      - key: TICKET_TOKEN_SECRET
+        generateValue: true
       # Payments. Required in production: the development provider moves no money and is refused.
       # Stripe test-mode keys (sk_test_…, pk_test_…) work until you are ready to take real money.
       - key: PAYMENTS_PROVIDER

@@ -54,6 +54,10 @@ export const RETENTION = {
   callHistoryDays: 365,
   /** Watch together sessions (who joined and left, the queue), after they end. */
   watchSessionsDays: 90,
+  /** The door's log for events: each scan, typed code and undo. */
+  ticketScansDays: 90,
+  /** Event tickets (with who gave them to whom), after the event ended or was cancelled. */
+  pastTicketsDays: 365,
   /** Games in chats (and their card in the chat), after they end. */
   endedGamesDays: 365,
   /** An earlier username, after the 14-day hold on it ends. */
@@ -353,6 +357,14 @@ export async function runRetention(deps: RetentionDeps): Promise<{ counts: Recor
     deleteInBatches(db, 'calls', `status NOT IN ('ringing', 'active') AND coalesce(ended_at, created_at) < ${days(RETENTION.callHistoryDays)}`),
   );
   await step('watchSessions', () => deleteInBatches(db, 'watch_sessions', `status = 'ended' AND ended_at < ${days(RETENTION.watchSessionsDays)}`));
+  await step('ticketScans', () => deleteInBatches(db, 'ticket_scans', `created_at < ${days(RETENTION.ticketScansDays)}`));
+  await step('pastTickets', () =>
+    deleteInBatches(
+      db,
+      'event_tickets',
+      `event_id IN (SELECT id FROM events WHERE coalesce(deleted_at, ends_at, starts_at + interval '3 hours') < ${days(RETENTION.pastTicketsDays)})`,
+    ),
+  );
   // A game goes with its card in the chat, as when the card is unsent (the message is then erased like any deleted one).
   await step('endedGames', async () => {
     let n = 0;

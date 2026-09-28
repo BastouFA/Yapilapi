@@ -129,6 +129,8 @@ function Screens() {
         <Stack.Screen name="assistant" options={{ title: t('m.title.assistant') }} />
         <Stack.Screen name="events" options={{ title: t('events.title') }} />
         <Stack.Screen name="event/[id]" options={{ title: t('m.event.title') }} />
+        <Stack.Screen name="tickets" options={{ title: t('tickets.title') }} />
+        <Stack.Screen name="check-in/[id]" options={{ title: t('checkin.title') }} />
         <Stack.Screen name="place/[id]" options={{ title: t('m.place.title') }} />
         <Stack.Screen name="communities" options={{ title: t('communities.title') }} />
         <Stack.Screen name="community-new" options={{ title: t('communities.create'), presentation: 'modal', headerLeft: closeButton }} />

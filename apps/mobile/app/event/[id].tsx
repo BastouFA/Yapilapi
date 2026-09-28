@@ -257,6 +257,16 @@ export default function EventScreen() {
           {full && event.myRsvp !== 'going' ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('m.event.full')}</Text> : null}
         </View>
       )}
+      {event.canCheckIn || (event.myRsvp === 'going' && !hosting) ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+          {event.canCheckIn ? (
+            <Button label={t('checkin.open')} icon="scan-outline" onPress={() => router.push(`/check-in/${encodeURIComponent(event.id)}`)} />
+          ) : null}
+          {event.myRsvp === 'going' && !hosting ? (
+            <Button label={t('tickets.yourTicket')} icon="ticket-outline" variant="secondary" onPress={() => router.push('/tickets')} />
+          ) : null}
+        </View>
+      ) : null}
       {note ? (
         <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted, fontSize: 13 }}>
           {note}

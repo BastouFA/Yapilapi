@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import type { PaymentRegistry } from './payments.ts';
 import { revokePlusForOrder } from './plus.ts';
 import { releaseDropOrder } from './drops.ts';
+import { refundOrderTickets } from './tickets.ts';
 
 type Q = Pick<Pool | PoolClient, 'query'>;
 
@@ -38,7 +39,7 @@ export async function startPayment(
 
 /**
  * Refund a paid order in full through the provider that took the payment, and
- * undo what it paid for (ad budget, Plus days, a service booking). Call inside
+ * undo what it paid for (ad budget, Plus days, a service booking, event tickets). Call inside
  * a transaction; the order row should already be locked by the caller.
  */
 export async function refundOrder(
@@ -87,6 +88,8 @@ export async function refundOrder(
   );
   // Units bought in a drop go back to it.
   await releaseDropOrder(c, orderId);
+  // Event tickets it bought stop working, with whoever holds them now.
+  await refundOrderTickets(c, orderId);
   await c.query(`UPDATE orders SET status = 'refunded', updated_at = now() WHERE id = $1`, [orderId]);
   await c.query(`UPDATE payments SET status = 'refunded', updated_at = now() WHERE id = $1`, [r.payment_id]);
   return 'succeeded';

@@ -35,6 +35,7 @@ import draftsModule from './modules/drafts.ts';
 import messagingModule from './modules/messaging.ts';
 import communitiesModule from './modules/communities.ts';
 import eventsModule from './modules/events.ts';
+import ticketsModule from './modules/tickets.ts';
 import commerceModule from './modules/commerce.ts';
 import searchModule from './modules/search.ts';
 import notificationsModule from './modules/notifications.ts';
@@ -375,6 +376,7 @@ export async function buildApp(
     messagingModule,
     communitiesModule,
     eventsModule,
+    ticketsModule,
     commerceModule,
     searchModule,
     notificationsModule,

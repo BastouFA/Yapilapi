@@ -67,6 +67,8 @@ const schema = z.object({
   LIVE_HLS_BASE: z.string().default('http://localhost:8888'),
   LIVE_RTMP_URL: z.string().default('rtmp://localhost:1935'),
   LIVE_HOOK_SECRET: z.string().default('dev-live-hook-secret'),
+  /** Signs the tokens in event tickets' QR codes (at least 32 characters in production). Development uses a fixed dev secret. */
+  TICKET_TOKEN_SECRET: z.string().default(''),
   /** MediaMTX control API (e.g. http://localhost:9997). When set, ending a live disconnects the encoder. */
   LIVE_CONTROL_URL: z.string().default(''),
   /** Header a trusted CDN sets with the visitor's country (e.g. cf-ipcountry). Unset: only the country people choose is used. */
@@ -188,6 +190,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     // Verification, password reset and security emails must reach people.
     if (cfg.EMAIL_TRANSPORT !== 'smtp')
       throw new Error('Emails are only logged with EMAIL_TRANSPORT=log. Set EMAIL_TRANSPORT=smtp and SMTP_URL for production.');
+    if (cfg.TICKET_TOKEN_SECRET.length < 32) throw new Error('Set TICKET_TOKEN_SECRET (at least 32 characters) for production: it signs event tickets.');
   }
   return cfg;
 }

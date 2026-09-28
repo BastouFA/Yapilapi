@@ -144,7 +144,28 @@ export async function exportSections(db: Q, userId: string) {
        FROM place_reviews r JOIN places p ON p.id = r.place_id WHERE r.author_id = $1 ORDER BY r.created_at DESC`,
     ),
     eventsHosted: await q(
-      `SELECT id, title, description, starts_at, ends_at, timezone, location_text, online, capacity, visibility, created_at, deleted_at FROM events WHERE host_id = $1 ORDER BY starts_at DESC`,
+      `SELECT id, title, description, starts_at, ends_at, timezone, location_text, online, capacity, visibility, ticket_transfers, created_at, deleted_at FROM events WHERE host_id = $1 ORDER BY starts_at DESC`,
+    ),
+    // Your tickets (never their QR token or backup code), who gave you one or who you gave one to,
+    // the events you co-host, and how many people you checked in at each event you ran the door for.
+    tickets: await q(
+      `SELECT t.id, t.event_id, e.title AS event, e.starts_at, t.source, t.type_title AS type, t.status, t.checked_in_at, t.created_at
+       FROM event_tickets t JOIN events e ON e.id = t.event_id WHERE t.holder_id = $1 ORDER BY e.starts_at DESC`,
+    ),
+    ticketTransfers: await q(
+      `SELECT tt.ticket_id, e.title AS event, CASE WHEN tt.from_id = $1 THEN 'you gave it' ELSE 'you were given it' END AS direction,
+              ${un('CASE WHEN tt.from_id = $1 THEN tt.to_id ELSE tt.from_id END')} AS username, tt.created_at
+       FROM ticket_transfers tt JOIN event_tickets t ON t.id = tt.ticket_id JOIN events e ON e.id = t.event_id
+       WHERE tt.from_id = $1 OR tt.to_id = $1 ORDER BY tt.created_at DESC`,
+    ),
+    eventsCohosted: await q(
+      `SELECT ec.event_id, e.title AS event, ${un('ec.added_by')} AS added_by, ec.created_at FROM event_cohosts ec JOIN events e ON e.id = ec.event_id
+       WHERE ec.user_id = $1 ORDER BY ec.created_at DESC`,
+    ),
+    doorCheckIns: await q(
+      `SELECT s.event_id, e.title AS event, count(*) FILTER (WHERE s.result = 'valid')::int AS checked_in, count(*) FILTER (WHERE s.result = 'undone')::int AS undone,
+              min(s.created_at) AS first_at, max(s.created_at) AS last_at
+       FROM ticket_scans s JOIN events e ON e.id = s.event_id WHERE s.scanner_id = $1 GROUP BY s.event_id, e.title ORDER BY max(s.created_at) DESC`,
     ),
     communitiesOwned: await q(
       `SELECT slug, name, description, visibility, topics, rules, created_at, deleted_at FROM communities WHERE owner_id = $1 ORDER BY created_at`,
@@ -480,7 +501,8 @@ export const EXPORT_README = {
     account: 'Your sign-in details, birth date and account status.',
     profile: 'Your profile as others see it, and its settings.',
     'posts, comments, messagesSent': 'What you shared. Messages include only the ones you sent.',
-    content: 'Stories, chapters, boards, saves, memories, recaps, lives, rooms, products, drops, places, businesses, photos and videos, and more you made.',
+    content:
+      'Stories, chapters, boards, saves, memories, recaps, lives, rooms, products, drops, places, businesses, photos and videos, and more you made; your event tickets, tickets given or received, events you co-host and how many people you checked in.',
     chats:
       'Chats you are in, and the polls, lists, plans, games, calls and watch together sessions you took part in (your side only), and when you shared where you were, with whom (never the place).',
     activity: 'Reposts, votes, notifications, feed feedback, daily minutes, and views counted per day.',
@@ -508,7 +530,7 @@ export const EXPORT_README = {
     'safety.auditLog': `The newest ${EXPORT_LIMITS.auditLog}.`,
   },
   leftOut: [
-    'Passwords, sign-in and reset links, session and API key tokens, two-step secrets and codes, passkey keys, stream keys and webhook secrets (and their hashes).',
+    'Passwords, sign-in and reset links, session and API key tokens, two-step secrets and codes, passkey keys, stream keys and webhook secrets (and their hashes), and the QR codes and backup codes of tickets.',
     'Other people’s messages, email addresses and private details.',
     'Who reported you, and cases still being reviewed.',
     'Where you were: places you shared in chats are not included, and a live share keeps none once it ends.',

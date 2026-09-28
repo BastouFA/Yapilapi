@@ -237,7 +237,10 @@ describe('email delivery', () => {
     };
     expect(() => loadConfig(prod)).toThrow(/EMAIL_TRANSPORT=smtp/);
     expect(() => loadConfig({ ...prod, EMAIL_TRANSPORT: 'smtp' })).toThrow(/SMTP_URL/);
-    expect(loadConfig({ ...prod, EMAIL_TRANSPORT: 'smtp', SMTP_URL: 'smtps://u:p@smtp.example.test:465' }).EMAIL_TRANSPORT).toBe('smtp');
+    const smtp = { ...prod, EMAIL_TRANSPORT: 'smtp', SMTP_URL: 'smtps://u:p@smtp.example.test:465' };
+    // Event tickets are signed with a real secret too.
+    expect(() => loadConfig(smtp)).toThrow(/TICKET_TOKEN_SECRET/);
+    expect(loadConfig({ ...smtp, TICKET_TOKEN_SECRET: 'x'.repeat(32) }).EMAIL_TRANSPORT).toBe('smtp');
   });
 
   it('sends verification, password reset and security emails through the configured transport', async () => {

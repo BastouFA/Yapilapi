@@ -114,6 +114,16 @@ const PATHS = {
     'M15.5 11h.01',
     'M17.5 13h.01',
   ],
+  /** A ticket with a notch on each side: event tickets. */
+  ticket: ['M4 6h16v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0 0-4V6z', 'M14 6v2.5', 'M14 11v2', 'M14 15.5V18'],
+  /** A frame to scan a code in: check-in at the door. */
+  scan: [
+    'M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8',
+    'M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8',
+    'M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16',
+    'M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16',
+    'M4 12h16',
+  ],
 } as const;
 
 export type IconName = keyof typeof PATHS | NavGlyphName;

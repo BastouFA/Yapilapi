@@ -337,6 +337,15 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         `DELETE FROM together_contributions WHERE user_id = $1`,
         `UPDATE togethers SET status = 'closed' WHERE creator_id = $1`,
         `DELETE FROM event_attendees WHERE user_id = $1`,
+        // Their tickets go (bought ones stay in the order's payment records), and so do their places as
+        // co-hosts. Tickets they gave friends stay with the friends; the door's log forgets who scanned.
+        `DELETE FROM event_tickets WHERE holder_id = $1`,
+        `UPDATE event_tickets SET checked_in_by = NULL WHERE checked_in_by = $1`,
+        `DELETE FROM event_cohosts WHERE user_id = $1`,
+        `UPDATE event_cohosts SET added_by = NULL WHERE added_by = $1`,
+        `UPDATE ticket_transfers SET from_id = NULL WHERE from_id = $1`,
+        `UPDATE ticket_transfers SET to_id = NULL WHERE to_id = $1`,
+        `UPDATE ticket_scans SET scanner_id = NULL WHERE scanner_id = $1`,
         // Lives: any still to come or on air end, and the titles and stream keys go. What they said in lives goes like comments.
         `UPDATE live_sessions SET status = 'ended', ended_at = coalesce(ended_at, now()) WHERE host_id = $1 AND status <> 'ended'`,
         `UPDATE live_sessions SET title = '', stream_key_hash = NULL WHERE host_id = $1`,

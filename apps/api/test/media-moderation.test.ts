@@ -287,6 +287,7 @@ describe('automated media checks in the media job', () => {
       COOKIE_SECURE: 'true',
       EMAIL_TRANSPORT: 'smtp',
       SMTP_URL: 'smtp://localhost:2525',
+      TICKET_TOKEN_SECRET: 'x'.repeat(32),
     });
     expect(prod.MEDIA_MODERATION_PROVIDER).toBe('none');
     expect(prod.REQUIRE_VERIFICATION).toBe(true);
