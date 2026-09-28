@@ -25,7 +25,8 @@ import { conversationTitle } from '../../lib/post';
 import { isVerificationError, SensitiveCover, UnavailableMedia, VerifyPrompt } from '../../lib/safety';
 import { useRealtime, useSession } from '../../lib/session';
 import { elevation, gradient, radius, space } from '../../lib/theme';
-import { ActionSheet, BottomSheet, Icon, KeyboardAvoid, Notice, SwitchRow, useColors, useKeyboardVisible, userText } from '../../lib/ui';
+import { ActionSheet, BottomSheet, ErrorState, Icon, KeyboardAvoid, Notice, SwitchRow, useColors, useKeyboardVisible, userText } from '../../lib/ui';
+import { onBackOnline } from '../../lib/network';
 import { ViewOnceBubble } from '../../lib/view-once';
 import { useMicInUse, Waveform, YAP_MAX_MS, YAP_MIN_MS } from '../../lib/yaps';
 import { SmartRepliesSwitch, SmartReplyChips } from '../../lib/ai-helpers';
@@ -148,6 +149,7 @@ export default function Chat() {
       for (const ms of [150, 500, 1200]) setTimeout(() => atBottom.current && list.current?.scrollToEnd({ animated: false }), ms);
       void api.conversations.read(id).catch(() => {});
       void loadPins();
+      setError(null);
     } catch (e) {
       setError(errorMessage(e));
     }
@@ -157,7 +159,29 @@ export default function Chat() {
     void load();
   }, [load]);
 
+  // Back from a dropped connection (the phone's, or the live one to the server): fetch what came in
+  // meanwhile. Messages already here stay, so history scrolled back to isn't lost.
+  const loaded = !!conversation;
+  const catchUp = useCallback(async () => {
+    if (!loaded) return void load();
+    try {
+      const page = await (await client()).conversations.messages(id);
+      setMessages((cur) => {
+        const fresh = new Map(page.items.map((m) => [m.id, m]));
+        const ids = new Set(cur.map((m) => m.id));
+        const clientIds = new Set(cur.map((m) => m.clientId).filter(Boolean));
+        return [...cur.map((m) => fresh.get(m.id) ?? m), ...page.items.filter((m) => !ids.has(m.id) && !(m.clientId && clientIds.has(m.clientId)))];
+      });
+      void client().then((api) => api.conversations.read(id).catch(() => {}));
+    } catch {
+      // Still offline: the next reconnect tries again.
+    }
+  }, [id, loaded, load]);
+  useEffect(() => onBackOnline(() => void catchUp()), [catchUp]);
+
   useRealtime((e) => {
+    // A new live connection (the server says `ready` on each): anything sent while it was down.
+    if (e.type === 'ready') void catchUp();
     if (e.type === 'message.created' && e.data?.conversationId === id) {
       const m = e.data as Message;
       setMessages((cur) => (cur.some((x) => x.id === m.id || (m.clientId && x.clientId === m.clientId)) ? cur : [...cur, m]));
@@ -838,7 +862,8 @@ export default function Chat() {
     <KeyboardAvoid style={{ backgroundColor: c.ground }}>
       {error ? (
         <View style={{ padding: space[3] }}>
-          <Notice tone="danger">{error}</Notice>
+          {/* Nothing loaded yet: say why and offer to try again. */}
+          {conversation ? <Notice tone="danger">{error}</Notice> : <ErrorState message={error} onRetry={load} />}
         </View>
       ) : null}
       {micDenied ? (

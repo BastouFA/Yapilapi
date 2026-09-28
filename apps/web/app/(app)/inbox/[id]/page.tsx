@@ -187,6 +187,20 @@ export default function ChatPage() {
   }
 
   useRealtime((e) => {
+    // A new live connection (the server says `ready` on each): fetch what came in while it was
+    // down. Messages already here, including older ones scrolled back to, stay.
+    if (e.type === 'ready')
+      api.conversations.messages(id).then(
+        (page) =>
+          setMessages((cur) => {
+            if (!cur) return cur;
+            const fresh = new Map(page.items.map((m) => [m.id, m]));
+            const ids = new Set(cur.map((m) => m.id));
+            const clientIds = new Set(cur.map((m) => m.clientId).filter(Boolean));
+            return [...cur.map((m) => fresh.get(m.id) ?? m), ...page.items.filter((m) => !ids.has(m.id) && !(m.clientId && clientIds.has(m.clientId)))];
+          }),
+        () => {},
+      );
     if (e.type === 'message.created' && e.data.conversationId === id) {
       setMessages((cur) => {
         if (!cur) return cur;
