@@ -16,6 +16,7 @@ beforeAll(async () => {
   t = await testApp();
 });
 afterAll(async () => {
+  await t.ctx.db.query(`DELETE FROM feature_flags WHERE key = 'REAL_TOGETHER'`);
   await t.close();
 });
 

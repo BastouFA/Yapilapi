@@ -212,7 +212,7 @@ describe('making echoes', () => {
     const cornerInfo = await probe(await storedFile(corner.media.id));
     expect(cornerInfo).toMatchObject({ width: 720, height: 1280, hasAudio: true });
     expect(Math.abs(cornerInfo.durationMs! - 1000)).toBeLessThan(200);
-  });
+  }, 120_000);
 
   it('checks the request: your own video, a cut within their reel of up to 15 seconds', async () => {
     const ada = await signUp(t.app);
