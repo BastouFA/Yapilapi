@@ -187,7 +187,7 @@ The "basis claimed" column below applies that general statement to each item. "N
 ## 8. Payments and creator earnings
 
 - **Providers:** Stripe and Paystack. YAPILAPI takes the buyer's payment and pays the seller later on request (payouts are checked manually). In practice YAPILAPI collects and holds funds for sellers. See question 14.
-- **Platform fee:** 5% of each sale, booking, subscription payment, tip and gift (`PLATFORM_FEE_BPS = 500`).
+- **Platform fee:** 5% of each sale, booking, subscription payment, tip and gift (`PLATFORM_FEE_BPS = 500`), plus payment processing at the provider's standard rate (`PROCESSING_FEES`: for example 2.9% + 30¢ for USD cards; Paystack 1.5%, plus ₦100 from ₦2,500, at most ₦2,000), never more than the payment. Tips and plans start at about $1 in every currency.
 - **Plus:**
   - 4.99 USD (configurable) for 30 days, with no automatic renewal.
   - It includes no sponsored posts, 10-minute reels, 500 MB uploads and a badge.

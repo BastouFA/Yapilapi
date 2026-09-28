@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from 'pg';
+import { PLATFORM_FEE_BPS } from '@yapilapi/shared';
 import { badRequest } from './errors.ts';
 import { isZeroDecimal, type PaymentRegistry } from './payments.ts';
 import { revokePlusForOrder } from './plus.ts';
@@ -6,6 +7,13 @@ import { releaseDropOrder } from './drops.ts';
 import { refundOrderTickets } from './tickets.ts';
 
 type Q = Pick<Pool | PoolClient, 'query'>;
+
+/**
+ * A seller's fees on one order line (`oi`, in order `o`): the platform fee on the line, plus its part of the
+ * order's processing cost (an order can hold several sellers' products; each pays by their share of the total).
+ */
+export const sellerFeesSql = `(round(oi.quantity * oi.unit_cents * ${PLATFORM_FEE_BPS} / 10000.0)
+  + coalesce(round(o.processing_fee_cents::numeric * oi.quantity * oi.unit_cents / nullif(o.total_cents, 0)), 0))`;
 
 /**
  * Start paying for an order that was just created: pick the provider for its

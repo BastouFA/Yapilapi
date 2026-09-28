@@ -1,11 +1,11 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
-import { BOOST_DAYS, BOOST_OPTIONS, CURRENCIES, PLATFORM_FEE_BPS } from '@yapilapi/shared';
+import { BOOST_DAYS, BOOST_OPTIONS, CURRENCIES, PLATFORM_FEE_BPS, processingFeeCents } from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
-import { startPayment } from '../lib/checkout.ts';
+import { sellerFeesSql, startPayment } from '../lib/checkout.ts';
 import { assertDigitalCheckoutAllowed } from '../lib/store-purchases.ts';
 import { DIGITAL_TYPES, openPrivate, putPrivate } from '../lib/private-files.ts';
 import { analyzeText } from '../lib/moderation.ts';
@@ -226,8 +226,15 @@ export default async function moneyModule(app: FastifyInstance, ctx: AppContext)
       }
       const fee = Math.round((product.price_cents * PLATFORM_FEE_BPS) / 10_000);
       const order = await c.query(
-        `INSERT INTO orders (buyer_id, total_cents, platform_fee_cents, currency, idempotency_key) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-        [u.id, product.price_cents, fee, currency, input.idempotencyKey],
+        `INSERT INTO orders (buyer_id, total_cents, platform_fee_cents, processing_fee_cents, currency, idempotency_key) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+        [
+          u.id,
+          product.price_cents,
+          fee,
+          Math.min(processingFeeCents(product.price_cents, currency), product.price_cents - fee),
+          currency,
+          input.idempotencyKey,
+        ],
       );
       const orderId = order.rows[0].id as string;
       await c.query(`INSERT INTO order_items (order_id, product_id, quantity, unit_cents) VALUES ($1,$2,1,$3)`, [orderId, id, product.price_cents]);
@@ -286,7 +293,7 @@ export default async function moneyModule(app: FastifyInstance, ctx: AppContext)
     const { days } = parse(z.object({ days: z.coerce.number().int().min(1).max(365).default(30) }), req.query);
     const [totals, items] = await Promise.all([
       db.query(
-        `SELECT o.currency, count(DISTINCT o.id)::int AS orders, sum(oi.quantity * oi.unit_cents)::bigint AS gross
+        `SELECT o.currency, count(DISTINCT o.id)::int AS orders, sum(oi.quantity * oi.unit_cents)::bigint AS gross, sum(${sellerFeesSql})::bigint AS fees
          FROM order_items oi JOIN orders o ON o.id = oi.order_id JOIN products pd ON pd.id = oi.product_id
          WHERE pd.seller_id = $1 AND o.status = 'paid' AND o.created_at > now() - make_interval(days => $2)
          GROUP BY o.currency ORDER BY o.currency`,
@@ -305,7 +312,7 @@ export default async function moneyModule(app: FastifyInstance, ctx: AppContext)
       days,
       totals: totals.rows.map((r) => {
         const gross = Number(r.gross);
-        const fees = Math.round((gross * PLATFORM_FEE_BPS) / 10_000);
+        const fees = Number(r.fees);
         return { currency: r.currency.trim(), orders: r.orders, grossCents: gross, feeCents: fees, netCents: gross - fees };
       }),
       items: items.rows.map((r) => ({

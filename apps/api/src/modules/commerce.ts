@@ -9,6 +9,7 @@ import {
   EARNINGS_HOLD_DAYS,
   PLACE_CATEGORIES,
   PLATFORM_FEE_BPS,
+  processingFeeCents,
 } from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
@@ -25,7 +26,7 @@ import { eventVisibleSql, liveVisibleSql } from '../lib/visibility.ts';
 import { liveChatAudience } from '../lib/live.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
 import { grantPlus } from '../lib/plus.ts';
-import { refundOrder, revokeRefundedOrder, startPayment } from '../lib/checkout.ts';
+import { refundOrder, revokeRefundedOrder, sellerFeesSql, startPayment } from '../lib/checkout.ts';
 import { assertDigitalCheckoutAllowed } from '../lib/store-purchases.ts';
 import { confirmDropOrder, dropGateSql, publishDropChange, releaseDropOrder, takeDropStock } from '../lib/drops.ts';
 import { issueOrderTickets, publishDoor } from '../lib/tickets.ts';
@@ -362,9 +363,11 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
         total += p.price_cents * item.quantity;
       }
       const fee = Math.round((total * PLATFORM_FEE_BPS) / 10_000);
+      const currency = [...currencies][0]!;
       const { rows } = await c.query<{ id: string }>(
-        `INSERT INTO orders (buyer_id, total_cents, platform_fee_cents, currency, idempotency_key, live_session_id) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-        [u.id, total, fee, [...currencies][0], input.idempotencyKey, input.liveSessionId ?? null],
+        `INSERT INTO orders (buyer_id, total_cents, platform_fee_cents, processing_fee_cents, currency, idempotency_key, live_session_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+        [u.id, total, fee, Math.min(processingFeeCents(total, currency), total - fee), currency, input.idempotencyKey, input.liveSessionId ?? null],
       );
       const orderId = rows[0]!.id;
       for (const item of input.items) {
@@ -392,7 +395,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     return { order: await loadOrder(order.orderId, u.id), payment: { provider: order.provider, clientSecret: order.clientSecret, orderId: order.orderId } };
   });
 
-  const ORDER_SELECT = `SELECT o.id, o.status, o.total_cents, o.platform_fee_cents, o.currency, o.created_at,
+  const ORDER_SELECT = `SELECT o.id, o.status, o.total_cents, o.platform_fee_cents, o.processing_fee_cents, o.currency, o.created_at,
          (SELECT json_agg(json_build_object('productId', oi.product_id, 'title', p.title, 'quantity', oi.quantity, 'unitCents', oi.unit_cents))
           FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = o.id) AS items
        FROM orders o`;
@@ -401,6 +404,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     status: r.status,
     totalCents: r.total_cents,
     platformFeeCents: r.platform_fee_cents,
+    processingFeeCents: r.processing_fee_cents,
     currency: r.currency,
     items: r.items,
     createdAt: r.created_at,
@@ -722,18 +726,18 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
 }
 
 /**
- * What someone earned per currency after the platform fee. A sale's share is held for EARNINGS_HOLD_DAYS
+ * What someone earned per currency after the platform fee and payment processing. A sale's share is held for EARNINGS_HOLD_DAYS
  * after it was paid (heldCents); what's left once payouts (other than failed ones) are taken off can be
  * paid out (availableCents).
  */
 async function earnings(q: Pick<Pool, 'query'>, userId: string) {
   const { rows } = await q.query(
     `SELECT currency, sum(gross) AS gross, sum(fees) AS fees, sum(gross - fees) FILTER (WHERE held) AS held FROM (
-       SELECT o.currency, oi.quantity * oi.unit_cents AS gross, round(oi.quantity * oi.unit_cents * ${PLATFORM_FEE_BPS} / 10000.0) AS fees, o.paid_at > now() - make_interval(days => $2) AS held
+       SELECT o.currency, oi.quantity * oi.unit_cents AS gross, ${sellerFeesSql} AS fees, o.paid_at > now() - make_interval(days => $2) AS held
        FROM order_items oi JOIN orders o ON o.id = oi.order_id JOIN products p ON p.id = oi.product_id
        WHERE p.seller_id = $1 AND o.status = 'paid'
        UNION ALL
-       SELECT o.currency, o.total_cents, o.platform_fee_cents, o.paid_at > now() - make_interval(days => $2) FROM orders o
+       SELECT o.currency, o.total_cents, o.platform_fee_cents + o.processing_fee_cents, o.paid_at > now() - make_interval(days => $2) FROM orders o
        WHERE o.payee_id = $1 AND o.status = 'paid' AND o.purpose IN ('subscription', 'tip')
      ) x GROUP BY currency`,
     [userId, EARNINGS_HOLD_DAYS],

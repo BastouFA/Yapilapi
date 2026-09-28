@@ -99,8 +99,8 @@ describe('events, places and commerce', () => {
     expect(stock.rows[0].inventory).toBe(1);
 
     const earnings = await as(t.app, host).get('/v1/me/earnings');
-    // Just sold: held for a week before it can be paid out.
-    expect(earnings.body.balances[0]).toMatchObject({ currency: 'EUR', grossCents: 1300, feeCents: 65, heldCents: 1235, availableCents: 0 });
+    // 5% and processing (2.9% + €0.25) come off; just sold, so it's held for a week before it can be paid out.
+    expect(earnings.body.balances[0]).toMatchObject({ currency: 'EUR', grossCents: 1300, feeCents: 128, heldCents: 1172, availableCents: 0 });
 
     // Only the seller (or an admin) can refund.
     expect((await as(t.app, other).post(`/v1/orders/${order.body.order.id}/refund`, {})).status).toBe(404);

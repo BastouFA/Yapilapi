@@ -61,18 +61,18 @@ describe('payouts', () => {
 
     const o = await order(buyer, [{ productId: await product(seller) }]);
     expect((await webhook(o, 'payment.succeeded')).status).toBe(200);
-    // $10 less the 5% fee, held for a week after the sale so an early refund or chargeback comes out of it.
+    // $10 less the 5% fee and processing (2.9% + 30¢), held for a week after the sale so an early refund or chargeback comes out of it.
     expect((await as(t.app, seller).get('/v1/me/earnings')).body.balances).toEqual([
-      { currency: 'USD', grossCents: 1000, feeCents: 50, heldCents: 950, availableCents: 0 },
+      { currency: 'USD', grossCents: 1000, feeCents: 109, heldCents: 891, availableCents: 0 },
     ]);
-    expect((await as(t.app, seller).post('/v1/me/payouts', { amountCents: 950, currency: 'USD' })).status).toBe(400);
+    expect((await as(t.app, seller).post('/v1/me/payouts', { amountCents: 891, currency: 'USD' })).status).toBe(400);
     await db().query(`UPDATE orders SET paid_at = now() - interval '7 days 1 minute' WHERE id = $1`, [o]);
     expect((await as(t.app, seller).get('/v1/me/earnings')).body.balances).toEqual([
-      { currency: 'USD', grossCents: 1000, feeCents: 50, heldCents: 0, availableCents: 950 },
+      { currency: 'USD', grossCents: 1000, feeCents: 109, heldCents: 0, availableCents: 891 },
     ]);
-    expect((await as(t.app, seller).post('/v1/me/payouts', { amountCents: 951, currency: 'USD' })).status).toBe(400);
+    expect((await as(t.app, seller).post('/v1/me/payouts', { amountCents: 892, currency: 'USD' })).status).toBe(400);
     // Two requests at once can't both spend the same balance.
-    const both = await Promise.all([1, 2].map(() => as(t.app, seller).post('/v1/me/payouts', { amountCents: 950, currency: 'USD' })));
+    const both = await Promise.all([1, 2].map(() => as(t.app, seller).post('/v1/me/payouts', { amountCents: 891, currency: 'USD' })));
     expect(both.map((r) => r.status).sort()).toEqual([201, 400]);
     const payoutId = both.find((r) => r.status === 201)!.body.payout.id;
     expect((await as(t.app, seller).get('/v1/me/earnings')).body.balances[0].availableCents).toBe(0);
@@ -80,7 +80,7 @@ describe('payouts', () => {
     // Refunded after the request: there's nothing left to cover it, so it can't be verified.
     expect((await as(t.app, seller).post(`/v1/orders/${o}/refund`, { reason: 'Changed my mind' })).body.status).toBe('succeeded');
     const listed = (await as(t.app, admin).get('/v1/admin/payouts')).body.items.find((p: any) => p.id === payoutId);
-    expect(listed).toMatchObject({ amount_cents: 950, available_cents: -950 });
+    expect(listed).toMatchObject({ amount_cents: 891, available_cents: -891 });
     expect((await as(t.app, admin).post(`/v1/admin/payouts/${payoutId}/verify`)).status).toBe(400);
     expect((await db().query(`SELECT status FROM payouts WHERE id = $1`, [payoutId])).rows[0].status).toBe('pending');
   });
@@ -194,6 +194,22 @@ describe('currencies', () => {
     const r = await as(t.app, buyer).post('/v1/orders', { items: [{ productId: odd, quantity: 1 }], idempotencyKey: key() });
     expect(r.status).toBe(400);
     expect(await order(buyer, [{ productId: await product(seller, { priceCents: 1_000_000, currency: 'XOF' }) }])).toBeTruthy();
+  });
+
+  it('takes processing on top of the platform fee, and starts tips at about $1 in every currency', async () => {
+    const creator = await adult();
+    const fan = await adult();
+    const tip = (amountCents: number, currency: string) =>
+      as(t.app, fan).post(`/v1/users/${creator.id}/tips`, { amountCents, currency, idempotencyKey: key() });
+    // ₦500 is about 30 US cents: processing would eat it, and tiny payments are how stolen cards get tested.
+    expect((await tip(50_000, 'NGN')).status).toBe(400);
+    const ok = await tip(100_000, 'NGN');
+    expect(ok.status).toBe(201);
+    const o = (await db().query(`SELECT platform_fee_cents, processing_fee_cents FROM orders WHERE id = $1`, [ok.body.payment.orderId])).rows[0];
+    // 5% and Paystack's 1.5% (its ₦100 only starts at ₦2,500).
+    expect(o).toEqual({ platform_fee_cents: 5_000, processing_fee_cents: 1_500 });
+    const usd = await tip(100, 'USD');
+    expect((await db().query(`SELECT processing_fee_cents FROM orders WHERE id = $1`, [usd.body.payment.orderId])).rows[0].processing_fee_cents).toBe(33);
   });
 
   it('keeps ad bids and budgets to about the same worth in every currency', async () => {

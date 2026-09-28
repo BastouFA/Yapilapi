@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { BottomSheet, Button, Card, Select, TextField } from '@yapilapi/design-system';
-import { CURRENCIES, formatMoney } from '@yapilapi/shared';
+import { CURRENCIES, CURRENCY_SCALE, formatMoney, type Currency } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 import { useCheckout } from './Checkout';
@@ -102,9 +102,11 @@ export function TipSheet({
 }) {
   const { toast, locale, t } = useSession();
   const checkout = useCheckout();
+  // The choice is in US cents; each currency scales it so the amounts are worth about the same everywhere (and never below the smallest tip).
   const [amount, setAmount] = useState('300');
-  const [currency, setCurrency] = useState('USD');
+  const [currency, setCurrency] = useState<Currency>('USD');
   const [message, setMessage] = useState('');
+  const cents = (usCents: number) => usCents * CURRENCY_SCALE[currency];
   return (
     <BottomSheet open={open} onClose={onClose} title={liveId ? t('support.giftTitle', { name }) : t('support.tipTitle', { name })}>
       <form
@@ -113,7 +115,7 @@ export function TipSheet({
           e.preventDefault();
           try {
             const r = await api.economy.tip(userId, {
-              amountCents: Math.round(Number(amount)),
+              amountCents: cents(Number(amount)),
               currency,
               message,
               liveId,
@@ -122,7 +124,7 @@ export function TipSheet({
             });
             setMessage('');
             onClose();
-            const price = formatMoney(Math.round(Number(amount)), currency, locale);
+            const price = formatMoney(cents(Number(amount)), currency, locale);
             checkout({
               orderId: r.payment.orderId,
               clientSecret: r.payment.clientSecret,
@@ -138,11 +140,11 @@ export function TipSheet({
         <Select label={t('support.amount')} value={amount} onChange={(e) => setAmount(e.currentTarget.value)}>
           {[100, 300, 500, 1000, 2000].map((c) => (
             <option key={c} value={c}>
-              {formatMoney(c, currency, locale)}
+              {formatMoney(cents(c), currency, locale)}
             </option>
           ))}
         </Select>
-        <Select label={t('m.drops.form.currency')} value={currency} onChange={(e) => setCurrency(e.currentTarget.value)}>
+        <Select label={t('m.drops.form.currency')} value={currency} onChange={(e) => setCurrency(e.currentTarget.value as Currency)}>
           {CURRENCIES.map((c) => (
             <option key={c}>{c}</option>
           ))}

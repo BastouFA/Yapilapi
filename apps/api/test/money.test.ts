@@ -282,7 +282,8 @@ describe('digital products', () => {
 
     expect((await as(t.app, buyer).get('/v1/me/purchases')).body.items[0]).toMatchObject({ productId: product.id, title: 'Lagos food guide' });
     const sales = (await as(t.app, seller).get('/v1/me/sales')).body;
-    expect(sales.totals).toEqual([{ currency: 'NGN', orders: 1, grossCents: 150_000, feeCents: 7_500, netCents: 142_500 }]);
+    // ₦75 platform fee and ₦22.50 processing (1.5%; Paystack's ₦100 starts at ₦2,500).
+    expect(sales.totals).toEqual([{ currency: 'NGN', orders: 1, grossCents: 150_000, feeCents: 9_750, netCents: 140_250 }]);
     expect(sales.items[0]).toMatchObject({ status: 'paid', product: { id: product.id }, buyer: { id: buyer.id }, amountCents: 150_000 });
 
     // Links expire.
