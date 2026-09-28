@@ -9,6 +9,8 @@ export * from './filters.ts';
 export * from './stories.ts';
 export * from './music.ts';
 export * from './dual.ts';
+export * from './collage.ts';
+export * from './collage-schemas.ts';
 export * from './data-saver.ts';
 export * from './rooms.ts';
 export * from './date-picker.ts';

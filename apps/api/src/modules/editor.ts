@@ -27,7 +27,7 @@ const STATUS_SQL = `CASE WHEN r.status IN ('queued', 'rendering') THEN 'processi
  *                             adjustments, crop, turn, flips, text and (videos) trim, mute and cover
  *   POST /v1/media/dual     → a "Both sides" photo: your back camera photo with your front camera
  *                             photo in a rounded corner, as a new media item
- *   GET  /v1/media/:id      → one of your media items, to wait for an edit to finish
+ *   GET  /v1/media/:id      → one of your media items, to wait for an edit (or its processing) to finish
  * The original uploads are never changed. Rendering runs as a 'media.editor' job.
  */
 export default async function editorModule(app: FastifyInstance, ctx: AppContext) {
@@ -135,7 +135,7 @@ export default async function editorModule(app: FastifyInstance, ctx: AppContext
   app.get('/v1/media/:id', { preHandler: requireAuth }, async (req) => {
     const { id } = parse(idParam, req.params);
     const { rows } = await db.query(
-      `SELECT m.id, m.kind, m.url, m.mime, m.alt_text, m.variants, m.poster_url, m.hls_url, m.blurhash, m.width, m.height, m.duration_ms,
+      `SELECT m.id, m.kind, m.url, m.mime, m.alt_text, m.variants, m.poster_url, m.hls_url, m.blurhash, m.width, m.height, m.duration_ms, m.moderation,
               ${mediaSizesSql()} AS sizes, ${STATUS_SQL} AS status, r.error AS edit_error, r.source_media_id AS edit_of
        FROM media m LEFT JOIN media_editor_renders r ON r.result_media_id = m.id
        WHERE m.id = $1 AND m.owner_id = $2`,
@@ -161,6 +161,8 @@ export default async function editorModule(app: FastifyInstance, ctx: AppContext
         durationMs: m.duration_ms,
         editOf: m.edit_of,
         error: m.status === 'failed' ? (m.edit_error ?? "We couldn't process this file.") : null,
+        // The media job has made its sizes and (when automated checks are on) checked it: a collage can use it.
+        processed: m.status === 'ready' && Object.keys(m.variants ?? {}).length > 0 && (ctx.mediaModerator.name === 'none' || m.moderation !== 'pending'),
       },
     };
   });

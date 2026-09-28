@@ -8689,3 +8689,154 @@ button.profile-song__play::after {
   font-weight: 600;
   cursor: pointer;
 }
+
+/* Collage editor (components/Collage.tsx): preview on the left, choices on the right; one column on phones. */
+.yp-dialog.collage {
+  max-width: 920px;
+  max-height: calc(100dvh - 2 * var(--space-4));
+  overflow-y: auto;
+}
+.collage__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 300px);
+  gap: var(--space-6);
+  align-items: start;
+}
+@media (max-width: 720px) {
+  .collage__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.collage__hint {
+  margin: 0 0 var(--space-2);
+  font-size: 14px;
+}
+.collage__canvas {
+  position: relative;
+  width: 100%;
+  margin-inline: auto;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  touch-action: none;
+  user-select: none;
+}
+.collage__status {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: var(--space-4);
+  text-align: center;
+  font-weight: 600;
+}
+.collage__cell {
+  position: absolute;
+  box-sizing: border-box;
+  padding: 0;
+  border: 0 solid #fff;
+  background: #fff;
+  cursor: grab;
+  touch-action: none;
+}
+.collage__cell:active {
+  cursor: grabbing;
+}
+.collage__cell:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.collage__cell--chosen {
+  outline: 3px solid var(--yapi);
+  outline-offset: 2px;
+}
+.collage__photo {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.collage__photo img {
+  position: absolute;
+  max-width: none;
+  pointer-events: none;
+}
+.collage__cell-tools {
+  justify-content: center;
+  margin-top: var(--space-3);
+}
+.collage__controls {
+  display: grid;
+  gap: var(--space-4);
+}
+.collage__group {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.collage__group legend,
+.collage__label {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 14px;
+}
+.collage .yp-segments button {
+  height: 44px;
+}
+.collage__layouts,
+.collage__swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.collage__layout {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  padding: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+}
+.collage__layout[aria-pressed='true'] {
+  border: 2px solid var(--ink);
+  background: var(--surface-sunken);
+}
+.collage__layout:focus-visible,
+.collage__swatch:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.collage__thumb {
+  position: relative;
+  display: block;
+  height: 100%;
+  max-width: 100%;
+}
+.collage__thumb > span {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px solid var(--surface);
+  background: var(--ink-muted);
+}
+.collage__swatch {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+.collage__swatch[aria-pressed='true'] {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}

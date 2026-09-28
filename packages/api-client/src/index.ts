@@ -84,6 +84,7 @@ import type {
   StorySticker,
   StoryStickerInput,
   DualComposeInput,
+  CollageInput,
   ChatTheme,
   ScheduledMessage,
   UsernameCheck,
@@ -572,6 +573,37 @@ export function createClient(opts: ClientOptions) {
       /** A "Both sides" photo from two of your uploaded photos (back, and front in a corner). Wait for it with waitUntilReady. */
       dual: (b: DualComposeInput) =>
         post<{ media: { id: string; kind: 'image'; url: string; altText: string | null; status: 'processing'; editOf: string } }>(`/v1/media/dual`, b),
+      /**
+       * A collage from 2 to 9 of your processed photos (wait for them with waitUntilProcessed first). Ready
+       * to use like an uploaded photo. Sending the same clientKey again gives back the same collage; while
+       * a photo is still being prepared the request is tried again for up to a minute.
+       */
+      collage: async (b: CollageInput, o: { timeoutMs?: number; signal?: AbortSignal } = {}) => {
+        const started = Date.now();
+        for (;;) {
+          try {
+            return await post<{
+              media: { id: string; kind: 'image'; url: string; altText: string | null; width: number | null; height: number | null; collage: true };
+            }>('/v1/media/collage', b);
+          } catch (e) {
+            const retry = e instanceof ApiError && (e.code === 'media_processing' || e.code === 'collage_in_progress');
+            if (!retry || o.signal?.aborted || Date.now() - started > (o.timeoutMs ?? 60_000)) throw e;
+            await new Promise((r) => setTimeout(r, 1500));
+          }
+        }
+      },
+      /** Poll GET /v1/media/:id until the media job has made its sizes and checked it (photos and videos). */
+      waitUntilProcessed: async (id: string, o: { intervalMs?: number; timeoutMs?: number; signal?: AbortSignal } = {}) => {
+        const started = Date.now();
+        for (;;) {
+          if (o.signal?.aborted) throw new ApiError(0, 'aborted', 'Stopped waiting.');
+          const { media } = await get<{ media: MediaItemStatus }>(`/v1/media/${id}`);
+          if (media.processed) return media;
+          if (media.status === 'failed') throw new ApiError(422, 'processing_failed', media.error ?? "We couldn't process this file.");
+          if (Date.now() - started > (o.timeoutMs ?? 2 * 60_000)) throw new ApiError(0, 'timeout', 'This is taking longer than usual. Try again in a moment.');
+          await new Promise((r) => setTimeout(r, o.intervalMs ?? 1000));
+        }
+      },
       /** Poll GET /v1/media/:id until it is ready (resolves) or failed (rejects). */
       waitUntilReady: async (id: string, o: { intervalMs?: number; timeoutMs?: number; signal?: AbortSignal } = {}) => {
         const started = Date.now();
@@ -1816,6 +1848,8 @@ export interface MediaItemStatus {
   /** The upload this one was edited from, for editor results. */
   editOf: string | null;
   error: string | null;
+  /** The media job has made its sizes and (when automated checks are on) checked it. */
+  processed?: boolean;
 }
 
 export interface StudioVideo {

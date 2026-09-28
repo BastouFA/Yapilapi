@@ -201,6 +201,18 @@ export function mediaModeratorFromConfig(config: Config): MediaModerator {
 }
 
 /**
+ * The verdict media made from other media inherits: a collage is at least as sensitive as the
+ * photos it was made from (and blocked if one of them has been blocked since). 'ok' otherwise.
+ */
+export async function inheritedVerdict(db: Q, mediaId: string): Promise<MediaVerdict> {
+  const { rows } = await db.query<{ moderation: string }>(
+    `SELECT s.moderation FROM media_collages c JOIN media s ON s.id = ANY(c.source_ids) WHERE c.media_id = $1 AND s.moderation IN ('sensitive', 'blocked')`,
+    [mediaId],
+  );
+  return rows.reduce<MediaVerdict>((v, r) => worst(v, r.moderation as MediaVerdict), 'ok');
+}
+
+/**
  * Store a verdict. Blocked media takes the posts it's in down, opens a
  * moderation case and tells the uploader in plain words. Stories and chat
  * attachments read the verdict when they're loaded, so they follow it too.
