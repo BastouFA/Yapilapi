@@ -447,7 +447,8 @@ export class AiAssists {
       }>(
         `SELECT m.id, m.sender_id, pr.display_name AS name, m.body, m.lang, m.kind, m.view_once, m.attachments, m.moderation_status,
                 EXISTS (SELECT 1 FROM chat_polls cp WHERE cp.message_id = m.id) OR EXISTS (SELECT 1 FROM chat_lists cl WHERE cl.message_id = m.id)
-                  OR EXISTS (SELECT 1 FROM chat_games cg WHERE cg.message_id = m.id) OR (m.meta ? 'mixId') AS rich
+                  OR EXISTS (SELECT 1 FROM chat_games cg WHERE cg.message_id = m.id) OR (m.meta ? 'mixId')
+                  OR EXISTS (SELECT 1 FROM location_shares ls WHERE ls.message_id = m.id) AS rich
          FROM messages m JOIN profiles pr ON pr.user_id = m.sender_id
          WHERE m.conversation_id = $1 AND ${messageVisibleSql('$2')} AND m.deleted_at IS NULL AND m.unsent_at IS NULL AND m.kind <> 'system'
          ORDER BY m.created_at DESC, m.id DESC LIMIT 12`,

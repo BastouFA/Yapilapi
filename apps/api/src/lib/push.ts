@@ -127,6 +127,8 @@ const TEXT: Record<string, (actor: string, data: Record<string, unknown>) => str
   recap_ready: () => 'Your recap video is ready',
   recap_failed: () => "We couldn't make your recap video",
   watch_invite: (a) => `${a} wants to watch together`,
+  // Quiet: no sound, like every push but calls. Never says where.
+  location_shared: (a) => `${a} is sharing where they are with you`,
   weekly_wrap: () => 'Your week in YAPILAPI is ready to look back on',
   // Questions asked without a name have no actor, so they read "Someone asked you a question".
   question_received: (a) => `${a} asked you a question`,

@@ -279,6 +279,8 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         // Product analytics stay in the totals without being linked to them.
         `UPDATE analytics_events SET user_id = NULL WHERE user_id = $1`,
         `UPDATE conversation_members SET left_at = now() WHERE user_id = $1`,
+        // Where they shared their location: points and records alike.
+        `DELETE FROM location_shares WHERE user_id = $1`,
         `UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`,
         // Sign-in material goes: devices, one-time links and challenges, two-step methods and codes,
         // download links. Apps they allowed lose access; their own apps, keys and webhooks stop.

@@ -51,6 +51,7 @@ const TEXT: Record<string, MessageKey> = {
   view_once_screenshot: 'm.notif.viewOnceScreenshot',
   chapter_invite: 'm.notif.chapterInvite',
   watch_invite: 'watch.invite',
+  location_shared: 'location.notif',
   drop_opened: 'm.notif.dropOpened',
   drop_cancelled: 'm.notif.dropCancelled',
 };

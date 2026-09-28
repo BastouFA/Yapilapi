@@ -49,6 +49,8 @@ import { useReport } from '../../lib/report';
 import { ListCard, ListComposer, PollCard, PollComposer, ReminderNote, ReminderPicker } from '../../lib/chat-polls';
 import { GameCard, GameSheet, StartGameSheet } from '../../lib/chat-games';
 import { ChatMixCard, ShareMixHereSheet } from '../../lib/mixes';
+import { LocationCard, LocationRequestLine, ShareLocationSheet, SharingBanner, useLocationSharing } from '../../lib/chat-location';
+import type { LatLng } from '../../../../packages/shared/src/location';
 import { accentFor, ChatLookSheet, ChatWallpaperView, laterLimits, ScheduledList, useScheduled } from '../../lib/chat-later';
 import { DateTimeSheet } from '../../lib/date-time';
 import { useFlag } from '../../lib/flags';
@@ -100,6 +102,9 @@ export default function Chat() {
   const [boardFor, setBoardFor] = useState<string | null>(null);
   // Mixes: the sheet to share one of yours here.
   const [mixShareOpen, setMixShareOpen] = useState(false);
+  // Sharing where you are: the sheet, and your live share here (started on the web) with its banner.
+  const [locationOpen, setLocationOpen] = useState(false);
+  const sharing = useLocationSharing(id, me?.id);
   const [remindFor, setRemindFor] = useState<{ message: Message; scope: 'me' | 'group' } | null>(null);
   // Send later (touch and hold Send), your messages waiting here, and the chat's wallpaper and colour.
   const scheduled = useScheduled(id);
@@ -175,9 +180,12 @@ export default function Chat() {
         poll: undefined,
         list: undefined,
         game: undefined,
+        location: undefined,
         reminder: undefined,
       }));
       setBoardFor((cur) => (cur === e.data.id ? null : cur));
+      const own = sharing.mine;
+      if (own && own.messageId === e.data.id) sharing.apply({ ...own, live: false, stoppedAt: new Date().toISOString(), point: null });
       setMessages((cur) =>
         cur.map((x) => (x.replyTo && x.replyTo.id === e.data.id ? { ...x, replyTo: { ...x.replyTo, unsent: true, body: '', attachmentKind: null } } : x)),
       );
@@ -194,6 +202,11 @@ export default function Chat() {
     // A move, a forfeit or the end of a game: the card and any open board follow. An older update arriving late never winds the board back.
     if (e.type === 'game.updated' && e.data?.conversationId === id)
       patchMessage(e.data.id, (x) => (x.unsent || (x.game && x.game.moveNumber > e.data.game.moveNumber) ? x : { ...x, game: e.data.game }));
+    // Where someone is: the card moves, or says they stopped; your own share's banner follows.
+    if (e.type === 'location.updated' && e.data?.conversationId === id) {
+      patchMessage(e.data.id, (x) => (x.unsent ? x : { ...x, location: e.data.location }));
+      sharing.apply(e.data.location);
+    }
     // "Ada added 3 songs": more adds raise the line's count.
     if (e.type === 'message.system' && e.data?.conversationId === id) patchMessage(e.data.id, (x) => ({ ...x, system: e.data.system }));
     // A mix shared here changed: its cards show it as it is now (or that it's gone).
@@ -538,6 +551,28 @@ export default function Chat() {
     }
   }
 
+  /** Stop your live share here (started on the web): the card says you stopped. */
+  async function stopSharing() {
+    try {
+      const ended = await sharing.stop();
+      if (ended) patchMessage(ended.messageId, (x) => (x.location ? { ...x, location: ended } : x));
+      AccessibilityInfo.announceForAccessibility(t('location.stoppedToast'));
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  }
+
+  /** Ask the others where they are: a line in the chat; each person chooses whether to share. */
+  async function askLocation() {
+    try {
+      const { message } = await (await client()).conversations.askLocation(id);
+      setMessages((cur) => (cur.some((x) => x.id === message.id) ? cur : [...cur, message]));
+      AccessibilityInfo.announceForAccessibility(t('location.request.sent'));
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  }
+
   const canManage = conversation?.kind === 'direct' || conversation?.myRole === 'admin';
   const pinnedIds = new Set(pins.map((p) => p.message.id));
 
@@ -552,6 +587,7 @@ export default function Chat() {
       !m.list &&
       !m.game &&
       !m.mix &&
+      !m.location &&
       !m.unsent &&
       Date.now() - new Date(m.createdAt).getTime() < MESSAGE_EDIT_MINUTES * 60_000;
     const out: SheetAction[] = [];
@@ -667,8 +703,20 @@ export default function Chat() {
   }
 
   // Stable handlers for the memoised rows; they call this render's functions.
-  const latest = useRef({ jumpTo, setActionsFor, startReply, react, patchMessage, replaceMessage, setBoardFor, setError });
-  latest.current = { jumpTo, setActionsFor, startReply, react, patchMessage, replaceMessage, setBoardFor, setError };
+  const latest = useRef({
+    jumpTo,
+    setActionsFor,
+    startReply,
+    react,
+    patchMessage,
+    replaceMessage,
+    setBoardFor,
+    setError,
+    stopSharing,
+    setLocationOpen,
+    sharing,
+  });
+  latest.current = { jumpTo, setActionsFor, startReply, react, patchMessage, replaceMessage, setBoardFor, setError, stopSharing, setLocationOpen, sharing };
   const rowHandlers = useMemo<RowHandlers>(
     () => ({
       jumpTo: (mid) => void latest.current.jumpTo(mid),
@@ -678,6 +726,9 @@ export default function Chat() {
       patchMessage: (mid, fn) => latest.current.patchMessage(mid, fn),
       replaceMessage: (m) => latest.current.replaceMessage(m),
       openGame: (mid) => latest.current.setBoardFor(mid),
+      stopSharing: () => latest.current.stopSharing(),
+      shareLocation: () => latest.current.setLocationOpen(true),
+      setViewer: (p) => latest.current.sharing.setViewer(p),
       // Adding a song from a mix card: a problem shows at the top; a song added is read out.
       note: (text, failed) => (failed ? latest.current.setError(text) : AccessibilityInfo.announceForAccessibility(text)),
     }),
@@ -710,6 +761,7 @@ export default function Chat() {
         </View>
       ) : null}
       {watching ? <WatchBanner summary={watching} /> : null}
+      <SharingBanner share={sharing.mine} onStop={stopSharing} />
       <PinnedBar
         pins={pins}
         canManage={canManage}
@@ -770,6 +822,7 @@ export default function Chat() {
               highlighted={highlight === item.id}
               accent={accent}
               watchLive={!!watching && item.system?.type === 'watch' && item.system.sessionId === watching.id}
+              viewer={item.location ? sharing.viewer : null}
               h={rowHandlers}
             />
           )}
@@ -1143,9 +1196,17 @@ export default function Chat() {
             ? [
                 { label: t('m.chat.game.new'), icon: 'game-controller-outline' as const, onPress: () => setGameStartOpen(true) },
                 { label: t('mixes.shareHere'), icon: 'list-outline' as const, onPress: () => setMixShareOpen(true) },
+                { label: t('location.menu'), icon: 'location-outline' as const, onPress: () => setLocationOpen(true) },
+                { label: t('location.ask'), icon: 'help-circle-outline' as const, onPress: () => void askLocation() },
               ]
             : []),
         ]}
+      />
+      <ShareLocationSheet
+        visible={locationOpen}
+        onClose={() => setLocationOpen(false)}
+        conversationId={id}
+        onSent={(m) => setMessages((cur) => (cur.some((x) => x.id === m.id) ? cur : [...cur, m]))}
       />
       <ShareMixHereSheet
         visible={mixShareOpen}
@@ -1231,6 +1292,9 @@ interface RowHandlers {
   replaceMessage: (m: Message) => void;
   openGame: (messageId: string) => void;
   note: (text: string, failed?: boolean) => void;
+  stopSharing: () => Promise<unknown>;
+  shareLocation: () => void;
+  setViewer: (p: LatLng) => void;
 }
 
 /** One message: its bubble (yours at the end edge), reactions, and swipe to reply. */
@@ -1242,6 +1306,7 @@ const MessageRow = memo(function MessageRow({
   highlighted,
   accent,
   watchLive,
+  viewer,
   h,
 }: {
   item: Message;
@@ -1252,12 +1317,19 @@ const MessageRow = memo(function MessageRow({
   /** Your bubbles' colours in this chat (the brand gradient unless the chat has its own). */
   accent: AccentColors;
   watchLive: boolean;
+  /** Where you are, for distances on location cards (worked out on this phone only). */
+  viewer: LatLng | null;
   h: RowHandlers;
 }) {
   const c = useColors();
   const { t } = useT();
-  if (item.kind === 'system') return <SystemLine message={item} meId={meId} onJump={h.jumpTo} watchLive={watchLive} />;
-  const rich = !item.unsent && (item.poll || item.list || item.game || item.mix);
+  if (item.kind === 'system')
+    return item.system?.type === 'location_request' ? (
+      <LocationRequestLine message={item} meId={meId} onShare={h.shareLocation} />
+    ) : (
+      <SystemLine message={item} meId={meId} onJump={h.jumpTo} watchLive={watchLive} />
+    );
+  const rich = !item.unsent && (item.poll || item.list || item.game || item.mix || item.location);
   const text = item.unsent
     ? t(mine ? 'm.chat.unsentMine' : 'm.chat.unsent')
     : rich
@@ -1276,6 +1348,8 @@ const MessageRow = memo(function MessageRow({
     <GameCard message={item} meId={meId} tint={tint} onOpen={() => h.openGame(item.id)} />
   ) : item.mix ? (
     <ChatMixCard mix={item.mix} onMix={(mix) => h.patchMessage(item.id, (x) => ({ ...x, mix }))} onNote={h.note} />
+  ) : item.location ? (
+    <LocationCard message={item} meId={meId} tint={tint} viewer={viewer} onViewer={h.setViewer} onStop={h.stopSharing} />
   ) : item.viewOnce ? (
     <ViewOnceBubble message={item} mine={mine} tint={tint} onChange={h.replaceMessage} />
   ) : (

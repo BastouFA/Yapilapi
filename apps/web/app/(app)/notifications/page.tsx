@@ -124,6 +124,8 @@ function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): s
   // Whole sentences in your language (the name, when there is one, is part of them).
   if (n.type === 'weekly_wrap') return t('wrap.notif');
   if (n.type === 'watch_invite') return t('watch.invite', { name: n.actor?.displayName ?? t('m.calls.someone') });
+  // Someone started sharing where they are with a chat you're in (it opens the chat).
+  if (n.type === 'location_shared') return t('location.notif', { name: n.actor?.displayName ?? t('m.calls.someone') });
   // A question asked without a name has no actor: it never says who.
   if (n.type === 'question_received') return n.actor ? t('ask.notif.received', { name: n.actor.displayName }) : t('ask.notif.receivedHidden');
   if (n.type === 'question_answered') return t('ask.notif.answered', { name: n.actor?.displayName ?? '' });

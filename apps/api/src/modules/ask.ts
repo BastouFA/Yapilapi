@@ -26,6 +26,7 @@ import { hydratePosts } from '../lib/posts.ts';
 import { notify, track } from '../lib/services.ts';
 import { assessQuestion, flagContent, isRestricted, recordSignals } from '../lib/spam.ts';
 import { areFriends, blockUser } from '../lib/users.ts';
+import { publishShares } from '../lib/location.ts';
 import { requireVerified } from '../lib/verification.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
@@ -383,12 +384,15 @@ export default async function askModule(app: FastifyInstance, ctx: AppContext) {
     const u = me(req);
     const { id } = parse(idParam, req.params);
     const q = await ownQuestion(id, u.id);
-    await tx(db, async (c) => {
+    const stopped = await tx(db, async (c) => {
+      let shares: string[] = [];
       if (q.hide_name)
         await c.query(`INSERT INTO ask_blocks (recipient_id, asker_id, question_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, [u.id, q.asker_id, id]);
-      else await blockUser(c, u.id, q.asker_id);
+      else shares = await blockUser(c, u.id, q.asker_id);
       if (!q.answered_at) await c.query(`UPDATE ask_questions SET hidden_at = coalesce(hidden_at, now()) WHERE id = $1`, [id]);
+      return shares;
     });
+    await publishShares({ db, realtime: ctx.realtime }, stopped);
     return { blocked: true, scope: q.hide_name ? 'questions' : 'account', question: await one(id, u.id) };
   });
 

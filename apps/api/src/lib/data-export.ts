@@ -253,6 +253,14 @@ export async function exportSections(db: Q, userId: string) {
        FROM watch_sessions s LEFT JOIN watch_participants p ON p.session_id = s.id AND p.user_id = $1
        WHERE s.started_by = $1 OR p.user_id = $1 ORDER BY s.created_at DESC`,
     ),
+    // That you shared where you were, with whom and when: never the place itself (a live share keeps
+    // none once it ends, and a pin sent once is listed here without it).
+    locationShares: await q(
+      `SELECT s.conversation_id, s.mode, s.precision, s.started_at, coalesce(s.stopped_at, s.ends_at) AS ended_at,
+              coalesce((SELECT array_agg(pr.username ORDER BY pr.username) FROM conversation_members cm JOIN profiles pr ON pr.user_id = cm.user_id
+                        WHERE cm.conversation_id = s.conversation_id AND cm.user_id <> $1), '{}') AS shared_with
+       FROM location_shares s WHERE s.user_id = $1 ORDER BY s.started_at DESC`,
+    ),
   };
 
   const activity = {
@@ -473,7 +481,8 @@ export const EXPORT_README = {
     profile: 'Your profile as others see it, and its settings.',
     'posts, comments, messagesSent': 'What you shared. Messages include only the ones you sent.',
     content: 'Stories, chapters, boards, saves, memories, recaps, lives, rooms, products, drops, places, businesses, photos and videos, and more you made.',
-    chats: 'Chats you are in, and the polls, lists, plans, games, calls and watch together sessions you took part in (your side only).',
+    chats:
+      'Chats you are in, and the polls, lists, plans, games, calls and watch together sessions you took part in (your side only), and when you shared where you were, with whom (never the place).',
     activity: 'Reposts, votes, notifications, feed feedback, daily minutes, and views counted per day.',
     relationships: 'Friends, friend requests, blocks, mutes, restrictions and family links.',
     money: 'Orders (bought and sold), payments, refunds, tips, subscriptions, payouts, bookings and Plus.',
@@ -502,6 +511,7 @@ export const EXPORT_README = {
     'Passwords, sign-in and reset links, session and API key tokens, two-step secrets and codes, passkey keys, stream keys and webhook secrets (and their hashes).',
     'Other people’s messages, email addresses and private details.',
     'Who reported you, and cases still being reviewed.',
+    'Where you were: places you shared in chats are not included, and a live share keeps none once it ends.',
     'How automated spam and abuse checks work: the flags on your account are counted, not described.',
   ],
 } as const;

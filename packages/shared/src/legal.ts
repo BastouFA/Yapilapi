@@ -19,7 +19,7 @@ export const LEGAL_DOCS = [
 export type LegalSlug = (typeof LEGAL_DOCS)[number]['slug'];
 
 /** When the templates were last changed (shown as "Last updated" on every page). */
-export const LEGAL_UPDATED = '2026-09-27';
+export const LEGAL_UPDATED = '2026-09-28';
 
 /** The share of each sale, tip and subscription the platform keeps (PLATFORM_FEE_BPS = 500 in apps/api/src/modules/money.ts, economy.ts and commerce.ts). */
 export const PLATFORM_FEE_PERCENT = 5;
