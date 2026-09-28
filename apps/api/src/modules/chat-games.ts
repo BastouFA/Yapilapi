@@ -8,6 +8,8 @@ import {
   createChatGameSchema,
   drawAction,
   forfeit,
+  GAME_ACTIVE_LIMIT,
+  GAME_KIND_ACTIVE_LIMIT,
   GAME_NAMES,
   GAME_PLAYERS,
   newGame,
@@ -54,8 +56,20 @@ const MOVE_ERRORS: Record<GameError, [number, string]> = {
   draw_too_soon: [409, 'You can offer a draw again after your next move.'],
 };
 const moveError = (code: GameError) => new AppError(MOVE_ERRORS[code][0], code, MOVE_ERRORS[code][1]);
-const inProgress = (kind: GameKind, gameId?: string) =>
-  new AppError(409, 'game_in_progress', `A game of ${GAME_NAMES[kind]} is already going in this chat. Finish it first.`, gameId ? { gameId } : undefined);
+/** A chat with as many games going as it can have (all kinds, or this kind): see migration 0060. */
+const gamesFull = () =>
+  new AppError(409, 'games_full', `${GAME_ACTIVE_LIMIT} games are going in this chat. Finish or forfeit one to start another.`, {
+    limit: GAME_ACTIVE_LIMIT,
+  });
+const kindFull = (kind: GameKind) =>
+  new AppError(
+    409,
+    'game_kind_full',
+    `${GAME_KIND_ACTIVE_LIMIT} games of ${GAME_NAMES[kind]} are going in this chat. Finish or forfeit one to start another.`,
+    {
+      limit: GAME_KIND_ACTIVE_LIMIT,
+    },
+  );
 
 /**
  * Games in chats: Four up, Noughts, Word ladder and Chess, turn by turn, in one-to-one chats and groups.
@@ -111,7 +125,8 @@ export function registerChatGames(app: FastifyInstance, ctx: AppContext, h: Chat
 
   /**
    * Start a game: its card goes in the chat as a message from `u`, and the board is new. A retry with
-   * the same clientId returns the first one. One game of each kind at a time per chat.
+   * the same clientId returns the first one. Up to GAME_ACTIVE_LIMIT games go at once in a chat,
+   * GAME_KIND_ACTIVE_LIMIT of the same kind.
    */
   async function startGame(
     u: AuthUser,
@@ -138,19 +153,18 @@ export function registerChatGames(app: FastifyInstance, ctx: AppContext, h: Chat
       if (r.conversation_id !== conversationId) throw badRequest('That clientId was used in another chat.');
       // The same clientId again (a retry): the first one stands.
       if (!r.inserted) return { id: r.id, inserted: false };
-      const running = (
-        await c.query<{ id: string }>(`SELECT id FROM chat_games WHERE conversation_id = $1 AND kind = $2 AND status = 'active'`, [conversationId, kind])
-      ).rows[0];
-      if (running) throw inProgress(kind, running.id);
+      // The limits on games going at once are checked by the database as the game goes in, under a
+      // lock per chat, so two starts at once can't both take the last place (migration 0060).
       const game = await c
         .query<{ id: string }>(
           `INSERT INTO chat_games (message_id, conversation_id, kind, created_by, players, state, rematch_of) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
           [r.id, conversationId, kind, u.id, players, state, rematchOf ?? null],
         )
         .catch((e: { code?: string; constraint?: string }) => {
-          // Two starts at once: one wins, the other hears a game is going (or, for a rematch, gets the same one).
+          if (e.constraint === 'chat_games_active_limit') throw gamesFull();
+          if (e.constraint === 'chat_games_kind_limit') throw kindFull(kind);
+          // Two rematches at once: one wins, the other gets the same one.
           if (e.code === '23505' && e.constraint === 'chat_games_rematch_key') throw new AppError(409, 'rematch_exists', 'A rematch has already started.');
-          if (e.code === '23505') throw inProgress(kind);
           throw e;
         });
       await scheduleIdleEnd(c, game.rows[0]!.id, 0);
@@ -223,7 +237,7 @@ export function registerChatGames(app: FastifyInstance, ctx: AppContext, h: Chat
     return { message };
   });
 
-  /** The games going in this chat (one of each kind at most), as cards you can see. */
+  /** The games going in this chat (up to GAME_ACTIVE_LIMIT), as cards you can see, oldest first. */
   app.get('/v1/conversations/:id/games', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
@@ -353,7 +367,8 @@ export function registerChatGames(app: FastifyInstance, ctx: AppContext, h: Chat
     try {
       message = await startGame(u, g.conversation_id, g.kind, seats, undefined, { rematchOf: id, white });
     } catch (e) {
-      const again = e instanceof AppError && e.code === 'rematch_exists' ? await existing() : null;
+      // Both asked at once: the other one's rematch went in first (and may have taken the chat's last place).
+      const again = e instanceof AppError && ['rematch_exists', 'games_full', 'game_kind_full'].includes(e.code) ? await existing() : null;
       if (again) return { message: again };
       throw e;
     }

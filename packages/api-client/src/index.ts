@@ -827,7 +827,7 @@ export function createClient(opts: ClientOptions) {
        */
       startGame: (id: string, input: { kind: GameKind; playerIds?: string[]; color?: 'white' | 'black' | 'random'; clientId?: string }) =>
         post<{ message: Message }>(`/v1/conversations/${id}/games`, input),
-      /** The games going in this chat (one of each kind at most). */
+      /** The games going in this chat (up to 6, at most 3 of a kind), oldest first. */
       games: (id: string) => get<{ items: ChatGame[] }>(`/v1/conversations/${id}/games`),
       /**
        * Share where you are with this chat: live for `minutes` (15, 60 or 480), or once. Approximate points

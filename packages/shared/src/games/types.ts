@@ -17,6 +17,20 @@ export const GAME_PLAYERS: Record<GameKind, { min: number; max: number }> = {
 export const GAME_IDLE_HOURS = 24;
 
 /**
+ * Games going at once in one chat: 6 in all, and 3 of the same kind (migration 0060 checks the same
+ * numbers when a game starts).
+ */
+export const GAME_ACTIVE_LIMIT = 6;
+export const GAME_KIND_ACTIVE_LIMIT = 3;
+
+/** Whether another game of `kind` can start in a chat with these games going (`kinds`: one per game). */
+export function gameStartBlock(kinds: readonly GameKind[], kind: GameKind): 'games_full' | 'game_kind_full' | null {
+  if (kinds.length >= GAME_ACTIVE_LIMIT) return 'games_full';
+  if (kinds.filter((k) => k === kind).length >= GAME_KIND_ACTIVE_LIMIT) return 'game_kind_full';
+  return null;
+}
+
+/**
  * Why a game of chess was drawn: no legal move and not in check, the same position three times,
  * fifty moves each without a capture or a pawn move, too few pieces left for anyone to checkmate,
  * or both players agreed.

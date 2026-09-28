@@ -80,7 +80,7 @@ async function aDayLater(gameId: string) {
 }
 
 describe('Starting a game', () => {
-  it('puts a card in a one-to-one chat that only its members see; one of each kind at a time', async () => {
+  it('puts a card in a one-to-one chat that only its members see; several can go at once', async () => {
     const [a, b, stranger] = [await adult(), await adult(), await adult()];
     const convo = await direct(a, b);
     const live = connect(b);
@@ -102,13 +102,11 @@ describe('Starting a game', () => {
     expect(live.of('message.created').find((e) => e.data.id === m.id)?.data.game.kind).toBe('four_up');
     expect(outsider.events).toEqual([]);
 
-    // The same kind again waits for this one to finish; another kind can go alongside it.
-    const again = await start(b, convo, 'four_up');
-    expect(again.status).toBe(409);
-    expect(again.body.error).toMatchObject({ code: 'game_in_progress', details: { gameId: m.game.id } });
+    // Another game can go alongside it, of the same kind or another.
+    await started(b, convo, 'four_up');
     await started(b, convo, 'noughts');
     const going = (await as(t.app, a).get(`/v1/conversations/${convo}/games`)).body.items;
-    expect(going.map((g: any) => g.kind).sort()).toEqual(['four_up', 'noughts']);
+    expect(going.map((g: any) => g.kind)).toEqual(['four_up', 'four_up', 'noughts']);
     expect((await as(t.app, stranger).get(`/v1/conversations/${convo}/games`)).status).toBe(404);
 
     // It reads like a message elsewhere: a reply quotes it as a game.
@@ -135,11 +133,53 @@ describe('Starting a game', () => {
     expect(n.rows[0].n).toBe(1);
   });
 
-  it('two starts at once make one game', async () => {
+  it('up to 3 games of a kind and 6 in all go at once, with clear errors past that', async () => {
     const [a, b] = [await adult(), await adult()];
     const convo = await direct(a, b);
-    const [x, y] = await Promise.all([start(a, convo, 'word_ladder'), start(b, convo, 'word_ladder')]);
-    expect([x.status, y.status].sort()).toEqual([201, 409]);
+    const fours = [await started(a, convo, 'four_up'), await started(b, convo, 'four_up'), await started(a, convo, 'four_up')];
+    const fourth = await start(b, convo, 'four_up');
+    expect(fourth.status).toBe(409);
+    expect(fourth.body.error).toMatchObject({ code: 'game_kind_full', details: { limit: 3 } });
+    expect(fourth.body.error.message).toContain('3 games of Four up');
+    // Nothing was left behind: no card for the refused game.
+    expect((await messages(a, convo)).filter((m) => m.game)).toHaveLength(3);
+
+    await started(a, convo, 'noughts');
+    await started(a, convo, 'chess');
+    await started(b, convo, 'word_ladder');
+    const seventh = await start(a, convo, 'noughts');
+    expect(seventh.status).toBe(409);
+    expect(seventh.body.error).toMatchObject({ code: 'games_full', details: { limit: 6 } });
+    expect((await as(t.app, b).get(`/v1/conversations/${convo}/games`)).body.items).toHaveLength(6);
+
+    // A game that ends frees its place.
+    expect((await as(t.app, b).post(`/v1/games/${fours[0]!.game.id}/forfeit`)).status).toBe(200);
+    await started(b, convo, 'four_up');
+    expect((await start(a, convo, 'noughts')).body.error.code).toBe('games_full');
+    // Another chat has its own places.
+    const [c] = [await adult()];
+    await started(a, await direct(a, c), 'four_up');
+  });
+
+  it('starts at once can’t go past the limits', async () => {
+    const [a, b] = [await adult(), await adult()];
+    const convo = await direct(a, b);
+    const tries = await Promise.all([0, 1, 2, 3, 4].map((i) => start(i % 2 ? b : a, convo, 'word_ladder')));
+    expect(tries.map((r) => r.status).sort()).toEqual([201, 201, 201, 409, 409]);
+    const n = await db().query(`SELECT count(*)::int AS n FROM chat_games WHERE conversation_id = $1 AND status = 'active'`, [convo]);
+    expect(n.rows[0].n).toBe(3);
+    // The database holds the line even if a check were skipped.
+    const g = (await db().query(`SELECT * FROM chat_games WHERE conversation_id = $1 LIMIT 1`, [convo])).rows[0];
+    const msg = await db().query(`INSERT INTO messages (conversation_id, sender_id, body) VALUES ($1,$2,'x') RETURNING id`, [convo, a.id]);
+    await expect(
+      db().query(`INSERT INTO chat_games (message_id, conversation_id, kind, created_by, players, state) VALUES ($1,$2,'word_ladder',$3,$4,$5)`, [
+        msg.rows[0].id,
+        convo,
+        a.id,
+        g.players,
+        g.state,
+      ]),
+    ).rejects.toMatchObject({ constraint: 'chat_games_kind_limit' });
   });
 
   it('a block in a one-to-one chat stops new games and moves', async () => {
@@ -277,6 +317,16 @@ describe('Playing', () => {
     expect(same.body.message.game.id).toBe(next.id);
     expect((await as(t.app, a).get(`/v1/games/${game.id}`)).body.game.rematchId).toBe(next.id);
     expect((await as(t.app, a).post(`/v1/games/${next.id}/rematch`)).body.error.code).toBe('game_active');
+    // With the chat full, a rematch says so; asking for one already made still finds it.
+    for (let i = 0; i < 5; i++) await started(i % 2 ? a : b, convo, i < 2 ? 'noughts' : 'four_up');
+    const finished = (await db().query(`SELECT id FROM chat_games WHERE conversation_id = $1 AND status = 'active' AND kind = 'four_up' LIMIT 1`, [convo]))
+      .rows[0].id;
+    expect((await as(t.app, a).post(`/v1/games/${finished}/forfeit`)).status).toBe(200);
+    await started(a, convo, 'word_ladder');
+    const full = await as(t.app, a).post(`/v1/games/${finished}/rematch`);
+    expect(full.status).toBe(409);
+    expect(full.body.error.code).toBe('games_full');
+    expect((await as(t.app, b).post(`/v1/games/${game.id}/rematch`)).body.message.game.id).toBe(next.id);
     liveB.remove();
   });
 
@@ -416,8 +466,8 @@ describe('Chess', () => {
     expect([0, 1]).toContain(random.message.game.state.white);
     expect(random.message.game.turnId).toBe(random.message.game.players[random.message.game.state.white].id);
 
-    // One chess game at a time in a chat.
-    expect((await start(white.b, white.convo, 'chess')).body.error.code).toBe('game_in_progress');
+    // A second chess game can go alongside the first.
+    expect((await start(white.b, white.convo, 'chess')).status).toBe(201);
     expect((await as(t.app, white.a).post(`/v1/conversations/${white.convo}/games`, { kind: 'chess', color: 'green' })).status).toBe(400);
   });
 

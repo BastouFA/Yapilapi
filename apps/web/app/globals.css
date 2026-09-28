@@ -4473,6 +4473,285 @@ span.cam__icon {
   }
 }
 
+/* The games going in a chat, in the start sheet. */
+.chat-game-going {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chat-game-going__turn {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* ── Chat: games in 3D ────────────────────────────────────────────────── */
+/*
+ * The 3D view (a choice kept in this browser; flat boards are the default). Everything is CSS
+ * transforms and shadows, nothing runs per frame: boards tilt towards a camera and show a thick
+ * edge (stacked shadows), discs, marks and pieces sit above the board (translateZ) and never take
+ * clicks themselves (the square or column under the pointer does, and browsers hit-test through the
+ * transforms). The same buttons, labels and keys as the flat board. Less motion: nothing drops or lifts.
+ */
+.game-view__bar {
+  justify-content: flex-end;
+}
+.game-view__bar .yp-btn[aria-pressed='true'] {
+  border-color: var(--yapi);
+  background: var(--yapi-soft);
+  color: var(--ink);
+}
+.game-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  inline-size: 100%;
+}
+.game-view--3d {
+  --game-edge: color-mix(in srgb, var(--line-strong) 60%, #000);
+  perspective: 1000px;
+  perspective-origin: 50% 0%;
+  padding-block: 4px 18px;
+}
+.game-view--3d .game-board,
+.game-view--3d .game-board__row,
+.game-view--3d .game-board__cell,
+.game-view--3d .game-column,
+.game-view--3d .game-square {
+  transform-style: preserve-3d;
+}
+/* In a 3D scene the board and the buttons on it share a plane, and the board could take the click:
+   only the buttons (lifted a hair above it) take pointers, and what stands on them never does. */
+.game-view--3d .game-board,
+.game-view--3d .chess-board {
+  pointer-events: none;
+}
+.game-view--3d .game-column,
+.game-view--3d .game-square,
+.game-view--3d .chess-sq {
+  pointer-events: auto;
+  transform: translateZ(1px);
+}
+.game-view--3d .game-piece,
+.game-view--3d .game-mark,
+.game-view--3d .chess-piece,
+.game-view--3d .chess-sq::after,
+.game-view--3d .chess-sq__rank,
+.game-view--3d .chess-sq__file {
+  pointer-events: none;
+}
+/* Four up: an upright rack seen a little from the side, discs standing proud of it. */
+.game-view--3d .game-board--four_up {
+  transform: rotateX(8deg) rotateY(-12deg) scale(0.94);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--yapi) 14%, var(--surface-sunken)), var(--surface-sunken) 60%);
+  box-shadow:
+    1px 1px 0 var(--game-edge),
+    2px 2px 0 var(--game-edge),
+    3px 3px 0 var(--game-edge),
+    4px 4px 0 var(--game-edge),
+    5px 5px 0 var(--game-edge),
+    6px 6px 0 var(--game-edge),
+    7px 7px 0 var(--game-edge),
+    14px 18px 26px rgb(0 0 0 / 0.3);
+}
+.game-view--3d .game-piece--four_up {
+  transform: translateZ(6px);
+}
+.game-view--3d .game-piece--four_up.game-piece--empty {
+  transform: none;
+  background: var(--surface);
+  box-shadow:
+    inset 0 4px 6px rgb(0 0 0 / 0.35),
+    inset 0 0 0 1px var(--line-strong);
+}
+.game-view--3d .game-piece--four_up.game-piece--p0 {
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, #fff 40%, var(--yapi)), var(--yapi) 55%, color-mix(in srgb, #000 30%, var(--yapi)));
+  box-shadow:
+    0 2px 0 color-mix(in srgb, #000 40%, var(--yapi)),
+    0 3px 0 color-mix(in srgb, #000 45%, var(--yapi)),
+    0 6px 8px rgb(0 0 0 / 0.35);
+}
+.game-view--3d .game-piece--four_up.game-piece--p1 {
+  background: radial-gradient(
+    circle at 35% 30%,
+    color-mix(in srgb, #fff 45%, var(--saffron)),
+    var(--saffron) 55%,
+    color-mix(in srgb, #000 25%, var(--saffron))
+  );
+  box-shadow:
+    inset 0 0 0 3px var(--ink),
+    0 2px 0 color-mix(in srgb, #000 40%, var(--saffron)),
+    0 3px 0 color-mix(in srgb, #000 45%, var(--saffron)),
+    0 6px 8px rgb(0 0 0 / 0.35);
+}
+/* The newest disc falls into its place (--drop: how many rows it fell). */
+.game-view--3d .game-piece--four_up.game-piece--last:not(.game-piece--empty) {
+  animation: game-drop 380ms cubic-bezier(0.5, 0, 1, 0.6) both;
+}
+@keyframes game-drop {
+  from {
+    transform: translateY(calc(var(--drop, 1) * -40px)) translateZ(6px);
+  }
+  to {
+    transform: translateZ(6px);
+  }
+}
+/* Noughts: a board lying back, the marks standing up on it. */
+.game-view--3d .game-board--noughts {
+  transform: rotateX(30deg) scale(0.96);
+  transform-origin: 50% 60%;
+  box-shadow:
+    0 2px 0 var(--game-edge),
+    0 4px 0 var(--game-edge),
+    0 6px 0 var(--game-edge),
+    0 8px 0 var(--game-edge),
+    0 10px 0 var(--game-edge),
+    0 22px 26px rgb(0 0 0 / 0.3);
+}
+.game-view--3d .game-square {
+  box-shadow:
+    0 2px 0 var(--line-strong),
+    0 4px 0 var(--line-strong);
+}
+.game-view--3d .game-mark {
+  display: block;
+  transform: translateZ(10px) rotateX(-30deg);
+  transform-origin: 50% 100%;
+  text-shadow:
+    0 1px 0 color-mix(in srgb, currentColor 75%, #000),
+    0 2px 0 color-mix(in srgb, currentColor 70%, #000),
+    0 3px 0 color-mix(in srgb, currentColor 65%, #000),
+    0 4px 0 color-mix(in srgb, currentColor 60%, #000),
+    0 9px 10px rgb(0 0 0 / 0.35);
+}
+.game-view--3d .game-mark--last {
+  animation: game-lift 320ms ease-out both;
+}
+@keyframes game-lift {
+  from {
+    opacity: 0;
+    transform: translateZ(60px) rotateX(-30deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateZ(10px) rotateX(-30deg);
+  }
+}
+/* Word ladder: each rung a row of letter tiles, the letter it changed picked out. */
+.ladder-3d {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  inline-size: 100%;
+  max-block-size: 280px;
+  margin: 0;
+  padding: 4px 4px 10px;
+  overflow-y: auto;
+  list-style: none;
+}
+.ladder-3d__rung {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  perspective: 500px;
+}
+.ladder-3d__tiles {
+  display: inline-flex;
+  gap: 4px;
+  transform: rotateX(24deg);
+  transform-origin: 50% 100%;
+}
+.ladder-3d__tile {
+  display: grid;
+  place-items: center;
+  inline-size: 36px;
+  block-size: 36px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 800 18px/1 var(--font-mono);
+  box-shadow:
+    0 1px 0 var(--line-strong),
+    0 2px 0 var(--line-strong),
+    0 3px 0 var(--line-strong),
+    0 4px 0 var(--line-strong),
+    0 8px 8px rgb(0 0 0 / 0.25);
+}
+.ladder-3d__tile--changed {
+  border-color: var(--yapi);
+  background: var(--yapi-soft);
+}
+.ladder-3d__who {
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+.ladder-3d__rung--last .ladder-3d__tiles {
+  animation: game-rung 300ms ease-out both;
+}
+@keyframes game-rung {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) rotateX(24deg);
+  }
+  to {
+    opacity: 1;
+    transform: rotateX(24deg);
+  }
+}
+/* Chess: the board lying back with a wooden edge, the pieces standing up and facing you. */
+/* The board sits inside .chess, so the camera (perspective) goes there too. */
+.game-view--3d .chess {
+  padding-block-start: 10px;
+  perspective: 1000px;
+  perspective-origin: 50% 0%;
+}
+.game-view--3d .chess-board {
+  overflow: visible;
+  /* Lying back, the board takes less height than its square box: the space under it closes up. */
+  margin-block-end: -3%;
+  transform: rotateX(28deg) scale(0.88);
+  transform-origin: 50% 0%;
+  transform-style: preserve-3d;
+  box-shadow:
+    0 2px 0 #5a3d25,
+    0 4px 0 #52381f,
+    0 6px 0 #4a321c,
+    0 8px 0 #432d19,
+    0 10px 0 #3c2816,
+    0 26px 30px rgb(0 0 0 / 0.4);
+}
+.game-view--3d .chess-board__row,
+.game-view--3d .chess-board__cell,
+.game-view--3d .chess-sq {
+  transform-style: preserve-3d;
+}
+.game-view--3d .chess-sq .chess-piece {
+  transform: translateY(-18%) rotateX(-28deg);
+  transform-origin: 50% 100%;
+  font-size: 11cqi;
+  text-shadow:
+    0 1px 0 #7a7a7a,
+    0 2px 0 #5c5c5c,
+    0 3px 0 #444,
+    0 7px 6px rgb(0 0 0 / 0.45);
+}
+@media (prefers-reduced-motion: reduce) {
+  .game-view--3d .game-piece--four_up.game-piece--last:not(.game-piece--empty),
+  .game-view--3d .game-mark--last,
+  .ladder-3d__rung--last .ladder-3d__tiles {
+    animation: none;
+  }
+}
+@media (forced-colors: active) {
+  .game-view--3d .game-board,
+  .game-view--3d .chess-board {
+    transform: none;
+  }
+}
+
 /* ── Chapters and the story archive ─────────────────────────────────── */
 .chapters {
   display: grid;

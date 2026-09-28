@@ -4025,8 +4025,14 @@ const en = {
   'm.chat.game.players': 'Who plays with you',
   'm.chat.game.pickOne': 'Choose one person.',
   'm.chat.game.pickUpTo': 'Choose up to {count} people.',
-  'm.chat.game.going': 'A game of {game} is already going here.',
   'm.chat.game.startButton': 'Start game',
+  'm.chat.game.goingHere': 'Going here',
+  'm.chat.game.startNew': 'Start another',
+  'm.chat.game.kindFull': '{count} games of {game} are going here. Finish or forfeit one to start another.',
+  'm.chat.game.allFull': '{count} games are going here, as many as a chat can have. Finish or forfeit one to start another.',
+  'm.chat.game.nGoing.one': '{count} going here',
+  'm.chat.game.nGoing.other': '{count} going here',
+  'm.chat.game.view3d': '3D view',
   'm.chat.game.yourTurn': 'Your turn',
   'm.chat.game.theirTurn': '{name} to play',
   'm.chat.game.open': 'Open board',
@@ -5897,7 +5903,6 @@ const en = {
   'admin.regions.term': 'Term',
   'admin.regions.topic': 'Topic',
   'admin.regions.add': 'Add rule',
-  'm.chat.game.allGoing': 'A game of each kind is going here. Open one to carry on, or forfeit it to start a new one.',
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -9953,8 +9958,14 @@ const fr: Catalog = {
   'm.chat.game.players': 'Qui joue avec vous',
   'm.chat.game.pickOne': 'Choisissez une personne.',
   'm.chat.game.pickUpTo': 'Choisissez jusqu’à {count} personnes.',
-  'm.chat.game.going': 'Une partie de {game} est déjà en cours ici.',
   'm.chat.game.startButton': 'Lancer la partie',
+  'm.chat.game.goingHere': 'En cours ici',
+  'm.chat.game.startNew': 'En commencer une autre',
+  'm.chat.game.kindFull': '{count} parties de {game} sont en cours ici. Termine ou abandonne-en une pour en commencer une autre.',
+  'm.chat.game.allFull': '{count} parties sont en cours ici, le maximum pour une discussion. Termine ou abandonne-en une pour en commencer une autre.',
+  'm.chat.game.nGoing.one': '{count} en cours ici',
+  'm.chat.game.nGoing.other': '{count} en cours ici',
+  'm.chat.game.view3d': 'Vue 3D',
   'm.chat.game.yourTurn': 'À vous de jouer',
   'm.chat.game.theirTurn': 'Au tour de {name}',
   'm.chat.game.open': 'Ouvrir le plateau',
@@ -11839,7 +11850,6 @@ const fr: Catalog = {
   'admin.regions.term': 'Terme',
   'admin.regions.topic': 'Sujet',
   'admin.regions.add': 'Ajouter la règle',
-  'm.chat.game.allGoing': 'Une partie de chaque jeu est en cours ici. Ouvre-en une pour continuer, ou abandonne-la pour en commencer une nouvelle.',
 };
 
 const ar: Catalog = {
@@ -15843,8 +15853,14 @@ const ar: Catalog = {
   'm.chat.game.players': 'من يلعب معك',
   'm.chat.game.pickOne': 'اختر شخصًا واحدًا.',
   'm.chat.game.pickUpTo': 'اختر حتى {count} أشخاص.',
-  'm.chat.game.going': 'هناك لعبة {game} جارية هنا بالفعل.',
   'm.chat.game.startButton': 'ابدأ اللعبة',
+  'm.chat.game.goingHere': 'جارية هنا',
+  'm.chat.game.startNew': 'ابدأ لعبة أخرى',
+  'm.chat.game.kindFull': 'هناك {count} ألعاب {game} جارية هنا. أنهِ واحدة أو انسحب منها لتبدأ أخرى.',
+  'm.chat.game.allFull': 'هناك {count} ألعاب جارية هنا، وهذا أقصى عدد في المحادثة. أنهِ واحدة أو انسحب منها لتبدأ أخرى.',
+  'm.chat.game.nGoing.one': '{count} جارية هنا',
+  'm.chat.game.nGoing.other': '{count} جارية هنا',
+  'm.chat.game.view3d': 'عرض ثلاثي الأبعاد',
   'm.chat.game.yourTurn': 'دورك',
   'm.chat.game.theirTurn': 'دور {name}',
   'm.chat.game.open': 'افتح اللوحة',
@@ -17710,7 +17726,6 @@ const ar: Catalog = {
   'admin.regions.term': 'العبارة',
   'admin.regions.topic': 'الموضوع',
   'admin.regions.add': 'إضافة القاعدة',
-  'm.chat.game.allGoing': 'هناك لعبة من كل نوع جارية هنا. افتح واحدة لتكمل، أو انسحب منها لتبدأ لعبة جديدة.',
 };
 
 const es: Catalog = {
@@ -21746,8 +21761,14 @@ const es: Catalog = {
   'm.chat.game.players': 'Quién juega contigo',
   'm.chat.game.pickOne': 'Elige a una persona.',
   'm.chat.game.pickUpTo': 'Elige hasta {count} personas.',
-  'm.chat.game.going': 'Ya hay una partida de {game} en marcha aquí.',
   'm.chat.game.startButton': 'Empezar partida',
+  'm.chat.game.goingHere': 'En curso aquí',
+  'm.chat.game.startNew': 'Empezar otra',
+  'm.chat.game.kindFull': 'Hay {count} partidas de {game} en curso aquí. Termina o abandona una para empezar otra.',
+  'm.chat.game.allFull': 'Hay {count} partidas en curso aquí, el máximo para un chat. Termina o abandona una para empezar otra.',
+  'm.chat.game.nGoing.one': '{count} en curso aquí',
+  'm.chat.game.nGoing.other': '{count} en curso aquí',
+  'm.chat.game.view3d': 'Vista 3D',
   'm.chat.game.yourTurn': 'Tu turno',
   'm.chat.game.theirTurn': 'Le toca a {name}',
   'm.chat.game.open': 'Abrir tablero',
@@ -23628,7 +23649,6 @@ const es: Catalog = {
   'admin.regions.term': 'Término',
   'admin.regions.topic': 'Tema',
   'admin.regions.add': 'Añadir regla',
-  'm.chat.game.allGoing': 'Aquí hay una partida de cada juego en curso. Abre una para seguir, o abandónala para empezar otra.',
 };
 
 const pt: Catalog = {
@@ -27658,8 +27678,14 @@ const pt: Catalog = {
   'm.chat.game.players': 'Quem joga com você',
   'm.chat.game.pickOne': 'Escolha uma pessoa.',
   'm.chat.game.pickUpTo': 'Escolha até {count} pessoas.',
-  'm.chat.game.going': 'Já há uma partida de {game} rolando aqui.',
   'm.chat.game.startButton': 'Começar partida',
+  'm.chat.game.goingHere': 'Em andamento aqui',
+  'm.chat.game.startNew': 'Começar outra',
+  'm.chat.game.kindFull': 'Há {count} partidas de {game} em andamento aqui. Termine ou desista de uma para começar outra.',
+  'm.chat.game.allFull': 'Há {count} partidas em andamento aqui, o máximo para uma conversa. Termine ou desista de uma para começar outra.',
+  'm.chat.game.nGoing.one': '{count} em andamento aqui',
+  'm.chat.game.nGoing.other': '{count} em andamento aqui',
+  'm.chat.game.view3d': 'Visão 3D',
   'm.chat.game.yourTurn': 'Sua vez',
   'm.chat.game.theirTurn': 'Vez de {name}',
   'm.chat.game.open': 'Abrir tabuleiro',
@@ -29539,7 +29565,6 @@ const pt: Catalog = {
   'admin.regions.term': 'Termo',
   'admin.regions.topic': 'Tópico',
   'admin.regions.add': 'Adicionar regra',
-  'm.chat.game.allGoing': 'Há uma partida de cada jogo em andamento aqui. Abra uma para continuar, ou desista dela para começar outra.',
 };
 
 const sw: Catalog = {
@@ -33573,8 +33598,14 @@ const sw: Catalog = {
   'm.chat.game.players': 'Nani anacheza nawe',
   'm.chat.game.pickOne': 'Chagua mtu mmoja.',
   'm.chat.game.pickUpTo': 'Chagua hadi watu {count}.',
-  'm.chat.game.going': 'Mchezo wa {game} tayari unaendelea hapa.',
   'm.chat.game.startButton': 'Anza mchezo',
+  'm.chat.game.goingHere': 'Inaendelea hapa',
+  'm.chat.game.startNew': 'Anzisha mwingine',
+  'm.chat.game.kindFull': 'Michezo {count} ya {game} inaendelea hapa. Maliza mmoja au ujitoe ili uanzishe mwingine.',
+  'm.chat.game.allFull': 'Michezo {count} inaendelea hapa, idadi ya juu kwa gumzo moja. Maliza mmoja au ujitoe ili uanzishe mwingine.',
+  'm.chat.game.nGoing.one': '{count} inaendelea hapa',
+  'm.chat.game.nGoing.other': '{count} inaendelea hapa',
+  'm.chat.game.view3d': 'Mwonekano wa 3D',
   'm.chat.game.yourTurn': 'Zamu yako',
   'm.chat.game.theirTurn': 'Zamu ya {name}',
   'm.chat.game.open': 'Fungua ubao',
@@ -35452,7 +35483,6 @@ const sw: Catalog = {
   'admin.regions.term': 'Neno',
   'admin.regions.topic': 'Mada',
   'admin.regions.add': 'Ongeza sheria',
-  'm.chat.game.allGoing': 'Kuna mchezo wa kila aina unaoendelea hapa. Fungua mmoja uendelee, au ujitoe ili uanze mpya.',
 };
 
 const yo: Catalog = {
@@ -39475,8 +39505,14 @@ const yo: Catalog = {
   'm.chat.game.players': 'Ta ló ń bá ọ ṣeré',
   'm.chat.game.pickOne': 'Yan ẹnì kan.',
   'm.chat.game.pickUpTo': 'Yan ènìyàn tó tó {count}.',
-  'm.chat.game.going': 'Eré {game} kan ti ń lọ níbí tẹ́lẹ̀.',
   'm.chat.game.startButton': 'Bẹ̀rẹ̀ eré',
+  'm.chat.game.goingHere': 'Ń lọ lọ́wọ́ níbí',
+  'm.chat.game.startNew': 'Bẹ̀rẹ̀ òmíràn',
+  'm.chat.game.kindFull': 'Eré {game} {count} ń lọ lọ́wọ́ níbí. Parí ọ̀kan tàbí jáwọ́ nínú ọ̀kan láti bẹ̀rẹ̀ òmíràn.',
+  'm.chat.game.allFull': 'Eré {count} ń lọ lọ́wọ́ níbí, iye tó pọ̀ jù fún ìjíròrò kan. Parí ọ̀kan tàbí jáwọ́ nínú ọ̀kan láti bẹ̀rẹ̀ òmíràn.',
+  'm.chat.game.nGoing.one': '{count} ń lọ lọ́wọ́ níbí',
+  'm.chat.game.nGoing.other': '{count} ń lọ lọ́wọ́ níbí',
+  'm.chat.game.view3d': 'Ìwò 3D',
   'm.chat.game.yourTurn': 'Àyè rẹ',
   'm.chat.game.theirTurn': 'Àyè {name}',
   'm.chat.game.open': 'Ṣí pákó',
@@ -41352,7 +41388,6 @@ const yo: Catalog = {
   'admin.regions.term': 'Ọ̀rọ̀',
   'admin.regions.topic': 'Kókó',
   'admin.regions.add': 'Ṣàfikún òfin',
-  'm.chat.game.allGoing': 'Eré kọ̀ọ̀kan ń lọ lọ́wọ́ níbí. Ṣí ọ̀kan láti tẹ̀síwájú, tàbí jáwọ́ nínú rẹ̀ láti bẹ̀rẹ̀ tuntun.',
 };
 
 const ha: Catalog = {
@@ -45388,8 +45423,14 @@ const ha: Catalog = {
   'm.chat.game.players': 'Wa zai yi wasa da kai',
   'm.chat.game.pickOne': 'Zaɓi mutum ɗaya.',
   'm.chat.game.pickUpTo': 'Zaɓi har mutum {count}.',
-  'm.chat.game.going': 'Akwai wasan {game} da ke gudana a nan tuni.',
   'm.chat.game.startButton': 'Fara wasa',
+  'm.chat.game.goingHere': 'Ana yi a nan',
+  'm.chat.game.startNew': 'Fara wani',
+  'm.chat.game.kindFull': 'Wasannin {game} {count} ana yi a nan. Kammala ɗaya ko ka janye daga ɗaya don fara wani.',
+  'm.chat.game.allFull': 'Wasanni {count} ana yi a nan, iyakar abin da hira ɗaya za ta iya ɗauka. Kammala ɗaya ko ka janye daga ɗaya don fara wani.',
+  'm.chat.game.nGoing.one': '{count} ana yi a nan',
+  'm.chat.game.nGoing.other': '{count} ana yi a nan',
+  'm.chat.game.view3d': 'Kallon 3D',
   'm.chat.game.yourTurn': 'Lokacinka ne',
   'm.chat.game.theirTurn': 'Lokacin {name} ne',
   'm.chat.game.open': 'Buɗe allo',
@@ -47270,7 +47311,6 @@ const ha: Catalog = {
   'admin.regions.term': 'Kalma',
   'admin.regions.topic': 'Batu',
   'admin.regions.add': 'Ƙara doka',
-  'm.chat.game.allGoing': 'Akwai wasa na kowane iri da ake yi a nan. Buɗe ɗaya don ci gaba, ko ka janye don fara sabo.',
 };
 
 export const CATALOGS: Record<string, Catalog> = { en, fr, ar, es, pt, sw, yo, ha };

@@ -32,7 +32,7 @@ import { Button, useColors, userText } from './ui';
  */
 
 /** The board's own wood colours, the same in light and dark: near-black pieces are 6:1 on the dark squares and 13:1 on the light ones. */
-const BOARD = { light: '#f0d9b5', dark: '#b58863', ink: '#1b1b1b', edge: '#6b4a2e', last: 'rgba(205, 210, 106, 0.8)', check: '#d42020' };
+const BOARD = { light: '#f0d9b5', dark: '#b58863', ink: '#1b1b1b', edge: '#6b4a2e', side: '#4a321c', last: 'rgba(205, 210, 106, 0.8)', check: '#d42020' };
 
 /** Display position (0 = top left) to square (0 = a1), from white's side or black's. */
 const squareAt = (d: number, flip: boolean) => {
@@ -46,6 +46,7 @@ export function ChessBoard({
   moveNumber,
   seat,
   canMove,
+  threeD = false,
   onMove,
 }: {
   state: ChessState;
@@ -53,6 +54,11 @@ export function ChessBoard({
   /** Your seat (-1 when watching). */
   seat: number;
   canMove: boolean;
+  /**
+   * The 3D view: the board lies back towards the camera with a wooden edge, and each piece is drawn
+   * twice, a dark copy just below it, so it looks raised. Transforms only; the same squares and labels.
+   */
+  threeD?: boolean;
   onMove: (move: ChessMoveInput) => void;
 }) {
   const { t } = useT();
@@ -105,16 +111,30 @@ export function ChessBoard({
     <View style={{ gap: space[2] }}>
       <View
         accessibilityLabel={t('m.chat.game.board', { game: t('m.chat.game.kind.chess') })}
-        style={{
-          alignSelf: 'center',
-          marginHorizontal: bleed,
-          width: boardWidth,
-          borderWidth: 2,
-          borderColor: BOARD.edge,
-          borderRadius: 6,
-          overflow: 'hidden',
-          direction: 'ltr',
-        }}
+        style={[
+          {
+            alignSelf: 'center',
+            marginHorizontal: bleed,
+            width: boardWidth,
+            borderWidth: 2,
+            borderColor: BOARD.edge,
+            borderRadius: 6,
+            overflow: 'hidden',
+            direction: 'ltr',
+          },
+          threeD
+            ? {
+                borderBottomWidth: 10,
+                borderBottomColor: BOARD.side,
+                transform: [{ perspective: 1000 }, { rotateX: '22deg' }, { scale: 0.94 }],
+                shadowColor: '#000',
+                shadowOpacity: 0.35,
+                shadowRadius: 12,
+                shadowOffset: { width: 0, height: 10 },
+                elevation: 10,
+              }
+            : null,
+        ]}
       >
         {Array.from({ length: 8 }, (_, row) => (
           <View key={row} style={{ flexDirection: 'row' }}>
@@ -178,8 +198,37 @@ export function ChessBoard({
                       <View style={{ flex: 1, borderWidth: 2, borderColor: '#fff' }} />
                     </View>
                   ) : null}
+                  {piece && threeD ? (
+                    // A dark copy a little lower, then the piece raised above its square: layered glyphs for depth.
+                    <Text
+                      allowFontScaling={false}
+                      style={{
+                        position: 'absolute',
+                        color: 'rgba(0,0,0,0.35)',
+                        fontSize: Math.round(size * 0.78),
+                        lineHeight: Math.round(size * 0.9),
+                        transform: [{ translateY: size * 0.02 }, { scaleX: 1.04 }],
+                      }}
+                    >
+                      {CHESS_GLYPHS[piece.color][piece.type]}
+                    </Text>
+                  ) : null}
                   {piece ? (
-                    <Text allowFontScaling={false} style={{ color: BOARD.ink, fontSize: Math.round(size * 0.74), lineHeight: Math.round(size * 0.9) }}>
+                    <Text
+                      allowFontScaling={false}
+                      style={[
+                        { color: BOARD.ink, fontSize: Math.round(size * 0.74), lineHeight: Math.round(size * 0.9) },
+                        threeD
+                          ? {
+                              fontSize: Math.round(size * 0.8),
+                              transform: [{ translateY: -size * 0.1 }],
+                              textShadowColor: 'rgba(0,0,0,0.3)',
+                              textShadowOffset: { width: 0, height: 2 },
+                              textShadowRadius: 1,
+                            }
+                          : null,
+                      ]}
+                    >
                       {CHESS_GLYPHS[piece.color][piece.type]}
                     </Text>
                   ) : null}

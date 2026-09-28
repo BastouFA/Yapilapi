@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Alert, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, Alert, Animated, Easing, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { ApiError } from '../../../packages/api-client/src/index';
 import {
   applyMove,
@@ -14,21 +14,28 @@ import {
   FOUR_UP_ROWS,
   fourUpColumn,
   fourUpFree,
+  GAME_ACTIVE_LIMIT,
+  GAME_KIND_ACTIVE_LIMIT,
   GAME_KINDS,
   GAME_PLAYERS,
+  gameStartBlock,
   ladderCurrent,
   type ChessState,
   type DrawAction,
+  type FourUpState,
   type GameKind,
   type GameMove,
   type GameState,
+  type NoughtsState,
   type WordLadderState,
 } from '../../../packages/shared/src/games/index';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import type { ChatGame, Conversation, Message, PublicUser } from '../../../packages/shared/src/types';
 import { client, errorMessage } from './api';
 import { ChessBoard, ChessRecord, MiniChess } from './chess-board';
+import { useGame3D } from './game-view';
 import { useT } from './i18n';
+import { useReducedMotion } from './motion';
 import { radius, space } from './theme';
 import { BottomSheet, Button, Icon, useColors, userText } from './ui';
 
@@ -146,6 +153,7 @@ export function GameCard({ message, meId, tint, onOpen }: { message: Message; me
   const playing = game.players.some((p) => p.id === meId);
   const yourTurn = game.status === 'active' && game.turnId === meId;
   const label = yourTurn ? t('m.chat.game.yourTurn') : playing || game.status !== 'active' ? t('m.chat.game.open') : t('m.chat.game.watch');
+  const names = game.players.map((p) => nameOf(t, p, meId)).join(', ');
   return (
     <View style={{ gap: space[2], minWidth: 220 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -163,13 +171,12 @@ export function GameCard({ message, meId, tint, onOpen }: { message: Message; me
       >
         <MiniBoard game={game} meId={meId} />
       </View>
-      <Text style={[{ color: tint, fontSize: 12, opacity: 0.85 }, userText]}>
-        {t('m.chat.game.playersList', { names: game.players.map((p) => nameOf(t, p, meId)).join(', ') })}
-      </Text>
+      <Text style={[{ color: tint, fontSize: 12, opacity: 0.85 }, userText]}>{t('m.chat.game.playersList', { names })}</Text>
       <Text style={{ color: tint, fontSize: 14, fontWeight: '700' }}>{gameStatus(t, game, meId)}</Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${label}: ${gameName(t, game.kind)}`}
+        // A chat can have several games of a kind going: the players tell them apart.
+        accessibilityLabel={`${label}: ${gameName(t, game.kind)}, ${names}`}
         onPress={onOpen}
         style={{
           minHeight: 44,
@@ -252,6 +259,290 @@ function Disc({ seat, size, mark }: { seat: number | null; size: number; mark?: 
   );
 }
 
+/** "3D view": a switch above the board, remembered on this phone. */
+function View3DToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+  const { t } = useT();
+  const c = useColors();
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityState={{ checked: on }}
+      accessibilityLabel={t('m.chat.game.view3d')}
+      onPress={() => onChange(!on)}
+      style={({ pressed }) => ({
+        alignSelf: 'flex-end',
+        minHeight: 44,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space[2],
+        paddingHorizontal: space[3],
+        borderRadius: radius.full,
+        borderWidth: 1,
+        borderColor: on ? c.yapi : c.line,
+        backgroundColor: on ? c.yapiSoft : pressed ? c.surfaceSunken : 'transparent',
+      })}
+    >
+      <Icon name="cube-outline" size={18} color={on ? c.yapi : c.inkMuted} />
+      <Text style={{ color: c.ink, fontSize: 14, fontWeight: '700' }}>{t('m.chat.game.view3d')}</Text>
+      <Icon name={on ? 'toggle' : 'toggle-outline'} size={22} color={on ? c.yapi : c.inkMuted} />
+    </Pressable>
+  );
+}
+
+/**
+ * The 3D view's tilt (perspective and a turn about the x axis, and y for Four up's rack). Only
+ * transforms and shadows, so nothing runs per frame; the same buttons and labels as the flat board.
+ */
+const tilt = (x: number, y = 0, scale = 1) => ({
+  transform: [{ perspective: 900 }, { rotateX: `${x}deg` }, ...(y ? [{ rotateY: `${y}deg` }] : []), ...(scale !== 1 ? [{ scale }] : [])],
+});
+
+/** A soft shadow under something raised (iOS shadow, Android elevation). */
+const lifted = (depth: number) => ({
+  shadowColor: '#000',
+  shadowOpacity: 0.3,
+  shadowRadius: depth,
+  shadowOffset: { width: 0, height: depth / 2 },
+  elevation: depth,
+});
+
+/** A disc in the 3D rack: a lighter spot and a darker lower rim give it volume; the newest one drops into place (`drop` rows). */
+function Disc3D({ seat, size, mark, drop }: { seat: number | null; size: number; mark?: 'line' | 'last'; drop: number }) {
+  const c = useColors();
+  const reduce = useReducedMotion();
+  const y = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!drop || reduce || seat === null) return;
+    y.setValue(-drop * (size + 3));
+    Animated.timing(y, { toValue: 0, duration: 360, easing: Easing.in(Easing.quad), useNativeDriver: true }).start();
+  }, [reduce, seat, drop, size, y]);
+  if (seat === null)
+    return (
+      <View
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: c.surface,
+          borderWidth: 1,
+          borderTopWidth: 4,
+          borderColor: c.lineStrong,
+        }}
+      />
+    );
+  return (
+    <Animated.View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: seat === 0 ? c.yapi : c.saffron,
+        borderWidth: seat === 1 ? 3 : 0,
+        borderBottomWidth: seat === 1 ? 5 : 4,
+        borderColor: seat === 1 ? c.ink : 'rgba(0,0,0,0.3)',
+        outlineColor: mark ? c.ink : undefined,
+        outlineWidth: mark === 'line' ? 3 : mark === 'last' ? 2 : 0,
+        outlineStyle: mark === 'last' ? 'dashed' : 'solid',
+        outlineOffset: 1,
+        transform: [{ translateY: y }],
+        ...lifted(4),
+      }}
+    >
+      <View
+        style={{
+          position: 'absolute',
+          top: size * 0.12,
+          left: size * 0.18,
+          width: size * 0.3,
+          height: size * 0.2,
+          borderRadius: size,
+          backgroundColor: 'rgba(255,255,255,0.4)',
+        }}
+      />
+    </Animated.View>
+  );
+}
+
+function FourUpBoard({
+  game,
+  state: s,
+  meId,
+  canMove,
+  threeD,
+  onColumn,
+}: {
+  game: ChatGame;
+  state: FourUpState;
+  meId?: string;
+  canMove: boolean;
+  threeD: boolean;
+  onColumn: (column: number) => void;
+}) {
+  const { t, tp } = useT();
+  const c = useColors();
+  const line = s.result?.type === 'win' ? (s.result.line ?? []) : [];
+  return (
+    <View
+      accessibilityLabel={t('m.chat.game.board', { game: gameName(t, 'four_up') })}
+      style={[
+        { alignSelf: 'center', flexDirection: 'row', gap: 2, padding: 4, borderRadius: radius.md, backgroundColor: c.surfaceSunken, direction: 'ltr' },
+        // An upright rack seen a little from the side, with a thick edge.
+        threeD ? { ...tilt(8, -10, 0.95), borderRightWidth: 6, borderBottomWidth: 6, borderColor: c.lineStrong, marginBottom: space[2], ...lifted(10) } : null,
+      ]}
+    >
+      {Array.from({ length: FOUR_UP_COLUMNS }, (_, col) => {
+        const free = fourUpFree(s.cells, col);
+        const discs = fourUpColumn(s.cells, col);
+        const label = [
+          t('m.chat.game.column', { n: col + 1 }),
+          free ? tp('m.chat.game.free', free) : t('m.chat.game.full'),
+          discs.length ? t('m.chat.game.fromBottom', { discs: discs.map((d) => nameOf(t, game.players[d], meId)).join(', ') }) : '',
+        ]
+          .filter(Boolean)
+          .join(', ');
+        const disabled = !canMove || !free;
+        return (
+          <Pressable
+            key={col}
+            accessibilityRole="button"
+            accessibilityLabel={label}
+            accessibilityState={{ disabled }}
+            onPress={() => !disabled && onColumn(col)}
+            style={({ pressed }) => ({
+              minWidth: 44,
+              alignItems: 'center',
+              gap: 3,
+              paddingVertical: 4,
+              borderRadius: radius.sm,
+              backgroundColor: pressed && !disabled ? c.yapiSoft : 'transparent',
+            })}
+          >
+            {Array.from({ length: FOUR_UP_ROWS }, (_, r) => {
+              const i = r * FOUR_UP_COLUMNS + col;
+              const mark = line.includes(i) ? 'line' : s.last === i ? 'last' : undefined;
+              return threeD ? (
+                <Disc3D key={r} seat={s.cells[i] ?? null} size={34} mark={mark} drop={s.last === i ? r + 1 : 0} />
+              ) : (
+                <Disc key={r} seat={s.cells[i] ?? null} size={34} mark={mark} />
+              );
+            })}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function NoughtsBoard({
+  game,
+  state: s,
+  meId,
+  canMove,
+  threeD,
+  onCell,
+}: {
+  game: ChatGame;
+  state: NoughtsState;
+  meId?: string;
+  canMove: boolean;
+  threeD: boolean;
+  onCell: (cell: number) => void;
+}) {
+  const { t } = useT();
+  const c = useColors();
+  return (
+    <View
+      accessibilityLabel={t('m.chat.game.board', { game: gameName(t, 'noughts') })}
+      style={[
+        { alignSelf: 'center', gap: 4, direction: 'ltr' },
+        // A board lying back, with a thick edge; the marks stand proud of it.
+        threeD
+          ? {
+              ...tilt(26),
+              padding: 6,
+              borderRadius: radius.lg,
+              backgroundColor: c.surfaceSunken,
+              borderBottomWidth: 8,
+              borderColor: c.lineStrong,
+              ...lifted(10),
+            }
+          : null,
+      ]}
+    >
+      {[0, 1, 2].map((r) => (
+        <View key={r} style={{ flexDirection: 'row', gap: 4 }}>
+          {[0, 1, 2].map((col) => {
+            const i = r * 3 + col;
+            const v = s.cells[i] ?? null;
+            const inLine = s.result?.type === 'win' && (s.result.line ?? []).includes(i);
+            const disabled = !canMove || v !== null;
+            return (
+              <Pressable
+                key={col}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('m.chat.game.square', { row: r + 1, col: col + 1 })}, ${v === null ? t('m.chat.game.empty') : `${v === 0 ? 'X' : 'O'}, ${nameOf(t, game.players[v], meId)}`}`}
+                accessibilityState={{ disabled }}
+                onPress={() => !disabled && onCell(i)}
+                style={{
+                  width: 76,
+                  height: 76,
+                  borderRadius: radius.md,
+                  borderWidth: inLine ? 3 : 1,
+                  borderBottomWidth: threeD ? 5 : inLine ? 3 : 1,
+                  borderColor: inLine ? c.ink : c.lineStrong,
+                  backgroundColor: inLine ? c.yapiSoft : c.surface,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {/* The squares are a fixed size, so the mark grows with the text size only so far (the label says it anyway). */}
+                {v !== null ? <Mark seat={v} threeD={threeD} fresh={s.last === i} /> : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** An X or an O; in 3D a raised token with a darker side, lifting into place when it's new. */
+function Mark({ seat, threeD, fresh }: { seat: number; threeD: boolean; fresh: boolean }) {
+  const c = useColors();
+  const reduce = useReducedMotion();
+  const lift = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!threeD || !fresh || reduce) return;
+    lift.setValue(0);
+    Animated.timing(lift, { toValue: 1, duration: 300, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+  }, [threeD, fresh, reduce, lift]);
+  const text = (
+    <Text
+      maxFontSizeMultiplier={1.3}
+      style={[
+        { color: seat === 0 ? c.yapi : c.ink, fontSize: 40, fontWeight: '800' },
+        threeD ? { textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 4 }, textShadowRadius: 1 } : null,
+      ]}
+    >
+      {seat === 0 ? 'X' : 'O'}
+    </Text>
+  );
+  if (!threeD) return text;
+  return (
+    <Animated.View
+      style={{
+        opacity: lift,
+        transform: [
+          { translateY: lift.interpolate({ inputRange: [0, 1], outputRange: [-24, -4] }) },
+          { scale: lift.interpolate({ inputRange: [0, 1], outputRange: [1.3, 1] }) },
+        ],
+      }}
+    >
+      {text}
+    </Animated.View>
+  );
+}
+
 // ─── The board ──────────────────────────────────────────────────────────
 
 export function GameSheet({
@@ -269,6 +560,7 @@ export function GameSheet({
 }) {
   const { t, tp, dateTime } = useT();
   const c = useColors();
+  const [threeD, setThreeD] = useGame3D();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const last = game ? lastMoveText(t, game, meId) : '';
@@ -367,9 +659,10 @@ export function GameSheet({
         {last ? `${last} ` : ''}
         <Text style={{ fontWeight: '800' }}>{headline}</Text>
       </Text>
+      <View3DToggle on={threeD} onChange={setThreeD} />
       {s.kind === 'chess' ? (
         <>
-          <ChessBoard state={s} moveNumber={game.moveNumber} seat={seat} canMove={canMove} onMove={(m) => void play(m)} />
+          <ChessBoard state={s} moveNumber={game.moveNumber} seat={seat} canMove={canMove} threeD={threeD} onMove={(m) => void play(m)} />
           {active ? (
             <DrawOffer
               state={s}
@@ -382,87 +675,11 @@ export function GameSheet({
           <ChessRecord state={s} names={namesOf(t, game, meId)} />
         </>
       ) : s.kind === 'four_up' ? (
-        <View
-          accessibilityLabel={t('m.chat.game.board', { game: gameName(t, 'four_up') })}
-          style={{ alignSelf: 'center', flexDirection: 'row', gap: 2, padding: 4, borderRadius: radius.md, backgroundColor: c.surfaceSunken, direction: 'ltr' }}
-        >
-          {Array.from({ length: FOUR_UP_COLUMNS }, (_, col) => {
-            const free = fourUpFree(s.cells, col);
-            const discs = fourUpColumn(s.cells, col);
-            const line = s.result?.type === 'win' ? (s.result.line ?? []) : [];
-            const label = [
-              t('m.chat.game.column', { n: col + 1 }),
-              free ? tp('m.chat.game.free', free) : t('m.chat.game.full'),
-              discs.length ? t('m.chat.game.fromBottom', { discs: discs.map((d) => nameOf(t, game.players[d], meId)).join(', ') }) : '',
-            ]
-              .filter(Boolean)
-              .join(', ');
-            const disabled = !canMove || !free;
-            return (
-              <Pressable
-                key={col}
-                accessibilityRole="button"
-                accessibilityLabel={label}
-                accessibilityState={{ disabled }}
-                onPress={() => !disabled && void play({ column: col })}
-                style={({ pressed }) => ({
-                  minWidth: 44,
-                  alignItems: 'center',
-                  gap: 3,
-                  paddingVertical: 4,
-                  borderRadius: radius.sm,
-                  backgroundColor: pressed && !disabled ? c.yapiSoft : 'transparent',
-                })}
-              >
-                {Array.from({ length: FOUR_UP_ROWS }, (_, r) => {
-                  const i = r * FOUR_UP_COLUMNS + col;
-                  return <Disc key={r} seat={s.cells[i] ?? null} size={34} mark={line.includes(i) ? 'line' : s.last === i ? 'last' : undefined} />;
-                })}
-              </Pressable>
-            );
-          })}
-        </View>
+        <FourUpBoard game={game} state={s} meId={meId} canMove={canMove} threeD={threeD} onColumn={(column) => void play({ column })} />
       ) : s.kind === 'noughts' ? (
-        <View accessibilityLabel={t('m.chat.game.board', { game: gameName(t, 'noughts') })} style={{ alignSelf: 'center', gap: 4, direction: 'ltr' }}>
-          {[0, 1, 2].map((r) => (
-            <View key={r} style={{ flexDirection: 'row', gap: 4 }}>
-              {[0, 1, 2].map((col) => {
-                const i = r * 3 + col;
-                const v = s.cells[i] ?? null;
-                const inLine = s.result?.type === 'win' && (s.result.line ?? []).includes(i);
-                const disabled = !canMove || v !== null;
-                return (
-                  <Pressable
-                    key={col}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${t('m.chat.game.square', { row: r + 1, col: col + 1 })}, ${v === null ? t('m.chat.game.empty') : `${v === 0 ? 'X' : 'O'}, ${nameOf(t, game.players[v], meId)}`}`}
-                    accessibilityState={{ disabled }}
-                    onPress={() => !disabled && void play({ cell: i })}
-                    style={{
-                      width: 76,
-                      height: 76,
-                      borderRadius: radius.md,
-                      borderWidth: inLine ? 3 : 1,
-                      borderColor: inLine ? c.ink : c.lineStrong,
-                      backgroundColor: inLine ? c.yapiSoft : c.surface,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {/* The squares are a fixed size, so the mark grows with the text size only so far (the label says it anyway). */}
-                    {v !== null ? (
-                      <Text maxFontSizeMultiplier={1.3} style={{ color: v === 0 ? c.yapi : c.ink, fontSize: 40, fontWeight: '800' }}>
-                        {v === 0 ? 'X' : 'O'}
-                      </Text>
-                    ) : null}
-                  </Pressable>
-                );
-              })}
-            </View>
-          ))}
-        </View>
+        <NoughtsBoard game={game} state={s} meId={meId} canMove={canMove} threeD={threeD} onCell={(cell) => void play({ cell })} />
       ) : (
-        <Ladder game={game} state={s} meId={meId} canMove={canMove} busy={busy} onMove={(m) => void play(m)} onProblem={setProblem} />
+        <Ladder game={game} state={s} meId={meId} canMove={canMove} busy={busy} threeD={threeD} onMove={(m) => void play(m)} onProblem={setProblem} />
       )}
       {problem ? (
         <Text accessibilityRole="alert" style={{ color: c.danger, fontSize: 14, fontWeight: '700' }}>
@@ -567,6 +784,7 @@ function Ladder({
   meId,
   canMove,
   busy,
+  threeD,
   onMove,
   onProblem,
 }: {
@@ -575,6 +793,8 @@ function Ladder({
   meId?: string;
   canMove: boolean;
   busy: boolean;
+  /** Rungs as rows of raised letter tiles. */
+  threeD: boolean;
   onMove: (move: GameMove) => void;
   onProblem: (text: string | null) => void;
 }) {
@@ -603,15 +823,57 @@ function Ladder({
         </Text>
       </View>
       <Text style={{ color: c.inkMuted, fontSize: 13 }}>{tp('m.chat.game.ladder.best', s.best)}</Text>
-      <View accessibilityLabel={t('m.chat.game.ladder.rungs')} style={{ gap: 4 }}>
-        <Text style={{ color: c.ink, fontSize: 16, fontWeight: '800', letterSpacing: 1 }}>{s.start.toUpperCase()}</Text>
-        {s.rungs.map((r, i) => (
-          <Text key={i} style={{ color: c.ink, fontSize: 16 }}>
-            <Text style={{ fontWeight: '800', letterSpacing: 1 }}>{r.word.toUpperCase()}</Text>
-            <Text style={[{ color: c.inkMuted, fontSize: 13 }, userText]}> {nameOf(t, game.players[r.seat], meId)}</Text>
-          </Text>
-        ))}
-      </View>
+      {threeD ? (
+        // Stacked rungs of letter tiles; the letter each rung changed stands out. Each rung reads as its word.
+        <View accessibilityLabel={t('m.chat.game.ladder.rungs')} style={{ gap: space[2] }}>
+          {[{ word: s.start, seat: -1 }, ...s.rungs].map((r, i, all) => (
+            <View
+              key={i}
+              accessible
+              accessibilityLabel={r.seat >= 0 ? `${r.word.toUpperCase()}, ${nameOf(t, game.players[r.seat], meId)}` : r.word.toUpperCase()}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}
+            >
+              <View style={{ flexDirection: 'row', gap: 4, direction: 'ltr', ...tilt(20) }}>
+                {[...r.word.toUpperCase()].map((ch, k) => {
+                  const changed = i > 0 && all[i - 1]!.word[k] !== r.word[k];
+                  return (
+                    <View
+                      key={k}
+                      style={{
+                        width: 34,
+                        height: 34,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: 7,
+                        borderWidth: 1,
+                        borderBottomWidth: 5,
+                        borderColor: changed ? c.yapi : c.lineStrong,
+                        backgroundColor: changed ? c.yapiSoft : c.surface,
+                        ...lifted(3),
+                      }}
+                    >
+                      <Text allowFontScaling={false} style={{ color: c.ink, fontSize: 18, fontWeight: '800' }}>
+                        {ch}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+              {r.seat >= 0 ? <Text style={[{ color: c.inkMuted, fontSize: 13, flexShrink: 1 }, userText]}>{nameOf(t, game.players[r.seat], meId)}</Text> : null}
+            </View>
+          ))}
+        </View>
+      ) : (
+        <View accessibilityLabel={t('m.chat.game.ladder.rungs')} style={{ gap: 4 }}>
+          <Text style={{ color: c.ink, fontSize: 16, fontWeight: '800', letterSpacing: 1 }}>{s.start.toUpperCase()}</Text>
+          {s.rungs.map((r, i) => (
+            <Text key={i} style={{ color: c.ink, fontSize: 16 }}>
+              <Text style={{ fontWeight: '800', letterSpacing: 1 }}>{r.word.toUpperCase()}</Text>
+              <Text style={[{ color: c.inkMuted, fontSize: 13 }, userText]}> {nameOf(t, game.players[r.seat], meId)}</Text>
+            </Text>
+          ))}
+        </View>
+      )}
       {canMove || busy ? (
         <>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
@@ -673,17 +935,23 @@ export function StartGameSheet({
   conversation: Conversation | null;
   meId?: string;
   onSent: (m: Message) => void;
-  /** Open the board of a game already going here (by its card's message id). */
-  onOpenGame?: (messageId: string) => void;
+  /** Open the board of a game already going here. */
+  onOpenGame?: (game: ChatGame) => void;
 }) {
-  const { t } = useT();
+  const { t, tp } = useT();
   const c = useColors();
   const [kind, setKind] = useState<GameKind>('four_up');
-  const [going, setGoing] = useState<GameKind[]>([]);
-  const [goingCards, setGoingCards] = useState<Partial<Record<GameKind, string>>>({});
+  const [going, setGoing] = useState<ChatGame[]>([]);
   const [chosen, setChosen] = useState<string[]>([]);
   const [color, setColor] = useState<'white' | 'black' | 'random'>('white');
   const [error, setError] = useState<string | null>(null);
+  // What to do once this sheet has gone (opening the board): iOS can't show one sheet while another is still closing.
+  const after = useRef<(() => void) | null>(null);
+  const closeThen = (fn: () => void) => {
+    if (Platform.OS === 'ios') after.current = fn;
+    onClose();
+    if (Platform.OS !== 'ios') fn();
+  };
   const cid = conversation?.id;
   useEffect(() => {
     if (!open || !cid) return;
@@ -694,9 +962,9 @@ export function StartGameSheet({
       .then(
         (r) => {
           const kinds = r.items.map((g) => g.kind);
-          setGoing(kinds);
-          setGoingCards(Object.fromEntries(r.items.map((g) => [g.kind, g.messageId])));
-          setKind((k) => (kinds.includes(k) ? (GAME_KINDS.find((x) => !kinds.includes(x)) ?? k) : k));
+          setGoing(r.items);
+          // Start on a game that can still start here.
+          setKind((k) => (gameStartBlock(kinds, k) ? (GAME_KINDS.find((x) => !gameStartBlock(kinds, x)) ?? k) : k));
         },
         () => setGoing([]),
       );
@@ -706,8 +974,9 @@ export function StartGameSheet({
   const others = conversation.members.filter((m) => m.id !== meId);
   const max = GAME_PLAYERS[kind].max - 1;
   const single = max === 1;
-  const allGoing = GAME_KINDS.every((k) => going.includes(k));
-  const ready = !going.includes(kind) && (!group || (chosen.length >= 1 && chosen.length <= max));
+  const kinds = going.map((g) => g.kind);
+  const full = kinds.length >= GAME_ACTIVE_LIMIT;
+  const ready = !gameStartBlock(kinds, kind) && (!group || (chosen.length >= 1 && chosen.length <= max));
 
   async function submit() {
     if (!ready || !cid) return;
@@ -720,91 +989,131 @@ export function StartGameSheet({
         ...(kind === 'chess' ? { color } : {}),
         clientId: newId(),
       });
-      onSent(message);
-      onClose();
+      closeThen(() => onSent(message));
     } catch (e) {
       setError(errorMessage(e));
     }
   }
 
   return (
-    <BottomSheet visible={open} onClose={onClose} title={t('m.chat.game.start')}>
-      <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 15, fontWeight: '700' }}>
-        {t('m.chat.game.choose')}
-      </Text>
-      <View accessibilityRole="radiogroup" style={{ gap: space[2] }}>
-        {GAME_KINDS.map((k) => {
-          const busyHere = going.includes(k);
-          const on = kind === k;
-          const card = goingCards[k];
-          // A game already going here: no second one, but a way straight to it.
-          if (busyHere)
-            return (
-              <View
-                key={k}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: space[2],
-                  padding: space[3],
-                  minHeight: 44,
-                  borderRadius: radius.md,
-                  borderWidth: 1,
-                  borderColor: c.line,
-                }}
-              >
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={{ color: c.ink, fontSize: 15, fontWeight: '700' }}>{gameName(t, k)}</Text>
-                  <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('m.chat.game.going', { game: gameName(t, k) })}</Text>
+    <BottomSheet
+      visible={open}
+      onClose={onClose}
+      onDismiss={() => {
+        const fn = after.current;
+        after.current = null;
+        fn?.();
+      }}
+      title={t('m.chat.game.start')}
+    >
+      {going.length ? (
+        // The games going here, each with who plays and whose turn it is, and a way straight to its board.
+        <>
+          <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 15, fontWeight: '700' }}>
+            {t('m.chat.game.goingHere')}
+          </Text>
+          <View style={{ gap: space[2] }}>
+            {going.map((g) => {
+              const names = g.players.map((p) => nameOf(t, p, meId)).join(', ');
+              return (
+                <View
+                  key={g.id}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: space[2],
+                    padding: space[3],
+                    minHeight: 44,
+                    borderRadius: radius.md,
+                    borderWidth: 1,
+                    borderColor: c.line,
+                  }}
+                >
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={{ color: c.ink, fontSize: 15, fontWeight: '700' }}>{gameName(t, g.kind)}</Text>
+                    <Text style={[{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }, userText]}>{names}</Text>
+                    <Text
+                      style={{ color: g.turnId === meId ? c.ink : c.inkMuted, fontSize: 13, lineHeight: 18, fontWeight: g.turnId === meId ? '700' : '400' }}
+                    >
+                      {gameStatus(t, g, meId)}
+                    </Text>
+                  </View>
+                  {onOpenGame ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`${t('m.chat.game.open')}: ${gameName(t, g.kind)}, ${names}`}
+                      onPress={() => closeThen(() => onOpenGame(g))}
+                      style={({ pressed }) => ({
+                        minHeight: 44,
+                        justifyContent: 'center',
+                        paddingHorizontal: space[3],
+                        borderRadius: radius.full,
+                        borderWidth: 1,
+                        borderColor: c.lineStrong,
+                        backgroundColor: pressed ? c.surfaceSunken : 'transparent',
+                      })}
+                    >
+                      <Text style={{ color: c.ink, fontSize: 14, fontWeight: '700' }}>{t('m.chat.game.open')}</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
-                {card && onOpenGame ? (
-                  <Button
-                    label={t('m.chat.game.open')}
-                    size="sm"
-                    variant="secondary"
-                    onPress={() => {
-                      onClose();
-                      onOpenGame(card);
-                    }}
-                  />
-                ) : null}
-              </View>
-            );
-          return (
-            <Pressable
-              key={k}
-              accessibilityRole="radio"
-              accessibilityState={{ checked: on, disabled: busyHere }}
-              accessibilityLabel={`${gameName(t, k)}. ${busyHere ? t('m.chat.game.going', { game: gameName(t, k) }) : t(`m.chat.game.about.${k}` as MessageKey)}`}
-              disabled={busyHere}
-              onPress={() => {
-                setKind(k);
-                setChosen((cur) => (GAME_PLAYERS[k].max === 2 ? cur.slice(0, 1) : cur));
-              }}
-              style={{
-                flexDirection: 'row',
-                gap: space[2],
-                padding: space[3],
-                minHeight: 44,
-                borderRadius: radius.md,
-                borderWidth: on ? 2 : 1,
-                borderColor: on ? c.yapi : c.line,
-                backgroundColor: on ? c.yapiSoft : 'transparent',
-                opacity: busyHere ? 0.6 : 1,
-              }}
-            >
-              <Icon name={on ? 'radio-button-on' : 'radio-button-off'} size={20} color={on ? c.yapi : c.inkMuted} />
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={{ color: c.ink, fontSize: 15, fontWeight: '700' }}>{gameName(t, k)}</Text>
-                <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>
-                  {busyHere ? t('m.chat.game.going', { game: gameName(t, k) }) : t(`m.chat.game.about.${k}` as MessageKey)}
-                </Text>
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
-      {kind === 'chess' ? (
+              );
+            })}
+          </View>
+        </>
+      ) : null}
+      {full ? (
+        <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t('m.chat.game.allFull', { count: GAME_ACTIVE_LIMIT })}</Text>
+      ) : (
+        <>
+          <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 15, fontWeight: '700' }}>
+            {going.length ? t('m.chat.game.startNew') : t('m.chat.game.choose')}
+          </Text>
+          <View accessibilityRole="radiogroup" style={{ gap: space[2] }}>
+            {GAME_KINDS.map((k) => {
+              const blocked = !!gameStartBlock(kinds, k);
+              const here = kinds.filter((x) => x === k).length;
+              const on = kind === k;
+              const about = blocked
+                ? t('m.chat.game.kindFull', { count: GAME_KIND_ACTIVE_LIMIT, game: gameName(t, k) })
+                : t(`m.chat.game.about.${k}` as MessageKey);
+              const count = here && !blocked ? tp('m.chat.game.nGoing', here) : '';
+              return (
+                <Pressable
+                  key={k}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: on, disabled: blocked }}
+                  accessibilityLabel={[gameName(t, k), about, count].filter(Boolean).join('. ')}
+                  disabled={blocked}
+                  onPress={() => {
+                    setKind(k);
+                    setChosen((cur) => (GAME_PLAYERS[k].max === 2 ? cur.slice(0, 1) : cur));
+                  }}
+                  style={{
+                    flexDirection: 'row',
+                    gap: space[2],
+                    padding: space[3],
+                    minHeight: 44,
+                    borderRadius: radius.md,
+                    borderWidth: on ? 2 : 1,
+                    borderColor: on ? c.yapi : c.line,
+                    backgroundColor: on ? c.yapiSoft : 'transparent',
+                    opacity: blocked ? 0.6 : 1,
+                  }}
+                >
+                  <Icon name={on ? 'radio-button-on' : 'radio-button-off'} size={20} color={on ? c.yapi : c.inkMuted} />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={{ color: c.ink, fontSize: 15, fontWeight: '700' }}>{gameName(t, k)}</Text>
+                    <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{about}</Text>
+                    {count ? <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{count}</Text> : null}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        </>
+      )}
+      {kind === 'chess' && !full ? (
         <>
           <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 15, fontWeight: '700' }}>
             {t('m.chat.game.chess.colour')}
@@ -835,7 +1144,7 @@ export function StartGameSheet({
           </View>
         </>
       ) : null}
-      {group ? (
+      {group && !full ? (
         <>
           <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 15, fontWeight: '700' }}>
             {t('m.chat.game.players')}
@@ -872,11 +1181,7 @@ export function StartGameSheet({
           {error}
         </Text>
       ) : null}
-      {allGoing ? (
-        <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t('m.chat.game.allGoing')}</Text>
-      ) : (
-        <Button label={t('m.chat.game.startButton')} icon="game-controller-outline" disabled={!ready} onPress={submit} />
-      )}
+      {full ? null : <Button label={t('m.chat.game.startButton')} icon="game-controller-outline" disabled={!ready} onPress={submit} />}
     </BottomSheet>
   );
 }

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { AIPanel, BottomSheet, Button, ChatBubble, Icon, Menu, Skeleton, Switch, TranslatableText, type MenuAction } from '@yapilapi/design-system';
-import type { Conversation, Message, ScheduledMessage } from '@yapilapi/shared';
+import type { ChatGame, Conversation, Message, ScheduledMessage } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { ReportSheet } from '@/components/PostList';
 import { useRealtime, useSession } from '../../../providers';
@@ -94,6 +94,8 @@ export default function ChatPage() {
   // Games: the sheet to start one, and the board that's open (by its card's message id, so live updates show in it).
   const [gameStartOpen, setGameStartOpen] = useState(false);
   const [boardFor, setBoardFor] = useState<string | null>(null);
+  // A game opened from the start sheet whose card isn't among the messages loaded yet (an older one).
+  const [looseGame, setLooseGame] = useState<ChatGame | null>(null);
   // Mixes: the sheet to share one of yours here.
   const [mixShareOpen, setMixShareOpen] = useState(false);
   // Sharing where you are: the sheet, your live share here (the banner), and where this device is (for distances, never sent).
@@ -239,11 +241,13 @@ export default function ChatPage() {
     if (e.type === 'poll.updated' && e.data.conversationId === id) patchMessage(e.data.id, (x) => (x.unsent ? x : { ...x, poll: e.data.poll }));
     if (e.type === 'list.updated' && e.data.conversationId === id) patchMessage(e.data.id, (x) => (x.unsent ? x : { ...x, list: e.data.list }));
     // A move, a forfeit or the end of a game: the card and any open board follow.
-    if (e.type === 'game.updated' && e.data.conversationId === id)
+    if (e.type === 'game.updated' && e.data.conversationId === id) {
       patchMessage(e.data.id, (x) =>
         // An older update arriving late never winds the board back.
         x.unsent || (x.game && x.game.moveNumber > e.data.game.moveNumber) ? x : { ...x, game: e.data.game },
       );
+      setLooseGame((g) => (g && g.id === e.data.game.id && g.moveNumber <= e.data.game.moveNumber ? e.data.game : g));
+    }
     // Where someone is: the card moves, or says they stopped; your own share's banner follows.
     if (e.type === 'location.updated' && e.data.conversationId === id) {
       patchMessage(e.data.id, (x) => (x.unsent ? x : { ...x, location: e.data.location }));
@@ -1047,13 +1051,19 @@ export default function ChatPage() {
           addMessage(m);
           setBoardFor(m.id);
         }}
-        onOpenGame={setBoardFor}
+        onOpenGame={(game) => {
+          setLooseGame(messages?.some((m) => m.id === game.messageId) ? null : game);
+          setBoardFor(game.messageId);
+        }}
       />
       <GameSheet
-        game={messages?.find((m) => m.id === boardFor)?.game ?? null}
+        game={messages?.find((m) => m.id === boardFor)?.game ?? (looseGame?.messageId === boardFor ? looseGame : null)}
         meId={me?.id}
         onClose={() => setBoardFor(null)}
-        onGame={(game) => patchMessage(game.messageId, (x) => ({ ...x, game }))}
+        onGame={(game) => {
+          patchMessage(game.messageId, (x) => ({ ...x, game }));
+          setLooseGame((g) => (g && g.id === game.id ? game : g));
+        }}
         onRematch={(m) => {
           addMessage(m);
           setBoardFor(m.id);

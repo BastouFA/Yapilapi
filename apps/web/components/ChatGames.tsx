@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { BottomSheet, Button, Icon } from '@yapilapi/design-system';
 import {
   applyMove,
@@ -15,8 +15,11 @@ import {
   FOUR_UP_ROWS,
   fourUpColumn,
   fourUpFree,
+  GAME_ACTIVE_LIMIT,
+  GAME_KIND_ACTIVE_LIMIT,
   GAME_KINDS,
   GAME_PLAYERS,
+  gameStartBlock,
   ladderCurrent,
   type ChatGame,
   type ChessState,
@@ -32,6 +35,7 @@ import {
 } from '@yapilapi/shared';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
+import { useGame3D } from '@/lib/game-view';
 import { ChessBoard, ChessRecord, MiniChess } from './ChessBoard';
 
 /**
@@ -135,6 +139,7 @@ export function GameCard({ message, meId, mine, onOpen }: { message: Message; me
   const playing = game.players.some((p) => p.id === meId);
   const yourTurn = game.status === 'active' && game.turnId === meId;
   const button = yourTurn ? t('m.chat.game.yourTurn') : playing || game.status !== 'active' ? t('m.chat.game.open') : t('m.chat.game.watch');
+  const names = game.players.map((p) => nameOf(t, p, meId)).join(', ');
   return (
     <div className={`chat-game${mine ? ' chat-game--mine' : ''}`}>
       <span className="chat-poll__label">
@@ -144,9 +149,10 @@ export function GameCard({ message, meId, mine, onOpen }: { message: Message; me
       <div className="chat-game__preview" aria-hidden>
         <MiniBoard game={game} meId={meId} />
       </div>
-      <p className="chat-poll__status">{t('m.chat.game.playersList', { names: game.players.map((p) => nameOf(t, p, meId)).join(', ') })}</p>
+      <p className="chat-poll__status">{t('m.chat.game.playersList', { names })}</p>
       <p className="chat-game__status">{gameStatus(t, game, meId)}</p>
-      <Button size="sm" variant={yourTurn ? 'primary' : 'secondary'} icon="game" onClick={onOpen} aria-label={`${button}: ${gameName(t, game.kind)}`}>
+      {/* A chat can have several games of a kind going: the players tell them apart. */}
+      <Button size="sm" variant={yourTurn ? 'primary' : 'secondary'} icon="game" onClick={onOpen} aria-label={`${button}: ${gameName(t, game.kind)}, ${names}`}>
         {button}
       </Button>
     </div>
@@ -200,6 +206,7 @@ export function GameSheet({
   onRematch: (message: Message) => void;
 }) {
   const { t, locale, toast } = useSession();
+  const [threeD, setThreeD] = useGame3D();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const statusId = useId();
@@ -295,9 +302,16 @@ export function GameSheet({
           {last ? `${last} ` : ''}
           <strong>{s.kind === 'chess' ? chessStatusText(t, s, namesOf(t, game, meId), seat, !!last) : gameStatus(t, game, meId)}</strong>
         </p>
+        <div className="row game-view__bar">
+          <Button size="sm" variant="secondary" icon="game" aria-pressed={threeD} onClick={() => setThreeD(!threeD)}>
+            {t('m.chat.game.view3d')}
+          </Button>
+        </div>
         {s.kind === 'chess' ? (
           <>
-            <ChessBoard state={s} moveNumber={game.moveNumber} seat={seat} canMove={canMove} describedBy={statusId} onMove={(m) => void play(m)} />
+            <div className={`game-view${threeD ? ' game-view--3d' : ''}`}>
+              <ChessBoard state={s} moveNumber={game.moveNumber} seat={seat} canMove={canMove} describedBy={statusId} onMove={(m) => void play(m)} />
+            </div>
             {active ? (
               <DrawOffer
                 state={s}
@@ -310,11 +324,15 @@ export function GameSheet({
             <ChessRecord state={s} names={namesOf(t, game, meId)} />
           </>
         ) : s.kind === 'four_up' ? (
-          <FourUpBoard game={game} meId={meId} canMove={canMove} describedBy={statusId} onColumn={(column) => void play({ column })} />
+          <div className={`game-view${threeD ? ' game-view--3d' : ''}`}>
+            <FourUpBoard game={game} meId={meId} canMove={canMove} describedBy={statusId} onColumn={(column) => void play({ column })} />
+          </div>
         ) : s.kind === 'noughts' ? (
-          <NoughtsBoard game={game} meId={meId} canMove={canMove} describedBy={statusId} onCell={(cell) => void play({ cell })} />
+          <div className={`game-view${threeD ? ' game-view--3d' : ''}`}>
+            <NoughtsBoard game={game} meId={meId} canMove={canMove} describedBy={statusId} onCell={(cell) => void play({ cell })} />
+          </div>
         ) : (
-          <LadderBoard game={game} state={s} meId={meId} canMove={canMove} busy={busy} problem={problem} onMove={(m) => void play(m)} />
+          <LadderBoard game={game} state={s} meId={meId} canMove={canMove} busy={busy} problem={problem} threeD={threeD} onMove={(m) => void play(m)} />
         )}
         {problem && s.kind !== 'word_ladder' ? (
           <p className="yp-field__error" role="alert">
@@ -475,6 +493,8 @@ function FourUpBoard({
                     <span
                       key={r}
                       className={`game-piece game-piece--four_up ${v === null || v === undefined ? 'game-piece--empty' : `game-piece--p${v}`}${line.includes(i) ? ' game-piece--line' : ''}${s.last === i ? ' game-piece--last' : ''}`}
+                      // How far the last disc fell, for the drop in the 3D view.
+                      style={s.last === i ? ({ '--drop': r + 1 } as CSSProperties) : undefined}
                     />
                   );
                 })}
@@ -532,7 +552,7 @@ function NoughtsBoard({
                   onClick={() => canMove && v === null && onCell(i)}
                 >
                   {v === null || v === undefined ? null : (
-                    <span className={`game-mark game-mark--p${v}`} aria-hidden>
+                    <span className={`game-mark game-mark--p${v}${s.last === i ? ' game-mark--last' : ''}`} aria-hidden>
                       {v === 0 ? 'X' : 'O'}
                     </span>
                   )}
@@ -553,6 +573,7 @@ function LadderBoard({
   canMove,
   busy,
   problem,
+  threeD,
   onMove,
 }: {
   game: ChatGame;
@@ -561,6 +582,8 @@ function LadderBoard({
   canMove: boolean;
   busy: boolean;
   problem: string | null;
+  /** Rungs as stacked letter tiles. */
+  threeD: boolean;
   onMove: (move: GameMove) => void;
 }) {
   const { t, tp } = useSession();
@@ -585,16 +608,37 @@ function LadderBoard({
         </span>
       </div>
       <p className="chat-poll__status">{tp('m.chat.game.ladder.best', s.best)}</p>
-      <ol className="chat-game__rungs" aria-label={t('m.chat.game.ladder.rungs')}>
-        <li dir="ltr">
-          <strong>{s.start.toUpperCase()}</strong>
-        </li>
-        {s.rungs.map((r, i) => (
-          <li key={i}>
-            <strong dir="ltr">{r.word.toUpperCase()}</strong> <bdi className="muted">{nameOf(t, game.players[r.seat], meId)}</bdi>
+      {threeD ? (
+        // The ladder as stacked rungs of letter tiles, the newest nearest; the letter each rung changed stands out.
+        <div className="game-view game-view--3d">
+          <ol className="ladder-3d" aria-label={t('m.chat.game.ladder.rungs')}>
+            {[{ word: s.start, seat: -1 }, ...s.rungs].map((r, i, all) => (
+              <li key={i} className={`ladder-3d__rung${i === all.length - 1 && i > 0 ? ' ladder-3d__rung--last' : ''}`}>
+                <span className="yp-visually-hidden">{r.word.toUpperCase()}</span>
+                <span className="ladder-3d__tiles" dir="ltr" aria-hidden>
+                  {[...r.word.toUpperCase()].map((ch, k) => (
+                    <span key={k} className={`ladder-3d__tile${i > 0 && all[i - 1]!.word[k] !== r.word[k] ? ' ladder-3d__tile--changed' : ''}`}>
+                      {ch}
+                    </span>
+                  ))}
+                </span>
+                {r.seat >= 0 ? <bdi className="ladder-3d__who">{nameOf(t, game.players[r.seat], meId)}</bdi> : null}
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : (
+        <ol className="chat-game__rungs" aria-label={t('m.chat.game.ladder.rungs')}>
+          <li dir="ltr">
+            <strong>{s.start.toUpperCase()}</strong>
           </li>
-        ))}
-      </ol>
+          {s.rungs.map((r, i) => (
+            <li key={i}>
+              <strong dir="ltr">{r.word.toUpperCase()}</strong> <bdi className="muted">{nameOf(t, game.players[r.seat], meId)}</bdi>
+            </li>
+          ))}
+        </ol>
+      )}
       {canMove || busy ? (
         <form
           className="chat-inline-form"
@@ -662,13 +706,12 @@ export function StartGameSheet({
   conversation: Conversation | null;
   meId?: string;
   onSent: (m: Message) => void;
-  /** Open the board of a game already going here (by its card's message id). */
-  onOpenGame?: (messageId: string) => void;
+  /** Open the board of a game already going here. */
+  onOpenGame?: (game: ChatGame) => void;
 }) {
-  const { t, toast } = useSession();
+  const { t, tp, toast } = useSession();
   const [kind, setKind] = useState<GameKind>('four_up');
-  const [going, setGoing] = useState<GameKind[]>([]);
-  const [goingCards, setGoingCards] = useState<Partial<Record<GameKind, string>>>({});
+  const [going, setGoing] = useState<ChatGame[]>([]);
   const [chosen, setChosen] = useState<string[]>([]);
   const [color, setColor] = useState<'white' | 'black' | 'random'>('white');
   const [busy, setBusy] = useState(false);
@@ -679,9 +722,9 @@ export function StartGameSheet({
     api.conversations.games(cid).then(
       (r) => {
         const kinds = r.items.map((g) => g.kind);
-        setGoing(kinds);
-        setGoingCards(Object.fromEntries(r.items.map((g) => [g.kind, g.messageId])));
-        setKind((k) => (kinds.includes(k) ? (GAME_KINDS.find((x) => !kinds.includes(x)) ?? k) : k));
+        setGoing(r.items);
+        // Start on a game that can still start here.
+        setKind((k) => (gameStartBlock(kinds, k) ? (GAME_KINDS.find((x) => !gameStartBlock(kinds, x)) ?? k) : k));
       },
       () => setGoing([]),
     );
@@ -691,8 +734,9 @@ export function StartGameSheet({
   const others = conversation.members.filter((m) => m.id !== meId);
   const max = GAME_PLAYERS[kind].max - 1;
   const single = max === 1;
-  const allGoing = GAME_KINDS.every((k) => going.includes(k));
-  const ready = !going.includes(kind) && (!group || (chosen.length >= 1 && chosen.length <= max));
+  const kinds = going.map((g) => g.kind);
+  const full = kinds.length >= GAME_ACTIVE_LIMIT;
+  const ready = !gameStartBlock(kinds, kind) && (!group || (chosen.length >= 1 && chosen.length <= max));
 
   async function submit() {
     if (!ready || !cid) return;
@@ -723,61 +767,84 @@ export function StartGameSheet({
           void submit();
         }}
       >
-        <fieldset className="chat-radio">
-          <legend className="yp-field__label">{t('m.chat.game.choose')}</legend>
-          <div className="stack" style={{ gap: 8 }}>
-            {GAME_KINDS.map((k) => {
-              const busyHere = going.includes(k);
-              const card = goingCards[k];
-              // A game already going here: no second one, but a way straight to it.
-              if (busyHere)
+        {going.length ? (
+          // The games going here, each with who plays and whose turn it is, and a way straight to its board.
+          <section className="stack" style={{ gap: 8 }} aria-labelledby="game-going-title">
+            <h3 id="game-going-title" className="yp-field__label" style={{ margin: 0 }}>
+              {t('m.chat.game.goingHere')}
+            </h3>
+            <ul className="chat-game-going">
+              {going.map((g) => {
+                const names = g.players.map((p) => nameOf(t, p, meId)).join(', ');
                 return (
-                  <div key={k} className="chat-game-option chat-game-option--going">
-                    <span className="stack" style={{ gap: 2, flex: 1 }}>
-                      <strong>{gameName(t, k)}</strong>
-                      <span className="chat-poll__status">{t('m.chat.game.going', { game: gameName(t, k) })}</span>
+                  <li key={g.id} className="chat-game-option chat-game-option--going">
+                    <span className="stack" style={{ gap: 2, flex: 1, minInlineSize: 0 }}>
+                      <strong>{gameName(t, g.kind)}</strong>
+                      <span className="chat-poll__status">
+                        <bdi>{names}</bdi>
+                      </span>
+                      <span className={`chat-poll__status${g.turnId === meId ? ' chat-game-going__turn' : ''}`}>{gameStatus(t, g, meId)}</span>
                     </span>
-                    {card && onOpenGame ? (
+                    {onOpenGame ? (
                       <Button
                         size="sm"
                         variant="secondary"
                         icon="game"
-                        aria-label={`${t('m.chat.game.open')}: ${gameName(t, k)}`}
+                        aria-label={`${t('m.chat.game.open')}: ${gameName(t, g.kind)}, ${names}`}
                         onClick={() => {
                           onClose();
-                          onOpenGame(card);
+                          onOpenGame(g);
                         }}
                       >
                         {t('m.chat.game.open')}
                       </Button>
                     ) : null}
-                  </div>
+                  </li>
                 );
-              return (
-                <label key={k} className={`chat-game-option${kind === k ? ' chat-game-option--on' : ''}`}>
-                  <input
-                    type="radio"
-                    name="game-kind"
-                    value={k}
-                    checked={kind === k}
-                    disabled={busyHere}
-                    onChange={() => {
-                      setKind(k);
-                      setChosen((cur) => (GAME_PLAYERS[k].max === 2 ? cur.slice(0, 1) : cur));
-                    }}
-                  />
-                  <span className="stack" style={{ gap: 2 }}>
-                    <strong>{gameName(t, k)}</strong>
-                    <span className="chat-poll__status">
-                      {busyHere ? t('m.chat.game.going', { game: gameName(t, k) }) : t(`m.chat.game.about.${k}` as MessageKey)}
+              })}
+            </ul>
+          </section>
+        ) : null}
+        {full ? (
+          <p className="chat-poll__status" role="note" style={{ margin: 0 }}>
+            {t('m.chat.game.allFull', { count: GAME_ACTIVE_LIMIT })}
+          </p>
+        ) : (
+          <fieldset className="chat-radio">
+            <legend className="yp-field__label">{going.length ? t('m.chat.game.startNew') : t('m.chat.game.choose')}</legend>
+            <div className="stack" style={{ gap: 8 }}>
+              {GAME_KINDS.map((k) => {
+                const here = kinds.filter((x) => x === k).length;
+                const blocked = !!gameStartBlock(kinds, k);
+                return (
+                  <label key={k} className={`chat-game-option${kind === k ? ' chat-game-option--on' : ''}`}>
+                    <input
+                      type="radio"
+                      name="game-kind"
+                      value={k}
+                      checked={kind === k}
+                      disabled={blocked}
+                      onChange={() => {
+                        setKind(k);
+                        setChosen((cur) => (GAME_PLAYERS[k].max === 2 ? cur.slice(0, 1) : cur));
+                      }}
+                    />
+                    <span className="stack" style={{ gap: 2 }}>
+                      <strong>{gameName(t, k)}</strong>
+                      <span className="chat-poll__status">
+                        {blocked
+                          ? t('m.chat.game.kindFull', { count: GAME_KIND_ACTIVE_LIMIT, game: gameName(t, k) })
+                          : t(`m.chat.game.about.${k}` as MessageKey)}
+                      </span>
+                      {here && !blocked ? <span className="chat-poll__status">{tp('m.chat.game.nGoing', here)}</span> : null}
                     </span>
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-        </fieldset>
-        {kind === 'chess' ? (
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        )}
+        {kind === 'chess' && !full ? (
           <fieldset className="chat-radio">
             <legend className="yp-field__label">{t('m.chat.game.chess.colour')}</legend>
             <div className="stack" style={{ gap: 4 }}>
@@ -797,7 +864,7 @@ export function StartGameSheet({
             </div>
           </fieldset>
         ) : null}
-        {group ? (
+        {group && !full ? (
           <fieldset className="chat-radio">
             <legend className="yp-field__label">{t('m.chat.game.players')}</legend>
             <p className="chat-poll__status" style={{ marginBlock: '0 6px' }}>
@@ -825,16 +892,11 @@ export function StartGameSheet({
             </div>
           </fieldset>
         ) : null}
-        {allGoing ? (
-          <p className="chat-poll__status" role="note" style={{ margin: 0 }}>
-            {t('m.chat.game.allGoing')}
-          </p>
-        ) : null}
         <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
           <Button variant="ghost" onClick={onClose}>
-            {allGoing ? t('m.common.close') : t('m.chat.cancel')}
+            {full ? t('m.common.close') : t('m.chat.cancel')}
           </Button>
-          {allGoing ? null : (
+          {full ? null : (
             <Button type="submit" icon="game" loading={busy} disabled={!ready}>
               {t('m.chat.game.startButton')}
             </Button>

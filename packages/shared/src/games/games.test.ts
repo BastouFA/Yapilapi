@@ -5,6 +5,9 @@ import {
   FOUR_LETTER_WORDS,
   FOUR_UP_COLUMNS,
   forfeit,
+  GAME_ACTIVE_LIMIT,
+  GAME_KIND_ACTIVE_LIMIT,
+  gameStartBlock,
   fourUpColumn,
   fourUpFree,
   ladderCurrent,
@@ -277,5 +280,19 @@ describe('Forfeits and time-outs', () => {
     const s = play(newGame('four_up', 2) as FourUpState, cols(3, 4, 3));
     const back = JSON.parse(JSON.stringify(s)) as FourUpState;
     expect(play(back, cols(4))).toEqual(play(s, cols(4)));
+  });
+});
+
+describe('Games going at once in a chat', () => {
+  it('allows up to 3 of a kind and 6 in all', () => {
+    expect(GAME_ACTIVE_LIMIT).toBe(6);
+    expect(GAME_KIND_ACTIVE_LIMIT).toBe(3);
+    expect(gameStartBlock([], 'chess')).toBeNull();
+    expect(gameStartBlock(['chess', 'chess'], 'chess')).toBeNull();
+    expect(gameStartBlock(['chess', 'chess', 'chess'], 'chess')).toBe('game_kind_full');
+    expect(gameStartBlock(['chess', 'chess', 'chess'], 'noughts')).toBeNull();
+    expect(gameStartBlock(['chess', 'chess', 'chess', 'noughts', 'noughts', 'four_up'], 'word_ladder')).toBe('games_full');
+    // A full chat says so before a full kind.
+    expect(gameStartBlock(['chess', 'chess', 'chess', 'noughts', 'noughts', 'four_up'], 'chess')).toBe('games_full');
   });
 });
