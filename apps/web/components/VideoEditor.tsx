@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Badge, Button, EmptyState, List, ListItem, Select, TextField } from '@yapilapi/design-system';
 import type { CaptionCue, CaptionTrack, MediaEdit, StudioVideo } from '@yapilapi/api-client';
-import { formatRelativeTime, type MessageKey } from '@yapilapi/shared';
+import { captionErrorText, formatRelativeTime, mediaEditErrorText, type MessageKey } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
@@ -330,7 +330,7 @@ export function VideoEditor() {
                             <Badge tone={EDIT_STATUS[e.status].tone}>{t(EDIT_STATUS[e.status].label)}</Badge>
                           </span>
                         }
-                        secondary={e.error ?? formatRelativeTime(e.createdAt, locale)}
+                        secondary={mediaEditErrorText(e, t) ?? formatRelativeTime(e.createdAt, locale)}
                         end={
                           e.status === 'ready' && e.result ? (
                             <Button variant="ghost" size="sm" onClick={() => setSelectedId(e.result!.id)}>
@@ -507,7 +507,7 @@ function CaptionsEditor({
           onChange={(e) => ((dirty.current = true), setLabel(e.currentTarget.value))}
         />
       </div>
-      {current?.status === 'failed' && current.error ? <p className="yp-field__error">{current.error}</p> : null}
+      {current?.status === 'failed' && captionErrorText(current, t) ? <p className="yp-field__error">{captionErrorText(current, t)}</p> : null}
       {current?.status === 'processing' ? <p className="muted">{t('videoEditor.captions.making')}</p> : null}
 
       <ol className="stack-sm" style={{ listStyle: 'none', padding: 0, margin: 0 }} aria-label={t('reel.captions')}>

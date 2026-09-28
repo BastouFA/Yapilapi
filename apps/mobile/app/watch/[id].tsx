@@ -407,7 +407,7 @@ function SideChat({ conversationId, meId }: { conversationId: string; meId: stri
         renderItem={({ item: m }) => {
           if (m.kind === 'system') return <SystemLine message={m} meId={meId} />;
           const mine = m.sender.id === meId;
-          const text = m.unsent ? t('m.chat.unsent') : previewText(t, previewOf(m));
+          const text = m.unsent ? t('m.chat.unsent') : previewText(t, previewOf(m), { meId });
           return (
             // One stop per message for screen readers: who wrote it, then what they wrote.
             <View accessible style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '85%', gap: 2 }}>

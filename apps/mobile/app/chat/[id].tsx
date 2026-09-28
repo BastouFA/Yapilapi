@@ -72,6 +72,7 @@ import { useFlag } from '../../lib/flags';
 import { chatTheme, type AccentColors } from '../../../../packages/shared/src/chat-theme';
 import { chatTooBig, openWatch, startWatch, useChatWatch, WatchBanner, watchableChat } from '../../lib/watch';
 import { noticeText } from '../../../../packages/shared/src/server-text';
+import { storyReplyLabel } from '../../../../packages/shared/src/message-preview';
 
 /** Voice messages shorter than this are treated as a slip of the finger and not sent. */
 const MIN_VOICE_MS = 1000;
@@ -1068,7 +1069,7 @@ export default function Chat() {
             </Text>
             {replyTo ? (
               <Text numberOfLines={1} style={[{ color: c.ink, fontSize: 14 }, userText]}>
-                {previewText(t, previewOf(replyTo))}
+                {previewText(t, previewOf(replyTo), { meId: me?.id, locale })}
               </Text>
             ) : null}
           </View>
@@ -1533,6 +1534,10 @@ const MessageRow = memo(function MessageRow({
   ) : (
     <>
       {item.kind === 'yap' ? <Text style={{ color: tint, fontSize: 11, fontWeight: '800', letterSpacing: 0.5, opacity: 0.8 }}>{t('m.yap.label')}</Text> : null}
+      {/* A reply to a story says so first ("Replied to your story"), in your language. */}
+      {item.storyReply ? (
+        <Text style={[{ color: tint, fontSize: 12, opacity: 0.8 }, userText]}>{storyReplyLabel(item.storyReply, item.sender.id, meId, t)}</Text>
+      ) : null}
       {item.story ? <StoryCardView card={item.story} dark={mine} /> : null}
       <Attachments items={item.attachments} tint={tint} />
     </>

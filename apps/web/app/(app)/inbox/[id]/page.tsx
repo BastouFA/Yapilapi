@@ -1,6 +1,16 @@
 'use client';
 
-import { formatList, noticeText, isVideoFile, MEDIA_ACCEPT, MESSAGE_EDIT_MINUTES, WATCH_MAX_MEMBERS, type PinnedMessage } from '@yapilapi/shared';
+import {
+  formatList,
+  noticeText,
+  isVideoFile,
+  MEDIA_ACCEPT,
+  MESSAGE_EDIT_MINUTES,
+  messagePreviewOf,
+  storyReplyLabel,
+  WATCH_MAX_MEMBERS,
+  type PinnedMessage,
+} from '@yapilapi/shared';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -372,16 +382,7 @@ export default function ChatPage() {
       sender: { id: me.id, username: me.username, displayName: me.displayName, avatarUrl: me.avatarUrl, mode: me.mode },
       body: text,
       replyToId: quoting?.id ?? null,
-      replyTo: quoting
-        ? {
-            id: quoting.id,
-            available: true,
-            sender: quoting.sender,
-            body: quoting.body.slice(0, 200),
-            attachmentKind: quoting.attachments[0]?.kind ?? null,
-            createdAt: quoting.createdAt,
-          }
-        : undefined,
+      replyTo: quoting ? messagePreviewOf(quoting) : undefined,
       attachments: [],
       createdAt: new Date().toISOString(),
       clientId,
@@ -741,7 +742,17 @@ export default function ChatPage() {
               );
             const time = new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(new Date(m.createdAt));
             // The text, with "See translation" when it's in a language the reader doesn't understand.
-            const text = m.body ? <TranslatableText kind="message" id={m.id} text={m.body} lang={m.lang} own={mine || !!m.pending} locale={locale} /> : null;
+            // A reply to a story says so first ("Replied to your story"), in your language.
+            const replied = m.storyReply ? <span className="chat-story-reply">{storyReplyLabel(m.storyReply, m.sender.id, me?.id, t)}</span> : null;
+            const said = m.body ? <TranslatableText kind="message" id={m.id} text={m.body} lang={m.lang} own={mine || !!m.pending} locale={locale} /> : null;
+            const text = replied ? (
+              <>
+                {replied}
+                {said}
+              </>
+            ) : (
+              said
+            );
             const content = m.unsent ? (
               <span className="chat-unsent">{mine ? t('m.chat.unsentMine') : t('m.chat.unsent')}</span>
             ) : m.poll ? (
@@ -904,29 +915,7 @@ export default function ChatPage() {
               </span>
               {replyTo ? (
                 <span className="chat-compose-context__text" dir="auto">
-                  {previewText(t, {
-                    id: replyTo.id,
-                    available: true,
-                    sender: replyTo.sender,
-                    body: replyTo.body,
-                    attachmentKind: replyTo.attachments[0]?.kind ?? replyTo.viewOnce?.kind ?? null,
-                    createdAt: replyTo.createdAt,
-                    ...(replyTo.poll
-                      ? { kind: 'poll' as const }
-                      : replyTo.list
-                        ? { kind: 'list' as const }
-                        : replyTo.game
-                          ? { kind: 'game' as const, gameKind: replyTo.game.kind }
-                          : replyTo.mix
-                            ? { kind: 'mix' as const }
-                            : replyTo.location
-                              ? { kind: 'location' as const }
-                              : replyTo.market
-                                ? { kind: 'listing' as const }
-                                : replyTo.offer
-                                  ? { kind: 'offer' as const }
-                                  : {}),
-                  })}
+                  {previewText(t, messagePreviewOf(replyTo), { meId: me?.id, locale })}
                 </span>
               ) : null}
             </div>

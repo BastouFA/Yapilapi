@@ -1,7 +1,8 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { createMomentSchema, pollPercents, reshareMomentSchema } from '@yapilapi/shared';
+import { createMomentSchema, pollPercents, reshareMomentSchema, type MessageFailureCode } from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, conflict, forbidden, notFound, parse } from '../lib/errors.ts';
+import { messageFailureCode, messageFailureEnglish } from '../lib/failures.ts';
 import type { AppContext } from '../lib/context.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
@@ -262,10 +263,15 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
     await visibleStory(id, u.id);
     const asSender = asSameUser(req);
     const targets = [...new Set(input.conversationIds)];
-    const failed: { id: string; message: string }[] = [];
+    // Why each one wasn't sent, as a code the app says in your language (the English for older apps).
+    const failed: { id: string; code: MessageFailureCode; message: string }[] = [];
+    const refused = (id: string, r: { statusCode: number; json: () => { error?: { code?: string } } }) => {
+      const code = messageFailureCode({ status: r.statusCode, code: r.json().error?.code });
+      failed.push({ id, code, message: messageFailureEnglish(code) });
+    };
     for (const userId of new Set(input.userIds.filter((x) => x !== u.id))) {
       const convo = await app.inject({ method: 'POST', url: '/v1/conversations', headers: asSender, payload: { memberIds: [userId] } });
-      if (convo.statusCode >= 300) failed.push({ id: userId, message: convo.json().error?.message ?? 'Not sent.' });
+      if (convo.statusCode >= 300) refused(userId, convo);
       else targets.push(convo.json().conversation.id as string);
     }
     const sent: string[] = [];
@@ -276,10 +282,10 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
         headers: asSender,
         payload: { body: input.body, storyId: id, clientId: `story-share-${id.slice(0, 8)}-${conversationId.slice(0, 8)}-${Date.now()}` },
       });
-      if (r.statusCode >= 300) failed.push({ id: conversationId, message: r.json().error?.message ?? 'Not sent.' });
+      if (r.statusCode >= 300) refused(conversationId, r);
       else sent.push(conversationId);
     }
-    if (!sent.length) throw new AppError(403, 'not_sent', failed[0]?.message ?? 'Not sent.');
+    if (!sent.length) throw new AppError(403, 'not_sent', failed[0]?.message ?? 'Not sent.', { reason: failed[0]?.code ?? 'not_sent' });
     track(db, u.id, 'moment_sent', { to: sent.length });
     reply.code(201);
     return { conversationIds: sent, failed };
@@ -502,12 +508,13 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
     const convo = await app.inject({ method: 'POST', url: '/v1/conversations', headers: asViewer, payload: { memberIds: [s.author_id] } });
     if (convo.statusCode >= 300) return reply.code(convo.statusCode).send(convo.json());
     const conversationId = convo.json().conversation.id as string;
-    const quote = s.body ? `“${s.body.slice(0, 80)}${s.body.length > 80 ? '…' : ''}”` : 'your story';
+    // The body is the reply; the message keeps what it answers, and the apps write "Replied to your
+    // story" (or its words) in each reader's language.
     const sent = await app.inject({
       method: 'POST',
       url: `/v1/conversations/${conversationId}/messages`,
       headers: asViewer,
-      payload: { body: `Replied to ${quote}: ${body}`, clientId: `story-${id}-${Date.now()}` },
+      payload: { body, storyReplyTo: id, clientId: `story-${id}-${Date.now()}` },
     });
     if (sent.statusCode >= 300) return reply.code(sent.statusCode).send(sent.json());
     reply.code(201);

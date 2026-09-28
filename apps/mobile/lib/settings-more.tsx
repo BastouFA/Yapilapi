@@ -241,7 +241,7 @@ export function BlockedAccounts() {
   );
 }
 
-type SignIn = { id: string; device: string; ip: string; last_seen_at: string; current: boolean };
+type SignIn = { id: string; device: string; deviceLabel?: string; ip: string; last_seen_at: string; current: boolean };
 
 /** Where you're signed in; any other device can be signed out from here. */
 export function SessionsCard() {
@@ -266,7 +266,7 @@ export function SessionsCard() {
         items.map((s) => (
           <Row
             key={s.id}
-            title={s.current ? t('settings.sessions.thisDevice', { device: s.device }) : s.device}
+            title={s.current ? t('settings.sessions.thisDevice', { device: s.deviceLabel ?? s.device }) : (s.deviceLabel ?? s.device)}
             subtitle={t('settings.sessions.meta', { ip: s.ip || t('settings.sessions.unknownIp'), time: timeAgo(s.last_seen_at) })}
             end={
               s.current ? null : (

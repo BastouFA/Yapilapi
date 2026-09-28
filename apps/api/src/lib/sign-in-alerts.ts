@@ -2,7 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import type { RealtimeHub } from './realtime.ts';
 // Every language, loaded up front: the alert email is written in its reader's.
 import { t } from '@yapilapi/shared/i18n';
-import { deliverable, linkOrigin, recipientLocale, whenLine, type EmailSender } from './email.ts';
+import { deliverable, linkOrigin, recipientLocale, userLocale, whenLine, type EmailSender } from './email.ts';
 import { notify } from './services.ts';
 
 type Q = Pool | PoolClient;
@@ -40,6 +40,33 @@ export function deviceLabel(ua: string | null | undefined, locale: string): stri
   if (!ua) return t('email.device.unknown', locale);
   const { browser, os } = deviceParts(ua);
   return t('email.device.name', locale, { browser: browser ?? t('email.device.app', locale), os: os ?? t('email.device.unknownOs', locale) });
+}
+
+/**
+ * A stored device name (deviceName()'s English, kept as it is for the fingerprint) in the reader's
+ * language, for the apps: the sessions list and the sign-in notification. A name in another shape
+ * is shown as it is.
+ */
+export function deviceNameLabel(name: string | null | undefined, locale: string): string {
+  if (!name || name === 'Unknown device') return t('email.device.unknown', locale);
+  const m = /^(.+) on (.+)$/.exec(name);
+  if (!m) return name;
+  const browser = m[1] === 'App' ? t('email.device.app', locale) : m[1]!;
+  const os = m[2] === 'Unknown OS' ? t('email.device.unknownOs', locale) : m[2]!;
+  return t('email.device.name', locale, { browser, os });
+}
+
+/**
+ * The `new_sign_in` notification's device and place in the reader's language (`deviceLabel`,
+ * `placeLabel`), beside the English `device` and `place` older apps show. The phone can't name
+ * countries itself, so the server does, each time the list is read.
+ */
+export function signInLabels(data: Record<string, unknown>, locale: string): Record<string, unknown> {
+  return {
+    ...data,
+    deviceLabel: deviceNameLabel(typeof data.device === 'string' ? data.device : null, locale),
+    placeLabel: placeName(typeof data.country === 'string' ? data.country : null, locale) ?? (typeof data.place === 'string' ? data.place : null),
+  };
 }
 
 /**
@@ -92,13 +119,15 @@ export async function recordSignIn(
   if (seen || o.quiet || !known.rowCount) return false;
   const at = o.at ?? new Date();
   const place = placeName(s.country);
+  // Labelled in the account's language too, for the notification that arrives live.
+  const locale = await userLocale(deps.db, s.userId);
   await notify(deps.db, deps.realtime, {
     userId: s.userId,
     category: 'security',
     type: 'new_sign_in',
     entityType: 'session',
     entityId: s.sessionId,
-    data: { device, place, country: s.country, at: at.toISOString() },
+    data: signInLabels({ device, place, country: s.country, at: at.toISOString() }, locale),
   });
   void emailAlert(deps, s.userId, { userAgent: s.userAgent, country: s.country, at }).catch((err: Error) =>
     deps.log?.warn({ err: err.message }, 'sign-in alert email not sent'),

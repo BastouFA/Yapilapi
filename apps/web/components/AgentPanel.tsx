@@ -135,11 +135,11 @@ export function AgentPanel({ kind, businessId, compact = false }: { kind: AgentK
                     <Link href={r.href} className="agent__card">
                       <span className="agent__type">{TYPE_LABEL[r.type] ? t(TYPE_LABEL[r.type]) : r.type}</span>
                       <strong>{r.title}</strong>
-                      {r.startsAt || agentSubtitle(r, tp) ? (
+                      {r.startsAt || agentSubtitle(r, { t, tp, locale }) ? (
                         <span className="muted">
                           {[
                             r.startsAt ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(r.startsAt)) : null,
-                            agentSubtitle(r, tp),
+                            agentSubtitle(r, { t, tp, locale }),
                           ]
                             .filter(Boolean)
                             .join(' · ')}

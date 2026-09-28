@@ -12,6 +12,7 @@ import {
   expectedPositionMs,
   formatReelTime,
   isNewerPlayback,
+  messagePreviewOf,
   videoPoster,
   videoSrc,
   WATCH_HEARTBEAT_MS,
@@ -659,18 +660,9 @@ function WatchChat({ conversationId, group }: { conversationId: string; group: b
           messages.slice(-80).map((m) => {
             if (m.kind === 'system') return <SystemLine key={m.id} message={m} meId={me?.id} />;
             const mine = m.sender.id === me?.id;
-            const text = m.unsent
-              ? t('m.chat.unsent')
-              : m.body ||
-                previewText(t, {
-                  id: m.id,
-                  available: true,
-                  sender: m.sender,
-                  body: m.body,
-                  attachmentKind: m.attachments[0]?.kind ?? m.viewOnce?.kind ?? null,
-                  createdAt: m.createdAt,
-                  ...(m.poll ? { kind: 'poll' as const } : m.list ? { kind: 'list' as const } : {}),
-                });
+            // Cards the server wrote (a game, a location, an offer) and story replies are said in your language.
+            const card = m.game || m.location || m.offer || m.storyReply;
+            const text = m.unsent ? t('m.chat.unsent') : m.body && !card ? m.body : previewText(t, messagePreviewOf(m), { meId: me?.id, locale });
             return (
               <ChatBubble
                 key={m.id}

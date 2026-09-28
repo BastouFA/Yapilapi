@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { createRecapSchema, RECAP_SOURCES, type Recap, type RecapCandidates, type RecapSource } from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, featureDisabled, notFound, parse } from '../lib/errors.ts';
+import { recapFailure } from '../lib/failures.ts';
 import type { AppContext } from '../lib/context.ts';
 import { recapSharing } from '../lib/recap-sharing.ts';
 import { preselect, recapCandidates, recapsLeftToday, removeRecapMedia, startRecap } from '../lib/recaps.ts';
@@ -55,6 +56,7 @@ export default async function recapsModule(app: FastifyInstance, ctx: AppContext
     return rows.map((r) => {
       const ready = r.status === 'ready' && r.media_id && r.m_url;
       const s = sharing.get(r.id);
+      const failure = r.status === 'failed' ? recapFailure(r.error) : null;
       return {
         id: r.id,
         title: r.title,
@@ -65,7 +67,8 @@ export default async function recapsModule(app: FastifyInstance, ctx: AppContext
         sound: r.sound_id ? { id: r.sound_id, title: r.sound_title ?? '' } : null,
         lengthSeconds: r.length_seconds,
         status: r.status,
-        error: r.error,
+        error: failure?.english ?? null,
+        errorCode: failure?.code ?? null,
         itemCount: Array.isArray(r.items) ? r.items.length : 0,
         usedCount: r.used_media_ids ? r.used_media_ids.length : null,
         durationMs: r.duration_ms,

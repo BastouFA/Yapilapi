@@ -4,13 +4,11 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Avatar, AvatarGroup, BottomSheet, Button, EmptyState, List, ListItem, Skeleton, TextField } from '@yapilapi/design-system';
-import { formatRelativeTime, type Conversation, type MessageKey, type PublicUser } from '@yapilapi/shared';
+import { formatRelativeTime, messagePreviewOf, messagePreviewText, type Conversation, type PublicUser } from '@yapilapi/shared';
 import { api, errorMessage, sharedRequest } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { useRealtime, useSession } from '../../providers';
-
-const ATTACHMENT_LABEL: Record<string, MessageKey> = { image: 'm.post.photo', video: 'm.chat.video', audio: 'm.chat.voiceMessage' };
 
 function conversationTitle(c: Conversation, meId: string, justYou: string): string {
   if (c.title) return c.title;
@@ -103,8 +101,8 @@ export default function Inbox() {
           {items.map((c) => {
             const others = c.members.filter((m) => m.id !== me?.id);
             const last = c.lastMessage;
-            const kind = last?.attachments[0]?.kind ?? '';
-            const lastText = last ? last.body || t(ATTACHMENT_LABEL[kind] ?? 'm.chat.attachment') : '';
+            // Said from what it is (a location, a game, an offer, a story reply), in your language.
+            const lastText = last ? messagePreviewText(last.preview ?? messagePreviewOf(last), { t, locale, meId: me?.id }) : '';
             return (
               <ListItem
                 key={c.id}

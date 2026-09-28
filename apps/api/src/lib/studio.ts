@@ -9,6 +9,8 @@ import { enqueue } from './jobs.ts';
 import { probe, run } from './media-processing.ts';
 import { MAX_TRANSCRIBE_AUDIO_BYTES, type TranscriptionProvider } from './transcription.ts';
 import { parseVtt, serializeVtt, type Cue } from './webvtt.ts';
+import type { CaptionErrorCode, MediaEditErrorCode } from '@yapilapi/shared';
+import type { JobLog } from './failures.ts';
 
 type Q = Pool | PoolClient;
 
@@ -16,6 +18,14 @@ export interface StudioDeps {
   db: Pool;
   storage: MediaStorage;
   transcription: TranscriptionProvider | null;
+  log?: JobLog;
+}
+
+/** A step that failed for a reason the owner is told, by its code (job-failures.ts). */
+class StudioFailure<C extends string> extends Error {
+  constructor(public code: C) {
+    super(code);
+  }
 }
 
 /** Copy a stored object to a temp dir, run fn, clean up. */
@@ -75,7 +85,7 @@ async function renderEdit(deps: StudioDeps, editId: string) {
   if (!e || !['queued', 'rendering'].includes(e.status)) return;
   await deps.db.query(`UPDATE media_edits SET status = 'rendering' WHERE id = $1`, [editId]);
   try {
-    if (!e.storage_key) throw new Error('The original file is no longer stored.');
+    if (!e.storage_key) throw new StudioFailure<MediaEditErrorCode>('source_missing');
     const out = await withLocalCopy(deps.storage, e.storage_key, async (input, dir) => {
       const info = await probe(input);
       const file = path.join(dir, 'edit.mp4');
@@ -121,10 +131,10 @@ async function renderEdit(deps: StudioDeps, editId: string) {
       jobId,
     ]);
   } catch (err) {
-    await deps.db.query(`UPDATE media_edits SET status = 'failed', error = $2, finished_at = now() WHERE id = $1`, [
-      editId,
-      `We couldn't render this part of the video. ${String((err as Error).message).slice(0, 200)}`,
-    ]);
+    // The code is stored (the apps say it in the owner's language); what ffmpeg said stays in the logs.
+    const code: MediaEditErrorCode = err instanceof StudioFailure ? (err.code as MediaEditErrorCode) : 'render_failed';
+    if (!(err instanceof StudioFailure)) deps.log?.warn({ editId, err: String((err as Error).message).slice(0, 500) }, 'media edit failed');
+    await deps.db.query(`UPDATE media_edits SET status = 'failed', error = $2, finished_at = now() WHERE id = $1`, [editId, code]);
   }
 }
 
@@ -137,21 +147,22 @@ async function transcribeTrack(deps: StudioDeps, trackId: string) {
   );
   const t = rows[0];
   if (!t || t.status !== 'processing') return;
-  const fail = (message: string) => deps.db.query(`UPDATE caption_tracks SET status = 'failed', error = $2 WHERE id = $1`, [trackId, message]);
-  if (!deps.transcription) return fail('Automatic captions are not set up on this server.');
+  // The code is stored; the apps say it in the owner's language.
+  const fail = (code: CaptionErrorCode) => deps.db.query(`UPDATE caption_tracks SET status = 'failed', error = $2 WHERE id = $1`, [trackId, code]);
+  if (!deps.transcription) return fail('not_set_up');
   try {
     const audio = await withLocalCopy(deps.storage, t.storage_key, async (input, dir) => {
       if (!(await probe(input)).hasAudio) return null;
       const file = path.join(dir, 'audio.m4a');
       // Mono speech-quality audio keeps long videos under the provider's upload limit.
       await run(['-i', input, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'aac', '-b:a', '48k', file]);
-      if ((await stat(file)).size > MAX_TRANSCRIBE_AUDIO_BYTES) throw new Error('This video is too long for automatic captions.');
+      if ((await stat(file)).size > MAX_TRANSCRIBE_AUDIO_BYTES) throw new StudioFailure<CaptionErrorCode>('too_long');
       return readFile(file);
     });
-    if (!audio) return fail('This video has no sound to caption.');
+    if (!audio) return fail('no_sound');
     const vtt = await deps.transcription.transcribe({ audio, filename: 'audio.m4a', mime: 'audio/mp4', language: t.lang });
     const cues = parseVtt(vtt);
-    if (!cues.length) return fail('No speech was found in this video.');
+    if (!cues.length) return fail('no_speech');
     // The owner may have written or uploaded captions in this language meanwhile; theirs win. The check and the write
     // are one statement, so a save that lands in between is never overwritten.
     const stored = await deps.storage.putKey(
@@ -165,7 +176,10 @@ async function transcribeTrack(deps: StudioDeps, trackId: string) {
       [trackId, stored.key, stored.url, cues.length],
     );
   } catch (err) {
-    await fail(`Automatic captions failed. ${String((err as Error).message).slice(0, 200)}`);
+    if (err instanceof StudioFailure) return fail(err.code as CaptionErrorCode);
+    // What the provider or ffmpeg said stays in the logs.
+    deps.log?.warn({ trackId, err: String((err as Error).message).slice(0, 500) }, 'automatic captions failed');
+    await fail('failed');
   }
 }
 

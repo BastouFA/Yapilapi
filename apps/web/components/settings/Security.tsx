@@ -40,7 +40,7 @@ export function SessionsCard() {
                       <Icon name={/phone|iphone|android|mobile/i.test(s.device) ? 'device' : 'globe'} />
                     </span>
                   }
-                  primary={s.current ? t('settings.sessions.thisDevice', { device: s.device }) : s.device}
+                  primary={s.current ? t('settings.sessions.thisDevice', { device: s.deviceLabel ?? s.device }) : (s.deviceLabel ?? s.device)}
                   secondary={t('settings.sessions.meta', { ip: s.ip ?? t('settings.sessions.unknownIp'), time: formatRelativeTime(s.last_seen_at, locale) })}
                   end={
                     s.current ? null : (

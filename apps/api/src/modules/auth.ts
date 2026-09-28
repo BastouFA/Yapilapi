@@ -30,12 +30,12 @@ import { t } from '@yapilapi/shared/i18n';
 import { z } from 'zod';
 import { AppError, badRequest, conflict, notFound, parse, unauthorized } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
-import { recipientLocale } from '../lib/email.ts';
+import { recipientLocale, userLocale } from '../lib/email.ts';
 import { audit, securityEvent, track } from '../lib/services.ts';
 import { applyMinorDefaults, checkBirthDate } from '../lib/users.ts';
 import { announceReferral, applyReferral, inviterByCode, qualifyReferral } from '../lib/invites.ts';
 import { recordSignals, scoreSignup } from '../lib/spam.ts';
-import { deviceName, recordSignIn } from '../lib/sign-in-alerts.ts';
+import { deviceLabel, deviceName, deviceNameLabel, recordSignIn } from '../lib/sign-in-alerts.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 import { registerMfa } from './mfa.ts';
 import { registerPasskeys } from './passkeys.ts';
@@ -418,7 +418,15 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
        WHERE s.user_id = $1 AND s.revoked_at IS NULL AND s.expires_at > now() ORDER BY s.last_seen_at DESC`,
       [u.id],
     );
-    return { items: rows.map((r) => ({ ...r, current: r.id === u.sessionId })) };
+    // The device named in your language (`device` stays the stored English name, for older apps).
+    const locale = await userLocale(ctx.db, u.id);
+    return {
+      items: rows.map((r) => ({
+        ...r,
+        deviceLabel: r.device ? deviceNameLabel(r.device, locale) : deviceLabel(r.user_agent, locale),
+        current: r.id === u.sessionId,
+      })),
+    };
   });
 
   app.delete('/v1/auth/sessions/:id', { preHandler: requireAuth }, async (req) => {

@@ -30,6 +30,9 @@ import { sourceKey } from './share-video.ts';
 import { FONTS } from './media-edit.ts';
 import { parseVtt, type Cue } from './webvtt.ts';
 import { saveCaptionTrack } from './studio.ts';
+import { recipientLocale } from './email.ts';
+// Every language, loaded up front: the credit is drawn in the echo author's.
+import { t } from '@yapilapi/shared/i18n';
 
 type Q = Pool | PoolClient;
 
@@ -336,14 +339,15 @@ export function planEcho(p: EchoPlanInput): EchoPlan {
 const escapeMarkup = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /**
- * The "Echo of @name" credit as a small picture: white words on a soft dark pill, drawn with the
- * bundled font so it looks the same on any server. Returns false when text can't be drawn here.
+ * The "Echo of @name" credit as a small picture, in the echo's author's language: white words on a
+ * soft dark pill, drawn with the bundled font so it looks the same on any server. Returns false
+ * when text can't be drawn here.
  */
-export async function drawCredit(out: string, username: string, size: number): Promise<boolean> {
+export async function drawCredit(out: string, username: string, size: number, locale = 'en'): Promise<boolean> {
   try {
     const text = await sharp({
       text: {
-        text: `<span foreground="white">${escapeMarkup(`Echo of @${username}`)}</span>`,
+        text: `<span foreground="white">${escapeMarkup(t('echo.credit', locale, { username }))}</span>`,
         fontfile: FONTS.bold,
         font: `Inter Bold ${size}`,
         dpi: 72,
@@ -403,8 +407,9 @@ export async function renderEchoJob(deps: EchoDeps, echoId: string): Promise<voi
             src.storage_key AS your_key, src.duration_ms AS your_ms,
             om.storage_key AS their_key, om.variants AS their_variants, om.id AS their_media_id, om.duration_ms AS their_ms,
             sm.storage_key AS sound_key, (s.source_post_id IS DISTINCT FROM o.id) AS borrowed,
-            opr.username AS their_username
+            opr.username AS their_username, own.locale AS owner_locale
      FROM echoes e
+     LEFT JOIN profiles own ON own.user_id = e.owner_id
      LEFT JOIN media src ON src.id = e.source_media_id
      LEFT JOIN posts o ON o.id = e.original_post_id
      LEFT JOIN profiles opr ON opr.user_id = o.author_id
@@ -445,7 +450,8 @@ export async function renderEchoJob(deps: EchoDeps, echoId: string): Promise<voi
     const cutMs = e.cut_end_ms !== null ? e.cut_end_ms - e.cut_start_ms : 0;
     const f = echoFrame(e.layout);
     const creditFile = path.join(dir, 'credit.png');
-    const credit = e.their_username && (await drawCredit(creditFile, e.their_username, f.credit.size)) ? creditFile : null;
+    // Burned into the video, so in the language of whoever made the echo.
+    const credit = e.their_username && (await drawCredit(creditFile, e.their_username, f.credit.size, recipientLocale(e.owner_locale))) ? creditFile : null;
     const output = path.join(dir, 'echo.mp4');
     const plan = planEcho({
       layout: e.layout,

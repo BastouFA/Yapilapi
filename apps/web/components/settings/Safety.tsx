@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button, Card, Dialog, List, ListItem, TextField } from '@yapilapi/design-system';
-import type { InteractionSettings } from '@yapilapi/shared';
+import { appealStatusText, moderationCaseText, type InteractionSettings } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 import { Anchor, ChoiceGroup, PeopleCard } from './Shell';
@@ -83,13 +83,9 @@ export function ModerationCard() {
             {items.map((c) => (
               <ListItem
                 key={c.id}
-                primary={`${c.target_type}: ${c.decision.replace('_', ' ')}`}
+                primary={moderationCaseText(c, t)}
                 secondary={
-                  c.appeal_status
-                    ? t('settings.appeal.status', { status: c.appeal_status })
-                    : c.status === 'decided'
-                      ? t('settings.appeal.can')
-                      : t('settings.appeal.final')
+                  c.appeal_status ? appealStatusText(c.appeal_status, t) : c.status === 'decided' ? t('settings.appeal.can') : t('settings.appeal.final')
                 }
                 end={
                   c.status === 'decided' && !c.appeal_status ? (

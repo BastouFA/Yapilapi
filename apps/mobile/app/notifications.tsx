@@ -6,6 +6,8 @@ import type { NotificationItem, PublicUser } from '../../../packages/shared/src/
 import { reportOutcomeText } from '../../../packages/shared/src/report-outcome';
 import { togetherNoticeText } from '../../../packages/shared/src/together';
 import { echoNoticeText } from '../../../packages/shared/src/echoes';
+import { scheduledPostFailedText } from '../../../packages/shared/src/job-failures';
+import { signInNoticeText } from '../../../packages/shared/src/server-text';
 import { client, errorMessage } from '../lib/api';
 import { SectionHeader } from '../lib/chips';
 import { useT, type Translator } from '../lib/i18n';
@@ -157,11 +159,11 @@ function describe(g: Group, tr: Translator): string {
   // A question asked without a name has no actor: it never says who.
   if (n.type === 'question_received') return n.actor ? t('ask.notif.received', { name }) : t('ask.notif.receivedHidden');
   if (n.type === 'question_answered') return t('ask.notif.answered', { name });
-  // A sign-in from a device we hadn't seen: which one, and roughly where when known.
-  if (n.type === 'new_sign_in') {
-    const device = String(n.data.device ?? '');
-    return typeof n.data.place === 'string' && n.data.place ? t('m.notif.newSignInPlace', { device, place: n.data.place }) : t('m.notif.newSignIn', { device });
-  }
+  // A sign-in from a device we hadn't seen: which one, and roughly where when known (named in your language by the server).
+  const signIn = signInNoticeText(n, t);
+  if (signIn) return signIn;
+  // A scheduled post back in drafts, and why.
+  if (n.type === 'scheduled_post_failed') return scheduledPostFailedText(n, t);
   const own = OWN_TEXT[n.type];
   if (own) return t(own, { title });
   const key = TEXT[n.type];

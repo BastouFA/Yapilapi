@@ -333,9 +333,10 @@ describe('send later', () => {
     await runDue(s.id);
     expect(await messages(bola, chat)).toEqual([]);
     const [failed] = (await as(t.app, ada).get(`/v1/conversations/${chat}/scheduled`)).body.items;
-    expect(failed).toMatchObject({ id: s.id, status: 'failed' });
-    expect(failed.failure).toBeTruthy();
-    expect(await notes(ada.id, 'scheduled_message_failed')).toEqual([expect.objectContaining({ entity_type: 'conversation', entity_id: chat })]);
+    expect(failed).toMatchObject({ id: s.id, status: 'failed', failureCode: 'cannot_message', failure: "You can't message this person right now." });
+    expect(await notes(ada.id, 'scheduled_message_failed')).toEqual([
+      expect.objectContaining({ entity_type: 'conversation', entity_id: chat, data: expect.objectContaining({ code: 'cannot_message' }) }),
+    ]);
     // Dismissing it clears the list.
     expect((await as(t.app, ada).del(`/v1/scheduled-messages/${s.id}`)).status).toBe(200);
     expect((await as(t.app, ada).get(`/v1/conversations/${chat}/scheduled`)).body.items).toEqual([]);
@@ -352,8 +353,12 @@ describe('send later', () => {
     expect((await as(t.app, bola).post(`/v1/conversations/${g}/leave`)).status).toBe(200);
     await runDue(s.id);
     expect((await messages(ada, g)).filter((m) => m.body === 'Late note')).toEqual([]);
+    // Kept as a code, which the apps say in the sender's language; the English stays for older apps.
     const row = (await db().query(`SELECT status, failure FROM scheduled_messages WHERE id = $1`, [s.id])).rows[0];
-    expect(row).toMatchObject({ status: 'failed', failure: 'You’re no longer in this chat.' });
+    expect(row).toMatchObject({ status: 'failed', failure: 'left_chat' });
+    expect((await notes(bola.id, 'scheduled_message_failed')).map((n) => n.data)).toEqual([
+      { scheduledId: s.id, code: 'left_chat', reason: "You're no longer in this chat." },
+    ]);
   });
 });
 

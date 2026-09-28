@@ -33,6 +33,16 @@ const SCALE_SQL = `(CASE upper(trim(c.currency)) ${Object.entries(CURRENCY_SCALE
  * always labelled, explain why they were shown and can be hidden.
  * Each impression is charged at the campaign's CPM, in millicents.
  */
+/**
+ * A boost is named after its post ("Boost: Our new menu", written in English when it was made):
+ * `nameCode` and the post's words let the apps name it in the reader's language (campaignName).
+ */
+function boostName(r: { boost_days?: number | null; name?: string }): { nameCode?: 'boost'; nameParams?: { excerpt: string } } {
+  if (r.boost_days == null || typeof r.name !== 'string') return {};
+  const m = /^Boost(?:: ([\s\S]*))?$/.exec(r.name);
+  return m ? { nameCode: 'boost', nameParams: { excerpt: m[1] ?? '' } } : {};
+}
+
 export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
   const db = ctx.db;
   const adsOn = async () => {
@@ -42,6 +52,7 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
   const dto = (r: Record<string, any>) => ({
     id: r.id,
     name: r.name,
+    ...boostName(r),
     status: r.status,
     postId: r.post_id,
     topics: r.topics,

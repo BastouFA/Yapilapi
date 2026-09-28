@@ -3,7 +3,16 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { BottomSheet, Button, Icon } from '@yapilapi/design-system';
-import { chatTheme, chessDrawReason, DISAPPEARING_SECONDS, type Message, type MessageKey, type MessagePreview, type PinnedMessage } from '@yapilapi/shared';
+import {
+  chatTheme,
+  chessDrawReason,
+  DISAPPEARING_SECONDS,
+  messagePreviewText,
+  type Message,
+  type MessageKey,
+  type MessagePreview,
+  type PinnedMessage,
+} from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
@@ -19,36 +28,19 @@ export const disappearingLabel = (t: T, seconds: number | null | undefined) => {
   return key ? t(key) : t('m.unit.seconds', { count: seconds });
 };
 
-/** A one-line description of a quoted message. */
-export function previewText(t: T, p: MessagePreview): string {
-  if (!p.available) return t('m.chat.quoteUnavailable');
-  if (p.unsent) return t('m.chat.unsent');
-  if (p.kind === 'poll') return t('m.chat.poll.preview', { question: p.body });
-  if (p.kind === 'list') return t('m.chat.list.preview', { title: p.body });
-  if (p.kind === 'mix') return t('mixes.preview', { title: p.body });
-  if (p.kind === 'location') return t('location.pin');
-  // A Market listing (body is its title) or an offer on one (body is like "Offer · ₦5,000.00").
-  if (p.kind === 'listing') return t('market.preview.listing', { title: p.body });
-  if (p.kind === 'offer') return p.body || t('market.preview.offer');
-  if (p.kind === 'game') return t('m.chat.game.preview', { game: p.gameKind ? t(`m.chat.game.kind.${p.gameKind}` as MessageKey) : p.body });
-  if (p.body) return p.body;
-  switch (p.attachmentKind) {
-    case 'image':
-      return t('m.post.photo');
-    case 'video':
-      return t('m.chat.video');
-    case 'audio':
-      return t('m.chat.voiceMessage');
-    default:
-      return p.attachmentKind ? t('m.chat.attachment') : t('chat.message');
-  }
+/**
+ * A one-line description of a quoted message, in the reader's language (messagePreviewText in
+ * packages/shared). `meId` says whose story a story reply answered; `locale` formats amounts.
+ */
+export function previewText(t: T, p: MessagePreview, o: { meId?: string; locale?: string } = {}): string {
+  return messagePreviewText(p, { t, ...o });
 }
 
 /** The quoted original inside a reply bubble. Selecting it scrolls to the original. */
 export function MessageQuote({ preview, mine, meId, onJump }: { preview: MessagePreview; mine: boolean; meId?: string; onJump: (id: string) => void }) {
-  const { t } = useSession();
+  const { t, locale } = useSession();
   const who = !preview.available ? null : preview.sender?.id === meId ? t('m.chat.you') : preview.sender?.displayName;
-  const text = previewText(t, preview);
+  const text = previewText(t, preview, { meId, locale });
   return (
     <button
       type="button"
@@ -225,7 +217,9 @@ export function SystemLine({
   }
   if (s?.type === 'reminder') {
     const about = s.message;
-    const text = about?.available ? t('m.chat.systemReminder', { name: who, text: previewText(t, about) }) : t('m.chat.systemReminderGone', { name: who });
+    const text = about?.available
+      ? t('m.chat.systemReminder', { name: who, text: previewText(t, about, { meId }) })
+      : t('m.chat.systemReminderGone', { name: who });
     return (
       <p className="chat-system" role="note">
         {about?.available && onJump ? (
@@ -297,7 +291,7 @@ export function PinnedBar({
   onJump: (id: string) => void;
   onUnpin: (id: string) => void;
 }) {
-  const { t } = useSession();
+  const { t, locale, me } = useSession();
   const [i, setI] = useState(0);
   if (!pins.length) return null;
   const at = Math.min(i, pins.length - 1);
@@ -316,7 +310,7 @@ export function PinnedBar({
         <span className="chat-pinned__label">{pins.length > 1 ? t('m.chat.pinnedOf', { n: at + 1, total: pins.length }) : t('m.chat.pinned')}</span>
         <span className="chat-pinned__text" dir="auto">
           {pin.message.sender ? <bdi>{pin.message.sender.displayName}: </bdi> : null}
-          {previewText(t, pin.message)}
+          {previewText(t, pin.message, { meId: me?.id, locale })}
         </span>
       </button>
       {canManage ? (

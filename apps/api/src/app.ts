@@ -449,12 +449,12 @@ export async function buildApp(
   let lastRetentionCheck = 0;
   const jobHandlers = {
     ...mediaJobHandlers({ db, storage, moderator: ctx.mediaModerator, realtime: ctx.realtime }),
-    ...studioJobHandlers({ db, storage, transcription: ctx.transcription }),
+    ...studioJobHandlers({ db, storage, transcription: ctx.transcription, log: app.log }),
     ...editorJobHandlers({ db, storage }),
     ...liveRecordingJobHandlers({ db, storage, recordingsDir: config.LIVE_RECORDINGS_DIR }),
     ...shareVideoJobHandlers({ db, storage }),
     // Recap videos from Memories and Chapters.
-    ...recapJobHandlers({ db, storage, realtime: ctx.realtime, moderator: ctx.mediaModerator }),
+    ...recapJobHandlers({ db, storage, realtime: ctx.realtime, moderator: ctx.mediaModerator, log: app.log }),
     ...viewOnceJobHandlers(viewOnceDeps),
     ...chatJobHandlers(viewOnceDeps),
     // Live location shares stop at their time, and their point is deleted.

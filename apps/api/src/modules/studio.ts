@@ -3,6 +3,7 @@ import { tx } from '@yapilapi/database';
 import { z } from 'zod';
 import { AppError, badRequest, conflict, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
+import { captionFailure, mediaEditFailure } from '../lib/failures.ts';
 import { enqueue } from '../lib/jobs.ts';
 import { assertRecapUse } from '../lib/recap-sharing.ts';
 import { saveCaptionTrack, videoDurationMs } from '../lib/studio.ts';
@@ -37,6 +38,9 @@ const cuesSchema = z.object({
 export const EDIT_STATUS = `CASE WHEN e.status = 'processing' AND j.status = 'done' THEN 'ready'
                           WHEN e.status = 'processing' AND j.status = 'failed' THEN 'failed'
                           ELSE e.status END`;
+
+/** `errorCode` of a failed trim, clip or caption track, and its English (`error`) for older apps; both null otherwise. */
+const editError = <C extends string>(f: { code: C; english: string } | null) => ({ error: f?.english ?? null, errorCode: f?.code ?? null });
 
 function fieldError(field: string, message: string) {
   return new AppError(400, 'validation_failed', 'Check the highlighted fields.', { fields: { [field]: message } });
@@ -109,7 +113,8 @@ export default async function studioModule(app: FastifyInstance, ctx: AppContext
       start: r.start_ms / 1000,
       end: r.end_ms / 1000,
       status: r.status,
-      error: r.status === 'failed' ? (r.error ?? "We couldn't process the new video.") : null,
+      // A failed cut says why; a cut whose new video failed processing after it has no reason of its own.
+      ...editError(r.status === 'failed' ? mediaEditFailure(r.error ?? 'process_failed') : null),
       createdAt: r.created_at.toISOString(),
       result: r.r_id
         ? { id: r.r_id, url: r.r_url, variants: r.r_variants, posterUrl: r.r_poster, hlsUrl: r.r_hls, durationMs: r.r_duration, ready: r.status === 'ready' }
@@ -172,7 +177,7 @@ export default async function studioModule(app: FastifyInstance, ctx: AppContext
     status: r.status,
     url: r.url,
     cueCount: r.cue_count,
-    error: isOwner ? r.error : null,
+    ...editError(isOwner && r.status === 'failed' ? captionFailure(r.error) : null),
     updatedAt: r.updated_at.toISOString(),
   });
 

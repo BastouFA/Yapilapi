@@ -34,7 +34,7 @@ const route = (href: string) => (/^\/(c|p)\//.test(href) ? href : null);
  */
 export default function Assistant() {
   const c = useColors();
-  const { t, tp, dateTime } = useT();
+  const { t, tp, dateTime, locale } = useT();
   const [kind, setKind] = useState<AgentKind>('discover');
   const [prompt, setPrompt] = useState('');
   const [busy, setBusy] = useState(false);
@@ -101,7 +101,7 @@ export default function Assistant() {
               <Row
                 key={`${r.type}:${r.id}`}
                 title={r.title}
-                subtitle={`${TYPE_LABEL[r.type] ? t(TYPE_LABEL[r.type]!) : r.type}${r.startsAt ? ` · ${dateTime(r.startsAt)}` : ''}${agentSubtitle(r, tp) ? ` · ${agentSubtitle(r, tp)}` : ''}\n${r.reason}`}
+                subtitle={`${TYPE_LABEL[r.type] ? t(TYPE_LABEL[r.type]!) : r.type}${r.startsAt ? ` · ${dateTime(r.startsAt)}` : ''}${agentSubtitle(r, { t, tp, locale }) ? ` · ${agentSubtitle(r, { t, tp, locale })}` : ''}\n${r.reason}`}
                 onPress={route(r.href) ? () => router.push(route(r.href) as never) : undefined}
               />
             ))}

@@ -23,6 +23,8 @@ function safeTimeZoneOrThrow(tz: string) {
 }
 import { decodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
 import { plusCol, publicUserFrom } from '../lib/users.ts';
+import { userLocale } from '../lib/email.ts';
+import { signInLabels } from '../lib/sign-in-alerts.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 export default async function notificationsModule(app: FastifyInstance, ctx: AppContext) {
@@ -43,6 +45,8 @@ export default async function notificationsModule(app: FastifyInstance, ctx: App
     );
     const page = rows.slice(0, q.limit);
     const unread = (await db.query(`SELECT count(*) AS n FROM notifications WHERE user_id = $1 AND read_at IS NULL`, [u.id])).rows[0].n;
+    // A sign-in from a new device names the device and the country in your language (the phone can't name countries itself).
+    const locale = page.some((r) => r.type === 'new_sign_in') ? await userLocale(db, u.id) : 'en';
     const items: NotificationItem[] = page.map((r) => ({
       id: r.id,
       category: r.category,
@@ -51,7 +55,7 @@ export default async function notificationsModule(app: FastifyInstance, ctx: App
       followsActor: r.follows_actor,
       entityType: r.entity_type,
       entityId: r.entity_id,
-      data: r.data,
+      data: r.type === 'new_sign_in' && r.data ? signInLabels(r.data, locale) : r.data,
       readAt: r.read_at?.toISOString() ?? null,
       createdAt: r.created_at.toISOString(),
     }));
