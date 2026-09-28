@@ -3,6 +3,12 @@ import { AccessibilityInfo, Alert, Platform, Pressable, Text, TextInput, View } 
 import { ApiError } from '../../../packages/api-client/src/index';
 import {
   applyMove,
+  CHESS_GLYPHS,
+  chessColorSeat,
+  chessLastMoveText,
+  chessSeatColor,
+  chessSideLabel,
+  chessStatusText,
   checkRung,
   FOUR_UP_COLUMNS,
   FOUR_UP_ROWS,
@@ -11,6 +17,8 @@ import {
   GAME_KINDS,
   GAME_PLAYERS,
   ladderCurrent,
+  type ChessState,
+  type DrawAction,
   type GameKind,
   type GameMove,
   type GameState,
@@ -19,12 +27,14 @@ import {
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import type { ChatGame, Conversation, Message, PublicUser } from '../../../packages/shared/src/types';
 import { client, errorMessage } from './api';
+import { ChessBoard, ChessRecord, MiniChess } from './chess-board';
 import { useT } from './i18n';
 import { radius, space } from './theme';
 import { BottomSheet, Button, Icon, useColors, userText } from './ui';
 
 /**
- * Games in a chat (mobile): the card in the chat, the board in a sheet, and the sheet to start one.
+ * Games in a chat (mobile): the card in the chat, the board in a sheet, and the sheet to start one
+ * (the chess board itself is in chess-board.tsx).
  * Every column (Four up) and square (Noughts) is a button with a full label ("Column 4, 2 free
  * spaces"); what just happened is a live region, and is also announced on iOS. Moves are checked with
  * the same rules as the server, shown at once, and sent with the board's move number and an id, so
@@ -40,8 +50,18 @@ export const gameName = (t: T, kind: GameKind) => t(`m.chat.game.kind.${kind}` a
 const nameOf = (t: T, u: PublicUser | undefined, meId?: string) =>
   !u ? t('m.calls.someone') : u.id === meId ? t('m.chat.you') : u.displayName || t('m.calls.someone');
 
-/** "Your turn", "Ada to play", "Sam won", "A draw"… */
+/** The players' names by seat, as you see them ("You" for yourself). */
+const namesOf = (t: T, game: ChatGame, meId?: string) => game.players.map((p) => nameOf(t, p, meId));
+
+/** "Your turn", "Ada to play", "Sam won", "A draw"… (chess once it's over: "Checkmate. Ada won.", "Draw: stalemate"). */
 export function gameStatus(t: T, game: ChatGame, meId?: string): string {
+  if (game.state.kind === 'chess' && game.status !== 'active')
+    return chessStatusText(
+      t,
+      game.state,
+      namesOf(t, game, meId),
+      game.players.findIndex((p) => p.id === meId),
+    );
   const winner = game.players.find((p) => p.id === game.winnerId);
   const forfeitWin = game.state.result?.type === 'win' && game.state.result.by === 'forfeit';
   if (game.status === 'won')
@@ -66,6 +86,8 @@ function lastMoveText(t: T, game: ChatGame, meId?: string): string {
   if (s.kind === 'four_up' && s.last !== null) return t('m.chat.game.dropped', { name: who(s.cells[s.last]), n: (s.last % FOUR_UP_COLUMNS) + 1 });
   if (s.kind === 'noughts' && s.last !== null)
     return t('m.chat.game.took', { name: who(s.cells[s.last]), row: Math.floor(s.last / 3) + 1, col: (s.last % 3) + 1 });
+  // Chess: whoever isn't to move now made the last move.
+  if (s.kind === 'chess') return chessLastMoveText(t, s, who(chessColorSeat(s, s.side === 'w' ? 'b' : 'w')));
   if (s.kind === 'word_ladder') {
     if (s.lastPass !== null) return t('m.chat.game.passed', { name: who(s.lastPass) });
     const rung = s.rungs.at(-1);
@@ -139,7 +161,7 @@ export function GameCard({ message, meId, tint, onOpen }: { message: Message; me
         accessibilityElementsHidden
         style={{ alignSelf: 'flex-start', padding: space[2], borderRadius: radius.md, backgroundColor: c.surface, borderWidth: 1, borderColor: c.line }}
       >
-        <MiniBoard game={game} />
+        <MiniBoard game={game} meId={meId} />
       </View>
       <Text style={[{ color: tint, fontSize: 12, opacity: 0.85 }, userText]}>
         {t('m.chat.game.playersList', { names: game.players.map((p) => nameOf(t, p, meId)).join(', ') })}
@@ -168,9 +190,10 @@ export function GameCard({ message, meId, tint, onOpen }: { message: Message; me
   );
 }
 
-function MiniBoard({ game }: { game: ChatGame }) {
+function MiniBoard({ game, meId }: { game: ChatGame; meId?: string }) {
   const c = useColors();
   const s = game.state;
+  if (s.kind === 'chess') return <MiniChess state={s} seat={game.players.findIndex((p) => p.id === meId)} />;
   if (s.kind === 'word_ladder')
     return (
       <Text style={{ color: c.ink, fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'], letterSpacing: 0.5, writingDirection: 'ltr' }}>
@@ -249,7 +272,13 @@ export function GameSheet({
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const last = game ? lastMoveText(t, game, meId) : '';
-  const status = game ? `${last ? `${last} ` : ''}${gameStatus(t, game, meId)}` : '';
+  const seatHere = game ? game.players.findIndex((p) => p.id === meId) : -1;
+  const headline = !game
+    ? ''
+    : game.state.kind === 'chess'
+      ? chessStatusText(t, game.state, namesOf(t, game, meId), seatHere, !!last)
+      : gameStatus(t, game, meId);
+  const status = game ? `${last ? `${last} ` : ''}${headline}` : '';
   useAnnounce(status);
   useEffect(() => setProblem(null), [game?.id, game?.moveNumber]);
   if (!game) return null;
@@ -321,18 +350,38 @@ export function GameSheet({
             }}
           >
             {s.kind === 'four_up' ? <Disc seat={i} size={16} /> : null}
+            {s.kind === 'chess' ? (
+              <Text allowFontScaling={false} importantForAccessibility="no" accessibilityElementsHidden style={{ color: c.ink, fontSize: 20 }}>
+                {CHESS_GLYPHS[chessSeatColor(s, i)].k}
+              </Text>
+            ) : null}
             {s.kind === 'noughts' ? <Text style={{ color: i === 0 ? c.yapi : c.ink, fontWeight: '800', fontSize: 16 }}>{i === 0 ? 'X' : 'O'}</Text> : null}
             <Text style={[{ color: c.ink, fontSize: 14, fontWeight: game.turnId === p.id ? '800' : '500' }, userText]}>
               {s.out.includes(i) ? t('m.chat.game.out', { name: nameOf(t, p, meId) }) : nameOf(t, p, meId)}
             </Text>
+            {s.kind === 'chess' ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{chessSideLabel(t, chessSeatColor(s, i))}</Text> : null}
           </View>
         ))}
       </View>
       <Text accessibilityLiveRegion="polite" style={[{ color: c.ink, fontSize: 15, lineHeight: 22 }, userText]}>
         {last ? `${last} ` : ''}
-        <Text style={{ fontWeight: '800' }}>{gameStatus(t, game, meId)}</Text>
+        <Text style={{ fontWeight: '800' }}>{headline}</Text>
       </Text>
-      {s.kind === 'four_up' ? (
+      {s.kind === 'chess' ? (
+        <>
+          <ChessBoard state={s} moveNumber={game.moveNumber} seat={seat} canMove={canMove} onMove={(m) => void play(m)} />
+          {active ? (
+            <DrawOffer
+              state={s}
+              seat={out ? -1 : seat}
+              names={namesOf(t, game, meId)}
+              busy={busy}
+              onAction={(action) => run(async () => onGame((await (await client()).games.draw(game.id, action)).game))}
+            />
+          ) : null}
+          <ChessRecord state={s} names={namesOf(t, game, meId)} />
+        </>
+      ) : s.kind === 'four_up' ? (
         <View
           accessibilityLabel={t('m.chat.game.board', { game: gameName(t, 'four_up') })}
           style={{ alignSelf: 'center', flexDirection: 'row', gap: 2, padding: 4, borderRadius: radius.md, backgroundColor: c.surfaceSunken, direction: 'ltr' }}
@@ -425,18 +474,22 @@ export function GameSheet({
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: space[2] }}>
         {active && seat >= 0 && !out ? (
           <Button
-            label={t('m.chat.game.forfeit')}
+            label={t(s.kind === 'chess' ? 'm.chat.game.chess.resign' : 'm.chat.game.forfeit')}
             variant="ghost"
             disabled={busy}
             onPress={() =>
-              Alert.alert(t('m.chat.game.forfeit'), t('m.chat.game.forfeitConfirm'), [
-                { text: t('m.chat.cancel'), style: 'cancel' },
-                {
-                  text: t('m.chat.game.forfeit'),
-                  style: 'destructive',
-                  onPress: () => void run(async () => onGame((await (await client()).games.forfeit(game.id)).game)),
-                },
-              ])
+              Alert.alert(
+                t(s.kind === 'chess' ? 'm.chat.game.chess.resign' : 'm.chat.game.forfeit'),
+                t(s.kind === 'chess' ? 'm.chat.game.chess.resignConfirm' : 'm.chat.game.forfeitConfirm'),
+                [
+                  { text: t('m.chat.cancel'), style: 'cancel' },
+                  {
+                    text: t(s.kind === 'chess' ? 'm.chat.game.chess.resign' : 'm.chat.game.forfeit'),
+                    style: 'destructive',
+                    onPress: () => void run(async () => onGame((await (await client()).games.forfeit(game.id)).game)),
+                  },
+                ],
+              )
             }
           />
         ) : null}
@@ -450,6 +503,54 @@ export function GameSheet({
         ) : null}
       </View>
     </BottomSheet>
+  );
+}
+
+/**
+ * Chess draw offers: offer one (once per move of your own), or answer the other player's. People
+ * watching see that an offer is waiting. An offer lapses after the offerer's next move.
+ */
+function DrawOffer({
+  state: s,
+  seat,
+  names,
+  busy,
+  onAction,
+}: {
+  state: ChessState;
+  seat: number;
+  names: string[];
+  busy: boolean;
+  onAction: (action: DrawAction) => void;
+}) {
+  const { t } = useT();
+  const c = useColors();
+  const offer = s.drawOffer;
+  if (offer && offer.seat === seat) return <Text style={{ color: c.inkMuted, fontSize: 14 }}>{t('m.chat.game.chess.youOffered')}</Text>;
+  if (offer)
+    return (
+      <View style={{ gap: space[2] }}>
+        <Text style={[{ color: c.ink, fontSize: 15, fontWeight: '700' }, userText]}>
+          {t('m.chat.game.chess.theyOffered', { name: names[offer.seat] ?? '' })}
+        </Text>
+        {seat >= 0 ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+            <Button label={t('m.chat.game.chess.accept')} size="sm" disabled={busy} onPress={() => onAction('accept')} />
+            <Button label={t('m.chat.game.chess.decline')} size="sm" variant="secondary" disabled={busy} onPress={() => onAction('decline')} />
+          </View>
+        ) : null}
+      </View>
+    );
+  if (seat < 0 || s.moves < (s.offeredAt[seat] ?? -2) + 2) return null;
+  return (
+    <Button
+      label={t('m.chat.game.chess.offerDraw')}
+      size="sm"
+      variant="secondary"
+      disabled={busy}
+      onPress={() => onAction('offer')}
+      style={{ alignSelf: 'flex-start' }}
+    />
   );
 }
 
@@ -577,6 +678,7 @@ export function StartGameSheet({
   const [kind, setKind] = useState<GameKind>('four_up');
   const [going, setGoing] = useState<GameKind[]>([]);
   const [chosen, setChosen] = useState<string[]>([]);
+  const [color, setColor] = useState<'white' | 'black' | 'random'>('white');
   const [error, setError] = useState<string | null>(null);
   const cid = conversation?.id;
   useEffect(() => {
@@ -606,7 +708,12 @@ export function StartGameSheet({
     setError(null);
     try {
       const api = await client();
-      const { message } = await api.conversations.startGame(cid, { kind, playerIds: group ? chosen : [], clientId: newId() });
+      const { message } = await api.conversations.startGame(cid, {
+        kind,
+        playerIds: group ? chosen : [],
+        ...(kind === 'chess' ? { color } : {}),
+        clientId: newId(),
+      });
       onSent(message);
       onClose();
     } catch (e) {
@@ -657,6 +764,37 @@ export function StartGameSheet({
           );
         })}
       </View>
+      {kind === 'chess' ? (
+        <>
+          <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 15, fontWeight: '700' }}>
+            {t('m.chat.game.chess.colour')}
+          </Text>
+          <View accessibilityRole="radiogroup" style={{ gap: 2 }}>
+            {(['white', 'black', 'random'] as const).map((k) => {
+              const on = color === k;
+              const label = t(k === 'white' ? 'm.chat.game.chess.asWhite' : k === 'black' ? 'm.chat.game.chess.asBlack' : 'm.chat.game.chess.asRandom');
+              return (
+                <Pressable
+                  key={k}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: on }}
+                  accessibilityLabel={label}
+                  onPress={() => setColor(k)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: 44 }}
+                >
+                  <Icon name={on ? 'radio-button-on' : 'radio-button-off'} size={22} color={on ? c.yapi : c.inkMuted} />
+                  {k !== 'random' ? (
+                    <Text allowFontScaling={false} style={{ color: c.ink, fontSize: 20 }}>
+                      {CHESS_GLYPHS[k === 'white' ? 'w' : 'b'].k}
+                    </Text>
+                  ) : null}
+                  <Text style={{ color: c.ink, fontSize: 15 }}>{label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </>
+      ) : null}
       {group ? (
         <>
           <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 15, fontWeight: '700' }}>

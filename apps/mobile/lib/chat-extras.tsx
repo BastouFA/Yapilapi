@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Message, MessagePreview, PinnedMessage } from '../../../packages/shared/src/types';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import { chatTheme } from '../../../packages/shared/src/chat-theme';
+import { chessDrawReason } from '../../../packages/shared/src/games/index';
 import { client, errorMessage } from './api';
 import { useT } from './i18n';
 import { radius, space } from './theme';
@@ -239,11 +240,23 @@ export function SystemLine({
   }
   if (s?.type === 'game') {
     const game = t(`m.chat.game.kind.${s.kind}` as MessageKey);
+    const chess = s.kind === 'chess';
     const text =
       s.outcome === 'won'
-        ? t(s.by === 'forfeit' ? 'm.chat.systemGameForfeit' : 'm.chat.systemGameWon', { name, game })
+        ? t(
+            s.by === 'forfeit'
+              ? chess
+                ? 'm.chat.systemChessResigned'
+                : 'm.chat.systemGameForfeit'
+              : chess
+                ? 'm.chat.systemChessMate'
+                : 'm.chat.systemGameWon',
+            { name, game },
+          )
         : s.outcome === 'draw'
-          ? t('m.chat.systemGameDraw', { game })
+          ? s.reason
+            ? t('m.chat.systemChessDraw', { game, reason: chessDrawReason(t, s.reason) })
+            : t('m.chat.systemGameDraw', { game })
           : t('m.chat.systemGameUnfinished', { game });
     return (
       <View style={{ alignSelf: 'center', flexDirection: 'row', gap: space[1], alignItems: 'center', maxWidth: '90%', paddingVertical: space[1] }}>

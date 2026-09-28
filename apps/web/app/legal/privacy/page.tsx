@@ -69,7 +69,10 @@ export default async function PrivacyPage() {
           Messages you schedule with “Send later” are stored until their time, seen only by you, and then sent like any other message. Chat wallpapers and
           bubble colours are stored with the chat and seen by everyone in it.
         </li>
-        <li>Games in chats (Four up, Noughts and Word ladder): the board, each move, who played and who won. Only the people in the chat see them.</li>
+        <li>
+          Games in chats (Four up, Noughts, Word ladder and Chess): the board, each move (and chess draw offers), who played and who won. Only the people in the
+          chat see them.
+        </li>
         <li>
           Watch together: while people in a chat watch videos together, we keep the session, who joined and left, the queue of videos and where playback is.
         </li>

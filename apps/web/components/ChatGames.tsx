@@ -4,6 +4,12 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { BottomSheet, Button, Icon } from '@yapilapi/design-system';
 import {
   applyMove,
+  CHESS_GLYPHS,
+  chessColorSeat,
+  chessLastMoveText,
+  chessSeatColor,
+  chessSideLabel,
+  chessStatusText,
   checkRung,
   FOUR_UP_COLUMNS,
   FOUR_UP_ROWS,
@@ -13,7 +19,9 @@ import {
   GAME_PLAYERS,
   ladderCurrent,
   type ChatGame,
+  type ChessState,
   type Conversation,
+  type DrawAction,
   type GameKind,
   type GameMove,
   type GameState,
@@ -24,11 +32,12 @@ import {
 } from '@yapilapi/shared';
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
+import { ChessBoard, ChessRecord, MiniChess } from './ChessBoard';
 
 /**
  * Games in a chat (web): the card in the message list, the board in a sheet, and the sheet to start
  * one. Boards are grids you can move around with the arrow keys (Four up: one button per column,
- * "Column 4, 2 free spaces"; Noughts: one per square). What just happened is read out from a polite
+ * "Column 4, 2 free spaces"; Noughts: one per square; Chess: see ChessBoard.tsx). What just happened is read out from a polite
  * live region, so moves from other people are announced without moving focus. Moves are checked
  * here with the same rules the server uses, shown at once, and sent with the board's move number
  * and an id for the move, so a double click plays once.
@@ -43,8 +52,18 @@ export const gameName = (t: T, kind: GameKind) => t(`m.chat.game.kind.${kind}` a
 const nameOf = (t: T, u: PublicUser | undefined, meId?: string) =>
   !u ? t('m.calls.someone') : u.id === meId ? t('m.chat.you') : u.displayName || t('m.calls.someone');
 
-/** "Your turn", "Ada to play", "Sam won", "A draw"… */
+/** The players' names by seat, as you see them ("You" for yourself). */
+const namesOf = (t: T, game: ChatGame, meId?: string) => game.players.map((p) => nameOf(t, p, meId));
+
+/** "Your turn", "Ada to play", "Sam won", "A draw"… (chess once it's over: "Checkmate. Ada won.", "Draw: stalemate"). */
 export function gameStatus(t: T, game: ChatGame, meId?: string): string {
+  if (game.state.kind === 'chess' && game.status !== 'active')
+    return chessStatusText(
+      t,
+      game.state,
+      namesOf(t, game, meId),
+      game.players.findIndex((p) => p.id === meId),
+    );
   const winner = game.players.find((p) => p.id === game.winnerId);
   const forfeitWin = game.state.result?.type === 'win' && game.state.result.by === 'forfeit';
   if (game.status === 'won')
@@ -70,6 +89,8 @@ function lastMoveText(t: T, game: ChatGame, meId?: string): string {
   if (s.kind === 'four_up' && s.last !== null) return t('m.chat.game.dropped', { name: who(s.cells[s.last]), n: (s.last % FOUR_UP_COLUMNS) + 1 });
   if (s.kind === 'noughts' && s.last !== null)
     return t('m.chat.game.took', { name: who(s.cells[s.last]), row: Math.floor(s.last / 3) + 1, col: (s.last % 3) + 1 });
+  // Chess: whoever isn't to move now made the last move.
+  if (s.kind === 'chess') return chessLastMoveText(t, s, who(chessColorSeat(s, s.side === 'w' ? 'b' : 'w')));
   if (s.kind === 'word_ladder') {
     if (s.lastPass !== null) return t('m.chat.game.passed', { name: who(s.lastPass) });
     const rung = s.rungs.at(-1);
@@ -121,7 +142,7 @@ export function GameCard({ message, meId, mine, onOpen }: { message: Message; me
       </span>
       <strong className="chat-game__name">{gameName(t, game.kind)}</strong>
       <div className="chat-game__preview" aria-hidden>
-        <MiniBoard game={game} />
+        <MiniBoard game={game} meId={meId} />
       </div>
       <p className="chat-poll__status">{t('m.chat.game.playersList', { names: game.players.map((p) => nameOf(t, p, meId)).join(', ') })}</p>
       <p className="chat-game__status">{gameStatus(t, game, meId)}</p>
@@ -133,8 +154,9 @@ export function GameCard({ message, meId, mine, onOpen }: { message: Message; me
 }
 
 /** A small picture of the board for the card (the text next to it says what's going on). */
-function MiniBoard({ game }: { game: ChatGame }) {
+function MiniBoard({ game, meId }: { game: ChatGame; meId?: string }) {
   const s = game.state;
+  if (s.kind === 'chess') return <MiniChess state={s} seat={game.players.findIndex((p) => p.id === meId)} />;
   if (s.kind === 'word_ladder')
     return (
       <span className="chat-game__ladder-mini" dir="ltr">
@@ -253,22 +275,41 @@ export function GameSheet({
         <ul className="chat-game__players">
           {game.players.map((p, i) => (
             <li key={p.id} className={game.turnId === p.id ? 'chat-game__player--turn' : undefined}>
-              {s.kind !== 'word_ladder' ? (
+              {s.kind === 'chess' ? (
+                <span className={`chess-piece chess-piece--${chessSeatColor(s, i)} chess-legend`} aria-hidden>
+                  {CHESS_GLYPHS[chessSeatColor(s, i)].k}
+                </span>
+              ) : s.kind !== 'word_ladder' ? (
                 <span className={`game-piece game-piece--${s.kind} game-piece--p${i} game-piece--legend`} aria-hidden>
                   {s.kind === 'noughts' ? (i === 0 ? 'X' : 'O') : null}
                 </span>
               ) : null}
               <bdi>{s.out.includes(i) ? t('m.chat.game.out', { name: nameOf(t, p, meId) }) : nameOf(t, p, meId)}</bdi>
               {s.kind === 'noughts' ? <span className="yp-visually-hidden"> ({i === 0 ? 'X' : 'O'})</span> : null}
+              {s.kind === 'chess' ? <span className="chat-poll__status">{chessSideLabel(t, chessSeatColor(s, i))}</span> : null}
             </li>
           ))}
         </ul>
         {/* Read out when anyone moves or the game ends. */}
         <p className="chat-game__live" id={statusId} role="status" ref={statusRef} tabIndex={-1}>
           {last ? `${last} ` : ''}
-          <strong>{gameStatus(t, game, meId)}</strong>
+          <strong>{s.kind === 'chess' ? chessStatusText(t, s, namesOf(t, game, meId), seat, !!last) : gameStatus(t, game, meId)}</strong>
         </p>
-        {s.kind === 'four_up' ? (
+        {s.kind === 'chess' ? (
+          <>
+            <ChessBoard state={s} moveNumber={game.moveNumber} seat={seat} canMove={canMove} describedBy={statusId} onMove={(m) => void play(m)} />
+            {active ? (
+              <DrawOffer
+                state={s}
+                seat={out ? -1 : seat}
+                names={namesOf(t, game, meId)}
+                busy={busy}
+                onAction={(action) => void run(async () => onGame((await api.games.draw(game.id, action)).game))}
+              />
+            ) : null}
+            <ChessRecord state={s} names={namesOf(t, game, meId)} />
+          </>
+        ) : s.kind === 'four_up' ? (
           <FourUpBoard game={game} meId={meId} canMove={canMove} describedBy={statusId} onColumn={(column) => void play({ column })} />
         ) : s.kind === 'noughts' ? (
           <NoughtsBoard game={game} meId={meId} canMove={canMove} describedBy={statusId} onCell={(cell) => void play({ cell })} />
@@ -288,10 +329,11 @@ export function GameSheet({
               variant="ghost"
               disabled={busy}
               onClick={() => {
-                if (confirm(t('m.chat.game.forfeitConfirm'))) void run(async () => onGame((await api.games.forfeit(game.id)).game));
+                if (confirm(t(s.kind === 'chess' ? 'm.chat.game.chess.resignConfirm' : 'm.chat.game.forfeitConfirm')))
+                  void run(async () => onGame((await api.games.forfeit(game.id)).game));
               }}
             >
-              {t('m.chat.game.forfeit')}
+              {t(s.kind === 'chess' ? 'm.chat.game.chess.resign' : 'm.chat.game.forfeit')}
             </Button>
           ) : null}
           {!active && seat >= 0 ? (
@@ -305,6 +347,54 @@ export function GameSheet({
         </div>
       </div>
     </BottomSheet>
+  );
+}
+
+/**
+ * Chess draw offers: offer one (once per move of your own), or answer the other player's. People
+ * watching see that an offer is waiting. An offer lapses after the offerer's next move.
+ */
+function DrawOffer({
+  state: s,
+  seat,
+  names,
+  busy,
+  onAction,
+}: {
+  state: ChessState;
+  seat: number;
+  names: string[];
+  busy: boolean;
+  onAction: (action: DrawAction) => void;
+}) {
+  const { t } = useSession();
+  const offer = s.drawOffer;
+  if (offer && offer.seat === seat) return <p className="chat-poll__status">{t('m.chat.game.chess.youOffered')}</p>;
+  if (offer)
+    return (
+      <div className="row chess-draw" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <p className="chess-draw__text">
+          <bdi>{t('m.chat.game.chess.theyOffered', { name: names[offer.seat] ?? '' })}</bdi>
+        </p>
+        {seat >= 0 ? (
+          <>
+            <Button size="sm" disabled={busy} onClick={() => onAction('accept')}>
+              {t('m.chat.game.chess.accept')}
+            </Button>
+            <Button size="sm" variant="secondary" disabled={busy} onClick={() => onAction('decline')}>
+              {t('m.chat.game.chess.decline')}
+            </Button>
+          </>
+        ) : null}
+      </div>
+    );
+  if (seat < 0 || s.moves < (s.offeredAt[seat] ?? -2) + 2) return null;
+  return (
+    <div className="row" style={{ justifyContent: 'flex-start' }}>
+      <Button size="sm" variant="secondary" disabled={busy} onClick={() => onAction('offer')}>
+        {t('m.chat.game.chess.offerDraw')}
+      </Button>
+    </div>
   );
 }
 
@@ -576,6 +666,7 @@ export function StartGameSheet({
   const [kind, setKind] = useState<GameKind>('four_up');
   const [going, setGoing] = useState<GameKind[]>([]);
   const [chosen, setChosen] = useState<string[]>([]);
+  const [color, setColor] = useState<'white' | 'black' | 'random'>('white');
   const [busy, setBusy] = useState(false);
   const cid = conversation?.id;
   useEffect(() => {
@@ -601,7 +692,12 @@ export function StartGameSheet({
     if (!ready || !cid) return;
     setBusy(true);
     try {
-      const { message } = await api.conversations.startGame(cid, { kind, playerIds: group ? chosen : [], clientId: crypto.randomUUID() });
+      const { message } = await api.conversations.startGame(cid, {
+        kind,
+        playerIds: group ? chosen : [],
+        ...(kind === 'chess' ? { color } : {}),
+        clientId: crypto.randomUUID(),
+      });
       onSent(message);
       onClose();
     } catch (e) {
@@ -650,6 +746,26 @@ export function StartGameSheet({
             })}
           </div>
         </fieldset>
+        {kind === 'chess' ? (
+          <fieldset className="chat-radio">
+            <legend className="yp-field__label">{t('m.chat.game.chess.colour')}</legend>
+            <div className="stack" style={{ gap: 4 }}>
+              {(['white', 'black', 'random'] as const).map((c) => (
+                <label key={c} className="chat-game-person">
+                  <input type="radio" name="game-colour" value={c} checked={color === c} onChange={() => setColor(c)} />
+                  <span>
+                    {c === 'random' ? null : (
+                      <span className={`chess-piece chess-piece--${c === 'white' ? 'w' : 'b'} chess-legend`} aria-hidden>
+                        {CHESS_GLYPHS[c === 'white' ? 'w' : 'b'].k}
+                      </span>
+                    )}{' '}
+                    {t(c === 'white' ? 'm.chat.game.chess.asWhite' : c === 'black' ? 'm.chat.game.chess.asBlack' : 'm.chat.game.chess.asRandom')}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        ) : null}
         {group ? (
           <fieldset className="chat-radio">
             <legend className="yp-field__label">{t('m.chat.game.players')}</legend>

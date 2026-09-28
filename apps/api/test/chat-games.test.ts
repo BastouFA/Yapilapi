@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { chessFromFen } from '@yapilapi/shared';
 import { chatJobHandlers } from '../src/lib/chat.ts';
 import { GAME_IDLE_JOB } from '../src/lib/chat-games.ts';
 import { processJobs } from '../src/lib/jobs.ts';
@@ -85,7 +86,7 @@ describe('Starting a game', () => {
     const outsider = connect(stranger);
 
     expect((await start(stranger, convo, 'four_up')).status).toBe(404);
-    expect((await start(a, convo, 'chess')).status).toBe(400);
+    expect((await start(a, convo, 'go')).status).toBe(400);
 
     const m = await started(a, convo, 'four_up');
     expect(m.body).toBe('Four up');
@@ -381,5 +382,233 @@ describe('Membership, time-outs and removal', () => {
     expect((await as(t.app, a).get(`/v1/games/${m.game.id}`)).status).toBe(404);
     expect((await db().query(`SELECT 1 FROM chat_game_moves WHERE game_id = $1`, [m.game.id])).rowCount).toBe(0);
     expect((await start(a, convo, 'noughts')).status).toBe(201);
+  });
+});
+
+describe('Chess', () => {
+  /** Start a chess game in a new one-to-one chat; `color` is the starter's side. */
+  async function chess(color?: 'white' | 'black' | 'random') {
+    const [a, b] = [await adult(), await adult()];
+    const convo = await direct(a, b);
+    const r = await as(t.app, a).post(`/v1/conversations/${convo}/games`, { kind: 'chess', ...(color ? { color } : {}) });
+    expect(r.status).toBe(201);
+    return { a, b, convo, message: r.body.message as { id: string; body: string; game: any }, id: r.body.message.game.id as string };
+  }
+  /** Squares as the apps send them: "e2e4", "e7e8q". */
+  const sq = (m: string) => ({ from: m.slice(0, 2), to: m.slice(2, 4), ...(m[4] ? { promotion: m[4] } : {}) });
+  /** Put the board in a position (the starter playing white unless `white` says otherwise). */
+  const setPosition = (id: string, fen: string, white = 0) => db().query(`UPDATE chat_games SET state = $2 WHERE id = $1`, [id, chessFromFen(fen, white)]);
+  const draw = (u: TestUser, id: string, action: string) => as(t.app, u).post(`/v1/games/${id}/draw`, { action });
+
+  it('starts with the colour the starter chose; white moves first', async () => {
+    const white = await chess();
+    expect(white.message.body).toBe('Chess');
+    expect(white.message.game).toMatchObject({ kind: 'chess', turnId: white.a.id, moveNumber: 0 });
+    expect(white.message.game.state).toMatchObject({ white: 0, side: 'w', board: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR', san: [] });
+
+    const black = await chess('black');
+    expect(black.message.game.players.map((p: any) => p.id)).toEqual([black.a.id, black.b.id]);
+    expect(black.message.game.state.white).toBe(1);
+    expect(black.message.game.turnId).toBe(black.b.id);
+
+    const random = await chess('random');
+    expect([0, 1]).toContain(random.message.game.state.white);
+    expect(random.message.game.turnId).toBe(random.message.game.players[random.message.game.state.white].id);
+
+    // One chess game at a time in a chat.
+    expect((await start(white.b, white.convo, 'chess')).body.error.code).toBe('game_in_progress');
+    expect((await as(t.app, white.a).post(`/v1/conversations/${white.convo}/games`, { kind: 'chess', color: 'green' })).status).toBe(400);
+  });
+
+  it('in a group, you choose one person to play', async () => {
+    const [a, b, c] = [await adult(), await adult(), await adult()];
+    const convo = await group(a, [b, c]);
+    expect((await start(a, convo, 'chess', [b.id, c.id])).body.error.code).toBe('choose_players');
+    const m = await started(a, convo, 'chess', [c.id]);
+    expect(m.game.players.map((p: any) => p.id)).toEqual([a.id, c.id]);
+    expect((await move(b, m.game.id, 0, sq('e2e4'))).body.error.code).toBe('not_a_player');
+  });
+
+  it('the server refuses illegal moves, moves out of turn and malformed squares', async () => {
+    const { a, b, id } = await chess();
+    expect((await move(b, id, 0, sq('e7e5'))).body.error.code).toBe('not_your_turn');
+    expect((await move(a, id, 0, sq('e2e5'))).body.error.code).toBe('illegal_move');
+    expect((await move(a, id, 0, sq('f1c4'))).body.error.code).toBe('illegal_move');
+    expect((await move(a, id, 0, sq('e7e5'))).body.error.code).toBe('not_your_piece');
+    expect((await move(a, id, 0, sq('e4e5'))).body.error.code).toBe('not_your_piece');
+    expect((await move(a, id, 0, sq('e2e4q'))).body.error.code).toBe('bad_promotion');
+    expect((await move(a, id, 0, { from: 'z9', to: 'e4' })).status).toBe(400);
+    expect((await move(a, id, 0, { from: 'e2', to: 'e4', promotion: 'k' })).status).toBe(400);
+    expect((await move(a, id, 0, { column: 3 })).body.error.code).toBe('wrong_move');
+    const ok = await move(a, id, 0, sq('e2e4'));
+    expect(ok.status).toBe(200);
+    expect(ok.body.game).toMatchObject({ moveNumber: 1, turnId: b.id });
+    expect(ok.body.game.state).toMatchObject({ side: 'b', ep: 'e3', san: ['e4'], last: { from: 'e2', to: 'e4', piece: 'p' } });
+    expect((await db().query(`SELECT count(*)::int AS n FROM chat_game_moves WHERE game_id = $1`, [id])).rows[0].n).toBe(1);
+  });
+
+  it('a double tap plays once, and two moves for the same board: one goes through', async () => {
+    const { a, b, id } = await chess();
+    const tap = randomUUID();
+    expect((await move(a, id, 0, sq('d2d4'), tap)).status).toBe(200);
+    const again = await move(a, id, 0, sq('d2d4'), tap);
+    expect(again.body).toMatchObject({ duplicate: true, game: { moveNumber: 1 } });
+    const [x, y] = await Promise.all([move(b, id, 1, sq('d7d5')), move(b, id, 1, sq('g8f6'))]);
+    expect([x.status, y.status].sort()).toEqual([200, 409]);
+    expect((await move(a, id, 1, sq('c2c4'))).body.error.code).toBe('game_moved_on');
+    const board = (await as(t.app, a).get(`/v1/games/${id}`)).body.game;
+    expect(board.moveNumber).toBe(2);
+    expect(board.state.san).toHaveLength(2);
+  });
+
+  it('checkmate ends the game with the winner’s line in the chat', async () => {
+    const { a, b, convo, id } = await chess();
+    const liveA = connect(a);
+    const done = await playAll(id, [
+      [a, sq('f2f3')],
+      [b, sq('e7e5')],
+      [a, sq('g2g4')],
+      [b, sq('d8h4')],
+    ]);
+    expect(done).toMatchObject({ status: 'won', winnerId: b.id, turnId: null });
+    expect(done.state.san).toEqual(['f3', 'e5', 'g4', 'Qh4#']);
+    expect(done.state.result).toEqual({ type: 'win', winner: 1, by: 'play' });
+    expect(done.tally).toEqual([
+      { userId: a.id, wins: 0 },
+      { userId: b.id, wins: 1 },
+    ]);
+    const line = liveA.of('message.created').find((e) => e.data.system?.type === 'game');
+    expect(line!.data.system).toEqual({ type: 'game', gameId: id, kind: 'chess', outcome: 'won', by: 'play' });
+    expect(line!.data.sender.id).toBe(b.id);
+    expect((await move(a, id, 4, sq('a2a3'))).body.error.code).toBe('game_over');
+    expect((await messages(a, convo)).some((x) => x.system?.type === 'game' && x.system.kind === 'chess')).toBe(true);
+    liveA.remove();
+  });
+
+  it('promotion: the pawn needs a choice, and becomes that piece', async () => {
+    const { a, id } = await chess();
+    await setPosition(id, '8/4P1k1/8/8/8/8/8/4K3 w - - 0 1');
+    expect((await move(a, id, 0, sq('e7e8'))).body.error.code).toBe('promotion_needed');
+    const r = await move(a, id, 0, sq('e7e8n'));
+    expect(r.status).toBe(200);
+    expect(r.body.game.state.board.startsWith('4N3')).toBe(true);
+    expect(r.body.game.state.san).toEqual(['e8=N+']);
+  });
+
+  it('stalemate and the other draw rules end the game as a draw, with the reason in the line', async () => {
+    const stale = await chess();
+    await setPosition(stale.id, '7k/8/6K1/8/8/8/8/5Q2 w - - 0 1');
+    const s = await move(stale.a, stale.id, 0, sq('f1f7'));
+    expect(s.body.game).toMatchObject({ status: 'draw', winnerId: null });
+    expect(s.body.game.state.result).toEqual({ type: 'draw', reason: 'stalemate' });
+    const line = (await messages(stale.b, stale.convo)).find((x) => x.system?.type === 'game');
+    expect(line.system).toMatchObject({ outcome: 'draw', reason: 'stalemate' });
+
+    const bare = await chess();
+    await setPosition(bare.id, 'k7/8/8/8/8/8/1q6/K7 w - - 0 1');
+    expect((await move(bare.a, bare.id, 0, sq('a1b2'))).body.game.state.result).toEqual({ type: 'draw', reason: 'material' });
+
+    const fifty = await chess();
+    await setPosition(fifty.id, '7k/8/8/8/8/8/8/R5K1 w - - 99 80');
+    expect((await move(fifty.a, fifty.id, 0, sq('a1a2'))).body.game.state.result).toEqual({ type: 'draw', reason: 'fifty_moves' });
+
+    const rep = await chess();
+    const shuffle: [TestUser, Record<string, unknown>][] = [
+      [rep.a, sq('g1f3')],
+      [rep.b, sq('g8f6')],
+      [rep.a, sq('f3g1')],
+      [rep.b, sq('f6g8')],
+    ];
+    await playAll(rep.id, shuffle);
+    const repeated = await playAll(rep.id, shuffle);
+    expect(repeated).toMatchObject({ status: 'draw' });
+    expect(repeated.state.result).toEqual({ type: 'draw', reason: 'repetition' });
+  });
+
+  it('draw offers: offer, decline, offer again later, lapse, accept', async () => {
+    const { a, b, convo, id } = await chess();
+    const liveB = connect(b);
+    const offered = await draw(a, id, 'offer');
+    expect(offered.status).toBe(200);
+    expect(offered.body.game).toMatchObject({ moveNumber: 1, status: 'active', turnId: a.id });
+    expect(offered.body.game.state.drawOffer).toEqual({ seat: 0, at: 0 });
+    expect(liveB.of('game.updated').at(-1)!.data.game.state.drawOffer).toEqual({ seat: 0, at: 0 });
+    // A move sent for the board before the offer is refused: load it again.
+    expect((await move(a, id, 0, sq('e2e4'))).body.error.code).toBe('game_moved_on');
+
+    expect((await draw(a, id, 'accept')).body.error.code).toBe('no_draw_offer');
+    expect((await draw(b, id, 'offer')).body.error.code).toBe('draw_offered');
+    const declined = await draw(b, id, 'decline');
+    expect(declined.body.game.state.drawOffer).toBeNull();
+    expect((await draw(a, id, 'offer')).body.error.code).toBe('draw_too_soon');
+    expect((await draw(b, id, 'decline')).body.error.code).toBe('no_draw_offer');
+    expect((await as(t.app, a).post(`/v1/games/${id}/draw`, { action: 'maybe' })).status).toBe(400);
+
+    await playAll(id, [
+      [a, sq('e2e4')],
+      [b, sq('e7e5')],
+    ]);
+    // b offers on a's turn; a's move doesn't answer it, and b's next move lets it lapse.
+    await draw(b, id, 'offer');
+    let g = await playAll(id, [[a, sq('g1f3')]]);
+    expect(g.state.drawOffer).toMatchObject({ seat: 1 });
+    g = await playAll(id, [[b, sq('b8c6')]]);
+    expect(g.state.drawOffer).toBeNull();
+    expect((await draw(a, id, 'accept')).body.error.code).toBe('no_draw_offer');
+
+    await draw(a, id, 'offer');
+    const accepted = await draw(b, id, 'accept');
+    expect(accepted.body.game).toMatchObject({ status: 'draw', winnerId: null, turnId: null });
+    expect(accepted.body.game.state.result).toEqual({ type: 'draw', reason: 'agreed' });
+    const line = (await messages(a, convo)).find((x) => x.system?.type === 'game');
+    expect(line.system).toMatchObject({ kind: 'chess', outcome: 'draw', reason: 'agreed' });
+    expect(line.sender.id).toBe(b.id);
+    const logged = await db().query(`SELECT move->>'draw' AS draw FROM chat_game_moves WHERE game_id = $1 AND move->>'draw' IS NOT NULL ORDER BY number`, [id]);
+    expect(logged.rows.map((r) => r.draw)).toEqual(['offer', 'decline', 'offer', 'offer', 'accept']);
+    expect((await draw(a, id, 'offer')).body.error.code).toBe('game_over');
+    liveB.remove();
+  });
+
+  it('only chess has draw offers, only players make them, and blocks stop them', async () => {
+    const [a, b, c] = [await adult(), await adult(), await adult()];
+    const convo = await group(a, [b, c]);
+    const noughts = await started(a, convo, 'noughts', [b.id]);
+    expect((await draw(a, noughts.game.id, 'offer')).body.error.code).toBe('wrong_move');
+    const game = await started(a, convo, 'chess', [b.id]);
+    expect((await draw(c, game.game.id, 'offer')).body.error.code).toBe('not_a_player');
+
+    const duel = await chess();
+    expect((await as(t.app, duel.b).post(`/v1/users/${duel.a.id}/block`)).status).toBeLessThan(300);
+    expect((await draw(duel.a, duel.id, 'offer')).status).toBe(403);
+    expect((await move(duel.a, duel.id, 0, sq('e2e4'))).status).toBe(403);
+  });
+
+  it('resigning: the other player wins, and a rematch swaps colours', async () => {
+    const { a, b, convo, id } = await chess('black');
+    await playAll(id, [[b, sq('e2e4')]]);
+    const r = await as(t.app, a).post(`/v1/games/${id}/forfeit`);
+    expect(r.body.game).toMatchObject({ status: 'won', winnerId: b.id });
+    expect(r.body.game.state.result).toEqual({ type: 'win', winner: 1, by: 'forfeit' });
+    const line = (await messages(b, convo)).find((x) => x.system?.type === 'game');
+    expect(line.system).toMatchObject({ kind: 'chess', outcome: 'won', by: 'forfeit' });
+
+    // a played black; in the rematch a plays white, and moves first.
+    const re = await as(t.app, b).post(`/v1/games/${id}/rematch`);
+    expect(re.status).toBe(201);
+    const next = re.body.message.game;
+    expect(next.players.map((p: any) => p.id)).toEqual([b.id, a.id]);
+    expect(next.state.white).toBe(1);
+    expect(next.turnId).toBe(a.id);
+    expect(next.state.san).toEqual([]);
+  });
+
+  it('someone who left the group can’t move or offer a draw', async () => {
+    const [a, b, c] = [await adult(), await adult(), await adult()];
+    const convo = await group(a, [b, c]);
+    const { game } = await started(a, convo, 'chess', [b.id]);
+    await move(a, game.id, 0, sq('e2e4'));
+    await as(t.app, b).post(`/v1/conversations/${convo}/leave`);
+    expect((await move(b, game.id, 1, sq('e7e5'))).status).toBe(404);
+    expect((await draw(b, game.id, 'offer')).status).toBe(404);
   });
 });

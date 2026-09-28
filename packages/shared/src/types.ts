@@ -6,7 +6,7 @@ import type { ReelHighlight } from './reels.ts';
 import type { ProfileStyle, ProfileTab } from './profile-style.ts';
 import type { ChatTheme } from './chat-theme.ts';
 import type { ProfileAskBox, QuotedQuestion } from './ask.ts';
-import type { GameKind, GameState } from './games/types.ts';
+import type { DrawReason, GameKind, GameState } from './games/types.ts';
 import type { MixCard } from './mixes.ts';
 import type { CoverRecipe } from './cover.ts';
 import type {
@@ -550,14 +550,16 @@ export type MessageSystemInfo =
     }
   | {
       /**
-       * A game in the chat ended. 'won': the sender won ("Ada won Four up"), by playing or because
-       * the others forfeited. 'draw' and 'unfinished' (a day without a move): the sender made the last move.
+       * A game in the chat ended. 'won': the sender won ("Ada won Four up"), by playing (in chess,
+       * checkmate) or because the others forfeited (in chess, resigned). 'draw' and 'unfinished' (a day
+       * without a move): the sender made the last move. A chess draw says why.
        */
       type: 'game';
       gameId: string;
       kind: GameKind;
       outcome: 'won' | 'draw' | 'unfinished';
       by?: 'play' | 'forfeit';
+      reason?: DrawReason;
     }
   | {
       /**
@@ -625,7 +627,7 @@ export interface ChatList {
 }
 
 /**
- * A game in a chat (Four up, Noughts or Word ladder), as everyone in the chat sees it. It shows as a
+ * A game in a chat (Four up, Noughts, Word ladder or Chess), as everyone in the chat sees it. It shows as a
  * message whose card opens the board. `state` is the board as the shared rules in
  * packages/shared/src/games describe it; players sit in `players` order (seat 0 started it).
  */
