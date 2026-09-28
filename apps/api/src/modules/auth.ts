@@ -41,7 +41,7 @@ const authLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } };
 
 export async function loadMe(ctx: AppContext, userId: string): Promise<Me> {
   const { rows } = await ctx.db.query(
-    `SELECT u.id, u.email, u.email_verified_at, (u.birth_date IS NULL) AS no_birth_date, u.phone_e164, u.phone_verified_at, u.restricted_at, u.role, u.onboarded_at, pr.username, pr.display_name, pr.avatar_url, pr.mode, pr.locale, pr.country, pr.plus_until,
+    `SELECT u.id, u.email, u.email_verified_at, (u.birth_date IS NULL) AS no_birth_date, coalesce(u.birth_date > current_date - interval '18 years', false) AS under18, u.phone_e164, u.phone_verified_at, u.restricted_at, u.role, u.onboarded_at, pr.username, pr.display_name, pr.avatar_url, pr.mode, pr.locale, pr.country, pr.plus_until,
             coalesce(up.data_saver, 'auto') AS data_saver, coalesce(up.languages, '{}') AS languages, coalesce(up.auto_translate, false) AS auto_translate
      FROM users u JOIN profiles pr ON pr.user_id = u.id LEFT JOIN user_preferences up ON up.user_id = u.id WHERE u.id = $1`,
     [userId],
@@ -57,6 +57,7 @@ export async function loadMe(ctx: AppContext, userId: string): Promise<Me> {
     needsVerification: ctx.config.REQUIRE_VERIFICATION && !r.email_verified_at && !r.phone_verified_at,
     ...(r.restricted_at ? { limited: true } : {}),
     ...(r.no_birth_date ? { needsBirthDate: true } : {}),
+    ...(r.under18 ? { under18: true } : {}),
     role: r.role,
     onboarded: !!r.onboarded_at,
     username: r.username,

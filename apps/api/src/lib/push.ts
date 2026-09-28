@@ -113,6 +113,8 @@ const TEXT: Record<string, (actor: string, data: Record<string, unknown>) => str
   media_restored: () => 'Your photo or video is back up after review',
   account_limited: () => 'Your account is limited while our team reviews some recent activity',
   account_review: () => 'Our team finished reviewing your account',
+  // What happened is in the app, in the reader's language; the push only says there's an answer.
+  report_outcome: () => 'We finished reviewing something you reported',
   chapter_invite: (a) => `${a} invited you to add stories to a chapter`,
   // Posts added to a shared board are batched in the inbox and never pushed.
   board_invite: (a) => `${a} invited you to add to a board`,

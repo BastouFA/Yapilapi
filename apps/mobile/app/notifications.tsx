@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, RefreshControl, SectionList, Text, View } from 'react-native';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import type { NotificationItem, PublicUser } from '../../../packages/shared/src/types';
+import { reportOutcomeText } from '../../../packages/shared/src/report-outcome';
 import { togetherNoticeText } from '../../../packages/shared/src/together';
 import { client, errorMessage } from '../lib/api';
 import { SectionHeader } from '../lib/chips';
@@ -139,6 +140,9 @@ function describe(g: Group, tr: Translator): string {
   if (n.type === 'board_item_added' && n.actor) return tp('m.notif.boardItemAdded', Math.max(1, Number(n.data.count) || 1), { name, board: title });
   if (n.type === 'plus_referral_reward') return tp('m.notif.plusReward', Number(n.data.days ?? 30));
   if (n.type === 'account_review') return n.data.outcome === 'cleared' ? t('m.notif.reviewCleared') : t('m.notif.reviewLimited');
+  // What happened to something you reported, in plain words.
+  const report = reportOutcomeText(n, t);
+  if (report) return report;
   // A question asked without a name has no actor: it never says who.
   if (n.type === 'question_received') return n.actor ? t('ask.notif.received', { name }) : t('ask.notif.receivedHidden');
   if (n.type === 'question_answered') return t('ask.notif.answered', { name });

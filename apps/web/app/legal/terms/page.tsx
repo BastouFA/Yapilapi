@@ -90,8 +90,9 @@ export default async function TermsPage() {
       <p>
         We use automated tools and people to find content and behaviour that break these terms. We may remove or restrict content, hold it for review, withhold
         it in a country where the law requires it, limit features, or suspend or end accounts. When we act on your content or account we tell you why, in the
-        app, and you can appeal each decision once from Settings; a moderator reviews every appeal. We may also report content to the authorities where the law
-        requires it, for example child sexual abuse material.
+        app, and you can appeal each decision once from Settings; a different moderator from the one who decided reviews every appeal. When you report
+        something, we tell you what happened to it. We may also report content to the authorities where the law requires it, for example child sexual abuse
+        material.
       </p>
 
       <h2>6. AI features</h2>

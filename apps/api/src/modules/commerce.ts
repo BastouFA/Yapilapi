@@ -12,7 +12,8 @@ import { refundUnspentBudget } from '../lib/ad-refunds.ts';
 import { submitBoostForReview } from '../lib/boosts.ts';
 import { assertAdultForMoney, publicUserFrom } from '../lib/users.ts';
 import { EVENT_SELECT, toEvent } from './events.ts';
-import { eventVisibleSql } from '../lib/visibility.ts';
+import { eventVisibleSql, liveVisibleSql } from '../lib/visibility.ts';
+import { liveChatAudience } from '../lib/live.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
 import { grantPlus } from '../lib/plus.ts';
 import { refundOrder, startPayment } from '../lib/checkout.ts';
@@ -23,7 +24,7 @@ const idParam = z.object({ id: z.string().uuid() });
 const PLATFORM_FEE_BPS = 500; // 5%
 
 export default async function commerceModule(app: FastifyInstance, ctx: AppContext) {
-  /** A paid tip sent during a live shows up in that live's chat as a gift, for everyone watching. */
+  /** A paid tip sent during a live shows up in that live's chat as a gift, for everyone watching (minor safety as for chat). */
   async function announceLiveGift(c: { query: typeof ctx.db.query }, orderId: string) {
     const t = (
       await c.query(
@@ -43,7 +44,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
         [t.from_id],
       )
     ).rows[0];
-    const audience = (await c.query(`SELECT user_id FROM live_participants WHERE session_id = $1 AND left_at IS NULL`, [t.live_id])).rows.map((r) => r.user_id);
+    const audience = await liveChatAudience(c, t.live_id, t.from_id);
     const message = {
       id: rows[0].id,
       kind: 'gift',
@@ -330,7 +331,13 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       if (input.items.some((i) => products.find((p) => p.id === i.productId)!.kind === 'digital' && i.quantity !== 1))
         throw badRequest('Buy one of each download.');
       if (input.liveSessionId) {
-        const live = (await c.query(`SELECT ticket_product_id FROM live_sessions WHERE id = $1 AND status <> 'ended'`, [input.liveSessionId])).rows[0];
+        // Only for a live the buyer may see (a live hosted by someone under 18 is for their friends).
+        const live = (
+          await c.query(`SELECT l.ticket_product_id FROM live_sessions l WHERE l.id = $2 AND l.status <> 'ended' AND ${liveVisibleSql('$1')}`, [
+            u.id,
+            input.liveSessionId,
+          ])
+        ).rows[0];
         if (!live?.ticket_product_id || !ids.includes(live.ticket_product_id)) throw badRequest("That isn't the ticket for this live.");
       }
       // Sellers must be adults; a listing made before that rule can't be bought from someone younger.

@@ -33,6 +33,8 @@ const schema = z.object({
   /** Paystack (optional): takes NGN, GHS, KES and ZAR payments (cards and mobile money). Other currencies stay with PAYMENTS_PROVIDER. */
   PAYSTACK_SECRET_KEY: z.string().default(''),
   PAYSTACK_PUBLIC_KEY: z.string().default(''),
+  /** How many years payment, refund and payout records are kept (the legal accounting period). See RETENTION in lib/retention.ts. */
+  FINANCIAL_RECORDS_YEARS: z.coerce.number().int().min(1).max(30).default(7),
   /** Where digital products are stored on disk with the local storage driver. Never served as public media. */
   PRIVATE_UPLOAD_DIR: z.string().default('./uploads-private'),
   /** YAPILAPI Plus: the price of one month (30 days), in hundredths of PLUS_CURRENCY. */

@@ -35,3 +35,4 @@ export * from './store-purchases.ts';
 export * from './mixes.ts';
 export * from './mix-schemas.ts';
 export * from './cover.ts';
+export * from './report-outcome.ts';

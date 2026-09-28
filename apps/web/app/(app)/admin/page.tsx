@@ -98,7 +98,10 @@ function Moderation() {
             title={c.target_type === 'ad_campaign' ? `Ad review · ${c.signals?.name ?? 'campaign'}` : `${c.target_type} · ${c.risk}`}
             subtitle={`${c.source} · @${c.subject_username ?? 'unknown'} · ${formatRelativeTime(c.created_at, locale)}`}
             footer={
-              ['open', 'appealed'].includes(c.status) && c.target_type === 'ad_campaign' ? (
+              c.needs_other_reviewer ? (
+                // The server refuses it too: whoever made the decision can't decide its appeal.
+                <span className="muted">Needs another reviewer</span>
+              ) : ['open', 'appealed'].includes(c.status) && c.target_type === 'ad_campaign' ? (
                 <AdDecision onDecide={(approve, note) => decide(c.id, approve ? 'approve_ad' : 'reject_ad', note)} />
               ) : ['open', 'appealed'].includes(c.status) ? (
                 <>
@@ -123,6 +126,17 @@ function Moderation() {
             }
           >
             {c.risk === 'escalate' ? <Alert tone="danger">Escalated: review first.</Alert> : null}
+            {c.needs_other_reviewer ? (
+              <Alert tone="info" title="Needs another reviewer">
+                You made the decision being appealed ({String(c.decision).replace('_', ' ')}), so another moderator reviews this appeal. It waits until someone
+                else does.
+              </Alert>
+            ) : null}
+            {c.appeal_statement ? (
+              <p style={{ whiteSpace: 'pre-wrap' }}>
+                <strong>Appeal{c.status === 'appealed' ? ` against “${String(c.decision).replace('_', ' ')}”` : ''}:</strong> {c.appeal_statement}
+              </p>
+            ) : null}
             {c.media ? <CaseMedia media={c.media} /> : <p style={{ whiteSpace: 'pre-wrap' }}>{c.excerpt ?? '(no text preview)'}</p>}
             <code style={{ fontSize: 12 }}>{JSON.stringify(c.signals)}</code>
           </Card>

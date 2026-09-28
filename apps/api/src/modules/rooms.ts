@@ -6,7 +6,7 @@ import { AppError, badRequest, forbidden, notFound, parse } from '../lib/errors.
 import type { AppContext } from '../lib/context.ts';
 import { communityRooms, endRoom, notePeak, publishRoomState, roomDetail, roomStageRuleSql, roomSummary, type RoomsDeps } from '../lib/rooms.ts';
 import { audit, notify, track } from '../lib/services.ts';
-import { isBlockedEitherWay } from '../lib/users.ts';
+import { ageOf, isBlockedEitherWay } from '../lib/users.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -16,6 +16,17 @@ const roomFull = (what: 'listeners' | 'speakers') =>
   new AppError(409, 'room_full', what === 'listeners' ? 'Room is full.' : 'Room is full: every speaker spot is taken.');
 const notInRoom = () => new AppError(409, 'not_in_room', "You're not in this room. Join it again to listen.");
 const roomOver = () => new AppError(409, 'room_ended', 'This room has ended.');
+const minorStarts = () =>
+  new AppError(
+    403,
+    'minor_protection',
+    'To keep younger people safe, rooms are started by people 18 or older. A host who is your friend can invite you to speak.',
+  );
+/** Under 18 (by the signed-in person's birth date). Unknown ages count as adult, as for messages. */
+const isMinor = (birthDate: Date | null) => {
+  const age = ageOf(birthDate);
+  return age !== null && age < 18;
+};
 
 /**
  * Live audio rooms in communities.
@@ -35,6 +46,9 @@ const roomOver = () => new AppError(409, 'room_ended', 'This room has ended.');
  *   Listeners raise a hand; a host invites them to speak, and they accept.
  *   An adult can't invite someone under 18 (or the reverse) unless they are
  *   friends or linked through family, as for messages. Blocks apply too.
+ * - A room is heard by every member of the community, so people under 18
+ *   don't start or host rooms, even as moderators of the community: like any
+ *   listener, they speak when a host invites them (under the same rule).
  * - Hosts mute speakers, move them back to listening, or remove someone;
  *   removed people can't rejoin that room.
  * - Signaling is relayed only between two people in the same live room whom
@@ -147,7 +161,11 @@ export default async function roomsModule(app: FastifyInstance, ctx: AppContext)
     const c = await communityBySlug(slug, viewer);
     const member = c.my_status === 'active';
     if (c.visibility === 'private' && !member) return { items: [], canStart: false, locked: true };
-    return { items: await communityRooms(deps, c.id, viewer), canStart: isModerator(c.my_role, c.my_status), limits: media.limits };
+    return {
+      items: await communityRooms(deps, c.id, viewer),
+      canStart: isModerator(c.my_role, c.my_status) && !isMinor(req.user?.birthDate ?? null),
+      limits: media.limits,
+    };
   });
 
   app.post('/v1/communities/:slug/rooms', { preHandler: requireAuth, config: { rateLimit: { max: 20, timeWindow: '1 hour' } } }, async (req, reply) => {
@@ -162,6 +180,7 @@ export default async function roomsModule(app: FastifyInstance, ctx: AppContext)
     );
     const c = await communityBySlug(slug, u.id);
     if (!isModerator(c.my_role, c.my_status)) throw forbidden('Only moderators and owners can start rooms.');
+    if (isMinor(u.birthDate)) throw minorStarts();
     let when: Date | null = null;
     if (input.scheduledFor) {
       when = new Date(input.scheduledFor);
@@ -205,7 +224,7 @@ export default async function roomsModule(app: FastifyInstance, ctx: AppContext)
     return {
       room,
       removed: !!r.removed_at,
-      canHost: r.created_by === u.id || isModerator(r.c_role, r.c_status),
+      canHost: (r.created_by === u.id || isModerator(r.c_role, r.c_status)) && !r.minor,
       media: inRoom ? media.session({ id: u.id, minor: r.minor }) : null,
     };
   });
@@ -215,6 +234,7 @@ export default async function roomsModule(app: FastifyInstance, ctx: AppContext)
     const { id } = parse(idParam, req.params);
     const r = await load(id, u.id);
     if (!(r.created_by === u.id && r.c_status === 'active') && !isModerator(r.c_role, r.c_status)) throw forbidden('Only hosts can start this room.');
+    if (r.minor) throw minorStarts();
     if (r.status !== 'scheduled') throw new AppError(409, 'conflict', r.status === 'live' ? 'This room is already live.' : 'This room is over.');
     await db.query(`UPDATE rooms SET status = 'live', started_at = now(), host_seen_at = now() WHERE id = $1 AND status = 'scheduled'`, [id]).catch((e) => {
       if (e.code === '23505') throw new AppError(409, 'room_in_progress', 'This community already has a live room.');
@@ -272,7 +292,8 @@ export default async function roomsModule(app: FastifyInstance, ctx: AppContext)
     if (before.status === 'scheduled') throw new AppError(409, 'room_not_started', "This room hasn't started yet.");
     if (before.status !== 'live') throw roomOver();
     if (before.removed_at) throw new AppError(403, 'removed_from_room', 'A host removed you from this room.');
-    const isHost = before.created_by === u.id || isModerator(before.c_role, before.c_status);
+    // People under 18 don't host rooms (see the rules above).
+    const isHost = (before.created_by === u.id || isModerator(before.c_role, before.c_status)) && !before.minor;
 
     const result = await tx(db, async (c) => {
       // One join at a time per room, so the limits hold.
@@ -286,7 +307,7 @@ export default async function roomsModule(app: FastifyInstance, ctx: AppContext)
       }
       // The person who started the room goes on stage when there's space.
       let role: 'speaker' | 'listener' = 'listener';
-      if (before.created_by === u.id && (await count(c, id, 'speaker')) < media.limits.speakers) role = 'speaker';
+      if (before.created_by === u.id && isHost && (await count(c, id, 'speaker')) < media.limits.speakers) role = 'speaker';
       if (role === 'listener' && (await count(c, id, 'listener')) >= media.limits.listeners) throw roomFull('listeners');
       // One room at a time.
       const left = await c.query<{ room_id: string }>(

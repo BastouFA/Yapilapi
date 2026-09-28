@@ -95,7 +95,8 @@ export default async function GuidelinesPage() {
         withhold it in a country where it is illegal, remove features such as live video or messaging, limit your account for a while, or end it. Serious harm,
         like child sexual abuse or credible threats, ends the account on the first time. Our software checks text as it is posted and can refuse it or hold it
         for a moderator; photos and videos can be checked automatically too. We tell you what we did and why, and you can appeal each decision once in Settings;
-        a moderator reviews every appeal.
+        a different moderator from the one who decided reviews every appeal. If you reported something, we tell you whether we removed it, took action or found
+        it didn't break these guidelines, but not what happened to the other person's account.
       </p>
 
       <h2>How to report</h2>

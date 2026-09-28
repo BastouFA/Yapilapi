@@ -127,3 +127,31 @@ export function eventVisibleSql(v: string): string {
 export function allowDownloadSql(pr = 'pr', au = 'au'): string {
   return `(coalesce(${pr}.allow_download, NOT ${pr}.is_private) AND NOT coalesce(${au}.birth_date > current_date - interval '18 years', false))`;
 }
+
+/**
+ * Lives aliased `l`: who may see a live, and so join it, chat in it, send a gift or buy a ticket.
+ * Blocks apply both ways, and the host always sees their own. An adult's live reaches its audience
+ * (everyone, followers or friends). A live hosted by someone under 18 follows the rule for
+ * messages: adults see it only when they are the host's friends or a guardian the teen accepted
+ * through a family link; other under-18s who follow the host see it unless it is for friends (a
+ * teen's account is private, so its followers are ones the teen approved). It is never shown to
+ * everyone. Unknown ages count as adult, as for messages.
+ */
+export function liveVisibleSql(v: string): string {
+  const minor = (x: string) => `coalesce((SELECT ux.birth_date > current_date - interval '18 years' FROM users ux WHERE ux.id = ${x}), false)`;
+  const follows = `EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${v} AND f.followee_id = l.host_id)`;
+  const friends = `EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = ${v} AND fr.user_b = l.host_id) OR (fr.user_b = ${v} AND fr.user_a = l.host_id))`;
+  return `(
+    ${notBlockedSql('l.host_id', v)} AND (
+      l.host_id = ${v}
+      OR (NOT ${minor('l.host_id')} AND (
+        l.visibility = 'public'
+        OR (l.visibility = 'followers' AND ${follows})
+        OR (l.visibility = 'friends' AND ${friends})))
+      OR (${minor('l.host_id')} AND (
+        ${friends}
+        OR EXISTS (SELECT 1 FROM family_links fl WHERE fl.status = 'active' AND fl.guardian_id = ${v} AND fl.teen_id = l.host_id)
+        OR (${minor(v)} AND l.visibility IN ('public', 'followers') AND ${follows})))
+    )
+  )`;
+}
