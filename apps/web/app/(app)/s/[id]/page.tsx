@@ -40,13 +40,18 @@ export default function StoryPage() {
   if (missing)
     return (
       <div className="yp-shell__inner">
-        <EmptyState title={t('m.stories.unavailable')} body={t('m.stories.unavailableBody')} action={<Link href="/home">{t('storyPage.goHome')}</Link>} />
+        <EmptyState
+          level={1}
+          title={t('m.stories.unavailable')}
+          body={t('m.stories.unavailableBody')}
+          action={<Link href="/home">{t('storyPage.goHome')}</Link>}
+        />
       </div>
     );
   if (!groups && loadError)
     return (
       <div className="yp-shell__inner">
-        <EmptyState title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />
+        <EmptyState level={1} title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />
       </div>
     );
   if (!groups) return <Skeleton height={320} />;

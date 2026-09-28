@@ -52,8 +52,8 @@ export default function MixPage() {
     if (e.type === 'mix.updated' && e.data.mixId === id) void load();
   });
 
-  if (missing) return <EmptyState title={t('mixes.missing.title')} body={t('mixes.missing.body')} />;
-  if (!mix && loadError) return <EmptyState title={loadError} action={<Button onClick={() => void load()}>{t('m.common.retry')}</Button>} />;
+  if (missing) return <EmptyState level={1} title={t('mixes.missing.title')} body={t('mixes.missing.body')} />;
+  if (!mix && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={() => void load()}>{t('m.common.retry')}</Button>} />;
   if (!mix) return <Skeleton height={200} />;
   const own = mix.role === 'owner';
 

@@ -16,6 +16,7 @@ export interface SeedData {
   username: string;
   userId: string;
   friendId: string;
+  thirdId: string;
   communitySlug: string;
   eventId: string;
   placeId: string;
@@ -43,6 +44,14 @@ export interface SeedData {
   myDropId: string;
   /** This week's wrap (made through the development-only hook). */
   wrapId: string | null;
+  /** Ben's Market listing, and one of yours. */
+  listingId: string;
+  myListingId: string;
+  /** Ben's class, where you hold a ticket; your own tasting, where Ben is checked in and Cleo isn't yet. */
+  ticketEventId: string;
+  hostEventId: string;
+  /** A Together album you started with Ben: three photos, one starred with a comment. */
+  togetherId: string;
 }
 
 async function must(p: Promise<APIResponse>) {
@@ -136,6 +145,11 @@ export default async function globalSetup(config: FullConfig) {
     throw new Error(
       'The MEMORY feature flag is off, so memories, chapters and recaps would only show "turned off". Turn it on in the audit database first ' +
         `(see docs/accessibility.md): INSERT INTO feature_flags (key, enabled) VALUES ('MEMORY', true) ON CONFLICT (key) DO UPDATE SET enabled = true`,
+    );
+  if (!flags.REAL_TOGETHER)
+    throw new Error(
+      'The REAL_TOGETHER feature flag is off, so Together albums would only show "turned off". Turn it on in the audit database first ' +
+        `(see docs/accessibility.md): INSERT INTO feature_flags (key, enabled) VALUES ('REAL_TOGETHER', true) ON CONFLICT (key) DO UPDATE SET enabled = true`,
     );
 
   const main = await signUp('main', 'Ada Access');
@@ -386,6 +400,92 @@ export default async function globalSetup(config: FullConfig) {
   for (const kind of ['four_up', 'noughts', 'word_ladder', 'chess'])
     await must(main.ctx.post(`/api/v1/conversations/${gamesChatId}/games`, { data: { kind, clientId: randomUUID() } }));
 
+  // Market: Ben's listing (you can write to him or make an offer) and one of yours. Each run's words
+  // differ (the run's code), or the same words posted again and again are held for review.
+  const lamp = await upload(friend.ctx, 'bread.jpg', 'image/jpeg', 'A brass desk lamp on a wooden table');
+  const listing = await must(
+    friend.ctx.post('/api/v1/market/listings', {
+      data: {
+        title: 'Brass desk lamp',
+        description: `Works well, warm light. The shade has a small dent. Ref ${run}.`,
+        category: 'home',
+        condition: 'good',
+        priceCents: 2500,
+        photos: [{ mediaId: lamp.id, altText: 'A brass desk lamp on a wooden table' }],
+        area: 'Alfama',
+        delivery: ['pickup', 'seller_delivers'],
+      },
+    }),
+  );
+  const chair = await upload(main.ctx, 'market.jpg', 'image/jpeg', 'A folding chair');
+  const myListing = await must(
+    main.ctx.post('/api/v1/market/listings', {
+      data: {
+        title: 'Folding chair',
+        description: `Sturdy, folds flat. Ref ${run}.`,
+        category: 'furniture',
+        condition: 'like_new',
+        priceCents: null,
+        photos: [{ mediaId: chair.id, altText: 'A folding chair' }],
+        area: 'Baixa',
+        delivery: ['pickup'],
+      },
+    }),
+  );
+
+  // Tickets: Ben's class, where you're going (so you hold a ticket), and your own tasting, where Ben
+  // is checked in and Cleo is still to come (the check-in screen).
+  const ticketEvent = await must(
+    friend.ctx.post('/api/v1/events', {
+      data: {
+        title: 'Bread class',
+        description: 'Shaping and baking a loaf.',
+        startsAt: new Date(Date.now() + 4 * 86_400_000).toISOString(),
+        placeId: place.place.id,
+        capacity: 12,
+      },
+    }),
+  );
+  await must(main.ctx.post(`/api/v1/events/${ticketEvent.event.id}/rsvp`, { data: { status: 'going' } }));
+  const hostEvent = await must(
+    main.ctx.post('/api/v1/events', {
+      data: { title: 'Jam tasting', description: 'Five jams, one loaf.', startsAt: new Date(Date.now() + 3_600_000).toISOString(), placeId: place.place.id },
+    }),
+  );
+  for (const u of [friend, third]) await must(u.ctx.post(`/api/v1/events/${hostEvent.event.id}/rsvp`, { data: { status: 'going' } }));
+  const guests = await must(main.ctx.get(`/api/v1/events/${hostEvent.event.id}/guests`));
+  const benTicket = (guests.items as { ticketId: string; userId: string }[]).find((g) => g.userId === friend.id);
+  if (benTicket) await must(main.ctx.post(`/api/v1/events/${hostEvent.event.id}/check-in`, { data: { ticketId: benTicket.ticketId, method: 'list' } }));
+
+  // Together: an album started from a group chat with Ben and Cleo (people from the chat it came
+  // from can be added), two of your photos (one starred, with a comment) and one of Ben's.
+  const trip = await must(main.ctx.post('/api/v1/conversations', { data: { memberIds: [friend.id, third.id], title: 'Lisbon crew' } }));
+  const album = await must(
+    main.ctx.post('/api/v1/together', {
+      data: { title: 'Lisbon trip', description: 'Everyone’s photos from the weekend.', closesAt: null, conversationId: trip.conversation.id },
+    }),
+  );
+  const togetherId = album.together.id as string;
+  const [river, loaf] = [
+    await upload(main.ctx, 'cover.jpg', 'image/jpeg', 'The river at dusk, pink and blue'),
+    await upload(main.ctx, 'bread.jpg', 'image/jpeg', 'A round sourdough loaf on a linen cloth'),
+  ];
+  const added = await must(
+    main.ctx.post(`/api/v1/together/${togetherId}/items`, {
+      data: {
+        items: [
+          { mediaId: river.id, caption: 'The river at dusk' },
+          { mediaId: loaf.id, caption: 'Breakfast' },
+        ],
+      },
+    }),
+  );
+  const stall = await upload(friend.ctx, 'market.jpg', 'image/jpeg', 'Peaches and plums piled on a market stall at sunset');
+  await must(friend.ctx.post(`/api/v1/together/${togetherId}/items`, { data: { items: [{ mediaId: stall.id, caption: 'Market stall' }] } }));
+  const firstItem = added.items[0].id as string;
+  await must(friend.ctx.put(`/api/v1/together/${togetherId}/items/${firstItem}/star`, { data: {} }));
+  await must(friend.ctx.post(`/api/v1/together/${togetherId}/items/${firstItem}/comments`, { data: { body: 'That light' } }));
+
   // This week's wrap, made now (development-only hook; normally it comes on Sunday evening).
   const wraps = await must(main.ctx.post('/api/dev/weekly-wrap', { data: {} }));
   const wrapId = (wraps.items[0]?.id as string | undefined) ?? null;
@@ -399,6 +499,7 @@ export default async function globalSetup(config: FullConfig) {
     username: main.username,
     userId: main.id,
     friendId: friend.id,
+    thirdId: third.id,
     communitySlug,
     eventId: event.event.id,
     placeId: place.place.id,
@@ -420,6 +521,11 @@ export default async function globalSetup(config: FullConfig) {
     dropId: drop.drop.id,
     myDropId: myDrop.drop.id,
     wrapId,
+    listingId: listing.listing.id,
+    myListingId: myListing.listing.id,
+    ticketEventId: ticketEvent.event.id,
+    hostEventId: hostEvent.event.id,
+    togetherId,
   };
   await writeFile(DATA, JSON.stringify(data, null, 2));
   for (const u of [main, friend, third]) await u.ctx.dispose();

@@ -67,8 +67,8 @@ export default function TagPage() {
 
   const load = useCallback((cursor?: string) => api.tags.posts(tag, sort, cursor), [tag, sort]);
 
-  if (missing) return <EmptyState title={t('tag.invalid.title')} body={t('tag.invalid.body')} />;
-  if (!info && loadError) return <EmptyState title={loadError} action={<Button onClick={loadInfo}>{t('m.common.retry')}</Button>} />;
+  if (missing) return <EmptyState level={1} title={t('tag.invalid.title')} body={t('tag.invalid.body')} />;
+  if (!info && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={loadInfo}>{t('m.common.retry')}</Button>} />;
 
   return (
     <div className="yp-shell__inner stack">

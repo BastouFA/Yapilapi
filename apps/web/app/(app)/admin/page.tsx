@@ -35,7 +35,7 @@ const CASE_STATUS: Record<string, MessageKey> = {
 export default function Admin() {
   const { me, t } = useSession();
   const [tab, setTab] = useState('moderation');
-  if (me?.role === 'user') return <EmptyState title={t('admin.only')} body={t('admin.onlyBody')} />;
+  if (me?.role === 'user') return <EmptyState level={1} title={t('admin.only')} body={t('admin.onlyBody')} />;
   return (
     <div className="yp-shell__inner yp-shell__inner--wide">
       <div className="yp-topbar">

@@ -44,8 +44,8 @@ export default function EventPageClient({ isPublic }: { isPublic: boolean }) {
   }, [load, signedOut, isPublic]);
 
   if (signedOut && !isPublic) return <NeedsAccount title={t('eventPage.signIn.title')} body={t('eventPage.signIn.body')} />;
-  if (missing) return <EmptyState title={t('m.event.notFound')} body={t('eventPage.notFoundBody')} />;
-  if (!ev && loadError) return <EmptyState title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />;
+  if (missing) return <EmptyState level={1} title={t('m.event.notFound')} body={t('eventPage.notFoundBody')} />;
+  if (!ev && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />;
   if (!ev) return <Skeleton height={240} />;
 
   const tz = safeTimeZone(ev.timezone);

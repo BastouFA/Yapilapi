@@ -86,6 +86,7 @@ export function NeedsAccount({ title, body }: { title: string; body: string }) {
   return (
     <div className="yp-shell__inner">
       <EmptyState
+        level={1}
         title={title}
         body={body}
         action={

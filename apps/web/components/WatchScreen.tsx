@@ -781,6 +781,7 @@ export function WatchScreen({ id }: { id: string }) {
     return (
       <div className="yp-shell__inner watch-page">
         <EmptyState
+          level={1}
           title={t('watch.ended')}
           action={
             <Link href={session ? `/inbox/${session.conversationId}` : '/inbox'} className="yp-btn yp-btn--primary">
@@ -795,6 +796,7 @@ export function WatchScreen({ id }: { id: string }) {
     return (
       <div className="yp-shell__inner watch-page">
         <EmptyState
+          level={1}
           title={t('watch.loadFailed')}
           action={
             <div className="row" style={{ justifyContent: 'center' }}>

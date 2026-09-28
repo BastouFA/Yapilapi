@@ -492,3 +492,90 @@ test('chat: the chess board with the keyboard', async ({ page }) => {
   await expect(sheet).toBeHidden();
   await expect(opener).toBeFocused();
 });
+
+test('post: why am I seeing this, from the post menu', async ({ page }) => {
+  await page.goto('/home');
+  await page.waitForLoadState('networkidle');
+  const options = page.getByRole('button', { name: 'Post options' }).first();
+  await options.focus();
+  await page.keyboard.press('Enter');
+  await tabUntil(page, isFocused(page.getByRole('menuitem', { name: 'Why am I seeing this?' })), 14, 'ArrowDown');
+  await page.keyboard.press('Enter');
+  await sheetRoundTrip(page, 'Why am I seeing this?', options);
+});
+
+test('market: the offer sheet', async ({ page }) => {
+  const { listingId } = seed();
+  await page.goto(`/market/${listingId}`);
+  await page.waitForLoadState('networkidle');
+  const offer = page.getByRole('button', { name: 'Make an offer' });
+  await tabUntil(page, isFocused(offer));
+  await page.keyboard.press('Enter');
+  await sheetRoundTrip(page, 'Make an offer', offer);
+});
+
+test('tickets: give a ticket to a friend', async ({ page }) => {
+  await page.goto('/tickets');
+  await page.waitForLoadState('networkidle');
+  const give = page.getByRole('button', { name: 'Give to a friend' }).first();
+  await tabUntil(page, isFocused(give));
+  await page.keyboard.press('Enter');
+  await sheetRoundTrip(page, 'Give this ticket to a friend', give);
+});
+
+test('together: the photo viewer and the people sheet', async ({ page }) => {
+  const { togetherId } = seed();
+  await page.goto(`/together/${togetherId}`);
+  await page.waitForLoadState('networkidle');
+  // The viewer: focus moves in and stays in, Escape closes it and focus returns to the photo.
+  const tile = page.getByRole('button', { name: /^Photo by/ }).first();
+  await tabUntil(page, isFocused(tile));
+  await page.keyboard.press('Enter');
+  const viewer = page.getByRole('dialog', { name: /^Photos and videos in/ });
+  await expect(viewer).toBeVisible();
+  await expect.poll(() => focusInside(page, '[role="dialog"]'), { message: 'focus should move into the viewer' }).toBe(true);
+  await auditOpen(page, '[role="dialog"]');
+  await tabStaysInside(page, '[role="dialog"]');
+  await page.keyboard.press('Escape');
+  await expect(viewer).toBeHidden();
+  await expect(tile).toBeFocused();
+
+  // The people sheet, from the line under the title.
+  const people = page.getByRole('button', { name: /people/ }).first();
+  await people.focus();
+  await page.keyboard.press('Enter');
+  await sheetRoundTrip(page, 'People', people);
+});
+
+test('chat: the call screen keeps focus, and Escape does not hang up', async ({ page }) => {
+  const d = seed();
+  // A silent tone stands in for the microphone.
+  await page.addInitScript(() => {
+    navigator.mediaDevices.getUserMedia = async () => {
+      const audio = new AudioContext();
+      const out = audio.createMediaStreamDestination();
+      audio.createOscillator().connect(out);
+      return out.stream;
+    };
+  });
+  // A new group each time: a chat has one call at a time.
+  const group = await page.request.post('/api/v1/conversations', { data: { memberIds: [d.friendId, d.thirdId], title: 'Call crew' } });
+  expect(group.ok(), await group.text()).toBe(true);
+  const { conversation } = await group.json();
+  await page.goto(`/inbox/${conversation.id}`);
+  await page.waitForLoadState('networkidle');
+  const start = page.getByRole('button', { name: 'Audio call' });
+  await start.focus();
+  await page.keyboard.press('Enter');
+  const call = page.getByRole('dialog', { name: 'Call' });
+  await expect(call).toBeVisible();
+  await expect.poll(() => focusInside(page, '.call'), { message: 'focus should move into the call screen' }).toBe(true);
+  await tabStaysInside(page, '.call', 6);
+  // By design, Escape doesn't end a call.
+  await page.keyboard.press('Escape');
+  await expect(call).toBeVisible();
+  await tabUntil(page, isFocused(call.getByRole('button', { name: 'Hang up' })), 6);
+  await page.keyboard.press('Enter');
+  await expect(call).toBeHidden();
+  await expect(start).toBeFocused();
+});

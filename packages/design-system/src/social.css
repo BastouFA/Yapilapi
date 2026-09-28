@@ -610,10 +610,13 @@ a.yp-aside-row:hover {
   }
 }
 .yp-topbar h1 {
+  min-width: 0;
   margin: 0;
   font: 800 30px/34px var(--font-display);
   letter-spacing: -0.03em;
   text-wrap: balance;
+  /* A title with a long @handle or name in it breaks rather than pushing a phone screen sideways. */
+  overflow-wrap: anywhere;
 }
 
 /* ── Segmented control (feed modes) ───────────────────────────────────── */
@@ -1716,7 +1719,7 @@ a.yp-ecard:hover {
   transform: rotate(-8deg);
   box-shadow: 14px 10px 0 -4px color-mix(in oklab, var(--saffron) 40%, transparent);
 }
-.yp-empty h2 {
+.yp-empty__title {
   margin: 0;
   font: 800 20px/26px var(--font-display);
   color: var(--ink);

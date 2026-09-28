@@ -31,6 +31,7 @@ export default function Studio() {
     return (
       <div className="yp-shell__inner">
         <EmptyState
+          level={1}
           title={t('error.generic')}
           body={failed}
           action={

@@ -597,6 +597,7 @@ export default function TogetherPage() {
     return (
       <div className="yp-shell__inner">
         <EmptyState
+          level={1}
           title={t('together.missing')}
           body={t('together.missingBody')}
           action={
@@ -610,7 +611,7 @@ export default function TogetherPage() {
   if (!album && loadError)
     return (
       <div className="yp-shell__inner">
-        <EmptyState title={loadError} action={<Button onClick={() => void load()}>{t('m.common.retry')}</Button>} />
+        <EmptyState level={1} title={loadError} action={<Button onClick={() => void load()}>{t('m.common.retry')}</Button>} />
       </div>
     );
   if (!album)

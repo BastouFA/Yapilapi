@@ -24,8 +24,8 @@ export default function BusinessPage() {
   useEffect(() => {
     load();
   }, [load]);
-  if (missing) return <EmptyState title={t('bizPage.notFound')} />;
-  if (!data && loadError) return <EmptyState title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />;
+  if (missing) return <EmptyState level={1} title={t('bizPage.notFound')} />;
+  if (!data && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />;
   if (!data) return <Skeleton height={240} />;
   const { business, places, products } = data;
   const [runBefore, runAfter = ''] = t('bizPage.runBy').split('{name}');

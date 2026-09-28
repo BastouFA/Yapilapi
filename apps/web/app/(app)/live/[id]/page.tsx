@@ -106,8 +106,8 @@ export default function LivePage() {
     }
   });
 
-  if (missing) return <EmptyState title={t('m.live.missing')} />;
-  if (!live && loadError) return <EmptyState title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />;
+  if (missing) return <EmptyState level={1} title={t('m.live.missing')} />;
+  if (!live && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />;
   if (!live) return <Skeleton height={320} />;
 
   return (

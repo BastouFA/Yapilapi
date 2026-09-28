@@ -38,13 +38,13 @@ export default function JoinTogether() {
   if (missing)
     return (
       <div className="yp-shell__inner">
-        <EmptyState title={t('together.join.missing')} body={t('together.join.missingBody')} />
+        <EmptyState level={1} title={t('together.join.missing')} body={t('together.join.missingBody')} />
       </div>
     );
   if (!invite && loadError)
     return (
       <div className="yp-shell__inner">
-        <EmptyState title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />
+        <EmptyState level={1} title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />
       </div>
     );
   if (!invite)

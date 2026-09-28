@@ -232,8 +232,8 @@ export function CheckInDesk({ eventId }: { eventId: string }) {
     [eventId, t, toast],
   );
 
-  if (missing) return <EmptyState title={t('checkin.title')} body={t('checkin.detail.invalid')} />;
-  if ((!door || !counts) && loadError) return <EmptyState title={loadError} action={<Button onClick={loadDoor}>{t('m.common.retry')}</Button>} />;
+  if (missing) return <EmptyState level={1} title={t('checkin.title')} body={t('checkin.detail.invalid')} />;
+  if ((!door || !counts) && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={loadDoor}>{t('m.common.retry')}</Button>} />;
   if (!door || !counts) return <Skeleton height={320} />;
   const pct = counts.expected ? Math.round((counts.checkedIn / counts.expected) * 100) : 0;
 

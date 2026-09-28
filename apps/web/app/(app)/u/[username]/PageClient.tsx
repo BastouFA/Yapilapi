@@ -106,8 +106,8 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
   );
 
   if (signedOut && !isPublic) return <NeedsAccount title={t('profilePage.signIn.title')} body={t('profilePage.signIn.body')} />;
-  if (missing) return <EmptyState title={t('profilePage.missing.title')} body={t('profilePage.missing.body')} />;
-  if (!profile && loadError) return <EmptyState title={loadError} action={<Button onClick={() => void reload()}>{t('m.common.retry')}</Button>} />;
+  if (missing) return <EmptyState level={1} title={t('profilePage.missing.title')} body={t('profilePage.missing.body')} />;
+  if (!profile && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={() => void reload()}>{t('m.common.retry')}</Button>} />;
   if (!profile)
     return (
       <div className="yp-shell__inner">

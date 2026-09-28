@@ -86,8 +86,8 @@ export default function ListingPageClient({ preview }: { preview: PublicListingP
     if (loading) return <Skeleton height={320} />;
     return preview ? <PublicListing preview={preview} /> : <NeedsAccount title={t('market.signIn.title')} body={t('market.signIn.body')} />;
   }
-  if (missing) return <EmptyState title={t('market.listing.missing')} body={t('market.listing.missingBody')} />;
-  if (!listing && loadError) return <EmptyState title={loadError} action={<Button onClick={() => void load()}>{t('m.common.retry')}</Button>} />;
+  if (missing) return <EmptyState level={1} title={t('market.listing.missing')} body={t('market.listing.missingBody')} />;
+  if (!listing && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={() => void load()}>{t('m.common.retry')}</Button>} />;
   if (!listing) return <Skeleton height={420} />;
 
   const l = listing;

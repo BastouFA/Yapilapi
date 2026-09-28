@@ -32,8 +32,8 @@ export default function MemoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  if (missing) return <EmptyState title={t('memories.notFound')} />;
-  if (!data && loadError) return <EmptyState title={loadError} action={<Button onClick={() => void load()}>{t('m.common.retry')}</Button>} />;
+  if (missing) return <EmptyState level={1} title={t('memories.notFound')} />;
+  if (!data && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={() => void load()}>{t('m.common.retry')}</Button>} />;
   if (!data) return <Skeleton height={240} />;
   const m = data.memory;
 

@@ -42,7 +42,7 @@ export default function JoinPage() {
       </div>
     );
 
-  if (!inviter && loadError) return <EmptyState title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />;
+  if (!inviter && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />;
   if (!inviter) return <Skeleton height={200} />;
 
   return (

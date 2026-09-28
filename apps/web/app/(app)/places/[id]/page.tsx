@@ -26,8 +26,8 @@ export default function PlacePage() {
   useEffect(() => {
     load();
   }, [load]);
-  if (missing) return <EmptyState title={t('m.place.notFound')} />;
-  if (!data && loadError) return <EmptyState title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />;
+  if (missing) return <EmptyState level={1} title={t('m.place.notFound')} />;
+  if (!data && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />;
   if (!data) return <Skeleton height={240} />;
   const { place, events, products } = data;
   const hours = Object.entries(place.hours ?? {}) as [string, string][];
