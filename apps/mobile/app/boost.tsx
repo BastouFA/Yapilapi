@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import type { Boost } from '../../../packages/api-client/src/index';
 import { BOOST_DAYS, BOOST_OPTIONS, currencyForCountry } from '../../../packages/shared/src/constants';
@@ -16,6 +16,7 @@ import { useSession } from '../lib/session';
 import { ManagedOnWeb, useDigitalPurchases } from '../lib/store';
 import { space } from '../lib/theme';
 import { Button, Card, EmptyState, KeyboardAvoid, Loading, Notice, ScreenError, useColors, userText } from '../lib/ui';
+import { regionName } from '../lib/regions';
 
 /** Countries offered for a boost audience, as on the web (apps/web/components/Boost.tsx). Yours is always first. */
 const COUNTRIES = ['NG', 'GH', 'KE', 'ZA', 'CI', 'SN', 'CM', 'UG', 'TZ', 'RW', 'ET', 'EG', 'MA', 'US', 'CA', 'GB', 'FR', 'DE', 'BR', 'IN'];
@@ -73,14 +74,7 @@ export default function BoostScreen() {
   }, [load]);
   const { open, opened } = useWebCheckout(() => void load());
 
-  const regionName = useMemo(() => {
-    try {
-      const dn = new Intl.DisplayNames([locale], { type: 'region' });
-      return (code: string) => dn.of(code) ?? code;
-    } catch {
-      return (code: string) => code;
-    }
-  }, [locale]);
+  const countryName = (code: string) => regionName(code, locale);
 
   if (post === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <Loading />;
   if (post === null || post.author.id !== me?.id)
@@ -173,7 +167,7 @@ export default function BoostScreen() {
               <ChoiceField
                 label={t('m.boost.countryLabel')}
                 value={country}
-                options={countries.map((x) => ({ id: x, label: regionName(x) }))}
+                options={countries.map((x) => ({ id: x, label: countryName(x) }))}
                 onChange={setCountry}
               />
             ) : (
@@ -190,7 +184,7 @@ export default function BoostScreen() {
               <Text style={{ color: c.ink, fontSize: 15, fontWeight: '700' }}>{t('m.boost.estimate', { views: number(reach), price })}</Text>
               <Text style={[{ color: c.inkMuted, lineHeight: 20 }, userText]}>
                 {audience === 'country'
-                  ? t('m.boost.audienceCountries', { places: regionName(country) })
+                  ? t('m.boost.audienceCountries', { places: countryName(country) })
                   : topics.length
                     ? t('m.boost.audienceInterests', { topics: topics.join(', ') })
                     : t('m.boost.needInterest')}

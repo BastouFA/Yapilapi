@@ -5,6 +5,8 @@ import { Pill } from './forms';
 import { useT } from './i18n';
 import { radius, space } from './theme';
 import { Card, useColors, userText } from './ui';
+import { regionName } from './regions';
+import { formatList } from '../../../packages/shared/src/feed-reasons';
 
 /** Profile types that get Studio in the You tab (anyone can open it from a link). */
 export const STUDIO_MODES = ['creator', 'professional', 'business'] as const;
@@ -86,14 +88,8 @@ export function useAudienceText() {
   const { t, locale } = useT();
   return (a: Boost['audience']) => {
     if (a.type === 'interests') return t('m.boost.audienceInterests', { topics: a.topics.join(', ') });
-    let names: string[] = a.countries;
-    try {
-      const dn = new Intl.DisplayNames([locale], { type: 'region' });
-      names = a.countries.map((x) => dn.of(x) ?? x);
-    } catch {
-      // Without Intl.DisplayNames the country codes are shown.
-    }
-    return t('m.boost.audienceCountries', { places: names.join(', ') });
+    const names = a.countries.map((x) => regionName(x, locale));
+    return t('m.boost.audienceCountries', { places: formatList(names, locale, t) });
   };
 }
 
