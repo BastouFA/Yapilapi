@@ -1,13 +1,14 @@
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chatJobHandlers, expireMessages } from '../src/lib/chat.ts';
-import { processJobs } from '../src/lib/jobs.ts';
 import type { BuiltApp } from '../src/app.ts';
-import { as, signUp, testApp, type TestUser } from './helpers.ts';
+import { as, signUp, testApp, type TestUser, jobRunner, type JobRunner } from './helpers.ts';
 
 let t: BuiltApp;
+let runJobs: JobRunner;
 beforeAll(async () => {
   t = await testApp();
+  runJobs = await jobRunner(t.ctx.db);
 });
 afterAll(async () => {
   await t.close();
@@ -291,7 +292,7 @@ describe('Disappearing messages', () => {
     await db().query(`UPDATE messages SET expires_at = now() - interval '1 second' WHERE id = $1`, [m.id]);
     await db().query(`UPDATE jobs SET run_at = now() WHERE id = $1`, [job.id]);
     const deps = { db: db(), config: t.ctx.config, storage: t.ctx.storage, realtime: t.ctx.realtime };
-    await processJobs(db(), chatJobHandlers(deps));
+    await runJobs(chatJobHandlers(deps));
     expect((await db().query(`SELECT 1 FROM messages WHERE id = $1`, [m.id])).rowCount).toBe(0);
     expect(await fetchMedia(pic.path)).toBe(404);
     expect(live.of('message.deleted').map((e) => e.data.id)).toContain(m.id);

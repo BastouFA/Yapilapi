@@ -3,18 +3,19 @@ import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { as, signUp, testApp, type TestUser } from './helpers.ts';
+import { as, signUp, testApp, type TestUser, jobRunner, type JobRunner } from './helpers.ts';
 import type { BuiltApp } from '../src/app.ts';
-import { processJobs } from '../src/lib/jobs.ts';
 import { probe, run } from '../src/lib/media-processing.ts';
 import { END_CARD_SECONDS, renderShareVideo, shareVideoJobHandlers } from '../src/lib/share-video.ts';
 
 let t: BuiltApp;
+let runJobs: JobRunner;
 let salt: string;
 const UPLOADS = '/tmp/ypl-test-uploads';
 
 beforeAll(async () => {
   t = await testApp();
+  runJobs = await jobRunner(t.ctx.db);
 });
 afterAll(async () => {
   await t.close();
@@ -219,7 +220,7 @@ describe('share a reel as a video', () => {
     expect((await as(t.app, fan).post(`/v1/posts/${reel}/share-video`)).status).toBe(202);
 
     const handlers = shareVideoJobHandlers({ db: t.ctx.db, storage: t.ctx.storage });
-    while (await processJobs(t.ctx.db, handlers));
+    while (await runJobs(handlers));
     const ready = await as(t.app, fan).get(`/v1/posts/${reel}/share-video`);
     expect(ready.body.status).toBe('ready');
     expect(ready.body.url).toMatch(new RegExp(`/media/shares/${reel}/[0-9a-f-]+\\.mp4$`));

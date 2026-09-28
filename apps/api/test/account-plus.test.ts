@@ -1,13 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { processJobs } from '../src/lib/jobs.ts';
 import { deviceName, placeName, signInEmail, signInFingerprint } from '../src/lib/sign-in-alerts.ts';
 import { SEND_LATER_JOB } from '../src/modules/chat-later.ts';
 import type { BuiltApp } from '../src/app.ts';
-import { as, signUp, testApp, type TestUser } from './helpers.ts';
+import { as, signUp, testApp, type TestUser, jobRunner, type JobRunner } from './helpers.ts';
 
 let t: BuiltApp;
+let runJobs: JobRunner;
 beforeAll(async () => {
   t = await testApp();
+  runJobs = await jobRunner(t.ctx.db);
 });
 afterAll(async () => {
   await t.close();
@@ -246,7 +247,7 @@ describe('send later', () => {
       SEND_LATER_JOB,
       id,
     ]);
-    await processJobs(db(), t.ctx.jobs, 50);
+    await runJobs(t.ctx.jobs, 50);
   }
 
   const messages = async (u: TestUser, conversationId: string) => (await as(t.app, u).get(`/v1/conversations/${conversationId}/messages`)).body.items as any[];
@@ -275,7 +276,7 @@ describe('send later', () => {
     const row = (await db().query(`SELECT status, message_id FROM scheduled_messages WHERE id = $1`, [r.body.scheduled.id])).rows[0];
     expect(row).toMatchObject({ status: 'sent', message_id: seen[0].id });
     // Running the job again sends nothing twice.
-    await processJobs(db(), t.ctx.jobs, 50);
+    await runJobs(t.ctx.jobs, 50);
     expect((await messages(bola, chat)).filter((m) => m.kind !== 'system')).toHaveLength(1);
   });
 

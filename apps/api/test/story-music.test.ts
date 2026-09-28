@@ -2,15 +2,16 @@ import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { dualInsetBox, dualComposeSchema, storyMusicInputSchema, storyMusicPart } from '@yapilapi/shared';
-import { processJobs } from '../src/lib/jobs.ts';
 import { mediaJobHandlers } from '../src/lib/media-processing.ts';
 import { editorJobHandlers } from '../src/lib/media-edit.ts';
-import { as, signUp, testApp, type TestUser } from './helpers.ts';
+import { as, signUp, testApp, type TestUser, jobRunner, type JobRunner } from './helpers.ts';
 import type { BuiltApp } from '../src/app.ts';
 
 let t: BuiltApp;
+let runJobs: JobRunner;
 beforeAll(async () => {
   t = await testApp();
+  runJobs = await jobRunner(t.ctx.db);
 });
 afterAll(async () => {
   await t.close();
@@ -205,7 +206,7 @@ const handlers = () => ({
   ...editorJobHandlers({ db: t.ctx.db, storage: t.ctx.storage }),
 });
 async function drain() {
-  for (let i = 0; i < 50; i++) if (!(await processJobs(t.ctx.db, handlers()))) return;
+  for (let i = 0; i < 50; i++) if (!(await runJobs(handlers()))) return;
 }
 
 async function upload(user: TestUser, data: Buffer) {

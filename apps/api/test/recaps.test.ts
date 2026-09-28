@@ -5,14 +5,14 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { RECAP_DAILY_LIMIT } from '@yapilapi/shared';
-import { processJobs } from '../src/lib/jobs.ts';
 import { mediaJobHandlers, probe, run } from '../src/lib/media-processing.ts';
 import { planRecap, preselect, recapJobHandlers, titleWithSharp, wrapTitle } from '../src/lib/recaps.ts';
-import { as, signUp, testApp, type TestUser } from './helpers.ts';
+import { as, signUp, testApp, type TestUser, jobRunner, type JobRunner } from './helpers.ts';
 import type { BuiltApp } from '../src/app.ts';
 
 const UPLOADS = '/tmp/ypl-test-uploads';
 let t: BuiltApp;
+let runJobs: JobRunner;
 const colours = [
   { r: 200, g: 60, b: 40 },
   { r: 40, g: 160, b: 90 },
@@ -21,6 +21,7 @@ const colours = [
 
 beforeAll(async () => {
   t = await testApp();
+  runJobs = await jobRunner(t.ctx.db);
   await t.ctx.db.query(`INSERT INTO feature_flags (key, enabled) VALUES ('MEMORY', true) ON CONFLICT (key) DO UPDATE SET enabled = true`);
 });
 afterAll(async () => {
@@ -32,7 +33,7 @@ const handlers = () => ({
   ...recapJobHandlers({ db: t.ctx.db, storage: t.ctx.storage, realtime: t.ctx.realtime }),
 });
 async function drain() {
-  for (let i = 0; i < 20; i++) if (!(await processJobs(t.ctx.db, handlers()))) return;
+  for (let i = 0; i < 20; i++) if (!(await runJobs(handlers()))) return;
 }
 
 let photoN = 0;

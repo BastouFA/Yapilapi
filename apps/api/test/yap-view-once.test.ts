@@ -5,16 +5,17 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import ffmpegPath from '../src/lib/ffmpeg-path.ts';
-import { processJobs } from '../src/lib/jobs.ts';
 import { privatePath } from '../src/lib/private-files.ts';
 import { sweepViewOnce, viewOnceJobHandlers } from '../src/lib/view-once.ts';
 import { planYap } from '../src/lib/yaps.ts';
 import type { BuiltApp } from '../src/app.ts';
-import { as, signUp, testApp, type TestUser } from './helpers.ts';
+import { as, signUp, testApp, type TestUser, jobRunner, type JobRunner } from './helpers.ts';
 
 let t: BuiltApp;
+let ownJobs: JobRunner;
 beforeAll(async () => {
   t = await testApp();
+  ownJobs = await jobRunner(t.ctx.db);
 });
 afterAll(async () => {
   await t.close();
@@ -255,7 +256,7 @@ describe('View once', () => {
       .toBuffer();
   const handlers = () => viewOnceJobHandlers({ db: db(), config: t.ctx.config, storage: t.ctx.storage, realtime: t.ctx.realtime });
   const runJobs = async () => {
-    for (let i = 0; i < 20; i++) if (!(await processJobs(db(), handlers()))) return;
+    for (let i = 0; i < 20; i++) if (!(await ownJobs(handlers()))) return;
   };
   const keyOf = async (mediaId: string) => (await db().query(`SELECT storage_key, deleted_at FROM media WHERE id = $1`, [mediaId])).rows[0];
 

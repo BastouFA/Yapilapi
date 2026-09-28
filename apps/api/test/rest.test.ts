@@ -5,7 +5,7 @@ import path from 'node:path';
 import ffmpegPath from '../src/lib/ffmpeg-path.ts';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { processJobs } from '../src/lib/jobs.ts';
+import { enqueue, processJobs } from '../src/lib/jobs.ts';
 import { mediaJobHandlers } from '../src/lib/media-processing.ts';
 import { createPushSender } from '../src/lib/push.ts';
 import { signDevWebhook } from '../src/lib/payments.ts';
@@ -21,7 +21,11 @@ afterAll(async () => {
   await t.close();
 });
 
-async function storedMedia(owner: string, kind: 'image' | 'video', data: Buffer, ext: string, mime: string) {
+/**
+ * Store a file as media and run its processing job. Only this job runs: other files leave
+ * media jobs queued in the shared database, and a plain processJobs would take the oldest.
+ */
+async function processedMedia(owner: string, kind: 'image' | 'video', data: Buffer, ext: string, mime: string) {
   const stored = await t.ctx.storage.put(data, ext, mime);
   const { rows } = await t.ctx.db.query(`INSERT INTO media (owner_id, kind, url, mime, storage_key) VALUES ($1,$2,$3,$4,$5) RETURNING id`, [
     owner,
@@ -30,7 +34,10 @@ async function storedMedia(owner: string, kind: 'image' | 'video', data: Buffer,
     mime,
     stored.key,
   ]);
-  await t.ctx.db.query(`INSERT INTO jobs (kind, payload) VALUES ('media.process', $1)`, [{ mediaId: rows[0].id }]);
+  const job = await enqueue(t.ctx.db, 'media.process', { mediaId: rows[0].id });
+  await processJobs(t.ctx.db, mediaJobHandlers({ db: t.ctx.db, storage: t.ctx.storage }), 1, { ids: [job] });
+  const done = (await t.ctx.db.query(`SELECT status, last_error FROM jobs WHERE id = $1`, [job])).rows[0];
+  expect(done).toEqual({ status: 'done', last_error: null });
   return rows[0].id as string;
 }
 
@@ -49,8 +56,7 @@ describe('media processing', () => {
       .withExif({ IFD0: { Make: 'TestCam' }, IFD3: { GPSLatitudeRef: 'N', GPSLatitude: '38/1 43/1 0/1' } })
       .toBuffer();
     expect((await sharp(photo).metadata()).exif).toBeTruthy();
-    const id = await storedMedia(u.id, 'image', photo, 'jpg', 'image/jpeg');
-    await processJobs(t.ctx.db, mediaJobHandlers({ db: t.ctx.db, storage: t.ctx.storage }));
+    const id = await processedMedia(u.id, 'image', photo, 'jpg', 'image/jpeg');
     const m = (await t.ctx.db.query(`SELECT variants, width, blurhash, status FROM media WHERE id = $1`, [id])).rows[0];
     expect(Object.keys(m.variants).sort()).toEqual(['large', 'medium', 'thumb']);
     expect(m.width).toBe(2400);
@@ -86,8 +92,7 @@ describe('media processing', () => {
       src,
     ]);
     expect(r.status).toBe(0);
-    const id = await storedMedia(u.id, 'video', readFileSync(src), 'mp4', 'video/mp4');
-    await processJobs(t.ctx.db, mediaJobHandlers({ db: t.ctx.db, storage: t.ctx.storage }));
+    const id = await processedMedia(u.id, 'video', readFileSync(src), 'mp4', 'video/mp4');
     const m = (await t.ctx.db.query(`SELECT variants, poster_url, hls_url FROM media WHERE id = $1`, [id])).rows[0];
     expect(m.poster_url).toMatch(/_poster\.jpg$/);
     expect(m.variants.mp4).toMatch(/_web\.mp4$/);
@@ -102,8 +107,7 @@ describe('media processing', () => {
     const img = await sharp({ create: { width: 800, height: 600, channels: 3, background: '#e0a020' } })
       .png()
       .toBuffer();
-    const id = await storedMedia(u.id, 'image', img, 'png', 'image/png');
-    await processJobs(t.ctx.db, mediaJobHandlers({ db: t.ctx.db, storage: t.ctx.storage }));
+    const id = await processedMedia(u.id, 'image', img, 'png', 'image/png');
     const post = await as(t.app, u).post('/v1/posts', {
       body: 'With a photo',
       media: [{ id, url: 'http://x.test/ignored.png', kind: 'image', altText: 'Orange square' }],

@@ -6,19 +6,20 @@ import ffmpegPath from '../src/lib/ffmpeg-path.ts';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { applyColorMatrix, colorMatrix, cssFilter, FILTERS, filterOps, IDENTITY_MATRIX, mediaEditSchema } from '@yapilapi/shared';
-import { processJobs } from '../src/lib/jobs.ts';
 import { mediaJobHandlers, probe } from '../src/lib/media-processing.ts';
 import { editorJobHandlers, planVideo } from '../src/lib/media-edit.ts';
-import { as, signUp, testApp, type TestUser } from './helpers.ts';
+import { as, signUp, testApp, type TestUser, jobRunner, type JobRunner } from './helpers.ts';
 import type { BuiltApp } from '../src/app.ts';
 
 let t: BuiltApp;
+let runJobs: JobRunner;
 let clip: Buffer;
 let photo: Buffer;
 const dir = mkdtempSync(path.join(tmpdir(), 'ypl-editor-test-'));
 
 beforeAll(async () => {
   t = await testApp();
+  runJobs = await jobRunner(t.ctx.db);
   // A tiny 2 second test video with a tone, made with the bundled ffmpeg.
   const src = path.join(dir, 'clip.mp4');
   const r = spawnSync(ffmpegPath as unknown as string, [
@@ -58,7 +59,7 @@ const handlers = () => ({
 });
 
 async function drain() {
-  for (let i = 0; i < 50; i++) if (!(await processJobs(t.ctx.db, handlers()))) return;
+  for (let i = 0; i < 50; i++) if (!(await runJobs(handlers()))) return;
 }
 
 function multipart(file: { name: string; type: string; data: Buffer }) {

@@ -1,13 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createPool, tx } from '@yapilapi/database';
-import { processJobs } from '../src/lib/jobs.ts';
 import { DROP_END_JOB, DROP_OPEN_JOB, DROP_RELEASE_JOB, takeDropStock } from '../src/lib/drops.ts';
 import type { BuiltApp } from '../src/app.ts';
-import { as, signUp, testApp, type TestUser } from './helpers.ts';
+import { as, signUp, testApp, type TestUser, jobRunner, type JobRunner } from './helpers.ts';
 
 let t: BuiltApp;
+let runJobs: JobRunner;
 beforeAll(async () => {
   t = await testApp();
+  runJobs = await jobRunner(t.ctx.db);
 });
 afterAll(async () => {
   await t.close();
@@ -38,7 +39,7 @@ async function scheduled(seller: TestUser, items: Record<string, unknown>[], ext
 async function openNow(id: string) {
   await db().query(`UPDATE drops SET starts_at = now() - interval '1 second' WHERE id = $1`, [id]);
   await db().query(`UPDATE jobs SET run_at = now() - interval '1 second' WHERE kind = $1 AND payload->>'id' = $2 AND status = 'queued'`, [DROP_OPEN_JOB, id]);
-  await processJobs(db(), t.ctx.jobs, 50);
+  await runJobs(t.ctx.jobs, 50);
 }
 
 async function scheduledAndOpen(seller: TestUser, items: Record<string, unknown>[], extra: Record<string, unknown> = {}) {
@@ -200,7 +201,7 @@ describe('opening', () => {
 
     // A job that runs before the start time (the drop was moved later) does nothing.
     await db().query(`UPDATE jobs SET run_at = now() - interval '1 second' WHERE kind = $1 AND payload->>'id' = $2 AND status = 'queued'`, [DROP_OPEN_JOB, id]);
-    await processJobs(db(), t.ctx.jobs, 50);
+    await runJobs(t.ctx.jobs, 50);
     expect((await as(t.app, a).get(`/v1/drops/${id}`)).body.drop.status).toBe('scheduled');
     // Put the job back and open for real.
     await db().query(`INSERT INTO jobs (kind, payload, run_at) VALUES ($1, $2, now())`, [DROP_OPEN_JOB, { id }]);
@@ -216,7 +217,7 @@ describe('opening', () => {
     expect(await notes(quiet.id, 'drop_opened')).toHaveLength(0);
     // Running again tells nobody twice.
     await db().query(`INSERT INTO jobs (kind, payload, run_at) VALUES ($1, $2, now())`, [DROP_OPEN_JOB, { id }]);
-    await processJobs(db(), t.ctx.jobs, 50);
+    await runJobs(t.ctx.jobs, 50);
     expect(await notes(a.id, 'drop_opened')).toHaveLength(1);
     // Too late to ask to be told, and too late to change it.
     expect((await as(t.app, quiet).post(`/v1/drops/${id}/remind`)).status).toBe(409);
@@ -243,7 +244,7 @@ describe('opening', () => {
     // Past its end, it can't be bought even before the job has run.
     expect((await order(buyer, productId)).body.error.code).toBe('drop_ended');
     await db().query(`UPDATE jobs SET run_at = now() - interval '1 second' WHERE kind = $1 AND payload->>'id' = $2 AND status = 'queued'`, [DROP_END_JOB, id]);
-    await processJobs(db(), t.ctx.jobs, 50);
+    await runJobs(t.ctx.jobs, 50);
     expect((await as(t.app, buyer).get(`/v1/drops/${id}`)).body.drop).toMatchObject({ status: 'ended', endReason: 'time' });
     expect((await order(buyer, productId)).body.error.code).toBe('drop_ended');
   });
@@ -354,7 +355,7 @@ describe('stock', () => {
       DROP_RELEASE_JOB,
       first.body.order.id,
     ]);
-    await processJobs(db(), t.ctx.jobs, 50);
+    await runJobs(t.ctx.jobs, 50);
     expect((await as(t.app, slow).get(`/v1/orders/${first.body.order.id}`)).body.order.status).toBe('cancelled');
     expect(await taken(id, productId)).toBe(0);
     // The drop that had sold out is on sale again.
@@ -381,7 +382,7 @@ describe('stock', () => {
       DROP_RELEASE_JOB,
       o.body.order.id,
     ]);
-    await processJobs(db(), t.ctx.jobs, 50);
+    await runJobs(t.ctx.jobs, 50);
     expect(await taken(id, productId)).toBe(0);
     expect((await as(t.app, buyer).post('/v1/payments/dev/complete', { orderId: o.body.order.id })).body.status).toBe('paid');
     expect(await taken(id, productId)).toBe(2);
