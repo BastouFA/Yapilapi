@@ -89,13 +89,25 @@ export default function Chat() {
   const { t, locale } = useT();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const { me } = useSession();
+  const { me, sendRealtime } = useSession();
   const calls = useCalls();
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [body, setBody] = useState('');
   // While you type, the voice bar and suggested replies step aside so more of the chat shows.
   const typing = useKeyboardVisible();
+  // Someone else typing here (their name), cleared a few seconds after the last word from them or when their message arrives.
+  const [someoneTyping, setSomeoneTyping] = useState<{ userId: string; name: string } | null>(null);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(typingTimer.current), []);
+  // When you last told the others you were typing: at most every few seconds.
+  const typingSent = useRef(0);
+  const onType = (text: string) => {
+    setBody(text);
+    if (!text.trim() || editing || Date.now() - typingSent.current < 3000) return;
+    typingSent.current = Date.now();
+    sendRealtime({ type: 'typing', conversationId: id });
+  };
   const [error, setError] = useState<string | null>(null);
   // A sent message held for a quick check before it's delivered.
   const [held, setHeld] = useState<string | null>(null);
@@ -203,6 +215,13 @@ export default function Chat() {
       const m = e.data as Message;
       setMessages((cur) => (cur.some((x) => x.id === m.id || (m.clientId && x.clientId === m.clientId)) ? cur : [...cur, m]));
       void client().then((api) => api.conversations.read(id).catch(() => {}));
+      setSomeoneTyping((cur) => (cur?.userId === m.sender?.id ? null : cur));
+    }
+    if (e.type === 'typing' && e.data?.conversationId === id && e.data.userId !== me?.id) {
+      const name = conversation?.members.find((x) => x.id === e.data.userId)?.displayName ?? t('m.calls.someone');
+      setSomeoneTyping({ userId: e.data.userId, name });
+      clearTimeout(typingTimer.current);
+      typingTimer.current = setTimeout(() => setSomeoneTyping(null), 5000);
     }
     if ((e.type === 'message.deleted' || e.type === 'message.released') && e.data?.conversationId === id) void load();
     if (e.type === 'message.hidden' && e.data?.conversationId === id) setMessages((cur) => cur.filter((x) => x.id !== e.data.id));
@@ -980,6 +999,7 @@ export default function Chat() {
           renderItem={renderMessage}
           // Your messages waiting to be sent: only you see them, after the newest message.
           ListFooterComponent={
+            <>
             <ScheduledList
               items={scheduled.items}
               accent={accent}
@@ -991,6 +1011,12 @@ export default function Chat() {
               onRemoved={(s) => scheduled.setItems((cur) => cur.filter((x) => x.id !== s.id))}
               onError={setError}
             />
+            {someoneTyping ? (
+              <Text style={{ color: c.inkMuted, fontSize: 13, paddingHorizontal: space[4], paddingVertical: space[1] }}>
+                {t('chat.typing', { name: someoneTyping.name })}
+              </Text>
+            ) : null}
+            </>
           }
           initialNumToRender={20}
           maxToRenderPerBatch={12}
@@ -1158,7 +1184,7 @@ export default function Chat() {
               placeholder={t('inbox.placeholder')}
               placeholderTextColor={c.inkMuted}
               value={body}
-              onChangeText={setBody}
+              onChangeText={onType}
               maxLength={4000}
               multiline
               style={[

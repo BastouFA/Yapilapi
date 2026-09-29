@@ -1233,12 +1233,14 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
         const msg = JSON.parse(raw.toString()) as { type: string; conversationId?: string };
         if (msg.type === 'ping') socket.send(JSON.stringify({ type: 'pong' }));
         if (msg.type === 'typing' && msg.conversationId) {
+          if (!z.string().uuid().safeParse(msg.conversationId).success) return;
           const ids = await memberIds(msg.conversationId);
+          // People who blocked the typist never see them typing (in a group they share).
           if (ids.includes(user.id))
-            await ctx.realtime.publish(
-              ids.filter((i) => i !== user.id),
-              { type: 'typing', data: { conversationId: msg.conversationId, userId: user.id } },
-            );
+            await ctx.realtime.publish(await notBlocking(user.id, ids.filter((i) => i !== user.id)), {
+              type: 'typing',
+              data: { conversationId: msg.conversationId, userId: user.id },
+            });
         }
       } catch {
         /* ignore malformed frames */

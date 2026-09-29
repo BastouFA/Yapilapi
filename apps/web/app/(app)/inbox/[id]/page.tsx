@@ -56,12 +56,22 @@ type Pending = Message & { pending?: boolean };
 
 export default function ChatPage() {
   const { id } = useParams<{ id: string }>();
-  const { me, t, toast, locale, setUnread, unread, flags } = useSession();
+  const { me, t, toast, locale, setUnread, unread, flags, sendRealtime } = useSession();
   const [conv, setConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Pending[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [body, setBody] = useState('');
-  const [typing, setTyping] = useState<string | null>(null);
+  // Who is typing here (the name), cleared a few seconds after their last keystroke or when their message arrives.
+  const [typing, setTyping] = useState<{ userId: string; name: string } | null>(null);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // When this person last said they were typing, so the others hear it at most every few seconds.
+  const typingSent = useRef(0);
+  function saidTyping() {
+    const now = Date.now();
+    if (now - typingSent.current < 3000) return;
+    typingSent.current = now;
+    sendRealtime({ type: 'typing', conversationId: id });
+  }
   const [ai, setAi] = useState<{ title: string; text: string; notice?: string; plan?: Record<string, unknown> } | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [reportId, setReportId] = useState<string | null>(null);
@@ -221,6 +231,7 @@ export default function ChatPage() {
         return [...cur, m];
       });
       if (e.data.sender.id !== me?.id) void api.conversations.read(id);
+      setTyping((cur) => (cur?.userId === e.data.sender.id ? null : cur));
     }
     // Disappeared (or removed by moderation), or deleted just for you on another device.
     if ((e.type === 'message.deleted' || e.type === 'message.hidden') && e.data.conversationId === id) {
@@ -310,10 +321,11 @@ export default function ChatPage() {
         (r) => setMessages(r.items),
         () => {},
       );
-    if (e.type === 'typing' && e.data.conversationId === id) {
+    if (e.type === 'typing' && e.data.conversationId === id && e.data.userId !== me?.id) {
       const who = conv?.members.find((m) => m.id === e.data.userId)?.displayName ?? t('m.calls.someone');
-      setTyping(who);
-      setTimeout(() => setTyping(null), 3000);
+      setTyping({ userId: e.data.userId, name: who });
+      clearTimeout(typingTimer.current);
+      typingTimer.current = setTimeout(() => setTyping(null), 5000);
     }
   });
 
@@ -871,7 +883,7 @@ export default function ChatPage() {
           />
           {typing ? (
             <span className="muted" style={{ fontSize: 12 }}>
-              {t('chat.typing', { name: typing })}
+              {t('chat.typing', { name: typing.name })}
             </span>
           ) : null}
           <div ref={endRef} />
@@ -1001,7 +1013,10 @@ export default function ChatPage() {
           aria-describedby={replyTo || editing ? 'compose-context' : undefined}
           value={body}
           maxLength={4000}
-          onChange={(e) => setBody(e.currentTarget.value)}
+          onChange={(e) => {
+            setBody(e.currentTarget.value);
+            if (e.currentTarget.value.trim() && !editing) saidTyping();
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
