@@ -8,7 +8,7 @@ import { CIRCLE_NAME_MAX, KindPicker } from '../lib/circles';
 import { useT } from '../lib/i18n';
 import { useSession } from '../lib/session';
 import { space } from '../lib/theme';
-import { Button, Card, Field, Icon, KeyboardAvoid, Loading, Notice, Row, Title, useColors } from '../lib/ui';
+import { Button, Card, ErrorState, Field, Icon, KeyboardAvoid, Loading, Notice, Row, Title, useColors } from '../lib/ui';
 
 /**
  * Circles: your own small groups (family, work, a trip) to share a post with. Only you see
@@ -24,20 +24,22 @@ export default function Circles() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Why the list couldn't load (with Try again), apart from errors of actions.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const load = useCallback(() => {
+    setLoadError(null);
+    client()
+      .then((api) => api.circles.list())
+      .then(
+        (r) => setList(r.items),
+        (e) => {
+          setList((cur) => cur ?? []);
+          setLoadError(errorMessage(e));
+        },
+      );
+  }, []);
   // Reload when coming back from a circle (renamed, deleted, people added).
-  useFocusEffect(
-    useCallback(() => {
-      client()
-        .then((api) => api.circles.list())
-        .then(
-          (r) => setList(r.items),
-          (e) => {
-            setList((cur) => cur ?? []);
-            setError(errorMessage(e));
-          },
-        );
-    }, []),
-  );
+  useFocusEffect(load);
 
   if (me === undefined || list === null) return <Loading />;
   if (!me)
@@ -73,6 +75,7 @@ export default function Circles() {
         keyboardShouldPersistTaps="handled"
       >
         <Title sub={t('m.circles.hint')}>{t('m.circles.title')}</Title>
+        {loadError ? <ErrorState message={loadError} onRetry={load} /> : null}
         {error ? <Notice tone="danger">{error}</Notice> : null}
         <Card style={{ gap: space[3] }}>
           <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '700', fontSize: 15 }}>

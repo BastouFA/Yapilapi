@@ -95,9 +95,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm db:migrate
-      # Memories, chapters and recap videos are behind the MEMORY flag; the audit covers them.
+      # Memories, chapters and recap videos (MEMORY) and Together albums (REAL_TOGETHER) are behind flags; the audit covers them.
       - name: Turn on audited features
-        # MEMORY (memories and recaps) and REAL_TOGETHER (Together albums), which the suite audits.
         run: psql "$DATABASE_URL" -c "INSERT INTO feature_flags (key, enabled) VALUES ('MEMORY', true), ('REAL_TOGETHER', true) ON CONFLICT (key) DO UPDATE SET enabled = true"
       - name: Install Chromium
         run: pnpm --filter @yapilapi/web exec playwright install --with-deps chromium

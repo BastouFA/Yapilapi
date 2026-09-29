@@ -6,7 +6,7 @@ import { client, errorMessage } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { useSession } from '../lib/session';
 import { space } from '../lib/theme';
-import { Avatar, Button, EmptyState, ErrorState, Loading, Row, Screen, Segmented, useRefresh } from '../lib/ui';
+import { Avatar, Button, EmptyState, ErrorState, Loading, Notice, Row, Screen, Segmented, useRefresh } from '../lib/ui';
 
 type Kind = 'followers' | 'following';
 
@@ -25,6 +25,11 @@ export default function Follows() {
   const [items, setItems] = useState<PublicUser[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [follows, setFollows] = useState<Set<string>>(new Set());
+  // Private accounts asked from here (they answer first); tapping again takes the request back.
+  const [requested, setRequested] = useState<Set<string>>(new Set());
+  // Your own followers you removed just now.
+  const [removed, setRemoved] = useState<Set<string>>(new Set());
+  const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,28 +71,65 @@ export default function Follows() {
   };
 
   // Stable (it's told whether you follow them), so the memoised rows keep the same props.
-  const toggle = useCallback(async (u: PublicUser, on: boolean) => {
-    setBusy(u.id);
-    setError(null);
-    try {
-      const api = await client();
-      await (on ? api.users.unfollow(u.id) : api.users.follow(u.id));
-      setFollows((f) => {
-        const next = new Set(f);
-        if (on) next.delete(u.id);
-        else next.add(u.id);
-        return next;
-      });
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setBusy(null);
-    }
-  }, []);
+  const toggle = useCallback(
+    async (u: PublicUser, on: boolean) => {
+      setBusy(u.id);
+      setError(null);
+      try {
+        const api = await client();
+        const r = await (on ? api.users.unfollow(u.id) : api.users.follow(u.id));
+        setFollows((f) => {
+          const next = new Set(f);
+          if (r.following) next.add(u.id);
+          else next.delete(u.id);
+          return next;
+        });
+        setRequested((q) => {
+          const next = new Set(q);
+          if (r.requested) next.add(u.id);
+          else next.delete(u.id);
+          return next;
+        });
+        setNote(r.requested ? t('profile.requestedToast', { name: u.displayName }) : null);
+      } catch (e) {
+        setError(errorMessage(e));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [t],
+  );
+  const remove = useCallback(
+    async (u: PublicUser) => {
+      setBusy(u.id);
+      setError(null);
+      try {
+        await (await client()).users.removeFollower(u.id);
+        setRemoved((r) => new Set(r).add(u.id));
+        setNote(t('followers.removed', { name: u.displayName }));
+      } catch (e) {
+        setError(errorMessage(e));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [t],
+  );
   const meId = me?.id;
+  const ownFollowers = self && kind === 'followers';
   const renderPerson = useCallback(
-    ({ item: u }: { item: PublicUser }) => <PersonRow u={u} on={follows.has(u.id)} busy={busy === u.id} self={u.id === meId} onToggle={toggle} />,
-    [follows, busy, meId, toggle],
+    ({ item: u }: { item: PublicUser }) => (
+      <PersonRow
+        u={u}
+        on={follows.has(u.id)}
+        asked={requested.has(u.id)}
+        busy={busy === u.id}
+        self={u.id === meId}
+        onToggle={toggle}
+        onRemove={ownFollowers ? remove : undefined}
+      />
+    ),
+    [follows, requested, busy, meId, toggle, ownFollowers, remove],
   );
 
   const empty =
@@ -111,12 +153,17 @@ export default function Follows() {
         ]}
       />
       {error ? <ErrorState message={error} onRetry={load} /> : null}
+      {note ? (
+        <View accessibilityLiveRegion="polite">
+          <Notice>{note}</Notice>
+        </View>
+      ) : null}
       {items === null ? (
         <Loading />
       ) : (
         <FlatList
           keyboardShouldPersistTaps="handled"
-          data={items}
+          data={ownFollowers ? items.filter((u) => !removed.has(u.id)) : items}
           keyExtractor={(u) => u.id}
           refreshControl={refresh}
           contentContainerStyle={{ gap: space[2], paddingBottom: space[8] }}
@@ -134,15 +181,21 @@ export default function Follows() {
 const PersonRow = memo(function PersonRow({
   u,
   on,
+  asked,
   busy,
   self,
   onToggle,
+  onRemove,
 }: {
   u: PublicUser;
   on: boolean;
+  /** You asked to follow their private account and they haven't answered. */
+  asked: boolean;
   busy: boolean;
   self: boolean;
   onToggle: (u: PublicUser, on: boolean) => void;
+  /** Your own followers list: take them off it. */
+  onRemove?: (u: PublicUser) => void;
 }) {
   const { t } = useT();
   return (
@@ -153,14 +206,25 @@ const PersonRow = memo(function PersonRow({
       onPress={() => router.push(`/u/${encodeURIComponent(u.username)}`)}
       end={
         self ? null : (
-          <View>
+          <View style={{ flexDirection: 'row', gap: space[2] }}>
             <Button
-              label={on ? t('profile.unfollow') : t('profile.follow')}
-              variant={on ? 'secondary' : 'primary'}
+              label={on ? t('profile.unfollow') : asked ? t('profile.requested') : t('profile.follow')}
+              accessibilityLabel={asked && !on ? t('profile.withdrawRequest', { name: u.displayName }) : undefined}
+              variant={on || asked ? 'secondary' : 'primary'}
               size="sm"
               disabled={busy}
-              onPress={() => onToggle(u, on)}
+              onPress={() => onToggle(u, on || asked)}
             />
+            {onRemove ? (
+              <Button
+                label={t('followers.remove')}
+                accessibilityLabel={t('followers.removeLabel', { name: u.displayName })}
+                variant="ghost"
+                size="sm"
+                disabled={busy}
+                onPress={() => onRemove(u)}
+              />
+            ) : null}
           </View>
         )
       }
