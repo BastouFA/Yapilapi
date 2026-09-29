@@ -867,12 +867,7 @@ function PostAudio({ media }: { media: MediaItem }) {
   };
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], backgroundColor: c.surfaceSunken, borderRadius: radius.md, padding: space[2] }}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={status.playing ? t('m.common.pause') : t('m.common.play')}
-        hitSlop={8}
-        onPress={toggle}
-      >
+      <Pressable accessibilityRole="button" accessibilityLabel={status.playing ? t('m.common.pause') : t('m.common.play')} hitSlop={8} onPress={toggle}>
         <Icon name={status.playing ? 'pause-circle' : 'play-circle'} size={40} color={c.yapi} />
       </Pressable>
       <Icon name="musical-notes-outline" size={16} color={c.inkMuted} />

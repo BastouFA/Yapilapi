@@ -482,7 +482,15 @@ export default function PostScreen() {
           // Comments on a post for subscribers are for subscribers too; until the first page comes, a spinner (or why it didn't).
           post.locked ? null : controls === null ? (
             error ? (
-              <ErrorState message={error} onRetry={() => loadComments().then(() => setError(null), (e) => setError(errorMessage(e)))} />
+              <ErrorState
+                message={error}
+                onRetry={() =>
+                  loadComments().then(
+                    () => setError(null),
+                    (e) => setError(errorMessage(e)),
+                  )
+                }
+              />
             ) : (
               <Loading />
             )
