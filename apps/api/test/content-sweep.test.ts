@@ -12,6 +12,47 @@ afterAll(async () => {
 
 const adult = { birthDate: '1990-01-01' };
 
+describe('For you with a busy account', () => {
+  it('spreads one author out over the pages instead of dropping their posts, and ends only at the end', async () => {
+    const busy = await signUp(t.app, adult);
+    const quiet = await signUp(t.app, adult);
+    const viewer = await signUp(t.app, adult);
+    await as(t.app, viewer).post(`/v1/users/${busy.id}/follow`);
+    await as(t.app, viewer).post(`/v1/users/${quiet.id}/follow`);
+    const mine: string[] = [];
+    for (let i = 0; i < 9; i++) mine.push((await as(t.app, busy).post('/v1/posts', { body: `Busy post ${i}` })).body.post.id);
+    const theirs = (await as(t.app, quiet).post('/v1/posts', { body: 'Quiet post' })).body.post.id;
+
+    for (const personalization of [true, false]) {
+      await as(t.app, viewer).put('/v1/me/consents', { purpose: 'personalization', granted: personalization });
+      const seen: string[] = [];
+      let cursor: string | null = null;
+      let firstPage: string[] = [];
+      for (let page = 0; page < 200; page++) {
+        const r = await as(t.app, viewer).get(`/v1/feed?mode=for_you&limit=3${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+        expect(r.status).toBe(200);
+        const ids = (r.body.items as { id: string }[]).map((p) => p.id);
+        if (page === 0) firstPage = ids;
+        seen.push(...ids);
+        cursor = r.body.nextCursor;
+        if (!cursor) break;
+      }
+      // Every post once, nothing skipped between pages.
+      for (const id of [...mine, theirs]) expect(seen.filter((x) => x === id)).toHaveLength(1);
+      // With personalization on, the quiet account you follow isn't pushed off the first page by the busy one.
+      if (personalization) expect(firstPage).toContain(theirs);
+    }
+  });
+});
+
+describe('photo and video addresses', () => {
+  it('takes only web addresses, never javascript: or data:', async () => {
+    const author = await signUp(t.app, adult);
+    for (const url of ['javascript:alert(1)', 'data:image/png;base64,AAAA'])
+      expect((await as(t.app, author).post('/v1/posts', { body: 'Look', media: [{ url, kind: 'image' }] })).status).toBe(400);
+  });
+});
+
 describe('hashtags from places not everyone can see', () => {
   it('keeps tags of private communities and private accounts out of trending, topic search, NOW and related tags', async () => {
     const owner = await signUp(t.app, adult);
