@@ -31,6 +31,8 @@ export function messagePreviewOf(m: Message): MessagePreview {
     createdAt: m.createdAt,
     ...(m.unsent ? { unsent: true } : {}),
     ...(m.storyReply ? { storyReply: m.storyReply } : {}),
+    ...(m.viewOnce ? { viewOnce: true } : {}),
+    ...(m.kind === 'yap' ? { yap: true } : {}),
     ...(m.poll
       ? { kind: 'poll' as const }
       : m.list
@@ -86,6 +88,10 @@ export function messagePreviewText(p: MessagePreview, tr: PreviewTranslator): st
   if (p.kind === 'offer') return p.offer ? offerLine(p.offer, tr) : p.body || t('market.preview.offer');
   if (p.kind === 'game') return t('m.chat.game.preview', { game: p.gameKind ? t(`m.chat.game.kind.${p.gameKind}` as MessageKey) : p.body });
   if (p.storyReply) return t('chat.storyReply.preview', { label: storyReplyLabel(p.storyReply, p.sender?.id, tr.meId, t), text: p.body });
+  // A view-once photo, video or voice note says so, never more; a yap is a yap.
+  if (p.viewOnce)
+    return t(p.attachmentKind === 'video' ? 'm.viewOnce.videoSent' : p.attachmentKind === 'audio' ? 'm.viewOnce.voiceSent' : 'm.viewOnce.photoSent');
+  if (p.yap) return t('m.yap.label');
   if (p.body) return p.body;
   switch (p.attachmentKind) {
     case 'image':
@@ -97,6 +103,20 @@ export function messagePreviewText(p: MessagePreview, tr: PreviewTranslator): st
     default:
       return p.attachmentKind ? t('m.chat.attachment') : t('chat.message');
   }
+}
+
+/**
+ * A chat's last message in the inbox, in the reader's language: what it is, or a line about a call
+ * or the group ("Missed video call", "Ada added Léa"). `tp` counts a call's minutes.
+ */
+export function lastMessageText(
+  m: Message,
+  tr: PreviewTranslator & { tp: (key: PluralKey, count: number, vars?: Record<string, string | number>) => string },
+): string {
+  const s = m.kind === 'system' ? m.system : undefined;
+  if (s?.type === 'call') return callLineText(s, m.sender.id, tr);
+  if (s?.type === 'group') return groupLineText(s, m.sender.id === tr.meId ? tr.t('m.chat.you') : m.sender.displayName, tr);
+  return messagePreviewText(m.preview ?? messagePreviewOf(m), tr);
 }
 
 /**

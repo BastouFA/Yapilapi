@@ -251,7 +251,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
         }
         if (event.type === 'pong') return;
         if (event.type === 'notification.created') setUnreadState((u) => ({ ...u, notifications: u.notifications + 1 }));
-        if (event.type === 'message.created' && event.data.sender.id !== me.id && !location.pathname.startsWith(`/inbox/${event.data.conversationId}`))
+        // The same as the server counts: messages from others, and calls you missed (not the other lines in a chat).
+        const counts = event.data?.kind !== 'system' || (event.data.system?.type === 'call' && event.data.system.outcome === 'missed');
+        if (
+          event.type === 'message.created' &&
+          counts &&
+          event.data.sender.id !== me.id &&
+          !location.pathname.startsWith(`/inbox/${event.data.conversationId}`)
+        )
           setUnreadState((u) => ({ ...u, messages: u.messages + 1 }));
         // One page's handler failing doesn't keep the event from the others.
         listeners.current.forEach((l) => {

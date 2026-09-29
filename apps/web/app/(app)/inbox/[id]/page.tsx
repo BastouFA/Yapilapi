@@ -180,7 +180,25 @@ export default function ChatPage() {
   // Follow the newest message (not when earlier ones are loaded above).
   const lastId = messages?.at(-1)?.id;
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: 'end' });
+    const end = endRef.current;
+    if (!end) return;
+    end.scrollIntoView({ block: 'end' });
+    // Photos, videos and cards size themselves once they load: stay at the newest for a few
+    // seconds while the page grows, unless you scroll up.
+    let following = true;
+    const onScroll = () => (following = innerHeight + scrollY >= document.documentElement.scrollHeight - 160);
+    const grow = new ResizeObserver(() => following && end.scrollIntoView({ block: 'end' }));
+    grow.observe(document.body);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    const done = () => {
+      grow.disconnect();
+      window.removeEventListener('scroll', onScroll);
+    };
+    const timer = setTimeout(done, 4000);
+    return () => {
+      clearTimeout(timer);
+      done();
+    };
   }, [lastId]);
 
   // Go to a message once it's on the page, and mark it for a moment.
@@ -950,7 +968,6 @@ export default function ChatPage() {
               {t('chat.typing', { name: typing.name })}
             </span>
           ) : null}
-          <div ref={endRef} />
         </div>
       )}
 
@@ -1108,6 +1125,9 @@ export default function ChatPage() {
           <span className="chat-send__label">{editing ? t('common.save') : t('inbox.send')}</span>
         </Button>
       </form>
+      {/* The end of the page, under the Yap button and suggested replies: following the newest
+          message scrolls here, so they stay on screen above the message box in a long chat. */}
+      <div ref={endRef} aria-hidden />
       <ViewOnceCapture
         key={captureStart}
         open={captureOpen}

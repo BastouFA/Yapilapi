@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { BuiltApp } from '../src/app.ts';
+import { assertMessagePace } from '../src/lib/spam.ts';
 import { as, jobRunner, signUp, testApp, type JobRunner, type TestUser } from './helpers.ts';
 
 let t: BuiltApp;
@@ -70,6 +71,23 @@ describe('call history in the chat', () => {
     // A call's line is written once, however it ends.
     await as(t.app, ada).post(`/v1/calls/${call.id}/end`);
     expect(await callLines(bo, c)).toHaveLength(4);
+    // The inbox says it, and missed calls count as unread (the ended and declined ones don't).
+    const conv = (await as(t.app, bo).get(`/v1/conversations/${c}`)).body.conversation;
+    expect(conv.lastMessage).toMatchObject({ kind: 'system', system: { type: 'call', outcome: 'missed' } });
+    expect(conv.unreadCount).toBe(2);
+  });
+
+  it('lines the app writes never count toward a new account’s pace', async () => {
+    const [ada, bo] = [await adult(), await adult()];
+    const c = await chat(ada, [bo]);
+    await db().query(
+      `INSERT INTO messages (conversation_id, sender_id, body, kind, meta) SELECT $1, $2, '', 'system', '{"type":"call","callId":"x","kind":"audio","outcome":"missed","seconds":null}' FROM generate_series(1, 40)`,
+      [c, ada.id],
+    );
+    // The pace check itself, as it runs with spam checks on (the test app has them off).
+    await expect(assertMessagePace(db(), { ...t.ctx.config, SPAM_CHECKS: true }, ada.id)).resolves.toBeUndefined();
+    await db().query(`INSERT INTO messages (conversation_id, sender_id, body) SELECT $1, $2, 'hi' FROM generate_series(1, 40)`, [c, ada.id]);
+    await expect(assertMessagePace(db(), { ...t.ctx.config, SPAM_CHECKS: true }, ada.id)).rejects.toMatchObject({ code: 'slow_down' });
   });
 
   it('tells the caller someone is busy, and ends a group call when nobody is left', async () => {

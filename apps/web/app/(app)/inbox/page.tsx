@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Avatar, AvatarGroup, BottomSheet, Button, EmptyState, List, ListItem, Skeleton, TextField } from '@yapilapi/design-system';
-import { formatRelativeTime, messagePreviewOf, messagePreviewText, type Conversation, type PublicUser } from '@yapilapi/shared';
+import { formatRelativeTime, lastMessageText, type Conversation, type PublicUser } from '@yapilapi/shared';
 import { api, errorMessage, sharedRequest } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { PeoplePicker } from '@/components/PeoplePicker';
@@ -17,7 +17,7 @@ function conversationTitle(c: Conversation, meId: string, justYou: string): stri
 }
 
 export default function Inbox() {
-  const { me, t, locale, toast, unread } = useSession();
+  const { me, t, tp, locale, toast, unread } = useSession();
   const router = useRouter();
   const [items, setItems] = useState<Conversation[] | null>(null);
   const [requests, setRequests] = useState<{ id: string; from: PublicUser }[]>([]);
@@ -128,8 +128,8 @@ export default function Inbox() {
           {items.map((c) => {
             const others = c.members.filter((m) => m.id !== me?.id);
             const last = c.lastMessage;
-            // Said from what it is (a location, a game, an offer, a story reply), in your language.
-            const lastText = last ? messagePreviewText(last.preview ?? messagePreviewOf(last), { t, locale, meId: me?.id }) : '';
+            // Said from what it is (a location, a game, an offer, a story reply, a call), in your language.
+            const lastText = last ? lastMessageText(last, { t, tp, locale, meId: me?.id }) : '';
             return (
               <ListItem
                 key={c.id}
@@ -147,7 +147,9 @@ export default function Inbox() {
                   )
                 }
                 primary={conversationTitle(c, me!.id, t('m.chat.justYou'))}
-                secondary={last ? (last.sender.id === me?.id ? t('chat.lastFromYou', { text: lastText }) : lastText) : t('m.inbox.noMessages')}
+                secondary={
+                  last ? (last.sender.id === me?.id && last.kind !== 'system' ? t('chat.lastFromYou', { text: lastText }) : lastText) : t('m.inbox.noMessages')
+                }
                 end={
                   <>
                     {formatRelativeTime(c.updatedAt, locale)}

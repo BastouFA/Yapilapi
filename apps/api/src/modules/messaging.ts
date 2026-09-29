@@ -211,8 +211,9 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       `SELECT c.id, c.kind, c.title, c.last_message_at, c.disappearing_seconds, c.wallpaper, c.accent, cm.last_read_at, cm.yaps_out_loud, cm.role, cm.smart_replies,
          EXISTS (SELECT 1 FROM conversation_members o JOIN friendships f ON f.user_a = LEAST(o.user_id, $1::uuid) AND f.user_b = GREATEST(o.user_id, $1::uuid)
                  WHERE o.conversation_id = c.id AND o.user_id <> $1 AND o.left_at IS NULL) AS has_friend,
+         -- Unread: messages from the others, and calls you missed.
          (SELECT count(*) FROM messages m WHERE m.conversation_id = c.id AND m.created_at > cm.last_read_at AND m.sender_id <> $1 AND m.deleted_at IS NULL
-            AND m.moderation_status = 'normal' AND m.kind <> 'system') AS unread,
+            AND m.moderation_status = 'normal' AND (m.kind <> 'system' OR (m.meta->>'type' = 'call' AND m.meta->>'outcome' = 'missed'))) AS unread,
          (SELECT array_agg(user_id) FROM conversation_members WHERE conversation_id = c.id AND left_at IS NULL) AS member_ids,
          (SELECT array_agg(user_id) FROM conversation_members WHERE conversation_id = c.id AND left_at IS NULL AND role = 'admin') AS admin_ids,
          CASE WHEN c.kind <> 'community' THEN
@@ -221,10 +222,11 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
               AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = $1 AND b.blocked_id = o.user_id) OR (b.blocker_id = o.user_id AND b.blocked_id = $1)))
          END AS read_by,
          lm.id AS lm_id, lm.body AS lm_body, lm.created_at AS lm_created_at, lm.sender_id AS lm_sender, lm.attachments AS lm_attachments, lm.story_id,
-         lm.meta->'storyReply' AS lm_story_reply
+         lm.meta->'storyReply' AS lm_story_reply, lm.kind AS lm_kind, CASE WHEN lm.kind = 'system' THEN lm.meta END AS lm_system
        FROM conversation_members cm JOIN conversations c ON c.id = cm.conversation_id
-       LEFT JOIN LATERAL (SELECT x.id, x.body, x.created_at, x.sender_id, x.attachments, x.story_id, x.meta FROM messages x
-                          WHERE x.conversation_id = c.id AND x.deleted_at IS NULL AND x.kind <> 'system'
+       -- The last message, or a line about a call or who is in the group (the inbox says those too).
+       LEFT JOIN LATERAL (SELECT x.id, x.body, x.created_at, x.sender_id, x.attachments, x.story_id, x.meta, x.kind FROM messages x
+                          WHERE x.conversation_id = c.id AND x.deleted_at IS NULL AND (x.kind <> 'system' OR x.meta->>'type' IN ('call', 'group'))
                             AND (x.moderation_status = 'normal' OR (x.moderation_status = 'review' AND x.sender_id = $1))
                             AND (x.expires_at IS NULL OR x.expires_at > now())
                             AND NOT EXISTS (SELECT 1 FROM message_hides h WHERE h.user_id = $1 AND h.message_id = x.id)
@@ -274,6 +276,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
             attachments: r.attachments ?? [],
             ...(r.story ? { story: r.story } : {}),
             ...(r.lm_story_reply ? { storyReply: { quote: r.lm_story_reply.quote ?? null } } : {}),
+            ...(r.lm_system ? { kind: 'system' as const, system: r.lm_system } : {}),
             ...(previews.get(r.lm_id)?.available ? { preview: previews.get(r.lm_id) } : {}),
             createdAt: r.lm_created_at.toISOString(),
           }

@@ -636,6 +636,10 @@ export interface MessagePreview {
   offer?: OfferSummary;
   /** A reply to a story: body is only the reply. */
   storyReply?: StoryReply;
+  /** A photo, video or voice note sent to view once. */
+  viewOnce?: boolean;
+  /** A hold-to-talk voice clip. */
+  yap?: boolean;
 }
 
 /** An offer or a counter-offer on a Market listing, as a one-line preview says it. */
