@@ -31,6 +31,11 @@ export function FollowList({
   const [error, setError] = useState<string | null>(null);
   // People followed from this list just now keep a (no longer active) button, so focus isn't lost.
   const [justFollowed, setJustFollowed] = useState<Set<string>>(new Set());
+  // Private accounts asked from this list (they answer first).
+  const [requested, setRequested] = useState<Set<string>>(new Set());
+  // Your own followers you removed just now.
+  const [removed, setRemoved] = useState<Set<string>>(new Set());
+  const ownFollowers = userId === me?.id && tab === 'followers';
 
   useEffect(() => setTab(initial), [initial, open]);
   useEffect(() => {
@@ -54,10 +59,24 @@ export function FollowList({
 
   const more = async () => {
     if (!cursor) return;
-    const r = await (tab === 'followers' ? api.users.followers(userId, cursor) : api.users.following(userId, cursor));
-    setItems((cur) => [...(cur ?? []), ...r.items]);
-    setCursor(r.nextCursor);
-    setFollows((f) => new Set([...f, ...r.viewerFollows]));
+    try {
+      const r = await (tab === 'followers' ? api.users.followers(userId, cursor) : api.users.following(userId, cursor));
+      setItems((cur) => [...(cur ?? []), ...r.items]);
+      setCursor(r.nextCursor);
+      setFollows((f) => new Set([...f, ...r.viewerFollows]));
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  };
+  const remove = async (u: PublicUser) => {
+    try {
+      await api.users.removeFollower(u.id);
+      setRemoved((r) => new Set(r).add(u.id));
+      toast(t('followers.removed', { name: u.displayName }));
+      onFollowChange?.();
+    } catch (e) {
+      toast(errorMessage(e));
+    }
   };
 
   return (
@@ -79,57 +98,79 @@ export function FollowList({
         ) : items.length ? (
           <>
             <List>
-              {items.map((u) => (
-                <ListItem
-                  key={u.id}
-                  start={<Avatar name={u.displayName} src={u.avatarUrl} size="sm" />}
-                  primary={
-                    <Link href={`/u/${u.username}`} className="follow-list__name" onClick={onClose}>
-                      {u.displayName}
-                    </Link>
-                  }
-                  secondary={`@${u.username}`}
-                  end={
-                    u.id === me?.id ? null : justFollowed.has(u.id) && follows.has(u.id) ? (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        aria-disabled="true"
-                        aria-label={t('follow.followingName', { name: u.displayName })}
-                        onClick={() => {}}
-                      >
-                        {t('profile.unfollow')}
-                      </Button>
-                    ) : follows.has(u.id) ? (
-                      <span className="muted" style={{ fontSize: 13 }}>
-                        {t('profile.unfollow')}
+              {items
+                .filter((u) => !(ownFollowers && removed.has(u.id)))
+                .map((u) => (
+                  <ListItem
+                    key={u.id}
+                    start={<Avatar name={u.displayName} src={u.avatarUrl} size="sm" />}
+                    primary={
+                      <Link href={`/u/${u.username}`} className="follow-list__name" onClick={onClose}>
+                        {u.displayName}
+                      </Link>
+                    }
+                    secondary={`@${u.username}`}
+                    end={
+                      <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
+                        {u.id === me?.id ? null : requested.has(u.id) ? (
+                          <span className="muted" style={{ fontSize: 13 }}>
+                            {t('profile.requested')}
+                          </span>
+                        ) : justFollowed.has(u.id) && follows.has(u.id) ? (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            aria-disabled="true"
+                            aria-label={t('follow.followingName', { name: u.displayName })}
+                            onClick={() => {}}
+                          >
+                            {t('profile.unfollow')}
+                          </Button>
+                        ) : follows.has(u.id) ? (
+                          <span className="muted" style={{ fontSize: 13 }}>
+                            {t('profile.unfollow')}
+                          </span>
+                        ) : (
+                          <Button
+                            size="sm"
+                            aria-label={t('follow.followName', { name: u.displayName })}
+                            onClick={async () => {
+                              setJustFollowed((f) => new Set(f).add(u.id));
+                              setFollows((f) => new Set(f).add(u.id));
+                              try {
+                                const r = await api.users.follow(u.id);
+                                if (r.requested) {
+                                  setFollows((f) => {
+                                    const n = new Set(f);
+                                    n.delete(u.id);
+                                    return n;
+                                  });
+                                  setRequested((q) => new Set(q).add(u.id));
+                                  toast(t('profile.requestedToast', { name: u.displayName }));
+                                }
+                                onFollowChange?.();
+                              } catch (err) {
+                                setFollows((f) => {
+                                  const n = new Set(f);
+                                  n.delete(u.id);
+                                  return n;
+                                });
+                                toast(errorMessage(err));
+                              }
+                            }}
+                          >
+                            {t('profile.follow')}
+                          </Button>
+                        )}
+                        {ownFollowers ? (
+                          <Button size="sm" variant="ghost" aria-label={t('followers.removeLabel', { name: u.displayName })} onClick={() => void remove(u)}>
+                            {t('followers.remove')}
+                          </Button>
+                        ) : null}
                       </span>
-                    ) : (
-                      <Button
-                        size="sm"
-                        aria-label={t('follow.followName', { name: u.displayName })}
-                        onClick={async () => {
-                          setJustFollowed((f) => new Set(f).add(u.id));
-                          setFollows((f) => new Set(f).add(u.id));
-                          try {
-                            await api.users.follow(u.id);
-                            onFollowChange?.();
-                          } catch (err) {
-                            setFollows((f) => {
-                              const n = new Set(f);
-                              n.delete(u.id);
-                              return n;
-                            });
-                            toast(errorMessage(err));
-                          }
-                        }}
-                      >
-                        {t('profile.follow')}
-                      </Button>
-                    )
-                  }
-                />
-              ))}
+                    }
+                  />
+                ))}
             </List>
             {cursor ? (
               <Button variant="secondary" size="sm" onClick={more}>

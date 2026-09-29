@@ -336,6 +336,7 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         `DELETE FROM notifications WHERE user_id = $1 OR actor_id = $1`,
         // Who they are connected to or kept away, both ways.
         `DELETE FROM friend_requests WHERE from_user_id = $1 OR to_user_id = $1`,
+        `DELETE FROM follow_requests WHERE follower_id = $1 OR followee_id = $1`,
         `DELETE FROM blocks WHERE blocker_id = $1 OR blocked_id = $1`,
         `DELETE FROM mutes WHERE muter_id = $1 OR muted_id = $1`,
         `DELETE FROM restrictions WHERE restrictor_id = $1 OR restricted_id = $1`,

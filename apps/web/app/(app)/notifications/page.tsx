@@ -12,6 +12,7 @@ import {
   togetherNoticeText,
   type MessageKey,
   type NotificationItem,
+  type PublicUser,
 } from '@yapilapi/shared';
 import { api, errorMessage, sharedRequest } from '@/lib/api';
 import { NextLink } from '@/lib/link';
@@ -21,14 +22,17 @@ import { useRealtime, useSession, type Session } from '../../providers';
  * Whole sentences for each kind of notification, in the viewer's language. `name` is who did it
  * (for grouped rows, "Ada, Tunde and 2 others"); a notification about your own account ignores it.
  */
-type TextFn = (n: NotificationItem, name: string, t: Session['t'], tp: Session['tp']) => string;
+type TextFn = (n: NotificationItem, name: string, t: Session['t'], tp: Session['tp'], people: number) => string;
 const TEXT: Record<string, TextFn> = {
-  follow: (_n, name, t) => t('m.notif.group.follow', { names: name }),
+  // Grouped kinds read "Ada and 2 others liked…", or one person with a singular verb (it matters in French and others).
+  follow: (_n, name, t, _tp, people) => (people > 1 ? t('m.notif.group.follow', { names: name }) : t('m.notif.follow', { name })),
   friend_request: (_n, name, t) => t('m.notif.friendRequest', { name }),
   friend_accepted: (_n, name, t) => t('m.notif.friendAccepted', { name }),
-  post_reaction: (_n, name, t) => t('m.notif.group.like', { names: name }),
-  post_comment: (_n, name, t) => t('m.notif.group.comment', { names: name }),
-  post_repost: (_n, name, t) => t('m.notif.group.repost', { names: name }),
+  follow_request: (_n, name, t) => t('profile.followRequestFrom', { name }),
+  follow_accepted: (_n, name, t) => t('profile.followAccepted', { name }),
+  post_reaction: (_n, name, t, _tp, people) => (people > 1 ? t('m.notif.group.like', { names: name }) : t('m.notif.like', { name })),
+  post_comment: (_n, name, t, _tp, people) => (people > 1 ? t('m.notif.group.comment', { names: name }) : t('m.notif.comment', { name })),
+  post_repost: (_n, name, t, _tp, people) => (people > 1 ? t('m.notif.group.repost', { names: name }) : t('m.notif.repost', { name })),
   reel_duet: (_n, name, t) => t('m.notif.reelDuet', { name }),
   reel_remix: (_n, name, t) => t('m.notif.reelRemix', { name }),
   post_mention: (_n, name, t) => t('m.notif.postMention', { name }),
@@ -100,8 +104,13 @@ function decisionLabel(decision: unknown, t: Session['t']): string {
   return key ? t(key) : String(decision ?? '').replace(/_/g, ' ');
 }
 
+/** Notifications about a comment, which open the post with its comments. */
+const COMMENT_TYPES = new Set(['post_comment', 'comment_reply', 'comment_like', 'comment_mention']);
+
 function hrefFor(n: NotificationItem, meUsername?: string): string | undefined {
   if (n.type === 'new_sign_in') return '/settings/security?review=sign-in';
+  // A call opens the chat it was in (older call notifications open the caller).
+  if (n.type === 'call_incoming' && typeof n.data.conversationId === 'string') return `/inbox/${n.data.conversationId}`;
   // Market: a rating opens your profile's Market tab; the rest open the listing (offers open the chat, below).
   if (n.type === 'market_rated' && meUsername) return `/u/${meUsername}?tab=market`;
   if (n.entityType === 'listing') return `/market/${n.entityId}`;
@@ -122,6 +131,8 @@ function hrefFor(n: NotificationItem, meUsername?: string): string | undefined {
   if (n.entityType === 'recap' || n.type === 'recap_ready' || n.type === 'recap_failed') return n.entityId ? `/recaps?open=${n.entityId}` : '/recaps';
   if (n.entityType === 'board') return `/boards/${n.entityId}`;
   if (n.entityType === 'draft') return `/create?draft=${n.entityId}`;
+  // About a comment: the post with its comments open.
+  if (n.entityType === 'post' && COMMENT_TYPES.has(n.type)) return `/p/${n.entityId}?comments=1`;
   if (n.entityType === 'post') return `/p/${n.entityId}`;
   if (n.entityType === 'moment') return `/s/${n.entityId}`;
   if (n.entityType === 'live') return `/live/${n.entityId}`;
@@ -205,10 +216,13 @@ function bucket(iso: string): Bucket {
 function group(items: NotificationItem[]): { title: Bucket; groups: Group[] }[] {
   const sections: { title: Bucket; groups: Group[] }[] = [];
   for (const n of items) {
+    // Follow requests are answered in their own list above.
+    if (n.type === 'follow_request') continue;
     const title = bucket(n.createdAt);
     let section = sections.at(-1);
     if (!section || section.title !== title) sections.push((section = { title, groups: [] }));
-    const key = GROUPED.has(n.type) ? `${n.type}:${n.entityId ?? ''}` : n.id;
+    // New followers group together ("Ada and 3 others started following you"); the rest by what they're about.
+    const key = n.type === 'follow' ? 'follow' : GROUPED.has(n.type) ? `${n.type}:${n.entityId ?? ''}` : n.id;
     const existing = section.groups.find((g) => g.key === key);
     if (existing) existing.items.push(n);
     else section.groups.push({ key, items: [n] });
@@ -254,16 +268,66 @@ export default function Notifications() {
       setAnswering(null);
     }
   };
-  const load = () =>
-    sharedRequest('notifications', () => api.notifications.list()).then(
-      (r) => setItems(r.items),
-      (e) => toast(errorMessage(e)),
+  // Why the list couldn't load (shown with Try again), and the cursor for older ones.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [next, setNext] = useState<string | null>(null);
+  const [more, setMore] = useState(false);
+  // People asking to follow you (a private account), answered here.
+  const [requests, setRequests] = useState<{ user: PublicUser; createdAt: string }[]>([]);
+  const [requestBusy, setRequestBusy] = useState<string | null>(null);
+  const load = () => {
+    setLoadError(null);
+    void api.users.followRequests().then(
+      (r) => setRequests(r.items),
+      () => {},
     );
+    return sharedRequest('notifications', () => api.notifications.list()).then(
+      (r) => {
+        setItems(r.items);
+        setNext(r.nextCursor);
+        // Seen now, as on the phone: the badge clears and the unread dots stay for this visit.
+        // (Again once marked: a count asked for at the same time may have landed after this.)
+        setUnread({ notifications: 0 });
+        if (r.unread)
+          void api.notifications.markRead().then(
+            () => setUnread({ notifications: 0 }),
+            () => {},
+          );
+      },
+      (e) => setLoadError(errorMessage(e)),
+    );
+  };
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useRealtime((e) => e.type === 'notification.created' && void load());
+  const loadMore = async () => {
+    if (!next) return;
+    setMore(true);
+    try {
+      const r = await api.notifications.list(next);
+      setItems((cur) => [...(cur ?? []), ...r.items.filter((n) => !cur?.some((c) => c.id === n.id))]);
+      setNext(r.nextCursor);
+    } catch (e) {
+      toast(errorMessage(e));
+    } finally {
+      setMore(false);
+    }
+  };
+  const answerRequest = async (user: PublicUser, accept: boolean) => {
+    setRequestBusy(user.id);
+    try {
+      await (accept ? api.users.acceptFollow(user.id) : api.users.declineFollow(user.id));
+      setRequests((cur) => cur.filter((r) => r.user.id !== user.id));
+      toast(accept ? t('followRequests.accepted', { name: user.displayName }) : t('followRequests.declined'));
+      void load();
+    } catch (e) {
+      toast(errorMessage(e));
+    } finally {
+      setRequestBusy(null);
+    }
+  };
 
   return (
     <div className="yp-shell__inner">
@@ -281,9 +345,42 @@ export default function Notifications() {
           {t('notifList.markAllRead')}
         </Button>
       </div>
-      {items === null ? (
+      {requests.length ? (
+        <section className="stack-sm" aria-labelledby="n-requests">
+          <h2 id="n-requests" className="section-title">
+            {t('followRequests.title')}
+          </h2>
+          <List>
+            {requests.map((r) => (
+              <ListItem
+                key={r.user.id}
+                start={<Avatar name={r.user.displayName} src={r.user.avatarUrl} size="sm" />}
+                primary={
+                  <Link href={`/u/${r.user.username}`} className="notif__link">
+                    <span style={{ whiteSpace: 'normal' }}>{t('profile.followRequestFrom', { name: r.user.displayName })}</span>
+                  </Link>
+                }
+                secondary={formatRelativeTime(r.createdAt, locale)}
+                end={
+                  <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
+                    <Button size="sm" loading={requestBusy === r.user.id} disabled={!!requestBusy} onClick={() => answerRequest(r.user, true)}>
+                      {t('m.common.accept')}
+                    </Button>
+                    <Button size="sm" variant="ghost" disabled={!!requestBusy} onClick={() => answerRequest(r.user, false)}>
+                      {t('m.common.decline')}
+                    </Button>
+                  </span>
+                }
+              />
+            ))}
+          </List>
+        </section>
+      ) : null}
+      {items === null && loadError ? (
+        <EmptyState title={loadError} action={<Button onClick={() => void load()}>{t('m.common.retry')}</Button>} />
+      ) : items === null ? (
         <Skeleton height={240} />
-      ) : items.length ? (
+      ) : items.some((n) => n.type !== 'follow_request') ? (
         <div className="stack">
           {group(items).map((section) => (
             <section key={section.title} className="stack-sm" aria-labelledby={`n-${section.title}`}>
@@ -301,7 +398,7 @@ export default function Notifications() {
                     <span style={{ fontWeight: unread ? 600 : 400, whiteSpace: 'normal' }}>
                       {batched ??
                         (TEXT[n.type]
-                          ? TEXT[n.type]!(n, names(g, t, tp), t, tp)
+                          ? TEXT[n.type]!(n, names(g, t, tp), t, tp, actors.length)
                           : n.actor
                             ? t('m.notif.other', { name: names(g, t, tp) })
                             : t('m.notif.otherNoActor'))}
@@ -400,8 +497,12 @@ export default function Notifications() {
                           onClick={async () => {
                             setFollowed((f) => new Set(f).add(actors[0]!.id));
                             try {
-                              await api.users.follow(actors[0]!.id);
-                              toast(t('m.notif.nowFollowing', { name: actors[0]!.displayName }));
+                              const r = await api.users.follow(actors[0]!.id);
+                              toast(
+                                r.requested
+                                  ? t('profile.requestedToast', { name: actors[0]!.displayName })
+                                  : t('m.notif.nowFollowing', { name: actors[0]!.displayName }),
+                              );
                             } catch (e) {
                               setFollowed((f) => {
                                 const next = new Set(f);
@@ -423,6 +524,11 @@ export default function Notifications() {
               </List>
             </section>
           ))}
+          {next ? (
+            <Button variant="ghost" loading={more} onClick={() => void loadMore()}>
+              {t('feed.loadMore')}
+            </Button>
+          ) : null}
         </div>
       ) : (
         <EmptyState title={t('m.notif.caughtUp')} body={t('m.notif.caughtUpBody')} />

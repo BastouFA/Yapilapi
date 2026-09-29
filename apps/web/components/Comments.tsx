@@ -77,6 +77,8 @@ export function Comments({ post, onCountChange, moment }: { post: Post; onCountC
   const [sort, setSort] = useState<CommentSort>('top');
   const [page, setPage] = useState<Omit<CommentPage, 'items' | 'nextCursor'> | null>(null);
   const [items, setItems] = useState<Comment[] | null>(null);
+  // Why the comments couldn't load (shown with Try again, not as "No comments yet").
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [threads, setThreads] = useState<Record<string, Thread>>({});
@@ -123,12 +125,12 @@ export function Comments({ post, onCountChange, moment }: { post: Post; onCountC
         setCursor(nextCursor);
         setPage(rest);
         setThreads({});
+        setLoadError(null);
       } catch (e) {
-        setItems((cur) => cur ?? []);
-        toast(errorMessage(e));
+        setLoadError(errorMessage(e));
       }
     },
-    [post.id, toast],
+    [post.id],
   );
   useEffect(() => {
     void load(sort);
@@ -616,7 +618,25 @@ export function Comments({ post, onCountChange, moment }: { post: Post; onCountC
         </section>
       ) : null}
 
-      {items === null ? (
+      {loadError ? (
+        <div className="stack-sm" role="alert">
+          <p className="muted" style={{ margin: 0 }}>
+            {loadError}
+          </p>
+          <div>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setLoadError(null);
+                void load(sort);
+              }}
+            >
+              {t('m.common.retry')}
+            </Button>
+          </div>
+        </div>
+      ) : items === null ? (
         <Skeleton height={60} />
       ) : items.length ? (
         <div className="stack">{items.map((c) => row(c, false))}</div>

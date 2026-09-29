@@ -23,6 +23,7 @@ export function FriendsFinder({ onChecked }: { onChecked?: (r: { checked: number
   const [following, setFollowing] = useState<Set<string>>(new Set());
   const [link, setLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
   useEffect(() => {
     void client()
@@ -56,7 +57,12 @@ export function FriendsFinder({ onChecked }: { onChecked?: (r: { checked: number
     setFollowing(next);
     try {
       const api = await client();
-      await (on ? api.users.unfollow(id) : api.users.follow(id));
+      const r = await (on ? api.users.unfollow(id) : api.users.follow(id));
+      // A private account answers first: the button goes back to Follow until it does.
+      if (r.requested) {
+        setFollowing(following);
+        setNote(t('profile.requestedToast', { name: result?.found.find((f) => f.user.id === id)?.user.displayName ?? '' }));
+      }
     } catch (e) {
       setFollowing(following);
       setError(errorMessage(e));
@@ -91,6 +97,11 @@ export function FriendsFinder({ onChecked }: { onChecked?: (r: { checked: number
     <View style={{ gap: space[3] }}>
       <Text style={{ color: c.inkMuted, fontSize: 15, lineHeight: 21 }}>{t('friends.body')}</Text>
       {error ? <Notice tone="danger">{error}</Notice> : null}
+      {note ? (
+        <View accessibilityLiveRegion="polite">
+          <Notice>{note}</Notice>
+        </View>
+      ) : null}
       {state === 'idle' ? <Button label={t('friends.allow')} icon="people-outline" onPress={() => check()} /> : null}
       {/* Rather not share contacts (or can't): the invite link works without them. */}
       {link && (state === 'idle' || state === 'denied') ? (

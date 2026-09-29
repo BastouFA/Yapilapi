@@ -56,6 +56,16 @@ const VISIBLE = postVisibleSql('$1');
 const UNLOCKED = postUnlockedSql('$1');
 /** For You scores posts from your connections plus this many of the newest other posts. */
 const RECENT_CANDIDATES = 1000;
+/**
+ * Diversity in For you: an author's first posts rank on their own score; each one after the first
+ * FEED_PER_AUTHOR goes down by FEED_DIVERSITY_STEP more, so one busy account spreads out through the
+ * feed instead of filling it, and every post still has one place in the order (no post is skipped
+ * between pages).
+ */
+const FEED_PER_AUTHOR = 2;
+const FEED_DIVERSITY_STEP = 1.5;
+const diversified = (score: string, author: string, tiebreak: string) =>
+  `${score} - ${FEED_DIVERSITY_STEP} * greatest(0, row_number() OVER (PARTITION BY ${author} ORDER BY ${score} DESC, ${tiebreak}) - ${FEED_PER_AUTHOR})`;
 /** …and up to this many of the newest posts on the viewer's interests. */
 const INTEREST_CANDIDATES = 300;
 /** Reels ranks the newest this-many reels plus a month of reels from your follows and friends. */
@@ -627,7 +637,8 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
   /**
    * For You ranking. Score = affinity + interest match + engagement + freshness
    * − negative feedback. The candidate window is fixed at the first page (asOf)
-   * so pagination is stable. Diversity: at most 2 posts per author per page.
+   * so pagination is stable. Diversity: an author's posts after their first two
+   * rank lower and lower (see FEED_DIVERSITY_STEP).
    * Not optimized for time spent: no autoplay loops, a clear end of feed.
    */
   async function rankedFeed(userId: string, cursor: string | undefined, limit: number, personal: string, reduced: boolean, personalized: boolean) {
@@ -702,30 +713,21 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
          WHERE p.id IN (SELECT id FROM candidates) AND ${VISIBLE} ${personal} ${connectionOnly}
            AND (p.community_id IS NULL OR cm_self.user_id IS NOT NULL OR cm_c.visibility = 'public')
        )
-       SELECT s.id, s.author_id, s.display_name, s.community_name, s.member, s.followed, s.friend, s.collab_name, s.collab_friend,
-              (SELECT t FROM unnest(s.topics) t WHERE t = ANY(me.interests) LIMIT 1) AS matched_topic,
-              s.base
-                + CASE WHEN s.author_id = $1 THEN 1 ELSE 0 END
-                + CASE WHEN s.friend OR s.collab_friend THEN 3 ELSE 0 END
-                + CASE WHEN s.followed OR (s.collab_name IS NOT NULL AND NOT s.collab_friend) THEN 2 ELSE 0 END
-                + CASE WHEN s.member THEN 1.5 ELSE 0 END AS score
-       FROM scored s CROSS JOIN me
-       ORDER BY score DESC, s.created_at DESC, s.id DESC
+       SELECT x.* FROM (
+         SELECT s.id, s.author_id, s.created_at, s.display_name, s.community_name, s.member, s.followed, s.friend, s.collab_name, s.collab_friend,
+                (SELECT t FROM unnest(s.topics) t WHERE t = ANY(me.interests) LIMIT 1) AS matched_topic,
+                s.base
+                  + CASE WHEN s.author_id = $1 THEN 1 ELSE 0 END
+                  + CASE WHEN s.friend OR s.collab_friend THEN 3 ELSE 0 END
+                  + CASE WHEN s.followed OR (s.collab_name IS NOT NULL AND NOT s.collab_friend) THEN 2 ELSE 0 END
+                  + CASE WHEN s.member THEN 1.5 ELSE 0 END AS score
+         FROM scored s CROSS JOIN me
+       ) x
+       ORDER BY ${diversified('x.score', 'x.author_id', 'x.created_at DESC, x.id DESC')} DESC, x.created_at DESC, x.id DESC
        LIMIT $3 OFFSET $4`,
-      [userId, c.asOf, limit * 2 + 1, c.o],
+      [userId, c.asOf, limit + 1, c.o],
     );
-    // Diversity pass: cap posts per author on this page.
-    const perAuthor = new Map<string, number>();
-    const picked: typeof rows = [];
-    let consumed = 0;
-    for (const r of rows) {
-      if (picked.length >= limit) break;
-      consumed++;
-      const n = perAuthor.get(r.author_id) ?? 0;
-      if (n >= 2) continue;
-      perAuthor.set(r.author_id, n + 1);
-      picked.push(r);
-    }
+    const picked = rows.slice(0, limit);
     const reasons = new Map<string, FeedReason>();
     for (const r of picked)
       reasons.set(
@@ -748,7 +750,6 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
                         ? { code: 'community_popular', params: { community: r.community_name } }
                         : { code: 'popular' },
       );
-    const more = rows.length > consumed;
     return {
       mode: 'for_you',
       items: await hydratePosts(
@@ -757,7 +758,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
         userId,
         reasons,
       ),
-      nextCursor: more ? encodeCursor({ asOf: c.asOf, o: c.o + consumed }) : null,
+      nextCursor: rows.length > limit ? encodeCursor({ asOf: c.asOf, o: c.o + limit }) : null,
     };
   }
 
@@ -778,28 +779,20 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
          SELECT id FROM posts
          WHERE author_id = $1 AND deleted_at IS NULL AND status = 'published' AND created_at <= $2::timestamptz AND created_at > $2::timestamptz - interval '14 days'
        )
-       SELECT p.id, p.author_id, cm_c.name AS community_name,
-              ln(1 + p.like_count + 2 * p.comment_count) * 0.6 + 4.0 * exp(-extract(epoch FROM ($2::timestamptz - p.created_at)) / 86400.0) AS score
-       ${POST_FROM}
-       LEFT JOIN communities cm_c ON cm_c.id = p.community_id
-       LEFT JOIN community_members cm_self ON cm_self.community_id = p.community_id AND cm_self.user_id = $1 AND cm_self.status = 'active'
-       WHERE p.id IN (SELECT id FROM candidates) AND ${VISIBLE} ${personal} ${connectionOnly}
-         AND (p.community_id IS NULL OR cm_self.user_id IS NOT NULL OR cm_c.visibility = 'public')
-       ORDER BY score DESC, p.created_at DESC, p.id DESC
+       SELECT x.* FROM (
+         SELECT p.id, p.author_id, p.created_at, cm_c.name AS community_name,
+                ln(1 + p.like_count + 2 * p.comment_count) * 0.6 + 4.0 * exp(-extract(epoch FROM ($2::timestamptz - p.created_at)) / 86400.0) AS score
+         ${POST_FROM}
+         LEFT JOIN communities cm_c ON cm_c.id = p.community_id
+         LEFT JOIN community_members cm_self ON cm_self.community_id = p.community_id AND cm_self.user_id = $1 AND cm_self.status = 'active'
+         WHERE p.id IN (SELECT id FROM candidates) AND ${VISIBLE} ${personal} ${connectionOnly}
+           AND (p.community_id IS NULL OR cm_self.user_id IS NOT NULL OR cm_c.visibility = 'public')
+       ) x
+       ORDER BY ${diversified('x.score', 'x.author_id', 'x.created_at DESC, x.id DESC')} DESC, x.created_at DESC, x.id DESC
        LIMIT $3 OFFSET $4`,
-      [userId, c.asOf, limit * 2 + 1, c.o],
+      [userId, c.asOf, limit + 1, c.o],
     );
-    const perAuthor = new Map<string, number>();
-    const picked: typeof rows = [];
-    let consumed = 0;
-    for (const r of rows) {
-      if (picked.length >= limit) break;
-      consumed++;
-      const n = perAuthor.get(r.author_id) ?? 0;
-      if (n >= 2) continue;
-      perAuthor.set(r.author_id, n + 1);
-      picked.push(r);
-    }
+    const picked = rows.slice(0, limit);
     const reasons = new Map<string, FeedReason>(
       picked.map((r) => [
         r.id as string,
@@ -818,7 +811,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
         userId,
         reasons,
       ),
-      nextCursor: rows.length > consumed ? encodeCursor({ asOf: c.asOf, o: c.o + consumed }) : null,
+      nextCursor: rows.length > limit ? encodeCursor({ asOf: c.asOf, o: c.o + limit }) : null,
     };
   }
 
@@ -977,12 +970,24 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     };
   });
 
-  /** A person's reposts, newest first (what they chose to share). */
+  /**
+   * A person's reposts, newest first (what they chose to share). A private account's reposts are
+   * for the people who can see that profile (the account and its followers); others get `hidden`.
+   */
   app.get('/v1/users/:id/reposts', async (req) => {
     const viewer = req.user?.id ?? null;
     const { id } = parse(idParam, req.params);
     const q = parse(pageQuerySchema, req.query);
     const c = decodeCursor<KeyCursor>(q.cursor);
+    const owner = (
+      await db.query(
+        `SELECT pr.is_private, (pr.user_id = $2 OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $2 AND f.followee_id = pr.user_id)) AS sees
+         FROM profiles pr JOIN users u ON u.id = pr.user_id WHERE pr.user_id = $1 AND u.status = 'active' AND ${notBlockedSql('pr.user_id', '$2')}`,
+        [id, viewer],
+      )
+    ).rows[0];
+    if (!owner) throw notFound('That profile');
+    if (owner.is_private && !owner.sees) return { items: [], nextCursor: null, hidden: true };
     const { rows } = await db.query(
       `SELECT p.id, r.created_at, r.post_id AS rid FROM post_reposts r JOIN posts p ON p.id = r.post_id
        JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id

@@ -237,3 +237,28 @@ describe('editing a cover photo', () => {
     expect(exported.profile.cover_media_id).toBe(a.id);
   });
 });
+
+describe('profile photo', () => {
+  it('is one of your own uploads, never an address elsewhere', async () => {
+    const owner = await adult();
+    const other = await adult();
+    const set = (u: TestUser, avatarUrl: string | null) => as(t.app, u).patch('/v1/me/profile', { avatarUrl });
+    // Somewhere else: every viewer's device would fetch it.
+    expect((await set(owner, 'https://tracker.example/pixel.png')).status).toBe(400);
+    expect((await set(owner, 'javascript:alert(1)')).status).toBe(400);
+    const theirs = await upload(other);
+    expect((await set(owner, theirs.url)).status).toBe(400);
+
+    const mine = await upload(owner);
+    // Sent as the web app does (the address on its own origin), it's kept as the photo's own processed size.
+    const onWeb = new URL(new URL(mine.url, 'http://api.test').pathname, 'http://127.0.0.1:3000').toString();
+    const r = await set(owner, onWeb);
+    expect(r.status).toBe(200);
+    const variants = (await db().query(`SELECT variants FROM media WHERE id = $1`, [mine.id])).rows[0].variants;
+    expect(r.body.profile.avatarUrl).toBe(variants.medium);
+    expect((await set(owner, null)).body.profile.avatarUrl).toBeNull();
+
+    await db().query(`UPDATE media SET moderation = 'sensitive' WHERE id = $1`, [mine.id]);
+    expect((await set(owner, mine.url)).body.error.code).toBe('media_sensitive');
+  });
+});

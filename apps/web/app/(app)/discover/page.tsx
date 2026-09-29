@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import { AgentPanel } from '@/components/AgentPanel';
-import { BuyButton } from '@/components/BuyButton';
+import { MoreResults, SearchFailed, type BusinessResult, type PlaceResult, type ProductResult } from '@/components/SearchMore';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
-import { Avatar, Button, CommunityCard, EmptyState, EventCard, List, ListItem, ProductCard, Skeleton } from '@yapilapi/design-system';
+import { Avatar, Button, CommunityCard, EmptyState, EventCard, List, ListItem, Skeleton } from '@yapilapi/design-system';
 import type { Community, EventItem, MessageKey, Post, PublicUser } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
@@ -34,21 +34,32 @@ const INTENT_WHEN: Record<string, MessageKey> = {
 };
 
 function Discover() {
-  const { t, tp, locale, toast, flags } = useSession();
+  const { t, tp, locale, flags } = useSession();
   const router = useRouter();
   const q = useSearchParams().get('q') ?? '';
   const [input, setInput] = useState(q);
   const [results, setResults] = useState<Awaited<ReturnType<typeof api.search>> | null>(null);
+  // Why the search didn't go through (shown with Try again instead of loading forever).
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [now, setNow] = useState<Awaited<ReturnType<typeof api.now>> | null>(null);
   const [communities, setCommunities] = useState<Community[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
 
   useEffect(() => {
     setInput(q);
+    setSearchError(null);
     if (!q) return setResults(null);
     setResults(null);
-    api.search(q).then(setResults, (e) => toast(errorMessage(e)));
-  }, [q, toast]);
+    let current = true;
+    api.search(q).then(
+      (r) => current && setResults(r),
+      (e) => current && setSearchError(errorMessage(e)),
+    );
+    return () => {
+      current = false;
+    };
+  }, [q, attempt]);
 
   useEffect(() => {
     api
@@ -70,9 +81,11 @@ function Discover() {
   const posts = (r.posts ?? []) as Post[];
   const foundCommunities = (r.communities ?? []) as Community[];
   const foundEvents = (r.events ?? []) as EventItem[];
-  const places = (r.places ?? []) as { id: string; name: string; category: string; city: string | null }[];
-  const products = (r.products ?? []) as { id: string; kind: string; title: string; priceCents: number; currency: string }[];
-  const nothing = results && ![people, posts, foundCommunities, foundEvents, places, products].some((x) => x.length);
+  const places = (r.places ?? []) as PlaceResult[];
+  const businesses = (r.businesses ?? []) as BusinessResult[];
+  const products = (r.products ?? []) as ProductResult[];
+  const topics = (r.topics ?? []) as { slug: string; name: string; posts: number }[];
+  const nothing = results && ![people, posts, foundCommunities, foundEvents, places, businesses, products, topics].some((x) => x.length);
   const intent = results?.intent;
   let showing = '';
   if (intent && (intent.when || intent.placeCategory || intent.groupSize)) {
@@ -93,8 +106,8 @@ function Discover() {
   return (
     <div className="yp-shell__inner yp-shell__inner--wide">
       <div className="yp-topbar">
-        <h1>{t('discover.title')}</h1>
-        <div className="row">
+        <h1 className="topbar__word">{t('discover.title')}</h1>
+        <div className="row topbar__actions">
           {flags.LIVE ? (
             <Link href="/live" className="yp-btn yp-btn--ghost yp-btn--sm">
               {t('m.live.title')}
@@ -145,7 +158,9 @@ function Discover() {
       {!q ? <AgentPanel kind="discover" compact /> : null}
 
       {q ? (
-        results === null ? (
+        results === null && searchError ? (
+          <SearchFailed message={searchError} onRetry={() => setAttempt((n) => n + 1)} />
+        ) : results === null ? (
           <Skeleton height={200} />
         ) : nothing ? (
           <EmptyState title={t('search.noResults', { query: q })} body={t('discover.noResultsBody')} />
@@ -189,32 +204,19 @@ function Discover() {
                 </div>
               </section>
             ) : null}
-            {places.length ? (
+            {topics.length ? (
               <section className="stack-sm">
-                <h2 className="section-title">{t('discover.places')}</h2>
-                <List>
-                  {places.map((p) => (
-                    <ListItem
-                      key={p.id}
-                      href={`/places/${p.id}`}
-                      linkAs={NextLink}
-                      primary={p.name}
-                      secondary={[p.category, p.city].filter(Boolean).join(' · ')}
-                    />
-                  ))}
-                </List>
-              </section>
-            ) : null}
-            {products.length ? (
-              <section className="stack-sm">
-                <h2 className="section-title">{t('discover.products')}</h2>
-                <div className="yp-grid">
-                  {products.map((p) => (
-                    <ProductCard key={p.id} product={{ ...p, inventory: null }} locale={locale} action={<BuyButton productId={p.id} />} />
+                <h2 className="section-title">{t('m.wander.tags')}</h2>
+                <div className="row" style={{ flexWrap: 'wrap' }}>
+                  {topics.map((tag) => (
+                    <Link key={tag.slug} href={`/t/${encodeURIComponent(tag.slug)}`} className="yp-chip">
+                      <bdi>#{tag.slug}</bdi>
+                    </Link>
                   ))}
                 </div>
               </section>
             ) : null}
+            <MoreResults places={places} businesses={businesses} products={products} />
             {posts.length ? (
               <section className="stack-sm">
                 <h2 className="section-title">{t('discover.posts')}</h2>

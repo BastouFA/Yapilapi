@@ -864,6 +864,8 @@ export const ar: Record<string, string> = {
   "Poll option doesn't exist or isn't visible to you.": 'خيار الاستطلاع غير موجود أو لا يمكنك رؤيته.',
   // apps/api/src/modules/profiles.ts
   'Choose from your own posts and reels that people can see.': 'اختر من منشوراتك وريلزك التي يمكن للناس رؤيتها.',
+  'This photo may be sensitive, so it can’t be your profile photo. Choose another one.':
+    'قد تكون هذه الصورة حساسة، لذا لا يمكن استخدامها كصورة للملف الشخصي. اختر صورة أخرى.',
   'This photo may be sensitive, so it can’t be a cover. Choose another one.': 'قد تكون هذه الصورة حساسة، لذا لا يمكن استخدامها كغلاف. اختر صورة أخرى.',
   'This photo or video can’t be shared because it looks like it goes against our community rules. Someone on our team will check it, and you’ll get a notification either way.':
     'لا يمكن مشاركة هذه الصورة أو هذا الفيديو لأنه يبدو مخالفًا لقواعد مجتمعنا. سيراجعه أحد أعضاء فريقنا، وسيصلك إشعار بالنتيجة في كل الأحوال.',

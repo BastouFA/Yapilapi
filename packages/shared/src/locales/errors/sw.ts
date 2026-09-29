@@ -890,6 +890,8 @@ export const sw: Record<string, string> = {
   "Poll option doesn't exist or isn't visible to you.": 'Chaguo la kura ya maoni halipo au huwezi kuliona.',
   // apps/api/src/modules/profiles.ts
   'Choose from your own posts and reels that people can see.': 'Chagua kutoka kwenye machapisho na reels zako ambazo watu wanaweza kuona.',
+  'This photo may be sensitive, so it can’t be your profile photo. Choose another one.':
+    'Picha hii huenda ni nyeti, kwa hivyo haiwezi kuwa picha yako ya wasifu. Chagua nyingine.',
   'This photo may be sensitive, so it can’t be a cover. Choose another one.': 'Picha hii huenda ni nyeti, kwa hivyo haiwezi kuwa jalada. Chagua nyingine.',
   'This photo or video can’t be shared because it looks like it goes against our community rules. Someone on our team will check it, and you’ll get a notification either way.':
     'Picha au video hii haiwezi kushirikiwa kwa sababu inaonekana kwenda kinyume na sheria za jumuiya yetu. Mtu wa timu yetu ataikagua, na utapata arifa kwa vyovyote vile.',

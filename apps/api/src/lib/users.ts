@@ -55,6 +55,7 @@ export async function isBlockedEitherWay(db: Q, a: string, b: string): Promise<b
 export async function blockUser(c: PoolClient, blocker: string, blocked: string): Promise<string[]> {
   await c.query(`INSERT INTO blocks (blocker_id, blocked_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [blocker, blocked]);
   await c.query(`DELETE FROM follows WHERE (follower_id = $1 AND followee_id = $2) OR (follower_id = $2 AND followee_id = $1)`, [blocker, blocked]);
+  await c.query(`DELETE FROM follow_requests WHERE (follower_id = $1 AND followee_id = $2) OR (follower_id = $2 AND followee_id = $1)`, [blocker, blocked]);
   const [a, b] = [blocker, blocked].sort();
   await c.query(`DELETE FROM friendships WHERE user_a = $1 AND user_b = $2`, [a, b]);
   await c.query(

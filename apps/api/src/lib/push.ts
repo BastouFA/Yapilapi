@@ -87,6 +87,8 @@ const TEXT: Record<string, Text> = {
   follow: say('push.follow'),
   friend_request: say('push.friend_request'),
   friend_accepted: say('push.friend_accepted'),
+  follow_request: say('push.follow_request'),
+  follow_accepted: say('push.follow_accepted'),
   post_reaction: say('push.post_reaction'),
   post_comment: say('push.post_comment'),
   event_rsvp: say('push.event_rsvp'),

@@ -22,6 +22,8 @@ const TEXT: Record<string, MessageKey> = {
   follow: 'm.notif.follow',
   friend_request: 'm.notif.friendRequest',
   friend_accepted: 'm.notif.friendAccepted',
+  follow_request: 'profile.followRequestFrom',
+  follow_accepted: 'profile.followAccepted',
   post_reaction: 'm.notif.like',
   post_comment: 'm.notif.comment',
   post_repost: 'm.notif.repost',
@@ -110,11 +112,14 @@ function arrange(items: NotificationItem[], t: Translator['t']): Section[] {
   const sections: Section[] = [];
   const now = Date.now();
   for (const n of items) {
+    // Follow requests are answered in their own list above.
+    if (n.type === 'follow_request') continue;
     const age = now - new Date(n.createdAt).getTime();
     const title = age < 86_400_000 ? t('m.notif.today') : age < 7 * 86_400_000 ? t('m.notif.thisWeek') : t('m.notif.earlier');
     let section = sections.at(-1);
     if (!section || section.title !== title) sections.push((section = { title, data: [] }));
-    const key = GROUP_TEXT[n.type] ? `${n.type}:${n.entityId ?? ''}` : n.id;
+    // New followers group together ("Ada and 3 others started following you"); the rest by what they're about.
+    const key = n.type === 'follow' ? 'follow' : GROUP_TEXT[n.type] ? `${n.type}:${n.entityId ?? ''}` : n.id;
     const existing = section.data.find((g) => g.key === key);
     if (existing) existing.items.push(n);
     else section.data.push({ key, items: [n], actors: [] });
@@ -189,11 +194,21 @@ export default function Notifications() {
   const [error, setError] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [followed, setFollowed] = useState<Set<string>>(new Set());
+  // Followed back, but their account is private: they answer first.
+  const [requestedBack, setRequestedBack] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<string | null>(null);
+  // People asking to follow you (your account is private), answered at the top.
+  const [requests, setRequests] = useState<{ user: PublicUser; createdAt: string }[]>([]);
+  const [note, setNote] = useState<string | null>(null);
 
   const load = useCallback(async (next?: string) => {
     try {
       const api = await client();
+      if (!next)
+        void api.users.followRequests().then(
+          (r) => setRequests(r.items),
+          () => {},
+        );
       const page = await api.notifications.list(next);
       setItems((cur) => (next && cur ? [...cur, ...page.items.filter((x) => !cur.some((y) => y.id === x.id))] : page.items));
       setCursor(page.nextCursor);
@@ -235,7 +250,8 @@ export default function Notifications() {
     setFollowed((f) => new Set(f).add(user.id));
     setError(null);
     try {
-      await (await client()).users.follow(user.id);
+      const r = await (await client()).users.follow(user.id);
+      if (r.requested) setRequestedBack((q) => new Set(q).add(user.id));
     } catch (e) {
       setFollowed((f) => {
         const next = new Set(f);
@@ -245,6 +261,21 @@ export default function Notifications() {
       setError(errorMessage(e));
     }
   }, []);
+
+  const answerRequest = async (user: PublicUser, accept: boolean) => {
+    setBusy(user.id);
+    setError(null);
+    try {
+      const api = await client();
+      await (accept ? api.users.acceptFollow(user.id) : api.users.declineFollow(user.id));
+      setRequests((cur) => cur.filter((r) => r.user.id !== user.id));
+      setNote(accept ? t('followRequests.accepted', { name: user.displayName }) : t('followRequests.declined'));
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const renderGroup = useCallback(
     ({ item: g }: { item: Group }) => {
@@ -256,12 +287,13 @@ export default function Notifications() {
           answered={answers[n.id]}
           busy={busy === n.id}
           nowFollowing={!!single && followed.has(single.id)}
+          requested={!!single && requestedBack.has(single.id)}
           onAnswer={answer}
           onFollowBack={followBack}
         />
       );
     },
-    [answers, busy, followed, answer, followBack],
+    [answers, busy, followed, requestedBack, answer, followBack],
   );
 
   if (me === null)
@@ -285,7 +317,45 @@ export default function Notifications() {
       sections={sections}
       keyExtractor={(g) => g.key}
       stickySectionHeadersEnabled={false}
-      ListHeaderComponent={error ? <ErrorState message={error} onRetry={() => load()} /> : null}
+      ListHeaderComponent={
+        <View style={{ gap: space[2] }}>
+          {error ? <ErrorState message={error} onRetry={() => load()} /> : null}
+          {note ? (
+            <View accessibilityLiveRegion="polite">
+              <Notice>{note}</Notice>
+            </View>
+          ) : null}
+          {requests.length ? (
+            <View style={{ gap: space[2] }}>
+              <SectionHeader title={t('followRequests.title')} />
+              {requests.map((r) => (
+                <View key={r.user.id} style={{ backgroundColor: c.surface, borderRadius: radius.md, padding: space[3], gap: space[2] }}>
+                  <Pressable
+                    accessibilityRole="link"
+                    onPress={() => router.push(`/u/${encodeURIComponent(r.user.username)}` as never)}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44 }}
+                  >
+                    <Avatar name={r.user.displayName} url={r.user.avatarUrl} size={40} />
+                    <Text style={[{ flex: 1, color: c.ink, fontSize: 15, lineHeight: 20 }, userText]}>
+                      {t('profile.followRequestFrom', { name: r.user.displayName })}
+                    </Text>
+                  </Pressable>
+                  <View style={{ flexDirection: 'row', gap: space[2] }}>
+                    <Button label={t('m.common.accept')} size="sm" disabled={busy === r.user.id} onPress={() => answerRequest(r.user, true)} />
+                    <Button
+                      label={t('m.common.decline')}
+                      size="sm"
+                      variant="secondary"
+                      disabled={busy === r.user.id}
+                      onPress={() => answerRequest(r.user, false)}
+                    />
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : null}
+        </View>
+      }
       ListEmptyComponent={<EmptyState title={t('m.notif.caughtUp')} body={t('m.notif.caughtUpBody')} />}
       renderSectionHeader={({ section }) => (
         <View style={{ paddingTop: space[3], paddingBottom: space[2], backgroundColor: c.ground }}>
@@ -321,6 +391,7 @@ const NotificationRow = memo(function NotificationRow({
   answered,
   busy,
   nowFollowing,
+  requested,
   onAnswer,
   onFollowBack,
 }: {
@@ -328,6 +399,8 @@ const NotificationRow = memo(function NotificationRow({
   answered: Answer | undefined;
   busy: boolean;
   nowFollowing: boolean;
+  /** Followed back, and their private account has to say yes first. */
+  requested: boolean;
   onAnswer: (n: NotificationItem, accept: boolean) => void;
   onFollowBack: (user: PublicUser) => void;
 }) {
@@ -362,7 +435,7 @@ const NotificationRow = memo(function NotificationRow({
         <View style={{ flexDirection: 'row' }}>
           {nowFollowing ? (
             <Text style={{ color: c.inkMuted, fontSize: 13 }} accessibilityLiveRegion="polite">
-              {t('m.notif.nowFollowing', { name: single.displayName })}
+              {requested ? t('profile.requestedToast', { name: single.displayName }) : t('m.notif.nowFollowing', { name: single.displayName })}
             </Text>
           ) : (
             <Button label={t('m.notif.followBack')} size="sm" onPress={() => onFollowBack(single)} />

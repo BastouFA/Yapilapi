@@ -24,8 +24,12 @@ function safeTimeZoneOrThrow(tz: string) {
 import { decodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
 import { plusCol, publicUserFrom } from '../lib/users.ts';
 import { userLocale } from '../lib/email.ts';
+import { notBlockedSql } from '../lib/visibility.ts';
 import { signInLabels } from '../lib/sign-in-alerts.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
+
+/** Notifications (aliased `n`, for $1) from someone blocked either way stay out of the list and the count while the block lasts. */
+const SHOWN = `(n.actor_id IS NULL OR ${notBlockedSql('n.actor_id', '$1')})`;
 
 export default async function notificationsModule(app: FastifyInstance, ctx: AppContext) {
   const db = ctx.db;
@@ -39,12 +43,12 @@ export default async function notificationsModule(app: FastifyInstance, ctx: App
               pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode, ${plusCol('a_')},
               EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = n.actor_id) AS follows_actor
        FROM notifications n LEFT JOIN profiles pr ON pr.user_id = n.actor_id
-       WHERE n.user_id = $1 ${c ? 'AND (n.created_at, n.id) < ($3::timestamptz, $4::uuid)' : ''}
+       WHERE n.user_id = $1 AND ${SHOWN} ${c ? 'AND (n.created_at, n.id) < ($3::timestamptz, $4::uuid)' : ''}
        ORDER BY n.created_at DESC, n.id DESC LIMIT $2`,
       c ? [u.id, q.limit + 1, c.t, c.id] : [u.id, q.limit + 1],
     );
     const page = rows.slice(0, q.limit);
-    const unread = (await db.query(`SELECT count(*) AS n FROM notifications WHERE user_id = $1 AND read_at IS NULL`, [u.id])).rows[0].n;
+    const unread = (await db.query(`SELECT count(*) AS n FROM notifications n WHERE n.user_id = $1 AND n.read_at IS NULL AND ${SHOWN}`, [u.id])).rows[0].n;
     // A sign-in from a new device names the device and the country in your language (the phone can't name countries itself).
     const locale = page.some((r) => r.type === 'new_sign_in') ? await userLocale(db, u.id) : 'en';
     const items: NotificationItem[] = page.map((r) => ({
