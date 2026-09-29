@@ -723,6 +723,10 @@ a.yp-aside-row:hover {
   margin-inline-start: 4px;
   font-weight: 600;
 }
+/* Drafts and scheduled posts have no actions row: the card keeps its bottom padding without one. */
+.yp-post--unpublished {
+  padding-bottom: var(--space-4);
+}
 .yp-post__body {
   padding: var(--space-3) var(--space-4) 0;
   font-size: 16px;
@@ -930,9 +934,12 @@ button.yp-chip:focus-visible {
   position: relative;
   z-index: 1;
 }
-.yp-poll__bar {
+/* More specific than the rule above, so the bar stays behind the text instead of taking its room. */
+.yp-poll button > .yp-poll__bar {
   position: absolute;
-  inset: 0 auto 0 0;
+  z-index: 0;
+  inset-block: 0;
+  inset-inline-start: 0;
   background: color-mix(in oklab, var(--yapi) 22%, transparent);
   transition: width 500ms var(--ease-out);
 }

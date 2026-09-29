@@ -6652,7 +6652,13 @@ button.yp-chip[aria-pressed='true'] {
 /* Pulse header: search, Reels and the notifications bell sit together on the right. With every
    shortcut turned on they don't fit beside the title on a phone: they wrap (right-aligned) rather
    than widen the page. */
-.home__actions {
+/* A page title that is one short word in every language (Pulse, Wander): it keeps its width, and the
+   shortcuts beside it wrap instead of breaking it in the middle of the word on a phone. */
+.topbar__word {
+  flex: none;
+}
+.home__actions,
+.topbar__actions {
   flex-wrap: wrap;
   justify-content: flex-end;
   min-width: 0;

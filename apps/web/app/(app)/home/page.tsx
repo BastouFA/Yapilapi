@@ -42,7 +42,7 @@ export default function Home() {
   return (
     <div className="yp-shell__inner">
       <div className="yp-topbar">
-        <h1>{t('nav.home')}</h1>
+        <h1 className="topbar__word">{t('nav.home')}</h1>
         {/* Icons on the right keep the title on one line at phone widths. */}
         <div className="row home__actions">
           <Link href="/search" className="yp-action home__search" aria-label={t('home.search')}>
