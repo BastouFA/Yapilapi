@@ -7,7 +7,7 @@ import type { AppContext } from '../lib/context.ts';
 import { parseSearchIntent } from '../lib/ai/intent.ts';
 import { hydratePosts } from '../lib/posts.ts';
 import { PUBLIC_USER_COLS, toPublicUser, type PublicUserRow } from '../lib/users.ts';
-import { eventVisibleSql, notBlockedSql, postUnlockedSql, postVisibleSql } from '../lib/visibility.ts';
+import { eventVisibleSql, notBlockedSql, postUnlockedSql, postVisibleSql, PUBLIC_POST_SQL } from '../lib/visibility.ts';
 import { EVENT_SELECT, toEvent } from './events.ts';
 
 /**
@@ -150,8 +150,8 @@ export async function searchAll(db: Pool, viewer: string | null, q: SearchInput)
         // Hashtags people use (from public posts of the last 90 days), most used first, plus interest topics nobody has posted yet.
         .query(
           `WITH used AS (
-             SELECT t AS slug, count(*) AS posts FROM posts p, unnest(p.topics) t
-             WHERE p.visibility = 'public' AND p.deleted_at IS NULL AND p.status = 'published' AND p.moderation_status = 'normal' AND p.created_at > now() - interval '90 days'
+             SELECT t AS slug, count(*) AS posts FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id, unnest(p.topics) t
+             WHERE ${PUBLIC_POST_SQL} AND p.created_at > now() - interval '90 days'
                AND t LIKE $3 ESCAPE '\\'
              GROUP BY t ORDER BY count(*) DESC LIMIT $2)
            SELECT slug, slug AS name, posts FROM used
@@ -191,13 +191,13 @@ export default async function searchModule(app: FastifyInstance, ctx: AppContext
         [viewer],
       ),
       db.query(
-        `SELECT t AS topic, count(*) AS posts FROM posts p, unnest(p.topics) t
-         WHERE p.created_at > now() - interval '24 hours' AND p.visibility = 'public' AND p.deleted_at IS NULL AND p.status = 'published' AND p.moderation_status = 'normal'
+        `SELECT t AS topic, count(*) AS posts FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id, unnest(p.topics) t
+         WHERE p.created_at > now() - interval '24 hours' AND ${PUBLIC_POST_SQL}
          GROUP BY t ORDER BY count(*) DESC LIMIT 10`,
       ),
       db.query(
         `SELECT c.slug, c.name, count(p.id) AS posts FROM communities c JOIN posts p ON p.community_id = c.id
-         WHERE c.visibility = 'public' AND p.created_at > now() - interval '24 hours' AND p.deleted_at IS NULL AND p.status = 'published'
+         WHERE c.visibility = 'public' AND c.deleted_at IS NULL AND p.created_at > now() - interval '24 hours' AND p.deleted_at IS NULL AND p.status = 'published'
          GROUP BY c.id ORDER BY count(p.id) DESC LIMIT 5`,
       ),
     ]);
