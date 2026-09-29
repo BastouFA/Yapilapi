@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import type { MessageKey } from '../../../../packages/shared/src/i18n';
+import { formatMoney, type MessageKey } from '../../../../packages/shared/src/i18n';
 import { formatList } from '../../../../packages/shared/src/feed-reasons';
 import { normalizeTag } from '../../../../packages/shared/src/hashtags';
 import type { Community, EventItem, Post, PublicUser } from '../../../../packages/shared/src/types';
@@ -26,6 +26,8 @@ const TABS: { id: Tab; label: MessageKey }[] = [
 ];
 
 type Place = { id: string; name: string; category: string | null; city: string | null };
+/** A product in someone's shop: it opens there, by the seller's username. */
+type FoundProduct = { id: string; title: string; priceCents: number; currency: string; sellerUsername?: string };
 type Found = {
   people: PublicUser[];
   topics: { slug: string; name: string; posts: number }[];
@@ -33,6 +35,7 @@ type Found = {
   communities: Pick<Community, 'id' | 'slug' | 'name' | 'description' | 'memberCount'>[];
   events: EventItem[];
   places: Place[];
+  products: FoundProduct[];
 };
 
 /** What the search understood from a sentence, as words for "Showing events for tonight". */
@@ -137,6 +140,8 @@ export default function Wander() {
               communities: (x.communities ?? []) as Found['communities'],
               events: (x.events ?? []) as Found['events'],
               places: (x.places ?? []) as Found['places'],
+              // Products come with "All" (there's no tab of their own), when the API says whose shop they're in.
+              products: ((x.products ?? []) as FoundProduct[]).filter((p) => !!p.sellerUsername),
             });
             setIntent((r.intent ?? null) as Intent | null);
             setError(null);
@@ -475,6 +480,21 @@ export default function Wander() {
                     subtitle={[p.category, p.city].filter(Boolean).join(' · ')}
                     start={<Icon name="location-outline" size={22} color={c.yapi} />}
                     onPress={() => open(`/place/${p.id}`)}
+                  />
+                ))}
+              </View>
+            ) : null}
+
+            {tab === 'all' && found.products.length ? (
+              <View style={{ gap: space[2] }}>
+                <SectionHeader title={t('discover.products')} />
+                {found.products.map((p) => (
+                  <Row
+                    key={p.id}
+                    title={p.title}
+                    subtitle={formatMoney(p.priceCents, p.currency, locale)}
+                    start={<Icon name="bag-outline" size={22} color={c.yapi} />}
+                    onPress={() => open(`/product?username=${encodeURIComponent(p.sellerUsername!)}&id=${p.id}`)}
                   />
                 ))}
               </View>

@@ -137,9 +137,12 @@ export async function searchAll(db: Pool, viewer: string | null, q: SearchInput)
     jobs.push(
       db
         .query(
-          `SELECT pd.id, pd.kind, pd.title, pd.price_cents AS "priceCents", pd.currency FROM products pd
-             WHERE pd.deleted_at IS NULL AND pd.status = 'active' AND ($1 = '' OR pd.search @@ websearch_to_tsquery('english', $1) OR pd.title ILIKE $3) LIMIT $2`,
-          [terms, q.limit, like],
+          // With the seller's username, which opens the product in their shop; not from suspended sellers or people blocked either way.
+          `SELECT pd.id, pd.kind, pd.title, pd.price_cents AS "priceCents", pd.currency, sp.username AS "sellerUsername"
+             FROM products pd JOIN profiles sp ON sp.user_id = pd.seller_id JOIN users su ON su.id = pd.seller_id
+             WHERE pd.deleted_at IS NULL AND pd.status = 'active' AND su.status = 'active' AND ${notBlockedSql('pd.seller_id', '$4')}
+               AND ($1 = '' OR pd.search @@ websearch_to_tsquery('english', $1) OR pd.title ILIKE $3) LIMIT $2`,
+          [terms, q.limit, like, viewer],
         )
         .then((r) => void (out.products = r.rows)),
     );

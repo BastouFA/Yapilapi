@@ -72,6 +72,19 @@ describe('cursors someone made up', () => {
   });
 });
 
+describe('products in search', () => {
+  it("say whose shop they're in, and leave out sellers blocked either way", async () => {
+    const seller = await signUp(t.app, adult);
+    const viewer = await signUp(t.app, adult);
+    const word = `lantern${Date.now().toString(36)}`;
+    expect((await as(t.app, seller).post('/v1/products', { title: `Paper ${word}`, priceCents: 1500 })).status).toBe(201);
+    const found = (await as(t.app, viewer).get(`/v1/search?q=${word}`)).body.results.products;
+    expect(found).toEqual([expect.objectContaining({ title: `Paper ${word}`, sellerUsername: seller.username })]);
+    await as(t.app, seller).post(`/v1/users/${viewer.id}/block`);
+    expect((await as(t.app, viewer).get(`/v1/search?q=${word}`)).body.results.products).toEqual([]);
+  });
+});
+
 describe('search sentences', () => {
   it('reads a group size at the end of a sentence', async () => {
     const r = await as(t.app, null).get('/v1/search?q=restaurants%20for%20six');
