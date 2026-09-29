@@ -762,9 +762,13 @@ export default function ChatPage() {
                   <Button
                     size="sm"
                     onClick={async () => {
-                      await api.conversations.createPlan(id, String(ai.plan!.destination ?? t('chat.ai.newPlan')), ai.plan!);
-                      toast(t('chat.ai.planSaved'));
-                      setAi(null);
+                      try {
+                        await api.conversations.createPlan(id, String(ai.plan!.destination ?? t('chat.ai.newPlan')), ai.plan!);
+                        toast(t('chat.ai.planSaved'));
+                        setAi(null);
+                      } catch (e) {
+                        toast(errorMessage(e));
+                      }
                     }}
                   >
                     {t('chat.ai.savePlan')}
@@ -797,9 +801,13 @@ export default function ChatPage() {
               size="sm"
               variant="ghost"
               onClick={async () => {
-                const r = await api.conversations.messages(id, cursor);
-                setMessages((cur) => [...r.items, ...(cur ?? [])]);
-                setCursor(r.nextCursor);
+                try {
+                  const r = await api.conversations.messages(id, cursor);
+                  setMessages((cur) => [...r.items, ...(cur ?? [])]);
+                  setCursor(r.nextCursor);
+                } catch (e) {
+                  toast(errorMessage(e));
+                }
               }}
             >
               {t('chat.loadEarlier')}
