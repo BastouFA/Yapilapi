@@ -334,7 +334,8 @@ export default function Create() {
   useEffect(() => {
     if (!incoming) return;
     if (incoming.mode !== kind) {
-      setKind(incoming.mode);
+      // Through switchTo, so the audience and the music part fit the new kind (15 seconds on stories).
+      switchTo(incoming.mode);
       return;
     }
     setIncoming(null);
@@ -410,13 +411,15 @@ export default function Create() {
     try {
       const m = await uploadPicked(asset, setProgress);
       // A video saved for Wi-Fi is done once it is uploaded.
-      if (fromQueue.current) {
-        await removeQueuedVideo(fromQueue.current);
+      const queued = fromQueue.current;
+      if (queued) {
+        await removeQueuedVideo(queued);
         fromQueue.current = null;
         setLater(await listQueuedVideos());
       }
       const seconds = asset.duration ? asset.duration / 1000 : null;
-      if (!edits) return setMedia({ ...m, local: asset.uri, seconds });
+      // The saved copy was just deleted, so its preview plays the uploaded file instead.
+      if (!edits) return setMedia({ ...m, local: queued ? mediaUrl(m.url) : asset.uri, seconds });
       setApplying(true);
       const api = await client();
       const started = await api.media.edit(m.id, edits);

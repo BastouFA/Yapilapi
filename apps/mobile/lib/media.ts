@@ -1,4 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
+import { ApiError } from '../../../packages/api-client/src/index';
 import { baseUrl, client, getToken } from './api';
 import { shrinkForUpload } from './data-saver';
 import { tr } from './locale';
@@ -114,6 +115,9 @@ async function uploadInChunks(uri: string, name: string, type: string, onProgres
     const { media } = await (await client()).uploads.resumable(file, onProgress);
     return media;
   } catch (e) {
-    throw new Error(e instanceof Error && e.message ? e.message : tr('m.real.uploadFailed'));
+    // The API's own errors go on as they are (errorMessage says a dropped connection in the app's
+    // language); a chunk the phone couldn't send at all is a failed upload.
+    if (e instanceof ApiError && e.code !== 'upload_failed') throw e;
+    throw new Error(tr('m.real.uploadFailed'));
   }
 }
