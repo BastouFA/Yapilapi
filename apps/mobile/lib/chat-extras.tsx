@@ -6,7 +6,7 @@ import type { Message, MessagePreview, PinnedMessage } from '../../../packages/s
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import { chatTheme } from '../../../packages/shared/src/chat-theme';
 import { chessDrawReason } from '../../../packages/shared/src/games/index';
-import { groupLineText, messagePreviewOf, messagePreviewText } from '../../../packages/shared/src/message-preview';
+import { callLineText, groupLineText, messagePreviewOf, messagePreviewText } from '../../../packages/shared/src/message-preview';
 import { client, errorMessage } from './api';
 import { useT } from './i18n';
 import { useSession } from './session';
@@ -231,6 +231,15 @@ export function SystemLine({
       </View>
     );
   }
+  if (s?.type === 'call')
+    return (
+      <View style={{ alignSelf: 'center', flexDirection: 'row', gap: space[1], alignItems: 'center', maxWidth: '90%', paddingVertical: space[1] }}>
+        <Icon name={s.kind === 'video' ? 'videocam-outline' : 'call-outline'} size={14} color={c.inkMuted} />
+        <Text style={[{ color: c.inkMuted, fontSize: 13, textAlign: 'center', lineHeight: 18 }, userText]}>
+          {callLineText(s, message.sender.id, { t, tp, locale, meId })}
+        </Text>
+      </View>
+    );
   if (s?.type === 'group')
     return (
       <View style={{ alignSelf: 'center', flexDirection: 'row', gap: space[1], alignItems: 'center', maxWidth: '90%', paddingVertical: space[1] }}>

@@ -78,6 +78,8 @@ export function CallsProvider({ children }: { children: ReactNode }) {
   callRef.current = call;
   const starting = useRef(false);
   const phaseRef = useRef<Phase>('idle');
+  // Answering on this phone: the server's "answered" for you may arrive before the answer returns.
+  const answering = useRef(false);
   phaseRef.current = phase;
 
   const flash = useCallback((text: string) => {
@@ -211,6 +213,7 @@ export function CallsProvider({ children }: { children: ReactNode }) {
     if (!cur) return;
     audio.stopRing();
     Vibration.cancel();
+    answering.current = true;
     try {
       // Media and ICE servers first, so the caller's offer finds everything ready.
       const api = await client();
@@ -225,6 +228,8 @@ export function CallsProvider({ children }: { children: ReactNode }) {
       explain(e, 'answer');
       await (await client()).calls.decline(cur.id).catch(() => {});
       cleanup();
+    } finally {
+      answering.current = false;
     }
   }
 
@@ -256,30 +261,32 @@ export function CallsProvider({ children }: { children: ReactNode }) {
     if (!rtc) {
       // Without WebRTC we can still show the ring screen, which explains what is needed.
       if (e.type === 'call.incoming' && !callRef.current) ringIncoming(e.data);
-      if (callRef.current && e.data?.callId === callRef.current.id && (e.type === 'call.left' || e.type === 'call.declined')) cleanup();
+      if (callRef.current && e.data?.callId === callRef.current.id && ['call.left', 'call.declined', 'call.ended'].includes(e.type)) cleanup();
       return;
     }
     const cur = callRef.current;
     if (e.type === 'call.incoming') {
       if (cur)
         return void client().then(
-          (api) => api.calls.decline(e.data.id).catch(() => {}),
+          (api) => api.calls.decline(e.data.id, true).catch(() => {}),
           () => {},
-        ); // busy
+        ); // busy: the caller is told you're on another call
       ringIncoming(e.data);
       return;
     }
     if (!cur || e.data?.callId !== cur.id) return;
     try {
+      // Someone joined: everyone already in the call (the caller included) connects to them, so in a
+      // group each person reaches every other.
       if (e.type === 'call.answered' && e.data.userId !== me.id) {
-        if (cur.callerId !== me.id) return;
+        if (cur.callerId !== me.id && phaseRef.current !== 'active') return;
         setPhase('active');
         const pc = peerFor(cur.id, e.data.userId);
         const offer = await pc.createOffer({});
         await pc.setLocalDescription(offer);
         await (await client()).calls.signal(cur.id, e.data.userId, 'offer', { type: offer.type, sdp: offer.sdp });
       }
-      if (e.type === 'call.answered' && e.data.userId === me.id && phaseRef.current === 'incoming') {
+      if (e.type === 'call.answered' && e.data.userId === me.id && phaseRef.current === 'incoming' && !answering.current) {
         // Answered on another device.
         cleanup();
         return;
@@ -302,6 +309,19 @@ export function CallsProvider({ children }: { children: ReactNode }) {
           else pendingCandidates.current.set(from, [...(pendingCandidates.current.get(from) ?? []), data]);
         }
       }
+      // The call is over for everyone (the last other person left, or nobody answered).
+      if (e.type === 'call.ended') {
+        const was = phaseRef.current;
+        flash(
+          e.data.status === 'missed'
+            ? tr(was === 'incoming' ? 'm.calls.missed' : 'm.calls.noAnswer')
+            : e.data.status === 'declined'
+              ? tr('m.calls.declined')
+              : tr('m.calls.ended'),
+        );
+        cleanup();
+        return;
+      }
       if (e.type === 'call.declined' || e.type === 'call.left') {
         const uid = e.data.userId as string;
         if (uid === me.id) {
@@ -317,7 +337,7 @@ export function CallsProvider({ children }: { children: ReactNode }) {
           return n;
         });
         if (cur.participants.length === 2) {
-          flash(e.type === 'call.declined' ? tr('m.calls.declined') : tr('m.calls.ended'));
+          flash(e.type === 'call.declined' ? (e.data.busy ? tr('calls.otherBusy') : tr('m.calls.declined')) : tr('m.calls.ended'));
           cleanup();
         }
       }

@@ -1,9 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { t } from './i18n.ts';
-import { groupLineText } from './message-preview.ts';
-import type { MessageKey } from './i18n-core.ts';
+import { t, tp } from './i18n.ts';
+import { callLineText, groupLineText } from './message-preview.ts';
+import type { MessageKey, PluralKey } from './i18n-core.ts';
 
 const tr = (locale: string, meId?: string) => ({ t: (key: MessageKey, vars?: Record<string, string | number>) => t(key, locale, vars), locale, meId });
+
+describe('call lines', () => {
+  const withTp = (locale: string, meId?: string) => ({ ...tr(locale, meId), tp: (key: PluralKey, count: number) => tp(key, count, locale) });
+  it('say how a call went, from each side', () => {
+    expect(callLineText({ kind: 'video', outcome: 'missed', seconds: null }, 'ada', withTp('en', 'bo'))).toBe('Missed video call');
+    expect(callLineText({ kind: 'video', outcome: 'missed', seconds: null }, 'ada', withTp('en', 'ada'))).toBe('Video call, no answer');
+    expect(callLineText({ kind: 'audio', outcome: 'declined', seconds: null }, 'ada', withTp('en', 'bo'))).toBe('Audio call declined');
+    expect(callLineText({ kind: 'audio', outcome: 'ended', seconds: 20 }, 'ada', withTp('en'))).toBe('Audio call, 1 minute');
+    expect(callLineText({ kind: 'audio', outcome: 'ended', seconds: 185 }, 'ada', withTp('en'))).toBe('Audio call, 3 minutes');
+    expect(callLineText({ kind: 'video', outcome: 'ended', seconds: 185 }, 'ada', withTp('fr'))).toBe('Appel vidéo, 3 minutes');
+  });
+});
 
 describe('group lines', () => {
   it('say who changed the group, in the reader’s language', () => {

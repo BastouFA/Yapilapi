@@ -738,6 +738,17 @@ export type MessageSystemInfo =
       action: GroupLineAction;
       title?: string;
       people?: { id: string; displayName: string }[];
+    }
+  | {
+      /**
+       * A call here is over. The sender started it. 'missed': nobody answered (or the caller hung up
+       * first); 'declined'; 'ended' after talking for `seconds`.
+       */
+      type: 'call';
+      callId: string;
+      kind: 'audio' | 'video';
+      outcome: 'missed' | 'declined' | 'ended';
+      seconds: number | null;
     };
 
 export type GroupLineAction = 'renamed' | 'added' | 'removed' | 'left' | 'admin' | 'unadmin' | 'promoted';

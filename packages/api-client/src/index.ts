@@ -1378,7 +1378,8 @@ export function createClient(opts: ClientOptions) {
         post<{ call: CallInfo; iceServers: RTCIceServer[] }>(`/v1/conversations/${conversationId}/calls`, { kind }),
       get: (id: string) => get<{ call: CallInfo; iceServers: RTCIceServer[] }>(`/v1/calls/${id}`),
       answer: (id: string) => post<{ call: CallInfo; iceServers: RTCIceServer[] }>(`/v1/calls/${id}/answer`),
-      decline: (id: string) => post(`/v1/calls/${id}/decline`),
+      /** `busy`: declined by the app because you're on another call (the caller is told so). */
+      decline: (id: string, busy = false) => post(`/v1/calls/${id}/decline`, busy ? { busy } : {}),
       end: (id: string) => post(`/v1/calls/${id}/end`),
       signal: (id: string, toUserId: string, type: 'offer' | 'answer' | 'candidate', data: unknown) => post(`/v1/calls/${id}/signal`, { toUserId, type, data }),
     },

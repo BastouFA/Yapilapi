@@ -6177,6 +6177,18 @@ export const en = {
   'inbox.loadFailed': 'Couldn’t load your chats.',
   'chat.group.you': 'you',
   'chat.group.promotedYou': 'You’re now an admin.',
+  'chat.call.missedAudio': 'Missed audio call',
+  'chat.call.missedVideo': 'Missed video call',
+  'chat.call.noAnswerAudio': 'Audio call, no answer',
+  'chat.call.noAnswerVideo': 'Video call, no answer',
+  'chat.call.declinedAudio': 'Audio call declined',
+  'chat.call.declinedVideo': 'Video call declined',
+  'chat.call.endedAudio': 'Audio call, {duration}',
+  'chat.call.endedVideo': 'Video call, {duration}',
+  'chat.call.minutes.one': '{count} minute',
+  'chat.call.minutes.other': '{count} minutes',
+  'calls.otherBusy': 'They’re on another call. Try again in a moment.',
+  'calls.answeredElsewhere': 'Answered on another device',
 } as const;
 
 export type MessageKey = keyof typeof en;

@@ -6,6 +6,7 @@ import { BottomSheet, Button, Icon } from '@yapilapi/design-system';
 import {
   chatTheme,
   chessDrawReason,
+  callLineText,
   DISAPPEARING_SECONDS,
   groupLineText,
   messagePreviewText,
@@ -235,6 +236,12 @@ export function SystemLine({
       </p>
     );
   }
+  if (s?.type === 'call')
+    return (
+      <p className="chat-system" role="note">
+        <Icon name={s.kind === 'video' ? 'video' : 'phone'} size={14} /> <bdi>{callLineText(s, message.sender.id, { t, tp, locale, meId })}</bdi>
+      </p>
+    );
   if (s?.type === 'group')
     return (
       <p className="chat-system" role="note">

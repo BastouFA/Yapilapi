@@ -1,4 +1,4 @@
-import { formatMoney, type MessageKey } from './i18n-core.ts';
+import { formatMoney, type MessageKey, type PluralKey } from './i18n-core.ts';
 import { formatList } from './feed-reasons.ts';
 import type { GroupLineAction, Message, MessagePreview, StoryReply } from './types.ts';
 
@@ -97,6 +97,25 @@ export function messagePreviewText(p: MessagePreview, tr: PreviewTranslator): st
     default:
       return p.attachmentKind ? t('m.chat.attachment') : t('chat.message');
   }
+}
+
+/**
+ * A call's line in the chat ("Missed video call", "Audio call, 3 minutes"). The caller (`callerId`,
+ * the line's sender) reads a missed call as "no answer". Needs `tp` for the minutes.
+ */
+export function callLineText(
+  info: { kind: 'audio' | 'video'; outcome: 'missed' | 'declined' | 'ended'; seconds: number | null },
+  callerId: string,
+  tr: PreviewTranslator & { tp: (key: PluralKey, count: number, vars?: Record<string, string | number>) => string },
+): string {
+  const video = info.kind === 'video';
+  if (info.outcome === 'ended') {
+    const duration = tr.tp('chat.call.minutes', Math.max(1, Math.round((info.seconds ?? 0) / 60)));
+    return tr.t(video ? 'chat.call.endedVideo' : 'chat.call.endedAudio', { duration });
+  }
+  if (info.outcome === 'declined') return tr.t(video ? 'chat.call.declinedVideo' : 'chat.call.declinedAudio');
+  if (callerId === tr.meId) return tr.t(video ? 'chat.call.noAnswerVideo' : 'chat.call.noAnswerAudio');
+  return tr.t(video ? 'chat.call.missedVideo' : 'chat.call.missedAudio');
 }
 
 const GROUP_LINE_KEYS = {

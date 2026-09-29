@@ -32,6 +32,8 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
   const ice = useRef<RTCIceServer[]>([]);
   const localVideo = useRef<HTMLVideoElement>(null);
   const callRef = useRef<CallInfo | null>(null);
+  // Answering on this device: the server's "answered" for you may arrive before the answer returns.
+  const answering = useRef(false);
   const overlay = useRef<HTMLDivElement>(null);
   callRef.current = call;
   // Keep keyboard focus in the call UI while it's up. No Escape: that shouldn't hang up.
@@ -54,6 +56,10 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
     local.current = await navigator.mediaDevices.getUserMedia({ audio: true, video: kind === 'video' });
     if (localVideo.current) localVideo.current.srcObject = local.current;
   }
+  // Your own camera: the preview appears once the call screen (and its video element) does.
+  useEffect(() => {
+    if (localVideo.current && local.current && localVideo.current.srcObject !== local.current) localVideo.current.srcObject = local.current;
+  }, [phase, call]);
 
   const peerFor = useCallback(
     (callId: string, userId: string) => {
@@ -95,6 +101,7 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
 
   async function answer() {
     if (!call) return;
+    answering.current = true;
     try {
       // Camera and microphone first, so the caller's offer (sent as soon as we answer) finds them ready.
       await getMedia(call.kind);
@@ -106,6 +113,8 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
       toast(e instanceof DOMException ? t(call.kind === 'video' ? 'calls.allowToAnswer' : 'calls.allowMicToAnswer') : errorMessage(e));
       await api.calls.decline(call.id).catch(() => {});
       cleanup();
+    } finally {
+      answering.current = false;
     }
   }
 
@@ -117,18 +126,40 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
   useRealtime(async (e) => {
     const cur = callRef.current;
     if (e.type === 'call.incoming') {
-      if (cur) return void api.calls.decline(e.data.id).catch(() => {}); // busy
+      // Already on a call: the caller hears that you're busy.
+      if (cur) return void api.calls.decline(e.data.id, true).catch(() => {});
       setCall(e.data);
       setPhase('incoming');
       return;
     }
     if (!cur || e.data?.callId !== cur.id) return;
-    if (e.type === 'call.answered' && e.data.userId !== me?.id && cur.callerId === me?.id) {
+    // Answered on your other device: this one stops ringing.
+    if (e.type === 'call.answered' && e.data.userId === me?.id && phase === 'incoming' && !answering.current) {
+      toast(t('calls.answeredElsewhere'));
+      cleanup();
+      return;
+    }
+    // Someone joined: everyone already in the call (the caller included) connects to them, so in a
+    // group each person reaches every other.
+    if (e.type === 'call.answered' && e.data.userId !== me?.id && (phase === 'active' || cur.callerId === me?.id)) {
       setPhase('active');
       const pc = peerFor(cur.id, e.data.userId);
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       await api.calls.signal(cur.id, e.data.userId, 'offer', offer);
+    }
+    // The call is over for everyone (the last other person left, or nobody answered).
+    if (e.type === 'call.ended') {
+      if (phase !== 'idle')
+        toast(
+          e.data.status === 'missed'
+            ? t(phase === 'incoming' ? 'm.calls.missed' : 'm.calls.noAnswer')
+            : e.data.status === 'declined'
+              ? t('m.calls.declined')
+              : t('m.calls.ended'),
+        );
+      cleanup();
+      return;
     }
     if (e.type === 'call.signal') {
       const pc = peerFor(cur.id, e.data.from);
@@ -159,7 +190,7 @@ export function CallsProvider({ children }: { children: React.ReactNode }) {
         return n;
       });
       if (cur.participants.length === 2) {
-        toast(e.type === 'call.declined' ? t('m.calls.declined') : t('m.calls.ended'));
+        toast(e.type === 'call.declined' ? (e.data.busy ? t('calls.otherBusy') : t('m.calls.declined')) : t('m.calls.ended'));
         cleanup();
       }
     }
