@@ -179,8 +179,9 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
    */
   app.get('/v1/moments', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
-    const { rows } = await db.query(`SELECT ${STORY_SELECT} ${STORY_FROM} WHERE ${STORY_VISIBLE} ORDER BY m.created_at ASC LIMIT 300`, [u.id]);
-    return { items: await groupStories(db, rows, u.id) };
+    // The newest 300 (permanent stories pile up; the oldest must be the ones left out), then oldest first.
+    const { rows } = await db.query(`SELECT ${STORY_SELECT} ${STORY_FROM} WHERE ${STORY_VISIBLE} ORDER BY m.created_at DESC LIMIT 300`, [u.id]);
+    return { items: await groupStories(db, rows.reverse(), u.id) };
   });
 
   /** One story, as a group of one: for a link, a story card or a notification. */

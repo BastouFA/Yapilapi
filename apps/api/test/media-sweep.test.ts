@@ -99,3 +99,25 @@ describe('reels feed', () => {
     expect(ids).not.toContain(muted);
   });
 });
+
+describe('story strip', () => {
+  it('keeps the newest stories when more than 300 are open, oldest first within a person', async () => {
+    const author = await signUp(t.app);
+    const viewer = await signUp(t.app);
+    await as(t.app, viewer).post(`/v1/users/${author.id}/follow`);
+    // 305 permanent stories from last month, then a new one.
+    await db().query(
+      `INSERT INTO moments (author_id, body, visibility, created_at)
+       SELECT $1, 'old ' || g, 'public', now() - interval '30 days' + g * interval '1 minute' FROM generate_series(1, 305) g`,
+      [author.id],
+    );
+    const fresh = await as(t.app, author).post('/v1/moments', { body: 'Today', visibility: 'public', expiresIn: '24h' });
+    expect(fresh.status).toBe(201);
+    const strip = await as(t.app, viewer).get('/v1/moments');
+    const group = strip.body.items.find((g: { author: { id: string } }) => g.author.id === author.id);
+    const bodies = group.moments.map((m: { body: string }) => m.body);
+    expect(bodies.at(-1)).toBe('Today');
+    expect(bodies).not.toContain('old 1');
+    expect(bodies[0]).toBe('old 7');
+  });
+});
