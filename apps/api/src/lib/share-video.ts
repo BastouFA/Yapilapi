@@ -21,6 +21,14 @@ const MAX_WIDTH = 720;
 
 /** A font shipped with the API, so drawing text never depends on fonts installed on the server. */
 export const FONT_FILE = fileURLToPath(new URL('../../assets/fonts/Geist-Regular.ttf', import.meta.url));
+/** The bold face for the watermark's YAPILAPI. */
+const BOLD_FONT_FILE = fileURLToPath(new URL('../../assets/fonts/Inter-Bold.ttf', import.meta.url));
+
+/**
+ * Which watermark a saved video carries. Raise it when the watermark changes: videos saved with an
+ * older one are made again the next time someone saves the reel.
+ */
+export const SHARE_MARK_VERSION = 2;
 
 /** The app icon (shapes only, no text), rasterized for the end card. */
 const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48"><defs><linearGradient id="g" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#E0204F"/><stop offset=".6" stop-color="#FF5C4A"/><stop offset="1" stop-color="#FFB020"/></linearGradient></defs><rect x="2" y="2" width="44" height="44" rx="14" fill="url(#g)"/><g fill="#fff"><rect x="11" y="11" width="11" height="11" rx="3.5"/><rect x="26" y="11" width="11" height="11" rx="3.5"/><rect x="18.5" y="25" width="11" height="13" rx="3.5"/></g></svg>`;
@@ -28,9 +36,11 @@ const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" wi
 const even = (n: number) => Math.max(2, Math.round(n / 2) * 2);
 
 /**
- * Render the share video: the reel scaled to at most 720 wide, a small "YAPILAPI @username"
- * watermark in the corner, then a 1.5 s end card with the logo, the name and the profile
- * address. H.264/AAC with fast start, which WhatsApp status and other apps accept.
+ * Render the share video: the reel scaled to at most 720 wide with a watermark (the app icon,
+ * YAPILAPI and @username), then a 1.5 s end card with the logo, the name and the profile address.
+ * The watermark starts in the top corner and moves to the bottom corner halfway through, so
+ * cropping one corner doesn't remove it. H.264/AAC with fast start, which WhatsApp status and
+ * other apps accept.
  */
 export async function renderShareVideo(input: string, output: string, username: string): Promise<void> {
   const dir = path.dirname(output);
@@ -42,14 +52,22 @@ export async function renderShareVideo(input: string, output: string, username: 
 
   // Text goes through files so no character in a name can break the filter syntax.
   await copyFile(FONT_FILE, path.join(dir, 'font.ttf'));
-  await writeFile(path.join(dir, 'mark.txt'), `YAPILAPI @${username}`);
+  await copyFile(BOLD_FONT_FILE, path.join(dir, 'bold.ttf'));
+  await writeFile(path.join(dir, 'mark.txt'), `@${username}`);
   await writeFile(path.join(dir, 'brand.txt'), 'YAPILAPI');
   const address = `${SHARE_DOMAIN}/@${username}`;
   await writeFile(path.join(dir, 'address.txt'), address);
 
   const short = Math.min(W, H);
-  const markSize = Math.max(10, Math.round(short * 0.036));
-  const margin = Math.round(short * 0.04);
+  // The watermark: icon, then YAPILAPI over @username, about a sixth of the width.
+  const brandMark = Math.max(11, Math.round(short * 0.045));
+  const markSize = Math.max(10, Math.round(short * 0.04));
+  const markGap = Math.round(brandMark * 0.25);
+  const markLogo = even(brandMark + markGap + markSize);
+  const margin = Math.round(short * 0.045);
+  // Where it jumps from the top corner to the bottom one (the middle of the reel).
+  const half = Math.max(0.5, (info.durationMs ?? 2000) / 2000).toFixed(2);
+  const top = `lt(t,${half})`;
   const logo = even(short * 0.2);
   const brandSize = Math.max(14, Math.round(short * 0.1));
   // The address shrinks for long names so it always fits on one line.
@@ -59,13 +77,24 @@ export async function renderShareVideo(input: string, output: string, username: 
   const brandY = logoY + logo + Math.round(logo * 0.3);
   const addressY = brandY + brandSize + Math.round(brandSize * 0.6);
   await sharp(Buffer.from(LOGO_SVG)).resize(logo, logo).png().toFile(path.join(dir, 'logo.png'));
+  // The watermark's icon, a little see-through so it sits on the picture rather than over it.
+  await sharp(Buffer.from(LOGO_SVG)).resize(markLogo, markLogo).ensureAlpha(0.9).png().toFile(path.join(dir, 'mark-logo.png'));
 
-  const text = (file: string, size: number, color: string, x: string, y: string, shadow = false) =>
-    `drawtext=fontfile=font.ttf:textfile=${file}:fontsize=${size}:fontcolor=${color}:x=${x}:y=${y}` +
-    (shadow ? `:shadowcolor=black@0.55:shadowx=${Math.max(1, Math.round(markSize / 12))}:shadowy=${Math.max(1, Math.round(markSize / 12))}` : '');
+  const text = (file: string, size: number, color: string, x: string, y: string, shadow = false, font = 'font.ttf') =>
+    `drawtext=fontfile=${font}:textfile=${file}:fontsize=${size}:fontcolor=${color}:x='${x}':y='${y}'` +
+    (shadow ? `:shadowcolor=black@0.6:shadowx=${Math.max(1, Math.round(markSize / 12))}:shadowy=${Math.max(1, Math.round(markSize / 12))}` : '');
 
+  // Top left: icon, then the words to its right. Bottom right: the same, mirrored, so the words
+  // end at the icon. The expressions are quoted, so their commas stay inside them.
+  const markX = `if(${top},${margin},${W - margin - markLogo})`;
+  const markY = `if(${top},${margin},${H - margin - markLogo})`;
+  const wordsX = `if(${top},${margin + markLogo + markGap},${W - margin - markLogo - markGap}-tw)`;
+  const nameY = `if(${top},${margin + brandMark + markGap},${H - margin - markLogo + brandMark + markGap})`;
   const main =
-    `[0:v]scale=${W}:${H},setsar=1,fps=30,` + `${text('mark.txt', markSize, 'white@0.85', `w-tw-${margin}`, `h-th-${margin}`, true)},format=yuv420p[v0]`;
+    `[0:v]scale=${W}:${H},setsar=1,fps=30[scaled];` +
+    `[scaled][3:v]overlay=x='${markX}':y='${markY}':shortest=1,` +
+    `${text('brand.txt', brandMark, 'white@0.92', wordsX, markY, true, 'bold.ttf')},` +
+    `${text('mark.txt', markSize, 'white@0.88', wordsX, nameY, true)},format=yuv420p[v0]`;
   const card =
     `[1:v][2:v]overlay=x=(W-w)/2:y=${logoY},` +
     `${text('brand.txt', brandSize, 'white', '(w-tw)/2', String(brandY))},` +
@@ -85,6 +114,11 @@ export async function renderShareVideo(input: string, output: string, username: 
     String(END_CARD_SECONDS),
     '-i',
     'logo.png',
+    // The watermark's icon, held for as long as the reel plays (the overlay stops with the reel).
+    '-loop',
+    '1',
+    '-i',
+    'mark-logo.png',
   ];
   const encode = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', ...NO_METADATA, '-movflags', '+faststart'];
 
@@ -100,7 +134,7 @@ export async function renderShareVideo(input: string, output: string, username: 
         '-i',
         'anullsrc=r=44100:cl=stereo',
         '-filter_complex',
-        `${main};${card};[0:a]aresample=44100,aformat=channel_layouts=stereo[a0];[3:a]aformat=channel_layouts=stereo[a1];[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]`,
+        `${main};${card};[0:a]aresample=44100,aformat=channel_layouts=stereo[a0];[4:a]aformat=channel_layouts=stereo[a1];[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]`,
         '-map',
         '[v]',
         '-map',

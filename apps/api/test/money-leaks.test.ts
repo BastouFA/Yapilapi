@@ -194,6 +194,9 @@ describe('currencies', () => {
     const r = await as(t.app, buyer).post('/v1/orders', { items: [{ productId: odd, quantity: 1 }], idempotencyKey: key() });
     expect(r.status).toBe(400);
     expect(await order(buyer, [{ productId: await product(seller, { priceCents: 1_000_000, currency: 'XOF' }) }])).toBeTruthy();
+    // Paid items start at about $1 in every currency; free ones are fine.
+    expect((await as(t.app, seller).post('/v1/products', { title: 'Sticker', priceCents: 50 })).status).toBe(400);
+    expect((await as(t.app, seller).post('/v1/products', { title: 'Sticker', priceCents: 0 })).status).toBe(201);
   });
 
   it('takes processing on top of the platform fee, and starts tips at about $1 in every currency', async () => {

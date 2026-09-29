@@ -6,7 +6,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { as, signUp, testApp, type TestUser, jobRunner, type JobRunner } from './helpers.ts';
 import type { BuiltApp } from '../src/app.ts';
 import { probe, run } from '../src/lib/media-processing.ts';
-import { END_CARD_SECONDS, renderShareVideo, shareVideoJobHandlers } from '../src/lib/share-video.ts';
+import { END_CARD_SECONDS, renderShareVideo, SHARE_MARK_VERSION, shareVideoJobHandlers } from '../src/lib/share-video.ts';
+import sharp from 'sharp';
 
 let t: BuiltApp;
 let runJobs: JobRunner;
@@ -242,6 +243,40 @@ describe('share a reel as a video', () => {
     expect((await as(t.app, fan).get(`/v1/posts/${reel}/share-video`)).body.status).toBe('none');
     expect((await as(t.app, fan).post(`/v1/posts/${reel}/share-video`)).status).toBe(202);
     expect(await shareJobs(reel)).toBe(2);
+
+    // A video made with an older watermark is made again too.
+    while (await runJobs(handlers));
+    await t.ctx.db.query(`UPDATE share_videos SET mark_version = $2 WHERE post_id = $1`, [reel, SHARE_MARK_VERSION - 1]);
+    expect((await as(t.app, fan).get(`/v1/posts/${reel}/share-video`)).body).toMatchObject({ status: 'none', url: null });
+    expect((await as(t.app, fan).post(`/v1/posts/${reel}/share-video`)).status).toBe(202);
+    expect(await shareJobs(reel)).toBe(3);
+  });
+
+  it('moves the watermark from the top corner to the bottom one, so cropping a corner leaves it', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'ypl-share-mark-'));
+    try {
+      const input = path.join(dir, 'in.mp4');
+      await run(['-y', '-f', 'lavfi', '-i', 'color=c=0x0000ff:size=360x640:rate=15:duration=2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', input]);
+      const out = path.join(dir, 'out.mp4');
+      await renderShareVideo(input, out, 'mark_test');
+      // The middle of the watermark's icon (white shapes) in each corner, at the start and near the end of the reel.
+      const at = async (seconds: number, x: number, y: number) => {
+        const frame = path.join(dir, `f${seconds}.png`);
+        await run(['-y', '-ss', String(seconds), '-i', out, '-frames:v', '1', frame]);
+        const { data } = await sharp(frame)
+          .extract({ left: x - 2, top: y - 2, width: 5, height: 5 })
+          .raw()
+          .toBuffer({ resolveWithObject: true });
+        const [r, g, b] = [data[0]!, data[1]!, data[2]!];
+        return b > 180 && r < 80 && g < 80 ? 'blue' : 'mark';
+      };
+      expect(await at(0.3, 33, 33)).toBe('mark');
+      expect(await at(0.3, 327, 607)).toBe('blue');
+      expect(await at(1.6, 33, 33)).toBe('blue');
+      expect(await at(1.6, 327, 607)).toBe('mark');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it('renders silent videos too', async () => {

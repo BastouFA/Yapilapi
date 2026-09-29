@@ -9,6 +9,7 @@ import { track } from '../lib/services.ts';
 import { ageOf, PUBLIC_USER_COLS, toPublicUser, type PublicUserRow } from '../lib/users.ts';
 import { allowDownloadSql, notBlockedSql, postVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
+import { SHARE_MARK_VERSION } from '../lib/share-video.ts';
 
 /** Identifier kinds the server can match today. Phone numbers are not stored yet. */
 const CONTACT_KINDS = ['email'] as const;
@@ -134,11 +135,15 @@ export default async function growthModule(app: FastifyInstance, ctx: AppContext
   }
 
   const fileName = (username: string, postId: string) => `yapilapi-${username}-${postId.slice(0, 8)}.mp4`;
-  const shareState = (row: { status: string; url: string | null; username: string } | undefined, username: string, postId: string) => ({
-    status: (row && row.username === username ? row.status : 'none') as 'none' | 'queued' | 'processing' | 'ready' | 'failed',
-    url: row && row.username === username && row.status === 'ready' ? row.url : null,
-    fileName: fileName(username, postId),
-  });
+  // A video made for an older @name or with an older watermark counts as not made yet.
+  const shareState = (row: { status: string; url: string | null; username: string; mark_version: number } | undefined, username: string, postId: string) => {
+    const current = !!row && row.username === username && row.mark_version >= SHARE_MARK_VERSION;
+    return {
+      status: (current ? row.status : 'none') as 'none' | 'queued' | 'processing' | 'ready' | 'failed',
+      url: current && row.status === 'ready' ? row.url : null,
+      fileName: fileName(username, postId),
+    };
+  };
 
   /** Ask for the share video. Rendered once per reel and reused; poll GET for the result. */
   app.post('/v1/posts/:id/share-video', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (req, reply) => {
@@ -150,18 +155,19 @@ export default async function growthModule(app: FastifyInstance, ctx: AppContext
     // Start a render unless one is already done or on its way for the current @name.
     const started = await tx(db, async (c) => {
       const r = await c.query(
-        `INSERT INTO share_videos (post_id, username, requested_by) VALUES ($1, $2, $3)
+        `INSERT INTO share_videos (post_id, username, requested_by, mark_version) VALUES ($1, $2, $3, $4)
            ON CONFLICT (post_id) DO UPDATE SET status = 'queued', username = EXCLUDED.username, requested_by = EXCLUDED.requested_by,
-                                               url = NULL, storage_key = NULL, error = NULL
+                                               mark_version = EXCLUDED.mark_version, url = NULL, storage_key = NULL, error = NULL
              WHERE share_videos.status = 'failed' OR share_videos.username <> EXCLUDED.username
+                OR share_videos.mark_version < EXCLUDED.mark_version
            RETURNING post_id`,
-        [id, reel.username, u.id],
+        [id, reel.username, u.id, SHARE_MARK_VERSION],
       );
       if (r.rowCount) await enqueue(c, 'share.render', { postId: id });
       return !!r.rowCount;
     });
     if (started) track(db, u.id, 'share_video_requested', { postId: id });
-    const row = (await db.query(`SELECT status, url, username FROM share_videos WHERE post_id = $1`, [id])).rows[0];
+    const row = (await db.query(`SELECT status, url, username, mark_version FROM share_videos WHERE post_id = $1`, [id])).rows[0];
     const state = shareState(row, reel.username, id);
     reply.code(state.status === 'ready' ? 200 : 202);
     return state;
@@ -171,7 +177,7 @@ export default async function growthModule(app: FastifyInstance, ctx: AppContext
     const u = me(req);
     const { id } = parse(idParam, req.params);
     const reel = await shareableReel(id, u.id);
-    const row = (await db.query(`SELECT status, url, username FROM share_videos WHERE post_id = $1`, [id])).rows[0];
+    const row = (await db.query(`SELECT status, url, username, mark_version FROM share_videos WHERE post_id = $1`, [id])).rows[0];
     return shareState(row, reel.username, id);
   });
 }

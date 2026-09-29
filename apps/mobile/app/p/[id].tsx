@@ -354,7 +354,15 @@ export default function PostScreen() {
     replyButton: (commentId, v) => {
       replyButtons.current[commentId] = v;
     },
-    edit: (x) => setEditing({ id: x.id, body: x.body, busy: false }),
+    edit: (x) => {
+      setEditing({ id: x.id, body: x.body, busy: false });
+      // The comment (or the thread it's a reply in) near the top, so its box sits above the keyboard.
+      const top = x.parentId ? comments.findIndex((c) => c.id === x.parentId) : comments.findIndex((c) => c.id === x.id);
+      if (top >= 0) {
+        retried.current = false;
+        setTimeout(() => list.current?.scrollToIndex({ index: top, viewPosition: 0 }), 50);
+      }
+    },
     editText: (v) => setEditing((cur) => (cur ? { ...cur, body: v } : cur)),
     saveEdit: () => void saveEdit(),
     cancelEdit: () => setEditing(null),
@@ -496,7 +504,8 @@ export default function PostScreen() {
         keyboardDismissMode="on-drag"
         renderItem={renderTop}
       />
-      {me ? (
+      {/* While a comment is being edited in place, its own box is the one to type in. */}
+      {me && !editing ? (
         <View
           style={{
             padding: space[3],
