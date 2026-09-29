@@ -58,6 +58,7 @@ export function PostList({
   sponsored = false,
   showEnd = true,
   boost,
+  openComments,
 }: {
   load: (cursor?: string) => Promise<Page<Post>>;
   empty?: string;
@@ -69,6 +70,8 @@ export function PostList({
   showEnd?: boolean;
   /** Open the boost sheet for this post once it loads, with these choices filled in (a link from the phone app). */
   boost?: { postId: string; choices?: BoostChoices };
+  /** Open this post's comments once it loads (a notification about a comment). */
+  openComments?: string;
 }) {
   const { me, toast, t, tp, locale, flags } = useSession();
   const [memoryFor, setMemoryFor] = useState<Post | null>(null);
@@ -79,7 +82,8 @@ export function PostList({
   const [cursor, setCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [commentsFor, setCommentsFor] = useState<Post | null>(null);
-  const [why, setWhy] = useState<{ post: Post; reasons: string[] } | null>(null);
+  // The reasons, and which feed controls apply (no less or more like this while personalization is off).
+  const [why, setWhy] = useState<{ post: Post; reasons: string[]; controls?: string[] } | null>(null);
   const [reporting, setReporting] = useState<Post | null>(null);
   const [boosting, setBoosting] = useState<Post | null>(null);
   const [coauthorsFor, setCoauthorsFor] = useState<string | null>(null);
@@ -156,6 +160,16 @@ export function PostList({
     boostOpened.current = true;
     setBoosting(target);
   }, [boost, posts, me, flags.ADS, flags.COMMERCE]);
+
+  // A link to a post's comments: open them once, when the post is there.
+  const commentsOpened = useRef(false);
+  useEffect(() => {
+    if (!openComments || commentsOpened.current || !posts) return;
+    const target = posts.find((x) => x.id === openComments);
+    if (!target) return;
+    commentsOpened.current = true;
+    setCommentsFor(target);
+  }, [openComments, posts]);
 
   // Load the next page when the reader reaches the end, but the feed still ends.
   useEffect(() => {
@@ -398,9 +412,17 @@ export function PostList({
             onWhy={
               me
                 ? async (post) => {
-                    const why = await api.posts.why(post.id);
-                    // Each line in the reader's language; an older API only sends them in English.
-                    setWhy({ post, reasons: why.details ? why.details.map((d) => whyReasonText(d, { t, tp, locale })) : why.reasons });
+                    try {
+                      const why = await api.posts.why(post.id);
+                      // Each line in the reader's language; an older API only sends them in English.
+                      setWhy({
+                        post,
+                        reasons: why.details ? why.details.map((d) => whyReasonText(d, { t, tp, locale })) : why.reasons,
+                        controls: why.controls,
+                      });
+                    } catch (e) {
+                      toast(errorMessage(e));
+                    }
                   }
                 : undefined
             }
@@ -485,12 +507,16 @@ export function PostList({
           ))}
         </ul>
         <div className="row" style={{ marginTop: 16 }}>
-          <Button variant="secondary" size="sm" onClick={() => why && (feedback(why.post, 'less_like_this'), setWhy(null))}>
-            {t('post.lessLikeThis')}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => why && (feedback(why.post, 'more_like_this'), setWhy(null))}>
-            {t('post.moreLikeThis')}
-          </Button>
+          {!why?.controls || why.controls.includes('less_like_this') ? (
+            <Button variant="secondary" size="sm" onClick={() => why && (feedback(why.post, 'less_like_this'), setWhy(null))}>
+              {t('post.lessLikeThis')}
+            </Button>
+          ) : null}
+          {!why?.controls || why.controls.includes('more_like_this') ? (
+            <Button variant="ghost" size="sm" onClick={() => why && (feedback(why.post, 'more_like_this'), setWhy(null))}>
+              {t('post.moreLikeThis')}
+            </Button>
+          ) : null}
         </div>
       </BottomSheet>
 
@@ -816,6 +842,9 @@ export function ReportSheet({ target, onClose }: { target: { type: string; id: s
           try {
             await api.reports.create({ targetType: target.type, targetId: target.id, reason, details: details || undefined });
             toast(t('report.thanks'));
+            // The next report starts empty.
+            setReason('spam');
+            setDetails('');
             onClose();
           } catch (err) {
             toast(errorMessage(err));
@@ -875,8 +904,12 @@ function AddToMemorySheet({ post, onClose }: { post: Post; onClose: () => void }
           className="stack-sm"
           onSubmit={async (e) => {
             e.preventDefault();
-            const { memory } = await api.memories.create({ title });
-            await add(memory.id, memory.title);
+            try {
+              const { memory } = await api.memories.create({ title });
+              await add(memory.id, memory.title);
+            } catch (err) {
+              toast(errorMessage(err));
+            }
           }}
         >
           <TextField label={t('postList.newMemory')} value={title} onChange={(e) => setTitle(e.currentTarget.value)} maxLength={120} />
