@@ -21,16 +21,17 @@ export function CloseFriendsCard() {
   const [suggestions, setSuggestions] = useState<PublicUser[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const req = useRef(0);
+  // Why the list couldn't load (shown with Try again rather than as an empty list).
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    setLoadError(null);
     api.closeFriends.list().then(
       (r) => setList(r.items),
-      (e) => {
-        setList([]);
-        toast(errorMessage(e));
-      },
+      (e) => setLoadError(errorMessage(e)),
     );
-  }, [toast]);
+  }, [attempt]);
 
   useEffect(() => {
     const n = ++req.current;
@@ -79,7 +80,14 @@ export function CloseFriendsCard() {
           <h3 className="yp-field__label" style={{ margin: 0 }}>
             {list ? t('circles.closeFriendsCount', { count: list.length }) : t('m.closeFriends.onList')}
           </h3>
-          {list === null ? (
+          {list === null && loadError ? (
+            <div className="row">
+              <span role="alert">{loadError}</span>
+              <Button size="sm" variant="secondary" onClick={() => setAttempt((n) => n + 1)}>
+                {t('m.common.retry')}
+              </Button>
+            </div>
+          ) : list === null ? (
             <p className="muted">{t('common.loading')}</p>
           ) : list.length ? (
             <ul className="close-friends__list">

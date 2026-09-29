@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { as, signUp, testApp, type TestUser } from './helpers.ts';
+import { as, signUp, testApp, type TestUser, followAccepted } from './helpers.ts';
 import type { BuiltApp } from '../src/app.ts';
 import { ASK_LIMITS } from '@yapilapi/shared';
 
@@ -22,7 +22,7 @@ const befriend = (a: TestUser, b: TestUser) => {
   const [x, y] = [a.id, b.id].sort();
   return db().query(`INSERT INTO friendships (user_a, user_b) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [x, y]);
 };
-const follow = (a: TestUser, b: TestUser) => as(t.app, a).post(`/v1/users/${b.id}/follow`);
+const follow = (a: TestUser, b: TestUser) => followAccepted(t.app, a, b);
 const openBox = (u: TestUser, body: Record<string, unknown> = {}) => as(t.app, u).put('/v1/me/ask-box', { enabled: true, ...body });
 const ask = (from: TestUser | null, to: TestUser, body = 'What camera do you use?', hideName = false) =>
   as(t.app, from).post(`/v1/users/${to.id}/questions`, { body, hideName });

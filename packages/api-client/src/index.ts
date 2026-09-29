@@ -304,8 +304,16 @@ export function createClient(opts: ClientOptions) {
       /** `format: 'reel'` lists only their reels (the Reels tab). */
       posts: (username: string, cursor?: string, o: { format?: 'reel' } = {}) =>
         get<Page<Post>>(`/v1/users/${encodeURIComponent(username)}/posts${qs({ cursor, format: o.format })}`),
-      follow: (id: string) => post(`/v1/users/${id}/follow`),
-      unfollow: (id: string) => del(`/v1/users/${id}/follow`),
+      /** A private account is asked first: `requested` is true until they accept. */
+      follow: (id: string) => post<{ following: boolean; requested: boolean }>(`/v1/users/${id}/follow`),
+      /** Unfollow, or take back a follow request. */
+      unfollow: (id: string) => del<{ following: boolean; requested: boolean }>(`/v1/users/${id}/follow`),
+      /** People asking to follow you (your account is private), newest first. */
+      followRequests: () => get<{ items: { user: PublicUser; createdAt: string }[] }>('/v1/me/follow-requests'),
+      acceptFollow: (userId: string) => post<{ status: 'accepted' }>(`/v1/me/follow-requests/${userId}/accept`),
+      declineFollow: (userId: string) => post<{ status: 'declined' }>(`/v1/me/follow-requests/${userId}/decline`),
+      /** Remove someone from your followers. They aren't told. */
+      removeFollower: (userId: string) => del<{ ok: true }>(`/v1/me/followers/${userId}`),
       friendRequest: (id: string) => post<{ status: string }>(`/v1/users/${id}/friend-request`),
       unfriend: (id: string) => del(`/v1/users/${id}/friend`),
       block: (id: string) => post(`/v1/users/${id}/block`),
@@ -316,7 +324,8 @@ export function createClient(opts: ClientOptions) {
       unrestrict: (id: string) => del(`/v1/users/${id}/restrict`),
       followers: (id: string, cursor?: string) => get<Page<PublicUser> & { viewerFollows: string[] }>(`/v1/users/${id}/followers${qs({ cursor })}`),
       following: (id: string, cursor?: string) => get<Page<PublicUser> & { viewerFollows: string[] }>(`/v1/users/${id}/following${qs({ cursor })}`),
-      reposts: (id: string, cursor?: string) => get<Page<Post>>(`/v1/users/${id}/reposts${qs({ cursor })}`),
+      /** `hidden` is true when their profile is private and you don't follow them. */
+      reposts: (id: string, cursor?: string) => get<Page<Post> & { hidden?: boolean }>(`/v1/users/${id}/reposts${qs({ cursor })}`),
       /** Posts someone is tagged in that you can see. `hidden` is true when their profile is private and you don't follow them. */
       tagged: (username: string, cursor?: string) =>
         get<Page<Post> & { hidden?: boolean }>(`/v1/users/${encodeURIComponent(username)}/tagged${qs({ cursor })}`),

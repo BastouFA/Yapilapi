@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import type { PublicUser } from '../../../packages/shared/src/types';
 import { client, errorMessage } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { useSession } from '../lib/session';
 import { space } from '../lib/theme';
-import { Avatar, Button, Card, Field, KeyboardAvoid, Loading, Notice, Title, useColors, userText } from '../lib/ui';
+import { Avatar, Button, Card, ErrorState, Field, KeyboardAvoid, Loading, Notice, Title, useColors, userText } from '../lib/ui';
 
 type Entry = { user: PublicUser; followsYou: boolean };
 
@@ -25,17 +25,21 @@ export default function CloseFriends() {
   const [error, setError] = useState<string | null>(null);
   const req = useRef(0);
 
-  useEffect(() => {
+  // Why the list couldn't load (with Try again), apart from errors of actions.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const load = useCallback(() => {
+    setLoadError(null);
     client()
       .then((api) => api.closeFriends.list())
       .then(
         (r) => setList(r.items),
         (e) => {
-          setList([]);
-          setError(errorMessage(e));
+          setList((cur) => cur ?? []);
+          setLoadError(errorMessage(e));
         },
       );
   }, []);
+  useEffect(load, [load]);
 
   useEffect(() => {
     const n = ++req.current;
@@ -97,6 +101,7 @@ export default function CloseFriends() {
         keyboardShouldPersistTaps="handled"
       >
         <Title sub={t('m.closeFriends.hint')}>{t('m.closeFriends.title')}</Title>
+        {loadError ? <ErrorState message={loadError} onRetry={load} /> : null}
         {error ? <Notice tone="danger">{error}</Notice> : null}
         <Card style={{ gap: space[3] }}>
           <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '700', fontSize: 15 }}>

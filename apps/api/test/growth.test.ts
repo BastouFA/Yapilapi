@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { as, signUp, testApp, type TestUser, jobRunner, type JobRunner } from './helpers.ts';
+import { as, signUp, testApp, type TestUser, jobRunner, type JobRunner, followAccepted } from './helpers.ts';
 import type { BuiltApp } from '../src/app.ts';
 import { probe, run } from '../src/lib/media-processing.ts';
 import { END_CARD_SECONDS, renderShareVideo, SHARE_MARK_VERSION, shareVideoJobHandlers } from '../src/lib/share-video.ts';
@@ -177,7 +177,7 @@ describe('share a reel as a video', () => {
     const quiet = await adult();
     await as(t.app, quiet).patch('/v1/me/profile', { isPrivate: true });
     const follower = await adult();
-    await as(t.app, follower).post(`/v1/users/${quiet.id}/follow`);
+    await followAccepted(t.app, follower, quiet);
     const reel = await makeReel(quiet);
     expect((await as(t.app, follower).post(`/v1/posts/${reel}/share-video`)).status).toBe(403);
     // A private account can choose to allow it.
@@ -186,7 +186,7 @@ describe('share a reel as a video', () => {
 
     const teen = await signUp(t.app, { birthDate: new Date(Date.now() - 16 * 365.25 * 86400_000).toISOString().slice(0, 10) });
     const friendOfTeen = await signUp(t.app, { birthDate: new Date(Date.now() - 16 * 365.25 * 86400_000).toISOString().slice(0, 10) });
-    await as(t.app, friendOfTeen).post(`/v1/users/${teen.id}/follow`);
+    await followAccepted(t.app, friendOfTeen, teen);
     const teenReel = await makeReel(teen);
     expect((await as(t.app, friendOfTeen).get(`/v1/posts/${teenReel}`)).body.post.downloadable).toBe(false);
     expect((await as(t.app, friendOfTeen).post(`/v1/posts/${teenReel}/share-video`)).status).toBe(403);

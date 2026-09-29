@@ -117,6 +117,10 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
     );
 
   const rel = profile.relationship;
+  // A private account you don't follow: its posts, reels and reposts say why they're empty.
+  const locked = profile.isPrivate && !rel.isSelf && !rel.following && !rel.friends;
+  const lockedBody =
+    rel.followRequest === 'sent' ? t('profile.private.requested', { name: profile.displayName }) : t('profile.private.follow', { name: profile.displayName });
   // The tabs they chose, in their order; a link to the shop still opens it.
   const tabs: ProfileTab[] = tab && !profile.tabs.includes(tab) ? [...profile.tabs, tab] : profile.tabs;
   const current: ProfileTab = tab ?? tabs[0] ?? 'posts';
@@ -212,8 +216,25 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
                 <Button size="sm" variant="secondary" onClick={act(() => api.users.unfollow(profile.id))}>
                   {t('profile.unfollow')}
                 </Button>
+              ) : rel.followRequest === 'sent' ? (
+                // A private account hasn't answered yet: tapping takes the request back.
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  aria-label={t('profile.withdrawRequest', { name: profile.displayName })}
+                  onClick={act(() => api.users.unfollow(profile.id), t('profile.requestWithdrawn'))}
+                >
+                  {t('profile.requested')}
+                </Button>
               ) : (
-                <Button size="sm" onClick={act(() => api.users.follow(profile.id))} disabled={rel.blocked}>
+                <Button
+                  size="sm"
+                  onClick={act(async () => {
+                    const r = await api.users.follow(profile.id);
+                    if (r.requested) toast(t('profile.requestedToast', { name: profile.displayName }));
+                  })}
+                  disabled={rel.blocked}
+                >
                   {t('profile.follow')}
                 </Button>
               )}
@@ -314,6 +335,19 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
           </Button>
         ) : null}
       </div>
+      {rel.followRequest === 'received' && !rel.isSelf ? (
+        <div className="yp-card profile__request" role="group" aria-label={t('followRequests.title')}>
+          <span>{t('profile.followRequestFrom', { name: profile.displayName })}</span>
+          <span className="row" style={{ gap: 8 }}>
+            <Button size="sm" onClick={act(() => api.users.acceptFollow(profile.id), t('followRequests.accepted', { name: profile.displayName }))}>
+              {t('m.common.accept')}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={act(() => api.users.declineFollow(profile.id), t('followRequests.declined'))}>
+              {t('m.common.decline')}
+            </Button>
+          </span>
+        </div>
+      ) : null}
       {signedOut ? (
         <JoinNote
           text={
@@ -338,7 +372,9 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
           {t(tabLabel(current))}
         </h2>
       )}
-      {current === 'posts' ? (
+      {locked && (current === 'posts' || current === 'reels' || current === 'reposts') ? (
+        <EmptyState title={t('profilePage.tagged.privateTitle')} body={lockedBody} />
+      ) : current === 'posts' ? (
         <PostList load={load} reloadKey={`${username}-${version}`} empty={rel.isSelf ? t('profilePage.empty.postsSelf') : t('m.profile.noPosts')} />
       ) : current === 'reels' ? (
         <ReelGrid load={loadReels} reloadKey={`${username}-reels`} empty={t('ps.empty.reels')} />

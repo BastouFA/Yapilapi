@@ -79,3 +79,10 @@ export function as(app: FastifyInstance, user: TestUser | null) {
     del: (url: string, payload?: unknown) => call('DELETE', url, payload),
   };
 }
+
+/** `a` follows `b`; when `b`'s account is private (every under-18 account is), `b` accepts the request. */
+export async function followAccepted(app: FastifyInstance, a: TestUser, b: TestUser) {
+  const r = await as(app, a).post(`/v1/users/${b.id}/follow`);
+  if (r.body?.requested) await as(app, b).post(`/v1/me/follow-requests/${a.id}/accept`);
+  return r;
+}

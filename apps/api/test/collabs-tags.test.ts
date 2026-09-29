@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { as, signUp, testApp, type TestUser } from './helpers.ts';
+import { as, signUp, testApp, type TestUser, followAccepted } from './helpers.ts';
 import type { BuiltApp } from '../src/app.ts';
 
 let t: BuiltApp;
@@ -11,7 +11,7 @@ afterAll(async () => {
 });
 
 const adult = () => signUp(t.app, { birthDate: '1990-01-01' });
-const follow = (a: TestUser, b: TestUser) => as(t.app, a).post(`/v1/users/${b.id}/follow`);
+const follow = (a: TestUser, b: TestUser) => followAccepted(t.app, a, b);
 const mutual = async (a: TestUser, b: TestUser) => {
   await follow(a, b);
   await follow(b, a);

@@ -977,12 +977,24 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     };
   });
 
-  /** A person's reposts, newest first (what they chose to share). */
+  /**
+   * A person's reposts, newest first (what they chose to share). A private account's reposts are
+   * for the people who can see that profile (the account and its followers); others get `hidden`.
+   */
   app.get('/v1/users/:id/reposts', async (req) => {
     const viewer = req.user?.id ?? null;
     const { id } = parse(idParam, req.params);
     const q = parse(pageQuerySchema, req.query);
     const c = decodeCursor<KeyCursor>(q.cursor);
+    const owner = (
+      await db.query(
+        `SELECT pr.is_private, (pr.user_id = $2 OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $2 AND f.followee_id = pr.user_id)) AS sees
+         FROM profiles pr JOIN users u ON u.id = pr.user_id WHERE pr.user_id = $1 AND u.status = 'active' AND ${notBlockedSql('pr.user_id', '$2')}`,
+        [id, viewer],
+      )
+    ).rows[0];
+    if (!owner) throw notFound('That profile');
+    if (owner.is_private && !owner.sees) return { items: [], nextCursor: null, hidden: true };
     const { rows } = await db.query(
       `SELECT p.id, r.created_at, r.post_id AS rid FROM post_reposts r JOIN posts p ON p.id = r.post_id
        JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id

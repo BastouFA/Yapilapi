@@ -26,6 +26,8 @@ export function FindFriends({ onChecked }: { onChecked?: (result: { checked: num
   const [found, setFound] = useState<ContactMatch[] | null>(null);
   const [missing, setMissing] = useState<string[]>([]);
   const [following, setFollowing] = useState<Set<string>>(new Set());
+  // Private accounts asked to be followed (they answer first); tapping again takes the request back.
+  const [requested, setRequested] = useState<Set<string>>(new Set());
   const [inviteLink, setInviteLink] = useState<string | null>(null);
 
   useEffect(() => {
@@ -62,14 +64,28 @@ export function FindFriends({ onChecked }: { onChecked?: (result: { checked: num
     }
   }
 
-  async function toggle(id: string) {
-    const on = following.has(id);
+  async function toggle(id: string, name: string) {
+    const on = following.has(id) || requested.has(id);
     const next = new Set(following);
     if (on) next.delete(id);
     else next.add(id);
     setFollowing(next);
     try {
-      await (on ? api.users.unfollow(id) : api.users.follow(id));
+      const r = await (on ? api.users.unfollow(id) : api.users.follow(id));
+      setRequested((q) => {
+        const n = new Set(q);
+        if (r.requested) n.add(id);
+        else n.delete(id);
+        return n;
+      });
+      if (r.requested) {
+        setFollowing((f) => {
+          const n = new Set(f);
+          n.delete(id);
+          return n;
+        });
+        toast(t('profile.requestedToast', { name }));
+      }
     } catch (e) {
       setFollowing(following);
       toast(errorMessage(e));
@@ -106,6 +122,7 @@ export function FindFriends({ onChecked }: { onChecked?: (result: { checked: num
             <ul className="find-friends__list">
               {found.map((m) => {
                 const on = following.has(m.user.id);
+                const asked = requested.has(m.user.id);
                 return (
                   <li key={m.user.id} className="find-friends__row">
                     <Link href={`/u/${m.user.username}`} className="find-friends__who">
@@ -118,8 +135,14 @@ export function FindFriends({ onChecked }: { onChecked?: (result: { checked: num
                         </span>
                       </span>
                     </Link>
-                    <Button size="sm" variant={on ? 'secondary' : 'primary'} aria-pressed={on} onClick={() => toggle(m.user.id)}>
-                      {on ? t('profile.unfollow') : t('profile.follow')}
+                    <Button
+                      size="sm"
+                      variant={on || asked ? 'secondary' : 'primary'}
+                      aria-pressed={on || asked}
+                      aria-label={asked ? t('profile.withdrawRequest', { name: m.user.displayName }) : undefined}
+                      onClick={() => toggle(m.user.id, m.user.displayName)}
+                    >
+                      {on ? t('profile.unfollow') : asked ? t('profile.requested') : t('profile.follow')}
                     </Button>
                   </li>
                 );

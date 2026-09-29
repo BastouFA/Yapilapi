@@ -1836,6 +1836,14 @@ html[data-locale-pending] body {
   outline: 2px solid #fff;
   outline-offset: 2px;
 }
+.profile__request {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 12px 16px;
+}
 .profile__count {
   padding: 4px 6px;
   margin: -4px -6px;

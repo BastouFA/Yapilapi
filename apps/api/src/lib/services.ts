@@ -159,7 +159,9 @@ export async function notify(
         [row.id, n.actorId, row.actors.length + 1, JSON.stringify([...row.actors, n.actorId].slice(-50))],
       );
       const pausedNow = p?.notifications_paused_until && p.notifications_paused_until > new Date();
-      if (!pausedNow) await realtime.publish([n.userId], { type: 'notification.created', data: { id: row.id, category: n.category, type: n.type } });
+      // `grouped`: it joined a row that was already unread, so the unread count stays the same.
+      if (!pausedNow)
+        await realtime.publish([n.userId], { type: 'notification.created', data: { id: row.id, category: n.category, type: n.type, grouped: true } });
       return;
     }
   }

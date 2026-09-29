@@ -96,8 +96,11 @@ export function Button({
   disabled: disabledProp,
   style,
   tint,
+  accessibilityLabel,
 }: {
   label: string;
+  /** Read out in place of the label, when the label alone doesn't say what happens. */
+  accessibilityLabel?: string;
   onPress: () => unknown;
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   size?: 'sm' | 'md';
@@ -145,7 +148,7 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled, busy: pending }}
       disabled={disabled}
       onPress={press}
