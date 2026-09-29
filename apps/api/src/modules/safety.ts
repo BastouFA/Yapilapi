@@ -14,6 +14,7 @@ import { syncCommentCounts } from '../lib/comments.ts';
 import { answerCards } from '../lib/ask.ts';
 import { MIX_FROM, mixVisibleSql } from '../lib/mixes.ts';
 import { LISTING_FROM, listingVisibleSql } from '../lib/market.ts';
+import { postVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -65,6 +66,20 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       const ok = await db.query(
         `SELECT 1 FROM messages m JOIN conversation_members cm ON cm.conversation_id = m.conversation_id WHERE m.id = $1 AND cm.user_id = $2`,
         [input.targetId, u.id],
+      );
+      if (!ok.rowCount) throw notFound('The item you reported');
+    }
+    // A post, or a comment on one, only by someone who may see that post (so a post's id alone can't be used to
+    // report it, or to hide it with a minor-safety report). A block between the two doesn't stop a report: they may
+    // have seen it before blocking or being blocked.
+    if (input.targetType === 'post' || input.targetType === 'comment') {
+      const ok = await db.query(
+        `SELECT 1 FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
+         WHERE p.id = ${input.targetType === 'post' ? '$2' : '(SELECT cm.post_id FROM comments cm WHERE cm.id = $2)'}
+           AND (${postVisibleSql('$1')}
+                OR (p.deleted_at IS NULL AND EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = $1 AND b.blocked_id = p.author_id)
+                                                                             OR (b.blocker_id = p.author_id AND b.blocked_id = $1))))`,
+        [u.id, input.targetId],
       );
       if (!ok.rowCount) throw notFound('The item you reported');
     }
