@@ -7,6 +7,7 @@ import {
   chatTheme,
   chessDrawReason,
   DISAPPEARING_SECONDS,
+  groupLineText,
   messagePreviewText,
   type Message,
   type MessageKey,
@@ -171,7 +172,7 @@ export function SystemLine({
   /** The watch together session running in this chat now: its line gets a Join link. */
   watchSessionId?: string | null;
 }) {
-  const { t, tp } = useSession();
+  const { t, tp, locale } = useSession();
   const who = message.sender.id === meId ? t('m.chat.you') : message.sender.displayName;
   const s = message.system;
   // "Ada added 3 songs to Road trip": several adds by one person within ten minutes share the line.
@@ -234,6 +235,12 @@ export function SystemLine({
       </p>
     );
   }
+  if (s?.type === 'group')
+    return (
+      <p className="chat-system" role="note">
+        <Icon name="users" size={14} /> <bdi>{groupLineText(s, who, { t, locale, meId })}</bdi>
+      </p>
+    );
   if (s?.type === 'game') {
     const game = t(`m.chat.game.kind.${s.kind}` as MessageKey);
     const chess = s.kind === 'chess';

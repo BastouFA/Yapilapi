@@ -1,5 +1,6 @@
 import { formatMoney, type MessageKey } from './i18n-core.ts';
-import type { Message, MessagePreview, StoryReply } from './types.ts';
+import { formatList } from './feed-reasons.ts';
+import type { GroupLineAction, Message, MessagePreview, StoryReply } from './types.ts';
 
 /**
  * One line about a message, in the reader's language: a quoted reply, a pin, a chat's last
@@ -96,4 +97,33 @@ export function messagePreviewText(p: MessagePreview, tr: PreviewTranslator): st
     default:
       return p.attachmentKind ? t('m.chat.attachment') : t('chat.message');
   }
+}
+
+const GROUP_LINE_KEYS = {
+  renamed: 'chat.group.renamed',
+  added: 'chat.group.added',
+  removed: 'chat.group.removed',
+  left: 'chat.group.left',
+  admin: 'chat.group.admin',
+  unadmin: 'chat.group.unadmin',
+  promoted: 'chat.group.promoted',
+} as const satisfies Record<GroupLineAction, MessageKey>;
+
+/**
+ * A group line ("Ada added Léa and Kofi", "You left the group") in the reader's language. `name` is
+ * who did it as the reader says it (their own "You"); `people` are named as they were then, "You"
+ * for the reader.
+ */
+export function groupLineText(
+  info: { action: GroupLineAction; title?: string; people?: { id: string; displayName: string }[] },
+  name: string,
+  tr: PreviewTranslator,
+): string {
+  if (info.action === 'promoted' && info.people?.length === 1 && info.people[0]!.id === tr.meId) return tr.t('chat.group.promotedYou');
+  const people = formatList(
+    (info.people ?? []).map((p) => (p.id === tr.meId ? tr.t('chat.group.you') : p.displayName)),
+    tr.locale,
+    (k) => tr.t(k),
+  );
+  return tr.t(GROUP_LINE_KEYS[info.action], { name, people, title: info.title ?? '' });
 }

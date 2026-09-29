@@ -472,6 +472,10 @@ export const createConversationSchema = z.object({
   memberIds: z.array(uuid).min(1).max(255),
   title: z.string().trim().max(80).optional(),
 });
+/** A group's new name (group admins). */
+export const renameConversationSchema = z.object({ title: z.string().trim().min(1).max(80) });
+/** Make someone in a group an admin, or take it back (group admins). */
+export const memberRoleSchema = z.object({ role: z.enum(['admin', 'member']) });
 export const sendMessageSchema = z
   .object({
     body: z.string().trim().max(4000).default(''),

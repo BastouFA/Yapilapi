@@ -22,11 +22,15 @@ export default function Inbox() {
   const [items, setItems] = useState<Conversation[] | null>(null);
   const [requests, setRequests] = useState<{ id: string; from: PublicUser }[]>([]);
   const [newGroup, setNewGroup] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
 
   const load = () =>
     sharedRequest('conversations', () => api.conversations.list()).then(
-      (r) => setItems(r.items),
-      (e) => toast(errorMessage(e)),
+      (r) => {
+        setItems(r.items);
+        setFailed(null);
+      },
+      (e) => setFailed(errorMessage(e)),
     );
   useEffect(() => {
     void load();
@@ -37,7 +41,7 @@ export default function Inbox() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useRealtime((e) => {
-    if (e.type === 'message.created' || e.type === 'conversation.created') void load();
+    if (['message.created', 'conversation.created', 'conversation.changed', 'conversation.removed'].includes(e.type)) void load();
   });
 
   return (
@@ -69,9 +73,13 @@ export default function Inbox() {
                     <Button
                       size="sm"
                       onClick={async () => {
-                        await api.me.acceptFriend(r.id);
-                        setRequests((x) => x.filter((y) => y.id !== r.id));
-                        toast(t('chat.nowFriends', { name: r.from.displayName }));
+                        try {
+                          await api.me.acceptFriend(r.id);
+                          setRequests((x) => x.filter((y) => y.id !== r.id));
+                          toast(t('chat.nowFriends', { name: r.from.displayName }));
+                        } catch (e) {
+                          toast(errorMessage(e));
+                        }
                       }}
                     >
                       {t('m.common.accept')}
@@ -80,8 +88,12 @@ export default function Inbox() {
                       size="sm"
                       variant="ghost"
                       onClick={async () => {
-                        await api.me.declineFriend(r.id);
-                        setRequests((x) => x.filter((y) => y.id !== r.id));
+                        try {
+                          await api.me.declineFriend(r.id);
+                          setRequests((x) => x.filter((y) => y.id !== r.id));
+                        } catch (e) {
+                          toast(errorMessage(e));
+                        }
                       }}
                     >
                       {t('m.common.decline')}
@@ -94,7 +106,22 @@ export default function Inbox() {
         </section>
       ) : null}
 
-      {items === null ? (
+      {items === null && failed ? (
+        <EmptyState
+          title={t('inbox.loadFailed')}
+          body={failed}
+          action={
+            <Button
+              onClick={() => {
+                setFailed(null);
+                void load();
+              }}
+            >
+              {t('m.common.retry')}
+            </Button>
+          }
+        />
+      ) : items === null ? (
         <Skeleton height={240} />
       ) : items.length ? (
         <List label={t('chat.conversations')}>

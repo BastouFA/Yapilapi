@@ -325,7 +325,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <Ctx.Provider value={{ me, refresh, signOut, signOutEverywhere, accounts, switchAccount, removeAccount, subscribe, sendRealtime, setKeepAlive, waitForRealtime }}>
+    <Ctx.Provider
+      value={{ me, refresh, signOut, signOutEverywhere, accounts, switchAccount, removeAccount, subscribe, sendRealtime, setKeepAlive, waitForRealtime }}
+    >
       {children}
     </Ctx.Provider>
   );

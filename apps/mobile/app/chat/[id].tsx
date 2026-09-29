@@ -86,7 +86,7 @@ const MAX_VOICE_MS = 5 * 60 * 1000;
 export default function Chat() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const c = useColors();
-  const { t, locale } = useT();
+  const { t, tp, locale } = useT();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { me, sendRealtime } = useSession();
@@ -296,6 +296,29 @@ export default function Chat() {
       setConversation((cur) => (cur ? { ...cur, disappearingSeconds: e.data.disappearingSeconds } : cur));
     // Someone changed the wallpaper or bubble colour: everyone sees the same.
     if (e.type === 'conversation.theme' && e.data?.id === id) setConversation((cur) => (cur ? { ...cur, theme: e.data.theme } : cur));
+    // The group's name, people or admins changed; or you were taken out of it.
+    if (e.type === 'conversation.changed' && e.data?.id === id)
+      void client()
+        .then((api) => api.conversations.get(id))
+        .then(
+          (r) => setConversation(r.conversation),
+          () => {},
+        );
+    if (e.type === 'conversation.removed' && e.data?.id === id) {
+      setConversation(null);
+      setMessages([]);
+      setError(t('chat.group.gone'));
+    }
+    // Someone read up to here: "Seen" under your messages follows.
+    if (e.type === 'conversation.read' && e.data?.conversationId === id)
+      setConversation((cur) =>
+        cur
+          ? {
+              ...cur,
+              readBy: [...(cur.readBy ?? []).filter((r) => r.userId !== e.data.userId), { userId: e.data.userId, lastReadAt: e.data.lastReadAt }],
+            }
+          : cur,
+      );
     if (e.type === 'app.foreground') void load();
     // Someone opened a view-once photo you sent, or its file was deleted.
     if (e.type === 'view_once.updated' && e.data?.conversationId === id)
@@ -879,6 +902,17 @@ export default function Chat() {
   const showSender = !!conversation && conversation.members.length > 2;
   const watchingId = watching?.id ?? null;
   const viewer = sharing.viewer;
+  // Read receipts: under your newest message, "Seen" (one-to-one) or who of the group has read it.
+  const lastMine = messages.filter((m) => m.sender.id === meId && m.kind !== 'system' && !m.unsent && !m.moderation).at(-1);
+  const readers = lastMine ? (conversation?.readBy ?? []).filter((r) => r.lastReadAt >= lastMine.createdAt).length : 0;
+  const seenLabel = !readers
+    ? null
+    : conversation?.kind === 'direct'
+      ? t('chat.seen')
+      : readers >= (conversation?.readBy?.length ?? 0)
+        ? t('chat.seenByAll')
+        : tp('chat.seenBy', readers);
+  const lastMineId = lastMine?.id;
   const renderMessage = useCallback(
     ({ item }: { item: Message }) => (
       <MessageRow
@@ -890,10 +924,11 @@ export default function Chat() {
         accent={accent}
         watchLive={!!watchingId && item.system?.type === 'watch' && item.system.sessionId === watchingId}
         viewer={item.location ? viewer : null}
+        seen={item.id === lastMineId ? seenLabel : null}
         h={rowHandlers}
       />
     ),
-    [meId, showSender, highlight, accent, watchingId, viewer, rowHandlers],
+    [meId, showSender, highlight, accent, watchingId, viewer, rowHandlers, lastMineId, seenLabel],
   );
 
   // Follow the newest message, not when earlier ones are loaded above it.
@@ -1000,22 +1035,22 @@ export default function Chat() {
           // Your messages waiting to be sent: only you see them, after the newest message.
           ListFooterComponent={
             <>
-            <ScheduledList
-              items={scheduled.items}
-              accent={accent}
-              onChanged={(s) => scheduled.setItems((cur) => cur.map((x) => (x.id === s.id ? s : x)).sort((a, b) => a.sendAt.localeCompare(b.sendAt)))}
-              onSent={(s, m) => {
-                scheduled.setItems((cur) => cur.filter((x) => x.id !== s.id));
-                setMessages((cur) => (cur.some((x) => x.id === m.id) ? cur : [...cur, m]));
-              }}
-              onRemoved={(s) => scheduled.setItems((cur) => cur.filter((x) => x.id !== s.id))}
-              onError={setError}
-            />
-            {someoneTyping ? (
-              <Text style={{ color: c.inkMuted, fontSize: 13, paddingHorizontal: space[4], paddingVertical: space[1] }}>
-                {t('chat.typing', { name: someoneTyping.name })}
-              </Text>
-            ) : null}
+              <ScheduledList
+                items={scheduled.items}
+                accent={accent}
+                onChanged={(s) => scheduled.setItems((cur) => cur.map((x) => (x.id === s.id ? s : x)).sort((a, b) => a.sendAt.localeCompare(b.sendAt)))}
+                onSent={(s, m) => {
+                  scheduled.setItems((cur) => cur.filter((x) => x.id !== s.id));
+                  setMessages((cur) => (cur.some((x) => x.id === m.id) ? cur : [...cur, m]));
+                }}
+                onRemoved={(s) => scheduled.setItems((cur) => cur.filter((x) => x.id !== s.id))}
+                onError={setError}
+              />
+              {someoneTyping ? (
+                <Text style={{ color: c.inkMuted, fontSize: 13, paddingHorizontal: space[4], paddingVertical: space[1] }}>
+                  {t('chat.typing', { name: someoneTyping.name })}
+                </Text>
+              ) : null}
             </>
           }
           initialNumToRender={20}
@@ -1305,6 +1340,9 @@ export default function Chat() {
             : canWatch
               ? [{ label: t('watch.start'), icon: 'tv-outline' as const, hint: t('watch.startEmpty'), onPress: () => void startWatch(id).catch(fail) }]
               : []),
+          ...(conversation?.kind === 'group'
+            ? [{ label: t('chat.group.info'), icon: 'people-outline' as const, onPress: () => router.push({ pathname: '/group-info', params: { id } }) }]
+            : []),
           { label: t('m.chat.search'), icon: 'search-outline', onPress: () => setSearchOpen(true) },
           {
             label: `${t('m.chat.disappearing')} · ${disappearingText(t, conversation?.disappearingSeconds)}`,
@@ -1501,6 +1539,7 @@ const MessageRow = memo(function MessageRow({
   accent,
   watchLive,
   viewer,
+  seen,
   h,
 }: {
   item: Message;
@@ -1513,6 +1552,8 @@ const MessageRow = memo(function MessageRow({
   watchLive: boolean;
   /** Where you are, for distances on location cards (worked out on this phone only). */
   viewer: LatLng | null;
+  /** Read receipt under your newest message ("Seen", "Seen by 2"), or null. */
+  seen: string | null;
   h: RowHandlers;
 }) {
   const c = useColors();
@@ -1587,6 +1628,7 @@ const MessageRow = memo(function MessageRow({
       </Pressable>
       <ReactionRow message={item} mine onToggle={(emoji, on) => h.react(item, emoji, on)} />
       {item.moderation === 'review' ? <Text style={{ color: c.inkMuted, fontSize: 12, alignSelf: 'flex-end' }}>{t('m.chat.held')}</Text> : null}
+      {seen ? <Text style={{ color: c.inkMuted, fontSize: 12, alignSelf: 'flex-end' }}>{seen}</Text> : null}
       {item.reminder && !item.unsent ? <ReminderNote at={item.reminder.remindAt} alignEnd /> : null}
     </View>
   ) : (

@@ -801,6 +801,17 @@ export function createClient(opts: ClientOptions) {
       list: () => get<{ items: Conversation[] }>('/v1/conversations'),
       get: (id: string) => get<{ conversation: Conversation }>(`/v1/conversations/${id}`),
       create: (memberIds: string[], title?: string) => post<{ conversation: Conversation }>('/v1/conversations', { memberIds, title }),
+      /** Rename a group (its admins). */
+      rename: (id: string, title: string) => patch<{ conversation: Conversation; message: Message | null }>(`/v1/conversations/${id}`, { title }),
+      /** Add people to a group (anyone in it). */
+      addMembers: (id: string, userIds: string[]) => post<{ ok: true; added: number; message: Message | null }>(`/v1/conversations/${id}/members`, { userIds }),
+      /** Take someone out of a group (its admins). */
+      removeMember: (id: string, userId: string) => del<{ ok: true; message: Message | null }>(`/v1/conversations/${id}/members/${userId}`),
+      /** Make someone a group admin, or take it back (its admins; a group keeps at least one). */
+      setRole: (id: string, userId: string, role: 'admin' | 'member') =>
+        put<{ conversation: Conversation; message: Message | null }>(`/v1/conversations/${id}/members/${userId}/role`, { role }),
+      /** Leave a chat. When the last admin of a group leaves, whoever has been there longest becomes one. */
+      leave: (id: string) => post<{ ok: true }>(`/v1/conversations/${id}/leave`),
       messages: (id: string, cursor?: string) => get<Page<Message>>(`/v1/conversations/${id}/messages${qs({ cursor })}`),
       /** `kind: 'yap'` sends a hold-to-talk voice clip; `viewOnce` sends one photo or video uploaded with `viewOnce`. */
       send: (

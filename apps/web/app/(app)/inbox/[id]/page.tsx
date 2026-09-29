@@ -17,7 +17,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { AIPanel, BottomSheet, Button, ChatBubble, EmptyState, Icon, Menu, Skeleton, Switch, TranslatableText, type MenuAction } from '@yapilapi/design-system';
 import type { ChatGame, Conversation, Message, ScheduledMessage } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
+import { GroupInfoSheet } from '@/components/GroupInfo';
 import { ReportSheet } from '@/components/PostList';
 import { useRealtime, useSession } from '../../../providers';
 import { useCalls } from '@/components/Calls';
@@ -56,7 +57,7 @@ type Pending = Message & { pending?: boolean };
 
 export default function ChatPage() {
   const { id } = useParams<{ id: string }>();
-  const { me, t, toast, locale, setUnread, unread, flags, sendRealtime } = useSession();
+  const { me, t, tp, toast, locale, setUnread, unread, flags, sendRealtime } = useSession();
   const [conv, setConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Pending[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -148,21 +149,31 @@ export default function ChatPage() {
   const patchMessage = (messageId: string, fn: (m: Pending) => Pending) => setMessages((cur) => cur?.map((x) => (x.id === messageId ? fn(x) : x)) ?? cur);
   const addMessage = (m: Message) => setMessages((cur) => (cur?.some((x) => x.id === m.id) ? cur : [...(cur ?? []), m]));
 
-  useEffect(() => {
+  // The chat couldn't load: gone (you left, were removed, or it never was yours) or a failed request (Try again).
+  const [loadError, setLoadError] = useState<{ gone: boolean; text: string } | null>(null);
+  const [groupOpen, setGroupOpen] = useState(false);
+  const reloadConv = () =>
     api.conversations.get(id).then(
       (r) => setConv(r.conversation),
-      (e) => toast(errorMessage(e)),
+      () => {},
     );
-    api.conversations.messages(id).then(
-      (r) => {
+  function load() {
+    setLoadError(null);
+    Promise.all([api.conversations.get(id), api.conversations.messages(id)]).then(
+      ([c, r]) => {
+        setConv(c.conversation);
         setMessages(r.items);
         setCursor(r.nextCursor);
-        void api.conversations.read(id);
-        setUnread({ messages: Math.max(0, unread.messages - (conv?.unreadCount ?? 0)) });
+        void api.conversations.read(id).catch(() => {});
+        // What was unread here is read now.
+        setUnread({ messages: Math.max(0, unread.messages - c.conversation.unreadCount) });
       },
-      (e) => toast(errorMessage(e)),
+      (e) => setLoadError({ gone: isGone(e), text: isGone(e) ? t('chat.group.gone') : errorMessage(e) }),
     );
     void loadPins();
+  }
+  useEffect(() => {
+    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -312,6 +323,22 @@ export default function ChatPage() {
     if (e.type === 'conversation.updated' && e.data.id === id) setConv((c) => (c ? { ...c, disappearingSeconds: e.data.disappearingSeconds } : c));
     // Someone changed the wallpaper or bubble colour: everyone sees the same.
     if (e.type === 'conversation.theme' && e.data.id === id) setConv((c) => (c ? { ...c, theme: e.data.theme } : c));
+    // The group's name, people or admins changed; or you were taken out of it.
+    if (e.type === 'conversation.changed' && e.data.id === id) void reloadConv();
+    if (e.type === 'conversation.removed' && e.data.id === id) {
+      setGroupOpen(false);
+      setLoadError({ gone: true, text: t('chat.group.gone') });
+    }
+    // Someone read up to here: "Seen" under your messages follows.
+    if (e.type === 'conversation.read' && e.data.conversationId === id)
+      setConv((c) =>
+        c
+          ? {
+              ...c,
+              readBy: [...(c.readBy ?? []).filter((r) => r.userId !== e.data.userId), { userId: e.data.userId, lastReadAt: e.data.lastReadAt }],
+            }
+          : c,
+      );
     // Someone opened a view-once photo you sent, or its file was deleted.
     if (e.type === 'view_once.updated' && e.data.conversationId === id)
       setMessages((cur) => cur?.map((x) => (x.id === e.data.id ? { ...x, viewOnce: e.data.viewOnce } : x)) ?? cur);
@@ -560,7 +587,42 @@ export default function ChatPage() {
   const title = conv ? conv.title || others.map((m) => m.displayName).join(', ') : '';
   // Watch together: one-to-one chats and groups of up to 8 people.
   const watchable = !!conv && (conv.kind === 'direct' || conv.kind === 'group') && conv.members.length <= WATCH_MAX_MEMBERS;
+  // Read receipts: under your newest message, "Seen" (one-to-one) or who of the group has read it.
+  const lastMine = messages?.filter((m) => m.sender.id === me?.id && !m.pending && m.kind !== 'system' && !m.unsent && !m.moderation).at(-1);
+  const readers = lastMine ? (conv?.readBy ?? []).filter((r) => r.lastReadAt >= lastMine.createdAt).length : 0;
+  const seenLabel = !readers
+    ? null
+    : conv?.kind === 'direct'
+      ? t('chat.seen')
+      : readers >= (conv?.readBy?.length ?? 0)
+        ? t('chat.seenByAll')
+        : tp('chat.seenBy', readers);
   let lastDay = '';
+
+  if (loadError)
+    return (
+      <div className="yp-shell__inner chat-page">
+        <div className="yp-topbar">
+          <div className="row" style={{ minWidth: 0 }}>
+            <Link href="/inbox" className="yp-action" aria-label={t('chat.backToInbox')}>
+              <Icon name="arrow-left" />
+            </Link>
+          </div>
+        </div>
+        <EmptyState
+          title={loadError.text}
+          action={
+            loadError.gone ? (
+              <Link href="/inbox" className="yp-btn yp-btn--secondary">
+                {t('chat.backToInbox')}
+              </Link>
+            ) : (
+              <Button onClick={load}>{t('m.common.retry')}</Button>
+            )
+          }
+        />
+      </div>
+    );
 
   return (
     <div className="yp-shell__inner chat-page">
@@ -616,6 +678,7 @@ export default function ChatPage() {
           <Menu
             label={t('chat.options')}
             actions={[
+              ...(conv?.kind === 'group' ? [{ label: t('chat.group.info'), icon: 'users' as const, onSelect: () => setGroupOpen(true) }] : []),
               { label: t('chat.apps'), icon: 'create', onSelect: () => setAppsOpen(true) },
               { label: t('inbox.summarize'), icon: 'sparkle', onSelect: () => assist('summarize_conversation') },
               { label: t('chat.ai.draftPlan'), icon: 'calendar', onSelect: () => assist('plan_from_message') },
@@ -858,6 +921,7 @@ export default function ChatPage() {
                   ) : null}
                   <ReactionRow message={m} mine={mine} onToggle={(emoji, on) => void react(m, emoji, on)} />
                   {m.moderation === 'review' ? <span className="chat-held">{t('m.chat.held')}</span> : null}
+                  {seenLabel && m.id === lastMine?.id ? <span className="chat-seen">{seenLabel}</span> : null}
                   {m.reminder && !m.unsent ? <ReminderNote at={m.reminder.remindAt} /> : null}
                 </div>
               </div>
@@ -1089,6 +1153,16 @@ export default function ChatPage() {
         }}
       />
       <ReportSheet target={reportId ? { type: 'message', id: reportId } : null} onClose={() => setReportId(null)} />
+      {conv?.kind === 'group' ? (
+        <GroupInfoSheet
+          open={groupOpen}
+          onClose={() => setGroupOpen(false)}
+          conversation={conv}
+          onChanged={() => void reloadConv()}
+          onLine={addMessage}
+          onLeft={() => router.push('/inbox')}
+        />
+      ) : null}
       <PollSheet open={pollOpen} onClose={() => setPollOpen(false)} conversationId={id} onSent={addMessage} />
       <ListSheet open={listOpen} onClose={() => setListOpen(false)} conversationId={id} onSent={addMessage} />
       <ShareMixHereSheet open={mixShareOpen} onClose={() => setMixShareOpen(false)} conversationId={id} onSent={addMessage} />
