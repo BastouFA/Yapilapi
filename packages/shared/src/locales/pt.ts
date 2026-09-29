@@ -662,6 +662,8 @@ export const pt: Catalog = {
   'm.create.expires.1h': '1 hora',
   'm.create.expires.24h': '24 horas',
   'm.create.expires.permanent': 'Manter',
+  'm.create.expires.custom': 'Escolher duração',
+  'm.create.expires.hours': 'Horas, de 1 a 720 (30 dias)',
   'm.create.altText': 'Descreva esta foto ou vídeo',
   'm.create.altTextPlaceholder': 'O que aparece, para quem não consegue ver',
   'm.create.saveDraft': 'Salvar rascunho',

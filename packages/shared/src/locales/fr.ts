@@ -664,6 +664,8 @@ export const fr: Catalog = {
   'm.create.expires.1h': '1 heure',
   'm.create.expires.24h': '24 heures',
   'm.create.expires.permanent': 'La garder',
+  'm.create.expires.custom': 'Choisir la durée',
+  'm.create.expires.hours': 'Heures, de 1 à 720 (30 jours)',
   'm.create.altText': 'Décris cette photo ou vidéo',
   'm.create.altTextPlaceholder': "Ce qu'on y voit, pour les personnes qui ne peuvent pas la voir",
   'm.create.saveDraft': 'Enregistrer le brouillon',

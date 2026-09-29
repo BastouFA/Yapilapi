@@ -663,6 +663,8 @@ export const es: Catalog = {
   'm.create.expires.1h': '1 hora',
   'm.create.expires.24h': '24 horas',
   'm.create.expires.permanent': 'Conservarla',
+  'm.create.expires.custom': 'Elegir duración',
+  'm.create.expires.hours': 'Horas, de 1 a 720 (30 días)',
   'm.create.altText': 'Describe esta foto o video',
   'm.create.altTextPlaceholder': 'Qué se ve, para quienes no pueden verla',
   'm.create.saveDraft': 'Guardar borrador',

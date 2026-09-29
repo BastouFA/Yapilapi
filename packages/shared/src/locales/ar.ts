@@ -661,6 +661,8 @@ export const ar: Catalog = {
   'm.create.expires.1h': 'ساعة واحدة',
   'm.create.expires.24h': '24 ساعة',
   'm.create.expires.permanent': 'الاحتفاظ بها',
+  'm.create.expires.custom': 'اختيار المدة',
+  'm.create.expires.hours': 'عدد الساعات، من 1 إلى 720 (30 يومًا)',
   'm.create.altText': 'صِف هذه الصورة أو الفيديو',
   'm.create.altTextPlaceholder': 'ما فيها، لمن لا يستطيع رؤيتها',
   'm.create.saveDraft': 'حفظ المسودة',

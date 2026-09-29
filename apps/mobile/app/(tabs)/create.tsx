@@ -58,6 +58,7 @@ const EXPIRES = [
   { id: '1h', label: 'm.create.expires.1h' },
   { id: '24h', label: 'm.create.expires.24h' },
   { id: 'permanent', label: 'm.create.expires.permanent' },
+  { id: 'custom', label: 'm.create.expires.custom' },
 ] as const satisfies readonly { id: string; label: MessageKey }[];
 
 type Kind = (typeof KINDS)[number]['id'];
@@ -84,6 +85,8 @@ export default function Create() {
   const [body, setBody] = useState('');
   const [visibility, setVisibility] = useState<Visibility>(kind === 'story' ? 'friends' : 'public');
   const [expiresIn, setExpiresIn] = useState<(typeof EXPIRES)[number]['id']>('24h');
+  // With a chosen length: how many hours the story stays up (1 to 720), as typed.
+  const [customHours, setCustomHours] = useState('48');
   const [media, setMedia] = useState<Attached | null>(null);
   // A description of the photo or video, for people using a screen reader.
   const [altText, setAltText] = useState('');
@@ -563,6 +566,7 @@ export default function Create() {
           body: body.trim() || undefined,
           mediaId: media?.id,
           expiresIn,
+          customHours: expiresIn === 'custom' ? Math.min(720, Math.max(1, Math.round(Number(customHours)) || 24)) : undefined,
           visibility: closeFriends ? 'close_friends' : visibility === 'subscribers' || visibility === 'circle' ? 'friends' : visibility,
           allowReshare,
           stickers: stickers.map(({ key: _key, label: _label, ...s }) => s),
@@ -854,6 +858,9 @@ export default function Create() {
                 value={expiresIn}
                 onChange={setExpiresIn}
               />
+              {expiresIn === 'custom' ? (
+                <Field label={t('m.create.expires.hours')} value={customHours} onChangeText={setCustomHours} keyboardType="number-pad" maxLength={3} />
+              ) : null}
             </>
           ) : null}
 

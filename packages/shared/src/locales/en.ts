@@ -664,6 +664,8 @@ export const en = {
   'm.create.expires.1h': '1 hour',
   'm.create.expires.24h': '24 hours',
   'm.create.expires.permanent': 'Keep it',
+  'm.create.expires.custom': 'Choose hours',
+  'm.create.expires.hours': 'Hours, from 1 to 720 (30 days)',
   'm.create.altText': 'Describe this photo or video',
   'm.create.altTextPlaceholder': "What's in it, for people who can't see it",
   'm.create.saveDraft': 'Save draft',

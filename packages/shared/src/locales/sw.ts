@@ -661,6 +661,8 @@ export const sw: Catalog = {
   'm.create.expires.1h': 'Saa 1',
   'm.create.expires.24h': 'Saa 24',
   'm.create.expires.permanent': 'Ibaki',
+  'm.create.expires.custom': 'Chagua muda',
+  'm.create.expires.hours': 'Saa, kuanzia 1 hadi 720 (siku 30)',
   'm.create.altText': 'Eleza picha au video hii',
   'm.create.altTextPlaceholder': 'Kilichomo, kwa watu wasioweza kukiona',
   'm.create.saveDraft': 'Hifadhi rasimu',

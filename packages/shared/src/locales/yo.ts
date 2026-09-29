@@ -661,6 +661,8 @@ export const yo: Catalog = {
   'm.create.expires.1h': 'Wákàtí 1',
   'm.create.expires.24h': 'Wákàtí 24',
   'm.create.expires.permanent': 'Pa á mọ́',
+  'm.create.expires.custom': 'Yan àkókò',
+  'm.create.expires.hours': 'Wákàtí, láti 1 dé 720 (ọjọ́ 30)',
   'm.create.altText': 'Ṣàpèjúwe fọ́tò tàbí fídíò yìí',
   'm.create.altTextPlaceholder': 'Ohun tó wà nínú rẹ̀, fún àwọn tí kò lè rí i',
   'm.create.saveDraft': 'Fi pamọ́ bí àkọsílẹ̀',

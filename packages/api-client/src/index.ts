@@ -762,6 +762,8 @@ export function createClient(opts: ClientOptions) {
         mediaUrl?: string;
         mediaKind?: 'image' | 'video' | 'audio';
         expiresIn?: '1h' | '24h' | 'permanent' | 'custom';
+        /** With expiresIn 'custom': how many hours, 1 to 720. */
+        customHours?: number;
         visibility?: string;
         stickers?: StoryStickerInput[];
         allowReshare?: boolean;
