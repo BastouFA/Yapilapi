@@ -693,6 +693,8 @@ function Create() {
                 label={t('m.sticker.url')}
                 type="url"
                 inputMode="url"
+                // A web address reads left to right, also in Arabic.
+                dir="ltr"
                 autoComplete="off"
                 placeholder="https://"
                 value={link}
