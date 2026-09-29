@@ -537,6 +537,7 @@ export const yo: Record<string, string> = {
   'The seller already confirmed this booking. Message them to cancel it.': 'Olùtajà ti fìdí ìforúkọsílẹ̀ yìí múlẹ̀ tẹ́lẹ̀. Fi ìfiránṣẹ́ ránṣẹ́ sí wọn láti fagilé e.',
   'Payments is not enabled.': 'Ìsanwó kò tíì wà ní títàn.',
   'That price is higher than plans can be.': 'Iye owó yẹn ga ju iye tí ètò lè jẹ́ lọ.',
+  'A paid item costs at least {minCents} hundredths of {currency}.': 'Ohun tí a ń sanwó fún gbọ́dọ̀ tó {minCents} ìdá-ọgọ́rùn-ún {currency} ó kéré tán.',
   'A plan costs at least {value} hundredths of {currency}.': 'Ètò kan gbọ́dọ̀ tó {value} ìdá-ọgọ́rùn-ún {currency} ó kéré tán.',
   "Plan doesn't exist or isn't visible to you.": 'Ètò náà kò sí, tàbí o kò lè rí i.',
   "You can't subscribe to yourself.": 'O kò lè forúkọsílẹ̀ lọ́dọ̀ ara rẹ.',

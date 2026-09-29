@@ -395,11 +395,14 @@ export function ProfileView({
             <Button label={t('m.profile.share')} variant="secondary" size="sm" icon="share-outline" onPress={() => shareProfile()} />
           </View>
         ) : (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: space[2], marginTop: space[2] }}>
+          // One row: Follow and Message share the width, share and more keep their size (so
+          // "Following", or a longer word in another language, never pushes one onto a second line).
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], marginTop: space[2] }}>
             <Button
               label={rel.following ? t('profile.unfollow') : t('profile.follow')}
               variant={rel.following ? 'secondary' : 'primary'}
               tint={tint}
+              style={{ flex: 1, minWidth: 0 }}
               disabled={busy || rel.blocked}
               onPress={async () => {
                 setBusy(true);
@@ -418,7 +421,7 @@ export function ProfileView({
             <Button
               label={t('profile.message')}
               variant="secondary"
-              icon="chatbubble-outline"
+              style={{ flex: 1, minWidth: 0 }}
               disabled={busy || rel.blocked}
               onPress={async () => {
                 setNeedsVerify(false);

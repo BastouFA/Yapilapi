@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CURRENCIES, PLATFORM_FEE_BPS, processingFeeCents } from './constants.ts';
+import { CURRENCIES, CURRENCY_SCALE, PLATFORM_FEE_BPS, processingFeeCents } from './constants.ts';
 
 describe('processing fees', () => {
   it('takes a share plus a fixed amount, up to the cap, and never more than the payment', () => {
@@ -15,7 +15,7 @@ describe('processing fees', () => {
   it('leaves the creator most of the smallest tip in every currency', () => {
     // The smallest tip is 100 hundredths, scaled per currency; processing is charged on top of the 5%.
     for (const currency of CURRENCIES) {
-      const amount = 100 * { USD: 1, EUR: 1, GBP: 1, NGN: 1000, GHS: 10, KES: 100, ZAR: 10, XOF: 500 }[currency];
+      const amount = 100 * CURRENCY_SCALE[currency];
       const fees = Math.round((amount * PLATFORM_FEE_BPS) / 10_000) + processingFeeCents(amount, currency);
       expect(fees, currency).toBeLessThan(amount / 2);
     }

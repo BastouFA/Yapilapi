@@ -547,6 +547,7 @@ export const ha: Record<string, string> = {
   'The seller already confirmed this booking. Message them to cancel it.': 'Mai sayarwa ya riga ya tabbatar da wannan ajiyar. Ku aika masa saƙo don soke ta.',
   'Payments is not enabled.': 'Ba a kunna biyan kuɗi ba.',
   'That price is higher than plans can be.': 'Wannan farashin ya fi iyakar farashin tsare-tsaren biyan kuɗi.',
+  'A paid item costs at least {minCents} hundredths of {currency}.': 'Kaya mai biya yana kaiwa aƙalla {minCents} cikin ɗari na {currency}.',
   'A plan costs at least {value} hundredths of {currency}.': 'Tsarin biyan kuɗi yana kaiwa aƙalla {value} cikin ɗari na {currency}.',
   "Plan doesn't exist or isn't visible to you.": 'Ba a sami tsarin biyan kuɗin ba, ko kuma ba za ku iya ganinsa ba.',
   "You can't subscribe to yourself.": 'Ba za ku iya yin rajista da kanku ba.',
