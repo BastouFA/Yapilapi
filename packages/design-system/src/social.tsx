@@ -2,6 +2,7 @@ import {
   Fragment,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useId,
   useRef,
   useState,
@@ -617,9 +618,30 @@ export interface MenuAction {
  */
 export function Menu({ label, actions, icon = 'more' }: { label: string; actions: MenuAction[]; icon?: IconName }) {
   const [open, setOpen] = useState<false | 'first' | 'last'>(false);
+  // Opens upward when there isn't room below (the last message in a chat, just above the message box).
+  const [up, setUp] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLUListElement>(null);
   const listId = useId();
+  useLayoutEffect(() => {
+    if (!open) return setUp(false);
+    const place = () => {
+      const box = trigger.current?.getBoundingClientRect();
+      const height = list.current?.offsetHeight ?? 0;
+      if (!box) return;
+      const below = window.innerHeight - box.bottom;
+      setUp(below < height + 12 && box.top > below);
+    };
+    place();
+    // The page can move while it's open (something appearing above the message box, the keyboard,
+    // a scroll): check again each frame, which is cheap for the short time a menu is open.
+    let frame = requestAnimationFrame(function again() {
+      place();
+      frame = requestAnimationFrame(again);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
   const items = () => [...(wrap.current?.querySelectorAll<HTMLButtonElement>('.yp-menu__item') ?? [])];
   useEffect(() => {
     if (!open) return;
@@ -668,7 +690,7 @@ export function Menu({ label, actions, icon = 'more' }: { label: string; actions
         <Icon name={icon} />
       </button>
       {open ? (
-        <ul className="yp-menu__list" role="menu" id={listId} aria-label={label}>
+        <ul ref={list} className={cx('yp-menu__list', up && 'yp-menu__list--up')} role="menu" id={listId} aria-label={label}>
           {actions.map((a) => (
             <li key={a.label} role="none">
               <button

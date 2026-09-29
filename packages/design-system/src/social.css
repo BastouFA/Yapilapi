@@ -1208,6 +1208,10 @@ button.yp-chip:focus-visible {
   box-shadow: var(--shadow-lg);
   animation: yp-fade var(--duration-fast) ease-out;
 }
+.yp-menu__list--up {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
 .yp-menu__item {
   display: flex;
   align-items: center;
