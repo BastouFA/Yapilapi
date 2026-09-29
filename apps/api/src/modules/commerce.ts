@@ -6,6 +6,7 @@ import {
   createOrderSchema,
   createPlaceSchema,
   createProductSchema,
+  CURRENCY_SCALE,
   EARNINGS_HOLD_DAYS,
   PLACE_CATEGORIES,
   PLATFORM_FEE_BPS,
@@ -268,6 +269,9 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     if (!(await isEnabled(db, 'COMMERCE'))) throw featureDisabled('Commerce');
     const u = me(req);
     const input = parse(createProductSchema, req.body);
+    // Free, or about $1 at least in every currency: processing would eat less, and tiny prices are how stolen cards get tested.
+    const minCents = 100 * CURRENCY_SCALE[input.currency];
+    if (input.priceCents > 0 && input.priceCents < minCents) throw badRequest(`A paid item costs at least ${minCents} hundredths of ${input.currency}.`);
     // Selling is for adults (creator and seller terms).
     await assertAdultForMoney(db, u.id);
     if (input.businessId) {

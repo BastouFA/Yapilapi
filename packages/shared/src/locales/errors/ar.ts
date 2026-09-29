@@ -530,6 +530,7 @@ export const ar: Record<string, string> = {
   'The seller already confirmed this booking. Message them to cancel it.': 'أكّد البائع هذا الحجز بالفعل. راسله لإلغائه.',
   'Payments is not enabled.': 'المدفوعات غير مفعّلة.',
   'That price is higher than plans can be.': 'هذا السعر أعلى من الحد المسموح للخطط.',
+  'A paid item costs at least {minCents} hundredths of {currency}.': 'أقل سعر للمنتج المدفوع هو {minCents} جزءًا من مئة من {currency}.',
   'A plan costs at least {value} hundredths of {currency}.': 'أقل سعر للخطة هو {value} جزءًا من مئة من {currency}.',
   "Plan doesn't exist or isn't visible to you.": 'الخطة غير موجودة أو لا يمكنك رؤيتها.',
   "You can't subscribe to yourself.": 'لا يمكنك الاشتراك مع نفسك.',

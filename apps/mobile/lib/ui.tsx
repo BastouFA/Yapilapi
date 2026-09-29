@@ -137,7 +137,7 @@ export function Button({
     <>
       {icon ? <Icon name={icon} size={size === 'sm' ? 16 : 18} color={fg} /> : null}
       {/* Buttons are a fixed height: the label grows with the text size up to twice, which still fits (larger would be cut off). */}
-      <Text maxFontSizeMultiplier={2} style={{ color: fg, fontWeight: '700', fontSize: size === 'sm' ? 13 : 15 }}>
+      <Text maxFontSizeMultiplier={2} numberOfLines={1} style={{ color: fg, fontWeight: '700', fontSize: size === 'sm' ? 13 : 15, flexShrink: 1 }}>
         {label}
       </Text>
     </>
