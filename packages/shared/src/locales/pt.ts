@@ -5703,6 +5703,7 @@ export const pt: Catalog = {
   'videoEditor.option.edited': 'Vídeo editado · {when}',
   'videoEditor.option.editedLength': 'Vídeo editado, {length} · {when}',
   'videoEditor.option.processing': '{label} (processando)',
+  'videoEditor.option.failed': '{label} (não foi possível processar)',
   'videoEditor.stillProcessing': 'Este vídeo ainda está sendo processado. Você pode editá-lo quando estiver pronto.',
   'videoEditor.preview': 'Pré-visualização do vídeo',
   'videoEditor.startSeconds': 'Início (segundos)',

@@ -1,6 +1,7 @@
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { BuiltApp } from '../src/app.ts';
+import { mediaJobHandlers } from '../src/lib/media-processing.ts';
 import { as, signUp, testApp, type TestUser } from './helpers.ts';
 
 /** Bugs found in the media, reels and stories sweep (2026-09-29). */
@@ -119,5 +120,46 @@ describe('story strip', () => {
     expect(bodies.at(-1)).toBe('Today');
     expect(bodies).not.toContain('old 1');
     expect(bodies[0]).toBe('old 7');
+  });
+});
+
+describe("videos that can't be processed", () => {
+  it('are marked failed when processing gives up, and Studio says so', async () => {
+    const u = await signUp(t.app);
+    const junk = await t.ctx.storage.put(Buffer.from('not a video at all, just some bytes'), 'mp4', 'video/mp4');
+    const { rows } = await db().query(
+      `INSERT INTO media (owner_id, kind, url, mime, status, storage_key) VALUES ($1,'video',$2,'video/mp4','ready',$3) RETURNING id`,
+      [u.id, junk.url, junk.key],
+    );
+    const id = rows[0].id as string;
+    const handler = mediaJobHandlers({ db: db(), storage: t.ctx.storage })['media.process'];
+    // A try that will be retried leaves it waiting; the last one marks it failed.
+    await expect(handler({ mediaId: id }, { lastAttempt: false })).rejects.toThrow();
+    expect((await as(t.app, u).get(`/v1/media/${id}`)).body.media.status).toBe('ready');
+    await expect(handler({ mediaId: id }, { lastAttempt: true })).rejects.toThrow();
+    const m = (await as(t.app, u).get(`/v1/media/${id}`)).body.media;
+    expect(m).toMatchObject({ status: 'failed', processed: false });
+    expect(m.error).toBeTruthy();
+    const listed = (await as(t.app, u).get('/v1/me/videos')).body.items.find((v: { id: string }) => v.id === id);
+    expect(listed).toMatchObject({ processed: false, failed: true });
+  });
+
+  it("Studio's list leaves out view-once and deleted videos", async () => {
+    const u = await signUp(t.app);
+    const add = async (privateFlag: boolean, deleted: boolean) =>
+      (
+        await db().query(
+          `INSERT INTO media (owner_id, kind, url, mime, status, private, deleted_at)
+           VALUES ($1,'video','http://localhost:4000/media/v.mp4','video/mp4','ready',$2, CASE WHEN $3 THEN now() END) RETURNING id`,
+          [u.id, privateFlag, deleted],
+        )
+      ).rows[0].id as string;
+    const kept = await add(false, false);
+    const viewOnce = await add(true, false);
+    const deleted = await add(false, true);
+    const ids = (await as(t.app, u).get('/v1/me/videos')).body.items.map((v: { id: string }) => v.id);
+    expect(ids).toContain(kept);
+    expect(ids).not.toContain(viewOnce);
+    expect(ids).not.toContain(deleted);
   });
 });

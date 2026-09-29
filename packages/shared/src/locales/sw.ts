@@ -5705,6 +5705,7 @@ export const sw: Catalog = {
   'videoEditor.option.edited': 'Video iliyohaririwa · {when}',
   'videoEditor.option.editedLength': 'Video iliyohaririwa, {length} · {when}',
   'videoEditor.option.processing': '{label} (inachakatwa)',
+  'videoEditor.option.failed': '{label} (haikuweza kuchakatwa)',
   'videoEditor.stillProcessing': 'Video hii bado inachakatwa. Unaweza kuihariri ikishakuwa tayari.',
   'videoEditor.preview': 'Onyesho la awali la video',
   'videoEditor.startSeconds': 'Mwanzo (sekunde)',

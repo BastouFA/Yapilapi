@@ -5712,6 +5712,7 @@ export const ha: Catalog = {
   'videoEditor.option.edited': 'Bidiyon da aka gyara · {when}',
   'videoEditor.option.editedLength': 'Bidiyon da aka gyara, {length} · {when}',
   'videoEditor.option.processing': '{label} (ana sarrafawa)',
+  'videoEditor.option.failed': '{label} (an kasa sarrafa shi)',
   'videoEditor.stillProcessing': 'Ana ci gaba da sarrafa wannan bidiyon. Za ka iya gyara shi idan ya shirya.',
   'videoEditor.preview': 'Samfotin bidiyo',
   'videoEditor.startSeconds': 'Farko (daƙiƙoƙi)',

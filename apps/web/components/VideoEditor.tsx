@@ -173,13 +173,13 @@ export function VideoEditor() {
                 : t(v.editOf ? 'videoEditor.option.edited' : 'videoEditor.option.video', { when });
               return (
                 <option key={v.id} value={v.id} disabled={!v.processed}>
-                  {v.processed ? name : t('videoEditor.option.processing', { label: name })}
+                  {v.processed ? name : t(v.failed ? 'videoEditor.option.failed' : 'videoEditor.option.processing', { label: name })}
                 </option>
               );
             })}
           </Select>
 
-          {video && !video.processed ? <p className="muted">{t('videoEditor.stillProcessing')}</p> : null}
+          {video && !video.processed ? <p className="muted">{t(video.failed ? 'error.processingFailed' : 'videoEditor.stillProcessing')}</p> : null}
 
           {video?.processed ? (
             <>

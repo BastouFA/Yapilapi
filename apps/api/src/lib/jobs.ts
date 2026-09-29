@@ -1,7 +1,8 @@
 import type { Pool, PoolClient } from 'pg';
 
 type Q = Pool | PoolClient;
-export type JobHandler = (payload: any) => Promise<void>;
+/** `run.lastAttempt`: this is the job's last try, so a handler can record that its work failed for good. */
+export type JobHandler = (payload: any, run: { lastAttempt: boolean }) => Promise<void>;
 
 export const MAX_ATTEMPTS = 5;
 
@@ -43,7 +44,7 @@ export async function processJobs(db: Pool, handlers: Record<string, JobHandler>
   );
   for (const job of rows) {
     try {
-      await handlers[job.kind]!(job.payload);
+      await handlers[job.kind]!(job.payload, { lastAttempt: job.attempts >= MAX_ATTEMPTS });
       await db.query(`UPDATE jobs SET status = 'done', finished_at = now(), last_error = NULL WHERE id = $1`, [job.id]);
     } catch (e) {
       const failed = job.attempts >= MAX_ATTEMPTS;

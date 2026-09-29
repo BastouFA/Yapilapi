@@ -5728,6 +5728,7 @@ export const fr: Catalog = {
   'videoEditor.option.edited': 'Vidéo modifiée · {when}',
   'videoEditor.option.editedLength': 'Vidéo modifiée, {length} · {when}',
   'videoEditor.option.processing': '{label} (en traitement)',
+  'videoEditor.option.failed': '{label} (traitement impossible)',
   'videoEditor.stillProcessing': 'Cette vidéo est encore en traitement. Tu pourras la modifier dès qu’elle sera prête.',
   'videoEditor.preview': 'Aperçu de la vidéo',
   'videoEditor.startSeconds': 'Début (secondes)',

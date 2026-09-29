@@ -5692,6 +5692,7 @@ export const yo: Catalog = {
   'videoEditor.option.edited': 'Fídíò tí a ṣàtúnṣe · {when}',
   'videoEditor.option.editedLength': 'Fídíò tí a ṣàtúnṣe, {length} · {when}',
   'videoEditor.option.processing': '{label} (à ń ṣiṣẹ́ lé e lórí)',
+  'videoEditor.option.failed': '{label} (a kò lè ṣiṣẹ́ lé e lórí)',
   'videoEditor.stillProcessing': 'À ṣì ń ṣiṣẹ́ lórí fídíò yìí. O lè ṣàtúnṣe rẹ̀ nígbà tí ó bá ti ṣetán.',
   'videoEditor.preview': 'Àwòtẹ́lẹ̀ fídíò',
   'videoEditor.startSeconds': 'Ìbẹ̀rẹ̀ (ìṣẹ́jú-àáyá)',

@@ -2199,6 +2199,8 @@ export interface StudioVideo {
   altText: string | null;
   /** Poster, MP4 and HLS are ready. Only processed videos can be edited. */
   processed: boolean;
+  /** Processing gave up on this video: it won't become ready. */
+  failed?: boolean;
   /** Set when this video is a trim or clip of another one. */
   editOf: string | null;
   createdAt: string;

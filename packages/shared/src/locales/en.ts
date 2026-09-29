@@ -5693,6 +5693,7 @@ export const en = {
   'videoEditor.option.edited': 'Edited video · {when}',
   'videoEditor.option.editedLength': 'Edited video, {length} · {when}',
   'videoEditor.option.processing': '{label} (processing)',
+  'videoEditor.option.failed': '{label} (couldn’t be processed)',
   'videoEditor.stillProcessing': 'This video is still processing. You can edit it once it is ready.',
   'videoEditor.preview': 'Video preview',
   'videoEditor.startSeconds': 'Start (seconds)',

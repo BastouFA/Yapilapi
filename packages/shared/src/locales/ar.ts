@@ -5667,6 +5667,7 @@ export const ar: Catalog = {
   'videoEditor.option.edited': 'فيديو معدّل · {when}',
   'videoEditor.option.editedLength': 'فيديو معدّل، {length} · {when}',
   'videoEditor.option.processing': '{label} (قيد المعالجة)',
+  'videoEditor.option.failed': '{label} (تعذّرت المعالجة)',
   'videoEditor.stillProcessing': 'ما زال هذا الفيديو قيد المعالجة. يمكنك تعديله عندما يصبح جاهزًا.',
   'videoEditor.preview': 'معاينة الفيديو',
   'videoEditor.startSeconds': 'البداية (بالثواني)',
