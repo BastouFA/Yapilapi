@@ -102,6 +102,9 @@ function decisionLabel(decision: unknown, t: Session['t']): string {
   return key ? t(key) : String(decision ?? '').replace(/_/g, ' ');
 }
 
+/** Notifications about a comment, which open the post with its comments. */
+const COMMENT_TYPES = new Set(['post_comment', 'comment_reply', 'comment_like', 'comment_mention']);
+
 function hrefFor(n: NotificationItem, meUsername?: string): string | undefined {
   if (n.type === 'new_sign_in') return '/settings/security?review=sign-in';
   // A call opens the chat it was in (older call notifications open the caller).
@@ -126,6 +129,8 @@ function hrefFor(n: NotificationItem, meUsername?: string): string | undefined {
   if (n.entityType === 'recap' || n.type === 'recap_ready' || n.type === 'recap_failed') return n.entityId ? `/recaps?open=${n.entityId}` : '/recaps';
   if (n.entityType === 'board') return `/boards/${n.entityId}`;
   if (n.entityType === 'draft') return `/create?draft=${n.entityId}`;
+  // About a comment: the post with its comments open.
+  if (n.entityType === 'post' && COMMENT_TYPES.has(n.type)) return `/p/${n.entityId}?comments=1`;
   if (n.entityType === 'post') return `/p/${n.entityId}`;
   if (n.entityType === 'moment') return `/s/${n.entityId}`;
   if (n.entityType === 'live') return `/live/${n.entityId}`;

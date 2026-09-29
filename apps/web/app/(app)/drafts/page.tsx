@@ -20,16 +20,17 @@ export default function DraftsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [timing, setTiming] = useState<Post | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  // Why the list couldn't load, with Try again (not "No drafts", which would say they're gone).
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    setLoadError(null);
     api.drafts.list().then(
       (r) => setItems(r.items),
-      (e) => {
-        setItems([]);
-        toast(errorMessage(e));
-      },
+      (e) => setLoadError(errorMessage(e)),
     );
-  }, [toast]);
+  }, [attempt]);
 
   const replace = (post: Post) => setItems((cur) => cur?.map((x) => (x.id === post.id ? post : x)) ?? cur);
   const drop = (id: string) => {
@@ -126,7 +127,9 @@ export default function DraftsPage() {
       <p className="muted" style={{ margin: 0 }}>
         {t('m.drafts.intro')}
       </p>
-      {items === null ? (
+      {items === null && loadError ? (
+        <EmptyState title={loadError} action={<Button onClick={() => setAttempt((n) => n + 1)}>{t('m.common.retry')}</Button>} />
+      ) : items === null ? (
         <Skeleton height={200} />
       ) : !items.length ? (
         <EmptyState title={t('drafts.emptyTitle')} body={t('drafts.emptyBody')} />

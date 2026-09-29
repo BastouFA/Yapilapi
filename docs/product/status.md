@@ -507,6 +507,18 @@ People without an account now see the web in their own language instead of alway
 - **Load errors with Try again** (instead of a missing card or a misleading empty list): circles and close friends (web and phone), the questions inbox, and every card in Settings > Notifications.
 - Not done: the friends count on a profile still doesn't open a list; there is no verified badge (only Plus and the profile type).
 
+## Posts, feed and search sweep (2026-09-29, no migration, `apps/api/test/content-sweep.test.ts`, `apps/web/e2e/content.spec.ts`)
+
+Every flow in posts, feed, discovery and search was tried end to end on the web (desktop and 390px, light and dark, French and Arabic) and reviewed on the phone. What changed:
+
+- **For you diversity**: an author's posts after their first two on the feed rank 1.5 lower each, instead of being skipped on that page (skipped posts never came back, and a busy account could end the feed after a few posts). Every post has one place in the order; pages follow each other without gaps. Personalization off works the same way.
+- **Privacy**: a post or comment can be reported only by someone who can see the post (or across a block); before, a post's id was enough, and a minor-safety report hides a post at once. Trending, related tags, hashtag ideas, topic search and NOW count only public posts of public accounts outside private communities (`PUBLIC_POST_SQL`). Product search leaves out suspended sellers and people blocked either way, and says whose shop a product is in (`sellerUsername`).
+- **Robustness**: page cursors are checked when read (a made-up one is a 400, not a 500); "restaurants for six" reads the group size; photo and video addresses in a post must be http or https.
+- **Web**: Create has Link (a web address, shown under the post as the site's name); drafts keep an event or product they link to. Search and Wander list places, businesses, products and tags, and say what went wrong with Try again. Comment notifications open the post with its comments; a single post has no end-of-feed line. Comments, drafts and boards that fail to load offer Try again. Why am I seeing this offers less or more like this only with personalization on. Pulse and Wander titles no longer break mid-word on phones; a poll's result bar sits behind its option; draft cards keep their bottom padding; empty Communities and Local feeds say how they fill up.
+- **Phone**: delete and pin your posts, vote in polls, link, event and product chips, audio posts, the Communities and Local feeds, products in Wander, Saved refreshing on return, and drafts started on the web keeping what the phone can't edit (see the commit for the full list).
+
+Not built (found while testing): link preview cards (a link post shows the site's name only; nothing is fetched, so there's no address for the server to refuse), a location on a post, a content warning an author can set (sensitive media is flagged automatically), audio posts and event- or product-linked posts from either composer, and carousel, poll and link posts on the phone.
+
 ## Not built yet
 
 - Mainstream music: needs a licensing deal (docs/operations/music.md). Reporting song use to a licensing partner is not built.

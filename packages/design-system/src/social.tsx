@@ -1165,7 +1165,7 @@ export function PostCard({
   const showReelCard = post.format === 'reel' && !!viewerId && !post.locked && post.media.length > 0;
 
   return (
-    <article className="yp-post" aria-labelledby={`post-${post.id}-author`}>
+    <article className={cx('yp-post', post.status && 'yp-post--unpublished')} aria-labelledby={`post-${post.id}-author`}>
       {post.pinned ? (
         <p className="yp-post__pinned">
           <Icon name="bookmark" size={12} filled />

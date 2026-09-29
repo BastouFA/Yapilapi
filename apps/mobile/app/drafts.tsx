@@ -8,7 +8,7 @@ import { PostCard } from '../lib/post';
 import { SchedulePicker } from '../lib/post-edit';
 import { useSession } from '../lib/session';
 import { space } from '../lib/theme';
-import { Button, EmptyState, Loading, Notice, Screen, useColors } from '../lib/ui';
+import { Button, EmptyState, ErrorState, Loading, Notice, Screen, ScreenError, useColors } from '../lib/ui';
 import { noticeText } from '../../../packages/shared/src/server-text';
 
 /**
@@ -26,12 +26,14 @@ export default function Drafts() {
   const [note, setNote] = useState<{ tone: 'info' | 'danger'; text: string } | null>(null);
   const [timing, setTiming] = useState<Post | null>(null);
 
+  // Why the list couldn't load: on its own with Try again the first time, above the list after that.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const load = useCallback(async () => {
     try {
       setItems((await (await client()).drafts.list()).items);
+      setLoadError(null);
     } catch (e) {
-      setItems((cur) => cur ?? []);
-      setNote({ tone: 'danger', text: errorMessage(e) });
+      setLoadError(errorMessage(e));
     }
   }, []);
   // Back from Create (saved or published), the list is fresh.
@@ -61,7 +63,7 @@ export default function Drafts() {
         <Notice>{t('m.common.signedOut')}</Notice>
       </Screen>
     );
-  if (!items) return <Loading />;
+  if (!items) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <Loading />;
   // Scheduled first, soonest first; then drafts, last saved first (as listed).
   const sorted = [
     ...items.filter((p) => p.status === 'scheduled').sort((a, b) => (a.scheduledAt ?? '').localeCompare(b.scheduledAt ?? '')),
@@ -79,6 +81,7 @@ export default function Drafts() {
         ListHeaderComponent={
           <View style={{ gap: space[2] }}>
             <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t('m.drafts.intro')}</Text>
+            {loadError ? <ErrorState message={loadError} onRetry={load} /> : null}
             {note ? (
               <Notice tone={note.tone} key={note.text}>
                 {note.text}
