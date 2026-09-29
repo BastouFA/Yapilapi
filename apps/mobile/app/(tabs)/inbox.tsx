@@ -56,7 +56,8 @@ export default function Inbox() {
   useFocusEffect(loadExtras);
   useEffect(() => onBackOnline(() => (load(), loadExtras())), [load, loadExtras]);
   useRealtime((e) => {
-    if (e.type === 'message.created' || e.type === 'conversation.created') load();
+    // A new message, or a chat you were added to, left or taken out of, or that was renamed.
+    if (['message.created', 'conversation.created', 'conversation.changed', 'conversation.removed'].includes(e.type)) load();
     if (e.type === 'notification.created') loadExtras();
   });
 
