@@ -56,10 +56,11 @@ export function PasswordField({
 
 /**
  * After signing up or logging in: close the welcome screens and open the app (onboarding first
- * for a new account). `refresh` loads the account into the session.
+ * for a new account). `enter` (from the session) puts the account in use as the API returned it,
+ * so a check that fails right after (offline) can't leave the previous account showing.
  */
-export async function enterApp(user: Me, refresh: () => Promise<void>) {
-  await refresh();
+export async function enterApp(user: Me, enter: (user: Me) => Promise<void>) {
+  await enter(user);
   // This phone's notifications now go to the account just logged in to.
   void followActiveAccount();
   if (router.canDismiss()) router.dismissAll();
@@ -70,10 +71,11 @@ export async function enterApp(user: Me, refresh: () => Promise<void>) {
  * What went wrong, in the app's language where we know the case, with the fields to point at.
  * Other API messages are shown as they come.
  */
-export function authProblem(e: unknown, t: Translate): { message: string; fields: Record<string, string> } {
+export function authProblem(e: unknown, t: Translate, twoStep = false): { message: string; fields: Record<string, string> } {
   if (!(e instanceof ApiError)) return { message: e instanceof Error && e.message ? e.message : t('error.generic'), fields: {} };
   if (e.code === 'network') return { message: t('error.network'), fields: {} };
-  if (e.status === 429) return { message: t('m.auth.tooMany'), fields: {} };
+  // Too many wrong passwords for the account, or wrong codes for this sign-in: the server says what to do (in the reader's language).
+  if (e.status === 429) return { message: e.code === 'too_many_attempts' ? e.message : t('m.auth.tooMany'), fields: {} };
   const f = e.fields ?? {};
   const fields: Record<string, string> = {};
   if (f.email) fields.email = e.status === 409 ? t('m.auth.emailTaken') : t('m.auth.emailInvalid');
@@ -84,7 +86,8 @@ export function authProblem(e: unknown, t: Translate): { message: string; fields
   if (f.code) fields.code = t('m.auth.codeWrong');
   if (f.displayName) fields.displayName = t('m.auth.nameNeeded');
   const first = Object.values(fields)[0];
-  if (e.status === 401) return { message: e.message.includes('expired') ? t('m.auth.challengeExpired') : t('m.auth.wrongPassword'), fields };
+  // On the code step a 401 means the sign-in expired (the message is translated, so it can't be matched on).
+  if (e.status === 401) return { message: twoStep ? t('m.auth.challengeExpired') : t('m.auth.wrongPassword'), fields };
   if (e.code === 'under_minimum_age') return { message: t('m.auth.tooYoung'), fields };
   if (e.status === 403) return { message: e.message, fields };
   return { message: first ?? e.message ?? t('error.generic'), fields };

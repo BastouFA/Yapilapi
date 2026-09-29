@@ -1232,4 +1232,7 @@ export const es: Record<string, string> = {
   'Number must be less than {maximum}': 'Debe ser menor que {maximum}',
   'Number must be a multiple of {multipleOf}': 'Debe ser múltiplo de {multipleOf}',
   'Number must be finite': 'Debe ser un número finito',
+  'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
+    'Demasiadas contraseñas incorrectas para esta cuenta. Espera 15 minutos o restablece tu contraseña.',
+  "Follow request doesn't exist or isn't visible to you.": 'La solicitud para seguir no existe o no puedes verla.',
 };

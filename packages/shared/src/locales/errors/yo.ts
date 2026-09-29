@@ -1220,4 +1220,7 @@ export const yo: Record<string, string> = {
   'Number must be less than {maximum}': 'Nọ́mbà gbọ́dọ̀ kéré sí {maximum}',
   'Number must be a multiple of {multipleOf}': 'Nọ́mbà gbọ́dọ̀ jẹ́ ìlọ́po {multipleOf}',
   'Number must be finite': 'Nọ́mbà gbọ́dọ̀ ní òpin',
+  'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
+    'Ọ̀rọ̀ aṣínà tí kò tọ́ ti pọ̀ jù fún àkáǹtì yìí. Dúró fún ìṣẹ́jú 15, tàbí tún ọ̀rọ̀ aṣínà rẹ ṣe.',
+  "Follow request doesn't exist or isn't visible to you.": 'Ìbéèrè láti máa tẹ̀lé náà kò sí, tàbí o kò lè rí i.',
 };

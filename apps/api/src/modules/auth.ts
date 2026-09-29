@@ -41,6 +41,9 @@ import { registerMfa } from './mfa.ts';
 import { registerPasskeys } from './passkeys.ts';
 
 const authLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } };
+/** Wrong passwords for one account, from any address, before it waits LOGIN_LOCK_MINUTES. */
+const LOGIN_FAILS_PER_ACCOUNT = 10;
+const LOGIN_LOCK_MINUTES = 15;
 
 export async function loadMe(ctx: AppContext, userId: string): Promise<Me> {
   const { rows } = await ctx.db.query(
@@ -216,6 +219,21 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
       [input.email],
     );
     const u = rows[0];
+    // The per-address limit doesn't stop guesses spread over many addresses: an account that had
+    // too many wrong passwords lately waits (a sign-in or a password reset starts the count again).
+    if (u) {
+      const fails = await ctx.db.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM security_events
+         WHERE user_id = $1 AND type = 'login_failed'
+           AND created_at > greatest(now() - make_interval(mins => $2::int),
+             coalesce((SELECT max(created_at) FROM security_events WHERE user_id = $1 AND type IN ('login', 'password_reset')), '-infinity'))`,
+        [u.id, LOGIN_LOCK_MINUTES],
+      );
+      if (fails.rows[0]!.n >= LOGIN_FAILS_PER_ACCOUNT) {
+        await securityEvent(ctx.db, u.id, 'login_throttled', req.ip, req.headers['user-agent']);
+        throw new AppError(429, 'too_many_attempts', 'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.');
+      }
+    }
     const ok = await verifyPassword(input.password, u?.password_hash);
     if (!u || !ok) {
       await securityEvent(ctx.db, u?.id ?? null, 'login_failed', req.ip, req.headers['user-agent'], { email: input.email });
@@ -390,6 +408,8 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
       );
       if (!rows[0]) throw badRequest('This reset link has expired or was already used. Request a new one.');
       await c.query(`UPDATE users SET password_hash = $2 WHERE id = $1`, [rows[0].user_id, hash]);
+      // Any other reset link that was sent stops working too.
+      await c.query(`UPDATE auth_tokens SET used_at = now() WHERE user_id = $1 AND purpose = 'reset_password' AND used_at IS NULL`, [rows[0].user_id]);
       // Signing out everywhere protects an account that was taken over.
       await c.query(`UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`, [rows[0].user_id]);
       await securityEvent(c, rows[0].user_id, 'password_reset', req.ip);
@@ -404,6 +424,8 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
     if (!(await verifyPassword(input.currentPassword, rows[0]?.password_hash)))
       throw badRequest('Your current password is incorrect.', { fields: { currentPassword: 'Incorrect.' } });
     await ctx.db.query(`UPDATE users SET password_hash = $2 WHERE id = $1`, [u.id, await hashPassword(input.newPassword)]);
+    // Reset links sent before the change would undo it, so they stop working.
+    await ctx.db.query(`UPDATE auth_tokens SET used_at = now() WHERE user_id = $1 AND purpose = 'reset_password' AND used_at IS NULL`, [u.id]);
     await ctx.db.query(`UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND id <> $2 AND revoked_at IS NULL`, [u.id, u.sessionId]);
     await securityEvent(ctx.db, u.id, 'password_changed', req.ip);
     return { ok: true };
