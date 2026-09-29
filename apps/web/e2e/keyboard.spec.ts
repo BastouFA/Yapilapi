@@ -579,3 +579,32 @@ test('chat: the call screen keeps focus, and Escape does not hang up', async ({ 
   await expect(call).toBeHidden();
   await expect(start).toBeFocused();
 });
+
+test('chat: group info with the keyboard (rename, the people, Escape)', async ({ page }) => {
+  const d = seed();
+  const group = await page.request.post('/api/v1/conversations', { data: { memberIds: [d.friendId, d.thirdId], title: 'Supper club' } });
+  expect(group.ok(), await group.text()).toBe(true);
+  const { conversation } = await group.json();
+  await page.goto(`/inbox/${conversation.id}`);
+  await page.waitForLoadState('networkidle');
+  const chatMenu = page.getByRole('button', { name: 'Conversation options' });
+  await chatMenu.focus();
+  await page.keyboard.press('Enter');
+  await tabUntil(page, isFocused(page.getByRole('menuitem', { name: 'Group info' })), 12, 'ArrowDown');
+  await page.keyboard.press('Enter');
+  const sheet = page.getByRole('dialog', { name: 'Group info' });
+  await expect(sheet).toBeVisible();
+  await expect.poll(() => focusInside(page, '[role="dialog"]')).toBe(true);
+  await auditOpen(page, '[role="dialog"]');
+  // Rename: the line goes in the chat and the header follows.
+  const name = sheet.getByRole('textbox', { name: 'Group name' });
+  await name.fill('Supper club, Thursdays');
+  await name.press('Enter');
+  await expect(page.getByText('You renamed the group to Supper club, Thursdays.')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Supper club, Thursdays');
+  // An admin has options for each other person.
+  await expect(sheet.getByRole('button', { name: /^Options for / })).toHaveCount(2);
+  await page.keyboard.press('Escape');
+  await expect(sheet).toBeHidden();
+  await expect(chatMenu).toBeFocused();
+});
