@@ -297,6 +297,10 @@ export const ha: Record<string, string> = {
   'Up to 160 characters.': 'Har haruffa 160.',
   'Up to 280 characters.': 'Har haruffa 280.',
   // apps/api/src/modules/calls.ts
+  'To keep younger people safe, you can only call them once you are friends.': 'Don kare matasa, za ka iya kiransu ne kawai idan kun zama abokai.',
+  'This person only gets calls from people they know.': 'Wannan mutumin yana karɓar kira ne daga waɗanda ya sani kawai.',
+  'Calls work in one-to-one chats and groups of up to 8 people.': 'Kira yana aiki a hirar mutum biyu da rukunoni masu mutane har 8.',
+  'There’s nobody else here to call.': 'Babu wani a nan da za a kira.',
   'There is already a call in this conversation.': 'Akwai kira a wannan tattaunawar tuni.',
   "Call doesn't exist or isn't visible to you.": 'Ba a sami kiran ba, ko kuma ba za ku iya ganinsa ba.',
   'Calls support up to 8 people.': 'Kira yana ɗaukar mutane har 8.',
@@ -688,6 +692,15 @@ export const ha: Record<string, string> = {
   'You can only share memories with friends.': 'Za ku iya raba abubuwan tunawa da abokai kaɗai.',
   'Add some posts to this memory first.': 'Ku fara ƙara wasu rubuce-rubuce a wannan abin tunawa.',
   // apps/api/src/modules/messaging.ts
+  'This works in groups only.': 'Wannan yana aiki a rukunoni kawai.',
+  'Someone you’re adding can’t be in this group with someone already in it.':
+    'Wani da kake ƙarawa ba zai iya kasancewa a wannan rukunin tare da wani da ke ciki ba.',
+  'To go, leave the group instead.': 'Don tafiya, bar rukunin maimakon haka.',
+  'A group needs at least one admin. Make someone else an admin first.': 'Rukuni yana buƙatar mai kula ɗaya aƙalla. Mai da wani mai kula tukuna.',
+  'Only group admins can rename the group.': 'Masu kula da rukuni ne kawai za su iya canza sunan rukunin.',
+  'Only group admins can remove people.': 'Masu kula da rukuni ne kawai za su iya cire mutane.',
+  'Only group admins can choose admins.': 'Masu kula da rukuni ne kawai za su iya zaɓar masu kula.',
+  'React with an emoji.': 'Mayar da martani da emoji.',
   'To keep younger people safe, you can only message them once you are friends.': 'Don kare matasa, za ku iya aika musu saƙo ne kawai bayan kun zama abokai.',
   'This person only gets messages from people they know.': 'Wannan mutumin yana karɓar saƙonni ne kawai daga mutanen da ya sani.',
   'To keep younger people safe, adults and people under 18 can be in a group together only when they are friends.':

@@ -1023,15 +1023,14 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
   // One emoji (with its skin tone, joiners or keycap): never words.
   const REACTION =
     /^(?=.*[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}])[\p{Extended_Pictographic}\p{Emoji_Modifier}\u{1F1E6}-\u{1F1FF}\u200d\ufe0f\u20e3#*0-9]+$/u;
-  const reactionParams = z.object({ id: z.string().uuid(), emoji: z.string().min(1).max(16).regex(REACTION, 'React with an emoji.') });
-  // Taking a reaction back works for any that exists.
-  const unreactParams = z.object({ id: z.string().uuid(), emoji: z.string().min(1).max(16) });
+  const reactionParams = z.object({ id: z.string().uuid(), emoji: z.string().min(1).max(16) });
 
   app.put('/v1/messages/:id/reactions/:emoji', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const { id, emoji } = parse(reactionParams, req.params);
     const m = await messageFor(id, u.id);
     if (m.deleted_at || m.kind === 'system') throw notFound('Message');
+    if (!REACTION.test(emoji)) throw badRequest('React with an emoji.');
     const r = await db.query(`INSERT INTO message_reactions (message_id, user_id, emoji) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, [id, u.id, emoji]);
     if (r.rowCount)
       await ctx.realtime.publish(await memberIds(m.conversation_id), {
@@ -1043,7 +1042,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
 
   app.delete('/v1/messages/:id/reactions/:emoji', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
-    const { id, emoji } = parse(unreactParams, req.params);
+    const { id, emoji } = parse(reactionParams, req.params);
     const m = await messageFor(id, u.id);
     const r = await db.query(`DELETE FROM message_reactions WHERE message_id = $1 AND user_id = $2 AND emoji = $3`, [id, u.id, emoji]);
     if (r.rowCount)

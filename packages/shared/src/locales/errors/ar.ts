@@ -286,6 +286,10 @@ export const ar: Record<string, string> = {
   'Up to 160 characters.': 'حتى 160 حرفًا.',
   'Up to 280 characters.': 'حتى 280 حرفًا.',
   // apps/api/src/modules/calls.ts
+  'To keep younger people safe, you can only call them once you are friends.': 'لحماية الأصغر سنًا، لا يمكنك الاتصال بهم إلا بعد أن تصبحا صديقين.',
+  'This person only gets calls from people they know.': 'لا يتلقى هذا الشخص المكالمات إلا ممن يعرفهم.',
+  'Calls work in one-to-one chats and groups of up to 8 people.': 'تعمل المكالمات في الدردشات الفردية والمجموعات التي تضم حتى 8 أشخاص.',
+  'There’s nobody else here to call.': 'لا يوجد أحد آخر هنا للاتصال به.',
   'There is already a call in this conversation.': 'توجد مكالمة في هذه المحادثة بالفعل.',
   "Call doesn't exist or isn't visible to you.": 'المكالمة غير موجودة أو لا يمكنك رؤيتها.',
   'Calls support up to 8 people.': 'تدعم المكالمات 8 أشخاص كحد أقصى.',
@@ -667,6 +671,14 @@ export const ar: Record<string, string> = {
   'You can only share memories with friends.': 'يمكنك مشاركة الذكريات مع الأصدقاء فقط.',
   'Add some posts to this memory first.': 'أضف بعض المنشورات إلى هذه الذكرى أولًا.',
   // apps/api/src/modules/messaging.ts
+  'This works in groups only.': 'يعمل هذا في المجموعات فقط.',
+  'Someone you’re adding can’t be in this group with someone already in it.': 'لا يمكن لأحد من تضيفهم أن يكون في هذه المجموعة مع شخص موجود فيها بالفعل.',
+  'To go, leave the group instead.': 'للخروج، غادر المجموعة بدلًا من ذلك.',
+  'A group needs at least one admin. Make someone else an admin first.': 'تحتاج المجموعة إلى مشرف واحد على الأقل. اجعل شخصًا آخر مشرفًا أولًا.',
+  'Only group admins can rename the group.': 'لا يمكن تغيير اسم المجموعة إلا لمشرفيها.',
+  'Only group admins can remove people.': 'لا يمكن إزالة الأشخاص إلا لمشرفي المجموعة.',
+  'Only group admins can choose admins.': 'لا يمكن اختيار المشرفين إلا لمشرفي المجموعة.',
+  'React with an emoji.': 'تفاعل باستخدام رمز تعبيري.',
   'To keep younger people safe, you can only message them once you are friends.': 'حفاظًا على سلامة الأصغر سنًا، يمكنك مراسلته فقط بعد أن تصبحا صديقين.',
   'This person only gets messages from people they know.': 'لا يتلقى هذا الشخص الرسائل إلا من أشخاص يعرفهم.',
   'To keep younger people safe, adults and people under 18 can be in a group together only when they are friends.':
