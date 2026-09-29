@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 import { ApiError, type StoryGroup, type TagSummary } from '../../../../packages/api-client/src/index';
 import { normalizeTag } from '../../../../packages/shared/src/hashtags';
@@ -13,10 +13,19 @@ import { radius, space } from '../../lib/theme';
 import { Button, EmptyState, ErrorState, ScreenError, feedListProps, Loading, Segmented, useColors, useRefresh, userText } from '../../lib/ui';
 import { router } from 'expo-router';
 
+/** The tag as given in the link; one that isn't validly encoded is used as it is. */
+const decoded = (raw: string) => {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+};
+
 /** A hashtag: how many people use it, related tags, public stories with it now, recent or top posts, and following it. */
 export default function TagScreen() {
   const params = useLocalSearchParams<{ tag: string }>();
-  const tag = normalizeTag(decodeURIComponent(params.tag));
+  const tag = normalizeTag(decoded(params.tag));
   const c = useColors();
   const { t, tp } = useT();
   const { me } = useSession();
@@ -51,10 +60,14 @@ export default function TagScreen() {
     void loadInfo();
   }, [loadInfo]);
 
+  // Answers for a sort you've already left (or a first page asked for again) are dropped.
+  const seq = useRef(0);
   const load = useCallback(
     async (next?: string) => {
+      const run = next ? seq.current : ++seq.current;
       const page = await (await client()).tags.posts(tag, sort, next);
-      setPosts((cur) => (next ? [...(cur ?? []), ...page.items] : page.items));
+      if (run !== seq.current) return;
+      setPosts((cur) => (next ? [...(cur ?? []), ...page.items.filter((x) => !cur?.some((y) => y.id === x.id))] : page.items));
       setCursor(page.nextCursor);
     },
     [tag, sort],
@@ -70,8 +83,21 @@ export default function TagScreen() {
   }, [load]);
   useEffect(() => {
     setPosts(null);
+    setCursor(null);
     void loadPosts();
   }, [loadPosts]);
+  // The end of the list can be reached more than once before the next page arrives: ask once.
+  const fetching = useRef<string | null>(null);
+  const loadMore = () => {
+    if (!cursor || fetching.current === cursor) return;
+    fetching.current = cursor;
+    void load(cursor)
+      .catch((e: unknown) => setError(errorMessage(e)))
+      .finally(() => {
+        fetching.current = null;
+      });
+  };
+  const [following, setFollowing] = useState(false);
   const refresh = useRefresh(() => Promise.all([loadInfo(), loadPosts()]));
 
   if (info === undefined) return loadError ? <ScreenError message={loadError} onRetry={loadInfo} /> : <Loading />;
@@ -95,13 +121,17 @@ export default function TagScreen() {
             variant="secondary"
             size="sm"
             style={{ alignSelf: 'flex-start' }}
+            disabled={following}
             onPress={async () => {
+              setFollowing(true);
               try {
                 const api = await client();
                 const r = info.following ? await api.tags.unfollow(tag) : await api.tags.follow(tag);
                 setInfo({ ...info, following: r.following });
               } catch (e) {
                 setError(errorMessage(e));
+              } finally {
+                setFollowing(false);
               }
             }}
           />
@@ -154,7 +184,7 @@ export default function TagScreen() {
         refreshControl={refresh}
         ListHeaderComponent={header}
         renderItem={({ item }) => <PostCard post={item} />}
-        onEndReached={() => cursor && void load(cursor)}
+        onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         ListEmptyComponent={posts === null ? <Loading /> : error ? null : <EmptyState title={t('m.tag.empty')} />}
       />

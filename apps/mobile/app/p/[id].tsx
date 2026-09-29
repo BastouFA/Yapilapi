@@ -14,7 +14,7 @@ import { useReport } from '../../lib/report';
 import { TranslatableText } from '../../lib/translation';
 import { useSession } from '../../lib/session';
 import { elevation, radius, space } from '../../lib/theme';
-import { Avatar, Button, EmptyState, Icon, KeyboardAvoid, Loading, Notice, ScreenError, Segmented, useColors, userText } from '../../lib/ui';
+import { Avatar, Button, EmptyState, ErrorState, Icon, KeyboardAvoid, Loading, Notice, ScreenError, Segmented, useColors, userText } from '../../lib/ui';
 
 const POLICIES: { id: CommentPolicy; label: MessageKey }[] = [
   { id: 'everyone', label: 'comments.policy.everyone' },
@@ -69,6 +69,8 @@ export default function PostScreen() {
   const insets = useSafeAreaInsets();
   const { me } = useSession();
   const [post, setPost] = useState<Post | null | undefined>(undefined);
+  // Kept apart from the post, so the card keeps a like or an edit made here as comments come and go.
+  const [commentCount, setCommentCount] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sort, setSort] = useState<CommentSort>('top');
   const [controls, setControls] = useState<Controls | null>(null);
@@ -88,6 +90,8 @@ export default function PostScreen() {
   // The list, to bring a comment you just posted into view (it goes near the top, after the pinned ones).
   const list = useRef<FlatList<Comment>>(null);
   const retried = useRef(false);
+  // The end of the list can be reached more than once before the next page arrives: ask once.
+  const fetchingMore = useRef<string | null>(null);
   const showComment = (index: number) => {
     retried.current = false;
     requestAnimationFrame(() => list.current?.scrollToIndex({ index, viewPosition: 0.3 }));
@@ -119,7 +123,9 @@ export default function PostScreen() {
 
   const loadPost = useCallback(async () => {
     try {
-      setPost((await (await client()).posts.get(id)).post);
+      const r = await (await client()).posts.get(id);
+      setPost(r.post);
+      setCommentCount(r.post.counts.comments);
       setLoadError(null);
     } catch (e) {
       if (isGone(e)) setPost(null);
@@ -169,7 +175,7 @@ export default function PostScreen() {
       </View>
     );
 
-  const bump = (delta: number) => setPost((p) => (p ? { ...p, counts: { ...p.counts, comments: Math.max(0, p.counts.comments + delta) } } : p));
+  const bump = (delta: number) => setCommentCount((n) => Math.max(0, n + delta));
   /** Apply a change to a comment wherever it shows (top level or in a thread). */
   const update = (commentId: string, fn: (x: Comment) => Comment) => {
     setComments((cur) => cur.map((x) => (x.id === commentId ? fn(x) : x)));
@@ -361,7 +367,7 @@ export default function PostScreen() {
 
   const header = (
     <View style={{ gap: space[3], marginBottom: space[2] }}>
-      <PostCard post={post} open={false} />
+      <PostCard post={post} open={false} commentCount={commentCount} onDeleted={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
       <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '800', fontSize: 17 }}>
         {t('post.comments')}
       </Text>
@@ -464,8 +470,27 @@ export default function PostScreen() {
         }}
         contentContainerStyle={{ padding: space[4], gap: space[3] }}
         ListHeaderComponent={header}
-        ListEmptyComponent={<Text style={{ color: c.inkMuted }}>{t('m.comment.none')}</Text>}
-        onEndReached={() => cursor && void loadComments(cursor).catch(() => {})}
+        ListEmptyComponent={
+          // Comments on a post for subscribers are for subscribers too; until the first page comes, a spinner (or why it didn't).
+          post.locked ? null : controls === null ? (
+            error ? (
+              <ErrorState message={error} onRetry={() => loadComments().then(() => setError(null), (e) => setError(errorMessage(e)))} />
+            ) : (
+              <Loading />
+            )
+          ) : (
+            <Text style={{ color: c.inkMuted }}>{t('m.comment.none')}</Text>
+          )
+        }
+        onEndReached={() => {
+          if (!cursor || fetchingMore.current === cursor) return;
+          fetchingMore.current = cursor;
+          void loadComments(cursor)
+            .catch(() => {})
+            .finally(() => {
+              fetchingMore.current = null;
+            });
+        }}
         keyboardShouldPersistTaps="handled"
         // Scrolling tucks the keyboard away, so the whole conversation is readable again.
         keyboardDismissMode="on-drag"
@@ -482,7 +507,8 @@ export default function PostScreen() {
             backgroundColor: c.ground,
           }}
         >
-          {error ? <Notice tone="danger">{error}</Notice> : null}
+          {/* Comments that didn't load say so in the list, with Try again. */}
+          {error && controls ? <Notice tone="danger">{error}</Notice> : null}
           {controls && !controls.canComment ? (
             <Text style={{ color: c.inkMuted }} accessibilityLiveRegion="polite">
               {t(CLOSED[controls.commentPolicy])}

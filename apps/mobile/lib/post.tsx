@@ -1,6 +1,7 @@
+import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { router } from 'expo-router';
-import { Fragment, memo, useEffect, useState } from 'react';
-import { Image, Platform, Pressable, ScrollView, Share, Text, View, type StyleProp, type TextStyle } from 'react-native';
+import { Fragment, memo, useEffect, useRef, useState } from 'react';
+import { Alert, Image, Linking, Platform, Pressable, ScrollView, Share, Text, View, type StyleProp, type TextStyle } from 'react-native';
 import type { Conversation, MediaItem, PhotoTag, Post, PublicUser } from '../../../packages/shared/src/types';
 import { formatBytes } from '../../../packages/shared/src/data-saver';
 import { postReasonText, whyReasonText } from '../../../packages/shared/src/feed-reasons';
@@ -10,7 +11,7 @@ import { useBoards, type SaveChange } from './boards';
 import { useSession } from './session';
 import { useT, type Translate } from './i18n';
 import { radius, space } from './theme';
-import { type ActionSheetAction, Avatar, BottomSheet, Button, Card, Icon, Notice, PlusBadge, useActionSheet, useColors, userText } from './ui';
+import { type ActionSheetAction, Avatar, BottomSheet, Button, Card, Icon, type IconName, Notice, PlusBadge, useActionSheet, useColors, userText } from './ui';
 import { LockedPanel, TipButton } from './money';
 import { SensitiveCover } from './safety';
 import { EditPostSheet, HistorySheet } from './post-edit';
@@ -25,6 +26,7 @@ import { useReport } from './report';
 import { canWatch, useWatchStart } from './watch';
 import { QuestionQuoteView } from './ask';
 import { MixTile } from './mixes';
+import { clock } from './media';
 
 export { RichText };
 
@@ -146,12 +148,23 @@ function TagBubbles({
  */
 export const PostCard = memo(PostCardView);
 
-function PostCardView({ post: given, open = true }: { post: Post; open?: boolean }) {
+function PostCardView({
+  post: given,
+  open = true,
+  commentCount,
+  onDeleted,
+}: {
+  post: Post;
+  open?: boolean;
+  /** The post's page keeps the comment count itself, as comments are added and deleted there. */
+  commentCount?: number;
+  /** After you deleted your post (the post's page goes back). */
+  onDeleted?: () => void;
+}) {
   const c = useColors();
   const { t, tp, number, timeAgo, dateTime, locale } = useT();
   // The post as shown: the one given, or the version you just saved.
   const [post, setPost] = useState(given);
-  useEffect(() => setPost(given), [given]);
   // Why it's in your feed ("Your post", "You follow Ada"), in your language.
   const reason = postReasonText(post, { t });
   const [editing, setEditing] = useState(false);
@@ -169,6 +182,8 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
   const saver = useDataSaver().active;
   // The photos and videos shown in the card (a reel shows its own preview instead).
   const gallery = post.media.filter((m) => m.kind === 'image' || m.kind === 'video');
+  const audio = post.media.filter((m) => m.kind === 'audio');
+  const comments = commentCount ?? post.counts.comments;
   const isAuthor = !!me && post.author.id === me.id;
   // "Reposted by", on your own posts.
   const [repostersOpen, setRepostersOpen] = useState(false);
@@ -185,6 +200,25 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
         .flat()
         .find((x) => x.user.id === me.id)
     : undefined;
+  const [pinned, setPinned] = useState(!!post.pinned);
+  const [poll, setPoll] = useState(post.poll);
+  // A new copy of the post from the list (a refresh, the next load): show what it says now.
+  const shown = useRef(given);
+  useEffect(() => {
+    if (shown.current === given) return;
+    shown.current = given;
+    setPost(given);
+    setLiked(given.viewer.liked);
+    setLikes(given.counts.likes);
+    setSaved(given.viewer.saved);
+    setReposted(given.viewer.reposted);
+    setReposts(given.counts.reposts);
+    setCollab(given.viewer.collab);
+    setCoauthors(given.collaborators ?? []);
+    setTags(tagsOf(given));
+    setPinned(!!given.pinned);
+    setPoll(given.poll);
+  }, [given]);
 
   async function answerInvite(accept: boolean) {
     setCollabBusy(true);
@@ -250,7 +284,8 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
   // Feed controls on someone else's post, as on the web: why it's here, less or more like it,
   // not interested (folds the card), mute the author (folds it too).
   const canTune = !!me && !isAuthor && !post.status;
-  const [why, setWhy] = useState<string[] | null>(null);
+  // The reasons, and which of less or more like this apply (neither while personalization is off).
+  const [why, setWhy] = useState<{ lines: string[]; controls?: string[] } | null>(null);
   const [folded, setFolded] = useState<string | null>(null);
   const [tuneNote, setTuneNote] = useState<string | null>(null);
   async function tune(signal: 'more_like_this' | 'less_like_this' | 'not_interested' | 'mute_creator') {
@@ -267,7 +302,51 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
     try {
       const r = await (await client()).posts.why(post.id);
       // Each line in the reader's language; an older API only sends them in English.
-      setWhy(r.details ? r.details.map((d) => whyReasonText(d, { t, tp, locale })) : r.reasons);
+      setWhy({ lines: r.details ? r.details.map((d) => whyReasonText(d, { t, tp, locale })) : r.reasons, controls: r.controls });
+    } catch (e) {
+      setTuneNote(errorMessage(e));
+    }
+  }
+  const offers = (control: string) => !why?.controls || why.controls.includes(control);
+
+  // Your own published post: pin it to the top of your profile (not a community post), or delete it.
+  const canPin = canEdit && !post.community;
+  async function togglePin() {
+    const next = !pinned;
+    try {
+      await (await client()).posts.pin(next ? post.id : null);
+      setPinned(next);
+      setTuneNote(t(next ? 'postList.pinned' : 'postList.unpinned'));
+    } catch (e) {
+      setTuneNote(errorMessage(e));
+    }
+  }
+  function remove() {
+    Alert.alert(t('post.delete'), undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('m.common.delete'),
+        style: 'destructive',
+        onPress: () =>
+          void (async () => {
+            try {
+              await (await client()).posts.remove(post.id);
+              setFolded(t('postList.deleted'));
+              onDeleted?.();
+            } catch (e) {
+              setTuneNote(errorMessage(e));
+            }
+          })(),
+      },
+    ]);
+  }
+
+  // Polls: a vote can be changed; the shares show once you've voted.
+  const canVote = !!me && !post.status && !post.locked;
+  async function vote(optionId: string) {
+    if (!canVote || poll?.myVote === optionId) return;
+    try {
+      setPoll((await (await client()).posts.vote(post.id, optionId)).poll);
     } catch (e) {
       setTuneNote(errorMessage(e));
     }
@@ -286,6 +365,7 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
     if (canBoost)
       actions.push({ label: t('m.boost.cta'), icon: 'rocket-outline', onPress: () => router.push({ pathname: '/boost', params: { id: post.id } }) });
     if (canEdit) actions.push({ label: t('m.post.edit'), icon: 'create-outline', onPress: () => setEditing(true) });
+    if (canPin) actions.push({ label: t(pinned ? 'post.unpin' : 'post.pin'), icon: 'pin-outline', onPress: () => void togglePin() });
     if (me) actions.push({ label: t('m.boards.saveTo'), icon: 'bookmarks-outline', onPress: saveTo });
     // Watch together: a reel or video post, with people in a chat at the same time.
     if (me && canWatch(post))
@@ -305,6 +385,7 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
         destructive: true,
         onPress: () => report.open({ type: 'post', id: post.id, authorId: post.author.id, authorName: post.author.displayName }),
       });
+    if (canEdit) actions.push({ label: t('post.delete'), icon: 'trash-outline', destructive: true, onPress: remove });
     menu.show({
       title: t('m.post.more'),
       message: collab === 'accepted' ? t('m.collab.leaveBody', { name: post.author.displayName }) : undefined,
@@ -335,7 +416,7 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
       label={open ? t('m.post.by', { name: post.author.displayName }) : undefined}
       style={{ gap: space[3] }}
     >
-      {post.pinned ? (
+      {pinned ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <Icon name="bookmark" size={12} color={c.inkMuted} />
           <Text style={{ color: c.inkMuted, fontSize: 12, fontWeight: '600' }}>{t('m.post.pinned')}</Text>
@@ -493,13 +574,24 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
       {post.format === 'reel' && !post.locked && post.media.some((m) => m.kind === 'video') ? <ReelPreview post={post} saver={saver} /> : null}
       {post.format !== 'reel' && gallery.length ? <MediaGallery media={gallery} tags={tags} meId={me?.id} onRemoveTag={(tag) => void removeTag(tag)} /> : null}
 
-      {post.poll ? (
-        <View style={{ gap: space[1] }}>
-          {post.poll.options.map((o) => (
-            <Text key={o.id} style={[{ color: c.inkMuted, fontSize: 14 }, userText]}>
-              {o.label} · {tp('m.poll.votes', o.votes)}
-            </Text>
-          ))}
+      {post.format !== 'reel' ? audio.map((m) => <PostAudio key={m.id} media={m} />) : null}
+
+      {poll ? <PostPoll poll={poll} canVote={canVote} onVote={(id) => void vote(id)} /> : null}
+
+      {post.linkUrl || post.event || post.product ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+          {post.linkUrl ? (
+            <PostChip icon="globe-outline" label={hostOf(post.linkUrl)} onPress={() => void Linking.openURL(post.linkUrl!).catch(() => {})} />
+          ) : null}
+          {post.event ? <PostChip icon="calendar-outline" label={post.event.title} onPress={() => router.push(`/event/${post.event!.id}`)} /> : null}
+          {post.product ? (
+            // What's shared is always the author's own: it opens in their shop.
+            <PostChip
+              icon="bag-outline"
+              label={post.product.title}
+              onPress={() => router.push({ pathname: '/product', params: { username: post.author.username, id: post.product!.id } })}
+            />
+          ) : null}
         </View>
       ) : null}
 
@@ -530,9 +622,9 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
             <Icon name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? c.yapi : c.inkMuted} />
             <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>{number(likes)}</Text>
           </Pressable>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} accessible accessibilityLabel={tp('m.post.commentCount', post.counts.comments)}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} accessible accessibilityLabel={tp('m.post.commentCount', comments)}>
             <Icon name="chatbubble-outline" size={19} color={c.inkMuted} />
-            <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>{number(post.counts.comments)}</Text>
+            <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>{number(comments)}</Text>
           </View>
           {canRepost ? (
             <Pressable
@@ -653,18 +745,141 @@ function PostCardView({ post: given, open = true }: { post: Post; open?: boolean
         </Text>
       ) : null}
       <BottomSheet visible={!!why} title={t('post.why')} onClose={() => setWhy(null)}>
-        {why?.map((r) => (
+        {why?.lines.map((r) => (
           <View key={r} style={{ flexDirection: 'row', gap: space[2] }}>
             <Text style={{ color: c.inkMuted }}>•</Text>
             <Text style={{ color: c.ink, lineHeight: 20, flex: 1 }}>{r}</Text>
           </View>
         ))}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-          <Button label={t('post.lessLikeThis')} variant="secondary" size="sm" onPress={() => (setWhy(null), void tune('less_like_this'))} />
-          <Button label={t('post.moreLikeThis')} variant="ghost" size="sm" onPress={() => (setWhy(null), void tune('more_like_this'))} />
-        </View>
+        {offers('less_like_this') || offers('more_like_this') ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+            {offers('less_like_this') ? (
+              <Button label={t('post.lessLikeThis')} variant="secondary" size="sm" onPress={() => (setWhy(null), void tune('less_like_this'))} />
+            ) : null}
+            {offers('more_like_this') ? (
+              <Button label={t('post.moreLikeThis')} variant="ghost" size="sm" onPress={() => (setWhy(null), void tune('more_like_this'))} />
+            ) : null}
+          </View>
+        ) : null}
       </BottomSheet>
     </Card>
+  );
+}
+
+/** The site a link goes to, for its chip ("example.com"). */
+const hostOf = (url: string) => url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').split(/[/?#]/)[0] || url;
+
+/** A small rounded link under a post: its web link, event or product. */
+function PostChip({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
+  const c = useColors();
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        maxWidth: '100%',
+        minHeight: 32,
+        paddingHorizontal: space[3],
+        borderRadius: radius.full,
+        borderWidth: 1,
+        borderColor: c.line,
+        backgroundColor: pressed ? c.surfaceSunken : c.surface,
+      })}
+    >
+      <Icon name={icon} size={14} color={c.inkMuted} />
+      <Text style={[{ color: c.ink, fontSize: 13, fontWeight: '600', flexShrink: 1 }, userText]} numberOfLines={1}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** A poll: tap an option to vote (or to change your vote); each option's share shows once you've voted. */
+function PostPoll({ poll, canVote, onVote }: { poll: NonNullable<Post['poll']>; canVote: boolean; onVote: (optionId: string) => void }) {
+  const c = useColors();
+  const { t, tp, number } = useT();
+  const total = poll.options.reduce((n, o) => n + o.votes, 0);
+  const voted = !!poll.myVote;
+  return (
+    <View accessibilityRole="radiogroup" accessibilityLabel={t('m.sticker.kind.poll')} style={{ gap: space[2] }}>
+      {poll.options.map((o) => {
+        const mine = poll.myVote === o.id;
+        const part = total ? o.votes / total : 0;
+        const share = number(part, { style: 'percent' });
+        return (
+          <Pressable
+            key={o.id}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: mine, disabled: !canVote }}
+            accessibilityLabel={voted ? `${o.label}, ${share}` : o.label}
+            disabled={!canVote}
+            onPress={() => onVote(o.id)}
+            style={{
+              minHeight: 44,
+              justifyContent: 'center',
+              paddingHorizontal: space[3],
+              borderRadius: radius.md,
+              borderWidth: 1,
+              borderColor: mine ? c.yapi : c.line,
+              overflow: 'hidden',
+            }}
+          >
+            {voted ? (
+              <View style={{ position: 'absolute', top: 0, bottom: 0, start: 0, width: `${Math.round(part * 100)}%`, backgroundColor: c.yapiSoft }} />
+            ) : null}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+              <Text style={[{ flex: 1, color: c.ink, fontSize: 14, fontWeight: mine ? '700' : '500' }, userText]}>{o.label}</Text>
+              {voted ? <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>{share}</Text> : null}
+            </View>
+          </Pressable>
+        );
+      })}
+      <Text style={{ color: c.inkMuted, fontSize: 13 }}>{tp('m.poll.votes', total)}</Text>
+    </View>
+  );
+}
+
+/** An audio post: play and pause, with where it is. Nothing loads until play is pressed. */
+function PostAudio({ media }: { media: MediaItem }) {
+  const c = useColors();
+  const { t } = useT();
+  const player = useAudioPlayer(null, { updateInterval: 250 });
+  const status = useAudioPlayerStatus(player);
+  const [loaded, setLoaded] = useState(false);
+  // Back to the start when it finishes, ready to play again.
+  useEffect(() => {
+    if (!status.didJustFinish) return;
+    player.pause();
+    void player.seekTo(0);
+  }, [status.didJustFinish, player]);
+  const toggle = () => {
+    if (status.playing) return player.pause();
+    if (!loaded) {
+      player.replace({ uri: mediaUrl(media.url) });
+      setLoaded(true);
+    }
+    void setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).catch(() => {});
+    player.play();
+  };
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], backgroundColor: c.surfaceSunken, borderRadius: radius.md, padding: space[2] }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={status.playing ? t('m.common.pause') : t('m.common.play')}
+        hitSlop={8}
+        onPress={toggle}
+      >
+        <Icon name={status.playing ? 'pause-circle' : 'play-circle'} size={40} color={c.yapi} />
+      </Pressable>
+      <Icon name="musical-notes-outline" size={16} color={c.inkMuted} />
+      <Text style={{ color: c.inkMuted, fontSize: 13, fontVariant: ['tabular-nums'] }}>
+        {status.duration > 0 ? `${clock(status.currentTime)} / ${clock(status.duration)}` : clock(status.currentTime)}
+      </Text>
+    </View>
   );
 }
 
