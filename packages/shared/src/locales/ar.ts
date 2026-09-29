@@ -6139,4 +6139,13 @@ export const ar: Catalog = {
   'email.deleted.subject': 'تم حذف حسابك على YAPILAPI',
   'email.deleted.body': 'تم حذف حسابك على YAPILAPI وما شاركته، كما طلبت. لن يُرسل أي شيء آخر إلى هذا العنوان.',
   'email.deleted.notYou': 'إذا لم تحذف حسابك، فردّ على هذه الرسالة أو تواصل مع الدعم فورًا.',
+  'st.event.login_throttled': 'تم إيقاف تسجيل الدخول مؤقتًا بعد كلمات مرور خاطئة كثيرة',
+  'st.event.mfa_failed': 'تم إدخال رمز تحقق بخطوتين خاطئ',
+  'st.event.mfa_locked': 'تم إيقاف تسجيل الدخول بعد رموز خاطئة كثيرة',
+  'st.event.mfa_recovery_codes_regenerated': 'تم إنشاء رموز استرداد جديدة',
+  'st.event.passkey_added': 'تمت إضافة مفتاح مرور',
+  'st.event.passkey_removed': 'تمت إزالة مفتاح مرور',
+  'st.event.passkey_failed': 'لم ينجح تسجيل دخول بمفتاح مرور',
+  'st.event.phone_verified': 'تم تأكيد رقم الهاتف',
+  'st.event.phone_removed': 'تمت إزالة رقم الهاتف',
 };

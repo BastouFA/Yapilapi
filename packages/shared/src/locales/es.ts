@@ -6194,4 +6194,13 @@ export const es: Catalog = {
   'email.deleted.subject': 'Se eliminó tu cuenta de YAPILAPI',
   'email.deleted.body': 'Tu cuenta de YAPILAPI y lo que compartiste se eliminaron, como pediste. No se enviará nada más a esta dirección.',
   'email.deleted.notYou': 'Si no eliminaste tu cuenta, responde a este correo o contacta con soporte de inmediato.',
+  'st.event.login_throttled': 'Inicio de sesión pausado tras demasiadas contraseñas incorrectas',
+  'st.event.mfa_failed': 'Código de verificación en dos pasos incorrecto',
+  'st.event.mfa_locked': 'Inicio de sesión detenido tras demasiados códigos incorrectos',
+  'st.event.mfa_recovery_codes_regenerated': 'Se crearon nuevos códigos de recuperación',
+  'st.event.passkey_added': 'Llave de acceso añadida',
+  'st.event.passkey_removed': 'Llave de acceso quitada',
+  'st.event.passkey_failed': 'Un inicio de sesión con llave de acceso no funcionó',
+  'st.event.phone_verified': 'Número de teléfono confirmado',
+  'st.event.phone_removed': 'Número de teléfono quitado',
 };

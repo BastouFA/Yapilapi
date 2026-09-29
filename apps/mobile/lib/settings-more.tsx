@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { NOTIFICATION_CATEGORIES } from '../../../packages/shared/src/constants';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
-import { client, errorMessage } from './api';
+import { client, errorMessage, isGone } from './api';
 import { Chip, ChipRow } from './chips';
 import { useT } from './i18n';
 import { space } from './theme';
-import { Button, Card, Loading, Notice, Row, SwitchRow, Title, useColors } from './ui';
+import { Button, Card, ErrorState, Loading, Notice, Row, SwitchRow, Title, useColors } from './ui';
 
 /**
  * The rest of the web app's settings on the phone (same endpoints as apps/web/app/(app)/settings):
@@ -198,20 +198,28 @@ export function BlockedAccounts() {
   const { t } = useT();
   const [items, setItems] = useState<{ id: string; displayName: string }[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const load = useCallback(
+    () =>
+      client()
+        .then((api) => api.raw.get<{ items: { id: string; displayName: string }[] }>('/v1/me/blocked'))
+        .then(
+          (r) => (setItems(r.items), setError(null)),
+          (e) => setError(errorMessage(e)),
+        ),
+    [],
+  );
   useEffect(() => {
-    void client()
-      .then((api) => api.raw.get<{ items: { id: string; displayName: string }[] }>('/v1/me/blocked'))
-      .then(
-        (r) => setItems(r.items),
-        (e) => (setItems([]), setError(errorMessage(e))),
-      );
-  }, []);
+    void load();
+  }, [load]);
   return (
     <Card style={{ gap: space[3] }}>
       <Title>{t('settings.blocked.title')}</Title>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {/* Couldn't load: why, and Try again (never "You haven't blocked anyone"). */}
+      {items === null && error ? <ErrorState message={error} onRetry={load} /> : error ? <Notice tone="danger">{error}</Notice> : null}
       {items === null ? (
-        <Loading />
+        error ? null : (
+          <Loading />
+        )
       ) : items.length ? (
         items.map((u) => (
           <View key={u.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44 }}>
@@ -248,20 +256,27 @@ export function SessionsCard() {
   const { t, timeAgo } = useT();
   const [items, setItems] = useState<SignIn[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const load = () =>
-    void client()
-      .then((api) => api.auth.sessions())
-      .then(
-        (r) => setItems(r.items),
-        (e) => (setItems([]), setError(errorMessage(e))),
-      );
-  useEffect(load, []);
+  const load = useCallback(
+    () =>
+      client()
+        .then((api) => api.auth.sessions())
+        .then(
+          (r) => (setItems(r.items), setError(null)),
+          (e) => setError(errorMessage(e)),
+        ),
+    [],
+  );
+  useEffect(() => {
+    void load();
+  }, [load]);
   return (
     <Card style={{ gap: space[3] }}>
       <Title>{t('settings.sessions.title')}</Title>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {items === null && error ? <ErrorState message={error} onRetry={load} /> : error ? <Notice tone="danger">{error}</Notice> : null}
       {items === null ? (
-        <Loading />
+        error ? null : (
+          <Loading />
+        )
       ) : (
         items.map((s) => (
           <Row
@@ -278,10 +293,11 @@ export function SessionsCard() {
                     setError(null);
                     try {
                       await (await client()).auth.revokeSession(s.id);
-                      load();
                     } catch (e) {
-                      setError(errorMessage(e));
+                      // Already ended (404): the list below catches up; anything else says why.
+                      if (!isGone(e)) setError(errorMessage(e));
                     }
+                    await load();
                   }}
                 />
               )

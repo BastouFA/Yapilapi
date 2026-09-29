@@ -6191,4 +6191,13 @@ export const ha: Catalog = {
   'email.deleted.subject': 'An share asusunka na YAPILAPI',
   'email.deleted.body': 'An share asusunka na YAPILAPI da abin da ka raba, kamar yadda ka nema. Ba za a ƙara aika wani abu zuwa wannan adireshin ba.',
   'email.deleted.notYou': 'Idan ba kai ka share asusunka ba, amsa wannan imel ko tuntuɓi tallafi nan take.',
+  'st.event.login_throttled': 'An dakatar da shiga bayan kalmomin sirri marasa daidai da yawa',
+  'st.event.mfa_failed': 'An shigar da lambar tabbatarwa mai matakai biyu mara daidai',
+  'st.event.mfa_locked': 'An tsayar da shiga bayan lambobi marasa daidai da yawa',
+  'st.event.mfa_recovery_codes_regenerated': 'An ƙirƙiri sababbin lambobin dawo da asusu',
+  'st.event.passkey_added': 'An ƙara maɓallin shiga',
+  'st.event.passkey_removed': 'An cire maɓallin shiga',
+  'st.event.passkey_failed': 'Shiga da maɓallin shiga bai yi aiki ba',
+  'st.event.phone_verified': 'An tabbatar da lambar waya',
+  'st.event.phone_removed': 'An cire lambar waya',
 };

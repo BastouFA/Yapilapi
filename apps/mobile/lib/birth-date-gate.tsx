@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Modal, Text } from 'react-native';
 import { ApiError } from '../../../packages/api-client/src/index';
+import { goHome, useConfirmLogout } from './account-menu';
 import { client } from './api';
 import { AuthPage, isoDay } from './auth-ui';
 import { DateField } from './date-time';
@@ -22,6 +23,7 @@ export function BirthDateGate() {
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [closed, setClosed] = useState(false);
+  const confirmLogout = useConfirmLogout();
   const visible = !!me?.needsBirthDate || closed;
   if (!visible) return null;
 
@@ -36,6 +38,8 @@ export function BirthDateGate() {
       await refresh();
     } catch (e) {
       if (e instanceof ApiError && e.code === 'under_minimum_age') setClosed(true);
+      // Already saved (the answer to an earlier try was lost): check again, and the screen goes.
+      else if (e instanceof ApiError && e.status === 409) await refresh();
       else setProblem(e instanceof ApiError && e.code !== 'network' ? e.message : t('error.network'));
     } finally {
       setBusy(false);
@@ -52,9 +56,10 @@ export function BirthDateGate() {
             <Text style={{ color: c.ink, fontSize: 16, lineHeight: 22 }}>{t('birthDate.closedBody')}</Text>
             <Button
               label={t('birthDate.home')}
-              onPress={() => {
+              onPress={async () => {
                 setClosed(false);
-                void signOut();
+                // Another account on this phone takes over: close what the closed account had open.
+                if ((await signOut()) === 'switched') goHome();
               }}
             />
           </>
@@ -75,6 +80,8 @@ export function BirthDateGate() {
               note={t('m.auth.birthDate.hint')}
             />
             <Button label={busy ? t('m.common.saving') : t('birthDate.save')} disabled={busy} onPress={() => void save()} />
+            {/* A way out that isn't giving a date: log out (or over to another account on this phone). */}
+            <Button label={t('auth.logout')} variant="ghost" disabled={busy} onPress={confirmLogout} />
           </>
         )}
       </AuthPage>

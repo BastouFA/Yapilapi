@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { startRegistration } from '@simplewebauthn/browser';
 import { Alert, Button, Card, Dialog, Icon, List, ListItem, Switch, TextField } from '@yapilapi/design-system';
-import { formatRelativeTime, type MessageKey } from '@yapilapi/shared';
+import { formatRelativeTime, SECURITY_EVENT_KEYS, SECURITY_EVENT_WARNINGS } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { disableBrowserPush } from '@/lib/push';
@@ -11,16 +11,34 @@ import { PasswordField } from '@/components/PasswordField';
 import { useSession } from '@/app/providers';
 import { Anchor } from './Shell';
 
+/** A part of the page that couldn't load: why, and Try again. */
+function LoadFailed({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const { t } = useSession();
+  return (
+    <div className="stack-sm" role="alert">
+      <p className="muted" style={{ margin: 0 }}>
+        {message}
+      </p>
+      <div>
+        <Button size="sm" variant="secondary" onClick={onRetry}>
+          {t('m.common.retry')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /** Where you're signed in: log out any other device, or every device at once (this one too). */
 export function SessionsCard() {
   const { toast, locale, t } = useSession();
   const [sessions, setSessions] = useState<Awaited<ReturnType<typeof api.auth.sessions>>['items'] | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const load = () =>
     api.auth.sessions().then(
-      (r) => setSessions(r.items),
-      (e) => (setSessions([]), toast(errorMessage(e))),
+      (r) => (setSessions(r.items), setLoadError(null)),
+      (e) => setLoadError(errorMessage(e)),
     );
   useEffect(() => {
     void load();
@@ -30,6 +48,7 @@ export function SessionsCard() {
     <Anchor id="sessions">
       <Card title={t('settings.sessions.title')} subtitle={t('st.sessions.desc')}>
         <div className="stack-sm">
+          {loadError ? <LoadFailed message={loadError} onRetry={() => void load()} /> : null}
           {sessions?.length ? (
             <List>
               {sessions.map((s) => (
@@ -100,24 +119,6 @@ export function SessionsCard() {
   );
 }
 
-const EVENTS: Record<string, MessageKey> = {
-  login: 'st.event.login',
-  login_failed: 'st.event.login_failed',
-  login_password_ok_mfa_pending: 'st.event.login_pending',
-  password_changed: 'st.event.password_changed',
-  password_reset: 'st.event.password_reset',
-  password_reset_requested: 'st.event.password_reset_requested',
-  mfa_enabled: 'st.event.mfa_enabled',
-  mfa_disabled: 'st.event.mfa_disabled',
-  sessions_revoked: 'st.event.sessions_revoked',
-  session_revoked: 'st.event.session_revoked',
-  account_created: 'st.event.account_created',
-  email_verified: 'st.event.email_verified',
-  username_changed: 'st.event.username_changed',
-  sign_in_alerts_on: 'st.event.sign_in_alerts_on',
-  sign_in_alerts_off: 'st.event.sign_in_alerts_off',
-};
-
 /**
  * Opened from "This wasn't me" in a sign-in alert (?review=sign-in): what to do, right above the
  * devices signed in to the account.
@@ -182,13 +183,23 @@ export function ActivityCard() {
   const { t, locale } = useSession();
   const [items, setItems] = useState<{ type: string; ip: string | null; created_at: string }[] | null>(null);
   const [all, setAll] = useState(false);
-  useEffect(() => {
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const load = () =>
     api.auth.securityEvents().then(
-      (r) => setItems(r.items),
-      () => setItems([]),
+      (r) => (setItems(r.items), setLoadError(null)),
+      (e) => setLoadError(errorMessage(e)),
     );
+  useEffect(() => {
+    void load();
   }, []);
-  if (!items) return null;
+  if (!items)
+    return loadError ? (
+      <Anchor id="activity">
+        <Card title={t('st.activity.title')} subtitle={t('st.activity.desc')}>
+          <LoadFailed message={loadError} onRetry={() => void load()} />
+        </Card>
+      </Anchor>
+    ) : null;
   const shown = all ? items : items.slice(0, 6);
   return (
     <Anchor id="activity">
@@ -200,11 +211,11 @@ export function ActivityCard() {
                 <ListItem
                   key={`${e.created_at}-${i}`}
                   start={
-                    <span className={`settings-row__icon${e.type === 'login_failed' ? ' settings-row__icon--warn' : ''}`} aria-hidden>
-                      <Icon name={e.type === 'login_failed' ? 'alert' : e.type.startsWith('login') ? 'key' : 'shield'} />
+                    <span className={`settings-row__icon${SECURITY_EVENT_WARNINGS.has(e.type) ? ' settings-row__icon--warn' : ''}`} aria-hidden>
+                      <Icon name={SECURITY_EVENT_WARNINGS.has(e.type) ? 'alert' : e.type.startsWith('login') ? 'key' : 'shield'} />
                     </span>
                   }
-                  primary={t(EVENTS[e.type] ?? 'st.event.other')}
+                  primary={t(SECURITY_EVENT_KEYS[e.type] ?? 'st.event.other')}
                   secondary={[formatRelativeTime(e.created_at, locale), e.ip].filter(Boolean).join(' · ')}
                 />
               ))}
@@ -234,11 +245,23 @@ export function TwoStepCard() {
   const [password, setPassword] = useState('');
   const [disabling, setDisabling] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const load = () => api.mfa.status().then(setStatus);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const load = () =>
+    api.mfa.status().then(
+      (r) => (setStatus(r), setLoadError(null)),
+      (e) => setLoadError(errorMessage(e)),
+    );
   useEffect(() => {
     void load();
   }, []);
-  if (!status) return null;
+  if (!status)
+    return loadError ? (
+      <Anchor id="two-step">
+        <Card title={t('settings.twoStep.title')}>
+          <LoadFailed message={loadError} onRetry={() => void load()} />
+        </Card>
+      </Anchor>
+    ) : null;
 
   return (
     <Anchor id="two-step">
@@ -365,7 +388,12 @@ export function TwoStepCard() {
 export function PasskeysCard() {
   const { toast, locale, t } = useSession();
   const [items, setItems] = useState<Awaited<ReturnType<typeof api.passkeys.list>>['items']>([]);
-  const load = () => api.passkeys.list().then((r) => setItems(r.items));
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const load = () =>
+    api.passkeys.list().then(
+      (r) => (setItems(r.items), setLoadError(null)),
+      (e) => setLoadError(errorMessage(e)),
+    );
   useEffect(() => {
     void load();
   }, []);
@@ -373,6 +401,7 @@ export function PasskeysCard() {
     <Anchor id="passkeys">
       <Card title={t('settings.passkeys.title')} subtitle={t('settings.passkeys.subtitle')}>
         <div className="stack-sm">
+          {loadError ? <LoadFailed message={loadError} onRetry={() => void load()} /> : null}
           {items.length ? (
             <List>
               {items.map((p) => (
@@ -383,7 +412,18 @@ export function PasskeysCard() {
                     p.last_used_at ? t('settings.passkeys.used', { time: formatRelativeTime(p.last_used_at, locale) }) : t('settings.passkeys.notUsed')
                   }
                   end={
-                    <Button size="sm" variant="ghost" onClick={async () => (await api.passkeys.remove(p.id), await load())}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={async () => {
+                        try {
+                          await api.passkeys.remove(p.id);
+                        } catch (e) {
+                          toast(errorMessage(e));
+                        }
+                        await load();
+                      }}
+                    >
                       {t('dataSaver.remove')}
                     </Button>
                   }
@@ -421,14 +461,21 @@ export function PasskeysCard() {
 export function ConnectedAppsCard() {
   const { toast, t } = useSession();
   const [items, setItems] = useState<Awaited<ReturnType<typeof api.oauth.connectedApps>>['items']>([]);
-  const load = () => api.oauth.connectedApps().then((r) => setItems(r.items));
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const load = () =>
+    api.oauth.connectedApps().then(
+      (r) => (setItems(r.items), setLoadError(null)),
+      (e) => setLoadError(errorMessage(e)),
+    );
   useEffect(() => {
     void load();
   }, []);
   return (
     <Anchor id="apps">
       <Card title={t('settings.apps.title')} subtitle={t('settings.apps.subtitle')}>
-        {items.length ? (
+        {loadError ? (
+          <LoadFailed message={loadError} onRetry={() => void load()} />
+        ) : items.length ? (
           <List>
             {items.map((a) => (
               <ListItem
@@ -439,7 +486,15 @@ export function ConnectedAppsCard() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={async () => (await api.oauth.disconnect(a.id), toast(t('settings.apps.disconnected', { name: a.name })), await load())}
+                    onClick={async () => {
+                      try {
+                        await api.oauth.disconnect(a.id);
+                        toast(t('settings.apps.disconnected', { name: a.name }));
+                      } catch (e) {
+                        toast(errorMessage(e));
+                      }
+                      await load();
+                    }}
                   >
                     {t('settings.apps.disconnect')}
                   </Button>
