@@ -545,6 +545,7 @@ export const sw: Record<string, string> = {
   'The seller already confirmed this booking. Message them to cancel it.': 'Muuzaji tayari amethibitisha nafasi hii. Mtumie ujumbe ili uifute.',
   'Payments is not enabled.': 'Kipengele cha Malipo hakijawashwa.',
   'That price is higher than plans can be.': 'Bei hiyo inazidi kiwango cha juu cha mipango.',
+  'A paid item costs at least {minCents} hundredths of {currency}.': 'Bidhaa ya kulipia hugharimu angalau sehemu {minCents} za mia za {currency}.',
   'A plan costs at least {value} hundredths of {currency}.': 'Mpango hugharimu angalau sehemu {value} za mia za {currency}.',
   "Plan doesn't exist or isn't visible to you.": 'Mpango haupo au huwezi kuuona.',
   "You can't subscribe to yourself.": 'Huwezi kujisajili kwako mwenyewe.',

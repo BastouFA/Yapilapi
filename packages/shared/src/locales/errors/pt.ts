@@ -543,6 +543,7 @@ export const pt: Record<string, string> = {
   'The seller already confirmed this booking. Message them to cancel it.': 'Quem vende já confirmou esta reserva. Envie uma mensagem para cancelá-la.',
   'Payments is not enabled.': 'Os pagamentos não estão ativados.',
   'That price is higher than plans can be.': 'Esse preço é mais alto do que um plano pode custar.',
+  'A paid item costs at least {minCents} hundredths of {currency}.': 'Um item pago custa pelo menos {minCents} centésimos de {currency}.',
   'A plan costs at least {value} hundredths of {currency}.': 'Um plano custa pelo menos {value} centésimos de {currency}.',
   "Plan doesn't exist or isn't visible to you.": 'O plano não existe ou não está visível para você.',
   "You can't subscribe to yourself.": 'Você não pode assinar a si mesmo.',
