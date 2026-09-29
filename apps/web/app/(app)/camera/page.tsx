@@ -247,9 +247,12 @@ function Camera() {
     else if (Date.now() - pressAt.current < HOLD_MS + 50) takePhoto();
   };
 
+  // Opened straight from a link (nothing to go back to): leave for Create instead of the blank page before it.
+  const leave = () => (window.history.length > 1 ? router.back() : router.push('/create'));
+
   useModalFocus(root, !dualShots, () => {
     if (recording) stopRecording();
-    else router.back();
+    else leave();
   });
 
   /** Choose a mode with the keyboard; `focus` moves focus to its tab (when the tabs have it). */
@@ -320,7 +323,7 @@ function Camera() {
       ) : null}
 
       <div className="cam__top">
-        <button type="button" className="cam__icon" aria-label={t('m.camera.close')} onClick={() => router.back()}>
+        <button type="button" className="cam__icon" aria-label={t('m.camera.close')} onClick={leave}>
           <Icon name="x" />
         </button>
         {recording ? (

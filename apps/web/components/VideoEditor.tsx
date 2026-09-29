@@ -126,6 +126,20 @@ export function VideoEditor() {
     seek(e);
   };
   const now = () => round(videoRef.current?.currentTime ?? 0);
+  // A start typed past the end moves the end along (and an end typed before the start moves the
+  // start back), so typing the start and then the end gives the part that was typed.
+  const typedStart = () => {
+    const s = round(Math.max(0, Math.min(start, duration - MIN_SEGMENT)));
+    const e = end - s < MIN_SEGMENT ? round(Math.min(duration, s + MIN_SEGMENT)) : end;
+    setRange([s, e]);
+    seek(s);
+  };
+  const typedEnd = () => {
+    const e = round(Math.min(duration, Math.max(end, MIN_SEGMENT)));
+    const s = e - start < MIN_SEGMENT ? round(Math.max(0, e - MIN_SEGMENT)) : start;
+    setRange([s, e]);
+    seek(e);
+  };
 
   const submit = async (kind: 'trim' | 'clip', segments: [number, number][]) => {
     if (!video) return;
@@ -239,7 +253,7 @@ export function VideoEditor() {
                     step={0.1}
                     value={start}
                     onChange={(e) => setRange([round(Number(e.currentTarget.value) || 0), end])}
-                    onBlur={() => setStart(start)}
+                    onBlur={typedStart}
                     style={{ width: 120 }}
                   />
                   <Button variant="secondary" size="sm" onClick={() => setStart(now())}>
@@ -253,7 +267,7 @@ export function VideoEditor() {
                     step={0.1}
                     value={end}
                     onChange={(e) => setRange([start, round(Number(e.currentTarget.value) || 0)])}
-                    onBlur={() => setEnd(end)}
+                    onBlur={typedEnd}
                     style={{ width: 120 }}
                   />
                   <Button variant="secondary" size="sm" onClick={() => setEnd(now())}>

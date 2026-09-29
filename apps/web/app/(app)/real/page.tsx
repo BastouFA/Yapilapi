@@ -2,7 +2,7 @@
 
 import { FeatureOff } from '@/components/FeatureOff';
 import { useCallback, useEffect, useState } from 'react';
-import { Button, EmptyState, PostCard, Select, TextField } from '@yapilapi/design-system';
+import { Alert, Button, EmptyState, PostCard, Select, Skeleton, TextField } from '@yapilapi/design-system';
 import type { Post } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
@@ -12,7 +12,9 @@ import { useSession } from '../../providers';
 /** Real: capture what's in front of you now, both cameras if you like. No filters, no library. */
 export default function RealPage() {
   const { flags, toast, locale, t } = useSession();
-  const [items, setItems] = useState<Post[]>([]);
+  const [items, setItems] = useState<Post[] | null>(null);
+  // Why the Reals couldn't load (shown with Try again, rather than as "no Reals yet").
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [caption, setCaption] = useState('');
   const [visibility, setVisibility] = useState('friends');
@@ -20,8 +22,14 @@ export default function RealPage() {
   const load = useCallback(
     () =>
       api.real.feed().then(
-        (r) => setItems(r.items),
-        () => {},
+        (r) => {
+          setItems(r.items);
+          setLoadError(null);
+        },
+        (e) => {
+          setLoadError(errorMessage(e));
+          setItems((cur) => cur ?? []);
+        },
       ),
     [],
   );
@@ -71,9 +79,21 @@ export default function RealPage() {
           </Button>
         </div>
       ) : null}
-      {items.length ? (
+      {loadError ? (
+        <Alert tone="danger">
+          <span className="row">
+            {loadError}
+            <Button size="sm" variant="secondary" onClick={() => void load()}>
+              {t('m.common.retry')}
+            </Button>
+          </span>
+        </Alert>
+      ) : null}
+      {items === null ? (
+        <Skeleton height={240} />
+      ) : items.length ? (
         items.map((p) => <PostCard key={p.id} post={p} locale={locale} linkAs={NextLink} />)
-      ) : (
+      ) : loadError ? null : (
         <EmptyState title={t('real.empty.title')} body={t('real.empty.body')} />
       )}
     </div>
