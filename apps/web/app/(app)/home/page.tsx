@@ -99,7 +99,17 @@ export default function Home() {
 
       {mode === 'for_you' || mode === 'following' ? <SuggestedPeople /> : null}
 
-      <PostList load={load} reloadKey={mode} sponsored={mode === 'for_you'} />
+      <PostList
+        load={load}
+        reloadKey={mode}
+        sponsored={mode === 'for_you'}
+        // Communities and Local fill up in their own ways: say how.
+        {...(mode === 'communities'
+          ? { emptyTitle: t('feed.empty.communities.title'), empty: t('feed.empty.communities.body') }
+          : mode === 'local'
+            ? { emptyTitle: t('feed.empty.local.title'), empty: t('feed.empty.local.body') }
+            : {})}
+      />
 
       {viewing !== null && moments[viewing] ? <StoryViewer groups={moments} start={viewing} onClose={() => setViewing(null)} onChange={setMoments} /> : null}
     </div>

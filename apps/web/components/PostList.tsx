@@ -388,7 +388,7 @@ export function PostList({
         ))}
       </div>
     );
-  if (!posts.length) return <EmptyState title={emptyTitle ?? t('m.feed.empty.title')} body={empty ?? t('feed.empty')} />;
+  if (!posts.length) return <EmptyState title={emptyTitle ?? t('m.feed.empty.title')} body={empty ?? t('m.feed.empty.body')} />;
 
   return (
     <div className="stack">
