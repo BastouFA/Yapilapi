@@ -53,3 +53,49 @@ describe('resumable uploads', () => {
     expect(again.body.error.code).toBe('upload_finished');
   });
 });
+
+async function reelBy(owner: TestUser) {
+  const { rows } = await db().query(
+    `INSERT INTO media (owner_id, kind, url, mime, status, duration_ms) VALUES ($1,'video','http://localhost:4000/media/test.mp4','video/mp4','ready',8000) RETURNING id, url`,
+    [owner.id],
+  );
+  const r = await as(t.app, owner).post('/v1/posts', { format: 'reel', body: 'Ridge run', media: [{ id: rows[0].id, url: rows[0].url, kind: 'video' }] });
+  expect(r.status).toBe(201);
+  return r.body.post.id as string;
+}
+
+/** Every reel id the reels feed gives someone, over a few pages. */
+async function reelsFeed(u: TestUser) {
+  const ids: string[] = [];
+  let cursor: string | null = null;
+  for (let i = 0; i < 6; i++) {
+    const r = await as(t.app, u).get(`/v1/reels?limit=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+    expect(r.status).toBe(200);
+    ids.push(...r.body.items.map((p: { id: string }) => p.id));
+    cursor = r.body.nextCursor;
+    if (!cursor) break;
+  }
+  return ids;
+}
+
+describe('reels feed', () => {
+  it('leaves out reels you are not interested in and creators you muted, like the other feeds', async () => {
+    const creator = await signUp(t.app);
+    const other = await signUp(t.app);
+    const viewer = await signUp(t.app);
+    await as(t.app, viewer).post(`/v1/users/${creator.id}/follow`);
+    await as(t.app, viewer).post(`/v1/users/${other.id}/follow`);
+    const skipped = await reelBy(creator);
+    const kept = await reelBy(creator);
+    const muted = await reelBy(other);
+    let ids = await reelsFeed(viewer);
+    expect(ids).toEqual(expect.arrayContaining([skipped, kept, muted]));
+
+    expect((await as(t.app, viewer).post('/v1/feed/feedback', { signal: 'not_interested', postId: skipped })).status).toBe(200);
+    expect((await as(t.app, viewer).post('/v1/feed/feedback', { signal: 'mute_creator', authorId: other.id })).status).toBe(200);
+    ids = await reelsFeed(viewer);
+    expect(ids).toContain(kept);
+    expect(ids).not.toContain(skipped);
+    expect(ids).not.toContain(muted);
+  });
+});
