@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { DATA, liveRoom, STATE, type SeedData } from './global-setup';
+import { DATA, liveRoom, STATE, watchSession, type SeedData } from './global-setup';
 
 /**
  * Keyboard-only use of the shell and the overlay components: the skip link and
@@ -578,4 +578,25 @@ test('chat: the call screen keeps focus, and Escape does not hang up', async ({ 
   await page.keyboard.press('Enter');
   await expect(call).toBeHidden();
   await expect(start).toBeFocused();
+});
+
+test('watch together: arrow keys on the position move everyone once, 5 seconds a press', async ({ page }, info) => {
+  const id = await watchSession(info.project.use.baseURL!);
+  const seeks: { positionMs: number }[] = [];
+  page.on('request', (r) => {
+    const body = r.url().includes(`/watch/${id}/control`) ? r.postDataJSON() : null;
+    if (body?.action === 'seek') seeks.push(body);
+  });
+  await page.goto(`/watch/${id}`);
+  const join = page.getByRole('button', { name: 'Press play to join in' });
+  if (await join.isVisible()) await join.click();
+  const slider = page.getByRole('slider', { name: 'Position in the video' });
+  await expect(slider).toBeEnabled({ timeout: 15_000 });
+  await slider.focus();
+  // Home, then two presses: one seek, to 10 seconds or the end of the video, whichever comes first.
+  await page.keyboard.press('Home');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(() => seeks.length).toBe(1);
+  expect(seeks[0]!.positionMs).toBe(Math.min(10_000, Number(await slider.getAttribute('max'))));
 });
