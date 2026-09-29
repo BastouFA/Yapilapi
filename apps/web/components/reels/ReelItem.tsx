@@ -43,6 +43,8 @@ const TAP_MS = 260;
 const HOLD_MS = 380;
 /** The UI fades to a faint state after this much playback without a touch, a hover or a pause. */
 const FADE_MS = 3000;
+/** Where subtitles end, as a percentage of the frame's height: just above the name, caption and scrubber. */
+const CAPTION_LINE = 80;
 
 /** Keep a companion (the duet's original, or a borrowed sound) in step with the reel's own video. */
 function sync(v: HTMLVideoElement, other: HTMLMediaElement | null, event: 'play' | 'pause' | 'time') {
@@ -187,6 +189,23 @@ export function ReelItem({
     const base = locale.split('-')[0];
     const pick = tracks.find((x) => x.language === base) ?? tracks[0];
     for (const tr of tracks) tr.mode = prefs.captions && tr === pick ? 'showing' : 'hidden';
+    // The browser puts subtitles on the bottom line, under the name, caption and scrubber, which
+    // cover them: lift every cue above them once its file has loaded.
+    const lift = () => {
+      for (const tr of [...v.textTracks])
+        for (const cue of Array.from(tr.cues ?? [])) {
+          if (!(cue instanceof VTTCue) || !cue.snapToLines) continue;
+          cue.snapToLines = false;
+          cue.line = CAPTION_LINE;
+          cue.lineAlign = 'end';
+        }
+    };
+    lift();
+    const els = [...v.querySelectorAll('track')];
+    for (const el of els) el.addEventListener('load', lift);
+    return () => {
+      for (const el of els) el.removeEventListener('load', lift);
+    };
   }, [prefs.captions, locale, src, captions.length]);
 
   // Leaving a reel: it starts playing again next time, from where it was; remember that position.
