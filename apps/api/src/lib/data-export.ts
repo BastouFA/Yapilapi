@@ -328,6 +328,11 @@ export async function exportSections(db: Q, userId: string) {
               status, created_at, responded_at
        FROM friend_requests WHERE from_user_id = $1 OR to_user_id = $1 ORDER BY created_at DESC`,
     ),
+    followRequests: await q(
+      `SELECT CASE WHEN follower_id = $1 THEN 'sent' ELSE 'received' END AS direction, ${un('CASE WHEN follower_id = $1 THEN followee_id ELSE follower_id END')} AS username,
+              created_at
+       FROM follow_requests WHERE follower_id = $1 OR followee_id = $1 ORDER BY created_at DESC`,
+    ),
     blocked: await q(`SELECT ${un('blocked_id')} AS username, created_at FROM blocks WHERE blocker_id = $1 ORDER BY created_at`),
     muted: await q(`SELECT ${un('muted_id')} AS username, created_at FROM mutes WHERE muter_id = $1 ORDER BY created_at`),
     restricted: await q(`SELECT ${un('restricted_id')} AS username, created_at FROM restrictions WHERE restrictor_id = $1 ORDER BY created_at`),

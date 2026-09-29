@@ -52,17 +52,20 @@ export default function QuestionsPage() {
   const [reporting, setReporting] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  // Why the first page couldn't load (shown with Try again rather than as "No new questions").
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(
     async (next?: string) => {
+      if (!next) setLoadError(null);
       try {
         const page = await api.questions.inbox(filter, next);
         setItems((cur) => (next && cur ? [...cur, ...page.items.filter((x) => !cur.some((y) => y.id === x.id))] : page.items));
         setCursor(page.nextCursor);
         setCounts(page.counts);
       } catch (e) {
-        setItems((cur) => cur ?? []);
-        toast(errorMessage(e));
+        if (next) toast(errorMessage(e));
+        else setLoadError(errorMessage(e));
       }
     },
     [filter, toast],
@@ -180,7 +183,9 @@ export default function QuestionsPage() {
         onChange={setFilter}
         options={ASK_FILTERS.map((id) => ({ id, label: counts?.[id] ? `${t(FILTER_LABEL[id])} (${counts[id]})` : t(FILTER_LABEL[id]) }))}
       />
-      {items === null ? (
+      {items === null && loadError ? (
+        <EmptyState title={loadError} action={<Button onClick={() => void load()}>{t('m.common.retry')}</Button>} />
+      ) : items === null ? (
         <div className="stack" aria-busy>
           <Skeleton height={120} />
           <Skeleton height={120} />

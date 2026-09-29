@@ -9,6 +9,7 @@ import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { TrendingTags } from '@/components/TrendingTags';
 import { PostList } from '@/components/PostList';
+import { MoreResults, SearchFailed, type BusinessResult, type PlaceResult, type ProductResult } from '@/components/SearchMore';
 import { useSession } from '../../providers';
 
 type Tab = 'all' | 'people' | 'topics' | 'posts' | 'communities' | 'events';
@@ -29,13 +30,16 @@ function readRecent(): string[] {
  * address so it can be shared or revisited. Recent searches stay on this device.
  */
 function SearchPage() {
-  const { t, locale, toast } = useSession();
+  const { t, locale } = useSession();
   const router = useRouter();
   const params = useSearchParams();
   const [q, setQ] = useState(params.get('q') ?? '');
   const [tab, setTab] = useState<Tab>((params.get('type') as Tab) || 'all');
   const [results, setResults] = useState<Results | null>(null);
   const [loading, setLoading] = useState(false);
+  // Why the search didn't go through, with Try again.
+  const [failed, setFailed] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [recent, setRecent] = useState<string[]>([]);
   const input = useRef<HTMLInputElement>(null);
 
@@ -46,6 +50,7 @@ function SearchPage() {
 
   useEffect(() => {
     const term = q.trim();
+    setFailed(null);
     if (!term) {
       setResults(null);
       setLoading(false);
@@ -56,14 +61,14 @@ function SearchPage() {
     const timer = setTimeout(() => {
       api.search(term, tab).then(
         (r) => current && (setResults(r), setLoading(false)),
-        (e) => current && (setLoading(false), toast(errorMessage(e))),
+        (e) => current && (setResults(null), setLoading(false), setFailed(errorMessage(e))),
       );
     }, 250);
     return () => {
       current = false;
       clearTimeout(timer);
     };
-  }, [q, tab, toast]);
+  }, [q, tab, attempt]);
 
   const remember = (term: string) => {
     const next = [term, ...readRecent().filter((x) => x !== term)].slice(0, 8);
@@ -89,7 +94,11 @@ function SearchPage() {
   const posts = (r.posts ?? []) as Post[];
   const communities = (r.communities ?? []) as Community[];
   const events = (r.events ?? []) as EventItem[];
-  const nothing = results && ![people, topics, posts, communities, events].some((x) => x.length);
+  // Places, businesses and products come with "All".
+  const places = (tab === 'all' ? (r.places ?? []) : []) as PlaceResult[];
+  const businesses = (tab === 'all' ? (r.businesses ?? []) : []) as BusinessResult[];
+  const products = (tab === 'all' ? (r.products ?? []) : []) as ProductResult[];
+  const nothing = results && ![people, topics, posts, communities, events, places, businesses, products].some((x) => x.length);
   const show = (k: Tab) => tab === 'all' || tab === k;
   const n = new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 });
 
@@ -184,6 +193,8 @@ function SearchPage() {
             <TrendingTags limit={10} />
           </section>
         </>
+      ) : failed && !loading ? (
+        <SearchFailed message={failed} onRetry={() => setAttempt((n) => n + 1)} />
       ) : loading && !results ? (
         <Skeleton height={240} />
       ) : nothing ? (
@@ -248,6 +259,7 @@ function SearchPage() {
               </div>
             </section>
           ) : null}
+          <MoreResults places={places} businesses={businesses} products={products} />
           {show('posts') && posts.length ? (
             <section className="stack-sm" aria-labelledby="res-posts">
               <h2 id="res-posts" className="section-title">

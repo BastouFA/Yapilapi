@@ -122,7 +122,8 @@ export function parseSearchIntent(q: string, now = new Date()): SearchIntent {
   if (/\bbuy\b|\bproducts?\b|\bshopping\b/.test(text)) intent.types.push('products');
   if (/\bbusiness(es)?\b|\bcompan(y|ies)\b/.test(text)) intent.types.push('businesses');
 
-  const size = text.match(/\b(?:for|of)\s+(\d{1,3}|two|three|four|five|six|seven|eight|nine|ten)\s+(?:people|persons|guests)?/);
+  // "for six people", or just "for six" at the end or before another word ("restaurants for six").
+  const size = text.match(/\b(?:for|of)\s+(\d{1,3}|two|three|four|five|six|seven|eight|nine|ten)\b(?:\s+(?:people|persons|guests)\b)?/);
   if (size) {
     const words: Record<string, number> = { two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
     intent.groupSize = Number(size[1]) || words[size[1]!];

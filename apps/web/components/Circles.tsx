@@ -28,16 +28,17 @@ export function CirclesManager({ initialId }: { initialId?: string | null }) {
   const [kind, setKind] = useState<CircleKind>('custom');
   const [error, setError] = useState<string | undefined>();
   const [creating, setCreating] = useState(false);
+  // Why the list couldn't load (shown with Try again rather than as "no circles").
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    setLoadError(null);
     api.circles.list().then(
       (r) => setCircles(r.items),
-      (e) => {
-        setCircles([]);
-        toast(errorMessage(e));
-      },
+      (e) => setLoadError(errorMessage(e)),
     );
-  }, [toast]);
+  }, [attempt]);
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
@@ -92,7 +93,9 @@ export function CirclesManager({ initialId }: { initialId?: string | null }) {
         </form>
       </Card>
 
-      {circles === null ? (
+      {circles === null && loadError ? (
+        <EmptyState title={loadError} action={<Button onClick={() => setAttempt((n) => n + 1)}>{t('m.common.retry')}</Button>} />
+      ) : circles === null ? (
         <Skeleton height={120} />
       ) : circles.length ? (
         <ul className="circles__list" aria-label={t('m.circles.yours')}>

@@ -1,13 +1,13 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { BOARD_DESCRIPTION_MAX, BOARD_NAME_MAX, BOARD_VISIBILITIES, type BoardVisibility } from '../../../packages/shared/src/constants';
 import type { Board, Post } from '../../../packages/shared/src/types';
-import { client, errorMessage, mediaUrl } from '../lib/api';
+import { client, errorMessage, isGone, mediaUrl } from '../lib/api';
 import { VISIBILITY_ICON } from '../lib/boards';
 import { useT } from '../lib/i18n';
 import { radius, space } from '../lib/theme';
-import { Button, Field, Icon, KeyboardAvoid, Loading, Notice, useColors } from '../lib/ui';
+import { Button, EmptyState, Field, Icon, KeyboardAvoid, Loading, Notice, ScreenError, useColors } from '../lib/ui';
 
 /** Posts offered as a cover choice. */
 const COVER_CHOICES = 12;
@@ -40,30 +40,35 @@ export default function BoardEdit() {
   const [cover, setCover] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Why the board couldn't load, when that isn't because it's gone or not yours to see.
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!id) return;
-    void client().then(async (api) => {
-      try {
-        const [{ board: b }, page] = await Promise.all([api.boards.get(id), api.boards.items(id, 'all')]);
-        setBoard(b);
-        setPosts(page.items.slice(0, COVER_CHOICES));
-        setName(b.name);
-        setDescription(b.description);
-        setVisibility(b.visibility);
-        setCover(b.coverPostId ?? null);
-      } catch (e) {
-        setBoard(null);
-        setError(errorMessage(e));
-      }
-    });
+    try {
+      const api = await client();
+      const [{ board: b }, page] = await Promise.all([api.boards.get(id), api.boards.items(id, 'all')]);
+      setBoard(b);
+      setPosts(page.items.slice(0, COVER_CHOICES));
+      setName(b.name);
+      setDescription(b.description);
+      setVisibility(b.visibility);
+      setCover(b.coverPostId ?? null);
+      setLoadError(null);
+    } catch (e) {
+      if (isGone(e)) setBoard(null);
+      else setLoadError(errorMessage(e));
+    }
   }, [id]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  if (board === undefined) return <Loading />;
+  if (board === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <Loading />;
   if (id && !board)
     return (
-      <View style={{ flex: 1, backgroundColor: c.ground, padding: space[4] }}>
-        <Notice tone="danger">{error ?? t('m.boards.unavailable')}</Notice>
+      <View style={{ flex: 1, backgroundColor: c.ground }}>
+        <EmptyState title={t('m.boards.unavailable')} />
       </View>
     );
   const hasEmoji = !!EMOJI && EMOJI.test(description);

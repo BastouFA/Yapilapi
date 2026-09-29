@@ -23,6 +23,8 @@ const MODES = [
   { id: 'for_you', label: 'feed.for_you' },
   { id: 'following', label: 'feed.following' },
   { id: 'friends', label: 'feed.friends' },
+  { id: 'communities', label: 'feed.communities' },
+  { id: 'local', label: 'feed.local' },
 ] as const satisfies readonly { id: FeedMode; label: MessageKey }[];
 
 /** Home: the welcome screen if signed out, then stories and the feed with cursor pagination. */
@@ -87,14 +89,20 @@ function Feed() {
     }, [loadStories, viewing]),
   );
 
+  // Answers for a mode you've already left (or a first page asked for again) are dropped.
+  const seq = useRef(0);
   const load = useCallback(
     async (next?: string) => {
+      const run = next ? seq.current : ++seq.current;
       try {
         const page = await (await client()).feed(mode, next);
-        setPosts((cur) => (next && cur ? [...cur, ...page.items] : page.items));
+        if (run !== seq.current) return;
+        // A post can move down between pages (a repost, a new ranking): it shows once.
+        setPosts((cur) => (next && cur ? [...cur, ...page.items.filter((x) => !cur.some((y) => y.id === x.id))] : page.items));
         setCursor(page.nextCursor);
         setError(null);
       } catch (e) {
+        if (run !== seq.current) return;
         setError(errorMessage(e));
         setPosts((cur) => cur ?? []);
       }
@@ -104,6 +112,7 @@ function Feed() {
 
   useEffect(() => {
     setPosts(null);
+    setCursor(null);
     void load();
   }, [load]);
 

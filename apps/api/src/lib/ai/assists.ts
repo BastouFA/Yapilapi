@@ -20,7 +20,7 @@ import { AppError, forbidden, notFound } from '../errors.ts';
 import { analyzeText } from '../moderation.ts';
 import { personalizationAllowed, track } from '../services.ts';
 import type { MediaStorage } from '../storage.ts';
-import { eventVisibleSql, postUnlockedSql, postVisibleSql } from '../visibility.ts';
+import { eventVisibleSql, postUnlockedSql, postVisibleSql, PUBLIC_POST_SQL } from '../visibility.ts';
 import type { AiProvider, CompletionRequest } from './providers.ts';
 
 /**
@@ -58,7 +58,7 @@ const DEV_NOTICE = 'Made by the local development provider (rule-based, no model
 const HELD_NOTICE = 'Some of it was held back by safety filters.';
 
 /** Public, unflagged posts: where hashtag ideas come from (the same rule as trending). */
-const PUBLIC_POST = `p.visibility = 'public' AND p.deleted_at IS NULL AND p.status = 'published' AND p.moderation_status = 'normal' AND au.status = 'active' AND NOT ap.is_private`;
+const PUBLIC_POST = PUBLIC_POST_SQL;
 
 /** Moments that shouldn't get a quick canned answer. */
 const SENSITIVE_TOPIC =

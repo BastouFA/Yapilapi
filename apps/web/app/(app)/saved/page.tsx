@@ -40,16 +40,18 @@ export default function SavedPage() {
   const [noteFor, setNoteFor] = useState<Post | null>(null);
   const [saveTo, setSaveTo] = useState<Post | null>(null);
 
+  // Why the boards couldn't load the first time (shown with Try again); later failures keep what's shown.
+  const [boardsError, setBoardsError] = useState<string | null>(null);
   const loadBoards = useCallback(
     () =>
       api.boards.mine().then(
-        (r) => setBoards(r.items),
-        (e) => {
-          setBoards([]);
-          toast(errorMessage(e));
+        (r) => {
+          setBoards(r.items);
+          setBoardsError(null);
         },
+        (e) => setBoardsError(errorMessage(e)),
       ),
-    [toast],
+    [],
   );
   useEffect(() => {
     void loadBoards();
@@ -100,7 +102,13 @@ export default function SavedPage() {
         <h2 id="boards-title" className="section-title">
           {t('m.boards.title')}
         </h2>
-        {boards === null ? <Skeleton height={180} /> : <BoardGrid boards={boards} label={t('boards.yourBoards')} onNew={() => setCreating(true)} />}
+        {boards === null && boardsError ? (
+          <EmptyState title={boardsError} action={<Button onClick={() => void loadBoards()}>{t('m.common.retry')}</Button>} />
+        ) : boards === null ? (
+          <Skeleton height={180} />
+        ) : (
+          <BoardGrid boards={boards} label={t('boards.yourBoards')} onNew={() => setCreating(true)} />
+        )}
       </section>
 
       <section className="stack-sm" aria-labelledby="saves-title">

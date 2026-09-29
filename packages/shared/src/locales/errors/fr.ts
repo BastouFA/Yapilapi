@@ -894,6 +894,8 @@ export const fr: Record<string, string> = {
   "Poll option doesn't exist or isn't visible to you.": 'Cette option de sondage n’existe pas ou tu ne peux pas la voir.',
   // apps/api/src/modules/profiles.ts
   'Choose from your own posts and reels that people can see.': 'Choisis parmi tes propres publications et reels que les autres peuvent voir.',
+  'This photo may be sensitive, so it can’t be your profile photo. Choose another one.':
+    'Cette photo est peut-être sensible, elle ne peut donc pas être ta photo de profil. Choisis-en une autre.',
   'This photo may be sensitive, so it can’t be a cover. Choose another one.':
     'Cette photo est peut-être sensible, elle ne peut donc pas servir de couverture. Choisis-en une autre.',
   'This photo or video can’t be shared because it looks like it goes against our community rules. Someone on our team will check it, and you’ll get a notification either way.':

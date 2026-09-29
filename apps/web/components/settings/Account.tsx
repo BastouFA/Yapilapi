@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Avatar, BottomSheet, Button, Card, Select, TextField } from '@yapilapi/design-system';
 import {
   IMAGE_ACCEPT,
@@ -25,10 +25,26 @@ export function ProfileCard() {
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
-  useEffect(() => {
-    if (me) api.users.get(me.username).then((r) => setProfile(r.profile));
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const load = useCallback(() => {
+    if (!me) return;
+    setLoadError(null);
+    api.users.get(me.username).then(
+      (r) => setProfile(r.profile),
+      (e) => setLoadError(errorMessage(e)),
+    );
   }, [me]);
-  if (!profile || !me) return null;
+  useEffect(load, [load]);
+  if (!me) return null;
+  if (!profile)
+    return loadError ? (
+      <Card title={t('settings.tab.profile')}>
+        <Alert tone="danger">{loadError}</Alert>
+        <Button variant="secondary" onClick={load}>
+          {t('m.common.retry')}
+        </Button>
+      </Card>
+    ) : null;
   return (
     <Anchor id="profile">
       <Card title={t('settings.tab.profile')} subtitle={t('st.profile.desc')}>
@@ -66,8 +82,9 @@ export function ProfileCard() {
                   try {
                     const { media } = await api.media.upload(file);
                     const url = new URL(media.url, location.origin).toString();
-                    await api.me.updateProfile({ avatarUrl: url });
-                    setProfile((p) => (p ? { ...p, avatarUrl: url } : p));
+                    // The server keeps the photo's own processed size.
+                    const r = await api.me.updateProfile({ avatarUrl: url });
+                    setProfile(r.profile);
                     await refresh();
                   } catch (err) {
                     toast(errorMessage(err));

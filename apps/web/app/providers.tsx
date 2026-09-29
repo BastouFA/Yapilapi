@@ -250,7 +250,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
           return; // a malformed frame
         }
         if (event.type === 'pong') return;
-        if (event.type === 'notification.created') setUnreadState((u) => ({ ...u, notifications: u.notifications + 1 }));
+        // A like joining an unread "Ada and 2 others" row isn't one more unread.
+        if (event.type === 'notification.created' && !event.data?.grouped) setUnreadState((u) => ({ ...u, notifications: u.notifications + 1 }));
         // The same as the server counts: messages from others, and calls you missed (not the other lines in a chat).
         const counts = event.data?.kind !== 'system' || (event.data.system?.type === 'call' && event.data.system.outcome === 'missed');
         if (

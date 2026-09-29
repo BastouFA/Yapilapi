@@ -148,6 +148,8 @@ export interface Profile extends PublicUser {
     followedBy: boolean;
     friends: boolean;
     friendRequest: 'none' | 'sent' | 'received';
+    /** A follow request between you (their account or yours is private): 'sent' by you, or 'received' from them. */
+    followRequest: 'none' | 'sent' | 'received';
     blocked: boolean;
     muted: boolean;
   };

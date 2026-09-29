@@ -64,11 +64,16 @@ export default function Saved() {
     void loadSaves(filter);
   }, [me, filter, loadSaves]);
 
-  // Coming back from a board or the board editor: names, covers and counts may have changed.
+  // Coming back from a board or the board editor: names, covers and counts may have changed. Coming back
+  // from a post: it may have been unsaved there, so the first page of saves is read again too.
+  const focusedBefore = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      if (me) void loadBoards();
-    }, [me, loadBoards]),
+      if (!me) return;
+      void loadBoards();
+      if (focusedBefore.current) void loadSaves(filter);
+      focusedBefore.current = true;
+    }, [me, loadBoards, loadSaves, filter]),
   );
 
   const more = async () => {
