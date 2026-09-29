@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { as, signUp, testApp, type TestUser } from './helpers.ts';
+import { as, signUp, testApp, type TestUser, followAccepted } from './helpers.ts';
 import type { BuiltApp } from '../src/app.ts';
 import { openDueChapters } from '../src/modules/chapters.ts';
 
@@ -35,8 +35,8 @@ async function story(owner: TestUser, opts: { body?: string; withPhoto?: boolean
 }
 
 async function mutual(a: TestUser, b: TestUser) {
-  await as(t.app, a).post(`/v1/users/${b.id}/follow`);
-  await as(t.app, b).post(`/v1/users/${a.id}/follow`);
+  await followAccepted(t.app, a, b);
+  await followAccepted(t.app, b, a);
 }
 
 async function chapter(owner: TestUser, body: Record<string, unknown>) {
@@ -142,7 +142,7 @@ describe('chapter audience', () => {
     const teen = await signUp(t.app, { birthDate: TEEN });
     const follower = await signUp(t.app, { birthDate: TEEN });
     const stranger = await adult();
-    await as(t.app, follower).post(`/v1/users/${teen.id}/follow`);
+    await followAccepted(t.app, follower, teen);
     expect((await as(t.app, teen).post('/v1/chapters', { title: 'Everyone', audience: 'public' })).status).toBe(403);
     const c = await chapter(teen, { title: 'Class trip', audience: 'followers' });
     expect((await as(t.app, teen).patch(`/v1/chapters/${c.id}`, { audience: 'public' })).status).toBe(403);

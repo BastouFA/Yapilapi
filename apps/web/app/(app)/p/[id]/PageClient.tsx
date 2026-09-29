@@ -19,9 +19,12 @@ export default function PostPageClient({ isPublic }: { isPublic: boolean }) {
   const load = useCallback(() => api.posts.get(id).then((r) => ({ items: [r.post], nextCursor: null })), [id]);
   // ?boost=1 (from the phone app's boost screen) opens the boost sheet on your own post, with its choices filled in.
   const [boost, setBoost] = useState<{ postId: string; choices?: BoostChoices } | undefined>(undefined);
+  // ?comments=1 (a notification about a comment) opens the comments.
+  const [comments, setComments] = useState<string | undefined>(undefined);
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     if (q.has('boost')) setBoost({ postId: id, choices: boostChoicesFrom(q) });
+    if (q.has('comments')) setComments(id);
   }, [id]);
   if (!me && !isPublic) return <NeedsAccount title={t('postPage.signInTitle')} body={t('postPage.signInBody')} />;
   return (
@@ -29,7 +32,8 @@ export default function PostPageClient({ isPublic }: { isPublic: boolean }) {
       <div className="yp-topbar">
         <h1>{t('m.title.post')}</h1>
       </div>
-      <PostList load={load} reloadKey={id} boost={boost} empty={t('postPage.unavailable')} />
+      {/* One post: no "You're all caught up" under it. */}
+      <PostList load={load} reloadKey={id} boost={boost} openComments={comments} showEnd={false} empty={t('postPage.unavailable')} />
       {!me ? <JoinNote text={t('postPage.join')} /> : null}
     </div>
   );

@@ -124,7 +124,8 @@ export function ProfileView({
         const page = await api.users.posts(p.username);
         setPosts(page.items);
         setCursor(page.nextCursor);
-        setLocked(false);
+        // A private account you don't follow lists nothing: say why rather than "No posts yet".
+        setLocked(p.isPrivate && !p.relationship.isSelf && !p.relationship.following && !p.relationship.friends);
       } catch {
         setPosts([]);
         setLocked(p.isPrivate && !p.relationship.isSelf);
@@ -140,6 +141,23 @@ export function ProfileView({
     setTagged(null);
     setLists({});
   }, [load]);
+
+  /** Answer someone asking to follow you (your account is private). */
+  const answerRequest = async (accept: boolean) => {
+    if (!profile) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const api = await client();
+      await (accept ? api.users.acceptFollow(profile.id) : api.users.declineFollow(profile.id));
+      setNote(accept ? t('followRequests.accepted', { name: profile.displayName }) : t('followRequests.declined'));
+      await load();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const profileId = profile?.id;
   const loadList = useCallback(
@@ -399,17 +417,21 @@ export function ProfileView({
           // "Following", or a longer word in another language, never pushes one onto a second line).
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], marginTop: space[2] }}>
             <Button
-              label={rel.following ? t('profile.unfollow') : t('profile.follow')}
-              variant={rel.following ? 'secondary' : 'primary'}
+              label={rel.following ? t('profile.unfollow') : rel.followRequest === 'sent' ? t('profile.requested') : t('profile.follow')}
+              accessibilityLabel={rel.followRequest === 'sent' && !rel.following ? t('profile.withdrawRequest', { name: profile.displayName }) : undefined}
+              variant={rel.following || rel.followRequest === 'sent' ? 'secondary' : 'primary'}
               tint={tint}
               style={{ flex: 1, minWidth: 0 }}
               disabled={busy || rel.blocked}
               onPress={async () => {
                 setBusy(true);
                 setError(null);
+                setNote(null);
                 try {
                   const api = await client();
-                  await (rel.following ? api.users.unfollow(profile.id) : api.users.follow(profile.id));
+                  // Following, or a request a private account hasn't answered yet: tapping undoes it.
+                  const r = await (rel.following || rel.followRequest === 'sent' ? api.users.unfollow(profile.id) : api.users.follow(profile.id));
+                  if (r.requested) setNote(t('profile.requestedToast', { name: profile.displayName }));
                   await load();
                 } catch (e) {
                   setError(errorMessage(e));
@@ -476,6 +498,15 @@ export function ProfileView({
         )}
       </Card>
       {actions}
+      {rel.followRequest === 'received' && !rel.isSelf ? (
+        <Card style={{ gap: space[2] }}>
+          <Text style={[{ color: c.ink, fontSize: 15 }, userText]}>{t('profile.followRequestFrom', { name: profile.displayName })}</Text>
+          <View style={{ flexDirection: 'row', gap: space[2] }}>
+            <Button label={t('m.common.accept')} size="sm" tint={tint} disabled={busy} onPress={() => void answerRequest(true)} />
+            <Button label={t('m.common.decline')} size="sm" variant="secondary" disabled={busy} onPress={() => void answerRequest(false)} />
+          </View>
+        </Card>
+      ) : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {note ? (
         <View accessibilityLiveRegion="polite">
@@ -606,7 +637,7 @@ export function ProfileView({
           !lists[current] ? (
             <SkeletonList kind="post" count={2} />
           ) : (
-            <EmptyState title={current === 'reels' ? t('ps.empty.reels') : t('ps.empty.reposts')} />
+            <EmptyState title={locked ? t('m.profile.private') : current === 'reels' ? t('ps.empty.reels') : t('ps.empty.reposts')} />
           )
         ) : current === 'tagged' ? (
           !tagged ? (

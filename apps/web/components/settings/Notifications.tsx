@@ -11,12 +11,37 @@ import { Anchor } from './Shell';
 
 type Prefs = { notifications: Record<string, boolean>; attention: Record<string, any> };
 
+/** A card whose settings couldn't load: why, and Try again (rather than the card quietly missing). */
+function LoadFailed({ title, message, onRetry }: { title: string; message: string; onRetry: () => void }) {
+  const { t } = useSession();
+  return (
+    <Card title={title}>
+      <div className="row">
+        <span role="alert">{message}</span>
+        <Button size="sm" variant="secondary" onClick={onRetry}>
+          {t('m.common.retry')}
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+/** Loads settings once (and again on retry); `error` says why they couldn't load. */
+function useLoaded<T>(load: () => Promise<T>) {
+  const [value, setValue] = useState<T | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    setError(null);
+    load().then(setValue, (e) => setError(errorMessage(e)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attempt]);
+  return { value, setValue, error, retry: () => setAttempt((n) => n + 1) };
+}
+
 function usePrefs() {
   const { toast } = useSession();
-  const [prefs, setPrefs] = useState<Prefs | null>(null);
-  useEffect(() => {
-    api.me.preferences().then(setPrefs, (e) => toast(errorMessage(e)));
-  }, [toast]);
+  const { value: prefs, setValue: setPrefs, error, retry } = useLoaded<Prefs>(() => api.me.preferences());
   const setAttention = async (k: string, v: unknown) => {
     setPrefs((p) => (p ? { ...p, attention: { ...p.attention, [k]: v } } : p));
     try {
@@ -25,7 +50,7 @@ function usePrefs() {
       toast(errorMessage(e));
     }
   };
-  return { prefs, setPrefs, setAttention };
+  return { prefs, setPrefs, setAttention, error, retry };
 }
 
 /** Notifications on this browser, even when YAPILAPI isn't open. */
@@ -62,8 +87,8 @@ export function BrowserPushCard() {
 /** Pause everything but security notifications for 8 hours, and resume early. */
 export function PauseCard() {
   const { t, locale } = useSession();
-  const { prefs, setAttention } = usePrefs();
-  if (!prefs) return null;
+  const { prefs, setAttention, error, retry } = usePrefs();
+  if (!prefs) return error ? <LoadFailed title={t('st.pause.title')} message={error} onRetry={retry} /> : null;
   const until = prefs.attention.notificationsPausedUntil ? new Date(prefs.attention.notificationsPausedUntil) : null;
   const paused = !!until && until > new Date();
   return (
@@ -102,22 +127,23 @@ const zone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 /** Quiet hours: pushes wait until they end, every day, in your time zone. */
 export function QuietHoursCard() {
   const { t, toast } = useSession();
-  const [settings, setSettings] = useState<InteractionSettings | null>(null);
   const [start, setStart] = useState('22:00');
   const [end, setEnd] = useState('07:00');
-  useEffect(() => {
-    api.me.interactions().then(
-      (r) => {
-        setSettings(r.settings);
-        if (r.settings.quietHours) {
-          setStart(r.settings.quietHours.start);
-          setEnd(r.settings.quietHours.end);
-        }
-      },
-      (e) => toast(errorMessage(e)),
-    );
-  }, [toast]);
-  if (!settings) return null;
+  const {
+    value: settings,
+    setValue: setSettings,
+    error,
+    retry,
+  } = useLoaded(() =>
+    api.me.interactions().then((r) => {
+      if (r.settings.quietHours) {
+        setStart(r.settings.quietHours.start);
+        setEnd(r.settings.quietHours.end);
+      }
+      return r.settings;
+    }),
+  );
+  if (!settings) return error ? <LoadFailed title={t('st.quiet.title')} message={error} onRetry={retry} /> : null;
   const on = !!settings.quietHours;
   const save = async (quietHours: InteractionSettings['quietHours']) => {
     const before = settings;
@@ -162,8 +188,8 @@ export function QuietHoursCard() {
 /** Which kinds of notifications you get. Security ones are always on. */
 export function CategoriesCard() {
   const { toast, t } = useSession();
-  const { prefs, setPrefs } = usePrefs();
-  if (!prefs) return null;
+  const { prefs, setPrefs, error, retry } = usePrefs();
+  if (!prefs) return error ? <LoadFailed title={t('st.categories.title')} message={error} onRetry={retry} /> : null;
   return (
     <Anchor id="categories">
       <Card title={t('st.categories.title')} subtitle={t('settings.notificationsHint')}>
@@ -192,14 +218,8 @@ export function CategoriesCard() {
  */
 export function WeeklyWrapCard() {
   const { t, toast } = useSession();
-  const [settings, setSettings] = useState<WeeklyWrapSettings | null>(null);
-  useEffect(() => {
-    api.wraps.settings().then(
-      (r) => setSettings(r.settings),
-      (e) => toast(errorMessage(e)),
-    );
-  }, [toast]);
-  if (!settings) return null;
+  const { value: settings, setValue: setSettings, error, retry } = useLoaded<WeeklyWrapSettings>(() => api.wraps.settings().then((r) => r.settings));
+  if (!settings) return error ? <LoadFailed title={t('wrap.settings.title')} message={error} onRetry={retry} /> : null;
   const save = async (patch: { enabled?: boolean; notify?: boolean }) => {
     const before = settings;
     setSettings({ ...settings, ...patch });
@@ -234,8 +254,8 @@ export function WeeklyWrapCard() {
 /** "Your feed, your rules": friends only, fewer recommendations, focus and quiet modes, a daily time budget. */
 export function FeedCard() {
   const { t } = useSession();
-  const { prefs, setAttention } = usePrefs();
-  if (!prefs) return null;
+  const { prefs, setAttention, error, retry } = usePrefs();
+  if (!prefs) return error ? <LoadFailed title={t('settings.feed.title')} message={error} onRetry={retry} /> : null;
   const a = prefs.attention;
   return (
     <Card title={t('settings.feed.title')} subtitle={t('settings.feed.subtitle')}>

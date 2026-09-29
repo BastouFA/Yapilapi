@@ -882,6 +882,8 @@ export const ha: Record<string, string> = {
   "Poll option doesn't exist or isn't visible to you.": "Ba a sami zaɓin ƙuri'ar ba, ko kuma ba za ku iya ganinsa ba.",
   // apps/api/src/modules/profiles.ts
   'Choose from your own posts and reels that people can see.': 'Zaɓi daga cikin rubuce-rubucenku da reels ɗinku waɗanda mutane za su iya gani.',
+  'This photo may be sensitive, so it can’t be your profile photo. Choose another one.':
+    'Wannan hoton zai iya tayar da hankali, don haka ba zai iya zama hoton bayananka ba. Zaɓi wani daban.',
   'This photo may be sensitive, so it can’t be a cover. Choose another one.':
     'Wannan hoton zai iya tayar da hankali, don haka ba zai iya zama hoton murfi ba. Zaɓi wani daban.',
   'This photo or video can’t be shared because it looks like it goes against our community rules. Someone on our team will check it, and you’ll get a notification either way.':

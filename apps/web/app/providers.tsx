@@ -234,7 +234,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
       ws.onmessage = (ev) => {
         try {
           const event = JSON.parse(ev.data);
-          if (event.type === 'notification.created') setUnreadState((u) => ({ ...u, notifications: u.notifications + 1 }));
+          // A like joining an unread "Ada and 2 others" row isn't one more unread.
+          if (event.type === 'notification.created' && !event.data?.grouped) setUnreadState((u) => ({ ...u, notifications: u.notifications + 1 }));
           if (event.type === 'message.created' && event.data.sender.id !== me.id && !location.pathname.startsWith(`/inbox/${event.data.conversationId}`))
             setUnreadState((u) => ({ ...u, messages: u.messages + 1 }));
           listeners.current.forEach((l) => l(event));

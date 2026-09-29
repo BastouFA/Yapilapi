@@ -14,6 +14,16 @@ export function notBlockedSql(otherUserCol: string, v: string): string {
 }
 
 /**
+ * Posts aliased `p`, author's profile aliased `ap`, author user aliased `au`: public, unflagged posts anyone may see,
+ * which is what counts towards trending tags, hashtag suggestions and topic search. Not a private account's posts,
+ * and not posts in a private (or deleted) community, even when their audience says public: their tags would say
+ * what's being talked about in there.
+ */
+export const PUBLIC_POST_SQL = `(p.visibility = 'public' AND p.deleted_at IS NULL AND p.status = 'published' AND p.moderation_status = 'normal'
+  AND au.status = 'active' AND NOT ap.is_private
+  AND (p.community_id IS NULL OR EXISTS (SELECT 1 FROM communities pc WHERE pc.id = p.community_id AND pc.deleted_at IS NULL AND pc.visibility = 'public')))`;
+
+/**
  * Posts aliased `p`: the viewer and none of the post's accepted co-authors
  * blocked each other, so a post stays out of sight when someone you blocked is
  * on it as a co-author rather than as the author. (Co-authors never widen who

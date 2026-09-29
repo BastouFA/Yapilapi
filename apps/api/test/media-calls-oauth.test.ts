@@ -127,6 +127,9 @@ describe('calls', () => {
     expect(started.status).toBe(201);
     expect(started.body.iceServers[0].urls).toContain('stun:');
     const callId = started.body.call.id;
+    // The notification names the chat, so tapping it opens the chat.
+    const rang = (await as(t.app, b).get('/v1/notifications')).body.items.find((n: any) => n.type === 'call_incoming');
+    expect(rang).toMatchObject({ entityId: callId, data: { kind: 'video', conversationId: conv } });
     expect((await as(t.app, a).post(`/v1/conversations/${conv}/calls`, { kind: 'audio' })).status).toBe(409);
     expect((await as(t.app, c).get(`/v1/calls/${callId}`)).status).toBe(404);
     expect((await as(t.app, a).post(`/v1/calls/${callId}/signal`, { toUserId: c.id, type: 'offer', data: { sdp: 'x' } })).status).toBe(404);

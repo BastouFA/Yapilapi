@@ -867,6 +867,8 @@ export const yo: Record<string, string> = {
   "Poll option doesn't exist or isn't visible to you.": 'Àṣàyàn ìbò náà kò sí, tàbí o kò lè rí i.',
   // apps/api/src/modules/profiles.ts
   'Choose from your own posts and reels that people can see.': 'Yan láàárín àwọn àtẹ̀jáde àti reel tìrẹ tí àwọn ènìyàn lè rí.',
+  'This photo may be sensitive, so it can’t be your profile photo. Choose another one.':
+    'Fọ́tò yìí lè jẹ́ ẹlẹgẹ́, nítorí náà kò lè jẹ́ fọ́tò àkọsílẹ̀ rẹ. Yan òmíràn.',
   'This photo may be sensitive, so it can’t be a cover. Choose another one.': 'Fọ́tò yìí lè jẹ́ ẹlẹgẹ́, nítorí náà kò lè jẹ́ àwòrán iwájú. Yan òmíràn.',
   'This photo or video can’t be shared because it looks like it goes against our community rules. Someone on our team will check it, and you’ll get a notification either way.':
     'A kò lè pín fọ́tò tàbí fídíò yìí nítorí pé ó dà bí ẹni pé ó lòdì sí òfin àwùjọ wa. Ẹnì kan nínú ẹgbẹ́ wa yóò ṣàyẹ̀wò rẹ̀, o sì máa gba ìfitónilétí bó ti wù kí ó rí.',

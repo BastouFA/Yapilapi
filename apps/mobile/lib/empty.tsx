@@ -100,13 +100,24 @@ export function PulseEmpty({ mode, onFollowed, onShowForYou }: { mode: FeedMode;
     }
   }
 
-  const title = mode === 'following' ? t('m.empty.pulse.following') : mode === 'friends' ? t('m.empty.pulse.friends') : t('m.feed.empty.title');
+  const title =
+    mode === 'following'
+      ? t('m.empty.pulse.following')
+      : mode === 'friends'
+        ? t('m.empty.pulse.friends')
+        : mode === 'communities'
+          ? t('feed.empty.communities.title')
+          : mode === 'local'
+            ? t('feed.empty.local.title')
+            : t('m.feed.empty.title');
+  // Communities and Local fill up in their own ways: say how.
+  const body = mode === 'communities' ? t('feed.empty.communities.body') : mode === 'local' ? t('feed.empty.local.body') : t('starter.body');
   return (
     <View style={{ gap: space[3] }}>
       <EmptyState
         icon="sparkles-outline"
         title={title}
-        body={t('starter.body')}
+        body={body}
         action={{ label: t('friends.title'), icon: 'people-outline', onPress: () => router.push('/find-friends') }}
         secondary={
           onShowForYou

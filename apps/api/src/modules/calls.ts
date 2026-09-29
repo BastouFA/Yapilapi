@@ -93,7 +93,8 @@ export default async function callsModule(app: FastifyInstance, ctx: AppContext)
         actorId: u.id,
         entityType: 'call',
         entityId: callId,
-        data: { kind },
+        // The chat it was in, so tapping the notification opens it.
+        data: { kind, conversationId: id },
       });
     track(db, u.id, 'call_started', { kind, size: members.length });
     reply.code(201);

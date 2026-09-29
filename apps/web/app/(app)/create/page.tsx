@@ -132,6 +132,10 @@ function Create() {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [poll, setPoll] = useState<string[] | null>(null);
+  // A web link shown under the post (null: no link field).
+  const [link, setLink] = useState<string | null>(null);
+  // What a draft started elsewhere links to that this page has no picker for (an event, a product): kept as it is.
+  const [linked, setLinked] = useState<{ eventId?: string; productId?: string }>({});
   const [topics, setTopics] = useState('');
   const [expiresIn, setExpiresIn] = useState<'1h' | '24h' | 'permanent' | 'custom'>('24h');
   // With a chosen length: how many hours the story stays up (1 to 720), as typed.
@@ -181,6 +185,8 @@ function Create() {
         );
         setCollaborators(post.pendingCollaborators ?? []);
         setPoll(post.poll ? post.poll.options.map((o) => o.label) : null);
+        setLink(post.linkUrl);
+        setLinked({ ...(post.event ? { eventId: post.event.id } : {}), ...(post.product ? { productId: post.product.id } : {}) });
         // Topics that aren't #tags in the text were chosen by hand.
         const inText = extractHashtags(post.body, 50);
         setTopics(post.topics.filter((tp) => !inText.includes(tp)).join(', '));
@@ -398,7 +404,7 @@ function Create() {
       .slice(0, 5);
 
   // Music goes on photo and text posts (not videos, polls or links).
-  const postCanHaveMusic = !poll && media.every((m) => m.kind === 'image');
+  const postCanHaveMusic = !poll && !link?.trim() && media.every((m) => m.kind === 'image');
 
   /** What the post says and shows, for publishing it now, saving it as a draft or scheduling it. */
   function postContent(): Record<string, unknown> {
@@ -443,6 +449,8 @@ function Create() {
       })),
       collaborators: collaborators.map((u) => u.id),
       poll: poll ? { options: poll.filter((o) => o.trim()) } : undefined,
+      linkUrl: link?.trim() || undefined,
+      ...linked,
       music: music && postCanHaveMusic ? { ...musicInput(music), x: undefined, y: undefined, style: undefined } : undefined,
       topics: topicList(),
       aiAssisted: aiUsed,
@@ -519,7 +527,7 @@ function Create() {
   const empty =
     kind === 'reel'
       ? media.length !== 1 || media[0]!.kind !== 'video' || (!!remixOf && !original)
-      : !body.trim() && !media.length && !poll && !(kind === 'story' && (stickers.length || music));
+      : !body.trim() && !media.length && !poll && !(kind === 'post' && link?.trim()) && !(kind === 'story' && (stickers.length || music));
   const blocked = uploading || !draftLoaded || empty;
 
   return (
@@ -681,6 +689,31 @@ function Create() {
             </div>
           ) : null}
 
+          {kind === 'post' && link !== null ? (
+            <div className="stack-sm">
+              <TextField
+                id="post-link"
+                label={t('m.sticker.url')}
+                type="url"
+                inputMode="url"
+                // A web address reads left to right, also in Arabic.
+                dir="ltr"
+                autoComplete="off"
+                placeholder="https://"
+                value={link}
+                maxLength={1000}
+                hint={t('compose.linkHint')}
+                error={fields.linkUrl}
+                onChange={(e) => setLink(e.currentTarget.value)}
+              />
+              <div className="row">
+                <Button size="sm" variant="ghost" onClick={() => setLink(null)}>
+                  {t('compose.removeLink')}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
           {videoCost ? (
             <Alert tone="warning" title={t('dataSaver.title')} onDismiss={() => setVideoCost(null)} locale={locale}>
               {t('dataSaver.videoSize', { size: formatBytes(videoCost) })} {t('dataSaver.videoWifi')}
@@ -718,6 +751,19 @@ function Create() {
             {kind === 'post' && !poll ? (
               <Button size="sm" variant="secondary" icon="poll" onClick={() => setPoll(['', ''])}>
                 {t('m.sticker.kind.poll')}
+              </Button>
+            ) : null}
+            {kind === 'post' && link === null ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                icon="link"
+                onClick={() => {
+                  setLink('');
+                  requestAnimationFrame(() => document.getElementById('post-link')?.focus());
+                }}
+              >
+                {t('m.sticker.kind.link')}
               </Button>
             ) : null}
             {flags.AI_CAPTIONS && (body.trim() || media.some((m) => m.kind === 'image')) ? (

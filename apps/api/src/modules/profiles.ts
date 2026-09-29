@@ -52,6 +52,16 @@ import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 
+/** The storage key in a stored file's address (…/media/<key>), or null for any other address. */
+function mediaKeyOf(url: string): string | null {
+  try {
+    const m = /\/media\/(.+)$/.exec(new URL(url, 'http://localhost').pathname);
+    return m ? decodeURIComponent(m[1]!) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function profilesModule(app: FastifyInstance, ctx: AppContext) {
   const db = ctx.db;
 
@@ -247,6 +257,8 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
         EXISTS (SELECT 1 FROM friendships WHERE (user_a = $2 AND user_b = pr.user_id) OR (user_b = $2 AND user_a = pr.user_id)) AS is_friend,
         (SELECT CASE WHEN from_user_id = $2 THEN 'sent' ELSE 'received' END FROM friend_requests
           WHERE status = 'pending' AND ((from_user_id = $2 AND to_user_id = pr.user_id) OR (from_user_id = pr.user_id AND to_user_id = $2)) LIMIT 1) AS friend_request,
+        (SELECT CASE WHEN follower_id = $2 THEN 'sent' ELSE 'received' END FROM follow_requests
+          WHERE (follower_id = $2 AND followee_id = pr.user_id) OR (follower_id = pr.user_id AND followee_id = $2) ORDER BY follower_id = $2 DESC LIMIT 1) AS follow_request,
         EXISTS (SELECT 1 FROM blocks WHERE blocker_id = $2 AND blocked_id = pr.user_id) AS blocked,
         EXISTS (SELECT 1 FROM mutes WHERE muter_id = $2 AND muted_id = pr.user_id) AS muted
        FROM profiles pr JOIN users u ON u.id = pr.user_id WHERE pr.user_id = $1`,
@@ -283,6 +295,7 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
         followedBy: r.followed_by,
         friends: r.is_friend,
         friendRequest: r.friend_request ?? 'none',
+        followRequest: r.follow_request ?? 'none',
         blocked: r.blocked,
         muted: r.muted,
       },
@@ -320,6 +333,26 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     return { profile };
   });
 
+  /** The address of one of your own photos that `url` points at (the upload or a processed size of it). */
+  async function ownAvatar(userId: string, url: string): Promise<string> {
+    const key = mediaKeyOf(url);
+    const refused = () => badRequest('Upload a photo first.', { fields: { avatarUrl: 'Upload a photo first.' } });
+    if (!key) throw refused();
+    const { rows } = await db.query(
+      `SELECT m.url, m.variants, m.moderation FROM media m
+       WHERE m.owner_id = $1 AND m.kind = 'image' AND NOT m.private AND m.deleted_at IS NULL
+         AND (m.url LIKE '%/media/' || $2 OR EXISTS (SELECT 1 FROM jsonb_each_text(coalesce(m.variants, '{}'::jsonb)) v WHERE v.value LIKE '%/media/' || $2))
+       LIMIT 1`,
+      [userId, key.replace(/[\\%_]/g, (c) => `\\${c}`)],
+    );
+    const m = rows[0];
+    if (!m) throw refused();
+    if (m.moderation === 'blocked') throw new AppError(422, 'media_blocked', MEDIA_BLOCKED_MESSAGE);
+    if (m.moderation === 'sensitive')
+      throw new AppError(422, 'media_sensitive', 'This photo may be sensitive, so it can’t be your profile photo. Choose another one.');
+    return ((m.variants ?? {}) as Record<string, string>).medium ?? m.url;
+  }
+
   app.patch('/v1/me/profile', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const input = parse(updateProfileSchema, req.body);
@@ -340,6 +373,9 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
       tabs: 'tabs',
       featuredPostIds: 'featured_post_ids',
     };
+    // A profile photo is one of your own uploads, never an address elsewhere (it would reach every
+    // viewer's device without the checks uploads get). The stored address is the upload's own.
+    if (input.avatarUrl) input.avatarUrl = await ownAvatar(u.id, input.avatarUrl);
     const sets: string[] = [];
     const vals: unknown[] = [u.id];
     for (const [k, col] of Object.entries(map)) {
@@ -376,6 +412,14 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     // A cover photo is set from your own uploads (PUT /v1/me/cover); here it can only be removed.
     if (input.coverUrl) throw badRequest('Choose a cover photo from your own uploads.', { fields: { coverUrl: 'Upload a photo first.' } });
     if (sets.length) await db.query(`UPDATE profiles SET ${sets.join(', ')} WHERE user_id = $1`, vals);
+    // A public account has nothing to approve: everyone still waiting follows it now (quietly, as they asked).
+    if (input.isPrivate === false)
+      await db.query(
+        `WITH gone AS (DELETE FROM follow_requests WHERE followee_id = $1 RETURNING follower_id)
+         INSERT INTO follows (follower_id, followee_id) SELECT follower_id, $1 FROM gone ON CONFLICT DO NOTHING`,
+        [u.id],
+      );
+    if (input.isPrivate === false) await db.query(`UPDATE notifications SET type = 'follow' WHERE user_id = $1 AND type = 'follow_request'`, [u.id]);
     if (input.coverUrl === null) await clearCovers(db, `user_id = $1`, [u.id]);
     // Site icons for the links are fetched in the background, never while you wait.
     if (input.links?.length)
@@ -647,27 +691,107 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
   });
 
   // ── Follow ────────────────────────────────────────────────────────────
+  /**
+   * Follow someone. A private account is asked first: the request waits in follow_requests until
+   * they accept or decline (`requested: true`), and nothing of theirs opens up until then.
+   */
   app.post('/v1/users/:id/follow', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
     if (id === u.id) throw badRequest("You can't follow yourself.");
     if (await isBlockedEitherWay(db, u.id, id)) throw notFound('That profile');
-    const r = await db.query(`INSERT INTO follows (follower_id, followee_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [u.id, id]).catch((e) => {
-      if (e.code === '23503') throw notFound('That profile');
-      throw e;
-    });
-    if (r.rowCount) {
-      await notify(db, ctx.realtime, { userId: id, category: 'friends', type: 'follow', actorId: u.id, entityType: 'user', entityId: u.id });
-      track(db, u.id, 'follow', { followee: id });
-      await emitWebhook(db, id, 'follower.new', { followerId: u.id });
+    const target = await db.query<{ is_private: boolean }>(
+      `SELECT pr.is_private FROM profiles pr JOIN users x ON x.id = pr.user_id WHERE pr.user_id = $1 AND x.status = 'active' AND x.deleted_at IS NULL`,
+      [id],
+    );
+    if (!target.rows[0]) throw notFound('That profile');
+    const already = await db.query(`SELECT 1 FROM follows WHERE follower_id = $1 AND followee_id = $2`, [u.id, id]);
+    if (already.rowCount) return { following: true, requested: false };
+    if (target.rows[0].is_private) {
+      const asked = await db.query(`INSERT INTO follow_requests (follower_id, followee_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [u.id, id]);
+      if (asked.rowCount)
+        await notify(db, ctx.realtime, { userId: id, category: 'friends', type: 'follow_request', actorId: u.id, entityType: 'user', entityId: u.id });
+      return { following: false, requested: true };
     }
-    return { following: true };
+    const r = await db.query(`INSERT INTO follows (follower_id, followee_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [u.id, id]);
+    if (r.rowCount) await followed(u.id, id);
+    return { following: true, requested: false };
   });
 
+  /** What follows a new follow: their notification, the event and the webhook. */
+  async function followed(follower: string, followee: string, type: 'follow' | 'follow_accepted' = 'follow') {
+    if (type === 'follow')
+      await notify(db, ctx.realtime, { userId: followee, category: 'friends', type: 'follow', actorId: follower, entityType: 'user', entityId: follower });
+    else
+      await notify(db, ctx.realtime, {
+        userId: follower,
+        category: 'friends',
+        type: 'follow_accepted',
+        actorId: followee,
+        entityType: 'user',
+        entityId: followee,
+      });
+    track(db, follower, 'follow', { followee });
+    await emitWebhook(db, followee, 'follower.new', { followerId: follower });
+  }
+
+  /** Unfollow, or take back a request you sent (the notification about it goes too). */
   app.delete('/v1/users/:id/follow', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
     const { id } = parse(idParam, req.params);
-    await db.query(`DELETE FROM follows WHERE follower_id = $1 AND followee_id = $2`, [me(req).id, id]);
-    return { following: false };
+    await db.query(`DELETE FROM follows WHERE follower_id = $1 AND followee_id = $2`, [u.id, id]);
+    const took = await db.query(`DELETE FROM follow_requests WHERE follower_id = $1 AND followee_id = $2`, [u.id, id]);
+    if (took.rowCount) await db.query(`DELETE FROM notifications WHERE user_id = $1 AND actor_id = $2 AND type = 'follow_request'`, [id, u.id]);
+    return { following: false, requested: false };
+  });
+
+  /** People asking to follow you (your account is private), newest first. */
+  app.get('/v1/me/follow-requests', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { rows } = await db.query(
+      `SELECT fr.created_at AS requested_at, ${PUBLIC_USER_COLS} FROM follow_requests fr JOIN profiles pr ON pr.user_id = fr.follower_id
+       JOIN users ux ON ux.id = fr.follower_id
+       WHERE fr.followee_id = $1 AND ux.status = 'active' AND ux.deleted_at IS NULL AND ${notBlockedSql('fr.follower_id', '$1')}
+       ORDER BY fr.created_at DESC LIMIT 500`,
+      [u.id],
+    );
+    return { items: rows.map((r) => ({ user: toPublicUser(r as PublicUserRow), createdAt: new Date(r.requested_at).toISOString() })) };
+  });
+
+  /** Let someone who asked follow you. They're told; the request's notification becomes "started following you". */
+  app.post('/v1/me/follow-requests/:id/accept', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const accepted = await tx(db, async (c) => {
+      const r = await c.query(`DELETE FROM follow_requests WHERE follower_id = $1 AND followee_id = $2 RETURNING 1`, [id, u.id]);
+      if (!r.rowCount) return false;
+      await c.query(`INSERT INTO follows (follower_id, followee_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [id, u.id]);
+      await c.query(
+        `UPDATE notifications SET type = 'follow', read_at = coalesce(read_at, now()) WHERE user_id = $1 AND actor_id = $2 AND type = 'follow_request'`,
+        [u.id, id],
+      );
+      return true;
+    });
+    if (!accepted) throw notFound('That request');
+    await followed(id, u.id, 'follow_accepted');
+    return { status: 'accepted' };
+  });
+
+  /** Say no to a request. They aren't told; they can ask again. */
+  app.post('/v1/me/follow-requests/:id/decline', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const r = await db.query(`DELETE FROM follow_requests WHERE follower_id = $1 AND followee_id = $2`, [id, u.id]);
+    if (!r.rowCount) throw notFound('That request');
+    await db.query(`DELETE FROM notifications WHERE user_id = $1 AND actor_id = $2 AND type = 'follow_request'`, [u.id, id]);
+    return { status: 'declined' };
+  });
+
+  /** Remove one of your followers. They aren't told. */
+  app.delete('/v1/me/followers/:id', { preHandler: requireAuth }, async (req) => {
+    const { id } = parse(idParam, req.params);
+    await db.query(`DELETE FROM follows WHERE follower_id = $1 AND followee_id = $2`, [id, me(req).id]);
+    return { ok: true };
   });
 
   async function listUsers(sql: string, params: unknown[], cursor?: string, limit = 30) {
@@ -691,8 +815,9 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     if (!p) throw notFound('That person');
     if (viewer && (await isBlockedEitherWay(db, viewer, id))) throw notFound('That person');
     if (!p.is_private || viewer === id) return;
+    // Approved: they follow it, or it accepted them as a friend.
     const follows = viewer ? await db.query(`SELECT 1 FROM follows WHERE follower_id = $1 AND followee_id = $2`, [viewer, id]) : null;
-    if (!follows?.rowCount) throw forbidden('This account is private.');
+    if (!follows?.rowCount && !(viewer && (await areFriends(db, viewer, id)))) throw forbidden('This account is private.');
   }
 
   app.get('/v1/users/:id/followers', async (req) => {
@@ -722,6 +847,8 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
   app.get('/v1/users/:id/friends', async (req) => {
     const { id } = parse(idParam, req.params);
     const q = parse(pageQuerySchema, req.query);
+    // Like followers and following: a private account's friends are for it and the people it approved.
+    await assertListsVisible(id, req.user?.id ?? null);
     return listUsers(
       `SELECT ${PUBLIC_USER_COLS} FROM friendships fr JOIN profiles pr ON pr.user_id = CASE WHEN fr.user_a = $1 THEN fr.user_b ELSE fr.user_a END
        WHERE (fr.user_a = $1 OR fr.user_b = $1) AND ${notBlockedSql('pr.user_id', '$2')} ORDER BY fr.created_at DESC`,

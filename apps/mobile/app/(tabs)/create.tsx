@@ -7,6 +7,7 @@ import type { EditorParamsInput } from '../../../../packages/shared/src/filters'
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
 import type { CaptionIdeas, Circle, MediaItem, PublicUser } from '../../../../packages/shared/src/types';
 import { COMMENT_POLICIES, type CommentPolicy } from '../../../../packages/shared/src/constants';
+import { extractHashtags } from '../../../../packages/shared/src/hashtags';
 import { ECHO_PERMISSIONS, type EchoPermission } from '../../../../packages/shared/src/echoes';
 import { useAutocomplete } from '../../lib/autocomplete';
 import { Chips } from '../../lib/circles';
@@ -98,6 +99,9 @@ export default function Create() {
   const [draftId, setDraftId] = useState<string | null>(null);
   // A draft's audience that the choices here don't cover (a circle or chosen people): kept unless another is picked.
   const [keptAudience, setKeptAudience] = useState<{ visibility: string; circleId: string | null; audience: string[] } | null>(null);
+  // What a draft started on the web has that this composer doesn't show (more photos, a poll, a link,
+  // a community, an event, a product, topics): kept as it is, so saving or publishing here doesn't drop it.
+  const [keptParts, setKeptParts] = useState<{ media: Record<string, unknown>[]; fields: Record<string, unknown> } | null>(null);
   const [scheduling, setScheduling] = useState(false);
   const [keeping, setKeeping] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
@@ -252,6 +256,32 @@ export default function Create() {
             setKeptAudience(null);
           } else setKeptAudience({ visibility: post.visibility, circleId, audience });
           const m = post.media[0];
+          const more = post.format === 'reel' ? [] : post.media.slice(1);
+          // Topics chosen on the web; the text's own #tags come from the text as it is when saved.
+          const inText = new Set(extractHashtags(post.body));
+          const chosen = post.topics.filter((x) => !inText.has(x));
+          const fields = {
+            ...(post.poll ? { poll: { options: post.poll.options.map((o) => o.label) } } : {}),
+            ...(post.linkUrl ? { linkUrl: post.linkUrl } : {}),
+            ...(post.community ? { communityId: post.community.id } : {}),
+            ...(post.event ? { eventId: post.event.id } : {}),
+            ...(post.product ? { productId: post.product.id } : {}),
+            ...(chosen.length ? { topics: chosen } : {}),
+          };
+          setKeptParts(
+            more.length || Object.keys(fields).length
+              ? {
+                  media: more.map((x) => ({
+                    id: x.id,
+                    url: mediaUrl(x.url),
+                    kind: x.kind,
+                    ...(x.altText ? { altText: x.altText } : {}),
+                    ...(x.kind === 'image' && x.tags?.length ? { tags: x.tags.map((g) => ({ userId: g.user.id, x: g.x, y: g.y })) } : {}),
+                  })),
+                  fields,
+                }
+              : null,
+          );
           restoredTags.current = (m?.tags ?? []).map((x) => ({ user: x.user, x: x.x, y: x.y }));
           restoredAlt.current = true;
           setAltText(m?.altText ?? '');
@@ -484,23 +514,24 @@ export default function Create() {
         ...(coauthors.length ? { collaborators: coauthors.map((u) => u.id) } : {}),
       };
     }
+    const first = media
+      ? [
+          {
+            id: media.id,
+            url: mediaUrl(media.url),
+            kind: media.kind,
+            ...described,
+            ...(media.kind === 'image' && photoTags.length ? { tags: photoTags.map((x) => ({ userId: x.user.id, x: x.x, y: x.y })) } : {}),
+          },
+        ]
+      : [];
+    const all = [...first, ...(keptParts?.media ?? [])];
     return {
+      ...keptParts?.fields,
       body,
       ...assisted,
       ...audience,
-      ...(media
-        ? {
-            media: [
-              {
-                id: media.id,
-                url: mediaUrl(media.url),
-                kind: media.kind,
-                ...described,
-                ...(media.kind === 'image' && photoTags.length ? { tags: photoTags.map((x) => ({ userId: x.user.id, x: x.x, y: x.y })) } : {}),
-              },
-            ],
-          }
-        : {}),
+      ...(all.length ? { media: all } : {}),
       ...(coauthors.length ? { collaborators: coauthors.map((u) => u.id) } : {}),
       commentPolicy,
       ...(music && postCanHaveMusic
@@ -525,8 +556,10 @@ export default function Create() {
     setAltText('');
     setDraftId(null);
     setKeptAudience(null);
+    setKeptParts(null);
     setCommentPolicy('everyone');
     setAllowRemix(true);
+    setAllowEchoes('default');
     setRemix(null);
     setOriginal(null);
     setOriginalMissing(false);

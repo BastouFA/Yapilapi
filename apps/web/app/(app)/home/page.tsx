@@ -42,7 +42,7 @@ export default function Home() {
   return (
     <div className="yp-shell__inner">
       <div className="yp-topbar">
-        <h1>{t('nav.home')}</h1>
+        <h1 className="topbar__word">{t('nav.home')}</h1>
         {/* Icons on the right keep the title on one line at phone widths. */}
         <div className="row home__actions">
           <Link href="/search" className="yp-action home__search" aria-label={t('home.search')}>
@@ -99,7 +99,17 @@ export default function Home() {
 
       {mode === 'for_you' || mode === 'following' ? <SuggestedPeople /> : null}
 
-      <PostList load={load} reloadKey={mode} sponsored={mode === 'for_you'} />
+      <PostList
+        load={load}
+        reloadKey={mode}
+        sponsored={mode === 'for_you'}
+        // Communities and Local fill up in their own ways: say how.
+        {...(mode === 'communities'
+          ? { emptyTitle: t('feed.empty.communities.title'), empty: t('feed.empty.communities.body') }
+          : mode === 'local'
+            ? { emptyTitle: t('feed.empty.local.title'), empty: t('feed.empty.local.body') }
+            : {})}
+      />
 
       {viewing !== null && moments[viewing] ? <StoryViewer groups={moments} start={viewing} onClose={() => setViewing(null)} onChange={setMoments} /> : null}
     </div>
