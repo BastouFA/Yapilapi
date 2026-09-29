@@ -8,7 +8,7 @@ import { me, requireAuth } from '../plugins/auth.ts';
 
 /**
  * Creator Studio foundation: performance of your own content (posts you co-author count too),
- * audience growth, one post's insights, your payout requests and the tips (gifts) you sent and got.
+ * audience growth, one post's insights and the tips (gifts) you sent and got (payouts: modules/payouts.ts).
  */
 export default async function creatorModule(app: FastifyInstance, ctx: AppContext) {
   const topSelect = `SELECT id, left(body, 120) AS excerpt, kind, format, like_count, comment_count, view_count, created_at FROM posts p
@@ -77,23 +77,6 @@ export default async function creatorModule(app: FastifyInstance, ctx: AppContex
         reposts: p.reposts as number,
         viewsByDay: days.rows.map((r) => ({ day: r.day, views: r.views as number })),
       },
-    };
-  });
-
-  /** Your payout requests and where each one is. */
-  app.get('/v1/me/payouts', { preHandler: requireAuth }, async (req) => {
-    const { rows } = await ctx.db.query(
-      `SELECT id, amount_cents, currency, status, created_at FROM payouts WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
-      [me(req).id],
-    );
-    return {
-      items: rows.map((r) => ({
-        id: r.id as string,
-        amountCents: r.amount_cents as number,
-        currency: String(r.currency).trim(),
-        status: r.status as 'pending' | 'verified' | 'paid' | 'failed',
-        createdAt: r.created_at,
-      })),
     };
   });
 

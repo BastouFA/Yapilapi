@@ -850,6 +850,16 @@ export const fr: Record<string, string> = {
   "Passkey doesn't exist or isn't visible to you.": 'Cette clé d’accès n’existe pas ou tu ne peux pas la voir.',
   "That passkey isn't registered here. Sign in with your password.": 'Cette clé d’accès n’est pas enregistrée ici. Connecte-toi avec ton mot de passe.',
   "That passkey couldn't be verified.": 'Cette clé d’accès n’a pas pu être vérifiée.',
+  // apps/api/src/modules/payouts.ts
+  'Payouts in this currency are set up on the payment provider’s page.':
+    'Les versements dans cette devise se configurent sur la page du prestataire de paiement.',
+  'Payouts in this currency are set up with a bank account.': 'Les versements dans cette devise se configurent avec un compte bancaire.',
+  'Pick a bank from the list.': 'Choisis une banque dans la liste.',
+  'Set up where your payouts go before asking for one.': 'Indique où envoyer tes versements avant d’en demander un.',
+  'The bank could not confirm that account. Check the number and try again.': 'La banque n’a pas pu confirmer ce compte. Vérifie le numéro et réessaie.',
+  'The smallest payout is {min} hundredths of {currency}.': 'Le versement minimum est de {min} centièmes de {currency}.',
+  'This person has no payout account ready for that currency.': 'Cette personne n’a pas de compte de versement prêt pour cette devise.',
+  'Verify your email before setting up payouts.': 'Vérifie ton adresse e-mail avant de configurer les versements.',
   // apps/api/src/modules/phone.ts
   'That number is already confirmed on another account.': 'Ce numéro est déjà confirmé sur un autre compte.',
   'Already in use.': 'Déjà utilisé.',

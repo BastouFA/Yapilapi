@@ -824,6 +824,15 @@ export const yo: Record<string, string> = {
   "Passkey doesn't exist or isn't visible to you.": 'Kọ́kọ́rọ́ ìwọlé náà kò sí, tàbí o kò lè rí i.',
   "That passkey isn't registered here. Sign in with your password.": 'A kò forúkọ kọ́kọ́rọ́ ìwọlé yẹn sílẹ̀ níbí. Wọlé pẹ̀lú ọ̀rọ̀ aṣínà rẹ.',
   "That passkey couldn't be verified.": 'A kò lè jẹ́rìí kọ́kọ́rọ́ ìwọlé yẹn.',
+  // apps/api/src/modules/payouts.ts
+  'Payouts in this currency are set up on the payment provider’s page.': 'Owó sísan ní owó yìí ni a ń ṣètò lójú-ìwé olùpèsè ìsanwó.',
+  'Payouts in this currency are set up with a bank account.': 'Owó sísan ní owó yìí ni a ń ṣètò pẹ̀lú àkáǹtì báńkì.',
+  'Pick a bank from the list.': 'Yan báńkì kan láti inú àtòjọ.',
+  'Set up where your payouts go before asking for one.': 'Ṣètò ibi tí owó sísan rẹ yóò lọ kí o tó béèrè rẹ̀.',
+  'The bank could not confirm that account. Check the number and try again.': 'Báńkì kò lè jẹ́rìí àkáǹtì náà. Ṣàyẹ̀wò nọ́mbà náà kí o sì gbìyànjú lẹ́ẹ̀kan sí i.',
+  'The smallest payout is {min} hundredths of {currency}.': 'Owó sísan tó kéré jù ni {min} ìdá-ọgọ́rùn-ún {currency}.',
+  'This person has no payout account ready for that currency.': 'Ẹni yìí kò ní àkáǹtì owó sísan tó ti ṣetán fún owó yẹn.',
+  'Verify your email before setting up payouts.': 'Jẹ́rìí ímeèlì rẹ kí o tó ṣètò owó sísan.',
   // apps/api/src/modules/phone.ts
   'That number is already confirmed on another account.': 'A ti jẹ́rìí nọ́mbà yẹn lórí àkáǹtì mìíràn tẹ́lẹ̀.',
   'Already in use.': 'Ó ti wà ní lílò.',

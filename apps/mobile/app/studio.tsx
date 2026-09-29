@@ -220,6 +220,7 @@ export default function StudioScreen() {
         ) : (
           <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('m.studio.noPayouts')}</Text>
         )}
+        <Button label={t('m.studio.payouts.manage')} variant="secondary" icon="open-outline" onPress={() => openOnWeb('/studio#payouts')} />
       </View>
 
       {data.sales ? (

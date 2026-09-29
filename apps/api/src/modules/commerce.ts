@@ -1,5 +1,4 @@
 import type { FastifyInstance } from 'fastify';
-import type { Pool } from 'pg';
 import { tx } from '@yapilapi/database';
 import {
   createBusinessSchema,
@@ -7,7 +6,6 @@ import {
   createPlaceSchema,
   createProductSchema,
   CURRENCY_SCALE,
-  EARNINGS_HOLD_DAYS,
   PLACE_CATEGORIES,
   PLATFORM_FEE_BPS,
   processingFeeCents,
@@ -25,12 +23,13 @@ import { assertAdultForMoney, publicUserFrom } from '../lib/users.ts';
 import { EVENT_SELECT, toEvent } from './events.ts';
 import { eventVisibleSql, liveVisibleSql } from '../lib/visibility.ts';
 import { liveChatAudience } from '../lib/live.ts';
-import { me, requireAuth, requireRole } from '../plugins/auth.ts';
+import { me, requireAuth } from '../plugins/auth.ts';
 import { grantPlus } from '../lib/plus.ts';
-import { refundOrder, revokeRefundedOrder, sellerFeesSql, startPayment } from '../lib/checkout.ts';
+import { refundOrder, revokeRefundedOrder, startPayment } from '../lib/checkout.ts';
 import { assertDigitalCheckoutAllowed } from '../lib/store-purchases.ts';
 import { confirmDropOrder, dropGateSql, publishDropChange, releaseDropOrder, takeDropStock } from '../lib/drops.ts';
 import { issueOrderTickets, publishDoor } from '../lib/tickets.ts';
+import { applyPayoutEvent } from '../lib/payouts.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 
@@ -494,6 +493,8 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
         duplicate = true;
         return;
       }
+      // Payouts: a transfer that arrived or bounced, a payout account that became ready.
+      if (await applyPayoutEvent(c, ctx.realtime, provider, event)) return;
       const pay = await c.query(`SELECT id, order_id, amount_cents, currency, status FROM payments WHERE provider = $1 AND provider_ref = $2 FOR UPDATE`, [
         provider,
         event.providerRef,
@@ -673,91 +674,6 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     const events = await db.query<{ event_id: string }>(`SELECT DISTINCT event_id FROM event_tickets WHERE order_id = $1`, [id]);
     for (const e of events.rows) await publishDoor(db, ctx.realtime, e.event_id);
     return done;
-  });
-
-  /** Seller earnings and payout requests. Payouts need verification before they are paid. */
-  app.get('/v1/me/earnings', { preHandler: requireAuth }, async (req) => {
-    return { balances: await earnings(db, me(req).id) };
-  });
-
-  app.post('/v1/me/payouts', { preHandler: requireAuth }, async (req, reply) => {
-    const u = me(req);
-    const input = parse(z.object({ amountCents: z.number().int().positive(), currency: z.string().length(3).toUpperCase() }), req.body);
-    if (!u.emailVerified) throw forbidden('Verify your email before requesting a payout.');
-    await assertAdultForMoney(db, u.id);
-    const payout = await tx(db, async (c) => {
-      // One request at a time per person, so two at once can't both spend the same balance.
-      await c.query(`SELECT pg_advisory_xact_lock(hashtext('payout:' || $1))`, [u.id]);
-      const available = (await earnings(c, u.id)).find((b) => b.currency === input.currency)?.availableCents ?? 0;
-      if (input.amountCents > available) throw badRequest('That is more than you have available to pay out.', { availableCents: Math.max(0, available) });
-      return (
-        await c.query(`INSERT INTO payouts (user_id, amount_cents, currency) VALUES ($1,$2,$3) RETURNING id, status`, [u.id, input.amountCents, input.currency])
-      ).rows[0];
-    });
-    await audit(db, { actorId: u.id, action: 'payout.request', entityType: 'payout', entityId: payout.id, metadata: input });
-    reply.code(201);
-    return { payout, message: 'Payout requested. It will be paid after verification.' };
-  });
-
-  app.get('/v1/admin/payouts', { preHandler: requireRole('admin') }, async () => {
-    const { rows } = await db.query(`SELECT id, user_id, amount_cents, currency, status, created_at FROM payouts WHERE status = 'pending' ORDER BY created_at`);
-    // What each person still has in that currency with their pending payouts taken off: below zero means refunds have left it uncovered.
-    const balances = new Map<string, Awaited<ReturnType<typeof earnings>>>();
-    for (const r of rows) if (!balances.has(r.user_id)) balances.set(r.user_id, await earnings(db, r.user_id));
-    return {
-      items: rows.map((r) => ({ ...r, available_cents: balances.get(r.user_id)!.find((b) => b.currency === r.currency)?.availableCents ?? 0 })),
-    };
-  });
-
-  app.post('/v1/admin/payouts/:id/verify', { preHandler: requireRole('admin') }, async (req) => {
-    const { id } = parse(idParam, req.params);
-    const payout = (await db.query(`SELECT user_id FROM payouts WHERE id = $1 AND status = 'pending'`, [id])).rows[0];
-    if (!payout) throw notFound('Payout');
-    // Payouts only go to adults, whatever was requested before the rule.
-    await assertAdultForMoney(db, payout.user_id, false);
-    await tx(db, async (c) => {
-      await c.query(`SELECT pg_advisory_xact_lock(hashtext('payout:' || $1))`, [payout.user_id]);
-      const p = (await c.query(`SELECT currency FROM payouts WHERE id = $1 AND status = 'pending' FOR UPDATE`, [id])).rows[0];
-      if (!p) throw notFound('Payout');
-      // Refunds since the request can leave less than was asked for (pending payouts already count as spent).
-      const available = (await earnings(c, payout.user_id)).find((b) => b.currency === p.currency)?.availableCents ?? 0;
-      if (available < 0) throw badRequest('Refunds since this request leave the person without enough earnings to cover it.');
-      await c.query(`UPDATE payouts SET status = 'verified' WHERE id = $1`, [id]);
-    });
-    await audit(db, { actorId: me(req).id, action: 'payout.verify', entityType: 'payout', entityId: id });
-    return { status: 'verified' };
-  });
-}
-
-/**
- * What someone earned per currency after the platform fee and payment processing. A sale's share is held for EARNINGS_HOLD_DAYS
- * after it was paid (heldCents); what's left once payouts (other than failed ones) are taken off can be
- * paid out (availableCents).
- */
-async function earnings(q: Pick<Pool, 'query'>, userId: string) {
-  const { rows } = await q.query(
-    `SELECT currency, sum(gross) AS gross, sum(fees) AS fees, sum(gross - fees) FILTER (WHERE held) AS held FROM (
-       SELECT o.currency, oi.quantity * oi.unit_cents AS gross, ${sellerFeesSql} AS fees, o.paid_at > now() - make_interval(days => $2) AS held
-       FROM order_items oi JOIN orders o ON o.id = oi.order_id JOIN products p ON p.id = oi.product_id
-       WHERE p.seller_id = $1 AND o.status = 'paid'
-       UNION ALL
-       SELECT o.currency, o.total_cents, o.platform_fee_cents + o.processing_fee_cents, o.paid_at > now() - make_interval(days => $2) FROM orders o
-       WHERE o.payee_id = $1 AND o.status = 'paid' AND o.purpose IN ('subscription', 'tip')
-     ) x GROUP BY currency`,
-    [userId, EARNINGS_HOLD_DAYS],
-  );
-  const payouts = await q.query(`SELECT currency, sum(amount_cents) AS paid FROM payouts WHERE user_id = $1 AND status <> 'failed' GROUP BY currency`, [
-    userId,
-  ]);
-  // Payouts count even in a currency with nothing earned any more (refunded since), which leaves less than nothing available.
-  const currencies = [...new Set<string>([...rows.map((r) => r.currency), ...payouts.rows.map((p) => p.currency)])];
-  return currencies.map((currency) => {
-    const r = rows.find((x) => x.currency === currency);
-    const gross = Number(r?.gross ?? 0);
-    const fees = Number(r?.fees ?? 0);
-    const held = Number(r?.held ?? 0);
-    const paid = Number(payouts.rows.find((p) => p.currency === currency)?.paid ?? 0);
-    return { currency, grossCents: gross, feeCents: fees, heldCents: held, availableCents: gross - fees - held - paid };
   });
 }
 

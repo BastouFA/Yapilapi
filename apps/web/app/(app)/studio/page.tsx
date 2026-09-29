@@ -7,6 +7,7 @@ import { api, errorMessage } from '@/lib/api';
 import { Campaigns } from '@/components/Campaigns';
 import { VideoEditor } from '@/components/VideoEditor';
 import { BoostsPanel, SalesPanel, ShopManager } from '@/components/StudioMoney';
+import { PayoutsPanel } from '@/components/Payouts';
 import { useSession } from '../../providers';
 
 /** Creator Studio: how your content performs over the last 28 days, and what you've earned. */
@@ -93,6 +94,7 @@ export default function Studio() {
           </div>
         </section>
       ) : null}
+      {earnings.length ? <PayoutsPanel balances={earnings} /> : null}
       <section className="stack-sm">
         <h2 className="section-title">{t('m.studio.topPosts')}</h2>
         {data.topPosts.length ? (

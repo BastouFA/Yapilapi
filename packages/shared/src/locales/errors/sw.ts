@@ -839,6 +839,15 @@ export const sw: Record<string, string> = {
   "Passkey doesn't exist or isn't visible to you.": 'Ufunguo wa siri haupo au huwezi kuuona.',
   "That passkey isn't registered here. Sign in with your password.": 'Ufunguo huo wa siri haujasajiliwa hapa. Ingia kwa nenosiri lako.',
   "That passkey couldn't be verified.": 'Ufunguo huo wa siri haukuweza kuthibitishwa.',
+  // apps/api/src/modules/payouts.ts
+  'Payouts in this currency are set up on the payment provider’s page.': 'Malipo kwa sarafu hii yanawekwa kwenye ukurasa wa mtoa huduma wa malipo.',
+  'Payouts in this currency are set up with a bank account.': 'Malipo kwa sarafu hii yanawekwa kwa akaunti ya benki.',
+  'Pick a bank from the list.': 'Chagua benki kutoka kwenye orodha.',
+  'Set up where your payouts go before asking for one.': 'Weka mahali malipo yako yanapoenda kabla ya kuomba malipo.',
+  'The bank could not confirm that account. Check the number and try again.': 'Benki haikuweza kuthibitisha akaunti hiyo. Angalia nambari na ujaribu tena.',
+  'The smallest payout is {min} hundredths of {currency}.': 'Malipo ya chini kabisa ni sehemu {min} za mia za {currency}.',
+  'This person has no payout account ready for that currency.': 'Mtu huyu hana akaunti ya malipo iliyo tayari kwa sarafu hiyo.',
+  'Verify your email before setting up payouts.': 'Thibitisha barua pepe yako kabla ya kuweka malipo.',
   // apps/api/src/modules/phone.ts
   'That number is already confirmed on another account.': 'Nambari hiyo tayari imethibitishwa kwenye akaunti nyingine.',
   'Already in use.': 'Tayari inatumika.',

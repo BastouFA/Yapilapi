@@ -23,7 +23,7 @@ About $30/month to start, in Frankfurt (the closest Render region to West and Ea
 
 ### Optional, can be added later
 
-- **Paystack** (mobile money and local cards in Nigeria, Ghana, Kenya and South Africa): `PAYSTACK_SECRET_KEY` and `PAYSTACK_PUBLIC_KEY`. Webhook: `https://yapilapi-api.onrender.com/v1/payments/webhook/paystack`.
+- **Paystack** (mobile money and local cards in Nigeria, Ghana, Kenya and South Africa): `PAYSTACK_SECRET_KEY` and `PAYSTACK_PUBLIC_KEY`. Webhook: `https://yapilapi-api.onrender.com/v1/payments/webhook/paystack`. It also pays creators' payouts in those currencies from your Paystack balance: in the Paystack dashboard, turn on Transfers and turn off the one-time password for transfers (Settings > Preferences), or every payout waits for a code and the payout job keeps retrying.
 - **Twilio Verify** (phone confirmation by text):
   - set `SMS_PROVIDER=twilio` with `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `TWILIO_VERIFY_SERVICE_SID`;
   - without it, people confirm by email, and asking for a text says it isn't available yet.
@@ -41,7 +41,7 @@ In production, new accounts must confirm their email (or phone) before posting p
    - `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`;
    - optional: `ANTHROPIC_API_KEY` (then set `AI_PROVIDER=anthropic`), `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`.
 3. Click **Apply**. The first build takes about 10 minutes. The API is ready when `https://yapilapi-api.onrender.com/health/ready` answers `"status":"ready"`.
-4. **Stripe webhook.** In Stripe, go to Developers > Webhooks and add the endpoint `https://yapilapi-api.onrender.com/v1/payments/webhook/stripe` (straight to the API, so the signed body arrives untouched) with the `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded` and `charge.dispute.created` events (the last two undo an order refunded from the Stripe dashboard or taken back by a chargeback: access ends and it stops counting as the seller's earnings). Copy its signing secret (`whsec_…`) into `STRIPE_WEBHOOK_SECRET` on `yapilapi-api` (it's in the `yapilapi-secrets` group), then save; the API redeploys.
+4. **Stripe webhook.** In Stripe, go to Developers > Webhooks and add the endpoint `https://yapilapi-api.onrender.com/v1/payments/webhook/stripe` (straight to the API, so the signed body arrives untouched) with the `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded`, `charge.dispute.created` and `transfer.reversed` events (the last two undo an order refunded from the Stripe dashboard or taken back by a chargeback: access ends and it stops counting as the seller's earnings). Payouts in US dollars, euros and pounds use Stripe Connect: in Stripe, turn on Connect with Express accounts (Settings > Connect), and fill in the platform profile; creators then set up their account from Studio, and Studio checks it is ready each time they open it. Copy its signing secret (`whsec_…`) into `STRIPE_WEBHOOK_SECRET` on `yapilapi-api` (it's in the `yapilapi-secrets` group), then save; the API redeploys.
 5. Open `https://yapilapi-web.onrender.com`, sign up, and check the verification email arrives.
 
 If a service name is already taken on Render, it gets a different hostname. In that case, update these to match, then redeploy the web app (its three values are built into it):

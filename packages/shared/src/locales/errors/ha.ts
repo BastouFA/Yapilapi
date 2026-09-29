@@ -841,6 +841,15 @@ export const ha: Record<string, string> = {
   "Passkey doesn't exist or isn't visible to you.": 'Ba a sami maɓallin shigar ba, ko kuma ba za ku iya ganinsa ba.',
   "That passkey isn't registered here. Sign in with your password.": 'Ba a yi rajistar wannan maɓallin shiga a nan ba. Ku shiga da kalmar sirrinku.',
   "That passkey couldn't be verified.": 'Ba a iya tabbatar da wannan maɓallin shiga ba.',
+  // apps/api/src/modules/payouts.ts
+  'Payouts in this currency are set up on the payment provider’s page.': 'Ana saita biyan kuɗi da wannan kuɗin a shafin mai ba da biyan kuɗi.',
+  'Payouts in this currency are set up with a bank account.': 'Ana saita biyan kuɗi da wannan kuɗin da asusun banki.',
+  'Pick a bank from the list.': 'Ku zaɓi banki daga jerin.',
+  'Set up where your payouts go before asking for one.': 'Ku saita inda za a biya ku kafin ku nemi a biya ku.',
+  'The bank could not confirm that account. Check the number and try again.': 'Bankin bai iya tabbatar da wannan asusun ba. Ku duba lambar ku sake gwadawa.',
+  'The smallest payout is {min} hundredths of {currency}.': 'Mafi ƙarancin biya shi ne {min} cikin ɗari na {currency}.',
+  'This person has no payout account ready for that currency.': 'Wannan mutumin ba shi da asusun biyan kuɗi da ya shirya don wannan kuɗin.',
+  'Verify your email before setting up payouts.': 'Ku tabbatar da imel ɗinku kafin ku saita biyan kuɗi.',
   // apps/api/src/modules/phone.ts
   'That number is already confirmed on another account.': 'An riga an tabbatar da wannan lambar waya a wani asusu.',
   'Already in use.': 'Ana amfani da ita tuni.',
