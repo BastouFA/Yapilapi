@@ -45,6 +45,41 @@ describe('For you with a busy account', () => {
   });
 });
 
+describe('cursors someone made up', () => {
+  it('are refused with a 400, not a server error, and real ones still page', async () => {
+    const viewer = await signUp(t.app, adult);
+    const post = (await as(t.app, viewer).post('/v1/posts', { body: 'Paging #cursortest' })).body.post;
+    const made = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
+    const bad = [made({ t: 'yesterday', id: 'nope' }), made({ asOf: 'soon', o: -5 }), made([1, 2]), made('text'), made({ t: '2026-09-29T07:00:00Z', id: 'x' })];
+    const urls = [
+      '/v1/feed?mode=following',
+      '/v1/feed?mode=for_you',
+      `/v1/posts/${post.id}/comments?sort=newest`,
+      `/v1/posts/${post.id}/comments?sort=top`,
+      '/v1/tags/cursortest/posts',
+      '/v1/me/saved',
+      `/v1/users/${viewer.username}/posts`,
+    ];
+    for (const url of urls)
+      for (const cursor of bad) {
+        const r = await as(t.app, viewer).get(`${url}${url.includes('?') ? '&' : '?'}cursor=${cursor}`);
+        expect(r.status, `${url} with ${Buffer.from(cursor, 'base64url').toString()}`).toBe(400);
+      }
+    // Cursors the API writes are still taken (an ISO time, and Postgres' own text form).
+    const ok = [made({ t: new Date().toISOString(), id: post.id }), made({ t: '2026-09-29 07:00:00.123456+00', id: post.id })];
+    for (const cursor of ok) expect((await as(t.app, viewer).get(`/v1/feed?mode=following&cursor=${cursor}`)).status).toBe(200);
+    expect((await as(t.app, viewer).get(`/v1/feed?mode=for_you&cursor=${made({ asOf: new Date().toISOString(), o: 0 })}`)).status).toBe(200);
+  });
+});
+
+describe('search sentences', () => {
+  it('reads a group size at the end of a sentence', async () => {
+    const r = await as(t.app, null).get('/v1/search?q=restaurants%20for%20six');
+    expect(r.body.intent).toMatchObject({ types: ['places'], placeCategory: 'restaurant', groupSize: 6 });
+    expect((await as(t.app, null).get('/v1/search?q=a%20table%20for%204%20people')).body.intent.groupSize).toBe(4);
+  });
+});
+
 describe('photo and video addresses', () => {
   it('takes only web addresses, never javascript: or data:', async () => {
     const author = await signUp(t.app, adult);
