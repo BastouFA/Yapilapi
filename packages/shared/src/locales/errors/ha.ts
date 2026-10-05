@@ -1239,5 +1239,4 @@ export const ha: Record<string, string> = {
   'Number must be finite': 'Dole lambar ta zama mai iyaka',
   'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
     'Kalmar sirri mara daidai ta yi yawa a wannan asusun. Ku jira minti 15, ko ku sake saita kalmar sirrinku.',
-  "Follow request doesn't exist or isn't visible to you.": 'Ba a sami buƙatar bi ba, ko kuma ba za ku iya ganinta ba.',
 };

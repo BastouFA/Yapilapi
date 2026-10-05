@@ -1236,5 +1236,4 @@ export const sw: Record<string, string> = {
   'Number must be finite': 'Namba lazima iwe na kikomo',
   'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
     'Nenosiri lisilo sahihi limejaribiwa mara nyingi kwa akaunti hii. Subiri dakika 15, au weka upya nenosiri lako.',
-  "Follow request doesn't exist or isn't visible to you.": 'Ombi la kufuata halipo au huwezi kuliona.',
 };

@@ -1209,5 +1209,4 @@ export const ar: Record<string, string> = {
   'Number must be finite': 'يجب أن يكون الرقم محدودًا',
   'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
     'كلمات مرور خاطئة كثيرة لهذا الحساب. انتظر 15 دقيقة أو أعد تعيين كلمة المرور.',
-  "Follow request doesn't exist or isn't visible to you.": 'طلب المتابعة غير موجود أو لا يمكنك رؤيته.',
 };

@@ -1233,5 +1233,4 @@ export const pt: Record<string, string> = {
   'Number must be finite': 'O número precisa ser finito',
   'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
     'Muitas senhas erradas para esta conta. Espere 15 minutos ou redefina sua senha.',
-  "Follow request doesn't exist or isn't visible to you.": 'O pedido para seguir não existe ou não está visível para você.',
 };
