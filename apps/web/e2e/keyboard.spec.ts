@@ -577,6 +577,8 @@ test('together: the slideshow fits each photo on the screen, and a failed upload
   await page.waitForLoadState('networkidle');
 
   // A tall photo used to grow its slide past the bottom of a wide screen and get cut off.
+  // Measured without the slow zoom each photo plays (reduced motion turns it off), so only the layout counts.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.getByRole('button', { name: 'Slideshow' }).click();
   const show = page.getByRole('dialog', { name: /^Slideshow/ });
   await expect(show).toBeVisible();

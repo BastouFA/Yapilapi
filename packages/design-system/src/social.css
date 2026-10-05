@@ -794,7 +794,8 @@ a.yp-post__name {
 }
 .yp-audio__transcript summary {
   cursor: pointer;
-  color: var(--yapi);
+  /* Ink, not the accent: a profile's accent colour can be too light for text on this panel. */
+  color: var(--ink);
   font-weight: 600;
   min-height: 44px;
   display: flex;
@@ -806,6 +807,7 @@ a.yp-post__name {
   display: none;
 }
 .yp-audio__transcript summary svg {
+  color: var(--yapi);
   transition: transform var(--duration-fast) var(--ease-out);
 }
 .yp-audio__transcript[open] summary svg {
