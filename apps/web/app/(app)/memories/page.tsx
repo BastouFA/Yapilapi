@@ -3,7 +3,7 @@
 import { FeatureOff } from '@/components/FeatureOff';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, EmptyState, EventCard, Icon, PostCard, Skeleton, TextField } from '@yapilapi/design-system';
 import type { MemorySummary } from '@yapilapi/api-client';
 import type { EventItem, Post } from '@yapilapi/shared';
@@ -19,17 +19,23 @@ export default function Memories() {
   const [title, setTitle] = useState('');
   const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    if (flags.MEMORY === false) return;
+  // Why the memories couldn't load (shown with Try again, not as "no memories yet").
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const loadList = useCallback(() => {
+    setLoadError(null);
     api.memories.list().then(
       (r) => setItems(r.items),
-      (e) => (setItems([]), toast(errorMessage(e))),
+      (e) => setLoadError(errorMessage(e)),
     );
+  }, []);
+  useEffect(() => {
+    if (flags.MEMORY === false) return;
+    loadList();
     api.memories
       .suggestions()
       .then(setSugg)
       .catch(() => {});
-  }, [flags.MEMORY, toast]);
+  }, [flags.MEMORY, loadList]);
 
   if (flags.MEMORY === false) return <FeatureOff name={t('memories.title')} />;
 
@@ -118,7 +124,16 @@ export default function Memories() {
 
       <section className="stack-sm">
         <h2 className="section-title">{t('m.recap.memories')}</h2>
-        {items === null ? (
+        {items === null && loadError ? (
+          <EmptyState
+            title={loadError}
+            action={
+              <Button variant="secondary" onClick={loadList}>
+                {t('m.common.retry')}
+              </Button>
+            }
+          />
+        ) : items === null ? (
           <Skeleton height={120} />
         ) : items.length ? (
           <div className="yp-grid">

@@ -8,7 +8,7 @@ import { useT } from '../../lib/i18n';
 import { useRealtime } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
 import { statusText } from '../../lib/together';
-import { Button, Card, EmptyState, Icon, Loading, Notice, useColors, userText } from '../../lib/ui';
+import { Button, Card, EmptyState, ErrorState, Icon, Loading, Notice, useColors, userText } from '../../lib/ui';
 
 /**
  * Together: the shared albums you're in (only their people see them), open ones first, and a
@@ -28,7 +28,7 @@ export default function TogetherList() {
       setItems((await (await client()).together.list()).items);
       setError(null);
     } catch (e) {
-      setItems((cur) => cur ?? []);
+      // A list already showing stays, with the reason above it; with none yet, the reason and Try again.
       setError(errorMessage(e));
     }
   }, []);
@@ -128,8 +128,10 @@ export default function TogetherList() {
     >
       <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('together.intro')}</Text>
       <Button label={t('together.new')} icon="add" onPress={() => router.push('/together/new')} />
-      {error ? <Notice tone="danger">{error}</Notice> : null}
-      {items === null ? (
+      {error && items ? <Notice tone="danger">{error}</Notice> : null}
+      {items === null && error ? (
+        <ErrorState message={error} onRetry={load} />
+      ) : items === null ? (
         <Loading />
       ) : items.length ? (
         <>
