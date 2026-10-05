@@ -146,6 +146,62 @@ Pixel diffs, before → after, on the three dense pages (1440 × 900 and Pixel 7
 
 The same check over 60 more pages, signed in and out, showed only the changes in the table above (the signed-out pages centre their card, so the footer's wider line spacing moves the whole card up). Element sizes were compared too (every element's box, before and after): the only boxes that change size are the ones listed.
 
+## Results (2026-10-05): phone app, 44pt touch targets
+
+Every control in the phone app (`apps/mobile`) can now be tapped anywhere in a 44 × 44 point box, as on the web. It was done by reading the code: each control's size from its styles (width, height, minimums, padding, the icon or line of text inside) plus its `hitSlop`. The app wasn't run for this, and no tool measured it on a device.
+
+**The check:** `node scripts/check-targets.mjs` (from `apps/mobile`). It reads every screen and component with the TypeScript compiler and flags a `Pressable` (or `Touchable*`) whose touch area it can work out from literals and that is under 44 in either direction. It counts width and height, their minimums, padding, `space[n]`, an icon that is the control's only content, `StyleSheet.create` styles in the same file, both sides of a condition, and `hitSlop` (a number, `{ top, bottom, left, right }` or `slop({ … })`). It is conservative: a size that comes from text, a variable or the layout around it is unknown, so it isn't flagged. A smaller control that is meant to be one (a screen reader-only control, say) is marked `targets-ok: why` in a comment on the line above. Before this work it flagged 39 controls. Now it flags none, and it fails (exit 1) if one comes back.
+
+**The rules used:**
+- `hitSlop` first, because it changes nothing visible.
+- Where `hitSlop` can't reach 44, `minWidth` or `minHeight` with the content centred, on controls that have no background.
+- Spacing changes only where two 44pt areas would otherwise overlap. In those places the reach is split between the two controls, or goes the way that has room.
+- `hitSlop`'s left and right don't swap in Arabic, so `slop({ top, bottom, start, end })` in `lib/ui.tsx` gives an uneven reach by reading direction.
+- A touch area doesn't reach past a parent that clips (`overflow: 'hidden'`, or a scroll view's own edge). Rows of chips that scroll sideways therefore have 4pt of padding inside, taken back by a negative margin.
+- Where touch areas overlap, the later control wins. So wrapped rows of small chips and links get a `rowGap`.
+
+**Shared parts** (`lib/ui.tsx`, `lib/chips.tsx`):
+- `SwitchRow` is at least 44 tall. The switch itself is 31.
+- A section header's action ("Clear", "See all") reaches less far downwards, so it no longer covers chips that start 8pt below it.
+- These were already 44: `Button` (`size="sm"` is 36 with 4 of slop), `Segmented`, `Chip`, `SheetItem` (48), the sheet's close button, `Field` (44 tall; the password eye is 44 × 44), the tab bar (each tab is a full slot, 54 tall) and the header Cancel and Home buttons.
+
+**What changed, by place:**
+
+| Where | Change |
+| --- | --- |
+| Post card (`lib/post.tsx`) | The actions (like, repost, share, tip, more, save) are 20pt icons 16pt apart. They reach 44 × 44 without overlapping: further down into the card's padding than up, and further sideways for the icon-only ones. Link, event and product chips, the community name, the "duet with" / "remix of" and sound lines, a photo's name tags and their remove cross, "Load full photo", and a co-author's avatar now reach 44. |
+| Post page (`app/p/[id].tsx`) | Comment buttons (Reply, Edit, Pin, Delete, Report, like) are at least 32 × 36 with slop; avatars, the comment settings choices, the likers list and Cancel reply now reach 44. |
+| Chat (`app/chat/[id].tsx`, `lib/chat-*.tsx`) | The composer's add and view-once buttons reach into the free space next to them. The disappearing-messages line, "Open settings", video attachments, a quoted message, the pinned bar and its unpin button, the search close button, reactions, poll and list buttons, the scheduled-message actions and the game board picture now reach 44. |
+| Headers | The home bell and Reels and the You title now reach 44. Chat header icons now sit in 36 × 44 boxes. |
+| Reels, stories, camera (`app/reels.tsx`, `lib/stories.tsx`, `lib/story-stickers.tsx`, `app/camera.tsx`) | Now 44: the reel's author, Follow, "more" and its chips, the details panel chips and topics, the rail avatar and follow badge, the story top-bar buttons, reply-bar buttons, footer pills and share list, sticker choices and placed stickers, the camera's mode tabs and "Both sides". |
+| Elsewhere | Translation links, catch-up links, smart replies, picked people in a new group, chapters and the chapter player, boards, the date and time picker, co-author and photo-tag crosses, hidden-word, circle, starter and archive chips, music and sound links, the `Slider` track, a community's similar posts, an event's links, an invited person's row, related tags, and an echo's link. |
+
+**What looks different** (everything else looks the same):
+
+| Where | Change |
+| --- | --- |
+| Switch rows | At least 44 tall. A one-line switch row with no hint is about 13pt taller. |
+| Chat header | The icons are 6pt further apart, so a long chat name is cut off a little sooner. |
+| Post card | When a post has both a "duet with" / "remix of" line and a sound, they are 14pt further apart. Link chips that wrap onto a second line are 4pt further apart. |
+| Comments | Each comment's button row is 4pt taller, and buttons with short labels ("Pin", "Edit") take at least 32pt. "View replies" is 44 tall (was 32). Wrapped button rows are 8pt apart. |
+| Reply bar on a post | "Cancel" is 24 tall (was about 20). |
+| Translation links | "See translation" and "See original" are 32 tall (was 17), under any post, comment, message or story that offers them. |
+| Scheduled messages in a chat | The pill shows the time on one line and the actions on the next. Before, they all shared one line that wrapped. |
+| Chat list items | The move and remove buttons are 44 wide (was 32), so the item text is narrower. The pinned bar's unpin button and the search close button are 2pt wider. |
+| Reels | The caption and chips sit 9pt higher. Items in the details panel are 4pt further apart. Wrapped topic tags are about 44pt apart (was 25). |
+| A community's similar posts | Each is 44 tall (the links were 4pt apart). |
+| Rows that wrap onto a second line | 2pt to 16pt more between the lines. This covers the date picker's shortcuts, sticker choices, starter tags, related tags (16pt), chat reactions and new-group chips. |
+
+**Left as is:**
+- Links inside running text: mentions, hashtags, inline links, the sign-up consent sentence, and a post's "Edited" in its time line. The web leaves these too (WCAG's inline exception).
+- The chess board's squares are the board's width ÷ 8. They are 44 on a 375pt phone and about 37 on a 320pt one. The calendar's days are about 41 wide on a 320pt screen.
+- Where the room isn't there, two controls' areas still meet:
+  - "See translation" just above a post's remix line;
+  - a long Reels chip that reaches under "more";
+  - the Reels avatar, whose 44 partly comes from the space above it, because the follow badge covers it.
+- Story stickers are scaled by the person who placed them, so a sticker scaled down is smaller to tap. Stickers can also overlap.
+- Short photo-tag names: a name of two letters, next to its remove cross, is about 35 wide.
+
 ## Results (2026-09-29): Market, tickets and check-in, Together, echoes, 3D game boards, calls in the chat header, "Why am I seeing this?", Try again
 
 The suite first ran unchanged on the day's code (production build): all 468 audits, 14 keyboard tests and 232 right-to-left checks passed. The 14 new pages and 18 new states were then added and run before any fix, and everything again after the fixes (production build, 596 audits, 19 keyboard tests, 288 right-to-left checks, all passing).
@@ -318,7 +374,7 @@ The "before" run used the development server; the "after" run a production build
 ## Remaining known issues
 
 - **Newer features:** the start a game, send later, wallpaper and chess board checks are now in `keyboard.spec.ts` (run 2026-09-28, desktop and mobile, all passing); watch together is still checked by hand. A game move made by the other player while the board is open, and a drop opening while its page is open, are not exercised. The phone app was reviewed in code only, not with VoiceOver or TalkBack.
-- **Touch targets:** 44px is checked on 32 pages and 4 open states (`targets.spec.ts`) and was scanned once on every page the axe suite opens; other open sheets and menus, the phone app, and pages not in the axe suite were not measured. The chess board's squares are the size of the board (about 40px on a phone) and have no extra layer. Suggested replies reach 44px through `overflow-clip-margin`, which Safari doesn't support yet (there they stay 36px tall). Hovering near a small control now shows its hover state a few pixels early, since the layer is part of it.
+- **Touch targets:** 44px is checked on 32 pages and 4 open states (`targets.spec.ts`) and was scanned once on every page the axe suite opens; other open sheets and menus and pages not in the axe suite were not measured. The phone app was checked in code (`apps/mobile/scripts/check-targets.mjs` and by reading), not measured on a device. The chess board's squares are the size of the board (about 40px on a phone) and have no extra layer. Suggested replies reach 44px through `overflow-clip-margin`, which Safari doesn't support yet (there they stay 36px tall). Hovering near a small control now shows its hover state a few pixels early, since the layer is part of it.
 - **Not audited automatically:** admin, real, onboarding, OAuth consent, password reset pages; the incoming-call and Mini App overlays (they need a second live session or a registered app); the video editor (it needs a real video decode in the browser); a room you host (speaking needs a microphone). They use the same components, but have not been run through axe.
 - **Color contrast** is checked by axe on rendered text only. Text over photos, video and gradients (moment rings, story text and stickers, the music sticker, profile covers) is reported as "needs review" by axe, not as pass or fail, and has not been checked by hand. Icon-only buttons' 3:1 non-text contrast isn't checked by axe either (chat message tools are dimmed to 70% on touch screens).
 - **Screen readers:** no manual pass with VoiceOver, TalkBack or NVDA yet. Toasts, chat search results, raised hands and loading lines use live regions; the conversation is a `role="log"` that announces new messages as they arrive (not yet confirmed with each screen reader).

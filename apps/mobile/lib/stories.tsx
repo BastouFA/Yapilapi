@@ -535,7 +535,13 @@ function Viewer({
                 <Icon name={musicOn ? 'volume-high-outline' : 'volume-mute-outline'} size={20} color={WHITE} />
               </Pressable>
             ) : null}
-            <Pressable accessibilityRole="button" accessibilityLabel={t('m.stories.share')} hitSlop={ICON_SLOP} onPress={() => setSharing(true)} style={st.icon}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('m.stories.share')}
+              hitSlop={ICON_SLOP}
+              onPress={() => setSharing(true)}
+              style={st.icon}
+            >
               <Icon name="paper-plane-outline" size={20} color={WHITE} directional />
             </Pressable>
             <Pressable
