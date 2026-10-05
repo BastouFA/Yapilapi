@@ -131,6 +131,29 @@ test('settings search and dialog (delete account)', async ({ page }) => {
   await expect(opener).toBeFocused();
 });
 
+test('developers: revoking a key asks first, and Escape keeps it', async ({ page }, info) => {
+  const made = await page.request.post('/api/v1/developer/apps', { data: { name: `Keys ${info.project.name}` } });
+  expect(made.ok(), await made.text()).toBe(true);
+  const { app } = await made.json();
+  await page.request.post(`/api/v1/developer/apps/${app.id}/keys`, { data: { name: 'Reader', scopes: ['read'] } });
+  await page.goto('/developers');
+  await page.getByRole('button', { name: `Keys ${info.project.name}` }).click();
+  const opener = page.getByRole('button', { name: 'Revoke', exact: true });
+  await opener.focus();
+  await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog', { name: 'Revoke Reader?' });
+  await expect(dialog).toBeVisible();
+  expect(await focusInside(page, '[role="dialog"]')).toBe(true);
+  await tabStaysInside(page, '[role="dialog"]');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(opener).toBeFocused();
+  // Nothing was revoked.
+  const keys = await (await page.request.get(`/api/v1/developer/apps/${app.id}/keys`)).json();
+  expect(keys.items[0].revoked_at).toBeNull();
+  await page.request.delete(`/api/v1/developer/apps/${app.id}`);
+});
+
 test('checkout sheet', async ({ page }) => {
   const { businessSlug } = JSON.parse(readFileSync(DATA, 'utf8')) as SeedData;
   await page.goto(`/b/${businessSlug}`);
