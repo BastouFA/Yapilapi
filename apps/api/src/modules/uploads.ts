@@ -2,6 +2,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { tx } from '@yapilapi/database';
 import { AppError, badRequest, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { detectMedia, SUPPORTED_FORMATS, toWebFormat } from '../lib/media-formats.ts';
@@ -86,35 +87,45 @@ export default async function uploadsModule(app: FastifyInstance, ctx: AppContex
     const u = me(req);
     const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
     const alt = parse(z.object({ altText: z.string().max(500).optional() }), req.body ?? {}).altText ?? null;
-    const s = await session(id, u.id);
-    if (s.status === 'completed')
-      return { media: (await db.query(`SELECT id, kind, url, alt_text AS "altText" FROM media WHERE id = $1`, [s.media_id])).rows[0] };
-    if (s.received.length !== s.total_chunks) throw badRequest(`${s.total_chunks - s.received.length} chunks are still missing.`);
-    const dir = chunkDir(id);
-    const parts = (await readdir(dir)).map(Number).sort((a, b) => a - b);
-    const data = Buffer.concat(await Promise.all(parts.map((i) => readFile(path.join(dir, String(i))))));
-    if (data.length !== Number(s.size)) throw badRequest('The uploaded size does not match.');
-    const detected = detectMedia(data, s.mime);
-    const web = detected ? await toWebFormat(data, detected).catch(() => null) : null;
-    if (!detected || !web) {
-      await db.query(`UPDATE upload_sessions SET status = 'failed' WHERE id = $1`, [id]);
-      await rm(dir, { recursive: true, force: true });
-      throw new AppError(
-        415,
-        'unsupported_media',
-        detected ? "That file couldn't be read. It may be damaged; try exporting it again." : `That file type isn't supported. ${SUPPORTED_FORMATS}`,
+    await session(id, u.id);
+    // One completion at a time per upload: a retry sent while the first is still running (a slow
+    // network, a double tap) waits for it and gets the same media item back instead of a second copy.
+    const done = await tx(db, async (c) => {
+      const s = (await c.query(`SELECT * FROM upload_sessions WHERE id = $1 FOR UPDATE`, [id])).rows[0];
+      if (s.status === 'completed')
+        return { again: true, media: (await c.query(`SELECT id, kind, url, alt_text AS "altText" FROM media WHERE id = $1`, [s.media_id])).rows[0] };
+      if (s.status !== 'open') throw new AppError(409, 'upload_finished', 'This upload is already finished.');
+      if (s.received.length !== s.total_chunks) throw badRequest(`${s.total_chunks - s.received.length} chunks are still missing.`);
+      const dir = chunkDir(id);
+      const parts = (await readdir(dir)).map(Number).sort((a, b) => a - b);
+      const data = Buffer.concat(await Promise.all(parts.map((i) => readFile(path.join(dir, String(i))))));
+      if (data.length !== Number(s.size)) throw badRequest('The uploaded size does not match.');
+      const detected = detectMedia(data, s.mime);
+      const web = detected ? await toWebFormat(data, detected).catch(() => null) : null;
+      if (!detected || !web) {
+        await c.query(`UPDATE upload_sessions SET status = 'failed' WHERE id = $1`, [id]);
+        await rm(dir, { recursive: true, force: true });
+        return {
+          error: new AppError(
+            415,
+            'unsupported_media',
+            detected ? "That file couldn't be read. It may be damaged; try exporting it again." : `That file type isn't supported. ${SUPPORTED_FORMATS}`,
+          ),
+        };
+      }
+      const stored = await ctx.storage.put(web.buf, web.ext, web.mime);
+      const { rows } = await c.query(
+        `INSERT INTO media (owner_id, kind, url, mime, alt_text, status, storage_key, size_bytes, duration_ms) VALUES ($1,$2,$3,$4,$5,'ready',$6,$7,$8) RETURNING id, kind, url, alt_text AS "altText"`,
+        [u.id, detected.kind, stored.url, web.mime, alt, stored.key, web.buf.length, web.durationMs ?? null],
       );
-    }
-    const kind = { kind: detected.kind };
-    const stored = await ctx.storage.put(web.buf, web.ext, web.mime);
-    const { rows } = await db.query(
-      `INSERT INTO media (owner_id, kind, url, mime, alt_text, status, storage_key, size_bytes, duration_ms) VALUES ($1,$2,$3,$4,$5,'ready',$6,$7,$8) RETURNING id, kind, url, alt_text AS "altText"`,
-      [u.id, kind.kind, stored.url, web.mime, alt, stored.key, web.buf.length, web.durationMs ?? null],
-    );
-    await db.query(`UPDATE upload_sessions SET status = 'completed', media_id = $2 WHERE id = $1`, [id, rows[0].id]);
-    await enqueue(db, 'media.process', { mediaId: rows[0].id, filename: s.filename });
-    await rm(dir, { recursive: true, force: true });
+      await c.query(`UPDATE upload_sessions SET status = 'completed', media_id = $2 WHERE id = $1`, [id, rows[0].id]);
+      await enqueue(c, 'media.process', { mediaId: rows[0].id, filename: s.filename });
+      await rm(dir, { recursive: true, force: true });
+      return { media: rows[0] };
+    });
+    if (done.error) throw done.error;
+    if (done.again) return { media: done.media };
     reply.code(201);
-    return { media: rows[0] };
+    return { media: done.media };
   });
 }

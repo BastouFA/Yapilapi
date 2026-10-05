@@ -74,9 +74,12 @@ export default async function studioModule(app: FastifyInstance, ctx: AppContext
   // ── Your videos ───────────────────────────────────────────────────────
   app.get('/v1/me/videos', { preHandler: requireAuth }, async (req) => {
     const { rows } = await db.query(
-      `SELECT m.id, m.url, m.variants, m.poster_url, m.hls_url, m.duration_ms, m.alt_text, m.created_at, (m.variants ? 'mp4') AS processed,
+      `SELECT m.id, m.url, m.variants, m.poster_url, m.hls_url, m.duration_ms, m.alt_text, m.created_at, (m.variants ? 'mp4') AS processed, m.status,
               (SELECT e.source_media_id FROM media_edits e WHERE e.result_media_id = m.id LIMIT 1) AS edit_of
-       FROM media m WHERE m.owner_id = $1 AND m.kind = 'video' ORDER BY m.created_at DESC LIMIT 100`,
+       FROM media m WHERE m.owner_id = $1 AND m.kind = 'video' AND NOT m.private AND m.deleted_at IS NULL
+         -- Not view-once videos (never stored publicly), nor echoes of someone else's reel (they can't be edited).
+         AND NOT EXISTS (SELECT 1 FROM echoes e WHERE e.result_media_id = m.id AND e.original_author_id IS DISTINCT FROM m.owner_id)
+       ORDER BY m.created_at DESC LIMIT 100`,
       [me(req).id],
     );
     return {
@@ -89,6 +92,8 @@ export default async function studioModule(app: FastifyInstance, ctx: AppContext
         durationMs: r.duration_ms,
         altText: r.alt_text,
         processed: r.processed,
+        // Processing gave up on it: it will never be ready to edit.
+        failed: r.status === 'failed',
         editOf: r.edit_of,
         createdAt: r.created_at.toISOString(),
       })),

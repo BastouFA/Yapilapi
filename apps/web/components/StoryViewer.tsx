@@ -350,9 +350,14 @@ export function StoryViewer({
             <Button
               size="sm"
               variant="secondary"
-              onClick={async () =>
-                setViewers(await api.moments.viewers(story.id).catch(() => ({ items: [], results: [], reshares: 0, allowReshare: !!story.allowReshare })))
-              }
+              onClick={async () => {
+                // A list that couldn't load says why, rather than showing as "no viewers yet".
+                try {
+                  setViewers(await api.moments.viewers(story.id));
+                } catch (e) {
+                  toast(errorMessage(e));
+                }
+              }}
             >
               {t('m.stories.seenBy', { count: story.views ?? 0 })}
             </Button>
@@ -363,6 +368,11 @@ export function StoryViewer({
               size="sm"
               variant="ghost"
               onClick={async () => {
+                // Deleting can't be undone: ask first, with the story paused.
+                setPaused(true);
+                const sure = confirm(`${t('m.stories.delete.title')} ${t('m.stories.delete.body')}`);
+                setPaused(false);
+                if (!sure) return;
                 try {
                   await api.moments.remove(story.id);
                   const rest = group.moments.filter((m) => m.id !== story.id);

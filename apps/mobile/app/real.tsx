@@ -2,7 +2,7 @@ import { CameraView, useCameraPermissions, type CameraType } from 'expo-camera';
 import { router, useIsFocused } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { client } from '../lib/api';
+import { client, errorMessage } from '../lib/api';
 import { uploadFile } from '../lib/media';
 import { useT } from '../lib/i18n';
 import { space } from '../lib/theme';
@@ -51,7 +51,7 @@ export default function Real() {
       setStatus(null);
       router.navigate('/');
     } catch (e) {
-      setStatus((e as Error).message);
+      setStatus(errorMessage(e));
     } finally {
       setSharing(false);
     }
