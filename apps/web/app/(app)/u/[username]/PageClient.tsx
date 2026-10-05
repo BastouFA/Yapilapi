@@ -298,20 +298,23 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
         {profile.song ? <ProfileSongChip song={profile.song} /> : null}
         <ProfileLinks links={profile.links} />
         <ProfileAbout profile={profile} />
-        <div className="profile__counts">
-          <span>
-            <strong>{compact.format(profile.counts.posts)}</strong> {t('profile.posts')}
-          </span>
-          <button type="button" className="profile__count" onClick={() => (signedOut ? signIn() : setList('followers'))}>
-            <strong>{compact.format(profile.counts.followers)}</strong> {t('profile.followers')}
-          </button>
-          <button type="button" className="profile__count" onClick={() => (signedOut ? signIn() : setList('following'))}>
-            <strong>{compact.format(profile.counts.following)}</strong> {t('profile.following')}
-          </button>
-          <span>
-            <strong>{profile.counts.friends}</strong> {t('profile.friends')}
-          </span>
-        </div>
+        {/* Someone you blocked shows nothing of theirs, not even counts. */}
+        {rel.blocked ? null : (
+          <div className="profile__counts">
+            <span>
+              <strong>{compact.format(profile.counts.posts)}</strong> {t('profile.posts')}
+            </span>
+            <button type="button" className="profile__count" onClick={() => (signedOut ? signIn() : setList('followers'))}>
+              <strong>{compact.format(profile.counts.followers)}</strong> {t('profile.followers')}
+            </button>
+            <button type="button" className="profile__count" onClick={() => (signedOut ? signIn() : setList('following'))}>
+              <strong>{compact.format(profile.counts.following)}</strong> {t('profile.following')}
+            </button>
+            <span>
+              <strong>{profile.counts.friends}</strong> {t('profile.friends')}
+            </span>
+          </div>
+        )}
         {profile.interests.length ? (
           <div className="row">
             {profile.interests.map((i) => (
@@ -348,6 +351,14 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
           </span>
         </div>
       ) : null}
+      {rel.blocked ? (
+        <div className="yp-card profile__request" role="group">
+          <span>{t('m.profile.blocked', { name: profile.displayName })}</span>
+          <Button size="sm" variant="ghost" onClick={act(() => api.users.unblock(profile.id), t('m.profile.unblocked', { name: profile.displayName }))}>
+            {t('profile.unblock')}
+          </Button>
+        </div>
+      ) : null}
       {signedOut ? (
         <JoinNote
           text={
@@ -357,22 +368,22 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
           }
         />
       ) : null}
-      {!rel.isSelf && !signedOut ? (
+      {!rel.isSelf && !signedOut && !rel.blocked ? (
         <div id="subscribe" className={intent === 'subscribe' ? 'profile__subscribe profile__subscribe--focus' : 'profile__subscribe'}>
           <SupportCreator userId={profile.id} name={profile.displayName} isCreator={profile.mode === 'creator'} onSubscribed={() => setVersion((v) => v + 1)} />
         </div>
       ) : null}
-      {!signedOut || profile.ask?.enabled ? <AskCard profile={profile} onChanged={reload} /> : null}
+      {rel.blocked ? null : !signedOut || profile.ask?.enabled ? <AskCard profile={profile} onChanged={reload} /> : null}
       <FeaturedRow posts={profile.featured} />
-      {signedOut ? null : <DropsRow userId={profile.id} isSelf={rel.isSelf} />}
-      {tabs.length > 1 ? (
+      {signedOut || rel.blocked ? null : <DropsRow userId={profile.id} isSelf={rel.isSelf} />}
+      {rel.blocked ? null : tabs.length > 1 ? (
         <Segments label={t('ps.tabs.title')} value={current} onChange={setTab} options={tabs.map((id) => ({ id, label: t(tabLabel(id)) }))} />
       ) : (
         <h2 className="section-title" style={{ margin: 0 }}>
           {t(tabLabel(current))}
         </h2>
       )}
-      {locked && (current === 'posts' || current === 'reels' || current === 'reposts') ? (
+      {rel.blocked ? null : locked && (current === 'posts' || current === 'reels' || current === 'reposts') ? (
         <EmptyState title={t('profilePage.tagged.privateTitle')} body={lockedBody} />
       ) : current === 'posts' ? (
         <PostList load={load} reloadKey={`${username}-${version}`} empty={rel.isSelf ? t('profilePage.empty.postsSelf') : t('m.profile.noPosts')} />

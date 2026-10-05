@@ -156,3 +156,23 @@ describe('people search without an account', () => {
     expect(byName.body.results.people.map((p: { id: string }) => p.id)).toContain(priv.id);
   });
 });
+
+describe('a profile you blocked', () => {
+  it('shows you their name only, marked blocked, so you can unblock; they still cannot find you', async () => {
+    const me = await signUp(t.app);
+    const them = await signUp(t.app);
+    await as(t.app, them).patch('/v1/me/profile', { bio: '[Dev data] Not for blockers' });
+    expect((await as(t.app, me).post(`/v1/users/${them.id}/block`)).status).toBe(200);
+
+    const seen = await as(t.app, me).get(`/v1/users/${them.username}`);
+    expect(seen.status).toBe(200);
+    expect(seen.body.profile).toMatchObject({ username: them.username, bio: '', relationship: { blocked: true } });
+    expect(seen.body.profile.counts).toEqual({ followers: 0, following: 0, friends: 0, posts: 0 });
+
+    // The blocked person still gets not found.
+    expect((await as(t.app, them).get(`/v1/users/${me.username}`)).status).toBe(404);
+
+    expect((await as(t.app, me).del(`/v1/users/${them.id}/block`)).status).toBe(200);
+    expect((await as(t.app, me).get(`/v1/users/${them.username}`)).body.profile.bio).toBe('[Dev data] Not for blockers');
+  });
+});

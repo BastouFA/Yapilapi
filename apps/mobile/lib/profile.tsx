@@ -369,49 +369,52 @@ export function ProfileView({
         {profile.song ? <ProfileSongChip song={profile.song} tint={tint} /> : null}
         <ProfileLinks links={profile.links} tint={tint} />
         <ProfileAbout profile={profile} />
-        <View style={{ flexDirection: 'row', gap: space[4], marginTop: space[2] }}>
-          {(
-            [
-              ['profile.posts', profile.counts.posts],
-              ['profile.followers', profile.counts.followers],
-              ['profile.following', profile.counts.following],
-              ['profile.friends', profile.counts.friends],
-            ] as const
-          ).map(([key, n]) => {
-            const list = key === 'profile.followers' ? 'followers' : key === 'profile.following' ? 'following' : null;
-            const stat = (
-              <>
-                <Text style={{ color: c.ink, fontWeight: '800', fontSize: 17 }}>{number(n)}</Text>
-                <Text style={{ color: c.inkMuted, fontSize: 12 }}>{t(key)}</Text>
-              </>
-            );
-            // Followers and following open the list of people, as on the web.
-            return list ? (
-              <Pressable
-                key={key}
-                accessibilityRole="button"
-                accessibilityLabel={t('m.common.stat', { label: t(key), count: n })}
-                accessibilityHint={t('m.follows.hint')}
-                hitSlop={8}
-                onPress={() =>
-                  router.push({ pathname: '/follows', params: { id: profile.id, kind: list, name: profile.displayName, self: rel.isSelf ? '1' : '' } })
-                }
-                style={({ pressed }) => ({ alignItems: 'center', minWidth: 44, minHeight: 44, justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
-              >
-                {stat}
-              </Pressable>
-            ) : (
-              <View
-                key={key}
-                style={{ alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
-                accessible
-                accessibilityLabel={t('m.common.stat', { label: t(key), count: n })}
-              >
-                {stat}
-              </View>
-            );
-          })}
-        </View>
+        {/* Someone you blocked shows nothing of theirs, not even counts. */}
+        {rel.blocked ? null : (
+          <View style={{ flexDirection: 'row', gap: space[4], marginTop: space[2] }}>
+            {(
+              [
+                ['profile.posts', profile.counts.posts],
+                ['profile.followers', profile.counts.followers],
+                ['profile.following', profile.counts.following],
+                ['profile.friends', profile.counts.friends],
+              ] as const
+            ).map(([key, n]) => {
+              const list = key === 'profile.followers' ? 'followers' : key === 'profile.following' ? 'following' : null;
+              const stat = (
+                <>
+                  <Text style={{ color: c.ink, fontWeight: '800', fontSize: 17 }}>{number(n)}</Text>
+                  <Text style={{ color: c.inkMuted, fontSize: 12 }}>{t(key)}</Text>
+                </>
+              );
+              // Followers and following open the list of people, as on the web.
+              return list ? (
+                <Pressable
+                  key={key}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('m.common.stat', { label: t(key), count: n })}
+                  accessibilityHint={t('m.follows.hint')}
+                  hitSlop={8}
+                  onPress={() =>
+                    router.push({ pathname: '/follows', params: { id: profile.id, kind: list, name: profile.displayName, self: rel.isSelf ? '1' : '' } })
+                  }
+                  style={({ pressed }) => ({ alignItems: 'center', minWidth: 44, minHeight: 44, justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
+                >
+                  {stat}
+                </Pressable>
+              ) : (
+                <View
+                  key={key}
+                  style={{ alignItems: 'center', minHeight: 44, justifyContent: 'center' }}
+                  accessible
+                  accessibilityLabel={t('m.common.stat', { label: t(key), count: n })}
+                >
+                  {stat}
+                </View>
+              );
+            })}
+          </View>
+        )}
         {rel.isSelf ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: space[2], marginTop: space[2] }}>
             <Button label={t('profile.edit')} variant="secondary" size="sm" icon="person-circle-outline" onPress={() => router.push('/profile-edit')} />
@@ -534,13 +537,33 @@ export function ProfileView({
           onMessage={(text, tone) => (tone === 'danger' ? (setError(text), setNote(null)) : (setNote(text), setError(null)))}
         />
       )}
+      {/* Blocked by you: say so where it shows, with the way back (it's also in the menu). */}
+      {rel.blocked ? (
+        <Notice>
+          <Text style={{ color: c.ink, lineHeight: 20 }}>{t('m.profile.blocked', { name: profile.displayName })}</Text>
+          <Button
+            label={t('profile.unblock')}
+            variant="secondary"
+            size="sm"
+            style={{ alignSelf: 'flex-start', marginTop: space[2] }}
+            onPress={async () => {
+              try {
+                await (await client()).users.unblock(profile.id);
+                await load();
+              } catch (e) {
+                setError(errorMessage(e));
+              }
+            }}
+          />
+        </Notice>
+      ) : null}
       {rel.isSelf || rel.blocked ? null : (
         <SupportCard userId={profile.id} username={profile.username} name={profile.displayName} isCreator={profile.mode === 'creator'} />
       )}
       {rel.blocked ? null : <AskCard profile={profile} tint={tint} onChanged={load} />}
       <FeaturedRow posts={profile.featured} tint={tint} />
       {rel.blocked ? null : <DropsRow userId={profile.id} isSelf={rel.isSelf} />}
-      {tabs.length > 1 ? (
+      {rel.blocked ? null : tabs.length > 1 ? (
         <Segmented label={t('m.title.profile')} value={current} onChange={setTab} tint={tint} options={tabs.map((id) => ({ id, label: t(tabLabel(id)) }))} />
       ) : (
         <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 17, fontWeight: '800' }}>
@@ -599,13 +622,15 @@ export function ProfileView({
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: bottom + space[4] }}
       data={
-        current === 'posts'
-          ? posts
-          : current === 'tagged'
-            ? (tagged?.items ?? [])
-            : current === 'reels' || current === 'reposts'
-              ? (lists[current]?.items ?? [])
-              : []
+        rel.blocked
+          ? []
+          : current === 'posts'
+            ? posts
+            : current === 'tagged'
+              ? (tagged?.items ?? [])
+              : current === 'reels' || current === 'reposts'
+                ? (lists[current]?.items ?? [])
+                : []
       }
       keyExtractor={(p) => p.id}
       ListHeaderComponent={header}
@@ -633,7 +658,7 @@ export function ProfileView({
         />
       }
       ListEmptyComponent={
-        current === 'answers' ? (
+        rel.blocked ? null : current === 'answers' ? (
           <AnswersList profile={profile} />
         ) : current === 'mixes' ? (
           <ProfileMixes username={profile.username} isSelf={rel.isSelf} />

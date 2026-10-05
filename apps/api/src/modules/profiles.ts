@@ -133,11 +133,15 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
     };
   });
 
-  async function userIdByUsername(username: string, viewer: string | null): Promise<string> {
+  async function userIdByUsername(username: string, viewer: string | null, { blockedByViewer = false } = {}): Promise<string> {
     const { rows } = await db.query<{ user_id: string }>(
       // A username changed in the last 14 days still finds the profile; the page then moves to the new address.
+      // Someone who blocked you never finds you; someone you blocked can be found (shown bare, to unblock) when asked for.
       `SELECT pr.user_id FROM profiles pr JOIN users u ON u.id = pr.user_id
-       WHERE ${usernameMatchSql('pr', '$1')} AND u.status = 'active' AND ${notBlockedSql('pr.user_id', '$2')}`,
+       WHERE ${usernameMatchSql('pr', '$1')} AND u.status = 'active'
+         AND ${
+           blockedByViewer ? `NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = pr.user_id AND b.blocked_id = $2)` : notBlockedSql('pr.user_id', '$2')
+         }`,
       [username, viewer],
     );
     if (!rows[0]) throw notFound('That profile');
@@ -306,13 +310,33 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
   app.get('/v1/users/:username', async (req) => {
     const { username } = parse(z.object({ username: usernameSchema }), req.params);
     const viewer = req.user?.id ?? null;
-    const id = await userIdByUsername(username, viewer);
+    const id = await userIdByUsername(username, viewer, { blockedByViewer: !!viewer });
     if (!viewer) {
       // People without an account never see accounts of under-18s, and see only the name and picture of private ones.
       const minor = await db.query(`SELECT 1 FROM users WHERE id = $1 AND birth_date > current_date - interval '18 years'`, [id]);
       if (minor.rowCount) throw notFound('That person');
     }
     const profile = await loadProfile(id, viewer);
+    // Someone you blocked: their name and picture only, so the page can say so and offer Unblock.
+    if (profile.relationship.blocked)
+      return {
+        profile: {
+          ...profile,
+          bio: '',
+          links: [],
+          interests: [],
+          coverUrl: null,
+          coverAlt: null,
+          nowStatus: null,
+          pronouns: null,
+          city: null,
+          featured: [],
+          song: null,
+          ask: null,
+          tabs: [],
+          counts: { followers: 0, following: 0, friends: 0, posts: 0 },
+        },
+      };
     if (!viewer && profile.isPrivate)
       return {
         profile: {
