@@ -16,6 +16,7 @@ import {
   type TogetherJoinRequest,
   type TogetherView,
   type TogetherWindow,
+  withItems,
 } from '../../../../packages/shared/src/together';
 import { client, errorMessage, isGone, mediaUrl, webUrl } from '../../lib/api';
 import { FriendPicker, useFriends } from '../../lib/friend-picker';
@@ -126,7 +127,15 @@ export default function TogetherScreen() {
       void client()
         .then((api) => api.together.item(id, e.data.itemId))
         .then(
-          (r) => setAlbum((a) => (a ? { ...a, items: a.items.map((x) => (x.id === r.item.id ? r.item : x)) } : a)),
+          (r) =>
+            setAlbum((a) =>
+              a
+                ? withItems(
+                    a,
+                    a.items.map((x) => (x.id === r.item.id ? r.item : x)),
+                  )
+                : a,
+            ),
           () => {},
         );
     if (e.type === 'together.updated' || e.type === 'together.requests') void load();
@@ -144,7 +153,10 @@ export default function TogetherScreen() {
         const first = g.items[0]!;
         const last = g.items.at(-1)!;
         const fmt = (iso: string) => tr.date(iso, { hour: 'numeric', minute: '2-digit' });
-        const range = first === last ? fmt(first.takenAt) : `${fmt(first.takenAt)} – ${fmt(last.takenAt)}`;
+        const from = fmt(first.takenAt);
+        const to = fmt(last.takenAt);
+        // One time when the run starts and ends in the same minute.
+        const range = from === to ? from : `${from} – ${to}`;
         out.push({
           type: 'head',
           key: g.key,
@@ -498,10 +510,27 @@ export default function TogetherScreen() {
           items={a.items}
           startId={open}
           onClose={() => setOpen(null)}
-          onItem={(item) => setAlbum((x) => (x ? { ...x, items: x.items.map((i) => (i.id === item.id ? item : i)) } : x))}
+          // The best of follows stars and reactions straight away.
+          onItem={(item) =>
+            setAlbum((x) =>
+              x
+                ? withItems(
+                    x,
+                    x.items.map((i) => (i.id === item.id ? item : i)),
+                  )
+                : x,
+            )
+          }
           onRemoved={(rid) => {
             setOpen(null);
-            setAlbum((x) => (x ? { ...x, items: x.items.filter((i) => i.id !== rid) } : x));
+            setAlbum((x) =>
+              x
+                ? withItems(
+                    x,
+                    x.items.filter((i) => i.id !== rid),
+                  )
+                : x,
+            );
           }}
         />
       ) : null}

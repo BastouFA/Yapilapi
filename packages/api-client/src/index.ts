@@ -1432,8 +1432,10 @@ export function createClient(opts: ClientOptions) {
       signal: (id: string, toUserId: string, type: 'offer' | 'answer' | 'candidate', data: unknown) => post(`/v1/calls/${id}/signal`, { toUserId, type, data }),
     },
     real: {
-      feed: () => get<{ items: Post[] }>('/v1/real'),
-      create: (b: { mediaIds: string[]; caption?: string; visibility?: string }) => post<{ post: Post }>('/v1/real', b),
+      /** `remaining`: how many more Reals you can share now (three in 24 hours). */
+      feed: () => get<{ items: Post[]; remaining?: number }>('/v1/real'),
+      /** `moderation`: set when the Real waits for review (its caption was flagged). */
+      create: (b: { mediaIds: string[]; caption?: string; visibility?: string }) => post<{ post: Post; moderation?: ModerationNotice }>('/v1/real', b),
     },
     /** Together: shared albums (packages/shared/src/together.ts). Only the people in one ever see it. */
     together: {
@@ -1884,6 +1886,8 @@ export interface MemorySummary {
   mine: boolean;
   itemCount: number;
   createdAt: string;
+  /** GET /v1/memories/:id, for the owner: the friends it's shared with. */
+  sharedWith?: string[];
 }
 
 export interface LiveSummary {

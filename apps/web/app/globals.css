@@ -10796,8 +10796,11 @@ button.profile-song__play::after {
 .tg-show__slide--on {
   opacity: 1;
 }
+/* Pinned to the slide, so a tall photo or video fits the screen instead of growing the grid row. */
 .tg-show__slide img,
 .tg-show__slide video {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: contain;

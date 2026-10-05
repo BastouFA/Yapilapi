@@ -1,10 +1,10 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button, Segments } from '@yapilapi/design-system';
 import type { Mix, MixFilter } from '@yapilapi/shared';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 import { MixEditor, MixGrid } from '@/components/Mixes';
 import { useSession } from '../../providers';
 
@@ -15,14 +15,18 @@ export default function MixesPage() {
   const [filter, setFilter] = useState<MixFilter>('own');
   const [items, setItems] = useState<Mix[] | null>(null);
   const [editing, setEditing] = useState(false);
+  // Why the list couldn't load (shown with Try again, rather than as an empty list).
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     setItems(null);
+    setError(null);
     api.mixes.mine(filter).then(
       (r) => setItems(r.items),
-      () => setItems([]),
+      (e) => setError(errorMessage(e)),
     );
   }, [filter]);
+  useEffect(load, [load]);
 
   const empty =
     filter === 'own'
@@ -48,7 +52,7 @@ export default function MixesPage() {
           { id: 'saved', label: t('mixes.filter.saved') },
         ]}
       />
-      <MixGrid items={items} empty={empty} />
+      <MixGrid items={items} empty={empty} error={error} onRetry={load} />
       <MixEditor open={editing} onClose={() => setEditing(false)} onSaved={(m) => router.push(`/mixes/${m.id}`)} />
     </div>
   );

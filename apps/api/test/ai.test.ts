@@ -69,6 +69,24 @@ describe('AI gateway', () => {
     expect(seen[0]).not.toContain('garden');
   });
 
+  it('context: a chat summary holds only what the reader sees in the chat', async () => {
+    const chat = (await as(t.app, alice).post('/v1/conversations', { memberIds: [bob.id] })).body.conversation.id as string;
+    await as(t.app, alice).post(`/v1/conversations/${chat}/messages`, { body: 'Picnic on Sunday at the lake.' });
+    const hidden = (await as(t.app, alice).post(`/v1/conversations/${chat}/messages`, { body: 'Bring the blue blanket.' })).body.message.id;
+    // Bob deletes one for himself, and another is held for review.
+    expect((await as(t.app, bob).post(`/v1/messages/${hidden}/delete-for-me`, {})).status).toBe(200);
+    await t.ctx.db.query(`INSERT INTO messages (conversation_id, sender_id, body, moderation_status) VALUES ($1,$2,'Held words stay out.','review')`, [
+      chat,
+      alice.id,
+    ]);
+    const { provider, seen } = spyProvider('summary');
+    const gw = new AiGateway(t.ctx.db, provider);
+    await gw.run({ userId: bob.id, task: 'summarize_conversation', input: '', conversationId: chat });
+    expect(seen[0]).toContain('Picnic on Sunday');
+    expect(seen[0]).not.toContain('blue blanket');
+    expect(seen[0]).not.toContain('Held words');
+  });
+
   it('safety: unsafe model output is withheld', async () => {
     const { provider } = spyProvider('free crypto, click this link to claim');
     const gw = new AiGateway(t.ctx.db, provider);

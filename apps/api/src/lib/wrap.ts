@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import sharp, { type OverlayOptions } from 'sharp';
 import {
   isEmptyWeek,
+  isRtl,
   WRAP_CARD_DAYS,
   WRAP_HOUR,
   type OnThisDayCard,
@@ -382,6 +383,8 @@ export async function renderWrapCard(db: Q, storage: MediaStorage, wrapId: strin
   const locale: string = w.locale ?? 'en';
   const s = w.summary as WrapSummary;
   const fmt = (d: string) => new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${d}T00:00:00Z`));
+  // Arabic and other right-to-left languages read from the right: lines start there and the numbers' columns swap.
+  const rtl = isRtl(locale);
   const layers: OverlayOptions[] = [];
   const text = async (markup: string, bold: boolean, size: number, width = W - 160) =>
     sharp({
@@ -390,26 +393,29 @@ export async function renderWrapCard(db: Q, storage: MediaStorage, wrapId: strin
         fontfile: bold ? RECAP_FONTS.title : RECAP_FONTS.subtitle,
         font: `${bold ? 'Inter Bold' : 'Inter'} ${size}`,
         width,
+        align: rtl ? 'right' : 'left',
         dpi: 72,
         rgba: true,
       },
     })
       .png()
       .toBuffer({ resolveWithObject: true });
+  /** Where a block of text goes in a column: its start edge, which is the right one in right-to-left languages. */
+  const startOf = (block: { info: { width: number } }, colLeft = 80, colWidth = W - 160) => Math.round(rtl ? colLeft + colWidth - block.info.width : colLeft);
   let y = 96;
   try {
     const brand = await text(`<span foreground="#FFFFFFB3">YAPILAPI</span>`, true, 30);
-    layers.push({ input: brand.data, left: 80, top: y });
+    layers.push({ input: brand.data, left: startOf(brand), top: y });
     y += brand.info.height + 28;
     const title = await text(`<span foreground="white">${escapeMarkup(t('wrap.card.title', locale))}</span>`, true, 76);
-    layers.push({ input: title.data, left: 80, top: y });
+    layers.push({ input: title.data, left: startOf(title), top: y });
     y += title.info.height + 12;
     const dates = await text(
       `<span foreground="#FFFFFFCC">${escapeMarkup(t('wrap.card.dates', locale, { start: fmt(w.week_start), end: fmt(w.week_end) }))}</span>`,
       false,
       36,
     );
-    layers.push({ input: dates.data, left: 80, top: y });
+    layers.push({ input: dates.data, left: startOf(dates), top: y });
     y += dates.info.height + 48;
   } catch {
     // No text rendering on this server: the card still has its picture and colours.
@@ -429,7 +435,7 @@ export async function renderWrapCard(db: Q, storage: MediaStorage, wrapId: strin
       layers.push({ input: img, left: 80, top: y });
       y += ph + 24;
       const label = await text(`<span foreground="#FFFFFFB3">${escapeMarkup(t('wrap.card.moment', locale))}</span>`, false, 30);
-      layers.push({ input: label.data, left: 80, top: y });
+      layers.push({ input: label.data, left: startOf(label), top: y });
       y += label.info.height + 40;
     } catch {
       /* an unreadable picture is left out */
@@ -458,13 +464,14 @@ export async function renderWrapCard(db: Q, storage: MediaStorage, wrapId: strin
     if (!picture) y += 40;
     for (let i = 0; i < Math.min(stats.length, 6); i++) {
       const [n, label] = stats[i]!;
-      const left = 80 + (i % 2) * colW;
+      // The first of each pair goes on the start side.
+      const left = 80 + (rtl ? 1 - (i % 2) : i % 2) * colW + (rtl ? 20 : 0);
       const top = y + Math.floor(i / 2) * rowH;
       if (top + rowH - 10 > H - 140) break;
       const num = await text(`<span foreground="white">${new Intl.NumberFormat(locale).format(n)}</span>`, true, Math.round(64 * scale), colW - 20);
       const lab = await text(`<span foreground="#FFFFFFCC">${escapeMarkup(label)}</span>`, false, Math.round(28 * Math.min(scale, 1.3)), colW - 20);
-      layers.push({ input: num.data, left: Math.round(left), top });
-      layers.push({ input: lab.data, left: Math.round(left), top: top + num.info.height + 10 });
+      layers.push({ input: num.data, left: startOf(num, left, colW - 20), top });
+      layers.push({ input: lab.data, left: startOf(lab, left, colW - 20), top: top + num.info.height + 10 });
     }
     y += Math.ceil(Math.min(stats.length, 6) / 2) * rowH;
     const song = s.songs?.[0];
@@ -476,7 +483,7 @@ export async function renderWrapCard(db: Q, storage: MediaStorage, wrapId: strin
         false,
         30,
       );
-      layers.push({ input: line.data, left: 80, top: Math.max(y + 10, H - 150 - line.info.height) });
+      layers.push({ input: line.data, left: startOf(line), top: Math.max(y + 10, H - 150 - line.info.height) });
     }
   } catch {
     /* numbers without text rendering are left out */

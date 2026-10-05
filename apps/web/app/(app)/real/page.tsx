@@ -3,7 +3,7 @@
 import { FeatureOff } from '@/components/FeatureOff';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, EmptyState, PostCard, Select, Skeleton, TextField } from '@yapilapi/design-system';
-import type { Post } from '@yapilapi/shared';
+import { noticeText, type Post } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { Capture } from '@/components/Capture';
@@ -19,11 +19,14 @@ export default function RealPage() {
   const [caption, setCaption] = useState('');
   const [visibility, setVisibility] = useState('friends');
   const [busy, setBusy] = useState(false);
+  // How many more can be shared now; at none, the camera doesn't open (photos would be taken for nothing).
+  const [remaining, setRemaining] = useState<number | null>(null);
   const load = useCallback(
     () =>
       api.real.feed().then(
         (r) => {
           setItems(r.items);
+          setRemaining(r.remaining ?? null);
           setLoadError(null);
         },
         (e) => {
@@ -44,10 +47,10 @@ export default function RealPage() {
     try {
       const ids: string[] = [];
       for (const f of files) ids.push((await api.media.upload(f)).media.id);
-      await api.real.create({ mediaIds: ids, caption, visibility });
+      const r = await api.real.create({ mediaIds: ids, caption, visibility });
       setCapturing(false);
       setCaption('');
-      toast(t('real.shared'));
+      toast(noticeText(r.moderation, t) ?? t('real.shared'));
       await load();
     } catch (e) {
       toast(errorMessage(e));
@@ -60,11 +63,16 @@ export default function RealPage() {
     <div className="yp-shell__inner">
       <div className="yp-topbar">
         <h1>{t('m.title.real')}</h1>
-        {!capturing ? <Button onClick={() => setCapturing(true)}>{t('m.real.capture')}</Button> : null}
+        {!capturing ? (
+          <Button onClick={() => setCapturing(true)} disabled={remaining === 0}>
+            {t('m.real.capture')}
+          </Button>
+        ) : null}
       </div>
       <p className="muted" style={{ margin: 0 }}>
         {t('real.intro')}
       </p>
+      {remaining === 0 && !capturing ? <Alert tone="info">{t('real.noneLeft')}</Alert> : null}
       {capturing ? (
         <div className="stack-sm yp-card" style={{ padding: 16 }}>
           <TextField label={t('m.real.caption')} value={caption} onChange={(e) => setCaption(e.currentTarget.value)} maxLength={300} />

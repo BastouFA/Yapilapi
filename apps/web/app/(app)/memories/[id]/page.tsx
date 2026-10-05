@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { AIPanel, Avatar, BottomSheet, Button, Checkbox, EmptyState, EventCard, Icon, PostCard, Skeleton } from '@yapilapi/design-system';
+import { AIPanel, Avatar, BottomSheet, Button, Checkbox, Dialog, EmptyState, EventCard, Icon, PostCard, Skeleton } from '@yapilapi/design-system';
 import type { PublicUser } from '@yapilapi/shared';
 import { api, errorMessage, isGone } from '@/lib/api';
 import { NextLink } from '@/lib/link';
@@ -19,6 +19,7 @@ export default function MemoryPage() {
   const [sharing, setSharing] = useState(false);
   const [friends, setFriends] = useState<PublicUser[]>([]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Why it couldn't load, when that isn't because it's gone; a memory already showing stays.
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -48,20 +49,20 @@ export default function MemoryPage() {
                 size="sm"
                 variant="secondary"
                 onClick={async () => {
-                  if (me) setFriends((await api.raw.get<{ items: PublicUser[] }>(`/v1/users/${me.id}/friends`)).items);
+                  try {
+                    if (me) setFriends((await api.raw.get<{ items: PublicUser[] }>(`/v1/users/${me.id}/friends`)).items);
+                  } catch (e) {
+                    toast(errorMessage(e));
+                    return;
+                  }
+                  // Start from who it's shared with now: saving replaces the list.
+                  setPicked(new Set(m.sharedWith ?? []));
                   setSharing(true);
                 }}
               >
                 {m.visibility === 'private' ? t('m.common.share') : t('memories.sharing')}
               </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={async () => {
-                  await api.memories.remove(id);
-                  router.push('/memories');
-                }}
-              >
+              <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(true)}>
                 {t('m.common.delete')}
               </Button>
             </>
@@ -85,6 +86,7 @@ export default function MemoryPage() {
       {m.recap || m.mine ? (
         <AIPanel
           title={t('memories.recapTitle')}
+          label={t('ai.label')}
           loading={recapping}
           notice={t('memories.recapNotice')}
           actions={
@@ -130,8 +132,40 @@ export default function MemoryPage() {
         <EmptyState title={t('m.feed.empty.title')} body={t('memories.emptyItems')} />
       ) : null}
 
+      <Dialog
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        title={t('m.mem.deleteTitle')}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="danger"
+              onClick={async () => {
+                try {
+                  await api.memories.remove(id);
+                  router.push('/memories');
+                } catch (e) {
+                  setConfirmDelete(false);
+                  toast(errorMessage(e));
+                }
+              }}
+            >
+              {t('m.common.delete')}
+            </Button>
+          </>
+        }
+      >
+        <p>{t('m.mem.deleteBody')}</p>
+      </Dialog>
+
       <BottomSheet open={sharing} onClose={() => setSharing(false)} title={t('memories.shareTitle')}>
         <div className="stack-sm">
+          <p className="muted" style={{ margin: 0 }}>
+            {t('m.mem.shareHint')}
+          </p>
           {friends.length ? (
             friends.map((f) => (
               <Checkbox

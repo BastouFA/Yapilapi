@@ -300,8 +300,12 @@ export function MemoryCard() {
                       size="sm"
                       variant="ghost"
                       onClick={async () => {
-                        await api.ai.deleteMemory(m.id);
-                        setMemories((x) => x.filter((y) => y.id !== m.id));
+                        try {
+                          await api.ai.deleteMemory(m.id);
+                          setMemories((x) => x.filter((y) => y.id !== m.id));
+                        } catch (e) {
+                          toast(errorMessage(e));
+                        }
                       }}
                     >
                       {t('settings.delete')}

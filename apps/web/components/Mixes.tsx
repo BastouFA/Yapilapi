@@ -634,9 +634,32 @@ export function PostMixSheet({ mix, open, onClose }: { mix: Mix; open: boolean; 
 
 // ── Lists and cards ─────────────────────────────────────────────────────
 
-/** Mixes as a list of cards. */
-export function MixGrid({ items, empty }: { items: Mix[] | null; empty: { title: string; body?: string } }) {
-  const { locale } = useSession();
+/** Mixes as a list of cards; when they couldn't load, why, with Try again. */
+export function MixGrid({
+  items,
+  empty,
+  error,
+  onRetry,
+}: {
+  items: Mix[] | null;
+  empty: { title: string; body?: string };
+  error?: string | null;
+  onRetry?: () => void;
+}) {
+  const { locale, t } = useSession();
+  if (error)
+    return (
+      <EmptyState
+        title={error}
+        action={
+          onRetry ? (
+            <Button size="sm" variant="secondary" onClick={onRetry}>
+              {t('m.common.retry')}
+            </Button>
+          ) : undefined
+        }
+      />
+    );
   if (items === null) return <Skeleton height={88} />;
   if (!items.length) return <EmptyState title={empty.title} body={empty.body} />;
   return (
@@ -654,12 +677,16 @@ export function MixGrid({ items, empty }: { items: Mix[] | null; empty: { title:
 export function ProfileMixes({ username, isSelf }: { username: string; isSelf: boolean }) {
   const { t } = useSession();
   const [items, setItems] = useState<Mix[] | null>(null);
-  useEffect(() => {
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(() => {
+    setError(null);
+    setItems(null);
     api.mixes.forUser(username).then(
       (r) => setItems(r.items),
-      () => setItems([]),
+      (e) => setError(errorMessage(e)),
     );
   }, [username]);
+  useEffect(load, [load]);
   return (
     <div className="stack-sm">
       {isSelf ? (
@@ -667,7 +694,7 @@ export function ProfileMixes({ username, isSelf }: { username: string; isSelf: b
           {t('mixes.yours')}
         </Link>
       ) : null}
-      <MixGrid items={items} empty={{ title: t('mixes.profileEmpty') }} />
+      <MixGrid items={items} empty={{ title: t('mixes.profileEmpty') }} error={error} onRetry={load} />
     </div>
   );
 }

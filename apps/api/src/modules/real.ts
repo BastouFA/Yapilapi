@@ -6,7 +6,7 @@ import type { AppContext } from '../lib/context.ts';
 import { hydratePosts } from '../lib/posts.ts';
 import { isEnabled, track } from '../lib/services.ts';
 import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
-import { requireVerified } from '../lib/verification.ts';
+import { moderationNotice, recordFlags, screenPost } from '../lib/publishing.ts';
 import { postVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 import { langOf } from '../lib/translation.ts';
@@ -39,6 +39,15 @@ export default async function realModule(app: FastifyInstance, ctx: AppContext) 
     if (!(await isEnabled(db, flag))) throw featureDisabled('Real');
   };
 
+  /** Reals shared in the last 24 hours (three are allowed). */
+  async function realsToday(userId: string): Promise<number> {
+    const { rows } = await db.query(
+      `SELECT count(*)::int AS n FROM posts WHERE author_id = $1 AND metadata ? 'real' AND created_at > now() - interval '24 hours' AND deleted_at IS NULL AND status = 'published'`,
+      [userId],
+    );
+    return rows[0].n;
+  }
+
   // ── Real ──────────────────────────────────────────────────────────────
   app.post('/v1/real', { preHandler: gate('REAL'), config: { rateLimit: { max: 10, timeWindow: '1 hour' } } }, async (req, reply) => {
     const u = me(req);
@@ -51,17 +60,16 @@ export default async function realModule(app: FastifyInstance, ctx: AppContext) 
       }),
       req.body,
     );
-    const today = await db.query(
-      `SELECT count(*) AS n FROM posts WHERE author_id = $1 AND metadata ? 'real' AND created_at > now() - interval '24 hours' AND deleted_at IS NULL AND status = 'published'`,
-      [u.id],
-    );
-    if (Number(today.rows[0].n) >= REALS_PER_DAY) throw new AppError(429, 'real_limit', `You can share ${REALS_PER_DAY} Reals a day.`);
-    if (input.visibility === 'public') await requireVerified(db, ctx.config, u.id, 'post');
+    if ((await realsToday(u.id)) >= REALS_PER_DAY) throw new AppError(429, 'real_limit', `You can share ${REALS_PER_DAY} Reals a day.`);
+    // The caption is checked like any post's: harmful words are refused, anything flagged waits for a
+    // moderator, and the posting pace and verification for everyone apply.
+    const screening = await screenPost(db, ctx.config, u.id, { body: input.caption, pollText: '', visibility: input.visibility, communityId: null });
+    let limitedNow = false;
     const postId = await tx(db, async (c) => {
       const media = await freshMedia(c, u.id, input.mediaIds);
       if (media.some((m) => m.kind !== 'image')) throw badRequest('Real is for photos.');
       const { rows } = await c.query(
-        `INSERT INTO posts (author_id, kind, body, visibility, topics, metadata, rights, lang) VALUES ($1,$2,$3,$4,'{real}',$5,$6,$7) RETURNING id`,
+        `INSERT INTO posts (author_id, kind, body, visibility, topics, metadata, rights, lang, moderation_status) VALUES ($1,$2,$3,$4,'{real}',$5,$6,$7,$8) RETURNING id`,
         [
           u.id,
           media.length > 1 ? 'carousel' : 'photo',
@@ -70,15 +78,17 @@ export default async function realModule(app: FastifyInstance, ctx: AppContext) 
           { real: { capturedAt: new Date().toISOString(), dual: media.length > 1, locationText: input.locationText ?? null } },
           { owner: u.id, license: 'all_rights_reserved' },
           langOf(input.caption),
+          screening.status,
         ],
       );
       for (const [i, id] of input.mediaIds.entries())
         await c.query(`INSERT INTO post_media (post_id, media_id, position) VALUES ($1,$2,$3)`, [rows[0].id, id, i]);
+      limitedNow = await recordFlags(c, ctx.realtime, u.id, rows[0].id, screening);
       return rows[0].id as string;
     });
     track(db, u.id, 'real_created');
     reply.code(201);
-    return { post: (await hydratePosts(db, [postId], u.id))[0] };
+    return { post: (await hydratePosts(db, [postId], u.id))[0], moderation: moderationNotice(screening, limitedNow) };
   });
 
   app.get('/v1/real', { preHandler: gate('REAL') }, async (req) => {
@@ -97,6 +107,8 @@ export default async function realModule(app: FastifyInstance, ctx: AppContext) 
         rows.map((r) => r.id),
         u.id,
       ),
+      // How many more you can share now, so the apps say so before the camera opens.
+      remaining: Math.max(0, REALS_PER_DAY - (await realsToday(u.id))),
     };
   });
 }

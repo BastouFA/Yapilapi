@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
 import {
-  pickBestOf,
+  bestOfItems,
   TOGETHER_ADDED_NOTICE_MINUTES,
   TOGETHER_CLOSING_NOTICE_MINUTES,
   TOGETHER_ITEMS_MAX,
@@ -168,15 +168,7 @@ export async function albumItems(db: Q, albumId: string, viewer: string, title: 
 
 /** The best of from these items (marks them in place) and its ids, oldest first. */
 export function markBestOf(items: TogetherItem[]): string[] {
-  const best = pickBestOf(
-    items.map((i) => ({
-      id: i.id,
-      authorId: i.author.id,
-      stars: i.stars,
-      reactions: i.reactions.reduce((n, r) => n + r.count, 0),
-      takenAt: i.takenAt,
-    })),
-  );
+  const best = bestOfItems(items);
   const set = new Set(best);
   for (const i of items) i.best = set.has(i.id);
   return best;

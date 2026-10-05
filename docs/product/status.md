@@ -583,6 +583,22 @@ Checked and working as described above: sending (idempotent double sends), live 
 
 **Not done in this round:** leaving or being removed from a group still doesn't forfeit your games there (they end after a day without a move); read receipts can't be turned off; there is no separate folder for message requests (messages from people you don't know arrive in the inbox, checked for spam, and "who can message you" limits them).
 
+## Together, Memory, Real, mixes, wraps and AI sweep (2026-10-05, no migration, tests in `ai`, `expansion`, `watch-wrap`, `media-calls-oauth`, `packages/shared/src/together.test.ts`, `apps/web/e2e/keyboard.spec.ts`)
+
+Every flow in Together albums, Memory and chapters, On this day, recaps, mixes, the weekly wrap, the AI helpers, the assistant, post translation and Real was run end to end in headless Chromium with two to four people at once (desktop and 390px phone widths, light and dark, French and Arabic, a fake camera for Real). What was wrong, now fixed:
+
+- **Real**: a Real's caption skipped the checks every post gets, so harmful words went out and flagged ones weren't held; it is now screened like a post (refused, or held for a moderator with a case), and the apps say when it waits for review. The feed says how many Reals you can still share (`remaining`), so a fourth one in 24 hours is turned down before the camera opens instead of after both photos are uploaded.
+- **Together**: a file whose upload failed vanished when the add sheet closed; it now stays marked with Try again. The slideshow cropped tall photos and portrait videos on a wide screen. The best of didn't follow stars and reactions until the page was loaded again (`withItems` in `packages/shared/src/together.ts`). The album lists (web and phone) said "No albums yet" when they couldn't load.
+- **Memories**: the Memories page's On this day used UTC while the Pulse card that links to it uses your time zone. The share sheet started empty, so saving it unshared everyone; the owner now gets `sharedWith` and the sheet starts from it. Deleting a memory on the web asks first; a failed create or list says why.
+- **Chapters**: sealing a time capsule can't be undone, so the web and phone now ask first.
+- **Weekly wrap**: the card image is laid out right to left in Arabic.
+- **AI**: a chat summary read messages held for review, from people the reader blocked, deleted for themselves or view-once; it now reads only what the reader sees in the chat. A plan drafted from a message showed the model's keys ("destination: Accra") in every language; it now has translated labels. The chat summary, plan, assistant and memory recap carry the AI-generated label, and their notes (dev stand-in, held back by safety filters) are in the reader's language on the web and phone.
+- **Mixes**: the Your mixes list and a profile's Mixes tab said "No mixes yet" when they couldn't load.
+
+Checked and working: albums from scratch, from a chat and for an event; invite link and QR, requests, approve and decline; co-hosts and what each role may do; adding, captions, the viewer (stars, reactions, comments, keyboard, download, report, cover); People and Grid views; closing, reopening, leaving, deleting; recap, post and chapter afterwards; under-18 rules for every pair, blocks hiding items; chapters (archive, contributors, guestbook, player, time capsule); recaps from On this day and albums; mixes (making, the picker, order, sharing in a chat with songs added by others, as a post, the profile tab, private mixes); the wrap (made, the card, put away, settings); catch-up on Pulse and in communities; suggested replies and their switches (off by default under 18); caption ideas and photo descriptions; the assistant's searches and one-tap actions (RSVP, join, follow, book and buy open the item); its memory and the AI processing switch; See translation and See original on posts and comments, languages you understand, and refusal for posts you can't see.
+
+**Not done in this round:** the mix player's skip buttons keep their left-to-right order in Arabic; a co-host can remove an item they can't see (only by its id, which isn't shown to them); the phone has no chat summary or plan draft (web only).
+
 ## Not built yet
 
 - Mainstream music: needs a licensing deal (docs/operations/music.md). Reporting song use to a licensing partner is not built.

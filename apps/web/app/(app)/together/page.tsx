@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { EmptyState, Icon, Skeleton } from '@yapilapi/design-system';
+import { Button, EmptyState, Icon, Skeleton } from '@yapilapi/design-system';
 import type { TogetherSummary } from '@yapilapi/shared';
 import { FeatureOff } from '@/components/FeatureOff';
 import { AlbumCard } from '@/components/Together';
@@ -13,13 +13,16 @@ import { useRealtime, useSession } from '../../providers';
 export default function TogetherList() {
   const { flags, me, t, toast } = useSession();
   const [items, setItems] = useState<TogetherSummary[] | null>(null);
+  // Why the list couldn't load the first time (shown with Try again, not as "no albums yet").
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = () =>
     api.together.list().then(
-      (r) => setItems(r.items),
+      (r) => (setItems(r.items), setLoadError(null)),
       (e) => {
-        setItems((cur) => cur ?? []);
-        toast(errorMessage(e));
+        // A list already showing stays; a later failure is only mentioned.
+        if (items) toast(errorMessage(e));
+        else setLoadError(errorMessage(e));
       },
     );
   useEffect(() => {
@@ -42,7 +45,16 @@ export default function TogetherList() {
         </Link>
       </div>
       <p className="tg-intro">{t('together.intro')}</p>
-      {items === null ? (
+      {items === null && loadError ? (
+        <EmptyState
+          title={loadError}
+          action={
+            <Button variant="secondary" onClick={() => (setLoadError(null), void load())}>
+              {t('m.common.retry')}
+            </Button>
+          }
+        />
+      ) : items === null ? (
         <div className="stack-sm">
           <Skeleton height={88} />
           <Skeleton height={88} />

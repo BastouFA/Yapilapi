@@ -121,7 +121,10 @@ export default function Assistant() {
                 />
               ),
             )}
-            <Text style={{ color: c.inkMuted, fontSize: 12 }}>{res.notice ?? t('m.assistant.answeredBy', { model: res.model })}</Text>
+            <Text style={{ color: c.inkMuted, fontSize: 12 }}>
+              {t('ai.label')} ·{' '}
+              {res.provider === 'dev' ? t('ai.devNotice') : res.notice ? t('chat.ai.withheld') : t('m.assistant.answeredBy', { model: res.model })}
+            </Text>
           </Card>
         ) : null}
         <View>

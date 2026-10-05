@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 import { languageName, protectForTranslation, restoreTranslation, type TranslatableKind, type Translation } from '@yapilapi/shared';
+import { messageVisibleSql } from '../chat.ts';
 import { analyzeText } from '../moderation.ts';
 import { AppError, forbidden, notFound } from '../errors.ts';
 import { cachedTranslation, loadTranslatable, storeTranslation } from '../translation.ts';
@@ -192,13 +193,17 @@ export class AiGateway {
         req.userId,
       ]);
       if (!member.rowCount) throw notFound('Conversation');
+      // Only what this member sees in the chat: no messages held for review or blocked, none from
+      // people they blocked, none they deleted for themselves or that have disappeared, and no
+      // view-once messages or lines the app wrote.
       const { rows } = await this.db.query<{ name: string; body: string }>(
         `SELECT p.display_name AS name, m.body FROM messages m JOIN profiles p ON p.user_id = m.sender_id
-         WHERE m.conversation_id = $1 AND m.deleted_at IS NULL
+         WHERE m.conversation_id = $1 AND m.deleted_at IS NULL AND m.kind <> 'system' AND NOT m.view_once AND m.body <> ''
+           AND ${messageVisibleSql('$2')}
            -- Shared locations are left out: a summary never mentions where anyone is.
            AND NOT EXISTS (SELECT 1 FROM location_shares ls WHERE ls.message_id = m.id)
          ORDER BY m.created_at DESC LIMIT 200`,
-        [req.conversationId],
+        [req.conversationId, req.userId],
       );
       return {
         text: rows

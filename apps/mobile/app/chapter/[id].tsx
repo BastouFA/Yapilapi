@@ -102,7 +102,17 @@ export default function ChapterScreen() {
                   variant="secondary"
                   label={t('m.chapters.seal')}
                   disabled={!chapter.storyCount}
-                  onPress={act(async () => (await api()).seal(chapter.id))}
+                  onPress={() =>
+                    // Sealing can't be undone: say what it means first.
+                    Alert.alert(
+                      t('m.chapters.sealConfirmTitle'),
+                      t('m.chapters.sealConfirmBody', { date: date(chapter.capsule!.opensAt, { dateStyle: 'long' }) }),
+                      [
+                        { text: t('common.cancel'), style: 'cancel' },
+                        { text: t('m.chapters.seal'), onPress: () => void act(async () => (await api()).seal(chapter.id))() },
+                      ],
+                    )
+                  }
                 />
               ) : null}
             </Card>

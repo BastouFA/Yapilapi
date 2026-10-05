@@ -53,6 +53,9 @@ import { MarketListingChat, MarketOfferChat } from '@/components/MarketChat';
 const GameSheet = dynamic(() => import('@/components/ChatGameSheets').then((m) => m.GameSheet), { ssr: false });
 const StartGameSheet = dynamic(() => import('@/components/ChatGameSheets').then((m) => m.StartGameSheet), { ssr: false });
 
+/** The parts of a plan drafted from a message, in the order they're shown. */
+const PLAN_FIELDS = ['destination', 'dates', 'participants', 'budget', 'transport', 'accommodation', 'activities', 'tasks'] as const;
+
 type Pending = Message & { pending?: boolean };
 
 export default function ChatPage() {
@@ -464,22 +467,29 @@ export default function ChatPage() {
   async function assist(task: 'summarize_conversation' | 'plan_from_message') {
     setAiLoading(true);
     try {
+      // The small print in the reader's language: the dev stand-in's mark, or that safety filters held the result back.
+      const noteOf = (r: { provider: string; output: unknown }) =>
+        r.provider === 'dev' ? t('ai.devNotice') : r.output === null ? t('chat.ai.withheld') : undefined;
       if (task === 'summarize_conversation') {
         const r = await api.ai.assist({ task, conversationId: id });
-        setAi({ title: t('chat.ai.summary'), text: String(r.output ?? ''), notice: r.notice });
+        setAi({ title: t('chat.ai.summary'), text: String(r.output ?? ''), notice: noteOf(r) });
       } else {
         const last = [...(messages ?? [])].reverse().find((m) => m.body)?.body ?? '';
         const r = await api.ai.assist({ task, input: last });
-        const plan = r.output as Record<string, unknown>;
+        const plan = r.output as Record<string, unknown> | null;
+        // Each part under its own label (the model's keys never show).
+        const lines = plan
+          ? PLAN_FIELDS.flatMap((k) => {
+              const v = plan[k];
+              const text = Array.isArray(v) ? v.filter(Boolean).join(', ') : typeof v === 'string' || typeof v === 'number' ? String(v) : '';
+              return text ? [`${t(`chat.ai.plan.${k}`)}: ${text}`] : [];
+            })
+          : [];
         setAi({
           title: t('chat.ai.planDraft'),
-          text:
-            Object.entries(plan)
-              .filter(([, v]) => v && (!Array.isArray(v) || v.length))
-              .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
-              .join('\n') || t('chat.ai.planEmpty'),
-          notice: r.notice,
-          plan,
+          text: lines.join('\n') || (plan ? t('chat.ai.planEmpty') : ''),
+          notice: noteOf(r),
+          ...(plan && lines.length ? { plan } : {}),
         });
       }
     } catch (e) {
@@ -753,6 +763,7 @@ export default function ChatPage() {
       {ai || aiLoading ? (
         <AIPanel
           title={ai?.title ?? t('chat.ai.working')}
+          label={t('ai.label')}
           loading={aiLoading}
           notice={ai?.notice}
           actions={
