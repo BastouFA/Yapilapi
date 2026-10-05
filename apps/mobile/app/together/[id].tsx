@@ -144,7 +144,10 @@ export default function TogetherScreen() {
         const first = g.items[0]!;
         const last = g.items.at(-1)!;
         const fmt = (iso: string) => tr.date(iso, { hour: 'numeric', minute: '2-digit' });
-        const range = first === last ? fmt(first.takenAt) : `${fmt(first.takenAt)} – ${fmt(last.takenAt)}`;
+        const from = fmt(first.takenAt);
+        const to = fmt(last.takenAt);
+        // One time when the run starts and ends in the same minute.
+        const range = from === to ? from : `${from} – ${to}`;
         out.push({
           type: 'head',
           key: g.key,

@@ -217,7 +217,10 @@ export function MomentsView({ items, onOpen }: { items: TogetherItem[]; onOpen: 
       {groups.map((g) => {
         const first = g.items[0]!;
         const last = g.items.at(-1)!;
-        const range = first === last ? fmt.format(new Date(first.takenAt)) : `${fmt.format(new Date(first.takenAt))} – ${fmt.format(new Date(last.takenAt))}`;
+        const from = fmt.format(new Date(first.takenAt));
+        const to = fmt.format(new Date(last.takenAt));
+        // One time when the run starts and ends in the same minute.
+        const range = from === to ? from : `${from} – ${to}`;
         const heading = t(`together.part.${g.part}` as MessageKey, { day: momentDayLabel(g.day, locale, groups) });
         return (
           <section key={g.key} className="tg-moment" aria-label={heading}>
@@ -367,6 +370,8 @@ export function AddSheet({
   async function start() {
     setBusy(true);
     const ready: { key: string; mediaId: string; caption: string; takenAt?: string }[] = [];
+    // Counted here: `list` is this render's copy, so it doesn't see the states set below.
+    let failures = 0;
     for (const p of list) {
       if (p.state === 'done') continue;
       patch(p.key, { state: 'uploading', progress: 0 });
@@ -380,6 +385,7 @@ export function AddSheet({
           takenAt: taken && taken.getTime() <= Date.now() ? taken.toISOString() : undefined,
         });
       } catch {
+        failures++;
         patch(p.key, { state: 'failed' });
       }
     }
@@ -395,6 +401,7 @@ export function AddSheet({
         for (const b of batch) patch(b.key, { state: 'done', progress: 1 });
       } catch (e) {
         toast(errorMessage(e));
+        failures += batch.length;
         for (const b of batch) patch(b.key, { state: 'failed' });
       }
     }
@@ -403,7 +410,8 @@ export function AddSheet({
       onAdded(added);
       toast(tp('together.add.done', added.length));
     }
-    if (added.length === list.filter((p) => p.state !== 'done').length + done || !list.some((p) => p.state === 'failed')) onClose();
+    // Anything that failed stays in the sheet, marked, with Try again.
+    if (!failures) onClose();
   }
 
   return (
