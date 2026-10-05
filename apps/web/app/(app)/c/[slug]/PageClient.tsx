@@ -196,7 +196,7 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
           ) : null}
           {canManage ? (
             <Link href={`/c/${c.slug}/manage`} className="yp-btn yp-btn--secondary yp-btn--sm">
-              {t('m.manage.open')}
+              {t('m.manage.title')}
             </Link>
           ) : null}
           {signedOut || locked ? null : (

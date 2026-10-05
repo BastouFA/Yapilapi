@@ -15,7 +15,9 @@ import { useSession } from '@/app/providers';
  * the host of an event still to come.
  */
 export function EventTickets({ event, hosting, over }: { event: EventItem; hosting: boolean; over: boolean }) {
-  const { t, tp, toast, locale, flags } = useSession();
+  const { t, tp, toast, locale, flags, me } = useSession();
+  // Selling is for adults (the server says so too).
+  const canSell = hosting && !over && !me?.under18;
   const [items, setItems] = useState<EventTicketType[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const load = useCallback(() => {
@@ -39,11 +41,11 @@ export function EventTickets({ event, hosting, over }: { event: EventItem; hosti
         </Button>
       </Alert>
     );
-  if (!items || (!items.length && (!hosting || over))) return null;
+  if (!items || (!items.length && !canSell)) return null;
   const price = (x: EventTicketType) => (x.priceCents ? formatMoney(x.priceCents, x.currency, locale) : t('eventTickets.free'));
 
   return (
-    <Card title={t('eventTickets.title')} subtitle={hosting ? t('eventTickets.sellHint') : undefined}>
+    <Card title={t('eventTickets.title')} subtitle={canSell ? t('eventTickets.sellHint') : undefined}>
       <div className="stack-sm">
         {items.length ? (
           <List label={t('eventTickets.title')}>
@@ -92,7 +94,7 @@ export function EventTickets({ event, hosting, over }: { event: EventItem; hosti
             {t('tickets.title')}
           </Link>
         ) : null}
-        {hosting && !over ? <SellTickets eventId={event.id} onAdded={load} /> : null}
+        {canSell ? <SellTickets eventId={event.id} onAdded={load} /> : null}
       </div>
     </Card>
   );
