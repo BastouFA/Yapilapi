@@ -47,7 +47,7 @@ import { mediaIdsOf, messagePreviews, messageVisibleSql, reactionSummaries, revo
 import { langOf } from '../lib/translation.ts';
 import { listsFor, myReminders, pollsFor } from '../lib/chat-polls.ts';
 import { registerChatPollsLists } from './chat-polls-lists.ts';
-import { gamesFor } from '../lib/chat-games.ts';
+import { forfeitGamesOnLeave, gamesFor } from '../lib/chat-games.ts';
 import { registerChatGames } from './chat-games.ts';
 import { mixCardsForMessages } from '../lib/mixes.ts';
 import { registerMixChats } from './mixes.ts';
@@ -457,6 +457,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     );
     if (!r.rowCount) throw notFound('That person');
     await stopSharesOnLeave({ db, realtime: ctx.realtime }, id, userId);
+    await forfeitGamesOnLeave({ db, realtime: ctx.realtime }, id, userId);
     await ctx.realtime.publish([userId], { type: 'conversation.removed', data: { id } });
     const message = await groupLine(id, u.id, { type: 'group', action: 'removed', people: await namesOf([userId]) });
     return { ok: true, message };
@@ -517,6 +518,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     });
     // Sharing where you are with this chat stops when you leave it.
     await stopSharesOnLeave({ db, realtime: ctx.realtime }, id, u.id);
+    // So do the games you were playing in it.
+    await forfeitGamesOnLeave({ db, realtime: ctx.realtime }, id, u.id);
     // Your other devices close the chat too.
     await ctx.realtime.publish([u.id], { type: 'conversation.removed', data: { id } });
     if (conv.kind === 'group') {

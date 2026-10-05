@@ -13,16 +13,14 @@ import {
   GAME_NAMES,
   GAME_PLAYERS,
   newGame,
-  winnerSeat,
   type GameError,
   type GameKind,
-  type GameState,
   type Message,
 } from '@yapilapi/shared';
 import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import type { AppContext } from '../lib/context.ts';
-import { GAME_COLS, gameById, insertEndLine, presentGames, publishGame, publishLine, scheduleIdleEnd, type GameRow } from '../lib/chat-games.ts';
+import { GAME_COLS, gameById, presentGames, publishGame, publishLine, saveGameMove, scheduleIdleEnd, type GameRow } from '../lib/chat-games.ts';
 import { AppError, badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import { enqueue } from '../lib/jobs.ts';
 import { assertMessagePace } from '../lib/spam.ts';
@@ -203,27 +201,6 @@ export function registerChatGames(app: FastifyInstance, ctx: AppContext, h: Chat
     return { g, seat };
   }
 
-  /** Save a new state after a move (or a forfeit), and the line in the chat if it ended the game. */
-  async function saveMove(c: PoolClient, g: GameRow, userId: string, state: GameState, move: object, clientMoveId: string | null) {
-    const number = g.move_number + 1;
-    await c.query(`INSERT INTO chat_game_moves (game_id, number, player_id, move, client_move_id) VALUES ($1,$2,$3,$4,$5)`, [
-      g.id,
-      number,
-      userId,
-      move,
-      clientMoveId,
-    ]);
-    const seat = winnerSeat(state);
-    const status = !state.result ? 'active' : state.result.type === 'win' ? 'won' : state.result.type === 'draw' ? 'draw' : 'unfinished';
-    await c.query(
-      `UPDATE chat_games SET state = $2, move_number = $3, status = $4, winner_id = $5, last_move_at = now(), ended_at = CASE WHEN $4 = 'active' THEN NULL ELSE now() END
-       WHERE id = $1`,
-      [g.id, state, number, status, seat === null ? null : g.players[seat]],
-    );
-    if (status === 'active') await scheduleIdleEnd(c, g.id, number);
-    return insertEndLine(c, g, state, userId);
-  }
-
   app.post('/v1/conversations/:id/games', { preHandler: requireAuth, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req, reply) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
@@ -283,7 +260,7 @@ export function registerChatGames(app: FastifyInstance, ctx: AppContext, h: Chat
         throw new AppError(409, 'game_moved_on', 'The board changed since you last saw it. Here it is now.', { moveNumber: g.move_number });
       const r = applyMove(g.state, seat, input.move);
       if (!r.ok) throw moveError(r.error);
-      return { duplicate: false as const, line: await saveMove(c, g, u.id, r.state, input.move, input.clientMoveId) };
+      return { duplicate: false as const, line: await saveGameMove(c, g, u.id, r.state, input.move, input.clientMoveId) };
     });
     if (done.duplicate) return { game: await gameById(db, id), duplicate: true };
     const game = await publishGame(deps, id);
@@ -307,7 +284,7 @@ export function registerChatGames(app: FastifyInstance, ctx: AppContext, h: Chat
       if (g.status !== 'active') throw moveError('game_over');
       const r = drawAction(g.state, seat, action);
       if (!r.ok) throw moveError(r.error);
-      return saveMove(c, g, u.id, r.state, { draw: action }, null);
+      return saveGameMove(c, g, u.id, r.state, { draw: action }, null);
     });
     const game = await publishGame(deps, id);
     if (line) await publishLine(deps, line);
@@ -324,7 +301,7 @@ export function registerChatGames(app: FastifyInstance, ctx: AppContext, h: Chat
       if (g.status !== 'active') throw moveError('game_over');
       const r = forfeit(g.state, seat);
       if (!r.ok) throw moveError(r.error);
-      return saveMove(c, g, u.id, r.state, { forfeit: true }, null);
+      return saveGameMove(c, g, u.id, r.state, { forfeit: true }, null);
     });
     const game = await publishGame(deps, id);
     if (line) await publishLine(deps, line);

@@ -1,7 +1,9 @@
 import type { Pool, PoolClient } from 'pg';
 import {
+  forfeit,
   GAME_IDLE_HOURS,
   timeOut,
+  winnerSeat,
   type ChatGame,
   type GameKind,
   type GameState,
@@ -207,6 +209,51 @@ export async function endIdleGame(deps: ChatGameDeps, gameId: string, moveNumber
   await publishGame(deps, gameId);
   if (line) await publishLine(deps, line);
   return true;
+}
+
+/** Save a new state after a move (or a forfeit), and the line in the chat if it ended the game. */
+export async function saveGameMove(c: PoolClient, g: GameRow, userId: string, state: GameState, move: object, clientMoveId: string | null) {
+  const number = g.move_number + 1;
+  await c.query(`INSERT INTO chat_game_moves (game_id, number, player_id, move, client_move_id) VALUES ($1,$2,$3,$4,$5)`, [
+    g.id,
+    number,
+    userId,
+    move,
+    clientMoveId,
+  ]);
+  const seat = winnerSeat(state);
+  const status = !state.result ? 'active' : state.result.type === 'win' ? 'won' : state.result.type === 'draw' ? 'draw' : 'unfinished';
+  await c.query(
+    `UPDATE chat_games SET state = $2, move_number = $3, status = $4, winner_id = $5, last_move_at = now(), ended_at = CASE WHEN $4 = 'active' THEN NULL ELSE now() END
+     WHERE id = $1`,
+    [g.id, state, number, status, seat === null ? null : g.players[seat]],
+  );
+  if (status === 'active') await scheduleIdleEnd(c, g.id, number);
+  return insertEndLine(c, g, state, userId);
+}
+
+/**
+ * Someone left the chat (or was removed): they forfeit the games they're playing in it, as if they
+ * had pressed Forfeit, so nobody waits a day on a player who has gone.
+ */
+export async function forfeitGamesOnLeave(deps: ChatGameDeps, conversationId: string, userId: string): Promise<void> {
+  const { rows } = await deps.db.query<{ id: string }>(
+    `SELECT id FROM chat_games WHERE conversation_id = $1 AND status = 'active' AND $2::uuid = ANY(players)`,
+    [conversationId, userId],
+  );
+  for (const { id } of rows) {
+    const line = await tx(deps.db, async (c) => {
+      const g = (await c.query<GameRow>(`SELECT ${GAME_COLS} FROM chat_games g WHERE g.id = $1 AND g.status = 'active' FOR UPDATE`, [id])).rows[0];
+      const seat = g ? g.players.indexOf(userId) : -1;
+      if (!g || seat < 0) return undefined;
+      const r = forfeit(g.state, seat);
+      if (!r.ok) return undefined;
+      return saveGameMove(c, g, userId, r.state, { forfeit: true }, null);
+    });
+    if (line === undefined) continue;
+    await publishGame(deps, id);
+    if (line) await publishLine(deps, line);
+  }
 }
 
 export function chatGameJobHandlers(deps: ChatGameDeps) {

@@ -362,6 +362,27 @@ describe('Playing', () => {
     expect((await move(a, m.game.id, 1, { pass: true })).body.error.code).toBe('not_a_player');
   });
 
+  it('leaving the chat, or being removed, forfeits your games there', async () => {
+    const [a, b, c] = [await adult(), await adult(), await adult()];
+    const convo = await group(a, [b, c]);
+    const duel = await started(a, convo, 'four_up', [b.id]);
+    const ladder = await started(a, convo, 'word_ladder', [b.id, c.id]);
+    const aLive = connect(a);
+
+    expect((await as(t.app, b).post(`/v1/conversations/${convo}/leave`)).status).toBe(200);
+    const after = (await as(t.app, a).get(`/v1/games/${duel.game.id}`)).body.game;
+    expect(after).toMatchObject({ status: 'won', winnerId: a.id });
+    expect(after.state.result).toEqual({ type: 'win', winner: 0, by: 'forfeit' });
+    expect((await messages(a, convo)).find((x) => x.system?.type === 'game')?.system).toMatchObject({ outcome: 'won', by: 'forfeit' });
+    expect(aLive.of('game.updated').some((e) => e.data.game.id === duel.game.id)).toBe(true);
+    // In the bigger game the others play on without them.
+    expect((await as(t.app, a).get(`/v1/games/${ladder.game.id}`)).body.game.state.out).toEqual([1]);
+
+    expect((await as(t.app, a).del(`/v1/conversations/${convo}/members/${c.id}`)).status).toBe(200);
+    const ended = (await as(t.app, a).get(`/v1/games/${ladder.game.id}`)).body.game;
+    expect(ended).toMatchObject({ status: 'won', winnerId: a.id });
+  });
+
   it('word ladder: rungs are checked against the word list and one-letter changes', async () => {
     const [a, b] = [await adult(), await adult()];
     const convo = await direct(a, b);
