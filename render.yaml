@@ -46,7 +46,7 @@ services:
     branch: main
     # Applies database migrations before the new version takes traffic. If one fails, the deploy stops
     # and the running version keeps serving. (The image also migrates on start, which is then a no-op.)
-    preDeployCommand: node --import tsx ../../packages/database/src/migrate-cli.ts
+    preDeployCommand: sh -c "cd /app/apps/api && node --import tsx ../../packages/database/src/migrate-cli.ts"
     # Answers 200 only once the database answers, so a new version gets traffic only when it can serve it.
     healthCheckPath: /health/ready
     envVars:

@@ -5,6 +5,8 @@
  *   pnpm --filter @yapilapi/api launch:check --offline        settings only, nothing is contacted
  *   pnpm --filter @yapilapi/api launch:check --send-email you@example.com   also sends one test email
  *
+ * On Render, open the yapilapi-api service's Shell tab and run: node --import tsx scripts/launch-check.ts
+ *
  * It reads the same settings as the server (the .env file and the environment). Secrets are never
  * printed. Live checks are read-only and cheap: the AI check asks for a one-word reply, the payment
  * checks read the account balance, and nothing is created anywhere.
@@ -43,6 +45,13 @@ async function live(fn: () => Promise<string>): Promise<{ ok: boolean; note: str
   } catch (e) {
     return { ok: false, note: (e as Error).message.slice(0, 160) };
   }
+}
+
+/** live or test, from a Stripe or Paystack key's prefix (sk_live_…, pk_test_…). */
+function keyMode(key: string, prefix = 'sk_'): 'live' | 'test' | 'unknown' {
+  if (key.startsWith(`${prefix}live_`) || (prefix === 'sk_' && key.startsWith('rk_live_'))) return 'live';
+  if (key.startsWith(`${prefix}test_`) || (prefix === 'sk_' && key.startsWith('rk_test_'))) return 'test';
+  return 'unknown';
 }
 
 async function bearerGet(url: string, key: string): Promise<Response> {
@@ -113,7 +122,11 @@ async function main() {
 
   // AI
   if (cfg.AI_PROVIDER !== 'anthropic' || !cfg.ANTHROPIC_API_KEY)
-    add('AI (Anthropic)', 'not set', 'AI helpers use the built-in stand-in; set AI_PROVIDER=anthropic and ANTHROPIC_API_KEY (section 2)');
+    add(
+      'AI (Anthropic)',
+      'not set',
+      `AI helpers use the built-in stand-in; set ${cfg.AI_PROVIDER === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'AI_PROVIDER=anthropic and ANTHROPIC_API_KEY'} (section 2)`,
+    );
   else {
     const client = new Anthropic({ apiKey: cfg.ANTHROPIC_API_KEY, timeout: 15_000, maxRetries: 0 });
     const r = await live(async () => {
@@ -141,7 +154,7 @@ async function main() {
   // Payments
   if (cfg.PAYMENTS_PROVIDER !== 'stripe') add('Payments (Stripe)', prod ? 'problem' : 'dev only', 'the development provider moves no money');
   else {
-    const mode = cfg.STRIPE_SECRET_KEY.startsWith('sk_live_') ? 'live' : cfg.STRIPE_SECRET_KEY.startsWith('sk_test_') ? 'test' : 'unknown';
+    const mode = keyMode(cfg.STRIPE_SECRET_KEY);
     const r = await live(async () => {
       await bearerGet('https://api.stripe.com/v1/balance', cfg.STRIPE_SECRET_KEY);
       return `the key works (${mode} mode)`;
@@ -149,15 +162,23 @@ async function main() {
     add(
       'Payments (Stripe)',
       r.ok ? (prod && mode !== 'live' ? 'problem' : 'ready') : 'problem',
-      prod && mode !== 'live' && r.ok ? 'production is using a test key' : r.note,
+      prod && mode !== 'live' && r.ok ? 'production is using a test key (fine for a trial run, not for real money)' : r.note,
     );
+    const pk = keyMode(cfg.STRIPE_PUBLISHABLE_KEY, 'pk_');
+    if (pk !== mode) add('Stripe keys', 'problem', `the secret key is ${mode} mode but the publishable key is ${pk}: copy both from the same mode`);
+    if (!cfg.STRIPE_WEBHOOK_SECRET.startsWith('whsec_'))
+      add('Stripe webhook', 'problem', 'STRIPE_WEBHOOK_SECRET is not a webhook signing secret (whsec_…): add the webhook in Stripe and paste its secret');
+    else add('Stripe webhook', 'ready', 'signing secret set (payments are confirmed when Stripe calls /v1/payments/webhook/stripe)');
   }
   if (cfg.PAYSTACK_SECRET_KEY) {
+    const mode = keyMode(cfg.PAYSTACK_SECRET_KEY);
     const r = await live(async () => {
       await bearerGet('https://api.paystack.co/balance', cfg.PAYSTACK_SECRET_KEY);
-      return `the key works (${cfg.PAYSTACK_SECRET_KEY.startsWith('sk_live_') ? 'live' : 'test'} mode)`;
+      return `the key works (${mode} mode)`;
     });
     add('Payments (Paystack)', r.ok ? 'ready' : 'problem', r.note);
+    const pk = keyMode(cfg.PAYSTACK_PUBLIC_KEY, 'pk_');
+    if (pk !== mode) add('Paystack keys', 'problem', `the secret key is ${mode} mode but the public key is ${pk}: copy both from the same mode`);
   } else add('Payments (Paystack)', 'not set', 'optional: for NGN, GHS, KES and ZAR');
 
   // Storage
@@ -174,6 +195,20 @@ async function main() {
       return `bucket ${cfg.S3_BUCKET} is reachable`;
     });
     add('Media storage (S3)', r.ok ? 'ready' : 'problem', r.note);
+  }
+
+  // Automatic captions
+  if (cfg.TRANSCRIBE_PROVIDER === 'none')
+    add('Captions (speech-to-text)', 'not set', 'optional: people can still write captions; set TRANSCRIBE_PROVIDER=openai-compatible and TRANSCRIBE_API_KEY');
+  else {
+    const base = cfg.TRANSCRIBE_API_URL.replace(/\/+$/, '');
+    const r = await live(async () => {
+      // OpenAI-compatible services list their models here; a self-hosted server may not, which is fine.
+      const res = await fetch(`${base}/models`, { headers: cfg.TRANSCRIBE_API_KEY ? { authorization: `Bearer ${cfg.TRANSCRIBE_API_KEY}` } : {} });
+      if (res.status === 401 || res.status === 403) throw new Error(`the key was refused (${res.status})`);
+      return `${new URL(base).host} answers (model ${cfg.TRANSCRIBE_MODEL})`;
+    });
+    add('Captions (speech-to-text)', r.ok ? 'ready' : 'problem', r.note);
   }
 
   // Phone numbers, moderation, calls, live, web push
@@ -194,15 +229,23 @@ async function main() {
     mod === 'rekognition' ? 'ready' : prod ? 'problem' : 'dev only',
     mod === 'rekognition' ? 'Amazon Rekognition is configured (not contacted)' : `MEDIA_MODERATION_PROVIDER=${mod}: uploads aren't checked automatically`,
   );
+  // Optional at launch: both need a server of their own (docs/operations/deploy-render.md, "Live video and the calls relay").
   add(
     'Calls relay (TURN)',
-    cfg.TURN_URLS && cfg.TURN_SECRET ? 'ready' : prod ? 'problem' : 'dev only',
-    cfg.TURN_URLS ? 'configured' : 'calls may fail between some networks',
+    cfg.TURN_URLS && cfg.TURN_SECRET ? 'ready' : prod ? 'not set' : 'dev only',
+    cfg.TURN_URLS && cfg.TURN_SECRET ? 'configured' : 'optional: without it, calls may fail between some strict networks',
   );
+  const liveLocal = /localhost|127\.0\.0\.1/.test(cfg.LIVE_HLS_BASE);
   add(
     'Live video',
-    /localhost|127\.0\.0\.1/.test(cfg.LIVE_HLS_BASE) ? (prod ? 'problem' : 'dev only') : 'ready',
-    /localhost/.test(cfg.LIVE_HLS_BASE) ? 'the live server is this machine' : cfg.LIVE_HLS_BASE,
+    liveLocal ? (prod ? 'not set' : 'dev only') : cfg.LIVE_HLS_BASE.startsWith('https://') || !prod ? 'ready' : 'problem',
+    liveLocal
+      ? prod
+        ? 'optional: keep the LIVE feature flag off until a live server runs'
+        : 'the live server is this machine'
+      : cfg.LIVE_HLS_BASE.startsWith('https://') || !prod
+        ? cfg.LIVE_HLS_BASE
+        : `${cfg.LIVE_HLS_BASE}: browsers only play live video from an https address`,
   );
   add(
     'Web notifications',
@@ -218,11 +261,39 @@ async function main() {
 
   // Addresses the world sees
   const local = (u: string) => /localhost|127\.0\.0\.1|\.local\b/.test(u);
+  const web = cfg.WEB_ORIGIN.split(',')[0]!.trim().replace(/\/+$/, '');
+  const insecure = prod && !web.startsWith('https://');
   add(
     'Public addresses',
-    local(cfg.WEB_ORIGIN) || local(cfg.PUBLIC_API_URL) ? (prod ? 'problem' : 'dev only') : 'ready',
-    `web ${cfg.WEB_ORIGIN}, API ${cfg.PUBLIC_API_URL}`,
+    local(cfg.WEB_ORIGIN) || local(cfg.PUBLIC_API_URL) || insecure ? (prod ? 'problem' : 'dev only') : 'ready',
+    insecure ? `WEB_ORIGIN must be an https address (${web})` : `web ${cfg.WEB_ORIGIN}, media ${cfg.PUBLIC_API_URL}`,
   );
+  const passkeyOrigin = cfg.WEBAUTHN_ORIGIN || web;
+  const passkeyHost = (() => {
+    try {
+      return new URL(passkeyOrigin).hostname;
+    } catch {
+      return '';
+    }
+  })();
+  const rpId = cfg.WEBAUTHN_RP_ID || passkeyHost;
+  add(
+    'Passkeys',
+    passkeyHost === rpId || passkeyHost.endsWith(`.${rpId}`) ? 'ready' : 'problem',
+    passkeyHost === rpId || passkeyHost.endsWith(`.${rpId}`)
+      ? `signing in with a passkey on ${rpId}`
+      : `WEBAUTHN_RP_ID (${rpId}) must be the host of WEBAUTHN_ORIGIN (${passkeyOrigin}) or a domain above it`,
+  );
+  // The whole path a browser takes: the web app, its /api proxy, the API and the database.
+  if (!local(web) || prod) {
+    const r = await live(async () => {
+      const res = await fetch(`${web}/api/health/ready`, { redirect: 'manual' });
+      const body = (await res.json().catch(() => ({}))) as { status?: string };
+      if (body.status !== 'ready') throw new Error(`${web}/api/health/ready answered ${res.status}: check API_INTERNAL_URL on the web app`);
+      return `${web} reaches the API through /api`;
+    });
+    add('Web app to API', r.ok ? 'ready' : 'problem', r.note);
+  }
 
   // Print
   const icon: Record<Status, string> = { ready: 'ok  ', 'not set': 'todo', problem: 'FIX ', 'dev only': 'dev ' };
