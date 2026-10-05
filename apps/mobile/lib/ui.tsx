@@ -445,16 +445,19 @@ export function SwitchRow({
         <Text style={{ color: c.ink, fontSize: 15, fontWeight: '600' }}>{label}</Text>
         {hint ? <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{hint}</Text> : null}
       </View>
-      <Switch
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-        value={value}
-        disabled={disabled}
-        onValueChange={onValueChange}
-        trackColor={{ true: c.yapi, false: c.line }}
-        thumbColor={c.theme === 'dark' ? c.ink : '#FFFFFF'}
-        ios_backgroundColor={c.line}
-      />
+      {/* A box of the switch's own size: on newer iOS the switch draws at the top of a taller frame. */}
+      <View style={{ height: 31, justifyContent: 'center' }}>
+        <Switch
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          value={value}
+          disabled={disabled}
+          onValueChange={onValueChange}
+          trackColor={{ true: c.yapi, false: c.line }}
+          thumbColor={c.theme === 'dark' ? c.ink : '#FFFFFF'}
+          ios_backgroundColor={c.line}
+        />
+      </View>
     </Pressable>
   );
 }
