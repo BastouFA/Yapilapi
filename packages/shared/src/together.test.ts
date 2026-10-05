@@ -57,10 +57,16 @@ describe('Together helpers', () => {
     const item = (id: string, stars: number, takenAt: string) =>
       ({ id, author: user('ada'), stars, reactions: [], takenAt, best: false }) as unknown as TogetherItem;
     const album = { bestOf: [] as string[], items: [item('a', 0, '2026-01-01T10:00:00Z'), item('b', 0, '2026-01-01T11:00:00Z')] };
-    const starred = withItems(album, album.items.map((i) => (i.id === 'b' ? { ...i, stars: 1 } : i)));
+    const starred = withItems(
+      album,
+      album.items.map((i) => (i.id === 'b' ? { ...i, stars: 1 } : i)),
+    );
     expect(starred.bestOf).toEqual(['b']);
     expect(starred.items.map((i) => i.best)).toEqual([false, true]);
-    const unstarred = withItems(starred, starred.items.map((i) => ({ ...i, stars: 0 })));
+    const unstarred = withItems(
+      starred,
+      starred.items.map((i) => ({ ...i, stars: 0 })),
+    );
     expect(unstarred.bestOf).toEqual([]);
     expect(unstarred.items.every((i) => !i.best)).toBe(true);
   });

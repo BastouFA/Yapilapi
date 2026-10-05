@@ -127,7 +127,15 @@ export default function TogetherScreen() {
       void client()
         .then((api) => api.together.item(id, e.data.itemId))
         .then(
-          (r) => setAlbum((a) => (a ? withItems(a, a.items.map((x) => (x.id === r.item.id ? r.item : x))) : a)),
+          (r) =>
+            setAlbum((a) =>
+              a
+                ? withItems(
+                    a,
+                    a.items.map((x) => (x.id === r.item.id ? r.item : x)),
+                  )
+                : a,
+            ),
           () => {},
         );
     if (e.type === 'together.updated' || e.type === 'together.requests') void load();
@@ -503,10 +511,26 @@ export default function TogetherScreen() {
           startId={open}
           onClose={() => setOpen(null)}
           // The best of follows stars and reactions straight away.
-          onItem={(item) => setAlbum((x) => (x ? withItems(x, x.items.map((i) => (i.id === item.id ? item : i))) : x))}
+          onItem={(item) =>
+            setAlbum((x) =>
+              x
+                ? withItems(
+                    x,
+                    x.items.map((i) => (i.id === item.id ? item : i)),
+                  )
+                : x,
+            )
+          }
           onRemoved={(rid) => {
             setOpen(null);
-            setAlbum((x) => (x ? withItems(x, x.items.filter((i) => i.id !== rid)) : x));
+            setAlbum((x) =>
+              x
+                ? withItems(
+                    x,
+                    x.items.filter((i) => i.id !== rid),
+                  )
+                : x,
+            );
           }}
         />
       ) : null}

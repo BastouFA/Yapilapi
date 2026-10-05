@@ -128,9 +128,7 @@ export function AgentPanel({ kind, businessId, compact = false }: { kind: AgentK
         <AIPanel
           title={t('agent.panelLabel', { name: a.title })}
           label={t('ai.label')}
-          notice={
-            res.provider === 'dev' ? t('ai.devNotice') : res.notice ? t('chat.ai.withheld') : t('m.assistant.answeredBy', { model: res.model })
-          }
+          notice={res.provider === 'dev' ? t('ai.devNotice') : res.notice ? t('chat.ai.withheld') : t('m.assistant.answeredBy', { model: res.model })}
         >
           <div className="stack">
             {res.text ? <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{res.text}</p> : null}

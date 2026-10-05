@@ -585,14 +585,33 @@ export default function TogetherPage() {
     }
     if (e.type === 'together.item')
       void api.together.item(id, e.data.itemId).then(
-        (r) => setAlbum((a) => (a ? withItems(a, a.items.map((x) => (x.id === r.item.id ? r.item : x))) : a)),
+        (r) =>
+          setAlbum((a) =>
+            a
+              ? withItems(
+                  a,
+                  a.items.map((x) => (x.id === r.item.id ? r.item : x)),
+                )
+              : a,
+          ),
         () => {},
       );
     if (e.type === 'together.updated' || e.type === 'together.requests') void load();
   });
 
   // The best of follows stars and reactions straight away.
-  const replaceItem = useCallback((item: TogetherItem) => setAlbum((a) => (a ? withItems(a, a.items.map((x) => (x.id === item.id ? item : x))) : a)), []);
+  const replaceItem = useCallback(
+    (item: TogetherItem) =>
+      setAlbum((a) =>
+        a
+          ? withItems(
+              a,
+              a.items.map((x) => (x.id === item.id ? item : x)),
+            )
+          : a,
+      ),
+    [],
+  );
 
   if (!flags.REAL_TOGETHER) return <FeatureOff name="Together" />;
   if (missing)
@@ -786,7 +805,16 @@ export default function TogetherPage() {
           startId={open}
           onClose={() => setOpen(null)}
           onItem={replaceItem}
-          onRemoved={(rid) => setAlbum((x) => (x ? withItems(x, x.items.filter((i) => i.id !== rid)) : x))}
+          onRemoved={(rid) =>
+            setAlbum((x) =>
+              x
+                ? withItems(
+                    x,
+                    x.items.filter((i) => i.id !== rid),
+                  )
+                : x,
+            )
+          }
         />
       ) : null}
       {show ? <Slideshow album={a} onClose={() => setShow(false)} /> : null}

@@ -401,8 +401,7 @@ export async function renderWrapCard(db: Q, storage: MediaStorage, wrapId: strin
       .png()
       .toBuffer({ resolveWithObject: true });
   /** Where a block of text goes in a column: its start edge, which is the right one in right-to-left languages. */
-  const startOf = (block: { info: { width: number } }, colLeft = 80, colWidth = W - 160) =>
-    Math.round(rtl ? colLeft + colWidth - block.info.width : colLeft);
+  const startOf = (block: { info: { width: number } }, colLeft = 80, colWidth = W - 160) => Math.round(rtl ? colLeft + colWidth - block.info.width : colLeft);
   let y = 96;
   try {
     const brand = await text(`<span foreground="#FFFFFFB3">YAPILAPI</span>`, true, 30);

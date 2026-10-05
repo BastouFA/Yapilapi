@@ -242,10 +242,10 @@ describe('memory', () => {
   it('suggests posts from this day in earlier years in the person’s time zone, like the Pulse card', async () => {
     const c = await signUp(t.app);
     const tz = 'Pacific/Kiritimati'; // 14 hours ahead of UTC, so its day and UTC's often differ
-    await t.ctx.db.query(
-      `INSERT INTO user_preferences (user_id, timezone) VALUES ($1,$2) ON CONFLICT (user_id) DO UPDATE SET timezone = EXCLUDED.timezone`,
-      [c.id, tz],
-    );
+    await t.ctx.db.query(`INSERT INTO user_preferences (user_id, timezone) VALUES ($1,$2) ON CONFLICT (user_id) DO UPDATE SET timezone = EXCLUDED.timezone`, [
+      c.id,
+      tz,
+    ]);
     const at = async (sql: string) => {
       const id = (await as(t.app, c).post('/v1/posts', { body: `Then: ${sql}` })).body.post.id as string;
       await t.ctx.db.query(`UPDATE posts SET created_at = ${sql} WHERE id = $1`, [id]);

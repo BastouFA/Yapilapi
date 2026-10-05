@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { DATA, liveRoom, STATE, watchSession, type SeedData } from './global-setup';
 
 /**
@@ -545,6 +546,45 @@ test('together: the photo viewer and the people sheet', async ({ page }) => {
   await people.focus();
   await page.keyboard.press('Enter');
   await sheetRoundTrip(page, 'People', people);
+});
+
+test('together: the slideshow fits each photo on the screen, and a failed upload stays to try again', async ({ page }) => {
+  const { togetherId } = seed();
+  await page.goto(`/together/${togetherId}`);
+  await page.waitForLoadState('networkidle');
+
+  // A tall photo used to grow its slide past the bottom of a wide screen and get cut off.
+  await page.getByRole('button', { name: 'Slideshow' }).click();
+  const show = page.getByRole('dialog', { name: /^Slideshow/ });
+  await expect(show).toBeVisible();
+  for (let i = 0; i < 3; i++) {
+    const shown = show.locator('.tg-show__slide--on img');
+    await expect(shown).toBeVisible();
+    const box = (await shown.boundingBox())!;
+    const view = page.viewportSize()!;
+    expect(box.height, 'the photo fits the screen').toBeLessThanOrEqual(view.height + 1);
+    expect(box.width, 'the photo fits the screen').toBeLessThanOrEqual(view.width + 1);
+    await page.keyboard.press('ArrowRight');
+  }
+  await page.keyboard.press('Escape');
+  await expect(show).toBeHidden();
+
+  // The first upload fails: the sheet stays open with that file marked and Try again, instead of closing.
+  let failed = false;
+  await page.route('**/api/v1/uploads', (route) => {
+    if (failed || route.request().method() !== 'POST') return route.continue();
+    failed = true;
+    return route.abort();
+  });
+  await page
+    .locator('input[type=file]')
+    .first()
+    .setInputFiles(join(import.meta.dirname, 'fixtures', 'bread.jpg'));
+  const sheet = page.getByRole('dialog', { name: /^Add to/ });
+  await sheet.getByRole('button', { name: /^Add 1/ }).click();
+  await expect(sheet.getByText("This one couldn't be added.")).toBeVisible();
+  await sheet.getByRole('button', { name: 'Try again' }).click();
+  await expect(sheet).toBeHidden();
 });
 
 test('chat: the call screen keeps focus, and Escape does not hang up', async ({ page }) => {

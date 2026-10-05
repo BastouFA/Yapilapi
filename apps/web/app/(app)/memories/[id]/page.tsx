@@ -62,11 +62,7 @@ export default function MemoryPage() {
               >
                 {m.visibility === 'private' ? t('m.common.share') : t('memories.sharing')}
               </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setConfirmDelete(true)}
-              >
+              <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(true)}>
                 {t('m.common.delete')}
               </Button>
             </>
