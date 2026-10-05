@@ -763,6 +763,7 @@ export default function ChatPage() {
       {ai || aiLoading ? (
         <AIPanel
           title={ai?.title ?? t('chat.ai.working')}
+          label={t('ai.label')}
           loading={aiLoading}
           notice={ai?.notice}
           actions={

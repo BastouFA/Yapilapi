@@ -1857,6 +1857,8 @@ export interface MemorySummary {
   mine: boolean;
   itemCount: number;
   createdAt: string;
+  /** GET /v1/memories/:id, for the owner: the friends it's shared with. */
+  sharedWith?: string[];
 }
 
 export interface LiveSummary {

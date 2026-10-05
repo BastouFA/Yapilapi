@@ -17,6 +17,7 @@ export default function Memories() {
   const [items, setItems] = useState<MemorySummary[] | null>(null);
   const [sugg, setSugg] = useState<{ events: EventItem[]; onThisDay: Post[] } | null>(null);
   const [title, setTitle] = useState('');
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (flags.MEMORY === false) return;
@@ -47,8 +48,15 @@ export default function Memories() {
         className="row"
         onSubmit={async (e) => {
           e.preventDefault();
-          const { memory } = await api.memories.create({ title });
-          router.push(`/memories/${memory.id}`);
+          if (!title.trim() || creating) return;
+          setCreating(true);
+          try {
+            const { memory } = await api.memories.create({ title: title.trim() });
+            router.push(`/memories/${memory.id}`);
+          } catch (err) {
+            toast(errorMessage(err));
+            setCreating(false);
+          }
         }}
       >
         <TextField
@@ -58,7 +66,7 @@ export default function Memories() {
           onChange={(e) => setTitle(e.currentTarget.value)}
           maxLength={120}
         />
-        <Button type="submit" disabled={!title.trim()} style={{ alignSelf: 'flex-end' }}>
+        <Button type="submit" loading={creating} disabled={!title.trim()} style={{ alignSelf: 'flex-end' }}>
           {t('m.chapters.create')}
         </Button>
       </form>

@@ -125,7 +125,13 @@ export function AgentPanel({ kind, businessId, compact = false }: { kind: AgentK
       ) : null}
       {error ? <p className="yp-field__error">{error}</p> : null}
       {res ? (
-        <AIPanel title={t('agent.panelLabel', { name: a.title })} notice={res.notice ?? t('m.assistant.answeredBy', { model: res.model })}>
+        <AIPanel
+          title={t('agent.panelLabel', { name: a.title })}
+          label={t('ai.label')}
+          notice={
+            res.provider === 'dev' ? t('ai.devNotice') : res.notice ? t('chat.ai.withheld') : t('m.assistant.answeredBy', { model: res.model })
+          }
+        >
           <div className="stack">
             {res.text ? <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{res.text}</p> : null}
             {res.recommendations.length ? (

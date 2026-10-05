@@ -232,8 +232,33 @@ describe('memory', () => {
     const req = (await as(t.app, b).get('/v1/me/friend-requests')).body.items[0];
     await as(t.app, b).post(`/v1/friend-requests/${req.id}/accept`);
     expect((await as(t.app, a).put(`/v1/memories/${memoryId}/shares`, { userIds: [b.id] })).body.visibility).toBe('selected');
+    // The owner sees who it's shared with (so the share sheet starts from it); the friend doesn't.
+    expect((await as(t.app, a).get(`/v1/memories/${memoryId}`)).body.memory.sharedWith).toEqual([b.id]);
+    expect((await as(t.app, b).get(`/v1/memories/${memoryId}`)).body.memory.sharedWith).toBeUndefined();
     expect((await as(t.app, b).get(`/v1/memories/${memoryId}`)).status).toBe(200);
     expect((await as(t.app, b).post(`/v1/memories/${memoryId}/recap`)).status).toBe(404);
+  });
+
+  it('suggests posts from this day in earlier years in the person’s time zone, like the Pulse card', async () => {
+    const c = await signUp(t.app);
+    const tz = 'Pacific/Kiritimati'; // 14 hours ahead of UTC, so its day and UTC's often differ
+    await t.ctx.db.query(
+      `INSERT INTO user_preferences (user_id, timezone) VALUES ($1,$2) ON CONFLICT (user_id) DO UPDATE SET timezone = EXCLUDED.timezone`,
+      [c.id, tz],
+    );
+    const at = async (sql: string) => {
+      const id = (await as(t.app, c).post('/v1/posts', { body: `Then: ${sql}` })).body.post.id as string;
+      await t.ctx.db.query(`UPDATE posts SET created_at = ${sql} WHERE id = $1`, [id]);
+      return id;
+    };
+    // Just after midnight on this local day a year ago, and late the evening before it.
+    const sameDay = await at(`(date_trunc('day', now() AT TIME ZONE '${tz}') - interval '1 year' + interval '30 minutes') AT TIME ZONE '${tz}'`);
+    const dayBefore = await at(`(date_trunc('day', now() AT TIME ZONE '${tz}') - interval '1 year' - interval '30 minutes') AT TIME ZONE '${tz}'`);
+    const ids = (await as(t.app, c).get('/v1/memories/suggestions')).body.onThisDay.map((p: { id: string }) => p.id);
+    expect(ids).toContain(sameDay);
+    expect(ids).not.toContain(dayBefore);
+    const card = (await as(t.app, c).get('/v1/me/pulse-cards')).body.onThisDay;
+    expect(card.posts.map((p: { id: string }) => p.id)).toEqual(ids);
   });
 });
 

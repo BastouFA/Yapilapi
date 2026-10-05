@@ -6,6 +6,7 @@ import type { AppContext } from '../lib/context.ts';
 import { hydratePosts } from '../lib/posts.ts';
 import { isEnabled } from '../lib/services.ts';
 import { areFriends } from '../lib/users.ts';
+import { TIMEZONE_SQL } from '../lib/wrap.ts';
 import { eventVisibleSql, postVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 import { EVENT_SELECT, toEvent } from './events.ts';
@@ -129,8 +130,18 @@ export default async function memoryModule(app: FastifyInstance, ctx: AppContext
           ])
         ).rows
       : [];
+    // The owner sees who it's shared with (friends still), so the share sheet starts from that list.
+    const sharedWith = m.mine
+      ? (
+          await db.query<{ user_id: string }>(
+            `SELECT s.user_id FROM memory_shares s
+             WHERE s.memory_id = $1 AND EXISTS (SELECT 1 FROM friendships f WHERE (f.user_a = $2 AND f.user_b = s.user_id) OR (f.user_a = s.user_id AND f.user_b = $2))`,
+            [id, u.id],
+          )
+        ).rows.map((r) => r.user_id)
+      : undefined;
     return {
-      memory: dto(m, items.rowCount ?? 0),
+      memory: { ...dto(m, items.rowCount ?? 0), ...(sharedWith ? { sharedWith } : {}) },
       posts: await hydratePosts(
         db,
         postIds.filter((p) => visiblePosts.includes(p)),
@@ -199,9 +210,16 @@ export default async function memoryModule(app: FastifyInstance, ctx: AppContext
        ORDER BY e.starts_at DESC LIMIT 10`,
       [u.id],
     );
+    // "This day" in the person's time zone, as on the Pulse card that links here.
     const onThisDay = await db.query(
-      `SELECT id FROM posts WHERE author_id = $1 AND deleted_at IS NULL AND status = 'published' AND extract(month FROM created_at) = extract(month FROM now())
-         AND extract(day FROM created_at) = extract(day FROM now()) AND created_at < date_trunc('year', now()) ORDER BY created_at DESC LIMIT 10`,
+      `WITH zone AS (SELECT ${TIMEZONE_SQL('up')} AS tz FROM (SELECT $1::uuid AS id) x LEFT JOIN user_preferences up ON up.user_id = x.id),
+            today AS (SELECT (now() AT TIME ZONE zone.tz)::date AS d, zone.tz FROM zone)
+       SELECT p.id FROM posts p, today
+       WHERE p.author_id = $1 AND p.deleted_at IS NULL AND p.status = 'published'
+         AND extract(month FROM (p.created_at AT TIME ZONE today.tz)) = extract(month FROM today.d)
+         AND extract(day FROM (p.created_at AT TIME ZONE today.tz)) = extract(day FROM today.d)
+         AND (p.created_at AT TIME ZONE today.tz)::date < date_trunc('year', today.d)::date
+       ORDER BY p.created_at DESC LIMIT 10`,
       [u.id],
     );
     return {

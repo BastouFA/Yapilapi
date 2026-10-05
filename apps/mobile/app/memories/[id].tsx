@@ -62,7 +62,8 @@ export default function MemoryScreen() {
     try {
       const r = await (await client()).memories.recap(id);
       setData((d) => (d ? { ...d, memory: { ...d.memory, recap: r.recap } } : d));
-      if (r.notice) setNote({ tone: 'info', text: r.notice });
+      // The only note on success is the development stand-in's mark: in the reader's language.
+      if (r.notice) setNote({ tone: 'info', text: t('ai.devNotice') });
     } catch (e) {
       setNote({ tone: 'danger', text: errorMessage(e) });
     } finally {
@@ -151,6 +152,7 @@ export default function MemoryScreen() {
               <Text accessibilityRole="header" style={{ color: c.ink, fontWeight: '800', fontSize: 16, flex: 1 }}>
                 {t('memories.recapTitle')}
               </Text>
+              <Text style={{ color: c.inkMuted, fontSize: 12, fontWeight: '700' }}>{t('ai.label')}</Text>
             </View>
             {recapping ? (
               <ActivityIndicator color={c.yapi} accessibilityLabel={t('m.mem.writing')} style={{ alignSelf: 'flex-start' }} />
@@ -221,10 +223,13 @@ export default function MemoryScreen() {
       {sharing ? (
         <ShareSheet
           id={id}
+          sharedWith={m.sharedWith ?? []}
           onClose={() => setSharing(false)}
           onShared={(visibility, text) => {
             setData((d) => (d ? { ...d, memory: { ...d.memory, visibility: visibility as typeof m.visibility } } : d));
             setNote({ tone: 'info', text });
+            // Again, so the sheet starts from the new list next time.
+            void load();
           }}
         />
       ) : null}
@@ -268,14 +273,24 @@ function RenameSheet({ id, title, onClose, onSaved }: { id: string; title: strin
 }
 
 /**
- * Share with friends you pick, or keep private with nobody picked. Sharing replaces the list
- * (the API doesn't tell who it's shared with today), so the sheet says so.
+ * Share with friends you pick, or keep private with nobody picked. Sharing replaces the list, so
+ * the sheet starts from the friends it's shared with now and says so.
  */
-function ShareSheet({ id, onClose, onShared }: { id: string; onClose: () => void; onShared: (visibility: string, text: string) => void }) {
+function ShareSheet({
+  id,
+  sharedWith,
+  onClose,
+  onShared,
+}: {
+  id: string;
+  sharedWith: string[];
+  onClose: () => void;
+  onShared: (visibility: string, text: string) => void;
+}) {
   const c = useColors();
   const { t, tp } = useT();
   const friends = useFriends();
-  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [picked, setPicked] = useState<Set<string>>(() => new Set(sharedWith));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   async function share() {
