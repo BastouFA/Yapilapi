@@ -362,7 +362,7 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
          WHERE bk.id = $1 AND bk.status = 'requested' AND (
            EXISTS (SELECT 1 FROM places p JOIN businesses b ON b.id = p.business_id WHERE p.id = bk.place_id AND b.owner_id = $2)
            OR EXISTS (SELECT 1 FROM products pd WHERE pd.id = bk.product_id AND pd.seller_id = $2))
-         RETURNING bk.user_id, bk.order_id`,
+         RETURNING bk.user_id, bk.order_id, bk.place_id`,
         [id, u.id, confirm ? 'confirmed' : 'declined'],
       );
       if (res.rows[0]?.order_id && !confirm) {
@@ -381,7 +381,7 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
       actorId: u.id,
       entityType: 'booking',
       entityId: id,
-      data: { confirmed: confirm },
+      data: { confirmed: confirm, placeId: r.rows[0].place_id },
     });
     await audit(db, { actorId: u.id, action: `booking.${confirm ? 'confirm' : 'decline'}`, entityType: 'booking', entityId: id });
     return { status: confirm ? 'confirmed' : 'declined' };

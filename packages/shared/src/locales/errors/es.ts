@@ -1234,4 +1234,5 @@ export const es: Record<string, string> = {
   'Number must be finite': 'Debe ser un número finito',
   'You already own this community.': 'Ya eres el propietario de esta comunidad.',
   'Make them a member first.': 'Primero hazle miembro.',
+  'Use a full link starting with https://': 'Usa un enlace completo que empiece por https://',
 };

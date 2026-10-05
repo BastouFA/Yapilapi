@@ -6199,4 +6199,8 @@ export const ha: Catalog = {
   'm.manage.makeOwnerBody': "Zai iya canza komai a al'ummar, har da masu gudanar da ita. Kai za ka ci gaba a matsayin admin kuma za ka iya fita daga baya.",
   'm.manage.ownerChanged': '{name} ne mai shi yanzu.',
   'm.community.withdraw': 'Janye buƙata',
+  'm.notif.waitlistIn': 'Wuri ya buɗe a taron {name}: yanzu za ka je',
+  'push.event_waitlist_in': 'Wuri ya buɗe a taron {name}: yanzu za ka je',
+  'm.event.onWaitlist': 'Kana cikin jerin jira. Idan wuri ya buɗe, za ka je kuma za mu sanar da kai.',
+  'm.event.over': 'Wannan taron ya ƙare.',
 };

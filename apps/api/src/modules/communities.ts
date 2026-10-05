@@ -148,6 +148,8 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
           actorId: u.id,
           entityType: 'community',
           entityId: row.id,
+          // The apps open the community's requests by its address.
+          data: { slug: row.slug },
         });
     }
     return { status, role: status === 'active' ? 'member' : null };
@@ -215,7 +217,15 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
       await c.query(`UPDATE communities SET member_count = member_count + 1 WHERE id = $1`, [row.id]);
       await joinChat(c, row.id, userId);
     });
-    await notify(db, ctx.realtime, { userId, category: 'communities', type: 'join_approved', actorId: u.id, entityType: 'community', entityId: row.id });
+    await notify(db, ctx.realtime, {
+      userId,
+      category: 'communities',
+      type: 'join_approved',
+      actorId: u.id,
+      entityType: 'community',
+      entityId: row.id,
+      data: { slug: row.slug },
+    });
     return { ok: true };
   });
 

@@ -6178,4 +6178,8 @@ export const yo: Catalog = {
   'm.manage.makeOwnerBody': 'Wọ́n lè yí ohunkóhun padà nínú àwùjọ, títí kan àwọn tó ń darí rẹ̀. Ìwọ yóò dúró gẹ́gẹ́ bí alábòójútó, o sì lè kúrò lẹ́yìn náà.',
   'm.manage.ownerChanged': '{name} ni onílé báyìí.',
   'm.community.withdraw': 'Fa ìbéèrè sẹ́yìn',
+  'm.notif.waitlistIn': 'Àyè ṣí sílẹ̀ níbi ìṣẹ̀lẹ̀ {name}: o ń lọ báyìí',
+  'push.event_waitlist_in': 'Àyè ṣí sílẹ̀ níbi ìṣẹ̀lẹ̀ {name}: o ń lọ báyìí',
+  'm.event.onWaitlist': 'O wà nínú àtòjọ ìdúró. Bí àyè bá ṣí sílẹ̀, o máa lọ, a ó sì sọ fún ọ.',
+  'm.event.over': 'Ìṣẹ̀lẹ̀ yìí ti parí.',
 };

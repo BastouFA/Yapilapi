@@ -6147,4 +6147,8 @@ export const ar: Catalog = {
   'm.manage.makeOwnerBody': 'سيتمكن من تغيير أي شيء في المجتمع، بما في ذلك من يديره. ستبقى مشرفًا ويمكنك المغادرة بعد ذلك.',
   'm.manage.ownerChanged': '{name} هو المالك الآن.',
   'm.community.withdraw': 'سحب الطلب',
+  'm.notif.waitlistIn': 'تحرر مكان في فعالية {name}: أنت ذاهب الآن',
+  'push.event_waitlist_in': 'تحرر مكان في فعالية {name}: أنت ذاهب الآن',
+  'm.event.onWaitlist': 'أنت على قائمة الانتظار. إذا تحرر مكان، ستكون ذاهبًا وسنخبرك.',
+  'm.event.over': 'انتهت هذه الفعالية.',
 };

@@ -1209,4 +1209,5 @@ export const ar: Record<string, string> = {
   'Number must be finite': 'يجب أن يكون الرقم محدودًا',
   'You already own this community.': 'أنت مالك هذا المجتمع بالفعل.',
   'Make them a member first.': 'اجعله عضوًا أولًا.',
+  'Use a full link starting with https://': 'استخدم رابطًا كاملًا يبدأ بـ https://',
 };

@@ -1222,4 +1222,5 @@ export const yo: Record<string, string> = {
   'Number must be finite': 'Nọ́mbà gbọ́dọ̀ ní òpin',
   'You already own this community.': 'Ìwọ ni onílé àwùjọ yìí tẹ́lẹ̀.',
   'Make them a member first.': 'Sọ wọ́n di ọmọ ẹgbẹ́ ná.',
+  'Use a full link starting with https://': 'Lo ìjápọ̀ kíkún tó bẹ̀rẹ̀ pẹ̀lú https://',
 };

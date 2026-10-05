@@ -2,6 +2,7 @@ import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router
 import { useCallback, useState } from 'react';
 import { Alert, Linking, Platform, Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
 import { formatEventWhen, safeTimeZone } from '../../../../packages/shared/src/i18n';
+import { eventEndsAt } from '../../../../packages/shared/src/tickets';
 import { timeZoneLabel } from '../../../../packages/shared/src/scheduling';
 import type { EventItem, PublicUser } from '../../../../packages/shared/src/types';
 import { client, errorMessage, isGone, webUrl } from '../../lib/api';
@@ -78,6 +79,7 @@ export default function EventScreen() {
   }
   const hosting = event.host.id === me?.id;
   const full = !!event.capacity && event.counts.going >= event.capacity;
+  const over = eventEndsAt(event).getTime() < Date.now();
   const where = event.online ? t('m.event.online') : (event.place?.name ?? event.locationText ?? t('m.event.tba'));
   const joinLink = event.online && event.locationText && isWebLink(event.locationText) ? event.locationText.trim() : null;
   const otherZone = event.timezone && event.timezone !== deviceTimeZone() ? event.timezone : null;
@@ -232,25 +234,28 @@ export default function EventScreen() {
         </Pressable>
       </Card>
 
+      {over ? <Notice>{t('m.event.over')}</Notice> : null}
       {hosting ? (
         <View style={{ gap: space[2] }}>
           <Notice>{t('m.event.hosting')}</Notice>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-            <Button
-              label={t('m.event.edit')}
-              icon="create-outline"
-              variant="secondary"
-              size="sm"
-              onPress={() => router.push(`/event-edit?id=${encodeURIComponent(event.id)}`)}
-            />
-            <Button label={t('m.event.cancel')} variant="ghost" size="sm" disabled={busy} onPress={cancelEvent} />
-          </View>
+          {over ? null : (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+              <Button
+                label={t('m.event.edit')}
+                icon="create-outline"
+                variant="secondary"
+                size="sm"
+                onPress={() => router.push(`/event-edit?id=${encodeURIComponent(event.id)}`)}
+              />
+              <Button label={t('m.event.cancel')} variant="ghost" size="sm" disabled={busy} onPress={cancelEvent} />
+            </View>
+          )}
         </View>
-      ) : (
+      ) : over ? null : (
         <View style={{ gap: space[2] }}>
           <Segmented<Rsvp | 'none'>
             label={t('m.event.yourAnswer')}
-            value={event.myRsvp ?? 'none'}
+            value={event.onWaitlist ? 'going' : (event.myRsvp ?? 'none')}
             onChange={(v) => v !== 'none' && !busy && void rsvp(v)}
             options={[
               { id: 'going', label: t('events.going') },
@@ -258,7 +263,13 @@ export default function EventScreen() {
               { id: 'not_going', label: t('events.notGoing') },
             ]}
           />
-          {full && event.myRsvp !== 'going' ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('m.event.full')}</Text> : null}
+          {event.onWaitlist ? (
+            <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted, fontSize: 13 }}>
+              {t('m.event.onWaitlist')}
+            </Text>
+          ) : full && event.myRsvp !== 'going' ? (
+            <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('m.event.full')}</Text>
+          ) : null}
         </View>
       )}
       {event.canCheckIn || (event.myRsvp === 'going' && !hosting) ? (

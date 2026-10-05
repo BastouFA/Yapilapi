@@ -6178,6 +6178,10 @@ export const en = {
   'm.manage.makeOwnerBody': 'They can change anything in the community, including who runs it. You stay on as an admin and can leave afterwards.',
   'm.manage.ownerChanged': '{name} is now the owner.',
   'm.community.withdraw': 'Withdraw request',
+  'm.notif.waitlistIn': "A place opened up at {name}'s event: you're going now",
+  'push.event_waitlist_in': "A place opened up at {name}'s event: you're going now",
+  'm.event.onWaitlist': "You're on the waitlist. If a place opens up, you're going and we'll tell you.",
+  'm.event.over': 'This event is over.',
 } as const;
 
 export type MessageKey = keyof typeof en;

@@ -42,6 +42,7 @@ const TEXT: Record<string, MessageKey> = {
   event_rsvp: 'm.notif.eventRsvp',
   event_cancelled: 'm.notif.eventCancelled',
   event_updated: 'm.notif.eventUpdated',
+  event_waitlist_in: 'm.notif.waitlistIn',
   order_paid: 'm.notif.orderPaid',
   tip_received: 'm.notif.tip',
   subscription_started: 'm.notif.subscribed',

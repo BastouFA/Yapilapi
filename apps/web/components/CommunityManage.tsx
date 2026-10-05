@@ -30,11 +30,13 @@ const rank = (role: string | null | undefined) => (role && role in COMMUNITY_ROL
  * people below them and gives only roles below their own, as the API checks; the owner can hand
  * the community to another member.
  */
-export function CommunityManage({ slug }: { slug: string }) {
+export function CommunityManage({ slug, initialSection }: { slug: string; initialSection?: string | null }) {
   const { t } = useSession();
   const [community, setCommunity] = useState<Community | null | undefined>(undefined);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [section, setSection] = useState<Section | null>(null);
+  const [section, setSection] = useState<Section | null>(
+    (['details', 'members', 'requests', 'banned', 'faq'] as const).find((x) => x === initialSection) ?? null,
+  );
 
   const load = useCallback(() => {
     setLoadError(null);
@@ -59,7 +61,7 @@ export function CommunityManage({ slug }: { slug: string }) {
     { id: 'banned', label: t('m.manage.banned') },
     { id: 'faq', label: t('m.community.faq') },
   ];
-  const current = section ?? sections[0]!.id;
+  const current = sections.find((x) => x.id === section)?.id ?? sections[0]!.id;
 
   return (
     <div className="yp-shell__inner">

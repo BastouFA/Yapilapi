@@ -947,6 +947,8 @@ export interface EventItem {
   online: boolean;
   counts: { going: number; interested: number };
   myRsvp: 'going' | 'interested' | 'not_going' | null;
+  /** You said you're going when it was full: you get the next place that opens (myRsvp says interested meanwhile). */
+  onWaitlist?: boolean;
   /** Whether people can give their ticket to a friend (the host's choice, on by default). */
   ticketTransfers: boolean;
   /** You host or co-host it: you see the guest list and check people in. */

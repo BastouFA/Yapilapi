@@ -6197,4 +6197,8 @@ export const sw: Catalog = {
   'm.manage.makeOwnerBody': 'Ataweza kubadilisha chochote katika jumuiya, hata nani anaiendesha. Wewe unabaki kuwa msimamizi na unaweza kuondoka baadaye.',
   'm.manage.ownerChanged': '{name} sasa ndiye mmiliki.',
   'm.community.withdraw': 'Ondoa ombi',
+  'm.notif.waitlistIn': 'Nafasi imepatikana kwenye tukio la {name}: sasa unahudhuria',
+  'push.event_waitlist_in': 'Nafasi imepatikana kwenye tukio la {name}: sasa unahudhuria',
+  'm.event.onWaitlist': 'Uko kwenye orodha ya kusubiri. Nafasi ikipatikana, utahudhuria na tutakujulisha.',
+  'm.event.over': 'Tukio hili limekwisha.',
 };

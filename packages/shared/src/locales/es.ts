@@ -6202,4 +6202,8 @@ export const es: Catalog = {
   'm.manage.makeOwnerBody': 'Podrá cambiar todo en la comunidad, también quién la gestiona. Tú sigues como admin y podrás salir después.',
   'm.manage.ownerChanged': '{name} es ahora el propietario.',
   'm.community.withdraw': 'Retirar solicitud',
+  'm.notif.waitlistIn': 'Se liberó un lugar en el evento de {name}: ahora vas',
+  'push.event_waitlist_in': 'Se liberó un lugar en el evento de {name}: ahora vas',
+  'm.event.onWaitlist': 'Estás en la lista de espera. Si se libera un lugar, irás y te avisaremos.',
+  'm.event.over': 'Este evento ha terminado.',
 };

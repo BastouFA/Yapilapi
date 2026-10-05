@@ -1239,4 +1239,5 @@ export const ha: Record<string, string> = {
   'Number must be finite': 'Dole lambar ta zama mai iyaka',
   'You already own this community.': "Kai ne mai wannan al'umma tuni.",
   'Make them a member first.': 'Ka mai da shi memba tukuna.',
+  'Use a full link starting with https://': 'Yi amfani da cikakken mahaɗi da ya fara da https://',
 };

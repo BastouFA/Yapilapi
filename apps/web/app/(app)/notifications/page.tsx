@@ -45,6 +45,7 @@ const TEXT: Record<string, TextFn> = {
   event_rsvp: (_n, name, t) => t('m.notif.eventRsvp', { name }),
   event_cancelled: (_n, name, t) => t('m.notif.eventCancelled', { name }),
   event_updated: (_n, name, t) => t('m.notif.eventUpdated', { name }),
+  event_waitlist_in: (_n, name, t) => t('m.notif.waitlistIn', { name }),
   order_paid: (_n, name, t) => t('m.notif.orderPaid', { name }),
   enforcement: (n, _name, t) => t('notifList.enforcement', { decision: decisionLabel(n.data.decision, t) }),
   tip_received: (_n, name, t) => t('m.notif.tip', { name }),
@@ -124,6 +125,12 @@ function hrefFor(n: NotificationItem, meUsername?: string): string | undefined {
   // A ticket a friend gave you opens your Tickets; being made a co-host opens the event's check-in.
   if (n.type === 'ticket_received') return '/tickets';
   if (n.type === 'event_cohost' && n.entityId) return `/events/${n.entityId}/check-in`;
+  // A request to join opens the community's settings; being let in opens the community.
+  if (n.type === 'join_request' && typeof n.data.slug === 'string') return `/c/${n.data.slug}/manage?tab=requests`;
+  if (n.type === 'join_approved' && typeof n.data.slug === 'string') return `/c/${n.data.slug}`;
+  // A booking to answer opens Studio; an answer to yours opens the place.
+  if (n.type === 'booking_request') return '/studio';
+  if (n.type === 'booking_decided' && typeof n.data.placeId === 'string') return `/places/${n.data.placeId}`;
   if (n.entityType === 'chapter') return `/chapters/${n.entityId}`;
   if (n.entityType === 'drop') return `/drops/${n.entityId}`;
   if (n.entityType === 'recap' || n.type === 'recap_ready' || n.type === 'recap_failed') return n.entityId ? `/recaps?open=${n.entityId}` : '/recaps';
