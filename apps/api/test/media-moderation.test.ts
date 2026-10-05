@@ -288,6 +288,8 @@ describe('automated media checks in the media job', () => {
       EMAIL_TRANSPORT: 'smtp',
       SMTP_URL: 'smtp://localhost:2525',
       TICKET_TOKEN_SECRET: 'x'.repeat(32),
+      EMAIL_FROM: 'YAPILAPI <hello@yapilapi.test>',
+      LIVE_HOOK_SECRET: 'h'.repeat(32),
     });
     expect(prod.MEDIA_MODERATION_PROVIDER).toBe('none');
     expect(prod.REQUIRE_VERIFICATION).toBe(true);

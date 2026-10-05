@@ -25,5 +25,5 @@ COPY apps/api apps/api
 WORKDIR /app/apps/api
 USER ypl
 EXPOSE 4000
-HEALTHCHECK --interval=15s --timeout=3s CMD wget -qO- http://127.0.0.1:4000/health/live || exit 1
+HEALTHCHECK --interval=15s --timeout=3s CMD wget -qO- "http://127.0.0.1:${API_PORT:-4000}/health/live" || exit 1
 CMD ["node", "--import", "tsx", "src/server.ts"]

@@ -240,7 +240,46 @@ describe('email delivery', () => {
     const smtp = { ...prod, EMAIL_TRANSPORT: 'smtp', SMTP_URL: 'smtps://u:p@smtp.example.test:465' };
     // Event tickets are signed with a real secret too.
     expect(() => loadConfig(smtp)).toThrow(/TICKET_TOKEN_SECRET/);
-    expect(loadConfig({ ...smtp, TICKET_TOKEN_SECRET: 'x'.repeat(32) }).EMAIL_TRANSPORT).toBe('smtp');
+    const tickets = { ...smtp, TICKET_TOKEN_SECRET: 'x'.repeat(32) };
+    // The placeholder sender would be refused by every relay.
+    expect(() => loadConfig(tickets)).toThrow(/EMAIL_FROM/);
+    const sender = { ...tickets, EMAIL_FROM: 'YAPILAPI <hello@yapilapi.test>' };
+    // Mini App tokens are signed with the live hook secret, so the dev one is refused.
+    expect(() => loadConfig(sender)).toThrow(/LIVE_HOOK_SECRET/);
+    expect(() => loadConfig({ ...sender, LIVE_HOOK_SECRET: 'dev-live-hook-secret' })).toThrow(/LIVE_HOOK_SECRET/);
+    const ready = { ...sender, LIVE_HOOK_SECRET: 'h'.repeat(32) };
+    expect(loadConfig(ready).EMAIL_TRANSPORT).toBe('smtp');
+    // Storage keys left at the development values never reach a real bucket.
+    expect(() => loadConfig({ ...ready, STORAGE_DRIVER: 's3' })).toThrow(/S3_ACCESS_KEY_ID/);
+    expect(loadConfig({ ...ready, STORAGE_DRIVER: 's3', S3_ACCESS_KEY_ID: 'key', S3_SECRET_ACCESS_KEY: 'secret' }).STORAGE_DRIVER).toBe('s3');
+    // Browser push needs a real contact address.
+    const vapid = { ...ready, VAPID_PUBLIC_KEY: 'pub', VAPID_PRIVATE_KEY: 'priv' };
+    expect(() => loadConfig(vapid)).toThrow(/VAPID_SUBJECT/);
+    expect(loadConfig({ ...vapid, VAPID_SUBJECT: 'mailto:support@yapilapi.test' }).VAPID_SUBJECT).toBe('mailto:support@yapilapi.test');
+  });
+
+  it('treats blank settings as unset and trims pasted values', () => {
+    const cfg = loadConfig({
+      DATABASE_URL: 'postgres://x',
+      EMAIL_FROM: '',
+      MEDIA_MODERATION_PROVIDER: '',
+      TRUST_PROXY: ' ',
+      STRIPE_SECRET_KEY: ' sk_test_abc\n',
+    });
+    expect(cfg.EMAIL_FROM).toBe('YAPILAPI <no-reply@yapilapi.local>');
+    expect(cfg.MEDIA_MODERATION_PROVIDER).toBe('dev');
+    expect(cfg.TRUST_PROXY).toEqual(['loopback', 'linklocal', 'uniquelocal']);
+    expect(cfg.STRIPE_SECRET_KEY).toBe('sk_test_abc');
+    expect(() => loadConfig({ DATABASE_URL: '' })).toThrow(/DATABASE_URL is required/);
+  });
+
+  it('checks optional services are set up in full', () => {
+    const base = { DATABASE_URL: 'postgres://x' };
+    expect(() => loadConfig({ ...base, TRANSCRIBE_PROVIDER: 'openai-compatible' })).toThrow(/TRANSCRIBE_API_URL/);
+    expect(loadConfig({ ...base, TRANSCRIBE_PROVIDER: 'openai-compatible', TRANSCRIBE_API_URL: 'https://stt.example.test/v1' }).TRANSCRIBE_PROVIDER).toBe(
+      'openai-compatible',
+    );
+    expect(() => loadConfig({ ...base, VAPID_PUBLIC_KEY: 'pub' })).toThrow(/VAPID_PRIVATE_KEY/);
   });
 
   it('sends verification, password reset and security emails through the configured transport', async () => {
