@@ -7,6 +7,7 @@ import {
   echoNoticeText,
   formatRelativeTime,
   reportOutcomeText,
+  appealDecidedText,
   scheduledPostFailedText,
   signInNoticeText,
   togetherNoticeText,
@@ -95,6 +96,7 @@ const TEXT: Record<string, TextFn> = {
 /** A moderation decision in plain words (the server sends a code like `suspend_user`). */
 const DECISIONS: Record<string, MessageKey> = {
   no_action: 'notifList.decision.noAction',
+  warn: 'notifList.decision.warn',
   restrict: 'notifList.decision.restrict',
   remove: 'notifList.decision.remove',
   suspend_user: 'notifList.decision.suspendUser',
@@ -163,6 +165,9 @@ function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): s
   // What happened to something you reported, in plain words.
   const report = reportOutcomeText(n, t);
   if (report) return report;
+  // The answer to your appeal.
+  const appeal = appealDecidedText(n, t);
+  if (appeal) return appeal;
   // Together albums: whole sentences with the album's name ("Ada added 12 photos to Lagos weekend").
   const together = togetherNoticeText(n, t, tp);
   if (together) return together;

@@ -9,12 +9,16 @@ import { formatEventWhen, safeTimeZone } from '@yapilapi/shared';
 import { api, errorMessage, isGone } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { JoinNote, NeedsAccount, useSignIn } from '@/components/SignedOut';
+import { MiniAppsSheet } from '@/components/MiniApps';
+import { ReportSheet } from '@/components/PostList';
 import { useSession } from '../../../providers';
 
 /** An event. Without an account, a public event is readable and RSVP leads to sign in. */
 export default function EventPageClient({ isPublic }: { isPublic: boolean }) {
   const { id } = useParams<{ id: string }>();
-  const { t, tp, toast, locale, me } = useSession();
+  const { t, tp, toast, locale, me, flags } = useSession();
+  const [appsOpen, setAppsOpen] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const signIn = useSignIn();
   const signedOut = !me;
   const [ev, setEv] = useState<EventItem | null>(null);
@@ -128,6 +132,24 @@ export default function EventPageClient({ isPublic }: { isPublic: boolean }) {
       ) : null}
 
       {ev.description ? <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{ev.description}</p> : null}
+
+      {signedOut ? null : (
+        <div className="row">
+          {/* Mini Apps: the host adds them; guests who replied use them. */}
+          {flags.MINI_APPS && (ev.host.id === me?.id || ev.myRsvp) ? (
+            <Button size="sm" variant="secondary" icon="create" onClick={() => setAppsOpen(true)}>
+              {t('chat.apps')}
+            </Button>
+          ) : null}
+          {ev.host.id !== me?.id ? (
+            <Button size="sm" variant="ghost" icon="flag" onClick={() => setReporting(true)}>
+              {t('post.report')}
+            </Button>
+          ) : null}
+        </div>
+      )}
+      <MiniAppsSheet open={appsOpen} onClose={() => setAppsOpen(false)} surface="event" surfaceId={ev.id} canManage={ev.host.id === me?.id} />
+      <ReportSheet target={reporting ? { type: 'event', id: ev.id } : null} onClose={() => setReporting(false)} />
 
       {going.length && !signedOut ? (
         <section className="stack-sm">

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button, Card, Dialog, List, ListItem, TextField } from '@yapilapi/design-system';
-import { appealStatusText, moderationCaseText, type InteractionSettings } from '@yapilapi/shared';
+import { appealStatusText, formatRelativeTime, moderationCaseText, type InteractionSettings } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 import { Anchor, ChoiceGroup, PeopleCard } from './Shell';
@@ -65,31 +65,56 @@ export function RestrictedCard() {
 
 /** Decisions our team made about your content, and appeals. */
 export function ModerationCard() {
-  const { toast, t } = useSession();
-  const [items, setItems] = useState<Awaited<ReturnType<typeof api.me.moderation>>['items']>([]);
+  const { toast, locale, t } = useSession();
+  const [items, setItems] = useState<Awaited<ReturnType<typeof api.me.moderation>>['items'] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [appealFor, setAppealFor] = useState<string | null>(null);
   const [statement, setStatement] = useState('');
+  const [sending, setSending] = useState(false);
   useEffect(() => {
+    setError(null);
     api.me.moderation().then(
       (r) => setItems(r.items),
-      () => {},
+      (e) => setError(errorMessage(e)),
     );
-  }, []);
+  }, [attempt]);
   return (
     <Anchor id="moderation">
       <Card title={t('settings.moderation.title')}>
-        {items.length ? (
+        {error && !items ? (
+          <div className="row">
+            <span role="alert">{error}</span>
+            <Button size="sm" variant="secondary" onClick={() => setAttempt((n) => n + 1)}>
+              {t('m.common.retry')}
+            </Button>
+          </div>
+        ) : !items ? (
+          <p className="muted" style={{ margin: 0 }}>
+            {t('common.loading')}
+          </p>
+        ) : items.length ? (
           <List>
             {items.map((c) => (
               <ListItem
                 key={c.id}
                 primary={moderationCaseText(c, t)}
-                secondary={
-                  c.appeal_status ? appealStatusText(c.appeal_status, t) : c.status === 'decided' ? t('settings.appeal.can') : t('settings.appeal.final')
-                }
+                secondary={[
+                  c.decided_at ? formatRelativeTime(c.decided_at, locale) : null,
+                  c.appeal_status ? appealStatusText(c.appeal_status, t) : c.status === 'decided' ? t('settings.appeal.can') : t('settings.appeal.final'),
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
                 end={
                   c.status === 'decided' && !c.appeal_status ? (
-                    <Button size="sm" variant="secondary" onClick={() => setAppealFor(c.id)}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        setStatement('');
+                        setAppealFor(c.id);
+                      }}
+                    >
                       {t('settings.appeal')}
                     </Button>
                   ) : null
@@ -110,14 +135,19 @@ export function ModerationCard() {
         footer={
           <Button
             disabled={!statement.trim()}
+            loading={sending}
             onClick={async () => {
+              setSending(true);
               try {
-                await api.raw.post('/v1/appeals', { caseId: appealFor, statement });
+                await api.raw.post('/v1/appeals', { caseId: appealFor, statement: statement.trim() });
                 toast(t('settings.appeal.sent'));
                 setAppealFor(null);
-                setItems((await api.me.moderation()).items);
+                setStatement('');
+                setAttempt((n) => n + 1);
               } catch (e) {
                 toast(errorMessage(e));
+              } finally {
+                setSending(false);
               }
             }}
           >

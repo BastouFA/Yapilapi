@@ -8,6 +8,7 @@ import { FollowList } from '@/components/FollowList';
 import type { Profile, ProfileTab } from '@yapilapi/shared';
 import { api, errorMessage, isGone } from '@/lib/api';
 import { PostList, ReportSheet } from '@/components/PostList';
+import { MiniAppsSheet } from '@/components/MiniApps';
 import { SupportCreator, TipSheet } from '@/components/SupportCreator';
 import { Shop } from '@/components/Shop';
 import { DropsRow } from '@/components/Drops';
@@ -38,7 +39,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
   // Why it couldn't load, when that isn't because it's gone; a profile already showing stays.
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reporting, setReporting] = useState(false);
-  const [sheet, setSheet] = useState<'cover' | 'status' | 'share' | null>(null);
+  const [sheet, setSheet] = useState<'cover' | 'status' | 'share' | 'apps' | null>(null);
   const [list, setList] = useState<'followers' | 'following' | null>(null);
   // null: the first tab the person chose to show.
   const [tab, setTab] = useState<ProfileTab | null>(null);
@@ -197,6 +198,11 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
               <Button size="sm" variant="ghost" icon="link" onClick={() => setSheet('share')}>
                 {t('m.profile.share')}
               </Button>
+              {flags.MINI_APPS ? (
+                <Button size="sm" variant="ghost" icon="create" onClick={() => setSheet('apps')}>
+                  {t('chat.apps')}
+                </Button>
+              ) : null}
             </div>
           ) : signedOut ? (
             <div className="row">
@@ -258,6 +264,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
                 label={t('m.profile.more')}
                 actions={[
                   { label: t('m.profile.share'), icon: 'link', onSelect: () => setSheet('share') },
+                  ...(flags.MINI_APPS && !rel.blocked ? [{ label: t('chat.apps'), icon: 'create' as const, onSelect: () => setSheet('apps') }] : []),
                   rel.friends
                     ? {
                         label: t('m.profile.unfriend'),
@@ -423,6 +430,9 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
         <TipSheet open={intent === 'tip'} onClose={() => setIntent(null)} userId={profile.id} name={profile.displayName} postId={focus.post} />
       ) : null}
       <ShareProfileSheet open={sheet === 'share'} onClose={() => setSheet(null)} profile={profile} />
+      {signedOut ? null : (
+        <MiniAppsSheet open={sheet === 'apps'} onClose={() => setSheet(null)} surface="profile" surfaceId={profile.id} canManage={rel.isSelf} />
+      )}
       {rel.isSelf ? (
         <>
           <CoverSheet open={sheet === 'cover'} onClose={() => setSheet(null)} profile={profile} onSaved={setProfile} />

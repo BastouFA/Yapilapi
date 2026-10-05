@@ -41,6 +41,9 @@ import { useSignIn } from './SignedOut';
 import { BoostSheet, type BoostChoices } from './Boost';
 import { SaveToSheet } from './Boards';
 import { CommentsSheet } from './Comments';
+import { ReportSheet } from './ReportSheet';
+
+export { ReportSheet };
 import { SuggestAltText } from './AiHelpers';
 import { hasVideo, WatchChatPicker } from './WatchTogether';
 
@@ -808,63 +811,6 @@ function CoauthorsSheet({ post, onClose, onChanged }: { post: Post; onClose: () 
           </p>
         )}
       </div>
-    </BottomSheet>
-  );
-}
-
-const REASON_LABEL: Record<string, MessageKey> = {
-  spam: 'postList.reason.spam',
-  harassment: 'postList.reason.harassment',
-  hate: 'postList.reason.hate',
-  violence: 'postList.reason.violence',
-  nudity: 'postList.reason.nudity',
-  self_harm: 'postList.reason.selfHarm',
-  impersonation: 'postList.reason.impersonation',
-  fraud: 'postList.reason.fraud',
-  minor_safety: 'postList.reason.minorSafety',
-  copyright: 'postList.reason.copyright',
-  other: 'postList.reason.other',
-};
-
-export function ReportSheet({ target, onClose }: { target: { type: string; id: string } | null; onClose: () => void }) {
-  const { toast, t } = useSession();
-  const [reason, setReason] = useState<string>('spam');
-  const [details, setDetails] = useState('');
-  const [busy, setBusy] = useState(false);
-  return (
-    <BottomSheet open={!!target} onClose={onClose} title={t('post.report')}>
-      <form
-        className="stack"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (!target) return;
-          setBusy(true);
-          try {
-            await api.reports.create({ targetType: target.type, targetId: target.id, reason, details: details || undefined });
-            toast(t('report.thanks'));
-            // The next report starts empty.
-            setReason('spam');
-            setDetails('');
-            onClose();
-          } catch (err) {
-            toast(errorMessage(err));
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        <Select label={t('postList.reportWhat')} value={reason} onChange={(e) => setReason(e.currentTarget.value)}>
-          {REPORT_REASONS.map((r) => (
-            <option key={r} value={r}>
-              {REASON_LABEL[r] ? t(REASON_LABEL[r]) : r}
-            </option>
-          ))}
-        </Select>
-        <TextField label={t('postList.reportDetails')} multiline value={details} onChange={(e) => setDetails(e.currentTarget.value)} maxLength={2000} />
-        <Button type="submit" variant="danger" loading={busy}>
-          {t('postList.sendReport')}
-        </Button>
-      </form>
     </BottomSheet>
   );
 }

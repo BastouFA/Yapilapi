@@ -41,6 +41,8 @@ export interface Session {
   refresh: () => Promise<Me | null>;
   setMe: (me: Me | null) => void;
   flags: Record<string, boolean>;
+  /** Load the feature flags again (after an admin changes one; also when the tab comes back to the front). */
+  refreshFlags: () => Promise<void>;
   unread: { notifications: number; messages: number };
   setUnread: (u: Partial<{ notifications: number; messages: number }>) => void;
   /** A short message; with an `action` (like "Add to a board") it shows a button and stays longer. */
@@ -186,13 +188,26 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }, [locale]);
   const loading = meLoading || !ready;
 
+  const refreshFlags = useCallback(
+    () =>
+      api
+        .flags()
+        .then((r) => setFlags(r.flags))
+        .catch(() => {}),
+    [],
+  );
   useEffect(() => {
     void refresh();
-    api
-      .flags()
-      .then((r) => setFlags(r.flags))
-      .catch(() => {});
-  }, [refresh]);
+    void refreshFlags();
+  }, [refresh, refreshFlags]);
+  // A feature an admin turned on or off reaches open tabs when they come back to the front.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refreshFlags();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [refreshFlags]);
 
   // <html lang> and dir follow the language on screen, before the browser paints it (so Arabic never
   // shows left to right first), and this browser remembers a signed-in reader's for the next page
@@ -327,6 +342,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         refresh,
         setMe,
         flags,
+        refreshFlags,
         unread,
         setUnread,
         toast,

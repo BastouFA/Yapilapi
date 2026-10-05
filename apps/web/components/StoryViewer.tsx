@@ -31,6 +31,7 @@ import {
 import { api, ApiError, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 import { AddToChapter } from '@/components/Chapters';
+import { ReportSheet } from '@/components/ReportSheet';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { StickerLayer, StoryCardView, StoryText } from '@/components/StoryStickers';
 import { MusicSticker, musicHref, useMusicLoop, useStoryMusicOn } from '@/components/StoryMusic';
@@ -79,6 +80,7 @@ export function StoryViewer({
     allowReshare: boolean;
   } | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const [answering, setAnswering] = useState(false);
   const [addingToChapter, setAddingToChapter] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -438,11 +440,16 @@ export function StoryViewer({
               <button type="submit" className="story__icon" aria-label={t('m.stories.sendReply')}>
                 <Icon name="send" />
               </button>
-            ) : null}
+            ) : (
+              <button type="button" className="story__icon" aria-label={t('m.report.title.story')} onClick={() => (setPaused(true), setReporting(true))}>
+                <Icon name="flag" />
+              </button>
+            )}
           </form>
         )}
       </div>
 
+      <ReportSheet target={reporting ? { type: 'story', id: story.id } : null} onClose={() => (setReporting(false), setPaused(false))} />
       <AddToChapter momentId={group.mine ? story.id : null} open={addingToChapter} onClose={() => (setAddingToChapter(false), setPaused(false))} />
       <ShareSheet
         open={sharing}

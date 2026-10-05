@@ -277,6 +277,11 @@ export function createClient(opts: ClientOptions) {
       /** `remember: false` ("Stay signed in" off): the web session ends when the browser closes. */
       login: (b: { email: string; password: string; remember?: boolean }) =>
         post<{ user?: Me; token?: string; mfaRequired?: boolean; challengeToken?: string }>('/v1/auth/login', b),
+      /**
+       * A suspended account signing in with the right password gets `account_suspended` with
+       * `details.appeal.token` (when the suspension can still be appealed): send the appeal with it.
+       */
+      appealSuspension: (token: string, statement: string) => post<{ status: 'appealed'; message: string }>('/v1/appeals/suspension', { token, statement }),
       logout: () => post<{ ok: true }>('/v1/auth/logout'),
       /** Ends every session of the account, this one included. */
       logoutAll: () => post<{ ok: true; revoked: number }>('/v1/auth/logout-all'),
@@ -410,7 +415,20 @@ export function createClient(opts: ClientOptions) {
       setStatus: (b: { text: string; icon?: NowStatusIcon | null; audience?: NowStatusAudience }) => put<{ status: NowStatus }>('/v1/me/status', b),
       clearStatus: () => del<{ status: null }>('/v1/me/status'),
       moderation: () =>
-        get<{ items: { id: string; target_type: string; decision: string; status: string; appeal_status: string | null }[] }>('/v1/me/moderation'),
+        get<{
+          items: {
+            id: string;
+            target_type: string;
+            target_id: string;
+            /** What the person was told about: the decision an appeal was against. */
+            decision: string;
+            /** Where it ended (differs from `decision` when an appeal overturned it). */
+            final_decision: string;
+            status: string;
+            decided_at: string | null;
+            appeal_status: string | null;
+          }[];
+        }>('/v1/me/moderation'),
     },
     /**
      * "Ask me": your question box, asking someone, your inbox of questions and the answers on a
@@ -1315,6 +1333,7 @@ export function createClient(opts: ClientOptions) {
           `/v1/mini-apps/installed${qs({ surface, surfaceId })}`,
         ),
       install: (id: string, surface: string, surfaceId: string) => post(`/v1/mini-apps/${id}/install`, { surface, surfaceId }),
+      uninstall: (id: string, surface: string, surfaceId: string) => del(`/v1/mini-apps/${id}/install`, { surface, surfaceId }),
       context: (id: string, surface: string, surfaceId: string) =>
         post<{ token: string; permissions: string[] }>(`/v1/mini-apps/${id}/context`, { surface, surfaceId }),
     },
@@ -1501,7 +1520,8 @@ export function createClient(opts: ClientOptions) {
         get<{
           items: { id: string; name: string; prefix: string; scopes: string[]; last_used_at: string | null; revoked_at: string | null; created_at: string }[];
         }>(`/v1/developer/apps/${appId}/keys`),
-      createKey: (appId: string, b: { name: string; scopes: string[] }) => post<{ secret: string; message: string }>(`/v1/developer/apps/${appId}/keys`, b),
+      createKey: (appId: string, b: { name: string; scopes: string[]; expiresInDays?: number }) =>
+        post<{ secret: string; message: string }>(`/v1/developer/apps/${appId}/keys`, b),
       revokeKey: (appId: string, keyId: string) => del(`/v1/developer/apps/${appId}/keys/${keyId}`),
       webhooks: (appId: string) =>
         get<{
@@ -1512,6 +1532,12 @@ export function createClient(opts: ClientOptions) {
       createWebhook: (appId: string, url: string, events: string[]) => post<{ secret: string }>(`/v1/developer/apps/${appId}/webhooks`, { url, events }),
       deleteWebhook: (appId: string, id: string) => del(`/v1/developer/apps/${appId}/webhooks/${id}`),
       ping: (appId: string, id: string) => post(`/v1/developer/apps/${appId}/webhooks/${id}/ping`),
+      /** The app's Mini Apps and where each is in review. */
+      miniApps: (appId: string) => get<{ items: DeveloperMiniApp[] }>(`/v1/developer/apps/${appId}/mini-apps`),
+      submitMiniApp: (
+        appId: string,
+        b: { name: string; description?: string; entryUrl: string; permissions: MiniAppPermission[]; surfaces: MiniAppSurface[] },
+      ) => post<{ miniApp: { id: string; name: string; status: string } }>(`/v1/developer/apps/${appId}/mini-apps`, b),
     },
     memories: {
       list: () => get<{ items: MemorySummary[] }>('/v1/memories'),
@@ -1824,7 +1850,11 @@ export function createClient(opts: ClientOptions) {
       summary: () => get<{ summary: Record<string, number>; meaningfulByAction: { name: string; n: number }[] }>('/v1/admin/analytics/summary'),
       setFlag: (key: string, enabled: boolean) => put<{ flags: Record<string, boolean> }>(`/v1/admin/flags/${key}`, { enabled }),
       users: (q = '') => get<{ items: Record<string, any>[] }>(`/v1/admin/users${qs({ q })}`),
-      setUserStatus: (id: string, status: 'active' | 'suspended') => put(`/v1/admin/users/${id}/status`, { status }),
+      setUserStatus: (id: string, status: 'active' | 'suspended', note?: string) => put(`/v1/admin/users/${id}/status`, { status, note }),
+      setUserRole: (id: string, role: 'user' | 'moderator' | 'admin') => put<{ role: string }>(`/v1/admin/users/${id}/role`, { role }),
+      /** Mini Apps waiting for review. */
+      miniApps: () => get<{ items: AdminMiniApp[] }>('/v1/admin/mini-apps'),
+      decideMiniApp: (id: string, approve: boolean) => post<{ id: string; status: string }>(`/v1/admin/mini-apps/${id}/decide`, { approve }),
       auditLogs: () => get<{ items: Record<string, any>[] }>('/v1/admin/audit-logs'),
       payouts: (status: AdminPayout['status'] = 'pending') => get<{ items: AdminPayout[] }>(`/v1/admin/payouts${qs({ status })}`),
       approvePayout: (id: string) => post<{ status: 'verified' }>(`/v1/admin/payouts/${id}/verify`),
@@ -1844,6 +1874,33 @@ export function createClient(opts: ClientOptions) {
 }
 
 export type YapilapiClient = ReturnType<typeof createClient>;
+
+export type MiniAppSurface = 'conversation' | 'community' | 'event' | 'profile' | 'business';
+/** What a Mini App can ask for: your name and photo, who is in the chat, and sending a message as you (each time you confirm). */
+export type MiniAppPermission = 'profile' | 'members' | 'post_message';
+
+export interface DeveloperMiniApp {
+  id: string;
+  name: string;
+  description: string;
+  entryUrl: string;
+  permissions: MiniAppPermission[];
+  surfaces: MiniAppSurface[];
+  status: 'review' | 'approved' | 'rejected';
+  installs: number;
+  createdAt: string;
+}
+
+export interface AdminMiniApp {
+  id: string;
+  name: string;
+  description: string;
+  entry_url: string;
+  permissions: MiniAppPermission[];
+  surfaces: MiniAppSurface[];
+  developer_app: string;
+  created_at: string;
+}
 
 export interface MemorySummary {
   id: string;

@@ -7,7 +7,8 @@ import { AIPanel, Alert, Avatar, Badge, Button, EmptyState, EventCard, List, Lis
 import type { Community, EventItem, MessageKey, PublicUser, RoomSummary } from '@yapilapi/shared';
 import { api, errorMessage, isGone } from '@/lib/api';
 import { NextLink } from '@/lib/link';
-import { PostList } from '@/components/PostList';
+import { PostList, ReportSheet } from '@/components/PostList';
+import { MiniAppsSheet } from '@/components/MiniApps';
 import { CommunityFaq } from '@/components/CommunityExtras';
 import { CommunityRooms } from '@/components/RoomView';
 import { JoinNote, NeedsAccount, useSignIn } from '@/components/SignedOut';
@@ -33,7 +34,9 @@ const YOU_ARE: Record<string, MessageKey> = {
 /** A community. Without an account, a public community's posts and events are readable and joining leads to sign in. */
 export default function CommunityPageClient({ isPublic }: { isPublic: boolean }) {
   const { slug } = useParams<{ slug: string }>();
-  const { t, tp, toast, locale, me } = useSession();
+  const { t, tp, toast, locale, me, flags } = useSession();
+  const [appsOpen, setAppsOpen] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const signIn = useSignIn();
   const signedOut = !me;
   const [c, setC] = useState<(Community & { membershipStatus: string | null }) | null>(null);
@@ -155,6 +158,17 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
               {t('events.create')}
             </Link>
           ) : null}
+          {/* Mini Apps: a community's admins add them; members use them. */}
+          {isMember && flags.MINI_APPS ? (
+            <Button size="sm" variant="secondary" icon="create" onClick={() => setAppsOpen(true)}>
+              {t('chat.apps')}
+            </Button>
+          ) : null}
+          {!signedOut && c.myRole !== 'owner' ? (
+            <Button size="sm" variant="ghost" icon="flag" onClick={() => setReporting(true)}>
+              {t('post.report')}
+            </Button>
+          ) : null}
           {signedOut ? null : (
             <Button
               size="sm"
@@ -275,6 +289,14 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
           </List>
         )}
       </div>
+      <MiniAppsSheet
+        open={appsOpen}
+        onClose={() => setAppsOpen(false)}
+        surface="community"
+        surfaceId={c.id}
+        canManage={c.myRole === 'owner' || c.myRole === 'admin'}
+      />
+      <ReportSheet target={reporting ? { type: 'community', id: c.id } : null} onClose={() => setReporting(false)} />
     </div>
   );
 }

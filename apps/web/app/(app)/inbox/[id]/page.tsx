@@ -697,7 +697,8 @@ export default function ChatPage() {
             label={t('chat.options')}
             actions={[
               ...(conv?.kind === 'group' ? [{ label: t('chat.group.info'), icon: 'users' as const, onSelect: () => setGroupOpen(true) }] : []),
-              { label: t('chat.apps'), icon: 'create', onSelect: () => setAppsOpen(true) },
+              // Only when Mini Apps are on: otherwise the item would open nothing.
+              ...(flags.MINI_APPS ? [{ label: t('chat.apps'), icon: 'create' as const, onSelect: () => setAppsOpen(true) }] : []),
               { label: t('inbox.summarize'), icon: 'sparkle', onSelect: () => assist('summarize_conversation') },
               { label: t('chat.ai.draftPlan'), icon: 'calendar', onSelect: () => assist('plan_from_message') },
               { label: t('m.chat.search'), icon: 'search', onSelect: () => setSearchOpen(true) },

@@ -44,6 +44,8 @@ function LoginForm() {
   const [challenge, setChallenge] = useState<string | null>(null);
   const [remember, setRemember] = useState(true);
   const [passkeys, setPasskeys] = useState(false);
+  // A suspended account signed in with the right password: it can appeal from here (it can't reach Settings).
+  const [appealToken, setAppealToken] = useState<string | null>(null);
   useEffect(() => setPasskeys(browserSupportsWebAuthn()), []);
 
   // Already signed in (another tab logged in): carry on to where you were going.
@@ -61,6 +63,7 @@ function LoginForm() {
     const f = new FormData(e.currentTarget);
     setBusy(true);
     setError(null);
+    setAppealToken(null);
     try {
       if (challenge) {
         done((await api.mfa.verify(challenge, String(f.get('code')).replace(/\s+/g, ''), remember)).user);
@@ -74,6 +77,8 @@ function LoginForm() {
     } catch (err) {
       const message = problem(err, t, !!challenge);
       setError(message);
+      const appeal = err instanceof ApiError && err.code === 'account_suspended' ? (err.details?.appeal as { token?: string } | undefined) : undefined;
+      if (appeal?.token) setAppealToken(appeal.token);
       // An expired two-step sign-in (or one with too many wrong codes) starts again from the password.
       if (challenge && err instanceof ApiError && (err.status === 401 || err.code === 'too_many_attempts')) setChallenge(null);
       setBusy(false);
@@ -118,6 +123,7 @@ function LoginForm() {
       </div>
       {loggedOut && !error ? <Alert tone="success">{t('acct.loggedOut')}</Alert> : null}
       {error ? <Alert tone="danger">{error}</Alert> : null}
+      {appealToken ? <SuspensionAppeal token={appealToken} onDone={() => setAppealToken(null)} /> : null}
       <TextField
         label={t('auth.email')}
         name="email"
@@ -166,6 +172,62 @@ function LoginForm() {
         {t('auth.noAccount')} <Link href={next ? `/signup?next=${encodeURIComponent(next)}` : '/signup'}>{t('auth.signup.submit')}</Link>
       </p>
     </form>
+  );
+}
+
+/**
+ * Appealing a suspension from the sign-in page, with the one-time token signing in gave. The form
+ * is a region of its own inside the sign-in form, so it sends with its own button.
+ */
+function SuspensionAppeal({ token, onDone }: { token: string; onDone: () => void }) {
+  const { t } = useSession();
+  const [open, setOpen] = useState(false);
+  const [statement, setStatement] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (sent) return <Alert tone="success">{t('settings.appeal.sent')}</Alert>;
+  if (!open)
+    return (
+      <Button variant="secondary" block onClick={() => setOpen(true)}>
+        {t('settings.appeal.title')}
+      </Button>
+    );
+  return (
+    <section className="stack-sm" aria-label={t('settings.appeal.title')}>
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+      <TextField
+        label={t('settings.appeal.why')}
+        multiline
+        value={statement}
+        onChange={(e) => setStatement(e.currentTarget.value)}
+        maxLength={2000}
+        autoFocus
+      />
+      <div className="row">
+        <Button
+          loading={busy}
+          disabled={!statement.trim()}
+          onClick={async () => {
+            setBusy(true);
+            setError(null);
+            try {
+              await api.auth.appealSuspension(token, statement.trim());
+              setSent(true);
+            } catch (err) {
+              setError(errorMessage(err));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {t('settings.appeal.send')}
+        </Button>
+        <Button variant="ghost" onClick={onDone}>
+          {t('common.cancel')}
+        </Button>
+      </div>
+    </section>
   );
 }
 

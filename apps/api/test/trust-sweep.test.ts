@@ -58,6 +58,17 @@ describe('admin roles', () => {
     const log = (await db().query(`SELECT metadata FROM audit_logs WHERE action = 'user.role' AND entity_id = $1`, [someone.id])).rows[0];
     expect(log.metadata).toMatchObject({ role: 'moderator', before: 'user' });
   });
+
+  it('finds people by username as typed, underscores and all', async () => {
+    const admin = await asRole('admin');
+    const someone = await adult();
+    // Test usernames look like "t_abc123": the underscore used to be dropped, so nothing matched.
+    const found = (await as(t.app, admin).get(`/v1/admin/users?q=${encodeURIComponent(`@${someone.username}`)}`)).body.items as any[];
+    expect(found[0]).toMatchObject({ id: someone.id, username: someone.username });
+    // "_" is a letter here, not a wildcard.
+    const none = (await as(t.app, admin).get(`/v1/admin/users?q=${encodeURIComponent(someone.username.replace('_', 'x'))}`)).body.items as any[];
+    expect(none.some((u) => u.id === someone.id)).toBe(false);
+  });
 });
 
 describe('minor-safety reports', () => {

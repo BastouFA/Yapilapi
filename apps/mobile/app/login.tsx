@@ -2,7 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Pressable, Text, View, type TextInput } from 'react-native';
 import { ApiError } from '../../../packages/api-client/src/index';
-import { MAX_ACCOUNTS, signIn, verifyTwoStep } from '../lib/api';
+import { appealSuspension, errorMessage, MAX_ACCOUNTS, signIn, verifyTwoStep } from '../lib/api';
 import { AuthPage, authProblem, enterApp, PasswordField } from '../lib/auth-ui';
 import { useT } from '../lib/i18n';
 import { useSession } from '../lib/session';
@@ -28,6 +28,8 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  // A suspended account signed in with the right password: it can appeal from here (it can't reach Settings).
+  const [appealToken, setAppealToken] = useState<string | null>(null);
   const passwordRef = useRef<TextInput>(null);
 
   const ready = challenge ? code.trim().length >= 6 : /\S+@\S+\.\S+/.test(email.trim()) && password.length > 0;
@@ -37,6 +39,7 @@ export default function Login() {
     setBusy(true);
     setError(null);
     setFields({});
+    setAppealToken(null);
     try {
       if (challenge) {
         const user = await verifyTwoStep(challenge, code);
@@ -59,6 +62,8 @@ export default function Login() {
       }
       setError(p.message);
       setFields(p.fields);
+      const appeal = e instanceof ApiError && e.code === 'account_suspended' ? (e.details?.appeal as { token?: string } | undefined) : undefined;
+      if (appeal?.token) setAppealToken(appeal.token);
       setBusy(false);
     }
   }
@@ -100,6 +105,7 @@ export default function Login() {
       <Title sub={adding ? t('acct.addHint') : t('m.auth.login.body')}>{adding ? t('acct.addTitle') : t('auth.login.title')}</Title>
       {full ? <Notice tone="warn">{t('acct.max', { count: MAX_ACCOUNTS })}</Notice> : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}
+      {appealToken ? <SuspensionAppeal token={appealToken} /> : null}
       <Field
         label={t('auth.email')}
         value={email}
@@ -143,5 +149,39 @@ export default function Login() {
         </Pressable>
       </View>
     </AuthPage>
+  );
+}
+
+/** Appealing a suspension from the sign-in screen, with the one-time token signing in gave. */
+function SuspensionAppeal({ token }: { token: string }) {
+  const { t } = useT();
+  const [open, setOpen] = useState(false);
+  const [statement, setStatement] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (sent) return <Notice>{t('settings.appeal.sent')}</Notice>;
+  if (!open) return <Button label={t('settings.appeal.title')} variant="secondary" onPress={() => setOpen(true)} />;
+  return (
+    <View style={{ gap: space[2] }}>
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      <Field label={t('settings.appeal.why')} value={statement} onChangeText={setStatement} multiline maxLength={2000} autoFocus />
+      <Button
+        label={t('settings.appeal.send')}
+        disabled={busy || !statement.trim()}
+        onPress={async () => {
+          setBusy(true);
+          setError(null);
+          try {
+            await appealSuspension(token, statement.trim());
+            setSent(true);
+          } catch (e) {
+            setError(errorMessage(e));
+          } finally {
+            setBusy(false);
+          }
+        }}
+      />
+    </View>
   );
 }

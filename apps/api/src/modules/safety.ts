@@ -790,11 +790,14 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
 
   // ── Admin ─────────────────────────────────────────────────────────────
   app.get('/v1/admin/users', { preHandler: requireRole('admin') }, async (req) => {
-    const q = parse(z.object({ q: z.string().max(100).default('') }), req.query);
+    const q = parse(z.object({ q: z.string().trim().max(100).default('') }), req.query);
+    // Matched as typed: "_" and "%" are letters here, not wildcards (usernames have underscores). "@ada" finds ada.
+    const term = q.q.replace(/^@/, '');
     const { rows } = await db.query(
       `SELECT u.id, u.email, u.role, u.status, u.created_at, u.is_dev_data, pr.username, pr.display_name FROM users u JOIN profiles pr ON pr.user_id = u.id
-       WHERE $1 = '' OR pr.username ILIKE $2 OR u.email ILIKE $2 ORDER BY u.created_at DESC LIMIT 50`,
-      [q.q, `%${q.q.replace(/[%_]/g, '')}%`],
+       WHERE u.deleted_at IS NULL AND ($1 = '' OR pr.username ILIKE $2 OR u.email ILIKE $2)
+       ORDER BY (lower(pr.username) = lower($1)) DESC, u.created_at DESC LIMIT 50`,
+      [term, `%${term.replace(/[\\%_]/g, '\\$&')}%`],
     );
     return { items: rows };
   });
@@ -871,7 +874,8 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
 
   app.get('/v1/admin/audit-logs', { preHandler: requireRole('admin') }, async () => {
     const { rows } = await db.query(
-      `SELECT id, actor_id, action, entity_type, entity_id, host(ip) AS ip, request_id, metadata, created_at FROM audit_logs ORDER BY id DESC LIMIT 200`,
+      `SELECT l.id, l.actor_id, pr.username AS actor_username, l.action, l.entity_type, l.entity_id, host(l.ip) AS ip, l.request_id, l.metadata, l.created_at
+       FROM audit_logs l LEFT JOIN profiles pr ON pr.user_id = l.actor_id ORDER BY l.id DESC LIMIT 200`,
     );
     return { items: rows };
   });
