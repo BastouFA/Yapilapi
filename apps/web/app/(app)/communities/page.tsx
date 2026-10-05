@@ -51,11 +51,15 @@ export default function CommunitiesPage() {
       ) : items === null ? (
         <Skeleton height={160} />
       ) : items.length ? (
-        <div className="yp-grid">
-          {items.map((c) => (
-            <CommunityCard key={c.id} community={c} href={`/c/${c.slug}`} linkAs={NextLink} locale={locale} />
-          ))}
-        </div>
+        <>
+          {/* The cards' names are level-3 headings under this one. */}
+          <h2 className="yp-visually-hidden">{scope === 'mine' ? t('m.communities.mine') : t('m.communities.discover')}</h2>
+          <div className="yp-grid">
+            {items.map((c) => (
+              <CommunityCard key={c.id} community={c} href={`/c/${c.slug}`} linkAs={NextLink} locale={locale} />
+            ))}
+          </div>
+        </>
       ) : (
         <EmptyState title={scope === 'mine' ? t('m.communities.emptyMine') : t('m.communities.emptyDiscover')} />
       )}

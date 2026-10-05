@@ -131,6 +131,20 @@ describe('events', () => {
     expect(await validTickets(c, id)).toHaveLength(1);
   });
 
+  it('an event for people with the link opens by its address but is never listed', async () => {
+    const host = await signUp(t.app);
+    const guest = await signUp(t.app);
+    const id = await newEvent(host, { visibility: 'private', title: 'Secret supper' });
+    expect((await as(t.app, guest).get(`/v1/events/${id}`)).status).toBe(200);
+    expect((await rsvp(guest, id, 'going')).status).toBe(200);
+    const stranger = await signUp(t.app);
+    const listed = await as(t.app, stranger).get('/v1/events?limit=50');
+    expect(listed.body.items.map((e: { id: string }) => e.id)).not.toContain(id);
+    // Someone the host blocked doesn't get it even with the link.
+    await as(t.app, host).post(`/v1/users/${stranger.id}/block`);
+    expect((await as(t.app, stranger).get(`/v1/events/${id}`)).status).toBe(404);
+  });
+
   it("answering an event that's over is refused", async () => {
     const host = await signUp(t.app);
     const guest = await signUp(t.app);

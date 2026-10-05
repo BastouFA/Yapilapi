@@ -1632,7 +1632,7 @@ export const sw: Catalog = {
   'm.eventForm.everyone': 'Kila mtu',
   'm.eventForm.followers': 'Wafuasi',
   'm.eventForm.friends': 'Marafiki',
-  'm.eventForm.invited': 'Walioalikwa pekee',
+  'm.eventForm.invited': 'Wenye kiungo pekee',
   'm.eventForm.community': 'Jumuiya',
   'm.eventForm.communityHint': 'Tukio la jumuiya linaonekana kwenye ukurasa wa jumuiya.',
   'm.eventForm.noCommunity': 'Hakuna',
@@ -6231,4 +6231,5 @@ export const sw: Catalog = {
   'place.edit.capacityHint': 'Maombi ya kuhifadhi yanasimama idadi hii ya watu ikihifadhiwa ndani ya dakika 90 za muda. Tupu: bila kikomo.',
   'live.newKey': 'Pata ufunguo mpya wa mtiririko',
   'live.newKeyHint': 'Ufunguo wa mtiririko unaonyeshwa mara moja tu. Mpya unauchukua nafasi: weka ufunguo mpya kwenye programu yako ya kutiririsha.',
+  'eventPage.linkOnly': 'Ni wale tu unaowatumia kiungo wanaoweza kuona tukio hili. Haliorodheshwi popote.',
 };

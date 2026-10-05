@@ -1631,7 +1631,7 @@ export const ha: Catalog = {
   'm.eventForm.everyone': 'Kowa',
   'm.eventForm.followers': 'Mabiya',
   'm.eventForm.friends': 'Abokai',
-  'm.eventForm.invited': 'Waɗanda aka gayyata kaɗai',
+  'm.eventForm.invited': 'Masu mahaɗin kaɗai',
   'm.eventForm.community': 'Al’umma',
   'm.eventForm.communityHint': 'Taron al’umma yana bayyana a shafin al’ummar.',
   'm.eventForm.noCommunity': 'Babu',
@@ -6233,4 +6233,5 @@ export const ha: Catalog = {
   'place.edit.capacityHint': 'Neman ajiyar wuri yana tsayawa idan an ajiye wa wannan adadin mutane cikin mintuna 90 na wani lokaci. Babu komai: babu iyaka.',
   'live.newKey': 'Samu sabon mabuɗin yaɗawa',
   'live.newKeyHint': 'Mabuɗin yaɗawa yana bayyana sau ɗaya kawai. Sabo zai maye gurbinsa: saka sabon mabuɗin a manhajar yaɗawarka.',
+  'eventPage.linkOnly': "Sai waɗanda ka aika wa mahaɗin ne kaɗai za su iya ganin wannan taron. Ba a jera shi ko'ina.",
 };

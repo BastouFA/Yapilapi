@@ -397,7 +397,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       // Tickets to an event: only while it's still to come (or on), and only for people who can see it.
       for (const eventId of new Set(products.filter((p) => p.event_id).map((p) => p.event_id as string))) {
         const on = await c.query(
-          `SELECT 1 FROM events e WHERE e.id = $2 AND ${eventVisibleSql('$1')} AND coalesce(e.ends_at, e.starts_at + interval '3 hours') > now()`,
+          `SELECT 1 FROM events e WHERE e.id = $2 AND ${eventVisibleSql('$1', { byLink: true })} AND coalesce(e.ends_at, e.starts_at + interval '3 hours') > now()`,
           [u.id, eventId],
         );
         if (!on.rowCount) throw new AppError(409, 'event_over', "Tickets for this event aren't on sale any more.");

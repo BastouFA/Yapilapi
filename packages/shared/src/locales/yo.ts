@@ -1630,7 +1630,7 @@ export const yo: Catalog = {
   'm.eventForm.everyone': 'Gbogbo ènìyàn',
   'm.eventForm.followers': 'Àwọn olùtẹ̀lé',
   'm.eventForm.friends': 'Àwọn ọ̀rẹ́',
-  'm.eventForm.invited': 'Àwọn tí a pè nìkan',
+  'm.eventForm.invited': 'Àwọn tó ní ìjápọ̀ náà',
   'm.eventForm.community': 'Àwùjọ',
   'm.eventForm.communityHint': 'Ìṣẹ̀lẹ̀ àwùjọ máa hàn lójú ìwé àwùjọ náà.',
   'm.eventForm.noCommunity': 'Kò sí',
@@ -6212,4 +6212,5 @@ export const yo: Catalog = {
   'place.edit.capacityHint': 'Ìbéèrè ìfipamọ́ máa dúró nígbà tí iye ènìyàn yìí bá ti fipamọ́ láàárín ìṣẹ́jú 90 sí àkókò kan. Òfo: kò sí òpin.',
   'live.newKey': 'Gba kọ́kọ́rọ́ ìgbéjáde tuntun',
   'live.newKeyHint': 'Kọ́kọ́rọ́ ìgbéjáde máa ń hàn lẹ́ẹ̀kan ṣoṣo. Tuntun á rọ́pò rẹ̀: fi kọ́kọ́rọ́ tuntun sínú ètò ìgbéjáde rẹ.',
+  'eventPage.linkOnly': 'Àwọn tí o bá fi ìjápọ̀ ránṣẹ́ sí nìkan ló lè rí ìṣẹ̀lẹ̀ yìí. Kò hàn níbikíbi mìíràn.',
 };

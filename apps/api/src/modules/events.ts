@@ -118,7 +118,7 @@ export default async function eventsModule(app: FastifyInstance, ctx: AppContext
   }
 
   async function load(id: string, viewer: string | null) {
-    const { rows } = await db.query(`${EVENT_SELECT} WHERE e.id = $2 AND ${eventVisibleSql('$1')}`, [viewer, id]);
+    const { rows } = await db.query(`${EVENT_SELECT} WHERE e.id = $2 AND ${eventVisibleSql('$1', { byLink: true })}`, [viewer, id]);
     if (!rows[0]) throw notFound('Event');
     return rows[0];
   }

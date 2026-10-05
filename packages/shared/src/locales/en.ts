@@ -1631,7 +1631,7 @@ export const en = {
   'm.eventForm.everyone': 'Everyone',
   'm.eventForm.followers': 'Followers',
   'm.eventForm.friends': 'Friends',
-  'm.eventForm.invited': 'Only invited people',
+  'm.eventForm.invited': 'People with the link',
   'm.eventForm.community': 'Community',
   'm.eventForm.communityHint': 'A community event shows on the community page.',
   'm.eventForm.noCommunity': 'None',
@@ -6212,6 +6212,7 @@ export const en = {
   'place.edit.capacityHint': 'Booking requests stop once this many people are booked within 90 minutes of a time. Empty: no limit.',
   'live.newKey': 'Get a new stream key',
   'live.newKeyHint': 'The stream key is shown only once. A new one replaces it: put the new key in your streaming software.',
+  'eventPage.linkOnly': "Only people you send the link to can see this event. It isn't listed anywhere.",
 } as const;
 
 export type MessageKey = keyof typeof en;

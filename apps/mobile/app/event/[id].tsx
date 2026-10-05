@@ -238,6 +238,7 @@ export default function EventScreen() {
       {hosting ? (
         <View style={{ gap: space[2] }}>
           <Notice>{t('m.event.hosting')}</Notice>
+          {event.visibility === 'private' ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('eventPage.linkOnly')}</Text> : null}
           {over ? null : (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
               <Button

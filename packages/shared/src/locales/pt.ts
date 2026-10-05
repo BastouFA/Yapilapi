@@ -1633,7 +1633,7 @@ export const pt: Catalog = {
   'm.eventForm.everyone': 'Todos',
   'm.eventForm.followers': 'Seguidores',
   'm.eventForm.friends': 'Amigos',
-  'm.eventForm.invited': 'Só convidados',
+  'm.eventForm.invited': 'Quem tiver o link',
   'm.eventForm.community': 'Comunidade',
   'm.eventForm.communityHint': 'Um evento de comunidade aparece na página da comunidade.',
   'm.eventForm.noCommunity': 'Nenhuma',
@@ -6230,4 +6230,5 @@ export const pt: Catalog = {
   'place.edit.capacityHint': 'Os pedidos de reserva param quando esse número de pessoas estiver reservado em até 90 minutos de um horário. Vazio: sem limite.',
   'live.newKey': 'Gerar uma nova chave de transmissão',
   'live.newKeyHint': 'A chave de transmissão aparece só uma vez. Uma nova a substitui: coloque a nova chave no seu programa de transmissão.',
+  'eventPage.linkOnly': 'Só quem receber o link pode ver este evento. Ele não aparece em nenhuma lista.',
 };

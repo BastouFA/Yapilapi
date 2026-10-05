@@ -1625,7 +1625,7 @@ export const ar: Catalog = {
   'm.eventForm.everyone': 'الجميع',
   'm.eventForm.followers': 'المتابعون',
   'm.eventForm.friends': 'الأصدقاء',
-  'm.eventForm.invited': 'المدعوون فقط',
+  'm.eventForm.invited': 'من لديه الرابط',
   'm.eventForm.community': 'المجتمع',
   'm.eventForm.communityHint': 'تظهر فعالية المجتمع في صفحة المجتمع.',
   'm.eventForm.noCommunity': 'لا شيء',
@@ -6181,4 +6181,5 @@ export const ar: Catalog = {
   'place.edit.capacityHint': 'تتوقف طلبات الحجز عند حجز هذا العدد من الأشخاص خلال 90 دقيقة من الوقت. فارغ: بلا حد.',
   'live.newKey': 'احصل على مفتاح بث جديد',
   'live.newKeyHint': 'يظهر مفتاح البث مرة واحدة فقط. المفتاح الجديد يحل محله: ضع المفتاح الجديد في برنامج البث.',
+  'eventPage.linkOnly': 'لا يرى هذه الفعالية إلا من ترسل إليه الرابط. لا تظهر في أي قائمة.',
 };

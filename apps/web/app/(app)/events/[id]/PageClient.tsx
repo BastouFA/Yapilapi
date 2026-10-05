@@ -141,6 +141,11 @@ export default function EventPageClient({ isPublic }: { isPublic: boolean }) {
           ) : null}
         </div>
       ) : null}
+      {hosting && ev.visibility === 'private' ? (
+        <p className="muted" style={{ margin: 0 }}>
+          {t('eventPage.linkOnly')}
+        </p>
+      ) : null}
       {hosting ? (
         <div className="row" style={{ flexWrap: 'wrap' }}>
           <Badge tone="success">{t('eventPage.hosting')}</Badge>

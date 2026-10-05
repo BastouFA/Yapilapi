@@ -1640,7 +1640,7 @@ export const fr: Catalog = {
   'm.eventForm.everyone': 'Tout le monde',
   'm.eventForm.followers': 'Abonnés',
   'm.eventForm.friends': 'Amis',
-  'm.eventForm.invited': 'Seulement les invités',
+  'm.eventForm.invited': 'Les personnes qui ont le lien',
   'm.eventForm.community': 'Communauté',
   'm.eventForm.communityHint': 'Un événement de communauté s’affiche sur la page de la communauté.',
   'm.eventForm.noCommunity': 'Aucune',
@@ -6258,4 +6258,5 @@ export const fr: Catalog = {
     'Les demandes de réservation s’arrêtent quand ce nombre de personnes est réservé dans les 90 minutes autour d’une heure. Vide : pas de limite.',
   'live.newKey': 'Obtenir une nouvelle clé de stream',
   'live.newKeyHint': 'La clé de stream ne s’affiche qu’une fois. Une nouvelle la remplace : mets la nouvelle clé dans ton logiciel de streaming.',
+  'eventPage.linkOnly': 'Seules les personnes à qui tu envoies le lien peuvent voir cet événement. Il n’apparaît nulle part ailleurs.',
 };
