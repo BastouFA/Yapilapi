@@ -1408,7 +1408,8 @@ export function createClient(opts: ClientOptions) {
     },
     real: {
       feed: () => get<{ items: Post[] }>('/v1/real'),
-      create: (b: { mediaIds: string[]; caption?: string; visibility?: string }) => post<{ post: Post }>('/v1/real', b),
+      /** `moderation`: set when the Real waits for review (its caption was flagged). */
+      create: (b: { mediaIds: string[]; caption?: string; visibility?: string }) => post<{ post: Post; moderation?: ModerationNotice }>('/v1/real', b),
     },
     /** Together: shared albums (packages/shared/src/together.ts). Only the people in one ever see it. */
     together: {

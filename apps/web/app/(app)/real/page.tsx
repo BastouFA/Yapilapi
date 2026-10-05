@@ -3,7 +3,7 @@
 import { FeatureOff } from '@/components/FeatureOff';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, EmptyState, PostCard, Select, Skeleton, TextField } from '@yapilapi/design-system';
-import type { Post } from '@yapilapi/shared';
+import { noticeText, type Post } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { Capture } from '@/components/Capture';
@@ -44,10 +44,10 @@ export default function RealPage() {
     try {
       const ids: string[] = [];
       for (const f of files) ids.push((await api.media.upload(f)).media.id);
-      await api.real.create({ mediaIds: ids, caption, visibility });
+      const r = await api.real.create({ mediaIds: ids, caption, visibility });
       setCapturing(false);
       setCaption('');
-      toast(t('real.shared'));
+      toast(noticeText(r.moderation, t) ?? t('real.shared'));
       await load();
     } catch (e) {
       toast(errorMessage(e));

@@ -1,7 +1,8 @@
 import { CameraView, useCameraPermissions, type CameraType } from 'expo-camera';
 import { router, useIsFocused } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
+import { noticeText } from '../../../packages/shared/src/server-text';
 import { client, errorMessage } from '../lib/api';
 import { uploadFile } from '../lib/media';
 import { useT } from '../lib/i18n';
@@ -45,10 +46,12 @@ export default function Real() {
     try {
       const ids = [];
       for (const u of uris) ids.push(await upload(u));
-      await (await client()).real.create({ mediaIds: ids, caption });
+      const r = await (await client()).real.create({ mediaIds: ids, caption });
       setShots([]);
       setCaption('');
       setStatus(null);
+      // Held for review: say so before leaving.
+      if (r.moderation) Alert.alert(noticeText(r.moderation, t) ?? r.moderation.message);
       router.navigate('/');
     } catch (e) {
       setStatus(errorMessage(e));

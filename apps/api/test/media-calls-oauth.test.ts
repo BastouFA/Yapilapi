@@ -171,6 +171,21 @@ describe('Real and Real Together', () => {
     expect((await as(t.app, stranger).get('/v1/real')).body.items).toHaveLength(0);
   });
 
+  it('checks a Real caption like any post: harmful words are refused, flagged ones wait for review', async () => {
+    const risky = await as(t.app, b).post('/v1/real', { mediaIds: [await insertMedia(b.id)], caption: 'you should kill yourself' });
+    expect(risky.status).toBe(422);
+    expect(risky.body.error.code).toBe('content_blocked');
+    // The photo wasn't used up by the refused Real.
+    const held = await as(t.app, b).post('/v1/real', { mediaIds: [await insertMedia(b.id)], caption: 'free crypto, click this link to claim' });
+    expect(held.status).toBe(201);
+    expect(held.body.moderation?.code).toMatch(/post_(held|limited)/);
+    // Held: its author sees it, nobody else does until a moderator has looked.
+    expect((await as(t.app, b).get('/v1/real')).body.items.map((p: { id: string }) => p.id)).toContain(held.body.post.id);
+    expect((await as(t.app, a).get('/v1/real')).body.items.map((p: { id: string }) => p.id)).not.toContain(held.body.post.id);
+    const cases = await t.ctx.db.query(`SELECT 1 FROM moderation_cases WHERE target_type = 'post' AND target_id = $1`, [held.body.post.id]);
+    expect(cases.rowCount).toBe(1);
+  });
+
   it('lets friends add perspectives to one shared moment, members only', async () => {
     expect((await as(t.app, a).post('/v1/together', { title: 'Concert', memberIds: [stranger.id] })).status).toBe(403);
     const created = await as(t.app, a).post('/v1/together', { title: 'Concert night', memberIds: [b.id] });
