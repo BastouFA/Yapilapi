@@ -1145,6 +1145,8 @@ export const fr: Catalog = {
   'm.chapters.addingOpen': "On peut encore ajouter des stories jusqu'à ce qu'il soit scellé.",
   'm.chapters.addingClosed': 'Plus rien ne peut être ajouté.',
   'm.chapters.seal': 'Le sceller maintenant',
+  'm.chapters.sealConfirmTitle': 'La sceller maintenant ?',
+  'm.chapters.sealConfirmBody': "Plus rien ne pourra être ajouté et la date d'ouverture ne pourra plus changer. Elle s'ouvrira le {date}.",
   'm.chapters.play': 'Lire',
   'm.chapters.playAgain': 'Revoir',
   'm.chapters.by': 'Chapitre de {name}',

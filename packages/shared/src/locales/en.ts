@@ -1141,6 +1141,8 @@ export const en = {
   'm.chapters.addingOpen': 'Stories can still be added until it is sealed.',
   'm.chapters.addingClosed': 'Nothing more can be added.',
   'm.chapters.seal': 'Seal it now',
+  'm.chapters.sealConfirmTitle': 'Seal it now?',
+  'm.chapters.sealConfirmBody': "Nothing more can be added, and the opening date can't change. It opens on {date}.",
   'm.chapters.play': 'Play',
   'm.chapters.playAgain': 'Play again',
   'm.chapters.by': "{name}'s chapter",

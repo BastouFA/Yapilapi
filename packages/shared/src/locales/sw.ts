@@ -1139,6 +1139,8 @@ export const sw: Catalog = {
   'm.chapters.addingOpen': 'Bado unaweza kuongeza hadithi hadi itakapofungwa.',
   'm.chapters.addingClosed': 'Hakuna kinachoweza kuongezwa tena.',
   'm.chapters.seal': 'Ifunge sasa',
+  'm.chapters.sealConfirmTitle': 'Uifunge sasa?',
+  'm.chapters.sealConfirmBody': 'Hakuna kitu kingine kitakachoongezwa, na tarehe ya kufunguliwa haitabadilika. Itafunguka {date}.',
   'm.chapters.play': 'Cheza',
   'm.chapters.playAgain': 'Cheza tena',
   'm.chapters.by': 'Sura ya {name}',

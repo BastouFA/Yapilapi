@@ -1140,6 +1140,8 @@ export const pt: Catalog = {
   'm.chapters.addingOpen': 'Ainda dá para adicionar stories até ele ser lacrado.',
   'm.chapters.addingClosed': 'Não dá para adicionar mais nada.',
   'm.chapters.seal': 'Lacrar agora',
+  'm.chapters.sealConfirmTitle': 'Selar agora?',
+  'm.chapters.sealConfirmBody': 'Nada mais poderá ser adicionado e a data de abertura não poderá mudar. Ela abre em {date}.',
   'm.chapters.play': 'Reproduzir',
   'm.chapters.playAgain': 'Ver de novo',
   'm.chapters.by': 'Capítulo de {name}',

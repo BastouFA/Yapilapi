@@ -397,6 +397,31 @@ describe('weekly wrap', () => {
       fs.writeFileSync(process.env.WRAP_CARD_OUT.replace(/\.png$/, '-picture.png'), withPicture.rawPayload);
     }
 
+    // In Arabic the lines start on the right, as the language reads: the title's white text sits
+    // against the right margin instead of the left one.
+    const titleSpan = async (png: Buffer) => {
+      const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true });
+      let min = info.width;
+      let max = -1;
+      for (let row = 150; row < 300; row++)
+        for (let col = 0; col < info.width; col++) {
+          const i = (row * info.width + col) * info.channels;
+          if (data[i]! > 230 && data[i + 1]! > 230 && data[i + 2]! > 230) [min, max] = [Math.min(min, col), Math.max(max, col)];
+        }
+      return { min, max };
+    };
+    const ltr = await titleSpan(withPicture.rawPayload);
+    expect(ltr.min).toBeLessThan(120);
+    await db().query(`UPDATE profiles SET locale = 'ar' WHERE user_id = $1`, [me.id]);
+    try {
+      const arabic = await t.app.inject({ method: 'GET', url: `/v1/wraps/${id}/card.png`, headers: { authorization: `Bearer ${me.token}` } });
+      const rtl = await titleSpan(arabic.rawPayload);
+      expect(rtl.max).toBeGreaterThan(1080 - 120);
+      expect(rtl.min).toBeGreaterThan(300);
+    } finally {
+      await db().query(`UPDATE profiles SET locale = 'en' WHERE user_id = $1`, [me.id]);
+    }
+
     // A friend blocked since then drops out of it.
     await as(t.app, me).post(`/v1/users/${friend.id}/block`);
     expect((await as(t.app, me).get(`/v1/wraps/${id}`)).body.wrap.newFriends).toEqual([]);

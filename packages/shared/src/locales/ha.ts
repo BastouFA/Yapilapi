@@ -1140,6 +1140,8 @@ export const ha: Catalog = {
   'm.chapters.addingOpen': 'Ana iya ƙara labarai har sai an rufe shi.',
   'm.chapters.addingClosed': 'Ba za a iya ƙara komai ba kuma.',
   'm.chapters.seal': 'Rufe shi yanzu',
+  'm.chapters.sealConfirmTitle': 'A rufe shi yanzu?',
+  'm.chapters.sealConfirmBody': 'Ba za a iya ƙara komai ba, kuma ranar buɗewa ba za ta canza ba. Za a buɗe shi a {date}.',
   'm.chapters.play': 'Kunna',
   'm.chapters.playAgain': 'Sake kunnawa',
   'm.chapters.by': 'Babin {name}',

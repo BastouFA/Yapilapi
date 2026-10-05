@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { Avatar, Badge, BottomSheet, Button, EmptyState, Icon, Skeleton, Switch } from '@yapilapi/design-system';
+import { Avatar, Badge, BottomSheet, Button, Dialog, EmptyState, Icon, Skeleton, Switch } from '@yapilapi/design-system';
 import type { ChapterDetail, GuestbookEntry } from '@yapilapi/api-client';
 import { CHAPTER_GUESTBOOK_MAX, formatRelativeTime, type PublicUser } from '@yapilapi/shared';
 import { api, errorMessage, isGone } from '@/lib/api';
@@ -30,6 +30,7 @@ export default function ChapterPage() {
   const [playing, setPlaying] = useState<number | null>(null);
   const [editing, setEditing] = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [confirmSeal, setConfirmSeal] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -106,7 +107,7 @@ export default function ChapterPage() {
             {t('m.chapters.sealedBody')}
           </span>
           {owner && !chapter.capsule!.sealed ? (
-            <Button size="sm" variant="secondary" onClick={act(() => api.chapters.seal(chapter.id), t('chapters.sealed'))} disabled={!chapter.storyCount}>
+            <Button size="sm" variant="secondary" onClick={() => setConfirmSeal(true)} disabled={!chapter.storyCount}>
               {t('m.chapters.seal')}
             </Button>
           ) : null}
@@ -302,6 +303,31 @@ export default function ChapterPage() {
         </section>
       ) : null}
 
+      {owner && chapter.capsule ? (
+        // Sealing can't be undone: say what it means first.
+        <Dialog
+          open={confirmSeal}
+          onClose={() => setConfirmSeal(false)}
+          title={t('m.chapters.sealConfirmTitle')}
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setConfirmSeal(false)}>
+                {t('common.cancel')}
+              </Button>
+              <Button
+                onClick={() => {
+                  setConfirmSeal(false);
+                  void act(() => api.chapters.seal(chapter.id), t('chapters.sealed'))();
+                }}
+              >
+                {t('m.chapters.seal')}
+              </Button>
+            </>
+          }
+        >
+          <p>{t('m.chapters.sealConfirmBody', { date: formatDay(chapter.capsule.opensAt, locale) })}</p>
+        </Dialog>
+      ) : null}
       {playing !== null ? <ChapterPlayer detail={data} start={playing} onClose={() => (setPlaying(null), void load())} /> : null}
       {owner ? (
         <>

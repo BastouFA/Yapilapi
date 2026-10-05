@@ -1139,6 +1139,8 @@ export const yo: Catalog = {
   'm.chapters.addingOpen': 'A ṣì lè fi ìtàn kún un títí a ó fi dì í.',
   'm.chapters.addingClosed': 'A kò lè fi nǹkan kún un mọ́.',
   'm.chapters.seal': 'Dì í báyìí',
+  'm.chapters.sealConfirmTitle': 'Ṣé kí o dì í pa báyìí?',
+  'm.chapters.sealConfirmBody': 'Kò sí ohun tí a ó lè fi kún un mọ́, ọjọ́ ìṣísílẹ̀ kò sì ní yí padà. Yóò ṣí ní {date}.',
   'm.chapters.play': 'Ṣe é',
   'm.chapters.playAgain': 'Ṣe é lẹ́ẹ̀kan sí i',
   'm.chapters.by': 'Orí {name}',

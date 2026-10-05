@@ -1137,6 +1137,8 @@ export const ar: Catalog = {
   'm.chapters.addingOpen': 'لا يزال بالإمكان إضافة قصص حتى يُختم.',
   'm.chapters.addingClosed': 'لا يمكن إضافة المزيد.',
   'm.chapters.seal': 'اختمه الآن',
+  'm.chapters.sealConfirmTitle': 'هل تريد ختمها الآن؟',
+  'm.chapters.sealConfirmBody': 'لن يمكن إضافة أي شيء بعد ذلك، ولن يتغير تاريخ الفتح. ستُفتح في {date}.',
   'm.chapters.play': 'شغّل',
   'm.chapters.playAgain': 'شغّل مجددًا',
   'm.chapters.by': 'فصل {name}',

@@ -1141,6 +1141,8 @@ export const es: Catalog = {
   'm.chapters.addingOpen': 'Aún se pueden agregar historias hasta que se selle.',
   'm.chapters.addingClosed': 'Ya no se puede agregar nada más.',
   'm.chapters.seal': 'Sellarlo ahora',
+  'm.chapters.sealConfirmTitle': '¿Sellarla ahora?',
+  'm.chapters.sealConfirmBody': 'No se podrá añadir nada más y la fecha de apertura no podrá cambiar. Se abrirá el {date}.',
   'm.chapters.play': 'Reproducir',
   'm.chapters.playAgain': 'Ver de nuevo',
   'm.chapters.by': 'Capítulo de {name}',
