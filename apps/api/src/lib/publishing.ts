@@ -6,7 +6,7 @@ import {
   PLUS_AUDIO_POST_MAX_MS,
   SCHEDULE_MAX_DAYS,
   SCHEDULE_MIN_MINUTES,
-  TRANSLATION_LANGUAGES,
+  transcriptLanguage,
   type CreatePostInput,
   type ModerationNotice,
 } from '@yapilapi/shared';
@@ -410,8 +410,7 @@ async function transcribeRecording(deps: Deps, postId: string): Promise<void> {
     [postId],
   );
   for (const r of rows) {
-    const lang = r.locale.split('-')[0]!.toLowerCase();
-    const label = TRANSLATION_LANGUAGES.find((l) => l.code === lang)?.autonym ?? lang;
+    const { lang, label } = transcriptLanguage(r.locale);
     const made = await deps.db.query<{ id: string }>(
       `INSERT INTO caption_tracks (media_id, lang, label, source, status, created_by) VALUES ($1,$2,$3,'auto','processing',$4)
        ON CONFLICT (media_id, lang) DO NOTHING RETURNING id`,

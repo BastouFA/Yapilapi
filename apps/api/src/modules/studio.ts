@@ -59,12 +59,13 @@ export default async function studioModule(app: FastifyInstance, ctx: AppContext
   /** Your video, or with `captioned` also your recording (captions are its transcript). */
   async function ownVideo(id: string, userId: string, { captioned = false } = {}) {
     const { rows } = await db.query(
-      `SELECT id, storage_key, duration_ms, (kind = 'audio' OR variants ? 'mp4') AS processed FROM media
+      // A recording has nothing to process (no MP4 or HLS copies): it is ready as uploaded.
+      `SELECT id, kind, storage_key, duration_ms, (kind = 'audio' OR variants ? 'mp4') AS processed FROM media
        WHERE id = $1 AND owner_id = $2 AND kind = ANY($3::text[]) AND NOT private`,
       [id, userId, captioned ? ['video', 'audio'] : ['video']],
     );
     if (!rows[0]) throw notFound('That video');
-    return rows[0] as { id: string; storage_key: string | null; duration_ms: number | null; processed: boolean };
+    return rows[0] as { id: string; kind: 'video' | 'audio'; storage_key: string | null; duration_ms: number | null; processed: boolean };
   }
 
   async function visibleVideo(id: string, viewer: string | null) {
@@ -224,7 +225,10 @@ export default async function studioModule(app: FastifyInstance, ctx: AppContext
       const text = sanitizeCueText(c.text);
       if (!text) throw fieldError(`cues.${i}.text`, 'Add the words for this caption, or remove it.');
       if (c.end <= c.start) throw fieldError(`cues.${i}.end`, 'A caption must end after it starts.');
-      if (video.duration_ms && c.start * 1000 >= video.duration_ms) throw fieldError(`cues.${i}.start`, 'This caption starts after the video ends.');
+      if (video.duration_ms && c.start * 1000 >= video.duration_ms) {
+        if (video.kind === 'audio') throw fieldError(`cues.${i}.start`, 'This line starts after the recording ends.');
+        throw fieldError(`cues.${i}.start`, 'This caption starts after the video ends.');
+      }
       return { start: c.start, end: c.end, text };
     });
     await saveCaptionTrack(ctx, { mediaId: id, lang, label: input.label, source: 'manual', cues, userId: u.id });

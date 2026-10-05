@@ -1025,6 +1025,7 @@ export const ha: Record<string, string> = {
   'Add the words for this caption, or remove it.': 'Ƙara kalmomin wannan rubutun magana, ko ku cire shi.',
   'A caption must end after it starts.': 'Dole rubutun magana ya ƙare bayan ya fara.',
   'This caption starts after the video ends.': 'Wannan rubutun magana yana farawa bayan bidiyon ya ƙare.',
+  'This line starts after the recording ends.': 'Wannan layin yana farawa bayan rikodin ya ƙare.',
   'Use a language code such as en, fr or pt-BR.': 'Yi amfani da lambar harshe kamar en, fr ko pt-BR.',
   'Add a label, such as English.': 'Ƙara suna, kamar Turanci.',
   'You can make up to 20 clips at once.': 'Za ku iya yin guntaye har 20 a lokaci guda.',

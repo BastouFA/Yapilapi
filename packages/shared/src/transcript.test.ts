@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { transcriptText } from './transcript.ts';
+import { authorTranscript, transcriptLanguage, transcriptText } from './transcript.ts';
 
 describe('transcriptText', () => {
   it('keeps only the words, as running text with paragraphs at long pauses', () => {
@@ -30,5 +30,21 @@ describe('transcriptText', () => {
 
   it('reads hour-long timings', () => {
     expect(transcriptText('WEBVTT\n\n1:00:00.000 --> 1:00:01.000\nA\n\n1:00:05.000 --> 1:00:06.000\nB\n')).toBe('A\n\nB');
+  });
+});
+
+describe('the author’s transcript', () => {
+  const fr = { lang: 'fr', label: 'Français' };
+  const en = { lang: 'en', label: 'English' };
+
+  it('is the one in their language, else the first one', () => {
+    expect(authorTranscript([en, fr], 'fr-CA')).toBe(fr);
+    expect(authorTranscript([fr], 'sw')).toBe(fr);
+    expect(authorTranscript([], 'en')).toBeNull();
+  });
+
+  it('is made in their language, named in itself', () => {
+    expect(transcriptLanguage('pt-BR')).toEqual({ lang: 'pt', label: 'Português' });
+    expect(transcriptLanguage('yo')).toEqual({ lang: 'yo', label: 'Yorùbá' });
   });
 });

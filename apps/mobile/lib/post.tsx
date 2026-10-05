@@ -30,6 +30,7 @@ import {
 import { LockedPanel, TipButton } from './money';
 import { SensitiveCover } from './safety';
 import { EditPostSheet, HistorySheet } from './post-edit';
+import { TranscriptSheet } from './transcript-edit';
 import { RichText } from './rich-text';
 import { TranslatableText } from './translation';
 import { PostMusicChip } from './music';
@@ -192,6 +193,7 @@ function PostCardView({
   const reason = postReasonText(post, { t });
   const [editing, setEditing] = useState(false);
   const [history, setHistory] = useState(false);
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
   const [liked, setLiked] = useState(post.viewer.liked);
   const [likes, setLikes] = useState(post.counts.likes);
   const [saved, setSaved] = useState(post.viewer.saved);
@@ -287,6 +289,8 @@ function PostCardView({
 
   // Drafts and scheduled posts are changed from Drafts, not here.
   const canEdit = isAuthor && !post.status;
+  // Your audio post: its recording's transcript.
+  const canEditTranscript = isAuthor && post.media.length === 1 && post.media[0]!.kind === 'audio';
   // Memories (behind the MEMORY flag): add a published post to one of yours.
   const memoryOn = useFlag('MEMORY');
   const canRemember = !!me && !post.status && memoryOn === true;
@@ -377,7 +381,7 @@ function PostCardView({
   const report = useReport({ onBlocked: () => setBlockedAuthor(true) });
 
   /**
-   * More: insights and boost, edit your post, save to a board, add to a memory, leave as
+   * More: insights and boost, edit your post or its transcript, save to a board, add to a memory, leave as
    * co-author, remove your photo tag, report someone else's post.
    */
   const menu = useActionSheet();
@@ -388,6 +392,7 @@ function PostCardView({
     if (canBoost)
       actions.push({ label: t('m.boost.cta'), icon: 'rocket-outline', onPress: () => router.push({ pathname: '/boost', params: { id: post.id } }) });
     if (canEdit) actions.push({ label: t('m.post.edit'), icon: 'create-outline', onPress: () => setEditing(true) });
+    if (canEditTranscript) actions.push({ label: t('transcript.edit'), icon: 'mic-outline', onPress: () => setTranscriptOpen(true) });
     if (canPin) actions.push({ label: t(pinned ? 'post.unpin' : 'post.pin'), icon: 'pin-outline', onPress: () => void togglePin() });
     if (me) actions.push({ label: t('m.boards.saveTo'), icon: 'bookmarks-outline', onPress: saveTo });
     // Watch together: a reel or video post, with people in a chat at the same time.
@@ -767,6 +772,7 @@ function PostCardView({
         />
       ) : null}
       {history ? <HistorySheet postId={post.id} onClose={() => setHistory(false)} /> : null}
+      {transcriptOpen ? <TranscriptSheet post={post} onClose={() => setTranscriptOpen(false)} onChanged={setPost} /> : null}
       {repostersOpen ? <RepostersSheet postId={post.id} onClose={() => setRepostersOpen(false)} /> : null}
       {remembering ? <AddToMemorySheet postId={post.id} onClose={() => setRemembering(false)} /> : null}
       {menu.sheet}
@@ -896,6 +902,16 @@ export function PostAudio({ media }: { media: MediaItem }) {
   const [transcript, setTranscript] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [failed, setFailed] = useState(false);
+  // An edited transcript is a new file: forget the old words, and load the new ones if it's open.
+  const shownUrl = useRef(track?.url);
+  useEffect(() => {
+    if (shownUrl.current === track?.url) return;
+    shownUrl.current = track?.url;
+    setTranscript(null);
+    setFailed(false);
+    if (open && track) fetchTranscript(track.url);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [track?.url]);
   // Back to the start when it finishes, ready to play again.
   useEffect(() => {
     if (!status.didJustFinish) return;
@@ -911,16 +927,19 @@ export function PostAudio({ media }: { media: MediaItem }) {
     void setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).catch(() => {});
     player.play();
   };
+  function fetchTranscript(url: string) {
+    setFailed(false);
+    fetch(mediaUrl(url))
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
+      .then(
+        (vtt) => shownUrl.current === url && setTranscript(transcriptText(vtt)),
+        () => shownUrl.current === url && setFailed(true),
+      );
+  }
   const showTranscript = () => {
     setOpen((v) => !v);
     if (!track || transcript !== null) return;
-    setFailed(false);
-    fetch(mediaUrl(track.url))
-      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
-      .then(
-        (vtt) => setTranscript(transcriptText(vtt)),
-        () => setFailed(true),
-      );
+    fetchTranscript(track.url);
   };
   return (
     <View style={{ gap: space[2], backgroundColor: c.surfaceSunken, borderRadius: radius.md, padding: space[2] }}>

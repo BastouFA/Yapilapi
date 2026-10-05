@@ -1020,6 +1020,7 @@ export const es: Record<string, string> = {
   'Add the words for this caption, or remove it.': 'Añade el texto de este subtítulo o quítalo.',
   'A caption must end after it starts.': 'Un subtítulo debe terminar después de empezar.',
   'This caption starts after the video ends.': 'Este subtítulo empieza después de que termine el video.',
+  'This line starts after the recording ends.': 'Esta línea empieza después de que termine la grabación.',
   'Use a language code such as en, fr or pt-BR.': 'Usa un código de idioma como en, fr o pt-BR.',
   'Add a label, such as English.': 'Añade una etiqueta, como Español.',
   'You can make up to 20 clips at once.': 'Puedes crear hasta 20 clips a la vez.',

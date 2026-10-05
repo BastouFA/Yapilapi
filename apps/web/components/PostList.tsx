@@ -42,6 +42,7 @@ import { BoostSheet, type BoostChoices } from './Boost';
 import { SaveToSheet } from './Boards';
 import { CommentsSheet } from './Comments';
 import { ReportSheet } from './ReportSheet';
+import { TranscriptSheet } from './TranscriptEditor';
 
 export { ReportSheet };
 import { SuggestAltText } from './AiHelpers';
@@ -94,6 +95,7 @@ export function PostList({
   const [saveTo, setSaveTo] = useState<Post | null>(null);
   const [editing, setEditing] = useState<Post | null>(null);
   const [historyFor, setHistoryFor] = useState<Post | null>(null);
+  const [transcriptFor, setTranscriptFor] = useState<Post | null>(null);
   // Video posts: sharing offers "Watch together" too, which picks a chat.
   const [shareFor, setShareFor] = useState<Post | null>(null);
   const [watchFor, setWatchFor] = useState<Post | null>(null);
@@ -442,6 +444,7 @@ export function PostList({
             onManageCollaborators={me ? (post) => setCoauthorsFor(post.id) : undefined}
             onEdit={me ? setEditing : undefined}
             onHistory={setHistoryFor}
+            onEditTranscript={me ? setTranscriptFor : undefined}
           />
           {ad && i === Math.min(2, posts.length - 1) ? renderAd(ad) : null}
         </Fragment>
@@ -502,6 +505,7 @@ export function PostList({
       </BottomSheet>
       <WatchChatPicker post={watchFor} onClose={() => setWatchFor(null)} />
 
+      <TranscriptSheet post={transcriptFor} onClose={() => setTranscriptFor(null)} onChanged={(p) => patch(p.id, () => p)} />
       <Reposters postId={repostersOf} onClose={() => setRepostersOf(null)} />
       <BottomSheet open={!!why} onClose={() => setWhy(null)} title={t('post.why')}>
         <ul className="stack-sm" style={{ paddingInlineStart: 20, margin: 0 }}>

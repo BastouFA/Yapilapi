@@ -1008,6 +1008,7 @@ export const yo: Record<string, string> = {
   'Add the words for this caption, or remove it.': 'Fi ọ̀rọ̀ kún àkọlé ọ̀rọ̀ yìí, tàbí yọ ọ́ kúrò.',
   'A caption must end after it starts.': 'Àkọlé ọ̀rọ̀ gbọ́dọ̀ parí lẹ́yìn tí ó bá bẹ̀rẹ̀.',
   'This caption starts after the video ends.': 'Àkọlé ọ̀rọ̀ yìí bẹ̀rẹ̀ lẹ́yìn tí fídíò parí.',
+  'This line starts after the recording ends.': 'Ìlà yìí bẹ̀rẹ̀ lẹ́yìn tí ohùn tí a gbà sílẹ̀ parí.',
   'Use a language code such as en, fr or pt-BR.': 'Lo kóòdù èdè bíi en, fr tàbí pt-BR.',
   'Add a label, such as English.': 'Fi orúkọ kún un, bíi English.',
   'You can make up to 20 clips at once.': 'O lè ṣe àgékù tí kò ju 20 lọ ní ẹ̀ẹ̀kan.',

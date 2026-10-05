@@ -282,14 +282,27 @@ export function PostAudio({ media, locale = 'en' }: { media: MediaItem; locale?:
   const track = tracks.find((c) => c.lang.split('-')[0] === locale.split('-')[0]) ?? tracks[0];
   const [text, setText] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
-  const load = () => {
-    if (!track || text !== null) return;
+  // An edited transcript is a new file: forget the old words, and load the new ones if it's open.
+  const details = useRef<HTMLDetailsElement>(null);
+  const shownUrl = useRef(track?.url);
+  useEffect(() => {
+    if (shownUrl.current === track?.url) return;
+    shownUrl.current = track?.url;
+    setText(null);
     setFailed(false);
-    fetch(track.url)
+    if (details.current?.open) load(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [track?.url]);
+  const load = (again = false) => {
+    if (!track || (text !== null && !again)) return;
+    setFailed(false);
+    const url = track.url;
+    fetch(url)
       .then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
       .then(
-        (vtt) => setText(transcriptText(vtt)),
-        () => setFailed(true),
+        // Words of a transcript that has since changed are dropped.
+        (vtt) => shownUrl.current === url && setText(transcriptText(vtt)),
+        () => shownUrl.current === url && setFailed(true),
       );
   };
   return (
@@ -301,7 +314,7 @@ export function PostAudio({ media, locale = 'en' }: { media: MediaItem; locale?:
         <audio src={media.url} controls preload="metadata" aria-label={tr('ds.audio.label', locale)} />
       </div>
       {track ? (
-        <details className="yp-audio__transcript" onToggle={(e) => e.currentTarget.open && load()}>
+        <details ref={details} className="yp-audio__transcript" onToggle={(e) => e.currentTarget.open && load()}>
           <summary>
             <Icon name="chevron-down" size={16} />
             {tr('ds.audio.transcript', locale)}
@@ -867,6 +880,8 @@ export interface PostCardProps {
   onEdit?: (post: Post) => void;
   /** Open the versions of an edited post's text (the "Edited" label). */
   onHistory?: (post: Post) => void;
+  /** Your own audio post: see and fix its recording's transcript. */
+  onEditTranscript?: (post: Post) => void;
 }
 
 type Person = Pick<PublicUser, 'id' | 'username' | 'displayName'>;
@@ -1187,6 +1202,7 @@ export function PostCard({
   onManageCollaborators,
   onEdit,
   onHistory,
+  onEditTranscript,
 }: PostCardProps) {
   const tt = (k: MessageKey) => t(k, locale);
   // Why it's in your feed, in your language.
@@ -1212,6 +1228,8 @@ export function PostCard({
   }
   if (onReport && !isOwn && !coauthor) menu.push({ label: tt('post.report'), icon: 'flag', danger: true, onSelect: () => onReport(post) });
   if (onEdit && isOwn && !post.status) menu.push({ label: tt('m.post.edit'), icon: 'edit', onSelect: () => onEdit(post) });
+  if (onEditTranscript && isOwn && post.media.length === 1 && post.media[0]!.kind === 'audio')
+    menu.push({ label: tt('transcript.edit'), icon: 'mic', onSelect: () => onEditTranscript(post) });
   if (onPin && isOwn && !post.community) menu.push({ label: tt(post.pinned ? 'post.unpin' : 'post.pin'), icon: 'bookmark', onSelect: () => onPin(post) });
   if (onManageCollaborators && isOwn && !post.community)
     menu.push({
