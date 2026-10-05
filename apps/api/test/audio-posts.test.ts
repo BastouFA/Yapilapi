@@ -166,3 +166,126 @@ describe('audio posts', () => {
     t.ctx.transcription = null;
   });
 });
+
+describe('the author fixes the transcript', () => {
+  const transcribe = (u: TestUser, id: string, lang = 'en') => as(t.app, u).post(`/v1/media/${id}/captions/transcribe`, { lang, label: 'English' });
+  const drain = async (provider: TranscriptionProvider) => {
+    const handlers = studioJobHandlers({ db: db(), storage: t.ctx.storage, transcription: provider });
+    for (let i = 0; i < 20; i++) if (!(await runJobs(handlers))) break;
+  };
+
+  it('edits it, and the post shows the new words; a line must fit in the recording', async () => {
+    const u = await signUp(t.app);
+    const rec = await recording(u, 20_000);
+    const r = await post(u, { body: '[Dev data] A voice note', media: [{ ...rec, kind: 'audio' }] });
+    expect(r.status).toBe(201);
+    const put = (cues: unknown[]) => as(t.app, u).put(`/v1/media/${rec.id}/captions/en`, { label: 'English', cues });
+
+    const first = await put([{ start: 0, end: 2, text: 'Helo everyone' }]);
+    expect(first.status).toBe(200);
+    expect(first.body.track).toMatchObject({ lang: 'en', source: 'manual', status: 'ready', cueCount: 1 });
+    const fixed = await put([
+      { start: 0, end: 2, text: 'Hello everyone' },
+      { start: 2, end: 4.5, text: 'and welcome.' },
+    ]);
+    expect(fixed.status).toBe(200);
+    expect(fixed.body.track.cueCount).toBe(2);
+    // A new file each time, so a listener never gets the old words from a cache.
+    expect(fixed.body.track.url).not.toBe(first.body.track.url);
+    expect((await as(t.app, u).get(`/v1/media/${rec.id}/captions/en`)).body.cues).toEqual([
+      { start: 0, end: 2, text: 'Hello everyone' },
+      { start: 2, end: 4.5, text: 'and welcome.' },
+    ]);
+    const shown = (await as(t.app, await signUp(t.app)).get(`/v1/posts/${r.body.post.id}`)).body.post;
+    expect(shown.media[0].captions).toEqual([{ lang: 'en', label: 'English', url: fixed.body.track.url }]);
+
+    // The recording is 20 seconds long: a line can't start at or after its end.
+    const late = await put([{ start: 20, end: 21, text: 'Too late' }]);
+    expect(late.status).toBe(400);
+    expect(late.body.error.details.fields['cues.0.start']).toBe('This line starts after the recording ends.');
+    const backwards = await put([{ start: 3, end: 2, text: 'Backwards' }]);
+    expect(backwards.status).toBe(400);
+    expect(Object.keys(backwards.body.error.details.fields)).toEqual(['cues.0.end']);
+    expect((await put([{ start: 19.5, end: 20, text: 'Just in time' }])).status).toBe(200);
+  });
+
+  it('deletes it: the post has no transcript any more', async () => {
+    const u = await signUp(t.app);
+    const rec = await recording(u, 10_000);
+    const r = await post(u, { body: 'x', media: [{ ...rec, kind: 'audio' }] });
+    await as(t.app, u).put(`/v1/media/${rec.id}/captions/fr`, { label: 'Français', cues: [{ start: 0, end: 1, text: 'Salut' }] });
+    expect((await as(t.app, u).del(`/v1/media/${rec.id}/captions/fr`)).status).toBe(200);
+    expect((await as(t.app, u).get(`/v1/media/${rec.id}/captions`)).body.items).toEqual([]);
+    expect((await as(t.app, u).get(`/v1/posts/${r.body.post.id}`)).body.post.media[0].captions).toEqual([]);
+    expect((await as(t.app, u).del(`/v1/media/${rec.id}/captions/fr`)).status).toBe(404);
+  });
+
+  it('makes it again automatically, once the old one is gone or failed', async () => {
+    const u = await signUp(t.app);
+    const up = await upload(u, 'voice.m4a', 'audio/mp4', tone(2));
+    const r = await post(u, { body: 'x', media: [{ id: up.id, url: up.url, kind: 'audio' }] });
+    expect(r.status).toBe(201);
+
+    // Without speech-to-text the app is told, and offers writing it instead.
+    t.ctx.transcription = null;
+    expect((await as(t.app, u).get(`/v1/media/${up.id}/captions`)).body.autoCaptions).toBe(false);
+    expect((await transcribe(u, up.id)).status).toBe(501);
+
+    let said = 'WEBVTT\n\n';
+    const provider: TranscriptionProvider = { name: 'fake', transcribe: async () => said };
+    t.ctx.transcription = provider;
+    try {
+      expect((await as(t.app, u).get(`/v1/media/${up.id}/captions`)).body.autoCaptions).toBe(true);
+      // A recording is ready as uploaded: nothing to wait for.
+      const made = await transcribe(u, up.id);
+      expect(made.status).toBe(202);
+      expect(made.body.track).toMatchObject({ status: 'processing', source: 'auto' });
+      expect((await transcribe(u, up.id)).status).toBe(409);
+      await drain(provider);
+      // Nothing was said: it failed, with the reason as a code.
+      let items = (await as(t.app, u).get(`/v1/media/${up.id}/captions`)).body.items;
+      expect(items).toEqual([expect.objectContaining({ lang: 'en', status: 'failed', errorCode: 'no_speech' })]);
+
+      // A failed one can be made again.
+      said = 'WEBVTT\n\n00:00.000 --> 00:01.500\nHello again\n';
+      expect((await transcribe(u, up.id)).status).toBe(202);
+      await drain(provider);
+      items = (await as(t.app, u).get(`/v1/media/${up.id}/captions`)).body.items;
+      expect(items).toEqual([expect.objectContaining({ lang: 'en', status: 'ready', source: 'auto', cueCount: 1, errorCode: null })]);
+      expect((await as(t.app, u).get(`/v1/media/${up.id}/captions/en`)).body.cues).toEqual([{ start: 0, end: 1.5, text: 'Hello again' }]);
+
+      // A ready one is deleted first.
+      expect((await transcribe(u, up.id)).status).toBe(409);
+      expect((await as(t.app, u).del(`/v1/media/${up.id}/captions/en`)).status).toBe(200);
+      expect((await transcribe(u, up.id)).status).toBe(202);
+    } finally {
+      t.ctx.transcription = null;
+    }
+  }, 120_000);
+
+  it('is the author’s alone: someone else can read it but not change, delete or remake it', async () => {
+    const u = await signUp(t.app);
+    const other = await signUp(t.app);
+    const rec = await recording(u, 10_000);
+    await post(u, { body: 'x', media: [{ ...rec, kind: 'audio' }] });
+    await as(t.app, u).put(`/v1/media/${rec.id}/captions/en`, { label: 'English', cues: [{ start: 0, end: 1, text: 'Mine' }] });
+    // Being made, it's for the author's eyes only.
+    await db().query(`INSERT INTO caption_tracks (media_id, lang, label, source, status) VALUES ($1,'fr','Français','auto','processing')`, [rec.id]);
+
+    t.ctx.transcription = { name: 'fake', transcribe: async () => 'WEBVTT\n\n' };
+    try {
+      const seen = (await as(t.app, other).get(`/v1/media/${rec.id}/captions`)).body;
+      expect(seen.items.map((x: { lang: string }) => x.lang)).toEqual(['en']);
+      expect(seen.autoCaptions).toBeUndefined();
+      expect((await as(t.app, other).put(`/v1/media/${rec.id}/captions/en`, { label: 'English', cues: [{ start: 0, end: 1, text: 'Theirs' }] })).status).toBe(
+        404,
+      );
+      expect((await as(t.app, other).del(`/v1/media/${rec.id}/captions/en`)).status).toBe(404);
+      expect((await transcribe(other, rec.id, 'sw')).status).toBe(404);
+      expect((await as(t.app, null).put(`/v1/media/${rec.id}/captions/en`, { label: 'English', cues: [] })).status).toBe(401);
+    } finally {
+      t.ctx.transcription = null;
+    }
+    expect((await as(t.app, u).get(`/v1/media/${rec.id}/captions/en`)).body.cues).toEqual([{ start: 0, end: 1, text: 'Mine' }]);
+  });
+});

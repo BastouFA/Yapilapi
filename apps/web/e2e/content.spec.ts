@@ -89,3 +89,34 @@ test('an audio post plays in the card, and its transcript opens from the keyboar
   const results = await new AxeBuilder({ page }).include('.yp-audio').analyze();
   expect(results.violations.map((v) => v.id)).toEqual([]);
 });
+
+test('the author fixes a line of their recording’s transcript, and the post shows it', async ({ page }) => {
+  const up = await page.request.post('/api/v1/media', { multipart: { file: { name: 'tone.wav', mimeType: 'audio/wav', buffer: toneWav(2) } } });
+  const { media } = await up.json();
+  const { post } = await (
+    await page.request.post('/api/v1/posts', {
+      data: { body: '[Dev data] A voice note to fix', visibility: 'friends', media: [{ id: media.id, url: media.url, kind: 'audio' }] },
+    })
+  ).json();
+  await page.request.put(`/api/v1/media/${media.id}/captions/en`, {
+    data: { label: 'English', cues: [{ start: 0, end: 1.5, text: 'Helo from the recordin.' }] },
+  });
+  await page.goto(`/p/${post.id}`);
+  const transcript = page.locator('.yp-audio__transcript p');
+  await page.locator('.yp-audio__transcript summary').click();
+  await expect(transcript).toHaveText('Helo from the recordin.');
+  await page.getByRole('button', { name: 'Post options' }).first().click();
+  await page.getByRole('menuitem', { name: 'Edit transcript' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Edit transcript' });
+  const line = sheet.getByRole('textbox', { name: 'Line 1 text' });
+  await expect(line).toHaveValue('Helo from the recordin.');
+  await line.fill('Hello from the recording.');
+  await sheet.getByRole('button', { name: 'Save transcript' }).click();
+  await expect(page.getByText('Transcript saved.')).toBeVisible();
+  const results = await new AxeBuilder({ page }).include('.yp-sheet').analyze();
+  expect(results.violations.map((v) => v.id)).toEqual([]);
+  await page.keyboard.press('Escape');
+  await expect(sheet).toBeHidden();
+  // The post now has the new file: its open Transcript reads the new words.
+  await expect(transcript).toHaveText('Hello from the recording.');
+});

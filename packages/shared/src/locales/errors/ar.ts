@@ -995,6 +995,7 @@ export const ar: Record<string, string> = {
   'Add the words for this caption, or remove it.': 'أضف كلمات هذه الترجمة المرئية، أو أزلها.',
   'A caption must end after it starts.': 'يجب أن تنتهي الترجمة المرئية بعد وقت بدايتها.',
   'This caption starts after the video ends.': 'تبدأ هذه الترجمة المرئية بعد نهاية الفيديو.',
+  'This line starts after the recording ends.': 'يبدأ هذا السطر بعد نهاية التسجيل.',
   'Use a language code such as en, fr or pt-BR.': 'استخدم رمز لغة مثل en أو fr أو pt-BR.',
   'Add a label, such as English.': 'أضف تسمية، مثل English.',
   'You can make up to 20 clips at once.': 'يمكنك صنع 20 مقطعًا في المرة الواحدة كحد أقصى.',

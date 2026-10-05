@@ -1023,6 +1023,7 @@ export const sw: Record<string, string> = {
   'Add the words for this caption, or remove it.': 'Ongeza maneno ya manukuu haya, au uyaondoe.',
   'A caption must end after it starts.': 'Manukuu lazima yaishe baada ya kuanza.',
   'This caption starts after the video ends.': 'Manukuu haya yanaanza baada ya video kuisha.',
+  'This line starts after the recording ends.': 'Mstari huu unaanza baada ya rekodi kuisha.',
   'Use a language code such as en, fr or pt-BR.': 'Tumia msimbo wa lugha kama en, fr au pt-BR.',
   'Add a label, such as English.': 'Ongeza lebo, kama Kiswahili.',
   'You can make up to 20 clips at once.': 'Unaweza kutengeneza hadi vipande 20 kwa wakati mmoja.',

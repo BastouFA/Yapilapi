@@ -1020,6 +1020,7 @@ export const pt: Record<string, string> = {
   'Add the words for this caption, or remove it.': 'Adicione o texto desta legenda ou remova-a.',
   'A caption must end after it starts.': 'Uma legenda precisa terminar depois de começar.',
   'This caption starts after the video ends.': 'Esta legenda começa depois do fim do vídeo.',
+  'This line starts after the recording ends.': 'Esta linha começa depois do fim da gravação.',
   'Use a language code such as en, fr or pt-BR.': 'Use um código de idioma como en, fr ou pt-BR.',
   'Add a label, such as English.': 'Adicione um rótulo, como Português.',
   'You can make up to 20 clips at once.': 'Você pode criar até 20 clipes de uma vez.',

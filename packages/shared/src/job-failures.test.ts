@@ -7,6 +7,7 @@ import {
   RECAP_ERROR_KEYS,
   SCHEDULED_POST_FAILURE_KEYS,
   captionErrorText,
+  transcriptErrorText,
   isFailureCode,
   mediaEditErrorText,
   recapErrorText,
@@ -113,6 +114,9 @@ describe('the last sentences the API wrote in English', () => {
     expect(recapErrorText({ error: null }, tr('fr').t)).toBeNull();
     expect(mediaEditErrorText({ errorCode: 'process_failed', error: 'x' }, tr('es').t)).toBe(t('videoEditor.error.processFailed', 'es'));
     expect(captionErrorText({ errorCode: 'no_speech', error: 'x' }, tr('sw').t)).toBe(t('videoEditor.captions.error.noSpeech', 'sw'));
+    // A recording's transcript says recording, not video.
+    expect(transcriptErrorText({ errorCode: 'no_speech', error: 'x' }, tr('en').t)).toBe('No speech was found in this recording.');
+    expect(transcriptErrorText({ error: 'Old English' }, tr('fr').t)).toBe('Old English');
     expect(scheduledFailureText({ failureCode: 'left_chat', failure: 'x' }, tr('en').t)).toBe("You're no longer in this chat.");
     expect(storySendFailureText({ code: 'cannot_message', message: 'x' }, tr('ar').t)).toBe(t('chat.failure.cannotMessage', 'ar'));
     expect(isFailureCode(RECAP_ERROR_KEYS, 'failed')).toBe(true);

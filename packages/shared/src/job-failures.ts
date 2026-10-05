@@ -31,6 +31,15 @@ export const CAPTION_ERROR_KEYS: Record<CaptionErrorCode, MessageKey> = {
   failed: 'videoEditor.captions.error.failed',
 };
 
+/** The same reasons for a recording's transcript (an audio post), which isn't a video. */
+export const TRANSCRIPT_ERROR_KEYS: Record<CaptionErrorCode, MessageKey> = {
+  not_set_up: 'transcript.error.notSetUp',
+  no_sound: 'transcript.error.noSound',
+  no_speech: 'transcript.error.noSpeech',
+  too_long: 'transcript.error.tooLong',
+  failed: 'transcript.error.failed',
+};
+
 export const MESSAGE_FAILURE_KEYS: Record<MessageFailureCode, MessageKey> = {
   left_chat: 'chat.failure.leftChat',
   unavailable: 'chat.failure.unavailable',
@@ -76,6 +85,10 @@ export const mediaEditErrorText = (e: { errorCode?: MediaEditErrorCode | null; e
 
 /** Why automatic captions couldn't be made. */
 export const captionErrorText = (c: { errorCode?: CaptionErrorCode | null; error?: string | null }, t: T) => coded(CAPTION_ERROR_KEYS, c.errorCode, c.error, t);
+
+/** Why a recording's automatic transcript couldn't be made. */
+export const transcriptErrorText = (c: { errorCode?: CaptionErrorCode | null; error?: string | null }, t: T) =>
+  coded(TRANSCRIPT_ERROR_KEYS, c.errorCode, c.error, t);
 
 /** Why a message scheduled for later wasn't sent. */
 export const scheduledFailureText = (s: { failureCode?: MessageFailureCode | null; failure?: string | null }, t: T) =>
