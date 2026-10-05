@@ -47,7 +47,8 @@ export const EVENT_SELECT = `
          (SELECT count(*) FROM event_attendees WHERE event_id = e.id AND status = 'going') AS going,
          (SELECT count(*) FROM event_attendees WHERE event_id = e.id AND status = 'interested') AS interested,
          (SELECT status FROM event_attendees WHERE event_id = e.id AND user_id = $1) AS my_rsvp,
-         coalesce(e.host_id = $1 OR EXISTS (SELECT 1 FROM event_cohosts ec WHERE ec.event_id = e.id AND ec.user_id = $1), false) AS can_check_in
+         coalesce(e.host_id = $1 OR EXISTS (SELECT 1 FROM event_cohosts ec WHERE ec.event_id = e.id AND ec.user_id = $1), false) AS can_check_in,
+         EXISTS (SELECT 1 FROM event_tickets et WHERE et.event_id = e.id AND et.holder_id = $1 AND et.status = 'valid') AS has_ticket
   FROM events e JOIN profiles pr ON pr.user_id = e.host_id
   LEFT JOIN places pl ON pl.id = e.place_id LEFT JOIN communities c ON c.id = e.community_id`;
 
@@ -71,6 +72,7 @@ export function toEvent(r: Record<string, any>): EventItem {
     onWaitlist: r.my_rsvp === 'waitlist',
     ticketTransfers: r.ticket_transfers,
     canCheckIn: !!r.can_check_in,
+    hasTicket: !!r.has_ticket,
   };
 }
 

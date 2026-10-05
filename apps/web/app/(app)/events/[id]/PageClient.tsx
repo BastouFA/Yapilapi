@@ -195,7 +195,7 @@ export default function EventPageClient({ isPublic }: { isPublic: boolean }) {
         <p style={{ margin: 0 }}>{t('m.event.cancelBody')}</p>
       </Dialog>
 
-      {ev.canCheckIn || (ev.myRsvp === 'going' && !hosting) ? (
+      {ev.canCheckIn || ((ev.myRsvp === 'going' || ev.hasTicket) && !hosting) ? (
         <div className="row">
           {ev.canCheckIn ? (
             <Link href={`/events/${id}/check-in`} className="yp-btn yp-btn--primary">
@@ -203,7 +203,7 @@ export default function EventPageClient({ isPublic }: { isPublic: boolean }) {
               {t('checkin.open')}
             </Link>
           ) : null}
-          {ev.myRsvp === 'going' && !hosting ? (
+          {(ev.myRsvp === 'going' || ev.hasTicket) && !hosting ? (
             <Link href="/tickets" className="yp-btn yp-btn--secondary">
               <Icon name="ticket" />
               {t('tickets.yourTicket')}
@@ -212,7 +212,7 @@ export default function EventPageClient({ isPublic }: { isPublic: boolean }) {
         </div>
       ) : null}
 
-      {signedOut ? null : <EventTickets event={ev} hosting={hosting} over={over} />}
+      {signedOut ? null : <EventTickets event={ev} hosting={hosting} over={over} onBought={load} />}
 
       {ev.description ? <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{ev.description}</p> : null}
 

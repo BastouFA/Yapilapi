@@ -176,8 +176,11 @@ describe('events', () => {
     expect(list.body.items).toMatchObject([{ title: 'General', priceCents: 1500, currency: 'USD', inventory: 50, soldOut: false }]);
     const order = await as(t.app, guest).post('/v1/orders', { items: [{ productId: made.body.ticket.id, quantity: 1 }], idempotencyKey: `k_${Date.now()}a` });
     expect(order.status).toBe(201);
+    expect((await as(t.app, guest).get(`/v1/events/${id}`)).body.event.hasTicket).toBe(false);
     await as(t.app, guest).post('/v1/payments/dev/complete', { orderId: order.body.order.id });
     expect(await validTickets(guest, id)).toHaveLength(1);
+    // The event says so, for a link to the ticket.
+    expect((await as(t.app, guest).get(`/v1/events/${id}`)).body.event.hasTicket).toBe(true);
     expect((await as(t.app, host).del(`/v1/events/${id}/tickets/${made.body.ticket.id}`)).status).toBe(204);
     expect((await as(t.app, guest).get(`/v1/events/${id}/tickets`)).body.items).toHaveLength(0);
     // The ticket bought before still works.

@@ -273,12 +273,12 @@ export default function EventScreen() {
           ) : null}
         </View>
       )}
-      {event.canCheckIn || (event.myRsvp === 'going' && !hosting) ? (
+      {event.canCheckIn || ((event.myRsvp === 'going' || event.hasTicket) && !hosting) ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
           {event.canCheckIn ? (
             <Button label={t('checkin.open')} icon="scan-outline" onPress={() => router.push(`/check-in/${encodeURIComponent(event.id)}`)} />
           ) : null}
-          {event.myRsvp === 'going' && !hosting ? (
+          {(event.myRsvp === 'going' || event.hasTicket) && !hosting ? (
             <Button label={t('tickets.yourTicket')} icon="ticket-outline" variant="secondary" onPress={() => router.push('/tickets')} />
           ) : null}
         </View>

@@ -953,6 +953,8 @@ export interface EventItem {
   ticketTransfers: boolean;
   /** You host or co-host it: you see the guest list and check people in. */
   canCheckIn: boolean;
+  /** You hold a ticket for it that works (an RSVP ticket, one you bought, or one a friend gave you). */
+  hasTicket?: boolean;
 }
 
 export interface NotificationItem {

@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card, List, ListItem, Select, TextField } from '@yapilapi/design-system';
 import type { EventTicketType } from '@yapilapi/api-client';
@@ -14,7 +13,7 @@ import { useSession } from '@/app/providers';
  * kinds of ticket on sale and stops selling them. Nothing shows when nothing is on sale, except to
  * the host of an event still to come.
  */
-export function EventTickets({ event, hosting, over }: { event: EventItem; hosting: boolean; over: boolean }) {
+export function EventTickets({ event, hosting, over, onBought }: { event: EventItem; hosting: boolean; over: boolean; onBought?: () => void }) {
   const { t, tp, toast, locale, flags, me } = useSession();
   // Selling is for adults (the server says so too).
   const canSell = hosting && !over && !me?.under18;
@@ -81,6 +80,7 @@ export function EventTickets({ event, hosting, over }: { event: EventItem; hosti
                       onPaid={() => {
                         toast(t('eventTickets.bought'));
                         load();
+                        onBought?.();
                       }}
                     />
                   )
@@ -88,11 +88,6 @@ export function EventTickets({ event, hosting, over }: { event: EventItem; hosti
               />
             ))}
           </List>
-        ) : null}
-        {!hosting && items.length ? (
-          <Link href="/tickets" className="muted">
-            {t('tickets.title')}
-          </Link>
         ) : null}
         {canSell ? <SellTickets eventId={event.id} onAdded={load} /> : null}
       </div>
