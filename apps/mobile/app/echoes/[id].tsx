@@ -55,7 +55,8 @@ export default function EchoesScreen() {
 
   const header = (
     <View style={{ gap: space[3], marginBottom: space[3] }}>
-      <Pressable accessibilityRole="link" onPress={() => router.push({ pathname: '/reels', params: { start: original.id } })}>
+      {/* One line of text, about 20pt: the touch area reaches 44. */}
+      <Pressable accessibilityRole="link" onPress={() => router.push({ pathname: '/reels', params: { start: original.id } })} hitSlop={{ top: 12, bottom: 12 }}>
         <Text style={[{ color: c.yapi, fontWeight: '700', fontSize: 15 }, userText]}>{t('echo.list.intro', { name: original.author.displayName })}</Text>
       </Pressable>
       {count ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{tp('echo.count', count, { count: number(count) })}</Text> : null}

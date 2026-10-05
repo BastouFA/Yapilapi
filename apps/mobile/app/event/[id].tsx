@@ -185,7 +185,8 @@ export default function EventScreen() {
             accessibilityRole="link"
             onPress={() => router.push(`/c/${event.community!.slug}`)}
             hitSlop={8}
-            style={{ alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center' }}
+            // minWidth with the 8pt slop: a short name still gets a touch area 44 wide.
+            style={{ alignSelf: 'flex-start', minHeight: 32, minWidth: 28, justifyContent: 'center' }}
           >
             <Text style={[{ color: c.yapi, fontWeight: '700' }, userText]}>{event.community.name}</Text>
           </Pressable>
@@ -200,7 +201,13 @@ export default function EventScreen() {
           </Text>
         ) : null}
         {event.place && !event.online ? (
-          <Pressable accessibilityRole="link" onPress={() => router.push(`/place/${event.place!.id}`)} style={{ minHeight: 32, justifyContent: 'center' }}>
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => router.push(`/place/${event.place!.id}`)}
+            // 32pt tall; the touch area reaches 44.
+            hitSlop={6}
+            style={{ minHeight: 32, justifyContent: 'center' }}
+          >
             <Line icon="location-outline" text={where} link />
           </Pressable>
         ) : joinLink ? (

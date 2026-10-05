@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform, ScrollView, Share, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Share, Text, View } from 'react-native';
 import type { InvitesInfo } from '../../../packages/api-client/src/index';
 import { client, errorMessage } from '../lib/api';
 import { useT } from '../lib/i18n';
@@ -85,20 +85,22 @@ export default function InviteScreen() {
         </Text>
         {info.people.length ? (
           info.people.map((p) => (
-            <View key={p.user.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
+            // The whole 36pt row opens the profile (the name alone was about 20pt tall); the touch area reaches 44.
+            <Pressable
+              key={p.user.id}
+              accessibilityRole="link"
+              onPress={() => router.push(`/u/${p.user.username}`)}
+              hitSlop={{ top: 4, bottom: 4 }}
+              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space[3], opacity: pressed ? 0.7 : 1 })}
+            >
               <Avatar name={p.user.displayName} url={p.user.avatarUrl} size={36} />
               <View style={{ flex: 1 }}>
-                <Text
-                  accessibilityRole="link"
-                  onPress={() => router.push(`/u/${p.user.username}`)}
-                  style={[{ color: c.ink, fontWeight: '700' }, userText]}
-                  numberOfLines={1}
-                >
+                <Text style={[{ color: c.ink, fontWeight: '700' }, userText]} numberOfLines={1}>
                   {p.user.displayName}
                 </Text>
                 <Text style={{ color: c.inkMuted, fontSize: 12 }}>{p.confirmed ? t('invite.confirmed') : t('invite.pending')}</Text>
               </View>
-            </View>
+            </Pressable>
           ))
         ) : (
           <EmptyState title={t('invite.empty')} />

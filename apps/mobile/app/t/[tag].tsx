@@ -138,15 +138,17 @@ export default function TagScreen() {
         ) : null}
       </View>
       {info.related.length ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+        // Wrapped rows sit space[4] apart so each 30pt chip's slop (8 up and down) reaches 44 without overlapping the next row.
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: space[4], columnGap: space[2] }}>
           {info.related.map((r) => (
             <Pressable
               key={r}
               accessibilityRole="link"
               onPress={() => router.push(`/t/${encodeURIComponent(r)}`)}
+              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
               style={{ backgroundColor: c.surfaceSunken, borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 6 }}
             >
-              <Text style={[{ color: c.ink, fontWeight: '600', fontSize: 13 }, userText]}>#{r}</Text>
+              <Text style={[{ color: c.ink, fontWeight: '600', fontSize: 13, lineHeight: 18 }, userText]}>#{r}</Text>
             </Pressable>
           ))}
         </View>

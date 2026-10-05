@@ -631,8 +631,9 @@ function CommunityComposer({ slug, communityId, name, onPosted }: { slug: string
               </Text>
             </View>
           ))}
+          {/* Links 4pt apart: each is 44pt tall itself, as slop would overlap the next one. */}
           {similar.posts.map((p) => (
-            <Pressable key={p.id} accessibilityRole="link" onPress={() => router.push(`/p/${p.id}`)} hitSlop={6}>
+            <Pressable key={p.id} accessibilityRole="link" onPress={() => router.push(`/p/${p.id}`)} style={{ minHeight: 44, justifyContent: 'center' }}>
               <Text style={[{ color: c.yapi, fontWeight: '600' }, userText]} numberOfLines={2}>
                 {p.body}
               </Text>
