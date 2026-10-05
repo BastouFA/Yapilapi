@@ -2,6 +2,9 @@
 
 import {
   noticeText,
+  AUDIO_ACCEPT,
+  AUDIO_POST_MAX_MS,
+  PLUS_AUDIO_POST_MAX_MS,
   COLLAGE_MAX_PHOTOS,
   COLLAGE_MIN_PHOTOS,
   COMMENT_POLICIES,
@@ -52,6 +55,7 @@ import { PhotoTagger, type DraftTag } from '@/components/PhotoTags';
 import { StoryStickerEditor, type DraftSticker } from '@/components/StoryStickerEditor';
 import { clipMax, draftMusic, MusicField, musicInput, soundAsTrack, type DraftMusic } from '@/components/MusicPicker';
 import { localInput, nextHour, scheduleBounds } from '@/lib/schedule';
+import { VoiceRecorder } from '@/components/ChatAttachments';
 import { useSession } from '../../providers';
 
 // The editors open full screen once photos or a video are picked, so they download then.
@@ -94,6 +98,7 @@ function Create() {
   // Data saver: what the videos just picked will cost to upload (photos are made smaller on their own).
   const [videoCost, setVideoCost] = useState<number | null>(null);
   const reelMax = me?.plus ? PLUS_REEL_MAX_SECONDS : REEL_MAX_SECONDS;
+  const audioMax = me?.plus ? PLUS_AUDIO_POST_MAX_MS : AUDIO_POST_MAX_MS;
   const router = useRouter();
   const params = useSearchParams();
   // Duet, remix or "Use this sound" links open Create as a reel, prefilled; "Add to your story" on a sound opens a story with it.
@@ -170,6 +175,8 @@ function Create() {
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<'publish' | 'draft' | 'schedule' | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // An audio post: one recording, made here or picked from a file.
+  const audioRef = useRef<HTMLInputElement>(null);
   // The collage editor, with the photos going into it; stories pick theirs with their own file input.
   const [collage, setCollage] = useState<{ photos: CollagePhoto[]; shape: CollageShape } | null>(null);
   const collageRef = useRef<HTMLInputElement>(null);
@@ -285,6 +292,14 @@ function Create() {
   const [editing, setEditing] = useState(false);
   const uploads = useRef<Promise<void>>(Promise.resolve());
   const pendingUploads = useRef(0);
+
+  /** A recording for an audio post: checked for length, then uploaded as it is. */
+  async function addRecording(f: File) {
+    if (audioRef.current) audioRef.current.value = '';
+    const seconds = await videoSeconds(f);
+    if (seconds * 1000 > audioMax + 500) return toast(t('compose.audio.tooLong', { minutes: audioMax / 60_000 }));
+    enqueueUpload(f, null);
+  }
 
   function choose(files: FileList | File[] | null) {
     if (!files?.length) return;
@@ -633,7 +648,17 @@ function Create() {
             <SimilarQuestions slug={communities.find((c) => c.id === communityId)!.slug} text={body} />
           ) : null}
 
-          {media.length ? (
+          {media[0]?.kind === 'audio' ? (
+            <div className="compose-audio">
+              <audio src={media[0].url} controls preload="metadata" aria-label={t('compose.audio.yours')} />
+              <Button size="sm" variant="ghost" icon="x" onClick={() => setMedia([])}>
+                {t('m.common.remove')}
+              </Button>
+              <p className="muted setting-hint" style={{ margin: 0 }}>
+                {t('compose.audio.hint')}
+              </p>
+            </div>
+          ) : media.length ? (
             <div className="thumbs">
               {media.map((m, i) => (
                 <div key={m.id} className="stack-sm" style={{ width: 96 }}>
@@ -753,13 +778,36 @@ function Create() {
               hidden
               onChange={(e) => choose(e.currentTarget.files)}
             />
-            <Button size="sm" variant="secondary" icon="image" loading={uploading} onClick={() => fileRef.current?.click()}>
-              {editing
-                ? t('m.editor.applying')
-                : progress !== null
-                  ? t('m.cover.uploading', { progress: new Intl.NumberFormat(locale, { style: 'percent' }).format(progress / 100) })
-                  : t(kind === 'reel' ? (media.length ? 'm.create.replaceVideo' : 'm.create.chooseVideo') : 'm.create.choosePhotoVideo')}
-            </Button>
+            {media[0]?.kind === 'audio' ? null : (
+              <Button size="sm" variant="secondary" icon="image" loading={uploading} onClick={() => fileRef.current?.click()}>
+                {editing
+                  ? t('m.editor.applying')
+                  : progress !== null
+                    ? t('m.cover.uploading', { progress: new Intl.NumberFormat(locale, { style: 'percent' }).format(progress / 100) })
+                    : t(kind === 'reel' ? (media.length ? 'm.create.replaceVideo' : 'm.create.chooseVideo') : 'm.create.choosePhotoVideo')}
+              </Button>
+            )}
+            {kind === 'post' && !media.length && !poll && !uploading ? (
+              <>
+                <VoiceRecorder
+                  startLabel={t('compose.audio.record')}
+                  doneLabel={t('compose.audio.done')}
+                  maxMs={audioMax}
+                  onError={toast}
+                  onRecorded={(f) => void addRecording(f)}
+                />
+                <input
+                  ref={audioRef}
+                  type="file"
+                  accept={AUDIO_ACCEPT}
+                  hidden
+                  onChange={(e) => e.currentTarget.files?.[0] && void addRecording(e.currentTarget.files[0])}
+                />
+                <Button size="sm" variant="secondary" icon="music" onClick={() => audioRef.current?.click()}>
+                  {t('compose.audio.file')}
+                </Button>
+              </>
+            ) : null}
             {kind === 'post' && media.filter((m) => m.kind === 'image').length >= COLLAGE_MIN_PHOTOS ? (
               <Button size="sm" variant="secondary" icon="image" disabled={uploading} onClick={openCollage}>
                 {t('collage.make')}
@@ -773,7 +821,7 @@ function Create() {
                 </Button>
               </>
             ) : null}
-            {kind === 'post' && !poll ? (
+            {kind === 'post' && !poll && media[0]?.kind !== 'audio' ? (
               <Button size="sm" variant="secondary" icon="poll" onClick={() => setPoll(['', ''])}>
                 {t('m.sticker.kind.poll')}
               </Button>

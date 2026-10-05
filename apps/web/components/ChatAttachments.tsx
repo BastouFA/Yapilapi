@@ -263,15 +263,23 @@ function EscapeToClose({ onClose }: { onClose: () => void }) {
 /**
  * Hold-free voice recording: tap the mic to start, then send or cancel. Uses the
  * browser's recorder (webm/opus in Chromium and Firefox, mp4/aac in Safari).
+ * The composer's "Record audio" uses it too, with a labelled button, its own
+ * length limit and "Done" in place of Send.
  */
 export function VoiceRecorder({
   onRecorded,
   onError,
   disabled,
+  startLabel,
+  doneLabel,
+  maxMs = 5 * 60_000,
 }: {
   onRecorded: (file: File, durationMs: number) => void;
   onError: (message: string) => void;
   disabled?: boolean;
+  startLabel?: string;
+  doneLabel?: string;
+  maxMs?: number;
 }) {
   const { t } = useSession();
   const [state, setState] = useState<'idle' | 'recording'>('idle');
@@ -286,7 +294,7 @@ export function VoiceRecorder({
     const timer = setInterval(() => {
       const ms = Date.now() - started.current;
       setElapsed(ms);
-      if (ms >= 5 * 60_000) stop(true); // five minutes at most
+      if (ms >= maxMs) stop(true); // what's recorded so far is kept at the limit
     }, 250);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -335,15 +343,21 @@ export function VoiceRecorder({
       <div className="voice-rec" role="group" aria-label={t('chat.recordingVoice')}>
         <span className="voice-rec__dot" aria-hidden />
         <span className="voice-rec__time" aria-live="off">
-          {clock(elapsed)}
+          {startLabel ? `${clock(elapsed)} / ${clock(maxMs)}` : clock(elapsed)}
         </span>
         <Button type="button" size="sm" variant="ghost" onClick={() => stop(false)}>
           {t('common.cancel')}
         </Button>
-        <Button type="button" size="sm" icon="send" onClick={() => stop(true)}>
-          {t('inbox.send')}
+        <Button type="button" size="sm" icon={doneLabel ? 'check' : 'send'} onClick={() => stop(true)}>
+          {doneLabel ?? t('inbox.send')}
         </Button>
       </div>
+    );
+  if (startLabel)
+    return (
+      <Button type="button" size="sm" variant="secondary" icon="mic" disabled={disabled} onClick={() => void start()}>
+        {startLabel}
+      </Button>
     );
   return (
     <button type="button" className="yp-action" aria-label={t('m.chat.record')} disabled={disabled} onClick={() => void start()}>

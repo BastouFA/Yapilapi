@@ -28,6 +28,7 @@ import {
   smallAvatarUrl,
   splitRichText,
   t,
+  transcriptText,
   type CaptionTrackRef,
   type EventItem,
   type MediaItem,
@@ -269,6 +270,47 @@ export interface MediaTagOptions {
   /** The post's original author can remove any tag. */
   canRemoveAny?: boolean;
   onRemoveTag?: (mediaId: string, tag: PhotoTag) => void;
+}
+
+/**
+ * An audio post: the browser's own player (keyboard and screen reader friendly) and, when the
+ * recording has one, its transcript, loaded the first time it's opened. The transcript in the
+ * reader's language is shown when there is one.
+ */
+export function PostAudio({ media, locale = 'en' }: { media: MediaItem; locale?: string }) {
+  const tracks = media.captions ?? [];
+  const track = tracks.find((c) => c.lang.split('-')[0] === locale.split('-')[0]) ?? tracks[0];
+  const [text, setText] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const load = () => {
+    if (!track || text !== null) return;
+    setFailed(false);
+    fetch(track.url)
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
+      .then(
+        (vtt) => setText(transcriptText(vtt)),
+        () => setFailed(true),
+      );
+  };
+  return (
+    <div className="yp-audio">
+      <div className="yp-audio__row">
+        <span className="yp-audio__icon" aria-hidden>
+          <Icon name="mic" />
+        </span>
+        <audio src={media.url} controls preload="metadata" aria-label={tr('ds.audio.label', locale)} />
+      </div>
+      {track ? (
+        <details className="yp-audio__transcript" onToggle={(e) => e.currentTarget.open && load()}>
+          <summary>
+            <Icon name="chevron-down" size={16} />
+            {tr('ds.audio.transcript', locale)}
+          </summary>
+          <p lang={track.lang}>{text ?? (failed ? tr('ds.audio.transcriptFailed', locale) : tr('ds.audio.transcriptLoading', locale))}</p>
+        </details>
+      ) : null}
+    </div>
+  );
 }
 
 export function MediaGrid({ media, tagOptions, locale = 'en' }: { media: MediaItem[]; tagOptions?: MediaTagOptions; locale?: string }) {
@@ -1350,6 +1392,10 @@ export function PostCard({
 
       {showReelCard ? (
         <ReelCard post={post} locale={locale} linkAs={L} />
+      ) : post.media[0]?.kind === 'audio' && post.media.length === 1 && !post.media[0].sensitive ? (
+        <div className="yp-post__media yp-post__media--audio">
+          <PostAudio media={post.media[0]} locale={locale} />
+        </div>
       ) : post.media.length ? (
         <div className="yp-post__media">
           <MediaGrid

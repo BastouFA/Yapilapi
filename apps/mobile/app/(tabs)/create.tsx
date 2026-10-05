@@ -1,3 +1,4 @@
+import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from 'expo-audio';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { onPendingAsset, takePendingAsset } from '../../lib/create-sheet';
@@ -6,7 +7,7 @@ import { Alert, Image, Linking, ScrollView, Text, View } from 'react-native';
 import type { EditorParamsInput } from '../../../../packages/shared/src/filters';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
 import type { CaptionIdeas, Circle, MediaItem, PublicUser } from '../../../../packages/shared/src/types';
-import { COMMENT_POLICIES, type CommentPolicy } from '../../../../packages/shared/src/constants';
+import { AUDIO_POST_MAX_MS, AUDIO_POST_MIN_MS, COMMENT_POLICIES, PLUS_AUDIO_POST_MAX_MS, type CommentPolicy } from '../../../../packages/shared/src/constants';
 import { extractHashtags } from '../../../../packages/shared/src/hashtags';
 import { ECHO_PERMISSIONS, type EchoPermission } from '../../../../packages/shared/src/echoes';
 import { useAutocomplete } from '../../lib/autocomplete';
@@ -21,7 +22,9 @@ import {
   PLUS_REEL_MAX_SECONDS,
   REEL_MAX_SECONDS,
   RESUMABLE_MAX_BYTES,
+  uploadFile,
   uploadPicked,
+  VOICE_MIME,
   type Picked,
   type Uploaded,
 } from '../../lib/media';
@@ -38,6 +41,7 @@ import { StickerEditor, type DraftSticker } from '../../lib/story-stickers';
 import { clipMax, draftMusic, MusicField, musicInput, soundAsTrack, type DraftMusic } from '../../lib/music';
 import { SchedulePicker } from '../../lib/post-edit';
 import { CaptionIdeasPanel, SuggestAltText } from '../../lib/ai-helpers';
+import { PostAudio } from '../../lib/post';
 import { useFlag } from '../../lib/flags';
 import { noticeText } from '../../../../packages/shared/src/server-text';
 
@@ -488,6 +492,20 @@ export default function Create() {
   const postCanHaveMusic = (!media || media.kind === 'image') && more.every((m) => m.kind === 'image') && !poll && !link?.trim();
   const pollOptions = poll?.map((o) => o.trim()).filter(Boolean) ?? [];
 
+  /** A recording made here, for an audio post. */
+  async function uploadRecording(uri: string, ms: number) {
+    setError(null);
+    setProgress(0);
+    try {
+      const m = await uploadFile(uri, `recording-${Date.now()}.m4a`, VOICE_MIME, setProgress);
+      setMedia({ ...m, local: uri, seconds: ms / 1000 });
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setProgress(null);
+    }
+  }
+
   /** Another photo or video for a post (a carousel), uploaded as it is. */
   async function addMore() {
     setError(null);
@@ -807,6 +825,14 @@ export default function Create() {
               onPress={() => choose()}
               style={{ alignSelf: 'flex-start' }}
             />
+            {kind === 'post' && !media && !more.length && !poll ? (
+              <RecordAudio
+                maxMs={me.plus ? PLUS_AUDIO_POST_MAX_MS : AUDIO_POST_MAX_MS}
+                disabled={uploading || busy}
+                onError={setError}
+                onRecorded={(uri, ms) => void uploadRecording(uri, ms)}
+              />
+            ) : null}
             {kind === 'post'
               ? more.map((x, i) => (
                   <View key={x.id} style={{ gap: space[2] }}>
@@ -845,9 +871,9 @@ export default function Create() {
                 style={{ alignSelf: 'flex-start' }}
               />
             ) : null}
-            {kind === 'post' && (!poll || link === null) ? (
+            {kind === 'post' && ((!poll && media?.kind !== 'audio') || link === null) ? (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-                {!poll ? (
+                {!poll && media?.kind !== 'audio' ? (
                   <Button label={t('m.sticker.kind.poll')} icon="stats-chart-outline" variant="secondary" size="sm" onPress={() => setPoll(['', ''])} />
                 ) : null}
                 {link === null ? (
@@ -1231,6 +1257,14 @@ function RemixSource({ mode, original, missing, onCancel }: { mode: 'duet' | 're
 function Preview({ media, onRemove }: { media: Attached; onRemove: () => void }) {
   const c = useColors();
   const { t } = useT();
+  if (media.kind === 'audio')
+    return (
+      <View style={{ gap: space[2] }}>
+        <PostAudio media={{ id: media.id, kind: 'audio', url: media.url, altText: null, width: null, height: null }} />
+        <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('compose.audio.hint')}</Text>
+        <Button label={t('m.common.remove')} variant="ghost" size="sm" icon="close" onPress={onRemove} style={{ alignSelf: 'flex-start' }} />
+      </View>
+    );
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
       <View style={{ width: 72, height: 96, borderRadius: radius.md, overflow: 'hidden', backgroundColor: c.surfaceSunken }}>
@@ -1251,6 +1285,100 @@ function Preview({ media, onRemove }: { media: Attached; onRemove: () => void })
         ) : null}
         <Button label={t('m.common.remove')} variant="ghost" size="sm" icon="close" onPress={onRemove} style={{ alignSelf: 'flex-start' }} />
       </View>
+    </View>
+  );
+}
+
+/**
+ * "Record audio" for an audio post: record, see how long against the limit, then keep it or
+ * cancel. Asks for the microphone the first time; at the limit, what's recorded is kept.
+ */
+function RecordAudio({
+  maxMs,
+  disabled,
+  onRecorded,
+  onError,
+}: {
+  maxMs: number;
+  disabled: boolean;
+  onRecorded: (uri: string, ms: number) => void;
+  onError: (message: string) => void;
+}) {
+  const c = useColors();
+  const { t } = useT();
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const status = useAudioRecorderState(recorder, 250);
+  const [on, setOn] = useState(false);
+  const [denied, setDenied] = useState(false);
+
+  async function start() {
+    try {
+      const perm = await requestRecordingPermissionsAsync();
+      if (!perm.granted) return setDenied(true);
+      setDenied(false);
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      setOn(true);
+    } catch (e) {
+      setOn(false);
+      onError(errorMessage(e));
+      void setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
+    }
+  }
+
+  async function stop(keep: boolean) {
+    let ms = 0;
+    try {
+      ms = recorder.getStatus().durationMillis;
+    } catch {
+      // Released: nothing was kept.
+    }
+    setOn(false);
+    try {
+      await recorder.stop();
+    } catch {
+      // Already stopped.
+    }
+    await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true }).catch(() => {});
+    if (!keep || !recorder.uri) return;
+    if (ms < AUDIO_POST_MIN_MS) return onError(t('compose.audio.tooShort'));
+    onRecorded(recorder.uri, ms);
+  }
+
+  useEffect(() => {
+    if (on && status.durationMillis >= maxMs) void stop(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [on, status.durationMillis, maxMs]);
+
+  if (on)
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[2] }}>
+        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: c.danger }} />
+        <Text accessibilityLiveRegion="none" style={{ color: c.ink, fontSize: 14, fontVariant: ['tabular-nums'], flexShrink: 1 }}>
+          {t('compose.audio.recording', { time: clock(status.durationMillis / 1000), max: clock(maxMs / 1000) })}
+        </Text>
+        <Button label={t('common.cancel')} variant="ghost" size="sm" onPress={() => void stop(false)} />
+        <Button label={t('compose.audio.done')} icon="checkmark" size="sm" onPress={() => void stop(true)} />
+      </View>
+    );
+  return (
+    <View style={{ gap: space[2] }}>
+      {denied ? (
+        <Notice tone="warn">
+          <Text style={{ color: c.ink, lineHeight: 20 }}>{t('compose.audio.micPermission')}</Text>
+          <Button label={t('m.common.openSettings')} size="sm" variant="secondary" onPress={() => Linking.openSettings()} style={{ alignSelf: 'flex-start' }} />
+        </Notice>
+      ) : null}
+      <Button
+        label={t('compose.audio.record')}
+        icon="mic-outline"
+        variant="secondary"
+        size="sm"
+        disabled={disabled}
+        onPress={() => void start()}
+        style={{ alignSelf: 'flex-start' }}
+      />
     </View>
   );
 }

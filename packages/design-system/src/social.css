@@ -759,6 +759,69 @@ a.yp-post__name {
   border-radius: calc(var(--radius-lg) - 6px);
   overflow: hidden;
 }
+/* An audio post: the player on a soft panel, with the transcript under it. */
+.yp-post__media--audio {
+  overflow: visible;
+}
+.yp-audio {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.yp-audio__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.yp-audio__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--grad);
+  color: var(--on-yapi);
+}
+.yp-audio audio {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 44px;
+}
+.yp-audio__transcript summary {
+  cursor: pointer;
+  color: var(--yapi);
+  font-weight: 600;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  list-style: none;
+}
+.yp-audio__transcript summary::-webkit-details-marker {
+  display: none;
+}
+.yp-audio__transcript summary svg {
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.yp-audio__transcript[open] summary svg {
+  transform: rotate(180deg);
+}
+.yp-audio__transcript summary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-md);
+}
+.yp-audio__transcript p {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.5;
+  white-space: pre-line;
+}
 /* A reel in a feed: its poster, a play sign and "Watch reel"; the whole card opens the viewer. */
 .yp-post__reel-card {
   position: relative;

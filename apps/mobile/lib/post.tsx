@@ -4,6 +4,7 @@ import { Fragment, memo, useEffect, useRef, useState } from 'react';
 import { Alert, Image, Linking, Platform, Pressable, ScrollView, Share, Text, View, type StyleProp, type TextStyle } from 'react-native';
 import type { Conversation, MediaItem, PhotoTag, Post, PublicUser } from '../../../packages/shared/src/types';
 import { formatBytes } from '../../../packages/shared/src/data-saver';
+import { transcriptText } from '../../../packages/shared/src/transcript';
 import { postReasonText, whyReasonText } from '../../../packages/shared/src/feed-reasons';
 import { client, errorMessage, mediaUrl, webUrl } from './api';
 import { useDataSaver } from './data-saver';
@@ -843,13 +844,21 @@ function PostPoll({ poll, canVote, onVote }: { poll: NonNullable<Post['poll']>; 
   );
 }
 
-/** An audio post: play and pause, with where it is. Nothing loads until play is pressed. */
-function PostAudio({ media }: { media: MediaItem }) {
+/**
+ * An audio post: play and pause, with where it is. Nothing loads until play is pressed. When the
+ * recording has a transcript, "Transcript" shows it (in the reader's language when there is one).
+ */
+export function PostAudio({ media }: { media: MediaItem }) {
   const c = useColors();
-  const { t } = useT();
+  const { t, locale } = useT();
   const player = useAudioPlayer(null, { updateInterval: 250 });
   const status = useAudioPlayerStatus(player);
   const [loaded, setLoaded] = useState(false);
+  const tracks = media.captions ?? [];
+  const track = tracks.find((x) => x.lang.split('-')[0] === locale.split('-')[0]) ?? tracks[0];
+  const [transcript, setTranscript] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [failed, setFailed] = useState(false);
   // Back to the start when it finishes, ready to play again.
   useEffect(() => {
     if (!status.didJustFinish) return;
@@ -865,15 +874,47 @@ function PostAudio({ media }: { media: MediaItem }) {
     void setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).catch(() => {});
     player.play();
   };
+  const showTranscript = () => {
+    setOpen((v) => !v);
+    if (!track || transcript !== null) return;
+    setFailed(false);
+    fetch(mediaUrl(track.url))
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
+      .then(
+        (vtt) => setTranscript(transcriptText(vtt)),
+        () => setFailed(true),
+      );
+  };
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], backgroundColor: c.surfaceSunken, borderRadius: radius.md, padding: space[2] }}>
-      <Pressable accessibilityRole="button" accessibilityLabel={status.playing ? t('m.common.pause') : t('m.common.play')} hitSlop={8} onPress={toggle}>
-        <Icon name={status.playing ? 'pause-circle' : 'play-circle'} size={40} color={c.yapi} />
-      </Pressable>
-      <Icon name="musical-notes-outline" size={16} color={c.inkMuted} />
-      <Text style={{ color: c.inkMuted, fontSize: 13, fontVariant: ['tabular-nums'] }}>
-        {status.duration > 0 ? `${clock(status.currentTime)} / ${clock(status.duration)}` : clock(status.currentTime)}
-      </Text>
+    <View style={{ gap: space[2], backgroundColor: c.surfaceSunken, borderRadius: radius.md, padding: space[2] }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
+        <Pressable accessibilityRole="button" accessibilityLabel={status.playing ? t('m.common.pause') : t('m.common.play')} hitSlop={8} onPress={toggle}>
+          <Icon name={status.playing ? 'pause-circle' : 'play-circle'} size={44} color={c.yapi} />
+        </Pressable>
+        <Icon name="mic-outline" size={16} color={c.inkMuted} />
+        <Text style={{ color: c.inkMuted, fontSize: 13, fontVariant: ['tabular-nums'] }}>
+          {status.duration > 0 ? `${clock(status.currentTime)} / ${clock(status.duration)}` : clock(status.currentTime)}
+        </Text>
+      </View>
+      {track ? (
+        <>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: open }}
+            onPress={showTranscript}
+            hitSlop={4}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: space[1], minHeight: 44 }}
+          >
+            <Icon name={open ? 'chevron-up' : 'chevron-down'} size={16} color={c.yapi} />
+            <Text style={{ color: c.yapi, fontWeight: '700', fontSize: 14 }}>{t('ds.audio.transcript')}</Text>
+          </Pressable>
+          {open ? (
+            <Text selectable style={{ color: c.ink, fontSize: 15, lineHeight: 22 }}>
+              {transcript ?? (failed ? t('ds.audio.transcriptFailed') : t('ds.audio.transcriptLoading'))}
+            </Text>
+          ) : null}
+        </>
+      ) : null}
     </View>
   );
 }
