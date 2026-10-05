@@ -28,6 +28,7 @@ import {
 // Every language, loaded up front: emails are written in their reader's.
 import { t } from '@yapilapi/shared/i18n';
 import { z } from 'zod';
+import { suspendedError } from '../lib/suspension.ts';
 import { AppError, badRequest, conflict, notFound, parse, unauthorized } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { recipientLocale, userLocale } from '../lib/email.ts';
@@ -239,7 +240,8 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
       await securityEvent(ctx.db, u?.id ?? null, 'login_failed', req.ip, req.headers['user-agent'], { email: input.email });
       throw unauthorized('That email and password don’t match. Try again or reset your password.');
     }
-    if (u.status !== 'active') throw new AppError(403, 'account_suspended', 'This account is suspended. You can appeal from the email we sent you.');
+    // A suspended account can't sign in; the right password gives a way to appeal the suspension (lib/suspension.ts).
+    if (u.status !== 'active') throw await suspendedError(ctx.db, u.id);
     // Second factor: the password alone only earns a short-lived challenge.
     const mfa = await ctx.db.query(`SELECT 1 FROM mfa_factors WHERE user_id = $1 AND kind = 'totp' AND confirmed_at IS NOT NULL`, [u.id]);
     if (mfa.rowCount) {

@@ -39,7 +39,17 @@ export default async function developerModule(app: FastifyInstance, ctx: AppCont
   app.post('/v1/developer/apps', { preHandler: requireAuth, config: { rateLimit: { max: 10, timeWindow: '1 hour' } } }, async (req, reply) => {
     const u = me(req);
     const input = parse(
-      z.object({ name: z.string().trim().min(1).max(60), description: z.string().trim().max(500).default(''), website: z.string().url().optional() }),
+      z.object({
+        name: z.string().trim().min(1).max(60),
+        description: z.string().trim().max(500).default(''),
+        // Shown on the consent screen as the app's site: a web address, never a script.
+        website: z
+          .string()
+          .url()
+          .max(500)
+          .refine((u) => /^https?:\/\//i.test(u), 'Use a web address that starts with https://.')
+          .optional(),
+      }),
       req.body,
     );
     const count = await db.query(`SELECT count(*) AS n FROM developer_apps WHERE owner_id = $1 AND deleted_at IS NULL`, [u.id]);
@@ -59,6 +69,9 @@ export default async function developerModule(app: FastifyInstance, ctx: AppCont
     await db.query(`UPDATE developer_apps SET deleted_at = now() WHERE id = $1`, [id]);
     await db.query(`UPDATE api_keys SET revoked_at = now() WHERE app_id = $1 AND revoked_at IS NULL`, [id]);
     await db.query(`UPDATE webhook_subscriptions SET active = false WHERE app_id = $1`, [id]);
+    // Everyone who connected the app is disconnected, and its Mini Apps leave every chat, community and profile.
+    await db.query(`UPDATE oauth_grants SET revoked_at = now() WHERE app_id = $1 AND revoked_at IS NULL`, [id]);
+    await db.query(`UPDATE mini_apps SET status = 'rejected' WHERE app_id = $1`, [id]);
     await audit(db, { actorId: me(req).id, action: 'developer.app_delete', entityType: 'developer_app', entityId: id });
     return { ok: true };
   });

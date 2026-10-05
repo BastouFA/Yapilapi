@@ -6287,4 +6287,15 @@ export const ha: Catalog = {
   'chat.call.minutes.other': 'minti {count}',
   'calls.otherBusy': 'Suna kan wani kira. Sake gwadawa nan ba da jimawa ba.',
   'calls.answeredElsewhere': "An amsa a wata na'ura",
+  'moderation.decision.warn': 'Gargaɗi',
+  'email.suspension.suspended.subject': 'An dakatar da asusunka na YAPILAPI',
+  'email.suspension.suspended.body':
+    'Mun dakatar da asusunka saboda ya karya dokokinmu, don haka ba za ka iya shiga ba a yanzu.\nIdan kana ganin mun yi kuskure, shiga a {url} kuma za ka iya ɗaukaka ƙara. Wani mai sa ido daban zai duba shi.',
+  'email.suspension.upheld.subject': 'An duba ƙarar da ka ɗaukaka',
+  'email.suspension.upheld.body':
+    'Wani mai sa ido daban ya duba ƙarar da ka ɗaukaka kan dakatar da asusunka. Hukuncin yana nan, don haka har yanzu ba za ka iya shiga ba.',
+  'email.suspension.overturned.subject': 'Asusunka yana aiki kuma',
+  'email.suspension.overturned.body': 'Wani mai sa ido daban ya duba ƙararka kuma ya soke dakatarwar. Za ka iya sake shiga a {url}.',
+  'push.enforcement': 'Wani mai sa ido ya duba wani abu da ka raba',
+  'push.appeal_decided': 'An duba ƙarar da ka ɗaukaka',
 };

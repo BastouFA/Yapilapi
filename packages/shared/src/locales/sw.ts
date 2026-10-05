@@ -6284,4 +6284,15 @@ export const sw: Catalog = {
   'chat.call.minutes.other': 'dakika {count}',
   'calls.otherBusy': 'Yuko kwenye simu nyingine. Jaribu tena baada ya muda mfupi.',
   'calls.answeredElsewhere': 'Imepokelewa kwenye kifaa kingine',
+  'moderation.decision.warn': 'Onyo',
+  'email.suspension.suspended.subject': 'Akaunti yako ya YAPILAPI imesimamishwa',
+  'email.suspension.suspended.body':
+    'Tumesimamisha akaunti yako kwa sababu ilivunja sheria zetu, kwa hivyo huwezi kuingia kwa sasa.\nIkiwa unadhani tumekosea, ingia kupitia {url} na utaweza kukata rufaa. Msimamizi mwingine ataikagua.',
+  'email.suspension.upheld.subject': 'Rufaa yako imekaguliwa',
+  'email.suspension.upheld.body':
+    'Msimamizi mwingine amekagua rufaa yako dhidi ya kusimamishwa kwa akaunti yako. Uamuzi unabaki, kwa hivyo bado huwezi kuingia.',
+  'email.suspension.overturned.subject': 'Akaunti yako iko hai tena',
+  'email.suspension.overturned.body': 'Msimamizi mwingine amekagua rufaa yako na kuondoa usimamishaji. Unaweza kuingia tena kupitia {url}.',
+  'push.enforcement': 'Msimamizi amekagua kitu ulichoshiriki',
+  'push.appeal_decided': 'Rufaa yako imekaguliwa',
 };

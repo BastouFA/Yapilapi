@@ -6266,4 +6266,14 @@ export const yo: Catalog = {
   'chat.call.minutes.other': 'ìṣẹ́jú {count}',
   'calls.otherBusy': 'Wọ́n wà lórí ìpè mìíràn. Gbìyànjú lẹ́ẹ̀kan sí i láìpẹ́.',
   'calls.answeredElsewhere': 'A dáhùn rẹ̀ lórí ẹ̀rọ mìíràn',
+  'moderation.decision.warn': 'Ìkìlọ̀',
+  'email.suspension.suspended.subject': 'A ti dá àkáǹtì YAPILAPI rẹ dúró',
+  'email.suspension.suspended.body':
+    'A dá àkáǹtì rẹ dúró nítorí pé ó rú òfin wa, nítorí náà o kò lè wọlé fún báyìí.\nTí o bá rò pé a ṣàṣìṣe, wọlé ní {url} wàá sì lè pe ẹjọ́. Alábòójútó mìíràn yóò yẹ̀ ẹ́ wò.',
+  'email.suspension.upheld.subject': 'A ti yẹ ẹjọ́ tí o pè wò',
+  'email.suspension.upheld.body': 'Alábòójútó mìíràn ti yẹ ẹjọ́ tí o pè lórí bí a ṣe dá àkáǹtì rẹ dúró wò. Ìpinnu náà dúró, nítorí náà o ṣì kò lè wọlé.',
+  'email.suspension.overturned.subject': 'Àkáǹtì rẹ tún ti ń ṣiṣẹ́',
+  'email.suspension.overturned.body': 'Alábòójútó mìíràn ti yẹ ẹjọ́ rẹ wò ó sì ti fagi lé ìdádúró náà. O lè wọlé padà ní {url}.',
+  'push.enforcement': 'Alábòójútó kan ti yẹ ohun tí o pín wò',
+  'push.appeal_decided': 'A ti yẹ ẹjọ́ tí o pè wò',
 };

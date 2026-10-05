@@ -6234,4 +6234,14 @@ export const ar: Catalog = {
   'chat.call.minutes.other': 'الدقائق: {count}',
   'calls.otherBusy': 'الطرف الآخر في مكالمة أخرى. حاول بعد قليل.',
   'calls.answeredElsewhere': 'تم الرد من جهاز آخر',
+  'moderation.decision.warn': 'تحذير',
+  'email.suspension.suspended.subject': 'تم تعليق حسابك على YAPILAPI',
+  'email.suspension.suspended.body':
+    'علّقنا حسابك لأنه خالف قواعدنا، لذا لا يمكنك تسجيل الدخول حاليًا.\nإذا كنت تعتقد أننا أخطأنا، فسجّل الدخول عبر {url} وستتمكن من تقديم طعن. سيراجعه مشرف آخر.',
+  'email.suspension.upheld.subject': 'تمت مراجعة طعنك',
+  'email.suspension.upheld.body': 'راجع مشرف آخر طعنك في تعليق حسابك. يبقى القرار كما هو، لذا لا يمكنك تسجيل الدخول بعد.',
+  'email.suspension.overturned.subject': 'أصبح حسابك نشطًا مجددًا',
+  'email.suspension.overturned.body': 'راجع مشرف آخر طعنك وألغى تعليق الحساب. يمكنك تسجيل الدخول مجددًا عبر {url}.',
+  'push.enforcement': 'راجع مشرف شيئًا شاركته',
+  'push.appeal_decided': 'تمت مراجعة طعنك',
 };

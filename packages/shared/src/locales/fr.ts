@@ -6311,4 +6311,15 @@ export const fr: Catalog = {
   'chat.call.minutes.other': '{count} minutes',
   'calls.otherBusy': 'Cette personne est déjà en appel. Réessaie dans un instant.',
   'calls.answeredElsewhere': 'Répondu sur un autre appareil',
+  'moderation.decision.warn': 'Avertissement',
+  'email.suspension.suspended.subject': 'Ton compte YAPILAPI est suspendu',
+  'email.suspension.suspended.body':
+    'Nous avons suspendu ton compte parce qu’il ne respectait pas nos règles : tu ne peux pas te connecter pour l’instant.\nSi tu penses que nous nous sommes trompés, connecte-toi sur {url} et tu pourras faire appel. Un autre modérateur l’examinera.',
+  'email.suspension.upheld.subject': 'Ton appel a été examiné',
+  'email.suspension.upheld.body':
+    'Un autre modérateur a examiné ton appel contre la suspension de ton compte. La décision est maintenue : tu ne peux toujours pas te connecter.',
+  'email.suspension.overturned.subject': 'Ton compte est de nouveau actif',
+  'email.suspension.overturned.body': 'Un autre modérateur a examiné ton appel et a levé la suspension. Tu peux de nouveau te connecter sur {url}.',
+  'push.enforcement': 'Un modérateur a examiné quelque chose que tu as partagé',
+  'push.appeal_decided': 'Ton appel a été examiné',
 };

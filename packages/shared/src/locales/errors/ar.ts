@@ -247,7 +247,6 @@ export const ar: Record<string, string> = {
   'Taken.': 'مستخدم بالفعل.',
   "That invite code doesn't work. Check it, or leave it empty.": 'رمز الدعوة هذا لا يعمل. تحقق منه، أو اتركه فارغًا.',
   "That invite code doesn't work.": 'رمز الدعوة هذا لا يعمل.',
-  'This account is suspended. You can appeal from the email we sent you.': 'هذا الحساب معلّق. يمكنك الطعن من خلال البريد الإلكتروني الذي أرسلناه إليك.',
   'You need to be at least 13 to use YAPILAPI, so this account is now closed.':
     'يجب أن يكون عمرك 13 عامًا على الأقل لاستخدام YAPILAPI، لذلك أُغلق هذا الحساب الآن.',
   'That’s your username now.': 'هذا هو اسم المستخدم الخاص بك الآن.',
@@ -1230,4 +1229,13 @@ export const ar: Record<string, string> = {
   'Number must be finite': 'يجب أن يكون الرقم محدودًا',
   'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
     'كلمات مرور خاطئة كثيرة لهذا الحساب. انتظر 15 دقيقة أو أعد تعيين كلمة المرور.',
+  // apps/api/src/lib/suspension.ts, apps/api/src/modules/safety.ts (trust and safety sweep)
+  'This account is suspended. If you think we got this wrong, you can appeal.': 'هذا الحساب معلّق. إذا كنت تعتقد أننا أخطأنا، يمكنك تقديم طعن.',
+  'This account is suspended. Your appeal is waiting for a different moderator.': 'هذا الحساب معلّق. طعنك بانتظار مشرف آخر.',
+  'This account is suspended.': 'هذا الحساب معلّق.',
+  'This link to appeal has expired. Sign in again to appeal.': 'انتهت صلاحية رابط الطعن هذا. سجّل الدخول مجددًا لتقديم الطعن.',
+  "That decision doesn't apply to this kind of report.": 'هذا القرار لا ينطبق على هذا النوع من البلاغات.',
+  "You can't change your own role.": 'لا يمكنك تغيير دورك بنفسك.',
+  // apps/api/src/modules/developer.ts (trust and safety sweep)
+  'Use a web address that starts with https://.': 'استخدم عنوان ويب يبدأ بـ https://.',
 };

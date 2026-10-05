@@ -5,9 +5,12 @@ import { z } from 'zod';
 import { badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { audit, isEnabled } from '../lib/services.ts';
+import { notBlockedSql } from '../lib/visibility.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
 
 const SURFACES = ['conversation', 'community', 'event', 'profile', 'business'] as const;
+/** Mini Apps whose developer app still exists (a deleted app takes its Mini Apps down). Joins `m`. */
+const LIVE_APP = `JOIN developer_apps da ON da.id = m.app_id AND da.deleted_at IS NULL`;
 type Surface = (typeof SURFACES)[number];
 
 /**
@@ -56,13 +59,53 @@ export default async function miniAppsModule(app: FastifyInstance, ctx: AppConte
         ])
       ).rowCount;
     }
-    if (surface === 'profile') return manage ? id === userId : true;
-    if (surface === 'business') return manage ? !!(await db.query(`SELECT 1 FROM businesses WHERE id = $1 AND owner_id = $2`, [id, userId])).rowCount : true;
+    // A profile's apps are for whoever may see the profile: not across a block, and a private account's only for its approved followers.
+    if (surface === 'profile') {
+      if (manage || id === userId) return id === userId;
+      return !!(
+        await db.query(
+          `SELECT 1 FROM users u JOIN profiles p ON p.user_id = u.id WHERE u.id = $1 AND u.status = 'active' AND ${notBlockedSql('u.id', '$2')}
+             AND (NOT p.is_private OR EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $2 AND f.followee_id = u.id))`,
+          [id, userId],
+        )
+      ).rowCount;
+    }
+    if (surface === 'business')
+      return manage
+        ? !!(await db.query(`SELECT 1 FROM businesses WHERE id = $1 AND owner_id = $2`, [id, userId])).rowCount
+        : !!(await db.query(`SELECT 1 FROM businesses b WHERE b.id = $1 AND b.deleted_at IS NULL AND ${notBlockedSql('b.owner_id', '$2')}`, [id, userId]))
+            .rowCount;
     return false;
   }
 
   // ── Developers submit; admins review ──────────────────────────────────
-  app.post('/v1/developer/apps/:id/mini-apps', { preHandler: requireAuth }, async (req, reply) => {
+  /** The developer's own Mini Apps for an app, with where each is in review. */
+  app.get('/v1/developer/apps/:id/mini-apps', { preHandler: requireAuth }, async (req) => {
+    const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
+    const own = await db.query(`SELECT 1 FROM developer_apps WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL`, [id, me(req).id]);
+    if (!own.rowCount) throw notFound('App');
+    const { rows } = await db.query(
+      `SELECT m.id, m.name, m.description, m.entry_url, m.permissions, m.surfaces, m.status, m.created_at,
+              (SELECT count(*) FROM mini_app_installs i WHERE i.mini_app_id = m.id)::int AS installs
+       FROM mini_apps m WHERE m.app_id = $1 ORDER BY m.created_at DESC`,
+      [id],
+    );
+    return {
+      items: rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        description: r.description,
+        entryUrl: r.entry_url,
+        permissions: r.permissions,
+        surfaces: r.surfaces,
+        status: r.status,
+        installs: r.installs,
+        createdAt: r.created_at,
+      })),
+    };
+  });
+
+  app.post('/v1/developer/apps/:id/mini-apps', { preHandler: requireAuth, config: { rateLimit: { max: 20, timeWindow: '1 hour' } } }, async (req, reply) => {
     const u = me(req);
     const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
     const input = parse(
@@ -104,9 +147,10 @@ export default async function miniAppsModule(app: FastifyInstance, ctx: AppConte
   // ── Users ─────────────────────────────────────────────────────────────
   app.get('/v1/mini-apps', { preHandler: gate }, async (req) => {
     const q = parse(z.object({ surface: z.enum(SURFACES) }), req.query);
-    const { rows } = await db.query(`SELECT id, name, description, permissions FROM mini_apps WHERE status = 'approved' AND $1 = ANY(surfaces) ORDER BY name`, [
-      q.surface,
-    ]);
+    const { rows } = await db.query(
+      `SELECT m.id, m.name, m.description, m.permissions FROM mini_apps m ${LIVE_APP} WHERE m.status = 'approved' AND $1 = ANY(m.surfaces) ORDER BY m.name`,
+      [q.surface],
+    );
     return { items: rows };
   });
 
@@ -114,7 +158,7 @@ export default async function miniAppsModule(app: FastifyInstance, ctx: AppConte
     const q = parse(z.object({ surface: z.enum(SURFACES), surfaceId: z.string().uuid() }), req.query);
     if (!(await surfaceAccess(q.surface, q.surfaceId, me(req).id, false))) throw notFound('That place');
     const { rows } = await db.query(
-      `SELECT m.id, m.name, m.description, m.entry_url, m.permissions FROM mini_app_installs i JOIN mini_apps m ON m.id = i.mini_app_id
+      `SELECT m.id, m.name, m.description, m.entry_url, m.permissions FROM mini_app_installs i JOIN mini_apps m ON m.id = i.mini_app_id ${LIVE_APP}
        WHERE i.surface = $1 AND i.surface_id = $2 AND m.status = 'approved' ORDER BY i.created_at`,
       [q.surface, q.surfaceId],
     );
@@ -125,7 +169,7 @@ export default async function miniAppsModule(app: FastifyInstance, ctx: AppConte
     const u = me(req);
     const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
     const input = parse(z.object({ surface: z.enum(SURFACES), surfaceId: z.string().uuid() }), req.body);
-    const m = (await db.query(`SELECT surfaces FROM mini_apps WHERE id = $1 AND status = 'approved'`, [id])).rows[0];
+    const m = (await db.query(`SELECT m.surfaces FROM mini_apps m ${LIVE_APP} WHERE m.id = $1 AND m.status = 'approved'`, [id])).rows[0];
     if (!m) throw notFound('Mini App');
     if (!m.surfaces.includes(input.surface)) throw badRequest(`This Mini App can't be added to a ${input.surface}.`);
     if (!(await surfaceAccess(input.surface, input.surfaceId, u.id, true))) throw forbidden(`You can't add apps here.`);
@@ -155,7 +199,8 @@ export default async function miniAppsModule(app: FastifyInstance, ctx: AppConte
     const input = parse(z.object({ surface: z.enum(SURFACES), surfaceId: z.string().uuid() }), req.body);
     const m = (
       await db.query(
-        `SELECT m.permissions, m.app_id FROM mini_apps m JOIN mini_app_installs i ON i.mini_app_id = m.id AND i.surface = $2 AND i.surface_id = $3 WHERE m.id = $1 AND m.status = 'approved'`,
+        `SELECT m.permissions, m.app_id FROM mini_apps m JOIN mini_app_installs i ON i.mini_app_id = m.id AND i.surface = $2 AND i.surface_id = $3 ${LIVE_APP}
+         WHERE m.id = $1 AND m.status = 'approved'`,
         [id, input.surface, input.surfaceId],
       )
     ).rows[0];

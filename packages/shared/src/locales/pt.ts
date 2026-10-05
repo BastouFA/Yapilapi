@@ -6283,4 +6283,15 @@ export const pt: Catalog = {
   'chat.call.minutes.other': '{count} minutos',
   'calls.otherBusy': 'A pessoa está em outra chamada. Tente de novo daqui a pouco.',
   'calls.answeredElsewhere': 'Atendida em outro aparelho',
+  'moderation.decision.warn': 'Advertência',
+  'email.suspension.suspended.subject': 'Sua conta do YAPILAPI está suspensa',
+  'email.suspension.suspended.body':
+    'Suspendemos sua conta porque ela não seguiu nossas regras, então você não pode entrar por enquanto.\nSe você acha que erramos, entre em {url} e você poderá recorrer. Outro moderador vai analisar.',
+  'email.suspension.upheld.subject': 'Seu recurso foi analisado',
+  'email.suspension.upheld.body':
+    'Outro moderador analisou seu recurso contra a suspensão da sua conta. A decisão foi mantida, então você ainda não pode entrar.',
+  'email.suspension.overturned.subject': 'Sua conta está ativa de novo',
+  'email.suspension.overturned.body': 'Outro moderador analisou seu recurso e reverteu a suspensão. Você pode entrar de novo em {url}.',
+  'push.enforcement': 'Um moderador analisou algo que você compartilhou',
+  'push.appeal_decided': 'Seu recurso foi analisado',
 };

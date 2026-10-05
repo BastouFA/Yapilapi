@@ -6265,6 +6265,17 @@ export const en = {
   'chat.call.minutes.other': '{count} minutes',
   'calls.otherBusy': 'They’re on another call. Try again in a moment.',
   'calls.answeredElsewhere': 'Answered on another device',
+  'moderation.decision.warn': 'Warning',
+  'email.suspension.suspended.subject': 'Your YAPILAPI account is suspended',
+  'email.suspension.suspended.body':
+    "We suspended your account because it broke our rules, so you can't sign in for now.\nIf you think we got this wrong, sign in at {url} and you'll be able to appeal. A different moderator will review it.",
+  'email.suspension.upheld.subject': 'Your appeal was reviewed',
+  'email.suspension.upheld.body':
+    "A different moderator reviewed your appeal against the suspension of your account. The decision stays, so you still can't sign in.",
+  'email.suspension.overturned.subject': 'Your account is active again',
+  'email.suspension.overturned.body': 'A different moderator reviewed your appeal and reversed the suspension. You can sign in again at {url}.',
+  'push.enforcement': 'A moderator reviewed something you shared',
+  'push.appeal_decided': 'Your appeal was reviewed',
 } as const;
 
 export type MessageKey = keyof typeof en;

@@ -252,7 +252,6 @@ export const yo: Record<string, string> = {
   'Taken.': 'Ẹlòmíràn ti mú un.',
   "That invite code doesn't work. Check it, or leave it empty.": 'Kóòdù ìpè yẹn kò ṣiṣẹ́. Ṣàyẹ̀wò rẹ̀, tàbí fi í sílẹ̀ ní òfìfo.',
   "That invite code doesn't work.": 'Kóòdù ìpè yẹn kò ṣiṣẹ́.',
-  'This account is suspended. You can appeal from the email we sent you.': 'A ti dá àkáǹtì yìí dúró. O lè pe ẹjọ́ láti inú ímeèlì tí a fi ránṣẹ́ sí ọ.',
   'You need to be at least 13 to use YAPILAPI, so this account is now closed.':
     'O gbọ́dọ̀ ti pé ọmọ ọdún 13 ó kéré tán láti lo YAPILAPI, nítorí náà a ti ti àkáǹtì yìí báyìí.',
   'That’s your username now.': 'Ìyẹn ni orúkọ oníṣàmúlò rẹ báyìí.',
@@ -1243,4 +1242,13 @@ export const yo: Record<string, string> = {
   'Number must be finite': 'Nọ́mbà gbọ́dọ̀ ní òpin',
   'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
     'Ọ̀rọ̀ aṣínà tí kò tọ́ ti pọ̀ jù fún àkáǹtì yìí. Dúró fún ìṣẹ́jú 15, tàbí tún ọ̀rọ̀ aṣínà rẹ ṣe.',
+  // apps/api/src/lib/suspension.ts, apps/api/src/modules/safety.ts (trust and safety sweep)
+  'This account is suspended. If you think we got this wrong, you can appeal.': 'A ti dá àkáǹtì yìí dúró. Tí o bá rò pé a ṣàṣìṣe, o lè pe ẹjọ́.',
+  'This account is suspended. Your appeal is waiting for a different moderator.': 'A ti dá àkáǹtì yìí dúró. Ẹjọ́ tí o pè ń dúró de alábòójútó mìíràn.',
+  'This account is suspended.': 'A ti dá àkáǹtì yìí dúró.',
+  'This link to appeal has expired. Sign in again to appeal.': 'Ìjápọ̀ yìí fún pípe ẹjọ́ ti parí. Wọlé lẹ́ẹ̀kan sí i láti pe ẹjọ́.',
+  "That decision doesn't apply to this kind of report.": 'Ìpinnu yẹn kò bá irú ìròyìn yìí mu.',
+  "You can't change your own role.": 'O kò lè yí ipa tìrẹ padà.',
+  // apps/api/src/modules/developer.ts (trust and safety sweep)
+  'Use a web address that starts with https://.': 'Lo àdírẹ́sì wẹ́ẹ̀bù tí ó bẹ̀rẹ̀ pẹ̀lú https://.',
 };

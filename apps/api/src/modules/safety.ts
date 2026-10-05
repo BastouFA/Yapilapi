@@ -2,7 +2,16 @@ import type { PoolClient } from 'pg';
 import { refundUnspentBudget } from '../lib/ad-refunds.ts';
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
-import { appealSchema, FEATURE_FLAG_KEYS, moderationDecisionSchema, problemReportSchema, reportOutcome, reportSchema } from '@yapilapi/shared';
+import {
+  appealSchema,
+  decisionsFor,
+  FEATURE_FLAG_KEYS,
+  moderationDecisionSchema,
+  problemReportSchema,
+  reportOutcome,
+  reportSchema,
+  suspensionAppealSchema,
+} from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, badRequest, conflict, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
@@ -15,9 +24,32 @@ import { answerCards } from '../lib/ask.ts';
 import { MIX_FROM, mixVisibleSql } from '../lib/mixes.ts';
 import { LISTING_FROM, listingVisibleSql } from '../lib/market.ts';
 import { postVisibleSql } from '../lib/visibility.ts';
+import { emailSuspension, redeemAppealToken } from '../lib/suspension.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
+
+/**
+ * What can be reported and has a moderation state, and its table. A question and its answer are one
+ * row. "Limited" hides it from everyone but its author; "removed" deletes it.
+ */
+const CONTENT_TABLES: Record<string, string> = {
+  post: 'posts',
+  comment: 'comments',
+  question: 'ask_questions',
+  answer: 'ask_questions',
+  mix: 'mixes',
+  listing: 'market_listings',
+  market_rating: 'market_ratings',
+  story: 'moments',
+};
+/** What a removal deletes that has no moderation state. */
+const DELETED_TABLES: Record<string, string> = {
+  community: 'communities',
+  event: 'events',
+  product: 'products',
+  together_item: 'together_contributions',
+};
 
 // Reports in these categories skip the queue and are escalated immediately.
 const URGENT = new Set(['minor_safety', 'self_harm', 'violence']);
@@ -122,14 +154,32 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
                        risk = CASE WHEN EXCLUDED.risk = 'escalate' THEN 'escalate' ELSE moderation_cases.risk END`,
         [input.targetType, input.targetId, subject, risk, { reports: 1, reasons: [input.reason] }],
       );
-      // Content reported for minor safety is hidden immediately pending review.
-      if (input.reason === 'minor_safety' && input.targetType === 'post')
-        await c.query(`UPDATE posts SET moderation_status = 'restricted' WHERE id = $1`, [input.targetId]);
+      // Content reported for minor safety is hidden from everyone but its author at once, until a moderator decides.
+      if (input.reason === 'minor_safety') await holdForMinorSafety(c, input.targetType, input.targetId);
       return r.rows[0];
     });
     reply.code(201);
     return { report: { id: report.id }, message: 'Thanks for reporting. Our team will review it. You can also block this account.' };
   });
+
+  /**
+   * A message is held like one waiting for review (its sender still sees it); everything else with a
+   * limited state is limited. An account, a community or an event isn't taken down on one report:
+   * those wait for a moderator, at the top of the queue.
+   */
+  async function holdForMinorSafety(c: PoolClient, type: string, id: string) {
+    if (type === 'message') {
+      await c.query(`UPDATE messages SET moderation_status = 'review' WHERE id = $1 AND moderation_status = 'normal'`, [id]);
+      return;
+    }
+    const table = CONTENT_TABLES[type];
+    if (!table) return;
+    await c.query(`UPDATE ${table} SET moderation_status = 'restricted' WHERE id = $1 AND moderation_status IN ('normal', 'review')`, [id]);
+    if (type === 'comment') {
+      const post = await c.query(`SELECT post_id FROM comments WHERE id = $1`, [id]);
+      if (post.rows[0]) await syncCommentCounts(c, post.rows[0].post_id);
+    }
+  }
 
   // ── Report a problem (Settings > Help) ────────────────────────────────
   app.post('/v1/me/problems', { preHandler: requireAuth, config: { rateLimit: { max: 5, timeWindow: '1 hour' } } }, async (req, reply) => {
@@ -165,13 +215,24 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
                              WHEN 'message' THEN (SELECT body FROM messages WHERE id = mc.target_id)
                              WHEN 'question' THEN (SELECT body FROM ask_questions WHERE id = mc.target_id)
                              WHEN 'answer' THEN (SELECT 'Q: ' || body || E'\nA: ' || coalesce(answer, '') FROM ask_questions WHERE id = mc.target_id)
-                             WHEN 'mix' THEN (SELECT title || E'\n' || description FROM mixes WHERE id = mc.target_id)
+                             WHEN 'mix' THEN (SELECT concat_ws(E'\n', title, nullif(description, '')) FROM mixes WHERE id = mc.target_id)
                              WHEN 'together_item' THEN (SELECT caption FROM together_contributions WHERE id = mc.target_id)
-                             WHEN 'listing' THEN (SELECT title || E'\n' || description || E'\n' || area FROM market_listings WHERE id = mc.target_id)
-                             WHEN 'market_rating' THEN (SELECT stars || '/5: ' || body FROM market_ratings WHERE id = mc.target_id)
+                             WHEN 'listing' THEN (SELECT concat_ws(E'\n', title, nullif(description, ''), area) FROM market_listings WHERE id = mc.target_id)
+                             WHEN 'market_rating' THEN (SELECT stars || '/5: ' || coalesce(body, '') FROM market_ratings WHERE id = mc.target_id)
+                             -- What the moderator needs to judge an account, a story, a community, an event and the rest.
+                             WHEN 'user' THEN (SELECT concat_ws(E'\n', display_name || ' (@' || username || ')', nullif(bio, '')) FROM profiles WHERE user_id = mc.target_id)
+                             WHEN 'story' THEN (SELECT body FROM moments WHERE id = mc.target_id)
+                             WHEN 'community' THEN (SELECT concat_ws(E'\n', name, nullif(description, '')) FROM communities WHERE id = mc.target_id)
+                             WHEN 'event' THEN (SELECT concat_ws(E'\n', title, nullif(description, '')) FROM events WHERE id = mc.target_id)
+                             WHEN 'product' THEN (SELECT concat_ws(E'\n', title, nullif(description, '')) FROM products WHERE id = mc.target_id)
+                             WHEN 'drop' THEN (SELECT concat_ws(E'\n', title, nullif(description, '')) FROM drops WHERE id = mc.target_id)
+                             WHEN 'room' THEN (SELECT title FROM rooms WHERE id = mc.target_id)
+                             WHEN 'live' THEN (SELECT title FROM live_sessions WHERE id = mc.target_id)
                              WHEN 'ad_campaign' THEN (SELECT p.body FROM ad_campaigns a JOIN posts p ON p.id = a.post_id WHERE a.id = mc.target_id) END AS excerpt,
          CASE WHEN mc.target_type = 'media' THEN (SELECT json_build_object('kind', m.kind, 'url', coalesce(m.variants->>'medium', m.poster_url, m.url), 'moderation', m.moderation)
                                                     FROM media m WHERE m.id = mc.target_id)
+              WHEN mc.target_type = 'story' THEN (SELECT json_build_object('kind', m.kind, 'url', coalesce(m.variants->>'medium', m.poster_url, m.url), 'moderation', m.moderation)
+                                                    FROM moments s JOIN media m ON m.id = s.media_id WHERE s.id = mc.target_id)
               WHEN mc.target_type = 'together_item' THEN (SELECT json_build_object('kind', m.kind, 'url', coalesce(m.variants->>'medium', m.poster_url, m.url), 'moderation', m.moderation)
                                                     FROM together_contributions tc JOIN media m ON m.id = tc.media_id WHERE tc.id = mc.target_id)
               WHEN mc.target_type = 'listing' THEN (SELECT json_build_object('kind', m.kind, 'url', coalesce(m.variants->>'medium', m.url), 'moderation', m.moderation)
@@ -189,9 +250,10 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     const { id } = parse(idParam, req.params);
     const input = parse(moderationDecisionSchema, req.body);
     if (input.decision === 'suspend_user' && mod.role !== 'admin') throw badRequest('Only admins can suspend accounts.');
-    await tx(db, async (c) => {
+    const emails = await tx(db, async (c) => {
       const { rows } = await c.query(
-        `SELECT mc.*, ap.id AS appeal_id, coalesce(ap.original_reviewer_id, mc.reviewer_id) AS original_reviewer_id
+        `SELECT mc.*, ap.id AS appeal_id, ap.original_decision AS appeal_original_decision,
+                coalesce(ap.original_reviewer_id, mc.reviewer_id) AS original_reviewer_id
          FROM moderation_cases mc LEFT JOIN appeals ap ON ap.case_id = mc.id WHERE mc.id = $1 AND mc.status IN ('open','appealed') FOR UPDATE OF mc`,
         [id],
       );
@@ -207,14 +269,25 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       const isAd = mc.target_type === 'ad_campaign';
       if (isAd !== (input.decision === 'approve_ad' || input.decision === 'reject_ad'))
         throw badRequest(isAd ? 'Approve or reject this ad.' : 'That decision is only for ad reviews.');
+      // An account is warned or suspended, not removed; only things with a limited state can be limited.
+      if (!isAd && !(decisionsFor(mc.target_type) as string[]).includes(input.decision))
+        throw badRequest("That decision doesn't apply to this kind of report.");
       if (input.decision === 'reject_ad' && !input.note?.trim()) throw badRequest('Say why the ad was rejected. The advertiser sees this.');
+      const appeal = mc.status === 'appealed' && !!mc.appeal_id;
+      const original: string = mc.appeal_original_decision ?? mc.decision;
+      // An appeal keeps the first decision (upheld: nothing to change) or reverses it before the new one applies.
+      const upheld = appeal && input.decision === original;
+      if (appeal && !upheld) await undoDecision(c, mc, original);
       if (isAd) await applyAdDecision(c, mc, input.decision === 'approve_ad', mod.id, input.note ?? null);
-      else if (mc.target_type === 'media') {
-        await applyMediaDecision(c, ctx.realtime, mc, input.decision);
+      else if (upheld) {
+        // The decision stands as it is.
+      } else if (mc.target_type === 'media') {
+        await applyMediaDecision(c, ctx.realtime, mc, input.decision === 'warn' ? 'no_action' : input.decision);
         if (input.decision === 'suspend_user') await applyDecision(c, mc, input.decision);
       } else await applyDecision(c, mc, input.decision);
       // A post cleared from review goes out now: tell the people invited to co-author it or tagged in it.
-      if (input.decision === 'no_action' && mc.target_type === 'post') await notifyReleasedPosts(c, ctx.realtime, [mc.target_id]);
+      if ((input.decision === 'no_action' || input.decision === 'warn') && mc.target_type === 'post')
+        await notifyReleasedPosts(c, ctx.realtime, [mc.target_id]);
       // Spam signals attached to this item follow the decision.
       if (!isAd)
         await c.query(
@@ -223,18 +296,11 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
         );
       await c.query(`UPDATE moderation_cases SET status = $2, decision = $3, reviewer_id = $4, note = $5, decided_at = now() WHERE id = $1`, [
         id,
-        mc.status === 'appealed' ? 'final' : 'decided',
+        appeal ? 'final' : 'decided',
         input.decision,
         mod.id,
         input.note ?? null,
       ]);
-      // The appeal is settled: the first decision stands (upheld) or not (overturned).
-      if (mc.status === 'appealed' && mc.appeal_id)
-        await c.query(`UPDATE appeals SET status = $2, reviewer_id = $3, decided_at = now() WHERE id = $1`, [
-          mc.appeal_id,
-          input.decision === mc.decision ? 'upheld' : 'overturned',
-          mod.id,
-        ]);
       const closed = await c.query<{ reporter_id: string }>(
         `UPDATE reports SET status = 'closed', closed_at = now() WHERE target_type = $1 AND target_id = $2 AND status <> 'closed' RETURNING reporter_id`,
         [mc.target_type, mc.target_id],
@@ -251,7 +317,34 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
             entityId: mc.target_id,
             data: { targetType: mc.target_type, outcome },
           });
-      if (input.decision !== 'no_action' && !isAd && mc.subject_user_id) {
+      const sendEmails: { userId: string; kind: 'suspended' | 'upheld' | 'overturned' }[] = [];
+      if (appeal) {
+        // The appeal is settled: the first decision stands (upheld) or not (overturned), and the person hears which.
+        await c.query(`UPDATE appeals SET status = $2, reviewer_id = $3, decided_at = now() WHERE id = $1`, [
+          mc.appeal_id,
+          upheld ? 'upheld' : 'overturned',
+          mod.id,
+        ]);
+        if (!upheld) {
+          // What the first decision did to the account ends; a new decision other than "no action" is recorded in its place.
+          await c.query(`UPDATE enforcements SET expires_at = now() WHERE case_id = $1 AND (expires_at IS NULL OR expires_at > now())`, [id]);
+          if (input.decision !== 'no_action' && mc.subject_user_id)
+            await c.query(`INSERT INTO enforcements (case_id, user_id, action) VALUES ($1,$2,$3)`, [id, mc.subject_user_id, input.decision]);
+        }
+        if (mc.subject_user_id) {
+          await notify(c, ctx.realtime, {
+            userId: mc.subject_user_id,
+            category: 'moderation',
+            type: 'appeal_decided',
+            entityType: 'moderation_case',
+            entityId: id,
+            data: { outcome: upheld ? 'upheld' : 'overturned', targetType: mc.target_type, decision: input.decision },
+          });
+          // Someone suspended can't open the app to see it: the answer to their appeal goes by email too.
+          if (original === 'suspend_user') sendEmails.push({ userId: mc.subject_user_id, kind: upheld ? 'upheld' : 'overturned' });
+          else if (input.decision === 'suspend_user') sendEmails.push({ userId: mc.subject_user_id, kind: 'suspended' });
+        }
+      } else if (input.decision !== 'no_action' && !isAd && mc.subject_user_id) {
         await c.query(`INSERT INTO enforcements (case_id, user_id, action) VALUES ($1,$2,$3)`, [id, mc.subject_user_id, input.decision]);
         await notify(c, ctx.realtime, {
           userId: mc.subject_user_id,
@@ -259,19 +352,50 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
           type: 'enforcement',
           entityType: 'moderation_case',
           entityId: id,
-          data: { decision: input.decision, canAppeal: mc.status !== 'appealed' },
+          data: { decision: input.decision, canAppeal: true, targetType: mc.target_type },
         });
+        if (input.decision === 'suspend_user') sendEmails.push({ userId: mc.subject_user_id, kind: 'suspended' });
       }
       await audit(c, {
         actorId: mod.id,
         action: `moderation.${input.decision}`,
         entityType: mc.target_type,
         entityId: mc.target_id,
-        metadata: { caseId: id, note: input.note },
+        metadata: { caseId: id, note: input.note, ...(appeal ? { appeal: upheld ? 'upheld' : 'overturned' } : {}) },
       });
+      return sendEmails;
     });
+    for (const e of emails)
+      await emailSuspension(db, ctx.email, ctx.config.WEB_ORIGIN, e.userId, e.kind, (err) => req.log.error({ err: err.message }, 'suspension email not sent'));
     return { ok: true };
   });
+
+  /**
+   * Undo what a decision did, when an appeal overturns it: removed things come back (unless their
+   * author deleted them first), limited things are seen again, a suspended account is active again.
+   * A removed message can't come back: its words were erased when it was removed. Neither can an
+   * ended room or live, or a cancelled drop.
+   */
+  async function undoDecision(c: PoolClient, mc: { id: string; target_type: string; target_id: string; subject_user_id: string | null }, decision: string) {
+    const table = CONTENT_TABLES[mc.target_type];
+    if (decision === 'remove') {
+      // A removal set deleted_at in the same transaction as the case's decided_at, so the two are equal (compared in the
+      // database, to the microsecond); an earlier one is the author's own.
+      const decidedAt = `(SELECT decided_at FROM moderation_cases WHERE id = $2)`;
+      if (table)
+        await c.query(
+          `UPDATE ${table} SET moderation_status = 'normal', deleted_at = CASE WHEN deleted_at = ${decidedAt} THEN NULL ELSE deleted_at END
+           WHERE id = $1 AND moderation_status = 'removed'`,
+          [mc.target_id, mc.id],
+        );
+      const deleted = DELETED_TABLES[mc.target_type];
+      if (deleted) await c.query(`UPDATE ${deleted} SET deleted_at = NULL WHERE id = $1 AND deleted_at = ${decidedAt}`, [mc.target_id, mc.id]);
+    }
+    if (decision === 'restrict' && table)
+      await c.query(`UPDATE ${table} SET moderation_status = 'normal' WHERE id = $1 AND moderation_status = 'restricted'`, [mc.target_id]);
+    if (decision === 'suspend_user' && mc.subject_user_id)
+      await c.query(`UPDATE users SET status = 'active' WHERE id = $1 AND status = 'suspended' AND deleted_at IS NULL`, [mc.subject_user_id]);
+  }
 
   /** Ad reviews aren't enforcement: approval starts the campaign (paused if its budget ran out meanwhile); rejection tells the advertiser why. */
   async function applyAdDecision(
@@ -311,31 +435,30 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
   ) {
     // A question and its answer are one row: a decision on either applies to the card.
     // A restricted mix is seen by its owner alone; a removed one by nobody. So is a Market listing (one
-    // held for review shows once cleared), and a held Market rating.
-    const table: Record<string, string> = {
-      post: 'posts',
-      comment: 'comments',
-      question: 'ask_questions',
-      answer: 'ask_questions',
-      mix: 'mixes',
-      listing: 'market_listings',
-      market_rating: 'market_ratings',
-    };
-    const t = table[mc.target_type];
-    if (decision === 'no_action' && t) await c.query(`UPDATE ${t} SET moderation_status = 'normal' WHERE id = $1`, [mc.target_id]);
+    // held for review shows once cleared), a held Market rating and a story.
+    const t = CONTENT_TABLES[mc.target_type];
+    // A warning leaves the thing up, like no action: it was reviewed, and the person is told it broke the rules.
+    const release = decision === 'no_action' || decision === 'warn';
+    if (release && t) {
+      const before = await c.query<{ before: string }>(
+        `WITH old AS (SELECT moderation_status FROM ${t} WHERE id = $1) UPDATE ${t} SET moderation_status = 'normal' WHERE id = $1 RETURNING (SELECT moderation_status FROM old) AS before`,
+        [mc.target_id],
+      );
+      // A question held when it was asked reaches the person asked, and a held answer its asker, once a moderator lets it
+      // through. One hidden after a report was already seen: nobody is told again.
+      if ((mc.target_type === 'question' || mc.target_type === 'answer') && before.rows[0]?.before === 'review')
+        await releaseQuestion(c as PoolClient, mc.target_type, mc.target_id);
+    }
     // A held message is delivered once a moderator lets it through.
-    if (decision === 'no_action' && mc.target_type === 'message') await releaseMessages(c, [mc.target_id]);
-    // A held question reaches the person asked, and a held answer its asker, once a moderator lets it through.
-    if (decision === 'no_action' && (mc.target_type === 'question' || mc.target_type === 'answer'))
-      await releaseQuestion(c as PoolClient, mc.target_type, mc.target_id);
+    if (release && mc.target_type === 'message') await releaseMessages(c, [mc.target_id]);
     if (decision === 'restrict' && t) await c.query(`UPDATE ${t} SET moderation_status = 'restricted' WHERE id = $1`, [mc.target_id]);
     if (decision === 'remove') {
       if (t) await c.query(`UPDATE ${t} SET moderation_status = 'removed', deleted_at = coalesce(deleted_at, now()) WHERE id = $1`, [mc.target_id]);
       if (mc.target_type === 'message')
         await c.query(`UPDATE messages SET deleted_at = now(), body = '', attachments = '[]', moderation_status = 'removed' WHERE id = $1`, [mc.target_id]);
-      if (mc.target_type === 'community') await c.query(`UPDATE communities SET deleted_at = now() WHERE id = $1`, [mc.target_id]);
-      if (mc.target_type === 'event') await c.query(`UPDATE events SET deleted_at = now() WHERE id = $1`, [mc.target_id]);
-      if (mc.target_type === 'product') await c.query(`UPDATE products SET deleted_at = now() WHERE id = $1`, [mc.target_id]);
+      // Communities, events, products and album photos: an earlier deletion by their owner is kept (an overturned appeal brings back only ours).
+      const deleted = DELETED_TABLES[mc.target_type];
+      if (deleted) await c.query(`UPDATE ${deleted} SET deleted_at = coalesce(deleted_at, now()) WHERE id = $1`, [mc.target_id]);
       // A removed drop is hidden from everyone and, if it hadn't ended, stops.
       if (mc.target_type === 'drop')
         await c.query(
@@ -345,9 +468,6 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
            WHERE id = $1`,
           [mc.target_id],
         );
-      if (mc.target_type === 'story') await c.query(`UPDATE moments SET deleted_at = coalesce(deleted_at, now()) WHERE id = $1`, [mc.target_id]);
-      if (mc.target_type === 'together_item')
-        await c.query(`UPDATE together_contributions SET deleted_at = coalesce(deleted_at, now()) WHERE id = $1`, [mc.target_id]);
       // A removed room or live ends now; its history stays for the case.
       if (mc.target_type === 'room')
         await c.query(`UPDATE rooms SET status = 'ended', ended_at = coalesce(ended_at, now()) WHERE id = $1 AND status IN ('scheduled', 'live')`, [
@@ -359,7 +479,7 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     // Removed or restricted comments leave the post's counts; cleared ones come back.
     if (mc.target_type === 'comment') {
       const post = await c.query(`SELECT post_id FROM comments WHERE id = $1`, [mc.target_id]);
-      if (decision !== 'no_action') await c.query(`UPDATE posts SET pinned_comment_id = NULL WHERE pinned_comment_id = $1`, [mc.target_id]);
+      if (!release) await c.query(`UPDATE posts SET pinned_comment_id = NULL WHERE pinned_comment_id = $1`, [mc.target_id]);
       if (post.rows[0]) await syncCommentCounts(c as PoolClient, post.rows[0].post_id);
     }
     if (decision === 'suspend_user' && mc.subject_user_id) {
@@ -599,41 +719,70 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
   });
 
   // ── Appeals ───────────────────────────────────────────────────────────
+  /** Record an appeal against a decided case. Who made the decision is kept with the appeal: they can't decide it. */
+  async function appealCase(c: PoolClient, caseId: string, userId: string, statement: string) {
+    // Ad reviews aren't penalties: the advertiser sees the reason in Studio and can promote the post again after fixing it.
+    const mc = await c.query(
+      `SELECT status, reviewer_id, decision FROM moderation_cases WHERE id = $1 AND subject_user_id = $2 AND target_type <> 'ad_campaign' FOR UPDATE`,
+      [caseId, userId],
+    );
+    if (!mc.rows[0]) throw notFound('Case');
+    if (mc.rows[0].status !== 'decided' || mc.rows[0].decision === 'no_action') throw badRequest('This decision can’t be appealed.');
+    await c
+      .query(`INSERT INTO appeals (case_id, user_id, statement, original_reviewer_id, original_decision) VALUES ($1,$2,$3,$4,$5)`, [
+        caseId,
+        userId,
+        statement,
+        mc.rows[0].reviewer_id,
+        mc.rows[0].decision,
+      ])
+      .catch((e) => {
+        if (e.code === '23505') throw conflict('You already appealed this decision.');
+        throw e;
+      });
+    await c.query(`UPDATE moderation_cases SET status = 'appealed' WHERE id = $1`, [caseId]);
+  }
+
   app.post('/v1/appeals', { preHandler: requireAuth }, async (req, reply) => {
     const u = me(req);
     const input = parse(appealSchema, req.body);
+    await tx(db, (c) => appealCase(c, input.caseId, u.id, input.statement));
+    reply.code(201);
+    return { status: 'appealed', message: 'Your appeal was sent. A different reviewer will look at it.' };
+  });
+
+  /**
+   * Appealing a suspension from the sign-in page: signing in to a suspended account with the right
+   * password gives a token (lib/suspension.ts) that works once, for 30 minutes, and only here.
+   */
+  app.post('/v1/appeals/suspension', { config: { rateLimit: { max: 10, timeWindow: '1 hour' } } }, async (req, reply) => {
+    const input = parse(suspensionAppealSchema, req.body);
     await tx(db, async (c) => {
-      // Ad reviews aren't penalties: the advertiser sees the reason in Studio and can promote the post again after fixing it.
-      const mc = await c.query(
-        `SELECT status, reviewer_id FROM moderation_cases WHERE id = $1 AND subject_user_id = $2 AND target_type <> 'ad_campaign' FOR UPDATE`,
-        [input.caseId, u.id],
+      const userId = await redeemAppealToken(c, input.token);
+      if (!userId) throw badRequest('This link to appeal has expired. Sign in again to appeal.');
+      const mc = await c.query<{ id: string }>(
+        `SELECT id FROM moderation_cases WHERE subject_user_id = $1 AND decision = 'suspend_user' AND status = 'decided' ORDER BY decided_at DESC LIMIT 1`,
+        [userId],
       );
-      if (!mc.rows[0]) throw notFound('Case');
-      if (mc.rows[0].status !== 'decided') throw badRequest('This decision can’t be appealed.');
-      // Who made the decision is kept with the appeal: they can't decide it.
-      await c
-        .query(`INSERT INTO appeals (case_id, user_id, statement, original_reviewer_id) VALUES ($1,$2,$3,$4)`, [
-          input.caseId,
-          u.id,
-          input.statement,
-          mc.rows[0].reviewer_id,
-        ])
-        .catch((e) => {
-          if (e.code === '23505') throw conflict('You already appealed this decision.');
-          throw e;
-        });
-      await c.query(`UPDATE moderation_cases SET status = 'appealed' WHERE id = $1`, [input.caseId]);
+      if (!mc.rows[0]) throw badRequest('This decision can’t be appealed.');
+      await appealCase(c, mc.rows[0].id, userId, input.statement);
     });
     reply.code(201);
     return { status: 'appealed', message: 'Your appeal was sent. A different reviewer will look at it.' };
   });
 
+  /**
+   * Decisions about your things and your account, for Settings > Safety. `decision` is the one
+   * the person was told about (what an appeal was against); `final_decision` is where it ended.
+   * A case an appeal overturned to "no action" stays listed, with the appeal's outcome.
+   */
   app.get('/v1/me/moderation', { preHandler: requireAuth }, async (req) => {
     const { rows } = await db.query(
-      `SELECT mc.id, mc.target_type, mc.target_id, mc.status, mc.decision, mc.decided_at,
-              (SELECT status FROM appeals a WHERE a.case_id = mc.id) AS appeal_status
-       FROM moderation_cases mc WHERE mc.subject_user_id = $1 AND mc.decision IS NOT NULL AND mc.decision <> 'no_action'
-         AND mc.target_type <> 'ad_campaign' ORDER BY mc.decided_at DESC`,
+      `SELECT mc.id, mc.target_type, mc.target_id, mc.status, coalesce(a.original_decision, mc.decision) AS decision, mc.decision AS final_decision,
+              mc.decided_at, a.status AS appeal_status
+       FROM moderation_cases mc LEFT JOIN appeals a ON a.case_id = mc.id
+       WHERE mc.subject_user_id = $1 AND mc.decision IS NOT NULL AND (mc.decision <> 'no_action' OR a.id IS NOT NULL)
+         AND mc.target_type <> 'ad_campaign' ORDER BY mc.decided_at DESC LIMIT 200`,
       [me(req).id],
     );
     return { items: rows };
@@ -650,22 +799,73 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     return { items: rows };
   });
 
+  /**
+   * Suspend or reinstate an account from the console. A suspension is recorded as a decided case
+   * about the account, like one from the queue: the person is emailed (they can't sign in to see it)
+   * and can appeal from the sign-in page. Reinstating ends it.
+   */
   app.put('/v1/admin/users/:id/status', { preHandler: requireRole('admin') }, async (req) => {
+    const admin = me(req);
     const { id } = parse(idParam, req.params);
-    const { status } = parse(z.object({ status: z.enum(['active', 'suspended']) }), req.body);
-    if (id === me(req).id) throw badRequest("You can't change your own status.");
-    const r = await db.query(`UPDATE users SET status = $2 WHERE id = $1 AND status <> 'deleted'`, [id, status]);
-    if (!r.rowCount) throw notFound('User');
-    if (status === 'suspended') await db.query(`UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`, [id]);
-    await audit(db, { actorId: me(req).id, action: `user.${status}`, entityType: 'user', entityId: id, ip: req.ip, requestId: req.id });
+    const { status, note } = parse(z.object({ status: z.enum(['active', 'suspended']), note: z.string().trim().max(2000).optional() }), req.body);
+    if (id === admin.id) throw badRequest("You can't change your own status.");
+    const changed = await tx(db, async (c) => {
+      const r = await c.query<{ before: string }>(
+        `UPDATE users u SET status = $2 FROM users old WHERE u.id = $1 AND old.id = u.id AND u.status <> 'deleted' AND u.deleted_at IS NULL RETURNING old.status AS before`,
+        [id, status],
+      );
+      if (!r.rowCount) throw notFound('User');
+      const before = r.rows[0]!.before;
+      if (status === 'suspended') {
+        await c.query(`UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`, [id]);
+        if (before !== 'suspended') {
+          const mc = await c.query<{ id: string }>(
+            `INSERT INTO moderation_cases (target_type, target_id, subject_user_id, source, risk, status, decision, reviewer_id, note, decided_at)
+             VALUES ('user', $1, $1, 'admin', 'review', 'decided', 'suspend_user', $2, $3, now()) RETURNING id`,
+            [id, admin.id, note ?? null],
+          );
+          await c.query(`INSERT INTO enforcements (case_id, user_id, action) VALUES ($1, $2, 'suspend_user')`, [mc.rows[0]!.id, id]);
+          await notify(c, ctx.realtime, {
+            userId: id,
+            category: 'moderation',
+            type: 'enforcement',
+            entityType: 'moderation_case',
+            entityId: mc.rows[0]!.id,
+            data: { decision: 'suspend_user', canAppeal: true, targetType: 'user' },
+          });
+        }
+      } else if (before === 'suspended')
+        await c.query(
+          `UPDATE enforcements SET expires_at = now() WHERE user_id = $1 AND action = 'suspend_user' AND (expires_at IS NULL OR expires_at > now())`,
+          [id],
+        );
+      await audit(c, {
+        actorId: admin.id,
+        action: `user.${status}`,
+        entityType: 'user',
+        entityId: id,
+        ip: req.ip,
+        requestId: req.id,
+        metadata: { before, note },
+      });
+      return before !== status;
+    });
+    if (changed && status === 'suspended')
+      await emailSuspension(db, ctx.email, ctx.config.WEB_ORIGIN, id, 'suspended', (err) => req.log.error({ err: err.message }, 'suspension email not sent'));
     return { status };
   });
 
   app.put('/v1/admin/users/:id/role', { preHandler: requireRole('admin') }, async (req) => {
     const { id } = parse(idParam, req.params);
     const { role } = parse(z.object({ role: z.enum(['user', 'moderator', 'admin']) }), req.body);
-    await db.query(`UPDATE users SET role = $2 WHERE id = $1`, [id, role]);
-    await audit(db, { actorId: me(req).id, action: 'user.role', entityType: 'user', entityId: id, metadata: { role } });
+    // An admin can't change their own role: the last admin could otherwise lock everyone out of the console.
+    if (id === me(req).id) throw badRequest("You can't change your own role.");
+    const r = await db.query<{ before: string }>(
+      `UPDATE users u SET role = $2 FROM users old WHERE u.id = $1 AND old.id = u.id AND u.status <> 'deleted' AND u.deleted_at IS NULL RETURNING old.role AS before`,
+      [id, role],
+    );
+    if (!r.rowCount) throw notFound('User');
+    await audit(db, { actorId: me(req).id, action: 'user.role', entityType: 'user', entityId: id, metadata: { role, before: r.rows[0]!.before } });
     return { role };
   });
 

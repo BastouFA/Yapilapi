@@ -35,7 +35,8 @@ type Q = Pool | PoolClient;
 /**
  * Stories (moments aliased `m`, author user aliased `au`) the viewer `v` may see: their own, and active ones from people
  * they follow or are friends with. Close friends stories reach only the people on the author's close friends list who
- * still follow them. Stories whose photo or video was blocked are gone for everyone; sensitive ones are never shown to
+ * still follow them. A story hidden after a minor-safety report or limited by a moderator is seen by its author alone.
+ * Stories whose photo or video was blocked are gone for everyone; sensitive ones are never shown to
  * people under 18 (or people whose age isn't known).
  *
  * With `open`, public stories from accounts that aren't private can also be opened by anyone (a shared link, a tag page,
@@ -43,6 +44,7 @@ type Q = Pool | PoolClient;
  */
 export function storyVisibleSql(v: string, opts: { open?: boolean } = {}): string {
   return `m.deleted_at IS NULL AND (m.expires_at IS NULL OR m.expires_at > now()) AND au.status = 'active'
+  AND (m.moderation_status = 'normal' OR m.author_id = ${v})
   AND ${notBlockedSql('m.author_id', v)}
   AND (m.author_id = ${v}
     OR (m.visibility = 'close_friends'
@@ -59,7 +61,7 @@ export function storyVisibleSql(v: string, opts: { open?: boolean } = {}): strin
  * Active public stories only, from accounts that aren't private, without a blocked or sensitive photo or video:
  * what tag pages and trending may show. Followers-only and close friends stories never qualify.
  */
-export const PUBLIC_STORY = `m.visibility = 'public' AND m.deleted_at IS NULL AND (m.expires_at IS NULL OR m.expires_at > now()) AND au.status = 'active'
+export const PUBLIC_STORY = `m.visibility = 'public' AND m.moderation_status = 'normal' AND m.deleted_at IS NULL AND (m.expires_at IS NULL OR m.expires_at > now()) AND au.status = 'active'
   AND NOT EXISTS (SELECT 1 FROM profiles px WHERE px.user_id = m.author_id AND px.is_private)
   AND NOT EXISTS (SELECT 1 FROM media x WHERE x.id = m.media_id AND x.moderation IN ('blocked', 'sensitive'))`;
 
