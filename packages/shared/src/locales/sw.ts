@@ -2003,6 +2003,7 @@ export const sw: Catalog = {
   'compose.addOption': 'Ongeza chaguo',
   'compose.removePoll': 'Ondoa kura ya maoni',
   'compose.removeLink': 'Ondoa kiungo',
+  'compose.aboutEvent': 'Kuhusu {title}',
   'compose.linkHint': 'Huanza na http:// au https://. Huonekana chini ya chapisho lako.',
   'compose.suggestedCaption': 'Maelezo yaliyopendekezwa',
   'compose.useThis': 'Tumia hii',

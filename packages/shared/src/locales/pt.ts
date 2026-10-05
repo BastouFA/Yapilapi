@@ -2001,6 +2001,7 @@ export const pt: Catalog = {
   'compose.addOption': 'Adicionar opção',
   'compose.removePoll': 'Remover enquete',
   'compose.removeLink': 'Remover o link',
+  'compose.aboutEvent': 'Sobre {title}',
   'compose.linkHint': 'Começa com http:// ou https://. Aparece abaixo da sua publicação.',
   'compose.suggestedCaption': 'Legenda sugerida',
   'compose.useThis': 'Usar',

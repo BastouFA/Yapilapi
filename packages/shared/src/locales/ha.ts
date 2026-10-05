@@ -2002,6 +2002,7 @@ export const ha: Catalog = {
   'compose.addOption': 'Ƙara zaɓi',
   'compose.removePoll': 'Cire ƙuri’ar jin ra’ayi',
   'compose.removeLink': 'Cire hanyar haɗi',
+  'compose.aboutEvent': 'Game da {title}',
   'compose.linkHint': 'Yana farawa da http:// ko https://. Yana bayyana a ƙasan rubutunka.',
   'compose.suggestedCaption': 'Take da aka ba da shawara',
   'compose.useThis': 'Yi amfani da wannan',

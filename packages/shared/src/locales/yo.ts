@@ -1999,6 +1999,7 @@ export const yo: Catalog = {
   'compose.addOption': 'Fi àṣàyàn kún un',
   'compose.removePoll': 'Yọ ìbò kúrò',
   'compose.removeLink': 'Yọ ìjápọ̀ kúrò',
+  'compose.aboutEvent': 'Nípa {title}',
   'compose.linkHint': 'Ó bẹ̀rẹ̀ pẹ̀lú http:// tàbí https://. Ó máa hàn nísàlẹ̀ ìfiránṣẹ́ rẹ.',
   'compose.suggestedCaption': 'Àkọlé tí a dábàá',
   'compose.useThis': 'Lo èyí',

@@ -2001,6 +2001,7 @@ export const en = {
   'compose.addOption': 'Add option',
   'compose.removePoll': 'Remove poll',
   'compose.removeLink': 'Remove link',
+  'compose.aboutEvent': 'About {title}',
   'compose.linkHint': 'Starts with http:// or https://. It shows under your post.',
   'compose.suggestedCaption': 'Suggested caption',
   'compose.useThis': 'Use this',

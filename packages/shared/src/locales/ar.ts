@@ -1991,6 +1991,7 @@ export const ar: Catalog = {
   'compose.addOption': 'إضافة خيار',
   'compose.removePoll': 'إزالة الاستطلاع',
   'compose.removeLink': 'إزالة الرابط',
+  'compose.aboutEvent': 'عن {title}',
   'compose.linkHint': 'يبدأ بـ http:// أو https://. يظهر أسفل منشورك.',
   'compose.suggestedCaption': 'وصف مقترح',
   'compose.useThis': 'استخدم هذا',

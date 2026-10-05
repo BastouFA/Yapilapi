@@ -135,7 +135,24 @@ function Create() {
   // A web link shown under the post (null: no link field).
   const [link, setLink] = useState<string | null>(null);
   // What a draft started elsewhere links to that this page has no picker for (an event, a product): kept as it is.
-  const [linked, setLinked] = useState<{ eventId?: string; productId?: string }>({});
+  // A post about an event ("Share a post about this event" on its page) carries a link to it.
+  const [linked, setLinked] = useState<{ eventId?: string; productId?: string }>(() => {
+    const eventId = params.get('event');
+    return eventId ? { eventId } : {};
+  });
+  const [linkedEventTitle, setLinkedEventTitle] = useState<string | null>(null);
+  useEffect(() => {
+    if (!linked.eventId) return setLinkedEventTitle(null);
+    let live = true;
+    api.events.get(linked.eventId).then(
+      (r) => live && setLinkedEventTitle(r.event.title),
+      // Gone or not visible: post without it.
+      () => live && setLinked(({ eventId: _gone, ...rest }) => rest),
+    );
+    return () => {
+      live = false;
+    };
+  }, [linked.eventId]);
   const [topics, setTopics] = useState('');
   const [expiresIn, setExpiresIn] = useState<'1h' | '24h' | 'permanent' | 'custom'>('24h');
   // With a chosen length: how many hours the story stays up (1 to 720), as typed.
@@ -711,6 +728,15 @@ function Create() {
                   {t('compose.removeLink')}
                 </Button>
               </div>
+            </div>
+          ) : null}
+
+          {linked.eventId && linkedEventTitle ? (
+            <div className="row" style={{ alignItems: 'center' }}>
+              <span className="muted">{t('compose.aboutEvent', { title: linkedEventTitle })}</span>
+              <Button size="sm" variant="ghost" onClick={() => setLinked(({ eventId: _removed, ...rest }) => rest)}>
+                {t('m.common.remove')}
+              </Button>
             </div>
           ) : null}
 

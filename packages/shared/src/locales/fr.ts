@@ -2015,6 +2015,7 @@ export const fr: Catalog = {
   'compose.addOption': 'Ajouter une option',
   'compose.removePoll': 'Retirer le sondage',
   'compose.removeLink': 'Retirer le lien',
+  'compose.aboutEvent': 'À propos de {title}',
   'compose.linkHint': 'Commence par http:// ou https://. Il s’affiche sous votre publication.',
   'compose.suggestedCaption': 'Légende suggérée',
   'compose.useThis': 'Utiliser',

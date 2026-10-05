@@ -233,7 +233,7 @@ export default function EventPageClient({ isPublic }: { isPublic: boolean }) {
       {signedOut ? (
         <JoinNote text={t('eventPage.join')} />
       ) : (
-        <Link href={`/create`} className="yp-btn yp-btn--secondary">
+        <Link href={`/create?event=${ev.id}`} className="yp-btn yp-btn--secondary">
           {t('eventPage.sharePost')}
         </Link>
       )}
