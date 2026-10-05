@@ -64,7 +64,13 @@ export default function Developers() {
       (r) => {
         setError(null);
         setApps(r.items);
-        setSelected((s) => (s && r.items.some((a) => a.id === s) ? s : (r.items[0]?.id ?? null)));
+        // A notification about a Mini App's review opens its app (?app=).
+        const asked = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('app');
+        setSelected((s) => {
+          if (s && r.items.some((a) => a.id === s)) return s;
+          if (asked && r.items.some((a) => a.id === asked)) return asked;
+          return r.items[0]?.id ?? null;
+        });
       },
       (e) => setError(errorMessage(e)),
     );
@@ -505,14 +511,24 @@ function MiniApps({ appId }: { appId: string }) {
               <ListItem
                 key={m.id}
                 primary={m.name}
-                secondary={[
-                  formatList(
-                    m.surfaces.map((s) => (SURFACES[s] ? t(SURFACES[s]) : s)),
-                    locale,
-                  ),
-                  tp('dev.mini.installs', m.installs),
-                  formatRelativeTime(m.createdAt, locale),
-                ].join(' · ')}
+                secondary={
+                  <>
+                    {[
+                      formatList(
+                        m.surfaces.map((s) => (SURFACES[s] ? t(SURFACES[s]) : s)),
+                        locale,
+                      ),
+                      tp('dev.mini.installs', m.installs),
+                      formatRelativeTime(m.createdAt, locale),
+                    ].join(' · ')}
+                    {/* Why it was turned down, in the admin's words, on as many lines as it takes. */}
+                    {m.status === 'rejected' && m.rejectionReason ? (
+                      <span dir="auto" style={{ display: 'block', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                        {t('dev.mini.reason', { reason: m.rejectionReason })}
+                      </span>
+                    ) : null}
+                  </>
+                }
                 end={<Badge tone={m.status === 'approved' ? 'success' : m.status === 'rejected' ? 'danger' : 'warning'}>{t(MINI_STATUS[m.status])}</Badge>}
               />
             ))}

@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { DATA, liveRoom, STATE, watchSession, type SeedData } from './global-setup';
+import { ADMIN_STATE, DATA, liveRoom, STATE, watchSession, type SeedData } from './global-setup';
 
 /**
  * axe-core over the main pages, and over open sheets, menus and other states,
@@ -850,6 +850,58 @@ test.describe('open sheets, menus and states', () => {
  * microphone. A chat has one call at a time, so each project calls in a new group (you, Ben and
  * Cleo); nobody answers, and the test hangs up.
  */
+/**
+ * The admin console, as Dee (an admin: see grantAdmin in global-setup.ts), one tab at a time. The
+ * queue holds a reported post and an ad waiting for review; the Mini Apps tab holds one waiting,
+ * and is audited again with "Turn down" open (the reason field). Skipped when nobody could be made
+ * an admin (A11Y_PSQL unset); CI always sets it.
+ */
+const ADMIN_TABS: [string, string, (page: Page) => Promise<void>][] = [
+  [
+    'queue',
+    'Moderation',
+    async (page) => {
+      await expect(page.getByText(/^Free followers, click the link in my bio/).first()).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Approve ad' }).first()).toBeVisible();
+    },
+  ],
+  ['account signals', 'Account signals', async () => {}],
+  ['people', 'People', async (page) => void (await expect(page.getByRole('searchbox', { name: 'Username or email' })).toBeVisible())],
+  ['overview', 'Overview', async () => {}],
+  ['flags', 'Feature flags', async (page) => void (await expect(page.getByRole('switch').first()).toBeVisible())],
+  ['mini apps', 'Mini Apps', async (page) => void (await expect(page.getByText('Supper polls').first()).toBeVisible())],
+  ['regional rules', 'Regional rules', async () => {}],
+  ['payouts', 'Payouts', async () => {}],
+  ['audit log', 'Audit log', async (page) => void (await expect(page.getByRole('table')).toBeVisible())],
+];
+
+async function adminTab(page: Page, tab: string) {
+  await open(page, '/admin');
+  await page.getByRole('tab', { name: tab, exact: true }).click();
+  await expect(page.getByRole('tab', { name: tab, exact: true })).toHaveAttribute('aria-selected', 'true');
+}
+
+test.describe('admin console', () => {
+  test.use({ storageState: ADMIN_STATE });
+  test.beforeEach(() => test.skip(!data().adminReady, 'A11Y_PSQL is not set, so there is no admin to audit with'));
+  for (const [name, tab, ready] of ADMIN_TABS)
+    test(`admin: ${name}`, async ({ page }, info) => {
+      await narrow(page, info.project.name);
+      await adminTab(page, tab);
+      await ready(page);
+      await audit(page, `admin - ${name}`, info.project.name);
+      await noSidewaysScroll(page, `admin: ${name}`);
+    });
+  test('admin: turning down a Mini App', async ({ page }, info) => {
+    await narrow(page, info.project.name);
+    await adminTab(page, 'Mini Apps');
+    await page.getByRole('button', { name: 'Turn down' }).first().click();
+    await expect(page.getByRole('textbox', { name: /Why it was turned down/ })).toBeFocused();
+    await audit(page, 'admin - turning down a Mini App', info.project.name);
+    await noSidewaysScroll(page, 'admin: turning down a Mini App');
+  });
+});
+
 test.describe('a call', () => {
   test.use({ storageState: STATE });
   test('chat: calling', async ({ page }, info) => {

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
-import { expect, test, type Page } from '@playwright/test';
-import { DATA, STATE, type SeedData } from './global-setup';
+import { expect, request, test, type Page } from '@playwright/test';
+import { DATA, STATE, THIRD_STATE, type SeedData } from './global-setup';
 
 /**
  * Touch targets: every visible control must be at least 44 by 44 CSS pixels to press, the
@@ -23,6 +23,7 @@ test.use({ storageState: STATE });
 test.beforeEach(({}, info) => test.skip(info.project.name.endsWith('dark'), 'covered by the light projects'));
 
 const data = (): SeedData => JSON.parse(readFileSync(DATA, 'utf8'));
+const BASE = process.env.A11Y_BASE_URL ?? 'http://127.0.0.1:3100';
 
 const PAGES: [string, (d: SeedData) => string][] = [
   ['home', () => '/home'],
@@ -239,6 +240,26 @@ const STATES: [string, string, (page: Page, d: SeedData) => Promise<void>][] = [
     async (page, d) => {
       await open(page, `/u/${d.username}`);
       await page.getByRole('button', { name: 'Edit status' }).click();
+    },
+  ],
+  [
+    // Suggested replies under a message from Cleo, in a chat of their own (other tests don't see them).
+    // Their text is cut off inside the chip, so the chip's 44px layer isn't clipped in any browser.
+    'suggested replies',
+    '.smart-replies',
+    async (page, d) => {
+      const cleo = await request.newContext({ baseURL: BASE, storageState: THIRD_STATE });
+      try {
+        const made = await cleo.post('/api/v1/conversations', { data: { memberIds: [d.userId] } });
+        expect(made.ok(), await made.text()).toBe(true);
+        const id = (await made.json()).conversation.id as string;
+        expect((await cleo.post(`/api/v1/conversations/${id}/messages`, { data: { body: 'Are you free for dinner on Friday?' } })).ok()).toBe(true);
+        expect((await page.request.put(`/api/v1/conversations/${id}/smart-replies`, { data: { enabled: true } })).ok()).toBe(true);
+        await open(page, `/inbox/${id}`);
+        await expect(page.locator('.smart-replies__chip').first()).toBeVisible();
+      } finally {
+        await cleo.dispose();
+      }
     },
   ],
 ];

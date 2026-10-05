@@ -4,7 +4,7 @@ import { COMMUNITY_ROLE_RANK } from '@yapilapi/shared';
 import { z } from 'zod';
 import { badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
-import { audit, isEnabled } from '../lib/services.ts';
+import { audit, isEnabled, notify } from '../lib/services.ts';
 import { notBlockedSql } from '../lib/visibility.ts';
 import { me, requireAuth, requireRole } from '../plugins/auth.ts';
 
@@ -85,7 +85,7 @@ export default async function miniAppsModule(app: FastifyInstance, ctx: AppConte
     const own = await db.query(`SELECT 1 FROM developer_apps WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL`, [id, me(req).id]);
     if (!own.rowCount) throw notFound('App');
     const { rows } = await db.query(
-      `SELECT m.id, m.name, m.description, m.entry_url, m.permissions, m.surfaces, m.status, m.created_at,
+      `SELECT m.id, m.name, m.description, m.entry_url, m.permissions, m.surfaces, m.status, m.review_reason, m.created_at,
               (SELECT count(*) FROM mini_app_installs i WHERE i.mini_app_id = m.id)::int AS installs
        FROM mini_apps m WHERE m.app_id = $1 ORDER BY m.created_at DESC`,
       [id],
@@ -99,6 +99,8 @@ export default async function miniAppsModule(app: FastifyInstance, ctx: AppConte
         permissions: r.permissions,
         surfaces: r.surfaces,
         status: r.status,
+        // Why it wasn't approved, when the admin said.
+        rejectionReason: r.status === 'rejected' ? r.review_reason : null,
         installs: r.installs,
         createdAt: r.created_at,
       })),
@@ -135,13 +137,35 @@ export default async function miniAppsModule(app: FastifyInstance, ctx: AppConte
     return { items: rows };
   });
 
+  /** Approve or reject a Mini App. Its developer is told either way, with the reason when the admin gives one. */
   app.post('/v1/admin/mini-apps/:id/decide', { preHandler: requireRole('admin') }, async (req) => {
     const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
-    const { approve } = parse(z.object({ approve: z.boolean() }), req.body);
-    const r = await db.query(`UPDATE mini_apps SET status = $2 WHERE id = $1 RETURNING id, status`, [id, approve ? 'approved' : 'rejected']);
-    if (!r.rowCount) throw notFound('Mini App');
-    await audit(db, { actorId: me(req).id, action: `mini_app.${approve ? 'approve' : 'reject'}`, entityType: 'mini_app', entityId: id });
-    return r.rows[0];
+    const { approve, reason } = parse(z.object({ approve: z.boolean(), reason: z.string().trim().max(2000).optional() }), req.body);
+    const note = approve ? null : reason || null;
+    const r = await db.query<{ id: string; status: string; name: string; app_id: string; owner_id: string }>(
+      `UPDATE mini_apps m SET status = $2, review_reason = $3 FROM developer_apps a
+       WHERE m.id = $1 AND a.id = m.app_id RETURNING m.id, m.status, m.name, m.app_id, a.owner_id`,
+      [id, approve ? 'approved' : 'rejected', note],
+    );
+    const row = r.rows[0];
+    if (!row) throw notFound('Mini App');
+    await audit(db, {
+      actorId: me(req).id,
+      action: `mini_app.${approve ? 'approve' : 'reject'}`,
+      entityType: 'mini_app',
+      entityId: id,
+      metadata: note ? { reason: note } : undefined,
+    });
+    // No actor: the developer hears from YAPILAPI, not from a named admin.
+    await notify(db, ctx.realtime, {
+      userId: row.owner_id,
+      category: 'moderation',
+      type: approve ? 'mini_app_approved' : 'mini_app_rejected',
+      entityType: 'mini_app',
+      entityId: id,
+      data: { title: row.name, appId: row.app_id, reason: note },
+    });
+    return { id: row.id, status: row.status };
   });
 
   // ── Users ─────────────────────────────────────────────────────────────

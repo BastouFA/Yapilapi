@@ -794,9 +794,9 @@ function PhonePurchases() {
 function MiniAppReview() {
   const { toast, locale, t } = useSession();
   const { data, setData, error, reload } = useLoad(() => api.admin.miniApps(), []);
-  const decide = async (m: AdminMiniApp, approve: boolean) => {
+  const decide = async (m: AdminMiniApp, approve: boolean, reason?: string) => {
     try {
-      await api.admin.decideMiniApp(m.id, approve);
+      await api.admin.decideMiniApp(m.id, approve, reason);
       setData((d) => (d ? { items: d.items.filter((x) => x.id !== m.id) } : d));
       toast(approve ? t('admin.mini.approved', { name: m.name }) : t('admin.mini.rejected', { name: m.name }));
     } catch (e) {
@@ -813,16 +813,7 @@ function MiniAppReview() {
           key={m.id}
           title={m.name}
           subtitle={[t('admin.mini.from', { app: m.developer_app }), formatRelativeTime(m.created_at, locale)].join(' · ')}
-          footer={
-            <>
-              <Button size="sm" variant="secondary" onClick={() => decide(m, false)}>
-                {t('admin.mini.reject')}
-              </Button>
-              <Button size="sm" onClick={() => decide(m, true)}>
-                {t('admin.mini.approve')}
-              </Button>
-            </>
-          }
+          footer={<MiniAppDecision onDecide={(approve, reason) => decide(m, approve, reason)} />}
         >
           {m.description ? <p style={{ whiteSpace: 'pre-wrap' }}>{m.description}</p> : null}
           <p style={{ margin: 0, overflowWrap: 'anywhere' }}>
@@ -860,7 +851,8 @@ function Audit() {
   if (error) return <LoadFailed error={error} onRetry={reload} />;
   if (!data) return <Loading />;
   return (
-    <div className="table-wrap">
+    // It scrolls sideways on a phone, so it can be focused and scrolled with the arrow keys.
+    <div className="table-wrap" tabIndex={0} role="region" aria-label={t('admin.tab.audit')}>
       <table className="table">
         <thead>
           <tr>
@@ -884,6 +876,44 @@ function Audit() {
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** Approve a Mini App, or turn it down, with a reason its developer will see if you give one. */
+function MiniAppDecision({ onDecide }: { onDecide: (approve: boolean, reason?: string) => void }) {
+  const { t } = useSession();
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState('');
+  if (rejecting)
+    return (
+      <form
+        className="row"
+        style={{ flex: 1 }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          onDecide(false, reason.trim() || undefined);
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <TextField label={t('admin.mini.why')} value={reason} onChange={(e) => setReason(e.currentTarget.value)} maxLength={2000} autoFocus />
+        </div>
+        <Button type="submit" size="sm" variant="danger">
+          {t('admin.mini.reject')}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => setRejecting(false)}>
+          {t('common.cancel')}
+        </Button>
+      </form>
+    );
+  return (
+    <>
+      <Button size="sm" variant="secondary" onClick={() => setRejecting(true)}>
+        {t('admin.mini.reject')}
+      </Button>
+      <Button size="sm" onClick={() => onDecide(true)}>
+        {t('admin.mini.approve')}
+      </Button>
+    </>
   );
 }
 

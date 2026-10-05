@@ -173,7 +173,7 @@ export function SmartReplyChips({
             setReplies(null);
           }}
         >
-          {s}
+          <span className="smart-replies__text">{s}</span>
         </button>
       ))}
     </div>
@@ -280,7 +280,7 @@ export function CaptionIdeasPanel({
                   setAdded((a) => [...a, tag]);
                 }}
               >
-                <bdi>#{tag}</bdi>
+                <bdi className="smart-replies__text">#{tag}</bdi>
               </button>
             ))}
           </div>

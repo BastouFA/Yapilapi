@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { randomBytes, randomUUID } from 'node:crypto';
 import path from 'node:path';
@@ -9,6 +10,8 @@ export const STATE = path.join(AUTH_DIR, 'state.json');
 export const FRIEND_STATE = path.join(AUTH_DIR, 'friend.json');
 /** The third user (Cleo): starts watch together sessions that the tests open fresh. */
 export const THIRD_STATE = path.join(AUTH_DIR, 'third.json');
+/** The fourth user (Dee): an admin, for the admin console. Made one through A11Y_PSQL (see grantAdmin). */
+export const ADMIN_STATE = path.join(AUTH_DIR, 'admin.json');
 export const DATA = path.join(AUTH_DIR, 'data.json');
 const FIXTURES = path.join(import.meta.dirname, 'fixtures');
 
@@ -52,6 +55,31 @@ export interface SeedData {
   hostEventId: string;
   /** A Together album you started with Ben: three photos, one starred with a comment. */
   togetherId: string;
+  /**
+   * Whether Dee is an admin, so the admin console is audited. With it, the console has a reported
+   * post and an ad in its queue, a Mini App waiting for review and a regional rule.
+   */
+  adminReady: boolean;
+}
+
+/**
+ * Gives an account the admin role. There is no way to do that through the API, so it runs SQL
+ * through A11Y_PSQL: a command that runs psql on the audit's database and reads the statement from
+ * its input (CI: `psql <url>`; on your machine, `docker compose exec -T db psql -U postgres -d <db>`).
+ * Without it the admin console isn't audited (and CI fails, so it can't be left out there unnoticed).
+ */
+function grantAdmin(userId: string): boolean {
+  const psql = process.env.A11Y_PSQL;
+  if (!psql) {
+    const why = 'A11Y_PSQL is not set, so nobody can be made an admin and the admin console is not audited (see docs/accessibility.md).';
+    if (process.env.CI) throw new Error(why);
+    console.warn(why);
+    return false;
+  }
+  if (!/^[0-9a-f-]{36}$/.test(userId)) throw new Error(`Not a user id: ${userId}`);
+  const out = execFileSync('sh', ['-c', psql], { input: `UPDATE users SET role = 'admin' WHERE id = '${userId}';\n`, encoding: 'utf8' });
+  if (!/UPDATE 1/.test(out)) throw new Error(`A11Y_PSQL didn't make the audit's admin an admin: ${out}`);
+  return true;
 }
 
 async function must(p: Promise<APIResponse>) {
@@ -109,13 +137,14 @@ export async function watchSession(baseURL: string): Promise<string> {
 }
 
 /**
- * Signs up three fresh users through the web app's /api proxy (so the session
+ * Signs up four fresh users through the web app's /api proxy (so the session
  * cookie belongs to the web origin) and gives the main one something on every
  * page: posts with photos, a draft and a scheduled post, a board, a circle, a
  * chapter and a recap video, a community, an event at a place, a conversation
  * with a reply and a pinned message, stories (one with music and stickers), a
- * status, a cover photo and grouped notifications. Every run uses new accounts
- * with random throwaway passwords.
+ * status, a cover photo and grouped notifications. The fourth is made an admin
+ * (with A11Y_PSQL) for the admin console. Every run uses new accounts with
+ * random throwaway passwords.
  */
 export default async function globalSetup(config: FullConfig) {
   const baseURL = config.projects[0]!.use.baseURL!;
@@ -155,6 +184,8 @@ export default async function globalSetup(config: FullConfig) {
   const main = await signUp('main', 'Ada Access');
   const friend = await signUp('ben', 'Ben Keyboard');
   const third = await signUp('cleo', 'Cleo Contrast');
+  const admin = await signUp('dee', 'Dee Admin');
+  const adminReady = grantAdmin(admin.id);
 
   const post = await must(main.ctx.post('/api/v1/posts', { data: { body: 'Sunday market run: peaches, bread and a new mug. #food', topics: ['food'] } }));
   const communitySlug = `a11y-${run}`.slice(0, 40);
@@ -491,10 +522,53 @@ export default async function globalSetup(config: FullConfig) {
   const wrapId = (wraps.items[0]?.id as string | undefined) ?? null;
   if (!wrapId) console.warn('No weekly wrap was made: the wrap pages are audited empty.');
 
+  // The admin console's queue and review tabs, filled in: Ben reports a post of Cleo's, Ben's ad and
+  // Mini App wait for review, and there's a regional rule. Ads are turned on only while Ben's
+  // campaign is made (so the other pages are audited as they were), and back off unless they were on.
+  if (adminReady) {
+    const cleoPost = await must(third.ctx.post('/api/v1/posts', { data: { body: `Free followers, click the link in my bio. Ref ${run}.` } }));
+    await must(
+      friend.ctx.post('/api/v1/reports', {
+        data: { targetType: 'post', targetId: cleoPost.post.id, reason: 'spam', details: 'The same link under every post.' },
+      }),
+    );
+    const adsWereOn = flags.ADS;
+    if (!adsWereOn) await must(admin.ctx.put('/api/v1/admin/flags/ADS', { data: { enabled: true } }));
+    try {
+      const promo = await must(friend.ctx.post('/api/v1/posts', { data: { body: `Rye loaves every Friday at Corner Bakes. Ref ${run}.`, topics: ['food'] } }));
+      const camp = await must(friend.ctx.post('/api/v1/ads/campaigns', { data: { postId: promo.post.id, name: 'Friday rye', topics: ['food'] } }));
+      const fund = await must(
+        friend.ctx.post(`/api/v1/ads/campaigns/${camp.campaign.id}/fund`, { data: { amountCents: 1000, idempotencyKey: `a11y-${run}-ad` } }),
+      );
+      await must(friend.ctx.post('/api/v1/payments/dev/complete', { data: { orderId: fund.payment.orderId } }));
+      await must(friend.ctx.patch(`/api/v1/ads/campaigns/${camp.campaign.id}`, { data: { status: 'active' } }));
+    } finally {
+      if (!adsWereOn) await must(admin.ctx.put('/api/v1/admin/flags/ADS', { data: { enabled: false } }));
+    }
+    const devApp = await must(friend.ctx.post('/api/v1/developer/apps', { data: { name: 'Corner Polls' } }));
+    await must(
+      friend.ctx.post(`/api/v1/developer/apps/${devApp.app.id}/mini-apps`, {
+        data: {
+          name: 'Supper polls',
+          description: 'Vote on what to cook next, right in the chat.',
+          entryUrl: 'https://polls.example.test/app',
+          permissions: ['profile'],
+          surfaces: ['conversation', 'community'],
+        },
+      }),
+    );
+    await must(
+      admin.ctx.post('/api/v1/admin/regional-rules', {
+        data: { kind: 'blocked_term', country: 'PT', term: `a11yterm${run}`, legalBasis: 'An example rule for the accessibility audit.' },
+      }),
+    );
+  }
+
   await mkdir(AUTH_DIR, { recursive: true });
   await main.ctx.storageState({ path: STATE });
   await friend.ctx.storageState({ path: FRIEND_STATE });
   await third.ctx.storageState({ path: THIRD_STATE });
+  await admin.ctx.storageState({ path: ADMIN_STATE });
   const data: SeedData = {
     username: main.username,
     userId: main.id,
@@ -526,7 +600,8 @@ export default async function globalSetup(config: FullConfig) {
     ticketEventId: ticketEvent.event.id,
     hostEventId: hostEvent.event.id,
     togetherId,
+    adminReady,
   };
   await writeFile(DATA, JSON.stringify(data, null, 2));
-  for (const u of [main, friend, third]) await u.ctx.dispose();
+  for (const u of [main, friend, third, admin]) await u.ctx.dispose();
 }

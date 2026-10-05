@@ -6,6 +6,7 @@ import { Avatar, Button, EmptyState, List, ListItem, Skeleton } from '@yapilapi/
 import {
   echoNoticeText,
   formatRelativeTime,
+  miniAppNoticeText,
   reportOutcomeText,
   appealDecidedText,
   scheduledPostFailedText,
@@ -148,6 +149,8 @@ function hrefFor(n: NotificationItem, meUsername?: string): string | undefined {
   if (n.entityType === 'room') return `/rooms/${n.entityId}`;
   if (n.entityType === 'family_link') return '/settings';
   if (n.entityType === 'ad_campaign') return '/studio';
+  // A Mini App's review opens its developer app on the developers page.
+  if (n.entityType === 'mini_app') return typeof n.data.appId === 'string' ? `/developers?app=${encodeURIComponent(n.data.appId)}` : '/developers';
   if (n.entityType === 'plus') return '/plus';
   if (n.entityType === 'together') return `/together/${n.entityId}`;
   if (n.entityType === 'user' && n.actor) return `/u/${n.actor.username}`;
@@ -175,6 +178,9 @@ function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): s
   // The answer to your appeal.
   const appeal = appealDecidedText(n, t);
   if (appeal) return appeal;
+  // How a Mini App's review went, with the admin's reason when there is one.
+  const mini = miniAppNoticeText(n, t);
+  if (mini) return mini;
   // Together albums: whole sentences with the album's name ("Ada added 12 photos to Lagos weekend").
   const together = togetherNoticeText(n, t, tp);
   if (together) return together;

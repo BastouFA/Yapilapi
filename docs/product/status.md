@@ -615,7 +615,7 @@ Every flow in administration, moderation, the developer platform and Mini Apps w
 
 Checked and working: overview numbers, flags on and off (the app follows), audit log, regional rules (add, duplicate refused, remove), payouts list, ad review (approve runs it, reject needs a reason the advertiser sees), reports of every target kind with duplicates refused, reporters told the outcome, different-reviewer rule, scoped API keys (read/write, refused routes including encoded paths), signed webhooks (signature, retry with backoff, private addresses refused), Sign in with YAPILAPI (consent screen, exact redirects, plain PKCE refused, code reuse refused, rotation, revoke), Mini App context tokens (tamper refused) and the flag gate.
 
-**Not done:** Mini App developers aren't notified of review decisions (they see the status on the developers page); admin pages aren't in the axe audit (the audit's accounts aren't admins).
+**Not done:** Mini App developers aren't notified of review decisions (they see the status on the developers page); admin pages aren't in the axe audit (the audit's accounts aren't admins). Both done 2026-10-06: the developer app's owner is notified either way (`mini_app_approved`, `mini_app_rejected`, pushed in their language), an admin can give a reason for turning one down (migration 0076, shown in the notification and on the developers page; `apps/api/test/miniapp-review.test.ts`), and the admin console's tabs are audited (docs/accessibility.md).
 
 ## Audio posts and the last sweep leftovers (2026-10-05, migration 0075, `apps/api/test/audio-posts.test.ts`, `packages/shared/src/transcript.test.ts`, `apps/web/e2e/content.spec.ts`)
 

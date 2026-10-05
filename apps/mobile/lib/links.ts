@@ -16,7 +16,8 @@ export type NotificationTarget = {
 /**
  * Where a notification opens in the app: the same places as the web notifications page
  * (apps/web/app/(app)/notifications/page.tsx, hrefFor), at the phone app's paths. Things the
- * phone app can't show yet (an ad) open the person who did it, or nothing.
+ * phone app can't show yet (an ad, a Mini App's review, which the web's developers page shows)
+ * open the person who did it, or nothing.
  */
 export function notificationHref(n: NotificationTarget): string | null {
   const id = n.entityId ? encodeURIComponent(n.entityId) : null;
@@ -34,6 +35,8 @@ export function notificationHref(n: NotificationTarget): string | null {
   if (n.type === 'watch_invite' || n.entityType === 'watch') return id ? `/watch/${id}` : null;
   if (n.type === 'weekly_wrap' || n.entityType === 'wrap') return id ? `/wraps/${id}` : '/wraps';
   if (n.type === 'account_limited' || n.type === 'account_review') return '/settings';
+  // A Mini App's review: the notification says how it went (and why); its page is on the web.
+  if (n.entityType === 'mini_app') return null;
   // A sign-in from a new device: where you're signed in, to log it out, and your password.
   if (n.type === 'new_sign_in') return '/settings/security';
   // Money: a tip you got opens your tips and gifts; a new subscriber, a sale or a booking to confirm opens Studio.
