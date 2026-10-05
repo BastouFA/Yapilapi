@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CATALOGS, gmtOffsetLabel, isRtl, pluralIsOne, SUPPORTED_LOCALES, t, tp, zoneOffsetMinutes, type MessageKey } from './i18n.ts';
+import { fr as frErrors } from './locales/errors/fr.ts';
 
 const en = CATALOGS.en!;
 const keys = Object.keys(en).sort();
@@ -50,6 +51,17 @@ describe('message catalogs', () => {
       const names = rows.map((k) => t(k, locale));
       expect(new Set(names).size, locale).toBe(names.length);
     }
+  });
+
+  it('speaks to the reader as "tu" in French', () => {
+    // One register everywhere, the API's error messages included. "Rendez-vous" is a noun, not "vous".
+    const formal = /(?<!\p{L})(vous|votre|vos)(?!\p{L})/iu;
+    const found = (table: Record<string, string>) =>
+      Object.entries(table)
+        .filter(([, s]) => formal.test(s.replace(/rendez-vous/giu, '')))
+        .map(([k, s]) => `${k}: ${s}`);
+    expect(found(CATALOGS.fr!)).toEqual([]);
+    expect(found(frErrors)).toEqual([]);
   });
 
   it('comes with both halves of every plural pair', () => {

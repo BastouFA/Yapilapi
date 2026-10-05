@@ -34,13 +34,13 @@ export const fr: Record<string, string> = {
   'This person already answered an invite to this post.': 'Cette personne a déjà répondu à une invitation pour cette publication.',
   "That person couldn't be found.": 'Cette personne est introuvable.',
   'To keep younger people safe, you can only invite them once you are friends.':
-    'Pour protéger les plus jeunes, tu ne peux inviter cette personne qu’une fois que vous êtes amis.',
+    'Pour protéger les plus jeunes, tu ne peux inviter cette personne qu’une fois que tu fais partie de ses amis.',
   "You can invite people you follow who follow you back. This person can't be invited.":
     'Tu peux inviter les personnes que tu suis et qui te suivent aussi. Cette personne ne peut pas être invitée.',
   "This person can't see posts you share with friends only.": 'Cette personne ne peut pas voir les publications que tu partages avec tes amis seulement.',
   'A post can have up to 3 co-authors.': 'Une publication peut avoir jusqu’à 3 coauteurs.',
   'To keep younger people safe, you can only tag them once you are friends.':
-    'Pour protéger les plus jeunes, tu ne peux identifier cette personne qu’une fois que vous êtes amis.',
+    'Pour protéger les plus jeunes, tu ne peux identifier cette personne qu’une fois que tu fais partie de ses amis.',
   "{display_name} doesn't allow you to tag them.": '{display_name} ne t’autorise pas à l’identifier.',
   // apps/api/src/lib/comments.ts
   "This comment can't be posted because it may put someone at risk.": 'Ce commentaire ne peut pas être publié, car il pourrait mettre quelqu’un en danger.',
@@ -223,7 +223,7 @@ export const fr: Record<string, string> = {
   'Log in to ask a question.': 'Connecte-toi pour poser une question.',
   'This person’s question box is off.': 'La boîte à questions de cette personne est désactivée.',
   'To keep younger people safe, you can only ask them questions once you are friends.':
-    'Pour protéger les plus jeunes, tu ne peux poser des questions à cette personne qu’une fois que vous êtes amis.',
+    'Pour protéger les plus jeunes, tu ne peux poser des questions à cette personne qu’une fois que tu fais partie de ses amis.',
   'This account is private. Follow it to ask a question.': 'Ce compte est privé. Abonne-toi pour poser une question.',
   'Accounts of people under 18 only get questions with the asker’s name.':
     'Les comptes des moins de 18 ans ne reçoivent que des questions avec le nom de la personne.',
@@ -303,7 +303,7 @@ export const fr: Record<string, string> = {
   'Up to 280 characters.': '280 caractères maximum.',
   // apps/api/src/modules/calls.ts
   'To keep younger people safe, you can only call them once you are friends.':
-    'Pour protéger les plus jeunes, tu ne peux appeler cette personne qu’une fois que vous êtes amis.',
+    'Pour protéger les plus jeunes, tu ne peux appeler cette personne qu’une fois que tu fais partie de ses amis.',
   'This person only gets calls from people they know.': 'Cette personne ne reçoit des appels que des personnes qu’elle connaît.',
   'Calls work in one-to-one chats and groups of up to 8 people.': 'Les appels fonctionnent dans les discussions à deux et les groupes de 8 personnes maximum.',
   'There’s nobody else here to call.': 'Il n’y a personne d’autre ici à appeler.',
@@ -618,7 +618,7 @@ export const fr: Record<string, string> = {
   'This live needs a ticket.': 'Ce direct nécessite un billet.',
   "That message can't be posted.": 'Ce message ne peut pas être publié.',
   'To keep younger people safe, you can only give them a role once you are friends.':
-    'Pour protéger les plus jeunes, tu ne peux donner un rôle à cette personne qu’une fois que vous êtes amis.',
+    'Pour protéger les plus jeunes, tu ne peux donner un rôle à cette personne qu’une fois que tu fais partie de ses amis.',
   'Live is not enabled.': 'Les directs ne sont pas activés.',
   "Live doesn't exist or isn't visible to you.": 'Ce direct n’existe pas ou tu ne peux pas le voir.',
   'Use a ticket you sell.': 'Utilise un billet que tu vends.',
@@ -666,13 +666,13 @@ export const fr: Record<string, string> = {
     'Cette annonce est vendue. Marque-la d’abord comme disponible si la vente n’a pas abouti.',
   'You can renew a listing once it has 7 days or less left.': 'Tu peux renouveler une annonce quand il lui reste 7 jours ou moins.',
   'You can rate each other once the seller marks it sold to the buyer from your chat.':
-    'Vous pourrez vous noter quand le vendeur l’aura marquée comme vendue à l’acheteur depuis votre discussion.',
+    'Chacun pourra noter l’autre quand le vendeur l’aura marquée comme vendue à l’acheteur depuis la discussion.',
   'This rating can’t be posted because it may put someone at risk.': 'Cette note ne peut pas être publiée, car elle pourrait mettre quelqu’un en danger.',
   'You already rated this sale.': 'Tu as déjà noté cette vente.',
   'To keep younger people safe, you can write to sellers about listings once you’re friends.':
-    'Pour protéger les plus jeunes, tu pourras écrire aux vendeurs au sujet de leurs annonces une fois que vous serez amis.',
+    'Pour protéger les plus jeunes, tu pourras écrire aux vendeurs au sujet de leurs annonces une fois que tu feras partie de leurs amis.',
   'Family settings on this account limit who it can message.': 'Les réglages familiaux de ce compte limitent les personnes à qui il peut écrire.',
-  'There’s already an offer waiting for an answer in your chat.': 'Une offre attend déjà une réponse dans votre discussion.',
+  'There’s already an offer waiting for an answer in your chat.': 'Une offre attend déjà une réponse dans ta discussion.',
   'This offer has already been answered.': 'Cette offre a déjà reçu une réponse.',
   'Only the person who made this offer can withdraw it.': 'Seule la personne qui a fait cette offre peut la retirer.',
   'You made this offer.': 'C’est toi qui as fait cette offre.',
@@ -713,7 +713,7 @@ export const fr: Record<string, string> = {
   'Only group admins can choose admins.': 'Seuls les admins du groupe peuvent choisir les admins.',
   'React with an emoji.': 'Réagis avec un emoji.',
   'To keep younger people safe, you can only message them once you are friends.':
-    'Pour protéger les plus jeunes, tu ne peux écrire à cette personne qu’une fois que vous êtes amis.',
+    'Pour protéger les plus jeunes, tu ne peux écrire à cette personne qu’une fois que tu fais partie de ses amis.',
   'This person only gets messages from people they know.': 'Cette personne ne reçoit des messages que des personnes qu’elle connaît.',
   'To keep younger people safe, adults and people under 18 can be in a group together only when they are friends.':
     'Pour protéger les plus jeunes, un adulte et une personne de moins de 18 ans ne peuvent être dans le même groupe que s’ils sont amis.',
@@ -977,7 +977,7 @@ export const fr: Record<string, string> = {
   "Reminders are for rooms that haven't started yet.": 'Les rappels sont réservés aux salons qui n’ont pas encore commencé.',
   "This room hasn't started yet.": 'Ce salon n’a pas encore commencé.',
   'To keep younger people safe, you can only invite them to speak once you are friends.':
-    'Pour protéger les plus jeunes, tu ne peux inviter cette personne à prendre la parole qu’une fois que vous êtes amis.',
+    'Pour protéger les plus jeunes, tu ne peux inviter cette personne à prendre la parole qu’une fois que tu fais partie de ses amis.',
   'To keep younger people safe, this invite no longer works.': 'Pour protéger les plus jeunes, cette invitation ne fonctionne plus.',
   "Room doesn't exist or isn't visible to you.": 'Ce salon n’existe pas ou tu ne peux pas le voir.',
   "You can't join this room.": 'Tu ne peux pas rejoindre ce salon.',
@@ -1069,7 +1069,7 @@ export const fr: Record<string, string> = {
   "Co-host doesn't exist or isn't visible to you.": 'Ce co-organisateur n’existe pas ou tu ne peux pas le voir.',
   // apps/api/src/modules/together.ts
   'To keep younger people safe, you can only add them once you are friends.':
-    'Pour protéger les plus jeunes, tu ne peux ajouter cette personne qu’une fois que vous êtes amis.',
+    'Pour protéger les plus jeunes, tu ne peux ajouter cette personne qu’une fois que tu fais partie de ses amis.',
   'To keep younger people safe, adults and people under 18 can be in an album together only when they are friends.':
     'Pour protéger les plus jeunes, un adulte et une personne de moins de 18 ans ne peuvent être dans le même album que s’ils sont amis.',
   "You can't join this album.": 'Tu ne peux pas rejoindre cet album.',
