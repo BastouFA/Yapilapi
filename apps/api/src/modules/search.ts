@@ -29,8 +29,12 @@ export async function searchAll(db: Pool, viewer: string | null, q: SearchInput)
   const tsq = `websearch_to_tsquery('simple', $2)`;
   const tsqEn = `websearch_to_tsquery('english', $2)`;
   const like = `%${terms.replace(/[%_]/g, '')}%`;
-  // Names and usernames as typed: an underscore in a username is matched as one, not dropped.
-  const nameLike = `%${terms.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+  // Names and usernames as typed (the search terms turn "ada_obi" into "ada obi"): an underscore in a
+  // username is matched as one, so an account found only by its name (private, signed out) is found.
+  const nameLike = `%${q.q
+    .trim()
+    .replace(/^@/, '')
+    .replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
   const out: Record<string, unknown> = {};
   const jobs: Promise<void>[] = [];
 
