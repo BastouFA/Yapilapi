@@ -771,6 +771,8 @@ export function createClient(opts: ClientOptions) {
         mediaUrl?: string;
         mediaKind?: 'image' | 'video' | 'audio';
         expiresIn?: '1h' | '24h' | 'permanent' | 'custom';
+        /** With expiresIn 'custom': how many hours, 1 to 720. */
+        customHours?: number;
         visibility?: string;
         stickers?: StoryStickerInput[];
         allowReshare?: boolean;
@@ -2218,6 +2220,8 @@ export interface StudioVideo {
   altText: string | null;
   /** Poster, MP4 and HLS are ready. Only processed videos can be edited. */
   processed: boolean;
+  /** Processing gave up on this video: it won't become ready. */
+  failed?: boolean;
   /** Set when this video is a trim or clip of another one. */
   editOf: string | null;
   createdAt: string;

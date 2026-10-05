@@ -781,7 +781,8 @@ html[data-locale-pending] body {
   height: 100%;
   object-fit: cover;
 }
-.thumbs button {
+/* Only the remove button sits on the photo; "Tag people" and "Suggest a description" stay under it. */
+.thumbs figure > button {
   position: absolute;
   top: 4px;
   inset-inline-end: 4px;
@@ -3420,11 +3421,19 @@ video.chat-att__media {
 }
 .ed__bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--line);
+}
+/* Undo, Reset and Done stay together; on a narrow screen they move under the title as one row. */
+.ed__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: auto;
 }
 .ed__title {
   margin: 0;
@@ -3913,13 +3922,13 @@ span.cam__icon {
 
 /* Tagging people in a photo (Create and the photo editor) */
 .thumb-tag {
-  height: 28px;
-  padding: 0 8px;
+  min-height: 28px;
+  padding: 4px 8px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-full);
   background: var(--surface);
   color: var(--ink);
-  font: 600 12px/1 var(--font-sans);
+  font: 600 12px/1.2 var(--font-sans);
   cursor: pointer;
 }
 .thumb-tag:focus-visible {

@@ -4,6 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Image, Modal, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { formatList } from '../../../packages/shared/src/feed-reasons';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import {
   MUSIC_CLIP_DEFAULT_MS,
@@ -307,7 +308,7 @@ function useSourceLabel() {
 export function MusicPicker({ visible, onClose, onPick }: { visible: boolean; onClose: () => void; onPick: (t: MusicTrack) => void }) {
   const focused = useScreenFocused();
   const c = useColors();
-  const { t } = useT();
+  const { t, locale } = useT();
   const { me } = useSession();
   const insets = useSafeAreaInsets();
   const credit = useMusicCredit();
@@ -380,8 +381,8 @@ export function MusicPicker({ visible, onClose, onPick }: { visible: boolean; on
         <Segmented label={t('music.tabs')} value={tab} onChange={setTab} options={TABS.map((id) => ({ id, label: t(`music.tab.${id}` as MessageKey) }))} />
         {on.length ? (
           <Text style={{ color: c.inkMuted, fontSize: 12 }}>
-            {t('music.sources', { sources: on.map(sourceLabel).join(', ') })}
-            {off.length ? ` · ${t('music.sourcesOff', { sources: off.map(sourceLabel).join(', ') })}` : ''}
+            {t('music.sources', { sources: formatList(on.map(sourceLabel), locale, t) })}
+            {off.length ? ` · ${t('music.sourcesOff', { sources: formatList(off.map(sourceLabel), locale, t) })}` : ''}
           </Text>
         ) : null}
         {me?.mode === 'business' ? <Text style={{ color: c.inkMuted, fontSize: 12 }}>{t('music.businessNote')}</Text> : null}

@@ -46,7 +46,22 @@ import { useDataSaver } from '../lib/data-saver';
 import { useSession } from '../lib/session';
 import { useT } from '../lib/i18n';
 import { radius, space } from '../lib/theme';
-import { Avatar, BottomSheet, Button, EmptyState, Field, Icon, type IconName, Loading, Notice, Segmented, SwitchRow, useColors, userText } from '../lib/ui';
+import {
+  Avatar,
+  BottomSheet,
+  Button,
+  EmptyState,
+  ErrorState,
+  Field,
+  Icon,
+  type IconName,
+  Loading,
+  Notice,
+  Segmented,
+  SwitchRow,
+  useColors,
+  userText,
+} from '../lib/ui';
 import { LockedPanel } from '../lib/money';
 import { useBoards, type SaveChange } from '../lib/boards';
 import { AuthorNames, RichText } from '../lib/post';
@@ -522,8 +537,8 @@ export default function Reels() {
         <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 28, fontWeight: '800', letterSpacing: -0.5 }}>
           {t('m.title.reels')}
         </Text>
-        {error ? <Notice tone="danger">{error}</Notice> : null}
-        <EmptyState title={t('m.reels.empty.title')} body={t('m.reels.empty.body')} />
+        {/* Reels that could not load aren't "no reels": say why, with Try again. */}
+        {error ? <ErrorState message={error} onRetry={() => more()} /> : <EmptyState title={t('m.reels.empty.title')} body={t('m.reels.empty.body')} />}
         <Button
           label={t('m.reels.make')}
           icon="videocam-outline"
@@ -1499,6 +1514,9 @@ function Scrubber({
   const [drag, setDrag] = useState<number | null>(null);
   const state = useRef({ width: 0, duration: 0 });
   state.current = { width, duration };
+  // The pan responder is made once: it calls the latest handlers (whether the reel is playing changes).
+  const handlers = useRef({ onSeek, onScrubbing });
+  handlers.current = { onSeek, onScrubbing };
   const at = (x: number) => {
     const w = state.current.width || 1;
     const f = Math.max(0, Math.min(1, x / w));
@@ -1510,19 +1528,19 @@ function Scrubber({
       onMoveShouldSetPanResponder: () => true,
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: (e) => {
-        onScrubbing(true);
+        handlers.current.onScrubbing(true);
         setDrag(at(e.nativeEvent.locationX));
       },
       onPanResponderMove: (e) => setDrag(at(e.nativeEvent.locationX)),
       onPanResponderRelease: (e) => {
         const f = at(e.nativeEvent.locationX);
         setDrag(null);
-        onSeek(f * state.current.duration);
-        onScrubbing(false);
+        handlers.current.onSeek(f * state.current.duration);
+        handlers.current.onScrubbing(false);
       },
       onPanResponderTerminate: () => {
         setDrag(null);
-        onScrubbing(false);
+        handlers.current.onScrubbing(false);
       },
     }),
   ).current;

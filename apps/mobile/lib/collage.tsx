@@ -263,6 +263,8 @@ export function CollageEditor({
   const [selected, setSelected] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [area, setArea] = useState({ w: 0, h: 0 });
+  // Bumped by Try again, to wait for the photos once more (a timeout or a dropped connection).
+  const [attempt, setAttempt] = useState(0);
   // One key per version of the collage: sending the same one again (a retry) gives back the same result.
   const specJson = JSON.stringify(spec);
   const clientKey = useMemo(() => newKey(), [specJson]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -270,6 +272,7 @@ export function CollageEditor({
   // The server only takes photos its media job has finished with; wait for each, and use its sizes.
   useEffect(() => {
     const stop = new AbortController();
+    setError(null);
     (async () => {
       const api = await client();
       await Promise.all(
@@ -283,7 +286,7 @@ export function CollageEditor({
       if (!stop.signal.aborted) setError(errorMessage(e));
     });
     return () => stop.abort();
-  }, [photos]);
+  }, [photos, attempt]);
 
   const layout = collageLayout(spec.layout)!;
   const size = COLLAGE_SIZES[spec.shape];
@@ -389,6 +392,16 @@ export function CollageEditor({
             <Text accessibilityRole="alert" style={{ color: c.danger, lineHeight: 20 }}>
               {error}
             </Text>
+          ) : null}
+          {error && !ready ? (
+            <Button
+              label={t('m.common.retry')}
+              variant="secondary"
+              size="sm"
+              icon="refresh"
+              onPress={() => setAttempt((n) => n + 1)}
+              style={{ alignSelf: 'flex-start' }}
+            />
           ) : null}
           <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>
             {t('collage.hint')} {t('collage.hintPinch')}
