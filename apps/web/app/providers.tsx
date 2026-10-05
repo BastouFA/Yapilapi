@@ -51,7 +51,7 @@ export interface Session {
   /** Send a small frame on the realtime socket (like "typing"); dropped when it isn't open. */
   sendRealtime: (frame: { type: string; conversationId?: string }) => void;
   t: (key: MessageKey, vars?: Record<string, string | number>) => string;
-  /** Plural-aware: picks `<key>.one` or `<key>.other` for `count`, which is also passed as {count}. */
+  /** Plural-aware: picks the form of `key` for `count` (`.one`, `.other`, or Arabic's `.two`, `.few`…), and passes {count}. */
   tp: (key: PluralKey, count: number, vars?: Record<string, string | number>) => string;
   locale: string;
   /** Without an account: show the site in this language, and remember it on this browser. */

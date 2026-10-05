@@ -1,14 +1,21 @@
 // The app's language, outside React. lib/i18n.tsx keeps it in sync with the signed-in user's
 // locale and the device languages; code that runs outside a component (alerts from callbacks,
 // errors thrown in lib/api.ts, notification buttons) reads it through `tr`.
-import { CATALOGS, isRtl, pluralIsOne, t as translate, type MessageKey } from '../../../packages/shared/src/i18n';
+import {
+  CATALOGS,
+  isRtl,
+  pluralCategory,
+  pluralFormKey,
+  t as translate,
+  type MessageKey,
+  type PluralCategory,
+  type PluralKey,
+} from '../../../packages/shared/src/i18n';
 
 export type Vars = Record<string, string | number>;
 export type Translate = (key: MessageKey, vars?: Vars) => string;
 
-type PluralBase<K> = K extends `${infer B}.one` ? (`${B}.other` extends MessageKey ? B : never) : never;
-/** Keys that come in `.one` / `.other` pairs, without the suffix. */
-export type PluralKey = PluralBase<MessageKey>;
+export type { PluralKey };
 
 export interface LocaleInfo {
   /** BCP 47 tag used for Intl formatting (for example `pt-BR`). */
@@ -53,7 +60,7 @@ export interface Translator {
   lang: string;
   rtl: boolean;
   t: Translate;
-  /** Plural-aware: picks `<key>.one` or `<key>.other` for `count`, which is also passed as {count}. */
+  /** Plural-aware: picks the form of `key` for `count` (`.one`, `.other`, or Arabic's `.two`, `.few`…), and passes {count}. */
   tp: (key: PluralKey, count: number, vars?: Vars) => string;
   number: (n: number, opts?: Intl.NumberFormatOptions) => string;
   date: (d: Date | string | number, opts?: Intl.DateTimeFormatOptions) => string;
@@ -112,8 +119,8 @@ export function translator(info: LocaleInfo): Translator {
     return translate(key, info.lang, out);
   };
   const tp: Translator['tp'] = (key, count, vars) => {
-    const one = pr ? pr.select(count) === 'one' : pluralIsOne(info.locale, count);
-    return t(`${key}.${one ? 'one' : 'other'}` as MessageKey, { ...vars, count });
+    const category = pr ? (pr.select(count) as PluralCategory) : pluralCategory(info.locale, count);
+    return t(pluralFormKey(key, category, info.lang) as MessageKey, { ...vars, count });
   };
 
   const tr: Translator = {
