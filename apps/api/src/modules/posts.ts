@@ -52,6 +52,14 @@ import { langOf } from '../lib/translation.ts';
 import { checkEchoSong } from '../lib/echoes.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
+
+/** Personal filters for every feed (the viewer is $1): muted people, "not interested", muted creators and topics. */
+const PERSONAL_FILTERS = `
+      AND NOT EXISTS (SELECT 1 FROM mutes m WHERE m.muter_id = $1 AND m.muted_id = p.author_id)
+      AND NOT EXISTS (SELECT 1 FROM feed_feedback ff WHERE ff.user_id = $1 AND (
+            (ff.signal = 'not_interested' AND ff.post_id = p.id)
+         OR (ff.signal = 'mute_creator' AND ff.author_id = p.author_id)
+         OR (ff.signal = 'mute_topic' AND ff.topic = ANY(p.topics))))`;
 const VISIBLE = postVisibleSql('$1');
 const UNLOCKED = postUnlockedSql('$1');
 /** For You scores posts from your connections plus this many of the newest other posts. */
@@ -126,6 +134,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
        SELECT p.id ${POST_FROM} CROSS JOIN me
        WHERE p.id IN (SELECT id FROM candidates) AND p.format = 'reel' AND ${VISIBLE} AND p.moderation_status = 'normal' AND p.created_at <= $2::timestamptz
          AND ($5 OR NOT EXISTS (SELECT 1 FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id AND m.moderation = 'sensitive'))
+         ${PERSONAL_FILTERS}
        ORDER BY (
            -- People you're close to and your interests only count with Personalization on ($6).
            CASE WHEN $6 AND p.author_id IN (SELECT id FROM friends) THEN 3 ELSE 0 END
@@ -559,13 +568,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     const prefs = (await db.query(`SELECT friends_only, reduced_recommendations FROM user_preferences WHERE user_id = $1`, [u.id])).rows[0] ?? {};
     const mode = prefs.friends_only && q.mode === 'for_you' ? 'friends' : q.mode;
 
-    // Personal filters apply to every mode: muted people, "not interested", muted topics.
-    const personal = `
-      AND NOT EXISTS (SELECT 1 FROM mutes m WHERE m.muter_id = $1 AND m.muted_id = p.author_id)
-      AND NOT EXISTS (SELECT 1 FROM feed_feedback ff WHERE ff.user_id = $1 AND (
-            (ff.signal = 'not_interested' AND ff.post_id = p.id)
-         OR (ff.signal = 'mute_creator' AND ff.author_id = p.author_id)
-         OR (ff.signal = 'mute_topic' AND ff.topic = ANY(p.topics))))`;
+    const personal = PERSONAL_FILTERS;
 
     if (mode === 'for_you') return rankedFeed(u.id, q.cursor, q.limit, personal, !!prefs.reduced_recommendations, await personalizationAllowed(db, u.id));
 

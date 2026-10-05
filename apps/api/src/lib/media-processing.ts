@@ -324,13 +324,19 @@ async function processVideo(deps: ProcessDeps, m: MediaRow) {
 export function mediaJobHandlers(deps: ProcessDeps) {
   return {
     /** `filename` is the name the file had on the uploader's device; the dev moderator reads it. */
-    'media.process': async ({ mediaId, filename }: { mediaId: string; filename?: string | null }) => {
+    'media.process': async ({ mediaId, filename }: { mediaId: string; filename?: string | null }, run?: { lastAttempt: boolean }) => {
       const { rows } = await deps.db.query(`SELECT id, owner_id, kind, storage_key FROM media WHERE id = $1 AND NOT private`, [mediaId]);
       const r = rows[0];
       if (!r?.storage_key) return;
       const m: MediaRow = { id: r.id, ownerId: r.owner_id, kind: r.kind, key: r.storage_key, filename: filename ?? null };
-      if (r.kind === 'image') await processImage(deps, m);
-      else if (r.kind === 'video') await processVideo(deps, m);
+      try {
+        if (r.kind === 'image') await processImage(deps, m);
+        else if (r.kind === 'video') await processVideo(deps, m);
+      } catch (e) {
+        // Given up: say so, instead of leaving the apps waiting for sizes that will never come.
+        if (run?.lastAttempt) await deps.db.query(`UPDATE media SET status = 'failed' WHERE id = $1 AND status <> 'failed'`, [mediaId]);
+        throw e;
+      }
     },
   };
 }

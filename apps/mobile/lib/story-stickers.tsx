@@ -697,7 +697,15 @@ function StickerForm({ kind, onAdd, onCancel }: { kind: Kind; onAdd: (s: NewStic
   return (
     <View style={{ gap: space[2], padding: space[3], borderRadius: radius.md, borderWidth: 1, borderColor: c.line }}>
       {kind === 'mention' ? (
-        <Field label={t('m.sticker.username')} value={a} onChangeText={setA} autoCapitalize="none" autoCorrect={false} placeholder="@username" maxLength={31} />
+        <Field
+          label={t('m.sticker.username')}
+          value={a}
+          onChangeText={setA}
+          autoCapitalize="none"
+          autoCorrect={false}
+          placeholder={t('m.family.invite.placeholder')}
+          maxLength={31}
+        />
       ) : null}
       {kind === 'hashtag' ? (
         <Field label={t('m.sticker.kind.hashtag')} value={a} onChangeText={setA} autoCapitalize="none" placeholder="#tag" maxLength={41} />

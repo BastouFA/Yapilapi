@@ -176,7 +176,7 @@ export default function MusicTrackScreen() {
       refreshControl={refresh}
       ListHeaderComponent={header}
       renderItem={({ item }) => <PostCard post={item} />}
-      onEndReached={() => cursor && void load(cursor)}
+      onEndReached={() => cursor && void load(cursor).catch((e: unknown) => setError(errorMessage(e)))}
       onEndReachedThreshold={0.5}
       ListEmptyComponent={posts === null ? <Loading /> : error ? null : <EmptyState title={t('music.track.empty')} />}
     />

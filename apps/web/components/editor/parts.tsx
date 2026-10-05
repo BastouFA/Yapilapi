@@ -152,7 +152,7 @@ export function EditorShell({
         <h2 id={titleId} className="ed__title">
           {title}
         </h2>
-        <div className="row" style={{ gap: 4 }}>
+        <div className="ed__actions">
           <Button variant="ghost" size="sm" onClick={onUndo} disabled={!canUndo || busy} aria-keyshortcuts="Control+Z Meta+Z">
             {t('m.editor.undo')}
           </Button>

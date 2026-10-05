@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ApiError } from '../../../../packages/api-client/src/index';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
 import {
   ECHO_BALANCE_DEFAULT,
@@ -100,6 +101,7 @@ export default function EchoScreen() {
   const [making, setMaking] = useState(false);
   const [render, setRender] = useState<EchoRender | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  const [posting, setPosting] = useState(false);
   const alive = useRef(true);
 
   const loadOptions = useCallback(async () => {
@@ -186,14 +188,16 @@ export default function EchoScreen() {
       const done = await api.echoes.waitUntilReady(echo.id);
       if (alive.current) setRender(done);
     } catch (e) {
-      if (alive.current) setFailed(errorMessage(e));
+      // A render that failed on the server comes with its reason in English only: say it in the app's language.
+      if (alive.current) setFailed(e instanceof ApiError && e.code === 'echo_failed' ? t('echo.failed') : errorMessage(e));
     } finally {
       if (alive.current) setMaking(false);
     }
   }
 
   async function post() {
-    if (!render?.media) return;
+    if (!render?.media || posting) return;
+    setPosting(true);
     try {
       const { post: created, moderation } = await (
         await client()
@@ -208,6 +212,8 @@ export default function EchoScreen() {
       router.replace({ pathname: '/reels', params: { start: created.id } });
     } catch (e) {
       Alert.alert(errorMessage(e));
+    } finally {
+      if (alive.current) setPosting(false);
     }
   }
 
@@ -272,8 +278,8 @@ export default function EchoScreen() {
               onChange={setVisibility}
               options={AUDIENCES.map((a) => ({ id: a, label: t(`visibility.${a}`) }))}
             />
-            <Button label={t('echo.post')} icon="paper-plane-outline" onPress={post} />
-            <Button label={t('echo.startOver')} variant="ghost" onPress={() => setRender(null)} />
+            <Button label={t('echo.post')} icon="paper-plane-outline" onPress={post} disabled={posting} />
+            <Button label={t('echo.startOver')} variant="ghost" onPress={() => setRender(null)} disabled={posting} />
           </View>
         ) : (
           <>

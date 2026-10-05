@@ -14,7 +14,7 @@ import { conversationTitle } from '../lib/post';
 import { isMaking, isRecapsOff, RECAP_STATUS, recapError, recapRatio } from '../lib/recaps';
 import { useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
-import { Avatar, Button, Card, EmptyState, Field, Icon, Loading, Notice, Row, Segmented, Title, useColors, useRefresh, userText } from '../lib/ui';
+import { Avatar, Button, Card, EmptyState, ErrorState, Field, Icon, Loading, Notice, Row, Segmented, Title, useColors, useRefresh, userText } from '../lib/ui';
 import { noticeText } from '../../../packages/shared/src/server-text';
 import { recapErrorText } from '../../../packages/shared/src/job-failures';
 
@@ -37,6 +37,8 @@ export default function Recaps() {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [off, setOff] = useState(false);
   const [note, setNote] = useState<Note | null>(null);
+  // Why the list couldn't load (shown in its place, with Try again, rather than "none yet").
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [memories, setMemories] = useState<MemorySummary[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -49,13 +51,14 @@ export default function Recaps() {
       setItems(r.items);
       setRemaining(r.remainingToday);
       setOff(false);
+      setLoadError(null);
     } catch (e) {
       setItems((cur) => cur ?? []);
       if (isRecapsOff(e)) {
         setOff(true);
         return;
       }
-      setNote({ tone: 'danger', text: errorMessage(e) });
+      setLoadError(errorMessage(e));
     }
     api.memories.list().then(
       (r) => setMemories(r.items),
@@ -173,9 +176,10 @@ export default function Recaps() {
         ) : (
           <>
             {heading(t('m.recap.yours'))}
+            {loadError ? <ErrorState message={loadError} onRetry={load} /> : null}
             {items.length ? (
               items.map((r) => <RecapRow key={r.id} recap={r} onPress={() => setOpenId(r.id)} />)
-            ) : (
+            ) : loadError ? null : (
               <Text style={{ color: c.inkMuted, lineHeight: 20 }}>{t('m.recap.empty')}</Text>
             )}
 

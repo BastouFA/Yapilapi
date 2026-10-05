@@ -137,7 +137,9 @@ function Create() {
   // What a draft started elsewhere links to that this page has no picker for (an event, a product): kept as it is.
   const [linked, setLinked] = useState<{ eventId?: string; productId?: string }>({});
   const [topics, setTopics] = useState('');
-  const [expiresIn, setExpiresIn] = useState<'1h' | '24h' | 'permanent'>('24h');
+  const [expiresIn, setExpiresIn] = useState<'1h' | '24h' | 'permanent' | 'custom'>('24h');
+  // With a chosen length: how many hours the story stays up (1 to 720), as typed.
+  const [customHours, setCustomHours] = useState('48');
   // Stories: stickers placed on the preview, and whether people may add it to their own story.
   const [stickers, setStickers] = useState<DraftSticker[]>([]);
   const [allowReshare, setAllowReshare] = useState(true);
@@ -494,6 +496,7 @@ function Create() {
           body,
           mediaId: media[0]?.id,
           expiresIn,
+          customHours: expiresIn === 'custom' ? Math.min(720, Math.max(1, Math.round(Number(customHours)) || 24)) : undefined,
           visibility,
           allowReshare,
           stickers: stickers.map(({ key: _key, label: _label, ...s }) => s),
@@ -854,8 +857,21 @@ function Create() {
               <option value="1h">{t('m.create.expires.1h')}</option>
               <option value="24h">{t('m.create.expires.24h')}</option>
               <option value="permanent">{t('m.create.expires.permanent')}</option>
+              <option value="custom">{t('m.create.expires.custom')}</option>
             </Select>
           )}
+          {kind === 'story' && expiresIn === 'custom' ? (
+            <TextField
+              label={t('m.create.expires.hours')}
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={720}
+              step={1}
+              value={customHours}
+              onChange={(e) => setCustomHours(e.currentTarget.value)}
+            />
+          ) : null}
           {!communityId ? (
             <Select
               label={t('create.visibility')}

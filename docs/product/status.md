@@ -519,6 +519,14 @@ Every flow in posts, feed, discovery and search was tried end to end on the web 
 
 Not built (found while testing): link preview cards (a link post shows the site's name only; nothing is fetched, so there's no address for the server to refuse), a location on a post, a content warning an author can set (sensitive media is flagged automatically), audio posts and event- or product-linked posts from either composer, and carousel, poll and link posts on the phone.
 
+## Media, reels and stories sweep (2026-09-29, no migration, `apps/api/test/media-sweep.test.ts`, keyboard e2e "watch together")
+
+Uploads (photos, videos, audio, resumable, too big, wrong type, GPS and tags gone from every stored file), processing, the photo and video editors, the camera, collages, reels and the reels viewer, duets and remixes, echoes, Studio, music and sounds, stories and every sticker, recaps, watch together and Real were tried end to end on the web (desktop and 390px, light and dark, French and Arabic, two people where it's social) and reviewed on the phone. What changed:
+
+- **API**: a repeated "complete" of a resumable upload gives back the same media item (two at once made two); the reels feed applies "not interested" and muted people, creators and topics like the other feeds; the story strip reads the newest 300 open stories (permanent ones piled up and hid new ones); media the job gives up on (its last try) is marked failed, so apps stop waiting; Studio's video list leaves out view-once videos, deleted ones and echoes of other people's reels, and names videos that couldn't be processed.
+- **Web**: reel subtitles sit above the name, caption and scrubber instead of under them; "Not interested" says when it failed; stories ask before deleting and "Seen by" says why it couldn't load; stories can stay up for a chosen number of hours (1 to 720; web and phone); watch together's position slider moves 5 seconds per arrow key and seeks everyone once; "Tag people" under each photo in Create was squeezed into the remove button's style and is back; the editors keep Undo, Reset and Done together on narrow screens; closing the camera opened from a link goes to Create; Real says when its feed couldn't load; Studio's trim fields keep the part that was typed.
+- **Phone**: errors with Try again instead of empty states on reels, recaps and collages; echo posting can't be sent twice and a failed render is described in the app's language; uploads keep the API's error; the reel scrubber seeks with the latest handler; list formatting of music sources uses the locale.
+
 ## Not built yet
 
 - Mainstream music: needs a licensing deal (docs/operations/music.md). Reporting song use to a licensing partner is not built.
