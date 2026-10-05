@@ -1253,6 +1253,13 @@ export const es: Record<string, string> = {
   'Number must be less than {maximum}': 'Debe ser menor que {maximum}',
   'Number must be a multiple of {multipleOf}': 'Debe ser múltiplo de {multipleOf}',
   'Number must be finite': 'Debe ser un número finito',
+  'You already own this community.': 'Ya eres el propietario de esta comunidad.',
+  'Make them a member first.': 'Primero hazle miembro.',
+  'Use a full link starting with https://': 'Usa un enlace completo que empiece por https://',
+  "Tickets for this event aren't on sale any more.": 'Las entradas para este evento ya no están a la venta.',
+  'An event can sell up to 10 kinds of ticket at once.': 'Un evento puede vender hasta 10 tipos de entrada a la vez.',
+  'Name the days, such as mon or tue-sun.': 'Indica los días, por ejemplo mon o tue-sun.',
+  'Up to 14 lines of opening hours.': 'Hasta 14 líneas de horario.',
   'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
     'Demasiadas contraseñas incorrectas para esta cuenta. Espera 15 minutos o restablece tu contraseña.',
   // apps/api/src/lib/suspension.ts, apps/api/src/modules/safety.ts (trust and safety sweep)

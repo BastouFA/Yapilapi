@@ -3,13 +3,14 @@ import { tx } from '@yapilapi/database';
 import { z } from 'zod';
 import { CURRENCIES, CURRENCY_SCALE, PLATFORM_FEE_BPS, processingFeeCents } from '@yapilapi/shared';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
-import { liveVisibleSql } from '../lib/visibility.ts';
+import { liveVisibleSql, notBlockedSql } from '../lib/visibility.ts';
 import type { AppContext } from '../lib/context.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { audit, isEnabled, notify } from '../lib/services.ts';
 import { assertAdultForMoney, isBlockedEitherWay, publicUserFrom } from '../lib/users.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 import { refundOrder, startPayment } from '../lib/checkout.ts';
+import { isZeroDecimal } from '../lib/payments.ts';
 import { assertDigitalCheckoutAllowed } from '../lib/store-purchases.ts';
 
 /**
@@ -17,6 +18,9 @@ import { assertDigitalCheckoutAllowed } from '../lib/store-purchases.ts';
  * bookings. Money moves only through the payment provider; an order is marked
  * paid by the signed webhook, which then activates the subscription.
  */
+/** A subscription that is waiting for its payment or still in its paid month (an active one whose month ran out is over). */
+const liveSubscription = (t = '') => `(${t}status = 'pending' OR (${t}status = 'active' AND ${t}current_period_end > now()))`;
+
 export default async function economyModule(app: FastifyInstance, ctx: AppContext) {
   const db = ctx.db;
   const commerceOn = async () => {
@@ -32,6 +36,9 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
     currency: string,
     idempotencyKey: string,
   ) {
+    // A retried request (a double tap, a dropped connection) gets a plain answer, not the database's unique-key error.
+    const again = await c.query(`SELECT id FROM orders WHERE buyer_id = $1 AND idempotency_key = $2`, [buyerId, idempotencyKey]);
+    if (again.rowCount) throw new AppError(409, 'conflict', 'This checkout was already started. Refresh and try again.');
     const fee = Math.round((amountCents * PLATFORM_FEE_BPS) / 10_000);
     const { rows } = await c.query(
       `INSERT INTO orders (buyer_id, total_cents, platform_fee_cents, processing_fee_cents, currency, idempotency_key, purpose, payee_id)
@@ -62,6 +69,7 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
     // About $1 at least in every currency, so what's left after the fee and processing is worth having.
     if (input.priceCents < 100 * CURRENCY_SCALE[input.currency])
       throw badRequest(`A plan costs at least ${100 * CURRENCY_SCALE[input.currency]} hundredths of ${input.currency}.`);
+    if (isZeroDecimal(input.currency) && input.priceCents % 100 !== 0) throw badRequest(`${input.currency} amounts must be whole units.`);
     const count = await db.query(`SELECT count(*) AS n FROM creator_plans WHERE creator_id = $1 AND active`, [u.id]);
     if (Number(count.rows[0].n) >= 5) throw new AppError(409, 'conflict', 'You can have up to 5 plans.');
     const { rows } = await db.query(`INSERT INTO creator_plans (creator_id, name, description, price_cents, currency) VALUES ($1,$2,$3,$4,$5) RETURNING *`, [
@@ -82,7 +90,7 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
     const mine = req.user
       ? (
           await db.query(
-            `SELECT plan_id, status, current_period_end FROM creator_subscriptions WHERE subscriber_id = $1 AND creator_id = $2 AND status IN ('pending','active')`,
+            `SELECT plan_id, status, current_period_end FROM creator_subscriptions WHERE subscriber_id = $1 AND creator_id = $2 AND ${liveSubscription()}`,
             [req.user.id, id],
           )
         ).rows[0]
@@ -102,6 +110,11 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
     if (await isBlockedEitherWay(db, u.id, plan.creator_id)) throw forbidden();
     await assertAdultForMoney(db, plan.creator_id, false);
     const result = await tx(db, async (c) => {
+      // A month that ran out (nothing renews on its own) is over: it doesn't stand in the way of subscribing again.
+      await c.query(
+        `UPDATE creator_subscriptions SET status = 'expired' WHERE subscriber_id = $1 AND creator_id = $2 AND status = 'active' AND current_period_end <= now()`,
+        [u.id, plan.creator_id],
+      );
       const existing = await c.query(
         `SELECT id, status FROM creator_subscriptions WHERE subscriber_id = $1 AND creator_id = $2 AND status IN ('pending','active')`,
         [u.id, plan.creator_id],
@@ -124,7 +137,7 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
       `SELECT s.id, s.status, s.current_period_end, p.name AS plan, p.price_cents, p.currency,
               pr.user_id AS c_id, pr.username AS c_username, pr.display_name AS c_display_name, pr.avatar_url AS c_avatar_url, pr.mode AS c_mode
        FROM creator_subscriptions s JOIN creator_plans p ON p.id = s.plan_id JOIN profiles pr ON pr.user_id = s.creator_id
-       WHERE s.subscriber_id = $1 AND s.status IN ('pending','active') ORDER BY s.created_at DESC`,
+       WHERE s.subscriber_id = $1 AND ${liveSubscription('s.')} ORDER BY s.created_at DESC`,
       [me(req).id],
     );
     return {
@@ -153,7 +166,7 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
 
   app.get('/v1/creator/subscribers', { preHandler: requireAuth }, async (req) => {
     const { rows } = await db.query(
-      `SELECT count(*) FILTER (WHERE status = 'active') AS active, count(*) FILTER (WHERE status = 'cancelled') AS cancelled FROM creator_subscriptions WHERE creator_id = $1`,
+      `SELECT count(*) FILTER (WHERE status = 'active' AND current_period_end > now()) AS active, count(*) FILTER (WHERE status = 'cancelled') AS cancelled FROM creator_subscriptions WHERE creator_id = $1`,
       [me(req).id],
     );
     return { active: Number(rows[0].active), cancelled: Number(rows[0].cancelled) };
@@ -209,10 +222,13 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
   // ── Place reviews ─────────────────────────────────────────────────────
   app.get('/v1/places/:id/reviews', async (req) => {
     const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
+    // Reviews by people blocked either way stay out of the list (they still count in the average).
     const { rows } = await db.query(
       `SELECT r.id, r.rating, r.body, r.created_at, pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode
-       FROM place_reviews r JOIN profiles pr ON pr.user_id = r.author_id WHERE r.place_id = $1 AND r.moderation_status IN ('normal','review') ORDER BY r.created_at DESC LIMIT 100`,
-      [id],
+       FROM place_reviews r JOIN profiles pr ON pr.user_id = r.author_id
+       WHERE r.place_id = $1 AND r.moderation_status IN ('normal','review') AND ($2::uuid IS NULL OR ${notBlockedSql('r.author_id', '$2')})
+       ORDER BY r.created_at DESC LIMIT 100`,
+      [id, req.user?.id ?? null],
     );
     const stats = (
       await db.query(
@@ -304,18 +320,26 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
       )
     ).rows[0];
     if (!place) throw badRequest('This place does not take bookings on YAPILAPI.');
-    if (place.booking_capacity) {
-      const taken = await db.query(
-        `SELECT coalesce(sum(party_size), 0) AS n FROM bookings WHERE place_id = $1 AND status IN ('requested','confirmed') AND starts_at BETWEEN $2::timestamptz - interval '90 minutes' AND $2::timestamptz + interval '90 minutes'`,
-        [id, input.startsAt],
-      );
-      if (Number(taken.rows[0].n) + input.partySize > place.booking_capacity)
-        throw new AppError(409, 'fully_booked', 'That time is fully booked. Try another time.');
-    }
-    const { rows } = await db.query(
-      `INSERT INTO bookings (place_id, user_id, party_size, starts_at, note) VALUES ($1,$2,$3,$4,$5) RETURNING id, status, party_size, starts_at`,
-      [id, u.id, input.partySize, input.startsAt, input.note],
-    );
+    // Someone the owner blocked (or who blocked the owner) can't book.
+    if (place.owner_id !== u.id && (await isBlockedEitherWay(db, place.owner_id, u.id))) throw notFound('Place');
+    const rows = await tx(db, async (c) => {
+      // One booking at a time per place, so two requests can't both take the last places.
+      await c.query(`SELECT 1 FROM places WHERE id = $1 FOR UPDATE`, [id]);
+      if (place.booking_capacity) {
+        const taken = await c.query(
+          `SELECT coalesce(sum(party_size), 0) AS n FROM bookings WHERE place_id = $1 AND status IN ('requested','confirmed') AND starts_at BETWEEN $2::timestamptz - interval '90 minutes' AND $2::timestamptz + interval '90 minutes'`,
+          [id, input.startsAt],
+        );
+        if (Number(taken.rows[0].n) + input.partySize > place.booking_capacity)
+          throw new AppError(409, 'fully_booked', 'That time is fully booked. Try another time.');
+      }
+      return (
+        await c.query(
+          `INSERT INTO bookings (place_id, user_id, party_size, starts_at, note) VALUES ($1,$2,$3,$4,$5) RETURNING id, status, party_size, starts_at`,
+          [id, u.id, input.partySize, input.startsAt, input.note],
+        )
+      ).rows;
+    });
     await notify(db, ctx.realtime, {
       userId: place.owner_id,
       category: 'commerce',
@@ -362,7 +386,7 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
          WHERE bk.id = $1 AND bk.status = 'requested' AND (
            EXISTS (SELECT 1 FROM places p JOIN businesses b ON b.id = p.business_id WHERE p.id = bk.place_id AND b.owner_id = $2)
            OR EXISTS (SELECT 1 FROM products pd WHERE pd.id = bk.product_id AND pd.seller_id = $2))
-         RETURNING bk.user_id, bk.order_id`,
+         RETURNING bk.user_id, bk.order_id, bk.place_id`,
         [id, u.id, confirm ? 'confirmed' : 'declined'],
       );
       if (res.rows[0]?.order_id && !confirm) {
@@ -381,7 +405,7 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
       actorId: u.id,
       entityType: 'booking',
       entityId: id,
-      data: { confirmed: confirm },
+      data: { confirmed: confirm, placeId: r.rows[0].place_id },
     });
     await audit(db, { actorId: u.id, action: `booking.${confirm ? 'confirm' : 'decline'}`, entityType: 'booking', entityId: id });
     return { status: confirm ? 'confirmed' : 'declined' };

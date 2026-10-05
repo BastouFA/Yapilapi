@@ -22,6 +22,7 @@ function currentTab(path: string, username?: string): NavEntry['id'] | undefined
     path.startsWith('/search') ||
     path.startsWith('/t/') ||
     path.startsWith('/c/') ||
+    path.startsWith('/communities') ||
     path.startsWith('/events') ||
     path.startsWith('/places') ||
     path.startsWith('/market')

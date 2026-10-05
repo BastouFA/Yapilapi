@@ -76,7 +76,8 @@ export default function BusinessPage() {
       {products.length ? <h2 className="section-title">{t('bizPage.products')}</h2> : null}
       <div className="yp-grid">
         {products.map((p) => (
-          <ProductCard key={p.id} product={p as never} locale={locale} action={<BuyButton productId={p.id} />} />
+          // The owner can't buy their own products: no Buy button that can only fail.
+          <ProductCard key={p.id} product={p as never} locale={locale} action={me?.id === business.owner.id ? null : <BuyButton productId={p.id} />} />
         ))}
       </div>
     </div>

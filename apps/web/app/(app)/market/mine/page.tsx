@@ -19,6 +19,8 @@ export default function MyListingsPage() {
   const [items, setItems] = useState<MarketListing[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [more, setMore] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   // From "Saved" on the Market page: ?tab=saved.
   useEffect(() => {
@@ -30,6 +32,7 @@ export default function MyListingsPage() {
     let live = true;
     setItems(null);
     setCursor(null);
+    setLoadError(null);
     const load = tab === 'saved' ? api.market.saved() : api.market.mine(tab).then((r) => ({ items: r.items, nextCursor: null as string | null }));
     load.then(
       (r) => {
@@ -40,13 +43,13 @@ export default function MyListingsPage() {
       (e) => {
         if (!live) return;
         setItems([]);
-        toast(errorMessage(e));
+        setLoadError(errorMessage(e));
       },
     );
     return () => {
       live = false;
     };
-  }, [tab, toast]);
+  }, [tab, attempt]);
 
   const empty =
     tab === 'active'
@@ -101,7 +104,12 @@ export default function MyListingsPage() {
         ]}
       />
       {tab === 'expired' ? <p className="muted market__intro">{t('market.mine.expiredNote')}</p> : null}
-      <ListingGrid items={items} empty={empty} showMine={tab !== 'saved'} />
+      <ListingGrid
+        items={items}
+        empty={empty}
+        showMine={tab !== 'saved'}
+        error={loadError ? { message: loadError, retry: () => setAttempt((n) => n + 1) } : null}
+      />
       {cursor && items ? (
         <Button
           variant="secondary"

@@ -1255,6 +1255,13 @@ export const sw: Record<string, string> = {
   'Number must be less than {maximum}': 'Namba lazima iwe chini ya {maximum}',
   'Number must be a multiple of {multipleOf}': 'Namba lazima igawanyike kwa {multipleOf}',
   'Number must be finite': 'Namba lazima iwe na kikomo',
+  'You already own this community.': 'Tayari wewe ndiye mmiliki wa jumuiya hii.',
+  'Make them a member first.': 'Mfanye kuwa mwanachama kwanza.',
+  'Use a full link starting with https://': 'Tumia kiungo kamili kinachoanza na https://',
+  "Tickets for this event aren't on sale any more.": 'Tiketi za tukio hili haziuzwi tena.',
+  'An event can sell up to 10 kinds of ticket at once.': 'Tukio linaweza kuuza hadi aina 10 za tiketi kwa wakati mmoja.',
+  'Name the days, such as mon or tue-sun.': 'Taja siku, kama mon au tue-sun.',
+  'Up to 14 lines of opening hours.': 'Hadi mistari 14 ya saa za kufungua.',
   'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
     'Nenosiri lisilo sahihi limejaribiwa mara nyingi kwa akaunti hii. Subiri dakika 15, au weka upya nenosiri lako.',
   // apps/api/src/lib/suspension.ts, apps/api/src/modules/safety.ts (trust and safety sweep)

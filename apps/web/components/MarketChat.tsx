@@ -235,7 +235,8 @@ export function MarketOfferChat({
         submitLabel={t('market.offer.counterSend')}
         onSubmit={async (cents) => {
           const r = await api.market.counterOffer(offer.id, cents);
-          onOffer(r.offer);
+          // The answer is the new counter-offer, in its own message; this card is the offer it answers.
+          onOffer({ ...offer, status: 'countered', canRespond: false, canWithdraw: false, respondedAt: r.offer.createdAt });
           onMessage(r.message);
           setSaid(t('market.offer.counterSent'));
         }}

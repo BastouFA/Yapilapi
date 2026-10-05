@@ -49,15 +49,16 @@ export function Shop({
   const [items, setItems] = useState<ShopItem[] | null>(null);
   const [booking, setBooking] = useState<ShopItem | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = useCallback(
-    () =>
-      api.shop.list(userId).then(
-        (r) => setItems(r.items),
-        () => setItems([]),
-      ),
-    [userId],
-  );
+  const load = useCallback(() => {
+    setLoadError(null);
+    return api.shop.list(userId).then(
+      (r) => setItems(r.items),
+      // A shop that failed to load isn't an empty shop.
+      (e) => setLoadError(errorMessage(e)),
+    );
+  }, [userId]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -66,6 +67,17 @@ export function Shop({
   }, [focusId, items]);
 
   if (flags.COMMERCE === false) return <EmptyState title={t('m.shop.tab')} body={t('shop.unavailable')} />;
+  if (items === null && loadError)
+    return (
+      <EmptyState
+        title={loadError}
+        action={
+          <Button variant="secondary" size="sm" onClick={() => void load()}>
+            {t('m.common.retry')}
+          </Button>
+        }
+      />
+    );
   if (items === null) return <Skeleton height={160} />;
   if (!items.length)
     return (
@@ -219,38 +231,107 @@ function BookSheet({ item, onClose, seller }: { item: ShopItem | null; onClose: 
 export function PurchasesCard() {
   const { toast, locale, t } = useSession();
   const [items, setItems] = useState<Awaited<ReturnType<typeof api.shop.purchases>>['items'] | null>(null);
-  useEffect(() => {
+  const [subs, setSubs] = useState<Awaited<ReturnType<typeof api.economy.mySubscriptions>>['items']>([]);
+  const [failed, setFailed] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState<string | null>(null);
+  const load = useCallback(() => {
+    setFailed(null);
     api.shop.purchases().then(
       (r) => setItems(r.items),
-      () => setItems([]),
+      (e) => {
+        setItems((cur) => cur ?? []);
+        setFailed(errorMessage(e));
+      },
+    );
+    api.economy.mySubscriptions().then(
+      (r) => setSubs(r.items),
+      () => {},
     );
   }, []);
+  useEffect(load, [load]);
   if (!items) return null;
+  const day = (d: string) => new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(d));
   return (
-    <section className="yp-card stack-sm" style={{ padding: 16 }}>
-      <h2 className="section-title" style={{ margin: 0 }}>
-        {t('shop.purchases.title')}
-      </h2>
-      {/* This card is the whole Purchases page: it says so when there's nothing yet, rather than leaving it blank. */}
-      {!items.length ? (
-        <p className="muted" style={{ margin: 0 }}>
-          {t('m.purchases.noDownloads')}
-        </p>
-      ) : null}
-      {items.map((p) => (
-        <div key={p.productId} className="row" style={{ justifyContent: 'space-between' }}>
-          <span>
-            <strong>{p.title}</strong>
-            <span className="muted">
-              {' '}
-              · {p.seller.displayName} · {new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(p.boughtAt))}
+    <>
+      <section className="yp-card stack-sm" style={{ padding: 16 }}>
+        <h2 className="section-title" style={{ margin: 0 }}>
+          {t('shop.purchases.title')}
+        </h2>
+        {failed ? (
+          <div className="row" role="alert">
+            <span className="muted">{failed}</span>
+            <Button size="sm" variant="secondary" onClick={load}>
+              {t('m.common.retry')}
+            </Button>
+          </div>
+        ) : null}
+        {/* This card is the whole Purchases page: it says so when there's nothing yet, rather than leaving it blank. */}
+        {!items.length && !failed ? (
+          <p className="muted" style={{ margin: 0 }}>
+            {t('m.purchases.noDownloads')}
+          </p>
+        ) : null}
+        {items.map((p) => (
+          <div key={p.productId} className="row" style={{ justifyContent: 'space-between' }}>
+            <span>
+              <strong>{p.title}</strong>
+              <span className="muted">
+                {' '}
+                · {p.seller.displayName} · {day(p.boughtAt)}
+              </span>
             </span>
-          </span>
-          <Button size="sm" variant="secondary" disabled={!p.file} onClick={() => startDownload(p.productId).catch((e) => toast(errorMessage(e)))}>
-            {t('m.shop.download')}
-          </Button>
-        </div>
-      ))}
-    </section>
+            <Button size="sm" variant="secondary" disabled={!p.file} onClick={() => startDownload(p.productId).catch((e) => toast(errorMessage(e)))}>
+              {t('m.shop.download')}
+            </Button>
+          </div>
+        ))}
+      </section>
+      {/* Subscriptions to creators: what you pay for, until when, and a way to cancel. */}
+      <section className="yp-card stack-sm" style={{ padding: 16 }}>
+        <h2 className="section-title" style={{ margin: 0 }}>
+          {t('m.purchases.subscriptions')}
+        </h2>
+        {subs.length ? (
+          subs.map((s) => (
+            <div key={s.id} className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+              <span>
+                <Link href={`/u/${s.creator.username}`}>
+                  <strong>{s.creator.displayName}</strong>
+                </Link>
+                <span className="muted">
+                  {' '}
+                  · {s.plan} · {t('m.money.perMonth', { price: formatMoney(s.priceCents, s.currency, locale) })} ·{' '}
+                  {s.status === 'active' && s.currentPeriodEnd ? t('purchases.paidUntil', { date: day(s.currentPeriodEnd) }) : t('m.money.waitingPayment')}
+                </span>
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                loading={cancelling === s.id}
+                onClick={async () => {
+                  if (!window.confirm(`${t('m.purchases.cancelTitle', { name: s.creator.displayName })}\n\n${t('m.purchases.cancelBody')}`)) return;
+                  setCancelling(s.id);
+                  try {
+                    await api.economy.cancel(s.id);
+                    toast(t('m.purchases.cancelled'));
+                    load();
+                  } catch (e) {
+                    toast(errorMessage(e));
+                  } finally {
+                    setCancelling(null);
+                  }
+                }}
+              >
+                {t('m.purchases.cancel')}
+              </Button>
+            </div>
+          ))
+        ) : (
+          <p className="muted" style={{ margin: 0 }}>
+            {t('m.purchases.noSubscriptions')}
+          </p>
+        )}
+      </section>
+    </>
   );
 }

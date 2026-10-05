@@ -1,17 +1,44 @@
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
-import { COMMUNITY_ROLE_RANK, createEventSchema, rsvpSchema, updateEventSchema, type EventItem } from '@yapilapi/shared';
+import type { PoolClient } from 'pg';
+import {
+  COMMUNITY_ROLE_RANK,
+  createEventSchema,
+  createProductSchema,
+  CURRENCY_SCALE,
+  eventEndsAt,
+  rsvpSchema,
+  updateEventSchema,
+  type EventItem,
+} from '@yapilapi/shared';
 import { z } from 'zod';
-import { AppError, forbidden, notFound, parse } from '../lib/errors.ts';
+import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
-import { notify, track } from '../lib/services.ts';
+import { isEnabled, notify, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
-import { PUBLIC_USER_COLS, publicUserFrom, toPublicUser, type PublicUserRow } from '../lib/users.ts';
+import { assertAdultForMoney, PUBLIC_USER_COLS, publicUserFrom, toPublicUser, type PublicUserRow } from '../lib/users.ts';
 import { eventVisibleSql } from '../lib/visibility.ts';
 import { cancelEventTickets, cancelRsvpTicket, issueRsvpTicket, publishDoor } from '../lib/tickets.ts';
+import { refundOrder } from '../lib/checkout.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
+/** A kind of ticket an event sells: a name, a price and, optionally, how many there are. */
+const ticketTypeSchema = createProductSchema.pick({ title: true, description: true, priceCents: true, currency: true }).extend({
+  inventory: z.number().int().min(1).max(100_000).optional(),
+});
+/** Kinds of ticket on sale at once for one event. */
+export const TICKET_TYPES_MAX = 10;
+
+const ticketTypeDto = (r: Record<string, any>) => ({
+  id: r.id as string,
+  title: r.title as string,
+  description: r.description as string,
+  priceCents: r.price_cents as number,
+  currency: r.currency as string,
+  inventory: r.inventory as number | null,
+  soldOut: r.inventory === 0,
+});
 
 export const EVENT_SELECT = `
   SELECT e.id, e.title, e.description, e.starts_at, e.ends_at, e.timezone, e.location_text, e.capacity, e.visibility, e.online, e.ticket_transfers,
@@ -20,7 +47,8 @@ export const EVENT_SELECT = `
          (SELECT count(*) FROM event_attendees WHERE event_id = e.id AND status = 'going') AS going,
          (SELECT count(*) FROM event_attendees WHERE event_id = e.id AND status = 'interested') AS interested,
          (SELECT status FROM event_attendees WHERE event_id = e.id AND user_id = $1) AS my_rsvp,
-         coalesce(e.host_id = $1 OR EXISTS (SELECT 1 FROM event_cohosts ec WHERE ec.event_id = e.id AND ec.user_id = $1), false) AS can_check_in
+         coalesce(e.host_id = $1 OR EXISTS (SELECT 1 FROM event_cohosts ec WHERE ec.event_id = e.id AND ec.user_id = $1), false) AS can_check_in,
+         EXISTS (SELECT 1 FROM event_tickets et WHERE et.event_id = e.id AND et.holder_id = $1 AND et.status = 'valid') AS has_ticket
   FROM events e JOIN profiles pr ON pr.user_id = e.host_id
   LEFT JOIN places pl ON pl.id = e.place_id LEFT JOIN communities c ON c.id = e.community_id`;
 
@@ -41,16 +69,58 @@ export function toEvent(r: Record<string, any>): EventItem {
     online: r.online,
     counts: { going: r.going, interested: r.interested },
     myRsvp: r.my_rsvp === 'waitlist' ? 'interested' : r.my_rsvp,
+    onWaitlist: r.my_rsvp === 'waitlist',
     ticketTransfers: r.ticket_transfers,
     canCheckIn: !!r.can_check_in,
+    hasTicket: !!r.has_ticket,
   };
+}
+
+/**
+ * Places that opened at an event with a capacity (someone stopped going, or the host made room) go
+ * to the waitlist, first come first served: they're going now, with a ticket. Returns who moved up,
+ * to be told. Call inside a transaction that holds the event's row lock.
+ */
+export async function promoteWaitlist(c: Pick<PoolClient, 'query'>, eventId: string): Promise<string[]> {
+  const ev = (
+    await c.query<{ capacity: number | null; going: number }>(
+      `SELECT e.capacity, (SELECT count(*)::int FROM event_attendees WHERE event_id = e.id AND status = 'going') AS going
+       FROM events e WHERE e.id = $1 AND e.deleted_at IS NULL AND coalesce(e.ends_at, e.starts_at + interval '3 hours') > now()`,
+      [eventId],
+    )
+  ).rows[0];
+  if (!ev) return [];
+  const room = ev.capacity === null ? 1000 : ev.capacity - ev.going;
+  if (room <= 0) return [];
+  const { rows } = await c.query<{ user_id: string }>(
+    `UPDATE event_attendees SET status = 'going', updated_at = now()
+     WHERE event_id = $1 AND user_id IN (SELECT user_id FROM event_attendees WHERE event_id = $1 AND status = 'waitlist' ORDER BY updated_at, user_id LIMIT $2)
+     RETURNING user_id`,
+    [eventId, room],
+  );
+  for (const r of rows) await issueRsvpTicket(c, eventId, r.user_id);
+  return rows.map((r) => r.user_id);
+}
+
+/** An online event's location is the link people open to join: a web address, or nothing. */
+function assertJoinLink(online: boolean, locationText: string | null | undefined) {
+  if (online && locationText && !/^https?:\/\/\S+\.\S+$/i.test(locationText.trim()))
+    throw new AppError(400, 'validation_failed', 'Use a full link starting with https://', {
+      fields: { locationText: 'Use a full link starting with https://' },
+    });
 }
 
 export default async function eventsModule(app: FastifyInstance, ctx: AppContext) {
   const db = ctx.db;
 
+  /** People who got a place from the waitlist hear about it. */
+  async function tellPromoted(eventId: string, hostId: string, users: string[]) {
+    for (const userId of users)
+      await notify(db, ctx.realtime, { userId, category: 'events', type: 'event_waitlist_in', actorId: hostId, entityType: 'event', entityId: eventId });
+  }
+
   async function load(id: string, viewer: string | null) {
-    const { rows } = await db.query(`${EVENT_SELECT} WHERE e.id = $2 AND ${eventVisibleSql('$1')}`, [viewer, id]);
+    const { rows } = await db.query(`${EVENT_SELECT} WHERE e.id = $2 AND ${eventVisibleSql('$1', { byLink: true })}`, [viewer, id]);
     if (!rows[0]) throw notFound('Event');
     return rows[0];
   }
@@ -58,6 +128,7 @@ export default async function eventsModule(app: FastifyInstance, ctx: AppContext
   app.post('/v1/events', { preHandler: requireAuth, config: { rateLimit: { max: 20, timeWindow: '1 hour' } } }, async (req, reply) => {
     const u = me(req);
     const input = parse(createEventSchema, req.body);
+    assertJoinLink(input.online, input.locationText);
     if (input.communityId) {
       const r = await db.query(`SELECT role FROM community_members WHERE community_id = $1 AND user_id = $2 AND status = 'active'`, [input.communityId, u.id]);
       const role = r.rows[0]?.role;
@@ -137,6 +208,9 @@ export default async function eventsModule(app: FastifyInstance, ctx: AppContext
     const { id } = parse(idParam, req.params);
     const { status } = parse(rsvpSchema, req.body);
     const ev = await load(id, u.id);
+    if (eventEndsAt({ startsAt: ev.starts_at.toISOString(), endsAt: ev.ends_at?.toISOString() ?? null }) < new Date())
+      throw new AppError(409, 'event_over', 'This event is over.');
+    let promoted: string[] = [];
     const stored = await tx(db, async (c) => {
       await c.query(`SELECT id FROM events WHERE id = $1 FOR UPDATE`, [id]);
       let s: string = status;
@@ -145,21 +219,85 @@ export default async function eventsModule(app: FastifyInstance, ctx: AppContext
         if (going.rows[0].n >= ev.capacity) s = 'waitlist';
       }
       await c.query(
-        `INSERT INTO event_attendees (event_id, user_id, status) VALUES ($1,$2,$3) ON CONFLICT (event_id, user_id) DO UPDATE SET status = EXCLUDED.status, updated_at = now()`,
+        // Answering the same again keeps your place in the waitlist.
+        `INSERT INTO event_attendees (event_id, user_id, status) VALUES ($1,$2,$3)
+         ON CONFLICT (event_id, user_id) DO UPDATE SET status = EXCLUDED.status,
+           updated_at = CASE WHEN event_attendees.status = EXCLUDED.status THEN event_attendees.updated_at ELSE now() END`,
         [id, u.id, s],
       );
       // Going comes with a ticket in the wallet; anything else takes it back.
       if (s === 'going') await issueRsvpTicket(c, id, u.id);
-      else await cancelRsvpTicket(c, id, u.id);
+      else {
+        await cancelRsvpTicket(c, id, u.id);
+        // A place someone gave up goes to the waitlist.
+        promoted = await promoteWaitlist(c, id);
+      }
       return s;
     });
     await publishDoor(db, ctx.realtime, id);
+    await tellPromoted(id, ev.h_id, promoted);
     if (stored === 'going') {
       await notify(db, ctx.realtime, { userId: ev.h_id, category: 'events', type: 'event_rsvp', actorId: u.id, entityType: 'event', entityId: id });
       track(db, u.id, 'event_rsvp_going');
       await emitWebhook(db, ev.h_id, 'event.rsvp', { eventId: id, status: stored });
     }
     return { status: stored, event: toEvent(await load(id, u.id)) };
+  });
+
+  // ── Tickets on sale ─────────────────────────────────────────────────────
+  /** The kinds of ticket an event sells, for anyone who can see it. While one is on sale, going doesn't give a free ticket. */
+  app.get('/v1/events/:id/tickets', async (req) => {
+    const { id } = parse(idParam, req.params);
+    await load(id, req.user?.id ?? null);
+    const { rows } = await db.query(
+      `SELECT id, title, description, price_cents, currency, inventory FROM products
+       WHERE event_id = $1 AND kind = 'ticket' AND status = 'active' AND deleted_at IS NULL ORDER BY price_cents, created_at`,
+      [id],
+    );
+    return { items: rows.map(ticketTypeDto) };
+  });
+
+  /** The host puts a kind of ticket on sale (selling is for adults); buying one goes through checkout like any product. */
+  app.post('/v1/events/:id/tickets', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (req, reply) => {
+    if (!(await isEnabled(db, 'COMMERCE'))) throw featureDisabled('Commerce');
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const input = parse(ticketTypeSchema, req.body);
+    const ev = (
+      await db.query<{ over: boolean }>(
+        `SELECT coalesce(ends_at, starts_at + interval '3 hours') < now() AS over FROM events WHERE id = $1 AND host_id = $2 AND deleted_at IS NULL`,
+        [id, u.id],
+      )
+    ).rows[0];
+    if (!ev) throw notFound('Event');
+    if (ev.over) throw new AppError(409, 'event_over', 'This event is over.');
+    const minCents = 100 * CURRENCY_SCALE[input.currency];
+    if (input.priceCents > 0 && input.priceCents < minCents) throw badRequest(`A paid item costs at least ${minCents} hundredths of ${input.currency}.`);
+    await assertAdultForMoney(db, u.id);
+    const count = await db.query(
+      `SELECT count(*)::int AS n FROM products WHERE event_id = $1 AND kind = 'ticket' AND status = 'active' AND deleted_at IS NULL`,
+      [id],
+    );
+    if (count.rows[0].n >= TICKET_TYPES_MAX) throw new AppError(409, 'conflict', 'An event can sell up to 10 kinds of ticket at once.');
+    const { rows } = await db.query(
+      `INSERT INTO products (seller_id, event_id, kind, title, description, price_cents, currency, inventory) VALUES ($1,$2,'ticket',$3,$4,$5,$6,$7)
+       RETURNING id, title, description, price_cents, currency, inventory`,
+      [u.id, id, input.title, input.description, input.priceCents, input.currency, input.inventory ?? null],
+    );
+    reply.code(201);
+    return { ticket: ticketTypeDto(rows[0]) };
+  });
+
+  /** The host stops selling a kind of ticket. Tickets already bought keep working. */
+  app.delete('/v1/events/:id/tickets/:productId', { preHandler: requireAuth }, async (req, reply) => {
+    const u = me(req);
+    const { id, productId } = parse(idParam.extend({ productId: z.string().uuid() }), req.params);
+    const r = await db.query(
+      `UPDATE products SET status = 'archived', updated_at = now() WHERE id = $1 AND event_id = $2 AND seller_id = $3 AND kind = 'ticket' AND status = 'active'`,
+      [productId, id, u.id],
+    );
+    if (!r.rowCount) throw notFound('Ticket');
+    reply.code(204);
   });
 
   app.get('/v1/events/:id/attendees', async (req) => {
@@ -185,6 +323,8 @@ export default async function eventsModule(app: FastifyInstance, ctx: AppContext
     const cur = (await db.query(`SELECT host_id, starts_at, ends_at, place_id, location_text, online FROM events WHERE id = $1 AND deleted_at IS NULL`, [id]))
       .rows[0];
     if (!cur || cur.host_id !== u.id) throw notFound('Event');
+    if (input.online !== undefined || input.locationText !== undefined)
+      assertJoinLink(input.online ?? cur.online, input.locationText === undefined ? cur.location_text : input.locationText);
     if (input.placeId) {
       const p = await db.query(`SELECT 1 FROM places WHERE id = $1 AND deleted_at IS NULL`, [input.placeId]);
       if (!p.rowCount) throw notFound('Place');
@@ -210,7 +350,15 @@ export default async function eventsModule(app: FastifyInstance, ctx: AppContext
     if (input.visibility !== undefined) set('visibility', input.visibility);
     if (input.online !== undefined) set('online', input.online);
     if (input.ticketTransfers !== undefined) set('ticket_transfers', input.ticketTransfers);
-    if (sets.length) await db.query(`UPDATE events SET ${sets.join(', ')}, updated_at = now() WHERE id = $1`, params);
+    // More room (or no limit any more) lets people in from the waitlist.
+    const promoted = sets.length
+      ? await tx(db, async (c) => {
+          await c.query(`UPDATE events SET ${sets.join(', ')}, updated_at = now() WHERE id = $1`, params);
+          return input.capacity !== undefined ? promoteWaitlist(c, id) : [];
+        })
+      : [];
+    if (promoted.length) await publishDoor(db, ctx.realtime, id);
+    await tellPromoted(id, u.id, promoted);
     const moved =
       (input.startsAt !== undefined && new Date(input.startsAt).getTime() !== (cur.starts_at as Date).getTime()) ||
       (input.placeId !== undefined && input.placeId !== cur.place_id) ||
@@ -232,10 +380,25 @@ export default async function eventsModule(app: FastifyInstance, ctx: AppContext
     const { id } = parse(idParam, req.params);
     const r = await db.query(`UPDATE events SET deleted_at = now() WHERE id = $1 AND host_id = $2 AND deleted_at IS NULL RETURNING id`, [id, u.id]);
     if (!r.rowCount) throw notFound('Event');
-    // Every ticket for it stops working (the wallet shows it as cancelled).
+    // Every ticket for it stops working (the wallet shows it as cancelled), and none are sold any more.
     await cancelEventTickets(db, id);
+    await db.query(`UPDATE products SET status = 'archived', updated_at = now() WHERE event_id = $1 AND kind = 'ticket' AND status = 'active'`, [id]);
+    // Tickets people paid for are refunded: every paid order that bought only tickets to this event.
+    const paid = await db.query<{ id: string }>(
+      `SELECT DISTINCT o.id FROM orders o JOIN order_items oi ON oi.order_id = o.id JOIN products p ON p.id = oi.product_id
+       WHERE p.event_id = $1 AND p.kind = 'ticket' AND o.status = 'paid'
+         AND NOT EXISTS (SELECT 1 FROM order_items oi2 JOIN products p2 ON p2.id = oi2.product_id
+                         WHERE oi2.order_id = o.id AND (p2.event_id IS DISTINCT FROM $1 OR p2.kind <> 'ticket'))`,
+      [id],
+    );
+    for (const o of paid.rows)
+      await tx(db, async (c) => {
+        await c.query(`SELECT 1 FROM orders WHERE id = $1 FOR UPDATE`, [o.id]);
+        await refundOrder(c, ctx.paymentProviders, o.id, u.id, 'Event cancelled');
+      });
     const attendees = await db.query<{ user_id: string }>(
-      `SELECT user_id FROM event_attendees WHERE event_id = $1 AND status IN ('going','interested','waitlist')`,
+      `SELECT user_id FROM event_attendees WHERE event_id = $1 AND status IN ('going','interested','waitlist')
+       UNION SELECT holder_id FROM event_tickets WHERE event_id = $1 AND source = 'order'`,
       [id],
     );
     for (const a of attendees.rows)

@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { bookingSlots, openingRanges, timeZoneLabel, timeZoneList, utcToZonedWall, zonedWallToUtc } from './scheduling.ts';
+import {
+  bookingSlots,
+  hoursInWeekOrder,
+  hoursKeyDays,
+  hoursKeyLabel,
+  openingRanges,
+  timeZoneLabel,
+  timeZoneList,
+  utcToZonedWall,
+  zonedWallToUtc,
+} from './scheduling.ts';
 
 const hm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
@@ -44,6 +54,33 @@ describe('opening hours', () => {
     expect(openingRanges({ sun: 'ask us' }, 0)).toBeNull();
     expect(openingRanges({}, 2)).toBeNull();
     expect(openingRanges(null, 2)).toBeNull();
+  });
+
+  it('reads keys for several days, the most specific winning', () => {
+    const hours = { mon: 'closed', 'tue-sun': '12:00-22:00', sat: '10:00-23:00' };
+    expect(openingRanges(hours, 1)).toEqual([]);
+    expect(openingRanges(hours, 3)).toEqual([[720, 1320]]);
+    expect(openingRanges(hours, 0)).toEqual([[720, 1320]]);
+    expect(openingRanges(hours, 6)).toEqual([[600, 1380]]);
+    expect(hoursKeyDays('fri-mon')).toEqual([5, 6, 0, 1]);
+    expect(hoursKeyDays('sat, sun')).toEqual([6, 0]);
+    expect(hoursKeyDays('Monday')).toEqual([1]);
+    expect(hoursKeyDays('holidays')).toBeNull();
+  });
+
+  it("names the days in the reader's language", () => {
+    expect(hoursKeyLabel('tue-sun', 'en')).toBe('Tue – Sun');
+    expect(hoursKeyLabel('mon', 'fr')).toBe('lun.');
+    expect(hoursKeyLabel('sat, sun', 'en')).toBe('Sat, Sun');
+    expect(hoursKeyLabel('holidays', 'en')).toBe('holidays');
+    // Stored hours come back in any order; they're shown Monday first.
+    expect(hoursInWeekOrder({ fri: 'a', mon: 'b', holidays: 'c', 'sat-sun': 'd', tue: 'e' }).map(([k]) => k)).toEqual([
+      'mon',
+      'tue',
+      'fri',
+      'sat-sun',
+      'holidays',
+    ]);
   });
 });
 

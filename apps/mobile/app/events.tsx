@@ -69,7 +69,7 @@ export default function Events() {
           renderItem={({ item }) => (
             <Row
               title={item.title}
-              subtitle={[dateTime(item.startsAt), item.place?.name ?? item.locationText].filter(Boolean).join(' · ')}
+              subtitle={[dateTime(item.startsAt), item.online ? t('m.event.online') : (item.place?.name ?? item.locationText)].filter(Boolean).join(' · ')}
               onPress={() => router.push(`/event/${item.id}`)}
             />
           )}

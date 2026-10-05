@@ -1227,6 +1227,13 @@ export const ar: Record<string, string> = {
   'Number must be less than {maximum}': 'يجب أن يكون الرقم أقل من {maximum}',
   'Number must be a multiple of {multipleOf}': 'يجب أن يكون الرقم من مضاعفات {multipleOf}',
   'Number must be finite': 'يجب أن يكون الرقم محدودًا',
+  'You already own this community.': 'أنت مالك هذا المجتمع بالفعل.',
+  'Make them a member first.': 'اجعله عضوًا أولًا.',
+  'Use a full link starting with https://': 'استخدم رابطًا كاملًا يبدأ بـ https://',
+  "Tickets for this event aren't on sale any more.": 'لم تعد تذاكر هذه الفعالية معروضة للبيع.',
+  'An event can sell up to 10 kinds of ticket at once.': 'يمكن للفعالية بيع 10 أنواع من التذاكر كحد أقصى في وقت واحد.',
+  'Name the days, such as mon or tue-sun.': 'اذكر الأيام، مثل mon أو tue-sun.',
+  'Up to 14 lines of opening hours.': 'حتى 14 سطرًا من ساعات العمل.',
   'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
     'كلمات مرور خاطئة كثيرة لهذا الحساب. انتظر 15 دقيقة أو أعد تعيين كلمة المرور.',
   // apps/api/src/lib/suspension.ts, apps/api/src/modules/safety.ts (trust and safety sweep)

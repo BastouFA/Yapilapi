@@ -51,6 +51,8 @@ export default function MarketPage() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [more, setMore] = useState(false);
   const [said, setSaid] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const seq = useRef(0);
 
   const query = useCallback(
@@ -75,6 +77,7 @@ export default function MarketPage() {
   useEffect(() => {
     const mine = ++seq.current;
     setItems(null);
+    setLoadError(null);
     query(applied, place.here).then(
       (r) => {
         if (mine !== seq.current) return;
@@ -86,10 +89,10 @@ export default function MarketPage() {
         if (mine !== seq.current) return;
         setItems([]);
         setCursor(null);
-        toast(errorMessage(e));
+        setLoadError(errorMessage(e));
       },
     );
-  }, [applied, place.here, query, t, toast]);
+  }, [applied, place.here, query, t, attempt]);
 
   /** Choices that don't need typing apply at once; words and prices typed but not searched yet stay as they are. */
   const choose = (patch: Partial<Filters>) => {
@@ -261,6 +264,7 @@ export default function MarketPage() {
       <ListingGrid
         items={items}
         label={t('market.browse.results')}
+        error={loadError ? { message: loadError, retry: () => setAttempt((n) => n + 1) } : null}
         empty={{
           title: t('market.browse.emptyTitle'),
           body: place.here ? t('market.browse.emptyNear') : t('market.browse.empty'),
