@@ -1206,6 +1206,8 @@ export function createClient(opts: ClientOptions) {
         post<{ order: Record<string, any>; payment?: CheckoutPayment }>('/v1/orders', { items, idempotencyKey, liveSessionId }),
       list: () => get<{ items: Record<string, any>[] }>('/v1/orders'),
       get: (id: string) => get<{ order: Record<string, any> }>(`/v1/orders/${id}`),
+      /** Refund a paid order in full (its seller, when everything in it is theirs, or an admin). */
+      refund: (id: string, reason?: string) => post<{ status: 'succeeded' | 'failed' }>(`/v1/orders/${id}/refund`, reason ? { reason } : {}),
     },
     realtime: {
       /** A 60-second ticket for opening the realtime socket when the API is on another host. */
@@ -1333,7 +1335,9 @@ export function createClient(opts: ClientOptions) {
         post<{ payment: CheckoutPayment }>(`/v1/users/${userId}/tips`, b),
       subscribers: () => get<{ active: number; cancelled: number }>('/v1/creator/subscribers'),
       mySubscriptions: () =>
-        get<{ items: { id: string; status: string; plan: string; priceCents: number; currency: string; creator: PublicUser }[] }>('/v1/me/subscriptions'),
+        get<{
+          items: { id: string; status: string; currentPeriodEnd: string | null; plan: string; priceCents: number; currency: string; creator: PublicUser }[];
+        }>('/v1/me/subscriptions'),
       cancel: (id: string) => post(`/v1/creator/subscriptions/${id}/cancel`),
     },
     reviews: {

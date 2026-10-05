@@ -15,11 +15,11 @@ import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } fro
 import type { AppContext } from '../lib/context.ts';
 import { audit, isEnabled, notify, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
-import { signDevWebhook } from '../lib/payments.ts';
+import { isZeroDecimal, signDevWebhook } from '../lib/payments.ts';
 import { businessOverview } from '../lib/ai/agents.ts';
 import { refundUnspentBudget } from '../lib/ad-refunds.ts';
 import { submitBoostForReview } from '../lib/boosts.ts';
-import { assertAdultForMoney, publicUserFrom } from '../lib/users.ts';
+import { assertAdultForMoney, isBlockedEitherWay, publicUserFrom } from '../lib/users.ts';
 import { EVENT_SELECT, toEvent } from './events.ts';
 import { eventVisibleSql, liveVisibleSql } from '../lib/visibility.ts';
 import { liveChatAudience } from '../lib/live.ts';
@@ -107,7 +107,10 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     const [places, products] = await Promise.all([
       db.query(`SELECT id, name, category, address, city FROM places WHERE business_id = $1 AND deleted_at IS NULL`, [b.id]),
       db.query(
-        `SELECT id, kind, title, description, price_cents, currency, inventory FROM products WHERE business_id = $1 AND deleted_at IS NULL AND status = 'active' ORDER BY created_at DESC`,
+        // Products in a drop that isn't open are shown on the drop instead, as on the profile's shop.
+        `SELECT pd.id, pd.kind, pd.title, pd.description, pd.price_cents, pd.currency, pd.inventory FROM products pd
+         WHERE pd.business_id = $1 AND pd.deleted_at IS NULL AND pd.status = 'active' AND coalesce(${dropGateSql('pd.id')}, 'open') = 'open'
+         ORDER BY pd.created_at DESC`,
         [b.id],
       ),
     ]);
@@ -219,7 +222,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     );
     const products = await db.query(
       `SELECT pd.id, pd.kind, pd.title, pd.description, pd.price_cents, pd.currency, pd.inventory FROM products pd JOIN places pl ON pl.business_id = pd.business_id
-       WHERE pl.id = $1 AND pd.deleted_at IS NULL AND pd.status = 'active' LIMIT 20`,
+       WHERE pl.id = $1 AND pd.deleted_at IS NULL AND pd.status = 'active' AND coalesce(${dropGateSql('pd.id')}, 'open') = 'open' LIMIT 20`,
       [id],
     );
     return { place, events: events.rows.map(toEvent), products: products.rows.map(productDto) };
@@ -271,6 +274,8 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     // Free, or about $1 at least in every currency: processing would eat less, and tiny prices are how stolen cards get tested.
     const minCents = 100 * CURRENCY_SCALE[input.currency];
     if (input.priceCents > 0 && input.priceCents < minCents) throw badRequest(`A paid item costs at least ${minCents} hundredths of ${input.currency}.`);
+    // A price checkout could never charge (a fraction of a franc) is refused here, not at the buyer's checkout.
+    if (isZeroDecimal(input.currency) && input.priceCents % 100 !== 0) throw badRequest(`${input.currency} amounts must be whole units.`);
     // Selling is for adults (creator and seller terms).
     await assertAdultForMoney(db, u.id);
     if (input.businessId) {
@@ -356,6 +361,9 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       }
       // Sellers must be adults; a listing made before that rule can't be bought from someone younger.
       for (const seller of new Set(products.map((p) => p.seller_id as string))) if (seller !== u.id) await assertAdultForMoney(c, seller, false);
+      // Blocks work both ways here too: the shop is hidden from them, and so is buying from it by its address.
+      for (const seller of new Set(products.map((p) => p.seller_id as string)))
+        if (seller !== u.id && (await isBlockedEitherWay(c, u.id, seller))) throw notFound('One of those products');
       const currencies = new Set(products.map((p) => p.currency));
       if (currencies.size > 1) throw badRequest('All items in one order must use the same currency.');
       let total = 0;
@@ -667,6 +675,12 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       if (r.status !== 'paid') throw badRequest('Only paid orders can be refunded.');
       const status = await refundOrder(c, ctx.paymentProviders, id, u.id, reason ?? null);
       const result = status === 'succeeded' ? 'succeeded' : 'failed';
+      // A paid order took its units from stock; refunding it here (before anything changed hands) puts them back on sale.
+      if (result === 'succeeded')
+        await c.query(
+          `UPDATE products pd SET inventory = pd.inventory + oi.quantity FROM order_items oi WHERE oi.order_id = $1 AND oi.product_id = pd.id AND pd.inventory IS NOT NULL`,
+          [id],
+        );
       await audit(c, { actorId: u.id, action: 'order.refund', entityType: 'order', entityId: id, metadata: { status: result } });
       return { status: result };
     });

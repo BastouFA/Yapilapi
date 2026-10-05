@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { EmptyState, Segments, Skeleton } from '@yapilapi/design-system';
+import { useCallback, useEffect, useState } from 'react';
+import { Button, EmptyState, Segments, Skeleton } from '@yapilapi/design-system';
 import { dropPhase, type Drop, type DropActivity, type MessageKey } from '@yapilapi/shared';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 import { DropCard, useNow } from '@/components/Drops';
 import { useSession } from '../../providers';
 
@@ -26,17 +26,22 @@ export default function DropsPage() {
   const [tab, setTab] = useState<Tab>('waiting');
   const [activity, setActivity] = useState<DropActivity[] | null>(null);
   const [mine, setMine] = useState<Drop[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
-    api.drops.activity().then(
-      (r) => setActivity(r.items),
-      () => setActivity([]),
-    );
-    api.drops.mine().then(
-      (r) => setMine(r.items),
-      () => setMine([]),
+  const load = useCallback(() => {
+    setLoadError(null);
+    setActivity(null);
+    setMine(null);
+    // Both lists or neither: an empty list that only failed to load would say "nothing here".
+    Promise.all([api.drops.activity(), api.drops.mine()]).then(
+      ([a, m]) => {
+        setActivity(a.items);
+        setMine(m.items);
+      },
+      (e) => setLoadError(errorMessage(e)),
     );
   }, []);
+  useEffect(load, [load]);
 
   const waiting = (activity ?? []).filter((a) => a.drop.reminded && ['upcoming', 'opening', 'open'].includes(dropPhase(a.drop, now)));
   const bought = (activity ?? []).filter((a) => a.purchases.length);
@@ -61,7 +66,16 @@ export default function DropsPage() {
           { id: 'mine', label: t('m.drops.section.mine') },
         ]}
       />
-      {activity === null || mine === null ? (
+      {loadError ? (
+        <EmptyState
+          title={loadError}
+          action={
+            <Button variant="secondary" onClick={load}>
+              {t('m.common.retry')}
+            </Button>
+          }
+        />
+      ) : activity === null || mine === null ? (
         <Skeleton height={160} />
       ) : tab === 'waiting' ? (
         waiting.length ? (

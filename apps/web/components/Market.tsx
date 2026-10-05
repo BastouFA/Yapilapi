@@ -135,12 +135,13 @@ export const amountInput = (cents: number | null) => (cents === null ? '' : Stri
 
 let meCache: Promise<MarketMe | null> | null = null;
 
-/** Your currency and whether you can sell, asked once per visit. */
-export function useMarketMe(): MarketMe | null | undefined {
+/** Your currency and whether you can sell, asked once per visit (null when signed out or it couldn't load; a new `attempt` asks again). */
+export function useMarketMe(attempt = 0): MarketMe | null | undefined {
   const { me } = useSession();
   const [value, setValue] = useState<MarketMe | null | undefined>(undefined);
   useEffect(() => {
     if (!me) return setValue(null);
+    setValue(undefined);
     meCache ??= api.market.me().then(
       (r) => r.market,
       () => {
@@ -153,7 +154,7 @@ export function useMarketMe(): MarketMe | null | undefined {
     return () => {
       live = false;
     };
-  }, [me]);
+  }, [me, attempt]);
   return value;
 }
 
@@ -277,12 +278,27 @@ export function ListingGrid({
   empty,
   showMine,
   label,
+  error,
 }: {
   items: MarketListing[] | null;
   empty: { title: string; body?: string; action?: React.ReactNode };
   showMine?: boolean;
   label?: string;
+  /** Why the list couldn't load, with a way to ask again: shown instead of an empty list that isn't really empty. */
+  error?: { message: string; retry: () => void } | null;
 }) {
+  const { t } = useSession();
+  if (error)
+    return (
+      <EmptyState
+        title={error.message}
+        action={
+          <Button variant="secondary" onClick={error.retry}>
+            {t('m.common.retry')}
+          </Button>
+        }
+      />
+    );
   if (items === null)
     return (
       <div className="market-grid" aria-hidden>

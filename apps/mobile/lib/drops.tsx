@@ -37,23 +37,19 @@ export function opensText(tr: Pick<Translator, 't' | 'locale'>, startsAt: string
   return tr.t('m.drops.opensOn', { day: d.day, time: d.time });
 }
 
-/** "in 3 days" where the phone can say it (some Android builds have no relative time formatting). */
-export function untilText(locale: string, at: string, now = new Date()): string | null {
+/** "in 3 days", from the catalog: the phone's JavaScript engine has no relative time formatting. */
+export function untilText(tr: Pick<Translator, 'tp'>, at: string, now = new Date()): string | null {
   const c = dropCountdown(at, now);
   if (!c) return null;
-  try {
-    return new Intl.RelativeTimeFormat(locale, { numeric: 'always' }).format(c.value, c.unit);
-  } catch {
-    return null;
-  }
+  return tr.tp(c.unit === 'day' ? 'm.drops.inDays' : c.unit === 'hour' ? 'm.drops.inHours' : 'm.drops.inMinutes', c.value);
 }
 
 /** One line for where a drop is: when it opens, that it's open (and until when), or how it ended. */
-export function dropStatusText(tr: Pick<Translator, 't' | 'locale' | 'date'>, d: Drop, now = new Date()): string {
+export function dropStatusText(tr: Pick<Translator, 't' | 'tp' | 'locale' | 'date'>, d: Drop, now = new Date()): string {
   const phase = dropPhase(d, now);
   if (phase === 'upcoming' || phase === 'draft') {
     const opens = opensText(tr, d.startsAt, now);
-    const until = untilText(tr.locale, d.startsAt, now);
+    const until = untilText(tr, d.startsAt, now);
     return phase === 'draft' ? `${tr.t('m.drops.draft')} · ${opens}` : until ? `${opens} · ${until}` : opens;
   }
   if (phase === 'opening') return tr.t('m.drops.opening');
