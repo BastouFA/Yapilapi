@@ -170,6 +170,8 @@ export function GameCard({ message, meId, tint, onOpen }: { message: Message; me
         importantForAccessibility="no-hide-descendants"
         accessibilityElementsHidden
         onPress={onOpen}
+        // A word ladder's board is one line of text, 34pt tall; the touch area reaches 44.
+        hitSlop={{ top: 5, bottom: 5 }}
         style={({ pressed }) => ({
           alignSelf: 'flex-start',
           padding: space[2],

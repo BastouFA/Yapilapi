@@ -162,6 +162,7 @@ export function PollCard({ message, meId, tint, onPoll }: { message: Message; me
                 setAdding(false);
               }
             }}
+            hitSlop={4}
             style={{ padding: space[2], opacity: text.trim() ? 1 : 0.5 }}
           >
             <Icon name="add-circle" size={26} color={tint} />
@@ -273,6 +274,8 @@ export function ListCard({ message, meId, tint, onList }: { message: Message; me
                 else if (a === 'down') move(i, 1);
                 else if (a === 'remove') void run(async () => (await client()).messages.removeListItem(message.id, item.id));
               }}
+              // 40pt tall, with the items 4pt apart; the touch area reaches 44.
+              hitSlop={{ top: 2, bottom: 2 }}
               style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: 40 }}
             >
               <Icon name={item.done ? 'checkbox' : 'square-outline'} size={20} color={tint} />
@@ -326,6 +329,7 @@ export function ListCard({ message, meId, tint, onList }: { message: Message; me
             onPress={async () => {
               if (await run(async () => (await client()).messages.addListItem(message.id, text.trim()))) setText('');
             }}
+            hitSlop={5}
             style={{ padding: space[1], opacity: text.trim() ? 1 : 0.5 }}
           >
             <Icon name="add-circle" size={26} color={tint} />
@@ -361,8 +365,9 @@ function IconButton({
       accessibilityElementsHidden
       disabled={disabled}
       onPress={onPress}
-      hitSlop={4}
-      style={{ width: 32, height: 40, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.35 : 1 }}
+      // 44 wide (the buttons sit side by side, so slop can't widen them); 40 tall, and the slop takes it to 44.
+      hitSlop={{ top: 2, bottom: 2 }}
+      style={{ width: 44, height: 40, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.35 : 1 }}
     >
       <Icon name={icon} size={18} color={tint} />
     </Pressable>

@@ -160,13 +160,17 @@ export function TranslationBar({ state, tint, linkTint }: { state: Translatable;
   const muted = tint ?? c.inkMuted;
   const link = linkTint ?? c.yapi;
   const small = { fontSize: 12, lineHeight: 17 } as const;
+  // The links are 32 tall and their slop reaches 44: 2 up (only the gap, since the text above can
+  // hold #tag and @name links) and 10 down.
+  const linkBox = { minHeight: 32, justifyContent: 'center' } as const;
+  const linkSlop = { top: 2, bottom: 10, left: 8, right: 8 };
   if (state.status === 'shown' && state.translation) {
     const from = t('translate.from', { language: languageName(state.translation.sourceLanguage, locale) });
     return (
       <View style={{ gap: 1, marginTop: 2 }} accessibilityLiveRegion="polite">
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
           <Text style={[small, { color: muted }]}>{from} · </Text>
-          <Pressable accessibilityRole="button" onPress={state.showOriginal} hitSlop={8}>
+          <Pressable accessibilityRole="button" onPress={state.showOriginal} hitSlop={linkSlop} style={linkBox}>
             <Text style={[small, { color: link, fontWeight: '700' }]}>{t('translate.seeOriginal')}</Text>
           </Pressable>
         </View>
@@ -182,8 +186,8 @@ export function TranslationBar({ state, tint, linkTint }: { state: Translatable;
         accessibilityState={{ disabled: loading, busy: loading }}
         disabled={loading}
         onPress={state.see}
-        hitSlop={8}
-        style={{ alignSelf: 'flex-start' }}
+        hitSlop={linkSlop}
+        style={[linkBox, { alignSelf: 'flex-start' }]}
       >
         <Text style={[small, { color: loading ? muted : link, fontWeight: '700' }]}>{loading ? t('translate.loading') : t('translate.see')}</Text>
       </Pressable>

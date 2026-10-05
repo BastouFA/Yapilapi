@@ -68,6 +68,8 @@ export function Quote({ preview, tint, meId, onJump }: { preview: MessagePreview
       accessibilityLabel={who ? `${t('m.chat.goTo', { name: who })}. ${text}` : text}
       disabled={!preview.available}
       onPress={() => onJump(preview.id)}
+      // About 37pt tall with a name and one line; the touch area reaches 44.
+      hitSlop={{ top: 4, bottom: 4 }}
       style={{ borderStartWidth: 3, borderStartColor: tint, paddingStart: space[2], paddingVertical: 2, marginBottom: space[1], opacity: 0.9 }}
     >
       {who ? <Text style={[{ color: tint, fontSize: 12, fontWeight: '700' }, userText]}>{who}</Text> : null}
@@ -84,7 +86,8 @@ export function ReactionRow({ message, mine, onToggle }: { message: Message; min
   const { t } = useT();
   if (!message.reactions?.length) return null;
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, alignSelf: mine ? 'flex-end' : 'flex-start', marginTop: -2 }}>
+    // rowGap 16: chips that wrap onto a second row keep their 44pt touch areas apart.
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 4, rowGap: 16, alignSelf: mine ? 'flex-end' : 'flex-start', marginTop: -2 }}>
       {message.reactions.map((r) => (
         <Pressable
           key={r.emoji}
@@ -92,8 +95,9 @@ export function ReactionRow({ message, mine, onToggle }: { message: Message; min
           accessibilityState={{ selected: r.mine }}
           accessibilityLabel={t('m.chat.reactionA11y', { emoji: r.emoji, count: r.count })}
           onPress={() => onToggle(r.emoji, !r.mine)}
-          // 28pt tall; the touch area still reaches 44pt.
-          hitSlop={8}
+          // 28pt tall; the touch area still reaches 44pt. Sideways the chips are 4pt apart, so
+          // they share the gap (each chip is about 44 wide already).
+          hitSlop={{ top: 8, bottom: 8, left: 2, right: 2 }}
           style={{
             flexDirection: 'row',
             alignItems: 'center',
@@ -320,6 +324,8 @@ export function PinnedBar({
       <Icon name="pin-outline" size={18} color={c.yapi} />
       <Pressable
         accessibilityRole="button"
+        // Two lines, about 34pt; the bar's padding takes the touch area to 44.
+        hitSlop={{ top: 6, bottom: 6 }}
         style={{ flex: 1 }}
         onPress={() => {
           onJump(pin.message.id);
@@ -338,9 +344,10 @@ export function PinnedBar({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('m.chat.unpinA11y')}
-          hitSlop={10}
+          // 28 × 26; the side slop stops at the pinned message 8pt away.
+          hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
           onPress={() => onUnpin(pin.message.id)}
-          style={{ padding: space[1] }}
+          style={{ paddingVertical: space[1], paddingHorizontal: space[1] + 1 }}
         >
           <Icon name="close" size={18} color={c.inkMuted} />
         </Pressable>
@@ -461,7 +468,14 @@ export function SearchSheet({
               userText,
             ]}
           />
-          <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} hitSlop={10} onPress={onClose}>
+          {/* 28pt wide so the side slop (8, the gap to the field) still makes 44. */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('m.common.close')}
+            hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+            onPress={onClose}
+            style={{ minWidth: 28, alignItems: 'center' }}
+          >
             <Icon name="close" size={26} color={c.ink} />
           </Pressable>
         </View>

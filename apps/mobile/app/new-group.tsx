@@ -80,13 +80,16 @@ export default function NewGroup() {
             <View style={{ gap: space[1] }}>
               <Text style={{ color: c.ink, fontWeight: '600', fontSize: 13 }}>{t('m.group.addPeople')}</Text>
               {picked.length ? (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2], marginBottom: space[1] }}>
+                // rowGap 12: chips that wrap keep their 44pt touch areas apart.
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space[2], rowGap: space[3], marginBottom: space[1] }}>
                   {picked.map((p) => (
                     <Pressable
                       key={p.id}
                       accessibilityRole="button"
                       accessibilityLabel={t('m.group.removePerson', { name: p.displayName })}
                       onPress={() => setPicked((cur) => cur.filter((x) => x.id !== p.id))}
+                      // 32pt tall; the touch area reaches 44 (and stops short of the field 8pt below).
+                      hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',

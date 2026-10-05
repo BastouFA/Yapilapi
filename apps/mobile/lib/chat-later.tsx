@@ -141,10 +141,11 @@ export function ScheduledList({
             accessibilityRole="button"
             accessibilityState={{ disabled: busy === s.id, busy: busy === s.id }}
             disabled={busy === s.id}
-            // Small words in a row: the touch area reaches 44pt tall.
-            hitSlop={{ top: 14, bottom: 14, left: 6, right: 6 }}
+            // Small words in a row: the touch area reaches 44 × 44 (they sit about 15pt apart, so the
+            // side slop doesn't overlap; minWidth covers a short word such as "Edit").
+            hitSlop={{ top: 15, bottom: 15, left: 7, right: 7 }}
             onPress={onPress}
-            style={{ opacity: busy === s.id ? 0.5 : 1 }}
+            style={{ minWidth: 30, alignItems: 'center', opacity: busy === s.id ? 0.5 : 1 }}
           >
             <Text style={{ color: c.yapi, fontSize: 12, fontWeight: '800' }}>{label}</Text>
           </Pressable>
@@ -166,38 +167,40 @@ export function ScheduledList({
             >
               <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 21 }, userText]}>{s.body}</Text>
             </View>
+            {/* The time on one line and the actions on the next: wrapped onto one line, actions on two
+                rows would sit too close for 44pt touch areas (rowGap keeps them apart if they wrap). */}
             <View
               style={{
-                flexDirection: 'row',
-                flexWrap: 'wrap',
-                justifyContent: 'flex-end',
-                alignItems: 'center',
-                gap: 6,
+                alignItems: 'flex-end',
+                gap: 2,
                 paddingHorizontal: 10,
                 paddingVertical: 3,
-                borderRadius: radius.full,
+                borderRadius: radius.lg,
                 backgroundColor: c.surface,
               }}
             >
-              <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-                <Icon name={failed ? 'alert-circle-outline' : 'time-outline'} size={13} color={failed ? c.danger : c.inkMuted} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                  <Icon name={failed ? 'alert-circle-outline' : 'time-outline'} size={13} color={failed ? c.danger : c.inkMuted} />
+                </View>
+                <Text style={{ flexShrink: 1, color: failed ? c.danger : c.inkMuted, fontSize: 12 }}>
+                  {failed ? t('m.chat.later.failed', { reason: scheduledFailureText(s, t) ?? '' }) : sendsLabel(s.sendAt)}
+                </Text>
               </View>
-              <Text style={{ color: failed ? c.danger : c.inkMuted, fontSize: 12 }}>
-                {failed ? t('m.chat.later.failed', { reason: scheduledFailureText(s, t) ?? '' }) : sendsLabel(s.sendAt)}
-              </Text>
-              <Dot color={c.inkMuted} />
-              {failed ? action(t('m.chat.later.newTime'), () => setEditTime(s)) : action(t('m.chat.later.edit'), () => edit(s))}
-              <Dot color={c.inkMuted} />
-              {action(
-                t('m.chat.later.sendNow'),
-                () =>
-                  void run(s, async () => {
-                    const { message } = await (await client()).scheduledMessages.sendNow(s.id);
-                    onSent(s, message);
-                  }),
-              )}
-              <Dot color={c.inkMuted} />
-              {action(failed ? t('m.chat.later.dismiss') : t('m.chat.later.cancel'), () => cancel(s))}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', columnGap: 6, rowGap: 28 }}>
+                {failed ? action(t('m.chat.later.newTime'), () => setEditTime(s)) : action(t('m.chat.later.edit'), () => edit(s))}
+                <Dot color={c.inkMuted} />
+                {action(
+                  t('m.chat.later.sendNow'),
+                  () =>
+                    void run(s, async () => {
+                      const { message } = await (await client()).scheduledMessages.sendNow(s.id);
+                      onSent(s, message);
+                    }),
+                )}
+                <Dot color={c.inkMuted} />
+                {action(failed ? t('m.chat.later.dismiss') : t('m.chat.later.cancel'), () => cancel(s))}
+              </View>
             </View>
           </View>
         );

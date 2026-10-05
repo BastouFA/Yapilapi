@@ -123,9 +123,16 @@ export function CatchUpCard() {
               {s.lines.map((l, i) => (
                 <View key={i} style={{ gap: 2 }}>
                   <Text style={[{ color: c.ink, fontSize: 15, lineHeight: 21 }, userText]}>{`• ${l.text}`}</Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[3], paddingStart: space[3] }}>
+                  {/* rowGap 28: links that wrap keep their 44pt touch areas apart. */}
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space[3], rowGap: 28, paddingStart: space[3] }}>
                     {l.posts.map((p) => (
-                      <Pressable key={p.id} accessibilityRole="link" hitSlop={8} onPress={() => router.push(`/p/${p.id}`)}>
+                      <Pressable
+                        key={p.id}
+                        accessibilityRole="link"
+                        // A 17pt line of text; the touch area reaches 44 (13 below, where the next point is 27pt away).
+                        hitSlop={{ top: 14, bottom: 13, left: 6, right: 6 }}
+                        onPress={() => router.push(`/p/${p.id}`)}
+                      >
                         <Text style={{ color: c.yapi, fontSize: 13, fontWeight: '600' }}>{t('catchUp.openPost', { name: p.authorName })}</Text>
                       </Pressable>
                     ))}
@@ -189,8 +196,10 @@ export function SmartReplyChips({
         horizontal
         showsHorizontalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        style={{ flex: 1 }}
-        contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: space[2], paddingEnd: space[3] }}
+        // The chips are 36 tall with 4pt slop; the 4pt of padding (taken back by the margin) keeps
+        // that slop inside the scroll view, which would clip it.
+        style={{ flex: 1, marginVertical: -4 }}
+        contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: space[2], paddingEnd: space[3], paddingVertical: 4 }}
       >
         {replies.suggestions.map((s) => (
           <Chip
