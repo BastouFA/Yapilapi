@@ -1216,4 +1216,6 @@ export const ar: Record<string, string> = {
   'Number must be less than {maximum}': 'يجب أن يكون الرقم أقل من {maximum}',
   'Number must be a multiple of {multipleOf}': 'يجب أن يكون الرقم من مضاعفات {multipleOf}',
   'Number must be finite': 'يجب أن يكون الرقم محدودًا',
+  'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
+    'كلمات مرور خاطئة كثيرة لهذا الحساب. انتظر 15 دقيقة أو أعد تعيين كلمة المرور.',
 };

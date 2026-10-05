@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Pressable, Text, View, type TextInput } from 'react-native';
+import { ApiError } from '../../../packages/api-client/src/index';
 import { MAX_ACCOUNTS, signIn, verifyTwoStep } from '../lib/api';
 import { AuthPage, authProblem, enterApp, PasswordField } from '../lib/auth-ui';
 import { useT } from '../lib/i18n';
@@ -15,7 +16,7 @@ import { Button, Field, Notice, Title, useColors } from '../lib/ui';
 export default function Login() {
   const c = useColors();
   const { t } = useT();
-  const { refresh, me, accounts } = useSession();
+  const { enter, me, accounts } = useSession();
   const params = useLocalSearchParams<{ email?: string; add?: string }>();
   // From the account menu: log in to another account, kept alongside the ones already here.
   const adding = params.add === '1' && !!me;
@@ -32,14 +33,14 @@ export default function Login() {
   const ready = challenge ? code.trim().length >= 6 : /\S+@\S+\.\S+/.test(email.trim()) && password.length > 0;
 
   async function submit() {
-    if (!ready || busy) return;
+    if (!ready || busy || full) return;
     setBusy(true);
     setError(null);
     setFields({});
     try {
       if (challenge) {
         const user = await verifyTwoStep(challenge, code);
-        await enterApp(user, refresh);
+        await enterApp(user, enter);
         return;
       }
       const r = await signIn(email.trim(), password);
@@ -48,11 +49,11 @@ export default function Login() {
         setBusy(false);
         return;
       }
-      await enterApp(r.user, refresh);
+      await enterApp(r.user, enter);
     } catch (e) {
-      const p = authProblem(e, t);
-      // An expired two-step sign-in starts again from the password.
-      if (challenge && p.message === t('m.auth.challengeExpired')) {
+      const p = authProblem(e, t, !!challenge);
+      // An expired two-step sign-in (or one with too many wrong codes) starts again from the password.
+      if (challenge && e instanceof ApiError && (e.status === 401 || e.code === 'too_many_attempts')) {
         setChallenge(null);
         setCode('');
       }

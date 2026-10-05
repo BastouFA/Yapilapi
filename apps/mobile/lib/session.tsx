@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 import type { Me } from '../../../packages/shared/src/types';
@@ -27,6 +28,11 @@ interface SessionCtx {
   me: Me | null | undefined;
   refresh: () => Promise<void>;
   /**
+   * Just logged in or signed up as `user` (its token is already stored): use it now, and keep it
+   * among this phone's accounts, without waiting on another check that could fail offline.
+   */
+  enter: (user: Me) => Promise<void>;
+  /**
    * Log out of the account in use on this phone. When other accounts are signed in here, the next
    * one takes over ('switched'); otherwise the app goes back to the welcome screen ('signedOut').
    */
@@ -35,8 +41,11 @@ interface SessionCtx {
   signOutEverywhere: () => Promise<'switched' | 'signedOut'>;
   /** The accounts signed in on this phone (the one in use included), in the order they were added. */
   accounts: StoredAccount[];
-  /** Use another signed-in account. False when it needs a new log in (its session ended). */
-  switchAccount: (id: string) => Promise<boolean>;
+  /**
+   * Use another signed-in account: 'ok', 'ended' when it needs a new log in (its session ended), or
+   * 'unavailable' when it couldn't be checked (offline, or a problem on our side; it stays on the phone).
+   */
+  switchAccount: (id: string) => Promise<'ok' | 'ended' | 'unavailable'>;
   /** Log out of an account that isn't the one in use. */
   removeAccount: (id: string) => Promise<void>;
   /** Subscribe to realtime events from the API socket. Returns an unsubscribe function. */
@@ -50,10 +59,11 @@ interface SessionCtx {
 const Ctx = createContext<SessionCtx>({
   me: undefined,
   refresh: async () => {},
+  enter: async () => {},
   signOut: async () => 'signedOut',
   signOutEverywhere: async () => 'signedOut',
   accounts: [],
-  switchAccount: async () => false,
+  switchAccount: async () => 'ended',
   removeAccount: async () => {},
   subscribe: () => () => {},
   setKeepAlive: () => {},
@@ -161,10 +171,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const ended = token ? await accountWithToken(token) : null;
       if (ended) await forgetAccount(ended);
       await restoreToken(undefined);
-      await takeOverNext(ended);
+      // Screens loaded for the account that ended close; the next one starts at Pulse.
+      if ((await takeOverNext(ended)) === 'switched') {
+        if (router.canDismiss()) router.dismissAll();
+        router.replace('/');
+      }
     }
   }, [takeOverNext, retrySoon]);
   refreshRef.current = refresh;
+
+  const enter = useCallback(async (user: Me) => {
+    setMe(user);
+    setAccounts(await rememberAccount(user).catch(() => storedAccounts()));
+  }, []);
+
+  // A session can end elsewhere (log out everywhere, a password reset, a suspension): check again
+  // when the app comes back to the front, at most once a minute.
+  const lastCheck = useRef(Date.now());
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s !== 'active' || !meRef.current || Date.now() - lastCheck.current < 60_000) return;
+      lastCheck.current = Date.now();
+      void refreshRef.current();
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     void refresh();
@@ -198,26 +229,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return (await takeOverNext(current?.id)) === 'signedOut' ? ('signedOut' as const) : ('switched' as const);
   }, [takeOverNext]);
 
-  const switchAccount = useCallback(async (id: string) => {
-    if (meRef.current?.id === id) return true;
+  const switchAccount = useCallback(async (id: string): Promise<'ok' | 'ended' | 'unavailable'> => {
+    if (meRef.current?.id === id) return 'ok';
     const before = await getToken();
     // Its token is gone from the keychain: nothing to switch to, so it leaves the list (it needs a new log in).
     if (!(await activateAccount(id))) {
       setAccounts(await forgetAccount(id));
-      return false;
+      return 'ended';
     }
     try {
       const user = (await (await client()).auth.me()).user;
       setMe(user);
       setAccounts(await rememberAccount(user));
       void followActiveAccount();
-      return true;
+      return 'ok';
     } catch (e) {
       await restoreToken(before);
       // Its session ended (logged out elsewhere, or the password changed): it needs a new log in.
       // Offline or a problem on our side: it stays on the phone, to try again.
-      if (sessionCheckFailure(e) === 'ended') setAccounts(await forgetAccount(id));
-      return false;
+      if (sessionCheckFailure(e) === 'ended') {
+        setAccounts(await forgetAccount(id));
+        return 'ended';
+      }
+      return 'unavailable';
     }
   }, []);
 
@@ -269,11 +303,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           }
         });
       };
-      socket.onclose = () => {
+      socket.onclose = (ev: CloseEvent) => {
         clearInterval(ping);
         if (ws !== socket && ws) return; // an old socket closing after a new one opened
         ready.current = false;
         ws = null;
+        // The API refused the session: it ended elsewhere. Find out (refresh forgets it) instead of retrying with it.
+        if (ev?.code === 4401) {
+          // Still signed in after all (the check raced a new log in): connect again, slowly.
+          void refreshRef.current().then(() => {
+            if (!stopped) retry = setTimeout(connect, 30_000);
+          });
+          return;
+        }
         if (stopped || (AppState.currentState !== 'active' && !keepAlive.current)) return;
         attempt++;
         retry = setTimeout(connect, Math.min(30_000, 1000 * 2 ** attempt));
@@ -315,7 +357,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <Ctx.Provider value={{ me, refresh, signOut, signOutEverywhere, accounts, switchAccount, removeAccount, subscribe, setKeepAlive, waitForRealtime }}>
+    <Ctx.Provider value={{ me, refresh, enter, signOut, signOutEverywhere, accounts, switchAccount, removeAccount, subscribe, setKeepAlive, waitForRealtime }}>
       {children}
     </Ctx.Provider>
   );

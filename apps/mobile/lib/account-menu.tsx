@@ -49,7 +49,10 @@ export function useSwitchAccount() {
   const { switchAccount } = useSession();
   return useCallback(
     async (a: StoredAccount) => {
-      if (await switchAccount(a.id)) return goHome();
+      const r = await switchAccount(a.id);
+      if (r === 'ok') return goHome();
+      // Offline, or a problem on our side: the account is still here; say so rather than that it was logged out.
+      if (r === 'unavailable') return Alert.alert(t('error.network'));
       Alert.alert(t('acct.expired.title'), t('acct.expired.body', { username: a.username }), [
         { text: t('common.cancel'), style: 'cancel' },
         { text: t('auth.login.submit'), onPress: () => router.push({ pathname: '/login', params: { add: '1' } }) },

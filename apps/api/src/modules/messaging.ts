@@ -37,7 +37,7 @@ import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
 import { heldNotice } from '../lib/notices.ts';
 import { assertMessagePace, assessMessage, flagContent, isRestricted, restrictedError } from '../lib/spam.ts';
 import { requireVerified } from '../lib/verification.ts';
-import { me, requireAuth, resolveSession, sessionTokenOf } from '../plugins/auth.ts';
+import { crossOriginCookieRequest, me, requireAuth, resolveSession, sessionTokenOf } from '../plugins/auth.ts';
 import { issueTicket, readTicket } from '../lib/realtime-ticket.ts';
 import { canSeeStory, storyCards } from '../lib/stories.ts';
 import { nowStatusesFor } from '../lib/now-status.ts';
@@ -1209,6 +1209,16 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
 
   app.get('/v1/realtime', { websocket: true }, async (socket, req) => {
     const query = req.query as { token?: string; ticket?: string };
+    // A page on another origin can't open the socket with the browser's session cookie (it would hear their messages).
+    if (
+      crossOriginCookieRequest(
+        req,
+        ctx.config.WEB_ORIGIN.split(',').map((o) => o.trim().replace(/\/+$/, '')),
+      )
+    ) {
+      socket.close(4403, 'forbidden');
+      return;
+    }
     let user: { id: string } | null = await resolveSession(ctx, sessionTokenOf(req) ?? query.token);
     if (!user && query.ticket) {
       const sessionId = readTicket(ctx.config, query.ticket);

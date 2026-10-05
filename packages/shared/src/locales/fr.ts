@@ -6260,4 +6260,13 @@ export const fr: Catalog = {
   'email.deleted.subject': 'Ton compte YAPILAPI a été supprimé',
   'email.deleted.body': 'Ton compte YAPILAPI et ce que tu as partagé ont été supprimés, comme tu l’as demandé. Plus rien ne sera envoyé à cette adresse.',
   'email.deleted.notYou': 'Si tu n’as pas supprimé ton compte, réponds à cet e-mail ou contacte le support tout de suite.',
+  'st.event.login_throttled': 'Connexion suspendue après trop de mots de passe erronés',
+  'st.event.mfa_failed': 'Code de vérification en deux étapes erroné',
+  'st.event.mfa_locked': 'Connexion arrêtée après trop de codes erronés',
+  'st.event.mfa_recovery_codes_regenerated': 'Nouveaux codes de récupération créés',
+  'st.event.passkey_added': 'Clé d’accès ajoutée',
+  'st.event.passkey_removed': 'Clé d’accès supprimée',
+  'st.event.passkey_failed': 'Une connexion par clé d’accès a échoué',
+  'st.event.phone_verified': 'Numéro de téléphone confirmé',
+  'st.event.phone_removed': 'Numéro de téléphone supprimé',
 };

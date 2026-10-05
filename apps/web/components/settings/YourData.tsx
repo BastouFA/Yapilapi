@@ -21,13 +21,32 @@ const HELD: Record<string, MessageKey> = {
 export function HeldCard() {
   const { t, locale } = useSession();
   const [summary, setSummary] = useState<Record<string, number> | null>(null);
-  useEffect(() => {
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const load = () =>
     api.me.privacy().then(
-      (r) => setSummary(r.dataSummary as Record<string, number>),
-      () => {},
+      (r) => (setSummary(r.dataSummary as Record<string, number>), setLoadError(null)),
+      (e) => setLoadError(errorMessage(e)),
     );
+  useEffect(() => {
+    void load();
   }, []);
-  if (!summary) return null;
+  if (!summary)
+    return loadError ? (
+      <Anchor id="held">
+        <Card title={t('settings.held.title')}>
+          <div className="stack-sm" role="alert">
+            <p className="muted" style={{ margin: 0 }}>
+              {loadError}
+            </p>
+            <div>
+              <Button size="sm" variant="secondary" onClick={() => void load()}>
+                {t('m.common.retry')}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </Anchor>
+    ) : null;
   const n = new Intl.NumberFormat(locale);
   return (
     <Anchor id="held">
@@ -63,8 +82,11 @@ export function DownloadCard() {
               const a = document.createElement('a');
               a.href = URL.createObjectURL(blob);
               a.download = 'yapilapi-data.json';
+              document.body.append(a);
               a.click();
-              URL.revokeObjectURL(a.href);
+              a.remove();
+              // Revoked a moment later: some browsers start the download after click() returns.
+              setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
             } catch (e) {
               toast(errorMessage(e));
             } finally {

@@ -32,6 +32,20 @@ export function sessionTokenOf(req: FastifyRequest): string | undefined {
   return undefined;
 }
 
+/**
+ * A browser request signed in by the session cookie that comes from a page on another origin
+ * (its Origin header isn't one of WEB_ORIGIN). SameSite=Lax keeps the cookie off requests from
+ * other sites, but not from other origins of the same site (another port or subdomain), so the
+ * server checks as well. Requests without an Origin (the web app's own server, the phone, tools)
+ * and requests that send the token themselves (Bearer) aren't affected.
+ */
+export function crossOriginCookieRequest(req: FastifyRequest, allowedOrigins: string[]): boolean {
+  if (!req.cookies?.[SESSION_COOKIE]) return false;
+  const origin = req.headers.origin;
+  if (origin === undefined) return false;
+  return !allowedOrigins.includes(origin.replace(/\/+$/, ''));
+}
+
 /** Developer API keys look like ypl_<8 hex>_<secret>. */
 async function resolveApiKey(ctx: AppContext, key: string): Promise<AuthUser | null> {
   const { rows } = await ctx.db.query(
@@ -57,14 +71,29 @@ async function resolveApiKey(ctx: AppContext, key: string): Promise<AuthUser | n
   };
 }
 
-/** Routes an API key can never reach: account security, keys themselves, data export, deletion, money out, admin. */
+/**
+ * Routes an API key can never reach: account security, keys themselves, data export, deletion, money
+ * out, admin. Also what identifies the account or protects it (email and phone, username, date of
+ * birth, sign-in alerts, the privacy center, apps allowed in, family supervision): a key that leaks
+ * must not be able to take the account over, hide a sign-in or put someone in charge of a teen.
+ */
 const KEY_BLOCKED = [
   /^\/v1\/auth\//,
   /^\/v1\/developer\//,
   /^\/v1\/admin\//,
+  /^\/v1\/oauth\//,
+  /^\/v1\/family(\/|$)/,
   /^\/v1\/me\/export$/,
   /^\/v1\/me\/payouts/,
   /^\/v1\/me\/consents$/,
+  /^\/v1\/me\/privacy$/,
+  /^\/v1\/me\/account$/,
+  /^\/v1\/me\/verification$/,
+  /^\/v1\/me\/phone(\/|$)/,
+  /^\/v1\/me\/username$/,
+  /^\/v1\/me\/birth-date$/,
+  /^\/v1\/me\/sign-in-alerts$/,
+  /^\/v1\/me\/connected-apps/,
   /^\/v1\/ai\/memories/,
 ];
 
@@ -128,7 +157,10 @@ export async function resolveSession(ctx: AppContext, token: string | undefined)
 
 export function registerAuth(app: FastifyInstance, ctx: AppContext) {
   app.decorateRequest('user', null);
+  const origins = ctx.config.WEB_ORIGIN.split(',').map((o) => o.trim().replace(/\/+$/, ''));
   app.addHook('onRequest', async (req) => {
+    // Changes made with the session cookie must come from the web app's own pages.
+    if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS' && crossOriginCookieRequest(req, origins)) throw forbidden();
     req.user = await resolveSession(ctx, sessionTokenOf(req));
     const key = req.user?.apiKey;
     if (!key) return;

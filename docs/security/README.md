@@ -4,19 +4,19 @@
 
 | Area | Control | Where |
 | --- | --- | --- |
-| Passwords | scrypt (N=2^15, r=8, p=1), per-password salt, constant-time compare, equal timing for unknown accounts | `packages/auth` |
+| Passwords | scrypt (N=2^15, r=8, p=1), per-password salt, constant-time compare, equal timing for unknown accounts; after 10 wrong passwords in 15 minutes (from any address) an account waits; a reset or change ends every other reset link | `packages/auth`, `apps/api/src/modules/auth.ts` |
 | Two-step verification | TOTP (RFC 6238, ±30 s), secrets encrypted with AES-256-GCM, 10 hashed single-use recovery codes, 5-minute login challenges locked after 5 wrong codes, disabling requires password + code | `apps/api/src/modules/mfa.ts`, `packages/auth/src/totp.ts` |
-| API keys | Hashed, scoped read/write, revocable, never carry admin roles, blocked from auth, keys, exports, payouts, consents and AI memory | `apps/api/src/plugins/auth.ts` |
+| API keys | Hashed, scoped read/write, revocable, never carry admin roles, blocked from auth, keys, exports, payouts, consents, AI memory, OAuth consent, family supervision, the privacy center and what identifies the account (email and phone, username, date of birth, sign-in alerts) | `apps/api/src/plugins/auth.ts` |
 | Webhooks | HMAC-SHA256 signed with timestamp, https only in production, private/loopback addresses rejected at creation and on the delivery connection itself, no redirects followed | `apps/api/src/lib/webhooks.ts`, `lib/safe-fetch.ts` |
 | Outside fetches | Every URL someone gives us is fetched through `safeFetch`: https only, public addresses only, checked on the connection itself (see below) | `apps/api/src/lib/safe-fetch.ts` |
-| Sessions | 256-bit random tokens, only SHA-256 hashes stored, httpOnly + SameSite=Lax cookies (Secure in production), expiry, per-device listing and revocation, revoke-all on password reset and suspension | `apps/api/src/modules/auth.ts` |
+| Sessions | 256-bit random tokens, only SHA-256 hashes stored, httpOnly + SameSite=Lax cookies (Secure in production); changes made with the cookie must come from `WEB_ORIGIN` (another origin of the same site gets 403, and can't open the realtime socket with it), expiry, per-device listing and revocation, revoke-all on password reset and suspension | `apps/api/src/modules/auth.ts` |
 | Authorization | Every protected route uses `requireAuth` / `requireRole`; visibility enforced in shared SQL predicates; hidden content returns 404, not 403 | `plugins/auth.ts`, `lib/visibility.ts` |
 | Input | zod validation on every body, query and path parameter; parameterized SQL only | `packages/shared/src/schemas.ts` |
 | Abuse | Global and per-route rate limits (Redis-backed), stricter on auth, posting, messaging, reports, AI | `app.ts`, route configs |
 | Caller address | `X-Forwarded-For` is only believed from proxies on loopback and private networks (`TRUST_PROXY`), so a caller can't write in a different address to get fresh rate limits or hide from sign-in alerts | `config.ts`, `test/trust-proxy.test.ts` |
 | Uploads | MIME allowlist, magic-byte sniffing, 50 MB limit, random object keys | `modules/media.ts`, `lib/storage.ts` |
 | Payments | No card data stored; HMAC-verified webhooks, event replay protection, amount reconciliation, idempotent orders | `modules/commerce.ts`, `lib/payments.ts` |
-| Minors | Minimum age 13, private by default under 18, no adult→minor DMs unless friends, immediate hiding on minor-safety reports | `modules/auth.ts`, `modules/messaging.ts`, `modules/safety.ts` |
+| Minors | Minimum age 13, private by default under 18 (private accounts approve each follower), no adult→minor DMs unless friends, immediate hiding on minor-safety reports | `modules/auth.ts`, `modules/messaging.ts`, `modules/safety.ts` |
 | Audit | Moderation decisions, role and status changes, flags, consents, orders, refunds, payouts, account deletion | `audit_logs` table |
 | Security events | Sign-ups, logins, failed logins, resets, session revocations, deletions (visible to the user) | `security_events` table |
 | Logging | Authorization headers, cookies, passwords and tokens are redacted from logs | `app.ts` logger `redact` |

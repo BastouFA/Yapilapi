@@ -6214,6 +6214,15 @@ export const en = {
   'email.deleted.subject': 'Your YAPILAPI account was deleted',
   'email.deleted.body': 'Your YAPILAPI account and what you shared were deleted, as you asked. Nothing else will be sent to this address.',
   'email.deleted.notYou': 'If you didn’t delete your account, reply to this email or contact support straight away.',
+  'st.event.login_throttled': 'Sign-in paused after too many wrong passwords',
+  'st.event.mfa_failed': 'Wrong two-step code entered',
+  'st.event.mfa_locked': 'Sign-in stopped after too many wrong codes',
+  'st.event.mfa_recovery_codes_regenerated': 'New recovery codes made',
+  'st.event.passkey_added': 'Passkey added',
+  'st.event.passkey_removed': 'Passkey removed',
+  'st.event.passkey_failed': 'A passkey sign-in didn’t work',
+  'st.event.phone_verified': 'Phone number confirmed',
+  'st.event.phone_removed': 'Phone number removed',
 } as const;
 
 export type MessageKey = keyof typeof en;

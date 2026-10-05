@@ -6232,4 +6232,13 @@ export const pt: Catalog = {
   'email.deleted.subject': 'Sua conta do YAPILAPI foi excluída',
   'email.deleted.body': 'Sua conta do YAPILAPI e o que você compartilhou foram excluídos, como você pediu. Nada mais será enviado para este endereço.',
   'email.deleted.notYou': 'Se você não excluiu sua conta, responda a este e-mail ou fale com o suporte imediatamente.',
+  'st.event.login_throttled': 'Entrada pausada depois de muitas senhas erradas',
+  'st.event.mfa_failed': 'Código de verificação em duas etapas errado',
+  'st.event.mfa_locked': 'Entrada interrompida depois de muitos códigos errados',
+  'st.event.mfa_recovery_codes_regenerated': 'Novos códigos de recuperação criados',
+  'st.event.passkey_added': 'Chave de acesso adicionada',
+  'st.event.passkey_removed': 'Chave de acesso removida',
+  'st.event.passkey_failed': 'Uma entrada com chave de acesso não funcionou',
+  'st.event.phone_verified': 'Número de telefone confirmado',
+  'st.event.phone_removed': 'Número de telefone removido',
 };

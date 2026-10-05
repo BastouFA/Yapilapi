@@ -6215,4 +6215,13 @@ export const yo: Catalog = {
   'email.deleted.subject': 'A ti pa àkọọ́lẹ̀ YAPILAPI rẹ rẹ́',
   'email.deleted.body': 'A ti pa àkọọ́lẹ̀ YAPILAPI rẹ àti ohun tí o pín rẹ́, gẹ́gẹ́ bí o ṣe béèrè. A kò ní fi nǹkan mìíràn ránṣẹ́ sí àdírẹ́sì yìí mọ́.',
   'email.deleted.notYou': 'Tí kì í ṣe ìwọ ló pa àkọọ́lẹ̀ rẹ rẹ́, fèsì sí ímeèlì yìí tàbí kàn sí ìrànlọ́wọ́ lẹ́sẹ̀kẹsẹ̀.',
+  'st.event.login_throttled': 'A dá wíwọlé dúró lẹ́yìn ọ̀pọ̀ ọ̀rọ̀ aṣínà tí kò tọ́',
+  'st.event.mfa_failed': 'A tẹ kóòdù ìjẹ́rìísí ìgbésẹ̀ méjì tí kò tọ́',
+  'st.event.mfa_locked': 'A dá wíwọlé dúró lẹ́yìn ọ̀pọ̀ kóòdù tí kò tọ́',
+  'st.event.mfa_recovery_codes_regenerated': 'A ṣe àwọn kóòdù ìmúpadàbọ̀sípò tuntun',
+  'st.event.passkey_added': 'A fi kọ́kọ́rọ́ ìwọlé kún un',
+  'st.event.passkey_removed': 'A yọ kọ́kọ́rọ́ ìwọlé kúrò',
+  'st.event.passkey_failed': 'Wíwọlé pẹ̀lú kọ́kọ́rọ́ ìwọlé kò ṣiṣẹ́',
+  'st.event.phone_verified': 'A ti jẹ́rìísí nọ́mbà fóònù',
+  'st.event.phone_removed': 'A yọ nọ́mbà fóònù kúrò',
 };

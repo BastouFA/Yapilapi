@@ -1260,4 +1260,6 @@ export const fr: Record<string, string> = {
   'Number must be less than {maximum}': 'Le nombre doit être inférieur à {maximum}',
   'Number must be a multiple of {multipleOf}': 'Le nombre doit être un multiple de {multipleOf}',
   'Number must be finite': 'Le nombre doit être fini',
+  'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
+    'Trop de mots de passe erronés pour ce compte. Patiente 15 minutes ou réinitialise ton mot de passe.',
 };

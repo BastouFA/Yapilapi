@@ -6233,4 +6233,13 @@ export const sw: Catalog = {
   'email.deleted.subject': 'Akaunti yako ya YAPILAPI imefutwa',
   'email.deleted.body': 'Akaunti yako ya YAPILAPI na ulichoshiriki vimefutwa, kama ulivyoomba. Hakuna kitu kingine kitakachotumwa kwa anwani hii.',
   'email.deleted.notYou': 'Kama hukufuta akaunti yako, jibu barua pepe hii au wasiliana na msaada mara moja.',
+  'st.event.login_throttled': 'Kuingia kumesitishwa baada ya manenosiri mengi yasiyo sahihi',
+  'st.event.mfa_failed': 'Msimbo wa uthibitishaji wa hatua mbili usio sahihi uliingizwa',
+  'st.event.mfa_locked': 'Kuingia kumesimamishwa baada ya misimbo mingi isiyo sahihi',
+  'st.event.mfa_recovery_codes_regenerated': 'Misimbo mipya ya kurejesha imetengenezwa',
+  'st.event.passkey_added': 'Ufunguo wa siri umeongezwa',
+  'st.event.passkey_removed': 'Ufunguo wa siri umeondolewa',
+  'st.event.passkey_failed': 'Kuingia kwa ufunguo wa siri hakukufanikiwa',
+  'st.event.phone_verified': 'Nambari ya simu imethibitishwa',
+  'st.event.phone_removed': 'Nambari ya simu imeondolewa',
 };
