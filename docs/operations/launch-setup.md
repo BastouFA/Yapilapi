@@ -11,9 +11,16 @@ secret, and says for each service whether it is set up and answering:
 pnpm --filter @yapilapi/api launch:check
 ```
 
+On Render, run it from **yapilapi-api > Shell** instead (the image has no pnpm):
+
+```bash
+cd /app/apps/api && node --import tsx scripts/launch-check.ts
+```
+
 Locally the settings live in `.env` at the root of the project (copy `.env.example` if it doesn't
 exist). In production they are environment variables on the API service (`render.yaml` lists them;
-see `docs/operations/deploy-render.md`). Never put a key in the code or in a commit.
+`docs/operations/deploy-render.md` starts with the go live checklist). Never put a key in the code or
+in a commit. A setting left empty counts as unset.
 
 | # | Service | Needed for launch | Time | Cost |
 | --- | --- | --- | --- | --- |
@@ -23,6 +30,7 @@ see `docs/operations/deploy-render.md`). Never put a key in the code or in a com
 | 4 | Lawyer review | Yes, before a public launch | Their time | `docs/legal/review-pack.md` |
 | 5 | Apple and Google developer accounts | Yes, for the store apps | 1 to 3 days of checks | Apple yearly fee, Google one-time fee |
 | 6 | How iPhone purchases work | Yes, before App Store review | A decision | `docs/operations/in-app-purchases.md` |
+| 7 | Automatic captions (speech-to-text) | No: people can still write captions | 10 minutes | Pay per minute of audio |
 
 ## 1. Email
 
@@ -78,7 +86,7 @@ With a key they use Claude.
    person in the app, but a limit on the account is the real safety net.
 3. Create an API key (Settings > API keys). Name it after the environment, for example
    `yapilapi-production`, and use a separate key for staging.
-4. Set:
+4. Set (on Render, `AI_PROVIDER` is already `anthropic`, so pasting the key is enough):
 
    ```
    AI_PROVIDER=anthropic
@@ -137,3 +145,26 @@ drops and bookings through the app's own checkout is allowed either way.
 `docs/operations/in-app-purchases.md` explains the options, fees and risks, and the one setting to
 change for each choice. Until you choose, the iPhone app follows the safest option, which passes
 review.
+
+## 7. Automatic captions (speech-to-text)
+
+Without a provider, the video editor says automatic captions aren't set up, and people can still
+write captions or upload a .vtt file. With one, "Make captions automatically" works on videos.
+
+1. Create an API key with OpenAI (https://platform.openai.com, **API keys**) and set a monthly limit.
+   Any other service with the same `POST /audio/transcriptions` request that returns WebVTT works too,
+   including a Whisper server you run yourself.
+2. Set:
+
+   ```
+   TRANSCRIBE_PROVIDER=openai-compatible
+   TRANSCRIBE_API_URL=https://api.openai.com/v1
+   TRANSCRIBE_API_KEY=<the key>
+   TRANSCRIBE_MODEL=whisper-1
+   ```
+
+3. Check it: the launch check asks the service for its model list (nothing is transcribed or paid
+   for), then open a short video in the video editor and choose **Make captions automatically**.
+
+The audio of the video being captioned is sent to the provider; this belongs in the privacy policy
+next to the AI helpers.

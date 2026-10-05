@@ -6,6 +6,8 @@ const bool = z
   .optional()
   .transform((v) => v === 'true' || v === '1');
 
+const DEV_LIVE_HOOK_SECRET = 'dev-live-hook-secret';
+
 /** TRUST_PROXY as Fastify takes it: true/false, the addresses and ranges to trust, or (for a number) the nearest that many hops. */
 export function trustProxySetting(v: string): boolean | string[] | ((address: string, hop: number) => boolean) {
   const t = v.trim();
@@ -26,7 +28,7 @@ const schema = z.object({
   API_PORT: z.coerce.number().default(4000),
   API_HOST: z.string().default('0.0.0.0'),
   WEB_ORIGIN: z.string().default('http://localhost:3000'),
-  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  DATABASE_URL: z.string({ required_error: 'DATABASE_URL is required' }).min(1, 'DATABASE_URL is required'),
   REDIS_URL: z.string().optional().default(''),
   SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(365).default(30),
   COOKIE_SECURE: bool,
@@ -80,7 +82,7 @@ const schema = z.object({
   // Live video (MediaMTX): where viewers load HLS, and the secret MediaMTX sends to our auth hook.
   LIVE_HLS_BASE: z.string().default('http://localhost:8888'),
   LIVE_RTMP_URL: z.string().default('rtmp://localhost:1935'),
-  LIVE_HOOK_SECRET: z.string().default('dev-live-hook-secret'),
+  LIVE_HOOK_SECRET: z.string().default(DEV_LIVE_HOOK_SECRET),
   /** Signs the tokens in event tickets' QR codes (at least 32 characters in production). Development uses a fixed dev secret. */
   TICKET_TOKEN_SECRET: z.string().default(''),
   /** MediaMTX control API (e.g. http://localhost:9997). When set, ending a live disconnects the encoder. */
@@ -185,9 +187,22 @@ const resolved = schema.transform((c) => ({
 
 export type Config = z.infer<typeof resolved>;
 
+/**
+ * Values are trimmed, and an empty one counts as unset: a field left blank in a hosting dashboard (or
+ * `KEY=` in .env) falls back to its default, and a key pasted with a stray space or newline still works.
+ */
+function withoutBlanks(env: NodeJS.ProcessEnv): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(env)) {
+    const t = v?.trim();
+    if (t) out[k] = t;
+  }
+  return out;
+}
+
 /** The settings as given, with defaults, before the checks that stop the server from starting (the launch check reads these). */
 export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const parsed = resolved.safeParse(env);
+  const parsed = resolved.safeParse(withoutBlanks(env));
   if (!parsed.success) {
     const msg = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n');
     throw new Error(`Invalid configuration:\n${msg}`);
@@ -207,6 +222,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (!!cfg.MUSIC_LICENSED_API_URL !== !!cfg.MUSIC_LICENSED_API_KEY)
     throw new Error('The licensed music catalogue needs both MUSIC_LICENSED_API_URL and MUSIC_LICENSED_API_KEY.');
   if (cfg.EMAIL_TRANSPORT === 'smtp' && !cfg.SMTP_URL) throw new Error('EMAIL_TRANSPORT=smtp needs SMTP_URL.');
+  if (cfg.TRANSCRIBE_PROVIDER === 'openai-compatible' && !cfg.TRANSCRIBE_API_URL)
+    throw new Error('TRANSCRIBE_PROVIDER=openai-compatible needs TRANSCRIBE_API_URL (and TRANSCRIBE_API_KEY for a hosted service).');
+  if (!!cfg.VAPID_PUBLIC_KEY !== !!cfg.VAPID_PRIVATE_KEY) throw new Error('Browser push needs both VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY, or neither.');
   if (cfg.APP_ENV === 'production') {
     if (cfg.PAYMENTS_PROVIDER === 'dev') throw new Error('The development payment provider moves no money. Set PAYMENTS_PROVIDER for production.');
     if (Buffer.from(cfg.MFA_ENCRYPTION_KEY, 'base64').length !== 32) throw new Error('Set MFA_ENCRYPTION_KEY (32 bytes, base64) for production.');
@@ -215,6 +233,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     if (cfg.EMAIL_TRANSPORT !== 'smtp')
       throw new Error('Emails are only logged with EMAIL_TRANSPORT=log. Set EMAIL_TRANSPORT=smtp and SMTP_URL for production.');
     if (cfg.TICKET_TOKEN_SECRET.length < 32) throw new Error('Set TICKET_TOKEN_SECRET (at least 32 characters) for production: it signs event tickets.');
+    if (/yapilapi\.local/.test(cfg.EMAIL_FROM))
+      throw new Error('Set EMAIL_FROM for production to a sender on your verified email domain, e.g. "YAPILAPI <hello@yourdomain.com>".');
+    if (cfg.LIVE_HOOK_SECRET === DEV_LIVE_HOOK_SECRET || cfg.LIVE_HOOK_SECRET.length < 32)
+      throw new Error('Set LIVE_HOOK_SECRET (at least 32 random characters) for production: it signs Mini App tokens and authorizes the live server.');
+    if (
+      cfg.STORAGE_DRIVER === 's3' &&
+      (!cfg.S3_ACCESS_KEY_ID || cfg.S3_ACCESS_KEY_ID === 'dev' || !cfg.S3_SECRET_ACCESS_KEY || cfg.S3_SECRET_ACCESS_KEY === 'dev')
+    )
+      throw new Error('STORAGE_DRIVER=s3 needs S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY from your storage provider (and S3_ENDPOINT and S3_BUCKET).');
+    if (cfg.VAPID_PUBLIC_KEY && /yapilapi\.local/.test(cfg.VAPID_SUBJECT))
+      throw new Error('Set VAPID_SUBJECT for production to a contact push services can reach, e.g. mailto:support@yourdomain.com.');
   }
   return cfg;
 }
