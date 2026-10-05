@@ -27,8 +27,9 @@ import { Button, useColors, userText } from './ui';
  * The chess board (mobile). Tap one of your pieces to pick it up, then a marked square to put it
  * down; tap it again to put it back. Every square is a button whose label says what's on it and
  * what it means now ("e4, white knight, move here"). The board turns round when you play black and
- * fills the sheet's width: squares are 44 points or more where the screen allows (a 375-point phone
- * gets 44), and a little smaller on narrower phones. A pawn reaching the last rank asks what it becomes.
+ * reaches out past the sheet's padding to the screen's edges, so squares are as big as the screen
+ * allows: 46 points on a 375-point phone, 48 on a 390, and 39 on a 320 (44 needs a 356-point screen).
+ * A pawn reaching the last rank asks what it becomes.
  */
 
 /** The board's own wood colours, the same in light and dark: near-black pieces are 6:1 on the dark squares and 13:1 on the light ones. */
@@ -80,9 +81,10 @@ export function ChessBoard({
     if (node) AccessibilityInfo.setAccessibilityFocus(node);
   }, [promotion]);
 
-  // The sheet's content is its width less 16 points each side; the board may use 10 of those on each side.
+  // The sheet's content is its width less 16 points each side. The board takes the whole screen's
+  // width (less its 2-point frame each side), reaching into that padding with a negative margin.
   const content = width - space[4] * 2;
-  const size = Math.max(28, Math.min(56, Math.floor((width - 20) / 8)));
+  const size = Math.max(28, Math.min(56, Math.floor((width - 4) / 8)));
   const boardWidth = size * 8 + 4;
   const bleed = Math.min(0, (content - boardWidth) / 2);
 

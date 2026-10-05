@@ -39,6 +39,7 @@ export * from './cover.ts';
 export * from './location.ts';
 export * from './location-schemas.ts';
 export * from './report-outcome.ts';
+export * from './mini-apps.ts';
 export * from './echoes.ts';
 export * from './echo-schemas.ts';
 export * from './qr.ts';

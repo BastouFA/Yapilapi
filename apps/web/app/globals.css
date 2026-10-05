@@ -919,6 +919,9 @@ html[data-locale-pending] body {
 }
 .table-wrap {
   overflow-x: auto;
+  /* Holds what's positioned inside (a visually hidden header, a button's touch layer), so it scrolls
+     and clips with the table instead of widening the page on a phone. */
+  position: relative;
 }
 .table {
   width: 100%;
@@ -8407,9 +8410,15 @@ button.yp-chip[aria-pressed='true'] {
   font: 500 14px/20px var(--font-sans);
   cursor: pointer;
   max-width: 100%;
-  /* Clipped for the ellipsis, but not the 44px touch layer around it (components.css). */
-  overflow: clip;
-  overflow-clip-margin: 5px;
+  /* The chip itself doesn't clip, so its 44px touch layer (components.css) reaches past it in every
+     browser; its text, in .smart-replies__text, is cut off with an ellipsis instead. */
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+.smart-replies__text {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

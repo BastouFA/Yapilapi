@@ -1883,7 +1883,9 @@ export function createClient(opts: ClientOptions) {
       setUserRole: (id: string, role: 'user' | 'moderator' | 'admin') => put<{ role: string }>(`/v1/admin/users/${id}/role`, { role }),
       /** Mini Apps waiting for review. */
       miniApps: () => get<{ items: AdminMiniApp[] }>('/v1/admin/mini-apps'),
-      decideMiniApp: (id: string, approve: boolean) => post<{ id: string; status: string }>(`/v1/admin/mini-apps/${id}/decide`, { approve }),
+      /** Approve or turn down a Mini App; a reason for turning it down is shown to its developer. */
+      decideMiniApp: (id: string, approve: boolean, reason?: string) =>
+        post<{ id: string; status: string }>(`/v1/admin/mini-apps/${id}/decide`, reason ? { approve, reason } : { approve }),
       auditLogs: () => get<{ items: Record<string, any>[] }>('/v1/admin/audit-logs'),
       payouts: (status: AdminPayout['status'] = 'pending') => get<{ items: AdminPayout[] }>(`/v1/admin/payouts${qs({ status })}`),
       approvePayout: (id: string) => post<{ status: 'verified' }>(`/v1/admin/payouts/${id}/verify`),
@@ -1916,6 +1918,8 @@ export interface DeveloperMiniApp {
   permissions: MiniAppPermission[];
   surfaces: MiniAppSurface[];
   status: 'review' | 'approved' | 'rejected';
+  /** Why it was turned down, when the admin said (null otherwise). */
+  rejectionReason: string | null;
   installs: number;
   createdAt: string;
 }

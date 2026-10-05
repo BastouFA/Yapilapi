@@ -4,6 +4,7 @@ import { Pressable, RefreshControl, SectionList, Text, View } from 'react-native
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import type { NotificationItem, PublicUser } from '../../../packages/shared/src/types';
 import { appealDecidedText, reportOutcomeText } from '../../../packages/shared/src/report-outcome';
+import { miniAppNoticeText } from '../../../packages/shared/src/mini-apps';
 import { togetherNoticeText } from '../../../packages/shared/src/together';
 import { echoNoticeText } from '../../../packages/shared/src/echoes';
 import { scheduledPostFailedText } from '../../../packages/shared/src/job-failures';
@@ -167,6 +168,9 @@ function describe(g: Group, tr: Translator): string {
   // The answer to your appeal.
   const appeal = appealDecidedText(n, t);
   if (appeal) return appeal;
+  // How your Mini App's review went, with the admin's reason when there is one.
+  const mini = miniAppNoticeText(n, t);
+  if (mini) return mini;
   // A question asked without a name has no actor: it never says who.
   if (n.type === 'question_received') return n.actor ? t('ask.notif.received', { name }) : t('ask.notif.receivedHidden');
   if (n.type === 'question_answered') return t('ask.notif.answered', { name });

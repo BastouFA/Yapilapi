@@ -132,6 +132,9 @@ const TEXT: Record<string, Text> = {
   family_invite: say('push.family_invite'),
   ad_approved: say('push.ad_approved'),
   ad_rejected: say('push.ad_rejected'),
+  // A Mini App's review: the reason, when the admin gave one, is in the app, not on the lock screen.
+  mini_app_approved: say('push.mini_app_approved'),
+  mini_app_rejected: say('push.mini_app_rejected'),
   family_accepted: say('push.family_accepted'),
   family_ended: say('push.family_ended'),
   family_controls_changed: say('push.family_controls_changed'),

@@ -86,6 +86,9 @@ jobs:
       API_INTERNAL_URL: http://127.0.0.1:4000
       NEXT_PUBLIC_WS_URL: ws://127.0.0.1:4000/v1/realtime
       A11Y_BASE_URL: http://localhost:3000
+      # The audit makes one of its accounts an admin through psql (there's no API for it), so the
+      # admin console is audited too. See docs/accessibility.md.
+      A11Y_PSQL: psql postgres://postgres:postgres@localhost:5432/yapilapi_a11y
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
