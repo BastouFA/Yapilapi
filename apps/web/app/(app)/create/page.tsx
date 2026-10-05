@@ -645,7 +645,6 @@ function Create() {
                   </figure>
                   <input
                     className="yp-input"
-                    style={{ height: 32, fontSize: 12 }}
                     placeholder={t('compose.altText')}
                     aria-label={t('compose.altTextLabel', { number: i + 1 })}
                     value={m.altText}

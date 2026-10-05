@@ -1008,6 +1008,9 @@ export default function ChatPage() {
           }}
         />
       ) : null}
+      {/* Following the newest message scrolls to here, so the Yap row and suggested replies under the
+          messages are in sight too, not under the message box that stays at the bottom. */}
+      <div ref={endRef} className="chat-end" />
       <form
         className={`yp-composer${replyTo || editing ? ' yp-composer--context' : ''}`}
         onSubmit={(e) => {
