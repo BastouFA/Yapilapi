@@ -242,7 +242,8 @@ export function OfferChatCard({
       if (r.message) onAppend(r.message);
       onNote(done);
     } catch (e) {
-      onNote(e instanceof ApiError && e.status === 409 ? t('m.market.offer.changed') : errorMessage(e), true);
+      // Only an offer already answered is "changed"; a listing that sold or ended says so in the API's words.
+      onNote(e instanceof ApiError && e.code === 'offer_closed' ? t('m.market.offer.changed') : errorMessage(e), true);
     }
   }
 
@@ -258,7 +259,7 @@ export function OfferChatCard({
         accessibilityLabel={t('m.market.card.open', { title: offer.listing.title })}
         disabled={!offer.listing.available}
         onPress={() => router.push(`/market/${offer.listingId}`)}
-        style={{ minHeight: 32, justifyContent: 'center' }}
+        style={{ minHeight: 44, justifyContent: 'center' }}
       >
         <Text style={[{ color: tint, fontSize: 13, opacity: 0.9 }, userText]} numberOfLines={1}>
           {offer.listing.title}
@@ -306,7 +307,9 @@ export function OfferChatCard({
         onClose={() => setCounterOpen(false)}
         onSend={async (cents) => {
           const r = await (await client()).market.counterOffer(offer.id, cents);
-          onOffer(r.offer);
+          // `r.offer` is the new counter-offer, which has its own card in `r.message`; this card is
+          // the one answered (market.updated says so too).
+          onOffer({ ...offer, status: 'countered', canRespond: false, canWithdraw: false, respondedAt: offer.respondedAt ?? new Date().toISOString() });
           onAppend(r.message);
           onNote(t('m.market.offer.status.countered'));
         }}

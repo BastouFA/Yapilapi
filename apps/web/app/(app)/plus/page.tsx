@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Button, Card, Icon, List, ListItem, PlusBadge, Skeleton, type IconName } from '@yapilapi/design-system';
+import { Alert, Button, Card, EmptyState, Icon, List, ListItem, PlusBadge, Skeleton, type IconName } from '@yapilapi/design-system';
 import { formatMoney } from '@yapilapi/shared';
 import type { PlusInfo } from '@yapilapi/api-client';
 import { api, errorMessage } from '@/lib/api';
@@ -20,19 +20,34 @@ export default function PlusPage() {
   const checkout = useCheckout();
   const [info, setInfo] = useState<PlusInfo | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = useCallback(
-    () =>
-      api.plus.get().then(
-        (r) => setInfo(r),
-        (e) => toast(errorMessage(e)),
-      ),
-    [toast],
-  );
+  const load = useCallback(() => {
+    setLoadError(null);
+    return api.plus.get().then(
+      (r) => setInfo(r),
+      (e) => setLoadError(errorMessage(e)),
+    );
+  }, []);
   useEffect(() => {
     void load();
   }, [load]);
 
+  // Couldn't load: say why, with a way to try again (not a page that loads for ever).
+  if (!info && loadError)
+    return (
+      <div className="yp-shell__inner">
+        <EmptyState
+          level={1}
+          title={loadError}
+          action={
+            <Button variant="secondary" onClick={() => void load()}>
+              {t('m.common.retry')}
+            </Button>
+          }
+        />
+      </div>
+    );
   if (!info)
     return (
       <div className="yp-shell__inner">

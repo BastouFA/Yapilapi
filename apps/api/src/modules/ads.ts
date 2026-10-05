@@ -229,6 +229,8 @@ export default async function adsModule(app: FastifyInstance, ctx: AppContext) {
       throw badRequest(`A budget must be between ${500 * scale} and ${1_000_000 * scale} hundredths of ${c.currency.trim()}.`);
     if (c.status === 'ended' || c.status === 'rejected') throw new AppError(409, 'conflict', 'This campaign has finished.');
     const result = await tx(db, async (q) => {
+      const again = await q.query(`SELECT id FROM orders WHERE buyer_id = $1 AND idempotency_key = $2`, [u.id, input.idempotencyKey]);
+      if (again.rowCount) throw new AppError(409, 'conflict', 'This checkout was already started. Refresh and try again.');
       const { rows } = await q.query(
         `INSERT INTO orders (buyer_id, total_cents, platform_fee_cents, currency, idempotency_key, purpose, campaign_id)
          VALUES ($1,$2,$2,$3,$4,'ad_budget',$5) RETURNING id`,

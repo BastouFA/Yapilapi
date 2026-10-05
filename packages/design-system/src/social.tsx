@@ -1735,6 +1735,15 @@ export function EventCard({
   );
 }
 
+/** A product's kind in the reader's language (the API sends its code). */
+const PRODUCT_KIND_LABEL: Record<string, MessageKey> = {
+  product: 'shop.kind.product',
+  digital: 'shop.kind.digital',
+  booking: 'shop.kind.booking',
+  service: 'm.shop.service',
+  ticket: 'shop.kind.ticket',
+};
+
 export function ProductCard({
   product,
   locale = 'en',
@@ -1746,7 +1755,7 @@ export function ProductCard({
 }) {
   return (
     <div className="yp-pcard">
-      <span className="yp-pcard__kind">{product.kind}</span>
+      <span className="yp-pcard__kind">{PRODUCT_KIND_LABEL[product.kind] ? t(PRODUCT_KIND_LABEL[product.kind]!, locale) : product.kind}</span>
       <h3 className="yp-pcard__title">{product.title}</h3>
       {product.description ? <p className="yp-ccard__desc">{product.description}</p> : null}
       <span className="yp-pcard__price">{formatMoney(product.priceCents, product.currency, locale)}</span>

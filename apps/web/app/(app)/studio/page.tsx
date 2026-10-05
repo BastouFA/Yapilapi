@@ -65,7 +65,7 @@ export default function Studio() {
         <Stat label={t('m.studio.likes')} value={data.totals.likes} />
         <Stat label={t('m.studio.comments')} value={data.totals.comments} />
         <Stat label={t('m.studio.saves')} value={data.totals.saves} />
-        <Stat label={t('profile.followers')} value={data.totals.followers} delta={t('m.studio.followersDelta', { count: total })} />
+        <Stat label={t('profile.followers')} value={data.totals.followers} delta={tp('studio.followersNew', total)} />
       </div>
       <section className="stack-sm">
         <h2 className="section-title">{t('m.studio.growth')}</h2>

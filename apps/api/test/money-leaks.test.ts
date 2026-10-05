@@ -191,7 +191,10 @@ describe('currencies', () => {
   it('charges currencies without a minor unit in whole units', async () => {
     const seller = await adult();
     const buyer = await adult();
-    const odd = await product(seller, { priceCents: 1_000_050, currency: 'XOF' });
+    // Refused when it's made; one made before that rule is refused at checkout.
+    expect((await as(t.app, seller).post('/v1/products', { title: 'Odd', priceCents: 1_000_050, currency: 'XOF' })).status).toBe(400);
+    const odd = await product(seller, { priceCents: 1_000_000, currency: 'XOF' });
+    await db().query(`UPDATE products SET price_cents = 1000050 WHERE id = $1`, [odd]);
     const r = await as(t.app, buyer).post('/v1/orders', { items: [{ productId: odd, quantity: 1 }], idempotencyKey: key() });
     expect(r.status).toBe(400);
     expect(await order(buyer, [{ productId: await product(seller, { priceCents: 1_000_000, currency: 'XOF' }) }])).toBeTruthy();
