@@ -51,7 +51,8 @@ test('countering an offer leaves the offer it answers as it was', async ({ page,
   await sheet.getByRole('button', { name: 'Send counter-offer' }).click();
 
   // The new amount is a card of its own; Ben's offer still says $30 and that it was answered.
-  await expect(offers.filter({ hasText: '$35.00' })).toBeVisible();
+  // (The answered card can mention the new amount too, so look for the counter-offer's own card.)
+  await expect(offers.filter({ hasText: 'You made a counter-offer' }).filter({ hasText: '$35.00' })).toBeVisible();
   await expect(original).toContainText('Answered with another amount');
   await expect(original.getByRole('button', { name: 'Accept' })).toHaveCount(0);
 });
