@@ -14,7 +14,7 @@ pnpm --filter @yapilapi/api launch:check
 On Render, run it from **yapilapi-api > Shell** instead (the image has no pnpm):
 
 ```bash
-node --import tsx scripts/launch-check.ts
+cd /app/apps/api && node --import tsx scripts/launch-check.ts
 ```
 
 Locally the settings live in `.env` at the root of the project (copy `.env.example` if it doesn't

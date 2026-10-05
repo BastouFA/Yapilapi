@@ -200,7 +200,6 @@ function withoutBlanks(env: NodeJS.ProcessEnv): Record<string, string> {
   return out;
 }
 
-
 /** The settings as given, with defaults, before the checks that stop the server from starting (the launch check reads these). */
 export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = resolved.safeParse(withoutBlanks(env));
@@ -238,7 +237,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       throw new Error('Set EMAIL_FROM for production to a sender on your verified email domain, e.g. "YAPILAPI <hello@yourdomain.com>".');
     if (cfg.LIVE_HOOK_SECRET === DEV_LIVE_HOOK_SECRET || cfg.LIVE_HOOK_SECRET.length < 32)
       throw new Error('Set LIVE_HOOK_SECRET (at least 32 random characters) for production: it signs Mini App tokens and authorizes the live server.');
-    if (cfg.STORAGE_DRIVER === 's3' && (!cfg.S3_ACCESS_KEY_ID || cfg.S3_ACCESS_KEY_ID === 'dev' || !cfg.S3_SECRET_ACCESS_KEY || cfg.S3_SECRET_ACCESS_KEY === 'dev'))
+    if (
+      cfg.STORAGE_DRIVER === 's3' &&
+      (!cfg.S3_ACCESS_KEY_ID || cfg.S3_ACCESS_KEY_ID === 'dev' || !cfg.S3_SECRET_ACCESS_KEY || cfg.S3_SECRET_ACCESS_KEY === 'dev')
+    )
       throw new Error('STORAGE_DRIVER=s3 needs S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY from your storage provider (and S3_ENDPOINT and S3_BUCKET).');
     if (cfg.VAPID_PUBLIC_KEY && /yapilapi\.local/.test(cfg.VAPID_SUBJECT))
       throw new Error('Set VAPID_SUBJECT for production to a contact push services can reach, e.g. mailto:support@yourdomain.com.');

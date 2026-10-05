@@ -5,7 +5,7 @@
  *   pnpm --filter @yapilapi/api launch:check --offline        settings only, nothing is contacted
  *   pnpm --filter @yapilapi/api launch:check --send-email you@example.com   also sends one test email
  *
- * On Render, open the yapilapi-api service's Shell tab and run: node --import tsx scripts/launch-check.ts
+ * On Render, open the yapilapi-api service's Shell tab and run: cd /app/apps/api && node --import tsx scripts/launch-check.ts
  *
  * It reads the same settings as the server (the .env file and the environment). Secrets are never
  * printed. Live checks are read-only and cheap: the AI check asks for a one-word reply, the payment

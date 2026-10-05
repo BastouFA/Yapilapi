@@ -59,7 +59,7 @@ different ones, use those.
 7. **Run the launch check.** In Render: **yapilapi-api > Shell**, then run
 
    ```bash
-   node --import tsx scripts/launch-check.ts --send-email you@yourdomain.com
+   cd /app/apps/api && node --import tsx scripts/launch-check.ts --send-email you@yourdomain.com
    ```
 
    It tests every service with the real keys and sends you one email. Fix every `FIX` line except
@@ -70,7 +70,7 @@ different ones, use those.
    email at the end):
 
    ```bash
-   node -e 'const pg=require("pg");const c=new pg.Client(process.env.DATABASE_URL);c.connect().then(()=>c.query("UPDATE users SET role = $1 WHERE lower(email) = lower($2)",["admin",process.argv[1]])).then(r=>{console.log(r.rowCount+" account made admin");return c.end()})' you@yourdomain.com
+   cd /app/apps/api && node -e 'const pg=require("pg");const c=new pg.Client(process.env.DATABASE_URL);c.connect().then(()=>c.query("UPDATE users SET role = $1 WHERE lower(email) = lower($2)",["admin",process.argv[1]])).then(r=>{console.log(r.rowCount+" account made admin");return c.end()})' you@yourdomain.com
    ```
 
    It prints `1 account made admin`. Sign out and in again.
