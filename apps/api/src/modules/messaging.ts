@@ -34,7 +34,7 @@ import { analyzeText } from '../lib/moderation.ts';
 import { isEnabled, notify, track } from '../lib/services.ts';
 import { smartRepliesEverywhereSql, smartRepliesState } from '../lib/ai/assists.ts';
 import { ageOf, areFriends, isBlockedEitherWay, publicUserFrom, usersByIds } from '../lib/users.ts';
-import { messagesAllowed, seesSensitiveMedia, seesSensitiveSql } from '../lib/interactions.ts';
+import { messagesAllowed, READ_RECEIPTS_ON, seesSensitiveMedia, seesSensitiveSql } from '../lib/interactions.ts';
 import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
 import { heldNotice } from '../lib/notices.ts';
 import { assertMessagePace, assessMessage, flagContent, isRestricted, restrictedError } from '../lib/spam.ts';
@@ -216,9 +216,10 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
             AND m.moderation_status = 'normal' AND (m.kind <> 'system' OR (m.meta->>'type' = 'call' AND m.meta->>'outcome' = 'missed'))) AS unread,
          (SELECT array_agg(user_id) FROM conversation_members WHERE conversation_id = c.id AND left_at IS NULL) AS member_ids,
          (SELECT array_agg(user_id) FROM conversation_members WHERE conversation_id = c.id AND left_at IS NULL AND role = 'admin') AS admin_ids,
-         CASE WHEN c.kind <> 'community' THEN
+         -- Read receipts go both ways: nobody's show while yours are off, and theirs don't while theirs are.
+         CASE WHEN c.kind <> 'community' AND ${READ_RECEIPTS_ON('$1')} THEN
            (SELECT json_agg(json_build_object('userId', o.user_id, 'lastReadAt', o.last_read_at)) FROM conversation_members o
-            WHERE o.conversation_id = c.id AND o.user_id <> $1 AND o.left_at IS NULL
+            WHERE o.conversation_id = c.id AND o.user_id <> $1 AND o.left_at IS NULL AND ${READ_RECEIPTS_ON('o.user_id')}
               AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = $1 AND b.blocked_id = o.user_id) OR (b.blocker_id = o.user_id AND b.blocked_id = $1)))
          END AS read_by,
          lm.id AS lm_id, lm.body AS lm_body, lm.created_at AS lm_created_at, lm.sender_id AS lm_sender, lm.attachments AS lm_attachments, lm.story_id,
@@ -888,8 +889,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
   });
 
   /**
-   * Read up to now: the others here see "Seen" under their messages (not in community chats, and
-   * never people with a block between them).
+   * Read up to now: the others here see "Seen" under their messages (not in community chats, never
+   * people with a block between them, and not when either side has read receipts off).
    */
   async function markRead(conversationId: string, userId: string) {
     const { rows } = await db.query<{ last_read_at: Date; kind: string }>(
@@ -899,10 +900,13 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     );
     const row = rows[0];
     if (!row || row.kind === 'community') return;
+    const { rows: mine } = await db.query<{ on: boolean }>(`SELECT ${READ_RECEIPTS_ON('$1')} AS on`, [userId]);
+    if (!mine[0]?.on) return;
     const others = (await memberIds(conversationId)).filter((x) => x !== userId);
     const { rows: blocked } = await db.query<{ id: string }>(
       `SELECT CASE WHEN blocker_id = $1 THEN blocked_id ELSE blocker_id END AS id FROM blocks
-       WHERE (blocker_id = $1 AND blocked_id = ANY($2::uuid[])) OR (blocked_id = $1 AND blocker_id = ANY($2::uuid[]))`,
+       WHERE (blocker_id = $1 AND blocked_id = ANY($2::uuid[])) OR (blocked_id = $1 AND blocker_id = ANY($2::uuid[]))
+       UNION SELECT user_id FROM user_preferences WHERE user_id = ANY($2::uuid[]) AND NOT read_receipts`,
       [userId, others],
     );
     const skip = new Set(blocked.map((b) => b.id));

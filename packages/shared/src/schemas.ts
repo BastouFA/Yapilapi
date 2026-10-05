@@ -146,6 +146,7 @@ export const interactionSettingsSchema = z
       .refine((q) => q.start !== q.end, { message: 'Quiet hours need a different start and end.' })
       .nullable(),
     sensitiveMedia: z.enum(SENSITIVE_MEDIA_LEVELS),
+    readReceipts: z.boolean(),
   })
   .partial();
 

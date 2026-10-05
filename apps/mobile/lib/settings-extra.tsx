@@ -824,6 +824,12 @@ export function WhoCanReach() {
               { id: 'nobody', label: t('st.who.nobody') },
             ]}
           />
+          <SwitchRow
+            label={t('st.who.readReceipts')}
+            hint={t('st.who.readReceiptsHint')}
+            value={settings.readReceipts}
+            onValueChange={(v) => void save({ readReceipts: v })}
+          />
         </>
       ) : !error ? (
         <Loading />

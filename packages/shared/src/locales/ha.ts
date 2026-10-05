@@ -3530,6 +3530,9 @@ export const ha: Catalog = {
   'st.who.commentHint': 'Kowane rubutu kuma zai iya taƙaita sharhi lokacin da ka raba shi.',
   'st.who.mention': 'Wanda zai iya ambatonka',
   'st.who.mentionHint': 'Ambaton wasu zai ci gaba da bayyana, amma ba za a sanar da kai ba.',
+  'st.who.readReceipts': 'Sanarwar karantawa',
+  'st.who.readReceiptsHint':
+    'Idan ka kashe wannan, mutane ba za su ga lokacin da ka karanta saƙonninsu ba, kai ma ba za ka ga lokacin da suka karanta naka ba.',
   'st.who.everyone': 'Kowa',
   'st.who.following': 'Mutanen da kake bi',
   'st.who.followers': 'Mabiyanka',

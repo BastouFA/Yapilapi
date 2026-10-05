@@ -88,12 +88,15 @@ export async function seesSensitiveMedia(db: Q, viewer: string | null | undefine
   return !!rows[0]?.ok;
 }
 
+/** SQL that's true when this person shows read receipts (on unless they turned them off). */
+export const READ_RECEIPTS_ON = (user: string) => `coalesce((SELECT rr.read_receipts FROM user_preferences rr WHERE rr.user_id = ${user}), true)`;
+
 export async function interactionSettings(db: Q, user: string): Promise<InteractionSettings> {
   const { rows } = await db.query(
     `SELECT coalesce(up.messages_from, 'everyone') AS messages_from, coalesce(up.comments_from, 'everyone') AS comments_from,
             coalesce(up.mentions_from, 'everyone') AS mentions_from, to_char(up.quiet_start, 'HH24:MI') AS quiet_start,
             to_char(up.quiet_end, 'HH24:MI') AS quiet_end, coalesce(up.quiet_timezone, 'UTC') AS quiet_timezone,
-            coalesce(up.sensitive_media, 'standard') AS sensitive_media,
+            coalesce(up.sensitive_media, 'standard') AS sensitive_media, coalesce(up.read_receipts, true) AS read_receipts,
             NOT coalesce(u.birth_date <= current_date - interval '18 years', false) AS minor
      FROM users u LEFT JOIN user_preferences up ON up.user_id = u.id WHERE u.id = $1`,
     [user],
@@ -106,5 +109,6 @@ export async function interactionSettings(db: Q, user: string): Promise<Interact
     quietHours: r.quiet_start && r.quiet_end ? { start: r.quiet_start, end: r.quiet_end, timezone: r.quiet_timezone } : null,
     sensitiveMedia: r.minor ? 'less' : (r.sensitive_media ?? 'standard'),
     sensitiveLocked: !!r.minor,
+    readReceipts: r.read_receipts ?? true,
   };
 }

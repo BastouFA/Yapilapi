@@ -97,6 +97,7 @@ export default async function notificationsModule(app: FastifyInstance, ctx: App
     if (input.commentsFrom) set('comments_from', input.commentsFrom);
     if (input.mentionsFrom) set('mentions_from', input.mentionsFrom);
     if (input.sensitiveMedia) set('sensitive_media', input.sensitiveMedia);
+    if (input.readReceipts !== undefined) set('read_receipts', input.readReceipts);
     if (input.quietHours !== undefined) {
       set('quiet_start', input.quietHours?.start ?? null);
       set('quiet_end', input.quietHours?.end ?? null);

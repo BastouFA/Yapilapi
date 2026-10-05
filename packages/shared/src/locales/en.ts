@@ -3525,6 +3525,8 @@ export const en = {
   'st.who.commentHint': 'Each post can also limit comments when you share it.',
   'st.who.mention': 'Who can mention you',
   'st.who.mentionHint': 'Mentions from others still show, but you won’t be notified.',
+  'st.who.readReceipts': 'Read receipts',
+  'st.who.readReceiptsHint': 'When this is off, people don’t see when you’ve read their messages, and you don’t see when they’ve read yours.',
   'st.who.everyone': 'Everyone',
   'st.who.following': 'People you follow',
   'st.who.followers': 'Your followers',

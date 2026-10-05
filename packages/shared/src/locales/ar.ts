@@ -3503,6 +3503,8 @@ export const ar: Catalog = {
   'st.who.commentHint': 'يمكن أيضًا تقييد التعليقات على كل منشور عند مشاركته.',
   'st.who.mention': 'من يمكنه الإشارة إليك',
   'st.who.mentionHint': 'تظل إشارات الآخرين ظاهرة، لكن لن تصلك إشعارات بها.',
+  'st.who.readReceipts': 'إشعارات القراءة',
+  'st.who.readReceiptsHint': 'عند إيقافها، لا يرى الآخرون متى قرأت رسائلهم، ولا ترى أنت متى قرأوا رسائلك.',
   'st.who.everyone': 'الجميع',
   'st.who.following': 'الأشخاص الذين تتابعهم',
   'st.who.followers': 'متابعوك',

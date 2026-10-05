@@ -106,6 +106,12 @@ export function ReachCard() {
               { id: 'nobody', label: label('st.who.nobody') },
             ]}
           />
+          <div>
+            <Switch label={t('st.who.readReceipts')} checked={settings.readReceipts} onChange={(v) => void save({ readReceipts: v })} />
+            <p className="muted setting-hint" style={{ margin: '6px 0 0' }}>
+              {t('st.who.readReceiptsHint')}
+            </p>
+          </div>
           {tags ? (
             <ChoiceGroup
               legend={t('settings.tags.who')}

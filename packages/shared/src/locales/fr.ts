@@ -3546,6 +3546,8 @@ export const fr: Catalog = {
   'st.who.commentHint': 'Chaque publication peut aussi limiter les commentaires quand tu la partages.',
   'st.who.mention': 'Qui peut te mentionner',
   'st.who.mentionHint': 'Les mentions des autres restent visibles, mais tu n’es pas averti.',
+  'st.who.readReceipts': 'Confirmations de lecture',
+  'st.who.readReceiptsHint': 'Désactivées, les autres ne voient pas quand tu as lu leurs messages, et tu ne vois pas quand ils ont lu les tiens.',
   'st.who.everyone': 'Tout le monde',
   'st.who.following': 'Les personnes que tu suis',
   'st.who.followers': 'Tes abonnés',

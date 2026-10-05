@@ -3520,6 +3520,8 @@ export const yo: Catalog = {
   'st.who.commentHint': 'Ìfìwéránṣẹ́ kọ̀ọ̀kan tún lè ṣe ààlà ọ̀rọ̀ nígbà tí o bá pín in.',
   'st.who.mention': 'Ẹni tó lè dárúkọ rẹ',
   'st.who.mentionHint': 'Ìdárúkọ láti ọ̀dọ̀ àwọn mìíràn ṣì ń hàn, ṣùgbọ́n a kò ní sọ fún ọ.',
+  'st.who.readReceipts': 'Ìfihàn pé a ti kà á',
+  'st.who.readReceiptsHint': 'Tí o bá pa èyí, àwọn ènìyàn kò ní rí ìgbà tí o ka ìfiránṣẹ́ wọn, ìwọ náà kò ní rí ìgbà tí wọ́n ka tìrẹ.',
   'st.who.everyone': 'Gbogbo ènìyàn',
   'st.who.following': 'Àwọn tí o ń tẹ̀lé',
   'st.who.followers': 'Àwọn olùtẹ̀lé rẹ',

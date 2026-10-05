@@ -3529,6 +3529,8 @@ export const sw: Catalog = {
   'st.who.commentHint': 'Kila chapisho linaweza pia kuzuia maoni unapolishiriki.',
   'st.who.mention': 'Nani anaweza kukutaja',
   'st.who.mentionHint': 'Kutajwa na wengine bado kunaonekana, lakini hutaarifiwa.',
+  'st.who.readReceipts': 'Taarifa za kusomwa',
+  'st.who.readReceiptsHint': 'Ukizima hii, watu hawaoni ulipozisoma jumbe zao, na wewe huoni walipozisoma zako.',
   'st.who.everyone': 'Kila mtu',
   'st.who.following': 'Watu unaowafuata',
   'st.who.followers': 'Wafuasi wako',

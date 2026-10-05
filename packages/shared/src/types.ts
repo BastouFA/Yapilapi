@@ -82,6 +82,8 @@ export interface InteractionSettings {
   /** "HH:MM" in `timezone`; null when quiet hours are off. */
   quietHours: { start: string; end: string; timezone: string } | null;
   sensitiveMedia: 'standard' | 'less';
+  /** Off: others don't see when you've read their messages, and you don't see when they've read yours. */
+  readReceipts: boolean;
   /** Under 18: sensitive media is never shown, whatever the setting. */
   sensitiveLocked: boolean;
 }

@@ -141,6 +141,28 @@ describe('read receipts', () => {
     expect(adaLive.of('conversation.read')).toHaveLength(0);
     expect((await as(t.app, ada).get(`/v1/conversations/${c}`)).body.conversation.readBy).toEqual([]);
   });
+
+  it('can be turned off, and then go neither way', async () => {
+    const [ada, bo] = [await adult(), await adult()];
+    await befriend(ada, bo);
+    const c = (await as(t.app, ada).post('/v1/conversations', { memberIds: [bo.id] })).body.conversation.id;
+    await as(t.app, ada).post(`/v1/conversations/${c}/messages`, { body: 'hi', clientId: 'r2' });
+    expect((await as(t.app, bo).get('/v1/me/interactions')).body.settings.readReceipts).toBe(true);
+    expect((await as(t.app, bo).put('/v1/me/interactions', { readReceipts: false })).body.settings.readReceipts).toBe(false);
+
+    // Bo's reads aren't shown to Ada, live or later.
+    const adaLive = connect(ada);
+    await as(t.app, bo).post(`/v1/conversations/${c}/read`);
+    expect(adaLive.of('conversation.read')).toHaveLength(0);
+    expect((await as(t.app, ada).get(`/v1/conversations/${c}`)).body.conversation.readBy).toEqual([]);
+    // And Bo doesn't see Ada's.
+    await as(t.app, ada).post(`/v1/conversations/${c}/read`);
+    expect((await as(t.app, bo).get(`/v1/conversations/${c}`)).body.conversation.readBy).toEqual([]);
+
+    await as(t.app, bo).put('/v1/me/interactions', { readReceipts: true });
+    expect((await as(t.app, ada).get(`/v1/conversations/${c}`)).body.conversation.readBy).toHaveLength(1);
+    expect((await as(t.app, bo).get(`/v1/conversations/${c}`)).body.conversation.readBy).toHaveLength(1);
+  });
 });
 
 describe('reactions', () => {
