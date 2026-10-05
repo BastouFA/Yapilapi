@@ -192,7 +192,13 @@ export default function ChapterScreen() {
               {contributors.map((m) => (
                 <View key={m.user.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
                   <Avatar name={m.user.displayName} url={m.user.avatarUrl} size={36} />
-                  <Pressable style={{ flex: 1 }} accessibilityRole="link" onPress={() => router.push(`/u/${m.user.username}`)}>
+                  {/* As tall as the row (the 36pt avatar); the touch area reaches 44. */}
+                  <Pressable
+                    style={{ flex: 1, alignSelf: 'stretch', justifyContent: 'center' }}
+                    hitSlop={{ top: 4, bottom: 4 }}
+                    accessibilityRole="link"
+                    onPress={() => router.push(`/u/${m.user.username}`)}
+                  >
                     <Text style={[{ color: c.ink, fontWeight: '700' }, userText]}>{m.user.displayName}</Text>
                     {m.status === 'invited' ? <Text style={{ color: c.inkMuted, fontSize: 13 }}>{t('m.chapters.pending')}</Text> : null}
                   </Pressable>

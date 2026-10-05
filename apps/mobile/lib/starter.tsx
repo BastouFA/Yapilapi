@@ -84,12 +84,15 @@ export function StarterRow() {
           <Text accessibilityRole="header" style={{ color: c.ink, fontSize: 15, fontWeight: '700' }}>
             {t('starter.tags')}
           </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+          {/* Wrapped lines 10pt apart, so the tags' touch areas (44 tall) don't overlap. */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space[2], rowGap: 10 }}>
             {tags.map((tg) => (
               <Pressable
                 key={tg.tag}
                 accessibilityRole="link"
                 onPress={() => router.push(`/t/${encodeURIComponent(tg.tag)}`)}
+                // 34pt tall; the touch area reaches 44 (and a short tag's, 44 wide).
+                hitSlop={{ top: 5, bottom: 5, left: 4, right: 4 }}
                 style={[s.tag, { borderColor: c.lineStrong, backgroundColor: c.surface }]}
               >
                 <Text style={[{ color: c.ink, fontWeight: '600' }, userText]}>#{tg.tag}</Text>

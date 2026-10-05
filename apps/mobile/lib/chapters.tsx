@@ -139,7 +139,8 @@ export function ChaptersRow({
           {t('m.chapters.title')}
         </Text>
         {isSelf ? (
-          <Pressable accessibilityRole="button" hitSlop={8} onPress={() => router.push('/archive')}>
+          // A line of text: the touch area reaches 44 tall, less downwards, where the chapters start 8pt under the heading.
+          <Pressable accessibilityRole="button" hitSlop={{ top: 16, bottom: 8, left: 8, right: 8 }} onPress={() => router.push('/archive')}>
             <Text style={{ color: c.yapi, fontWeight: '700' }}>{t('m.archive.title')}</Text>
           </Pressable>
         ) : null}
@@ -298,6 +299,8 @@ function Player({ detail, start, onClose }: { detail: ChapterDetail; start: numb
                   setDone(false);
                   setI(0);
                 }}
+                // 40pt tall; the touch area reaches 44.
+                hitSlop={2}
                 style={st.pill}
               >
                 <Icon name="refresh" size={18} color={WHITE} />
@@ -311,6 +314,8 @@ function Player({ detail, start, onClose }: { detail: ChapterDetail; start: numb
                   onClose();
                   router.push(`/chapter/${chapter.id}`);
                 }}
+                // 40pt tall; the touch area reaches 44.
+                hitSlop={2}
                 style={st.pill}
               >
                 <Icon name="book-outline" size={18} color={WHITE} />
@@ -397,14 +402,15 @@ function Player({ detail, start, onClose }: { detail: ChapterDetail; start: numb
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={paused ? t('m.common.play') : t('m.common.pause')}
-              hitSlop={8}
+              // 40pt buttons 8pt apart: 4pt more each way reaches 48 without overlapping.
+              hitSlop={4}
               onPress={() => setPaused((p) => !p)}
               style={st.icon}
             >
               <Icon name={paused ? 'play' : 'pause'} size={20} color={WHITE} />
             </Pressable>
           ) : null}
-          <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} hitSlop={8} onPress={onClose} style={st.icon}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} hitSlop={4} onPress={onClose} style={st.icon}>
             <Icon name="close" size={24} color={WHITE} />
           </Pressable>
         </View>

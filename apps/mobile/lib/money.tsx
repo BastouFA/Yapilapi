@@ -10,7 +10,7 @@ import { useFlag } from './flags';
 import { useT } from './i18n';
 import { ManagedOnWeb, useDigitalPurchases } from './store';
 import { radius, space } from './theme';
-import { Button, Card, EmptyState, Icon, Loading, useColors, userText } from './ui';
+import { Button, Card, EmptyState, Icon, Loading, slop, useColors, userText } from './ui';
 
 /**
  * Payments happen on the web app: the phone app has no checkout and never sees card details.
@@ -329,7 +329,8 @@ export function TipButton({ post }: { post: Post }) {
       accessibilityRole="button"
       accessibilityLabel={t('m.money.tipPost', { name: post.author.displayName })}
       accessibilityHint={t('m.shop.onWeb')}
-      hitSlop={8}
+      // A 20pt icon in the post's actions, 16pt after Share: the touch area reaches 44 wide, more towards the empty end.
+      hitSlop={slop({ top: 8, bottom: 16, start: 4, end: 20 })}
       onPress={() => void openOnWeb(webCheckout.tip(post.author.username, post.id))}
       style={({ pressed }) => ({ minHeight: 32, justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
     >

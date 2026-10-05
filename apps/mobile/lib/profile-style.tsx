@@ -198,8 +198,8 @@ export function ProfileSongChip({ song, tint }: { song: PostMusic; tint: Tint })
           accessibilityRole="link"
           accessibilityLabel={`${t('ps.song.title')}: ${t('music.open', { title: song.title })}`}
           onPress={() => openMusic(song)}
-          // 32pt tall inside the chip; the touch area still reaches 44pt.
-          hitSlop={6}
+          // 32pt tall inside the chip; the touch area still reaches 44pt (not to the sides: the play button's reaches up to it).
+          hitSlop={{ top: 6, bottom: 6 }}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, minHeight: 32 }}
         >
           <Icon name={playing && !reduce ? 'musical-notes' : 'musical-note'} size={14} color={tint.accentStrong} />

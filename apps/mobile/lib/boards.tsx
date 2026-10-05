@@ -308,7 +308,8 @@ export function SaveTile({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={note ? `${t('m.saved.editNote')}: ${note}` : t('m.saved.addNote')}
-          hitSlop={4}
+          // 24pt for one line: the touch area reaches 44, up to the name above and into the 16pt before the next row.
+          hitSlop={{ top: 6, bottom: 14, left: 4, right: 4 }}
           onPress={onEditNote}
           style={{ flexDirection: 'row', gap: 4, alignItems: 'flex-start', minHeight: 24 }}
         >
@@ -431,7 +432,8 @@ function SavedSnack({ onAdd, onClose }: { onAdd: () => void; onClose: () => void
           accessibilityRole="button"
           accessibilityLabel={t('m.saved.addToBoard')}
           onPress={onAdd}
-          hitSlop={4}
+          // 36pt tall; the touch area reaches 44 (not to the sides, where the close button's reaches).
+          hitSlop={{ top: 4, bottom: 4 }}
           style={({ pressed }) => ({
             paddingHorizontal: space[3],
             height: 36,

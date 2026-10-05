@@ -116,7 +116,14 @@ export default function Archive() {
             {note ? <Notice>{note}</Notice> : null}
             {error ? <ErrorState message={error} onRetry={() => Promise.all([loadMonths(), load()])} /> : null}
             {months.length ? (
-              <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space[2] }}>
+              // 4pt of room above and below the months (taken back by the margin), so their touch areas aren't cut off at the row's edges.
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ marginVertical: -4 }}
+                contentContainerStyle={{ gap: space[2], paddingVertical: 4 }}
+              >
                 {months.map((m) => {
                   const on = m.month === month;
                   return (
@@ -125,6 +132,8 @@ export default function Archive() {
                       accessibilityRole="button"
                       accessibilityState={{ selected: on }}
                       onPress={() => setMonth(m.month)}
+                      // 36pt tall; the touch area reaches 44.
+                      hitSlop={{ top: 4, bottom: 4 }}
                       style={{
                         paddingHorizontal: space[3],
                         height: 36,

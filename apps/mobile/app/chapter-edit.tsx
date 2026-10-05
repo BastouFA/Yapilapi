@@ -103,6 +103,8 @@ export default function ChapterEdit() {
       accessibilityState={{ selected: on }}
       accessibilityLabel={label}
       onPress={onPress}
+      // 36pt tall, 8pt apart: the touch area reaches 44 without overlapping the next line's.
+      hitSlop={4}
       style={{
         flexDirection: 'row',
         alignItems: 'center',

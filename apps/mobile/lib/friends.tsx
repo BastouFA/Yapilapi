@@ -134,6 +134,8 @@ export function FriendsFinder({ onChecked }: { onChecked?: (r: { checked: number
                     <Pressable
                       accessibilityRole="link"
                       onPress={() => router.push(`/u/${f.user.username}`)}
+                      // As tall as the 40pt avatar; the touch area reaches 44.
+                      hitSlop={{ top: 2, bottom: 2 }}
                       style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: space[3] }}
                     >
                       <Avatar name={f.user.displayName} url={f.user.avatarUrl} size={40} />

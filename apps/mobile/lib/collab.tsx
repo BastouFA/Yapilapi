@@ -120,7 +120,8 @@ export function CoauthorPicker({ value, onChange }: { value: PublicUser[]; onCha
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t('m.collab.removeInvite', { name: u.displayName })}
-                hitSlop={8}
+                // A 16pt cross in a 34pt chip: 14pt more each way reaches 44 and stays clear of the chips around it.
+                hitSlop={14}
                 onPress={() => onChange(value.filter((x) => x.id !== u.id))}
               >
                 <Icon name="close" size={16} color={c.inkMuted} />
@@ -256,7 +257,8 @@ export function PhotoTagger({ uri, value, onChange }: { uri: string; value: Draf
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={t('m.tags.remove', { name: tag.user.displayName })}
-                    hitSlop={8}
+                    // A 14pt cross: the touch area reaches 44.
+                    hitSlop={15}
                     onPress={() => onChange(value.filter((x) => x.user.id !== tag.user.id))}
                   >
                     <Icon name="close" size={14} color="#FFFFFF" />

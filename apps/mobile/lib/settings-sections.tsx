@@ -191,6 +191,8 @@ export function HiddenWords() {
                   accessibilityLabel={t('hiddenWords.remove', { word: w })}
                   disabled={busy}
                   onPress={() => void save(words.filter((x) => x !== w))}
+                  // 36pt tall, 8pt apart: the touch area reaches 44 without overlapping the next line's.
+                  hitSlop={4}
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',

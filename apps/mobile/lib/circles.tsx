@@ -36,6 +36,8 @@ export function Chips<T extends string>({
             accessibilityLabel={o.label}
             accessibilityState={{ selected: on, checked: on }}
             onPress={() => onChange(on && clearable ? null : o.id)}
+            // 36pt tall, 8pt apart: the touch area reaches 44 without overlapping the next line's.
+            hitSlop={4}
             style={({ pressed }) => ({
               flexDirection: 'row',
               alignItems: 'center',

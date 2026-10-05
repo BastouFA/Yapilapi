@@ -206,7 +206,8 @@ export function DateTimeSheet({ visible, title, value, min, max, mode = 'datetim
               <View
                 accessibilityRole="radiogroup"
                 accessibilityLabel={t('m.picker.shortcuts')}
-                style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}
+                // Wrapped lines 10pt apart, so the chips' touch areas (44 tall) don't overlap.
+                style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space[2], rowGap: 10 }}
               >
                 {chips.map((p) => {
                   const on = mode === 'date' ? sameDay(p.at, draft) : Math.abs(p.at.getTime() - draft.getTime()) < 60_000;
@@ -217,6 +218,8 @@ export function DateTimeSheet({ visible, title, value, min, max, mode = 'datetim
                       accessibilityState={{ selected: on }}
                       accessibilityLabel={`${p.label}, ${whenText(normalize(p.at), tr, mode, now, cal.hour12)}`}
                       onPress={() => choose(p.at)}
+                      // 34pt tall; the touch area reaches 44.
+                      hitSlop={{ top: 5, bottom: 5 }}
                       style={{
                         height: 34,
                         paddingHorizontal: space[3],
@@ -274,6 +277,8 @@ export function DateTimeSheet({ visible, title, value, min, max, mode = 'datetim
                         setView({ year: y, month });
                         setYears(false);
                       }}
+                      // 40pt tall; the touch area reaches 44.
+                      hitSlop={{ top: 2, bottom: 2 }}
                       style={{
                         width: 72,
                         height: 40,
@@ -352,7 +357,8 @@ function ArrowButton({ icon, label, disabled, onPress }: { icon: 'chevron-back' 
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      hitSlop={4}
+      // Already 44 wide: not to the sides, where the month's button starts.
+      hitSlop={{ top: 4, bottom: 4 }}
       style={({ pressed }) => ({
         width: 44,
         height: 44,
@@ -502,6 +508,8 @@ function TimeSteppers({
                   accessibilityState={{ selected: on, disabled: !ok }}
                   disabled={!ok}
                   onPress={() => period(isPm)}
+                  // 36pt tall; the touch area reaches 44.
+                  hitSlop={{ top: 4, bottom: 4 }}
                   style={{
                     minWidth: 48,
                     height: 36,

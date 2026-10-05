@@ -143,7 +143,13 @@ function DropsStrip({
           {title}
         </Text>
         {action ? (
-          <Pressable accessibilityRole="button" hitSlop={10} onPress={action.onPress} style={{ minHeight: 44, justifyContent: 'center' }}>
+          // Not further down than the 8pt above the drops.
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={{ top: 10, bottom: 8, left: 10, right: 10 }}
+            onPress={action.onPress}
+            style={{ minHeight: 44, justifyContent: 'center' }}
+          >
             <Text style={{ color: c.yapi, fontWeight: '700' }}>{action.label}</Text>
           </Pressable>
         ) : null}

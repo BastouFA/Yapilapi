@@ -268,7 +268,8 @@ export default function BoardScreen() {
             <Text style={{ color: c.inkMuted, fontSize: 13, flexShrink: 1 }}>{visibilityLine}</Text>
           </View>
           {!owner ? (
-            <Pressable accessibilityRole="link" hitSlop={6} onPress={() => router.push(`/u/${board.owner.username}`)}>
+            // A line of small text: the touch area reaches 44 tall.
+            <Pressable accessibilityRole="link" hitSlop={14} onPress={() => router.push(`/u/${board.owner.username}`)}>
               <Text style={[{ color: c.yapi, fontSize: 13, fontWeight: '700' }, userText]} numberOfLines={1}>
                 {t('m.boards.by', { name: board.owner.displayName })}
               </Text>
@@ -284,6 +285,8 @@ export default function BoardScreen() {
           accessibilityState={{ expanded: people }}
           accessibilityLabel={`${t('m.boards.people')}: ${tp('m.boards.collaborators', accepted.length)}`}
           onPress={() => setPeople((v) => !v)}
+          // 36pt tall; the touch area reaches 44.
+          hitSlop={4}
           style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], alignSelf: 'flex-start', minHeight: 36 }}
         >
           <View style={{ flexDirection: 'row' }}>
@@ -600,6 +603,8 @@ function ArrangeRow({
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
+      // 40pt circles 12pt apart; the touch area reaches 44.
+      hitSlop={2}
       style={({ pressed }) => ({
         width: 40,
         height: 40,
