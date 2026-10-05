@@ -125,7 +125,9 @@ export default async function oauthModule(app: FastifyInstance, ctx: AppContext)
       return tx(db, async (c) => {
         // Rotation: each refresh token works once; the old grant is revoked.
         const { rows } = await c.query(
-          `UPDATE oauth_grants SET revoked_at = now() WHERE refresh_hash = $1 AND app_id = $2 AND revoked_at IS NULL AND refresh_expires_at > now() RETURNING app_id, user_id, scopes`,
+          `UPDATE oauth_grants g SET revoked_at = now() FROM developer_apps a
+           WHERE g.refresh_hash = $1 AND g.app_id = $2 AND g.revoked_at IS NULL AND g.refresh_expires_at > now() AND a.id = g.app_id AND a.deleted_at IS NULL
+           RETURNING g.app_id, g.user_id, g.scopes`,
           [hashToken(p.data.refresh_token), p.data.client_id],
         );
         if (!rows[0]) return fail('invalid_grant', 'The refresh token is invalid or was already used.');
@@ -139,7 +141,7 @@ export default async function oauthModule(app: FastifyInstance, ctx: AppContext)
     const { rows } = await db.query(
       `SELECT a.id, a.name, a.website, array_agg(DISTINCT s) AS scopes, max(g.created_at) AS connected_at, max(g.last_used_at) AS last_used_at
        FROM oauth_grants g JOIN developer_apps a ON a.id = g.app_id, unnest(g.scopes) s
-       WHERE g.user_id = $1 AND g.revoked_at IS NULL AND g.refresh_expires_at > now() GROUP BY a.id ORDER BY max(g.created_at) DESC`,
+       WHERE g.user_id = $1 AND g.revoked_at IS NULL AND g.refresh_expires_at > now() AND a.deleted_at IS NULL GROUP BY a.id ORDER BY max(g.created_at) DESC`,
       [me(req).id],
     );
     return { items: rows };

@@ -259,7 +259,6 @@ export const fr: Record<string, string> = {
   'Taken.': 'Déjà pris.',
   "That invite code doesn't work. Check it, or leave it empty.": 'Ce code d’invitation ne fonctionne pas. Vérifie-le ou laisse le champ vide.',
   "That invite code doesn't work.": 'Ce code d’invitation ne fonctionne pas.',
-  'This account is suspended. You can appeal from the email we sent you.': 'Ce compte est suspendu. Tu peux contester depuis l’e-mail que nous t’avons envoyé.',
   'You need to be at least 13 to use YAPILAPI, so this account is now closed.':
     'Il faut avoir au moins 13 ans pour utiliser YAPILAPI, ce compte est donc maintenant fermé.',
   'That’s your username now.': 'C’est déjà ton nom d’utilisateur.',
@@ -1283,4 +1282,14 @@ export const fr: Record<string, string> = {
   'Up to 14 lines of opening hours.': 'Jusqu’à 14 lignes d’horaires.',
   'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
     'Trop de mots de passe erronés pour ce compte. Patiente 15 minutes ou réinitialise ton mot de passe.',
+  // apps/api/src/lib/suspension.ts, apps/api/src/modules/safety.ts (trust and safety sweep)
+  'This account is suspended. If you think we got this wrong, you can appeal.':
+    'Ce compte est suspendu. Si tu penses que nous nous sommes trompés, tu peux faire appel.',
+  'This account is suspended. Your appeal is waiting for a different moderator.': 'Ce compte est suspendu. Ton appel attend un autre modérateur.',
+  'This account is suspended.': 'Ce compte est suspendu.',
+  'This link to appeal has expired. Sign in again to appeal.': 'Ce lien pour faire appel a expiré. Reconnecte-toi pour faire appel.',
+  "That decision doesn't apply to this kind of report.": 'Cette décision ne s’applique pas à ce type de signalement.',
+  "You can't change your own role.": 'Tu ne peux pas changer ton propre rôle.',
+  // apps/api/src/modules/developer.ts (trust and safety sweep)
+  'Use a web address that starts with https://.': 'Utilise une adresse web qui commence par https://.',
 };

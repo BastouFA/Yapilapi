@@ -722,11 +722,13 @@ export const reportSchema = z.object({
 });
 
 export const moderationDecisionSchema = z.object({
-  decision: z.enum(['no_action', 'restrict', 'remove', 'suspend_user', 'approve_ad', 'reject_ad']),
+  decision: z.enum(['no_action', 'warn', 'restrict', 'remove', 'suspend_user', 'approve_ad', 'reject_ad']),
   note: z.string().max(2000).optional(),
 });
 
 export const appealSchema = z.object({ caseId: uuid, statement: trimmed(2000) });
+/** Appealing a suspension from the sign-in page: the token signing in gave, instead of a session. */
+export const suspensionAppealSchema = z.object({ token: z.string().min(20).max(200), statement: trimmed(2000) });
 
 export const createMomentSchema = z.object({
   body: z.string().trim().max(500).default(''),

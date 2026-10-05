@@ -255,7 +255,6 @@ export const sw: Record<string, string> = {
   'Taken.': 'Limeshachukuliwa.',
   "That invite code doesn't work. Check it, or leave it empty.": 'Msimbo huo wa mwaliko haufanyi kazi. Uangalie, au uache wazi.',
   "That invite code doesn't work.": 'Msimbo huo wa mwaliko haufanyi kazi.',
-  'This account is suspended. You can appeal from the email we sent you.': 'Akaunti hii imesimamishwa. Unaweza kukata rufaa kupitia barua pepe tuliyokutumia.',
   'You need to be at least 13 to use YAPILAPI, so this account is now closed.':
     'Unahitaji kuwa na umri wa angalau miaka 13 kutumia YAPILAPI, kwa hivyo akaunti hii sasa imefungwa.',
   'That’s your username now.': 'Hilo ndilo jina lako la mtumiaji sasa.',
@@ -1265,4 +1264,13 @@ export const sw: Record<string, string> = {
   'Up to 14 lines of opening hours.': 'Hadi mistari 14 ya saa za kufungua.',
   'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
     'Nenosiri lisilo sahihi limejaribiwa mara nyingi kwa akaunti hii. Subiri dakika 15, au weka upya nenosiri lako.',
+  // apps/api/src/lib/suspension.ts, apps/api/src/modules/safety.ts (trust and safety sweep)
+  'This account is suspended. If you think we got this wrong, you can appeal.': 'Akaunti hii imesimamishwa. Ikiwa unadhani tumekosea, unaweza kukata rufaa.',
+  'This account is suspended. Your appeal is waiting for a different moderator.': 'Akaunti hii imesimamishwa. Rufaa yako inasubiri msimamizi mwingine.',
+  'This account is suspended.': 'Akaunti hii imesimamishwa.',
+  'This link to appeal has expired. Sign in again to appeal.': 'Kiungo hiki cha kukata rufaa kimeisha muda. Ingia tena ili ukate rufaa.',
+  "That decision doesn't apply to this kind of report.": 'Uamuzi huo hauhusiki na aina hii ya ripoti.',
+  "You can't change your own role.": 'Huwezi kubadilisha jukumu lako mwenyewe.',
+  // apps/api/src/modules/developer.ts (trust and safety sweep)
+  'Use a web address that starts with https://.': 'Tumia anwani ya wavuti inayoanza na https://.',
 };

@@ -95,6 +95,11 @@ export async function register(input: RegisterInput): Promise<Me> {
   return r.user;
 }
 
+/** Appeal a suspension with the one-time token a suspended account's sign-in gave (no session needed). */
+export async function appealSuspension(token: string, statement: string) {
+  await authClient().auth.appealSuspension(token, statement);
+}
+
 /** Ask for a password reset email. The answer is the same whether or not the email has an account. */
 export async function forgotPassword(email: string) {
   await authClient().auth.forgot(email);

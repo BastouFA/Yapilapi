@@ -17,6 +17,7 @@ import {
   LegalLinks,
   LinkRow,
   LogoutEverywhere,
+  ModerationDecisions,
   MutedAccounts,
   PasskeysOnWeb,
   PrivateAccount,
@@ -107,6 +108,7 @@ function Content({ section }: { section: SectionId }): ReactNode {
       return (
         <>
           <Family />
+          <ModerationDecisions />
           <RestrictedAccounts />
           <SensitiveContent />
         </>

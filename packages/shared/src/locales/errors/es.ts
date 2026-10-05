@@ -257,7 +257,6 @@ export const es: Record<string, string> = {
   'Taken.': 'En uso.',
   "That invite code doesn't work. Check it, or leave it empty.": 'Ese código de invitación no funciona. Revísalo o déjalo vacío.',
   "That invite code doesn't work.": 'Ese código de invitación no funciona.',
-  'This account is suspended. You can appeal from the email we sent you.': 'Esta cuenta está suspendida. Puedes apelar desde el correo que te enviamos.',
   'You need to be at least 13 to use YAPILAPI, so this account is now closed.':
     'Necesitas tener al menos 13 años para usar YAPILAPI, así que esta cuenta se ha cerrado.',
   'That’s your username now.': 'Ese ya es tu nombre de usuario.',
@@ -1263,4 +1262,13 @@ export const es: Record<string, string> = {
   'Up to 14 lines of opening hours.': 'Hasta 14 líneas de horario.',
   'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
     'Demasiadas contraseñas incorrectas para esta cuenta. Espera 15 minutos o restablece tu contraseña.',
+  // apps/api/src/lib/suspension.ts, apps/api/src/modules/safety.ts (trust and safety sweep)
+  'This account is suspended. If you think we got this wrong, you can appeal.': 'Esta cuenta está suspendida. Si crees que nos equivocamos, puedes apelar.',
+  'This account is suspended. Your appeal is waiting for a different moderator.': 'Esta cuenta está suspendida. Tu apelación está esperando a otro moderador.',
+  'This account is suspended.': 'Esta cuenta está suspendida.',
+  'This link to appeal has expired. Sign in again to appeal.': 'Este enlace para apelar caducó. Vuelve a iniciar sesión para apelar.',
+  "That decision doesn't apply to this kind of report.": 'Esa decisión no se aplica a este tipo de denuncia.',
+  "You can't change your own role.": 'No puedes cambiar tu propio rol.',
+  // apps/api/src/modules/developer.ts (trust and safety sweep)
+  'Use a web address that starts with https://.': 'Usa una dirección web que empiece por https://.',
 };

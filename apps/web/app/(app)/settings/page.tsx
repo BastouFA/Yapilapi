@@ -131,6 +131,10 @@ export default function SettingsHome() {
                   />
                   <SettingsLink href="/invite" icon="users" title={t('invite.title')} desc={t('plus.inviteHint')} />
                   <SettingsLink href="/developers" icon="link" title={t('settings.dev.title')} desc={t('settings.dev.subtitle')} external />
+                  {/* The moderation console, for the people who work in it (the server checks the role on every call). */}
+                  {me?.role === 'admin' || me?.role === 'moderator' ? (
+                    <SettingsLink href="/admin" icon="shield" title={t('m.role.admin')} desc={t('admin.settingsDesc')} />
+                  ) : null}
                 </>
               ) : null}
             </div>

@@ -137,7 +137,7 @@ export function campaignName(c: { name: string; nameCode?: string | null; namePa
   return excerpt ? t('ads.boostName', { excerpt }) : t('ads.boostNameEmpty');
 }
 
-export type ModerationDecision = 'no_action' | 'restrict' | 'remove' | 'suspend_user';
+export type ModerationDecision = 'no_action' | 'warn' | 'restrict' | 'remove' | 'suspend_user';
 export type AppealStatus = 'open' | 'upheld' | 'overturned';
 
 /** What a decision was about, as a short label ("Post", "Your account"). */
@@ -162,6 +162,7 @@ export const MODERATION_TARGET_KEYS: Record<(typeof REPORT_TARGETS)[number], Mes
 
 export const MODERATION_DECISION_KEYS: Record<ModerationDecision, MessageKey> = {
   no_action: 'moderation.decision.noAction',
+  warn: 'moderation.decision.warn',
   restrict: 'moderation.decision.restrict',
   remove: 'moderation.decision.remove',
   suspend_user: 'moderation.decision.suspendUser',

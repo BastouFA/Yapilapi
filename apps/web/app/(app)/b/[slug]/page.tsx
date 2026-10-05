@@ -8,11 +8,13 @@ import { api, errorMessage, isGone } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { BuyButton } from '@/components/BuyButton';
 import { BusinessInsights } from '@/components/BusinessInsights';
+import { MiniAppsSheet } from '@/components/MiniApps';
 import { useSession } from '../../../providers';
 
 export default function BusinessPage() {
   const { slug } = useParams<{ slug: string }>();
-  const { locale, me, t } = useSession();
+  const { locale, me, t, flags } = useSession();
+  const [appsOpen, setAppsOpen] = useState(false);
   const [data, setData] = useState<Awaited<ReturnType<typeof api.businesses.get>> | null>(null);
   const [missing, setMissing] = useState(false);
   // Why it couldn't load, when that isn't because it's gone.
@@ -52,6 +54,17 @@ export default function BusinessPage() {
           ) : null}
         </span>
       </div>
+      {/* Mini Apps on a business page: its owner adds them; anyone signed in can open them. */}
+      {me && flags.MINI_APPS ? (
+        <div className="row">
+          <Button size="sm" variant="secondary" icon="create" onClick={() => setAppsOpen(true)}>
+            {t('chat.apps')}
+          </Button>
+        </div>
+      ) : null}
+      {me ? (
+        <MiniAppsSheet open={appsOpen} onClose={() => setAppsOpen(false)} surface="business" surfaceId={business.id} canManage={me.id === business.owner.id} />
+      ) : null}
       {me?.id === business.owner.id ? <BusinessInsights businessId={business.id} /> : null}
       {places.length ? (
         <List label={t('bizPage.locations')}>

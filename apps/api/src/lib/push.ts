@@ -144,6 +144,9 @@ const TEXT: Record<string, Text> = {
   account_review: say('push.account_review'),
   // What happened is in the app, in the reader's language; the push only says there's an answer.
   report_outcome: say('push.report_outcome'),
+  // A decision about your own things, and the answer to an appeal: what it was is in the app, never on the lock screen.
+  enforcement: say('push.enforcement'),
+  appeal_decided: say('push.appeal_decided'),
   chapter_invite: say('push.chapter_invite'),
   // Posts added to a shared board are batched in the inbox and never pushed.
   board_invite: say('push.board_invite'),

@@ -30,3 +30,25 @@ export function reportOutcomeText(n: { type: string; data: Record<string, unknow
   const thing = target === 'post' || target === 'comment' || target === 'message' ? target : target === 'user' && outcome !== 'removed' ? 'account' : 'other';
   return t(`report.outcome.${outcome}.${thing}` as MessageKey);
 }
+
+/** "Your appeal was reviewed and the decision was reversed": the notification after an appeal is decided, or null for other kinds. */
+export function appealDecidedText(n: { type: string; data: Record<string, unknown> }, t: Tr): string | null {
+  if (n.type !== 'appeal_decided') return null;
+  return t(n.data.outcome === 'overturned' ? 'moderation.appeal.overturned' : 'moderation.appeal.upheld');
+}
+
+/** The decisions a moderator makes about something reported (ad reviews are separate: approve or reject). */
+export const MODERATION_DECISIONS = ['no_action', 'warn', 'restrict', 'remove', 'suspend_user'] as const;
+export type ModerationDecisionCode = (typeof MODERATION_DECISIONS)[number];
+
+/** Things that have a limited state, seen only by their author (a photo or video is covered instead). */
+const RESTRICTABLE = new Set(['post', 'comment', 'question', 'answer', 'mix', 'listing', 'market_rating', 'story', 'media']);
+
+/**
+ * What a moderator can decide about this kind of thing. An account is warned or suspended, never
+ * "removed"; only things with a limited state can be limited. Suspending is for admins (the API checks).
+ */
+export function decisionsFor(targetType: string): ModerationDecisionCode[] {
+  if (targetType === 'user') return ['no_action', 'warn', 'suspend_user'];
+  return MODERATION_DECISIONS.filter((d) => d !== 'restrict' || RESTRICTABLE.has(targetType));
+}

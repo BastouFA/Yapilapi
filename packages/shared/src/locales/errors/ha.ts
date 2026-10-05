@@ -255,8 +255,6 @@ export const ha: Record<string, string> = {
   'Taken.': 'An riga an ɗauka.',
   "That invite code doesn't work. Check it, or leave it empty.": 'Wannan lambar gayyata ba ta aiki. Duba ta, ko ku bar wurin babu komai.',
   "That invite code doesn't work.": 'Wannan lambar gayyata ba ta aiki.',
-  'This account is suspended. You can appeal from the email we sent you.':
-    'An dakatar da wannan asusun. Za ku iya ɗaukaka ƙara daga imel ɗin da muka aiko muku.',
   'You need to be at least 13 to use YAPILAPI, so this account is now closed.':
     'Dole shekarunku su kai aƙalla 13 kafin ku yi amfani da YAPILAPI, don haka an rufe wannan asusun yanzu.',
   'That’s your username now.': 'Wannan ne sunan mai amfani ɗinku yanzu.',
@@ -1268,4 +1266,14 @@ export const ha: Record<string, string> = {
   'Up to 14 lines of opening hours.': 'Har layi 14 na lokutan buɗewa.',
   'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
     'Kalmar sirri mara daidai ta yi yawa a wannan asusun. Ku jira minti 15, ko ku sake saita kalmar sirrinku.',
+  // apps/api/src/lib/suspension.ts, apps/api/src/modules/safety.ts (trust and safety sweep)
+  'This account is suspended. If you think we got this wrong, you can appeal.':
+    'An dakatar da wannan asusun. Idan kana ganin mun yi kuskure, za ka iya ɗaukaka ƙara.',
+  'This account is suspended. Your appeal is waiting for a different moderator.': 'An dakatar da wannan asusun. Ƙararka tana jiran wani mai sa ido daban.',
+  'This account is suspended.': 'An dakatar da wannan asusun.',
+  'This link to appeal has expired. Sign in again to appeal.': 'Wannan hanyar ɗaukaka ƙara ta ƙare. Sake shiga don ɗaukaka ƙara.',
+  "That decision doesn't apply to this kind of report.": 'Wannan hukuncin bai shafi irin wannan rahoton ba.',
+  "You can't change your own role.": 'Ba za ka iya canza matsayinka da kanka ba.',
+  // apps/api/src/modules/developer.ts (trust and safety sweep)
+  'Use a web address that starts with https://.': 'Yi amfani da adireshin yanar gizo da ya fara da https://.',
 };

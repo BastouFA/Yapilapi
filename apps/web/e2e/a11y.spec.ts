@@ -782,6 +782,51 @@ test.describe('open sheets, menus and states', () => {
       await noSidewaysScroll(page, name);
     });
 
+  /**
+   * The developer platform: an app with a key and a webhook, its delete confirmation, and the Sign in
+   * with YAPILAPI consent screen that app opens. Each project makes its own app.
+   */
+  test('developers: an app, and its consent screen', async ({ page }, info) => {
+    await narrow(page, info.project.name);
+    const made = await page.request.post('/api/v1/developer/apps', { data: { name: `Lists ${info.project.name}`, website: 'https://lists.example' } });
+    expect(made.ok(), await made.text()).toBe(true);
+    const { app } = await made.json();
+    await page.request.put(`/api/v1/developer/apps/${app.id}/redirect-uris`, { data: { redirectUris: ['https://lists.example/cb'] } });
+    await page.request.post(`/api/v1/developer/apps/${app.id}/keys`, { data: { name: 'Reader', scopes: ['read'] } });
+    await open(page, '/developers');
+    await page.getByRole('button', { name: `Lists ${info.project.name}` }).click();
+    await expect(page.getByText(`client_id = ${app.id}`)).toBeVisible();
+    await audit(page, 'developers - an app', info.project.name);
+    await noSidewaysScroll(page, 'developers: an app');
+    await page.getByRole('button', { name: 'Delete app' }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await audit(page, 'developers - delete an app', info.project.name);
+    await page.keyboard.press('Escape');
+    const query = new URLSearchParams({
+      response_type: 'code',
+      client_id: app.id,
+      redirect_uri: 'https://lists.example/cb',
+      scope: 'read write',
+      code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+      code_challenge_method: 'S256',
+    });
+    await page.goto(`/oauth/authorize?${query}`);
+    await expect(page.getByRole('button', { name: 'Allow' })).toBeVisible();
+    await audit(page, 'oauth consent', info.project.name);
+    await noSidewaysScroll(page, 'oauth consent');
+    await page.request.delete(`/api/v1/developer/apps/${app.id}`);
+  });
+
+  test('report sheet on an event', async ({ page }, info) => {
+    await narrow(page, info.project.name);
+    // Ben's class: someone else's event, so it has Report (communities and events are reported from their page).
+    await open(page, `/events/${data().ticketEventId}`);
+    await page.getByRole('button', { name: 'Report', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Send report' })).toBeVisible();
+    await audit(page, 'event - report sheet', info.project.name);
+    await noSidewaysScroll(page, 'event: report sheet');
+  });
+
   test('room: before joining', async ({ page }, info) => {
     const id = await liveRoom(info.project.use.baseURL!);
     await open(page, `/rooms/${id}`);

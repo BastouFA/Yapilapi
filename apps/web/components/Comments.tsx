@@ -20,6 +20,7 @@ import { NextLink } from '@/lib/link';
 import { AutocompleteText } from '@/components/Autocomplete';
 import { useSession } from '@/app/providers';
 import { signInHref, useSignIn } from './SignedOut';
+import { ReportSheet } from './ReportSheet';
 
 const POLICY_LABEL: Record<CommentPolicy, MessageKey> = {
   everyone: 'comments.policy.everyone',
@@ -89,6 +90,7 @@ export function Comments({ post, onCountChange, moment }: { post: Post; onCountC
   const [pointAt, setPointAt] = useState(false);
   const momentMs = post.format === 'reel' && moment && moment.atMs !== null ? moment.atMs : null;
   const [editing, setEditing] = useState<{ id: string; body: string; busy: boolean } | null>(null);
+  const [reporting, setReporting] = useState<string | null>(null);
   const [likers, setLikers] = useState<{ comment: Comment; items: PublicUser[] | null } | null>(null);
   const [hidden, setHidden] = useState<Comment[] | null>(null);
   const [showHidden, setShowHidden] = useState(false);
@@ -478,6 +480,11 @@ export function Comments({ post, onCountChange, moment }: { post: Post; onCountC
                 {t('m.common.delete')}
               </button>
             ) : null}
+            {me && !own ? (
+              <button type="button" className="comment__action" aria-label={t('m.report.commentBy', { name })} onClick={() => setReporting(c.id)}>
+                {t('post.report')}
+              </button>
+            ) : null}
             {c.likedByAuthor ? (
               <span className="comment__author-like">
                 <Icon name="heart" size={12} />
@@ -590,6 +597,7 @@ export function Comments({ post, onCountChange, moment }: { post: Post; onCountC
         </section>
       ) : null}
 
+      <ReportSheet target={reporting ? { type: 'comment', id: reporting } : null} onClose={() => setReporting(null)} />
       {likers ? (
         <section className="stack-sm comments__likers" aria-labelledby="comment-likers-title">
           <div className="row" style={{ justifyContent: 'space-between' }}>

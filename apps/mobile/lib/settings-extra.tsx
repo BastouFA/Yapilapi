@@ -9,6 +9,7 @@ import { usernameProblem } from '../../../packages/shared/src/usernames';
 import { SUPPORTED_LOCALES } from '../../../packages/shared/src/i18n';
 import { languageName } from '../../../packages/shared/src/translation';
 import { LEGAL_DOCS } from '../../../packages/shared/src/legal';
+import { appealStatusText, moderationCaseText } from '../../../packages/shared/src/server-text';
 import { checkNewUsername, client, errorMessage, webUrl } from './api';
 import { AppearanceSegments, goHome } from './account-menu';
 import { useAppearance } from './appearance';
@@ -739,6 +740,96 @@ export function ConnectedApps() {
 }
 
 // ── Privacy and safety ──────────────────────────────────────────────────
+
+type ModerationItem = Awaited<ReturnType<Awaited<ReturnType<typeof client>>['me']['moderation']>>['items'][number];
+
+/**
+ * Decisions our team made about your things, and appeals (the same list as the web's Settings >
+ * Safety). Each decision can be appealed once; a different moderator reviews it, and the outcome
+ * shows here.
+ */
+export function ModerationDecisions() {
+  const c = useColors();
+  const { t, timeAgo } = useT();
+  const [items, setItems] = useState<ModerationItem[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [appealFor, setAppealFor] = useState<string | null>(null);
+  const [statement, setStatement] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const load = useCallback(() => {
+    void client()
+      .then((api) => api.me.moderation())
+      .then(
+        (r) => (setItems(r.items), setError(null)),
+        (e) => setError(errorMessage(e)),
+      );
+  }, []);
+  useEffect(load, [load]);
+  return (
+    <Card style={{ gap: space[3] }}>
+      <Title>{t('settings.moderation.title')}</Title>
+      {items === null && error ? <ErrorState message={error} onRetry={load} /> : null}
+      {items === null ? (
+        error ? null : (
+          <Loading />
+        )
+      ) : items.length ? (
+        items.map((m) => (
+          <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: c.ink, fontSize: 15, fontWeight: '600' }}>{moderationCaseText(m, t)}</Text>
+              <Text style={{ color: c.inkMuted, fontSize: 13 }}>
+                {[
+                  m.decided_at ? timeAgo(m.decided_at) : null,
+                  m.appeal_status ? appealStatusText(m.appeal_status, t) : m.status === 'decided' ? t('settings.appeal.can') : t('settings.appeal.final'),
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </Text>
+            </View>
+            {m.status === 'decided' && !m.appeal_status ? (
+              <Button
+                label={t('settings.appeal')}
+                size="sm"
+                variant="secondary"
+                onPress={() => {
+                  setStatement('');
+                  setSendError(null);
+                  setAppealFor(m.id);
+                }}
+              />
+            ) : null}
+          </View>
+        ))
+      ) : (
+        <Text style={{ color: c.inkMuted }}>{t('settings.moderation.none')}</Text>
+      )}
+      <BottomSheet visible={!!appealFor} title={t('settings.appeal.title')} onClose={() => setAppealFor(null)}>
+        {sendError ? <Notice tone="danger">{sendError}</Notice> : null}
+        <Field label={t('settings.appeal.why')} value={statement} onChangeText={setStatement} multiline maxLength={2000} />
+        <Button
+          label={t('settings.appeal.send')}
+          disabled={!statement.trim() || sending}
+          onPress={async () => {
+            setSending(true);
+            setSendError(null);
+            try {
+              await (await client()).raw.post('/v1/appeals', { caseId: appealFor, statement: statement.trim() });
+              setAppealFor(null);
+              AccessibilityInfo.announceForAccessibility(t('settings.appeal.sent'));
+              load();
+            } catch (e) {
+              setSendError(errorMessage(e));
+            } finally {
+              setSending(false);
+            }
+          }}
+        />
+      </BottomSheet>
+    </Card>
+  );
+}
 
 /** Private account: only approved followers see your posts. */
 export function PrivateAccount() {
