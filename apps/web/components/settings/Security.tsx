@@ -244,6 +244,7 @@ export function TwoStepCard() {
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [disabling, setDisabling] = useState(false);
+  const [renewing, setRenewing] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const load = () =>
@@ -337,10 +338,52 @@ export function TwoStepCard() {
               </div>
             </form>
           ) : null}
-          {status.enabled && !disabling ? (
-            <Button variant="secondary" onClick={() => setDisabling(true)}>
-              {t('settings.twoStep.turnOff')}
-            </Button>
+          {status.enabled && !disabling && !renewing ? (
+            <div className="row">
+              <Button variant="secondary" onClick={() => (setRenewing(true), setCode(''), setErr(null))}>
+                {t('settings.twoStep.newCodes')}
+              </Button>
+              <Button variant="secondary" onClick={() => (setDisabling(true), setCode(''), setErr(null))}>
+                {t('settings.twoStep.turnOff')}
+              </Button>
+            </div>
+          ) : null}
+          {renewing ? (
+            <form
+              className="stack-sm"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setErr(null);
+                try {
+                  setCodes((await api.mfa.newRecoveryCodes(code)).recoveryCodes);
+                  setRenewing(false);
+                  setCode('');
+                  await load();
+                } catch (e2) {
+                  setErr(errorMessage(e2));
+                }
+              }}
+            >
+              <p className="muted" style={{ margin: 0 }}>
+                {t('settings.twoStep.newCodesHint')}
+              </p>
+              <TextField
+                label={t('settings.twoStep.code')}
+                value={code}
+                onChange={(e) => setCode(e.currentTarget.value.replace(/\D/g, ''))}
+                autoComplete="one-time-code"
+                inputMode="numeric"
+                maxLength={6}
+              />
+              <div className="row">
+                <Button type="submit" disabled={code.length !== 6}>
+                  {t('settings.twoStep.makeCodes')}
+                </Button>
+                <Button variant="ghost" onClick={() => setRenewing(false)}>
+                  {t('common.cancel')}
+                </Button>
+              </div>
+            </form>
           ) : null}
           {disabling ? (
             <form

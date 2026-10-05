@@ -471,6 +471,7 @@ export function TwoStep() {
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [disabling, setDisabling] = useState(false);
+  const [renewing, setRenewing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(() => {
     void client()
@@ -550,7 +551,41 @@ export function TwoStep() {
           </View>
         </View>
       ) : null}
-      {status.enabled && !disabling ? <Button label={t('settings.twoStep.turnOff')} variant="secondary" onPress={() => setDisabling(true)} /> : null}
+      {status.enabled && !disabling && !renewing ? (
+        <>
+          <Button label={t('settings.twoStep.newCodes')} variant="secondary" onPress={() => (setRenewing(true), setCode(''), setError(null))} />
+          <Button label={t('settings.twoStep.turnOff')} variant="secondary" onPress={() => (setDisabling(true), setCode(''), setError(null))} />
+        </>
+      ) : null}
+      {renewing ? (
+        <View style={{ gap: space[3] }}>
+          <Text style={{ color: c.ink, lineHeight: 20 }}>{t('settings.twoStep.newCodesHint')}</Text>
+          <Field
+            label={t('settings.twoStep.code')}
+            value={code}
+            onChangeText={(v) => setCode(v.replace(/\D/g, ''))}
+            keyboardType="number-pad"
+            autoComplete="one-time-code"
+            textContentType="oneTimeCode"
+            maxLength={6}
+          />
+          <View style={{ flexDirection: 'row', gap: space[2], flexWrap: 'wrap' }}>
+            <Button
+              label={t('settings.twoStep.makeCodes')}
+              disabled={code.length !== 6}
+              onPress={() =>
+                run(async () => {
+                  setCodes((await (await client()).mfa.newRecoveryCodes(code)).recoveryCodes);
+                  setRenewing(false);
+                  setCode('');
+                  load();
+                })
+              }
+            />
+            <Button label={t('common.cancel')} variant="ghost" onPress={() => setRenewing(false)} />
+          </View>
+        </View>
+      ) : null}
       {disabling ? (
         <View style={{ gap: space[3] }}>
           <PasswordField

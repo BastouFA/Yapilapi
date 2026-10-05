@@ -60,6 +60,17 @@ describe('two-step verification', () => {
     expect((await as(t.app, null).post('/v1/auth/mfa/verify', { challengeToken: c2.body.challengeToken, code: recovery[0] })).status).toBe(400);
   });
 
+  it('new recovery codes need a current code and replace the old ones', async () => {
+    expect((await as(t.app, u).post('/v1/auth/mfa/recovery-codes', { code: '000000' })).status).toBe(400);
+    const fresh = (await as(t.app, u).post('/v1/auth/mfa/recovery-codes', { code: totp(secret) })).body.recoveryCodes as string[];
+    expect(fresh).toHaveLength(10);
+    expect((await as(t.app, u).get('/v1/auth/mfa')).body.recoveryCodesLeft).toBe(10);
+    const old = await login(u.email, u.password);
+    expect((await as(t.app, null).post('/v1/auth/mfa/verify', { challengeToken: old.body.challengeToken, code: recovery[1] })).status).toBe(400);
+    const next = await login(u.email, u.password);
+    expect((await as(t.app, null).post('/v1/auth/mfa/verify', { challengeToken: next.body.challengeToken, code: fresh[0] })).status).toBe(200);
+  });
+
   it('locks a challenge after too many wrong codes', async () => {
     const c = await login(u.email, u.password);
     for (let i = 0; i < 5; i++) await as(t.app, null).post('/v1/auth/mfa/verify', { challengeToken: c.body.challengeToken, code: '000000' });
