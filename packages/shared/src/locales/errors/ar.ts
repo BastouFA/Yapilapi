@@ -4,7 +4,7 @@ export const ar: Record<string, string> = {
   'The request body is not valid JSON.': 'نص الطلب ليس بصيغة JSON صالحة.',
   'Media not found.': 'الوسائط غير موجودة.',
   'Something went wrong on our side. Try again.': 'حدث خطأ من جهتنا. حاول مرة أخرى.',
-  'Too many requests. Try again in {ttl} seconds.': 'طلبات كثيرة جدًا. حاول مرة أخرى بعد {ttl} ثانية.',
+  'Too many requests. Try again in {ttl} seconds.': 'طلبات كثيرة جدًا. حاول مرة أخرى بعد قليل (بالثواني: {ttl}).',
   'No route for {method} {url}.': 'لا يوجد مسار لـ {method} {url}.',
   // apps/api/src/config.ts
   'DATABASE_URL is required': 'DATABASE_URL مطلوب',
@@ -79,7 +79,7 @@ export const ar: Record<string, string> = {
   "Music can't be checked right now. Try again in a moment.": 'تعذر التحقق من الموسيقى الآن. حاول مرة أخرى بعد لحظات.',
   "This song isn't cleared for business accounts. Choose another one.": 'هذه الأغنية غير مرخّصة لحسابات الأعمال. اختر أغنية أخرى.',
   "This song isn't available in your country. Choose another one.": 'هذه الأغنية غير متاحة في بلدك. اختر أغنية أخرى.',
-  'This song can play for up to {maxClipSeconds} seconds.': 'يمكن تشغيل هذه الأغنية لمدة {maxClipSeconds} ثانية كحد أقصى.',
+  'This song can play for up to {maxClipSeconds} seconds.': 'أقصى مدة لتشغيل هذه الأغنية بالثواني: {maxClipSeconds}.',
   "That song doesn't exist or isn't visible to you.": 'هذه الأغنية غير موجودة أو لا يمكنك رؤيتها.',
   // apps/api/src/lib/publishing.ts
   'Attach photos and videos uploaded here by their id.': 'أرفق الصور والفيديوهات المرفوعة هنا باستخدام معرّفها.',
@@ -154,9 +154,9 @@ export const ar: Record<string, string> = {
   "That sound doesn't exist or isn't visible to you.": 'هذا الصوت غير موجود أو لا يمكنك رؤيته.',
   // apps/api/src/lib/spam.ts
   'New accounts can share up to {newAccountPostsPerHour} posts an hour. You can post again a little later.':
-    'يمكن للحسابات الجديدة مشاركة {newAccountPostsPerHour} منشورات في الساعة كحد أقصى. يمكنك النشر مرة أخرى بعد قليل.',
+    'يمكن للحسابات الجديدة مشاركة {newAccountPostsPerHour} من المنشورات في الساعة كحد أقصى. يمكنك النشر مرة أخرى بعد قليل.',
   'New accounts can send up to {newAccountMessagesPerHour} messages an hour. You can send more a little later.':
-    'يمكن للحسابات الجديدة إرسال {newAccountMessagesPerHour} رسائل في الساعة كحد أقصى. يمكنك إرسال المزيد بعد قليل.',
+    'يمكن للحسابات الجديدة إرسال {newAccountMessagesPerHour} من الرسائل في الساعة كحد أقصى. يمكنك إرسال المزيد بعد قليل.',
   // apps/api/src/lib/store-purchases.ts
   "This can't be bought in the phone app. You can manage it on the web.": 'لا يمكن شراء هذا من تطبيق الهاتف. يمكنك إدارته على الويب.',
   // apps/api/src/lib/stories.ts
@@ -192,12 +192,12 @@ export const ar: Record<string, string> = {
   'Sponsored posts is not enabled.': 'المنشورات المموّلة غير مفعّلة.',
   "Campaign doesn't exist or isn't visible to you.": 'الحملة غير موجودة أو لا يمكنك رؤيتها.',
   'The price of 1,000 impressions must be between {value} and {value2} hundredths of {currency}.':
-    'يجب أن يكون سعر 1,000 ظهور بين {value} و{value2} جزءًا من مئة من {currency}.',
+    'يجب أن يكون سعر 1,000 ظهور بأجزاء المئة من {currency} بين {value} و{value2}.',
   'You can only promote your own posts.': 'يمكنك الترويج لمنشوراتك فقط.',
   'Only public posts can be promoted.': 'يمكن الترويج للمنشورات العامة فقط.',
   'You can only run ads for your own business.': 'يمكنك عرض إعلانات لنشاطك التجاري فقط.',
   'The promoted post is no longer public.': 'لم يعد المنشور المروَّج عامًا.',
-  'A budget must be between {value} and {value2} hundredths of {currency}.': 'يجب أن تكون الميزانية بين {value} و{value2} جزءًا من مئة من {currency}.',
+  'A budget must be between {value} and {value2} hundredths of {currency}.': 'يجب أن تكون الميزانية بأجزاء المئة من {currency} بين {value} و{value2}.',
   "Ad doesn't exist or isn't visible to you.": 'الإعلان غير موجود أو لا يمكنك رؤيته.',
   // apps/api/src/modules/ai.ts
   'Translation is turned off right now.': 'الترجمة متوقفة الآن.',
@@ -219,7 +219,7 @@ export const ar: Record<string, string> = {
   'This person only gets questions with the asker’s name. Turn off “Ask without your name shown” to ask.':
     'لا يتلقى هذا الشخص إلا أسئلة يظهر فيها اسم السائل. أوقف «اسأل دون إظهار اسمك» لتسأل.',
   'You can ask up to {perAskerPerHour} questions an hour. You can ask more a little later.':
-    'يمكنك طرح {perAskerPerHour} أسئلة في الساعة كحد أقصى. يمكنك طرح المزيد بعد قليل.',
+    'يمكنك طرح {perAskerPerHour} من الأسئلة في الساعة كحد أقصى. يمكنك طرح المزيد بعد قليل.',
   'You’ve asked this person several questions today. Give them time to answer, or ask again tomorrow.':
     'طرحت على هذا الشخص عدة أسئلة اليوم. امنحه وقتًا للإجابة، أو اسأل مرة أخرى غدًا.',
   'This question box is getting a lot of questions right now. Try again later.': 'يتلقى صندوق الأسئلة هذا أسئلة كثيرة الآن. حاول مرة أخرى لاحقًا.',
@@ -371,8 +371,8 @@ export const ar: Record<string, string> = {
   'You can offer a draw again after your next move.': 'يمكنك عرض التعادل مرة أخرى بعد نقلتك التالية.',
   'Choose one person to play Four up with.': 'اختر شخصًا واحدًا للعب «أربعة في صف» معه.',
   'Choose one person to play Word ladder with.': 'اختر شخصًا واحدًا للعب «سلّم الكلمات» معه.',
-  'Choose 1 to {max} people to play Four up with.': 'اختر من 1 إلى {max} أشخاص للعب «أربعة في صف» معهم.',
-  'Choose 1 to {max} people to play Word ladder with.': 'اختر من 1 إلى {max} أشخاص للعب «سلّم الكلمات» معهم.',
+  'Choose 1 to {max} people to play Four up with.': 'اختر من 1 إلى {max} من الأشخاص للعب «أربعة في صف» معهم.',
+  'Choose 1 to {max} people to play Word ladder with.': 'اختر من 1 إلى {max} من الأشخاص للعب «سلّم الكلمات» معهم.',
   // apps/api/src/modules/chat-later.ts
   "This message wasn't scheduled because it may put someone at risk.": 'لم تُجدوَل هذه الرسالة لأنها قد تعرّض شخصًا ما للخطر.',
   'You can only reply to a message in this chat.': 'يمكنك الرد فقط على رسالة في هذه المحادثة.',
@@ -521,7 +521,7 @@ export const ar: Record<string, string> = {
   'This video was not uploaded here, so it cannot be used.': 'لم يُرفع هذا الفيديو هنا، لذا لا يمكن استخدامه.',
   'Your video needs to be at least 1 second long.': 'يجب ألا تقل مدة الفيديو عن ثانية واحدة.',
   'The start is past the end of their reel.': 'البداية بعد نهاية الريل الخاص به.',
-  'Their reel is {theirMs} seconds long.': 'مدة الريل الخاص به {theirMs} ثانية.',
+  'Their reel is {theirMs} seconds long.': 'مدة الريل الخاص به بالثواني: {theirMs}.',
   'Keep at least 1 second of their reel.': 'احتفظ بثانية واحدة على الأقل من الريل الخاص به.',
   'An echo can be up to 3 minutes long. Trim your video to {ECHO_MAX_MS} seconds.': 'يمكن أن تصل مدة الصدى إلى 3 دقائق. قصّ الفيديو إلى {ECHO_MAX_MS} ثانية.',
   // apps/api/src/modules/economy.ts
@@ -533,14 +533,14 @@ export const ar: Record<string, string> = {
   'The seller already confirmed this booking. Message them to cancel it.': 'أكّد البائع هذا الحجز بالفعل. راسله لإلغائه.',
   'Payments is not enabled.': 'المدفوعات غير مفعّلة.',
   'That price is higher than plans can be.': 'هذا السعر أعلى من الحد المسموح للخطط.',
-  'A paid item costs at least {minCents} hundredths of {currency}.': 'أقل سعر للمنتج المدفوع هو {minCents} جزءًا من مئة من {currency}.',
-  'A plan costs at least {value} hundredths of {currency}.': 'أقل سعر للخطة هو {value} جزءًا من مئة من {currency}.',
+  'A paid item costs at least {minCents} hundredths of {currency}.': 'أقل سعر للمنتج المدفوع بأجزاء المئة من {currency}: {minCents}.',
+  'A plan costs at least {value} hundredths of {currency}.': 'أقل سعر للخطة بأجزاء المئة من {currency}: {value}.',
   "Plan doesn't exist or isn't visible to you.": 'الخطة غير موجودة أو لا يمكنك رؤيتها.',
   "You can't subscribe to yourself.": 'لا يمكنك الاشتراك مع نفسك.',
   "Subscription doesn't exist or isn't visible to you.": 'الاشتراك غير موجود أو لا يمكنك رؤيته.',
   "You can't tip yourself.": 'لا يمكنك إرسال إكرامية لنفسك.',
   'That tip is higher than tips can be.': 'هذه الإكرامية أعلى من الحد المسموح.',
-  'A tip is at least {value} hundredths of {currency}.': 'أقل مبلغ للإكرامية هو {value} جزءًا من مئة من {currency}.',
+  'A tip is at least {value} hundredths of {currency}.': 'أقل مبلغ للإكرامية بأجزاء المئة من {currency}: {value}.',
   "You can't review your own place.": 'لا يمكنك تقييم مكانك.',
   'Choose a time in the future.': 'اختر وقتًا في المستقبل.',
   'This place does not take bookings on YAPILAPI.': 'لا يقبل هذا المكان الحجوزات على YAPILAPI.',
@@ -831,7 +831,7 @@ export const ar: Record<string, string> = {
   'Pick a bank from the list.': 'اختر بنكًا من القائمة.',
   'Set up where your payouts go before asking for one.': 'حدّد وجهة دفعاتك قبل أن تطلب دفعة.',
   'The bank could not confirm that account. Check the number and try again.': 'لم يتمكن البنك من تأكيد هذا الحساب. تحقق من الرقم وحاول مرة أخرى.',
-  'The smallest payout is {min} hundredths of {currency}.': 'أقل مبلغ للدفعة هو {min} جزءًا من مئة من {currency}.',
+  'The smallest payout is {min} hundredths of {currency}.': 'أقل مبلغ للدفعة بأجزاء المئة من {currency}: {min}.',
   'This person has no payout account ready for that currency.': 'ليس لدى هذا الشخص حساب دفعات جاهز لهذه العملة.',
   'Verify your email before setting up payouts.': 'أكّد بريدك الإلكتروني قبل إعداد الدفعات.',
   // apps/api/src/modules/phone.ts
@@ -841,7 +841,7 @@ export const ar: Record<string, string> = {
   'Enter the number with its country code, for example +44 7700 900123.': 'أدخل الرقم مع رمز البلد، مثل +44 7700 900123.',
   'Include the country code, starting with +.': 'أضف رمز الدولة، بدءًا بـ +.',
   'Add a phone number first.': 'أضف رقم هاتف أولًا.',
-  'We just sent a code. You can ask for another in {wait} seconds.': 'أرسلنا رمزًا للتو. يمكنك طلب رمز آخر بعد {wait} ثانية.',
+  'We just sent a code. You can ask for another in {wait} seconds.': 'أرسلنا رمزًا للتو. يمكنك طلب رمز آخر بعد قليل (بالثواني: {wait}).',
   'Too many codes were sent to this number. Try again in an hour.': 'أُرسل عدد كبير جدًا من الرموز إلى هذا الرقم. حاول مرة أخرى بعد ساعة.',
   'Too many codes were requested from this network. Try again in an hour.': 'طُلب عدد كبير جدًا من الرموز من هذه الشبكة. حاول مرة أخرى بعد ساعة.',
   'You’ve asked for a lot of codes today. Try again tomorrow.': 'طلبت رموزًا كثيرة اليوم. حاول مرة أخرى غدًا.',
@@ -888,8 +888,8 @@ export const ar: Record<string, string> = {
   "That profile doesn't exist or isn't visible to you.": 'هذا الملف الشخصي غير موجود أو لا يمكنك رؤيته.',
   "That person doesn't exist or isn't visible to you.": 'هذا الشخص غير موجود أو لا يمكنك رؤيته.',
   "This sound can't be used in new posts.": 'لا يمكن استخدام هذا الصوت في منشورات جديدة.',
-  'This sound is {songMs} seconds long. Choose an earlier start.': 'مدة هذا الصوت {songMs} ثانية. اختر بداية أبكر.',
-  'This song is {songMs} seconds long. Choose an earlier start.': 'مدة هذه الأغنية {songMs} ثانية. اختر بداية أبكر.',
+  'This sound is {songMs} seconds long. Choose an earlier start.': 'مدة هذا الصوت بالثواني: {songMs}. اختر بداية أبكر.',
+  'This song is {songMs} seconds long. Choose an earlier start.': 'مدة هذه الأغنية بالثواني: {songMs}. اختر بداية أبكر.',
   'Accounts for people under 18 stay private.': 'تبقى حسابات من هم دون 18 عامًا خاصة.',
   'Choose a cover photo from your own uploads.': 'اختر صورة غلاف من الملفات التي رفعتها.',
   'Upload a photo first.': 'ارفع صورة أولًا.',
@@ -987,7 +987,7 @@ export const ar: Record<string, string> = {
   'The end must come after the start.': 'يجب أن تأتي النهاية بعد البداية.',
   'Each part must be at least 1 second long.': 'يجب ألا تقل مدة كل جزء عن ثانية واحدة.',
   'Each part can be up to 10 minutes long.': 'يمكن أن تصل مدة كل جزء إلى 10 دقائق.',
-  'The video is {durationMs} seconds long.': 'مدة الفيديو {durationMs} ثانية.',
+  'The video is {durationMs} seconds long.': 'مدة الفيديو بالثواني: {durationMs}.',
   "Those captions doesn't exist or isn't visible to you.": 'هذه الترجمة المرئية غير موجودة أو لا يمكنك رؤيتها.',
   'Attach a .vtt file.': 'أرفق ملف ‎.vtt.',
   'Captions in this language are already being made.': 'يجري إنشاء ترجمة مرئية بهذه اللغة بالفعل.',
@@ -1098,7 +1098,7 @@ export const ar: Record<string, string> = {
   'Use each photo once.': 'استخدم كل صورة مرة واحدة.',
   'A collage can have up to 9 photos.': 'يمكن أن تضم المجمّعة 9 صور كحد أقصى.',
   'Choose at least 2 photos.': 'اختر صورتين على الأقل.',
-  'This layout takes {length} photos.': 'يتسع هذا التخطيط لـ {length} صور.',
+  'This layout takes {length} photos.': 'يتسع هذا التخطيط لـ {length} من الصور.',
   // packages/shared/src/drop-schemas.ts
   'Each product can be added once.': 'يمكن إضافة كل منتج مرة واحدة.',
   'A drop can have up to 12 products.': 'يمكن أن يضم الإطلاق 12 منتجًا كحد أقصى.',
