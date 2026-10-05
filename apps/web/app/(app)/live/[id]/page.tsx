@@ -89,12 +89,38 @@ export default function LivePage() {
       /* storage may be unavailable */
     }
     load();
-    return () => void api.live.leave(id).catch(() => {});
+    // Closing the tab counts too, so the number watching stays right.
+    const bye = () => navigator.sendBeacon?.(`/api/v1/live/${id}/leave`);
+    window.addEventListener('pagehide', bye);
+    return () => {
+      window.removeEventListener('pagehide', bye);
+      void api.live.leave(id).catch(() => {});
+    };
   }, [id, load]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' });
   }, [chat.length]);
+
+  // Waiting for a scheduled live: look again now and then, and join when it starts.
+  const waitingToStart = live?.status === 'scheduled' && live.myRole !== 'host';
+  useEffect(() => {
+    if (!waitingToStart) return;
+    const timer = setInterval(async () => {
+      const r = await api.live.get(id).catch(() => null);
+      if (r?.live.status === 'live') load();
+    }, 10_000);
+    return () => clearInterval(timer);
+  }, [waitingToStart, id, load]);
+
+  /** Start or end the live; what went wrong is said. */
+  const hostAction = async (run: () => Promise<{ live: LiveSummary }>) => {
+    try {
+      setLive((await run()).live);
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  };
 
   useRealtime((e) => {
     if (e.type === 'live.chat' && e.data.liveId === id) setChat((c) => (c.some((m) => m.id === e.data.message.id) ? c : [...c, e.data.message]));
@@ -183,15 +209,44 @@ export default function LivePage() {
               <br />
               {t('live.ingest.note')}
             </Alert>
+          ) : live.status !== 'ended' ? (
+            // The key is shown once: a page opened later can get a new one.
+            <div className="stack-sm">
+              <p className="muted" style={{ margin: 0 }}>
+                {t('live.newKeyHint')}
+              </p>
+              <div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon="key"
+                  onClick={async () => {
+                    try {
+                      const r = await api.live.newKey(id);
+                      setIngest(r.ingest);
+                      try {
+                        sessionStorage.setItem(`ypl-ingest-${id}`, JSON.stringify(r.ingest));
+                      } catch {
+                        /* storage may be unavailable */
+                      }
+                    } catch (e) {
+                      toast(errorMessage(e));
+                    }
+                  }}
+                >
+                  {t('live.newKey')}
+                </Button>
+              </div>
+            </div>
           ) : null}
           <div className="row">
             {live.status === 'scheduled' ? (
-              <Button onClick={async () => setLive((await api.live.start(id)).live)} icon="send">
+              <Button onClick={() => void hostAction(() => api.live.start(id))} icon="send">
                 {t('live.start')}
               </Button>
             ) : null}
             {live.status === 'live' ? (
-              <Button variant="danger" onClick={async () => setLive((await api.live.end(id)).live)}>
+              <Button variant="danger" onClick={() => void hostAction(() => api.live.end(id))}>
                 {t('m.live.end')}
               </Button>
             ) : null}

@@ -1565,6 +1565,8 @@ export function createClient(opts: ClientOptions) {
       unpin: (id: string, productId: string) => del(`/v1/live/${id}/products/${productId}`),
       create: (b: { title: string; visibility?: string; ticketProductId?: string }) =>
         post<{ live: LiveSummary; ingest: { url: string; streamKey: string }; message: string }>('/v1/live', b),
+      /** The host gets a new stream key (the old one stops working for new connections). */
+      newKey: (id: string) => post<{ ingest: { url: string; streamKey: string }; message: string }>(`/v1/live/${id}/key`),
       start: (id: string) => post<{ live: LiveSummary }>(`/v1/live/${id}/start`),
       end: (id: string) => post<{ live: LiveSummary }>(`/v1/live/${id}/end`),
       join: (id: string) => post<{ live: LiveSummary }>(`/v1/live/${id}/join`),

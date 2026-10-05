@@ -29,14 +29,16 @@ export function HlsVideo({
   useEffect(() => {
     const video = ref.current;
     if (!video) return;
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = src;
-      return;
-    }
     let hls: import('hls.js').default | null = null;
     let cancelled = false;
+    // hls.js wherever the browser can feed it (Media Source); the browser's own player only where it
+    // can't (iPhone). Recent Chrome says it plays HLS itself but can't parse low-latency live streams.
+    const native = () => {
+      if (!cancelled && video.canPlayType('application/vnd.apple.mpegurl')) video.src = src;
+    };
     void import('hls.js').then(({ default: Hls }) => {
-      if (cancelled || !Hls.isSupported()) return;
+      if (cancelled) return;
+      if (!Hls.isSupported()) return native();
       hls = new Hls({ lowLatencyMode: !!live, manifestLoadingMaxRetry: live ? 30 : 3, manifestLoadingRetryDelay: 2000 });
       hls.on(Hls.Events.ERROR, (_e, data) => {
         if (data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR) setWaiting(true);
@@ -45,7 +47,7 @@ export function HlsVideo({
       hls.on(Hls.Events.MANIFEST_PARSED, () => setWaiting(false));
       hls.loadSource(src);
       hls.attachMedia(video);
-    });
+    }, native);
     return () => {
       cancelled = true;
       hls?.destroy();

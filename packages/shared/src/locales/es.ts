@@ -6235,4 +6235,6 @@ export const es: Catalog = {
   'place.edit.capacity': 'Personas por franja (opcional)',
   'place.edit.capacityHint':
     'Las solicitudes de reserva se detienen cuando hay este número de personas reservadas en los 90 minutos de una hora. Vacío: sin límite.',
+  'live.newKey': 'Obtener una nueva clave de transmisión',
+  'live.newKeyHint': 'La clave de transmisión solo se muestra una vez. Una nueva la reemplaza: pon la nueva clave en tu programa de transmisión.',
 };

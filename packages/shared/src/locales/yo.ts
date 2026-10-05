@@ -6210,4 +6210,6 @@ export const yo: Catalog = {
   'place.edit.hoursHint': 'Fún ọjọ́ kọ̀ọ̀kan, àkókò bíi 12:00-22:00 tàbí 9:00-14:00, 18:00-23:00, tàbí closed. Fi ọjọ́ sílẹ̀ ní òfo bí o kò bá fẹ́ sọ nǹkan.',
   'place.edit.capacity': 'Ènìyàn fún àkókò kọ̀ọ̀kan (kò pọndandan)',
   'place.edit.capacityHint': 'Ìbéèrè ìfipamọ́ máa dúró nígbà tí iye ènìyàn yìí bá ti fipamọ́ láàárín ìṣẹ́jú 90 sí àkókò kan. Òfo: kò sí òpin.',
+  'live.newKey': 'Gba kọ́kọ́rọ́ ìgbéjáde tuntun',
+  'live.newKeyHint': 'Kọ́kọ́rọ́ ìgbéjáde máa ń hàn lẹ́ẹ̀kan ṣoṣo. Tuntun á rọ́pò rẹ̀: fi kọ́kọ́rọ́ tuntun sínú ètò ìgbéjáde rẹ.',
 };

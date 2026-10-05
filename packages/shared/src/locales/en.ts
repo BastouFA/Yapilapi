@@ -6210,6 +6210,8 @@ export const en = {
   'place.edit.hoursHint': 'For each day, times such as 12:00-22:00 or 9:00-14:00, 18:00-23:00, or closed. Leave a day empty to say nothing about it.',
   'place.edit.capacity': 'People per time slot (optional)',
   'place.edit.capacityHint': 'Booking requests stop once this many people are booked within 90 minutes of a time. Empty: no limit.',
+  'live.newKey': 'Get a new stream key',
+  'live.newKeyHint': 'The stream key is shown only once. A new one replaces it: put the new key in your streaming software.',
 } as const;
 
 export type MessageKey = keyof typeof en;

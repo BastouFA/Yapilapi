@@ -6229,4 +6229,6 @@ export const sw: Catalog = {
   'place.edit.hoursHint': 'Kwa kila siku, saa kama 12:00-22:00 au 9:00-14:00, 18:00-23:00, au closed. Acha siku tupu usiseme lolote.',
   'place.edit.capacity': 'Watu kwa kila muda (si lazima)',
   'place.edit.capacityHint': 'Maombi ya kuhifadhi yanasimama idadi hii ya watu ikihifadhiwa ndani ya dakika 90 za muda. Tupu: bila kikomo.',
+  'live.newKey': 'Pata ufunguo mpya wa mtiririko',
+  'live.newKeyHint': 'Ufunguo wa mtiririko unaonyeshwa mara moja tu. Mpya unauchukua nafasi: weka ufunguo mpya kwenye programu yako ya kutiririsha.',
 };

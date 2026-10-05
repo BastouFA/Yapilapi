@@ -6231,4 +6231,6 @@ export const ha: Catalog = {
   'place.edit.hoursHint': 'Ga kowace rana, lokuta kamar 12:00-22:00 ko 9:00-14:00, 18:00-23:00, ko closed. Bar rana babu komai idan ba ka son faɗi.',
   'place.edit.capacity': 'Mutane a kowane lokaci (ba dole ba)',
   'place.edit.capacityHint': 'Neman ajiyar wuri yana tsayawa idan an ajiye wa wannan adadin mutane cikin mintuna 90 na wani lokaci. Babu komai: babu iyaka.',
+  'live.newKey': 'Samu sabon mabuɗin yaɗawa',
+  'live.newKeyHint': 'Mabuɗin yaɗawa yana bayyana sau ɗaya kawai. Sabo zai maye gurbinsa: saka sabon mabuɗin a manhajar yaɗawarka.',
 };

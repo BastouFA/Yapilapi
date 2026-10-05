@@ -6256,4 +6256,6 @@ export const fr: Catalog = {
   'place.edit.capacity': 'Personnes par créneau (facultatif)',
   'place.edit.capacityHint':
     'Les demandes de réservation s’arrêtent quand ce nombre de personnes est réservé dans les 90 minutes autour d’une heure. Vide : pas de limite.',
+  'live.newKey': 'Obtenir une nouvelle clé de stream',
+  'live.newKeyHint': 'La clé de stream ne s’affiche qu’une fois. Une nouvelle la remplace : mets la nouvelle clé dans ton logiciel de streaming.',
 };

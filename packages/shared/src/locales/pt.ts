@@ -6228,4 +6228,6 @@ export const pt: Catalog = {
   'place.edit.hoursHint': 'Para cada dia, horários como 12:00-22:00 ou 9:00-14:00, 18:00-23:00, ou closed. Deixe um dia vazio para não indicar nada.',
   'place.edit.capacity': 'Pessoas por horário (opcional)',
   'place.edit.capacityHint': 'Os pedidos de reserva param quando esse número de pessoas estiver reservado em até 90 minutos de um horário. Vazio: sem limite.',
+  'live.newKey': 'Gerar uma nova chave de transmissão',
+  'live.newKeyHint': 'A chave de transmissão aparece só uma vez. Uma nova a substitui: coloque a nova chave no seu programa de transmissão.',
 };

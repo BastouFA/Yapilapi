@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { BuiltApp } from '../src/app.ts';
+import { LIVE_MAX_HOURS, sweepLives } from '../src/lib/live.ts';
 import { as, signUp, testApp, type TestUser } from './helpers.ts';
 
 /** Bugs found in the communities, events, tickets, places and live sweep (2026-10-05). */
@@ -248,5 +249,43 @@ describe('places', () => {
     const list = await as(t.app, reader).get(`/v1/places/${place.id}/reviews`);
     expect(list.body.items).toHaveLength(0);
     expect((await as(t.app, null).get(`/v1/places/${place.id}/reviews`)).body.items).toHaveLength(1);
+  });
+});
+
+describe('live', () => {
+  beforeAll(async () => {
+    await db().query(`INSERT INTO feature_flags (key, enabled) VALUES ('LIVE', true) ON CONFLICT (key) DO UPDATE SET enabled = true`);
+  });
+  afterAll(async () => {
+    await db().query(`DELETE FROM feature_flags WHERE key = 'LIVE'`);
+  });
+  const hook = (body: object) => t.app.inject({ method: 'POST', url: `/v1/live/hooks/auth?secret=${t.ctx.config.LIVE_HOOK_SECRET}`, payload: body });
+
+  it('the host gets a new stream key, and the old one stops working', async () => {
+    const host = await signUp(t.app);
+    const other = await signUp(t.app);
+    const made = (await as(t.app, host).post('/v1/live', { title: 'Key test' })).body;
+    const oldKey = new URLSearchParams(made.ingest.streamKey.split('?')[1]).get('key');
+    const publish = (key: string | null) => hook({ action: 'publish', path: `live/${made.live.id}`, query: `key=${key}` });
+    expect((await publish(oldKey)).statusCode).toBe(200);
+    expect((await as(t.app, other).post(`/v1/live/${made.live.id}/key`)).status).toBe(404);
+    const fresh = await as(t.app, host).post(`/v1/live/${made.live.id}/key`);
+    expect(fresh.status).toBe(200);
+    const newKey = new URLSearchParams(fresh.body.ingest.streamKey.split('?')[1]).get('key');
+    expect((await publish(oldKey)).statusCode).toBe(401);
+    expect((await publish(newKey)).statusCode).toBe(200);
+  });
+
+  it('a live left on too long ends by itself, and nobody is counted as watching', async () => {
+    const host = await signUp(t.app);
+    const viewer = await signUp(t.app);
+    const live = (await as(t.app, host).post('/v1/live', { title: 'Forgotten' })).body.live;
+    await as(t.app, host).post(`/v1/live/${live.id}/start`);
+    await as(t.app, viewer).post(`/v1/live/${live.id}/join`);
+    await db().query(`UPDATE live_sessions SET started_at = now() - make_interval(hours => $2) WHERE id = $1`, [live.id, LIVE_MAX_HOURS + 1]);
+    const ended = await sweepLives({ db: db(), realtime: t.ctx.realtime, config: t.ctx.config });
+    expect(ended).toContain(live.id);
+    const after = (await as(t.app, viewer).get(`/v1/live/${live.id}`)).body.live;
+    expect(after).toMatchObject({ status: 'ended', viewers: 0 });
   });
 });
