@@ -20,12 +20,15 @@ export default function Studio() {
     setFailed(null);
     api.creator.analytics().then(setData, (e) => setFailed(errorMessage(e)));
   };
+  const loadEarnings = () => {
+    api.creator.earnings().then(
+      (r) => setEarnings(r.balances),
+      () => {},
+    );
+  };
   useEffect(() => {
     loadAnalytics();
-    api.raw
-      .get<{ balances: typeof earnings }>('/v1/me/earnings')
-      .then((r) => setEarnings(r.balances))
-      .catch(() => {});
+    loadEarnings();
   }, []);
   // A failed load says so, with a way to try again, instead of loading for ever.
   if (failed && !data)
@@ -94,7 +97,7 @@ export default function Studio() {
           </div>
         </section>
       ) : null}
-      {earnings.length ? <PayoutsPanel balances={earnings} /> : null}
+      {earnings.length ? <PayoutsPanel balances={earnings} onRequested={loadEarnings} /> : null}
       <section className="stack-sm">
         <h2 className="section-title">{t('m.studio.topPosts')}</h2>
         {data.topPosts.length ? (

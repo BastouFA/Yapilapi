@@ -13,7 +13,8 @@ type Balance = { currency: string; availableCents: number };
  * Studio's payouts: where the money goes in a currency (a Stripe account set up on Stripe's page, or a bank
  * account given here), asking for a payout of what's available, and the payouts so far.
  */
-export function PayoutsPanel({ balances }: { balances: Balance[] }) {
+/** `onRequested` reloads the balances above, which a request takes from. */
+export function PayoutsPanel({ balances, onRequested }: { balances: Balance[]; onRequested: () => void }) {
   const { me, toast, locale, t } = useSession();
   const currencies = balances.length ? balances.map((b) => b.currency) : [currencyForCountry(me?.country)];
   const [currency, setCurrency] = useState(currencies[0]!);
@@ -61,6 +62,7 @@ export function PayoutsPanel({ balances }: { balances: Balance[] }) {
               setAmount('');
               toast(t('studio.payouts.requested'));
               load();
+              onRequested();
             } catch (err) {
               toast(errorMessage(err));
             } finally {
