@@ -115,7 +115,8 @@ export function SectionHeader({ title, action }: { title: string; action?: { lab
           accessibilityRole="button"
           accessibilityLabel={action.a11yLabel ?? action.label}
           onPress={action.onPress}
-          hitSlop={10}
+          // 32pt tall: 44 to tap, reaching less downwards, where chips or rows can start 8pt below.
+          hitSlop={{ top: 8, bottom: 4, left: 10, right: 10 }}
           style={({ pressed }) => ({ minHeight: 32, justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
         >
           <Text style={{ color: c.yapi, fontWeight: '700', fontSize: 14 }}>{action.label}</Text>

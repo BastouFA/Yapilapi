@@ -12,7 +12,21 @@ import { useBoards, type SaveChange } from './boards';
 import { useSession } from './session';
 import { useT, type Translate } from './i18n';
 import { radius, space } from './theme';
-import { type ActionSheetAction, Avatar, BottomSheet, Button, Card, Icon, type IconName, Notice, PlusBadge, useActionSheet, useColors, userText } from './ui';
+import {
+  type ActionSheetAction,
+  Avatar,
+  BottomSheet,
+  Button,
+  Card,
+  Icon,
+  type IconName,
+  Notice,
+  PlusBadge,
+  slop,
+  useActionSheet,
+  useColors,
+  userText,
+} from './ui';
 import { LockedPanel, TipButton } from './money';
 import { SensitiveCover } from './safety';
 import { EditPostSheet, HistorySheet } from './post-edit';
@@ -118,19 +132,27 @@ function TagBubbles({
                 minHeight: 28,
               }}
             >
+              {/* The bubble is 28pt tall: the name fills its height and reaches 8pt past it, and out to the sides. */}
               <Pressable
                 accessibilityRole="link"
                 accessibilityLabel={t('m.title.profile') + ': ' + tag.user.displayName}
-                hitSlop={6}
+                hitSlop={slop({ top: 8, bottom: 8, start: 16, end: mine ? 3 : 16 })}
                 onPress={() => router.push(`/u/${tag.user.username}`)}
-                style={{ flexShrink: 1 }}
+                style={{ flexShrink: 1, alignSelf: 'stretch', justifyContent: 'center' }}
               >
                 <Text style={[{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }, userText]} numberOfLines={1}>
                   {tag.user.displayName}
                 </Text>
               </Pressable>
               {mine ? (
-                <Pressable accessibilityRole="button" accessibilityLabel={t('m.tags.removeMine')} hitSlop={8} onPress={() => onRemove(tag)}>
+                // The bubble's end padding is part of the button (the cross stays where it was); it reaches past the bubble's end.
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('m.tags.removeMine')}
+                  hitSlop={slop({ top: 8, bottom: 8, start: 3, end: 17 })}
+                  onPress={() => onRemove(tag)}
+                  style={{ alignSelf: 'stretch', justifyContent: 'center', paddingEnd: 10, marginEnd: -10 }}
+                >
                   <Icon name="close" size={14} color="#FFFFFF" />
                 </Pressable>
               ) : null}
@@ -429,6 +451,7 @@ function PostCardView({
           <Pressable
             accessibilityRole="link"
             accessibilityLabel={t('m.title.profile') + ': ' + post.author.displayName}
+            hitSlop={2}
             onPress={() => router.push(`/u/${post.author.username}`)}
           >
             <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={40} />
@@ -525,6 +548,8 @@ function PostCardView({
       {post.community ? (
         <Pressable
           accessibilityRole="link"
+          // 24pt tall; the touch area reaches 44.
+          hitSlop={10}
           onPress={() => router.push(`/c/${post.community!.slug}`)}
           style={{ alignSelf: 'flex-start', backgroundColor: c.yapiSoft, borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 4 }}
         >
@@ -548,6 +573,8 @@ function PostCardView({
       {post.remixOf?.post ? (
         <Pressable
           accessibilityRole="link"
+          // A line of text: the touch area reaches 44 tall (with the sound under it, the two split the room between them).
+          hitSlop={{ top: 14, bottom: post.sound ? 13 : 14, left: 8, right: 8 }}
           onPress={() => router.push({ pathname: '/reels', params: { start: post.remixOf!.post!.id } })}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' }}
         >
@@ -560,8 +587,9 @@ function PostCardView({
       {post.sound ? (
         <Pressable
           accessibilityRole="link"
+          hitSlop={{ top: post.remixOf?.post ? 13 : 14, bottom: 14, left: 8, right: 8 }}
           onPress={() => router.push(`/sounds/${post.sound!.id}`)}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', maxWidth: '100%' }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', maxWidth: '100%', marginTop: post.remixOf?.post ? 14 : 0 }}
         >
           <Icon name="musical-notes" size={14} color={c.inkMuted} />
           <Text style={[{ color: c.inkMuted, fontSize: 13, fontWeight: '600', flexShrink: 1 }, userText]} numberOfLines={1}>
@@ -580,7 +608,8 @@ function PostCardView({
       {poll ? <PostPoll poll={poll} canVote={canVote} onVote={(id) => void vote(id)} /> : null}
 
       {post.linkUrl || post.event || post.product ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+        // Wrapped lines 12pt apart, so the chips' touch areas (44 tall) don't overlap.
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space[2], rowGap: space[3] }}>
           {post.linkUrl ? (
             <PostChip icon="globe-outline" label={hostOf(post.linkUrl)} onPress={() => void Linking.openURL(post.linkUrl!).catch(() => {})} />
           ) : null}
@@ -598,12 +627,14 @@ function PostCardView({
 
       {/* Drafts and scheduled posts can't be liked, shared or saved yet. */}
       {post.status ? null : (
+        // 20pt icons 16pt apart, 12pt under what's above and over the card's 16pt padding: each button's touch
+        // area is 44 × 44 without overlapping its neighbours' (the icon-only ones reach further to the sides).
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[4] }}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={liked ? t('post.unlike') : t('post.like')}
             accessibilityState={{ selected: liked }}
-            hitSlop={8}
+            hitSlop={slop({ ...ACTION_SLOP, start: 16, end: 8 })}
             onPress={async () => {
               const next = !liked;
               setLiked(next);
@@ -632,7 +663,7 @@ function PostCardView({
               accessibilityRole="button"
               accessibilityLabel={reposted ? t('m.reels.undoRepost') : t('m.reels.repost')}
               accessibilityState={{ selected: reposted }}
-              hitSlop={8}
+              hitSlop={slop({ ...ACTION_SLOP, start: 8, end: 3 })}
               onPress={async () => {
                 const next = !reposted;
                 setReposted(next);
@@ -658,7 +689,7 @@ function PostCardView({
               accessibilityRole="button"
               accessibilityLabel={`${t('post.reposts')}, ${number(reposts)}`}
               accessibilityHint={t('m.post.repostersHint')}
-              hitSlop={8}
+              hitSlop={slop({ ...ACTION_SLOP, start: 8, end: 3 })}
               onPress={() => setRepostersOpen(true)}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32 }}
             >
@@ -675,7 +706,7 @@ function PostCardView({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('m.common.share')}
-              hitSlop={8}
+              hitSlop={slop({ ...ACTION_SLOP, start: 13, end: 12 })}
               onPress={async () => {
                 const url = `${webUrl}${post.format === 'reel' ? `/reels?start=${post.id}` : `/p/${post.id}`}`;
                 const title = t('m.reels.shareTitle', { name: post.author.displayName });
@@ -693,7 +724,7 @@ function PostCardView({
           {canTip ? <TipButton post={post} /> : null}
           <View style={{ flex: 1 }} />
           {collab === 'accepted' || myTag || canEdit || canRemember || canSeeInsights || canReport ? (
-            <Pressable accessibilityRole="button" accessibilityLabel={t('m.post.more')} hitSlop={8} onPress={more}>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('m.post.more')} hitSlop={slop({ ...ACTION_SLOP, start: 16, end: 8 })} onPress={more}>
               <Icon name="ellipsis-horizontal" size={20} color={c.inkMuted} />
             </Pressable>
           ) : null}
@@ -706,7 +737,8 @@ function PostCardView({
             onAccessibilityAction={(e) => {
               if (e.nativeEvent.actionName === 'saveTo') saveTo();
             }}
-            hitSlop={8}
+            // The last one: it reaches into the card's padding.
+            hitSlop={slop({ ...ACTION_SLOP, start: 8, end: 17 })}
             onLongPress={me ? saveTo : undefined}
             onPress={async () => {
               const next = !saved;
@@ -767,6 +799,9 @@ function PostCardView({
   );
 }
 
+/** How far a post action's touch area reaches above and below it: less upwards, where a chip can be 12pt above. */
+const ACTION_SLOP = { top: 8, bottom: 16 };
+
 /** The site a link goes to, for its chip ("example.com"). */
 const hostOf = (url: string) => url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').split(/[/?#]/)[0] || url;
 
@@ -777,6 +812,8 @@ function PostChip({ icon, label, onPress }: { icon: IconName; label: string; onP
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={label}
+      // 32pt tall: the touch area reaches 44, more upwards (the post's actions are 12pt under the row).
+      hitSlop={{ top: 8, bottom: 4 }}
       onPress={onPress}
       style={({ pressed }) => ({
         flexDirection: 'row',
@@ -1077,6 +1114,8 @@ function MediaGallery({
         {!covered && current.kind === 'image' && small(current) && current.variants?.thumb !== (current.variants?.medium ?? current.url) ? (
           <Pressable
             accessibilityRole="button"
+            // 36pt tall; the touch area reaches 44.
+            hitSlop={4}
             onPress={() => setFull((f) => new Set(f).add(current.id))}
             style={{
               position: 'absolute',

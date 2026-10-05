@@ -47,6 +47,14 @@ export function Icon({ name, size = 22, color, directional }: { name: IconName; 
 }
 
 /**
+ * A hitSlop that reaches further on one side than the other, by reading direction: `hitSlop` itself
+ * takes left and right, which don't swap in right-to-left layouts.
+ */
+export function slop({ top = 0, bottom = 0, start = 0, end = 0 }: { top?: number; bottom?: number; start?: number; end?: number }) {
+  return I18nManager.isRTL ? { top, bottom, left: end, right: start } : { top, bottom, left: start, right: end };
+}
+
+/**
  * For text people wrote (posts, messages, names, bios): take the direction from the text itself,
  * so English inside the Arabic app, or Arabic inside the English app, reads in its own order.
  * iOS honours `writingDirection`; Android already picks the direction from the first strong
@@ -430,7 +438,8 @@ export function SwitchRow({
       accessibilityState={{ checked: value, disabled: !!disabled }}
       disabled={disabled}
       onPress={() => onValueChange(!value)}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], opacity: disabled ? 0.5 : 1 }}
+      // The switch is 31pt tall: a one-line row is still 44 to tap.
+      style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44, opacity: disabled ? 0.5 : 1 }}
     >
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={{ color: c.ink, fontSize: 15, fontWeight: '600' }}>{label}</Text>

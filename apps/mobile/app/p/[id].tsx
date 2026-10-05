@@ -404,6 +404,8 @@ export default function PostScreen() {
                   accessibilityRole="radio"
                   accessibilityState={{ checked: on }}
                   onPress={() => !on && void setPolicy(p.id)}
+                  // 36 tall, 8 apart: 44 to tap.
+                  hitSlop={4}
                   style={{
                     minHeight: 36,
                     paddingHorizontal: space[3],
@@ -545,7 +547,9 @@ export default function PostScreen() {
                       setReplyTo(null);
                       focusReplyButton(answered);
                     }}
-                    hitSlop={6}
+                    // The box's 12pt padding is above and 8pt to what's under it: with this, 44 to tap.
+                    hitSlop={{ top: 12, bottom: 8, left: 8, right: 8 }}
+                    style={{ minHeight: 24, justifyContent: 'center' }}
                   >
                     <Text style={{ color: c.yapi, fontWeight: '700' }}>{t('common.cancel')}</Text>
                   </Pressable>
@@ -600,6 +604,12 @@ export default function PostScreen() {
   );
 }
 
+/**
+ * A comment's small buttons are at least 32 × 36, 12pt apart in a row (and wrapped lines 8pt apart):
+ * with this, each is 44 × 44 to tap without overlapping the next.
+ */
+const COMMENT_ACTION_SLOP = { top: 4, bottom: 4, left: 6, right: 6 };
+
 /** A small text button under a comment (Reply, Edit, Pin, Delete…). */
 function LinkAction({ label, onPress, a11y, buttonRef }: { label: string; onPress: () => void; a11y?: string; buttonRef?: (v: View | null) => void }) {
   const c = useColors();
@@ -609,8 +619,8 @@ function LinkAction({ label, onPress, a11y, buttonRef }: { label: string; onPres
       accessibilityRole="button"
       accessibilityLabel={a11y ?? label}
       onPress={onPress}
-      hitSlop={8}
-      style={{ minHeight: 32, justifyContent: 'center' }}
+      hitSlop={COMMENT_ACTION_SLOP}
+      style={{ minWidth: 32, minHeight: 36, justifyContent: 'center' }}
     >
       <Text style={{ color: c.inkMuted, fontWeight: '700', fontSize: 12 }}>{label}</Text>
     </Pressable>
@@ -651,7 +661,13 @@ const CommentRow = memo(function CommentRow({
   return (
     <View style={{ gap: space[2] }}>
       <View style={{ flexDirection: 'row', gap: space[2] }}>
-        <Pressable accessibilityRole="link" accessibilityLabel={name} onPress={() => router.push(`/u/${x.author.username}`)}>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={name}
+          // 44 to tap; a reply's smaller avatar reaches down, beside its bubble, rather than up into the reply above.
+          hitSlop={reply ? { top: 4, bottom: 12, left: 8, right: 8 } : 6}
+          onPress={() => router.push(`/u/${x.author.username}`)}
+        >
           <Avatar name={name} url={x.author.avatarUrl} size={reply ? 28 : 32} />
         </Pressable>
         <View style={{ flex: 1, gap: 4 }}>
@@ -720,15 +736,15 @@ const CommentRow = memo(function CommentRow({
               <TranslatableText kind="comment" id={x.id} text={x.body} lang={x.lang} own={own} style={{ color: c.ink, fontSize: 15, lineHeight: 21 }} />
             )}
           </View>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[3], paddingStart: space[2] }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[3], rowGap: space[2], paddingStart: space[2] }}>
             <Pressable
               accessibilityRole="togglebutton"
               accessibilityState={{ checked: x.viewer.liked, disabled: !meId }}
               accessibilityLabel={`${t('comments.likeLabel', { name })}, ${tp('comments.likes', x.likes)}`}
               disabled={!meId}
               onPress={() => h.current?.like(x)}
-              hitSlop={8}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 32 }}
+              hitSlop={COMMENT_ACTION_SLOP}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: 32, minHeight: 36 }}
             >
               <Icon name={x.viewer.liked ? 'heart' : 'heart-outline'} size={16} color={x.viewer.liked ? c.yapi : c.inkMuted} />
               {x.likes > 0 ? <Text style={{ color: x.viewer.liked ? c.yapi : c.inkMuted, fontSize: 12, fontWeight: '700' }}>{x.likes}</Text> : null}
@@ -765,6 +781,7 @@ const CommentRow = memo(function CommentRow({
                   <Pressable
                     key={u.id}
                     accessibilityRole="link"
+                    hitSlop={{ top: 4, bottom: 4 }}
                     onPress={() => router.push(`/u/${u.username}`)}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], minHeight: 36 }}
                   >
@@ -783,8 +800,9 @@ const CommentRow = memo(function CommentRow({
                 accessibilityRole="button"
                 accessibilityState={{ expanded: !!th?.open }}
                 onPress={() => h.current?.toggleThread(x)}
-                hitSlop={6}
-                style={{ minHeight: 32, justifyContent: 'center', paddingStart: space[2] }}
+                // 44 tall itself: the comment's buttons are only 4pt above it and the replies 8pt below.
+                hitSlop={{ left: 6, right: 6 }}
+                style={{ minHeight: 44, justifyContent: 'center', paddingStart: space[2] }}
               >
                 <Text style={{ color: c.yapi, fontWeight: '700', fontSize: 12 }}>
                   {th?.open ? t('comments.hideReplies') : tp('comments.viewReplies', Math.max(x.replies, th?.items.length ?? 0))}

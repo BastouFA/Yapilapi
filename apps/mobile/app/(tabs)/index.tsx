@@ -17,7 +17,7 @@ import { CatchUpCard } from '../../lib/ai-helpers';
 import { PulseCards } from '../../lib/wrap';
 import { FollowingDrops } from '../../lib/drops';
 import { space } from '../../lib/theme';
-import { ErrorState, feedListProps, Icon, Loading, Segmented, SkeletonList, useColors, useTabBarSpace } from '../../lib/ui';
+import { ErrorState, feedListProps, Icon, Loading, Segmented, SkeletonList, slop, useColors, useTabBarSpace } from '../../lib/ui';
 
 const MODES = [
   { id: 'for_you', label: 'feed.for_you' },
@@ -56,14 +56,20 @@ function Feed() {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
+        // 16pt apart: the bell's touch area reaches 44 wide mostly away from Reels, so the two don't overlap.
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[4], marginEnd: space[4] }}>
-          <Pressable accessibilityRole="button" accessibilityLabel={t('notifications.title')} hitSlop={10} onPress={() => router.push('/notifications')}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('notifications.title')}
+            hitSlop={slop({ top: 11, bottom: 11, start: 14, end: 8 })}
+            onPress={() => router.push('/notifications')}
+          >
             <Icon name="notifications-outline" size={22} color={c.yapi} />
           </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('m.title.reels')}
-            hitSlop={10}
+            hitSlop={slop({ top: 11, bottom: 11, start: 8, end: 10 })}
             onPress={() => router.push('/reels')}
             style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
           >

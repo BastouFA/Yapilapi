@@ -33,6 +33,7 @@ import {
   Icon,
   KeyboardAvoid,
   Notice,
+  slop,
   SwitchRow,
   useColors,
   useKeyboardVisible,
@@ -78,6 +79,9 @@ import { storyReplyLabel } from '../../../../packages/shared/src/message-preview
 const MIN_VOICE_MS = 1000;
 /** Voice messages stop recording at 5 minutes. */
 const MAX_VOICE_MS = 5 * 60 * 1000;
+/** An icon button in the header: 36 wide (44 to tap with the slop at its sides) and the header's 44 tall. */
+const headerIcon = { minWidth: 36, minHeight: 44, alignItems: 'center', justifyContent: 'center' } as const;
+const HEADER_SLOP = { left: 4, right: 4 };
 
 /**
  * A conversation, updated live over the realtime socket, with audio and video call buttons.
@@ -352,26 +356,46 @@ export default function Chat() {
           )
         : undefined,
       headerRight: () => (
-        <View style={{ flexDirection: 'row', gap: space[4] }}>
-          <Pressable accessibilityRole="button" accessibilityLabel={t('m.chat.options')} hitSlop={10} onPress={() => setOptionsOpen(true)}>
+        // Each icon sits in a 36 × 44 box, 8pt apart: the touch areas reach 44 wide without overlapping.
+        <View style={{ flexDirection: 'row', gap: space[2] }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('m.chat.options')}
+            hitSlop={HEADER_SLOP}
+            onPress={() => setOptionsOpen(true)}
+            style={headerIcon}
+          >
             <Icon name="ellipsis-horizontal-circle-outline" size={24} color={c.yapi} />
           </Pressable>
           {yaps?.available ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('m.yap.settings')}
-              hitSlop={10}
+              hitSlop={HEADER_SLOP}
               onPress={() => (setSettingsError(null), setYapSettings(true))}
+              style={headerIcon}
             >
               <Icon name={yaps.paused ? 'volume-mute-outline' : 'volume-high-outline'} size={22} color={c.yapi} />
             </Pressable>
           ) : null}
           {canCall ? (
             <>
-              <Pressable accessibilityRole="button" accessibilityLabel={t('m.calls.startAudio')} hitSlop={10} onPress={() => void calls.start(id, 'audio')}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('m.calls.startAudio')}
+                hitSlop={HEADER_SLOP}
+                onPress={() => void calls.start(id, 'audio')}
+                style={headerIcon}
+              >
                 <Icon name="call-outline" size={22} color={c.yapi} />
               </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel={t('m.calls.startVideo')} hitSlop={10} onPress={() => void calls.start(id, 'video')}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('m.calls.startVideo')}
+                hitSlop={HEADER_SLOP}
+                onPress={() => void calls.start(id, 'video')}
+                style={headerIcon}
+              >
                 <Icon name="videocam-outline" size={24} color={c.yapi} />
               </Pressable>
             </>
@@ -951,7 +975,7 @@ export default function Chat() {
         <View style={{ padding: space[3] }}>
           <Notice tone="warn">
             <Text style={{ color: c.ink, lineHeight: 20 }}>{t('m.chat.micPermission')}</Text>
-            <Pressable accessibilityRole="button" onPress={() => void Linking.openSettings()} hitSlop={8}>
+            <Pressable accessibilityRole="button" onPress={() => void Linking.openSettings()} hitSlop={10}>
               <Text style={{ color: c.yapi, fontWeight: '700', marginTop: space[1] }}>{t('m.common.openSettings')}</Text>
             </Pressable>
           </Notice>
@@ -973,6 +997,8 @@ export default function Chat() {
       {conversation?.disappearingSeconds ? (
         <Pressable
           accessibilityRole="button"
+          // 24pt tall; the touch area reaches 44.
+          hitSlop={{ top: 10, bottom: 10 }}
           onPress={() => setDisappearingOpen(true)}
           style={{ flexDirection: 'row', alignItems: 'center', gap: space[1], alignSelf: 'center', paddingVertical: space[1] }}
         >
@@ -1190,6 +1216,8 @@ export default function Chat() {
               accessibilityRole="button"
               accessibilityLabel={t('m.chat.addMenu')}
               disabled={sending}
+              // 32 wide; the touch area reaches 44 into the padding at the row's start.
+              hitSlop={slop({ start: 12 })}
               onPress={() => setAddOpen(true)}
               style={{ width: 32, height: 44, alignItems: 'center', justifyContent: 'center', opacity: sending ? 0.45 : 1 }}
             >
@@ -1208,6 +1236,8 @@ export default function Chat() {
               accessibilityRole="button"
               accessibilityLabel={t('m.viewOnce.send')}
               disabled={sending}
+              // 36 wide; the touch area reaches 44 into the gap before the message box.
+              hitSlop={slop({ end: 8 })}
               onPress={() => void sendViewOnce()}
               style={{ width: 36, height: 44, alignItems: 'center', justifyContent: 'center', opacity: sending ? 0.45 : 1 }}
             >
@@ -1714,6 +1744,8 @@ function Attachments({ items, tint }: { items: Message['attachments']; tint: str
           <Pressable
             key={i}
             accessibilityRole="button"
+            // 30pt tall; the touch area reaches 44 inside the bubble's padding.
+            hitSlop={{ top: 7, bottom: 7 }}
             onPress={() => void Linking.openURL(mediaUrl(a.url))}
             style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], paddingVertical: space[1] }}
           >

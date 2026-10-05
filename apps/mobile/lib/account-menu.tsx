@@ -247,7 +247,8 @@ export function YouHeaderTitle() {
       accessibilityRole="button"
       accessibilityLabel={t('acct.switchA11y', { username: me.username })}
       onPress={menu.open}
-      hitSlop={8}
+      // A line of 18pt text: the touch area reaches the header's 44.
+      hitSlop={{ top: 11, bottom: 11, left: 8, right: 8 }}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: 220 }}
     >
       <Text style={[{ color: c.ink, fontSize: 18, fontWeight: '800' }, userText]} numberOfLines={1}>

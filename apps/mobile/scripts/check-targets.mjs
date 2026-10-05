@@ -118,6 +118,7 @@ function styles(node, sheet, sf) {
       if (k && ts.isPropertyAssignment(p)) {
         const v = num(p.initializer);
         if (v !== undefined) out[k] = v;
+        else if (ts.isStringLiteral(p.initializer)) out[k] = p.initializer.text;
         // A size that isn't a literal: what it is isn't known, so it overrides what came before.
         else out[k] = null;
       }
@@ -129,7 +130,10 @@ function styles(node, sheet, sf) {
     return lit ? styles(lit, sheet, sf) : [{}];
   }
   if (ts.isConditionalExpression(node)) return [...styles(node.whenTrue, sheet, sf), ...styles(node.whenFalse, sheet, sf)];
-  if (ts.isBinaryExpression(node) && [ts.SyntaxKind.AmpersandAmpersandToken, ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionToken].includes(node.operatorToken.kind)) {
+  if (
+    ts.isBinaryExpression(node) &&
+    [ts.SyntaxKind.AmpersandAmpersandToken, ts.SyntaxKind.BarBarToken, ts.SyntaxKind.QuestionQuestionToken].includes(node.operatorToken.kind)
+  ) {
     // `on && {…}`: with it, or without it.
     return [...styles(node.right, sheet, sf), {}];
   }
@@ -152,9 +156,11 @@ function slop(attr) {
   if (!attr) return { x: 0, y: 0 };
   const init = attr.initializer;
   if (!init || !ts.isJsxExpression(init) || !init.expression) return undefined;
-  const e = init.expression;
+  let e = init.expression;
   const n = num(e);
   if (n !== undefined) return { x: 2 * n, y: 2 * n };
+  // slop({ top, bottom, start, end }) from lib/ui.tsx: the same, by reading direction.
+  if (ts.isCallExpression(e) && e.expression.getText() === 'slop' && e.arguments[0]) e = e.arguments[0];
   if (ts.isObjectLiteralExpression(e)) {
     const side = {};
     for (const p of e.properties) {
@@ -191,14 +197,26 @@ function pad(st, axis) {
 function size(st, axis, icon) {
   const [dim, min] = axis === 'y' ? ['height', 'minHeight'] : ['width', 'minWidth'];
   if (st[dim] === null || st[min] === null || st.flex === null || (st.flex ?? 0) > 0) return undefined;
-  if (axis === 'y' ? st.aspectRatio !== undefined : st.aspectRatio !== undefined) return undefined;
+  // Stretched across its row or column: as big as the parent, which isn't known here.
+  if (st.alignSelf === 'stretch') return undefined;
+  if (st.aspectRatio !== undefined || typeof st[dim] === 'string' || typeof st[min] === 'string') return undefined;
   const fixed = st[dim];
   const least = st[min];
   if (fixed !== undefined) return Math.max(fixed, least ?? 0);
   // Without a fixed size: the icon inside plus the padding, at least the minimum.
   if (icon === undefined) return least !== undefined && least >= MIN ? least : undefined;
-  const pads = [st.padding, st.paddingTop, st.paddingBottom, st.paddingVertical, st.paddingHorizontal, st.paddingStart, st.paddingEnd, st.paddingLeft, st.paddingRight];
-  if (pads.includes(null)) return undefined;
+  const pads = [
+    st.padding,
+    st.paddingTop,
+    st.paddingBottom,
+    st.paddingVertical,
+    st.paddingHorizontal,
+    st.paddingStart,
+    st.paddingEnd,
+    st.paddingLeft,
+    st.paddingRight,
+  ];
+  if (pads.some((v) => v === null || typeof v === 'string')) return undefined;
   return Math.max(icon + pad(st, axis), least ?? 0);
 }
 
