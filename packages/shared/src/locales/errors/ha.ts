@@ -1240,4 +1240,6 @@ export const ha: Record<string, string> = {
   'You already own this community.': "Kai ne mai wannan al'umma tuni.",
   'Make them a member first.': 'Ka mai da shi memba tukuna.',
   'Use a full link starting with https://': 'Yi amfani da cikakken mahaɗi da ya fara da https://',
+  "Tickets for this event aren't on sale any more.": 'Ba a sayar da tikitin wannan taron kuma.',
+  'An event can sell up to 10 kinds of ticket at once.': "Taro zai iya sayar da nau'in tikiti har 10 a lokaci guda.",
 };

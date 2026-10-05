@@ -1223,4 +1223,6 @@ export const yo: Record<string, string> = {
   'You already own this community.': 'Ìwọ ni onílé àwùjọ yìí tẹ́lẹ̀.',
   'Make them a member first.': 'Sọ wọ́n di ọmọ ẹgbẹ́ ná.',
   'Use a full link starting with https://': 'Lo ìjápọ̀ kíkún tó bẹ̀rẹ̀ pẹ̀lú https://',
+  "Tickets for this event aren't on sale any more.": 'Wọn kò ta tíkẹ́ẹ̀tì ìṣẹ̀lẹ̀ yìí mọ́.',
+  'An event can sell up to 10 kinds of ticket at once.': 'Ìṣẹ̀lẹ̀ kan lè ta tó oríṣi tíkẹ́ẹ̀tì 10 ní àkókò kan.',
 };

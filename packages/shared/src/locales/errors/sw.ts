@@ -1237,4 +1237,6 @@ export const sw: Record<string, string> = {
   'You already own this community.': 'Tayari wewe ndiye mmiliki wa jumuiya hii.',
   'Make them a member first.': 'Mfanye kuwa mwanachama kwanza.',
   'Use a full link starting with https://': 'Tumia kiungo kamili kinachoanza na https://',
+  "Tickets for this event aren't on sale any more.": 'Tiketi za tukio hili haziuzwi tena.',
+  'An event can sell up to 10 kinds of ticket at once.': 'Tukio linaweza kuuza hadi aina 10 za tiketi kwa wakati mmoja.',
 };

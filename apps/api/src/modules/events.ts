@@ -1,19 +1,44 @@
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
 import type { PoolClient } from 'pg';
-import { COMMUNITY_ROLE_RANK, createEventSchema, eventEndsAt, rsvpSchema, updateEventSchema, type EventItem } from '@yapilapi/shared';
+import {
+  COMMUNITY_ROLE_RANK,
+  createEventSchema,
+  createProductSchema,
+  CURRENCY_SCALE,
+  eventEndsAt,
+  rsvpSchema,
+  updateEventSchema,
+  type EventItem,
+} from '@yapilapi/shared';
 import { z } from 'zod';
-import { AppError, forbidden, notFound, parse } from '../lib/errors.ts';
+import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
-import { notify, track } from '../lib/services.ts';
+import { isEnabled, notify, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
-import { PUBLIC_USER_COLS, publicUserFrom, toPublicUser, type PublicUserRow } from '../lib/users.ts';
+import { assertAdultForMoney, PUBLIC_USER_COLS, publicUserFrom, toPublicUser, type PublicUserRow } from '../lib/users.ts';
 import { eventVisibleSql } from '../lib/visibility.ts';
 import { cancelEventTickets, cancelRsvpTicket, issueRsvpTicket, publishDoor } from '../lib/tickets.ts';
 import { refundOrder } from '../lib/checkout.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
+/** A kind of ticket an event sells: a name, a price and, optionally, how many there are. */
+const ticketTypeSchema = createProductSchema.pick({ title: true, description: true, priceCents: true, currency: true }).extend({
+  inventory: z.number().int().min(1).max(100_000).optional(),
+});
+/** Kinds of ticket on sale at once for one event. */
+export const TICKET_TYPES_MAX = 10;
+
+const ticketTypeDto = (r: Record<string, any>) => ({
+  id: r.id as string,
+  title: r.title as string,
+  description: r.description as string,
+  priceCents: r.price_cents as number,
+  currency: r.currency as string,
+  inventory: r.inventory as number | null,
+  soldOut: r.inventory === 0,
+});
 
 export const EVENT_SELECT = `
   SELECT e.id, e.title, e.description, e.starts_at, e.ends_at, e.timezone, e.location_text, e.capacity, e.visibility, e.online, e.ticket_transfers,
@@ -217,6 +242,62 @@ export default async function eventsModule(app: FastifyInstance, ctx: AppContext
     return { status: stored, event: toEvent(await load(id, u.id)) };
   });
 
+  // ── Tickets on sale ─────────────────────────────────────────────────────
+  /** The kinds of ticket an event sells, for anyone who can see it. While one is on sale, going doesn't give a free ticket. */
+  app.get('/v1/events/:id/tickets', async (req) => {
+    const { id } = parse(idParam, req.params);
+    await load(id, req.user?.id ?? null);
+    const { rows } = await db.query(
+      `SELECT id, title, description, price_cents, currency, inventory FROM products
+       WHERE event_id = $1 AND kind = 'ticket' AND status = 'active' AND deleted_at IS NULL ORDER BY price_cents, created_at`,
+      [id],
+    );
+    return { items: rows.map(ticketTypeDto) };
+  });
+
+  /** The host puts a kind of ticket on sale (selling is for adults); buying one goes through checkout like any product. */
+  app.post('/v1/events/:id/tickets', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 hour' } } }, async (req, reply) => {
+    if (!(await isEnabled(db, 'COMMERCE'))) throw featureDisabled('Commerce');
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const input = parse(ticketTypeSchema, req.body);
+    const ev = (
+      await db.query<{ over: boolean }>(
+        `SELECT coalesce(ends_at, starts_at + interval '3 hours') < now() AS over FROM events WHERE id = $1 AND host_id = $2 AND deleted_at IS NULL`,
+        [id, u.id],
+      )
+    ).rows[0];
+    if (!ev) throw notFound('Event');
+    if (ev.over) throw new AppError(409, 'event_over', 'This event is over.');
+    const minCents = 100 * CURRENCY_SCALE[input.currency];
+    if (input.priceCents > 0 && input.priceCents < minCents) throw badRequest(`A paid item costs at least ${minCents} hundredths of ${input.currency}.`);
+    await assertAdultForMoney(db, u.id);
+    const count = await db.query(
+      `SELECT count(*)::int AS n FROM products WHERE event_id = $1 AND kind = 'ticket' AND status = 'active' AND deleted_at IS NULL`,
+      [id],
+    );
+    if (count.rows[0].n >= TICKET_TYPES_MAX) throw new AppError(409, 'conflict', 'An event can sell up to 10 kinds of ticket at once.');
+    const { rows } = await db.query(
+      `INSERT INTO products (seller_id, event_id, kind, title, description, price_cents, currency, inventory) VALUES ($1,$2,'ticket',$3,$4,$5,$6,$7)
+       RETURNING id, title, description, price_cents, currency, inventory`,
+      [u.id, id, input.title, input.description, input.priceCents, input.currency, input.inventory ?? null],
+    );
+    reply.code(201);
+    return { ticket: ticketTypeDto(rows[0]) };
+  });
+
+  /** The host stops selling a kind of ticket. Tickets already bought keep working. */
+  app.delete('/v1/events/:id/tickets/:productId', { preHandler: requireAuth }, async (req, reply) => {
+    const u = me(req);
+    const { id, productId } = parse(idParam.extend({ productId: z.string().uuid() }), req.params);
+    const r = await db.query(
+      `UPDATE products SET status = 'archived', updated_at = now() WHERE id = $1 AND event_id = $2 AND seller_id = $3 AND kind = 'ticket' AND status = 'active'`,
+      [productId, id, u.id],
+    );
+    if (!r.rowCount) throw notFound('Ticket');
+    reply.code(204);
+  });
+
   app.get('/v1/events/:id/attendees', async (req) => {
     const viewer = req.user?.id ?? null;
     const { id } = parse(idParam, req.params);
@@ -297,8 +378,9 @@ export default async function eventsModule(app: FastifyInstance, ctx: AppContext
     const { id } = parse(idParam, req.params);
     const r = await db.query(`UPDATE events SET deleted_at = now() WHERE id = $1 AND host_id = $2 AND deleted_at IS NULL RETURNING id`, [id, u.id]);
     if (!r.rowCount) throw notFound('Event');
-    // Every ticket for it stops working (the wallet shows it as cancelled).
+    // Every ticket for it stops working (the wallet shows it as cancelled), and none are sold any more.
     await cancelEventTickets(db, id);
+    await db.query(`UPDATE products SET status = 'archived', updated_at = now() WHERE event_id = $1 AND kind = 'ticket' AND status = 'active'`, [id]);
     // Tickets people paid for are refunded: every paid order that bought only tickets to this event.
     const paid = await db.query<{ id: string }>(
       `SELECT DISTINCT o.id FROM orders o JOIN order_items oi ON oi.order_id = o.id JOIN products p ON p.id = oi.product_id

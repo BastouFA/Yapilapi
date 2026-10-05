@@ -279,7 +279,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       if (!own.rowCount) throw forbidden('You can only sell under your own business.');
     }
     if (input.eventId) {
-      const host = await db.query(`SELECT 1 FROM events WHERE id = $1 AND host_id = $2`, [input.eventId, u.id]);
+      const host = await db.query(`SELECT 1 FROM events WHERE id = $1 AND host_id = $2 AND deleted_at IS NULL`, [input.eventId, u.id]);
       if (!host.rowCount) throw forbidden('Only the host can sell tickets for this event.');
     }
     const { rows } = await db.query(
@@ -325,7 +325,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     const order = await tx(db, async (c) => {
       const ids = input.items.map((i) => i.productId);
       const { rows: products } = await c.query(
-        `SELECT pd.id, pd.seller_id, pd.kind, pd.price_cents, pd.currency, pd.inventory,
+        `SELECT pd.id, pd.seller_id, pd.kind, pd.price_cents, pd.currency, pd.inventory, pd.event_id,
                 EXISTS (SELECT 1 FROM product_files f WHERE f.product_id = pd.id) AS has_file,
                 EXISTS (SELECT 1 FROM order_items oi JOIN orders o ON o.id = oi.order_id
                         WHERE oi.product_id = pd.id AND o.buyer_id = $2 AND o.status = 'paid') AS owned
@@ -345,6 +345,14 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       }
       if (input.items.some((i) => products.find((p) => p.id === i.productId)!.kind === 'digital' && i.quantity !== 1))
         throw badRequest('Buy one of each download.');
+      // Tickets to an event: only while it's still to come (or on), and only for people who can see it.
+      for (const eventId of new Set(products.filter((p) => p.event_id).map((p) => p.event_id as string))) {
+        const on = await c.query(
+          `SELECT 1 FROM events e WHERE e.id = $2 AND ${eventVisibleSql('$1')} AND coalesce(e.ends_at, e.starts_at + interval '3 hours') > now()`,
+          [u.id, eventId],
+        );
+        if (!on.rowCount) throw new AppError(409, 'event_over', "Tickets for this event aren't on sale any more.");
+      }
       if (input.liveSessionId) {
         // Only for a live the buyer may see (a live hosted by someone under 18 is for their friends).
         const live = (

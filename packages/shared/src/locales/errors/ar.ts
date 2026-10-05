@@ -1210,4 +1210,6 @@ export const ar: Record<string, string> = {
   'You already own this community.': 'أنت مالك هذا المجتمع بالفعل.',
   'Make them a member first.': 'اجعله عضوًا أولًا.',
   'Use a full link starting with https://': 'استخدم رابطًا كاملًا يبدأ بـ https://',
+  "Tickets for this event aren't on sale any more.": 'لم تعد تذاكر هذه الفعالية معروضة للبيع.',
+  'An event can sell up to 10 kinds of ticket at once.': 'يمكن للفعالية بيع 10 أنواع من التذاكر كحد أقصى في وقت واحد.',
 };

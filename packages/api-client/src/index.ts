@@ -1140,6 +1140,13 @@ export function createClient(opts: ClientOptions) {
       cancel: (id: string) => del<{ ok: true }>(`/v1/events/${id}`),
       rsvp: (id: string, status: 'going' | 'interested' | 'not_going') => post<{ status: string; event: EventItem }>(`/v1/events/${id}/rsvp`, { status }),
       attendees: (id: string) => get<{ items: { user: PublicUser; status: string }[] }>(`/v1/events/${id}/attendees`),
+      /** The kinds of ticket an event sells (bought through checkout like any product). */
+      ticketTypes: (id: string) => get<{ items: EventTicketType[] }>(`/v1/events/${id}/tickets`),
+      /** The host puts a kind of ticket on sale. */
+      sellTickets: (id: string, b: { title: string; description?: string; priceCents: number; currency: string; inventory?: number }) =>
+        post<{ ticket: EventTicketType }>(`/v1/events/${id}/tickets`, b),
+      /** The host stops selling a kind of ticket; tickets already bought keep working. */
+      stopSellingTickets: (id: string, productId: string) => del(`/v1/events/${id}/tickets/${productId}`),
       /** The check-in screen (host and co-hosts only): the event, your role, the counts and the co-hosts. */
       door: (id: string) => get<DoorSummary>(`/v1/events/${id}/check-in`),
       /** The guest list (host and co-hosts only). `q` finds a name, username or backup code. */
@@ -2061,6 +2068,17 @@ export interface FaqEntry {
   answer: string;
   position: number;
   updatedAt: string;
+}
+
+/** A kind of ticket an event sells. `inventory` is how many are left (null: no set number). */
+export interface EventTicketType {
+  id: string;
+  title: string;
+  description: string;
+  priceCents: number;
+  currency: string;
+  inventory: number | null;
+  soldOut: boolean;
 }
 
 export interface SponsoredAd {

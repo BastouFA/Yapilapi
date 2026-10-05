@@ -242,7 +242,7 @@ function Members({ slug, myRole, onOwnerChanged }: { slug: string; myRole: Commu
   const mine = rank(myRole);
   if (!items) return <PeopleState loadError={loadError} reload={() => void reload()} />;
   return (
-    <div className="stack-sm">
+    <div className="stack-sm manage-people">
       {error ? <Alert tone="danger">{error}</Alert> : null}
       <p className="muted" style={{ margin: 0 }}>
         {t('m.manage.membersHint')}
@@ -356,7 +356,7 @@ function Requests({ slug }: { slug: string }) {
   const { items, loadError, error, act, reload } = usePeople(slug, 'pending');
   if (!items) return <PeopleState loadError={loadError} reload={() => void reload()} />;
   return (
-    <div className="stack-sm">
+    <div className="stack-sm manage-people">
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {items.length ? (
         <List label={t('m.manage.requests')}>
@@ -390,7 +390,7 @@ function Banned({ slug }: { slug: string }) {
   const { items, loadError, error, act, reload } = usePeople(slug, 'banned');
   if (!items) return <PeopleState loadError={loadError} reload={() => void reload()} />;
   return (
-    <div className="stack-sm">
+    <div className="stack-sm manage-people">
       {error ? <Alert tone="danger">{error}</Alert> : null}
       {items.length ? (
         <List label={t('m.manage.banned')}>

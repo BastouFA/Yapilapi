@@ -149,6 +149,39 @@ describe('events', () => {
     expect((await as(t.app, host).patch(`/v1/events/${id}`, { title: 'Renamed' })).status).toBe(200);
   });
 
+  it('the host sells kinds of ticket, guests buy them, and the host stops selling', async () => {
+    const host = await signUp(t.app);
+    const guest = await signUp(t.app);
+    const id = await newEvent(host);
+    expect((await as(t.app, guest).post(`/v1/events/${id}/tickets`, { title: 'Mine', priceCents: 500, currency: 'USD' })).status).toBe(404);
+    expect((await as(t.app, host).post(`/v1/events/${id}/tickets`, { title: 'Cheap', priceCents: 5, currency: 'USD' })).status).toBe(400);
+    const made = await as(t.app, host).post(`/v1/events/${id}/tickets`, { title: 'General', priceCents: 1500, currency: 'USD', inventory: 50 });
+    expect(made.status).toBe(201);
+    const list = await as(t.app, guest).get(`/v1/events/${id}/tickets`);
+    expect(list.body.items).toMatchObject([{ title: 'General', priceCents: 1500, currency: 'USD', inventory: 50, soldOut: false }]);
+    const order = await as(t.app, guest).post('/v1/orders', { items: [{ productId: made.body.ticket.id, quantity: 1 }], idempotencyKey: `k_${Date.now()}a` });
+    expect(order.status).toBe(201);
+    await as(t.app, guest).post('/v1/payments/dev/complete', { orderId: order.body.order.id });
+    expect(await validTickets(guest, id)).toHaveLength(1);
+    expect((await as(t.app, host).del(`/v1/events/${id}/tickets/${made.body.ticket.id}`)).status).toBe(204);
+    expect((await as(t.app, guest).get(`/v1/events/${id}/tickets`)).body.items).toHaveLength(0);
+    // The ticket bought before still works.
+    expect(await validTickets(guest, id)).toHaveLength(1);
+  });
+
+  it("tickets can't be bought for an event that's over or that the buyer can't see", async () => {
+    const host = await signUp(t.app);
+    const guest = await signUp(t.app);
+    const past = await newEvent(host, { startsAt: inDays(-2), endsAt: inDays(-1.9) });
+    const friendsOnly = await newEvent(host, { visibility: 'friends' });
+    for (const id of [past, friendsOnly]) {
+      const p = (await as(t.app, host).post('/v1/products', { kind: 'ticket', title: 'Door', priceCents: 1500, eventId: id })).body.product;
+      const o = await as(t.app, guest).post('/v1/orders', { items: [{ productId: p.id, quantity: 1 }], idempotencyKey: `k_${Date.now()}_${id}` });
+      expect(o.status).toBe(409);
+      expect(o.body.error.code).toBe('event_over');
+    }
+  });
+
   it('cancelling an event refunds the tickets people paid for and tells them', async () => {
     const host = await signUp(t.app);
     const buyer = await signUp(t.app);

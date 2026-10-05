@@ -7,6 +7,7 @@ import { Alert, Avatar, AvatarGroup, Badge, Button, Dialog, EmptyState, Icon, Se
 import type { EventItem, PublicUser } from '@yapilapi/shared';
 import { eventEndsAt, formatEventWhen, safeTimeZone, timeZoneLabel } from '@yapilapi/shared';
 import { browserTimeZone, isWebLink } from '@/components/EventForm';
+import { EventTickets } from '@/components/EventTickets';
 import { api, errorMessage, isGone } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { JoinNote, NeedsAccount, useSignIn } from '@/components/SignedOut';
@@ -205,6 +206,8 @@ export default function EventPageClient({ isPublic }: { isPublic: boolean }) {
           ) : null}
         </div>
       ) : null}
+
+      {signedOut ? null : <EventTickets event={ev} hosting={hosting} over={over} />}
 
       {ev.description ? <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{ev.description}</p> : null}
 

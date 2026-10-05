@@ -1234,4 +1234,6 @@ export const pt: Record<string, string> = {
   'You already own this community.': 'Você já é o dono desta comunidade.',
   'Make them a member first.': 'Torne a pessoa membro primeiro.',
   'Use a full link starting with https://': 'Use um link completo que comece com https://',
+  "Tickets for this event aren't on sale any more.": 'Os ingressos para este evento não estão mais à venda.',
+  'An event can sell up to 10 kinds of ticket at once.': 'Um evento pode vender até 10 tipos de ingresso ao mesmo tempo.',
 };

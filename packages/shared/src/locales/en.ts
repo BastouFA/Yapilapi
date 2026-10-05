@@ -6182,6 +6182,19 @@ export const en = {
   'push.event_waitlist_in': "A place opened up at {name}'s event: you're going now",
   'm.event.onWaitlist': "You're on the waitlist. If a place opens up, you're going and we'll tell you.",
   'm.event.over': 'This event is over.',
+  'eventTickets.title': 'Tickets',
+  'eventTickets.sell': 'Sell tickets',
+  'eventTickets.sellHint': "While tickets are on sale, saying you're going doesn't give a free ticket: people get in with the tickets they buy.",
+  'eventTickets.name': 'Ticket name',
+  'eventTickets.namePlaceholder': 'General admission',
+  'eventTickets.priceHint': '0 for free tickets.',
+  'eventTickets.priceInvalid': 'Enter a price, or 0 for free.',
+  'eventTickets.free': 'Free',
+  'eventTickets.add': 'Put on sale',
+  'eventTickets.added': 'On sale now.',
+  'eventTickets.stop': 'Stop selling',
+  'eventTickets.stopped': 'No longer on sale. Tickets already bought still work.',
+  'eventTickets.bought': 'Paid. Your ticket is in Tickets.',
 } as const;
 
 export type MessageKey = keyof typeof en;

@@ -11107,3 +11107,15 @@ button.profile-song__play::after {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Community settings: on a phone, the controls for each person sit under their name. */
+@media (max-width: 600px) {
+  .manage-people .yp-list__item {
+    flex-wrap: wrap;
+  }
+  .manage-people .yp-list__end {
+    flex-basis: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
