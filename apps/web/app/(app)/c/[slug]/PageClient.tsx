@@ -165,7 +165,8 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
                 setSummarizing(true);
                 try {
                   const r = await api.ai.assist({ task: 'summarize_community', communityId: c.id });
-                  setSummary({ text: String(r.output ?? ''), dev: r.provider === 'dev' });
+                  // Held back by the safety filters: say so rather than show an empty summary.
+                  setSummary({ text: r.output === null ? t('chat.ai.withheld') : String(r.output), dev: r.provider === 'dev' });
                 } catch (e) {
                   toast(errorMessage(e));
                 } finally {

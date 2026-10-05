@@ -356,7 +356,8 @@ export function CommunityCatchUp({ communityId }: { communityId: string }) {
             setError(null);
             try {
               const r = await (await client()).ai.assist({ task: 'summarize_community', communityId });
-              setSummary({ text: String(r.output ?? ''), dev: r.provider === 'dev' });
+              // Held back by the safety filters: say so rather than show an empty summary.
+              setSummary({ text: r.output === null ? t('chat.ai.withheld') : String(r.output), dev: r.provider === 'dev' });
             } catch (e) {
               setError(errorMessage(e));
             }
