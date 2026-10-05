@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CATALOGS, gmtOffsetLabel, isRtl, pluralIsOne, SUPPORTED_LOCALES, t, tp, zoneOffsetMinutes, type MessageKey } from './i18n.ts';
+import { CATALOGS, gmtOffsetLabel, isRtl, pluralCategory, pluralIsOne, SUPPORTED_LOCALES, t, tp, zoneOffsetMinutes, type MessageKey } from './i18n.ts';
+import { fr as frErrors } from './locales/errors/fr.ts';
 
 const en = CATALOGS.en!;
 const keys = Object.keys(en).sort();
@@ -12,33 +13,43 @@ describe('message catalogs', () => {
     expect(Object.keys(CATALOGS).sort()).toEqual([...SUPPORTED_LOCALES].sort());
   });
 
+  /** `m.poll.votes.few` → `m.poll.votes.other`: an extra plural form a language may add, or null. */
+  const extraFormOf = (k: string) => {
+    const base = /^(.+)\.(zero|two|few|many)$/.exec(k)?.[1];
+    return base && `${base}.one` in en && `${base}.other` in en ? (`${base}.other` as MessageKey) : null;
+  };
+
   for (const locale of SUPPORTED_LOCALES) {
     describe(locale, () => {
-      const catalog = CATALOGS[locale]!;
+      const catalog = CATALOGS[locale]! as Record<string, string>;
+      const own = Object.keys(catalog).sort();
 
-      it('has exactly the same keys as English', () => {
-        const own = Object.keys(catalog).sort();
+      it('has exactly the same keys as English, and only plural forms besides', () => {
         expect(keys.filter((k) => !(k in catalog))).toEqual([]);
-        expect(own.filter((k) => !(k in en))).toEqual([]);
+        // Arabic adds `.zero`, `.two`, `.few` and `.many` to some plurals; nothing else is extra.
+        expect(own.filter((k) => !(k in en) && !extraFormOf(k))).toEqual([]);
       });
 
       it('has a non-empty string for every key', () => {
-        const empty = keys.filter((k) => typeof catalog[k as MessageKey] !== 'string' || !catalog[k as MessageKey].trim());
+        const empty = own.filter((k) => typeof catalog[k] !== 'string' || !catalog[k].trim());
         expect(empty).toEqual([]);
       });
 
       it('keeps the same {placeholders} as English', () => {
         // A singular may say the number in words instead ("منشور واحد"), so `.one` can drop {count}.
-        const same = (k: string, own: string[], english: string[]) =>
-          own.join() === english.join() || (k.endsWith('.one') && own.join() === english.filter((p) => p !== 'count').join());
-        const differ = keys
-          .filter((k) => !same(k, placeholders(catalog[k as MessageKey] ?? ''), placeholders(en[k as MessageKey])))
-          .map((k) => `${k}: ${catalog[k as MessageKey]}`);
+        // The extra forms follow `.other`, and Arabic's dual says the number in its noun ("يومان",
+        // "ساعتين"), so they can drop the number's placeholder; none of them adds one.
+        const english = (k: string) => placeholders(en[(extraFormOf(k) ?? k) as MessageKey]);
+        const same = (k: string, mine: string[], theirs: string[]) =>
+          mine.join() === theirs.join() ||
+          (k.endsWith('.one') && mine.join() === theirs.filter((p) => p !== 'count').join()) ||
+          (!!extraFormOf(k) && mine.every((p) => theirs.includes(p)) && theirs.length - mine.length <= 1);
+        const differ = own.filter((k) => !same(k, placeholders(catalog[k] ?? ''), english(k))).map((k) => `${k}: ${catalog[k]}`);
         expect(differ).toEqual([]);
       });
 
       it('has no exclamation marks or emoji', () => {
-        const loud = keys.filter((k) => /[!¡]|\p{Extended_Pictographic}/u.test(catalog[k as MessageKey] ?? '')).map((k) => `${k}: ${catalog[k as MessageKey]}`);
+        const loud = own.filter((k) => /[!¡]|\p{Extended_Pictographic}/u.test(catalog[k] ?? '')).map((k) => `${k}: ${catalog[k]}`);
         expect(loud).toEqual([]);
       });
     });
@@ -50,6 +61,17 @@ describe('message catalogs', () => {
       const names = rows.map((k) => t(k, locale));
       expect(new Set(names).size, locale).toBe(names.length);
     }
+  });
+
+  it('speaks to the reader as "tu" in French', () => {
+    // One register everywhere, the API's error messages included. "Rendez-vous" is a noun, not "vous".
+    const formal = /(?<!\p{L})(vous|votre|vos)(?!\p{L})/iu;
+    const found = (table: Record<string, string>) =>
+      Object.entries(table)
+        .filter(([, s]) => formal.test(s.replace(/rendez-vous/giu, '')))
+        .map(([k, s]) => `${k}: ${s}`);
+    expect(found(CATALOGS.fr!)).toEqual([]);
+    expect(found(frErrors)).toEqual([]);
   });
 
   it('comes with both halves of every plural pair', () => {
@@ -99,18 +121,78 @@ describe('time zone offsets', () => {
   });
 });
 
-describe('plurals without Intl.PluralRules (the phone)', () => {
-  it('follows each language’s own rule', () => {
-    const real = Intl.PluralRules;
-    (Intl as unknown as { PluralRules?: unknown }).PluralRules = undefined;
-    try {
-      expect([0, 1, 2].map((n) => pluralIsOne('en', n))).toEqual([false, true, false]);
-      expect([0, 1, 2].map((n) => pluralIsOne('fr', n))).toEqual([true, true, false]);
-      expect(pluralIsOne('pt-BR', 0)).toBe(true);
-      expect(pluralIsOne('yo', 1)).toBe(false);
-      expect(tp('m.poll.votes', 0, 'fr')).toBe(t('m.poll.votes.one', 'fr', { count: 0 }));
-    } finally {
-      (Intl as unknown as { PluralRules?: unknown }).PluralRules = real;
-    }
+/** Runs `fn` the way the phone does: with no Intl.PluralRules at all. */
+function withoutPluralRules(fn: () => void) {
+  const real = Intl.PluralRules;
+  expect(Reflect.deleteProperty(Intl, 'PluralRules')).toBe(true);
+  try {
+    expect('PluralRules' in Intl).toBe(false);
+    fn();
+  } finally {
+    (Intl as { PluralRules: typeof Intl.PluralRules }).PluralRules = real;
+  }
+}
+
+const runtimes: [string, (fn: () => void) => void][] = [
+  ['with Intl.PluralRules', (fn) => fn()],
+  ['without Intl.PluralRules (the phone)', withoutPluralRules],
+];
+
+describe('plural categories', () => {
+  for (const [name, run] of runtimes) {
+    describe(name, () => {
+      it('gives Arabic all six', () => {
+        run(() => {
+          const counts = [0, 1, 2, 3, 10, 11, 99, 100, 101, 102, 103, 111];
+          expect(counts.map((n) => pluralCategory('ar', n)).join(' ')).toBe('zero one two few few many many other other other few many');
+          expect(pluralCategory('ar-EG', 1011)).toBe('many');
+          expect(pluralCategory('ar', 2.5)).toBe('other');
+        });
+      });
+
+      it('follows each language’s own rule', () => {
+        run(() => {
+          expect([0, 1, 2].map((n) => pluralCategory('en', n))).toEqual(['other', 'one', 'other']);
+          expect([0, 1, 2].map((n) => pluralCategory('fr', n))).toEqual(['one', 'one', 'other']);
+          expect([0, 1, 2, 100].map((n) => pluralCategory('yo', n))).toEqual(['other', 'other', 'other', 'other']);
+          expect([0, 1, 2].map((n) => pluralIsOne('en', n))).toEqual([false, true, false]);
+          expect([0, 1, 2].map((n) => pluralIsOne('fr', n))).toEqual([true, true, false]);
+          expect(pluralIsOne('pt-BR', 0)).toBe(true);
+          expect(pluralIsOne('yo', 1)).toBe(false);
+          expect(tp('m.poll.votes', 0, 'fr')).toBe(t('m.poll.votes.one', 'fr', { count: 0 }));
+        });
+      });
+
+      it('picks Arabic’s forms, and `.other` where a plural has no such form', () => {
+        run(() => {
+          const ar = CATALOGS.ar! as Record<string, string>;
+          const form = (k: string, n: number) => ar[k]!.replaceAll('{count}', String(n));
+          expect(tp('m.boost.days', 1, 'ar')).toBe(form('m.boost.days.one', 1));
+          expect(tp('m.boost.days', 2, 'ar')).toBe(ar['m.boost.days.two']);
+          expect(tp('m.boost.days', 7, 'ar')).toBe(form('m.boost.days.few', 7));
+          expect(tp('m.boost.days', 30, 'ar')).toBe(form('m.boost.days.many', 30));
+          expect(tp('m.boost.days', 100, 'ar')).toBe(form('m.boost.days.other', 100));
+          expect(tp('m.boost.days', 0, 'ar')).toBe(form('m.boost.days.other', 0));
+          // A plural written as "Label: {count}" reads right for every number, so it has only the two.
+          expect('m.poll.votes.few' in ar || 'm.poll.votes.many' in ar).toBe(false);
+          for (const n of [0, 2, 5, 50]) expect(tp('m.poll.votes', n, 'ar')).toBe(form('m.poll.votes.other', n));
+          // Some forms but not all: "11 stories" reads like "100 stories", so `.many` is left to `.other`.
+          expect(['m.stories.reshares.few' in ar, 'm.stories.reshares.many' in ar]).toEqual([true, false]);
+          expect(tp('m.stories.reshares', 4, 'ar')).toBe(form('m.stories.reshares.few', 4));
+          expect(tp('m.stories.reshares', 11, 'ar')).toBe(form('m.stories.reshares.other', 11));
+          // The other languages have only `.one` and `.other`, whatever Arabic has.
+          expect(tp('m.boost.days', 2, 'en')).toBe('2 days');
+        });
+      });
+    });
+  }
+
+  it('writes out the same rules as the runtime’s Intl.PluralRules', () => {
+    const counts = [...Array.from({ length: 1201 }, (_, n) => n), 0.5, 1.5, 2.5, 10.5, 1_000_000, 2_000_000, 1_500_000];
+    const locales = [...SUPPORTED_LOCALES, 'pt-BR', 'pt-PT', 'ar-EG', 'fr-CA'];
+    const expected = locales.map((l) => counts.map((n) => new Intl.PluralRules(l).select(n)));
+    withoutPluralRules(() => {
+      expect(locales.map((l) => counts.map((n) => pluralCategory(l, n)))).toEqual(expected);
+    });
   });
 });

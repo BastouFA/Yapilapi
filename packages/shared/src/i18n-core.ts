@@ -8,9 +8,9 @@
  * Add a locale by adding `locales/<code>.ts` with the same keys as English (the Catalog type makes a
  * missing key a type error), then list it in LOADERS below and in CATALOGS in `./i18n.ts`.
  */
-import { en, type Catalog, type MessageKey } from './locales/en.ts';
+import { en, type Catalog, type ExtraPluralForm, type MessageKey, type PluralKey } from './locales/en.ts';
 
-export type { Catalog, MessageKey };
+export type { Catalog, ExtraPluralForm, MessageKey, PluralKey };
 
 /** The other languages, each fetched the first time it is needed. */
 const LOADERS: Record<string, () => Promise<Catalog>> = {
@@ -84,41 +84,87 @@ export function loadLocale(locale: string): Promise<boolean> {
   return pending;
 }
 
-export function t(key: MessageKey, locale = 'en', vars?: Record<string, string | number>): string {
+export function t(key: MessageKey | PluralFormKey, locale = 'en', vars?: Record<string, string | number>): string {
   const base = locale.split('-')[0] ?? 'en';
-  let s: string = loaded.get(locale)?.[key] ?? loaded.get(base)?.[key] ?? en[key] ?? key;
+  let s: string = loaded.get(locale)?.[key] ?? loaded.get(base)?.[key] ?? (en as Catalog)[key] ?? key;
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, String(v));
   return s;
 }
 
-type PluralBase<K> = K extends `${infer B}.one` ? (`${B}.other` extends MessageKey ? B : never) : never;
-/** Keys that come in `.one` / `.other` pairs, without the suffix. */
-export type PluralKey = PluralBase<MessageKey>;
+/** The CLDR plural categories. A language uses some of them; every one has "other". */
+export type PluralCategory = 'zero' | 'one' | 'two' | 'few' | 'many' | 'other';
 
 /**
- * Whether `count` takes the `.one` form, by the language's own rule. The runtime's Intl.PluralRules
- * when it has one; the phone's JavaScript engine doesn't, so the rules for the app's languages are
- * written out here (CLDR "one": French and Portuguese count 0 and 1 as one, Yoruba has no plural).
+ * The plural category `count` falls in, by the language's own rule. The runtime's Intl.PluralRules
+ * when it has one; the phone's JavaScript engine doesn't, so the CLDR rules for the app's languages
+ * are written out here: French and Brazilian Portuguese count 0 and 1 as one, Yoruba has no plural,
+ * and Arabic has all six (0, 1, 2, 3–10, 11–99 and 100–102 each read differently).
  */
-export function pluralIsOne(locale: string, count: number): boolean {
+export function pluralCategory(locale: string, count: number): PluralCategory {
   const PR = (Intl as unknown as { PluralRules?: typeof Intl.PluralRules }).PluralRules;
   if (PR) {
     try {
-      return new PR(locale).select(count) === 'one';
+      return new PR(locale).select(count) as PluralCategory;
     } catch {
       // An unknown locale tag: the rules below.
     }
   }
-  const lang = locale.split('-')[0]?.toLowerCase() ?? 'en';
-  const whole = Number.isInteger(count);
-  if (lang === 'fr' || lang === 'pt') return Math.floor(Math.abs(count)) <= 1;
-  if (lang === 'yo') return false;
-  return whole && count === 1;
+  const [lang = 'en', region] = locale.toLowerCase().replace(/_/g, '-').split('-');
+  const n = Math.abs(count);
+  const whole = Number.isInteger(n);
+  // French, Spanish and Portuguese say "de" before a round million: "1 million de vues".
+  const million = whole && n !== 0 && n % 1_000_000 === 0;
+  switch (lang) {
+    case 'ar': {
+      if (!whole) return 'other';
+      if (n <= 2) return (['zero', 'one', 'two'] as const)[n]!;
+      const last2 = n % 100;
+      if (last2 >= 3 && last2 <= 10) return 'few';
+      if (last2 >= 11) return 'many';
+      return 'other';
+    }
+    case 'fr':
+      return Math.floor(n) <= 1 ? 'one' : million ? 'many' : 'other';
+    case 'pt':
+      // European Portuguese counts like English; Brazilian, the catalog's, like French.
+      if (region === 'pt') return n === 1 ? 'one' : million ? 'many' : 'other';
+      return Math.floor(n) <= 1 ? 'one' : million ? 'many' : 'other';
+    case 'es':
+      return n === 1 ? 'one' : million ? 'many' : 'other';
+    case 'yo':
+      return 'other';
+    default:
+      // English, Swahili, Hausa, and any language without a catalog.
+      return n === 1 ? 'one' : 'other';
+  }
 }
 
-/** Plural-aware t(): picks `<key>.one` or `<key>.other` for `count`, which is also passed as {count}. */
+/** Whether `count` takes the `.one` form, by the language's own rule (see pluralCategory). */
+export function pluralIsOne(locale: string, count: number): boolean {
+  return pluralCategory(locale, count) === 'one';
+}
+
+/** A plural key with one of the extra forms a catalog may add (`<key>.few`). */
+export type PluralFormKey = `${PluralKey}.${ExtraPluralForm}`;
+
+/**
+ * The catalog key for a plural category: `<key>.one` and `<key>.other` are always there; `.zero`,
+ * `.two`, `.few` and `.many` only where the language has them (Arabic), and `.other` stands in when
+ * it doesn't.
+ */
+export function pluralFormKey(key: PluralKey, category: PluralCategory, locale = 'en'): MessageKey | PluralFormKey {
+  if (category === 'one') return `${key}.one`;
+  if (category !== 'other') {
+    const form: PluralFormKey = `${key}.${category}`;
+    const base = locale.split('-')[0] ?? 'en';
+    if (loaded.get(locale)?.[form] ?? loaded.get(base)?.[form]) return form;
+  }
+  return `${key}.other`;
+}
+
+/** Plural-aware t(): picks the form of `key` for `count` (`.one`, `.other`, or Arabic's `.two`, `.few`…), and passes {count}. */
 export function tp(key: PluralKey, count: number, locale = 'en', vars?: Record<string, string | number>): string {
-  return t(`${key}.${pluralIsOne(locale, count) ? 'one' : 'other'}` as MessageKey, locale, { ...vars, count });
+  return t(pluralFormKey(key, pluralCategory(locale, count), locale), locale, { ...vars, count });
 }
 
 export function isRtl(locale: string): boolean {

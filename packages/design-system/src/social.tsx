@@ -21,6 +21,8 @@ import {
   videoSrc,
   formatRelativeTime,
   isRtl,
+  pluralCategory,
+  pluralFormKey,
   postReasonText,
   safeTimeZone,
   smallAvatarUrl,
@@ -58,15 +60,9 @@ function tr(key: MessageKey, locale: string, vars?: Vars): string {
   return t(key, locale, out);
 }
 
-/** Plural-aware tr(): picks `<key>.one` or `<key>.other` and passes {count}, formatted for the locale. */
+/** Plural-aware tr(): picks the form of `key` for `count` (`.one`, `.other`, or Arabic's `.two`, `.few`…) and passes {count}, formatted for the locale. */
 function trp(key: PluralKey, count: number, locale: string): string {
-  let one = count === 1;
-  try {
-    one = new Intl.PluralRules(locale).select(count) === 'one';
-  } catch {
-    // An unknown locale tag: English rules.
-  }
-  return t(`${key}.${one ? 'one' : 'other'}` as MessageKey, locale, { count: new Intl.NumberFormat(locale).format(count) });
+  return t(pluralFormKey(key, pluralCategory(locale, count), locale), locale, { count: new Intl.NumberFormat(locale).format(count) });
 }
 
 /** "a, b and c" in the reader's language. */

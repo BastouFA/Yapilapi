@@ -1,7 +1,8 @@
 /**
  * English: the source catalog. Every other catalog in this folder has exactly its keys (the Catalog
- * type makes a missing key a type error), and t() falls back to it. Keys starting with `m.` are only
- * used by the mobile app (apps/mobile).
+ * type makes a missing key a type error), and t() falls back to it. A language may add plural forms
+ * English doesn't have (Arabic's `.two`, `.few`, `.many`; see ExtraPluralForm). Keys starting with
+ * `m.` are only used by the mobile app (apps/mobile).
  */
 export const en = {
   'app.tagline': 'Your social world. One place.',
@@ -6443,5 +6444,16 @@ export const en = {
 } as const;
 
 export type MessageKey = keyof typeof en;
-/** Every catalog has every key: the type checker enforces parity with `en`. */
-export type Catalog = Record<MessageKey, string>;
+
+type PluralBase<K> = K extends `${infer B}.one` ? (`${B}.other` extends MessageKey ? B : never) : never;
+/** Keys that come in `.one` / `.other` pairs, without the suffix. */
+export type PluralKey = PluralBase<MessageKey>;
+/**
+ * The plural forms a language may add to a `.one` / `.other` pair, by CLDR category: Arabic says
+ * 2 days, 3–10 days and 11–99 days differently. English has none of them; tp() reads `.other` when
+ * a language leaves one out.
+ */
+export type ExtraPluralForm = 'zero' | 'two' | 'few' | 'many';
+
+/** Every catalog has every key (the type checker enforces parity with `en`), and may add extra plural forms. */
+export type Catalog = Record<MessageKey, string> & { [K in `${PluralKey}.${ExtraPluralForm}`]?: string };
