@@ -1042,6 +1042,8 @@ export function createClient(opts: ClientOptions) {
         put<{ role: string }>(`/v1/communities/${slug}/members/${userId}/role`, { role }),
       ban: (slug: string, userId: string) => post<{ ok: true }>(`/v1/communities/${slug}/members/${userId}/ban`),
       unban: (slug: string, userId: string) => post<{ ok: true }>(`/v1/communities/${slug}/members/${userId}/unban`),
+      /** The owner makes another member the owner; they stay on as an admin. */
+      makeOwner: (slug: string, userId: string) => post<{ ok: true }>(`/v1/communities/${slug}/members/${userId}/owner`),
       faq: (slug: string) => get<{ items: FaqEntry[]; canEdit: boolean }>(`/v1/communities/${slug}/faq`),
       addFaq: (slug: string, b: { question: string; answer: string }) => post<{ faq: FaqEntry }>(`/v1/communities/${slug}/faq`, b),
       updateFaq: (slug: string, id: string, b: Partial<{ question: string; answer: string; position: number }>) =>
@@ -1149,6 +1151,13 @@ export function createClient(opts: ClientOptions) {
       cancel: (id: string) => del<{ ok: true }>(`/v1/events/${id}`),
       rsvp: (id: string, status: 'going' | 'interested' | 'not_going') => post<{ status: string; event: EventItem }>(`/v1/events/${id}/rsvp`, { status }),
       attendees: (id: string) => get<{ items: { user: PublicUser; status: string }[] }>(`/v1/events/${id}/attendees`),
+      /** The kinds of ticket an event sells (bought through checkout like any product). */
+      ticketTypes: (id: string) => get<{ items: EventTicketType[] }>(`/v1/events/${id}/tickets`),
+      /** The host puts a kind of ticket on sale. */
+      sellTickets: (id: string, b: { title: string; description?: string; priceCents: number; currency: string; inventory?: number }) =>
+        post<{ ticket: EventTicketType }>(`/v1/events/${id}/tickets`, b),
+      /** The host stops selling a kind of ticket; tickets already bought keep working. */
+      stopSellingTickets: (id: string, productId: string) => del(`/v1/events/${id}/tickets/${productId}`),
       /** The check-in screen (host and co-hosts only): the event, your role, the counts and the co-hosts. */
       door: (id: string) => get<DoorSummary>(`/v1/events/${id}/check-in`),
       /** The guest list (host and co-hosts only). `q` finds a name, username or backup code. */
@@ -1173,6 +1182,18 @@ export function createClient(opts: ClientOptions) {
     places: {
       list: (params: Record<string, unknown> = {}) => get<{ items: Record<string, any>[] }>(`/v1/places${qs(params)}`),
       get: (id: string) => get<{ place: Record<string, any>; events: EventItem[]; products: Record<string, any>[] }>(`/v1/places/${id}`),
+      /** The owner changes a place: details, opening hours by day, and people per time slot (null: no limit). */
+      update: (
+        id: string,
+        b: {
+          name?: string;
+          description?: string;
+          address?: string | null;
+          city?: string | null;
+          hours?: Record<string, string> | null;
+          bookingCapacity?: number | null;
+        },
+      ) => patch<{ place: Record<string, any> }>(`/v1/places/${id}`, b),
       /** Room left at each time (ISO), counted like a booking request. `left` is null when the place sets no limit. */
       availability: (id: string, at: string[]) =>
         get<{ takesBookings: boolean; capacity: number | null; slots: { startsAt: string; left: number | null }[] }>(
@@ -1572,6 +1593,8 @@ export function createClient(opts: ClientOptions) {
       unpin: (id: string, productId: string) => del(`/v1/live/${id}/products/${productId}`),
       create: (b: { title: string; visibility?: string; ticketProductId?: string }) =>
         post<{ live: LiveSummary; ingest: { url: string; streamKey: string }; message: string }>('/v1/live', b),
+      /** The host gets a new stream key (the old one stops working for new connections). */
+      newKey: (id: string) => post<{ ingest: { url: string; streamKey: string }; message: string }>(`/v1/live/${id}/key`),
       start: (id: string) => post<{ live: LiveSummary }>(`/v1/live/${id}/start`),
       end: (id: string) => post<{ live: LiveSummary }>(`/v1/live/${id}/end`),
       join: (id: string) => post<{ live: LiveSummary }>(`/v1/live/${id}/join`),
@@ -2121,6 +2144,17 @@ export interface FaqEntry {
   answer: string;
   position: number;
   updatedAt: string;
+}
+
+/** A kind of ticket an event sells. `inventory` is how many are left (null: no set number). */
+export interface EventTicketType {
+  id: string;
+  title: string;
+  description: string;
+  priceCents: number;
+  currency: string;
+  inventory: number | null;
+  soldOut: boolean;
 }
 
 export interface SponsoredAd {

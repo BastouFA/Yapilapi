@@ -123,6 +123,71 @@ export function utcToZonedWall(instant: Date | string, tz: string): Date {
 }
 
 const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+
+const weekdayOf = (word: string): number | null => {
+  const i = WEEKDAYS.indexOf(word.trim().toLowerCase().slice(0, 3) as (typeof WEEKDAYS)[number]);
+  return i < 0 ? null : i;
+};
+
+/**
+ * The weekdays (0 is Sunday) an opening-hours key covers: "mon", "Monday", "tue-sun" (a range,
+ * wrapping past Sunday as in "fri-mon"), or a list such as "sat, sun". Null when it names no day.
+ */
+export function hoursKeyDays(key: string): number[] | null {
+  const days = new Set<number>();
+  for (const part of key.split(/[,&/]|\band\b/)) {
+    if (!part.trim()) continue;
+    const [a, b, ...rest] = part.split(/\s*[-–—]\s*|\s+to\s+/);
+    const from = weekdayOf(a ?? '');
+    if (from === null || rest.length) return null;
+    if (b === undefined) {
+      days.add(from);
+      continue;
+    }
+    const to = weekdayOf(b);
+    if (to === null) return null;
+    for (let d = from; ; d = (d + 1) % 7) {
+      days.add(d);
+      if (d === to) break;
+    }
+  }
+  return days.size ? [...days] : null;
+}
+
+/** Opening hours as written, in week order (Monday first); lines that name no day come last. */
+export function hoursInWeekOrder(hours: Record<string, unknown> | null | undefined): [string, string][] {
+  const rank = (k: string) => {
+    const days = hoursKeyDays(k);
+    return days ? (days[0]! + 6) % 7 : 7;
+  };
+  return Object.entries(hours ?? {})
+    .filter((e): e is [string, string] => typeof e[1] === 'string')
+    .sort((a, b) => rank(a[0]) - rank(b[0]));
+}
+
+/**
+ * An opening-hours key in the reader's language: "tue-sun" reads "Tue – Sun" in English, "mar. – dim."
+ * in French. Keys that name no day are shown as they are.
+ */
+export function hoursKeyLabel(key: string, locale: string): string {
+  const days = hoursKeyDays(key);
+  if (!days) return key;
+  let fmt: Intl.DateTimeFormat;
+  try {
+    fmt = new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' });
+  } catch {
+    return key;
+  }
+  // 2023-01-01 was a Sunday.
+  const name = (d: number) => fmt.format(new Date(Date.UTC(2023, 0, 1 + d)));
+  return key
+    .split(/\s*,\s*/)
+    .map((part) => {
+      const ends = part.split(/\s*[-–—]\s*|\s+to\s+/).map(weekdayOf);
+      return ends.every((d) => d !== null) ? ends.map((d) => name(d!)).join(' – ') : part;
+    })
+    .join(', ');
+}
 /** Opening hours when a place gives none it can be read from. */
 export const DEFAULT_BOOKING_HOURS: [number, number][] = [[8 * 60, 22 * 60]];
 
@@ -133,8 +198,12 @@ export const DEFAULT_BOOKING_HOURS: [number, number][] = [[8 * 60, 22 * 60]];
  */
 export function openingRanges(hours: Record<string, unknown> | null | undefined, weekday: number): [number, number][] | null {
   if (!hours) return null;
-  const want = WEEKDAYS[weekday]!;
-  const entry = Object.entries(hours).find(([k]) => k.trim().toLowerCase().slice(0, 3) === want);
+  // A key names one day ("mon", "Monday") or several ("tue-sun", "sat, sun"); the most specific one wins.
+  const matching = Object.entries(hours)
+    .map(([k, v]) => ({ days: hoursKeyDays(k), v }))
+    .filter((x) => x.days?.includes(weekday))
+    .sort((a, b) => a.days!.length - b.days!.length);
+  const entry = matching[0] ? ([null, matching[0].v] as const) : null;
   if (!entry || typeof entry[1] !== 'string') return null;
   const text = entry[1].toLowerCase();
   if (/closed|ferm|cerrado|fechado/.test(text)) return [];

@@ -22,6 +22,8 @@ export default function LiveList() {
   const [ticketId, setTicketId] = useState('');
   const [tickets, setTickets] = useState<LiveProduct[]>([]);
   const [needsVerify, setNeedsVerify] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!me || flags.LIVE === false) return;
     api.raw.get<{ items: LiveProduct[] }>(`/v1/products?sellerId=${me.id}&limit=50`).then(
@@ -32,11 +34,12 @@ export default function LiveList() {
 
   useEffect(() => {
     if (flags.LIVE === false) return;
+    setLoadError(null);
     api.live.list().then(
       (r) => setItems(r.items),
-      (e) => (setItems([]), toast(errorMessage(e))),
+      (e) => setLoadError(errorMessage(e)),
     );
-  }, [flags.LIVE, toast]);
+  }, [flags.LIVE, attempt]);
 
   if (flags.LIVE === false) return <FeatureOff name={t('m.live.title')} />;
 
@@ -86,7 +89,9 @@ export default function LiveList() {
           {t('live.form.submit')}
         </Button>
       </form>
-      {items === null ? (
+      {loadError ? (
+        <EmptyState title={loadError} action={<Button onClick={() => setAttempt((n) => n + 1)}>{t('m.common.retry')}</Button>} />
+      ) : items === null ? (
         <Skeleton height={120} />
       ) : items.length ? (
         <ul className="yp-list">

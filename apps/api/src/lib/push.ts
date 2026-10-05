@@ -93,6 +93,7 @@ const TEXT: Record<string, Text> = {
   post_comment: say('push.post_comment'),
   event_rsvp: say('push.event_rsvp'),
   event_updated: say('push.event_updated'),
+  event_waitlist_in: say('push.event_waitlist_in'),
   ticket_received: say('push.ticket_received'),
   event_cohost: say('push.event_cohost'),
   call_incoming: say('push.call_incoming'),

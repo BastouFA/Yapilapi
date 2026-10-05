@@ -3,13 +3,12 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { hashToken } from '@yapilapi/auth';
 import { tx } from '@yapilapi/database';
 import { z } from 'zod';
-import { enqueue } from '../lib/jobs.ts';
 import { EDIT_STATUS } from './studio.ts';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { isEnabled, notify, track } from '../lib/services.ts';
-import { liveChatAudience, liveChatVisibleSql } from '../lib/live.ts';
+import { finishLive, liveChatAudience, liveChatVisibleSql } from '../lib/live.ts';
 import { roomStageRuleSql } from '../lib/rooms.ts';
 import { ageOf, publicUserFrom } from '../lib/users.ts';
 import { liveVisibleSql } from '../lib/visibility.ts';
@@ -265,6 +264,23 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
     return { live: dto(await load(id, u.id), u.id), ingest: video.ingest(id, streamKey), message: 'Keep the stream key private. It is shown once.' };
   });
 
+  /**
+   * A new stream key for the host (it's shown once, so one lost with the page needs replacing). The
+   * old key stops working for new connections; a stream already running carries on.
+   */
+  app.post('/v1/live/:id/key', { preHandler: gate, config: { rateLimit: { max: 20, timeWindow: '1 hour' } } }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const streamKey = `sk_${randomBytes(20).toString('base64url')}`;
+    const r = await db.query(`UPDATE live_sessions SET stream_key_hash = $3 WHERE id = $1 AND host_id = $2 AND status <> 'ended' RETURNING id`, [
+      id,
+      u.id,
+      hashToken(streamKey),
+    ]);
+    if (!r.rowCount) throw notFound('Live');
+    return { ingest: video.ingest(id, streamKey), message: 'Keep the stream key private. It is shown once.' };
+  });
+
   app.get('/v1/live/:id', { preHandler: gate }, async (req) => {
     const { id } = parse(idParam, req.params);
     return { live: dto(await load(id, me(req).id), me(req).id) };
@@ -294,20 +310,12 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
   app.post('/v1/live/:id/end', { preHandler: gate }, async (req) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
-    const r = await db.query(`UPDATE live_sessions SET status = 'ended', ended_at = now() WHERE id = $1 AND host_id = $2 AND status <> 'ended' RETURNING id`, [
-      id,
-      u.id,
-    ]);
-    if (!r.rowCount) throw badRequest('Only the host can end this live.');
-    await ctx.realtime.publish(await audience(id), { type: 'live.status', data: { id, status: 'ended' } });
+    const own = await db.query(`SELECT 1 FROM live_sessions WHERE id = $1 AND host_id = $2 AND status <> 'ended'`, [id, u.id]);
+    if (!own.rowCount) throw badRequest('Only the host can end this live.');
+    // Everyone is told, and the recording and highlight clips are made once the last segment is closed.
+    await finishLive(ctx, id);
     // New publishing is already refused once the live has ended; this also drops an encoder that is still connected.
     await video.stop?.(id).catch((e) => req.log.warn({ err: (e as Error).message }, 'could not disconnect the encoder'));
-    // Give the video server a moment to close the last recording segment, then make the recording and highlight clips.
-    if (ctx.config.LIVE_RECORDINGS_DIR) {
-      await db.query(`UPDATE live_sessions SET recording_status = 'pending' WHERE id = $1`, [id]);
-      await enqueue(db, 'live.recording', { sessionId: id }, 15);
-    }
-    await db.query(`UPDATE live_participants SET left_at = now() WHERE session_id = $1 AND left_at IS NULL`, [id]);
     return { live: dto(await load(id, u.id), u.id) };
   });
 

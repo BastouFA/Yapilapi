@@ -133,14 +133,18 @@ export function mediaVisibleSql(v: string): string {
   )`;
 }
 
-/** Events aliased `e`. Co-hosts, and people holding a ticket (a friend may have given it to them), see it too. */
-export function eventVisibleSql(v: string): string {
+/**
+ * Events aliased `e`. Co-hosts, and people holding a ticket (a friend may have given it to them), see it too.
+ * An event for people with the link (visibility 'private') is never listed; `byLink` is for opening one
+ * event by its address, which is how the host invites people to it.
+ */
+export function eventVisibleSql(v: string, { byLink = false }: { byLink?: boolean } = {}): string {
   return `(
     e.deleted_at IS NULL
     AND ${notBlockedSql('e.host_id', v)}
     AND (
       e.host_id = ${v}
-      OR e.visibility = 'public'
+      OR e.visibility = 'public'${byLink ? ` OR e.visibility = 'private'` : ''}
       OR (e.visibility = 'followers' AND EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = ${v} AND f.followee_id = e.host_id))
       OR (e.visibility = 'friends' AND EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = ${v} AND fr.user_b = e.host_id) OR (fr.user_b = ${v} AND fr.user_a = e.host_id)))
       OR EXISTS (SELECT 1 FROM event_attendees ea WHERE ea.event_id = e.id AND ea.user_id = ${v})

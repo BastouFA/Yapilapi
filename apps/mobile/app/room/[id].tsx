@@ -65,7 +65,7 @@ export default function RoomScreen() {
   if (room.error && !room.env)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>
-        <EmptyState title={t('m.rooms.title')} body={room.error} />
+        <EmptyState title={t('m.rooms.title')} body={room.error} action={{ label: t('m.common.retry'), icon: 'refresh', onPress: () => void room.reload() }} />
       </View>
     );
   if (!r || !me) return <Loading />;

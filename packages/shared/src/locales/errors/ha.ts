@@ -1259,6 +1259,13 @@ export const ha: Record<string, string> = {
   'Number must be less than {maximum}': 'Dole lambar ta gaza {maximum}',
   'Number must be a multiple of {multipleOf}': 'Dole lambar ta zama ninkin {multipleOf}',
   'Number must be finite': 'Dole lambar ta zama mai iyaka',
+  'You already own this community.': "Kai ne mai wannan al'umma tuni.",
+  'Make them a member first.': 'Ka mai da shi memba tukuna.',
+  'Use a full link starting with https://': 'Yi amfani da cikakken mahaɗi da ya fara da https://',
+  "Tickets for this event aren't on sale any more.": 'Ba a sayar da tikitin wannan taron kuma.',
+  'An event can sell up to 10 kinds of ticket at once.': "Taro zai iya sayar da nau'in tikiti har 10 a lokaci guda.",
+  'Name the days, such as mon or tue-sun.': 'Faɗi ranakun, kamar mon ko tue-sun.',
+  'Up to 14 lines of opening hours.': 'Har layi 14 na lokutan buɗewa.',
   'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
     'Kalmar sirri mara daidai ta yi yawa a wannan asusun. Ku jira minti 15, ko ku sake saita kalmar sirrinku.',
 };

@@ -1254,6 +1254,13 @@ export const pt: Record<string, string> = {
   'Number must be less than {maximum}': 'O número precisa ser menor que {maximum}',
   'Number must be a multiple of {multipleOf}': 'O número precisa ser múltiplo de {multipleOf}',
   'Number must be finite': 'O número precisa ser finito',
+  'You already own this community.': 'Você já é o dono desta comunidade.',
+  'Make them a member first.': 'Torne a pessoa membro primeiro.',
+  'Use a full link starting with https://': 'Use um link completo que comece com https://',
+  "Tickets for this event aren't on sale any more.": 'Os ingressos para este evento não estão mais à venda.',
+  'An event can sell up to 10 kinds of ticket at once.': 'Um evento pode vender até 10 tipos de ingresso ao mesmo tempo.',
+  'Name the days, such as mon or tue-sun.': 'Indique os dias, por exemplo mon ou tue-sun.',
+  'Up to 14 lines of opening hours.': 'Até 14 linhas de horário.',
   'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
     'Muitas senhas erradas para esta conta. Espere 15 minutos ou redefina sua senha.',
 };
