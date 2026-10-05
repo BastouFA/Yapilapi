@@ -1,36 +1,34 @@
-# Render Blueprint for YAPILAPI (https://render.com/docs/blueprint-spec).
+# Render Blueprint for YAPILAPI on Render's free plans (https://render.com/docs/free).
 #
-# Creates: the API (Fastify, Docker), the web app (Next.js, Docker), a Postgres 16 database and a
-# Key Value (Redis-compatible) instance. Apply it from the Render Dashboard:
-#   New > Blueprint > connect github.com/BastouFA/Yapilapi > Apply.
-# Go live checklist and full walkthrough: docs/operations/deploy-render.md.
+# Same services and settings as render.yaml, at no cost, for trying YAPILAPI before paying for hosting.
+# Apply it from the Render Dashboard: New > Blueprint > connect github.com/BastouFA/Yapilapi, and set
+# **Blueprint Path** to `render.free.yaml`. Walkthrough: docs/operations/deploy-render.md ("Free start").
 #
-# Plans: the API and web app use "starter" because a free service sleeps after 15 minutes, which drops
-# live connections (messages, notifications) and pauses background jobs (video processing). The database
-# uses "basic-256mb" because free Render Postgres is deleted after 30 days.
+# What free means here, and when to move to render.yaml:
+# - The API and web app sleep after 15 minutes without visits; the next visit wakes them in about a
+#   minute. While asleep, background jobs (video processing, scheduled posts) wait.
+# - Free Postgres is deleted 30 days after it is created, with no backups. Move to render.yaml (paid
+#   database) before anyone you don't want to lose signs up.
+# - Free services can't use the pre-deploy step or the Shell tab: the API applies migrations when it
+#   starts (MIGRATE_ON_START, set in the image), and the launch check runs from your own computer.
+# - Free services can't send email on ports 25, 465 or 587: use port 2465 (Resend supports it).
+# - Free Key Value keeps everything in memory only; it holds nothing that can't be rebuilt.
 #
 # Settings marked `sync: false` are the ones you paste into the Dashboard the first time you apply this
-# file (they are never stored in git). They sit directly on each service on purpose: Render ignores
-# `sync: false` inside an environment group and would never ask for them. Optional ones can be left
-# empty. The API refuses to start in production without the required ones, so a missing secret shows
-# up as a failed deploy with a clear message in the log, not as a half-working site.
-#
-# Hostnames assume Render gives each service https://<name>.onrender.com. If a name is taken, or when you
-# add your own domain, update WEB_ORIGIN, PUBLIC_API_URL, WEBAUTHN_* on the API and API_INTERNAL_URL,
-# NEXT_PUBLIC_WS_URL and SITE_URL on the web app, then redeploy the web app (those three are built into it).
+# file. The API refuses to start in production without the required ones, with a clear message in the log.
 
 databases:
   - name: yapilapi-db
     databaseName: yapilapi
     user: yapilapi
-    plan: basic-256mb
+    plan: free
     postgresMajorVersion: '16'
     region: frankfurt
 
 services:
   - type: keyvalue
     name: yapilapi-cache
-    plan: starter
+    plan: free
     region: frankfurt
     # Rate limits and realtime fan-out tolerate losing keys, so evict rather than refuse writes.
     maxmemoryPolicy: allkeys-lru
@@ -41,12 +39,10 @@ services:
     runtime: docker
     dockerfilePath: infrastructure/docker/api.Dockerfile
     dockerContext: .
-    plan: starter
+    plan: free
     region: frankfurt
     branch: main
-    # Applies database migrations before the new version takes traffic. If one fails, the deploy stops
-    # and the running version keeps serving. (The image also migrates on start, which is then a no-op.)
-    preDeployCommand: sh -c "cd /app/apps/api && node --import tsx ../../packages/database/src/migrate-cli.ts"
+    # Free services have no pre-deploy step: the API applies migrations when it starts (MIGRATE_ON_START in the image).
     # Answers 200 only once the database answers, so a new version gets traffic only when it can serve it.
     healthCheckPath: /health/ready
     envVars:
@@ -218,7 +214,7 @@ services:
     runtime: docker
     dockerfilePath: infrastructure/docker/web.Dockerfile
     dockerContext: .
-    plan: starter
+    plan: free
     region: frankfurt
     branch: main
     healthCheckPath: /login

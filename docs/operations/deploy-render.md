@@ -1,5 +1,35 @@
 # Deploying YAPILAPI on Render
 
+## Free start
+
+Everything below can start at no cost. Accounts you need, all free: GitHub (already there), Render,
+Stripe (test mode), Resend and Cloudflare. Cloudflare asks for a card or PayPal to switch on R2 (photo
+and video storage) but doesn't charge within its free allowance (10 GB stored, uploads and downloads
+included). Nothing else asks for a card.
+
+The free way differs from the checklist below in five places:
+
+- **Step 4:** in **New > Blueprint**, set **Blueprint Path** to `render.free.yaml`. It creates the same
+  services on Render's free plans.
+- **Email without a domain:** until you buy a domain, use Resend's test sender: `EMAIL_FROM` =
+  `YAPILAPI <onboarding@resend.dev>`. Resend then only delivers to the email address you signed up
+  to Resend with, so sign up to YAPILAPI with that address. Add a domain (about 10 US dollars a year,
+  for example from Cloudflare Registrar) before inviting anyone.
+- **Email port:** free Render services can't use ports 25, 465 or 587, so `SMTP_URL` uses 2465:
+  `smtps://resend:<API key>@smtp.resend.com:2465` (this works on paid plans too).
+- **No Shell tab:** free services have none, so skip step 7, and do step 8 from your own computer:
+  in Render open **yapilapi-db > Connect > External Connection**, copy the **External Database URL**,
+  then with Docker Desktop running:
+
+  ```bash
+  docker run --rm postgres:16 psql "<External Database URL>" -c "UPDATE users SET role = 'admin' WHERE lower(email) = lower('you@example.com')"
+  ```
+
+  It prints `UPDATE 1`.
+- **Limits:** the site sleeps after 15 minutes without visits (the next visit takes about a minute),
+  and **the free database is deleted 30 days after it is created**. Before real people join, apply
+  `render.yaml` instead (paid plans) and move the data, or start again there.
+
 ## Go live checklist
 
 Do these in order. Steps 1 to 9 are needed for a working site; the rest are optional or can wait.
@@ -13,7 +43,7 @@ different ones, use those.
 2. **Email** (required). With Resend: **Domains > Add domain**, enter your domain, and add every DNS
    record it shows at your domain registrar. Wait until the domain says **Verified**. Then
    **API Keys > Create API key** (sending access) and note it. You now have:
-   - `SMTP_URL` = `smtps://resend:<the API key>@smtp.resend.com:465`
+   - `SMTP_URL` = `smtps://resend:<the API key>@smtp.resend.com:2465`
    - `EMAIL_FROM` = `YAPILAPI <hello@yourdomain.com>` (any address on the verified domain)
 
    Another provider works the same way; `docs/operations/launch-setup.md` (section 1) has the details.
