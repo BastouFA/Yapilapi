@@ -105,6 +105,7 @@ describe('who can reach you', () => {
       quietHours: null,
       sensitiveMedia: 'standard',
       sensitiveLocked: false,
+      readReceipts: true,
     });
   });
 
