@@ -38,7 +38,6 @@ Replace these in `apps/web/app/legal/*/page.tsx`. They have no settings behind t
 | `[Consumer cancellation rights and how to exercise them, by country.]` | Terms, section 7 | Withdrawal or cooling-off rights and how a buyer uses them (review pack, question 15) |
 | `[How long buyers keep access after a seller leaves.]` | Creator terms, section 7 | Same decision as "Owner to confirm how long" in the privacy policy |
 | `[Minimum refund rules sellers must offer.]` | Creator terms, section 8 | Any refund rules every seller must follow, beyond the law |
-| `[Payout method, currencies, minimum amount and timing.]` | Creator terms, section 9 | How payouts are paid, in which currencies, the minimum and how long they take |
 | `[U.S. designated copyright agent, if you serve the United States.]` | Copyright, "How to send a takedown notice" | The agent registered at dmca.copyright.gov, or remove it if the U.S. isn't served |
 | `[Counter-notice court jurisdiction]` | Copyright, "If your content was removed" | Which courts a counter-notice consents to, for users in and outside the U.S. |
 | `[Child safety reporting organisations, for example NCMEC]` | Safety, "Child sexual abuse material" | The organisations you report to for each launch country |

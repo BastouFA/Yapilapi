@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card, EmptyState, SensitiveCover, Select, Stat, Switch, Tabs, TextField } from '@yapilapi/design-system';
-import type { RegionalRule, RiskAccount } from '@yapilapi/api-client';
-import { FEATURE_FLAGS, formatRelativeTime, type MessageKey, type StorePurchasePolicy } from '@yapilapi/shared';
+import type { AdminPayout, RegionalRule, RiskAccount } from '@yapilapi/api-client';
+import { FEATURE_FLAGS, formatMoney, formatRelativeTime, type MessageKey, type StorePurchasePolicy } from '@yapilapi/shared';
 import { api, errorMessage, sharedRequest } from '@/lib/api';
 import { useSession, type Session } from '../../providers';
 
@@ -54,6 +54,7 @@ export default function Admin() {
                 { id: 'overview', label: t('admin.tab.overview') },
                 { id: 'flags', label: t('admin.tab.flags') },
                 { id: 'regions', label: t('admin.tab.regions') },
+                { id: 'payouts', label: t('admin.tab.payouts') },
                 { id: 'audit', label: t('admin.tab.audit') },
               ]
             : []),
@@ -73,6 +74,8 @@ export default function Admin() {
           </div>
         ) : tab === 'regions' ? (
           <RegionalRules />
+        ) : tab === 'payouts' ? (
+          <Payouts />
         ) : (
           <Audit />
         )}
@@ -628,5 +631,69 @@ function RegionalRules() {
         </form>
       </Card>
     </div>
+  );
+}
+
+/** Payouts waiting for a decision: who asked, what they still have in that currency, and where it would go. Approving sends it. */
+function Payouts() {
+  const { toast, locale, t } = useSession();
+  const [items, setItems] = useState<AdminPayout[] | null>(null);
+  const [reasons, setReasons] = useState<Record<string, string>>({});
+  const load = () =>
+    api.admin.payouts().then(
+      (r) => setItems(r.items),
+      (e) => toast(errorMessage(e)),
+    );
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const act = async (run: () => Promise<unknown>) => {
+    try {
+      await run();
+      await load();
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  };
+  return (
+    <Card title={t('admin.tab.payouts')} subtitle={t('admin.payouts.subtitle')}>
+      {items && !items.length ? <EmptyState title={t('admin.payouts.empty')} /> : null}
+      <div className="stack">
+        {items?.map((p) => (
+          <div key={p.id} className="stack-sm" style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+            <div className="row" style={{ alignItems: 'baseline' }}>
+              <strong>{formatMoney(p.amount_cents, p.currency, locale)}</strong>
+              <span>@{p.username ?? p.user_id}</span>
+              <span className="muted">{formatRelativeTime(p.created_at, locale)}</span>
+            </div>
+            <div className="row">
+              <Badge tone={p.available_cents < 0 ? 'danger' : 'neutral'}>
+                {t('admin.payouts.available', { amount: formatMoney(p.available_cents, p.currency, locale) })}
+              </Badge>
+              <Badge tone={p.account_ready ? 'neutral' : 'danger'}>{p.account_ready ? (p.account_label ?? p.currency) : t('admin.payouts.noAccount')}</Badge>
+            </div>
+            <div className="row" style={{ alignItems: 'flex-end' }}>
+              <Button disabled={!p.account_ready || p.available_cents < 0} onClick={() => act(() => api.admin.approvePayout(p.id))}>
+                {t('admin.payouts.approve')}
+              </Button>
+              <TextField
+                label={t('admin.payouts.reason')}
+                value={reasons[p.id] ?? ''}
+                onChange={(e) => setReasons({ ...reasons, [p.id]: e.currentTarget.value })}
+                maxLength={300}
+              />
+              <Button
+                variant="secondary"
+                disabled={(reasons[p.id] ?? '').trim().length < 3}
+                onClick={() => act(() => api.admin.rejectPayout(p.id, reasons[p.id]!.trim()))}
+              >
+                {t('admin.payouts.reject')}
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }

@@ -826,6 +826,15 @@ export const ar: Record<string, string> = {
   "Passkey doesn't exist or isn't visible to you.": 'مفتاح المرور غير موجود أو لا يمكنك رؤيته.',
   "That passkey isn't registered here. Sign in with your password.": 'مفتاح المرور هذا غير مسجّل هنا. سجّل الدخول بكلمة المرور.',
   "That passkey couldn't be verified.": 'تعذر التحقق من مفتاح المرور هذا.',
+  // apps/api/src/modules/payouts.ts
+  'Payouts in this currency are set up on the payment provider’s page.': 'تُعدّ الدفعات بهذه العملة على صفحة مزوّد الدفع.',
+  'Payouts in this currency are set up with a bank account.': 'تُعدّ الدفعات بهذه العملة باستخدام حساب بنكي.',
+  'Pick a bank from the list.': 'اختر بنكًا من القائمة.',
+  'Set up where your payouts go before asking for one.': 'حدّد وجهة دفعاتك قبل أن تطلب دفعة.',
+  'The bank could not confirm that account. Check the number and try again.': 'لم يتمكن البنك من تأكيد هذا الحساب. تحقق من الرقم وحاول مرة أخرى.',
+  'The smallest payout is {min} hundredths of {currency}.': 'أقل مبلغ للدفعة هو {min} جزءًا من مئة من {currency}.',
+  'This person has no payout account ready for that currency.': 'ليس لدى هذا الشخص حساب دفعات جاهز لهذه العملة.',
+  'Verify your email before setting up payouts.': 'أكّد بريدك الإلكتروني قبل إعداد الدفعات.',
   // apps/api/src/modules/phone.ts
   'That number is already confirmed on another account.': 'هذا الرقم مؤكَّد بالفعل على حساب آخر.',
   'Already in use.': 'مستخدم بالفعل.',

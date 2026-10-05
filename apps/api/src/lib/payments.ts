@@ -10,8 +10,20 @@ export interface PaymentIntent {
 
 export interface WebhookEvent {
   id: string;
-  type: 'payment.succeeded' | 'payment.failed' | 'refund.succeeded' | 'payment.disputed';
+  type:
+    | 'payment.succeeded'
+    | 'payment.failed'
+    | 'refund.succeeded'
+    | 'payment.disputed'
+    /** A payout reached the creator (providerRef: the transfer reference). */
+    | 'payout.paid'
+    /** A payout failed or was reversed: the money is theirs to ask for again. */
+    | 'payout.failed'
+    /** A hosted payout account changed (providerRef: the account); `ready` says whether it can take payouts. */
+    | 'payout_account.updated';
   providerRef: string;
+  ready?: boolean;
+  reason?: string;
   amountCents?: number;
   /** ISO 4217, upper case. When present it must match the payment's currency. */
   currency?: string;
@@ -38,6 +50,41 @@ export interface PaymentProvider {
   verifyWebhook(rawBody: string, headers: Record<string, string | string[] | undefined>): WebhookEvent | null;
   /** What the browser needs to show the provider's payment form (never a secret key). */
   publicConfig(): { provider: string; publishableKey?: string };
+  /** Sending creators their earnings, where the provider can. */
+  payouts?: PayoutRail;
+}
+
+/**
+ * How a provider pays creators. `hosted`: the creator gives their bank details on the provider's own pages
+ * (Stripe Connect), and we keep only the account's id. `bank`: they pick their bank and give an account
+ * number here, the provider keeps it as a transfer recipient, and we keep its code and the last four digits.
+ */
+export interface PayoutRail {
+  kind: 'hosted' | 'bank';
+  /** hosted: make (or reuse) the creator's account and a link to finish setting it up. */
+  onboard?(input: { accountRef?: string; email: string; country: string; userId: string; returnUrl: string }): Promise<{ accountRef: string; url: string }>;
+  /** hosted: whether the account can take payouts yet. */
+  accountReady?(accountRef: string): Promise<boolean>;
+  /** bank: the banks (and mobile money) that take payouts in a currency. */
+  banks?(currency: string): Promise<{ code: string; name: string; type: string }[]>;
+  /** bank: keep an account as a transfer recipient. */
+  addRecipient?(input: {
+    currency: string;
+    bankCode: string;
+    bankType: string;
+    accountNumber: string;
+    name: string;
+  }): Promise<{ accountRef: string; label: string }>;
+  /**
+   * Send a payout. `reference` is ours and the same on every try, so a retry never pays twice.
+   * `paid`: the money has left (Stripe moves it to the creator's account at once); `processing`: a webhook says how it went.
+   */
+  transfer(input: {
+    accountRef: string;
+    amountCents: number;
+    currency: string;
+    reference: string;
+  }): Promise<{ status: 'paid' | 'processing'; providerRef: string }>;
 }
 
 /** Development sandbox: intents start in requires_action; a signed webhook completes them. */
@@ -53,6 +100,19 @@ export function devPaymentProvider(secret: string): PaymentProvider {
     },
     publicConfig() {
       return { provider: 'dev' };
+    },
+    // A pretend bank that pays at once, so payouts can be tried end to end in development.
+    payouts: {
+      kind: 'bank',
+      async banks() {
+        return [{ code: 'DEV', name: 'Test Bank', type: 'nuban' }];
+      },
+      async addRecipient({ accountNumber }) {
+        return { accountRef: `dev_rcp_${randomUUID()}`, label: `Test Bank •••• ${accountNumber.slice(-4)}` };
+      },
+      async transfer({ reference }) {
+        return { status: 'paid', providerRef: reference };
+      },
     },
     verifyWebhook(rawBody, headers) {
       const signature = headers['x-signature'];
@@ -104,6 +164,40 @@ export function stripePaymentProvider(opts: { secretKey: string; webhookSecret: 
     publicConfig() {
       return { provider: 'stripe', publishableKey: opts.publishableKey };
     },
+    // Stripe Connect Express: creators give Stripe their bank details on Stripe's pages; a transfer moves the
+    // money to their Stripe account at once and Stripe pays it out to their bank.
+    payouts: {
+      kind: 'hosted',
+      async onboard({ accountRef, email, country, userId, returnUrl }) {
+        const id =
+          accountRef ??
+          (
+            await stripe.accounts.create(
+              { type: 'express', country, email, capabilities: { transfers: { requested: true } }, metadata: { userId } },
+              { idempotencyKey: `acct_${userId}` },
+            )
+          ).id;
+        const link = await stripe.accountLinks.create({ account: id, type: 'account_onboarding', return_url: returnUrl, refresh_url: returnUrl });
+        return { accountRef: id, url: link.url };
+      },
+      async accountReady(accountRef) {
+        const a = await stripe.accounts.retrieve(accountRef);
+        return !!a.payouts_enabled && a.capabilities?.transfers === 'active';
+      },
+      async transfer({ accountRef, amountCents, currency, reference }) {
+        const t = await stripe.transfers.create(
+          {
+            amount: toStripeAmount(amountCents, currency),
+            currency: currency.toLowerCase(),
+            destination: accountRef,
+            transfer_group: reference,
+            metadata: { reference },
+          },
+          { idempotencyKey: reference },
+        );
+        return { status: 'paid', providerRef: t.id };
+      },
+    },
     verifyWebhook(rawBody, headers) {
       const sig = headers['stripe-signature'];
       const event = stripe.webhooks.constructEvent(rawBody, typeof sig === 'string' ? sig : '', opts.webhookSecret);
@@ -128,6 +222,15 @@ export function stripePaymentProvider(opts: { secretKey: string; webhookSecret: 
         const d = event.data.object;
         const ref = typeof d.payment_intent === 'string' ? d.payment_intent : d.payment_intent?.id;
         return ref ? { id: event.id, type: 'payment.disputed', providerRef: ref } : null;
+      }
+      // A creator finished (or lost) the setup of their payout account.
+      if (event.type === 'account.updated') {
+        const a = event.data.object;
+        return { id: event.id, type: 'payout_account.updated', providerRef: a.id, ready: !!a.payouts_enabled && a.capabilities?.transfers === 'active' };
+      }
+      // A payout taken back: the money goes back to the creator's balance to ask for again.
+      if (event.type === 'transfer.reversed') {
+        return { id: event.id, type: 'payout.failed', providerRef: event.data.object.id, reason: 'The payout was reversed.' };
       }
       return null;
     },
@@ -154,11 +257,11 @@ export function paystackPaymentProvider(opts: {
 }): PaymentProvider {
   const f = opts.fetch ?? fetch;
   const base = opts.baseUrl ?? 'https://api.paystack.co';
-  async function call<T>(path: string, body: unknown): Promise<T> {
+  async function call<T>(path: string, body?: unknown): Promise<T> {
     const res = await f(`${base}${path}`, {
-      method: 'POST',
+      method: body === undefined ? 'GET' : 'POST',
       headers: { authorization: `Bearer ${opts.secretKey}`, 'content-type': 'application/json' },
-      body: JSON.stringify(body),
+      body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(20_000),
     });
     const json = (await res.json().catch(() => null)) as { status?: boolean; message?: string; data?: T } | null;
@@ -193,6 +296,39 @@ export function paystackPaymentProvider(opts: {
     publicConfig() {
       return { provider: 'paystack', publishableKey: opts.publicKey };
     },
+    // Transfers from the Paystack balance to a bank or mobile money account the creator gives here. Paystack
+    // keeps the account as a transfer recipient. Transfers need OTP turned off in the Paystack dashboard.
+    payouts: {
+      kind: 'bank',
+      async banks(currency) {
+        const data = await call<{ code: string; name: string; type: string; active?: boolean }[]>(`/bank?currency=${encodeURIComponent(currency)}&perPage=100`);
+        return data.filter((b) => b.active !== false).map((b) => ({ code: b.code, name: b.name, type: b.type }));
+      },
+      async addRecipient({ currency, bankCode, bankType, accountNumber, name }) {
+        const data = await call<{ recipient_code: string; details?: { bank_name?: string; account_number?: string } }>('/transferrecipient', {
+          type: bankType,
+          name,
+          account_number: accountNumber,
+          bank_code: bankCode,
+          currency,
+        });
+        const last4 = (data.details?.account_number ?? accountNumber).slice(-4);
+        return { accountRef: data.recipient_code, label: `${data.details?.bank_name ?? bankCode} •••• ${last4}` };
+      },
+      async transfer({ accountRef, amountCents, currency, reference }) {
+        const data = await call<{ status?: string; transfer_code?: string }>('/transfer', {
+          source: 'balance',
+          amount: amountCents,
+          currency,
+          recipient: accountRef,
+          reference,
+          reason: 'YAPILAPI earnings',
+        });
+        if (data.status === 'otp') throw new Error('Paystack transfers need OTP turned off in the Paystack dashboard.');
+        if (data.status === 'failed') throw new Error('Paystack refused the transfer.');
+        return { status: data.status === 'success' ? 'paid' : 'processing', providerRef: reference };
+      },
+    },
     verifyWebhook(rawBody, headers) {
       const signature = headers['x-paystack-signature'];
       const expected = Buffer.from(createHmac('sha512', opts.secretKey).update(rawBody).digest('hex'));
@@ -225,6 +361,16 @@ export function paystackPaymentProvider(opts: {
         const ref = d.transaction_reference ?? d.transaction?.reference;
         return ref ? { id: `paystack:refund.processed:${d.id ?? ref}`, type: 'refund.succeeded', providerRef: ref } : null;
       }
+      // Payouts: our reference comes back with how the transfer went.
+      if (event.event === 'transfer.success' && d.reference)
+        return { id: `paystack:transfer.success:${d.reference}`, type: 'payout.paid', providerRef: d.reference };
+      if ((event.event === 'transfer.failed' || event.event === 'transfer.reversed') && d.reference)
+        return {
+          id: `paystack:${event.event}:${d.reference}`,
+          type: 'payout.failed',
+          providerRef: d.reference,
+          reason: event.event === 'transfer.reversed' ? 'The payout was reversed.' : 'The bank refused the payout.',
+        };
       return null;
     },
   };

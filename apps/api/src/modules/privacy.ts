@@ -264,6 +264,8 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         // Nothing can reach this phone or browser any more, and nobody can sign in with these.
         `DELETE FROM push_subscriptions WHERE user_id = $1`,
         `DELETE FROM passkeys WHERE user_id = $1`,
+        // Where their payouts went (the provider keeps its own record; payouts themselves stay for the accounting period).
+        `DELETE FROM payout_accounts WHERE user_id = $1`,
         // Earlier usernames stop leading here, the devices seen for sign-in alerts are forgotten, and nothing scheduled goes out.
         `DELETE FROM username_history WHERE user_id = $1`,
         `DELETE FROM known_sign_ins WHERE user_id = $1`,
