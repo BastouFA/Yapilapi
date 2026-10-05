@@ -1273,4 +1273,10 @@ export const sw: Record<string, string> = {
   "You can't change your own role.": 'Huwezi kubadilisha jukumu lako mwenyewe.',
   // apps/api/src/modules/developer.ts (trust and safety sweep)
   'Use a web address that starts with https://.': 'Tumia anwani ya wavuti inayoanza na https://.',
+  // apps/api/src/lib/publishing.ts (audio posts)
+  'A reel is a video. Share a recording as a post.': 'Reel ni video. Shiriki rekodi kama chapisho.',
+  'A recording goes in a post on its own, without photos, videos or a poll.': 'Rekodi huwekwa peke yake kwenye chapisho, bila picha, video au kura ya maoni.',
+  'This recording is too short.': 'Rekodi hii ni fupi mno.',
+  'Recordings can be up to 5 minutes, or 10 minutes with YAPILAPI Plus.': 'Rekodi zinaweza kuwa hadi dakika 5, au dakika 10 ukiwa na YAPILAPI Plus.',
+  'Recordings can be up to 10 minutes.': 'Rekodi zinaweza kuwa hadi dakika 10.',
 };

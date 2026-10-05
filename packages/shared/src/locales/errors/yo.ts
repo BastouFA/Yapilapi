@@ -1258,4 +1258,10 @@ export const yo: Record<string, string> = {
   "You can't change your own role.": 'O kò lè yí ipa tìrẹ padà.',
   // apps/api/src/modules/developer.ts (trust and safety sweep)
   'Use a web address that starts with https://.': 'Lo àdírẹ́sì wẹ́ẹ̀bù tí ó bẹ̀rẹ̀ pẹ̀lú https://.',
+  // apps/api/src/lib/publishing.ts (audio posts)
+  'A reel is a video. Share a recording as a post.': 'Fídíò ni reel. Pín ohùn tí o gbà sílẹ̀ gẹ́gẹ́ bí ìfiránṣẹ́.',
+  'A recording goes in a post on its own, without photos, videos or a poll.': 'Ohùn tí a gbà sílẹ̀ máa ń dá wà nínú ìfiránṣẹ́, láìsí fọ́tò, fídíò tàbí ìbò.',
+  'This recording is too short.': 'Ohùn yìí kúrú jù.',
+  'Recordings can be up to 5 minutes, or 10 minutes with YAPILAPI Plus.': 'Ohùn tí a gbà sílẹ̀ lè gùn tó ìṣẹ́jú 5, tàbí ìṣẹ́jú 10 pẹ̀lú YAPILAPI Plus.',
+  'Recordings can be up to 10 minutes.': 'Ohùn tí a gbà sílẹ̀ lè gùn tó ìṣẹ́jú 10.',
 };

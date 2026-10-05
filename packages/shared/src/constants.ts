@@ -154,6 +154,15 @@ export type UserRole = (typeof USER_ROLES)[number];
 export const IMAGE_ACCEPT = 'image/*,.heic,.heif,.avif,.tif,.tiff,.bmp';
 export const VIDEO_ACCEPT = 'video/*,.mov,.mkv,.avi,.3gp,.3g2,.m4v,.mpg,.mpeg,.ts,.webm';
 export const MEDIA_ACCEPT = `${IMAGE_ACCEPT},${VIDEO_ACCEPT}`;
+export const AUDIO_ACCEPT = 'audio/*,.m4a,.mp3,.aac,.wav,.ogg,.oga,.opus,.flac,.amr,.weba';
+
+/**
+ * Audio posts: one recording on its own (a voice note, a song you made, a clip of a talk), up to 5
+ * minutes, or 10 with YAPILAPI Plus. Shorter than a second is too short to be anything.
+ */
+export const AUDIO_POST_MAX_MS = 5 * 60_000;
+export const PLUS_AUDIO_POST_MAX_MS = 10 * 60_000;
+export const AUDIO_POST_MIN_MS = 1000;
 
 /** Whether a picked file is a video, from its type or, when the browser doesn't know it, its extension. */
 export function isVideoFile(file: { type: string; name: string }): boolean {

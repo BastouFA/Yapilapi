@@ -1271,4 +1271,10 @@ export const es: Record<string, string> = {
   "You can't change your own role.": 'No puedes cambiar tu propio rol.',
   // apps/api/src/modules/developer.ts (trust and safety sweep)
   'Use a web address that starts with https://.': 'Usa una dirección web que empiece por https://.',
+  // apps/api/src/lib/publishing.ts (audio posts)
+  'A reel is a video. Share a recording as a post.': 'Un reel es un video. Comparte una grabación como publicación.',
+  'A recording goes in a post on its own, without photos, videos or a poll.': 'Una grabación va sola en una publicación, sin fotos, videos ni encuesta.',
+  'This recording is too short.': 'Esta grabación es demasiado corta.',
+  'Recordings can be up to 5 minutes, or 10 minutes with YAPILAPI Plus.': 'Las grabaciones pueden durar hasta 5 minutos, o 10 minutos con YAPILAPI Plus.',
+  'Recordings can be up to 10 minutes.': 'Las grabaciones pueden durar hasta 10 minutos.',
 };

@@ -1276,4 +1276,11 @@ export const ha: Record<string, string> = {
   "You can't change your own role.": 'Ba za ka iya canza matsayinka da kanka ba.',
   // apps/api/src/modules/developer.ts (trust and safety sweep)
   'Use a web address that starts with https://.': 'Yi amfani da adireshin yanar gizo da ya fara da https://.',
+  // apps/api/src/lib/publishing.ts (audio posts)
+  'A reel is a video. Share a recording as a post.': 'Reel bidiyo ne. Raba rikodi a matsayin rubutu.',
+  'A recording goes in a post on its own, without photos, videos or a poll.':
+    'Rikodi yana shiga rubutu shi kaɗai, ba tare da hotuna, bidiyo ko ƙuri’ar jin ra’ayi ba.',
+  'This recording is too short.': 'Wannan rikodin ya yi gajarta sosai.',
+  'Recordings can be up to 5 minutes, or 10 minutes with YAPILAPI Plus.': 'Rikodi zai iya kai minti 5, ko minti 10 da YAPILAPI Plus.',
+  'Recordings can be up to 10 minutes.': 'Rikodi zai iya kai minti 10.',
 };

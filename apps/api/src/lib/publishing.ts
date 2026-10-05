@@ -1,11 +1,20 @@
 import type { Pool, PoolClient } from 'pg';
 import { tx } from '@yapilapi/database';
-import { SCHEDULE_MAX_DAYS, SCHEDULE_MIN_MINUTES, type CreatePostInput, type ModerationNotice } from '@yapilapi/shared';
+import {
+  AUDIO_POST_MAX_MS,
+  AUDIO_POST_MIN_MS,
+  PLUS_AUDIO_POST_MAX_MS,
+  SCHEDULE_MAX_DAYS,
+  SCHEDULE_MIN_MINUTES,
+  TRANSLATION_LANGUAGES,
+  type CreatePostInput,
+  type ModerationNotice,
+} from '@yapilapi/shared';
 import { moderationOf } from './notices.ts';
 import type { AppContext } from './context.ts';
 import { AppError, badRequest, forbidden, notFound } from './errors.ts';
 import { scheduledPostFailureCode, scheduledPostFailureEnglish } from './failures.ts';
-import { enqueueAt, type JobHandler } from './jobs.ts';
+import { enqueue, enqueueAt, type JobHandler } from './jobs.ts';
 import { analyzeText, statusForRisk, type Analysis } from './moderation.ts';
 import { notifyMentions } from './mentions.ts';
 import { assertCanInvite, assertCanTag, notifyCollabInvites, notifyPhotoTags } from './collabs.ts';
@@ -25,7 +34,7 @@ import type { PreparedMusic } from './music/index.ts';
 import { claimEcho, linkEcho } from './echoes.ts';
 
 type Q = Pool | PoolClient;
-type Deps = Pick<AppContext, 'db' | 'config' | 'realtime' | 'music'>;
+type Deps = Pick<AppContext, 'db' | 'config' | 'realtime' | 'music'> & Partial<Pick<AppContext, 'transcription'>>;
 
 /** Check the music a new post, reel or draft asks for (outside a transaction: it may ask the song's provider). */
 export async function prepareMusic(deps: Pick<AppContext, 'music'>, userId: string, input: CreatePostInput): Promise<PreparedMusic | null> {
@@ -67,6 +76,21 @@ export function postKind(input: CreatePostInput): CreatePostInput['kind'] {
 }
 
 /**
+ * The kind of each uploaded item as stored (what the file turned out to be), not as the app said.
+ * An address from elsewhere has no stored kind and keeps the one given.
+ */
+async function withStoredKinds(c: PoolClient, userId: string, input: CreatePostInput): Promise<CreatePostInput> {
+  const ids = input.media.flatMap((m) => (m.id ? [m.id] : []));
+  if (!ids.length) return input;
+  const { rows } = await c.query<{ id: string; kind: 'image' | 'video' | 'audio' }>(`SELECT id, kind FROM media WHERE id = ANY($1::uuid[]) AND owner_id = $2`, [
+    ids,
+    userId,
+  ]);
+  const kinds = new Map(rows.map((r) => [r.id, r.kind]));
+  return { ...input, media: input.media.map((m) => (m.id && kinds.has(m.id) ? { ...m, kind: kinds.get(m.id)! } : m)) };
+}
+
+/**
  * Write a post's content: a new post (published, draft or scheduled), or, with
  * `id`, replace what one of your drafts or scheduled posts says and shows. Checks
  * everything the author must own or be allowed to use. Call inside a transaction.
@@ -74,10 +98,16 @@ export function postKind(input: CreatePostInput): CreatePostInput['kind'] {
 export async function writePost(
   c: PoolClient,
   userId: string,
-  input: CreatePostInput,
+  given: CreatePostInput,
   opts: { id?: string; state: PostState; scheduledAt?: Date | null; moderationStatus?: string; music?: PreparedMusic | null },
 ): Promise<{ id: string; kind: string; taggedIds: string[]; remixAuthor: string | null; echo: EchoPosted | null }> {
+  const input = await withStoredKinds(c, userId, given);
   const kind = postKind(input);
+  // A recording is a post of its own: not a reel, and without photos, videos or a poll.
+  if (input.media.some((m) => m.kind === 'audio')) {
+    if (input.format === 'reel') throw badRequest('A reel is a video. Share a recording as a post.');
+    if (input.media.length > 1 || input.poll) throw badRequest('A recording goes in a post on its own, without photos, videos or a poll.');
+  }
   // Music was checked by prepareMusic; photo, carousel and text posts, or a reel with a catalogue song.
   if (input.music && !opts.music) throw new Error('writePost: check the music with prepareMusic first');
   const music = input.music ? opts.music! : null;
@@ -223,6 +253,15 @@ export async function writePost(
     }
     await c.query(`INSERT INTO post_media (post_id, media_id, position) VALUES ($1,$2,$3)`, [id, mediaId, i]);
     mediaIds.push(mediaId);
+    if (m.kind === 'audio') {
+      // Uploads have their length once stored; one from elsewhere has none and isn't checked here.
+      const len = (await c.query(`SELECT duration_ms FROM media WHERE id = $1`, [mediaId])).rows[0]?.duration_ms as number | null | undefined;
+      if (len && len < AUDIO_POST_MIN_MS) throw badRequest('This recording is too short.');
+      if (len && len > AUDIO_POST_MAX_MS) {
+        if (!(await isPlus(c, userId))) throw badRequest('Recordings can be up to 5 minutes, or 10 minutes with YAPILAPI Plus.');
+        if (len > PLUS_AUDIO_POST_MAX_MS) throw badRequest('Recordings can be up to 10 minutes.');
+      }
+    }
     if (input.format === 'reel') {
       // Reels are short. Uploads still processing have no length yet; those are checked by the player, not refused here.
       const len = (await c.query(`SELECT duration_ms FROM media WHERE id = $1`, [mediaId])).rows[0]?.duration_ms;
@@ -357,6 +396,31 @@ export function moderationNotice(s: Screening, limitedNow: boolean): ModerationN
  * A post just went out: analytics, webhooks, and (when it isn't held for
  * review) mentions, photo tags, co-author invites and the duet, remix or echo notice.
  */
+/**
+ * An audio post gets a transcript, in its author's language, when speech-to-text is set up: the
+ * apps show it under the player, for people who can't or would rather not listen. Captions the
+ * author already has in that language are kept.
+ */
+async function transcribeRecording(deps: Deps, postId: string): Promise<void> {
+  if (!deps.transcription) return;
+  const { rows } = await deps.db.query<{ media_id: string; author_id: string; locale: string }>(
+    `SELECT pm.media_id, p.author_id, pr.locale
+     FROM post_media pm JOIN media m ON m.id = pm.media_id JOIN posts p ON p.id = pm.post_id JOIN profiles pr ON pr.user_id = p.author_id
+     WHERE pm.post_id = $1 AND m.kind = 'audio' AND m.owner_id = p.author_id`,
+    [postId],
+  );
+  for (const r of rows) {
+    const lang = r.locale.split('-')[0]!.toLowerCase();
+    const label = TRANSLATION_LANGUAGES.find((l) => l.code === lang)?.autonym ?? lang;
+    const made = await deps.db.query<{ id: string }>(
+      `INSERT INTO caption_tracks (media_id, lang, label, source, status, created_by) VALUES ($1,$2,$3,'auto','processing',$4)
+       ON CONFLICT (media_id, lang) DO NOTHING RETURNING id`,
+      [r.media_id, lang, label, r.author_id],
+    );
+    if (made.rows[0]) await enqueue(deps.db, 'captions.transcribe', { trackId: made.rows[0].id });
+  }
+}
+
 export async function announcePost(
   deps: Deps,
   p: {
@@ -378,6 +442,7 @@ export async function announcePost(
   const { db, realtime } = deps;
   track(db, p.authorId, 'post_created', { kind: p.kind, visibility: p.visibility, community: !!p.communityId });
   await emitWebhook(db, p.authorId, 'post.created', { postId: p.postId, kind: p.kind, visibility: p.visibility });
+  if (p.kind === 'audio') await transcribeRecording(deps, p.postId);
   if (p.status !== 'normal') return;
   // Mentions in the text (posts and reel captions alike), photo tags and co-author invites.
   await notifyMentions(db, realtime, { text: p.body, actorId: p.authorId, postId: p.postId, skip: [...p.taggedIds, ...p.collaborators] });

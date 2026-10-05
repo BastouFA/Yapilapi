@@ -56,17 +56,22 @@ function fieldError(field: string, message: string) {
 export default async function studioModule(app: FastifyInstance, ctx: AppContext) {
   const db = ctx.db;
 
-  async function ownVideo(id: string, userId: string) {
+  /** Your video, or with `captioned` also your recording (captions are its transcript). */
+  async function ownVideo(id: string, userId: string, { captioned = false } = {}) {
     const { rows } = await db.query(
-      `SELECT id, storage_key, duration_ms, (variants ? 'mp4') AS processed FROM media WHERE id = $1 AND owner_id = $2 AND kind = 'video' AND NOT private`,
-      [id, userId],
+      `SELECT id, storage_key, duration_ms, (kind = 'audio' OR variants ? 'mp4') AS processed FROM media
+       WHERE id = $1 AND owner_id = $2 AND kind = ANY($3::text[]) AND NOT private`,
+      [id, userId, captioned ? ['video', 'audio'] : ['video']],
     );
     if (!rows[0]) throw notFound('That video');
     return rows[0] as { id: string; storage_key: string | null; duration_ms: number | null; processed: boolean };
   }
 
   async function visibleVideo(id: string, viewer: string | null) {
-    const { rows } = await db.query(`SELECT m.id, m.owner_id FROM media m WHERE m.id = $2 AND m.kind = 'video' AND ${mediaVisibleSql('$1')}`, [viewer, id]);
+    const { rows } = await db.query(`SELECT m.id, m.owner_id FROM media m WHERE m.id = $2 AND m.kind IN ('video', 'audio') AND ${mediaVisibleSql('$1')}`, [
+      viewer,
+      id,
+    ]);
     if (!rows[0]) throw notFound('That video');
     return { id: rows[0].id as string, isOwner: rows[0].owner_id === viewer };
   }
@@ -214,7 +219,7 @@ export default async function studioModule(app: FastifyInstance, ctx: AppContext
     const u = me(req);
     const { id, lang } = parse(langParam, req.params);
     const input = parse(cuesSchema, req.body);
-    const video = await ownVideo(id, u.id);
+    const video = await ownVideo(id, u.id, { captioned: true });
     const cues = input.cues.map((c, i) => {
       const text = sanitizeCueText(c.text);
       if (!text) throw fieldError(`cues.${i}.text`, 'Add the words for this caption, or remove it.');
@@ -230,7 +235,7 @@ export default async function studioModule(app: FastifyInstance, ctx: AppContext
   app.put('/v1/media/:id/captions/:lang/file', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (req) => {
     const u = me(req);
     const { id, lang } = parse(langParam, req.params);
-    await ownVideo(id, u.id);
+    await ownVideo(id, u.id, { captioned: true });
     if (!req.isMultipart()) throw badRequest('Attach a .vtt file.');
     const file = await req.file({ limits: { fileSize: MAX_VTT_BYTES, files: 1 } });
     if (!file) throw badRequest('Attach a .vtt file.');
@@ -251,7 +256,7 @@ export default async function studioModule(app: FastifyInstance, ctx: AppContext
 
   app.delete('/v1/media/:id/captions/:lang', { preHandler: requireAuth }, async (req) => {
     const { id, lang } = parse(langParam, req.params);
-    await ownVideo(id, me(req).id);
+    await ownVideo(id, me(req).id, { captioned: true });
     const r = await db.query(`DELETE FROM caption_tracks WHERE media_id = $1 AND lang = $2`, [id, lang]);
     if (!r.rowCount) throw notFound('Those captions');
     return { ok: true };
@@ -262,7 +267,7 @@ export default async function studioModule(app: FastifyInstance, ctx: AppContext
     const u = me(req);
     const { id } = parse(idParam, req.params);
     const input = parse(z.object({ lang: langParam.shape.lang, label: labelSchema }), req.body);
-    const video = await ownVideo(id, u.id);
+    const video = await ownVideo(id, u.id, { captioned: true });
     if (!ctx.transcription)
       throw new AppError(
         501,
