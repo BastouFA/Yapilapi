@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { t, tp, type MessageKey, type PluralKey } from './i18n.ts';
-import { dayPartOf, momentGroups, peopleGroups, pickBestOf, togetherClosesAt, togetherClosesAtOk, togetherFileName, togetherNoticeText } from './together.ts';
+import {
+  dayPartOf,
+  momentGroups,
+  peopleGroups,
+  pickBestOf,
+  togetherClosesAt,
+  togetherClosesAtOk,
+  togetherFileName,
+  togetherNoticeText,
+  withItems,
+  type TogetherItem,
+} from './together.ts';
 
 const user = (id: string, displayName = id) => ({ id, username: id, displayName, avatarUrl: null, mode: 'personal' as const });
 
@@ -40,6 +51,18 @@ describe('Together helpers', () => {
       { id: 'none', authorId: 'c', stars: 0, reactions: 0, takenAt: '2026-01-01T12:00:00Z' },
     ]);
     expect(best).toEqual(['early', 'late']);
+  });
+
+  it('works the best of out again when a star or reaction changes, so it follows straight away', () => {
+    const item = (id: string, stars: number, takenAt: string) =>
+      ({ id, author: user('ada'), stars, reactions: [], takenAt, best: false }) as unknown as TogetherItem;
+    const album = { bestOf: [] as string[], items: [item('a', 0, '2026-01-01T10:00:00Z'), item('b', 0, '2026-01-01T11:00:00Z')] };
+    const starred = withItems(album, album.items.map((i) => (i.id === 'b' ? { ...i, stars: 1 } : i)));
+    expect(starred.bestOf).toEqual(['b']);
+    expect(starred.items.map((i) => i.best)).toEqual([false, true]);
+    const unstarred = withItems(starred, starred.items.map((i) => ({ ...i, stars: 0 })));
+    expect(unstarred.bestOf).toEqual([]);
+    expect(unstarred.items.every((i) => !i.best)).toBe(true);
   });
 
   it('checks closing times and works out the windows', () => {

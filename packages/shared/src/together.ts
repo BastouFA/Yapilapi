@@ -333,6 +333,29 @@ export function pickBestOf(items: BestOfCandidate[], max = TOGETHER_BEST_MAX): s
   return [...picked].sort((a, b) => order.get(a)!.localeCompare(order.get(b)!) || a.localeCompare(b));
 }
 
+/** The best of from an album's items as the apps hold them (ids, oldest first). */
+export function bestOfItems(items: Pick<TogetherItem, 'id' | 'author' | 'stars' | 'reactions' | 'takenAt'>[]): string[] {
+  return pickBestOf(
+    items.map((i) => ({
+      id: i.id,
+      authorId: i.author.id,
+      stars: i.stars,
+      reactions: i.reactions.reduce((n, r) => n + r.count, 0),
+      takenAt: i.takenAt,
+    })),
+  );
+}
+
+/**
+ * An album with these items and its best of worked out again: after a star, a reaction or a
+ * removal, the apps update the best of straight away instead of waiting for the next load.
+ */
+export function withItems<A extends { items: TogetherItem[]; bestOf: string[] }>(album: A, items: TogetherItem[]): A {
+  const bestOf = bestOfItems(items);
+  const best = new Set(bestOf);
+  return { ...album, bestOf, items: items.map((i) => (i.best === best.has(i.id) ? i : { ...i, best: best.has(i.id) })) };
+}
+
 /** A file name for saving an item: the album's title in plain letters, and the item. */
 export function togetherFileName(title: string, itemId: string, kind: 'image' | 'video', url?: string | null): string {
   const slug = title
