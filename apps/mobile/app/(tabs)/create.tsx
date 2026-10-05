@@ -66,6 +66,10 @@ type Kind = (typeof KINDS)[number]['id'];
 /** 'circle' is offered for posts and reels once you have a circle; the post goes to the one chosen. */
 type Visibility = (typeof VISIBILITY)[number]['id'] | 'circle';
 type Attached = Uploaded & { local: string; seconds: number | null };
+/** A photo or video after the first in a post (a carousel). `tags`: a draft's photo tags, kept as they are. */
+type Extra = Attached & { altText: string; tags?: { userId: string; x: number; y: number }[] };
+/** Photos and videos in one post, as on the web. */
+const MAX_POST_MEDIA = 10;
 /** The reel a duet plays beside, or a remix takes its sound from. */
 type Original = { id: string; username: string; media: MediaItem | null; soundTitle: string | null };
 
@@ -99,9 +103,13 @@ export default function Create() {
   const [draftId, setDraftId] = useState<string | null>(null);
   // A draft's audience that the choices here don't cover (a circle or chosen people): kept unless another is picked.
   const [keptAudience, setKeptAudience] = useState<{ visibility: string; circleId: string | null; audience: string[] } | null>(null);
-  // What a draft started on the web has that this composer doesn't show (more photos, a poll, a link,
-  // a community, an event, a product, topics): kept as it is, so saving or publishing here doesn't drop it.
-  const [keptParts, setKeptParts] = useState<{ media: Record<string, unknown>[]; fields: Record<string, unknown> } | null>(null);
+  // What a draft started on the web has that this composer doesn't show (a community, an event, a
+  // product, topics): kept as it is, so saving or publishing here doesn't drop it.
+  const [keptParts, setKeptParts] = useState<{ fields: Record<string, unknown> } | null>(null);
+  // Posts: more photos and videos after the first (a carousel), a poll (2 to 6 options) and a link.
+  const [more, setMore] = useState<Extra[]>([]);
+  const [poll, setPoll] = useState<string[] | null>(null);
+  const [link, setLink] = useState<string | null>(null);
   const [scheduling, setScheduling] = useState(false);
   const [keeping, setKeeping] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
@@ -260,28 +268,26 @@ export default function Create() {
           // Topics chosen on the web; the text's own #tags come from the text as it is when saved.
           const inText = new Set(extractHashtags(post.body));
           const chosen = post.topics.filter((x) => !inText.has(x));
+          setMore(
+            more.map((x) => ({
+              id: x.id,
+              kind: x.kind,
+              url: x.url,
+              local: mediaUrl(x.variants?.medium ?? x.url),
+              seconds: null,
+              altText: x.altText ?? '',
+              ...(x.kind === 'image' && x.tags?.length ? { tags: x.tags.map((g) => ({ userId: g.user.id, x: g.x, y: g.y })) } : {}),
+            })),
+          );
+          setPoll(post.poll ? post.poll.options.map((o) => o.label) : null);
+          setLink(post.linkUrl ?? null);
           const fields = {
-            ...(post.poll ? { poll: { options: post.poll.options.map((o) => o.label) } } : {}),
-            ...(post.linkUrl ? { linkUrl: post.linkUrl } : {}),
             ...(post.community ? { communityId: post.community.id } : {}),
             ...(post.event ? { eventId: post.event.id } : {}),
             ...(post.product ? { productId: post.product.id } : {}),
             ...(chosen.length ? { topics: chosen } : {}),
           };
-          setKeptParts(
-            more.length || Object.keys(fields).length
-              ? {
-                  media: more.map((x) => ({
-                    id: x.id,
-                    url: mediaUrl(x.url),
-                    kind: x.kind,
-                    ...(x.altText ? { altText: x.altText } : {}),
-                    ...(x.kind === 'image' && x.tags?.length ? { tags: x.tags.map((g) => ({ userId: g.user.id, x: g.x, y: g.y })) } : {}),
-                  })),
-                  fields,
-                }
-              : null,
-          );
+          setKeptParts(Object.keys(fields).length ? { fields } : null);
           restoredTags.current = (m?.tags ?? []).map((x) => ({ user: x.user, x: x.x, y: x.y }));
           restoredAlt.current = true;
           setAltText(m?.altText ?? '');
@@ -478,8 +484,32 @@ export default function Create() {
     return null;
   }
 
-  // Music goes on photo and text posts (not videos).
-  const postCanHaveMusic = !media || media.kind === 'image';
+  // Music goes on photo and text posts (not videos, polls or links).
+  const postCanHaveMusic = (!media || media.kind === 'image') && more.every((m) => m.kind === 'image') && !poll && !link?.trim();
+  const pollOptions = poll?.map((o) => o.trim()).filter(Boolean) ?? [];
+
+  /** Another photo or video for a post (a carousel), uploaded as it is. */
+  async function addMore() {
+    setError(null);
+    const asset = await pickOne(['images', 'videos'], me?.plus ? PLUS_REEL_MAX_SECONDS : REEL_MAX_SECONDS).catch((e: unknown) => {
+      setError(errorMessage(e));
+      return null;
+    });
+    if (asset === 'denied') return setDenied(true);
+    setDenied(false);
+    if (!asset) return;
+    const check = validate(asset);
+    if (check) return setError(check);
+    setProgress(0);
+    try {
+      const m = await uploadPicked(asset, setProgress);
+      setMore((cur) => [...cur, { ...m, local: asset.uri, seconds: asset.duration ? asset.duration / 1000 : null, altText: '' }]);
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setProgress(null);
+    }
+  }
 
   /** What the post or reel says and shows. */
   function content(): Record<string, unknown> {
@@ -525,9 +555,18 @@ export default function Create() {
           },
         ]
       : [];
-    const all = [...first, ...(keptParts?.media ?? [])];
+    const rest = more.map((x) => ({
+      id: x.id,
+      url: mediaUrl(x.url),
+      kind: x.kind,
+      ...(x.altText.trim() ? { altText: x.altText.trim() } : {}),
+      ...(x.tags?.length ? { tags: x.tags } : {}),
+    }));
+    const all = [...first, ...rest];
     return {
       ...keptParts?.fields,
+      ...(poll ? { poll: { options: pollOptions } } : {}),
+      ...(link?.trim() ? { linkUrl: link.trim() } : {}),
       body,
       ...assisted,
       ...audience,
@@ -557,6 +596,9 @@ export default function Create() {
     setDraftId(null);
     setKeptAudience(null);
     setKeptParts(null);
+    setMore([]);
+    setPoll(null);
+    setLink(null);
     setCommentPolicy('everyone');
     setAllowRemix(true);
     setAllowEchoes('default');
@@ -641,7 +683,13 @@ export default function Create() {
     !uploading &&
     (!forCircle || !!chosenCircle) &&
     (kind !== 'reel' || !remix || !!original) &&
-    (kind === 'reel' ? media?.kind === 'video' : !!body.trim() || !!media || (kind === 'story' && (stickers.length > 0 || !!music)));
+    (kind !== 'post' || !poll || pollOptions.length >= 2) &&
+    (kind === 'reel'
+      ? media?.kind === 'video'
+      : !!body.trim() ||
+        !!media ||
+        (kind === 'post' && (more.length > 0 || !!poll || !!link?.trim())) ||
+        (kind === 'story' && (stickers.length > 0 || !!music)));
   const audienceOptions: { id: Visibility; label: string }[] = [
     ...VISIBILITY.filter((v) => v.id !== 'subscribers' || (hasPlans && kind !== 'story')).map((v) => ({ id: v.id, label: t(v.label) })),
     ...(kind !== 'story' && circles?.length
@@ -759,6 +807,33 @@ export default function Create() {
               onPress={() => choose()}
               style={{ alignSelf: 'flex-start' }}
             />
+            {kind === 'post'
+              ? more.map((x, i) => (
+                  <View key={x.id} style={{ gap: space[2] }}>
+                    <Preview media={x} onRemove={() => setMore((cur) => cur.filter((y) => y.id !== x.id))} />
+                    {x.kind !== 'audio' ? (
+                      <Field
+                        label={t('compose.altTextLabel', { number: i + 2 })}
+                        placeholder={t('m.create.altTextPlaceholder')}
+                        value={x.altText}
+                        onChangeText={(v) => setMore((cur) => cur.map((y) => (y.id === x.id ? { ...y, altText: v } : y)))}
+                        maxLength={500}
+                      />
+                    ) : null}
+                  </View>
+                ))
+              : null}
+            {kind === 'post' && (media || more.length) && (media ? 1 : 0) + more.length < MAX_POST_MEDIA && media?.kind !== 'audio' ? (
+              <Button
+                label={t('compose.addMore')}
+                icon="add-circle-outline"
+                variant="secondary"
+                size="sm"
+                disabled={uploading || busy}
+                onPress={() => void addMore()}
+                style={{ alignSelf: 'flex-start' }}
+              />
+            ) : null}
             {kind !== 'reel' ? (
               <Button
                 label={t(kind === 'story' ? 'collage.fromPhotos' : 'collage.make')}
@@ -769,6 +844,61 @@ export default function Create() {
                 onPress={makeCollage}
                 style={{ alignSelf: 'flex-start' }}
               />
+            ) : null}
+            {kind === 'post' && (!poll || link === null) ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+                {!poll ? (
+                  <Button label={t('m.sticker.kind.poll')} icon="stats-chart-outline" variant="secondary" size="sm" onPress={() => setPoll(['', ''])} />
+                ) : null}
+                {link === null ? (
+                  <Button label={t('m.sticker.kind.link')} icon="link-outline" variant="secondary" size="sm" onPress={() => setLink('')} />
+                ) : null}
+              </View>
+            ) : null}
+            {kind === 'post' && poll ? (
+              <View style={{ gap: space[2] }}>
+                {poll.map((o, i) => (
+                  <Field
+                    key={i}
+                    label={t('compose.pollOption', { number: i + 1 })}
+                    placeholder={t('m.sticker.option', { number: i + 1 })}
+                    value={o}
+                    maxLength={80}
+                    onChangeText={(v) => setPoll((p) => p!.map((x, j) => (j === i ? v : x)))}
+                  />
+                ))}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+                  {poll.length < 6 ? (
+                    <Button label={t('compose.addOption')} icon="add" variant="ghost" size="sm" onPress={() => setPoll((p) => [...p!, ''])} />
+                  ) : null}
+                  <Button label={t('compose.removePoll')} icon="close" variant="ghost" size="sm" onPress={() => setPoll(null)} />
+                </View>
+              </View>
+            ) : null}
+            {kind === 'post' && link !== null ? (
+              <View style={{ gap: space[2] }}>
+                <Field
+                  label={t('m.sticker.url')}
+                  placeholder="https://"
+                  hint={t('compose.linkHint')}
+                  value={link}
+                  onChangeText={setLink}
+                  keyboardType="url"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  maxLength={1000}
+                  // A web address reads left to right, also in Arabic.
+                  style={{ writingDirection: 'ltr', textAlign: 'left' }}
+                />
+                <Button
+                  label={t('compose.removeLink')}
+                  icon="close"
+                  variant="ghost"
+                  size="sm"
+                  onPress={() => setLink(null)}
+                  style={{ alignSelf: 'flex-start' }}
+                />
+              </View>
             ) : null}
             {confirmVideo ? (
               <Notice tone="warn" title={t('dataSaver.title')}>
