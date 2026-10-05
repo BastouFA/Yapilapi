@@ -7,7 +7,7 @@ import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import { Redis } from 'ioredis';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { createPool } from '@yapilapi/database';
 // Every message catalog, loaded up front, so anything the API writes can be in any language at once.
 import '@yapilapi/shared/i18n';
@@ -363,7 +363,13 @@ export async function buildApp(
     reply.code(ready ? 200 : 503);
     return { status: ready ? 'ready' : 'not_ready', checks };
   });
-  app.get('/metrics', { config: { rateLimit: false } }, async (_req, reply) => {
+  app.get('/metrics', { config: { rateLimit: false } }, async (req, reply) => {
+    // Route names and error counts are for the people running the service: in production only with the token.
+    const token = config.METRICS_TOKEN;
+    const given = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+    const allowed = token ? given.length === token.length && timingSafeEqual(Buffer.from(given), Buffer.from(token)) : config.APP_ENV !== 'production';
+    // Otherwise it answers like any route that isn't there.
+    if (!allowed) return reply.callNotFound();
     reply.type('text/plain; version=0.0.4');
     const lines = ['# TYPE ypl_http_requests_total counter', '# TYPE ypl_http_errors_total counter', '# TYPE ypl_http_request_ms_sum counter'];
     for (const [k, m] of metrics) {

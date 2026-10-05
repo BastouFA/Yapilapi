@@ -85,6 +85,9 @@ services:
       # Signs Mini App tokens, and authorizes the live video server once you run one.
       - key: LIVE_HOOK_SECRET
         generateValue: true
+      # Lets a monitoring service read /metrics (Authorization: Bearer <value>); without it /metrics isn't served.
+      - key: METRICS_TOKEN
+        generateValue: true
       # Signs the QR codes on event tickets. Changing it makes every ticket's code show "not valid" until the wallet reloads.
       - key: TICKET_TOKEN_SECRET
         generateValue: true

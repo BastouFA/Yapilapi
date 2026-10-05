@@ -695,3 +695,18 @@ describe('files of a deleted account', () => {
     expect(gone).toBe(true);
   });
 });
+
+describe('metrics', () => {
+  it('are open in development, and need the token when one is set', async () => {
+    const open = await testApp();
+    expect((await open.app.inject({ url: '/metrics' })).statusCode).toBe(200);
+    await open.close();
+    const locked = await testApp({ METRICS_TOKEN: 'a-long-metrics-token-for-the-test' });
+    expect((await locked.app.inject({ url: '/metrics' })).statusCode).toBe(404);
+    expect((await locked.app.inject({ url: '/metrics', headers: { authorization: 'Bearer wrong' } })).statusCode).toBe(404);
+    const ok = await locked.app.inject({ url: '/metrics', headers: { authorization: 'Bearer a-long-metrics-token-for-the-test' } });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.body).toContain('ypl_http_requests_total');
+    await locked.close();
+  });
+});
