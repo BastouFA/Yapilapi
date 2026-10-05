@@ -1,6 +1,6 @@
 # Accessibility
 
-YAPILAPI targets **WCAG 2.2 AA**. Two automated suites in `apps/web/e2e/` guard it, and CI runs both (`accessibility` job in `.github/workflows/ci.yml`).
+YAPILAPI targets **WCAG 2.2 AA**, and 44 by 44 CSS pixel touch targets (WCAG 2.5.5, AAA). Three automated suites in `apps/web/e2e/` guard it, and CI runs all three (`accessibility` job in `.github/workflows/ci.yml`).
 
 ## How to run the audit
 
@@ -80,6 +80,8 @@ Everything runs in four projects: **desktop** (1440×900) and **mobile** (Pixel 
 
 **Right-to-left:** every signed-in page is loaded with `dir="rtl"` in all four projects and must not be wider than the viewport. (An offscreen skip link placed with `left: -9999px` once made every page scroll to blank space in RTL.) The design system uses logical properties (`inset-inline-*`, `margin-inline-*`, logical corner radii), mirrors directional icons, and marks user-written text with `dir="auto"` / `<bdi>` so mixed-direction names, handles, tags and messages read correctly.
 
+**`targets.spec.ts`** (desktop and mobile layouts, 32 pages and 4 open states): every visible control (links, buttons, fields, selects, summaries and the button-like ARIA roles) must be at least **44 × 44** to press. Each control is scrolled into view and the page is asked, pixel by pixel out from its centre (left, right, up, down), whether a press there still reaches the control, something inside it or its label: it must reach 44px across and 44px down (less a pixel for rounding). The failure names what stopped it, so a neighbour means two targets overlap and anything else means the target is too small; a control covered at its centre by another control fails too. A control bigger than 44px passes if 44px fits across it somewhere (a card with a small button over one corner). A checkbox or field inside its label is measured by the label. Not measured: links inside a paragraph or sentence (WCAG's inline exception), controls that are hidden, clipped away or covered by something that isn't a control, and past the edge of the screen. Pages: home, discover, a conversation, the chat with games, inbox, both profiles, a post, notifications, settings (home, account, privacy, notifications), create, Market and a listing, an event and events, a Together album, a board, a community, search results, studio, tickets, questions, drops, saved, a sound page, and signed out: landing, log in, sign up and legal. States: the post and message option menus, the share profile and status sheets. Colours don't change sizes, so the dark projects skip it.
+
 **`keyboard.spec.ts`** (desktop and mobile layouts, 19 tests):
 
 - The first Tab reaches a visible "Skip to content" link; following it puts the next Tab inside `main`. The primary navigation is reached next, in visual order, with `aria-current="page"` on the current destination.
@@ -97,6 +99,52 @@ Everything runs in four projects: **desktop** (1440×900) and **mobile** (Pixel 
 - **Chess board**: the board is one tab stop, starting on your king; arrows move around the grid and every square says what's on it; Enter picks a piece up ("picked up") and marks where it can go ("move here"); Escape puts it back without closing the sheet (this was broken: the sheet closed, because it listens on the document, where React does too; fixed in `ChessBoard.tsx`); a second Escape closes the sheet and returns focus to "Your turn: Chess". No move is made, since the projects share the game.
 - **Newest sheets**: "Why am I seeing this?" (from the post menu with the arrow keys), the offer sheet on a listing, giving a ticket, and an album's people sheet each take focus, keep Tab inside, are audited with axe, and on Escape close and return focus to what opened them. The album's photo viewer does the same and returns focus to the photo. The **call screen** keeps Tab inside and, by design, stays open on Escape; Hang up ends the call and focus returns to "Audio call".
 - **Reels**: M and C toggle sound and clear view (`aria-pressed`), Space plays and pauses, the scrubber is a slider (Home, arrows a second at a time), the options sheet takes focus and returns it on Escape, and J/K move between reels with the address following.
+
+## Results (2026-09-29): 44px touch targets
+
+Every control on the web app can now be pressed anywhere in a 44 × 44 box, while the design draws it at its own size. `targets.spec.ts` (above) measures it; it ran on main's code first (production build), then on the change.
+
+| Layout  | Before: controls too small | Before: pages and states failing | After |
+| ------- | -------------------------: | -------------------------------: | ----: |
+| desktop |            899 of 1416 |                         36 of 36 |     0 |
+| mobile  |            623 of 1014 |                         35 of 36 |     0 |
+
+The largest groups before: header and post actions (`.yp-action`, 38px), segments and tabs (34px), small buttons (32px), aside names and "See all" links (19px and 16px), chips (30px), text fields (40px), 40px buttons and menu items, links in navigation and footers, the chat's send-later actions (24px), suggested replies (36px) and the story "add" and suggested "hide" buttons (24px, 28px). A wider scan of every page the axe suite opens, signed in and out, in both layouts, found nothing left.
+
+**How** (centrally, in `packages/design-system/src/components.css`, "Touch targets"):
+
+- Buttons, links with a class, a heading's or a navigation's links, summaries, the button-like ARIA roles and labels around a checkbox or radio get a transparent `::after` layer, `inset: min(0px, (100% - 44px) / 2)`: 44px for a small control, its own size for a bigger one. The control gets `position: relative` and `isolation: isolate`, and the layer sits at `z-index: -1` inside it, so it is behind the control's own content and never covers a control nested in a bigger one. It changes neither layout nor paint. The switch draws its thumb with `::after`, so its layer is `::before`. Links inside running text (class-less links, hashtags and mentions) are left as they are. A link that is a line of its own gets a class so it is covered (a Market offer's listing link in a chat, a community card's name).
+- A text field in a `.yp-field` reaches out through its label, whose layer fills the gaps around the input. A text field on its own is 44px tall with a transparent border above and below (taken back by the margin), its visible 1px line drawn as an inset shadow; focused, it is drawn as before. Its drawn height is `--yp-input-h`, which pages set instead of `height` or `min-height`.
+- Where a control truncates its text, its own `overflow` clips the layer, so it reaches out with padding and an equal negative margin instead (aside names, a post's author, a reel's author), or `overflow: clip` with `overflow-clip-margin` (suggested replies; Safari clips those to the chip). Transparent inputs inside a drawn box (the chat composer, the co-author picker, the Discover assistant, the search bar) are 44px tall with the margin taking the difference back.
+- Where a later element sat over a control's layer, the control is raised (`z-index: 1`): the aside's "See all", a post's sound link, a community card's name, a reaction, a game's "Your turn", the reel play button, the suggested card's "hide". A notification's text link and a policy card's link cover their whole row or card.
+
+**What looks different** (before/after screenshots of the same data, production builds): these are the places where two 44px targets would otherwise overlap, so the page leaves room between them.
+
+| Where | Change |
+| --- | --- |
+| Segments (`.yp-segments`) and tab lists (`.yp-tabs__list`) | 2px taller (5px padding above and below instead of 4px): a scrolling row clips what reaches past it. Everything under them moves down 2px. |
+| Menus | Items 44px tall instead of 40px. With the taller items, a message's menu on a phone could open under the chat's header or the message box, or off the side of the screen, and its last items couldn't be reached. `Menu` now leaves out what stays over the page (the page's `scroll-padding-bottom`, which a chat sets for its message box and the navigation, and a sticky `.yp-topbar`) when it picks up or down, lines up with the button's other edge when it would run off the side, and moves the page when there's no room either way. |
+| Switches or checkboxes one under another | 12px (switches) or 13px (checkboxes) more between them; for example Settings > Notifications, the Market filters and delivery choices. |
+| Rows of small buttons, chips or plain links that wrap onto a second line | 14px between the lines instead of 8px (a row on one line is unchanged); the footer's policy links 21px. |
+| Chat composer on phones | 8px between the icon buttons instead of 2px. |
+| Profile | 6px more under the counts, 2px more above "Confirm your email"; wrapped action rows as above. |
+| Others | 9px more above a community's rules; the story sticker buttons' wrapped lines 14px apart; the recap reorder buttons 4px apart instead of 2px; a reel's caption block 8px higher; 14px (was 6px) between the log-in password field and "Forgot password?". |
+| A chat, when it follows the newest message | It now scrolls far enough to show the Yap row and suggested replies under the messages too: they used to stop under the message box that stays at the bottom, so on phones "Turn on Yaps" sat behind it (and axe found it partly covered, depending on the scroll). |
+| Text fields on their own | The rounded corners' anti-aliasing differs by a pixel (inset shadow instead of a border). |
+| Settings > Privacy, "Add a memory" | The field was drawn 20px tall (a `flex: 1` meant for the field landed on the input); it is now the usual 40px. |
+
+Pixel diffs, before → after, on the three dense pages (1440 × 900 and Pixel 7, the same seeded data and a fixed clock, both builds served one after the other; a second "before" run differs by at most 33 pixels, from presence and time). On desktop the right-hand column is left out: its "Happening soon" and "People to follow" follow the server's clock and the other test users, so they change between any two runs.
+
+| Page | Desktop | Phone |
+| --- | --- | --- |
+| A chat | 99 pixels, none off by more than 5 levels of colour (a reaction drawn on its own layer) | 0.2%: the composer's icon buttons, 6px further apart |
+| The chat with games | 0.2%, none off by more than 6 levels (the "Your turn" buttons on a layer of their own) | 0.3%: the composer, and the same |
+| Post feed (home) | 4.5%: everything under the feed segments moves down 2px; above them identical | 9.0%: the same |
+| Settings | identical | identical |
+| Settings > Account | identical in the first screen; 2px lower below the header picker's segments | 6.5%: segments and a wrapped button row |
+| Profile | 3.9%: segments and wrapped rows | 16.6%: wrapped action rows, counts and chips |
+
+The same check over 60 more pages, signed in and out, showed only the changes in the table above (the signed-out pages centre their card, so the footer's wider line spacing moves the whole card up). Element sizes were compared too (every element's box, before and after): the only boxes that change size are the ones listed.
 
 ## Results (2026-09-29): Market, tickets and check-in, Together, echoes, 3D game boards, calls in the chat header, "Why am I seeing this?", Try again
 
@@ -128,7 +176,7 @@ Walked through with the keyboard (headless Chromium, 1440px and 375px) and cover
 | Call screen | "Calling…" and "Connecting…" were plain text, so a screen reader landing on Mute heard only "Call, dialog, Mute"; an incoming call showed an eye or a bell | The status is a `role="status"` line and describes the dialog while nobody has joined; an incoming call shows the phone or camera icon, like the header buttons. Escape still doesn't hang up (by design). |
 | Market listing | The seller's name link was 23px tall | 24px (WCAG 2.5.8). |
 
-Targets: the new pages were scanned at 375px for controls under 44 × 44. Everything under 44px is a shared design-system size used across the app (40px buttons, 34px segments, 38px header actions, 32px small buttons, the 40 × 24 switch whose whole row is its label, 18px checkboxes inside their labels); Together's window and audience chips are 44px with the radio inside them. Changing those sizes is a design-system decision, left for later (below).
+Targets: the new pages were scanned at 375px for controls under 44 × 44. Everything under 44px is a shared design-system size used across the app (40px buttons, 34px segments, 38px header actions, 32px small buttons, the 40 × 24 switch whose whole row is its label, 18px checkboxes inside their labels); Together's window and audience chips are 44px with the radio inside them. Those sizes now reach 44px to press; see the touch target results above.
 
 ## Results (2026-09-28): watch together, weekly wraps, Ask me, drops, games, chat looks, send later, profile style, usernames
 
@@ -270,7 +318,7 @@ The "before" run used the development server; the "after" run a production build
 ## Remaining known issues
 
 - **Newer features:** the start a game, send later, wallpaper and chess board checks are now in `keyboard.spec.ts` (run 2026-09-28, desktop and mobile, all passing); watch together is still checked by hand. A game move made by the other player while the board is open, and a drop opening while its page is open, are not exercised. The phone app was reviewed in code only, not with VoiceOver or TalkBack.
-- **Target size:** WCAG 2.5.8 (24px) passes everywhere, but the 44px guideline doesn't hold for the design system's standard sizes: 40px buttons, 34px segments, 38px header icon buttons, 32px small buttons and the chat's scheduled-message actions (24px). Raising them is a design-system change for every page.
+- **Touch targets:** 44px is checked on 32 pages and 4 open states (`targets.spec.ts`) and was scanned once on every page the axe suite opens; other open sheets and menus, the phone app, and pages not in the axe suite were not measured. The chess board's squares are the size of the board (about 40px on a phone) and have no extra layer. Suggested replies reach 44px through `overflow-clip-margin`, which Safari doesn't support yet (there they stay 36px tall). Hovering near a small control now shows its hover state a few pixels early, since the layer is part of it.
 - **Not audited automatically:** admin, real, onboarding, OAuth consent, password reset pages; the incoming-call and Mini App overlays (they need a second live session or a registered app); the video editor (it needs a real video decode in the browser); a room you host (speaking needs a microphone). They use the same components, but have not been run through axe.
 - **Color contrast** is checked by axe on rendered text only. Text over photos, video and gradients (moment rings, story text and stickers, the music sticker, profile covers) is reported as "needs review" by axe, not as pass or fail, and has not been checked by hand. Icon-only buttons' 3:1 non-text contrast isn't checked by axe either (chat message tools are dimmed to 70% on touch screens).
 - **Screen readers:** no manual pass with VoiceOver, TalkBack or NVDA yet. Toasts, chat search results, raised hands and loading lines use live regions; the conversation is a `role="log"` that announces new messages as they arrive (not yet confirmed with each screen reader).

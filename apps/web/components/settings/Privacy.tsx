@@ -344,7 +344,7 @@ export function MemoryCard() {
               value={memory}
               onChange={(e) => setMemory(e.currentTarget.value)}
               maxLength={1000}
-              style={{ flex: 1 }}
+              className="yp-field--grow"
             />
             <Button type="submit" size="sm" disabled={!memory.trim()}>
               {t('settings.add')}

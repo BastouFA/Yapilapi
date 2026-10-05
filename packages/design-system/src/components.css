@@ -137,13 +137,16 @@
   color: var(--danger);
 }
 .yp-input {
-  height: var(--control-md);
+  /* Drawn height and border colour, as properties so the touch target rule below can use them. */
+  --yp-input-h: var(--control-md);
+  --yp-input-line: var(--line-strong);
+  height: var(--yp-input-h);
   width: 100%;
   padding: 0 var(--space-3);
   font: 400 15px/23px var(--font-sans);
   color: var(--ink);
   background: var(--surface);
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--yp-input-line);
   border-radius: var(--radius-md);
   transition:
     border-color var(--duration-fast),
@@ -159,15 +162,15 @@ textarea.yp-input {
   color: var(--ink-muted);
 }
 .yp-input:hover:not(:disabled) {
-  border-color: var(--ink-muted);
+  --yp-input-line: var(--ink-muted);
 }
 .yp-input:focus {
   outline: none;
-  border-color: var(--yapi);
+  --yp-input-line: var(--yapi);
   box-shadow: var(--focus-ring);
 }
 .yp-input[aria-invalid='true'] {
-  border-color: var(--danger);
+  --yp-input-line: var(--danger);
 }
 .yp-input:disabled {
   background: var(--surface-sunken);
@@ -283,6 +286,15 @@ textarea.yp-input {
 .yp-switch button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* Switches and checkboxes one under another sit 44px apart (with the usual 8px gap), so their touch
+   targets don't overlap. */
+.yp-switch + .yp-switch {
+  margin-top: 12px;
+}
+.yp-check + .yp-check {
+  margin-top: 13px;
 }
 
 /* Badge */
@@ -466,7 +478,9 @@ textarea.yp-input {
   scrollbar-width: none;
   display: flex;
   gap: var(--space-1);
-  padding: 4px;
+  /* 5px above and below: a scrolling row clips what reaches past it, and the 34px tabs reach 5px
+     each way for a 44px target. */
+  padding: 5px 4px;
   background: var(--surface-sunken);
   border-radius: var(--radius-full);
   overflow-x: auto;
@@ -628,4 +642,93 @@ textarea.yp-input {
 /* Right-to-left: the switch thumb travels the other way. */
 [dir='rtl'] .yp-switch button[aria-checked='true']::after {
   transform: translateX(-16px);
+}
+
+/* Touch targets
+   Every control can be pressed anywhere in a 44 by 44 box around its centre, whatever size it is
+   drawn (the project's rule, WCAG 2.5.5; apps/web/e2e/targets.spec.ts measures it). A transparent
+   layer reaches out from a small control; a larger control's layer is its own size. The layer sits
+   behind the control's content (z-index -1 inside the control's own stacking context), so a control
+   inside a bigger one, such as a menu button on a card link, stays pressable. It doesn't change
+   layout or paint. A label around a checkbox or radio is the target for it. Links inside running
+   text (class-less links, except a heading's or a navigation's, and hashtags and mentions) are left
+   as they are: WCAG's inline exception, and a 44px layer would reach over the lines around them.
+   Controls that draw with ::after use ::before instead (the switch below); the chess board's
+   squares are the size of the board. Where a small control truncates its text (overflow clips the
+   layer), it reaches out with padding and an equal negative margin instead; where two would overlap,
+   the page leaves room between them (see globals.css). */
+:where(
+  button,
+  a[href][class],
+  :is(h1, h2, h3, h4, h5, h6) > a[href],
+  nav a[href],
+  summary,
+  [role='button'],
+  [role='link'],
+  [role='tab'],
+  [role='menuitem'],
+  [role='menuitemradio'],
+  [role='menuitemcheckbox'],
+  [role='option'],
+  [role='switch'],
+  [role='checkbox'],
+  [role='radio'],
+  [role='slider'],
+  label:has(input[type='checkbox'], input[type='radio'])
+):not(:where(.yp-hashtag, .chess-sq, .yp-post__reel-card)) {
+  position: relative;
+  isolation: isolate;
+}
+:where(
+    button,
+    a[href][class],
+    :is(h1, h2, h3, h4, h5, h6) > a[href],
+    nav a[href],
+    summary,
+    [role='button'],
+    [role='link'],
+    [role='tab'],
+    [role='menuitem'],
+    [role='menuitemradio'],
+    [role='menuitemcheckbox'],
+    [role='option'],
+    [role='switch'],
+    [role='checkbox'],
+    [role='radio'],
+    [role='slider'],
+    label:has(input[type='checkbox'], input[type='radio'])
+  ):not(:where(.yp-hashtag, .yp-switch button, .chess-sq, .yp-post__reel-card))::after,
+.yp-switch button::before {
+  content: '';
+  position: absolute;
+  inset-block: min(0px, (100% - 44px) / 2);
+  inset-inline: min(0px, (100% - 44px) / 2);
+  z-index: -1;
+}
+/* A text field reaches out through its label: the gaps around the input belong to the label, which
+   focuses the input. */
+.yp-field {
+  position: relative;
+  isolation: isolate;
+}
+.yp-field__label::after {
+  content: '';
+  position: absolute;
+  inset: -2px 0;
+  z-index: -1;
+}
+/* A text field on its own (no label around it) is 44px tall to press but drawn at its own height:
+   the extra is a transparent border above and below, taken back by the margin, and the visible
+   1px line is an inset shadow. Focused, it is drawn as usual (the focus ring goes round the
+   border). */
+input.yp-input:not(.yp-field *):not(:focus) {
+  --yp-reach: max(0px, (44px - var(--yp-input-h)) / 2);
+  height: max(44px, var(--yp-input-h));
+  margin-block: calc(-1 * var(--yp-reach));
+  padding-inline: calc(var(--space-3) + 1px);
+  border-width: var(--yp-reach) 0;
+  border-color: transparent;
+  border-radius: var(--radius-md) / calc(var(--radius-md) + var(--yp-reach));
+  background-clip: padding-box;
+  box-shadow: inset 0 0 0 1px var(--yp-input-line);
 }

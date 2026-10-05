@@ -193,7 +193,9 @@ export function MarketOfferChat({
       <strong className="market-offer__amount">{amount}</strong>
       <span className="market-offer__for" dir="auto">
         {offer.listing.available ? (
-          <Link href={`/market/${offer.listing.id}`}>{t('market.offer.for', { title: offer.listing.title })}</Link>
+          <Link href={`/market/${offer.listing.id}`} className="market-offer__link">
+            {t('market.offer.for', { title: offer.listing.title })}
+          </Link>
         ) : (
           t('market.offer.for', { title: offer.listing.title })
         )}

@@ -134,7 +134,8 @@ function LoginForm() {
         spellCheck={false}
         required
       />
-      <div className="stack-sm" style={{ gap: 6 }}>
+      {/* 14px: the password field's show button and the link under it each keep a 44px touch target. */}
+      <div className="stack-sm" style={{ gap: 14 }}>
         <PasswordField label={t('auth.password')} name="password" autoComplete="current-password" required />
         <Link href="/forgot-password" className="auth__forgot">
           {t('auth.forgot')}
