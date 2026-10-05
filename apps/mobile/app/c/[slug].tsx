@@ -12,6 +12,7 @@ import { useReport } from '../../lib/report';
 import { PostCard } from '../../lib/post';
 import { CommunityCatchUp } from '../../lib/ai-helpers';
 import { roomDuration, roomStatusLabel } from '../../lib/rooms';
+import { MiniAppsSheet, useMiniAppsOn } from '../../lib/miniapps';
 import { useSession } from '../../lib/session';
 import { space } from '../../lib/theme';
 import {
@@ -119,6 +120,8 @@ export default function CommunityScreen() {
   }, [navigation, community, canReport, showMenu, openReport, t, c.yapi]);
 
   const locked = !!community && community.visibility === 'private' && !community.myRole;
+  const miniAppsOn = useMiniAppsOn();
+  const [appsOpen, setAppsOpen] = useState(false);
 
   const loadFaq = useCallback(async () => {
     try {
@@ -203,10 +206,14 @@ export default function CommunityScreen() {
           {community.name}
         </Title>
         {community.description ? <Text style={[{ color: c.ink, lineHeight: 21 }, userText]}>{community.description}</Text> : null}
-        {(community.myRole && chatId) || canOrganize(community.myRole) ? (
+        {(community.myRole && (chatId || miniAppsOn)) || canOrganize(community.myRole) ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
             {community.myRole && chatId ? (
               <Button label={t('m.community.chat')} icon="chatbubbles-outline" size="sm" variant="secondary" onPress={() => router.push(`/chat/${chatId}`)} />
+            ) : null}
+            {/* Mini Apps: a community's admins add them; members use them. */}
+            {community.myRole && miniAppsOn ? (
+              <Button label={t('chat.apps')} icon="apps-outline" size="sm" variant="secondary" onPress={() => setAppsOpen(true)} />
             ) : null}
             {canOrganize(community.myRole) ? (
               <Button
@@ -396,6 +403,13 @@ export default function CommunityScreen() {
       />
       {menu.sheet}
       {report.sheet}
+      <MiniAppsSheet
+        visible={appsOpen}
+        onClose={() => setAppsOpen(false)}
+        surface="community"
+        surfaceId={community.id}
+        canManage={community.myRole === 'owner' || community.myRole === 'admin'}
+      />
     </KeyboardAvoid>
   );
 }

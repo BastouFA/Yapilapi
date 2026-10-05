@@ -48,6 +48,7 @@ import { isVerificationError, VerifyPrompt } from './safety';
 import { ChaptersRow } from './chapters';
 import { DropsRow } from './drops';
 import { ProfileBoards } from './boards';
+import { MiniAppsSheet, useMiniAppsOn } from './miniapps';
 import { ProfileMenu } from './profile-menu';
 import { FeaturedRow, ProfileAbout, ProfileLinks, ProfileSongChip, tabLabel, useTint } from './profile-style';
 import type { Tint } from './ui';
@@ -90,6 +91,9 @@ export function ProfileView({
   const [note, setNote] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
   const coverMenu = useActionSheet();
+  // Mini Apps on your own profile: you add and remove them.
+  const miniAppsOn = useMiniAppsOn();
+  const [appsOpen, setAppsOpen] = useState(false);
   const [needsVerify, setNeedsVerify] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   // null: the first tab the person chose to show.
@@ -426,6 +430,7 @@ export function ProfileView({
               onPress={() => router.push('/now-status')}
             />
             <Button label={t('m.profile.share')} variant="secondary" size="sm" icon="share-outline" onPress={() => shareProfile()} />
+            {miniAppsOn ? <Button label={t('chat.apps')} variant="secondary" size="sm" icon="apps-outline" onPress={() => setAppsOpen(true)} /> : null}
           </View>
         ) : (
           // One row: Follow and Message share the width, share and more keep their size (so
@@ -528,6 +533,7 @@ export function ProfileView({
           <Notice>{note}</Notice>
         </View>
       ) : null}
+      {rel.isSelf ? <MiniAppsSheet visible={appsOpen} onClose={() => setAppsOpen(false)} surface="profile" surfaceId={profile.id} /> : null}
       {rel.isSelf ? null : (
         <ProfileMenu
           profile={profile}

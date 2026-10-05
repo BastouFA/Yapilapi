@@ -13,6 +13,7 @@ import { RichText } from '../../lib/post';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
 import { deviceTimeZone } from '../../lib/time-zone';
+import { MiniAppsSheet, useMiniAppsOn } from '../../lib/miniapps';
 import { Avatar, Button, Card, EmptyState, Icon, Loading, Notice, ScreenError, Segmented, useActionSheet, useColors, userText } from '../../lib/ui';
 
 type Rsvp = 'going' | 'interested' | 'not_going';
@@ -59,6 +60,10 @@ export default function EventScreen() {
       void load();
     }, [load]),
   );
+
+  // Mini Apps: the host adds them; guests who replied use them.
+  const miniAppsOn = useMiniAppsOn();
+  const [appsOpen, setAppsOpen] = useState(false);
 
   if (event === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <Loading />;
   if (event === null)
@@ -327,7 +332,11 @@ export default function EventScreen() {
         </View>
       ) : null}
 
+      {miniAppsOn && me && (hosting || event.myRsvp) ? (
+        <Button label={t('chat.apps')} variant="secondary" icon="apps-outline" onPress={() => setAppsOpen(true)} />
+      ) : null}
       <Button label={t('m.common.share')} variant="secondary" icon="share-outline" onPress={() => share()} />
+      <MiniAppsSheet visible={appsOpen} onClose={() => setAppsOpen(false)} surface="event" surfaceId={event.id} canManage={hosting} />
     </ScrollView>
   );
 }

@@ -63,6 +63,7 @@ import { TranslatableText } from '../../lib/translation';
 import { useReport } from '../../lib/report';
 import { ListCard, ListComposer, PollCard, PollComposer, ReminderNote, ReminderPicker } from '../../lib/chat-polls';
 import { GameCard, GameSheet, StartGameSheet } from '../../lib/chat-games';
+import { MiniAppsSheet, useMiniAppsOn } from '../../lib/miniapps';
 import { ChatMixCard, ShareMixHereSheet } from '../../lib/mixes';
 import { LocationCard, LocationRequestLine, ShareLocationSheet, SharingBanner, useLocationSharing } from '../../lib/chat-location';
 import { ListingChatCard, OfferChatCard } from '../../lib/chat-market';
@@ -132,6 +133,9 @@ export default function Chat() {
   const [addOpen, setAddOpen] = useState(false);
   const [pollOpen, setPollOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
+  // Mini Apps added to this chat (the options menu's Apps).
+  const miniAppsOn = useMiniAppsOn();
+  const [appsOpen, setAppsOpen] = useState(false);
   // Games: the sheet to start one, and the board that's open (by its card's message id, so live updates show in it).
   const [gameStartOpen, setGameStartOpen] = useState(false);
   const [boardFor, setBoardFor] = useState<string | null>(null);
@@ -1386,7 +1390,19 @@ export default function Chat() {
           ...(canAlbum
             ? [{ label: t('together.chat.start'), icon: 'images-outline' as const, onPress: () => router.push(`/together/new?chat=${encodeURIComponent(id)}`) }]
             : []),
+          ...(miniAppsOn ? [{ label: t('chat.apps'), icon: 'apps-outline' as const, onPress: () => setAppsOpen(true) }] : []),
         ]}
+      />
+      <MiniAppsSheet
+        visible={appsOpen}
+        onClose={() => setAppsOpen(false)}
+        surface="conversation"
+        surfaceId={id}
+        onSend={async (text) => {
+          const clientId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          const { message } = await (await client()).conversations.send(id, text, clientId);
+          setMessages((cur) => (cur.some((x) => x.id === message.id) ? cur : [...cur, message]));
+        }}
       />
       <DateTimeSheet
         visible={laterOpen}

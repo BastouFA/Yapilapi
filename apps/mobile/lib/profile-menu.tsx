@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Alert, View } from 'react-native';
 import type { Profile } from '../../../packages/shared/src/types';
 import { client, errorMessage } from './api';
 import { useT } from './i18n';
+import { MiniAppsSheet, useMiniAppsOn } from './miniapps';
 import { useReport } from './report';
 import { BottomSheet, SheetItem } from './ui';
 
@@ -27,6 +29,9 @@ export function ProfileMenu({
   const rel = profile.relationship;
   // Reporting from the shared sheet; blocking from there too reloads the profile.
   const reporter = useReport({ onBlocked: () => void onChanged() });
+  // The Mini Apps this person added to their profile.
+  const miniAppsOn = useMiniAppsOn();
+  const [appsOpen, setAppsOpen] = useState(false);
 
   const close = () => onClose();
 
@@ -82,6 +87,17 @@ export function ProfileMenu({
               onPress={() => void act(async () => (await client()).users.friendRequest(profile.id))}
             />
           )}
+          {miniAppsOn && !rel.blocked ? (
+            <SheetItem
+              icon="apps-outline"
+              label={t('chat.apps')}
+              onPress={() => {
+                close();
+                // After the menu has gone: iOS can't show a sheet over one that is closing.
+                setTimeout(() => setAppsOpen(true), 400);
+              }}
+            />
+          ) : null}
           <SheetItem
             icon={rel.muted ? 'volume-high-outline' : 'volume-mute-outline'}
             label={rel.muted ? t('m.profile.unmute') : t('m.profile.mute')}
@@ -108,6 +124,7 @@ export function ProfileMenu({
         </View>
       </BottomSheet>
       {reporter.sheet}
+      <MiniAppsSheet visible={appsOpen} onClose={() => setAppsOpen(false)} surface="profile" surfaceId={profile.id} canManage={false} />
     </>
   );
 }

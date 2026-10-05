@@ -615,7 +615,7 @@ Every flow in administration, moderation, the developer platform and Mini Apps w
 
 Checked and working: overview numbers, flags on and off (the app follows), audit log, regional rules (add, duplicate refused, remove), payouts list, ad review (approve runs it, reject needs a reason the advertiser sees), reports of every target kind with duplicates refused, reporters told the outcome, different-reviewer rule, scoped API keys (read/write, refused routes including encoded paths), signed webhooks (signature, retry with backoff, private addresses refused), Sign in with YAPILAPI (consent screen, exact redirects, plain PKCE refused, code reuse refused, rotation, revoke), Mini App context tokens (tamper refused) and the flag gate.
 
-**Not done:** the phone has no Mini Apps (web only); Mini App developers aren't notified of review decisions (they see the status on the developers page); admin pages aren't in the axe audit (the audit's accounts aren't admins).
+**Not done:** Mini App developers aren't notified of review decisions (they see the status on the developers page); admin pages aren't in the axe audit (the audit's accounts aren't admins).
 
 ## Audio posts and the last sweep leftovers (2026-10-05, migration 0075, `apps/api/test/audio-posts.test.ts`, `packages/shared/src/transcript.test.ts`, `apps/web/e2e/content.spec.ts`)
 
@@ -623,6 +623,7 @@ Checked and working: overview numbers, flags on and off (the app follows), audit
 - **Read receipts** can be turned off (Settings > Privacy), both ways. **New recovery codes** from Settings with a current authenticator code. **Leaving a chat**, or being removed, forfeits your games there. A **profile you blocked** says so, with Unblock. The web sends a **Content-Security-Policy**. The phone composer makes **carousels, polls and link posts**.
 - **Language**: French says "tu" throughout (a test keeps it that way); Arabic plurals have their dual, few and many forms (`pluralCategory`), and Arabic error messages read right for any number.
 - **Touch targets**: every web control has a 44 × 44 hit area (`apps/web/e2e/targets.spec.ts`).
+- **Mini Apps on the phone** (`apps/mobile/lib/miniapps.tsx`, react-native-webview): Apps in a chat's options, on communities (members; admins add), events (the host adds; guests who replied use them) and profiles (yours: add and remove; others': from the menu). Adding one says what it can see and do. An app runs full screen with no cookies or storage, no camera, microphone, location or files, stays on its own site (other links open in the browser), gets a context token only when it asks, and sending a message as you is asked every time. The web's `postMessage` protocol works unchanged. Phone touch targets are 44 × 44 too (`apps/mobile/scripts/check-targets.mjs`).
 
 ## Not built yet
 

@@ -45,7 +45,8 @@
     "react-native-incall-manager": "~4.3.0",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
-    "react-native-webrtc": "~124.0.8"
+    "react-native-webrtc": "~124.0.8",
+    "react-native-webview": "13.16.1"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
