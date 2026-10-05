@@ -109,7 +109,8 @@ export function StoriesStrip({ groups, onOpen, onCreate }: { groups: StoryGroup[
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t('m.stories.add')}
-                hitSlop={6}
+                // 22pt badge on the ring; the touch area reaches 44.
+                hitSlop={11}
                 onPress={onCreate}
                 style={[st.plus, { backgroundColor: c.yapi, borderColor: c.ground }]}
               >
@@ -527,31 +528,31 @@ function Viewer({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={musicOn ? t('m.music.off') : t('m.music.on')}
-                hitSlop={8}
+                hitSlop={ICON_SLOP}
                 onPress={() => setMusicOn(!musicOn)}
                 style={st.icon}
               >
                 <Icon name={musicOn ? 'volume-high-outline' : 'volume-mute-outline'} size={20} color={WHITE} />
               </Pressable>
             ) : null}
-            <Pressable accessibilityRole="button" accessibilityLabel={t('m.stories.share')} hitSlop={8} onPress={() => setSharing(true)} style={st.icon}>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('m.stories.share')} hitSlop={ICON_SLOP} onPress={() => setSharing(true)} style={st.icon}>
               <Icon name="paper-plane-outline" size={20} color={WHITE} directional />
             </Pressable>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={paused ? t('m.common.play') : t('m.common.pause')}
-              hitSlop={8}
+              hitSlop={ICON_SLOP}
               onPress={() => setPaused((p) => !p)}
               style={st.icon}
             >
               <Icon name={paused ? 'play' : 'pause'} size={20} color={WHITE} />
             </Pressable>
             {group.mine ? null : (
-              <Pressable accessibilityRole="button" accessibilityLabel={t('m.post.more')} hitSlop={8} onPress={() => setMoreOpen(true)} style={st.icon}>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('m.post.more')} hitSlop={ICON_SLOP} onPress={() => setMoreOpen(true)} style={st.icon}>
                 <Icon name="ellipsis-horizontal" size={22} color={WHITE} />
               </Pressable>
             )}
-            <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} hitSlop={8} onPress={onClose} style={st.icon}>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} hitSlop={ICON_SLOP} onPress={onClose} style={st.icon}>
               <Icon name="close" size={24} color={WHITE} />
             </Pressable>
           </View>
@@ -575,12 +576,13 @@ function Viewer({
                     setSent(errorMessage(e));
                   }
                 }}
+                hitSlop={2}
                 style={st.pill}
               >
                 <Icon name="eye-outline" size={18} color={WHITE} />
                 <Text style={st.pillText}>{t('m.stories.seenBy', { count: story.views ?? 0 })}</Text>
               </Pressable>
-              <Pressable accessibilityRole="button" onPress={() => setChapterFor(story.id)} style={st.pill}>
+              <Pressable accessibilityRole="button" hitSlop={2} onPress={() => setChapterFor(story.id)} style={st.pill}>
                 <Icon name="albums-outline" size={18} color={WHITE} />
                 <Text style={st.pillText}>{t('m.chapters.add')}</Text>
               </Pressable>
@@ -600,6 +602,7 @@ function Viewer({
                     },
                   ]);
                 }}
+                hitSlop={2}
                 style={st.pill}
               >
                 <Icon name="trash-outline" size={18} color={WHITE} />
@@ -609,7 +612,7 @@ function Viewer({
           ) : (
             <View style={{ gap: space[2] }}>
               {story.mentionsYou && story.canReshare ? (
-                <Pressable accessibilityRole="button" onPress={() => void addToStory('followers')} style={[st.pill, { alignSelf: 'flex-start' }]}>
+                <Pressable accessibilityRole="button" hitSlop={2} onPress={() => void addToStory('followers')} style={[st.pill, { alignSelf: 'flex-start' }]}>
                   <Icon name="add-circle-outline" size={18} color={WHITE} />
                   <Text style={st.pillText}>{t('m.stories.add')}</Text>
                 </Pressable>
@@ -632,7 +635,7 @@ function Viewer({
                   accessibilityRole="button"
                   accessibilityLabel={story.liked ? t('post.unlike') : t('post.like')}
                   accessibilityState={{ selected: story.liked }}
-                  hitSlop={8}
+                  hitSlop={ICON_SLOP}
                   onPress={async () => {
                     const liked = !story.liked;
                     const set = (v: boolean) =>
@@ -654,7 +657,7 @@ function Viewer({
                     accessibilityLabel={t('m.stories.sendReply')}
                     accessibilityState={{ disabled: replying, busy: replying }}
                     disabled={replying}
-                    hitSlop={8}
+                    hitSlop={ICON_SLOP}
                     onPress={() => void sendReply()}
                     style={[st.icon, replying && { opacity: 0.5 }]}
                   >
@@ -701,7 +704,7 @@ function Viewer({
               <Text accessibilityRole="header" style={{ flex: 1, color: c.ink, fontSize: 17, fontWeight: '800' }}>
                 {t('m.stories.seenByTitle')}
               </Text>
-              <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} hitSlop={8} onPress={() => setViewers(null)}>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} hitSlop={10} onPress={() => setViewers(null)}>
                 <Icon name="close" size={24} color={c.ink} />
               </Pressable>
             </View>
@@ -810,6 +813,9 @@ function StoryVideo({
   }, [paused, player]);
   return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="contain" nativeControls={false} pointerEvents="none" />;
 }
+
+// The 40pt round buttons sit 8 apart: 4 each side keeps their touch areas (48 × 56) from overlapping.
+const ICON_SLOP = { top: 8, bottom: 8, left: 4, right: 4 };
 
 const st = StyleSheet.create({
   item: { width: RING + 8, alignItems: 'center' },
@@ -958,7 +964,7 @@ function ShareSheet({
           <Text accessibilityRole="header" style={{ flex: 1, color: c.ink, fontSize: 17, fontWeight: '800' }}>
             {t('m.stories.share')}
           </Text>
-          <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} hitSlop={8} onPress={onClose}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('m.common.close')} hitSlop={10} onPress={onClose}>
             <Icon name="close" size={24} color={c.ink} />
           </Pressable>
         </View>
@@ -981,6 +987,7 @@ function ShareSheet({
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: on, disabled: !canMessage }}
                 disabled={!canMessage}
+                hitSlop={{ top: 4, bottom: 4 }}
                 onPress={() => toggle(user)}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], opacity: canMessage ? 1 : 0.45 }}
               >

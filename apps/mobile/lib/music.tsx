@@ -24,7 +24,7 @@ import { clock } from './media';
 import { useSession } from './session';
 import { Placed } from './story-stickers';
 import { radius, space } from './theme';
-import { Button, Field, Icon, Notice, Segmented, useColors, userText, useScreenFocused } from './ui';
+import { Button, Field, Icon, Notice, Segmented, slop, useColors, userText, useScreenFocused } from './ui';
 
 const INK = '#14151F';
 const CARD = '#FFFFFF';
@@ -176,6 +176,8 @@ export function MusicSticker({ music, onOpen }: { music: StoryMusic; onOpen: () 
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t('m.music.sticker', { title: music.sound.title, artist: music.sound.artist })}
+        // The compact sticker is about 33 tall; the touch area reaches 44.
+        hitSlop={6}
         onPress={onOpen}
         style={({ pressed }) => ({
           flexDirection: 'row',
@@ -260,7 +262,8 @@ export function PostMusicChip({ music }: { music: PostMusic }) {
               setStarted(true);
               setPlaying((p) => !p);
             }}
-            hitSlop={8}
+            // 30pt circle; 44 × 44 reaching down over the credit line, not up (the post's sound link is just above).
+            hitSlop={{ top: 2, bottom: 12, left: 7, right: 7 }}
             style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: c.yapi, alignItems: 'center', justifyContent: 'center' }}
           >
             <Icon name={playing ? 'pause' : 'play'} size={14} color="#fff" />
@@ -273,6 +276,8 @@ export function PostMusicChip({ music }: { music: PostMusic }) {
         <Pressable
           accessibilityRole="link"
           accessibilityLabel={t('music.open', { title: music.title })}
+          // One text line: 44 tall reaching down over the credit line, like the play button.
+          hitSlop={{ top: 8, bottom: 19 }}
           onPress={() => openMusic(music)}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}
         >
@@ -438,7 +443,8 @@ export function MusicPicker({ visible, onClose, onPick }: { visible: boolean; on
                   accessibilityLabel={item.saved ? t('music.unsave', { title: item.title }) : t('music.save', { title: item.title })}
                   accessibilityState={{ selected: item.saved }}
                   onPress={() => void toggleSave(item)}
-                  hitSlop={6}
+                  // A 20pt icon: 44 × 44, reaching less towards Use (12pt away, with its own 4pt slop).
+                  hitSlop={slop({ top: 12, bottom: 12, start: 16, end: 8 })}
                 >
                   <Icon name={item.saved ? 'bookmark' : 'bookmark-outline'} size={20} color={item.saved ? c.yapi : c.inkMuted} />
                 </Pressable>

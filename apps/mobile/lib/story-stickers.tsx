@@ -167,6 +167,7 @@ function Sticker({
               accessibilityLabel={shown ? `${o}, ${number((s.results![i] ?? 0) / 100, { style: 'percent' })}` : o}
               accessibilityState={{ selected: s.voted === i, disabled: mine || s.voted !== null }}
               disabled={mine || s.voted !== null}
+              hitSlop={2}
               onPress={() =>
                 void run(async () => {
                   const r = await (await client()).moments.vote(story.id, s.id, i as 0 | 1);
@@ -222,6 +223,7 @@ function Sticker({
               {text.trim() ? (
                 <Pressable
                   accessibilityRole="button"
+                  hitSlop={4}
                   onPress={() =>
                     void run(async () => {
                       const r = await (await client()).moments.answer(story.id, s.id, text.trim());
@@ -283,6 +285,7 @@ function Sticker({
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ selected: s.reminding }}
+              hitSlop={4}
               onPress={() =>
                 void run(async () => {
                   const r = await (await client()).moments.remind(story.id, s.id, !s.reminding);
@@ -358,6 +361,7 @@ function EmojiSlider({
         else onRelease(value);
       }}
       onLayout={(e) => (width.current = Math.max(1, e.nativeEvent.layout.width))}
+      hitSlop={{ top: 2, bottom: 2 }}
       style={{ height: 40, justifyContent: 'center' }}
       {...pan.panHandlers}
     >
@@ -512,10 +516,12 @@ export function StickerEditor({
           <Draggable sticker={music} icon="musical-notes" frame={frame} label={t('m.sticker.drag', { label: music.label })} onMove={onMoveMusic} />
         ) : null}
       </View>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+      {/* 34pt chips, rows 10 apart: 5 above and below reaches 44 without overlapping the next row. */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space[2], rowGap: 10 }}>
         {KINDS.map((k) => (
           <Pressable
             key={k.type}
+            hitSlop={{ top: 5, bottom: 5 }}
             accessibilityRole="button"
             accessibilityState={{ selected: adding === k.type, disabled: taken(k.type) || stickers.length >= 10 }}
             disabled={taken(k.type) || stickers.length >= 10}
@@ -603,6 +609,8 @@ function Draggable({
         accessibilityRole="adjustable"
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
         onAccessibilityAction={(e) => move.current(sticker.x, clamp(sticker.y + (e.nativeEvent.actionName === 'increment' ? 0.05 : -0.05)))}
+        // About 28 tall; the touch area reaches 44.
+        hitSlop={{ top: 9, bottom: 9, left: 4, right: 4 }}
         {...pan.panHandlers}
         style={{
           backgroundColor: CARD,

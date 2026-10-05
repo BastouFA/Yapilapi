@@ -142,7 +142,13 @@ export default function MusicTrackScreen() {
       </View>
       <Text style={{ color: c.inkMuted, fontSize: 12 }}>{credit({ ...track, licenceName: track.licence.name })}</Text>
       {track.licence.url ? (
-        <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(track.licence.url!)} style={{ alignSelf: 'flex-start' }}>
+        // One text line: 44 tall reaching up over the credit, short of the buttons 12pt below.
+        <Pressable
+          accessibilityRole="link"
+          hitSlop={{ top: 16, bottom: 12, left: 8, right: 8 }}
+          onPress={() => void Linking.openURL(track.licence.url!)}
+          style={{ alignSelf: 'flex-start' }}
+        >
           <Text style={{ color: c.yapi, fontWeight: '700', fontSize: 13 }}>{t('music.track.licence')}</Text>
         </Pressable>
       ) : null}

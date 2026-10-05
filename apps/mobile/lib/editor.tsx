@@ -162,6 +162,8 @@ export function Slider({
           width.current = Math.max(1, e.nativeEvent.layout.width - KNOB);
           setTrackWidth(width.current);
         }}
+        // 32 tall; a finger lands within 44.
+        hitSlop={{ top: 6, bottom: 6 }}
         style={{ height: 32, justifyContent: 'center', direction: 'ltr', paddingHorizontal: KNOB / 2 }}
         {...pan.panHandlers}
       >

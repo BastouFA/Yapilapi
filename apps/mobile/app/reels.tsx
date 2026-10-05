@@ -1161,7 +1161,7 @@ function Reel({
         <TopButton icon={clear ? 'eye-off-outline' : 'scan-outline'} label={t('reel.clearView')} selected={clear} onPress={onToggleClear} />
       </Animated.View>
       {hint ? (
-        <Pressable accessibilityRole="button" onPress={onToggleMute} style={[s.pill, { top: insets.top + 60, backgroundColor: WHITE }]}>
+        <Pressable accessibilityRole="button" hitSlop={2} onPress={onToggleMute} style={[s.pill, { top: insets.top + 60, backgroundColor: WHITE }]}>
           <Icon name="volume-mute" size={16} color="#0B0C14" />
           <Text style={{ color: '#0B0C14', fontWeight: '700', fontSize: 13 }}>{t('reel.tapForSound')}</Text>
         </Pressable>
@@ -1171,7 +1171,7 @@ function Reel({
           <Text style={{ color: WHITE, fontWeight: '700', fontSize: 13 }}>{t('reel.resume.from', { time: formatReelTime(resumed) })}</Text>
           <Pressable
             accessibilityRole="button"
-            hitSlop={12}
+            hitSlop={{ top: 13, bottom: 14, left: 12, right: 12 }}
             onPress={() => {
               seek(0);
               setResumed(null);
@@ -1195,9 +1195,16 @@ function Reel({
 
       {/* The info strip: name, Follow, one caption line with "more", the sound. */}
       {!details ? (
-        <Animated.View style={[s.info, { bottom: bottom + 48, opacity: fade }]} pointerEvents={clear ? 'none' : 'box-none'}>
+        // 57 above the bottom, not 48: room for the last chip's touch area (44) above the play button.
+        <Animated.View style={[s.info, { bottom: bottom + 57, opacity: fade }]} pointerEvents={clear ? 'none' : 'box-none'}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
-            <Pressable accessibilityRole="link" onPress={() => router.push(`/u/${post.author.username}`)} hitSlop={8} style={{ flexShrink: 1 }}>
+            {/* The name and Follow split the 8pt gap between them, so their touch areas don't overlap. */}
+            <Pressable
+              accessibilityRole="link"
+              onPress={() => router.push(`/u/${post.author.username}`)}
+              hitSlop={{ top: 12, bottom: 12, left: 4, right: 4 }}
+              style={{ flexShrink: 1 }}
+            >
               <AuthorNames author={post.author} collaborators={post.collaborators} numberOfLines={1} style={s.author} />
             </Pressable>
             {canFollow ? (
@@ -1205,7 +1212,7 @@ function Reel({
                 accessibilityRole="button"
                 accessibilityLabel={t('reel.followName', { name: post.author.displayName })}
                 onPress={onFollow}
-                hitSlop={10}
+                hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
                 style={s.follow}
               >
                 <Text style={{ color: WHITE, fontWeight: '700', fontSize: 12 }}>{t('reel.follow')}</Text>
@@ -1224,7 +1231,7 @@ function Reel({
               accessibilityRole="button"
               accessibilityLabel={t('reel.moreLabel')}
               accessibilityState={{ expanded: false }}
-              hitSlop={12}
+              hitSlop={{ top: 13, bottom: 13, left: 12, right: 12 }}
               onPress={() => {
                 setDetails(true);
                 wake();
@@ -1237,7 +1244,7 @@ function Reel({
             <Pressable
               accessibilityRole="link"
               accessibilityLabel={t('echo.ofLabel', { name: post.echoOf.post.author.displayName })}
-              hitSlop={6}
+              hitSlop={ECHO_CHIP_SLOP}
               onPress={() => router.push({ pathname: '/reels', params: { start: post.echoOf!.post!.id } })}
               style={s.chip}
             >
@@ -1247,7 +1254,7 @@ function Reel({
               </Text>
             </Pressable>
           ) : echoGone && mine ? (
-            <Pressable accessibilityRole="button" hitSlop={6} onPress={() => setDetails(true)} style={s.chip}>
+            <Pressable accessibilityRole="button" hitSlop={ECHO_CHIP_SLOP} onPress={() => setDetails(true)} style={s.chip}>
               <Icon name="git-compare-outline" size={13} color={WHITE} />
               <Text style={s.chipText}>{t('echo.title')}</Text>
             </Pressable>
@@ -1256,7 +1263,7 @@ function Reel({
             <Pressable
               accessibilityRole="link"
               accessibilityLabel={post.music ? t('music.open', { title: post.music.title }) : undefined}
-              hitSlop={6}
+              hitSlop={SOUND_CHIP_SLOP}
               onPress={() => (post.music ? openMusic(post.music) : router.push(`/sounds/${post.sound!.id}`))}
               style={s.chip}
             >
@@ -1273,6 +1280,7 @@ function Reel({
             <Pressable
               accessibilityRole="link"
               onPress={() => router.push(`/u/${post.author.username}`)}
+              hitSlop={{ top: 6, bottom: 6 }}
               style={{ flex: 1, flexDirection: 'row', gap: space[2], alignItems: 'center' }}
             >
               <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={32} />
@@ -1299,7 +1307,8 @@ function Reel({
               <Icon name="close" size={22} color={WHITE} />
             </Pressable>
           </View>
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space[3], paddingTop: space[2] }}>
+          {/* Gap 16 and 8 at the ends: room for the 28pt chips' 44pt touch areas. */}
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: space[4], paddingTop: space[2], paddingBottom: space[2] }}>
             {post.body ? (
               <TranslatableText
                 kind="post"
@@ -1313,7 +1322,12 @@ function Reel({
               />
             ) : null}
             {post.remixOf?.post ? (
-              <Pressable accessibilityRole="link" onPress={() => router.push({ pathname: '/reels', params: { start: post.remixOf!.post!.id } })} style={s.chip}>
+              <Pressable
+                accessibilityRole="link"
+                hitSlop={{ top: 8, bottom: 8 }}
+                onPress={() => router.push({ pathname: '/reels', params: { start: post.remixOf!.post!.id } })}
+                style={s.chip}
+              >
                 <Icon name="copy-outline" size={14} color={WHITE} />
                 <Text style={[s.chipText, userText]} numberOfLines={1}>
                   {t(post.remixOf.mode === 'duet' ? 'm.reels.duetWith' : 'm.reels.remixOf', { name: post.remixOf.post.author.username })}
@@ -1333,15 +1347,26 @@ function Reel({
             ) : null}
             {post.echoOf?.theirAudio === 'dropped' ? <Text style={{ color: '#C9CDE0', fontSize: 12 }}>{t('echo.audioDropped')}</Text> : null}
             {post.counts.echoes ? (
-              <Pressable accessibilityRole="link" onPress={() => router.push({ pathname: '/echoes/[id]', params: { id: post.id } })} style={s.chip}>
+              <Pressable
+                accessibilityRole="link"
+                hitSlop={{ top: 8, bottom: 8 }}
+                onPress={() => router.push({ pathname: '/echoes/[id]', params: { id: post.id } })}
+                style={s.chip}
+              >
                 <Icon name="git-compare-outline" size={14} color={WHITE} />
                 <Text style={s.chipText}>{tp('echo.count', post.counts.echoes, { count: number(post.counts.echoes) })}</Text>
               </Pressable>
             ) : null}
             {post.topics.length ? (
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space[2] }}>
                 {post.topics.map((tag) => (
-                  <Pressable key={tag} accessibilityRole="link" hitSlop={6} onPress={() => router.push(`/t/${encodeURIComponent(tag)}`)}>
+                  <Pressable
+                    key={tag}
+                    accessibilityRole="link"
+                    hitSlop={{ left: 4, right: 4 }}
+                    onPress={() => router.push(`/t/${encodeURIComponent(tag)}`)}
+                    style={s.topic}
+                  >
                     <Text style={{ color: WHITE, fontWeight: '700', fontSize: 13 }}>#{tag}</Text>
                   </Pressable>
                 ))}
@@ -1375,7 +1400,12 @@ function Reel({
               </View>
             ) : null}
             {moments.length ? (
-              <Pressable accessibilityRole="button" onPress={() => onComments(null)} style={[s.chip, { backgroundColor: 'rgba(61,219,194,0.18)' }]}>
+              <Pressable
+                accessibilityRole="button"
+                hitSlop={{ top: 8, bottom: 8 }}
+                onPress={() => onComments(null)}
+                style={[s.chip, { backgroundColor: 'rgba(61,219,194,0.18)' }]}
+              >
                 <Icon name="chatbubble-outline" size={14} color={MINT} />
                 <Text style={{ color: MINT, fontWeight: '700', fontSize: 13 }}>{tp('reel.moments', moments.length)}</Text>
               </Pressable>
@@ -1388,6 +1418,7 @@ function Reel({
         <Pressable
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
+          hitSlop={{ top: 7, bottom: 7 }}
           onPress={() => onComments(null)}
           style={[s.pop, { bottom: bottom + 50 }]}
         >
@@ -1408,6 +1439,8 @@ function Reel({
             <Pressable
               accessibilityRole="link"
               accessibilityLabel={t('reel.profile', { name: post.author.displayName })}
+              // The follow badge takes the avatar's lower part; the space above makes up the rest of 44.
+              hitSlop={{ top: 30 }}
               onPress={() => router.push(`/u/${post.author.username}`)}
               style={{ borderRadius: 24, borderWidth: 2, borderColor: WHITE }}
             >
@@ -1417,7 +1450,8 @@ function Reel({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t('reel.followName', { name: post.author.displayName })}
-                hitSlop={14}
+                // 22pt badge; 44 tall reaching up over the avatar, stopping short of Like's touch area.
+                hitSlop={{ top: 19, bottom: 3, left: 14, right: 14 }}
                 onPress={onFollow}
                 style={s.badge}
               >
@@ -1452,7 +1486,9 @@ function Reel({
           />
           <Action icon="ellipsis-horizontal" label={t('reel.options')} onPress={onOptions} />
           {/* Previous and next, for screen readers (people swipe). */}
+          {/* targets-ok: screen readers only */}
           <Pressable accessibilityRole="button" accessibilityLabel={t('reel.previous')} onPress={onPrevious} style={s.srOnly} />
+          {/* targets-ok: screen readers only */}
           <Pressable accessibilityRole="button" accessibilityLabel={t('reel.next')} onPress={onNext} style={s.srOnly} />
         </Animated.View>
       ) : null}
@@ -1919,6 +1955,11 @@ function HighlightsSheet({
   );
 }
 
+// The info strip's chips are 28 tall with 6pt between them: the echo chip (always above) reaches up,
+// the sound chip (always last) reaches down, so each is 44 tall without covering the other.
+const ECHO_CHIP_SLOP = { top: 13, bottom: 3, left: 6, right: 6 };
+const SOUND_CHIP_SLOP = { top: 3, bottom: 13, left: 6, right: 6 };
+
 const s = StyleSheet.create({
   markTime: { minWidth: 64, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[2] },
   markRemove: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
@@ -2053,6 +2094,7 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(5,6,11,0.42)',
   },
   chipText: { color: WHITE, fontSize: 12, fontWeight: '700', flexShrink: 1 },
+  topic: { minWidth: 36, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   echoGone: { gap: space[2], padding: space[3], borderRadius: radius.md, backgroundColor: 'rgba(255,255,255,0.12)' },
   sheetItem: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 52, paddingHorizontal: space[2], borderRadius: radius.md },
   sheetIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },

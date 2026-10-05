@@ -92,6 +92,8 @@ export function ViewOnceBubble({ message, mine, tint, onChange }: { message: Mes
         accessibilityRole={canOpen ? 'button' : 'text'}
         disabled={!canOpen || opening}
         onPress={() => void view()}
+        // 28 tall; the touch area reaches 44.
+        hitSlop={{ top: 8, bottom: 8 }}
         style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], paddingVertical: space[1] }}
       >
         {opening ? (

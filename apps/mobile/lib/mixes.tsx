@@ -311,7 +311,7 @@ export function SongRow({
         accessibilityRole={s.title ? 'link' : undefined}
         disabled={!s.title}
         onPress={() => openMusic({ source: s.source, id: s.musicId })}
-        style={{ flex: 1, minWidth: 0 }}
+        style={{ flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' }}
       >
         <Text style={[{ color: c.ink, fontWeight: '700', opacity: s.play ? 1 : 0.6 }, userText]} numberOfLines={1}>
           {i + 1}. {name}

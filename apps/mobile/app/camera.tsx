@@ -569,6 +569,7 @@ export default function Camera() {
             accessibilityState={{ checked: dual, disabled: busy }}
             accessibilityHint={t('m.camera.dualShutter')}
             disabled={busy}
+            hitSlop={4}
             onPress={() => {
               setDual((d) => !d);
               if (!dual) setFacing('back');
@@ -763,9 +764,10 @@ const s = StyleSheet.create({
   ring: { position: 'absolute', top: 0, width: SHUTTER, height: SHUTTER, borderRadius: SHUTTER / 2, borderWidth: RING },
   arc: { borderColor: 'transparent' },
   clip: { position: 'absolute', top: 0, width: SHUTTER / 2, height: SHUTTER, overflow: 'hidden' },
-  modes: { height: 40, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  // 44 tall for the tabs' touch areas, laid out as 40 (the negative margins): it clips the sliding row.
+  modes: { height: 44, marginVertical: -2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   modeRow: { flexDirection: 'row' },
-  mode: { width: MODE_WIDTH, height: 40, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[1] },
+  mode: { width: MODE_WIDTH, height: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[1] },
   modeText: { color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
   modeTextOn: { color: WHITE },
   dualToggle: {

@@ -89,6 +89,7 @@ export default function SoundScreen() {
           </View>
           <Pressable
             accessibilityRole="link"
+            hitSlop={{ top: 10, bottom: 10 }}
             onPress={() => router.push(`/u/${sound.owner.username}`)}
             style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}
           >
@@ -104,7 +105,12 @@ export default function SoundScreen() {
             {sound.durationMs ? ` · ${clock(sound.durationMs / 1000)}` : ''}
           </Text>
           {sound.sourcePostId ? (
-            <Pressable accessibilityRole="link" onPress={() => router.push({ pathname: '/reels', params: { start: sound.sourcePostId! } })}>
+            // One text line: 44 tall, meeting the owner link's touch area above without overlapping it.
+            <Pressable
+              accessibilityRole="link"
+              hitSlop={{ top: 15, bottom: 13, left: 8, right: 8 }}
+              onPress={() => router.push({ pathname: '/reels', params: { start: sound.sourcePostId! } })}
+            >
               <Text style={{ color: c.yapi, fontWeight: '700', fontSize: 13 }}>{t('m.sound.original')}</Text>
             </Pressable>
           ) : null}

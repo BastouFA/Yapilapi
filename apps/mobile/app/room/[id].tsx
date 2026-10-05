@@ -76,7 +76,8 @@ export default function RoomScreen() {
 
   const header = (
     <Card style={{ gap: space[2] }}>
-      <Pressable accessibilityRole="link" onPress={() => router.push(`/c/${r.community.slug}`)}>
+      {/* One text line: the touch area reaches 44 (into the card's padding and over the title). */}
+      <Pressable accessibilityRole="link" hitSlop={{ top: 13, bottom: 13 }} onPress={() => router.push(`/c/${r.community.slug}`)}>
         <Text style={{ color: c.inkMuted, fontWeight: '600' }}>{r.community.name}</Text>
       </Pressable>
       <Title sub={`${roomStatusLabel(r, t)} · ${t('m.rooms.startedBy', { name: r.createdBy.displayName })}`}>{r.title}</Title>
