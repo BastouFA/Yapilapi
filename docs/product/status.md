@@ -617,6 +617,13 @@ Checked and working: overview numbers, flags on and off (the app follows), audit
 
 **Not done:** the phone has no Mini Apps (web only); Mini App developers aren't notified of review decisions (they see the status on the developers page); admin pages aren't in the axe audit (the audit's accounts aren't admins).
 
+## Audio posts and the last sweep leftovers (2026-10-05, migration 0075, `apps/api/test/audio-posts.test.ts`, `packages/shared/src/transcript.test.ts`, `apps/web/e2e/content.spec.ts`)
+
+- **Audio posts**: a recording on its own in a post, up to 5 minutes (10 with Plus), at least a second. The web composer records (the chat's recorder) or takes an audio file, with a preview to listen to; the phone records. Post cards play it inline (the browser's own player on the web), and **Transcript** opens what was said, in the reader's language when there is one. When speech-to-text is set up, a transcript is made automatically in the author's language when the post goes out; the author can change it through the captions routes. A post's media kinds now come from the stored files, not what the app says.
+- **Read receipts** can be turned off (Settings > Privacy), both ways. **New recovery codes** from Settings with a current authenticator code. **Leaving a chat**, or being removed, forfeits your games there. A **profile you blocked** says so, with Unblock. The web sends a **Content-Security-Policy**. The phone composer makes **carousels, polls and link posts**.
+- **Language**: French says "tu" throughout (a test keeps it that way); Arabic plurals have their dual, few and many forms (`pluralCategory`), and Arabic error messages read right for any number.
+- **Touch targets**: every web control has a 44 × 44 hit area (`apps/web/e2e/targets.spec.ts`).
+
 ## Not built yet
 
 - Mainstream music: needs a licensing deal (docs/operations/music.md). Reporting song use to a licensing partner is not built.
