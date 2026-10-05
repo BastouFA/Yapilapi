@@ -41,7 +41,7 @@ export function notificationHref(n: NotificationTarget): string | null {
   // A question for your box opens your questions; an answer to yours opens their Answers tab.
   if (n.type === 'question_received') return '/questions';
   if (n.type === 'question_answered') return n.actor ? `/u/${encodeURIComponent(n.actor.username)}?tab=answers` : '/notifications';
-  if (n.type === 'subscription_started' || n.type === 'order_paid' || n.type === 'booking_request') return '/studio';
+  if (n.type === 'subscription_started' || n.type === 'order_paid' || n.type === 'booking_request' || n.type.startsWith('payout_')) return '/studio';
   // An answer to your booking opens the place.
   if (n.type === 'booking_decided' && typeof n.data?.placeId === 'string') return `/place/${encodeURIComponent(n.data.placeId)}`;
   // A request to join opens the community's settings; being let in opens the community.

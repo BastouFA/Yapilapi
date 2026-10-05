@@ -167,7 +167,7 @@ export async function assertMessagePace(db: Q, config: Config, userId: string): 
   if (!config.SPAM_CHECKS) return;
   const { rows } = await db.query(
     `SELECT u.created_at > now() - make_interval(hours => $2) AS new_account,
-            (SELECT count(*) FROM messages m WHERE m.sender_id = u.id AND m.created_at > now() - interval '1 hour')::int AS n
+            (SELECT count(*) FROM messages m WHERE m.sender_id = u.id AND m.kind <> 'system' AND m.created_at > now() - interval '1 hour')::int AS n
      FROM users u WHERE u.id = $1`,
     [userId, SPAM_RULES.newAccountHours],
   );

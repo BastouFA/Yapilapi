@@ -181,12 +181,13 @@ describe('Reactions', () => {
     const [a, b, stranger] = [await adult(), await adult(), await adult()];
     const convo = await direct(a, b);
     const m = await send(a, convo, 'Party');
-    expect((await as(t.app, stranger).put(`/v1/messages/${m.id}/reactions/yay`)).status).toBe(404);
-    expect((await as(t.app, b).put(`/v1/messages/${m.id}/reactions/yay`)).status).toBe(200);
-    expect((await as(t.app, a).put(`/v1/messages/${m.id}/reactions/yay`)).status).toBe(200);
-    expect((await list(b, convo)).find((x) => x.id === m.id).reactions).toEqual([{ emoji: 'yay', count: 2, mine: true }]);
-    expect((await as(t.app, b).del(`/v1/messages/${m.id}/reactions/yay`)).status).toBe(200);
-    expect((await list(b, convo)).find((x) => x.id === m.id).reactions).toEqual([{ emoji: 'yay', count: 1, mine: false }]);
+    const party = encodeURIComponent('🎉');
+    expect((await as(t.app, stranger).put(`/v1/messages/${m.id}/reactions/${party}`)).status).toBe(404);
+    expect((await as(t.app, b).put(`/v1/messages/${m.id}/reactions/${party}`)).status).toBe(200);
+    expect((await as(t.app, a).put(`/v1/messages/${m.id}/reactions/${party}`)).status).toBe(200);
+    expect((await list(b, convo)).find((x) => x.id === m.id).reactions).toEqual([{ emoji: '🎉', count: 2, mine: true }]);
+    expect((await as(t.app, b).del(`/v1/messages/${m.id}/reactions/${party}`)).status).toBe(200);
+    expect((await list(b, convo)).find((x) => x.id === m.id).reactions).toEqual([{ emoji: '🎉', count: 1, mine: false }]);
   });
 });
 

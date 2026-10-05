@@ -41,7 +41,17 @@ export function ShopManager() {
           <div className="shop__main">
             <div className="row" style={{ gap: 8 }}>
               <strong>{p.title}</strong>
-              <Badge tone="neutral">{t(p.kind === 'digital' ? 'shop.kind.digital' : p.kind === 'service' ? 'm.shop.service' : 'shop.kind.product')}</Badge>
+              <Badge tone="neutral">
+                {t(
+                  p.kind === 'digital'
+                    ? 'shop.kind.digital'
+                    : p.kind === 'service'
+                      ? 'm.shop.service'
+                      : p.kind === 'booking'
+                        ? 'shop.kind.booking'
+                        : 'shop.kind.product',
+                )}
+              </Badge>
             </div>
             <span className="shop__price">
               {formatMoney(p.priceCents, p.currency, locale)}
@@ -139,6 +149,7 @@ export function SalesPanel() {
   const { toast, locale, t, tp } = useSession();
   const [sales, setSales] = useState<SalesReport | null>(null);
   const [bookings, setBookings] = useState<ServiceBooking[]>([]);
+  const [refunding, setRefunding] = useState<string | null>(null);
   const load = useCallback(async () => {
     const [s, b] = await Promise.all([api.shop.sales(30), api.shop.serviceBookings()]);
     setSales(s);
@@ -148,6 +159,27 @@ export function SalesPanel() {
     load().catch(() => {});
   }, [load]);
   if (!sales) return null;
+
+  /** Refund a whole order (every line in it): the buyer gets their money back and its items go back on sale. */
+  const refund = async (orderId: string, buyer: string) => {
+    const lines = sales.items.filter((x) => x.orderId === orderId);
+    const amount = formatMoney(
+      lines.reduce((n, x) => n + x.amountCents, 0),
+      lines[0]!.currency,
+      locale,
+    );
+    if (!window.confirm(t('studio.sales.refundConfirm', { amount, name: buyer }))) return;
+    setRefunding(orderId);
+    try {
+      const r = await api.orders.refund(orderId);
+      toast(t(r.status === 'succeeded' ? 'studio.sales.refundDone' : 'studio.sales.refundFailed'));
+      await load();
+    } catch (e) {
+      toast(errorMessage(e));
+    } finally {
+      setRefunding(null);
+    }
+  };
 
   const decide = async (id: string, confirm: boolean) => {
     try {
@@ -186,8 +218,21 @@ export function SalesPanel() {
               primary={x.product.title}
               secondary={`${x.buyer.displayName} · ${formatRelativeTime(x.createdAt, locale)}`}
               end={
-                <span>
-                  {formatMoney(x.amountCents, x.currency, locale)} {x.status === 'refunded' ? <Badge tone="warning">{t('m.studio.refunded')}</Badge> : null}
+                <span className="row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  {formatMoney(x.amountCents, x.currency, locale)}{' '}
+                  {x.status === 'refunded' ? (
+                    <Badge tone="warning">{t('m.studio.refunded')}</Badge>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      loading={refunding === x.orderId}
+                      aria-label={t('studio.sales.refundA11y', { title: x.product.title, name: x.buyer.displayName })}
+                      onClick={() => void refund(x.orderId, x.buyer.displayName)}
+                    >
+                      {t('studio.sales.refund')}
+                    </Button>
+                  )}
                 </span>
               }
             />

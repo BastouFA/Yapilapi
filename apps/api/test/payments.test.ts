@@ -61,6 +61,15 @@ describe('Stripe provider', () => {
     expect(provider.verifyWebhook(partial, { 'stripe-signature': sign(partial) })).toBeNull();
     const dispute = event('charge.dispute.created', { id: 'dp_1', object: 'dispute', payment_intent: 'pi_4' });
     expect(provider.verifyWebhook(dispute, { 'stripe-signature': sign(dispute) })).toMatchObject({ type: 'payment.disputed', providerRef: 'pi_4' });
+    // Payouts: a creator's account became able to take them, and a payout taken back.
+    const account = event('account.updated', { id: 'acct_1', object: 'account', payouts_enabled: true, capabilities: { transfers: 'active' } });
+    expect(provider.verifyWebhook(account, { 'stripe-signature': sign(account) })).toMatchObject({
+      type: 'payout_account.updated',
+      providerRef: 'acct_1',
+      ready: true,
+    });
+    const reversed = event('transfer.reversed', { id: 'tr_1', object: 'transfer' });
+    expect(provider.verifyWebhook(reversed, { 'stripe-signature': sign(reversed) })).toMatchObject({ type: 'payout.failed', providerRef: 'tr_1' });
     const other = event('customer.created', { id: 'cus_1', object: 'customer' });
     expect(provider.verifyWebhook(other, { 'stripe-signature': sign(other) })).toBeNull();
   });

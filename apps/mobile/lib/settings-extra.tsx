@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AccessibilityInfo, Alert, Linking, Platform, Pressable, Text, View } from 'react-native';
 import type { AccountInfo, InteractionSettings, PublicUser, UsernameCheck, UsernameStatus } from '../../../packages/shared/src/types';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
+import { SECURITY_EVENT_KEYS, SECURITY_EVENT_WARNINGS } from '../../../packages/shared/src/security-events';
 import { usernameProblem } from '../../../packages/shared/src/usernames';
 import { SUPPORTED_LOCALES } from '../../../packages/shared/src/i18n';
 import { languageName } from '../../../packages/shared/src/translation';
@@ -17,7 +18,7 @@ import { openLegal } from './legal';
 import { registerForPush } from './push';
 import { useSession } from './session';
 import { radius, space } from './theme';
-import { Avatar, BottomSheet, Button, Card, Field, Icon, Loading, Notice, SwitchRow, Title, useColors, userText, type IconName } from './ui';
+import { Avatar, BottomSheet, Button, Card, ErrorState, Field, Icon, Loading, Notice, SwitchRow, Title, useColors, userText, type IconName } from './ui';
 
 /**
  * The parts of Settings that are new on the phone: account details, password, two-step
@@ -346,17 +347,25 @@ export function SignInAlerts() {
   const { t } = useT();
   const [email, setEmail] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const load = useCallback(
+    () =>
+      client()
+        .then((api) => api.me.signInAlerts())
+        .then(
+          (r) => (setEmail(r.email), setLoadError(null)),
+          // Unknown: the switch stays off-limits rather than pretending emails are on.
+          (e) => setLoadError(errorMessage(e)),
+        ),
+    [],
+  );
   useEffect(() => {
-    void client()
-      .then((api) => api.me.signInAlerts())
-      .then(
-        (r) => setEmail(r.email),
-        () => setEmail(true),
-      );
-  }, []);
+    void load();
+  }, [load]);
   return (
     <Card style={{ gap: space[3] }}>
       <Title sub={t('st.alerts.desc')}>{t('st.alerts.title')}</Title>
+      {loadError && email === null ? <ErrorState message={loadError} onRetry={load} /> : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}
       <SwitchRow
         label={t('st.alerts.email')}
@@ -465,7 +474,10 @@ export function TwoStep() {
   const load = useCallback(() => {
     void client()
       .then((api) => api.mfa.status())
-      .then(setStatus, (e) => setError(errorMessage(e)));
+      .then(
+        (r) => (setStatus(r), setError(null)),
+        (e) => setError(errorMessage(e)),
+      );
   }, []);
   useEffect(load, [load]);
   const run = async (fn: () => Promise<void>) => {
@@ -476,7 +488,7 @@ export function TwoStep() {
       setError(errorMessage(e));
     }
   };
-  if (!status) return error ? <Notice tone="danger">{error}</Notice> : <Loading />;
+  if (!status) return error ? <ErrorState message={error} onRetry={load} /> : <Loading />;
   return (
     <Card style={{ gap: space[3] }}>
       <Title sub={status.enabled ? tp('settings.twoStep.on', status.recoveryCodesLeft) : t('settings.twoStep.offHint')}>{t('settings.twoStep.title')}</Title>
@@ -623,54 +635,44 @@ export function LogoutEverywhere() {
   );
 }
 
-const EVENTS: Record<string, Parameters<ReturnType<typeof useT>['t']>[0]> = {
-  login: 'st.event.login',
-  login_failed: 'st.event.login_failed',
-  login_password_ok_mfa_pending: 'st.event.login_pending',
-  password_changed: 'st.event.password_changed',
-  password_reset: 'st.event.password_reset',
-  password_reset_requested: 'st.event.password_reset_requested',
-  mfa_enabled: 'st.event.mfa_enabled',
-  mfa_disabled: 'st.event.mfa_disabled',
-  sessions_revoked: 'st.event.sessions_revoked',
-  session_revoked: 'st.event.session_revoked',
-  account_created: 'st.event.account_created',
-  email_verified: 'st.event.email_verified',
-  username_changed: 'st.event.username_changed',
-  sign_in_alerts_on: 'st.event.sign_in_alerts_on',
-  sign_in_alerts_off: 'st.event.sign_in_alerts_off',
-};
-
 /** Login alerts and activity: recent sign-ins and changes to the account. */
 export function Activity() {
   const c = useColors();
   const { t, timeAgo } = useT();
   const [items, setItems] = useState<{ type: string; ip: string | null; created_at: string }[] | null>(null);
   const [all, setAll] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(
+    () =>
+      client()
+        .then((api) => api.auth.securityEvents())
+        .then(
+          (r) => (setItems(r.items), setError(null)),
+          (e) => setError(errorMessage(e)),
+        ),
+    [],
+  );
   useEffect(() => {
-    void client()
-      .then((api) => api.auth.securityEvents())
-      .then(
-        (r) => setItems(r.items),
-        () => setItems([]),
-      );
-  }, []);
+    void load();
+  }, [load]);
   return (
     <Card style={{ gap: space[3] }}>
       <Title sub={t('st.activity.desc')}>{t('st.activity.title')}</Title>
-      {items === null ? (
+      {items === null && error ? (
+        <ErrorState message={error} onRetry={load} />
+      ) : items === null ? (
         <Loading />
       ) : items.length ? (
         <>
           {(all ? items : items.slice(0, 6)).map((e, i) => (
             <View key={`${e.created_at}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44 }}>
               <Icon
-                name={e.type === 'login_failed' ? 'warning-outline' : e.type.startsWith('login') ? 'key-outline' : 'shield-checkmark-outline'}
+                name={SECURITY_EVENT_WARNINGS.has(e.type) ? 'warning-outline' : e.type.startsWith('login') ? 'key-outline' : 'shield-checkmark-outline'}
                 size={20}
-                color={e.type === 'login_failed' ? c.danger : c.inkMuted}
+                color={SECURITY_EVENT_WARNINGS.has(e.type) ? c.danger : c.inkMuted}
               />
               <View style={{ flex: 1 }}>
-                <Text style={{ color: c.ink, fontSize: 15, fontWeight: '600' }}>{t(EVENTS[e.type] ?? 'st.event.other')}</Text>
+                <Text style={{ color: c.ink, fontSize: 15, fontWeight: '600' }}>{t(SECURITY_EVENT_KEYS[e.type] ?? 'st.event.other')}</Text>
                 <Text style={{ color: c.inkMuted, fontSize: 13 }}>{[timeAgo(e.created_at), e.ip].filter(Boolean).join(' · ')}</Text>
               </View>
             </View>
@@ -694,17 +696,19 @@ export function ConnectedApps() {
     void client()
       .then((api) => api.oauth.connectedApps())
       .then(
-        (r) => setItems(r.items),
-        (e) => (setItems([]), setError(errorMessage(e))),
+        (r) => (setItems(r.items), setError(null)),
+        (e) => setError(errorMessage(e)),
       );
   }, []);
   useEffect(load, [load]);
   return (
     <Card style={{ gap: space[3] }}>
       <Title sub={t('settings.apps.subtitle')}>{t('settings.apps.title')}</Title>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {items === null && error ? <ErrorState message={error} onRetry={load} /> : error ? <Notice tone="danger">{error}</Notice> : null}
       {items === null ? (
-        <Loading />
+        error ? null : (
+          <Loading />
+        )
       ) : items.length ? (
         items.map((a) => (
           <View key={a.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44 }}>
@@ -848,18 +852,25 @@ function PeopleList({
   const [items, setItems] = useState<PublicUser[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const loader = useRef(load);
+  const reload = useCallback(
+    () =>
+      loader.current().then(
+        (r) => (setItems(r.items), setError(null)),
+        (e) => setError(errorMessage(e)),
+      ),
+    [],
+  );
   useEffect(() => {
-    loader.current().then(
-      (r) => setItems(r.items),
-      (e) => (setItems([]), setError(errorMessage(e))),
-    );
-  }, []);
+    void reload();
+  }, [reload]);
   return (
     <Card style={{ gap: space[3] }}>
       <Title sub={sub}>{title}</Title>
-      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {items === null && error ? <ErrorState message={error} onRetry={reload} /> : error ? <Notice tone="danger">{error}</Notice> : null}
       {items === null ? (
-        <Loading />
+        error ? null : (
+          <Loading />
+        )
       ) : items.length ? (
         items.map((u) => (
           <View key={u.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 44 }}>

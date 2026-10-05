@@ -157,6 +157,7 @@ function Screens() {
         <Stack.Screen name="profile-edit" options={{ title: t('profile.edit'), presentation: 'modal', headerLeft: closeButton }} />
         <Stack.Screen name="reels" options={{ title: t('m.title.reels'), headerShown: false, contentStyle: { backgroundColor: '#000' } }} />
         <Stack.Screen name="new-group" options={{ title: t('m.inbox.newGroup'), presentation: 'modal', headerLeft: closeButton }} />
+        <Stack.Screen name="group-info" options={{ title: t('chat.group.info') }} />
         <Stack.Screen
           name="camera"
           options={{

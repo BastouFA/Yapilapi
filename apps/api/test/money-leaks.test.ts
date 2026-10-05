@@ -54,25 +54,26 @@ describe('payouts', () => {
     const seller = await adult();
     await db().query(`UPDATE users SET email_verified_at = now() WHERE id = $1`, [seller.id]);
     const buyer = await adult();
+    await as(t.app, seller).post('/v1/me/payout-accounts/bank', { currency: 'USD', bankCode: 'DEV', accountNumber: '0123456789', accountName: 'Seller' });
     // Nothing earned yet: nothing to pay out.
     const early = await as(t.app, seller).post('/v1/me/payouts', { amountCents: 10_000_000, currency: 'USD' });
     expect(early.status).toBe(400);
     expect(early.body.error.details).toEqual({ availableCents: 0 });
 
-    const o = await order(buyer, [{ productId: await product(seller) }]);
+    const o = await order(buyer, [{ productId: await product(seller, { priceCents: 2000 }) }]);
     expect((await webhook(o, 'payment.succeeded')).status).toBe(200);
-    // $10 less the 5% fee and processing (2.9% + 30¢), held for a week after the sale so an early refund or chargeback comes out of it.
+    // $20 less the 5% fee and processing (2.9% + 30¢), held for a week after the sale so an early refund or chargeback comes out of it.
     expect((await as(t.app, seller).get('/v1/me/earnings')).body.balances).toEqual([
-      { currency: 'USD', grossCents: 1000, feeCents: 109, heldCents: 891, availableCents: 0 },
+      { currency: 'USD', grossCents: 2000, feeCents: 188, heldCents: 1812, availableCents: 0 },
     ]);
-    expect((await as(t.app, seller).post('/v1/me/payouts', { amountCents: 891, currency: 'USD' })).status).toBe(400);
+    expect((await as(t.app, seller).post('/v1/me/payouts', { amountCents: 1812, currency: 'USD' })).status).toBe(400);
     await db().query(`UPDATE orders SET paid_at = now() - interval '7 days 1 minute' WHERE id = $1`, [o]);
     expect((await as(t.app, seller).get('/v1/me/earnings')).body.balances).toEqual([
-      { currency: 'USD', grossCents: 1000, feeCents: 109, heldCents: 0, availableCents: 891 },
+      { currency: 'USD', grossCents: 2000, feeCents: 188, heldCents: 0, availableCents: 1812 },
     ]);
-    expect((await as(t.app, seller).post('/v1/me/payouts', { amountCents: 892, currency: 'USD' })).status).toBe(400);
+    expect((await as(t.app, seller).post('/v1/me/payouts', { amountCents: 1813, currency: 'USD' })).status).toBe(400);
     // Two requests at once can't both spend the same balance.
-    const both = await Promise.all([1, 2].map(() => as(t.app, seller).post('/v1/me/payouts', { amountCents: 891, currency: 'USD' })));
+    const both = await Promise.all([1, 2].map(() => as(t.app, seller).post('/v1/me/payouts', { amountCents: 1812, currency: 'USD' })));
     expect(both.map((r) => r.status).sort()).toEqual([201, 400]);
     const payoutId = both.find((r) => r.status === 201)!.body.payout.id;
     expect((await as(t.app, seller).get('/v1/me/earnings')).body.balances[0].availableCents).toBe(0);
@@ -80,7 +81,7 @@ describe('payouts', () => {
     // Refunded after the request: there's nothing left to cover it, so it can't be verified.
     expect((await as(t.app, seller).post(`/v1/orders/${o}/refund`, { reason: 'Changed my mind' })).body.status).toBe('succeeded');
     const listed = (await as(t.app, admin).get('/v1/admin/payouts')).body.items.find((p: any) => p.id === payoutId);
-    expect(listed).toMatchObject({ amount_cents: 891, available_cents: -891 });
+    expect(listed).toMatchObject({ amount_cents: 1812, available_cents: -1812 });
     expect((await as(t.app, admin).post(`/v1/admin/payouts/${payoutId}/verify`)).status).toBe(400);
     expect((await db().query(`SELECT status FROM payouts WHERE id = $1`, [payoutId])).rows[0].status).toBe('pending');
   });
@@ -190,7 +191,10 @@ describe('currencies', () => {
   it('charges currencies without a minor unit in whole units', async () => {
     const seller = await adult();
     const buyer = await adult();
-    const odd = await product(seller, { priceCents: 1_000_050, currency: 'XOF' });
+    // Refused when it's made; one made before that rule is refused at checkout.
+    expect((await as(t.app, seller).post('/v1/products', { title: 'Odd', priceCents: 1_000_050, currency: 'XOF' })).status).toBe(400);
+    const odd = await product(seller, { priceCents: 1_000_000, currency: 'XOF' });
+    await db().query(`UPDATE products SET price_cents = 1000050 WHERE id = $1`, [odd]);
     const r = await as(t.app, buyer).post('/v1/orders', { items: [{ productId: odd, quantity: 1 }], idempotencyKey: key() });
     expect(r.status).toBe(400);
     expect(await order(buyer, [{ productId: await product(seller, { priceCents: 1_000_000, currency: 'XOF' }) }])).toBeTruthy();

@@ -168,6 +168,8 @@ export const CURRENCIES = ['USD', 'EUR', 'GBP', 'NGN', 'GHS', 'KES', 'ZAR', 'XOF
 
 /** The platform's share of each sale, tip and subscription, in basis points (5%, as the creator and seller terms say). */
 export const PLATFORM_FEE_BPS = 500;
+/** The smallest payout, in US cents; scaled by CURRENCY_SCALE for other currencies (about $10 everywhere), so transfer fees don't eat it. */
+export const PAYOUT_MIN_CENTS = 1000;
 /** Days a sale's earnings wait before they can be paid out, so early refunds and chargebacks come out of them. */
 export const EARNINGS_HOLD_DAYS = 7;
 export type Currency = (typeof CURRENCIES)[number];

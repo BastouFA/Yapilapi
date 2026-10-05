@@ -29,7 +29,8 @@ import {
   type DeviceDataSaver,
 } from '@/lib/data-saver';
 
-type Listener = (event: { type: string; data: any }) => void;
+type RealtimeEvent = { type: string; data: any };
+type Listener = (event: RealtimeEvent) => void;
 
 export interface Session {
   me: Me | null;
@@ -45,6 +46,8 @@ export interface Session {
   /** A short message; with an `action` (like "Add to a board") it shows a button and stays longer. */
   toast: (message: string, action?: ToastAction) => void;
   subscribe: (fn: Listener) => () => void;
+  /** Send a small frame on the realtime socket (like "typing"); dropped when it isn't open. */
+  sendRealtime: (frame: { type: string; conversationId?: string }) => void;
   t: (key: MessageKey, vars?: Record<string, string | number>) => string;
   /** Plural-aware: picks `<key>.one` or `<key>.other` for `count`, which is also passed as {count}. */
   tp: (key: PluralKey, count: number, vars?: Record<string, string | number>) => string;
@@ -108,6 +111,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const toast = useCallback((message: string, action?: ToastAction) => setToastState({ id: ++toastId.current, message, action }), []);
   const clearToast = useCallback(() => setToastState(null), []);
   const listeners = useRef(new Set<Listener>());
+  const socket = useRef<WebSocket | null>(null);
 
   // Data saver: the account's setting (from /v1/auth/me), this browser's override and the connection.
   const [deviceSaver, setDeviceSaver] = useState<DeviceDataSaver>('account');
@@ -229,21 +233,46 @@ export function Providers({ children }: { children: React.ReactNode }) {
         () => null,
       );
       if (stopped) return;
-      ws = new WebSocket(ticket ? `${WS_URL}?ticket=${encodeURIComponent(ticket)}` : WS_URL);
-      ws.onopen = () => (attempt = 0);
-      ws.onmessage = (ev) => {
-        try {
-          const event = JSON.parse(ev.data);
-          // A like joining an unread "Ada and 2 others" row isn't one more unread.
-          if (event.type === 'notification.created' && !event.data?.grouped) setUnreadState((u) => ({ ...u, notifications: u.notifications + 1 }));
-          if (event.type === 'message.created' && event.data.sender.id !== me.id && !location.pathname.startsWith(`/inbox/${event.data.conversationId}`))
-            setUnreadState((u) => ({ ...u, messages: u.messages + 1 }));
-          listeners.current.forEach((l) => l(event));
-        } catch {
-          /* ignore */
-        }
+      const sock = new WebSocket(ticket ? `${WS_URL}?ticket=${encodeURIComponent(ticket)}` : WS_URL);
+      ws = sock;
+      socket.current = sock;
+      // A ping now and then keeps proxies from closing a quiet socket.
+      let ping: ReturnType<typeof setInterval> | undefined;
+      sock.onopen = () => {
+        attempt = 0;
+        ping = setInterval(() => sock.readyState === WebSocket.OPEN && sock.send(JSON.stringify({ type: 'ping' })), 25_000);
       };
-      ws.onclose = () => {
+      sock.onmessage = (ev) => {
+        let event: RealtimeEvent;
+        try {
+          event = JSON.parse(ev.data);
+        } catch {
+          return; // a malformed frame
+        }
+        if (event.type === 'pong') return;
+        // A like joining an unread "Ada and 2 others" row isn't one more unread.
+        if (event.type === 'notification.created' && !event.data?.grouped) setUnreadState((u) => ({ ...u, notifications: u.notifications + 1 }));
+        // The same as the server counts: messages from others, and calls you missed (not the other lines in a chat).
+        const counts = event.data?.kind !== 'system' || (event.data.system?.type === 'call' && event.data.system.outcome === 'missed');
+        if (
+          event.type === 'message.created' &&
+          counts &&
+          event.data.sender.id !== me.id &&
+          !location.pathname.startsWith(`/inbox/${event.data.conversationId}`)
+        )
+          setUnreadState((u) => ({ ...u, messages: u.messages + 1 }));
+        // One page's handler failing doesn't keep the event from the others.
+        listeners.current.forEach((l) => {
+          try {
+            l(event);
+          } catch (e) {
+            console.error(e);
+          }
+        });
+      };
+      sock.onclose = () => {
+        clearInterval(ping);
+        if (socket.current === sock) socket.current = null;
         if (stopped) return;
         attempt++;
         setTimeout(() => void connect(), Math.min(30_000, 1000 * 2 ** attempt));
@@ -262,6 +291,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const subscribe = useCallback((fn: Listener) => {
     listeners.current.add(fn);
     return () => void listeners.current.delete(fn);
+  }, []);
+  const sendRealtime = useCallback((frame: { type: string; conversationId?: string }) => {
+    const ws = socket.current;
+    if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(frame));
   }, []);
   const setUnread = useCallback((u: Partial<{ notifications: number; messages: number }>) => setUnreadState((s) => ({ ...s, ...u })), []);
   const t = useCallback((key: MessageKey, vars?: Record<string, string | number>) => translate(key, locale, isolate(locale, vars)), [locale]);
@@ -298,6 +331,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         setUnread,
         toast,
         subscribe,
+        sendRealtime,
         t,
         tp,
         locale,

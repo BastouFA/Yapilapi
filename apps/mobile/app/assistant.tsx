@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
-import type { AgentKind, AgentResult } from '../../../packages/api-client/src/index';
+import { ApiError, type AgentKind, type AgentResult } from '../../../packages/api-client/src/index';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import { client, errorMessage } from '../lib/api';
 import { useT } from '../lib/i18n';
@@ -51,7 +51,8 @@ export default function Assistant() {
       setRes(await (await client()).agents.run(kind, prompt.trim()));
     } catch (e) {
       setRes(null);
-      setError(kind === 'business' && /not found/i.test(errorMessage(e)) ? t('m.assistant.businessOnly') : errorMessage(e));
+      // A 404: no business on this account (the message is in the reader's language, so it isn't matched on).
+      setError(kind === 'business' && e instanceof ApiError && e.status === 404 ? t('m.assistant.businessOnly') : errorMessage(e));
     } finally {
       setBusy(false);
     }

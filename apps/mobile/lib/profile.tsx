@@ -30,6 +30,7 @@ import {
   Button,
   Card,
   EmptyState,
+  ErrorState,
   feedListProps,
   Icon,
   Notice,
@@ -82,6 +83,8 @@ export function ProfileView({
   const [posts, setPosts] = useState<Post[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
+  // Why the posts couldn't load (offline, a server error), shown with Try again instead of "No posts yet".
+  const [postsError, setPostsError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -120,15 +123,16 @@ export function ProfileView({
       if (onMoved && p.username.toLowerCase() !== username.toLowerCase()) return onMoved(p.username);
       setProfile(p);
       setLoadError(null);
+      // A private account you don't follow lists nothing: say why rather than "No posts yet".
+      setLocked(p.isPrivate && !p.relationship.isSelf && !p.relationship.following && !p.relationship.friends);
+      setPostsError(null);
       try {
         const page = await api.users.posts(p.username);
         setPosts(page.items);
         setCursor(page.nextCursor);
-        // A private account you don't follow lists nothing: say why rather than "No posts yet".
-        setLocked(p.isPrivate && !p.relationship.isSelf && !p.relationship.following && !p.relationship.friends);
-      } catch {
+      } catch (e) {
         setPosts([]);
-        setLocked(p.isPrivate && !p.relationship.isSelf);
+        setPostsError(errorMessage(e));
       }
     } catch (e) {
       if (isGone(e)) setProfile(null);
@@ -207,16 +211,24 @@ export function ProfileView({
 
   const more = async () => {
     if (!cursor) return;
-    const page = await (await client()).users.posts(username, cursor);
-    setPosts((cur) => [...cur, ...page.items.filter((x) => !cur.some((y) => y.id === x.id))]);
-    setCursor(page.nextCursor);
+    try {
+      const page = await (await client()).users.posts(username, cursor);
+      setPosts((cur) => [...cur, ...page.items.filter((x) => !cur.some((y) => y.id === x.id))]);
+      setCursor(page.nextCursor);
+    } catch (e) {
+      setPostsError(errorMessage(e));
+    }
   };
 
   if (profile === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <ProfileSkeleton bottom={bottom} />;
   if (profile === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>
-        <EmptyState title={t('m.post.unavailable.title')} action={{ label: t('m.common.retry'), icon: 'refresh', onPress: () => void load() }} />
+        <EmptyState
+          title={t('profilePage.missing.title')}
+          body={t('profilePage.missing.body')}
+          action={{ label: t('m.common.retry'), icon: 'refresh', onPress: () => void load() }}
+        />
       </View>
     );
 
@@ -647,6 +659,8 @@ export function ProfileView({
           ) : (
             <EmptyState title={t('m.tagged.empty')} body={rel.isSelf ? t('m.tagged.emptySelf') : undefined} />
           )
+        ) : postsError ? (
+          <ErrorState message={postsError} onRetry={load} />
         ) : rel.isSelf && !locked ? (
           // Your own profile with nothing on it yet: the way to your first post.
           <EmptyState

@@ -29,6 +29,12 @@ export async function searchAll(db: Pool, viewer: string | null, q: SearchInput)
   const tsq = `websearch_to_tsquery('simple', $2)`;
   const tsqEn = `websearch_to_tsquery('english', $2)`;
   const like = `%${terms.replace(/[%_]/g, '')}%`;
+  // Names and usernames as typed (the search terms turn "ada_obi" into "ada obi"): an underscore in a
+  // username is matched as one, so an account found only by its name (private, signed out) is found.
+  const nameLike = `%${q.q
+    .trim()
+    .replace(/^@/, '')
+    .replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
   const out: Record<string, unknown> = {};
   const jobs: Promise<void>[] = [];
 
@@ -38,10 +44,14 @@ export async function searchAll(db: Pool, viewer: string | null, q: SearchInput)
         .query<PublicUserRow>(
           `SELECT ${PUBLIC_USER_COLS} FROM profiles pr JOIN users u ON u.id = pr.user_id
              WHERE u.status = 'active' AND ${notBlockedSql('pr.user_id', '$1')}
-               AND ($2 = '' OR pr.search @@ ${tsq} OR pr.display_name ILIKE $4 OR pr.username ILIKE $4 OR pr.bio ILIKE $4)
+               -- Signed out: never people under 18 (their profiles aren't shown either), and a private
+               -- account only by its name (its bio is hidden, so searching it mustn't reveal it).
+               AND ($1::uuid IS NOT NULL OR NOT coalesce(u.birth_date > current_date - interval '18 years', false))
+               AND ($2 = '' OR pr.display_name ILIKE $4 OR pr.username ILIKE $4 OR pr.display_name ILIKE $5 OR pr.username ILIKE $5
+                    OR ((pr.search @@ ${tsq} OR pr.bio ILIKE $4) AND ($1::uuid IS NOT NULL OR NOT pr.is_private)))
                ${intent.creatorsOnly ? `AND pr.mode IN ('creator','professional')` : ''}
              ORDER BY ts_rank(pr.search, ${tsq}) DESC, (SELECT count(*) FROM follows WHERE followee_id = pr.user_id) DESC LIMIT $3`,
-          [viewer, terms, q.limit, like],
+          [viewer, terms, q.limit, like, nameLike],
         )
         .then((r) => void (out.people = r.rows.map(toPublicUser))),
     );

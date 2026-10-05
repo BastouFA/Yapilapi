@@ -1,5 +1,4 @@
 import type { FastifyInstance } from 'fastify';
-import type { Pool } from 'pg';
 import { tx } from '@yapilapi/database';
 import {
   createBusinessSchema,
@@ -8,7 +7,6 @@ import {
   createProductSchema,
   hoursKeyDays,
   CURRENCY_SCALE,
-  EARNINGS_HOLD_DAYS,
   PLACE_CATEGORIES,
   PLATFORM_FEE_BPS,
   processingFeeCents,
@@ -18,20 +16,21 @@ import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } fro
 import type { AppContext } from '../lib/context.ts';
 import { audit, isEnabled, notify, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
-import { signDevWebhook } from '../lib/payments.ts';
+import { isZeroDecimal, signDevWebhook } from '../lib/payments.ts';
 import { businessOverview } from '../lib/ai/agents.ts';
 import { refundUnspentBudget } from '../lib/ad-refunds.ts';
 import { submitBoostForReview } from '../lib/boosts.ts';
-import { assertAdultForMoney, publicUserFrom } from '../lib/users.ts';
+import { assertAdultForMoney, isBlockedEitherWay, publicUserFrom } from '../lib/users.ts';
 import { EVENT_SELECT, toEvent } from './events.ts';
 import { eventVisibleSql, liveVisibleSql } from '../lib/visibility.ts';
 import { liveChatAudience } from '../lib/live.ts';
-import { me, requireAuth, requireRole } from '../plugins/auth.ts';
+import { me, requireAuth } from '../plugins/auth.ts';
 import { grantPlus } from '../lib/plus.ts';
-import { refundOrder, revokeRefundedOrder, sellerFeesSql, startPayment } from '../lib/checkout.ts';
+import { refundOrder, revokeRefundedOrder, startPayment } from '../lib/checkout.ts';
 import { assertDigitalCheckoutAllowed } from '../lib/store-purchases.ts';
 import { confirmDropOrder, dropGateSql, publishDropChange, releaseDropOrder, takeDropStock } from '../lib/drops.ts';
 import { issueOrderTickets, publishDoor } from '../lib/tickets.ts';
+import { applyPayoutEvent } from '../lib/payouts.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 
@@ -109,7 +108,10 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     const [places, products] = await Promise.all([
       db.query(`SELECT id, name, category, address, city FROM places WHERE business_id = $1 AND deleted_at IS NULL`, [b.id]),
       db.query(
-        `SELECT id, kind, title, description, price_cents, currency, inventory FROM products WHERE business_id = $1 AND deleted_at IS NULL AND status = 'active' ORDER BY created_at DESC`,
+        // Products in a drop that isn't open are shown on the drop instead, as on the profile's shop.
+        `SELECT pd.id, pd.kind, pd.title, pd.description, pd.price_cents, pd.currency, pd.inventory FROM products pd
+         WHERE pd.business_id = $1 AND pd.deleted_at IS NULL AND pd.status = 'active' AND coalesce(${dropGateSql('pd.id')}, 'open') = 'open'
+         ORDER BY pd.created_at DESC`,
         [b.id],
       ),
     ]);
@@ -269,7 +271,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     );
     const products = await db.query(
       `SELECT pd.id, pd.kind, pd.title, pd.description, pd.price_cents, pd.currency, pd.inventory FROM products pd JOIN places pl ON pl.business_id = pd.business_id
-       WHERE pl.id = $1 AND pd.deleted_at IS NULL AND pd.status = 'active' LIMIT 20`,
+       WHERE pl.id = $1 AND pd.deleted_at IS NULL AND pd.status = 'active' AND coalesce(${dropGateSql('pd.id')}, 'open') = 'open' LIMIT 20`,
       [id],
     );
     return { place, events: events.rows.map(toEvent), products: products.rows.map(productDto) };
@@ -321,6 +323,8 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     // Free, or about $1 at least in every currency: processing would eat less, and tiny prices are how stolen cards get tested.
     const minCents = 100 * CURRENCY_SCALE[input.currency];
     if (input.priceCents > 0 && input.priceCents < minCents) throw badRequest(`A paid item costs at least ${minCents} hundredths of ${input.currency}.`);
+    // A price checkout could never charge (a fraction of a franc) is refused here, not at the buyer's checkout.
+    if (isZeroDecimal(input.currency) && input.priceCents % 100 !== 0) throw badRequest(`${input.currency} amounts must be whole units.`);
     // Selling is for adults (creator and seller terms).
     await assertAdultForMoney(db, u.id);
     if (input.businessId) {
@@ -414,6 +418,9 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       }
       // Sellers must be adults; a listing made before that rule can't be bought from someone younger.
       for (const seller of new Set(products.map((p) => p.seller_id as string))) if (seller !== u.id) await assertAdultForMoney(c, seller, false);
+      // Blocks work both ways here too: the shop is hidden from them, and so is buying from it by its address.
+      for (const seller of new Set(products.map((p) => p.seller_id as string)))
+        if (seller !== u.id && (await isBlockedEitherWay(c, u.id, seller))) throw notFound('One of those products');
       const currencies = new Set(products.map((p) => p.currency));
       if (currencies.size > 1) throw badRequest('All items in one order must use the same currency.');
       let total = 0;
@@ -551,6 +558,8 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
         duplicate = true;
         return;
       }
+      // Payouts: a transfer that arrived or bounced, a payout account that became ready.
+      if (await applyPayoutEvent(c, ctx.realtime, provider, event)) return;
       const pay = await c.query(`SELECT id, order_id, amount_cents, currency, status FROM payments WHERE provider = $1 AND provider_ref = $2 FOR UPDATE`, [
         provider,
         event.providerRef,
@@ -723,6 +732,12 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       if (r.status !== 'paid') throw badRequest('Only paid orders can be refunded.');
       const status = await refundOrder(c, ctx.paymentProviders, id, u.id, reason ?? null);
       const result = status === 'succeeded' ? 'succeeded' : 'failed';
+      // A paid order took its units from stock; refunding it here (before anything changed hands) puts them back on sale.
+      if (result === 'succeeded')
+        await c.query(
+          `UPDATE products pd SET inventory = pd.inventory + oi.quantity FROM order_items oi WHERE oi.order_id = $1 AND oi.product_id = pd.id AND pd.inventory IS NOT NULL`,
+          [id],
+        );
       await audit(c, { actorId: u.id, action: 'order.refund', entityType: 'order', entityId: id, metadata: { status: result } });
       return { status: result };
     });
@@ -730,91 +745,6 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     const events = await db.query<{ event_id: string }>(`SELECT DISTINCT event_id FROM event_tickets WHERE order_id = $1`, [id]);
     for (const e of events.rows) await publishDoor(db, ctx.realtime, e.event_id);
     return done;
-  });
-
-  /** Seller earnings and payout requests. Payouts need verification before they are paid. */
-  app.get('/v1/me/earnings', { preHandler: requireAuth }, async (req) => {
-    return { balances: await earnings(db, me(req).id) };
-  });
-
-  app.post('/v1/me/payouts', { preHandler: requireAuth }, async (req, reply) => {
-    const u = me(req);
-    const input = parse(z.object({ amountCents: z.number().int().positive(), currency: z.string().length(3).toUpperCase() }), req.body);
-    if (!u.emailVerified) throw forbidden('Verify your email before requesting a payout.');
-    await assertAdultForMoney(db, u.id);
-    const payout = await tx(db, async (c) => {
-      // One request at a time per person, so two at once can't both spend the same balance.
-      await c.query(`SELECT pg_advisory_xact_lock(hashtext('payout:' || $1))`, [u.id]);
-      const available = (await earnings(c, u.id)).find((b) => b.currency === input.currency)?.availableCents ?? 0;
-      if (input.amountCents > available) throw badRequest('That is more than you have available to pay out.', { availableCents: Math.max(0, available) });
-      return (
-        await c.query(`INSERT INTO payouts (user_id, amount_cents, currency) VALUES ($1,$2,$3) RETURNING id, status`, [u.id, input.amountCents, input.currency])
-      ).rows[0];
-    });
-    await audit(db, { actorId: u.id, action: 'payout.request', entityType: 'payout', entityId: payout.id, metadata: input });
-    reply.code(201);
-    return { payout, message: 'Payout requested. It will be paid after verification.' };
-  });
-
-  app.get('/v1/admin/payouts', { preHandler: requireRole('admin') }, async () => {
-    const { rows } = await db.query(`SELECT id, user_id, amount_cents, currency, status, created_at FROM payouts WHERE status = 'pending' ORDER BY created_at`);
-    // What each person still has in that currency with their pending payouts taken off: below zero means refunds have left it uncovered.
-    const balances = new Map<string, Awaited<ReturnType<typeof earnings>>>();
-    for (const r of rows) if (!balances.has(r.user_id)) balances.set(r.user_id, await earnings(db, r.user_id));
-    return {
-      items: rows.map((r) => ({ ...r, available_cents: balances.get(r.user_id)!.find((b) => b.currency === r.currency)?.availableCents ?? 0 })),
-    };
-  });
-
-  app.post('/v1/admin/payouts/:id/verify', { preHandler: requireRole('admin') }, async (req) => {
-    const { id } = parse(idParam, req.params);
-    const payout = (await db.query(`SELECT user_id FROM payouts WHERE id = $1 AND status = 'pending'`, [id])).rows[0];
-    if (!payout) throw notFound('Payout');
-    // Payouts only go to adults, whatever was requested before the rule.
-    await assertAdultForMoney(db, payout.user_id, false);
-    await tx(db, async (c) => {
-      await c.query(`SELECT pg_advisory_xact_lock(hashtext('payout:' || $1))`, [payout.user_id]);
-      const p = (await c.query(`SELECT currency FROM payouts WHERE id = $1 AND status = 'pending' FOR UPDATE`, [id])).rows[0];
-      if (!p) throw notFound('Payout');
-      // Refunds since the request can leave less than was asked for (pending payouts already count as spent).
-      const available = (await earnings(c, payout.user_id)).find((b) => b.currency === p.currency)?.availableCents ?? 0;
-      if (available < 0) throw badRequest('Refunds since this request leave the person without enough earnings to cover it.');
-      await c.query(`UPDATE payouts SET status = 'verified' WHERE id = $1`, [id]);
-    });
-    await audit(db, { actorId: me(req).id, action: 'payout.verify', entityType: 'payout', entityId: id });
-    return { status: 'verified' };
-  });
-}
-
-/**
- * What someone earned per currency after the platform fee and payment processing. A sale's share is held for EARNINGS_HOLD_DAYS
- * after it was paid (heldCents); what's left once payouts (other than failed ones) are taken off can be
- * paid out (availableCents).
- */
-async function earnings(q: Pick<Pool, 'query'>, userId: string) {
-  const { rows } = await q.query(
-    `SELECT currency, sum(gross) AS gross, sum(fees) AS fees, sum(gross - fees) FILTER (WHERE held) AS held FROM (
-       SELECT o.currency, oi.quantity * oi.unit_cents AS gross, ${sellerFeesSql} AS fees, o.paid_at > now() - make_interval(days => $2) AS held
-       FROM order_items oi JOIN orders o ON o.id = oi.order_id JOIN products p ON p.id = oi.product_id
-       WHERE p.seller_id = $1 AND o.status = 'paid'
-       UNION ALL
-       SELECT o.currency, o.total_cents, o.platform_fee_cents + o.processing_fee_cents, o.paid_at > now() - make_interval(days => $2) FROM orders o
-       WHERE o.payee_id = $1 AND o.status = 'paid' AND o.purpose IN ('subscription', 'tip')
-     ) x GROUP BY currency`,
-    [userId, EARNINGS_HOLD_DAYS],
-  );
-  const payouts = await q.query(`SELECT currency, sum(amount_cents) AS paid FROM payouts WHERE user_id = $1 AND status <> 'failed' GROUP BY currency`, [
-    userId,
-  ]);
-  // Payouts count even in a currency with nothing earned any more (refunded since), which leaves less than nothing available.
-  const currencies = [...new Set<string>([...rows.map((r) => r.currency), ...payouts.rows.map((p) => p.currency)])];
-  return currencies.map((currency) => {
-    const r = rows.find((x) => x.currency === currency);
-    const gross = Number(r?.gross ?? 0);
-    const fees = Number(r?.fees ?? 0);
-    const held = Number(r?.held ?? 0);
-    const paid = Number(payouts.rows.find((p) => p.currency === currency)?.paid ?? 0);
-    return { currency, grossCents: gross, feeCents: fees, heldCents: held, availableCents: gross - fees - held - paid };
   });
 }
 

@@ -11,12 +11,17 @@ import { api, errorMessage } from '@/lib/api';
 import { PasswordField } from '@/components/PasswordField';
 import { useSession } from '../../providers';
 
-/** What went wrong, in the reader's language where we know the case. */
-function problem(e: unknown, t: (k: MessageKey) => string): string {
+/**
+ * What went wrong, in the reader's language where we know the case. `twoStep`: the code step, where
+ * a 401 means the sign-in expired (the server's message is already in the reader's language, so it
+ * can't be matched on).
+ */
+function problem(e: unknown, t: (k: MessageKey) => string, twoStep = false): string {
   if (e instanceof ApiError) {
     if (e.code === 'network') return t('error.network');
-    if (e.status === 429) return t('m.auth.tooMany');
-    if (e.status === 401) return /expired/i.test(e.message) ? t('m.auth.challengeExpired') : t('m.auth.wrongPassword');
+    // Too many wrong passwords for the account, or wrong codes for this sign-in: the server says what to do.
+    if (e.status === 429) return e.code === 'too_many_attempts' ? e.message : t('m.auth.tooMany');
+    if (e.status === 401) return twoStep ? t('m.auth.challengeExpired') : t('m.auth.wrongPassword');
     if (e.status === 400 && e.fields?.code) return t('m.auth.codeWrong');
   }
   return errorMessage(e);
@@ -67,10 +72,10 @@ function LoginForm() {
         setBusy(false);
       } else if (r.user) done(r.user);
     } catch (err) {
-      const message = problem(err, t);
+      const message = problem(err, t, !!challenge);
       setError(message);
-      // An expired two-step sign-in starts again from the password.
-      if (challenge && message === t('m.auth.challengeExpired')) setChallenge(null);
+      // An expired two-step sign-in (or one with too many wrong codes) starts again from the password.
+      if (challenge && err instanceof ApiError && (err.status === 401 || err.code === 'too_many_attempts')) setChallenge(null);
       setBusy(false);
     }
   }

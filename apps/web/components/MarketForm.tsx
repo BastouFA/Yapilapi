@@ -63,9 +63,10 @@ type PlaceChoice = { kind: 'keep' } | { kind: 'set'; point: LatLng } | { kind: '
  * (then it waits for a moderator before others see it). The API makes the same check.
  */
 export function ListingForm({ listing }: { listing?: MarketListing }) {
-  const { t, toast, locale } = useSession();
+  const { t, toast, locale, me } = useSession();
   const router = useRouter();
-  const market = useMarketMe();
+  const [attempt, setAttempt] = useState(0);
+  const market = useMarketMe(attempt);
   const place = useApproxHere();
   const currency = listing?.currency ?? market?.currency ?? 'USD';
 
@@ -190,6 +191,24 @@ export function ListingForm({ listing }: { listing?: MarketListing }) {
   }
 
   if (market === undefined) return <Skeleton height={320} />;
+  // Signed in but your currency and what you may sell couldn't load: say so, rather than guess a currency.
+  if (market === null && me && !listing)
+    return (
+      <EmptyState
+        title={t('error.generic')}
+        action={
+          <Button
+            variant="secondary"
+            onClick={() => {
+              forgetMarketMe();
+              setAttempt((n) => n + 1);
+            }}
+          >
+            {t('m.common.retry')}
+          </Button>
+        }
+      />
+    );
   if (market && !market.canSell && !listing)
     return (
       <EmptyState

@@ -97,8 +97,11 @@ export default async function CreatorsPage() {
 
       <h2>9. Payouts</h2>
       <p>
-        Ask for a payout of your available earnings in Studio. Each request is checked by our team before it is paid. [Payout method, currencies, minimum amount
-        and timing.] We may hold payouts while we look into fraud, disputes or a breach of these terms, and we tell you why.
+        Ask for a payout of your available earnings in Studio. Earnings become available 7 days after each sale. Payouts are paid in the currency you earned: US
+        dollars, euros and pounds to a Stripe account you set up on Stripe&apos;s own pages, and naira, cedis, shillings and rand to a bank or mobile money
+        account you give us, through Paystack. The smallest payout is about US$10 in any currency. Each request is checked by our team; once approved it is sent
+        the same day, and banks usually show it within a few working days. A payout that your bank refuses or reverses goes back to your available earnings. We
+        may hold payouts while we look into fraud, disputes or a breach of these terms, and we tell you why.
       </p>
 
       <h2>10. Boosting posts</h2>

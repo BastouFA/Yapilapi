@@ -296,6 +296,10 @@ export const sw: Record<string, string> = {
   'Up to 160 characters.': 'Hadi herufi 160.',
   'Up to 280 characters.': 'Hadi herufi 280.',
   // apps/api/src/modules/calls.ts
+  'To keep younger people safe, you can only call them once you are friends.': 'Ili kuwalinda vijana, unaweza kuwapigia simu tu mkishakuwa marafiki.',
+  'This person only gets calls from people they know.': 'Mtu huyu hupokea simu kutoka kwa watu anaowajua tu.',
+  'Calls work in one-to-one chats and groups of up to 8 people.': 'Simu hufanya kazi kwenye gumzo za watu wawili na vikundi vya hadi watu 8.',
+  'There’s nobody else here to call.': 'Hakuna mtu mwingine hapa wa kumpigia.',
   'There is already a call in this conversation.': 'Tayari kuna simu kwenye mazungumzo haya.',
   "Call doesn't exist or isn't visible to you.": 'Simu haipo au huwezi kuiona.',
   'Calls support up to 8 people.': 'Simu zinaweza kuwa na hadi watu 8.',
@@ -688,6 +692,15 @@ export const sw: Record<string, string> = {
   'You can only share memories with friends.': 'Unaweza kushiriki kumbukumbu na marafiki tu.',
   'Add some posts to this memory first.': 'Ongeza machapisho kwenye kumbukumbu hii kwanza.',
   // apps/api/src/modules/messaging.ts
+  'This works in groups only.': 'Hii hufanya kazi kwenye vikundi tu.',
+  'Someone you’re adding can’t be in this group with someone already in it.':
+    'Mtu unayemwongeza hawezi kuwa kwenye kikundi hiki pamoja na mtu ambaye tayari yumo.',
+  'To go, leave the group instead.': 'Ili kuondoka, ondoka kwenye kikundi badala yake.',
+  'A group needs at least one admin. Make someone else an admin first.': 'Kikundi kinahitaji angalau msimamizi mmoja. Mfanye mtu mwingine msimamizi kwanza.',
+  'Only group admins can rename the group.': 'Wasimamizi wa kikundi pekee wanaweza kubadilisha jina la kikundi.',
+  'Only group admins can remove people.': 'Wasimamizi wa kikundi pekee wanaweza kuondoa watu.',
+  'Only group admins can choose admins.': 'Wasimamizi wa kikundi pekee wanaweza kuchagua wasimamizi.',
+  'React with an emoji.': 'Jibu kwa emoji.',
   'To keep younger people safe, you can only message them once you are friends.': 'Ili kuwalinda vijana, unaweza kumtumia ujumbe tu mkishakuwa marafiki.',
   'This person only gets messages from people they know.': 'Mtu huyu hupokea ujumbe kutoka kwa watu anaowajua tu.',
   'To keep younger people safe, adults and people under 18 can be in a group together only when they are friends.':
@@ -839,6 +852,15 @@ export const sw: Record<string, string> = {
   "Passkey doesn't exist or isn't visible to you.": 'Ufunguo wa siri haupo au huwezi kuuona.',
   "That passkey isn't registered here. Sign in with your password.": 'Ufunguo huo wa siri haujasajiliwa hapa. Ingia kwa nenosiri lako.',
   "That passkey couldn't be verified.": 'Ufunguo huo wa siri haukuweza kuthibitishwa.',
+  // apps/api/src/modules/payouts.ts
+  'Payouts in this currency are set up on the payment provider’s page.': 'Malipo kwa sarafu hii yanawekwa kwenye ukurasa wa mtoa huduma wa malipo.',
+  'Payouts in this currency are set up with a bank account.': 'Malipo kwa sarafu hii yanawekwa kwa akaunti ya benki.',
+  'Pick a bank from the list.': 'Chagua benki kutoka kwenye orodha.',
+  'Set up where your payouts go before asking for one.': 'Weka mahali malipo yako yanapoenda kabla ya kuomba malipo.',
+  'The bank could not confirm that account. Check the number and try again.': 'Benki haikuweza kuthibitisha akaunti hiyo. Angalia nambari na ujaribu tena.',
+  'The smallest payout is {min} hundredths of {currency}.': 'Malipo ya chini kabisa ni sehemu {min} za mia za {currency}.',
+  'This person has no payout account ready for that currency.': 'Mtu huyu hana akaunti ya malipo iliyo tayari kwa sarafu hiyo.',
+  'Verify your email before setting up payouts.': 'Thibitisha barua pepe yako kabla ya kuweka malipo.',
   // apps/api/src/modules/phone.ts
   'That number is already confirmed on another account.': 'Nambari hiyo tayari imethibitishwa kwenye akaunti nyingine.',
   'Already in use.': 'Tayari inatumika.',
@@ -1241,4 +1263,6 @@ export const sw: Record<string, string> = {
   'An event can sell up to 10 kinds of ticket at once.': 'Tukio linaweza kuuza hadi aina 10 za tiketi kwa wakati mmoja.',
   'Name the days, such as mon or tue-sun.': 'Taja siku, kama mon au tue-sun.',
   'Up to 14 lines of opening hours.': 'Hadi mistari 14 ya saa za kufungua.',
+  'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
+    'Nenosiri lisilo sahihi limejaribiwa mara nyingi kwa akaunti hii. Subiri dakika 15, au weka upya nenosiri lako.',
 };

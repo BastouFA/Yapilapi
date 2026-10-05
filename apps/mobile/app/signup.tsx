@@ -20,7 +20,7 @@ const MIN_PASSWORD = 10;
 export default function Signup() {
   const c = useColors();
   const { t, locale } = useT();
-  const { refresh } = useSession();
+  const { enter } = useSession();
   const params = useLocalSearchParams<{ invite?: string }>();
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
@@ -102,7 +102,7 @@ export default function Signup() {
         locale,
         inviteCode: invite.trim() || undefined,
       });
-      await enterApp(user, refresh);
+      await enterApp(user, enter);
     } catch (e) {
       const p = authProblem(e, t);
       setError(p.message);
@@ -188,7 +188,8 @@ export default function Signup() {
         min={earliest}
         max={today}
         openAt={openAt}
-        note={fields.birthDate ?? t('m.auth.birthDate.hint')}
+        note={t('m.auth.birthDate.hint')}
+        error={fields.birthDate}
       />
       {showInvite ? (
         <Field

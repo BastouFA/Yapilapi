@@ -292,6 +292,10 @@ export const yo: Record<string, string> = {
   'Up to 160 characters.': 'Títí dé lẹ́tà 160.',
   'Up to 280 characters.': 'Títí dé lẹ́tà 280.',
   // apps/api/src/modules/calls.ts
+  'To keep younger people safe, you can only call them once you are friends.': 'Láti dáàbò bo àwọn ọ̀dọ́, o lè pè wọ́n nígbà tí ẹ bá ti di ọ̀rẹ́ nìkan.',
+  'This person only gets calls from people they know.': 'Ẹni yìí máa ń gba ìpè láti ọ̀dọ̀ àwọn tó mọ̀ nìkan.',
+  'Calls work in one-to-one chats and groups of up to 8 people.': 'Ìpè ń ṣiṣẹ́ nínú ìjíròrò ẹni méjì àti ẹgbẹ́ tí kò ju ènìyàn 8 lọ.',
+  'There’s nobody else here to call.': 'Kò sí ẹlòmíràn níbí láti pè.',
   'There is already a call in this conversation.': 'Ìpè kan ti ń lọ nínú ìjíròrò yìí tẹ́lẹ̀.',
   "Call doesn't exist or isn't visible to you.": 'Ìpè náà kò sí, tàbí o kò lè rí i.',
   'Calls support up to 8 people.': 'Ìpè lè gba ènìyàn tí kò ju 8 lọ.',
@@ -676,6 +680,14 @@ export const yo: Record<string, string> = {
   'You can only share memories with friends.': 'O lè pín àwọn ìrántí pẹ̀lú àwọn ọ̀rẹ́ nìkan.',
   'Add some posts to this memory first.': 'Kọ́kọ́ fi àwọn àtẹ̀jáde díẹ̀ kún ìrántí yìí.',
   // apps/api/src/modules/messaging.ts
+  'This works in groups only.': 'Èyí ń ṣiṣẹ́ nínú ẹgbẹ́ nìkan.',
+  'Someone you’re adding can’t be in this group with someone already in it.': 'Ẹnì kan tí o ń fi kún un kò lè wà nínú ẹgbẹ́ yìí pẹ̀lú ẹnì kan tó ti wà níbẹ̀.',
+  'To go, leave the group instead.': 'Láti lọ, kúrò nínú ẹgbẹ́ dípò bẹ́ẹ̀.',
+  'A group needs at least one admin. Make someone else an admin first.': 'Ẹgbẹ́ nílò alábòójútó kan ó kéré tán. Sọ ẹlòmíràn di alábòójútó ná.',
+  'Only group admins can rename the group.': 'Àwọn alábòójútó ẹgbẹ́ nìkan ló lè yí orúkọ ẹgbẹ́ padà.',
+  'Only group admins can remove people.': 'Àwọn alábòójútó ẹgbẹ́ nìkan ló lè yọ ènìyàn kúrò.',
+  'Only group admins can choose admins.': 'Àwọn alábòójútó ẹgbẹ́ nìkan ló lè yan alábòójútó.',
+  'React with an emoji.': 'Fèsì pẹ̀lú emoji.',
   'To keep younger people safe, you can only message them once you are friends.':
     'Láti dáàbò bo àwọn ọ̀dọ́, o lè fi ìfiránṣẹ́ ránṣẹ́ sí wọn nígbà tí ẹ bá ti di ọ̀rẹ́ nìkan.',
   'This person only gets messages from people they know.': 'Ẹni yìí máa ń gba ìfiránṣẹ́ láti ọ̀dọ̀ àwọn tí ó mọ̀ nìkan.',
@@ -824,6 +836,15 @@ export const yo: Record<string, string> = {
   "Passkey doesn't exist or isn't visible to you.": 'Kọ́kọ́rọ́ ìwọlé náà kò sí, tàbí o kò lè rí i.',
   "That passkey isn't registered here. Sign in with your password.": 'A kò forúkọ kọ́kọ́rọ́ ìwọlé yẹn sílẹ̀ níbí. Wọlé pẹ̀lú ọ̀rọ̀ aṣínà rẹ.',
   "That passkey couldn't be verified.": 'A kò lè jẹ́rìí kọ́kọ́rọ́ ìwọlé yẹn.',
+  // apps/api/src/modules/payouts.ts
+  'Payouts in this currency are set up on the payment provider’s page.': 'Owó sísan ní owó yìí ni a ń ṣètò lójú-ìwé olùpèsè ìsanwó.',
+  'Payouts in this currency are set up with a bank account.': 'Owó sísan ní owó yìí ni a ń ṣètò pẹ̀lú àkáǹtì báńkì.',
+  'Pick a bank from the list.': 'Yan báńkì kan láti inú àtòjọ.',
+  'Set up where your payouts go before asking for one.': 'Ṣètò ibi tí owó sísan rẹ yóò lọ kí o tó béèrè rẹ̀.',
+  'The bank could not confirm that account. Check the number and try again.': 'Báńkì kò lè jẹ́rìí àkáǹtì náà. Ṣàyẹ̀wò nọ́mbà náà kí o sì gbìyànjú lẹ́ẹ̀kan sí i.',
+  'The smallest payout is {min} hundredths of {currency}.': 'Owó sísan tó kéré jù ni {min} ìdá-ọgọ́rùn-ún {currency}.',
+  'This person has no payout account ready for that currency.': 'Ẹni yìí kò ní àkáǹtì owó sísan tó ti ṣetán fún owó yẹn.',
+  'Verify your email before setting up payouts.': 'Jẹ́rìí ímeèlì rẹ kí o tó ṣètò owó sísan.',
   // apps/api/src/modules/phone.ts
   'That number is already confirmed on another account.': 'A ti jẹ́rìí nọ́mbà yẹn lórí àkáǹtì mìíràn tẹ́lẹ̀.',
   'Already in use.': 'Ó ti wà ní lílò.',
@@ -1227,4 +1248,6 @@ export const yo: Record<string, string> = {
   'An event can sell up to 10 kinds of ticket at once.': 'Ìṣẹ̀lẹ̀ kan lè ta tó oríṣi tíkẹ́ẹ̀tì 10 ní àkókò kan.',
   'Name the days, such as mon or tue-sun.': 'Dárúkọ àwọn ọjọ́, bíi mon tàbí tue-sun.',
   'Up to 14 lines of opening hours.': 'Tó ìlà 14 ti àkókò ìṣí.',
+  'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
+    'Ọ̀rọ̀ aṣínà tí kò tọ́ ti pọ̀ jù fún àkáǹtì yìí. Dúró fún ìṣẹ́jú 15, tàbí tún ọ̀rọ̀ aṣínà rẹ ṣe.',
 };

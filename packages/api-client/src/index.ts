@@ -812,6 +812,17 @@ export function createClient(opts: ClientOptions) {
       list: () => get<{ items: Conversation[] }>('/v1/conversations'),
       get: (id: string) => get<{ conversation: Conversation }>(`/v1/conversations/${id}`),
       create: (memberIds: string[], title?: string) => post<{ conversation: Conversation }>('/v1/conversations', { memberIds, title }),
+      /** Rename a group (its admins). */
+      rename: (id: string, title: string) => patch<{ conversation: Conversation; message: Message | null }>(`/v1/conversations/${id}`, { title }),
+      /** Add people to a group (anyone in it). */
+      addMembers: (id: string, userIds: string[]) => post<{ ok: true; added: number; message: Message | null }>(`/v1/conversations/${id}/members`, { userIds }),
+      /** Take someone out of a group (its admins). */
+      removeMember: (id: string, userId: string) => del<{ ok: true; message: Message | null }>(`/v1/conversations/${id}/members/${userId}`),
+      /** Make someone a group admin, or take it back (its admins; a group keeps at least one). */
+      setRole: (id: string, userId: string, role: 'admin' | 'member') =>
+        put<{ conversation: Conversation; message: Message | null }>(`/v1/conversations/${id}/members/${userId}/role`, { role }),
+      /** Leave a chat. When the last admin of a group leaves, whoever has been there longest becomes one. */
+      leave: (id: string) => post<{ ok: true }>(`/v1/conversations/${id}/leave`),
       messages: (id: string, cursor?: string) => get<Page<Message>>(`/v1/conversations/${id}/messages${qs({ cursor })}`),
       /** `kind: 'yap'` sends a hold-to-talk voice clip; `viewOnce` sends one photo or video uploaded with `viewOnce`. */
       send: (
@@ -1216,6 +1227,8 @@ export function createClient(opts: ClientOptions) {
         post<{ order: Record<string, any>; payment?: CheckoutPayment }>('/v1/orders', { items, idempotencyKey, liveSessionId }),
       list: () => get<{ items: Record<string, any>[] }>('/v1/orders'),
       get: (id: string) => get<{ order: Record<string, any> }>(`/v1/orders/${id}`),
+      /** Refund a paid order in full (its seller, when everything in it is theirs, or an admin). */
+      refund: (id: string, reason?: string) => post<{ status: 'succeeded' | 'failed' }>(`/v1/orders/${id}/refund`, reason ? { reason } : {}),
     },
     realtime: {
       /** A 60-second ticket for opening the realtime socket when the API is on another host. */
@@ -1274,6 +1287,18 @@ export function createClient(opts: ClientOptions) {
         get<{ balances: { currency: string; grossCents: number; feeCents: number; heldCents: number; availableCents: number }[] }>('/v1/me/earnings'),
       /** Your payout requests and where each one is. */
       payouts: () => get<{ items: Payout[] }>('/v1/me/payouts'),
+      /** Ask for a payout of what's available in a currency, to the account set up for it. */
+      requestPayout: (amountCents: number, currency: string) =>
+        post<{ payout: { id: string; status: Payout['status'] } }>('/v1/me/payouts', { amountCents, currency }),
+      /** Where your payouts go in each currency, and how that's set up. */
+      payoutAccounts: () => get<{ items: PayoutAccount[] }>('/v1/me/payout-accounts'),
+      /** The payment provider's page to give it your bank details (hosted payout accounts). */
+      startPayoutOnboarding: (currency: string, country?: string) => post<{ url: string }>('/v1/me/payout-accounts/onboard', { currency, country }),
+      /** The banks (and mobile money) that take payouts in a currency. */
+      payoutBanks: (currency: string) => get<{ items: { code: string; name: string; type: string }[] }>(`/v1/payout-banks${qs({ currency })}`),
+      /** Pay a currency's payouts to this bank account (kept by the provider; we keep the bank and last four digits). */
+      setPayoutBank: (b: { currency: string; bankCode: string; accountNumber: string; accountName: string }) =>
+        post<{ account: PayoutAccount }>('/v1/me/payout-accounts/bank', b),
       /** Paid tips you got or sent; ones sent during a live are gifts. */
       tips: (direction: 'received' | 'sent' = 'received') => get<{ direction: 'received' | 'sent'; items: TipRecord[] }>(`/v1/me/tips${qs({ direction })}`),
     },
@@ -1331,7 +1356,9 @@ export function createClient(opts: ClientOptions) {
         post<{ payment: CheckoutPayment }>(`/v1/users/${userId}/tips`, b),
       subscribers: () => get<{ active: number; cancelled: number }>('/v1/creator/subscribers'),
       mySubscriptions: () =>
-        get<{ items: { id: string; status: string; plan: string; priceCents: number; currency: string; creator: PublicUser }[] }>('/v1/me/subscriptions'),
+        get<{
+          items: { id: string; status: string; currentPeriodEnd: string | null; plan: string; priceCents: number; currency: string; creator: PublicUser }[];
+        }>('/v1/me/subscriptions'),
       cancel: (id: string) => post(`/v1/creator/subscriptions/${id}/cancel`),
     },
     reviews: {
@@ -1399,7 +1426,8 @@ export function createClient(opts: ClientOptions) {
         post<{ call: CallInfo; iceServers: RTCIceServer[] }>(`/v1/conversations/${conversationId}/calls`, { kind }),
       get: (id: string) => get<{ call: CallInfo; iceServers: RTCIceServer[] }>(`/v1/calls/${id}`),
       answer: (id: string) => post<{ call: CallInfo; iceServers: RTCIceServer[] }>(`/v1/calls/${id}/answer`),
-      decline: (id: string) => post(`/v1/calls/${id}/decline`),
+      /** `busy`: declined by the app because you're on another call (the caller is told so). */
+      decline: (id: string, busy = false) => post(`/v1/calls/${id}/decline`, busy ? { busy } : {}),
       end: (id: string) => post(`/v1/calls/${id}/end`),
       signal: (id: string, toUserId: string, type: 'offer' | 'answer' | 'candidate', data: unknown) => post(`/v1/calls/${id}/signal`, { toUserId, type, data }),
     },
@@ -1825,6 +1853,9 @@ export function createClient(opts: ClientOptions) {
       users: (q = '') => get<{ items: Record<string, any>[] }>(`/v1/admin/users${qs({ q })}`),
       setUserStatus: (id: string, status: 'active' | 'suspended') => put(`/v1/admin/users/${id}/status`, { status }),
       auditLogs: () => get<{ items: Record<string, any>[] }>('/v1/admin/audit-logs'),
+      payouts: (status: AdminPayout['status'] = 'pending') => get<{ items: AdminPayout[] }>(`/v1/admin/payouts${qs({ status })}`),
+      approvePayout: (id: string) => post<{ status: 'verified' }>(`/v1/admin/payouts/${id}/verify`),
+      rejectPayout: (id: string, reason: string) => post<{ status: 'failed' }>(`/v1/admin/payouts/${id}/reject`, { reason }),
       regionalRules: () => get<{ items: RegionalRule[] }>('/v1/admin/regional-rules'),
       addRegionalRule: (
         b:
@@ -1995,8 +2026,39 @@ export interface Payout {
   id: string;
   amountCents: number;
   currency: string;
-  status: 'pending' | 'verified' | 'paid' | 'failed';
+  status: 'pending' | 'verified' | 'processing' | 'paid' | 'failed';
+  /** Why it didn't go through (refused, reversed, or turned down by the team). */
+  failureReason?: string | null;
   createdAt: string;
+  paidAt?: string | null;
+}
+
+/** Where payouts in one currency go. `hosted`: set up on the provider's pages; `bank`: a bank account given here. */
+export interface PayoutAccount {
+  currency: string;
+  provider: string;
+  kind: 'hosted' | 'bank' | null;
+  ready: boolean;
+  /** The bank and the last four digits, for bank accounts. */
+  label: string | null;
+  /** The smallest payout in this currency. */
+  minCents?: number;
+}
+
+export interface AdminPayout {
+  id: string;
+  user_id: string;
+  username: string | null;
+  amount_cents: number;
+  currency: string;
+  status: 'pending' | 'verified' | 'processing' | 'paid' | 'failed';
+  failure_reason: string | null;
+  created_at: string;
+  paid_at: string | null;
+  /** What they still have in that currency with pending payouts taken off; below zero, refunds have left it uncovered. */
+  available_cents: number;
+  account_ready: boolean;
+  account_label: string | null;
 }
 
 export interface TipRecord {

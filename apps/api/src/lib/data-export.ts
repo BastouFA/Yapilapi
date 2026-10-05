@@ -385,7 +385,8 @@ export async function exportSections(db: Q, userId: string) {
       `SELECT ${un('s.subscriber_id')} AS subscriber, p.name AS plan, s.status, s.current_period_end, s.created_at, s.cancelled_at
        FROM creator_subscriptions s JOIN creator_plans p ON p.id = s.plan_id WHERE s.creator_id = $1 ORDER BY s.created_at DESC`,
     ),
-    payouts: await q(`SELECT amount_cents, currency, status, created_at FROM payouts WHERE user_id = $1 ORDER BY created_at DESC`),
+    payouts: await q(`SELECT amount_cents, currency, status, failure_reason, created_at, paid_at FROM payouts WHERE user_id = $1 ORDER BY created_at DESC`),
+    payout_accounts: await q(`SELECT provider, currency, label, ready, created_at FROM payout_accounts WHERE user_id = $1 ORDER BY created_at`),
     bookings: await q(
       `SELECT b.id, coalesce(pl.name, pd.title) AS at, b.party_size, b.starts_at, b.status, b.note, b.created_at, b.decided_at
        FROM bookings b LEFT JOIN places pl ON pl.id = b.place_id LEFT JOIN products pd ON pd.id = b.product_id WHERE b.user_id = $1 ORDER BY b.starts_at DESC`,

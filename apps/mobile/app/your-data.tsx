@@ -1,8 +1,8 @@
 import { File, Paths } from 'expo-file-system';
-import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { goHome } from '../lib/account-menu';
 import { client, errorMessage } from '../lib/api';
 import { PasswordField } from '../lib/auth-ui';
 import { useT } from '../lib/i18n';
@@ -88,9 +88,10 @@ function Delete() {
     setError(null);
     try {
       await (await client()).me.deleteAccount(password);
-      await signOut();
+      const next = await signOut();
       Alert.alert(t('account.deleted'));
-      router.replace('/');
+      // Another account on this phone takes over: close these screens. Nobody left: the root layout opens the welcome screen.
+      if (next === 'switched') goHome();
     } catch (e) {
       setError(errorMessage(e));
       setBusy(false);
@@ -98,6 +99,7 @@ function Delete() {
   };
 
   const confirm = () => {
+    if (busy) return;
     if (!password) return setError(t('account.delete.passwordNeeded'));
     Alert.alert(t('settings.deleteAccount.title'), t('settings.deleteAccount.body'), [
       { text: t('common.cancel'), style: 'cancel' },

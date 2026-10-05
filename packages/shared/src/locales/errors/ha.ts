@@ -297,6 +297,10 @@ export const ha: Record<string, string> = {
   'Up to 160 characters.': 'Har haruffa 160.',
   'Up to 280 characters.': 'Har haruffa 280.',
   // apps/api/src/modules/calls.ts
+  'To keep younger people safe, you can only call them once you are friends.': 'Don kare matasa, za ka iya kiransu ne kawai idan kun zama abokai.',
+  'This person only gets calls from people they know.': 'Wannan mutumin yana karɓar kira ne daga waɗanda ya sani kawai.',
+  'Calls work in one-to-one chats and groups of up to 8 people.': 'Kira yana aiki a hirar mutum biyu da rukunoni masu mutane har 8.',
+  'There’s nobody else here to call.': 'Babu wani a nan da za a kira.',
   'There is already a call in this conversation.': 'Akwai kira a wannan tattaunawar tuni.',
   "Call doesn't exist or isn't visible to you.": 'Ba a sami kiran ba, ko kuma ba za ku iya ganinsa ba.',
   'Calls support up to 8 people.': 'Kira yana ɗaukar mutane har 8.',
@@ -688,6 +692,15 @@ export const ha: Record<string, string> = {
   'You can only share memories with friends.': 'Za ku iya raba abubuwan tunawa da abokai kaɗai.',
   'Add some posts to this memory first.': 'Ku fara ƙara wasu rubuce-rubuce a wannan abin tunawa.',
   // apps/api/src/modules/messaging.ts
+  'This works in groups only.': 'Wannan yana aiki a rukunoni kawai.',
+  'Someone you’re adding can’t be in this group with someone already in it.':
+    'Wani da kake ƙarawa ba zai iya kasancewa a wannan rukunin tare da wani da ke ciki ba.',
+  'To go, leave the group instead.': 'Don tafiya, bar rukunin maimakon haka.',
+  'A group needs at least one admin. Make someone else an admin first.': 'Rukuni yana buƙatar mai kula ɗaya aƙalla. Mai da wani mai kula tukuna.',
+  'Only group admins can rename the group.': 'Masu kula da rukuni ne kawai za su iya canza sunan rukunin.',
+  'Only group admins can remove people.': 'Masu kula da rukuni ne kawai za su iya cire mutane.',
+  'Only group admins can choose admins.': 'Masu kula da rukuni ne kawai za su iya zaɓar masu kula.',
+  'React with an emoji.': 'Mayar da martani da emoji.',
   'To keep younger people safe, you can only message them once you are friends.': 'Don kare matasa, za ku iya aika musu saƙo ne kawai bayan kun zama abokai.',
   'This person only gets messages from people they know.': 'Wannan mutumin yana karɓar saƙonni ne kawai daga mutanen da ya sani.',
   'To keep younger people safe, adults and people under 18 can be in a group together only when they are friends.':
@@ -841,6 +854,15 @@ export const ha: Record<string, string> = {
   "Passkey doesn't exist or isn't visible to you.": 'Ba a sami maɓallin shigar ba, ko kuma ba za ku iya ganinsa ba.',
   "That passkey isn't registered here. Sign in with your password.": 'Ba a yi rajistar wannan maɓallin shiga a nan ba. Ku shiga da kalmar sirrinku.',
   "That passkey couldn't be verified.": 'Ba a iya tabbatar da wannan maɓallin shiga ba.',
+  // apps/api/src/modules/payouts.ts
+  'Payouts in this currency are set up on the payment provider’s page.': 'Ana saita biyan kuɗi da wannan kuɗin a shafin mai ba da biyan kuɗi.',
+  'Payouts in this currency are set up with a bank account.': 'Ana saita biyan kuɗi da wannan kuɗin da asusun banki.',
+  'Pick a bank from the list.': 'Ku zaɓi banki daga jerin.',
+  'Set up where your payouts go before asking for one.': 'Ku saita inda za a biya ku kafin ku nemi a biya ku.',
+  'The bank could not confirm that account. Check the number and try again.': 'Bankin bai iya tabbatar da wannan asusun ba. Ku duba lambar ku sake gwadawa.',
+  'The smallest payout is {min} hundredths of {currency}.': 'Mafi ƙarancin biya shi ne {min} cikin ɗari na {currency}.',
+  'This person has no payout account ready for that currency.': 'Wannan mutumin ba shi da asusun biyan kuɗi da ya shirya don wannan kuɗin.',
+  'Verify your email before setting up payouts.': 'Ku tabbatar da imel ɗinku kafin ku saita biyan kuɗi.',
   // apps/api/src/modules/phone.ts
   'That number is already confirmed on another account.': 'An riga an tabbatar da wannan lambar waya a wani asusu.',
   'Already in use.': 'Ana amfani da ita tuni.',
@@ -1244,4 +1266,6 @@ export const ha: Record<string, string> = {
   'An event can sell up to 10 kinds of ticket at once.': "Taro zai iya sayar da nau'in tikiti har 10 a lokaci guda.",
   'Name the days, such as mon or tue-sun.': 'Faɗi ranakun, kamar mon ko tue-sun.',
   'Up to 14 lines of opening hours.': 'Har layi 14 na lokutan buɗewa.',
+  'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
+    'Kalmar sirri mara daidai ta yi yawa a wannan asusun. Ku jira minti 15, ko ku sake saita kalmar sirrinku.',
 };

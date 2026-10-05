@@ -7,6 +7,7 @@ import { api, errorMessage } from '@/lib/api';
 import { Campaigns } from '@/components/Campaigns';
 import { VideoEditor } from '@/components/VideoEditor';
 import { BoostsPanel, SalesPanel, ShopManager } from '@/components/StudioMoney';
+import { PayoutsPanel } from '@/components/Payouts';
 import { useSession } from '../../providers';
 
 /** Creator Studio: how your content performs over the last 28 days, and what you've earned. */
@@ -19,12 +20,15 @@ export default function Studio() {
     setFailed(null);
     api.creator.analytics().then(setData, (e) => setFailed(errorMessage(e)));
   };
+  const loadEarnings = () => {
+    api.creator.earnings().then(
+      (r) => setEarnings(r.balances),
+      () => {},
+    );
+  };
   useEffect(() => {
     loadAnalytics();
-    api.raw
-      .get<{ balances: typeof earnings }>('/v1/me/earnings')
-      .then((r) => setEarnings(r.balances))
-      .catch(() => {});
+    loadEarnings();
   }, []);
   // A failed load says so, with a way to try again, instead of loading for ever.
   if (failed && !data)
@@ -61,7 +65,7 @@ export default function Studio() {
         <Stat label={t('m.studio.likes')} value={data.totals.likes} />
         <Stat label={t('m.studio.comments')} value={data.totals.comments} />
         <Stat label={t('m.studio.saves')} value={data.totals.saves} />
-        <Stat label={t('profile.followers')} value={data.totals.followers} delta={t('m.studio.followersDelta', { count: total })} />
+        <Stat label={t('profile.followers')} value={data.totals.followers} delta={tp('studio.followersNew', total)} />
       </div>
       <section className="stack-sm">
         <h2 className="section-title">{t('m.studio.growth')}</h2>
@@ -93,6 +97,7 @@ export default function Studio() {
           </div>
         </section>
       ) : null}
+      {earnings.length ? <PayoutsPanel balances={earnings} onRequested={loadEarnings} /> : null}
       <section className="stack-sm">
         <h2 className="section-title">{t('m.studio.topPosts')}</h2>
         {data.topPosts.length ? (

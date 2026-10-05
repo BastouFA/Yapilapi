@@ -118,7 +118,8 @@ export default function ListingScreen() {
       const r = await (await client()).market.offer(l.id, amountCents);
       router.push(`/chat/${r.conversationId}`);
     } catch (e) {
-      if (e instanceof ApiError && e.status === 409) throw new Error(t('m.market.offerPending'));
+      // Other conflicts (sold or ended since it loaded) keep the API's own words.
+      if (e instanceof ApiError && e.code === 'offer_pending') throw new Error(t('m.market.offerPending'));
       throw e;
     }
   }

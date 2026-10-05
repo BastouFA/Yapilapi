@@ -554,6 +554,13 @@ export interface Conversation {
   smartReplies?: ConversationSmartReplies;
   /** The chat's wallpaper and bubble colour, the same for everyone in it. Any member can change them. */
   theme?: ChatTheme;
+  /** Groups: who the admins are. */
+  adminIds?: string[];
+  /**
+   * Read receipts: how far each other person here has read (their last read time), for "Seen" under
+   * your messages. People who blocked you, or whom you blocked, aren't listed.
+   */
+  readBy?: { userId: string; lastReadAt: string }[];
 }
 
 /**
@@ -631,6 +638,10 @@ export interface MessagePreview {
   offer?: OfferSummary;
   /** A reply to a story: body is only the reply. */
   storyReply?: StoryReply;
+  /** A photo, video or voice note sent to view once. */
+  viewOnce?: boolean;
+  /** A hold-to-talk voice clip. */
+  yap?: boolean;
 }
 
 /** An offer or a counter-offer on a Market listing, as a one-line preview says it. */
@@ -721,7 +732,32 @@ export type MessageSystemInfo =
   | {
       /** The sender asked the others in the chat to share where they are (they choose whether to). */
       type: 'location_request';
+    }
+  | {
+      /**
+       * A change to who is in a group, or to its name. The sender did it: 'renamed' (to `title`),
+       * 'added' or 'removed' `people`, 'left', 'admin' (made `people` admins) or 'unadmin' (took it back).
+       * 'promoted': the last admin left, so `people` became admins; the sender is the person who left.
+       * Names are as they were when the line was written.
+       */
+      type: 'group';
+      action: GroupLineAction;
+      title?: string;
+      people?: { id: string; displayName: string }[];
+    }
+  | {
+      /**
+       * A call here is over. The sender started it. 'missed': nobody answered (or the caller hung up
+       * first); 'declined'; 'ended' after talking for `seconds`.
+       */
+      type: 'call';
+      callId: string;
+      kind: 'audio' | 'video';
+      outcome: 'missed' | 'declined' | 'ended';
+      seconds: number | null;
     };
+
+export type GroupLineAction = 'renamed' | 'added' | 'removed' | 'left' | 'admin' | 'unadmin' | 'promoted';
 
 /** One option of a poll in a chat. */
 export interface ChatPollOption {

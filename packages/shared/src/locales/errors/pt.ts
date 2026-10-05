@@ -296,6 +296,11 @@ export const pt: Record<string, string> = {
   'Up to 160 characters.': 'Até 160 caracteres.',
   'Up to 280 characters.': 'Até 280 caracteres.',
   // apps/api/src/modules/calls.ts
+  'To keep younger people safe, you can only call them once you are friends.':
+    'Para proteger os mais jovens, você só pode ligar para essa pessoa quando vocês forem amigos.',
+  'This person only gets calls from people they know.': 'Essa pessoa só recebe chamadas de quem ela conhece.',
+  'Calls work in one-to-one chats and groups of up to 8 people.': 'As chamadas funcionam em conversas a dois e em grupos de até 8 pessoas.',
+  'There’s nobody else here to call.': 'Não há mais ninguém aqui para ligar.',
   'There is already a call in this conversation.': 'Já há uma chamada nesta conversa.',
   "Call doesn't exist or isn't visible to you.": 'A chamada não existe ou não está visível para você.',
   'Calls support up to 8 people.': 'As chamadas comportam até 8 pessoas.',
@@ -686,6 +691,15 @@ export const pt: Record<string, string> = {
   'You can only share memories with friends.': 'Você só pode compartilhar memórias com amigos.',
   'Add some posts to this memory first.': 'Adicione algumas publicações a esta memória primeiro.',
   // apps/api/src/modules/messaging.ts
+  'This works in groups only.': 'Isso só funciona em grupos.',
+  'Someone you’re adding can’t be in this group with someone already in it.':
+    'Alguém que você está adicionando não pode estar neste grupo com alguém que já está nele.',
+  'To go, leave the group instead.': 'Para sair, use Sair do grupo.',
+  'A group needs at least one admin. Make someone else an admin first.': 'Um grupo precisa de pelo menos um admin. Torne outra pessoa admin primeiro.',
+  'Only group admins can rename the group.': 'Só os admins do grupo podem mudar o nome dele.',
+  'Only group admins can remove people.': 'Só os admins do grupo podem remover pessoas.',
+  'Only group admins can choose admins.': 'Só os admins do grupo podem escolher admins.',
+  'React with an emoji.': 'Reaja com um emoji.',
   'To keep younger people safe, you can only message them once you are friends.':
     'Para proteger os mais jovens, você só pode enviar mensagens a eles depois que vocês forem amigos.',
   'This person only gets messages from people they know.': 'Esta pessoa só recebe mensagens de pessoas que ela conhece.',
@@ -835,6 +849,15 @@ export const pt: Record<string, string> = {
   "Passkey doesn't exist or isn't visible to you.": 'A chave de acesso não existe ou não está visível para você.',
   "That passkey isn't registered here. Sign in with your password.": 'Essa chave de acesso não está registrada aqui. Entre com sua senha.',
   "That passkey couldn't be verified.": 'Não foi possível verificar essa chave de acesso.',
+  // apps/api/src/modules/payouts.ts
+  'Payouts in this currency are set up on the payment provider’s page.': 'Os repasses nesta moeda são configurados na página do provedor de pagamento.',
+  'Payouts in this currency are set up with a bank account.': 'Os repasses nesta moeda são configurados com uma conta bancária.',
+  'Pick a bank from the list.': 'Escolha um banco da lista.',
+  'Set up where your payouts go before asking for one.': 'Configure para onde vão seus repasses antes de pedir um.',
+  'The bank could not confirm that account. Check the number and try again.': 'O banco não conseguiu confirmar essa conta. Confira o número e tente de novo.',
+  'The smallest payout is {min} hundredths of {currency}.': 'O repasse mínimo é de {min} centésimos de {currency}.',
+  'This person has no payout account ready for that currency.': 'Esta pessoa não tem uma conta de repasse pronta para essa moeda.',
+  'Verify your email before setting up payouts.': 'Confirme seu e-mail antes de configurar os repasses.',
   // apps/api/src/modules/phone.ts
   'That number is already confirmed on another account.': 'Esse número já está confirmado em outra conta.',
   'Already in use.': 'Já está em uso.',
@@ -1238,4 +1261,6 @@ export const pt: Record<string, string> = {
   'An event can sell up to 10 kinds of ticket at once.': 'Um evento pode vender até 10 tipos de ingresso ao mesmo tempo.',
   'Name the days, such as mon or tue-sun.': 'Indique os dias, por exemplo mon ou tue-sun.',
   'Up to 14 lines of opening hours.': 'Até 14 linhas de horário.',
+  'Too many wrong passwords for this account. Wait 15 minutes, or reset your password.':
+    'Muitas senhas erradas para esta conta. Espere 15 minutos ou redefina sua senha.',
 };

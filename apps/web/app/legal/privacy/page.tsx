@@ -173,8 +173,10 @@ export default async function PrivacyPage() {
         When you pay, card details go straight to our payment provider: Stripe, or Paystack for payments in Nigerian naira, Ghanaian cedi, Kenyan shillings and
         South African rand. We send Paystack your email address with the amount. We keep your orders (what, how much, when, the provider’s reference), refunds,
         and the notifications the provider sends us about each payment, which can include your email address and the last digits and type of your card or bank.
-        If you sell on YAPILAPI, we keep your products, drops, sales and payout requests (amount, currency, status). If you ask to be reminded about a drop, we
-        keep that you asked; the seller sees only how many people are waiting, never who. Units of a drop in an unpaid order are held for you for 15 minutes.
+        If you sell on YAPILAPI, we keep your products, drops, sales and payout requests (amount, currency, status, the provider’s reference), and where your
+        payouts go: the reference Stripe or Paystack gives your account and, for a bank account, the bank’s name and the last four digits of the number (the
+        full number stays with Paystack). If you ask to be reminded about a drop, we keep that you asked; the seller sees only how many people are waiting,
+        never who. Units of a drop in an unpaid order are held for you for 15 minutes.
       </p>
 
       <h3>Safety</h3>

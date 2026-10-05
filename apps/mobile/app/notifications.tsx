@@ -46,6 +46,8 @@ const TEXT: Record<string, MessageKey> = {
   order_paid: 'm.notif.orderPaid',
   tip_received: 'm.notif.tip',
   subscription_started: 'm.notif.subscribed',
+  payout_paid: 'm.notif.payoutPaid',
+  payout_failed: 'm.notif.payoutFailed',
   invite_joined: 'm.notif.inviteJoined',
   live_started: 'm.notif.liveStarted',
   booking_request: 'm.notif.bookingRequest',

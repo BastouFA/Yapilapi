@@ -112,6 +112,8 @@ const TEXT: Record<string, Text> = {
   booking_request: say('push.booking_request'),
   booking_decided: say('push.booking_decided'),
   tip_received: say('push.tip_received'),
+  payout_paid: say('push.payout_paid'),
+  payout_failed: say('push.payout_failed'),
   post_repost: say('push.post_repost'),
   reel_duet: say('push.reel_duet'),
   reel_remix: say('push.reel_remix'),
