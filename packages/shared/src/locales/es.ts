@@ -6197,4 +6197,9 @@ export const es: Catalog = {
   'email.deleted.subject': 'Se eliminó tu cuenta de YAPILAPI',
   'email.deleted.body': 'Tu cuenta de YAPILAPI y lo que compartiste se eliminaron, como pediste. No se enviará nada más a esta dirección.',
   'email.deleted.notYou': 'Si no eliminaste tu cuenta, responde a este correo o contacta con soporte de inmediato.',
+  'm.manage.makeOwner': 'Hacer propietario',
+  'm.manage.makeOwnerTitle': '¿Hacer a {name} propietario?',
+  'm.manage.makeOwnerBody': 'Podrá cambiar todo en la comunidad, también quién la gestiona. Tú sigues como admin y podrás salir después.',
+  'm.manage.ownerChanged': '{name} es ahora el propietario.',
+  'm.community.withdraw': 'Retirar solicitud',
 };

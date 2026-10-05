@@ -6192,4 +6192,9 @@ export const sw: Catalog = {
   'email.deleted.subject': 'Akaunti yako ya YAPILAPI imefutwa',
   'email.deleted.body': 'Akaunti yako ya YAPILAPI na ulichoshiriki vimefutwa, kama ulivyoomba. Hakuna kitu kingine kitakachotumwa kwa anwani hii.',
   'email.deleted.notYou': 'Kama hukufuta akaunti yako, jibu barua pepe hii au wasiliana na msaada mara moja.',
+  'm.manage.makeOwner': 'Mfanye mmiliki',
+  'm.manage.makeOwnerTitle': 'Umfanye {name} kuwa mmiliki?',
+  'm.manage.makeOwnerBody': 'Ataweza kubadilisha chochote katika jumuiya, hata nani anaiendesha. Wewe unabaki kuwa msimamizi na unaweza kuondoka baadaye.',
+  'm.manage.ownerChanged': '{name} sasa ndiye mmiliki.',
+  'm.community.withdraw': 'Ondoa ombi',
 };

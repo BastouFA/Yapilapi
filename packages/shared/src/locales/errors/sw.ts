@@ -1234,4 +1234,6 @@ export const sw: Record<string, string> = {
   'Number must be less than {maximum}': 'Namba lazima iwe chini ya {maximum}',
   'Number must be a multiple of {multipleOf}': 'Namba lazima igawanyike kwa {multipleOf}',
   'Number must be finite': 'Namba lazima iwe na kikomo',
+  'You already own this community.': 'Tayari wewe ndiye mmiliki wa jumuiya hii.',
+  'Make them a member first.': 'Mfanye kuwa mwanachama kwanza.',
 };

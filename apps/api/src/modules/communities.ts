@@ -122,14 +122,18 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
     const row = await bySlug(slug, u.id);
     if (row.my_status === 'banned') throw forbidden("You can't join this community.");
     if (row.my_role) return { status: 'active', role: row.my_role };
+    // Asking again while a request is waiting changes nothing (and tells the moderators nothing new).
+    if (row.my_status === 'pending') return { status: 'pending', role: null };
     const status = row.visibility === 'private' ? 'pending' : 'active';
-    await tx(db, async (c) => {
-      await c.query(`INSERT INTO community_members (community_id, user_id, status) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, [row.id, u.id, status]);
-      if (status === 'active') {
+    const added = await tx(db, async (c) => {
+      const r = await c.query(`INSERT INTO community_members (community_id, user_id, status) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, [row.id, u.id, status]);
+      if (r.rowCount && status === 'active') {
         await c.query(`UPDATE communities SET member_count = member_count + 1 WHERE id = $1`, [row.id]);
         await joinChat(c, row.id, u.id);
       }
+      return !!r.rowCount;
     });
+    if (!added) return { status, role: status === 'active' ? 'member' : null };
     if (status === 'active') track(db, u.id, 'community_joined', { communityId: row.id });
     else {
       const admins = await db.query<{ user_id: string }>(
@@ -164,8 +168,12 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
     const row = await bySlug(slug, u.id);
     if (row.my_role === 'owner') throw badRequest('Transfer ownership before leaving your community.');
     await tx(db, async (c) => {
-      const r = await c.query(`DELETE FROM community_members WHERE community_id = $1 AND user_id = $2 AND status = 'active'`, [row.id, u.id]);
-      if (r.rowCount) await c.query(`UPDATE communities SET member_count = greatest(member_count - 1, 0) WHERE id = $1`, [row.id]);
+      // Leaving also takes back a request to join that is still waiting.
+      const r = await c.query<{ status: string }>(
+        `DELETE FROM community_members WHERE community_id = $1 AND user_id = $2 AND status IN ('active','pending') RETURNING status`,
+        [row.id, u.id],
+      );
+      if (r.rows[0]?.status === 'active') await c.query(`UPDATE communities SET member_count = greatest(member_count - 1, 0) WHERE id = $1`, [row.id]);
       await c.query(
         `UPDATE conversation_members SET left_at = now() WHERE user_id = $2 AND conversation_id IN (SELECT id FROM conversations WHERE community_id = $1)`,
         [row.id, u.id],
@@ -181,11 +189,14 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
     if (row.visibility === 'private' && !row.my_role) throw forbidden('Join this community to see its members.');
     const status = parse(z.object({ status: z.enum(['active', 'pending', 'banned']).default('active') }), req.query).status;
     if (status !== 'active' && !atLeast(row.my_role, 'moderator')) throw forbidden();
+    // A public community's member list is open to anyone: private accounts (every under-18 one is)
+    // show only to its members, as event guest lists leave them out.
+    const everyone = !!row.my_role || row.visibility === 'private';
     const { rows } = await db.query(
       `SELECT cm.role, cm.joined_at, ${PUBLIC_USER_COLS} FROM community_members cm JOIN profiles pr ON pr.user_id = cm.user_id
-       WHERE cm.community_id = $1 AND cm.status = $2
+       WHERE cm.community_id = $1 AND cm.status = $2 AND ($3 OR NOT pr.is_private OR pr.user_id = $4)
        ORDER BY CASE cm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'moderator' THEN 2 WHEN 'organizer' THEN 3 ELSE 4 END, cm.joined_at LIMIT 200`,
-      [row.id, status],
+      [row.id, status, everyone, viewer],
     );
     return { items: rows.map((r) => ({ user: toPublicUser(r as PublicUserRow), role: r.role, joinedAt: r.joined_at })) };
   });
@@ -253,6 +264,32 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
     return { role };
   });
 
+  /**
+   * The owner hands the community to another member, who becomes the owner; the old owner stays
+   * on as an admin (and can then leave). Guests can't be made owners.
+   */
+  app.post('/v1/communities/:slug/members/:userId/owner', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { slug, userId } = parse(z.object({ slug: z.string(), userId: z.string().uuid() }), req.params);
+    const row = await bySlug(slug, u.id);
+    if (row.my_role !== 'owner') throw forbidden();
+    if (userId === u.id) throw badRequest('You already own this community.');
+    await tx(db, async (c) => {
+      await c.query(`SELECT 1 FROM communities WHERE id = $1 FOR UPDATE`, [row.id]);
+      const t = await c.query<{ role: CommunityRole }>(
+        `SELECT role FROM community_members WHERE community_id = $1 AND user_id = $2 AND status = 'active' FOR UPDATE`,
+        [row.id, userId],
+      );
+      if (!t.rows[0]) throw notFound('Member');
+      if (t.rows[0].role === 'guest') throw badRequest('Make them a member first.');
+      await c.query(`UPDATE community_members SET role = 'owner' WHERE community_id = $1 AND user_id = $2`, [row.id, userId]);
+      await c.query(`UPDATE community_members SET role = 'admin' WHERE community_id = $1 AND user_id = $2`, [row.id, u.id]);
+      await c.query(`UPDATE communities SET owner_id = $2 WHERE id = $1`, [row.id, userId]);
+      await audit(c, { actorId: u.id, action: 'community.transfer', entityType: 'community', entityId: row.id, metadata: { userId } });
+    });
+    return { ok: true };
+  });
+
   app.post('/v1/communities/:slug/members/:userId/ban', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const { slug, userId } = parse(z.object({ slug: z.string(), userId: z.string().uuid() }), req.params);
@@ -260,11 +297,16 @@ export default async function communitiesModule(app: FastifyInstance, ctx: AppCo
     const target = await roleOf(row.id, userId);
     if (!atLeast(row.my_role, 'moderator') || (target && COMMUNITY_ROLE_RANK[target] >= COMMUNITY_ROLE_RANK[row.my_role as CommunityRole])) throw forbidden();
     await tx(db, async (c) => {
-      const r = await c.query(`UPDATE community_members SET status = 'banned' WHERE community_id = $1 AND user_id = $2 AND status = 'active'`, [
-        row.id,
-        userId,
-      ]);
-      if (r.rowCount) await c.query(`UPDATE communities SET member_count = greatest(member_count - 1, 0) WHERE id = $1`, [row.id]);
+      // Members and people waiting to join can be banned (a request is turned down for good).
+      const r = await c.query<{ was: string }>(
+        `UPDATE community_members cm SET status = 'banned' FROM community_members old
+         WHERE cm.community_id = $1 AND cm.user_id = $2 AND cm.status IN ('active','pending')
+           AND old.community_id = cm.community_id AND old.user_id = cm.user_id
+         RETURNING old.status AS was`,
+        [row.id, userId],
+      );
+      if (!r.rows[0]) throw notFound('Member');
+      if (r.rows[0].was === 'active') await c.query(`UPDATE communities SET member_count = greatest(member_count - 1, 0) WHERE id = $1`, [row.id]);
       await c.query(
         `UPDATE conversation_members SET left_at = now() WHERE user_id = $2 AND conversation_id IN (SELECT id FROM conversations WHERE community_id = $1)`,
         [row.id, userId],

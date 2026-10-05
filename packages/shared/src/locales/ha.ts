@@ -6194,4 +6194,9 @@ export const ha: Catalog = {
   'email.deleted.subject': 'An share asusunka na YAPILAPI',
   'email.deleted.body': 'An share asusunka na YAPILAPI da abin da ka raba, kamar yadda ka nema. Ba za a ƙara aika wani abu zuwa wannan adireshin ba.',
   'email.deleted.notYou': 'Idan ba kai ka share asusunka ba, amsa wannan imel ko tuntuɓi tallafi nan take.',
+  'm.manage.makeOwner': 'Mai da shi mai shi',
+  'm.manage.makeOwnerTitle': 'Ka mai da {name} mai shi?',
+  'm.manage.makeOwnerBody': "Zai iya canza komai a al'ummar, har da masu gudanar da ita. Kai za ka ci gaba a matsayin admin kuma za ka iya fita daga baya.",
+  'm.manage.ownerChanged': '{name} ne mai shi yanzu.',
+  'm.community.withdraw': 'Janye buƙata',
 };

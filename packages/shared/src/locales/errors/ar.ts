@@ -1207,4 +1207,6 @@ export const ar: Record<string, string> = {
   'Number must be less than {maximum}': 'يجب أن يكون الرقم أقل من {maximum}',
   'Number must be a multiple of {multipleOf}': 'يجب أن يكون الرقم من مضاعفات {multipleOf}',
   'Number must be finite': 'يجب أن يكون الرقم محدودًا',
+  'You already own this community.': 'أنت مالك هذا المجتمع بالفعل.',
+  'Make them a member first.': 'اجعله عضوًا أولًا.',
 };

@@ -6142,4 +6142,9 @@ export const ar: Catalog = {
   'email.deleted.subject': 'تم حذف حسابك على YAPILAPI',
   'email.deleted.body': 'تم حذف حسابك على YAPILAPI وما شاركته، كما طلبت. لن يُرسل أي شيء آخر إلى هذا العنوان.',
   'email.deleted.notYou': 'إذا لم تحذف حسابك، فردّ على هذه الرسالة أو تواصل مع الدعم فورًا.',
+  'm.manage.makeOwner': 'اجعله المالك',
+  'm.manage.makeOwnerTitle': 'هل تجعل {name} المالك؟',
+  'm.manage.makeOwnerBody': 'سيتمكن من تغيير أي شيء في المجتمع، بما في ذلك من يديره. ستبقى مشرفًا ويمكنك المغادرة بعد ذلك.',
+  'm.manage.ownerChanged': '{name} هو المالك الآن.',
+  'm.community.withdraw': 'سحب الطلب',
 };

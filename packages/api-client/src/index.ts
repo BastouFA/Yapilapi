@@ -1031,6 +1031,8 @@ export function createClient(opts: ClientOptions) {
         put<{ role: string }>(`/v1/communities/${slug}/members/${userId}/role`, { role }),
       ban: (slug: string, userId: string) => post<{ ok: true }>(`/v1/communities/${slug}/members/${userId}/ban`),
       unban: (slug: string, userId: string) => post<{ ok: true }>(`/v1/communities/${slug}/members/${userId}/unban`),
+      /** The owner makes another member the owner; they stay on as an admin. */
+      makeOwner: (slug: string, userId: string) => post<{ ok: true }>(`/v1/communities/${slug}/members/${userId}/owner`),
       faq: (slug: string) => get<{ items: FaqEntry[]; canEdit: boolean }>(`/v1/communities/${slug}/faq`),
       addFaq: (slug: string, b: { question: string; answer: string }) => post<{ faq: FaqEntry }>(`/v1/communities/${slug}/faq`, b),
       updateFaq: (slug: string, id: string, b: Partial<{ question: string; answer: string; position: number }>) =>

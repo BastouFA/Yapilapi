@@ -1220,4 +1220,6 @@ export const yo: Record<string, string> = {
   'Number must be less than {maximum}': 'Nọ́mbà gbọ́dọ̀ kéré sí {maximum}',
   'Number must be a multiple of {multipleOf}': 'Nọ́mbà gbọ́dọ̀ jẹ́ ìlọ́po {multipleOf}',
   'Number must be finite': 'Nọ́mbà gbọ́dọ̀ ní òpin',
+  'You already own this community.': 'Ìwọ ni onílé àwùjọ yìí tẹ́lẹ̀.',
+  'Make them a member first.': 'Sọ wọ́n di ọmọ ẹgbẹ́ ná.',
 };

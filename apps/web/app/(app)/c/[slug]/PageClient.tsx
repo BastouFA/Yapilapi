@@ -42,7 +42,10 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
   // Why it couldn't load, when that isn't because it's gone; a community already showing stays.
   const [loadError, setLoadError] = useState<string | null>(null);
   const [members, setMembers] = useState<{ user: PublicUser; role: string }[] | null>(null);
+  const [membersError, setMembersError] = useState<string | null>(null);
   const [events, setEvents] = useState<EventItem[] | null>(null);
+  const [eventsError, setEventsError] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
   const [summary, setSummary] = useState<{ text: string; dev: boolean } | null>(null);
   const [summarizing, setSummarizing] = useState(false);
   const [tab, setTab] = useState('posts');
@@ -62,19 +65,31 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
     if (signedOut && !isPublic) return;
     void reload();
   }, [reload, signedOut, isPublic]);
+  const locked = !!c && c.visibility === 'private' && !c.myRole;
+  const loadMembers = useCallback(() => {
+    setMembersError(null);
+    api.communities.members(slug).then(
+      (r) => setMembers(r.items),
+      (e) => setMembersError(errorMessage(e)),
+    );
+  }, [slug]);
+  const loadEvents = useCallback((communityId: string) => {
+    setEventsError(null);
+    api.raw.get<{ items: EventItem[] }>(`/v1/events?communityId=${communityId}`).then(
+      (r) => setEvents(r.items),
+      (e) => setEventsError(errorMessage(e)),
+    );
+  }, []);
   useEffect(() => {
-    if (!c) return;
-    if (tab === 'members' && !members)
-      api.communities.members(slug).then(
-        (r) => setMembers(r.items),
-        (e) => (setMembers([]), toast(errorMessage(e))),
-      );
-    if (tab === 'events' && !events)
-      api.raw.get<{ items: EventItem[] }>(`/v1/events?communityId=${c.id}`).then(
-        (r) => setEvents(r.items),
-        () => setEvents([]),
-      );
-  }, [tab, c, slug, members, events, toast]);
+    if (!c || locked) return;
+    if (tab === 'members' && !members && !membersError) loadMembers();
+    if (tab === 'events' && !events && !eventsError) loadEvents(c.id);
+  }, [tab, c, locked, members, membersError, events, eventsError, loadMembers, loadEvents]);
+  // Joining or leaving changes who is listed.
+  useEffect(() => {
+    setMembers(null);
+    setEvents(null);
+  }, [c?.myRole]);
   // A live room shows above the tabs.
   useEffect(() => {
     if (!c || signedOut) return;
@@ -92,6 +107,7 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
 
   const isMember = !!c.myRole;
   const canOrganize = ['owner', 'admin', 'moderator', 'organizer'].includes(c.myRole ?? '');
+  const canManage = ['owner', 'admin', 'moderator'].includes(c.myRole ?? '');
   const roleLabel = (role: string) => (ROLE_LABEL[role] ? t(ROLE_LABEL[role]) : role);
 
   return (
@@ -106,16 +122,39 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
               <Button
                 size="sm"
                 variant="secondary"
+                loading={leaving}
                 onClick={async () => {
+                  setLeaving(true);
                   await api.communities.leave(slug).catch((e) => toast(errorMessage(e)));
                   await reload();
+                  setLeaving(false);
                 }}
               >
                 {t('communities.leave')}
               </Button>
             )
           ) : c.membershipStatus === 'pending' ? (
-            <Badge tone="warning">{t('profile.requestSent')}</Badge>
+            <div className="row">
+              <Badge tone="warning">{t('profile.requestSent')}</Badge>
+              <Button
+                size="sm"
+                variant="ghost"
+                loading={leaving}
+                onClick={async () => {
+                  setLeaving(true);
+                  try {
+                    await api.communities.leave(slug);
+                    toast(t('profile.requestWithdrawn'));
+                  } catch (e) {
+                    toast(errorMessage(e));
+                  }
+                  await reload();
+                  setLeaving(false);
+                }}
+              >
+                {t('m.community.withdraw')}
+              </Button>
+            </div>
           ) : (
             <Button
               size="sm"
@@ -140,7 +179,7 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
         </span>
         {c.description ? <p style={{ margin: 0 }}>{c.description}</p> : null}
         <div className="row">
-          {isMember ? (
+          {isMember && c.myRole !== 'guest' ? (
             <Link href={`/create?community=${c.id}`} className="yp-btn yp-btn--primary yp-btn--sm">
               {t('communityPage.postHere')}
             </Link>
@@ -155,7 +194,12 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
               {t('events.create')}
             </Link>
           ) : null}
-          {signedOut ? null : (
+          {canManage ? (
+            <Link href={`/c/${c.slug}/manage`} className="yp-btn yp-btn--secondary yp-btn--sm">
+              {t('m.manage.open')}
+            </Link>
+          ) : null}
+          {signedOut || locked ? null : (
             <Button
               size="sm"
               variant="ghost"
@@ -247,7 +291,11 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
             <CommunityRooms slug={slug} isMember={isMember} />
           )
         ) : tab === 'events' ? (
-          events === null ? (
+          locked ? (
+            <Alert tone="info">{t('m.community.locked.events')}</Alert>
+          ) : eventsError ? (
+            <EmptyState title={eventsError} action={<Button onClick={() => loadEvents(c.id)}>{t('m.common.retry')}</Button>} />
+          ) : events === null ? (
             <Skeleton height={80} />
           ) : events.length ? (
             <div className="yp-grid">
@@ -258,6 +306,10 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
           ) : (
             <p className="muted">{t('communityPage.noEvents')}</p>
           )
+        ) : locked ? (
+          <Alert tone="info">{t('m.community.locked.members')}</Alert>
+        ) : membersError ? (
+          <EmptyState title={membersError} action={<Button onClick={loadMembers}>{t('m.common.retry')}</Button>} />
         ) : members === null ? (
           <Skeleton height={120} />
         ) : (

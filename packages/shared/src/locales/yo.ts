@@ -6173,4 +6173,9 @@ export const yo: Catalog = {
   'email.deleted.subject': 'A ti pa àkọọ́lẹ̀ YAPILAPI rẹ rẹ́',
   'email.deleted.body': 'A ti pa àkọọ́lẹ̀ YAPILAPI rẹ àti ohun tí o pín rẹ́, gẹ́gẹ́ bí o ṣe béèrè. A kò ní fi nǹkan mìíràn ránṣẹ́ sí àdírẹ́sì yìí mọ́.',
   'email.deleted.notYou': 'Tí kì í ṣe ìwọ ló pa àkọọ́lẹ̀ rẹ rẹ́, fèsì sí ímeèlì yìí tàbí kàn sí ìrànlọ́wọ́ lẹ́sẹ̀kẹsẹ̀.',
+  'm.manage.makeOwner': 'Sọ di onílé',
+  'm.manage.makeOwnerTitle': 'Ṣé kí {name} di onílé?',
+  'm.manage.makeOwnerBody': 'Wọ́n lè yí ohunkóhun padà nínú àwùjọ, títí kan àwọn tó ń darí rẹ̀. Ìwọ yóò dúró gẹ́gẹ́ bí alábòójútó, o sì lè kúrò lẹ́yìn náà.',
+  'm.manage.ownerChanged': '{name} ni onílé báyìí.',
+  'm.community.withdraw': 'Fa ìbéèrè sẹ́yìn',
 };

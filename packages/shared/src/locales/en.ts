@@ -6173,6 +6173,11 @@ export const en = {
   'email.deleted.subject': 'Your YAPILAPI account was deleted',
   'email.deleted.body': 'Your YAPILAPI account and what you shared were deleted, as you asked. Nothing else will be sent to this address.',
   'email.deleted.notYou': 'If you didn’t delete your account, reply to this email or contact support straight away.',
+  'm.manage.makeOwner': 'Make owner',
+  'm.manage.makeOwnerTitle': 'Make {name} the owner?',
+  'm.manage.makeOwnerBody': 'They can change anything in the community, including who runs it. You stay on as an admin and can leave afterwards.',
+  'm.manage.ownerChanged': '{name} is now the owner.',
+  'm.community.withdraw': 'Withdraw request',
 } as const;
 
 export type MessageKey = keyof typeof en;

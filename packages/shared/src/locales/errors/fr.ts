@@ -1250,4 +1250,6 @@ export const fr: Record<string, string> = {
   'Number must be less than {maximum}': 'Le nombre doit être inférieur à {maximum}',
   'Number must be a multiple of {multipleOf}': 'Le nombre doit être un multiple de {multipleOf}',
   'Number must be finite': 'Le nombre doit être fini',
+  'You already own this community.': 'Tu es déjà propriétaire de cette communauté.',
+  'Make them a member first.': 'Fais-en d’abord un membre.',
 };

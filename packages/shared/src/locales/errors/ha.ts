@@ -1237,4 +1237,6 @@ export const ha: Record<string, string> = {
   'Number must be less than {maximum}': 'Dole lambar ta gaza {maximum}',
   'Number must be a multiple of {multipleOf}': 'Dole lambar ta zama ninkin {multipleOf}',
   'Number must be finite': 'Dole lambar ta zama mai iyaka',
+  'You already own this community.': "Kai ne mai wannan al'umma tuni.",
+  'Make them a member first.': 'Ka mai da shi memba tukuna.',
 };
