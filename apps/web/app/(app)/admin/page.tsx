@@ -2,7 +2,22 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Badge, Button, Card, Dialog, EmptyState, SensitiveCover, Select, Skeleton, Stat, Switch, Tabs, TextField } from '@yapilapi/design-system';
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardHeadings,
+  Dialog,
+  EmptyState,
+  SensitiveCover,
+  Select,
+  Skeleton,
+  Stat,
+  Switch,
+  Tabs,
+  TextField,
+} from '@yapilapi/design-system';
 import type { AdminMiniApp, AdminPayout, RegionalRule, RiskAccount } from '@yapilapi/api-client';
 import {
   decisionsFor,
@@ -193,30 +208,33 @@ export default function Admin() {
             : []),
         ]}
       />
-      <div role="tabpanel" id="admin-panel" aria-labelledby={`admin-tabs-${tab}`}>
-        {tab === 'moderation' ? (
-          <Moderation />
-        ) : tab === 'accounts' ? (
-          <AccountSignals />
-        ) : tab === 'people' ? (
-          <People />
-        ) : tab === 'overview' ? (
-          <Overview />
-        ) : tab === 'flags' ? (
-          <div className="stack">
-            <Flags />
-            <PhonePurchases />
-          </div>
-        ) : tab === 'miniapps' ? (
-          <MiniAppReview />
-        ) : tab === 'regions' ? (
-          <RegionalRules />
-        ) : tab === 'payouts' ? (
-          <Payouts />
-        ) : (
-          <Audit />
-        )}
-      </div>
+      {/* Cards in every tab sit straight under the page's h1. */}
+      <CardHeadings level={2}>
+        <div role="tabpanel" id="admin-panel" aria-labelledby={`admin-tabs-${tab}`}>
+          {tab === 'moderation' ? (
+            <Moderation />
+          ) : tab === 'accounts' ? (
+            <AccountSignals />
+          ) : tab === 'people' ? (
+            <People />
+          ) : tab === 'overview' ? (
+            <Overview />
+          ) : tab === 'flags' ? (
+            <div className="stack">
+              <Flags />
+              <PhonePurchases />
+            </div>
+          ) : tab === 'miniapps' ? (
+            <MiniAppReview />
+          ) : tab === 'regions' ? (
+            <RegionalRules />
+          ) : tab === 'payouts' ? (
+            <Payouts />
+          ) : (
+            <Audit />
+          )}
+        </div>
+      </CardHeadings>
     </div>
   );
 }

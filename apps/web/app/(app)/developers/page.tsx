@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Alert, Badge, Button, Card, Checkbox, Dialog, EmptyState, List, ListItem, Select, Skeleton, TextField } from '@yapilapi/design-system';
+import { Alert, Badge, Button, Card, CardHeadings, Checkbox, Dialog, EmptyState, List, ListItem, Select, Skeleton, TextField } from '@yapilapi/design-system';
 import type { DeveloperMiniApp, MiniAppPermission, MiniAppSurface } from '@yapilapi/api-client';
 import { formatList, formatRelativeTime, type MessageKey } from '@yapilapi/shared';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
@@ -141,13 +141,16 @@ export default function Developers() {
             ))}
           </div>
           {selected ? (
-            <AppDetail
-              key={selected}
-              appId={selected}
-              appName={apps.find((a) => a.id === selected)?.name ?? ''}
-              initialRedirects={apps.find((a) => a.id === selected)?.redirect_uris ?? []}
-              onDeleted={() => (setSelected(null), void load())}
-            />
+            // The app's cards sit straight under the page's h1.
+            <CardHeadings level={2}>
+              <AppDetail
+                key={selected}
+                appId={selected}
+                appName={apps.find((a) => a.id === selected)?.name ?? ''}
+                initialRedirects={apps.find((a) => a.id === selected)?.redirect_uris ?? []}
+                onDeleted={() => (setSelected(null), void load())}
+              />
+            </CardHeadings>
           ) : null}
         </>
       ) : apps ? (

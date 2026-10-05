@@ -583,7 +583,7 @@ Checked and working as described above: sending (idempotent double sends), live 
 
 **Not done in this round:** leaving or being removed from a group still doesn't forfeit your games there (they end after a day without a move); read receipts can't be turned off; there is no separate folder for message requests (messages from people you don't know arrive in the inbox, checked for spam, and "who can message you" limits them).
 
-## Trust and safety, admin, developer platform and Mini Apps sweep (2026-10-05, migration 0074, `apps/api/test/trust-sweep.test.ts`, `packages/shared/src/report-outcome.test.ts`, a11y "developers" and "report sheet" states, keyboard "revoking a key")
+## Trust and safety, admin, developer platform and Mini Apps sweep (2026-10-05, migration 0074, `apps/api/test/trust-sweep.test.ts`, `packages/shared/src/report-outcome.test.ts`, a11y "developers" and "event report sheet" states, keyboard "revoking a key")
 
 Every flow in administration, moderation, the developer platform and Mini Apps was used end to end (API scripts and headless Chromium at 1440 and 390 px, light and dark, French and Arabic, several people at once). What was wrong, now fixed:
 

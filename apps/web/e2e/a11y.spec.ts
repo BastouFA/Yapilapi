@@ -817,20 +817,14 @@ test.describe('open sheets, menus and states', () => {
     await page.request.delete(`/api/v1/developer/apps/${app.id}`);
   });
 
-  test('report sheet on a community', async ({ page }, info) => {
+  test('report sheet on an event', async ({ page }, info) => {
     await narrow(page, info.project.name);
-    const d = data();
-    const slug = `a11y-report-${Date.now().toString(36)}`;
-    // The seeded community is the user's own (no Report there): Ben's room community is someone else's.
-    const id = await liveRoom(info.project.use.baseURL!, `Report check ${slug}`);
-    const room = await (await page.request.get(`/api/v1/rooms/${id}`)).json();
-    expect(room.room?.community?.slug, JSON.stringify(room)).toBeTruthy();
-    await open(page, `/c/${room.room.community.slug}`);
-    const report = page.getByRole('button', { name: 'Report', exact: true });
-    await report.click();
+    // Ben's class: someone else's event, so it has Report (communities and events are reported from their page).
+    await open(page, `/events/${data().ticketEventId}`);
+    await page.getByRole('button', { name: 'Report', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Send report' })).toBeVisible();
-    await audit(page, 'community - report sheet', info.project.name);
-    await noSidewaysScroll(page, 'community: report sheet');
+    await audit(page, 'event - report sheet', info.project.name);
+    await noSidewaysScroll(page, 'event: report sheet');
   });
 
   test('room: before joining', async ({ page }, info) => {
