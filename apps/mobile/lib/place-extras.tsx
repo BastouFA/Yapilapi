@@ -182,6 +182,8 @@ export function BookPlace({ placeId, hours, onBooked }: { placeId: string; hours
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Bumped after a booking, so the room left at each time is read again.
+  const [asked, setAsked] = useState(0);
   const hour12 = uses12Hour(locale);
 
   const days = useMemo(() => Array.from({ length: 14 }, (_, i) => new Date(startOfToday().getTime() + i * DAY_MS + 2 * 3_600_000)), []);
@@ -209,7 +211,7 @@ export function BookPlace({ placeId, hours, onBooked }: { placeId: string; hours
     };
     // slotKey stands for the slots.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placeId, slotKey]);
+  }, [placeId, slotKey, asked]);
 
   const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
   const pickDay = (d: Date) => {
@@ -290,6 +292,7 @@ export function BookPlace({ placeId, hours, onBooked }: { placeId: string; hours
             setDone(t('m.booking.requested', { when: when(slot) }));
             setNote('');
             setSlot(null);
+            setAsked((n) => n + 1);
             onBooked();
           } catch (e) {
             setError(errorMessage(e));

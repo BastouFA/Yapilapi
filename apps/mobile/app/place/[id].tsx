@@ -5,7 +5,7 @@ import { formatMoney } from '../../../../packages/shared/src/i18n';
 import type { EventItem } from '../../../../packages/shared/src/types';
 import { PLACE_CATEGORIES } from '../../../../packages/shared/src/constants';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
-import { hoursKeyLabel } from '../../../../packages/shared/src/scheduling';
+import { hoursInWeekOrder, hoursKeyLabel } from '../../../../packages/shared/src/scheduling';
 import { client, errorMessage, isGone } from '../../lib/api';
 import { BookPlace, ManageBookings, MyBookings, PlaceReviews, RatingLine, usePlaceOwner, type ReviewData } from '../../lib/place-extras';
 import { SectionHeader } from '../../lib/chips';
@@ -66,7 +66,7 @@ export default function PlaceScreen() {
 
   const { place, events, products } = data;
   const address = [place.address, place.city, place.country].filter(Boolean).join(', ');
-  const hours = Object.entries((place.hours ?? {}) as Record<string, string>);
+  const hours = hoursInWeekOrder(place.hours as Record<string, unknown> | null);
   const hasMap = typeof place.lat === 'number' && typeof place.lng === 'number';
 
   return (

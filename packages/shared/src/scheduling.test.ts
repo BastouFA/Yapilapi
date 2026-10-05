@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { bookingSlots, hoursKeyDays, hoursKeyLabel, openingRanges, timeZoneLabel, timeZoneList, utcToZonedWall, zonedWallToUtc } from './scheduling.ts';
+import {
+  bookingSlots,
+  hoursInWeekOrder,
+  hoursKeyDays,
+  hoursKeyLabel,
+  openingRanges,
+  timeZoneLabel,
+  timeZoneList,
+  utcToZonedWall,
+  zonedWallToUtc,
+} from './scheduling.ts';
 
 const hm = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
@@ -63,6 +73,14 @@ describe('opening hours', () => {
     expect(hoursKeyLabel('mon', 'fr')).toBe('lun.');
     expect(hoursKeyLabel('sat, sun', 'en')).toBe('Sat, Sun');
     expect(hoursKeyLabel('holidays', 'en')).toBe('holidays');
+    // Stored hours come back in any order; they're shown Monday first.
+    expect(hoursInWeekOrder({ fri: 'a', mon: 'b', holidays: 'c', 'sat-sun': 'd', tue: 'e' }).map(([k]) => k)).toEqual([
+      'mon',
+      'tue',
+      'fri',
+      'sat-sun',
+      'holidays',
+    ]);
   });
 });
 

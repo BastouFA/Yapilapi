@@ -154,6 +154,17 @@ export function hoursKeyDays(key: string): number[] | null {
   return days.size ? [...days] : null;
 }
 
+/** Opening hours as written, in week order (Monday first); lines that name no day come last. */
+export function hoursInWeekOrder(hours: Record<string, unknown> | null | undefined): [string, string][] {
+  const rank = (k: string) => {
+    const days = hoursKeyDays(k);
+    return days ? (days[0]! + 6) % 7 : 7;
+  };
+  return Object.entries(hours ?? {})
+    .filter((e): e is [string, string] => typeof e[1] === 'string')
+    .sort((a, b) => rank(a[0]) - rank(b[0]));
+}
+
 /**
  * An opening-hours key in the reader's language: "tue-sun" reads "Tue – Sun" in English, "mar. – dim."
  * in French. Keys that name no day are shown as they are.

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, EmptyState, EventCard, Skeleton } from '@yapilapi/design-system';
-import { hoursKeyLabel, PLACE_CATEGORIES, type EventItem, type MessageKey } from '@yapilapi/shared';
+import { hoursInWeekOrder, hoursKeyLabel, PLACE_CATEGORIES, type EventItem, type MessageKey } from '@yapilapi/shared';
 import { api, errorMessage, isGone } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { BuyButton } from '@/components/BuyButton';
@@ -32,7 +32,7 @@ export default function PlacePage() {
   if (!data && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />;
   if (!data) return <Skeleton height={240} />;
   const { place, events, products } = data;
-  const hours = Object.entries(place.hours ?? {}) as [string, string][];
+  const hours = hoursInWeekOrder(place.hours);
   const category = (PLACE_CATEGORIES as readonly string[]).includes(place.category) ? t(`place.category.${place.category}` as MessageKey) : place.category;
   const mine = !!place.business?.mine;
   return (

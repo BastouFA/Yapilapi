@@ -134,6 +134,8 @@ export function BookTable({ placeId, hours, onBooked }: { placeId: string; hours
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Bumped after a booking, so the room left at each time is read again.
+  const [asked, setAsked] = useState(0);
   const slots = useMemo(() => bookingSlots(day, hours, new Date()).slice(0, 48), [day, hours]);
   const slotKey = slots.map((s) => s.getTime()).join(',');
   const size = Number(party);
@@ -159,7 +161,7 @@ export function BookTable({ placeId, hours, onBooked }: { placeId: string; hours
     };
     // slotKey stands for the slots.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placeId, slotKey]);
+  }, [placeId, slotKey, asked]);
   const leftAt = (s: Date) => room?.get(s.getTime()) ?? null;
   const fits = (s: Date) => {
     const left = leftAt(s);
@@ -180,6 +182,7 @@ export function BookTable({ placeId, hours, onBooked }: { placeId: string; hours
             toast(t('m.booking.requested', { when: longDate.format(slot) }));
             setNote('');
             setSlot(null);
+            setAsked((n) => n + 1);
             onBooked();
           } catch (err) {
             setError(errorMessage(err));
