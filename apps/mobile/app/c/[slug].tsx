@@ -243,7 +243,25 @@ export default function CommunityScreen() {
               />
             ) : null
           ) : community.membershipStatus === 'pending' ? (
-            <Text style={{ color: c.inkMuted }}>{t('m.community.pending')}</Text>
+            <View style={{ gap: space[2] }}>
+              <Text style={{ color: c.inkMuted }}>{t('m.community.pending')}</Text>
+              <Button
+                label={t('m.community.withdraw')}
+                variant="secondary"
+                size="sm"
+                style={{ alignSelf: 'flex-start' }}
+                onPress={async () => {
+                  setError(null);
+                  try {
+                    await (await client()).communities.leave(slug);
+                    setNote(t('profile.requestWithdrawn'));
+                  } catch (e) {
+                    setError(errorMessage(e));
+                  }
+                  await reload();
+                }}
+              />
+            </View>
           ) : (
             <Button
               label={community.visibility === 'private' ? t('m.community.requestJoin') : t('communities.join')}
@@ -360,7 +378,9 @@ export default function CommunityScreen() {
           ) : item.event ? (
             <Row
               title={item.event.title}
-              subtitle={[dateTime(item.event.startsAt), item.event.place?.name ?? item.event.locationText].filter(Boolean).join(' · ')}
+              subtitle={[dateTime(item.event.startsAt), item.event.online ? t('m.event.online') : (item.event.place?.name ?? item.event.locationText)]
+                .filter(Boolean)
+                .join(' · ')}
               start={<Icon name="calendar-outline" size={22} color={c.yapi} />}
               onPress={() => router.push(`/event/${item.event!.id}`)}
             />

@@ -42,6 +42,11 @@ export function notificationHref(n: NotificationTarget): string | null {
   if (n.type === 'question_received') return '/questions';
   if (n.type === 'question_answered') return n.actor ? `/u/${encodeURIComponent(n.actor.username)}?tab=answers` : '/notifications';
   if (n.type === 'subscription_started' || n.type === 'order_paid' || n.type === 'booking_request' || n.type.startsWith('payout_')) return '/studio';
+  // An answer to your booking opens the place.
+  if (n.type === 'booking_decided' && typeof n.data?.placeId === 'string') return `/place/${encodeURIComponent(n.data.placeId)}`;
+  // A request to join opens the community's settings; being let in opens the community.
+  if (n.type === 'join_request' && typeof n.data?.slug === 'string') return `/community-settings?slug=${encodeURIComponent(n.data.slug)}`;
+  if (n.type === 'join_approved' && typeof n.data?.slug === 'string') return `/c/${encodeURIComponent(n.data.slug)}`;
   // A ticket a friend gave you opens your Tickets; being made a co-host opens the event's check-in.
   if (n.type === 'ticket_received') return '/tickets';
   if (n.type === 'event_cohost') return id ? `/check-in/${id}` : null;

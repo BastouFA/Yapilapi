@@ -5,6 +5,7 @@ import {
   createOrderSchema,
   createPlaceSchema,
   createProductSchema,
+  hoursKeyDays,
   CURRENCY_SCALE,
   PLACE_CATEGORIES,
   PLATFORM_FEE_BPS,
@@ -15,11 +16,11 @@ import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } fro
 import type { AppContext } from '../lib/context.ts';
 import { audit, isEnabled, notify, track } from '../lib/services.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
-import { signDevWebhook } from '../lib/payments.ts';
+import { isZeroDecimal, signDevWebhook } from '../lib/payments.ts';
 import { businessOverview } from '../lib/ai/agents.ts';
 import { refundUnspentBudget } from '../lib/ad-refunds.ts';
 import { submitBoostForReview } from '../lib/boosts.ts';
-import { assertAdultForMoney, publicUserFrom } from '../lib/users.ts';
+import { assertAdultForMoney, isBlockedEitherWay, publicUserFrom } from '../lib/users.ts';
 import { EVENT_SELECT, toEvent } from './events.ts';
 import { eventVisibleSql, liveVisibleSql } from '../lib/visibility.ts';
 import { liveChatAudience } from '../lib/live.ts';
@@ -107,7 +108,10 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     const [places, products] = await Promise.all([
       db.query(`SELECT id, name, category, address, city FROM places WHERE business_id = $1 AND deleted_at IS NULL`, [b.id]),
       db.query(
-        `SELECT id, kind, title, description, price_cents, currency, inventory FROM products WHERE business_id = $1 AND deleted_at IS NULL AND status = 'active' ORDER BY created_at DESC`,
+        // Products in a drop that isn't open are shown on the drop instead, as on the profile's shop.
+        `SELECT pd.id, pd.kind, pd.title, pd.description, pd.price_cents, pd.currency, pd.inventory FROM products pd
+         WHERE pd.business_id = $1 AND pd.deleted_at IS NULL AND pd.status = 'active' AND coalesce(${dropGateSql('pd.id')}, 'open') = 'open'
+         ORDER BY pd.created_at DESC`,
         [b.id],
       ),
     ]);
@@ -154,10 +158,58 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     return { place: await loadPlace(rows[0].id, u.id) };
   });
 
+  /**
+   * The owner of a place's business changes it: its details, its opening hours (by day: "mon",
+   * "tue-sun"; "closed" or times such as "12:00-22:00") and how many people it can take in one
+   * time slot (null: no limit). Only the fields sent change; null clears an optional one.
+   */
+  app.patch('/v1/places/:id', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const input = parse(
+      z.object({
+        name: createPlaceSchema.shape.name.optional(),
+        description: z.string().trim().max(2000).optional(),
+        address: z.string().trim().max(300).nullable().optional(),
+        city: z.string().trim().max(100).nullable().optional(),
+        hours: z
+          .record(z.string().trim().min(1).max(30), z.string().trim().min(1).max(80))
+          .refine((h) => Object.keys(h).length <= 14, 'Up to 14 lines of opening hours.')
+          .nullable()
+          .optional(),
+        bookingCapacity: z.number().int().min(1).max(10_000).nullable().optional(),
+      }),
+      req.body,
+    );
+    const own = await db.query(
+      `SELECT 1 FROM places pl JOIN businesses b ON b.id = pl.business_id WHERE pl.id = $1 AND b.owner_id = $2 AND pl.deleted_at IS NULL`,
+      [id, u.id],
+    );
+    if (!own.rowCount) throw notFound('Place');
+    if (input.hours)
+      for (const key of Object.keys(input.hours))
+        if (!hoursKeyDays(key))
+          throw new AppError(400, 'validation_failed', 'Name the days, such as mon or tue-sun.', {
+            fields: { hours: 'Name the days, such as mon or tue-sun.' },
+          });
+    const sets: string[] = [];
+    const params: unknown[] = [id];
+    const set = (col: string, v: unknown) => sets.push(`${col} = $${params.push(v)}`);
+    if (input.name !== undefined) set('name', input.name);
+    if (input.description !== undefined) set('description', input.description);
+    if (input.address !== undefined) set('address', input.address || null);
+    if (input.city !== undefined) set('city', input.city || null);
+    if (input.hours !== undefined) set('hours', JSON.stringify(input.hours ?? {}));
+    if (input.bookingCapacity !== undefined) set('booking_capacity', input.bookingCapacity);
+    if (sets.length) await db.query(`UPDATE places SET ${sets.join(', ')} WHERE id = $1`, params);
+    await audit(db, { actorId: u.id, action: 'place.update', entityType: 'place', entityId: id });
+    return { place: await loadPlace(id, u.id) };
+  });
+
   /** A place, with its business; `business.mine` tells its owner apart (only they can read its bookings). */
   async function loadPlace(id: string, viewer: string | null) {
     const { rows } = await db.query(
-      `SELECT pl.id, pl.name, pl.category, pl.description, pl.address, pl.city, pl.country, pl.lat, pl.lng, pl.hours,
+      `SELECT pl.id, pl.name, pl.category, pl.description, pl.address, pl.city, pl.country, pl.lat, pl.lng, pl.hours, pl.booking_capacity,
               b.slug AS business_slug, b.name AS business_name, (b.owner_id = $2) AS business_mine
        FROM places pl LEFT JOIN businesses b ON b.id = pl.business_id WHERE pl.id = $1 AND pl.deleted_at IS NULL`,
       [id, viewer],
@@ -219,7 +271,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     );
     const products = await db.query(
       `SELECT pd.id, pd.kind, pd.title, pd.description, pd.price_cents, pd.currency, pd.inventory FROM products pd JOIN places pl ON pl.business_id = pd.business_id
-       WHERE pl.id = $1 AND pd.deleted_at IS NULL AND pd.status = 'active' LIMIT 20`,
+       WHERE pl.id = $1 AND pd.deleted_at IS NULL AND pd.status = 'active' AND coalesce(${dropGateSql('pd.id')}, 'open') = 'open' LIMIT 20`,
       [id],
     );
     return { place, events: events.rows.map(toEvent), products: products.rows.map(productDto) };
@@ -271,6 +323,8 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     // Free, or about $1 at least in every currency: processing would eat less, and tiny prices are how stolen cards get tested.
     const minCents = 100 * CURRENCY_SCALE[input.currency];
     if (input.priceCents > 0 && input.priceCents < minCents) throw badRequest(`A paid item costs at least ${minCents} hundredths of ${input.currency}.`);
+    // A price checkout could never charge (a fraction of a franc) is refused here, not at the buyer's checkout.
+    if (isZeroDecimal(input.currency) && input.priceCents % 100 !== 0) throw badRequest(`${input.currency} amounts must be whole units.`);
     // Selling is for adults (creator and seller terms).
     await assertAdultForMoney(db, u.id);
     if (input.businessId) {
@@ -278,7 +332,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       if (!own.rowCount) throw forbidden('You can only sell under your own business.');
     }
     if (input.eventId) {
-      const host = await db.query(`SELECT 1 FROM events WHERE id = $1 AND host_id = $2`, [input.eventId, u.id]);
+      const host = await db.query(`SELECT 1 FROM events WHERE id = $1 AND host_id = $2 AND deleted_at IS NULL`, [input.eventId, u.id]);
       if (!host.rowCount) throw forbidden('Only the host can sell tickets for this event.');
     }
     const { rows } = await db.query(
@@ -324,7 +378,7 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     const order = await tx(db, async (c) => {
       const ids = input.items.map((i) => i.productId);
       const { rows: products } = await c.query(
-        `SELECT pd.id, pd.seller_id, pd.kind, pd.price_cents, pd.currency, pd.inventory,
+        `SELECT pd.id, pd.seller_id, pd.kind, pd.price_cents, pd.currency, pd.inventory, pd.event_id,
                 EXISTS (SELECT 1 FROM product_files f WHERE f.product_id = pd.id) AS has_file,
                 EXISTS (SELECT 1 FROM order_items oi JOIN orders o ON o.id = oi.order_id
                         WHERE oi.product_id = pd.id AND o.buyer_id = $2 AND o.status = 'paid') AS owned
@@ -344,6 +398,14 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       }
       if (input.items.some((i) => products.find((p) => p.id === i.productId)!.kind === 'digital' && i.quantity !== 1))
         throw badRequest('Buy one of each download.');
+      // Tickets to an event: only while it's still to come (or on), and only for people who can see it.
+      for (const eventId of new Set(products.filter((p) => p.event_id).map((p) => p.event_id as string))) {
+        const on = await c.query(
+          `SELECT 1 FROM events e WHERE e.id = $2 AND ${eventVisibleSql('$1', { byLink: true })} AND coalesce(e.ends_at, e.starts_at + interval '3 hours') > now()`,
+          [u.id, eventId],
+        );
+        if (!on.rowCount) throw new AppError(409, 'event_over', "Tickets for this event aren't on sale any more.");
+      }
       if (input.liveSessionId) {
         // Only for a live the buyer may see (a live hosted by someone under 18 is for their friends).
         const live = (
@@ -356,6 +418,9 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       }
       // Sellers must be adults; a listing made before that rule can't be bought from someone younger.
       for (const seller of new Set(products.map((p) => p.seller_id as string))) if (seller !== u.id) await assertAdultForMoney(c, seller, false);
+      // Blocks work both ways here too: the shop is hidden from them, and so is buying from it by its address.
+      for (const seller of new Set(products.map((p) => p.seller_id as string)))
+        if (seller !== u.id && (await isBlockedEitherWay(c, u.id, seller))) throw notFound('One of those products');
       const currencies = new Set(products.map((p) => p.currency));
       if (currencies.size > 1) throw badRequest('All items in one order must use the same currency.');
       let total = 0;
@@ -667,6 +732,12 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
       if (r.status !== 'paid') throw badRequest('Only paid orders can be refunded.');
       const status = await refundOrder(c, ctx.paymentProviders, id, u.id, reason ?? null);
       const result = status === 'succeeded' ? 'succeeded' : 'failed';
+      // A paid order took its units from stock; refunding it here (before anything changed hands) puts them back on sale.
+      if (result === 'succeeded')
+        await c.query(
+          `UPDATE products pd SET inventory = pd.inventory + oi.quantity FROM order_items oi WHERE oi.order_id = $1 AND oi.product_id = pd.id AND pd.inventory IS NOT NULL`,
+          [id],
+        );
       await audit(c, { actorId: u.id, action: 'order.refund', entityType: 'order', entityId: id, metadata: { status: result } });
       return { status: result };
     });

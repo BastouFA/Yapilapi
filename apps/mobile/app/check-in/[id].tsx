@@ -184,7 +184,7 @@ export default function CheckInScreen() {
   if (door === null)
     return (
       <View style={{ flex: 1, backgroundColor: c.ground }}>
-        <EmptyState title={t('checkin.title')} body={t('checkin.detail.invalid')} />
+        <EmptyState title={t('checkin.title')} body={t('checkin.notYours')} />
       </View>
     );
 

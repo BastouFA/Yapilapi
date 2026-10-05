@@ -4,17 +4,19 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, EmptyState, EventCard, Skeleton } from '@yapilapi/design-system';
-import type { EventItem } from '@yapilapi/shared';
+import { hoursInWeekOrder, hoursKeyLabel, PLACE_CATEGORIES, type EventItem, type MessageKey } from '@yapilapi/shared';
 import { api, errorMessage, isGone } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { BuyButton } from '@/components/BuyButton';
-import { BookTable, ManageBookings, PlaceReviews } from '@/components/PlaceExtras';
+import { BookTable, ManageBookings, MyBookings, PlaceReviews } from '@/components/PlaceExtras';
+import { EditPlace } from '@/components/EditPlace';
 import { ProductCard } from '@yapilapi/design-system';
 import { useSession } from '../../../providers';
 
 export default function PlacePage() {
   const { id } = useParams<{ id: string }>();
-  const { locale, t } = useSession();
+  const { locale, t, me } = useSession();
+  const [booked, setBooked] = useState(0);
   const [data, setData] = useState<{ place: Record<string, any>; events: EventItem[]; products: Record<string, any>[] } | null>(null);
   const [missing, setMissing] = useState(false);
   // Why it couldn't load, when that isn't because it's gone.
@@ -30,18 +32,20 @@ export default function PlacePage() {
   if (!data && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={load}>{t('m.common.retry')}</Button>} />;
   if (!data) return <Skeleton height={240} />;
   const { place, events, products } = data;
-  const hours = Object.entries(place.hours ?? {}) as [string, string][];
+  const hours = hoursInWeekOrder(place.hours);
+  const category = (PLACE_CATEGORIES as readonly string[]).includes(place.category) ? t(`place.category.${place.category}` as MessageKey) : place.category;
+  const mine = !!place.business?.mine;
   return (
     <div className="yp-shell__inner">
       <div className="stack-sm">
-        <Badge tone="neutral">{place.category}</Badge>
+        <Badge tone="neutral">{category}</Badge>
         <h1 className="profile__name">{place.name}</h1>
         <p className="muted" style={{ margin: 0 }}>
           {[place.address, place.city, place.country].filter(Boolean).join(', ')}
         </p>
         {place.business ? <Link href={`/b/${place.business.slug}`}>{place.business.name}</Link> : null}
         {place.description ? <p style={{ margin: 0 }}>{place.description}</p> : null}
-        {place.lat && place.lng ? (
+        {place.lat != null && place.lng != null ? (
           <a
             href={`https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lng}#map=17/${place.lat}/${place.lng}`}
             target="_blank"
@@ -59,8 +63,8 @@ export default function PlacePage() {
             <tbody>
               {hours.map(([d, h]) => (
                 <tr key={d}>
-                  <th scope="row">{d}</th>
-                  <td>{h}</td>
+                  <th scope="row">{hoursKeyLabel(d, locale)}</th>
+                  <td>{/^\s*closed\s*$/i.test(String(h)) ? t('place.closed') : String(h)}</td>
                 </tr>
               ))}
             </tbody>
@@ -87,9 +91,15 @@ export default function PlacePage() {
           </div>
         </section>
       ) : null}
-      {place.business ? <BookTable placeId={place.id} /> : null}
-      {place.business?.mine ? <ManageBookings placeId={place.id} /> : null}
-      <PlaceReviews placeId={place.id} />
+      {place.business && me && !mine ? (
+        <>
+          <BookTable placeId={place.id} hours={place.hours ?? null} onBooked={() => setBooked((n) => n + 1)} />
+          <MyBookings placeId={place.id} version={booked} />
+        </>
+      ) : null}
+      {mine ? <EditPlace key={JSON.stringify(place)} place={place} onSaved={(p) => setData({ ...data, place: p })} /> : null}
+      {mine ? <ManageBookings placeId={place.id} /> : null}
+      <PlaceReviews placeId={place.id} isOwner={mine} />
     </div>
   );
 }

@@ -107,6 +107,32 @@ export default function StudioScreen() {
     }
   }
 
+  /** Refund a whole order: the buyer gets their money back and its items go back on sale (asked first). */
+  function refund(orderId: string, buyer: string) {
+    const lines = data?.sales?.items.filter((x) => x.orderId === orderId) ?? [];
+    if (!lines.length) return;
+    const amount = money(
+      lines.reduce((n, x) => n + x.amountCents, 0),
+      lines[0]!.currency,
+    );
+    Alert.alert(t('studio.sales.refund'), t('studio.sales.refundConfirm', { amount, name: buyer }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('studio.sales.refund'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const r = await (await client()).orders.refund(orderId);
+            Alert.alert(t('m.studio.sales'), t(r.status === 'succeeded' ? 'studio.sales.refundDone' : 'studio.sales.refundFailed'));
+            await load();
+          } catch (e) {
+            Alert.alert(t('m.studio.sales'), errorMessage(e));
+          }
+        },
+      },
+    ]);
+  }
+
   const topList = (items: CreatorTopPost[], reel: boolean) =>
     items.length ? (
       <View style={{ gap: space[2] }}>
@@ -155,7 +181,11 @@ export default function StudioScreen() {
           { label: t('m.studio.likes'), value: number(Number(a.totals.likes)) },
           { label: t('m.studio.comments'), value: number(Number(a.totals.comments)) },
           { label: t('m.studio.saves'), value: number(Number(a.totals.saves)) },
-          { label: t('profile.followers'), value: number(Number(a.totals.followers)), sub: t('m.studio.followersDelta', { count: number(newFollowers) }) },
+          {
+            label: t('profile.followers'),
+            value: number(Number(a.totals.followers)),
+            sub: tp('studio.followersNew', newFollowers, { count: number(newFollowers) }),
+          },
         ]}
       />
       <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('m.studio.viewsNote')}</Text>
@@ -245,7 +275,17 @@ export default function StudioScreen() {
               end={
                 <View style={{ alignItems: 'flex-end', gap: 2 }}>
                   <Text style={{ color: c.ink, fontWeight: '700' }}>{money(x.amountCents, x.currency)}</Text>
-                  {x.status === 'refunded' ? <Pill text={t('m.studio.refunded')} tone="warn" /> : null}
+                  {x.status === 'refunded' ? (
+                    <Pill text={t('m.studio.refunded')} tone="warn" />
+                  ) : (
+                    <Button
+                      label={t('studio.sales.refund')}
+                      size="sm"
+                      variant="secondary"
+                      accessibilityLabel={t('studio.sales.refundA11y', { title: x.product.title, name: x.buyer.displayName })}
+                      onPress={() => refund(x.orderId, x.buyer.displayName)}
+                    />
+                  )}
                 </View>
               }
             />

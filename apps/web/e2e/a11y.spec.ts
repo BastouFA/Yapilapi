@@ -104,6 +104,11 @@ const NEW_PAGES: [string, (d: SeedData) => string][] = [
   ['event with a ticket', (d) => `/events/${d.ticketEventId}`],
   ['tickets', () => '/tickets'],
   ['check-in', (d) => `/events/${d.hostEventId}/check-in`],
+  // Communities and events from the 2026-10-05 sweep.
+  ['communities', () => '/communities'],
+  ['community settings', (d) => `/c/${d.communitySlug}/manage`],
+  ['new event', () => '/events/new'],
+  ['edit event', (d) => `/events/${d.hostEventId}/edit`],
   ['together', () => '/together'],
   ['together album', (d) => `/together/${d.togetherId}`],
   ['new together album', () => '/together/new'],

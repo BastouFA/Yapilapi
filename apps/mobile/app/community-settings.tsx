@@ -79,7 +79,7 @@ export default function CommunitySettings() {
         {current === 'details' ? (
           <Details community={community} onSaved={(next) => setCommunity(next)} />
         ) : current === 'members' ? (
-          <Members slug={slug} myRole={community.myRole!} />
+          <Members slug={slug} myRole={community.myRole!} onOwnerChanged={load} />
         ) : current === 'requests' ? (
           <Requests slug={slug} />
         ) : current === 'banned' ? (
@@ -192,7 +192,7 @@ function usePeople(slug: string, status: 'active' | 'pending' | 'banned') {
   return { items, error, act };
 }
 
-function Members({ slug, myRole }: { slug: string; myRole: CommunityRole }) {
+function Members({ slug, myRole, onOwnerChanged }: { slug: string; myRole: CommunityRole; onOwnerChanged: () => void }) {
   const c = useColors();
   const { t } = useT();
   const { me } = useSession();
@@ -220,6 +220,28 @@ function Members({ slug, myRole }: { slug: string; myRole: CommunityRole }) {
                 value={(ASSIGNABLE.includes(m.role as Assignable) ? m.role : 'member') as Assignable}
                 onChange={(role) => void act(async () => (await client()).communities.setRole(slug, m.user.id, role))}
                 options={ASSIGNABLE.filter((r) => COMMUNITY_ROLE_RANK[r] < mine).map((r) => ({ id: r, label: t(ROLE_LABEL[r]) }))}
+              />
+            ) : null}
+            {myRole === 'owner' && m.role !== 'guest' ? (
+              <Button
+                label={t('m.manage.makeOwner')}
+                variant="secondary"
+                size="sm"
+                style={{ alignSelf: 'flex-start' }}
+                onPress={() =>
+                  Alert.alert(t('m.manage.makeOwnerTitle', { name: m.user.displayName }), t('m.manage.makeOwnerBody'), [
+                    { text: t('common.cancel'), style: 'cancel' },
+                    {
+                      text: t('m.manage.makeOwner'),
+                      style: 'destructive',
+                      onPress: () =>
+                        void act(async () => {
+                          await (await client()).communities.makeOwner(slug, m.user.id);
+                          onOwnerChanged();
+                        }),
+                    },
+                  ])
+                }
               />
             ) : null}
             <Button

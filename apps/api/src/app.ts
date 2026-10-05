@@ -104,6 +104,7 @@ import { endExpiredCampaigns } from './lib/boosts.ts';
 import { sendCountdownReminders } from './lib/stories.ts';
 import { meshRoomMedia } from './lib/room-media.ts';
 import { sweepRooms } from './lib/rooms.ts';
+import { sweepLives } from './lib/live.ts';
 import { sweepWatch } from './lib/watch.ts';
 import { sweepWeeklyWraps } from './lib/wrap.ts';
 import { maybeRunRetention } from './lib/retention.ts';
@@ -509,6 +510,8 @@ export async function buildApp(
         await sweepWatch({ db, realtime: ctx.realtime }).catch((e) => app.log.warn({ err: e.message }, 'watch sweep'));
         // Live location shares past their time (each has its own job; this catches any that were missed).
         await expireShares({ db, realtime: ctx.realtime }).catch((e) => app.log.warn({ err: e.message }, 'location sweep'));
+        // Lives left on without video, or for too long, end (lib/live.ts).
+        await sweepLives({ db, realtime: ctx.realtime, config }).catch((e) => app.log.warn({ err: e.message }, 'live sweep'));
       }
       // Once a minute: weekly wraps (up to 200 at a time) for people whose Sunday evening has come (lib/wrap.ts).
       if (Date.now() - lastWrapSweep > 60_000) {

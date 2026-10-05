@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { EmptyState, EventCard, Segments, Skeleton } from '@yapilapi/design-system';
+import { Button, EmptyState, EventCard, Segments, Skeleton } from '@yapilapi/design-system';
 import type { EventItem, MessageKey } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
@@ -18,19 +18,23 @@ const EMPTY: Record<Scope, MessageKey> = {
 
 /** Events you can see: upcoming, happening now, ones you're going to and ones you host. */
 export default function EventsPage() {
-  const { t, toast, locale } = useSession();
+  const { t, locale } = useSession();
   const [scope, setScope] = useState<Scope>('upcoming');
   const [items, setItems] = useState<EventItem[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
+    let live = true;
     setItems(null);
+    setError(null);
     api.events.list(scope).then(
-      (r) => setItems(r.items),
-      (e) => {
-        setItems([]);
-        toast(errorMessage(e));
-      },
+      (r) => live && setItems(r.items),
+      (e) => live && setError(errorMessage(e)),
     );
-  }, [scope, toast]);
+    return () => {
+      live = false;
+    };
+  }, [scope, attempt]);
   return (
     <div className="yp-shell__inner">
       <div className="yp-topbar">
@@ -50,7 +54,9 @@ export default function EventsPage() {
           { id: 'hosting', label: t('m.events.hosting') },
         ]}
       />
-      {items === null ? (
+      {error ? (
+        <EmptyState title={error} action={<Button onClick={() => setAttempt((n) => n + 1)}>{t('m.common.retry')}</Button>} />
+      ) : items === null ? (
         <Skeleton height={160} />
       ) : items.length ? (
         <div className="yp-grid">
