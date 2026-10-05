@@ -121,15 +121,21 @@ export async function liveRoom(baseURL: string, title = 'Sunday night radio'): P
 }
 
 /**
- * A watch together session in the chat with Cleo, started by her with Ben's reel queued. People
- * whose player goes quiet leave after 45 seconds and a session nobody watches ends, so each test
- * that opens one asks for it here (it joins the session still running, or starts a new one).
+ * A watch together session started by Cleo with Ben's reel queued. People whose player goes quiet
+ * leave after 45 seconds and a session nobody watches ends, so each test that opens one asks for it
+ * here. In `conversationId` when given (it joins the session still running there, or starts one);
+ * otherwise in a group of its own, so projects running at once don't share a session and move each
+ * other's position.
  */
-export async function watchSession(baseURL: string): Promise<string> {
+export async function watchSession(baseURL: string, conversationId?: string): Promise<string> {
   const d: SeedData = JSON.parse(await readFile(DATA, 'utf8'));
   const cleo = await request.newContext({ baseURL, storageState: THIRD_STATE });
   try {
-    const r = await must(cleo.post('/api/v1/watch', { data: { conversationId: d.gamesChatId, postIds: [d.reelId] } }));
+    const chatId =
+      conversationId ??
+      (await must(cleo.post('/api/v1/conversations', { data: { memberIds: [d.userId], title: `[Dev data] Watch ${Math.random().toString(36).slice(2, 8)}` } })))
+        .conversation.id;
+    const r = await must(cleo.post('/api/v1/watch', { data: { conversationId: chatId, postIds: [d.reelId] } }));
     return r.session.id;
   } finally {
     await cleo.dispose();

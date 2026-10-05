@@ -583,7 +583,7 @@ const NEW_STATES: [string, (page: Page, d: SeedData) => Promise<void>][] = [
   [
     'chat: watch together banner',
     async (page, d) => {
-      await watchSession(BASE);
+      await watchSession(BASE, d.gamesChatId);
       await open(page, `/inbox/${d.gamesChatId}`);
       await expect(page.getByRole('region', { name: 'Watching together now' })).toBeVisible();
     },
