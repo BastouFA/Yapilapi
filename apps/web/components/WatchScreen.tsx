@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Avatar, Badge, Button, CaptionTracks, ChatBubble, EmptyState, Icon, Segments, Skeleton, videoCrossOrigin } from '@yapilapi/design-system';
 import {
   noticeText,
@@ -523,10 +523,28 @@ function Scrubber({ video, onSeek, disabled }: { video: HTMLVideoElement | null;
     return () => events.forEach((ev) => video.removeEventListener(ev, update));
   }, [video]);
   const value = drag ?? pos;
+  const max = Math.max(1, Math.round(dur));
   const commit = () => {
     if (drag === null) return;
+    clearTimeout(keyTimer.current);
     onSeek(drag);
     setDrag(null);
+  };
+  // Keys move 5 seconds (10 with Page Up and Page Down) and add up while pressed again: everyone
+  // is moved once, a moment after the last press, not once per press from the old position.
+  const keyTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(keyTimer.current), []);
+  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    const steps: Record<string, number> = { ArrowRight: 5000, ArrowUp: 5000, ArrowLeft: -5000, ArrowDown: -5000, PageUp: 10000, PageDown: -10000 };
+    const to = e.key === 'Home' ? 0 : e.key === 'End' ? max : e.key in steps ? Math.max(0, Math.min(max, value + steps[e.key]!)) : null;
+    if (to === null) return;
+    e.preventDefault();
+    setDrag(to);
+    clearTimeout(keyTimer.current);
+    keyTimer.current = setTimeout(() => {
+      onSeek(to);
+      setDrag(null);
+    }, 400);
   };
   return (
     <div className="watch-scrub">
@@ -537,15 +555,15 @@ function Scrubber({ video, onSeek, disabled }: { video: HTMLVideoElement | null;
         type="range"
         className="watch-scrub__range"
         min={0}
-        max={Math.max(1, Math.round(dur))}
+        max={max}
         step={500}
-        value={Math.min(Math.round(value), Math.max(1, Math.round(dur)))}
+        value={Math.min(Math.round(value), max)}
         disabled={disabled || !dur}
         aria-label={t('watch.seek')}
         aria-valuetext={t('watch.progress', { position: formatReelTime(value), duration: formatReelTime(dur) })}
         onChange={(e) => setDrag(Number(e.currentTarget.value))}
         onPointerUp={commit}
-        onKeyUp={commit}
+        onKeyDown={onKeyDown}
         onBlur={commit}
       />
       <span className="watch-scrub__time" aria-hidden>

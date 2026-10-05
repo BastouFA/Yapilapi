@@ -556,7 +556,13 @@ export function ReelsViewer() {
         pip={pipAvailable}
         onPip={() => void pip()}
         onNotInterested={async (p) => {
-          await api.feedback({ signal: 'not_interested', postId: p.id }).catch(() => {});
+          try {
+            await api.feedback({ signal: 'not_interested', postId: p.id });
+          } catch (e) {
+            // Not taken out of the feed when the choice wasn't saved: it would come back later.
+            toast(errorMessage(e));
+            return;
+          }
           setItems((cur) => cur?.filter((x) => x.id !== p.id) ?? cur);
           toast(t('reel.notInterested.done'));
         }}

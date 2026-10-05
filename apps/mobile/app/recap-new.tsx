@@ -12,12 +12,12 @@ import {
   type RecapStyle,
 } from '../../../packages/shared/src/constants';
 import type { RecapCandidate, RecapCandidates, Sound } from '../../../packages/shared/src/types';
-import { client, mediaUrl } from '../lib/api';
+import { client, isGone, mediaUrl } from '../lib/api';
 import { useT } from '../lib/i18n';
-import { recapError } from '../lib/recaps';
+import { isRecapsOff, recapError } from '../lib/recaps';
 import { useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
-import { Button, Card, EmptyState, Field, Icon, KeyboardAvoid, Loading, Notice, Segmented, useColors, userText } from '../lib/ui';
+import { Button, Card, EmptyState, Field, Icon, KeyboardAvoid, Loading, Notice, ScreenError, Segmented, useColors, userText } from '../lib/ui';
 
 type Length = 'auto' | `${(typeof RECAP_LENGTHS)[number]}`;
 
@@ -39,6 +39,9 @@ export default function RecapNew() {
 
   const [data, setData] = useState<RecapCandidates | null | undefined>(undefined);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // A load that failed for a reason trying again can fix (not a source that's gone or recaps being off).
+  const [retryable, setRetryable] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [chosen, setChosen] = useState<string[]>([]);
   const [title, setTitle] = useState('');
   const [style, setStyle] = useState<RecapStyle>('calm');
@@ -65,9 +68,10 @@ export default function RecapNew() {
         (e) => {
           setData(null);
           setLoadError(recapError(e, t));
+          setRetryable(!isGone(e) && !isRecapsOff(e));
         },
       );
-  }, [me, source, sourceId, valid, t]);
+  }, [me, source, sourceId, valid, t, attempt]);
 
   if (me === undefined) return <Loading />;
   if (!me)
@@ -84,7 +88,15 @@ export default function RecapNew() {
     );
   if (data === undefined) return <Loading />;
   if (data === null)
-    return (
+    return retryable && loadError ? (
+      <ScreenError
+        message={loadError}
+        onRetry={() => {
+          setData(undefined);
+          setAttempt((n) => n + 1);
+        }}
+      />
+    ) : (
       <View style={{ flex: 1, backgroundColor: c.ground, padding: space[4] }}>
         <Notice tone="danger">{loadError ?? t('m.recap.missing')}</Notice>
       </View>

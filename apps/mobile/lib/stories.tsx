@@ -568,10 +568,12 @@ function Viewer({
               <Pressable
                 accessibilityRole="button"
                 onPress={async () => {
-                  const r = await client()
-                    .then((api) => api.moments.viewers(story.id))
-                    .catch(() => ({ items: [], results: [], reshares: 0, allowReshare: !!story.allowReshare }));
-                  setViewers(r);
+                  // A list that couldn't load says why, rather than showing as "no viewers yet".
+                  try {
+                    setViewers(await (await client()).moments.viewers(story.id));
+                  } catch (e) {
+                    setSent(errorMessage(e));
+                  }
                 }}
                 style={st.pill}
               >

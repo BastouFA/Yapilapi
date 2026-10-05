@@ -159,7 +159,7 @@ export default function SoundScreen() {
       ListHeaderComponent={header}
       ItemSeparatorComponent={() => <View style={{ height: 4 }} />}
       renderItem={({ item }) => <ReelTile post={item} />}
-      onEndReached={() => cursor && void load(cursor)}
+      onEndReached={() => cursor && void load(cursor).catch((e: unknown) => setError(errorMessage(e)))}
       onEndReachedThreshold={0.5}
       ListEmptyComponent={reels === null ? <Loading /> : error ? null : <EmptyState title={t('m.sound.empty')} />}
     />
