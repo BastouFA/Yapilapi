@@ -254,7 +254,12 @@ function Discover() {
             )}
           </section>
           <section className="stack-sm">
-            <h2 className="section-title">{t('discover.communities')}</h2>
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <h2 className="section-title">{t('discover.communities')}</h2>
+              <Link href="/communities" className="muted">
+                {t('m.wander.seeAll')}
+              </Link>
+            </div>
             <div className="yp-grid">
               {communities.map((c) => (
                 <CommunityCard key={c.id} community={c} href={`/c/${c.slug}`} linkAs={NextLink} locale={locale} />

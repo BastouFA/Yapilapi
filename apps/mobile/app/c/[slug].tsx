@@ -378,7 +378,9 @@ export default function CommunityScreen() {
           ) : item.event ? (
             <Row
               title={item.event.title}
-              subtitle={[dateTime(item.event.startsAt), item.event.place?.name ?? item.event.locationText].filter(Boolean).join(' · ')}
+              subtitle={[dateTime(item.event.startsAt), item.event.online ? t('m.event.online') : (item.event.place?.name ?? item.event.locationText)]
+                .filter(Boolean)
+                .join(' · ')}
               start={<Icon name="calendar-outline" size={22} color={c.yapi} />}
               onPress={() => router.push(`/event/${item.event!.id}`)}
             />

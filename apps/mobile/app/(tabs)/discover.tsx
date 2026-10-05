@@ -391,7 +391,7 @@ export default function Wander() {
                   <Row
                     key={e.id}
                     title={e.title}
-                    subtitle={[dateTime(e.startsAt), e.place?.name ?? e.locationText].filter(Boolean).join(' · ')}
+                    subtitle={[dateTime(e.startsAt), e.online ? t('m.event.online') : (e.place?.name ?? e.locationText)].filter(Boolean).join(' · ')}
                     start={<Icon name="calendar-outline" size={22} color={c.yapi} />}
                     onPress={() => router.push(`/event/${e.id}`)}
                   />
@@ -462,7 +462,7 @@ export default function Wander() {
                   <Row
                     key={e.id}
                     title={e.title}
-                    subtitle={[dateTime(e.startsAt), e.place?.name ?? e.locationText].filter(Boolean).join(' · ')}
+                    subtitle={[dateTime(e.startsAt), e.online ? t('m.event.online') : (e.place?.name ?? e.locationText)].filter(Boolean).join(' · ')}
                     start={<Icon name="calendar-outline" size={22} color={c.yapi} />}
                     onPress={() => open(`/event/${e.id}`)}
                   />
