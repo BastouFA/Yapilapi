@@ -50,6 +50,8 @@ interface SessionCtx {
   removeAccount: (id: string) => Promise<void>;
   /** Subscribe to realtime events from the API socket. Returns an unsubscribe function. */
   subscribe: (fn: Listener) => () => void;
+  /** Send a small frame on the realtime socket (like "typing"); dropped when it isn't open. */
+  sendRealtime: (frame: { type: string; conversationId?: string }) => void;
   /** Keep the socket open in the background (during a call, so signaling keeps flowing). */
   setKeepAlive: (on: boolean) => void;
   /** Resolves once the realtime socket is open (or after a few seconds, whichever is first). */
@@ -66,6 +68,7 @@ const Ctx = createContext<SessionCtx>({
   switchAccount: async () => 'ended',
   removeAccount: async () => {},
   subscribe: () => () => {},
+  sendRealtime: () => {},
   setKeepAlive: () => {},
   waitForRealtime: async () => {},
 });
@@ -94,6 +97,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const keepAlive = useRef(false);
   const setKeepAlive = useCallback((on: boolean) => void (keepAlive.current = on), []);
   const ready = useRef(false);
+  const socketRef = useRef<WebSocket | null>(null);
   const waitForRealtime = useCallback(async () => {
     for (let i = 0; i < 50 && !ready.current; i++) await new Promise((r) => setTimeout(r, 100));
   }, []);
@@ -279,6 +283,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (!token || stopped || ws) return;
       const socket = new (WebSocket as unknown as RNWebSocketCtor)(realtimeUrl(), null, { headers: { authorization: `Bearer ${token}` } });
       ws = socket;
+      socketRef.current = socket;
       // Each socket keeps its own ping, so an old one closing late never stops the new one's.
       let ping: ReturnType<typeof setInterval> | undefined;
       socket.onopen = () => {
@@ -305,6 +310,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       };
       socket.onclose = (ev: CloseEvent) => {
         clearInterval(ping);
+        if (socketRef.current === socket) socketRef.current = null;
         if (ws !== socket && ws) return; // an old socket closing after a new one opened
         ready.current = false;
         ws = null;
@@ -355,9 +361,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     listeners.current.add(fn);
     return () => void listeners.current.delete(fn);
   }, []);
+  const sendRealtime = useCallback((frame: { type: string; conversationId?: string }) => {
+    const socket = socketRef.current;
+    if (socket?.readyState === 1) socket.send(JSON.stringify(frame));
+  }, []);
 
   return (
-    <Ctx.Provider value={{ me, refresh, enter, signOut, signOutEverywhere, accounts, switchAccount, removeAccount, subscribe, setKeepAlive, waitForRealtime }}>
+    <Ctx.Provider
+      value={{ me, refresh, enter, signOut, signOutEverywhere, accounts, switchAccount, removeAccount, subscribe, sendRealtime, setKeepAlive, waitForRealtime }}
+    >
       {children}
     </Ctx.Provider>
   );

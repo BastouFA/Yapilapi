@@ -43,7 +43,7 @@ export async function messagePreviews(db: Q, ids: string[], readerId: string): P
   const unique = [...new Set(ids)];
   if (!unique.length) return out;
   const { rows } = await db.query(
-    `SELECT m.id, m.sender_id, left(m.body, 200) AS body, m.attachments->0->>'kind' AS attachment_kind, m.created_at, m.deleted_at, m.unsent_at,
+    `SELECT m.id, m.sender_id, left(m.body, 200) AS body, coalesce(m.attachments->0->>'kind', vm.kind) AS attachment_kind, m.created_at, m.deleted_at, m.unsent_at, m.view_once,
             m.moderation_status, m.kind, (m.expires_at IS NOT NULL AND m.expires_at <= now()) AS expired,
             EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $2 AND b.blocked_id = m.sender_id) AS blocked,
             CASE WHEN EXISTS (SELECT 1 FROM chat_polls p WHERE p.message_id = m.id) THEN 'poll'
@@ -58,7 +58,7 @@ export async function messagePreviews(db: Q, ids: string[], readerId: string): P
             (SELECT json_build_object('amountCents', o.amount_cents, 'currency', trim(o.currency), 'counter', o.counter_of IS NOT NULL)
                FROM market_offers o WHERE o.message_id = m.id) AS offer,
             m.meta->'storyReply' AS story_reply
-     FROM messages m WHERE m.id = ANY($1::uuid[])`,
+     FROM messages m LEFT JOIN media vm ON vm.id = m.view_once_media_id WHERE m.id = ANY($1::uuid[])`,
     [unique, readerId],
   );
   const users = await usersByIds(
@@ -86,6 +86,8 @@ export async function messagePreviews(db: Q, ids: string[], readerId: string): P
             ...(r.rich_kind === 'location' ? { live: r.location_mode === 'live' } : {}),
             ...(r.rich_kind === 'offer' && r.offer ? { offer: { ...r.offer, amountCents: Number(r.offer.amountCents) } } : {}),
             ...(r.story_reply ? { storyReply: { quote: r.story_reply.quote ?? null } } : {}),
+            ...(r.view_once ? { viewOnce: true } : {}),
+            ...(r.kind === 'yap' ? { yap: true } : {}),
           },
     );
   }

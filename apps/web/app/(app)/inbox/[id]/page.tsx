@@ -17,7 +17,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { AIPanel, BottomSheet, Button, ChatBubble, EmptyState, Icon, Menu, Skeleton, Switch, TranslatableText, type MenuAction } from '@yapilapi/design-system';
 import type { ChatGame, Conversation, Message, ScheduledMessage } from '@yapilapi/shared';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, isGone } from '@/lib/api';
+import { GroupInfoSheet } from '@/components/GroupInfo';
 import { ReportSheet } from '@/components/PostList';
 import { useRealtime, useSession } from '../../../providers';
 import { useCalls } from '@/components/Calls';
@@ -56,12 +57,22 @@ type Pending = Message & { pending?: boolean };
 
 export default function ChatPage() {
   const { id } = useParams<{ id: string }>();
-  const { me, t, toast, locale, setUnread, unread, flags } = useSession();
+  const { me, t, tp, toast, locale, setUnread, unread, flags, sendRealtime } = useSession();
   const [conv, setConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Pending[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [body, setBody] = useState('');
-  const [typing, setTyping] = useState<string | null>(null);
+  // Who is typing here (the name), cleared a few seconds after their last keystroke or when their message arrives.
+  const [typing, setTyping] = useState<{ userId: string; name: string } | null>(null);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // When this person last said they were typing, so the others hear it at most every few seconds.
+  const typingSent = useRef(0);
+  function saidTyping() {
+    const now = Date.now();
+    if (now - typingSent.current < 3000) return;
+    typingSent.current = now;
+    sendRealtime({ type: 'typing', conversationId: id });
+  }
   const [ai, setAi] = useState<{ title: string; text: string; notice?: string; plan?: Record<string, unknown> } | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [reportId, setReportId] = useState<string | null>(null);
@@ -138,28 +149,56 @@ export default function ChatPage() {
   const patchMessage = (messageId: string, fn: (m: Pending) => Pending) => setMessages((cur) => cur?.map((x) => (x.id === messageId ? fn(x) : x)) ?? cur);
   const addMessage = (m: Message) => setMessages((cur) => (cur?.some((x) => x.id === m.id) ? cur : [...(cur ?? []), m]));
 
-  useEffect(() => {
+  // The chat couldn't load: gone (you left, were removed, or it never was yours) or a failed request (Try again).
+  const [loadError, setLoadError] = useState<{ gone: boolean; text: string } | null>(null);
+  const [groupOpen, setGroupOpen] = useState(false);
+  const reloadConv = () =>
     api.conversations.get(id).then(
       (r) => setConv(r.conversation),
-      (e) => toast(errorMessage(e)),
+      () => {},
     );
-    api.conversations.messages(id).then(
-      (r) => {
+  function load() {
+    setLoadError(null);
+    Promise.all([api.conversations.get(id), api.conversations.messages(id)]).then(
+      ([c, r]) => {
+        setConv(c.conversation);
         setMessages(r.items);
         setCursor(r.nextCursor);
-        void api.conversations.read(id);
-        setUnread({ messages: Math.max(0, unread.messages - (conv?.unreadCount ?? 0)) });
+        void api.conversations.read(id).catch(() => {});
+        // What was unread here is read now.
+        setUnread({ messages: Math.max(0, unread.messages - c.conversation.unreadCount) });
       },
-      (e) => toast(errorMessage(e)),
+      (e) => setLoadError({ gone: isGone(e), text: isGone(e) ? t('chat.group.gone') : errorMessage(e) }),
     );
     void loadPins();
+  }
+  useEffect(() => {
+    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   // Follow the newest message (not when earlier ones are loaded above).
   const lastId = messages?.at(-1)?.id;
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: 'end' });
+    const end = endRef.current;
+    if (!end) return;
+    end.scrollIntoView({ block: 'end' });
+    // Photos, videos and cards size themselves once they load: stay at the newest for a few
+    // seconds while the page grows, unless you scroll up.
+    let following = true;
+    const onScroll = () => (following = innerHeight + scrollY >= document.documentElement.scrollHeight - 160);
+    const grow = new ResizeObserver(() => following && end.scrollIntoView({ block: 'end' }));
+    grow.observe(document.body);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    const done = () => {
+      grow.disconnect();
+      window.removeEventListener('scroll', onScroll);
+    };
+    const timer = setTimeout(done, 4000);
+    return () => {
+      clearTimeout(timer);
+      done();
+    };
   }, [lastId]);
 
   // Go to a message once it's on the page, and mark it for a moment.
@@ -221,6 +260,7 @@ export default function ChatPage() {
         return [...cur, m];
       });
       if (e.data.sender.id !== me?.id) void api.conversations.read(id);
+      setTyping((cur) => (cur?.userId === e.data.sender.id ? null : cur));
     }
     // Disappeared (or removed by moderation), or deleted just for you on another device.
     if ((e.type === 'message.deleted' || e.type === 'message.hidden') && e.data.conversationId === id) {
@@ -301,6 +341,22 @@ export default function ChatPage() {
     if (e.type === 'conversation.updated' && e.data.id === id) setConv((c) => (c ? { ...c, disappearingSeconds: e.data.disappearingSeconds } : c));
     // Someone changed the wallpaper or bubble colour: everyone sees the same.
     if (e.type === 'conversation.theme' && e.data.id === id) setConv((c) => (c ? { ...c, theme: e.data.theme } : c));
+    // The group's name, people or admins changed; or you were taken out of it.
+    if (e.type === 'conversation.changed' && e.data.id === id) void reloadConv();
+    if (e.type === 'conversation.removed' && e.data.id === id) {
+      setGroupOpen(false);
+      setLoadError({ gone: true, text: t('chat.group.gone') });
+    }
+    // Someone read up to here: "Seen" under your messages follows.
+    if (e.type === 'conversation.read' && e.data.conversationId === id)
+      setConv((c) =>
+        c
+          ? {
+              ...c,
+              readBy: [...(c.readBy ?? []).filter((r) => r.userId !== e.data.userId), { userId: e.data.userId, lastReadAt: e.data.lastReadAt }],
+            }
+          : c,
+      );
     // Someone opened a view-once photo you sent, or its file was deleted.
     if (e.type === 'view_once.updated' && e.data.conversationId === id)
       setMessages((cur) => cur?.map((x) => (x.id === e.data.id ? { ...x, viewOnce: e.data.viewOnce } : x)) ?? cur);
@@ -310,10 +366,11 @@ export default function ChatPage() {
         (r) => setMessages(r.items),
         () => {},
       );
-    if (e.type === 'typing' && e.data.conversationId === id) {
+    if (e.type === 'typing' && e.data.conversationId === id && e.data.userId !== me?.id) {
       const who = conv?.members.find((m) => m.id === e.data.userId)?.displayName ?? t('m.calls.someone');
-      setTyping(who);
-      setTimeout(() => setTyping(null), 3000);
+      setTyping({ userId: e.data.userId, name: who });
+      clearTimeout(typingTimer.current);
+      typingTimer.current = setTimeout(() => setTyping(null), 5000);
     }
   });
 
@@ -548,7 +605,42 @@ export default function ChatPage() {
   const title = conv ? conv.title || others.map((m) => m.displayName).join(', ') : '';
   // Watch together: one-to-one chats and groups of up to 8 people.
   const watchable = !!conv && (conv.kind === 'direct' || conv.kind === 'group') && conv.members.length <= WATCH_MAX_MEMBERS;
+  // Read receipts: under your newest message, "Seen" (one-to-one) or who of the group has read it.
+  const lastMine = messages?.filter((m) => m.sender.id === me?.id && !m.pending && m.kind !== 'system' && !m.unsent && !m.moderation).at(-1);
+  const readers = lastMine ? (conv?.readBy ?? []).filter((r) => r.lastReadAt >= lastMine.createdAt).length : 0;
+  const seenLabel = !readers
+    ? null
+    : conv?.kind === 'direct'
+      ? t('chat.seen')
+      : readers >= (conv?.readBy?.length ?? 0)
+        ? t('chat.seenByAll')
+        : tp('chat.seenBy', readers);
   let lastDay = '';
+
+  if (loadError)
+    return (
+      <div className="yp-shell__inner chat-page">
+        <div className="yp-topbar">
+          <div className="row" style={{ minWidth: 0 }}>
+            <Link href="/inbox" className="yp-action" aria-label={t('chat.backToInbox')}>
+              <Icon name="arrow-left" />
+            </Link>
+          </div>
+        </div>
+        <EmptyState
+          title={loadError.text}
+          action={
+            loadError.gone ? (
+              <Link href="/inbox" className="yp-btn yp-btn--secondary">
+                {t('chat.backToInbox')}
+              </Link>
+            ) : (
+              <Button onClick={load}>{t('m.common.retry')}</Button>
+            )
+          }
+        />
+      </div>
+    );
 
   return (
     <div className="yp-shell__inner chat-page">
@@ -604,6 +696,7 @@ export default function ChatPage() {
           <Menu
             label={t('chat.options')}
             actions={[
+              ...(conv?.kind === 'group' ? [{ label: t('chat.group.info'), icon: 'users' as const, onSelect: () => setGroupOpen(true) }] : []),
               { label: t('chat.apps'), icon: 'create', onSelect: () => setAppsOpen(true) },
               { label: t('inbox.summarize'), icon: 'sparkle', onSelect: () => assist('summarize_conversation') },
               { label: t('chat.ai.draftPlan'), icon: 'calendar', onSelect: () => assist('plan_from_message') },
@@ -669,9 +762,13 @@ export default function ChatPage() {
                   <Button
                     size="sm"
                     onClick={async () => {
-                      await api.conversations.createPlan(id, String(ai.plan!.destination ?? t('chat.ai.newPlan')), ai.plan!);
-                      toast(t('chat.ai.planSaved'));
-                      setAi(null);
+                      try {
+                        await api.conversations.createPlan(id, String(ai.plan!.destination ?? t('chat.ai.newPlan')), ai.plan!);
+                        toast(t('chat.ai.planSaved'));
+                        setAi(null);
+                      } catch (e) {
+                        toast(errorMessage(e));
+                      }
                     }}
                   >
                     {t('chat.ai.savePlan')}
@@ -704,9 +801,13 @@ export default function ChatPage() {
               size="sm"
               variant="ghost"
               onClick={async () => {
-                const r = await api.conversations.messages(id, cursor);
-                setMessages((cur) => [...r.items, ...(cur ?? [])]);
-                setCursor(r.nextCursor);
+                try {
+                  const r = await api.conversations.messages(id, cursor);
+                  setMessages((cur) => [...r.items, ...(cur ?? [])]);
+                  setCursor(r.nextCursor);
+                } catch (e) {
+                  toast(errorMessage(e));
+                }
               }}
             >
               {t('chat.loadEarlier')}
@@ -846,6 +947,7 @@ export default function ChatPage() {
                   ) : null}
                   <ReactionRow message={m} mine={mine} onToggle={(emoji, on) => void react(m, emoji, on)} />
                   {m.moderation === 'review' ? <span className="chat-held">{t('m.chat.held')}</span> : null}
+                  {seenLabel && m.id === lastMine?.id ? <span className="chat-seen">{seenLabel}</span> : null}
                   {m.reminder && !m.unsent ? <ReminderNote at={m.reminder.remindAt} /> : null}
                 </div>
               </div>
@@ -871,10 +973,9 @@ export default function ChatPage() {
           />
           {typing ? (
             <span className="muted" style={{ fontSize: 12 }}>
-              {t('chat.typing', { name: typing })}
+              {t('chat.typing', { name: typing.name })}
             </span>
           ) : null}
-          <div ref={endRef} />
         </div>
       )}
 
@@ -1001,7 +1102,10 @@ export default function ChatPage() {
           aria-describedby={replyTo || editing ? 'compose-context' : undefined}
           value={body}
           maxLength={4000}
-          onChange={(e) => setBody(e.currentTarget.value)}
+          onChange={(e) => {
+            setBody(e.currentTarget.value);
+            if (e.currentTarget.value.trim() && !editing) saidTyping();
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
@@ -1029,6 +1133,9 @@ export default function ChatPage() {
           <span className="chat-send__label">{editing ? t('common.save') : t('inbox.send')}</span>
         </Button>
       </form>
+      {/* The end of the page, under the Yap button and suggested replies: following the newest
+          message scrolls here, so they stay on screen above the message box in a long chat. */}
+      <div ref={endRef} aria-hidden />
       <ViewOnceCapture
         key={captureStart}
         open={captureOpen}
@@ -1074,6 +1181,16 @@ export default function ChatPage() {
         }}
       />
       <ReportSheet target={reportId ? { type: 'message', id: reportId } : null} onClose={() => setReportId(null)} />
+      {conv?.kind === 'group' ? (
+        <GroupInfoSheet
+          open={groupOpen}
+          onClose={() => setGroupOpen(false)}
+          conversation={conv}
+          onChanged={() => void reloadConv()}
+          onLine={addMessage}
+          onLeft={() => router.push('/inbox')}
+        />
+      ) : null}
       <PollSheet open={pollOpen} onClose={() => setPollOpen(false)} conversationId={id} onSent={addMessage} />
       <ListSheet open={listOpen} onClose={() => setListOpen(false)} conversationId={id} onSent={addMessage} />
       <ShareMixHereSheet open={mixShareOpen} onClose={() => setMixShareOpen(false)} conversationId={id} onSent={addMessage} />

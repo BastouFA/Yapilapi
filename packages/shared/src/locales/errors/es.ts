@@ -297,6 +297,10 @@ export const es: Record<string, string> = {
   'Up to 160 characters.': 'Hasta 160 caracteres.',
   'Up to 280 characters.': 'Hasta 280 caracteres.',
   // apps/api/src/modules/calls.ts
+  'To keep younger people safe, you can only call them once you are friends.': 'Para proteger a los más jóvenes, solo puedes llamarles cuando seáis amigos.',
+  'This person only gets calls from people they know.': 'Esta persona solo recibe llamadas de gente que conoce.',
+  'Calls work in one-to-one chats and groups of up to 8 people.': 'Las llamadas funcionan en chats individuales y en grupos de hasta 8 personas.',
+  'There’s nobody else here to call.': 'No hay nadie más aquí a quien llamar.',
   'There is already a call in this conversation.': 'Ya hay una llamada en esta conversación.',
   "Call doesn't exist or isn't visible to you.": 'La llamada no existe o no puedes verla.',
   'Calls support up to 8 people.': 'Las llamadas admiten hasta 8 personas.',
@@ -687,6 +691,15 @@ export const es: Record<string, string> = {
   'You can only share memories with friends.': 'Solo puedes compartir recuerdos con amigos.',
   'Add some posts to this memory first.': 'Primero añade algunas publicaciones a este recuerdo.',
   // apps/api/src/modules/messaging.ts
+  'This works in groups only.': 'Esto solo funciona en grupos.',
+  'Someone you’re adding can’t be in this group with someone already in it.':
+    'Alguien que estás añadiendo no puede estar en este grupo con alguien que ya está en él.',
+  'To go, leave the group instead.': 'Para irte, sal del grupo.',
+  'A group needs at least one admin. Make someone else an admin first.': 'Un grupo necesita al menos un admin. Primero haz admin a otra persona.',
+  'Only group admins can rename the group.': 'Solo los admins del grupo pueden cambiarle el nombre.',
+  'Only group admins can remove people.': 'Solo los admins del grupo pueden quitar a personas.',
+  'Only group admins can choose admins.': 'Solo los admins del grupo pueden elegir admins.',
+  'React with an emoji.': 'Reacciona con un emoji.',
   'To keep younger people safe, you can only message them once you are friends.':
     'Para proteger a las personas más jóvenes, solo puedes escribirles cuando sean amigos.',
   'This person only gets messages from people they know.': 'Esta persona solo recibe mensajes de personas que conoce.',

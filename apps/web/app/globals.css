@@ -2810,7 +2810,8 @@ video.chat-att__media {
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.chat-held {
+.chat-held,
+.chat-seen {
   align-self: flex-end;
   margin-top: 2px;
   color: var(--ink-muted);

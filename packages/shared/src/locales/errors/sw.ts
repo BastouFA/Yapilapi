@@ -296,6 +296,10 @@ export const sw: Record<string, string> = {
   'Up to 160 characters.': 'Hadi herufi 160.',
   'Up to 280 characters.': 'Hadi herufi 280.',
   // apps/api/src/modules/calls.ts
+  'To keep younger people safe, you can only call them once you are friends.': 'Ili kuwalinda vijana, unaweza kuwapigia simu tu mkishakuwa marafiki.',
+  'This person only gets calls from people they know.': 'Mtu huyu hupokea simu kutoka kwa watu anaowajua tu.',
+  'Calls work in one-to-one chats and groups of up to 8 people.': 'Simu hufanya kazi kwenye gumzo za watu wawili na vikundi vya hadi watu 8.',
+  'There’s nobody else here to call.': 'Hakuna mtu mwingine hapa wa kumpigia.',
   'There is already a call in this conversation.': 'Tayari kuna simu kwenye mazungumzo haya.',
   "Call doesn't exist or isn't visible to you.": 'Simu haipo au huwezi kuiona.',
   'Calls support up to 8 people.': 'Simu zinaweza kuwa na hadi watu 8.',
@@ -688,6 +692,15 @@ export const sw: Record<string, string> = {
   'You can only share memories with friends.': 'Unaweza kushiriki kumbukumbu na marafiki tu.',
   'Add some posts to this memory first.': 'Ongeza machapisho kwenye kumbukumbu hii kwanza.',
   // apps/api/src/modules/messaging.ts
+  'This works in groups only.': 'Hii hufanya kazi kwenye vikundi tu.',
+  'Someone you’re adding can’t be in this group with someone already in it.':
+    'Mtu unayemwongeza hawezi kuwa kwenye kikundi hiki pamoja na mtu ambaye tayari yumo.',
+  'To go, leave the group instead.': 'Ili kuondoka, ondoka kwenye kikundi badala yake.',
+  'A group needs at least one admin. Make someone else an admin first.': 'Kikundi kinahitaji angalau msimamizi mmoja. Mfanye mtu mwingine msimamizi kwanza.',
+  'Only group admins can rename the group.': 'Wasimamizi wa kikundi pekee wanaweza kubadilisha jina la kikundi.',
+  'Only group admins can remove people.': 'Wasimamizi wa kikundi pekee wanaweza kuondoa watu.',
+  'Only group admins can choose admins.': 'Wasimamizi wa kikundi pekee wanaweza kuchagua wasimamizi.',
+  'React with an emoji.': 'Jibu kwa emoji.',
   'To keep younger people safe, you can only message them once you are friends.': 'Ili kuwalinda vijana, unaweza kumtumia ujumbe tu mkishakuwa marafiki.',
   'This person only gets messages from people they know.': 'Mtu huyu hupokea ujumbe kutoka kwa watu anaowajua tu.',
   'To keep younger people safe, adults and people under 18 can be in a group together only when they are friends.':

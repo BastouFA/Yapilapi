@@ -2,7 +2,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, Text, View } from 'react-native';
 import type { Conversation, PublicUser } from '../../../../packages/shared/src/types';
-import { messagePreviewOf, messagePreviewText } from '../../../../packages/shared/src/message-preview';
+import { lastMessageText } from '../../../../packages/shared/src/message-preview';
 import { client, errorMessage } from '../../lib/api';
 import { YapEmpty } from '../../lib/empty';
 import { onBackOnline } from '../../lib/network';
@@ -56,7 +56,8 @@ export default function Inbox() {
   useFocusEffect(loadExtras);
   useEffect(() => onBackOnline(() => (load(), loadExtras())), [load, loadExtras]);
   useRealtime((e) => {
-    if (e.type === 'message.created' || e.type === 'conversation.created') load();
+    // A new message, or a chat you were added to, left or taken out of, or that was renamed.
+    if (['message.created', 'conversation.created', 'conversation.changed', 'conversation.removed'].includes(e.type)) load();
     if (e.type === 'notification.created') loadExtras();
   });
 
@@ -184,15 +185,21 @@ export default function Inbox() {
 /** A conversation in the list. Memoised: pulling to refresh or a new friend request leaves the rows alone. */
 const ConversationRow = memo(function ConversationRow({ item, meId }: { item: Conversation; meId: string | undefined }) {
   const c = useColors();
-  const { t, timeAgo, locale } = useT();
+  const { t, tp, timeAgo, locale } = useT();
   const title = conversationTitle(item, meId, t);
-  // Said from what it is (a location, a game, an offer, a story reply), in your language.
-  const last = item.lastMessage ? messagePreviewText(item.lastMessage.preview ?? messagePreviewOf(item.lastMessage), { t, locale, meId }) : null;
+  // Said from what it is (a location, a game, an offer, a call), in your language.
+  const last = item.lastMessage ? lastMessageText(item.lastMessage, { t, tp, locale, meId }) : null;
   const other = item.members.find((m) => m.id !== meId);
   return (
     <Row
       title={title}
-      subtitle={item.lastMessage ? (item.lastMessage.sender.id === meId ? t('chat.lastFromYou', { text: last ?? '' }) : (last ?? '')) : t('m.inbox.noMessages')}
+      subtitle={
+        item.lastMessage
+          ? item.lastMessage.sender.id === meId && item.lastMessage.kind !== 'system'
+            ? t('chat.lastFromYou', { text: last ?? '' })
+            : (last ?? '')
+          : t('m.inbox.noMessages')
+      }
       start={<Avatar name={title} url={item.kind === 'direct' ? (other?.avatarUrl ?? null) : null} size={44} />}
       // The time above the unread count, so a long preview never cuts it off.
       end={

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Avatar, AvatarGroup, BottomSheet, Button, EmptyState, List, ListItem, Skeleton, TextField } from '@yapilapi/design-system';
-import { formatRelativeTime, messagePreviewOf, messagePreviewText, type Conversation, type PublicUser } from '@yapilapi/shared';
+import { formatRelativeTime, lastMessageText, type Conversation, type PublicUser } from '@yapilapi/shared';
 import { api, errorMessage, sharedRequest } from '@/lib/api';
 import { NextLink } from '@/lib/link';
 import { PeoplePicker } from '@/components/PeoplePicker';
@@ -17,16 +17,20 @@ function conversationTitle(c: Conversation, meId: string, justYou: string): stri
 }
 
 export default function Inbox() {
-  const { me, t, locale, toast, unread } = useSession();
+  const { me, t, tp, locale, toast, unread } = useSession();
   const router = useRouter();
   const [items, setItems] = useState<Conversation[] | null>(null);
   const [requests, setRequests] = useState<{ id: string; from: PublicUser }[]>([]);
   const [newGroup, setNewGroup] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
 
   const load = () =>
     sharedRequest('conversations', () => api.conversations.list()).then(
-      (r) => setItems(r.items),
-      (e) => toast(errorMessage(e)),
+      (r) => {
+        setItems(r.items);
+        setFailed(null);
+      },
+      (e) => setFailed(errorMessage(e)),
     );
   useEffect(() => {
     void load();
@@ -37,7 +41,7 @@ export default function Inbox() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useRealtime((e) => {
-    if (e.type === 'message.created' || e.type === 'conversation.created') void load();
+    if (['message.created', 'conversation.created', 'conversation.changed', 'conversation.removed'].includes(e.type)) void load();
   });
 
   return (
@@ -69,9 +73,13 @@ export default function Inbox() {
                     <Button
                       size="sm"
                       onClick={async () => {
-                        await api.me.acceptFriend(r.id);
-                        setRequests((x) => x.filter((y) => y.id !== r.id));
-                        toast(t('chat.nowFriends', { name: r.from.displayName }));
+                        try {
+                          await api.me.acceptFriend(r.id);
+                          setRequests((x) => x.filter((y) => y.id !== r.id));
+                          toast(t('chat.nowFriends', { name: r.from.displayName }));
+                        } catch (e) {
+                          toast(errorMessage(e));
+                        }
                       }}
                     >
                       {t('m.common.accept')}
@@ -80,8 +88,12 @@ export default function Inbox() {
                       size="sm"
                       variant="ghost"
                       onClick={async () => {
-                        await api.me.declineFriend(r.id);
-                        setRequests((x) => x.filter((y) => y.id !== r.id));
+                        try {
+                          await api.me.declineFriend(r.id);
+                          setRequests((x) => x.filter((y) => y.id !== r.id));
+                        } catch (e) {
+                          toast(errorMessage(e));
+                        }
                       }}
                     >
                       {t('m.common.decline')}
@@ -94,15 +106,30 @@ export default function Inbox() {
         </section>
       ) : null}
 
-      {items === null ? (
+      {items === null && failed ? (
+        <EmptyState
+          title={t('inbox.loadFailed')}
+          body={failed}
+          action={
+            <Button
+              onClick={() => {
+                setFailed(null);
+                void load();
+              }}
+            >
+              {t('m.common.retry')}
+            </Button>
+          }
+        />
+      ) : items === null ? (
         <Skeleton height={240} />
       ) : items.length ? (
         <List label={t('chat.conversations')}>
           {items.map((c) => {
             const others = c.members.filter((m) => m.id !== me?.id);
             const last = c.lastMessage;
-            // Said from what it is (a location, a game, an offer, a story reply), in your language.
-            const lastText = last ? messagePreviewText(last.preview ?? messagePreviewOf(last), { t, locale, meId: me?.id }) : '';
+            // Said from what it is (a location, a game, an offer, a story reply, a call), in your language.
+            const lastText = last ? lastMessageText(last, { t, tp, locale, meId: me?.id }) : '';
             return (
               <ListItem
                 key={c.id}
@@ -120,7 +147,9 @@ export default function Inbox() {
                   )
                 }
                 primary={conversationTitle(c, me!.id, t('m.chat.justYou'))}
-                secondary={last ? (last.sender.id === me?.id ? t('chat.lastFromYou', { text: lastText }) : lastText) : t('m.inbox.noMessages')}
+                secondary={
+                  last ? (last.sender.id === me?.id && last.kind !== 'system' ? t('chat.lastFromYou', { text: lastText }) : lastText) : t('m.inbox.noMessages')
+                }
                 end={
                   <>
                     {formatRelativeTime(c.updatedAt, locale)}

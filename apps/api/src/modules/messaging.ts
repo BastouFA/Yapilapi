@@ -5,6 +5,8 @@ import {
   conversationYapsSchema,
   createConversationSchema,
   disappearingSchema,
+  memberRoleSchema,
+  renameConversationSchema,
   editMessageSchema,
   MAX_PINNED_MESSAGES,
   MESSAGE_EDIT_MINUTES,
@@ -209,14 +211,22 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       `SELECT c.id, c.kind, c.title, c.last_message_at, c.disappearing_seconds, c.wallpaper, c.accent, cm.last_read_at, cm.yaps_out_loud, cm.role, cm.smart_replies,
          EXISTS (SELECT 1 FROM conversation_members o JOIN friendships f ON f.user_a = LEAST(o.user_id, $1::uuid) AND f.user_b = GREATEST(o.user_id, $1::uuid)
                  WHERE o.conversation_id = c.id AND o.user_id <> $1 AND o.left_at IS NULL) AS has_friend,
+         -- Unread: messages from the others, and calls you missed.
          (SELECT count(*) FROM messages m WHERE m.conversation_id = c.id AND m.created_at > cm.last_read_at AND m.sender_id <> $1 AND m.deleted_at IS NULL
-            AND m.moderation_status = 'normal' AND m.kind <> 'system') AS unread,
+            AND m.moderation_status = 'normal' AND (m.kind <> 'system' OR (m.meta->>'type' = 'call' AND m.meta->>'outcome' = 'missed'))) AS unread,
          (SELECT array_agg(user_id) FROM conversation_members WHERE conversation_id = c.id AND left_at IS NULL) AS member_ids,
+         (SELECT array_agg(user_id) FROM conversation_members WHERE conversation_id = c.id AND left_at IS NULL AND role = 'admin') AS admin_ids,
+         CASE WHEN c.kind <> 'community' THEN
+           (SELECT json_agg(json_build_object('userId', o.user_id, 'lastReadAt', o.last_read_at)) FROM conversation_members o
+            WHERE o.conversation_id = c.id AND o.user_id <> $1 AND o.left_at IS NULL
+              AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = $1 AND b.blocked_id = o.user_id) OR (b.blocker_id = o.user_id AND b.blocked_id = $1)))
+         END AS read_by,
          lm.id AS lm_id, lm.body AS lm_body, lm.created_at AS lm_created_at, lm.sender_id AS lm_sender, lm.attachments AS lm_attachments, lm.story_id,
-         lm.meta->'storyReply' AS lm_story_reply
+         lm.meta->'storyReply' AS lm_story_reply, lm.kind AS lm_kind, CASE WHEN lm.kind = 'system' THEN lm.meta END AS lm_system
        FROM conversation_members cm JOIN conversations c ON c.id = cm.conversation_id
-       LEFT JOIN LATERAL (SELECT x.id, x.body, x.created_at, x.sender_id, x.attachments, x.story_id, x.meta FROM messages x
-                          WHERE x.conversation_id = c.id AND x.deleted_at IS NULL AND x.kind <> 'system'
+       -- The last message, or a line about a call or who is in the group (the inbox says those too).
+       LEFT JOIN LATERAL (SELECT x.id, x.body, x.created_at, x.sender_id, x.attachments, x.story_id, x.meta, x.kind FROM messages x
+                          WHERE x.conversation_id = c.id AND x.deleted_at IS NULL AND (x.kind <> 'system' OR x.meta->>'type' IN ('call', 'group'))
                             AND (x.moderation_status = 'normal' OR (x.moderation_status = 'review' AND x.sender_id = $1))
                             AND (x.expires_at IS NULL OR x.expires_at > now())
                             AND NOT EXISTS (SELECT 1 FROM message_hides h WHERE h.user_id = $1 AND h.message_id = x.id)
@@ -266,6 +276,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
             attachments: r.attachments ?? [],
             ...(r.story ? { story: r.story } : {}),
             ...(r.lm_story_reply ? { storyReply: { quote: r.lm_story_reply.quote ?? null } } : {}),
+            ...(r.lm_system ? { kind: 'system' as const, system: r.lm_system } : {}),
             ...(previews.get(r.lm_id)?.available ? { preview: previews.get(r.lm_id) } : {}),
             createdAt: r.lm_created_at.toISOString(),
           }
@@ -282,6 +293,15 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       ...(r.kind === 'direct' ? { nowStatus: statuses.get(otherOf(r) ?? '') ?? null } : {}),
       disappearingSeconds: r.disappearing_seconds ?? null,
       myRole: r.role,
+      ...(r.kind === 'group' ? { adminIds: r.admin_ids ?? [] } : {}),
+      ...(r.kind !== 'community'
+        ? {
+            readBy: ((r.read_by ?? []) as { userId: string; lastReadAt: string }[]).map((x) => ({
+              userId: x.userId,
+              lastReadAt: new Date(x.lastReadAt).toISOString(),
+            })),
+          }
+        : {}),
       smartReplies: smartRepliesState(r.kind, r.smart_replies ?? null, smartEverywhere, smartFlag),
       theme: chatTheme({ wallpaper: r.wallpaper, accent: r.accent }),
     }));
@@ -339,33 +359,169 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     return { conversation: (await loadConversations(u.id, [id]))[0] };
   });
 
-  app.post('/v1/conversations/:id/members', { preHandler: requireAuth }, async (req) => {
+  /** A line in a group about who is in it or its name, sent to everyone in it (and returned). */
+  async function groupLine(conversationId: string, senderId: string, info: Extract<NonNullable<Message['system']>, { type: 'group' }>) {
+    const { rows } = await db.query<{ id: string }>(
+      `INSERT INTO messages (conversation_id, sender_id, body, kind, meta) VALUES ($1,$2,'','system',$3) RETURNING id`,
+      [conversationId, senderId, info],
+    );
+    await db.query(`UPDATE conversations SET last_message_at = now() WHERE id = $1`, [conversationId]);
+    const members = await memberIds(conversationId);
+    const line = await loadMessage(rows[0]!.id, senderId);
+    if (line) await ctx.realtime.publish(members, { type: 'message.created', data: line });
+    // Everyone's header and member list follow.
+    await ctx.realtime.publish(members, { type: 'conversation.changed', data: { id: conversationId } });
+    return line;
+  }
+
+  /** Display names for a group line, as they are now. */
+  async function namesOf(ids: string[]): Promise<{ id: string; displayName: string }[]> {
+    const users = await usersByIds(db, ids);
+    return ids.flatMap((id) => {
+      const user = users.get(id);
+      return user ? [{ id, displayName: user.displayName }] : [];
+    });
+  }
+
+  /** You, in a chat you're in: its kind and your role (not found otherwise). */
+  async function groupRole(conversationId: string, userId: string) {
+    const r = (
+      await db.query<{ kind: string; role: string }>(
+        `SELECT c.kind, cm.role FROM conversations c JOIN conversation_members cm ON cm.conversation_id = c.id
+         WHERE c.id = $1 AND cm.user_id = $2 AND cm.left_at IS NULL`,
+        [conversationId, userId],
+      )
+    ).rows[0];
+    if (!r) throw notFound('Conversation');
+    return r;
+  }
+
+  async function assertGroupAdmin(conversationId: string, userId: string, what: string) {
+    const r = await groupRole(conversationId, userId);
+    if (r.kind !== 'group') throw new AppError(400, 'not_a_group', 'This works in groups only.');
+    if (r.role !== 'admin') throw new AppError(403, 'admins_only', `Only group admins can ${what}.`);
+  }
+
+  /** Rename a group (its admins). A line tells everyone. */
+  app.patch('/v1/conversations/:id', { preHandler: requireAuth, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const { title } = parse(renameConversationSchema, req.body);
+    await assertGroupAdmin(id, u.id, 'rename the group');
+    const r = await db.query(`UPDATE conversations SET title = $2 WHERE id = $1 AND title IS DISTINCT FROM $2 RETURNING id`, [id, title]);
+    const message = r.rowCount ? await groupLine(id, u.id, { type: 'group', action: 'renamed', title }) : null;
+    return { conversation: (await loadConversations(u.id, [id]))[0], message };
+  });
+
+  /** Add people to a group. Anyone in it can; the rules for messaging them apply, and a line says who added whom. */
+  app.post('/v1/conversations/:id/members', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
     const { userIds } = parse(z.object({ userIds: z.array(z.string().uuid()).min(1).max(50) }), req.body);
-    const conv = await db.query(
-      `SELECT c.kind, cm.role FROM conversations c JOIN conversation_members cm ON cm.conversation_id = c.id WHERE c.id = $1 AND cm.user_id = $2 AND cm.left_at IS NULL`,
-      [id, u.id],
+    const conv = await groupRole(id, u.id);
+    if (conv.kind !== 'group') throw badRequest('You can only add people to group conversations.');
+    const current = await memberIds(id);
+    const adding = [...new Set(userIds)].filter((x) => x !== u.id && !current.includes(x));
+    if (!adding.length) return { ok: true, added: 0, message: null };
+    for (const other of adding) await assertCanMessage(u.id, u.birthDate, other);
+    // Nobody joins a group with someone who blocked them, or whom they blocked.
+    const clash = await db.query(
+      `SELECT 1 FROM blocks WHERE (blocker_id = ANY($1::uuid[]) AND blocked_id = ANY($2::uuid[])) OR (blocker_id = ANY($2::uuid[]) AND blocked_id = ANY($1::uuid[])) LIMIT 1`,
+      [adding, current],
     );
-    if (!conv.rows[0]) throw notFound('Conversation');
-    if (conv.rows[0].kind !== 'group') throw badRequest('You can only add people to group conversations.');
-    for (const other of userIds) await assertCanMessage(u.id, u.birthDate, other);
-    await assertGroupSafe(userIds, [...(await memberIds(id)), ...userIds]);
+    if (clash.rowCount) throw new AppError(403, 'blocked_in_group', 'Someone you’re adding can’t be in this group with someone already in it.');
+    await assertGroupSafe(adding, [...current, ...adding]);
+    // Coming back starts afresh: a member again, with nothing unread from while they were away.
     await db.query(
-      `INSERT INTO conversation_members (conversation_id, user_id) SELECT $1, unnest($2::uuid[]) ON CONFLICT (conversation_id, user_id) DO UPDATE SET left_at = NULL`,
-      [id, userIds],
+      `INSERT INTO conversation_members (conversation_id, user_id) SELECT $1, unnest($2::uuid[])
+       ON CONFLICT (conversation_id, user_id) DO UPDATE SET left_at = NULL, role = 'member', last_read_at = now()`,
+      [id, adding],
     );
     // People sharing where they are chose who saw it: their live shares here stop, and they can start again.
     await stopSharesOnJoin({ db, realtime: ctx.realtime }, id);
-    return { ok: true };
+    await ctx.realtime.publish(adding, { type: 'conversation.created', data: { id } });
+    const message = await groupLine(id, u.id, { type: 'group', action: 'added', people: await namesOf(adding) });
+    return { ok: true, added: adding.length, message };
   });
 
+  /** Take someone out of a group (its admins). To go yourself, leave. */
+  app.delete('/v1/conversations/:id/members/:userId', { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req) => {
+    const u = me(req);
+    const { id, userId } = parse(z.object({ id: z.string().uuid(), userId: z.string().uuid() }), req.params);
+    await assertGroupAdmin(id, u.id, 'remove people');
+    if (userId === u.id) throw new AppError(400, 'remove_self', 'To go, leave the group instead.');
+    const r = await db.query(
+      `UPDATE conversation_members SET left_at = now(), role = 'member' WHERE conversation_id = $1 AND user_id = $2 AND left_at IS NULL`,
+      [id, userId],
+    );
+    if (!r.rowCount) throw notFound('That person');
+    await stopSharesOnLeave({ db, realtime: ctx.realtime }, id, userId);
+    await ctx.realtime.publish([userId], { type: 'conversation.removed', data: { id } });
+    const message = await groupLine(id, u.id, { type: 'group', action: 'removed', people: await namesOf([userId]) });
+    return { ok: true, message };
+  });
+
+  /** Make someone an admin, or take it back (group admins). A group always keeps at least one admin. */
+  app.put(
+    '/v1/conversations/:id/members/:userId/role',
+    { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    async (req) => {
+      const u = me(req);
+      const { id, userId } = parse(z.object({ id: z.string().uuid(), userId: z.string().uuid() }), req.params);
+      const { role } = parse(memberRoleSchema, req.body);
+      await assertGroupAdmin(id, u.id, 'choose admins');
+      const changed = await tx(db, async (c) => {
+        // One change at a time per group, so two admins can't both step down at once.
+        await c.query(`SELECT 1 FROM conversations WHERE id = $1 FOR UPDATE`, [id]);
+        const cur = (
+          await c.query<{ role: string }>(`SELECT role FROM conversation_members WHERE conversation_id = $1 AND user_id = $2 AND left_at IS NULL`, [id, userId])
+        ).rows[0];
+        if (!cur) throw notFound('That person');
+        if (cur.role === role) return false;
+        if (role === 'member') {
+          const admins =
+            (await c.query(`SELECT 1 FROM conversation_members WHERE conversation_id = $1 AND role = 'admin' AND left_at IS NULL`, [id])).rowCount ?? 0;
+          if (admins <= 1) throw new AppError(409, 'last_admin', 'A group needs at least one admin. Make someone else an admin first.');
+        }
+        await c.query(`UPDATE conversation_members SET role = $3 WHERE conversation_id = $1 AND user_id = $2`, [id, userId, role]);
+        return true;
+      });
+      const message = changed
+        ? await groupLine(id, u.id, { type: 'group', action: role === 'admin' ? 'admin' : 'unadmin', people: await namesOf([userId]) })
+        : null;
+      return { conversation: (await loadConversations(u.id, [id]))[0], message };
+    },
+  );
+
+  /**
+   * Leave a chat. In a group, a line says so, and when the last admin goes, whoever has been there
+   * longest becomes an admin.
+   */
   app.post('/v1/conversations/:id/leave', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
     const { id } = parse(idParam, req.params);
-    await assertMember(id, me(req).id);
-    await db.query(`UPDATE conversation_members SET left_at = now() WHERE conversation_id = $1 AND user_id = $2`, [id, me(req).id]);
+    const conv = await groupRole(id, u.id);
+    const promoted = await tx(db, async (c) => {
+      await c.query(`SELECT 1 FROM conversations WHERE id = $1 FOR UPDATE`, [id]);
+      await c.query(`UPDATE conversation_members SET left_at = now(), role = 'member' WHERE conversation_id = $1 AND user_id = $2`, [id, u.id]);
+      if (conv.kind !== 'group' || conv.role !== 'admin') return [];
+      if ((await c.query(`SELECT 1 FROM conversation_members WHERE conversation_id = $1 AND role = 'admin' AND left_at IS NULL`, [id])).rowCount) return [];
+      const next = await c.query<{ user_id: string }>(
+        `UPDATE conversation_members SET role = 'admin' WHERE (conversation_id, user_id) =
+           (SELECT conversation_id, user_id FROM conversation_members WHERE conversation_id = $1 AND left_at IS NULL ORDER BY joined_at, user_id LIMIT 1)
+         RETURNING user_id`,
+        [id],
+      );
+      return next.rows.map((r) => r.user_id);
+    });
     // Sharing where you are with this chat stops when you leave it.
-    await stopSharesOnLeave({ db, realtime: ctx.realtime }, id, me(req).id);
+    await stopSharesOnLeave({ db, realtime: ctx.realtime }, id, u.id);
+    // Your other devices close the chat too.
+    await ctx.realtime.publish([u.id], { type: 'conversation.removed', data: { id } });
+    if (conv.kind === 'group') {
+      await groupLine(id, u.id, { type: 'group', action: 'left' });
+      if (promoted.length) await groupLine(id, u.id, { type: 'group', action: 'promoted', people: await namesOf(promoted) });
+    }
     return { ok: true };
   });
 
@@ -727,9 +883,34 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
   app.post('/v1/conversations/:id/read', { preHandler: requireAuth }, async (req) => {
     const { id } = parse(idParam, req.params);
     await assertMember(id, me(req).id);
-    await db.query(`UPDATE conversation_members SET last_read_at = now() WHERE conversation_id = $1 AND user_id = $2`, [id, me(req).id]);
+    await markRead(id, me(req).id);
     return { ok: true };
   });
+
+  /**
+   * Read up to now: the others here see "Seen" under their messages (not in community chats, and
+   * never people with a block between them).
+   */
+  async function markRead(conversationId: string, userId: string) {
+    const { rows } = await db.query<{ last_read_at: Date; kind: string }>(
+      `UPDATE conversation_members cm SET last_read_at = now() FROM conversations c
+       WHERE cm.conversation_id = $1 AND cm.user_id = $2 AND c.id = cm.conversation_id RETURNING cm.last_read_at, c.kind`,
+      [conversationId, userId],
+    );
+    const row = rows[0];
+    if (!row || row.kind === 'community') return;
+    const others = (await memberIds(conversationId)).filter((x) => x !== userId);
+    const { rows: blocked } = await db.query<{ id: string }>(
+      `SELECT CASE WHEN blocker_id = $1 THEN blocked_id ELSE blocker_id END AS id FROM blocks
+       WHERE (blocker_id = $1 AND blocked_id = ANY($2::uuid[])) OR (blocked_id = $1 AND blocker_id = ANY($2::uuid[]))`,
+      [userId, others],
+    );
+    const skip = new Set(blocked.map((b) => b.id));
+    await ctx.realtime.publish(
+      others.filter((x) => !skip.has(x)),
+      { type: 'conversation.read', data: { conversationId, userId, lastReadAt: row.last_read_at.toISOString() } },
+    );
+  }
 
   // ── Edit, unsend, delete for me ───────────────────────────────────────
   /** Edit the text of your own message, within 15 minutes of sending it. Everyone's view updates. */
@@ -839,6 +1020,9 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
   });
 
   // ── Reactions ─────────────────────────────────────────────────────────
+  // One emoji (with its skin tone, joiners or keycap): never words.
+  const REACTION =
+    /^(?=.*[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}])[\p{Extended_Pictographic}\p{Emoji_Modifier}\u{1F1E6}-\u{1F1FF}\u200d\ufe0f\u20e3#*0-9]+$/u;
   const reactionParams = z.object({ id: z.string().uuid(), emoji: z.string().min(1).max(16) });
 
   app.put('/v1/messages/:id/reactions/:emoji', { preHandler: requireAuth }, async (req) => {
@@ -846,6 +1030,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     const { id, emoji } = parse(reactionParams, req.params);
     const m = await messageFor(id, u.id);
     if (m.deleted_at || m.kind === 'system') throw notFound('Message');
+    if (!REACTION.test(emoji)) throw badRequest('React with an emoji.');
     const r = await db.query(`INSERT INTO message_reactions (message_id, user_id, emoji) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, [id, u.id, emoji]);
     if (r.rowCount)
       await ctx.realtime.publish(await memberIds(m.conversation_id), {
@@ -1243,11 +1428,19 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
         const msg = JSON.parse(raw.toString()) as { type: string; conversationId?: string };
         if (msg.type === 'ping') socket.send(JSON.stringify({ type: 'pong' }));
         if (msg.type === 'typing' && msg.conversationId) {
+          if (!z.string().uuid().safeParse(msg.conversationId).success) return;
           const ids = await memberIds(msg.conversationId);
+          // People who blocked the typist never see them typing (in a group they share).
           if (ids.includes(user.id))
             await ctx.realtime.publish(
-              ids.filter((i) => i !== user.id),
-              { type: 'typing', data: { conversationId: msg.conversationId, userId: user.id } },
+              await notBlocking(
+                user.id,
+                ids.filter((i) => i !== user.id),
+              ),
+              {
+                type: 'typing',
+                data: { conversationId: msg.conversationId, userId: user.id },
+              },
             );
         }
       } catch {
