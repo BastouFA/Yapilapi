@@ -180,7 +180,10 @@ describe('Real and Real Together', () => {
     expect(held.status).toBe(201);
     expect(held.body.moderation?.code).toMatch(/post_(held|limited)/);
     // Held: its author sees it, nobody else does until a moderator has looked.
-    expect((await as(t.app, b).get('/v1/real')).body.items.map((p: { id: string }) => p.id)).toContain(held.body.post.id);
+    const mine = (await as(t.app, b).get('/v1/real')).body;
+    expect(mine.items.map((p: { id: string }) => p.id)).toContain(held.body.post.id);
+    // Three a day: the refused one doesn't count, the held one does.
+    expect(mine.remaining).toBe(2);
     expect((await as(t.app, a).get('/v1/real')).body.items.map((p: { id: string }) => p.id)).not.toContain(held.body.post.id);
     const cases = await t.ctx.db.query(`SELECT 1 FROM moderation_cases WHERE target_type = 'post' AND target_id = $1`, [held.body.post.id]);
     expect(cases.rowCount).toBe(1);

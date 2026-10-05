@@ -5607,6 +5607,7 @@ export const sw: Catalog = {
   'real.intro': 'Picha zilizopigwa hapa na sasa, zikiwa na muda zilipopigwa. Hadi tatu kwa siku.',
   'real.empty.title': 'Hakuna Real katika siku iliyopita',
   'real.empty.body': 'Marafiki wanaposhiriki Real, inaonekana hapa kwa saa 24.',
+  'real.noneLeft': 'Umeshiriki Real tatu ndani ya saa 24 zilizopita. Utaweza kushiriki nyingine siku moja baada ya ya kwanza.',
   'remixes.unavailable': 'Reel hii haipatikani',
   'remixes.title': 'Remix',
   'remixes.intro': 'Duet na remix za {link}.',

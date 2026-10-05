@@ -5596,6 +5596,7 @@ export const yo: Catalog = {
   'real.intro': 'Àwọn fọ́tò tí a yà níbí àti ní báyìí, pẹ̀lú àkókò tí a yà wọ́n. Títí dé mẹ́ta lójúmọ́.',
   'real.empty.title': 'Kò sí Real kankan ní ọjọ́ tó kọjá',
   'real.empty.body': 'Tí àwọn ọ̀rẹ́ bá pín Real, yóò hàn níbí fún wákàtí 24.',
+  'real.noneLeft': 'O ti pín Real mẹ́ta láàárín wákàtí 24 sẹ́yìn. O lè pín òmíràn nígbà tí ọjọ́ kan bá ti kọjá láti ìgbà àkọ́kọ́.',
   'remixes.unavailable': 'Reel yìí kò sí',
   'remixes.title': 'Àwọn remix',
   'remixes.intro': 'Duet àti remix ti {link}.',

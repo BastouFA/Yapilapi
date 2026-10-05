@@ -5570,6 +5570,7 @@ export const ar: Catalog = {
   'real.intro': 'صور تُلتقط هنا والآن، مع وقت التقاطها. حتى ثلاث صور في اليوم.',
   'real.empty.title': 'لا يوجد Real خلال اليوم الماضي',
   'real.empty.body': 'عندما يشارك أصدقاؤك Real، يظهر هنا لمدة 24 ساعة.',
+  'real.noneLeft': 'شاركت ثلاث لقطات Real خلال آخر 24 ساعة. يمكنك مشاركة أخرى بعد مرور يوم على الأولى.',
   'remixes.unavailable': 'هذا الريل غير متاح',
   'remixes.title': 'الريمكسات',
   'remixes.intro': 'الثنائيات والريمكسات لـ {link}.',

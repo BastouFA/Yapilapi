@@ -5596,6 +5596,7 @@ export const en = {
   'real.intro': 'Photos taken here and now, marked with the time they were captured. Up to three a day.',
   'real.empty.title': 'No Reals in the last day',
   'real.empty.body': 'When friends share a Real, it shows up here for 24 hours.',
+  'real.noneLeft': "You've shared three Reals in the last 24 hours. You can share another once a day has passed since the first.",
   'remixes.unavailable': "This reel isn't available",
   'remixes.title': 'Remixes',
   'remixes.intro': 'Duets and remixes of {link}.',

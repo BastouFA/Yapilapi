@@ -1,6 +1,6 @@
 import { CameraView, useCameraPermissions, type CameraType } from 'expo-camera';
 import { router, useIsFocused } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { noticeText } from '../../../packages/shared/src/server-text';
 import { client, errorMessage } from '../lib/api';
@@ -29,6 +29,17 @@ export default function Real() {
   const [status, setStatus] = useState<string | null>(null);
   // While it uploads, neither button can share it a second time.
   const [sharing, setSharing] = useState(false);
+  // How many more can be shared now (three in 24 hours); at none, say so before any photo is taken.
+  const [remaining, setRemaining] = useState<number | null>(null);
+  useEffect(() => {
+    if (!focused) return;
+    client()
+      .then((a) => a.real.feed())
+      .then(
+        (r) => setRemaining(r.remaining ?? null),
+        () => {},
+      );
+  }, [focused]);
 
   if (!permission) return <Screen>{null}</Screen>;
   if (!permission.granted)
@@ -70,10 +81,15 @@ export default function Real() {
             {status}
           </Text>
         ) : null}
+        {remaining === 0 ? (
+          <Text accessibilityLiveRegion="polite" style={{ color: c.inkMuted, lineHeight: 20 }}>
+            {t('real.noneLeft')}
+          </Text>
+        ) : null}
         <Field label={t('m.real.caption')} value={caption} onChangeText={setCaption} maxLength={300} />
         <Button
           label={shots.length === 0 ? t('m.real.captureFirst') : t('m.real.captureFront')}
-          disabled={sharing}
+          disabled={sharing || remaining === 0}
           onPress={async () => {
             // The camera can refuse (not ready yet, or taken by another app): say so instead of failing silently.
             const photo = await camera.current?.takePictureAsync({ quality: 0.85, exif: false }).catch(() => {

@@ -5616,6 +5616,7 @@ export const ha: Catalog = {
   'real.intro': 'Hotunan da aka ɗauka a nan yanzu, tare da lokacin da aka ɗauke su. Har uku a rana.',
   'real.empty.title': 'Babu Real a cikin kwanan da ya wuce',
   'real.empty.body': 'Idan abokai suka raba Real, zai bayyana a nan na awa 24.',
+  'real.noneLeft': 'Ka raba Real uku a cikin awa 24 da suka wuce. Za ka iya raba wani idan kwana ɗaya ya wuce tun na farko.',
   'remixes.unavailable': 'Wannan reel ba ya samuwa',
   'remixes.title': 'Remix',
   'remixes.intro': 'Duet da remix na {link}.',

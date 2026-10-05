@@ -5630,6 +5630,7 @@ export const fr: Catalog = {
   'real.intro': "Des photos prises ici et maintenant, marquées de l'heure de la prise. Jusqu'à trois par jour.",
   'real.empty.title': 'Aucun Real depuis hier',
   'real.empty.body': 'Quand tes amis partagent un Real, il apparaît ici pendant 24 heures.',
+  'real.noneLeft': 'Tu as partagé trois Reals au cours des dernières 24 heures. Tu pourras en partager un autre un jour après le premier.',
   'remixes.unavailable': "Ce reel n'est pas disponible",
   'remixes.title': 'Remix',
   'remixes.intro': 'Duos et remix de {link}.',

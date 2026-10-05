@@ -39,6 +39,15 @@ export default async function realModule(app: FastifyInstance, ctx: AppContext) 
     if (!(await isEnabled(db, flag))) throw featureDisabled('Real');
   };
 
+  /** Reals shared in the last 24 hours (three are allowed). */
+  async function realsToday(userId: string): Promise<number> {
+    const { rows } = await db.query(
+      `SELECT count(*)::int AS n FROM posts WHERE author_id = $1 AND metadata ? 'real' AND created_at > now() - interval '24 hours' AND deleted_at IS NULL AND status = 'published'`,
+      [userId],
+    );
+    return rows[0].n;
+  }
+
   // ── Real ──────────────────────────────────────────────────────────────
   app.post('/v1/real', { preHandler: gate('REAL'), config: { rateLimit: { max: 10, timeWindow: '1 hour' } } }, async (req, reply) => {
     const u = me(req);
@@ -51,11 +60,7 @@ export default async function realModule(app: FastifyInstance, ctx: AppContext) 
       }),
       req.body,
     );
-    const today = await db.query(
-      `SELECT count(*) AS n FROM posts WHERE author_id = $1 AND metadata ? 'real' AND created_at > now() - interval '24 hours' AND deleted_at IS NULL AND status = 'published'`,
-      [u.id],
-    );
-    if (Number(today.rows[0].n) >= REALS_PER_DAY) throw new AppError(429, 'real_limit', `You can share ${REALS_PER_DAY} Reals a day.`);
+    if ((await realsToday(u.id)) >= REALS_PER_DAY) throw new AppError(429, 'real_limit', `You can share ${REALS_PER_DAY} Reals a day.`);
     // The caption is checked like any post's: harmful words are refused, anything flagged waits for a
     // moderator, and the posting pace and verification for everyone apply.
     const screening = await screenPost(db, ctx.config, u.id, { body: input.caption, pollText: '', visibility: input.visibility, communityId: null });
@@ -102,6 +107,8 @@ export default async function realModule(app: FastifyInstance, ctx: AppContext) 
         rows.map((r) => r.id),
         u.id,
       ),
+      // How many more you can share now, so the apps say so before the camera opens.
+      remaining: Math.max(0, REALS_PER_DAY - (await realsToday(u.id))),
     };
   });
 }
