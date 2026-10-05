@@ -3,6 +3,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Linking, ScrollView, Text, View } from 'react-native';
 import { formatMoney } from '../../../../packages/shared/src/i18n';
 import type { EventItem } from '../../../../packages/shared/src/types';
+import { PLACE_CATEGORIES } from '../../../../packages/shared/src/constants';
+import type { MessageKey } from '../../../../packages/shared/src/i18n';
+import { hoursKeyLabel } from '../../../../packages/shared/src/scheduling';
 import { client, errorMessage, isGone } from '../../lib/api';
 import { BookPlace, ManageBookings, MyBookings, PlaceReviews, RatingLine, usePlaceOwner, type ReviewData } from '../../lib/place-extras';
 import { SectionHeader } from '../../lib/chips';
@@ -77,7 +80,9 @@ export default function PlaceScreen() {
       >
         <Card style={{ gap: space[2] }}>
           {place.category ? (
-            <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '700', textTransform: 'capitalize' }}>{String(place.category)}</Text>
+            <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '700' }}>
+              {(PLACE_CATEGORIES as readonly string[]).includes(place.category) ? t(`place.category.${place.category}` as MessageKey) : String(place.category)}
+            </Text>
           ) : null}
           <Text accessibilityRole="header" style={[{ color: c.ink, fontSize: 24, fontWeight: '800', letterSpacing: -0.4 }, userText]}>
             {String(place.name)}
@@ -118,8 +123,8 @@ export default function PlaceScreen() {
             <Card style={{ gap: space[1] }}>
               {hours.map(([day, h]) => (
                 <View key={day} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space[3] }}>
-                  <Text style={{ color: c.ink, fontWeight: '600', textTransform: 'capitalize' }}>{day}</Text>
-                  <Text style={{ color: c.inkMuted }}>{h}</Text>
+                  <Text style={{ color: c.ink, fontWeight: '600' }}>{hoursKeyLabel(day, locale)}</Text>
+                  <Text style={{ color: c.inkMuted }}>{/^\s*closed\s*$/i.test(String(h)) ? t('place.closed') : String(h)}</Text>
                 </View>
               ))}
             </Card>

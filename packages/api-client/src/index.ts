@@ -1171,6 +1171,18 @@ export function createClient(opts: ClientOptions) {
     places: {
       list: (params: Record<string, unknown> = {}) => get<{ items: Record<string, any>[] }>(`/v1/places${qs(params)}`),
       get: (id: string) => get<{ place: Record<string, any>; events: EventItem[]; products: Record<string, any>[] }>(`/v1/places/${id}`),
+      /** The owner changes a place: details, opening hours by day, and people per time slot (null: no limit). */
+      update: (
+        id: string,
+        b: {
+          name?: string;
+          description?: string;
+          address?: string | null;
+          city?: string | null;
+          hours?: Record<string, string> | null;
+          bookingCapacity?: number | null;
+        },
+      ) => patch<{ place: Record<string, any> }>(`/v1/places/${id}`, b),
       /** Room left at each time (ISO), counted like a booking request. `left` is null when the place sets no limit. */
       availability: (id: string, at: string[]) =>
         get<{ takesBookings: boolean; capacity: number | null; slots: { startsAt: string; left: number | null }[] }>(

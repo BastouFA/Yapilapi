@@ -1212,4 +1212,6 @@ export const ar: Record<string, string> = {
   'Use a full link starting with https://': 'استخدم رابطًا كاملًا يبدأ بـ https://',
   "Tickets for this event aren't on sale any more.": 'لم تعد تذاكر هذه الفعالية معروضة للبيع.',
   'An event can sell up to 10 kinds of ticket at once.': 'يمكن للفعالية بيع 10 أنواع من التذاكر كحد أقصى في وقت واحد.',
+  'Name the days, such as mon or tue-sun.': 'اذكر الأيام، مثل mon أو tue-sun.',
+  'Up to 14 lines of opening hours.': 'حتى 14 سطرًا من ساعات العمل.',
 };

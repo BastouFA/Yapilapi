@@ -6195,6 +6195,21 @@ export const en = {
   'eventTickets.stop': 'Stop selling',
   'eventTickets.stopped': 'No longer on sale. Tickets already bought still work.',
   'eventTickets.bought': 'Paid. Your ticket is in Tickets.',
+  'checkin.notYours': 'Only the host and co-hosts can check people in for this event.',
+  'place.category.restaurant': 'Restaurant',
+  'place.category.store': 'Shop',
+  'place.category.venue': 'Venue',
+  'place.category.attraction': 'Attraction',
+  'place.category.service': 'Service',
+  'place.closed': 'Closed',
+  'place.reviews.loadError': "Reviews couldn't load.",
+  'place.edit': 'Edit place',
+  'place.edit.about': 'About',
+  'place.edit.address': 'Address',
+  'place.edit.city': 'City',
+  'place.edit.hoursHint': 'For each day, times such as 12:00-22:00 or 9:00-14:00, 18:00-23:00, or closed. Leave a day empty to say nothing about it.',
+  'place.edit.capacity': 'People per time slot (optional)',
+  'place.edit.capacityHint': 'Booking requests stop once this many people are booked within 90 minutes of a time. Empty: no limit.',
 } as const;
 
 export type MessageKey = keyof typeof en;

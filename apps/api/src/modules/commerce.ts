@@ -6,6 +6,7 @@ import {
   createOrderSchema,
   createPlaceSchema,
   createProductSchema,
+  hoursKeyDays,
   CURRENCY_SCALE,
   EARNINGS_HOLD_DAYS,
   PLACE_CATEGORIES,
@@ -155,10 +156,58 @@ export default async function commerceModule(app: FastifyInstance, ctx: AppConte
     return { place: await loadPlace(rows[0].id, u.id) };
   });
 
+  /**
+   * The owner of a place's business changes it: its details, its opening hours (by day: "mon",
+   * "tue-sun"; "closed" or times such as "12:00-22:00") and how many people it can take in one
+   * time slot (null: no limit). Only the fields sent change; null clears an optional one.
+   */
+  app.patch('/v1/places/:id', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 hour' } } }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const input = parse(
+      z.object({
+        name: createPlaceSchema.shape.name.optional(),
+        description: z.string().trim().max(2000).optional(),
+        address: z.string().trim().max(300).nullable().optional(),
+        city: z.string().trim().max(100).nullable().optional(),
+        hours: z
+          .record(z.string().trim().min(1).max(30), z.string().trim().min(1).max(80))
+          .refine((h) => Object.keys(h).length <= 14, 'Up to 14 lines of opening hours.')
+          .nullable()
+          .optional(),
+        bookingCapacity: z.number().int().min(1).max(10_000).nullable().optional(),
+      }),
+      req.body,
+    );
+    const own = await db.query(
+      `SELECT 1 FROM places pl JOIN businesses b ON b.id = pl.business_id WHERE pl.id = $1 AND b.owner_id = $2 AND pl.deleted_at IS NULL`,
+      [id, u.id],
+    );
+    if (!own.rowCount) throw notFound('Place');
+    if (input.hours)
+      for (const key of Object.keys(input.hours))
+        if (!hoursKeyDays(key))
+          throw new AppError(400, 'validation_failed', 'Name the days, such as mon or tue-sun.', {
+            fields: { hours: 'Name the days, such as mon or tue-sun.' },
+          });
+    const sets: string[] = [];
+    const params: unknown[] = [id];
+    const set = (col: string, v: unknown) => sets.push(`${col} = $${params.push(v)}`);
+    if (input.name !== undefined) set('name', input.name);
+    if (input.description !== undefined) set('description', input.description);
+    if (input.address !== undefined) set('address', input.address || null);
+    if (input.city !== undefined) set('city', input.city || null);
+    if (input.hours !== undefined) set('hours', JSON.stringify(input.hours ?? {}));
+    if (input.bookingCapacity !== undefined) set('booking_capacity', input.bookingCapacity);
+    if (sets.length) await db.query(`UPDATE places SET ${sets.join(', ')} WHERE id = $1`, params);
+    await audit(db, { actorId: u.id, action: 'place.update', entityType: 'place', entityId: id });
+    return { place: await loadPlace(id, u.id) };
+  });
+
   /** A place, with its business; `business.mine` tells its owner apart (only they can read its bookings). */
   async function loadPlace(id: string, viewer: string | null) {
     const { rows } = await db.query(
-      `SELECT pl.id, pl.name, pl.category, pl.description, pl.address, pl.city, pl.country, pl.lat, pl.lng, pl.hours,
+      `SELECT pl.id, pl.name, pl.category, pl.description, pl.address, pl.city, pl.country, pl.lat, pl.lng, pl.hours, pl.booking_capacity,
               b.slug AS business_slug, b.name AS business_name, (b.owner_id = $2) AS business_mine
        FROM places pl LEFT JOIN businesses b ON b.id = pl.business_id WHERE pl.id = $1 AND pl.deleted_at IS NULL`,
       [id, viewer],

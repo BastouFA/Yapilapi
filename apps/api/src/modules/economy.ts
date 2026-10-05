@@ -3,7 +3,7 @@ import { tx } from '@yapilapi/database';
 import { z } from 'zod';
 import { CURRENCIES, CURRENCY_SCALE, PLATFORM_FEE_BPS, processingFeeCents } from '@yapilapi/shared';
 import { AppError, badRequest, featureDisabled, forbidden, notFound, parse } from '../lib/errors.ts';
-import { liveVisibleSql } from '../lib/visibility.ts';
+import { liveVisibleSql, notBlockedSql } from '../lib/visibility.ts';
 import type { AppContext } from '../lib/context.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { audit, isEnabled, notify } from '../lib/services.ts';
@@ -209,10 +209,13 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
   // ── Place reviews ─────────────────────────────────────────────────────
   app.get('/v1/places/:id/reviews', async (req) => {
     const { id } = parse(z.object({ id: z.string().uuid() }), req.params);
+    // Reviews by people blocked either way stay out of the list (they still count in the average).
     const { rows } = await db.query(
       `SELECT r.id, r.rating, r.body, r.created_at, pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode
-       FROM place_reviews r JOIN profiles pr ON pr.user_id = r.author_id WHERE r.place_id = $1 AND r.moderation_status IN ('normal','review') ORDER BY r.created_at DESC LIMIT 100`,
-      [id],
+       FROM place_reviews r JOIN profiles pr ON pr.user_id = r.author_id
+       WHERE r.place_id = $1 AND r.moderation_status IN ('normal','review') AND ($2::uuid IS NULL OR ${notBlockedSql('r.author_id', '$2')})
+       ORDER BY r.created_at DESC LIMIT 100`,
+      [id, req.user?.id ?? null],
     );
     const stats = (
       await db.query(
@@ -304,18 +307,26 @@ export default async function economyModule(app: FastifyInstance, ctx: AppContex
       )
     ).rows[0];
     if (!place) throw badRequest('This place does not take bookings on YAPILAPI.');
-    if (place.booking_capacity) {
-      const taken = await db.query(
-        `SELECT coalesce(sum(party_size), 0) AS n FROM bookings WHERE place_id = $1 AND status IN ('requested','confirmed') AND starts_at BETWEEN $2::timestamptz - interval '90 minutes' AND $2::timestamptz + interval '90 minutes'`,
-        [id, input.startsAt],
-      );
-      if (Number(taken.rows[0].n) + input.partySize > place.booking_capacity)
-        throw new AppError(409, 'fully_booked', 'That time is fully booked. Try another time.');
-    }
-    const { rows } = await db.query(
-      `INSERT INTO bookings (place_id, user_id, party_size, starts_at, note) VALUES ($1,$2,$3,$4,$5) RETURNING id, status, party_size, starts_at`,
-      [id, u.id, input.partySize, input.startsAt, input.note],
-    );
+    // Someone the owner blocked (or who blocked the owner) can't book.
+    if (place.owner_id !== u.id && (await isBlockedEitherWay(db, place.owner_id, u.id))) throw notFound('Place');
+    const rows = await tx(db, async (c) => {
+      // One booking at a time per place, so two requests can't both take the last places.
+      await c.query(`SELECT 1 FROM places WHERE id = $1 FOR UPDATE`, [id]);
+      if (place.booking_capacity) {
+        const taken = await c.query(
+          `SELECT coalesce(sum(party_size), 0) AS n FROM bookings WHERE place_id = $1 AND status IN ('requested','confirmed') AND starts_at BETWEEN $2::timestamptz - interval '90 minutes' AND $2::timestamptz + interval '90 minutes'`,
+          [id, input.startsAt],
+        );
+        if (Number(taken.rows[0].n) + input.partySize > place.booking_capacity)
+          throw new AppError(409, 'fully_booked', 'That time is fully booked. Try another time.');
+      }
+      return (
+        await c.query(
+          `INSERT INTO bookings (place_id, user_id, party_size, starts_at, note) VALUES ($1,$2,$3,$4,$5) RETURNING id, status, party_size, starts_at`,
+          [id, u.id, input.partySize, input.startsAt, input.note],
+        )
+      ).rows;
+    });
     await notify(db, ctx.realtime, {
       userId: place.owner_id,
       category: 'commerce',

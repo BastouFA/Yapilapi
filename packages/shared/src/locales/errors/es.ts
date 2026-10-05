@@ -1237,4 +1237,6 @@ export const es: Record<string, string> = {
   'Use a full link starting with https://': 'Usa un enlace completo que empiece por https://',
   "Tickets for this event aren't on sale any more.": 'Las entradas para este evento ya no están a la venta.',
   'An event can sell up to 10 kinds of ticket at once.': 'Un evento puede vender hasta 10 tipos de entrada a la vez.',
+  'Name the days, such as mon or tue-sun.': 'Indica los días, por ejemplo mon o tue-sun.',
+  'Up to 14 lines of opening hours.': 'Hasta 14 líneas de horario.',
 };

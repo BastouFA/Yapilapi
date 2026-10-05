@@ -1242,4 +1242,6 @@ export const ha: Record<string, string> = {
   'Use a full link starting with https://': 'Yi amfani da cikakken mahaɗi da ya fara da https://',
   "Tickets for this event aren't on sale any more.": 'Ba a sayar da tikitin wannan taron kuma.',
   'An event can sell up to 10 kinds of ticket at once.': "Taro zai iya sayar da nau'in tikiti har 10 a lokaci guda.",
+  'Name the days, such as mon or tue-sun.': 'Faɗi ranakun, kamar mon ko tue-sun.',
+  'Up to 14 lines of opening hours.': 'Har layi 14 na lokutan buɗewa.',
 };

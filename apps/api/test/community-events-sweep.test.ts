@@ -198,3 +198,55 @@ describe('events', () => {
     expect(told.rowCount).toBe(1);
   });
 });
+
+async function placeOf(owner: TestUser) {
+  n++;
+  const biz = (await as(t.app, owner).post('/v1/businesses', { name: `Sweep Kitchen ${n}`, slug: `sweep-kitchen-${Date.now().toString(36)}-${n}` })).body
+    .business;
+  return (await as(t.app, owner).post('/v1/places', { name: 'Sweep Kitchen', category: 'restaurant', businessId: biz.id })).body.place as { id: string };
+}
+
+describe('places', () => {
+  it('the owner sets opening hours and people per time slot; nobody else can', async () => {
+    const owner = await signUp(t.app);
+    const other = await signUp(t.app);
+    const place = await placeOf(owner);
+    expect((await as(t.app, other).patch(`/v1/places/${place.id}`, { bookingCapacity: 4 })).status).toBe(404);
+    const bad = await as(t.app, owner).patch(`/v1/places/${place.id}`, { hours: { someday: '9:00-17:00' } });
+    expect(bad.status).toBe(400);
+    const r = await as(t.app, owner).patch(`/v1/places/${place.id}`, {
+      hours: { mon: 'closed', 'tue-sun': '12:00-22:00' },
+      bookingCapacity: 4,
+      city: 'Lisbon',
+    });
+    expect(r.status).toBe(200);
+    expect(r.body.place).toMatchObject({ hours: { mon: 'closed', 'tue-sun': '12:00-22:00' }, booking_capacity: 4, city: 'Lisbon' });
+    const at = inDays(4);
+    const left = await as(t.app, other).get(`/v1/places/${place.id}/availability?at=${encodeURIComponent(at)}`);
+    expect(left.body.slots[0].left).toBe(4);
+  });
+
+  it('two requests at once cannot both take the last places', async () => {
+    const owner = await signUp(t.app);
+    const place = await placeOf(owner);
+    await as(t.app, owner).patch(`/v1/places/${place.id}`, { bookingCapacity: 4 });
+    const [a, b] = [await signUp(t.app), await signUp(t.app)];
+    const at = inDays(3);
+    const res = await Promise.all([a, b].map((u) => as(t.app, u).post(`/v1/places/${place.id}/bookings`, { partySize: 3, startsAt: at })));
+    expect(res.map((r) => r.status).sort()).toEqual([201, 409]);
+  });
+
+  it("someone the owner blocked can't book, and blocked reviewers stay out of the list", async () => {
+    const owner = await signUp(t.app);
+    const blocked = await signUp(t.app);
+    const reader = await signUp(t.app);
+    const place = await placeOf(owner);
+    expect((await as(t.app, blocked).put(`/v1/places/${place.id}/reviews`, { rating: 1, body: 'Meh' })).status).toBe(200);
+    expect((await as(t.app, owner).post(`/v1/users/${blocked.id}/block`)).status).toBeLessThan(300);
+    expect((await as(t.app, blocked).post(`/v1/places/${place.id}/bookings`, { partySize: 2, startsAt: inDays(2) })).status).toBe(404);
+    expect((await as(t.app, reader).post(`/v1/users/${blocked.id}/block`)).status).toBeLessThan(300);
+    const list = await as(t.app, reader).get(`/v1/places/${place.id}/reviews`);
+    expect(list.body.items).toHaveLength(0);
+    expect((await as(t.app, null).get(`/v1/places/${place.id}/reviews`)).body.items).toHaveLength(1);
+  });
+});

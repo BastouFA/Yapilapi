@@ -1239,4 +1239,6 @@ export const sw: Record<string, string> = {
   'Use a full link starting with https://': 'Tumia kiungo kamili kinachoanza na https://',
   "Tickets for this event aren't on sale any more.": 'Tiketi za tukio hili haziuzwi tena.',
   'An event can sell up to 10 kinds of ticket at once.': 'Tukio linaweza kuuza hadi aina 10 za tiketi kwa wakati mmoja.',
+  'Name the days, such as mon or tue-sun.': 'Taja siku, kama mon au tue-sun.',
+  'Up to 14 lines of opening hours.': 'Hadi mistari 14 ya saa za kufungua.',
 };
