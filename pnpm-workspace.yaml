@@ -11,3 +11,8 @@ minimumReleaseAgeExclude:
   - '@aws-sdk/client-s3@3.1140.0'
   - '@aws-sdk/s3-request-presigner@3.1140.0'
   - '@simplewebauthn/server@14.0.3'
+# Test tooling only (vitest's worker pool and postcss's source maps): patched releases for advisories
+# GHSA-85c8-ppgw-ccpr, GHSA-5gmw-xhrv-c9v3 and GHSA-68fv-2mgg-jv7q.
+overrides:
+  tinypool: 2.1.2
+  source-map-js: 1.2.2
