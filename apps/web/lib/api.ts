@@ -6,7 +6,37 @@ import { dataSaverHeaders, prepareUpload } from './data-saver';
 // and photos are made smaller in the browser before they upload. Every request also says the
 // page's language (<html lang>), so errors come back in it before anyone has signed in.
 const pageLocale = () => (typeof document === 'undefined' ? undefined : document.documentElement.lang || undefined);
-export const api = createClient({ baseUrl: '/api', headers: dataSaverHeaders, locale: pageLocale, prepareUpload });
+// On the free plan the API sleeps when nobody has used it for a while, and the first request wakes it:
+// until it answers, a request either fails to connect or gets a gateway's page instead of our JSON
+// (the API itself always answers in JSON). That is noted here, and components/ServerWake.tsx says
+// "waking up" and watches for the API to come back, instead of the page only saying it can't be reached.
+type WakeListener = () => void;
+const wakeListeners = new Set<WakeListener>();
+let waking = false;
+/** Whether the API was found asleep and hasn't answered since. */
+export const apiWaking = () => waking;
+export function setApiWaking(on: boolean) {
+  if (waking === on) return;
+  waking = on;
+  wakeListeners.forEach((fn) => fn());
+}
+export function onApiWaking(fn: WakeListener): () => void {
+  wakeListeners.add(fn);
+  return () => void wakeListeners.delete(fn);
+}
+const wakeFetch: typeof fetch = async (input, init) => {
+  try {
+    const res = await fetch(input, init);
+    if (res.status >= 500 && !(res.headers.get('content-type') ?? '').includes('json')) setApiWaking(true);
+    return res;
+  } catch (e) {
+    // Offline is the browser's to say; anything else is the API not answering yet.
+    if (typeof navigator === 'undefined' || navigator.onLine !== false) setApiWaking(true);
+    throw e;
+  }
+};
+
+export const api = createClient({ baseUrl: '/api', fetch: wakeFetch, headers: dataSaverHeaders, locale: pageLocale, prepareUpload });
 export { ApiError };
 
 export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:4000/v1/realtime';
@@ -27,6 +57,7 @@ export function errorMessage(e: unknown): string {
   const locale = typeof document === 'undefined' ? 'en' : document.documentElement.lang || 'en';
   if (e instanceof ApiError) {
     // Errors the app itself raises while waiting on a file: in the reader's language.
+    if (waking && (e.code === 'network' || e.code === 'unavailable')) return t('wake.tryAgain', locale);
     const own = OWN_ERRORS[e.code];
     return own ? t(own, locale) : e.message;
   }

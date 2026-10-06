@@ -28,12 +28,18 @@ export const clock = (seconds: number) => {
  * Pick one photo or video from the library. Returns null when the person closed the picker,
  * or 'denied' when photo access is off.
  */
-export async function pickOne(kinds: ImagePicker.MediaType[], maxSeconds = REEL_MAX_SECONDS): Promise<Picked | 'denied' | null> {
+export async function pickOne(
+  kinds: ImagePicker.MediaType[],
+  maxSeconds = REEL_MAX_SECONDS,
+  /** square: the system's crop step, held to a square (profile photos). */
+  o: { square?: boolean } = {},
+): Promise<Picked | 'denied' | null> {
   const launch = () =>
     ImagePicker.launchImageLibraryAsync({
       mediaTypes: kinds,
       allowsMultipleSelection: false,
       quality: 0.9,
+      ...(o.square ? { allowsEditing: true, aspect: [1, 1] as [number, number] } : {}),
       videoMaxDuration: kinds.includes('videos') && !kinds.includes('images') ? maxSeconds : undefined,
     });
   // The system photo picker needs no library permission (iOS 14+, Android 13+), so open it straight

@@ -154,14 +154,24 @@ export function StoryViewer({
   }, [story?.id]);
 
   // Photos and text advance on a timer; videos report their own progress.
+  const timed = useRef<string | null>(null);
   const stopped = paused || reply.length > 0 || !!viewers || sharing || answering || waiting;
   useEffect(() => {
     if (!story || story.mediaKind === 'video' || stopped) return;
-    const started = performance.now() - progress * PHOTO_MS;
+    // A new story starts from nothing: `progress` here can still be the last story's (≈1) until its
+    // reset lands, which would skip straight past this one. A resumed story carries on where it paused.
+    const resumed = timed.current === story.id;
+    timed.current = story.id;
+    const started = performance.now() - (resumed ? progress : 0) * PHOTO_MS;
     let frame = 0;
+    let done = false;
     const tick = () => {
       const p = (performance.now() - started) / PHOTO_MS;
-      if (p >= 1) return next();
+      if (p >= 1) {
+        if (!done) next();
+        done = true;
+        return;
+      }
       setProgress(p);
       frame = requestAnimationFrame(tick);
     };

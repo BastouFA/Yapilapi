@@ -272,9 +272,14 @@ function Viewer({
   // Photos and text advance on a timer; videos report their own progress.
   const progressRef = useRef(0);
   progressRef.current = progress;
+  const timed = useRef<string | null>(null);
   useEffect(() => {
     if (!story || story.mediaKind === 'video' || stopped) return;
-    const started = Date.now() - progressRef.current * PHOTO_MS;
+    // A new story starts from nothing: the progress can still be the last story's (≈1) until its
+    // reset lands, which would skip straight past this one. A resumed story carries on where it paused.
+    const resumed = timed.current === story.id;
+    timed.current = story.id;
+    const started = Date.now() - (resumed ? progressRef.current : 0) * PHOTO_MS;
     const timer = setInterval(() => {
       const p = (Date.now() - started) / PHOTO_MS;
       if (p >= 1) {

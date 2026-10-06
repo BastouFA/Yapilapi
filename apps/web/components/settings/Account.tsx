@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Avatar, BottomSheet, Button, Card, Select, TextField } from '@yapilapi/design-system';
@@ -16,7 +17,10 @@ import {
 import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { PasswordField } from '@/components/PasswordField';
 import { useSession } from '@/app/providers';
+import { EditorLoading } from '@/components/Loading';
 import { Anchor, SettingsLink } from './Shell';
+
+const PhotoEditor = dynamic(() => import('@/components/editor/PhotoEditor').then((m) => m.PhotoEditor), { ssr: false, loading: () => <EditorLoading /> });
 
 /** Your photo, name, bio and profile type: how people see you. */
 export function ProfileCard() {
@@ -25,6 +29,8 @@ export function ProfileCard() {
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  // A new profile photo is cropped square (and can be turned or touched up) before it is uploaded.
+  const [cropping, setCropping] = useState<File | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const load = useCallback(() => {
     if (!me) return;
@@ -75,26 +81,38 @@ export function ProfileCard() {
                 type="file"
                 accept={IMAGE_ACCEPT}
                 hidden
-                onChange={async (e) => {
+                onChange={(e) => {
                   const file = e.currentTarget.files?.[0];
-                  if (!file) return;
-                  setUploading(true);
-                  try {
-                    const { media } = await api.media.upload(file);
-                    const url = new URL(media.url, location.origin).toString();
-                    // The server keeps the photo's own processed size.
-                    const r = await api.me.updateProfile({ avatarUrl: url });
-                    setProfile(r.profile);
-                    await refresh();
-                  } catch (err) {
-                    toast(errorMessage(err));
-                  } finally {
-                    setUploading(false);
-                  }
+                  e.currentTarget.value = '';
+                  if (file) setCropping(file);
                 }}
               />
             </label>
           </div>
+          {cropping ? (
+            <PhotoEditor
+              file={cropping}
+              square
+              title={t('settings.changePhoto')}
+              onCancel={() => setCropping(null)}
+              onDone={async (file) => {
+                setCropping(null);
+                setUploading(true);
+                try {
+                  const { media } = await api.media.upload(file);
+                  const url = new URL(media.url, location.origin).toString();
+                  // The server keeps the photo's own processed size.
+                  const r = await api.me.updateProfile({ avatarUrl: url });
+                  setProfile(r.profile);
+                  await refresh();
+                } catch (err) {
+                  toast(errorMessage(err));
+                } finally {
+                  setUploading(false);
+                }
+              }}
+            />
+          ) : null}
           <TextField label={t('auth.displayName')} name="displayName" defaultValue={profile.displayName} maxLength={60} error={fields.displayName} />
           <TextField label={t('settings.bio')} name="bio" multiline defaultValue={profile.bio} maxLength={300} error={fields.bio} />
           <Select label={t('settings.profileType')} name="mode" defaultValue={profile.mode}>

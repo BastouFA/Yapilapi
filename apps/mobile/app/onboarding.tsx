@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { topicName } from '../../../packages/shared/src/topic-names';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
@@ -355,7 +356,7 @@ function InterestsStep({
               {t('onboarding.topics')}
             </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-              {topics.filter((x) => !trending.includes(x.slug)).map((x) => chip(x.slug, x.name))}
+              {topics.filter((x) => !trending.includes(x.slug)).map((x) => chip(x.slug, topicName(x.slug, x.name, t)))}
             </View>
           </View>
         </>
@@ -543,7 +544,7 @@ function ProfileStep({ onNext, setError }: StepProps) {
 
   async function changePhoto() {
     setError(null);
-    const asset = await pickOne(['images']).catch((e: unknown) => {
+    const asset = await pickOne(['images'], undefined, { square: true }).catch((e: unknown) => {
       setError(errorMessage(e));
       return null;
     });

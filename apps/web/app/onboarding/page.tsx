@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Alert, Avatar, Button, Skeleton } from '@yapilapi/design-system';
 import type { OnboardingStep } from '@yapilapi/api-client';
-import { suggestionReasonText, type PeopleSuggestion } from '@yapilapi/shared';
+import { suggestionReasonText, topicName, type PeopleSuggestion } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { FindFriends } from '@/components/FindFriends';
 import { useSession } from '../providers';
@@ -148,7 +148,7 @@ export default function Onboarding() {
                       .filter((tp) => !trending.includes(tp.slug))
                       .map((tp) => (
                         <button key={tp.slug} type="button" aria-pressed={picked.has(tp.slug)} onClick={() => togglePick(tp.slug)}>
-                          {tp.name}
+                          {topicName(tp.slug, tp.name, t)}
                         </button>
                       ))
                   : Array.from({ length: 8 }, (_, i) => <Skeleton key={i} height={40} width={96} />)}

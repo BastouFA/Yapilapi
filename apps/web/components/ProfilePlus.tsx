@@ -362,33 +362,36 @@ export function NowStatusSheet({
           hint={t('m.now.counterLabel', { count: text.length, max: NOW_STATUS_MAX })}
           onChange={(e) => setText(e.currentTarget.value)}
         />
-        <fieldset className="now-status__icons">
-          <legend className="yp-field__label">{t('profilePlus.iconOptional')}</legend>
-          <label className="now-status__icon">
-            <input
-              type="radio"
-              className="yp-visually-hidden"
-              name={groupId}
-              aria-label={t('m.now.noIcon')}
-              checked={icon === null}
-              onChange={() => setIcon(null)}
-            />
-            <span aria-hidden>{t('profilePlus.noIconShort')}</span>
-          </label>
-          {NOW_STATUS_ICONS.map((name) => (
-            <label key={name} className="now-status__icon">
-              <input
-                type="radio"
-                className="yp-visually-hidden"
-                name={groupId}
-                aria-label={t(ICON_LABELS[name])}
-                checked={icon === name}
-                onChange={() => setIcon(name)}
-              />
-              <Icon name={name} />
-            </label>
+        {/* Buttons, not hidden radios: a press always lands in every browser. Arrow keys move between them. */}
+        <div className="now-status__icons" role="radiogroup" aria-labelledby={`${groupId}-icon`}>
+          <span id={`${groupId}-icon`} className="yp-field__label now-status__legend">
+            {t('profilePlus.iconOptional')}
+          </span>
+          {[null, ...NOW_STATUS_ICONS].map((name, i, all) => (
+            <button
+              key={name ?? 'none'}
+              type="button"
+              role="radio"
+              className="now-status__icon"
+              aria-checked={icon === name}
+              aria-label={name ? t(ICON_LABELS[name]) : t('m.now.noIcon')}
+              tabIndex={icon === name ? 0 : -1}
+              onClick={() => setIcon(name)}
+              onKeyDown={(e) => {
+                const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+                if (!step) return;
+                e.preventDefault();
+                const dir = getComputedStyle(e.currentTarget).direction === 'rtl' && (e.key === 'ArrowRight' || e.key === 'ArrowLeft') ? -step : step;
+                const next = all[(i + dir + all.length) % all.length] ?? null;
+                setIcon(next);
+                const buttons = e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('button');
+                buttons?.[(i + dir + all.length) % all.length]?.focus();
+              }}
+            >
+              {name ? <Icon name={name} /> : <span aria-hidden>{t('profilePlus.noIconShort')}</span>}
+            </button>
           ))}
-        </fieldset>
+        </div>
         <div className="stack-sm">
           <span className="yp-field__label">{t('m.now.audience')}</span>
           <Segments

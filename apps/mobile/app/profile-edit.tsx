@@ -83,7 +83,7 @@ export default function ProfileEdit() {
 
   async function changePhoto() {
     setError(null);
-    const asset = await pickOne(['images']).catch((e: unknown) => {
+    const asset = await pickOne(['images'], undefined, { square: true }).catch((e: unknown) => {
       setError(errorMessage(e));
       return null;
     });

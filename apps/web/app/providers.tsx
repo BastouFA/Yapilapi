@@ -16,6 +16,7 @@ import {
 } from '@yapilapi/shared';
 import { ApiError } from '@yapilapi/api-client';
 import { api, errorMessage, sharedRequest, WS_URL } from '@/lib/api';
+import { ServerWake } from '@/components/ServerWake';
 import { revealLocale, startLocale, visitorLocale, writeLocaleChoice, writeLocaleHint } from '@/lib/locale-script';
 import {
   connectionHints,
@@ -364,6 +365,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <DataSaverProvider on={saverOn}>
         <TranslationProvider value={translation}>{children}</TranslationProvider>
       </DataSaverProvider>
+      <ServerWake />
       <Toast id={toastState?.id} message={toastState?.message ?? null} action={toastState?.action} onDone={clearToast} />
     </Ctx.Provider>
   );

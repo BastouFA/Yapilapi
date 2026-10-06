@@ -1257,6 +1257,37 @@ button.yp-chip:focus-visible {
   border-radius: var(--radius-full);
   background: var(--line);
 }
+.yp-sheet__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+}
+.yp-sheet__head .yp-sheet__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.yp-sheet__close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin: -6px -10px 0 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  color: var(--ink);
+  cursor: pointer;
+}
+.yp-sheet__close:hover {
+  background: var(--line);
+}
+.yp-sheet__close:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
 .yp-sheet__title {
   margin: 0 0 var(--space-4);
   font: 800 22px/28px var(--font-display);

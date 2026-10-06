@@ -796,18 +796,38 @@ export function Menu({ label, actions, icon = 'more' }: { label: string; actions
 }
 
 /** Bottom sheet on phones, centered panel on larger screens. */
-export function BottomSheet({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
+export function BottomSheet({
+  open,
+  onClose,
+  title,
+  children,
+  locale,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: ReactNode;
+  /** For the Close button's name; the page's own language when left out. */
+  locale?: string;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
   useModalFocus(ref, open, onClose);
   if (!open) return null;
+  const lang = locale ?? (typeof document !== 'undefined' && document.documentElement.lang) ?? 'en';
   return (
     <div className="yp-sheet__backdrop" onClick={onClose}>
       <div className="yp-sheet" role="dialog" aria-modal aria-labelledby={titleId} tabIndex={-1} ref={ref} onClick={(e) => e.stopPropagation()}>
         <div className="yp-sheet__grip" aria-hidden />
-        <h2 className="yp-sheet__title" id={titleId}>
-          {title}
-        </h2>
+        {/* A way out that is always there: on a phone the sheet covers nearly all of the page behind it. */}
+        <div className="yp-sheet__head">
+          <h2 className="yp-sheet__title" id={titleId}>
+            {title}
+          </h2>
+          <button type="button" className="yp-sheet__close" aria-label={tr('m.common.close', lang || 'en')} onClick={onClose}>
+            <Icon name="x" size={20} />
+          </button>
+        </div>
         {children}
       </div>
     </div>

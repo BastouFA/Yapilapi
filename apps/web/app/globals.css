@@ -627,9 +627,9 @@ html[data-locale-pending] body {
   padding: 0;
   border: 0;
 }
-.now-status__icons legend {
-  margin-bottom: var(--space-2);
-  padding: 0;
+.now-status__legend {
+  flex-basis: 100%;
+  margin-bottom: var(--space-1);
 }
 .now-status__icon {
   display: inline-grid;
@@ -644,12 +644,17 @@ html[data-locale-pending] body {
   font-size: 14px;
   cursor: pointer;
 }
-.now-status__icon:has(input:checked) {
+.now-status__icon[aria-checked='true'] {
   border-color: var(--yapi);
   background: var(--yapi-soft);
   color: var(--yapi-strong);
 }
-.now-status__icon:has(input:focus-visible) {
+.now-status__icon {
+  cursor: pointer;
+  font: inherit;
+}
+.now-status__icon:focus-visible {
+  outline: none;
   box-shadow: var(--focus-ring);
 }
 .share-profile__card {
@@ -11211,5 +11216,51 @@ button.profile-song__play::after {
     flex-basis: 100%;
     flex-wrap: wrap;
     justify-content: flex-end;
+  }
+}
+
+/* "Waking up" while the API on the free plan starts again (components/ServerWake.tsx). */
+.server-wake {
+  position: fixed;
+  inset-inline: 0;
+  top: 12px;
+  z-index: 1900;
+  display: flex;
+  justify-content: center;
+  padding-inline: 16px;
+  pointer-events: none;
+}
+.server-wake__note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: var(--radius-full);
+  background: var(--ink);
+  color: var(--surface);
+  font: 600 14px/1.4 var(--font-sans);
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+}
+.server-wake__note--ready {
+  background: var(--yapi);
+  color: var(--on-yapi);
+}
+.server-wake__dot {
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: var(--radius-full);
+  background: var(--saffron);
+  animation: server-wake-pulse 1.2s ease-in-out infinite;
+}
+@keyframes server-wake-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .server-wake__dot {
+    animation: none;
   }
 }

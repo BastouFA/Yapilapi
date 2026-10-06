@@ -151,9 +151,12 @@ export function PhotoEditor({
   title,
   onDone,
   onCancel,
+  square = false,
 }: {
   file: File;
   title?: string;
+  /** A profile photo: the crop stays square, and there's no tagging. */
+  square?: boolean;
   /** The edited photo, and anyone tagged in it (spots on the finished, cropped photo). */
   onDone: (f: File, tags: DraftTag[]) => void;
   onCancel: () => void;
@@ -177,7 +180,12 @@ export function PhotoEditor({
     setFailed(false);
     const url = URL.createObjectURL(file);
     const el = new Image();
-    el.onload = () => live && setImg(el);
+    el.onload = () => {
+      if (!live) return;
+      setImg(el);
+      // A profile photo starts on a square crop in the middle, which the person moves and resizes.
+      if (square) h.set((cur) => ({ ...cur, aspect: '1:1', crop: fitCrop(1, el.naturalWidth, el.naturalHeight) }));
+    };
     el.onerror = () => live && setFailed(true);
     el.src = url;
     return () => {
@@ -255,12 +263,14 @@ export function PhotoEditor({
             label: t('m.editor.tab.crop'),
             content: (
               <div className="stack-sm">
-                <Segments
-                  label={t('photoEditor.cropShape')}
-                  value={s.aspect}
-                  onChange={setAspect}
-                  options={ASPECTS.map((a) => ({ id: a.id, label: a.label ? t(a.label) : a.id }))}
-                />
+                {square ? null : (
+                  <Segments
+                    label={t('photoEditor.cropShape')}
+                    value={s.aspect}
+                    onChange={setAspect}
+                    options={ASPECTS.map((a) => ({ id: a.id, label: a.label ? t(a.label) : a.id }))}
+                  />
+                )}
                 <div className="row">
                   <Button variant="secondary" size="sm" onClick={() => turn(-1)}>
                     {t('m.editor.turnLeft')}
@@ -296,11 +306,15 @@ export function PhotoEditor({
             label: t('m.post.text'),
             content: <TextPanel text={s.text} onChange={(text, group) => h.set((cur) => ({ ...cur, text }), group ?? null)} />,
           },
-          {
-            id: 'tag',
-            label: t('m.tags.add'),
-            content: tagging.pending ? <TagPersonSearch {...tagging.searchProps} /> : <TagHint count={tags.length} />,
-          },
+          ...(square
+            ? []
+            : [
+                {
+                  id: 'tag',
+                  label: t('m.tags.add'),
+                  content: tagging.pending ? <TagPersonSearch {...tagging.searchProps} /> : <TagHint count={tags.length} />,
+                },
+              ]),
         ]}
       />
     </>
