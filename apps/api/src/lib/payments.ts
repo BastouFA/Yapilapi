@@ -140,7 +140,8 @@ const fromStripeAmount = (amount: number, currency: string) => (ZERO_DECIMAL.has
  * browser (card data goes straight to Stripe), confirmed by signed webhooks
  * (payment_intent.succeeded / payment_failed, charge.refunded).
  */
-export function stripePaymentProvider(opts: { secretKey: string; webhookSecret: string; publishableKey: string }): PaymentProvider {
+/** `webhookSecret` may be a function: the API can learn the secret after start-up (lib/stripe-webhook-setup.ts). */
+export function stripePaymentProvider(opts: { secretKey: string; webhookSecret: string | (() => string); publishableKey: string }): PaymentProvider {
   const stripe = new Stripe(opts.secretKey, { maxNetworkRetries: 2, timeout: 20_000 });
   return {
     name: 'stripe',
@@ -200,7 +201,8 @@ export function stripePaymentProvider(opts: { secretKey: string; webhookSecret: 
     },
     verifyWebhook(rawBody, headers) {
       const sig = headers['stripe-signature'];
-      const event = stripe.webhooks.constructEvent(rawBody, typeof sig === 'string' ? sig : '', opts.webhookSecret);
+      const secret = typeof opts.webhookSecret === 'function' ? opts.webhookSecret() : opts.webhookSecret;
+      const event = stripe.webhooks.constructEvent(rawBody, typeof sig === 'string' ? sig : '', secret);
       if (event.type === 'payment_intent.succeeded' || event.type === 'payment_intent.payment_failed') {
         const pi = event.data.object;
         return {

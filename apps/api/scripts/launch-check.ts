@@ -167,7 +167,13 @@ async function main() {
     const pk = keyMode(cfg.STRIPE_PUBLISHABLE_KEY, 'pk_');
     if (pk !== mode) add('Stripe keys', 'problem', `the secret key is ${mode} mode but the publishable key is ${pk}: copy both from the same mode`);
     if (!cfg.STRIPE_WEBHOOK_SECRET.startsWith('whsec_'))
-      add('Stripe webhook', 'problem', 'STRIPE_WEBHOOK_SECRET is not a webhook signing secret (whsec_…): add the webhook in Stripe and paste its secret');
+      add(
+        'Stripe webhook',
+        process.env.RENDER_EXTERNAL_URL || process.env.STRIPE_WEBHOOK_URL ? 'ready' : 'problem',
+        process.env.RENDER_EXTERNAL_URL || process.env.STRIPE_WEBHOOK_URL
+          ? 'set up automatically by the API (no secret pasted); its log says "Stripe webhook ready"'
+          : 'no signing secret pasted and no address to set one up: set STRIPE_WEBHOOK_URL, or paste the whsec_… secret',
+      );
     else add('Stripe webhook', 'ready', 'signing secret set (payments are confirmed when Stripe calls /v1/payments/webhook/stripe)');
   }
   if (cfg.PAYSTACK_SECRET_KEY) {

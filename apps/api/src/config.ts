@@ -226,8 +226,9 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const cfg = readConfig(env);
-  if (cfg.PAYMENTS_PROVIDER === 'stripe' && (!cfg.STRIPE_SECRET_KEY || !cfg.STRIPE_WEBHOOK_SECRET || !cfg.STRIPE_PUBLISHABLE_KEY))
-    throw new Error('PAYMENTS_PROVIDER=stripe needs STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET and STRIPE_PUBLISHABLE_KEY.');
+  // STRIPE_WEBHOOK_SECRET may be left "pending": the API then sets up its own webhook (lib/stripe-webhook-setup.ts).
+  if (cfg.PAYMENTS_PROVIDER === 'stripe' && (!cfg.STRIPE_SECRET_KEY || !cfg.STRIPE_PUBLISHABLE_KEY))
+    throw new Error('PAYMENTS_PROVIDER=stripe needs STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY.');
   if (!!cfg.PAYSTACK_SECRET_KEY !== !!cfg.PAYSTACK_PUBLIC_KEY) throw new Error('Paystack needs both PAYSTACK_SECRET_KEY and PAYSTACK_PUBLIC_KEY.');
   if (cfg.SMS_PROVIDER === 'twilio' && (!cfg.TWILIO_ACCOUNT_SID || !cfg.TWILIO_AUTH_TOKEN || !cfg.TWILIO_VERIFY_SERVICE_SID))
     throw new Error('SMS_PROVIDER=twilio needs TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_VERIFY_SERVICE_SID.');

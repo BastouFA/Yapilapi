@@ -109,7 +109,9 @@ import { sweepWatch } from './lib/watch.ts';
 import { sweepWeeklyWraps } from './lib/wrap.ts';
 import { maybeRunRetention } from './lib/retention.ts';
 import { sweepMarket } from './lib/market.ts';
+import Stripe from 'stripe';
 import { adminEmails, promoteListedAdmins } from './lib/admin-bootstrap.ts';
+import { ensureStripeWebhook, isStripeWebhookSecret, stripeWebhookUrl } from './lib/stripe-webhook-setup.ts';
 
 export interface BuiltApp {
   app: FastifyInstance;
@@ -200,14 +202,30 @@ export async function buildApp(
   if ('ensureBucket' in storage)
     await (storage as { ensureBucket(): Promise<void> }).ensureBucket().catch((e) => app.log.warn({ err: e.message }, 'media bucket not reachable'));
 
+  // Without a pasted signing secret, the API sets up its own Stripe webhook and uses the secret Stripe returns.
+  let stripeWebhookSecret = config.STRIPE_WEBHOOK_SECRET;
   const defaultPayments =
     config.PAYMENTS_PROVIDER === 'stripe'
       ? stripePaymentProvider({
           secretKey: config.STRIPE_SECRET_KEY,
-          webhookSecret: config.STRIPE_WEBHOOK_SECRET,
+          webhookSecret: () => stripeWebhookSecret,
           publishableKey: config.STRIPE_PUBLISHABLE_KEY,
         })
       : devPaymentProvider(config.PAYMENTS_WEBHOOK_SECRET);
+  const webhookUrl = stripeWebhookUrl(process.env);
+  if (config.PAYMENTS_PROVIDER === 'stripe' && !isStripeWebhookSecret(config.STRIPE_WEBHOOK_SECRET) && webhookUrl)
+    void ensureStripeWebhook({
+      db,
+      stripe: new Stripe(config.STRIPE_SECRET_KEY, { timeout: 20_000 }),
+      url: webhookUrl,
+      mfaKey: config.MFA_ENCRYPTION_KEY,
+    }).then(
+      (secret) => {
+        stripeWebhookSecret = secret;
+        app.log.info({ url: webhookUrl }, 'Stripe webhook ready');
+      },
+      (e: Error) => app.log.warn({ err: e.message }, 'Stripe webhook could not be set up; paste its signing secret into STRIPE_WEBHOOK_SECRET'),
+    );
   // Paystack takes its own currencies (NGN, GHS, KES, ZAR) when its keys are set; everything else stays with the default.
   const paystack = config.PAYSTACK_SECRET_KEY
     ? paystackPaymentProvider({

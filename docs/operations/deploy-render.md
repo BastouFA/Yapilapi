@@ -76,16 +76,14 @@ different ones, use those.
    `https://yapilapi-web.onrender.com` shows the YAPILAPI home page. If the API deploy fails, open
    **yapilapi-api > Logs**: the line before the exit says which setting is missing or wrong (see
    [If a deploy fails](#if-a-deploy-fails)).
-6. **Stripe webhook** (required: payments are only confirmed when Stripe calls back). In Stripe:
-   **Developers > Webhooks > Add endpoint**.
-   - Endpoint URL: `https://yapilapi-api.onrender.com/v1/payments/webhook/stripe` (straight to the
-     API, so the signed body arrives untouched).
-   - Events: `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded`,
-     `charge.dispute.created` and `transfer.reversed`.
-   - Save, then **Reveal** the signing secret (`whsec_…`).
-
-   In Render: **yapilapi-api > Environment**, edit `STRIPE_WEBHOOK_SECRET`, paste it, and
-   **Save and deploy**.
+6. **Stripe webhook** (automatic). With `STRIPE_WEBHOOK_SECRET` left as `pending`, the API sets up
+   its own webhook in Stripe when it starts, with its secret key, for the events it handles, and
+   keeps the signing secret encrypted in the database. Its log then says `Stripe webhook ready`, and
+   **Developers > Webhooks** in Stripe lists "YAPILAPI (set up automatically by the API)". Nothing
+   to paste. (To manage it yourself instead, add an endpoint for
+   `https://yapilapi-api.onrender.com/v1/payments/webhook/stripe` with `payment_intent.succeeded`,
+   `payment_intent.payment_failed`, `charge.refunded`, `charge.dispute.created` and
+   `transfer.reversed`, and paste its `whsec_…` secret into `STRIPE_WEBHOOK_SECRET`.)
 7. **Run the launch check.** In Render: **yapilapi-api > Shell**, then run
 
    ```bash
