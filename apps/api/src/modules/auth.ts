@@ -136,14 +136,21 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
     ]);
     // In the account's language: at sign-up, the one the web or phone sent (register stores it before this).
     const locale = recipientLocale((await ctx.db.query<{ locale: string }>(`SELECT locale FROM profiles WHERE user_id = $1`, [userId])).rows[0]?.locale);
-    // A mail server that is down must not fail the sign-up: "Send the link again" in Settings retries.
-    await ctx.email
+    // A mail server that is down must not fail the sign-up: "Send the link again" in Settings retries,
+    // and says so when it can't send either. Returns whether the email went.
+    return ctx.email
       .send({
         to: email,
         subject: t('email.verify.subject', locale),
         text: t('email.verify.body', locale, { url: `${webOrigin}/verify-email?token=${token}` }),
       })
-      .catch((err: Error) => app.log.error({ err: err.message }, 'verification email not sent'));
+      .then(
+        () => true,
+        (err: Error) => {
+          app.log.error({ err: err.message }, 'verification email not sent');
+          return false;
+        },
+      );
   }
 
   app.post('/v1/auth/register', { config: authLimit }, async (req, reply) => {
@@ -372,7 +379,7 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
   app.post('/v1/auth/verify-email/resend', { preHandler: requireAuth, config: authLimit }, async (req) => {
     const u = me(req);
     if (u.emailVerified) return { ok: true };
-    await sendVerification(u.id, u.email);
+    if (!(await sendVerification(u.id, u.email))) throw new AppError(503, 'email_not_sent', 'The email couldn’t be sent right now. Try again later.');
     return { ok: true };
   });
 

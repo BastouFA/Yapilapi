@@ -21,6 +21,8 @@ export const yo: Record<string, string> = {
   // apps/api/src/lib/ai/gateway.ts
   'There’s no text to translate.': 'Kò sí ọ̀rọ̀ kankan láti túmọ̀.',
   'This is already in that language.': 'Èyí ti wà ní èdè yẹn tẹ́lẹ̀.',
+  // apps/api/src/modules/auth.ts
+  'The email couldn’t be sent right now. Try again later.': 'A kò lè fi ímeèlì ránṣẹ́ báyìí. Tún gbìyànjú nígbà míì.',
   'Translation isn’t available right now. Try again later.': 'Ìtumọ̀ kò sí báyìí. Gbìyànjú lẹ́ẹ̀kan sí i tó bá yá.',
   'This couldn’t be translated right now. Try again later.': 'A kò lè túmọ̀ èyí báyìí. Gbìyànjú lẹ́ẹ̀kan sí i tó bá yá.',
   "Community doesn't exist or isn't visible to you.": 'Àwùjọ náà kò sí, tàbí o kò lè rí i.',

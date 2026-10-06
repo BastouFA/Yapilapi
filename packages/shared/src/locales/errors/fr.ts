@@ -21,6 +21,8 @@ export const fr: Record<string, string> = {
   // apps/api/src/lib/ai/gateway.ts
   'There’s no text to translate.': 'Il n’y a pas de texte à traduire.',
   'This is already in that language.': 'C’est déjà dans cette langue.',
+  // apps/api/src/modules/auth.ts
+  'The email couldn’t be sent right now. Try again later.': 'L’e-mail n’a pas pu être envoyé pour le moment. Réessaie plus tard.',
   'Translation isn’t available right now. Try again later.': 'La traduction n’est pas disponible pour le moment. Réessaie plus tard.',
   'This couldn’t be translated right now. Try again later.': 'Impossible de traduire ceci pour le moment. Réessaie plus tard.',
   "Community doesn't exist or isn't visible to you.": 'Cette communauté n’existe pas ou tu ne peux pas la voir.',

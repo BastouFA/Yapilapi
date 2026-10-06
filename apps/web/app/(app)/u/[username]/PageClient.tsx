@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Avatar, Badge, Button, EmptyState, Menu, PlusBadge, Segments, Skeleton } from '@yapilapi/design-system';
 import { FollowList } from '@/components/FollowList';
 import type { Profile, ProfileTab } from '@yapilapi/shared';
-import { api, errorMessage, isGone } from '@/lib/api';
+import { api, errorMessage, isGone, onFollowChange } from '@/lib/api';
 import { PostList, ReportSheet } from '@/components/PostList';
 import { MiniAppsSheet } from '@/components/MiniApps';
 import { SupportCreator, TipSheet } from '@/components/SupportCreator';
@@ -94,6 +94,9 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
     if (signedOut && !isPublic) return;
     void reload();
   }, [reload, signedOut, isPublic]);
+  // Followed or unfollowed somewhere else on the page (People to follow): the buttons here catch up.
+  const profileId = profile?.id;
+  useEffect(() => onFollowChange((id) => void (id === profileId && reload())), [profileId, reload]);
   const load = useCallback((cursor?: string) => api.users.posts(username, cursor), [username]);
   const loadReels = useCallback((cursor?: string) => api.users.posts(username, cursor, { format: 'reel' }), [username]);
   const loadReposts = useCallback((cursor?: string) => api.users.reposts(profile?.id ?? '', cursor), [profile?.id]);

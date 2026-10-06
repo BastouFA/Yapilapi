@@ -322,6 +322,13 @@ describe('email delivery', () => {
       const later = await signUp(smtp.app);
       expect(later.id).toBeTruthy();
       expect((await as(smtp.app, null).post('/v1/auth/password/forgot', { email: later.email })).status).toBe(200);
+      // "Send the link again" says when the email didn't go, rather than that it did.
+      const resend = await as(smtp.app, later).post('/v1/auth/verify-email/resend', {});
+      expect(resend.status).toBe(503);
+      expect(resend.body.error.code).toBe('email_not_sent');
+      failing = false;
+      expect((await as(smtp.app, later).post('/v1/auth/verify-email/resend', {})).status).toBe(200);
+      expect(mails.filter((m) => m.to === later.email && /Confirm your email/.test(m.subject))).toHaveLength(1);
     } finally {
       await smtp.close();
     }

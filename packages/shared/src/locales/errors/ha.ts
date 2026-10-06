@@ -21,6 +21,8 @@ export const ha: Record<string, string> = {
   // apps/api/src/lib/ai/gateway.ts
   'There’s no text to translate.': 'Babu rubutun da za a fassara.',
   'This is already in that language.': 'Wannan yana cikin wannan harshen tuni.',
+  // apps/api/src/modules/auth.ts
+  'The email couldn’t be sent right now. Try again later.': 'Ba a iya aika imel ɗin yanzu ba. Sake gwadawa daga baya.',
   'Translation isn’t available right now. Try again later.': 'Fassara ba ta samuwa yanzu. Sake gwadawa daga baya.',
   'This couldn’t be translated right now. Try again later.': 'Ba a iya fassara wannan yanzu ba. Sake gwadawa daga baya.',
   "Community doesn't exist or isn't visible to you.": "Ba a sami al'ummar ba, ko kuma ba za ku iya ganinta ba.",

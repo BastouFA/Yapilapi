@@ -24,10 +24,33 @@ export function onApiWaking(fn: WakeListener): () => void {
   wakeListeners.add(fn);
   return () => void wakeListeners.delete(fn);
 }
+// Following someone anywhere (their profile, a list, a reel) is told to the lists that offer them,
+// like "People to follow", so those don't keep offering to follow someone already followed.
+type FollowListener = (userId: string, following: boolean) => void;
+const followListeners = new Set<FollowListener>();
+export function onFollowChange(fn: FollowListener): () => void {
+  followListeners.add(fn);
+  return () => void followListeners.delete(fn);
+}
+const FOLLOW_PATH = /\/api\/v1\/users\/([^/?]+)\/follow$/;
+function noteFollow(input: RequestInfo | URL, init: RequestInit | undefined, res: Response) {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  const userId = res.ok ? FOLLOW_PATH.exec(url.split('?')[0]!)?.[1] : undefined;
+  if (!userId || !['POST', 'DELETE'].includes((init?.method ?? 'GET').toUpperCase())) return;
+  res
+    .clone()
+    .json()
+    .then(
+      (b: { following?: boolean; requested?: boolean }) => followListeners.forEach((fn) => fn(userId, !!(b.following || b.requested))),
+      () => {},
+    );
+}
+
 const wakeFetch: typeof fetch = async (input, init) => {
   try {
     const res = await fetch(input, init);
     if (res.status >= 500 && !(res.headers.get('content-type') ?? '').includes('json')) setApiWaking(true);
+    noteFollow(input, init, res);
     return res;
   } catch (e) {
     // Offline is the browser's to say; anything else is the API not answering yet.

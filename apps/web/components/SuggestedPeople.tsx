@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Avatar, Button, Icon } from '@yapilapi/design-system';
 import { suggestionReasonText, type PeopleSuggestion } from '@yapilapi/shared';
-import { api, errorMessage, sharedRequest } from '@/lib/api';
+import { api, errorMessage, onFollowChange, sharedRequest } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
 type Suggestion = PeopleSuggestion;
@@ -14,6 +14,19 @@ export function SuggestedPeople() {
   const { toast, t, tp } = useSession();
   const [items, setItems] = useState<Suggestion[] | null>(null);
   const [followed, setFollowed] = useState<Set<string>>(new Set());
+  // Followed elsewhere (their profile, a reel): the button here says so too.
+  useEffect(
+    () =>
+      onFollowChange((id, on) =>
+        setFollowed((prev) => {
+          const next = new Set(prev);
+          if (on) next.add(id);
+          else next.delete(id);
+          return next;
+        }),
+      ),
+    [],
+  );
 
   useEffect(() => {
     let hidden: string[] = [];

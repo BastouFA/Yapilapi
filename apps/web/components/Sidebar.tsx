@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { Avatar, Button } from '@yapilapi/design-system';
 import { suggestionReasonText, type EventItem, type PeopleSuggestion } from '@yapilapi/shared';
 import type { LiveSummary } from '@yapilapi/api-client';
-import { api, errorMessage, sharedRequest } from '@/lib/api';
+import { api, errorMessage, onFollowChange, sharedRequest } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
 type Suggestion = PeopleSuggestion;
@@ -18,6 +18,19 @@ export function Sidebar() {
   const [q, setQ] = useState('');
   const [people, setPeople] = useState<Suggestion[]>([]);
   const [followed, setFollowed] = useState<Set<string>>(new Set());
+  // Followed elsewhere (their profile, a reel): the button here says so too.
+  useEffect(
+    () =>
+      onFollowChange((id, on) =>
+        setFollowed((prev) => {
+          const next = new Set(prev);
+          if (on) next.add(id);
+          else next.delete(id);
+          return next;
+        }),
+      ),
+    [],
+  );
   const [events, setEvents] = useState<EventItem[]>([]);
   const [topics, setTopics] = useState<{ topic: string; posts: number }[]>([]);
   const [live, setLive] = useState<LiveSummary[]>([]);
