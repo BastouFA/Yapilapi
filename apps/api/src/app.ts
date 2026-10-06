@@ -159,7 +159,8 @@ export async function buildApp(
   let redis: Redis | undefined;
   let sub: Redis | undefined;
   if (config.REDIS_URL) {
-    redis = new Redis(config.REDIS_URL, { maxRetriesPerRequest: 2, lazyConnect: false });
+    // family 0: IPv4 or IPv6, whichever the name resolves to (private networks such as Render's can be IPv6 only).
+    redis = new Redis(config.REDIS_URL, { maxRetriesPerRequest: 2, lazyConnect: false, family: 0 });
     sub = redis.duplicate();
     // Degrade gracefully: Redis outages must not take the API down.
     redis.on('error', (e) => app.log.warn({ err: e.message }, 'redis error'));

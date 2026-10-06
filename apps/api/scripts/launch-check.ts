@@ -89,7 +89,7 @@ async function main() {
   }
   if (!cfg.REDIS_URL) add('Redis', prod ? 'problem' : 'dev only', 'REDIS_URL not set: live updates only reach people on the same server');
   else {
-    const redis = new Redis(cfg.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1 });
+    const redis = new Redis(cfg.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1, family: 0 });
     const r = await live(async () => {
       await redis.connect();
       return `answered ${await redis.ping()}`;
