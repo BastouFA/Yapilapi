@@ -1,0 +1,16 @@
+{
+  "id": "/yap",
+  "name": "Yap by YAPILAPI",
+  "short_name": "Yap",
+  "description": "Your YAPILAPI chats, on their own.",
+  "start_url": "/yap",
+  "scope": "/yap",
+  "display": "standalone",
+  "background_color": "#EFEBE6",
+  "theme_color": "#EFEBE6",
+  "icons": [
+    { "src": "/yap-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/yap-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/yap-icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

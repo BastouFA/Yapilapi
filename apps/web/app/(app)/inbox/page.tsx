@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Avatar, AvatarGroup, BottomSheet, Button, EmptyState, List, ListItem, Skeleton, TextField } from '@yapilapi/design-system';
+import { Avatar, AvatarGroup, BottomSheet, Button, EmptyState, Icon, List, ListItem, Skeleton, TextField } from '@yapilapi/design-system';
 import { formatRelativeTime, lastMessageText, type Conversation, type PublicUser } from '@yapilapi/shared';
 import { api, errorMessage, sharedRequest } from '@/lib/api';
 import { NextLink } from '@/lib/link';
+import { useChatBase } from '@/lib/chat-base';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { useRealtime, useSession } from '../../providers';
 
@@ -19,6 +20,7 @@ function conversationTitle(c: Conversation, meId: string, justYou: string): stri
 export default function Inbox() {
   const { me, t, tp, locale, toast, unread } = useSession();
   const router = useRouter();
+  const base = useChatBase();
   const [items, setItems] = useState<Conversation[] | null>(null);
   const [requests, setRequests] = useState<{ id: string; from: PublicUser }[]>([]);
   const [newGroup, setNewGroup] = useState(false);
@@ -47,11 +49,18 @@ export default function Inbox() {
   return (
     <div className="yp-shell__inner">
       <div className="yp-topbar">
-        <h1>{t('inbox.title')}</h1>
+        <h1>{base === '/yap' ? t('yapMode.title') : t('inbox.title')}</h1>
         <div className="row">
-          <Link href="/notifications" className="yp-btn yp-btn--ghost yp-btn--sm">
-            {t('notifications.title')} {unread.notifications ? <span className="yp-unread">{unread.notifications}</span> : null}
-          </Link>
+          {base === '/inbox' ? (
+            <>
+              <Link href="/notifications" className="yp-btn yp-btn--ghost yp-btn--sm">
+                {t('notifications.title')} {unread.notifications ? <span className="yp-unread">{unread.notifications}</span> : null}
+              </Link>
+              <Link href="/yap" className="yp-btn yp-btn--ghost yp-btn--sm" aria-label={t('yapMode.open')} title={t('yapMode.open')}>
+                <Icon name="message" size={18} />
+              </Link>
+            </>
+          ) : null}
           <Button size="sm" icon="users" onClick={() => setNewGroup(true)}>
             {t('inbox.newGroup')}
           </Button>
@@ -133,7 +142,7 @@ export default function Inbox() {
             return (
               <ListItem
                 key={c.id}
-                href={`/inbox/${c.id}`}
+                href={`${base}/${c.id}`}
                 linkAs={NextLink}
                 start={
                   others.length > 1 ? (
@@ -164,7 +173,7 @@ export default function Inbox() {
         <EmptyState title={t('m.inbox.empty.title')} body={t('inbox.empty')} />
       )}
 
-      <NewGroupSheet open={newGroup} onClose={() => setNewGroup(false)} onCreated={(id) => router.push(`/inbox/${id}`)} />
+      <NewGroupSheet open={newGroup} onClose={() => setNewGroup(false)} onCreated={(id) => router.push(`${base}/${id}`)} />
     </div>
   );
 }

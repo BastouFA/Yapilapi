@@ -18,6 +18,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AIPanel, BottomSheet, Button, ChatBubble, EmptyState, Icon, Menu, Skeleton, Switch, TranslatableText, type MenuAction } from '@yapilapi/design-system';
 import type { ChatGame, Conversation, Message, ScheduledMessage } from '@yapilapi/shared';
 import { api, errorMessage, isGone } from '@/lib/api';
+import { useChatBase } from '@/lib/chat-base';
 import { GroupInfoSheet } from '@/components/GroupInfo';
 import { ReportSheet } from '@/components/PostList';
 import { useRealtime, useSession } from '../../../providers';
@@ -60,6 +61,7 @@ type Pending = Message & { pending?: boolean };
 
 export default function ChatPage() {
   const { id } = useParams<{ id: string }>();
+  const base = useChatBase();
   const { me, t, tp, toast, locale, setUnread, unread, flags, sendRealtime } = useSession();
   const [conv, setConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Pending[] | null>(null);
@@ -632,7 +634,7 @@ export default function ChatPage() {
       <div className="yp-shell__inner chat-page">
         <div className="yp-topbar">
           <div className="row" style={{ minWidth: 0 }}>
-            <Link href="/inbox" className="yp-action" aria-label={t('chat.backToInbox')}>
+            <Link href={base} className="yp-action" aria-label={t('chat.backToInbox')}>
               <Icon name="arrow-left" />
             </Link>
           </div>
@@ -641,7 +643,7 @@ export default function ChatPage() {
           title={loadError.text}
           action={
             loadError.gone ? (
-              <Link href="/inbox" className="yp-btn yp-btn--secondary">
+              <Link href={base} className="yp-btn yp-btn--secondary">
                 {t('chat.backToInbox')}
               </Link>
             ) : (
@@ -656,7 +658,7 @@ export default function ChatPage() {
     <div className="yp-shell__inner chat-page">
       <div className="yp-topbar">
         <div className="row" style={{ minWidth: 0 }}>
-          <Link href="/inbox" className="yp-action" aria-label={t('chat.backToInbox')}>
+          <Link href={base} className="yp-action" aria-label={t('chat.backToInbox')}>
             <Icon name="arrow-left" />
           </Link>
           <div className="chat-title">
@@ -1203,7 +1205,7 @@ export default function ChatPage() {
           conversation={conv}
           onChanged={() => void reloadConv()}
           onLine={addMessage}
-          onLeft={() => router.push('/inbox')}
+          onLeft={() => router.push(base)}
         />
       ) : null}
       <PollSheet open={pollOpen} onClose={() => setPollOpen(false)} conversationId={id} onSent={addMessage} />

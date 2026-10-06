@@ -11264,3 +11264,83 @@ button.profile-song__play::after {
     animation: none;
   }
 }
+
+/* ── Yap mode: chats on their own (components/YapShell.tsx) ───────────── */
+.yap-mode__main {
+  min-height: 100dvh;
+}
+.yap-mode__bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  padding-top: calc(var(--space-2) + env(safe-area-inset-top, 0px));
+  background: color-mix(in oklab, var(--ground) 88%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+.yap-mode__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  color: var(--ink);
+  font: 700 20px/1 var(--font-display);
+  text-decoration: none;
+}
+.yap-mode__hint {
+  margin: var(--space-2) var(--space-4) 0;
+  font-size: 14px;
+}
+.yap-mode__panes {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+.yap-mode__list,
+.yap-mode__chat {
+  min-width: 0;
+  padding: var(--space-4);
+}
+/* On a phone one pane at a time: the list, or the open chat. */
+.yap-mode--open .yap-mode__list,
+.yap-mode:not(.yap-mode--open) .yap-mode__chat {
+  display: none;
+}
+/* No navigation bar under the chat in Yap mode: the composer sits at the bottom edge. */
+.yap-mode .yp-composer {
+  bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+}
+.yap-mode .chat-page {
+  min-height: calc(100dvh - 100px);
+}
+:root:has(.yap-mode .chat-page) {
+  scroll-padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 900px) {
+  .yap-mode__panes {
+    grid-template-columns: minmax(300px, 380px) 1fr;
+  }
+  .yap-mode--open .yap-mode__list,
+  .yap-mode:not(.yap-mode--open) .yap-mode__chat {
+    display: block;
+  }
+  /* The list keeps its place while the chat scrolls. */
+  .yap-mode__list {
+    position: sticky;
+    top: 61px;
+    height: calc(100dvh - 61px);
+    overflow-y: auto;
+    border-inline-end: 1px solid var(--line);
+  }
+  .yap-mode__chat .yp-empty {
+    margin-top: 20vh;
+  }
+  /* The chat gets the room the rail and sidebar leave. */
+  .yap-mode__chat .yp-shell__inner {
+    max-width: 860px;
+  }
+}

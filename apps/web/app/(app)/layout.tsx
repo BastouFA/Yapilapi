@@ -29,7 +29,7 @@ function currentTab(path: string, username?: string): NavEntry['id'] | undefined
   )
     return 'discover';
   if (path.startsWith('/create') || path.startsWith('/camera')) return 'create';
-  if (path.startsWith('/inbox') || path.startsWith('/notifications')) return 'inbox';
+  if (path.startsWith('/inbox') || path.startsWith('/yap') || path.startsWith('/notifications')) return 'inbox';
   if (username && path.startsWith(`/u/${username}`)) return 'profile';
   if (path.startsWith('/settings') || path.startsWith('/studio') || path.startsWith('/saved')) return 'profile';
   return undefined;
@@ -86,6 +86,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { id: 'inbox', href: '/inbox', badge: unread.messages + unread.notifications },
     { id: 'profile', href: `/u/${me.username}`, avatar: { name: me.displayName, src: me.avatarUrl } },
   ];
+
+  // Yap mode: chats on their own (components/YapShell.tsx draws its own bar).
+  if (path.startsWith('/yap'))
+    return (
+      <CallsProvider>
+        <RoomsProvider>
+          <CheckoutProvider>
+            <main className="yap-mode__main" id="main">
+              {children}
+            </main>
+            <YapPlayer />
+          </CheckoutProvider>
+        </RoomsProvider>
+      </CallsProvider>
+    );
 
   return (
     <CallsProvider>
