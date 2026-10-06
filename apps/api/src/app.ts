@@ -109,6 +109,7 @@ import { sweepWatch } from './lib/watch.ts';
 import { sweepWeeklyWraps } from './lib/wrap.ts';
 import { maybeRunRetention } from './lib/retention.ts';
 import { sweepMarket } from './lib/market.ts';
+import { adminEmails, promoteListedAdmins } from './lib/admin-bootstrap.ts';
 
 export interface BuiltApp {
   app: FastifyInstance;
@@ -156,6 +157,12 @@ export async function buildApp(
   if (tracing) await app.register(tracing);
 
   const db = withRequestContext(createPool(config.DATABASE_URL));
+  // Accounts listed in ADMIN_EMAILS that are confirmed by now become admins.
+  const promoted = await promoteListedAdmins(db, adminEmails(config.ADMIN_EMAILS)).catch((e: Error) => {
+    console.warn(`ADMIN_EMAILS: ${e.message}`);
+    return 0;
+  });
+  if (promoted) console.info(`ADMIN_EMAILS: ${promoted} account(s) made admin.`);
   let redis: Redis | undefined;
   let sub: Redis | undefined;
   // The last thing Redis said went wrong, as a code only (ECONNREFUSED, ENOTFOUND…), for /health/ready.

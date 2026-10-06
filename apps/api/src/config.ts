@@ -85,6 +85,8 @@ const schema = z.object({
   LIVE_HOOK_SECRET: z.string().default(DEV_LIVE_HOOK_SECRET),
   /** Lets a monitoring service read /metrics with "Authorization: Bearer <token>". Without it, production doesn't serve /metrics. */
   METRICS_TOKEN: z.string().default(''),
+  /** Comma-separated addresses made admin once confirmed (for hosts without a shell). Remove them once done. */
+  ADMIN_EMAILS: z.string().default(''),
   /** Signs the tokens in event tickets' QR codes (at least 32 characters in production). Development uses a fixed dev secret. */
   TICKET_TOKEN_SECRET: z.string().default(''),
   /** MediaMTX control API (e.g. http://localhost:9997). When set, ending a live disconnects the encoder. */

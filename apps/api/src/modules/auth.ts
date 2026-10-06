@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { adminEmails, promoteListedAdmins } from '../lib/admin-bootstrap.ts';
 import { hashPassword, hashToken, newToken, SESSION_COOKIE, verifyPassword } from '@yapilapi/auth';
 import { tx } from '@yapilapi/database';
 import {
@@ -363,6 +364,8 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
       await qualifyReferral(c, ctx.realtime, rows[0]!.user_id);
     });
     await securityEvent(ctx.db, rows[0].user_id, 'email_verified', req.ip);
+    // An address listed in ADMIN_EMAILS becomes admin as soon as it is confirmed.
+    await promoteListedAdmins(ctx.db, adminEmails(ctx.config.ADMIN_EMAILS));
     return { ok: true };
   });
 
