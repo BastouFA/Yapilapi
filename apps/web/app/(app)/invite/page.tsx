@@ -138,7 +138,7 @@ function EnterCode({ days, onDone }: { days: number; onDone: () => void }) {
         onSubmit={async (e) => {
           e.preventDefault();
           const code = String(new FormData(e.currentTarget).get('code') ?? '').trim();
-          if (!code) return;
+          if (!code) return setError(t('invite.enter.empty'));
           setBusy(true);
           setError(undefined);
           try {

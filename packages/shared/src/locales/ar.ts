@@ -948,6 +948,7 @@ export const ar: Catalog = {
   'invite.enter.body': 'أدخل رمزه خلال أول {days} يومًا وسيتابع كل منكما الآخر.',
   'invite.enter.submit': 'استخدام الرمز',
   'invite.enter.label': 'رمز الدعوة',
+  'invite.enter.empty': 'أدخل رمز الدعوة الذي حصلت عليه.',
   'invite.enter.done': 'أنت و{name} تتابعان بعضكما الآن.',
   'visibility.close_friends': 'الأصدقاء المقربون',
   'm.chat.record': 'سجّل رسالة صوتية',

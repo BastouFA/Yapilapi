@@ -936,6 +936,7 @@ export const ha: Catalog = {
   'invite.enter.body': 'Shigar da lambarsa a cikin kwanakinka {days} na farko kuma za ku riƙa bin juna.',
   'invite.enter.submit': 'Yi amfani da lamba',
   'invite.enter.label': 'Lambar gayyata',
+  'invite.enter.empty': 'Shigar da lambar gayyatar da aka ba ka.',
   'invite.enter.done': 'Kai da {name} yanzu kuna bin juna.',
   'visibility.close_friends': 'Abokai na kusa',
   'm.chat.record': 'Naɗi saƙon murya',

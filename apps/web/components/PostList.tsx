@@ -574,6 +574,22 @@ const EDIT_AUDIENCES = ['public', 'followers', 'friends', 'private', 'subscriber
  * or video. Photos, polls and links stay as they are. Earlier text stays in the
  * post's history, which anyone who can see the post can open.
  */
+/**
+ * Posts the page already has (a memory's posts, On this day, Reals), with every interaction wired
+ * like any feed: on their own as PostCards, their like, comment and save buttons would do nothing.
+ */
+export function StaticPostList({ posts, empty, emptyTitle }: { posts: Post[]; empty?: string; emptyTitle?: string }) {
+  return (
+    <PostList
+      load={() => Promise.resolve({ items: posts, nextCursor: null })}
+      reloadKey={posts.map((p) => p.id).join(',')}
+      showEnd={false}
+      empty={empty}
+      emptyTitle={emptyTitle}
+    />
+  );
+}
+
 export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose: () => void; onSaved: (p: Post) => void }) {
   const { toast, t, me } = useSession();
   const [body, setBody] = useState(post.body);

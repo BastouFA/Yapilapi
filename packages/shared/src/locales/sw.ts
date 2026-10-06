@@ -936,6 +936,7 @@ export const sw: Catalog = {
   'invite.enter.body': 'Weka msimbo wake ndani ya siku zako {days} za kwanza na mtafuatana.',
   'invite.enter.submit': 'Tumia msimbo',
   'invite.enter.label': 'Msimbo wa mwaliko',
+  'invite.enter.empty': 'Weka msimbo wa mwaliko uliopewa.',
   'invite.enter.done': 'Wewe na {name} sasa mnafuatana.',
   'visibility.close_friends': 'Marafiki wa karibu',
   'm.chat.record': 'Rekodi ujumbe wa sauti',

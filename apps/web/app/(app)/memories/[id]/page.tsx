@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { AIPanel, Avatar, BottomSheet, Button, Checkbox, Dialog, EmptyState, EventCard, Icon, PostCard, Skeleton } from '@yapilapi/design-system';
+import { AIPanel, Avatar, BottomSheet, Button, Checkbox, Dialog, EmptyState, EventCard, Icon, Skeleton } from '@yapilapi/design-system';
 import type { PublicUser } from '@yapilapi/shared';
 import { api, errorMessage, isGone } from '@/lib/api';
 import { NextLink } from '@/lib/link';
+import { StaticPostList } from '@/components/PostList';
 import { useSession } from '../../../providers';
 
 export default function MemoryPage() {
@@ -124,9 +125,7 @@ export default function MemoryPage() {
           {mo.body ? <figcaption>{mo.body}</figcaption> : null}
         </figure>
       ))}
-      {data.posts.map((p) => (
-        <PostCard key={p.id} post={p} locale={locale} linkAs={NextLink} />
-      ))}
+      {data.posts.length ? <StaticPostList posts={data.posts} /> : null}
       {data.hiddenItems ? <p className="muted">{tp('memories.hiddenItems', data.hiddenItems)}</p> : null}
       {!data.posts.length && !data.events.length && !data.moments.length ? (
         <EmptyState title={t('m.feed.empty.title')} body={t('memories.emptyItems')} />

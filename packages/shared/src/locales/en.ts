@@ -939,6 +939,7 @@ export const en = {
   'invite.enter.body': 'Enter their code in your first {days} days and you will follow each other.',
   'invite.enter.submit': 'Use code',
   'invite.enter.label': 'Invite code',
+  'invite.enter.empty': 'Enter the invite code you were given.',
   'invite.enter.done': 'You and {name} now follow each other.',
   'visibility.close_friends': 'Close friends',
   'm.chat.record': 'Record a voice message',

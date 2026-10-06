@@ -936,6 +936,7 @@ export const pt: Catalog = {
   'invite.enter.body': 'Digite o código da pessoa nos seus primeiros {days} dias e vocês vão se seguir.',
   'invite.enter.submit': 'Usar código',
   'invite.enter.label': 'Código de convite',
+  'invite.enter.empty': 'Digite o código de convite que você recebeu.',
   'invite.enter.done': 'Você e {name} agora se seguem.',
   'visibility.close_friends': 'Amigos próximos',
   'm.chat.record': 'Gravar uma mensagem de voz',

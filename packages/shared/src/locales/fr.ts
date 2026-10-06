@@ -941,6 +941,7 @@ export const fr: Catalog = {
   'invite.enter.body': 'Saisis son code dans tes {days} premiers jours : tu suivras cette personne et elle te suivra.',
   'invite.enter.submit': 'Utiliser le code',
   'invite.enter.label': "Code d'invitation",
+  'invite.enter.empty': 'Saisis le code d’invitation que tu as reçu.',
   'invite.enter.done': 'Tu suis maintenant {name}, qui te suit aussi.',
   'visibility.close_friends': 'Amis proches',
   'm.chat.record': 'Enregistrer un message vocal',

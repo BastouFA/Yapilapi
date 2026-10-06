@@ -935,6 +935,7 @@ export const yo: Catalog = {
   'invite.enter.body': 'Tẹ kóòdù rẹ̀ láàárín ọjọ́ {days} àkọ́kọ́ rẹ, ẹ ó sì máa tẹ̀lé ara yín.',
   'invite.enter.submit': 'Lo kóòdù',
   'invite.enter.label': 'Kóòdù ìpè',
+  'invite.enter.empty': 'Tẹ kóòdù ìpè tí wọ́n fún ọ.',
   'invite.enter.done': 'Ìwọ àti {name} ti ń tẹ̀lé ara yín báyìí.',
   'visibility.close_friends': 'Àwọn ọ̀rẹ́ tímọ́tímọ́',
   'm.chat.record': 'Ṣe ìgbàsílẹ̀ ohùn',

@@ -2,16 +2,16 @@
 
 import { FeatureOff } from '@/components/FeatureOff';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Button, EmptyState, PostCard, Select, Skeleton, TextField } from '@yapilapi/design-system';
+import { Alert, Button, EmptyState, Select, Skeleton, TextField } from '@yapilapi/design-system';
 import { noticeText, type Post } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
-import { NextLink } from '@/lib/link';
+import { StaticPostList } from '@/components/PostList';
 import { Capture } from '@/components/Capture';
 import { useSession } from '../../providers';
 
 /** Real: capture what's in front of you now, both cameras if you like. No filters, no library. */
 export default function RealPage() {
-  const { flags, toast, locale, t } = useSession();
+  const { flags, toast, t } = useSession();
   const [items, setItems] = useState<Post[] | null>(null);
   // Why the Reals couldn't load (shown with Try again, rather than as "no Reals yet").
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -100,7 +100,7 @@ export default function RealPage() {
       {items === null ? (
         <Skeleton height={240} />
       ) : items.length ? (
-        items.map((p) => <PostCard key={p.id} post={p} locale={locale} linkAs={NextLink} />)
+        <StaticPostList posts={items} />
       ) : loadError ? null : (
         <EmptyState title={t('real.empty.title')} body={t('real.empty.body')} />
       )}

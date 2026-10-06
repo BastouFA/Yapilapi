@@ -4,11 +4,12 @@ import { FeatureOff } from '@/components/FeatureOff';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { Badge, Button, EmptyState, EventCard, Icon, PostCard, Skeleton, TextField } from '@yapilapi/design-system';
+import { Badge, Button, EmptyState, EventCard, Icon, Skeleton, TextField } from '@yapilapi/design-system';
 import type { MemorySummary } from '@yapilapi/api-client';
 import type { EventItem, Post } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
+import { StaticPostList } from '@/components/PostList';
 import { useSession } from '../../providers';
 
 export default function Memories() {
@@ -117,9 +118,7 @@ export default function Memories() {
             {t('memories.makeOne')}
           </Link>
         </div>
-        {sugg?.onThisDay.map((p) => (
-          <PostCard key={p.id} post={p} locale={locale} linkAs={NextLink} />
-        ))}
+        {sugg?.onThisDay.length ? <StaticPostList posts={sugg.onThisDay} /> : null}
       </section>
 
       <section className="stack-sm">
