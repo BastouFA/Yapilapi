@@ -710,3 +710,17 @@ describe('metrics', () => {
     await locked.close();
   });
 });
+
+describe('SMTP_URL', () => {
+  it('must be a whole address, and a key on its own is refused without printing it', () => {
+    const base = { DATABASE_URL: 'postgres://unused', EMAIL_TRANSPORT: 'smtp' };
+    expect(() => loadConfig({ ...base, SMTP_URL: 're_abc123secret' })).toThrow(/SMTP_URL must be a whole address/);
+    try {
+      loadConfig({ ...base, SMTP_URL: 're_abc123secret' });
+    } catch (e) {
+      expect(String(e)).not.toContain('re_abc123secret');
+    }
+    expect(() => loadConfig({ ...base, SMTP_URL: 'smtps://resend:re_abc@smtp.resend.com:2465' })).not.toThrow();
+    expect(() => loadConfig({ ...base, SMTP_URL: 'smtp://localhost:2525' })).not.toThrow();
+  });
+});

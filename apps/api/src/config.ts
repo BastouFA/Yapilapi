@@ -203,6 +203,16 @@ function withoutBlanks(env: NodeJS.ProcessEnv): Record<string, string> {
 }
 
 /** The settings as given, with defaults, before the checks that stop the server from starting (the launch check reads these). */
+/** smtp://host[:port] or smtps://user:password@host[:port]: a whole address, not a key on its own. */
+function isSmtpAddress(value: string): boolean {
+  try {
+    const u = new URL(value);
+    return (u.protocol === 'smtp:' || u.protocol === 'smtps:') && !!u.hostname;
+  } catch {
+    return false;
+  }
+}
+
 export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const parsed = resolved.safeParse(withoutBlanks(env));
   if (!parsed.success) {
@@ -224,6 +234,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (!!cfg.MUSIC_LICENSED_API_URL !== !!cfg.MUSIC_LICENSED_API_KEY)
     throw new Error('The licensed music catalogue needs both MUSIC_LICENSED_API_URL and MUSIC_LICENSED_API_KEY.');
   if (cfg.EMAIL_TRANSPORT === 'smtp' && !cfg.SMTP_URL) throw new Error('EMAIL_TRANSPORT=smtp needs SMTP_URL.');
+  // A pasted API key on its own (not an address) would otherwise reach the mail library, which prints it.
+  if (cfg.SMTP_URL && !isSmtpAddress(cfg.SMTP_URL))
+    throw new Error(
+      'SMTP_URL must be a whole address, like smtps://resend:<API key>@smtp.resend.com:2465 (it starts with smtp:// or smtps:// and has the server after "@").',
+    );
   if (cfg.TRANSCRIBE_PROVIDER === 'openai-compatible' && !cfg.TRANSCRIBE_API_URL)
     throw new Error('TRANSCRIBE_PROVIDER=openai-compatible needs TRANSCRIBE_API_URL (and TRANSCRIBE_API_KEY for a hosted service).');
   if (!!cfg.VAPID_PUBLIC_KEY !== !!cfg.VAPID_PRIVATE_KEY) throw new Error('Browser push needs both VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY, or neither.');
