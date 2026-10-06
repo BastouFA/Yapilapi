@@ -25,7 +25,9 @@
       "environment": "preview",
       "distribution": "internal",
       "env": {
-        "YAPILAPI_APP_ENV": "preview"
+        "YAPILAPI_APP_ENV": "preview",
+        "YAPILAPI_API_URL": "https://yapilapi-api.onrender.com",
+        "YAPILAPI_WEB_URL": "https://yapilapi-web.onrender.com"
       },
       "android": {
         "buildType": "apk"
@@ -36,7 +38,9 @@
       "distribution": "store",
       "autoIncrement": true,
       "env": {
-        "YAPILAPI_APP_ENV": "production"
+        "YAPILAPI_APP_ENV": "production",
+        "YAPILAPI_API_URL": "https://yapilapi-api.onrender.com",
+        "YAPILAPI_WEB_URL": "https://yapilapi-web.onrender.com"
       },
       "android": {
         "buildType": "app-bundle"

@@ -129,7 +129,7 @@ The files:
   - `preview`: an internal build for testers (Android APK, iOS ad hoc).
   - `production`: store builds (Android App Bundle, iOS App Store), with build numbers counted up automatically on EAS (`appVersionSource: remote`).
   - There's also a `submit.production` profile.
-- **`apps/mobile/app.config.js`**: reads settings from the environment at build time. A production build stops with a clear error if the API or web address is missing, isn't https, or points at a local machine, or if there is no EAS project id.
+- **`apps/mobile/app.config.js`**: reads settings from the environment at build time. A production build stops with a clear error if the API or web address is missing, isn't https, or points at a local machine, if there is no EAS project id, or (Android) if there is no `google-services.json`.
 - **`apps/mobile/app.json`**:
   - Bundle ids: `com.yapilapi.app` on both platforms.
   - Version `1.0.0`, iOS `buildNumber` 1 and Android `versionCode` 1. These are the starting values; EAS takes over the counting after that.
@@ -148,32 +148,39 @@ eas build:version:set -p android
 
 ### Environment variables
 
-None of these is secret. Set each one in all three EAS environments; the values below are examples.
+The server addresses are in `eas.json`, in each profile's `env`, because they aren't secret and belong with the code:
+
+| Profile | `YAPILAPI_API_URL` | `YAPILAPI_WEB_URL` |
+| --- | --- | --- |
+| `development` | not set: the app uses `extra.apiUrl` and `extra.webUrl` from `app.json` (this computer), or what you set when starting Metro | |
+| `preview`, `production` | `https://yapilapi-api.onrender.com` | `https://yapilapi-web.onrender.com` |
+
+When the services move to your own domain, change both lines in `eas.json` and build again ([deploy-render.md](deploy-render.md#your-own-domain)). Don't also create these two on EAS, so there is one place to look. `YAPILAPI_WS_URL` can name the realtime socket if it ever leaves the API's address; by default it is the API address with `wss://` and `/v1/realtime`.
+
+The rest go on EAS, in the preview and production environments (and development, if you build it):
 
 ```bash
-eas env:create --environment production --name YAPILAPI_API_URL --value https://api.example.com --visibility plaintext
-eas env:create --environment production --name YAPILAPI_WEB_URL --value https://example.com --visibility plaintext
 eas env:create --environment production --name EAS_PROJECT_ID --value <project id> --visibility plaintext
-# repeat with --environment preview and --environment development (a staging API is fine there)
+eas env:create --environment production --name GOOGLE_SERVICES_JSON --type file --value <path to google-services.json> --visibility sensitive
+# repeat with --environment preview
 ```
 
-- `YAPILAPI_API_URL` and `YAPILAPI_WEB_URL` replace `extra.apiUrl` and `extra.webUrl` from `app.json`.
-- The legal pages and shared links open at `YAPILAPI_WEB_URL`.
-- Push notifications need `EAS_PROJECT_ID`.
+- The legal pages, checkout and shared links open at `YAPILAPI_WEB_URL`. Its links (posts, reels, profiles, events and the others in `packages/shared/src/app-links.json`) open the app once the web service knows the app's signing details: see [real-device-testing.md](real-device-testing.md#links-that-open-the-app).
+- Push notifications need `EAS_PROJECT_ID`, and on Android also `GOOGLE_SERVICES_JSON` (below).
 
 ### Keys EAS keeps for you
 
 - **Apple:** distribution certificate and provisioning profile. Let `eas build` create and store them; it asks you to sign in to your Apple Developer account the first time.
 - **Push to iPhones:** EAS creates the APNs key during `eas credentials`. Expo's push service then uses it.
 - **Android:** EAS creates and keeps the upload keystore on the first build. Download a backup with `eas credentials`. Turn on Play App Signing in the Play Console, which is the default for new apps.
-- **Push to Android phones:** needs Firebase Cloud Messaging. Create a Firebase project, add the Android app `com.yapilapi.app`, and upload the FCM V1 service account key with `eas credentials` (Android > Push Notifications). The `google-services.json` file is only needed if you add Firebase SDKs, and this app doesn't.
+- **Push to Android phones:** needs Firebase Cloud Messaging. Create a Firebase project and add the Android app `com.yapilapi.app`. Download its `google-services.json` (the phone needs it to get a push address) and store it on EAS as the file variable `GOOGLE_SERVICES_JSON` (above); for a local build, put it in `apps/mobile/secrets/`. Then, in Firebase **Project settings > Service accounts**, create a key and upload it with `eas credentials` (Android > Push Notifications: FCM V1), which lets Expo's push service send.
 - **Google Play submission:** needs a service account JSON with "Release manager" access in the Play Console. Save it as `apps/mobile/secrets/google-play-service-account.json`. That folder is git-ignored; never commit it. Or upload it to EAS with `eas credentials`.
 
 ### Build and submit
 
 ```bash
 cd apps/mobile
-eas build --profile preview --platform all             # testers
+eas build --profile preview --platform all             # testers and your own phones: docs/operations/real-device-testing.md
 eas build --profile production --platform ios
 eas build --profile production --platform android
 eas submit --profile production --platform ios --latest      # asks for your Apple ID, or set submit.production.ios.ascAppId in eas.json

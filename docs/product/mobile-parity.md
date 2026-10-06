@@ -165,9 +165,13 @@ The web pages the phone opens for checkout take the choice with them: `/u/<name>
 (the Shop tab with that item), `/p/<id>?boost=1&currency=&budget=&days=&country=` or `&topics=`
 (the boost sheet filled in).
 
-Universal links (https links opening the app) need `associatedDomains` and an Android intent
-filter with a verified host, which are native configuration changes and not set up yet; the
-mapping above already handles those paths once they are.
+Universal links (https links opening the app): builds pointed at a real https web address declare
+it (iOS `associatedDomains`, an Android App Links intent filter) for the paths in
+`packages/shared/src/app-links.json`, and the web app serves `/.well-known/apple-app-site-association`
+and `/.well-known/assetlinks.json` once `APPLE_TEAM_ID` and `ANDROID_CERT_SHA256` are set on it. The
+mapping above opens them. Web pages the app opens on purpose go through `/web/<path>`, which no app
+link covers, so checkout stays in the browser. Not yet tried on a phone:
+`docs/operations/real-device-testing.md`.
 
 ## Still missing, and why
 

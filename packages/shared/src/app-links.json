@@ -1,0 +1,24 @@
+{
+  "iosBundleId": "com.yapilapi.app",
+  "androidPackage": "com.yapilapi.app",
+  "paths": [
+    "/p/",
+    "/reels",
+    "/s/",
+    "/u/",
+    "/@",
+    "/c/",
+    "/events/",
+    "/drops/",
+    "/market/",
+    "/live/",
+    "/boards/",
+    "/chapters/",
+    "/rooms/",
+    "/places/",
+    "/t/",
+    "/watch/",
+    "/together/join/",
+    "/join/"
+  ]
+}
