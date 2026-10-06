@@ -141,6 +141,12 @@ different ones, use those.
 13. **Real money** (when you are ready). Repeat steps 1 and 6 with Stripe's test mode off (`sk_live_…`,
     `pk_live_…`, a new live webhook and its `whsec_…`), paste the three values on yapilapi-api, and
     **Save and deploy**. Do the same for Paystack's live keys if you use it. Run the launch check again.
+14. **The phone app on your own phones** (optional, once you have an Expo account, and an Apple
+    Developer membership for the iPhone). The `preview` builds in `apps/mobile/eas.json` already
+    point at `yapilapi-api.onrender.com` and `yapilapi-web.onrender.com`. Build and install them,
+    set `APPLE_TEAM_ID` and `ANDROID_CERT_SHA256` on **yapilapi-web** so the site's links open the
+    app, then go through the checklist of what only a real phone can prove (push, calls on mobile
+    data, the microphone and cameras, links): [real-device-testing.md](real-device-testing.md).
 
 Live video and calls on strict networks need servers Render can't run; they stay off until you set
 them up ([Live video and the calls relay](#live-video-and-the-calls-relay)).
@@ -218,6 +224,10 @@ redeploy. Never set it to `true`. If you put Cloudflare in front of the site, al
    - `SITE_URL=https://yapilapi.com`
 4. Change the Stripe webhook URL (and Paystack's, if used) to `https://api.yapilapi.com/…`.
 5. Run the launch check: "Public addresses", "Passkeys" and "Web app to API" should say `ok`.
+6. Phone apps: change `YAPILAPI_API_URL` and `YAPILAPI_WEB_URL` in `apps/mobile/eas.json` (the
+   `preview` and `production` profiles) to `https://api.yapilapi.com` and `https://yapilapi.com`, and
+   build again. Phones already installed keep talking to the old addresses until they update, so keep
+   the `onrender.com` addresses working until then (Render keeps them alongside a custom domain).
 
 The same applies if a service name was taken and Render gave a different `onrender.com` address.
 
@@ -242,9 +252,11 @@ Both stay off on a plain Render deploy; everything else works without them.
 
 ## Phone apps
 
-Build with EAS (`docs/operations/app-store.md`) after setting `extra.apiUrl` (the API address,
-`https://yapilapi-api.onrender.com` or `https://api.yapilapi.com`) and `extra.webUrl` (the web address)
-in `apps/mobile/app.json`.
+The phone builds take the server addresses from `apps/mobile/eas.json` (`YAPILAPI_API_URL` and
+`YAPILAPI_WEB_URL` in the `preview` and `production` profiles), which point at
+`https://yapilapi-api.onrender.com` and `https://yapilapi-web.onrender.com`. Building and submitting
+is in `docs/operations/app-store.md`; installing on your own phones and what to test there is in
+[real-device-testing.md](real-device-testing.md).
 
 ## Checked locally
 

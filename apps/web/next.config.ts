@@ -49,6 +49,10 @@ const config: NextConfig = {
   async redirects() {
     return [
       { source: '/@:username', destination: '/u/:username', permanent: false },
+      // The phone app opens checkout, Studio and other web-only pages at /web/<path>. No app link
+      // covers /web, so the page stays in the browser instead of bouncing back into the app
+      // (packages/shared/src/app-links.ts). The query and the #section come along.
+      { source: '/web/:path*', destination: '/:path*', permanent: false },
       // Short links to the policies, for app store listings, emails and printed material.
       ...['terms', 'privacy', 'guidelines', 'cookies', 'copyright'].map((slug) => ({ source: `/${slug}`, destination: `/legal/${slug}`, permanent: false })),
       { source: '/dmca', destination: '/legal/copyright', permanent: false },

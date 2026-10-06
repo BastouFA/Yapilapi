@@ -138,6 +138,12 @@ documents and a payment, so only you can do them:
 
 Store listing text in several languages is ready in `docs/operations/store-listing.md`.
 
+Before submitting, put the app on your own iPhone and Android phone and go through
+`docs/operations/real-device-testing.md`: how to install a preview build that talks to the Render
+servers, the two settings that make the site's links open the app, and a checklist of what a
+simulator can't prove (push notifications, calls on mobile data, the microphone and cameras,
+location, links, large text and screen readers).
+
 ## 6. How iPhone purchases work
 
 This decides whether buying Plus and tipping happen inside the iPhone app. Selling physical goods,

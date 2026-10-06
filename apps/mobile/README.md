@@ -36,7 +36,7 @@ To try Arabic: set the phone (or simulator) language to Arabic while signed out,
 
 ## Store builds
 
-`eas.json` has development, preview and production profiles, and `app.config.js` takes the API and web addresses from EAS environment variables (a production build refuses local addresses). Accounts, credentials, TestFlight, the Play internal track and the store forms are in `docs/operations/app-store.md`.
+`eas.json` has development, preview and production profiles. The preview and production profiles set the API and web addresses (`YAPILAPI_API_URL`, `YAPILAPI_WEB_URL`, the Render services), which `app.config.js` reads at build time; a production build refuses local addresses. Accounts, credentials, TestFlight, the Play internal track and the store forms are in `docs/operations/app-store.md`; installing on your own phones and what to test there is in `docs/operations/real-device-testing.md`.
 
 ## Running it
 
@@ -46,7 +46,7 @@ npm install
 npx expo start
 ```
 
-Set `expo.extra.apiUrl` in `app.json` to an address the device can reach (your machine's LAN IP, not `localhost`, when testing on a phone). The realtime socket uses the same host (`ws://…/v1/realtime`).
+On a phone, the API must be at an address the phone can reach, not `localhost`: start Metro with `YAPILAPI_API_URL=http://<your machine's LAN IP>:4000 YAPILAPI_WEB_URL=http://<LAN IP>:3000 npx expo start`, or point it at the Render services. `app.config.js` reads these, so `app.json` stays as it is. The realtime socket uses the API's host (`ws://…/v1/realtime`) unless `YAPILAPI_WS_URL` names another.
 
 Everything except calls runs in Expo Go (`npx expo start --go`, since the dev client is installed and `expo start` now targets it by default).
 

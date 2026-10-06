@@ -9,9 +9,16 @@ import { currentTranslator, tr } from './locale';
 import { setProbeUrl, trackedFetch } from './network';
 
 const TOKEN_KEY = 'ypl_session';
-export const baseUrl = (Constants.expoConfig?.extra?.apiUrl as string | undefined) ?? 'http://localhost:4000';
+/**
+ * Where the servers are. Every address the app makes starts from these three: requests, uploads and
+ * media (baseUrl), the realtime socket (realtimeUrl) and pages on the web (webUrl). They come from
+ * the build (app.config.js: YAPILAPI_API_URL, YAPILAPI_WEB_URL, YAPILAPI_WS_URL, set per build
+ * profile in eas.json), and default to the development servers on this computer.
+ */
+const extra = (Constants.expoConfig?.extra ?? {}) as { apiUrl?: string; webUrl?: string; wsUrl?: string };
+export const baseUrl = (extra.apiUrl ?? 'http://localhost:4000').replace(/\/+$/, '');
 /** The web app, for links people share (a reel opens at `${webUrl}/reels?start=<id>`). */
-export const webUrl = ((Constants.expoConfig?.extra?.webUrl as string | undefined) ?? 'http://localhost:3000').replace(/\/+$/, '');
+export const webUrl = (extra.webUrl ?? 'http://localhost:3000').replace(/\/+$/, '');
 
 export const getToken = async () => (await SecureStore.getItemAsync(TOKEN_KEY)) ?? undefined;
 
@@ -44,8 +51,11 @@ const appLocale = () => currentTranslator().locale;
 /** For signing up and logging in: no token yet. */
 const authClient = () => createClient({ baseUrl, headers: platformHeaders, locale: appLocale, fetch: trackedFetch });
 
-/** The realtime socket URL (same endpoint as the web app). The token goes in a header, not the URL. */
-export const realtimeUrl = () => `${baseUrl.replace(/^http/, 'ws')}/v1/realtime`;
+/**
+ * The realtime socket URL (same endpoint as the web app): the API address with ws(s)://, unless the
+ * build names another (YAPILAPI_WS_URL). The token goes in a header, not the URL.
+ */
+export const realtimeUrl = () => extra.wsUrl ?? `${baseUrl.replace(/^http/, 'ws')}/v1/realtime`;
 
 /** Media URLs from the API may be relative to the API origin. */
 export const mediaUrl = (url: string) => (/^https?:\/\//.test(url) ? url : `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`);

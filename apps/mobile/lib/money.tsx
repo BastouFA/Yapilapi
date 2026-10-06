@@ -14,9 +14,12 @@ import { Button, Card, EmptyState, Icon, Loading, slop, useColors, userText } fr
 
 /**
  * Payments happen on the web app: the phone app has no checkout and never sees card details.
- * This opens a page there in the browser.
+ * This opens a page there in the browser. It goes through /web/<path>, which the web app
+ * redirects to <path>: no app link covers /web, so a page whose path the app also opens (a
+ * profile's checkout, a live) stays in the browser instead of coming back here
+ * (packages/shared/src/app-links.ts).
  */
-export const openOnWeb = (path: string) => Linking.openURL(`${webUrl}${path}`);
+export const openOnWeb = (path: string) => Linking.openURL(`${webUrl}/web${path.startsWith('/') ? '' : '/'}${path}`);
 
 /**
  * Open a web page for checkout and, when the person comes back to the app, call `onBack` (to
