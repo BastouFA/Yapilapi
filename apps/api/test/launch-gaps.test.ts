@@ -724,3 +724,20 @@ describe('SMTP_URL', () => {
     expect(() => loadConfig({ ...base, SMTP_URL: 'smtp://localhost:2525' })).not.toThrow();
   });
 });
+
+describe('health with Redis unreachable', () => {
+  it('still answers ready within the host’s time limit, and says what Redis reported', async () => {
+    // Nothing listens on this port.
+    const t2 = await testApp({ REDIS_URL: 'redis://127.0.0.1:6390' });
+    try {
+      await new Promise((r) => setTimeout(r, 300));
+      const started = Date.now();
+      const res = await t2.app.inject({ url: '/health/ready' });
+      expect(Date.now() - started).toBeLessThan(2500);
+      expect(res.statusCode).toBe(200);
+      expect(res.json().checks).toMatchObject({ database: 'ok', redis: 'degraded', redisProblem: 'ECONNREFUSED' });
+    } finally {
+      await t2.close();
+    }
+  });
+});

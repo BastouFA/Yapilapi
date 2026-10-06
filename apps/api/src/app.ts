@@ -158,12 +158,18 @@ export async function buildApp(
   const db = withRequestContext(createPool(config.DATABASE_URL));
   let redis: Redis | undefined;
   let sub: Redis | undefined;
+  // The last thing Redis said went wrong, as a code only (ECONNREFUSED, ENOTFOUND…), for /health/ready.
+  let redisProblem: string | null = null;
   if (config.REDIS_URL) {
     // family 0: IPv4 or IPv6, whichever the name resolves to (private networks such as Render's can be IPv6 only).
     redis = new Redis(config.REDIS_URL, { maxRetriesPerRequest: 2, lazyConnect: false, family: 0 });
     sub = redis.duplicate();
     // Degrade gracefully: Redis outages must not take the API down.
-    redis.on('error', (e) => app.log.warn({ err: e.message }, 'redis error'));
+    redis.on('error', (e: Error & { code?: string }) => {
+      redisProblem = e.code ?? e.name;
+      app.log.warn({ err: e.message }, 'redis error');
+    });
+    redis.on('ready', () => (redisProblem = null));
     sub.on('error', (e) => app.log.warn({ err: e.message }, 'redis subscriber error'));
   }
 
@@ -354,11 +360,16 @@ export async function buildApp(
     } catch {
       checks.database = 'down';
     }
-    if (redis)
-      checks.redis = await redis
-        .ping()
-        .then(() => 'ok')
-        .catch(() => 'degraded');
+    // At most a second for Redis: the API serves without it, and the host's health check gives up after 5 seconds.
+    if (redis) {
+      const ping = redis.ping().then(
+        () => 'ok',
+        () => 'degraded',
+      );
+      const late = new Promise<string>((resolve) => setTimeout(() => resolve('degraded'), 1000).unref());
+      checks.redis = await Promise.race([ping, late]);
+      if (checks.redis !== 'ok' && redisProblem) checks.redisProblem = redisProblem;
+    }
     checks.ai = ctx.ai.providerName;
     const ready = checks.database === 'ok';
     reply.code(ready ? 200 : 503);
