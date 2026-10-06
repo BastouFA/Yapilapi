@@ -15,6 +15,17 @@ The free way differs from the checklist below in five places:
   `YAPILAPI <onboarding@resend.dev>`. Resend then only delivers to the email address you signed up
   to Resend with, so sign up to YAPILAPI with that address. Add a domain (about 10 US dollars a year,
   for example from Cloudflare Registrar) before inviting anyone.
+- **Email to everyone, still free and without a domain:** use Brevo (300 emails a day).
+  1. Sign up at brevo.com.
+  2. Under **Senders, domains & dedicated IPs > Senders**, add your own address (for example your
+     Gmail) and confirm the email Brevo sends.
+  3. Under **SMTP & API > SMTP**, generate an SMTP key. The login is shown on the same page.
+  4. In the API service's **Environment** on Render, set:
+     - `SMTP_URL` = `smtp://<login>:<SMTP key>@smtp-relay.brevo.com:2525` (port 2525 works on free Render).
+     - `EMAIL_FROM` = `YAPILAPI <your confirmed address>`
+  5. Save. The API restarts, and confirmation emails reach any address. Without a domain of your own,
+     Brevo may send from a `@brevosend.com` address on your behalf, and emails may land in spam.
+     A domain fixes both.
 - **Email port:** free Render services can't use ports 25, 465 or 587, so `SMTP_URL` uses 2465:
   `smtps://resend:<API key>@smtp.resend.com:2465` (this works on paid plans too).
 - **No Shell tab:** free services have none, so skip step 7, and do step 8 from your own computer:
