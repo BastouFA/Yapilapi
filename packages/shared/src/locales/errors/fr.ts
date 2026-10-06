@@ -120,8 +120,8 @@ export const fr: Record<string, string> = {
     'Ce récap contient des photos ou vidéos d’autres personnes, il ne peut donc pas être publié. Tu peux quand même le regarder et l’enregistrer.',
   'Confirm your email or phone number to post publicly. You can do it in Settings, under Security. Posts for friends or only you work without it.':
     'Confirme ton adresse e-mail ou ton numéro de téléphone pour publier pour tout le monde. Tu peux le faire dans Réglages, sous Sécurité. Les publications pour tes amis ou pour toi seul fonctionnent sans.',
-  'Confirm your email or phone number to message people you aren’t friends with yet. You can do it in Settings, under Security.':
-    'Confirme ton adresse e-mail ou ton numéro de téléphone pour écrire à des personnes qui ne sont pas encore tes amis. Tu peux le faire dans Réglages, sous Sécurité.',
+  'Confirm your email or phone number to message people who aren’t your friends and don’t follow you back. You can do it in Settings, under Security.':
+    'Confirme ton e-mail ou ton numéro de téléphone pour écrire aux personnes qui ne sont pas tes amis et ne te suivent pas en retour. Tu peux le faire dans Paramètres, sous Sécurité.',
   'Confirm your email or phone number to go live. You can do it in Settings, under Security.':
     'Confirme ton adresse e-mail ou ton numéro de téléphone pour passer en direct. Tu peux le faire dans Réglages, sous Sécurité.',
   'Confirm your email or phone number to ask people you aren’t friends with yet. You can do it in Settings, under Security.':

@@ -116,8 +116,8 @@ export const yo: Record<string, string> = {
     'Àkópọ̀ yìí ní fọ́tò tàbí fídíò láti ọ̀dọ̀ àwọn ẹlòmíràn, nítorí náà a kò lè fi í síta. O ṣì lè wò ó kí o sì fi í pamọ́.',
   'Confirm your email or phone number to post publicly. You can do it in Settings, under Security. Posts for friends or only you work without it.':
     'Jẹ́rìí ímeèlì tàbí nọ́mbà fóònù rẹ láti fi àtẹ̀jáde síta fún gbogbo ènìyàn. O lè ṣe é nínú Ètò, lábẹ́ Ààbò. Àtẹ̀jáde fún àwọn ọ̀rẹ́ tàbí fún ìwọ nìkan ń ṣiṣẹ́ láìsí i.',
-  'Confirm your email or phone number to message people you aren’t friends with yet. You can do it in Settings, under Security.':
-    'Jẹ́rìí ímeèlì tàbí nọ́mbà fóònù rẹ láti fi ìfiránṣẹ́ ránṣẹ́ sí àwọn tí kì í ṣe ọ̀rẹ́ rẹ síbẹ̀. O lè ṣe é nínú Ètò, lábẹ́ Ààbò.',
+  'Confirm your email or phone number to message people who aren’t your friends and don’t follow you back. You can do it in Settings, under Security.':
+    'Jẹ́rìí sí ímeèlì tàbí nọ́mbà fóònù rẹ láti kọ̀wé sí àwọn tí kì í ṣe ọ̀rẹ́ rẹ tí wọn kò sì tẹ̀lé ọ padà. O lè ṣe é nínú Ètò, lábẹ́ Ààbò.',
   'Confirm your email or phone number to go live. You can do it in Settings, under Security.':
     'Jẹ́rìí ímeèlì tàbí nọ́mbà fóònù rẹ láti ṣe àfihàn lááàyè. O lè ṣe é nínú Ètò, lábẹ́ Ààbò.',
   'Confirm your email or phone number to ask people you aren’t friends with yet. You can do it in Settings, under Security.':

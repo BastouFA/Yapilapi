@@ -33,7 +33,7 @@ import { decodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { isEnabled, notify, track } from '../lib/services.ts';
 import { smartRepliesEverywhereSql, smartRepliesState } from '../lib/ai/assists.ts';
-import { ageOf, areFriends, isBlockedEitherWay, publicUserFrom, usersByIds } from '../lib/users.ts';
+import { ageOf, areFriends, followEachOther, isBlockedEitherWay, publicUserFrom, usersByIds } from '../lib/users.ts';
 import { messagesAllowed, READ_RECEIPTS_ON, seesSensitiveMedia, seesSensitiveSql } from '../lib/interactions.ts';
 import { MEDIA_BLOCKED_MESSAGE } from '../lib/media-moderation.ts';
 import { heldNotice } from '../lib/notices.ts';
@@ -134,8 +134,9 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
     if (!(await messagesAllowed(db, senderId, recipientId)))
       throw new AppError(403, 'messages_limited', 'This person only gets messages from people they know.');
     // Messaging people who aren't friends needs a confirmed email or phone, and isn't open to limited accounts.
+    // Two people who follow each other already know each other: they can write without confirming.
     if (!(await areFriends(db, senderId, recipientId))) {
-      await requireVerified(db, ctx.config, senderId, 'message');
+      if (!(await followEachOther(db, senderId, recipientId))) await requireVerified(db, ctx.config, senderId, 'message');
       if (await isRestricted(db, senderId)) throw restrictedError('message');
     }
   }

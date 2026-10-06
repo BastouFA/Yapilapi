@@ -119,8 +119,8 @@ export const es: Record<string, string> = {
     'Este resumen tiene fotos o videos de otras personas, así que no se puede publicar. Aún puedes verlo y guardarlo.',
   'Confirm your email or phone number to post publicly. You can do it in Settings, under Security. Posts for friends or only you work without it.':
     'Confirma tu correo o tu número de teléfono para publicar para todos. Puedes hacerlo en Ajustes, en Seguridad. Las publicaciones para amigos o solo para ti funcionan sin confirmarlo.',
-  'Confirm your email or phone number to message people you aren’t friends with yet. You can do it in Settings, under Security.':
-    'Confirma tu correo o tu número de teléfono para escribir a personas que aún no son tus amigos. Puedes hacerlo en Ajustes, en Seguridad.',
+  'Confirm your email or phone number to message people who aren’t your friends and don’t follow you back. You can do it in Settings, under Security.':
+    'Confirma tu correo o tu número de teléfono para escribir a personas que no son tus amigos y no te siguen. Puedes hacerlo en Ajustes, en Seguridad.',
   'Confirm your email or phone number to go live. You can do it in Settings, under Security.':
     'Confirma tu correo o tu número de teléfono para hacer directos. Puedes hacerlo en Ajustes, en Seguridad.',
   'Confirm your email or phone number to ask people you aren’t friends with yet. You can do it in Settings, under Security.':

@@ -116,8 +116,8 @@ export const ha: Record<string, string> = {
     'Wannan taƙaitawa tana da hotuna ko bidiyoyin wasu mutane, don haka ba za a iya wallafa ta ba. Har yanzu za ku iya kallonta ku ajiye ta.',
   'Confirm your email or phone number to post publicly. You can do it in Settings, under Security. Posts for friends or only you work without it.':
     'Ku tabbatar da imel ɗinku ko lambar wayarku don wallafawa ga kowa. Za ku iya yin hakan a Saituna, ƙarƙashin Tsaro. Rubuce-rubuce na abokai ko na ku kaɗai suna aiki ba tare da hakan ba.',
-  'Confirm your email or phone number to message people you aren’t friends with yet. You can do it in Settings, under Security.':
-    'Ku tabbatar da imel ɗinku ko lambar wayarku don aika saƙo ga mutanen da ba ku zama abokai ba tukuna. Za ku iya yin hakan a Saituna, ƙarƙashin Tsaro.',
+  'Confirm your email or phone number to message people who aren’t your friends and don’t follow you back. You can do it in Settings, under Security.':
+    'Tabbatar da imel ko lambar wayarka don aika saƙo ga mutanen da ba abokanka ba kuma ba sa bin ka. Za ka iya yin hakan a Saituna, ƙarƙashin Tsaro.',
   'Confirm your email or phone number to go live. You can do it in Settings, under Security.':
     'Ku tabbatar da imel ɗinku ko lambar wayarku don yin kai tsaye. Za ku iya yin hakan a Saituna, ƙarƙashin Tsaro.',
   'Confirm your email or phone number to ask people you aren’t friends with yet. You can do it in Settings, under Security.':

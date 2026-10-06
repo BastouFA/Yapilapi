@@ -116,8 +116,8 @@ export const sw: Record<string, string> = {
     'Muhtasari huu una picha au video za watu wengine, kwa hivyo hauwezi kuchapishwa. Bado unaweza kuutazama na kuuhifadhi.',
   'Confirm your email or phone number to post publicly. You can do it in Settings, under Security. Posts for friends or only you work without it.':
     'Thibitisha barua pepe yako au nambari ya simu ili uchapishe kwa kila mtu. Unaweza kufanya hivyo kwenye Mipangilio, chini ya Usalama. Machapisho kwa marafiki au kwa ajili yako tu yanafanya kazi bila hilo.',
-  'Confirm your email or phone number to message people you aren’t friends with yet. You can do it in Settings, under Security.':
-    'Thibitisha barua pepe yako au nambari ya simu ili uwatumie ujumbe watu ambao bado si marafiki zako. Unaweza kufanya hivyo kwenye Mipangilio, chini ya Usalama.',
+  'Confirm your email or phone number to message people who aren’t your friends and don’t follow you back. You can do it in Settings, under Security.':
+    'Thibitisha barua pepe au namba yako ya simu ili kuwatumia ujumbe watu ambao si marafiki zako na hawakufuati. Unaweza kufanya hivyo kwenye Mipangilio, chini ya Usalama.',
   'Confirm your email or phone number to go live. You can do it in Settings, under Security.':
     'Thibitisha barua pepe yako au nambari ya simu ili urushe moja kwa moja. Unaweza kufanya hivyo kwenye Mipangilio, chini ya Usalama.',
   'Confirm your email or phone number to ask people you aren’t friends with yet. You can do it in Settings, under Security.':

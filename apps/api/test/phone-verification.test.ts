@@ -207,6 +207,14 @@ describe('verification requirement', () => {
     const dm = await api.post('/v1/conversations', { memberIds: [stranger.id] });
     expect(dm.status).toBe(403);
     expect(dm.body.error.code).toBe('verification_required');
+    // People who follow each other can write without confirming; following one way isn't enough.
+    const mutual = await signUp(gated.app, { birthDate: '1990-01-01' });
+    expect((await api.post(`/v1/users/${mutual.id}/follow`)).status).toBe(200);
+    expect((await api.post('/v1/conversations', { memberIds: [mutual.id] })).body.error.code).toBe('verification_required');
+    expect((await as(gated.app, mutual).post(`/v1/users/${u.id}/follow`)).status).toBe(200);
+    const both = await api.post('/v1/conversations', { memberIds: [mutual.id] });
+    expect(both.status).toBe(201);
+    expect((await api.post(`/v1/conversations/${both.body.conversation.id}/messages`, { body: 'Hi, thanks for the follow' })).status).toBe(201);
     const live = await api.post('/v1/live', { title: 'Evening chat' });
     expect(live.status).toBe(403);
     expect(live.body.error.code).toBe('verification_required');

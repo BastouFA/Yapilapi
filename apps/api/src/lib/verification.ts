@@ -8,7 +8,7 @@ export type GatedAction = 'post' | 'message' | 'live' | 'ask';
 
 const WHY: Record<GatedAction, string> = {
   post: 'Confirm your email or phone number to post publicly. You can do it in Settings, under Security. Posts for friends or only you work without it.',
-  message: 'Confirm your email or phone number to message people you aren’t friends with yet. You can do it in Settings, under Security.',
+  message: 'Confirm your email or phone number to message people who aren’t your friends and don’t follow you back. You can do it in Settings, under Security.',
   live: 'Confirm your email or phone number to go live. You can do it in Settings, under Security.',
   ask: 'Confirm your email or phone number to ask people you aren’t friends with yet. You can do it in Settings, under Security.',
 };

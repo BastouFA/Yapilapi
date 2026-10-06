@@ -79,6 +79,15 @@ export async function areFriends(db: Q, a: string, b: string): Promise<boolean> 
   return !!(await db.query(`SELECT 1 FROM friendships WHERE user_a = $1 AND user_b = $2`, [x, y])).rowCount;
 }
 
+/** Each follows the other (accepted follows only: a pending request to a private account isn't one). */
+export async function followEachOther(db: Q, a: string, b: string): Promise<boolean> {
+  const { rows } = await db.query<{ n: number }>(
+    `SELECT count(*)::int AS n FROM follows WHERE (follower_id = $1 AND followee_id = $2) OR (follower_id = $2 AND followee_id = $1)`,
+    [a, b],
+  );
+  return rows[0]!.n === 2;
+}
+
 /** Age in whole years, or null when unknown. */
 export function ageOf(birthDate: Date | string | null, now = new Date()): number | null {
   if (!birthDate) return null;

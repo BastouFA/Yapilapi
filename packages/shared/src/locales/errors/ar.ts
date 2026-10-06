@@ -114,8 +114,8 @@ export const ar: Record<string, string> = {
     'يحتوي هذا الملخص على صور أو فيديوهات من أشخاص آخرين، لذا لا يمكن نشره. لا يزال بإمكانك مشاهدته وحفظه.',
   'Confirm your email or phone number to post publicly. You can do it in Settings, under Security. Posts for friends or only you work without it.':
     'أكّد بريدك الإلكتروني أو رقم هاتفك لتنشر للجميع. يمكنك فعل ذلك من الإعدادات، ضمن الأمان. أما المنشورات للأصدقاء أو لك وحدك فتعمل دون ذلك.',
-  'Confirm your email or phone number to message people you aren’t friends with yet. You can do it in Settings, under Security.':
-    'أكّد بريدك الإلكتروني أو رقم هاتفك لتراسل أشخاصًا لستم أصدقاء بعد. يمكنك فعل ذلك من الإعدادات، ضمن الأمان.',
+  'Confirm your email or phone number to message people who aren’t your friends and don’t follow you back. You can do it in Settings, under Security.':
+    'أكّد بريدك الإلكتروني أو رقم هاتفك لمراسلة أشخاص ليسوا أصدقاءك ولا يتابعونك. يمكنك ذلك من الإعدادات، ضمن الأمان.',
   'Confirm your email or phone number to go live. You can do it in Settings, under Security.':
     'أكّد بريدك الإلكتروني أو رقم هاتفك لتبث مباشرة. يمكنك فعل ذلك من الإعدادات، ضمن الأمان.',
   'Confirm your email or phone number to ask people you aren’t friends with yet. You can do it in Settings, under Security.':
