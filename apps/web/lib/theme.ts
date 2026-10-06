@@ -13,7 +13,7 @@ export type ThemeChoice = 'light' | 'dark' | 'system';
 
 const KEY = THEME_KEY;
 /** The browser bar colors, as in the root layout's viewport settings. */
-const BAR = { light: '#F4F5FA', dark: '#0B0C14' } as const;
+const BAR = { light: '#EFEBE6', dark: '#0B0C14' } as const;
 
 function read(): ThemeChoice {
   try {

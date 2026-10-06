@@ -283,7 +283,7 @@ export const CHAPTER_STORIES_MAX = 100;
 export const CHAPTER_CONTRIBUTORS_MAX = 20;
 /** Cover gradients from the brand palette, as [start, end] (135deg). White symbols read on all of them. */
 export const CHAPTER_GRADIENTS = {
-  yapi: ['#D21D4A', '#C2410C'],
+  yapi: ['#B42A4E', '#B8501F'],
   sunrise: ['#FF5C7A', '#C2410C'],
   saffron: ['#C2410C', '#FFB020'],
   dusk: ['#0E1020', '#D21D4A'],

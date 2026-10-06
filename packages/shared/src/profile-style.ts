@@ -17,7 +17,7 @@
 export const PROFILE_ACCENT_IDS = ['yapi', 'coral', 'saffron', 'leaf', 'teal', 'ocean', 'indigo', 'violet', 'orchid', 'graphite'] as const;
 export type ProfileAccent = (typeof PROFILE_ACCENT_IDS)[number];
 export const PROFILE_ACCENTS: readonly { id: ProfileAccent; hex: string; dark?: string; turn: number }[] = [
-  { id: 'yapi', hex: '#D21D4A', dark: '#FF5C7A', turn: 28 },
+  { id: 'yapi', hex: '#B42A4E', dark: '#FF5C7A', turn: 28 },
   { id: 'coral', hex: '#E0592A', turn: 22 },
   { id: 'saffron', hex: '#E09A12', turn: -18 },
   { id: 'leaf', hex: '#2F9E44', turn: 40 },
@@ -173,7 +173,7 @@ export function ensureContrast(fg: string, backgrounds: readonly string[], min =
 
 /** The page colours each theme draws on (mirrors packages/design-system/tokens.json; a test keeps them in step). */
 export const THEME_SURFACES = {
-  light: { ground: '#F4F5FA', surface: '#FFFFFF', sunken: '#ECEEF5', ink: '#0E1020' },
+  light: { ground: '#EFEBE6', surface: '#F9F7F3', sunken: '#E7E2DB', ink: '#26211E' },
   dark: { ground: '#0B0C14', surface: '#151726', sunken: '#10121E', ink: '#F2F3FA' },
 } as const;
 export type ThemeName = keyof typeof THEME_SURFACES;

@@ -137,7 +137,7 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
               pointerEvents="none"
               style={[
                 s.glow,
-                { width: slot - 6, start: PAD + 3, backgroundColor: c.yapiSoft, borderColor: c.theme === 'dark' ? '#FF5C7A33' : '#D21D4A26' },
+                { width: slot - 6, start: PAD + 3, backgroundColor: c.yapiSoft, borderColor: c.theme === 'dark' ? '#FF5C7A33' : '#B42A4E26' },
                 { transform: [{ translateX: slide }] },
               ]}
             />

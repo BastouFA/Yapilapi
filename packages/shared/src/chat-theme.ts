@@ -43,7 +43,7 @@ export interface WallpaperSpec {
 }
 
 // The app's ground colours (tokens.json), for "plain".
-const GROUND = { light: '#F4F5FA', dark: '#0B0C14' };
+const GROUND = { light: '#EFEBE6', dark: '#0B0C14' };
 
 export const WALLPAPERS: Record<ChatWallpaper, WallpaperSpec> = {
   plain: { kind: 'plain', light: { from: GROUND.light, to: GROUND.light }, dark: { from: GROUND.dark, to: GROUND.dark } },
@@ -84,7 +84,7 @@ export interface AccentColors {
 
 export const ACCENTS: Record<ChatAccent, { light: AccentColors; dark: AccentColors }> = {
   // The brand gradient (tokens yapi to grad-end, text on-yapi).
-  yapi: { light: { from: '#D21D4A', to: '#C2410C', on: '#FFFFFF' }, dark: { from: '#FF5C7A', to: '#FFBE3D', on: '#0B0C14' } },
+  yapi: { light: { from: '#B42A4E', to: '#B8501F', on: '#FFFFFF' }, dark: { from: '#FF5C7A', to: '#FFBE3D', on: '#0B0C14' } },
   saffron: { light: { from: '#B45309', to: '#9A3412', on: '#FFFFFF' }, dark: { from: '#FFBE3D', to: '#FFD37A', on: '#0B0C14' } },
   lagoon: { light: { from: '#00735F', to: '#0E7490', on: '#FFFFFF' }, dark: { from: '#3DDBC2', to: '#67D4F0', on: '#0B0C14' } },
   ocean: { light: { from: '#1D4ED8', to: '#0B5CAD', on: '#FFFFFF' }, dark: { from: '#7AA7FF', to: '#67D4F0', on: '#0B0C14' } },
