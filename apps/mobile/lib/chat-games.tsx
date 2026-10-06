@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Alert, Animated, Easing, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, Alert, Animated, Easing, Keyboard, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { ApiError } from '../../../packages/api-client/src/index';
 import {
   applyMove,
@@ -146,7 +146,12 @@ function useAnnounce(text: string) {
 
 // ─── The card in the chat ───────────────────────────────────────────────
 
-export function GameCard({ message, meId, tint, onOpen }: { message: Message; meId?: string; tint: string; onOpen: () => void }) {
+export function GameCard({ message, meId, tint, onOpen: openBoard }: { message: Message; meId?: string; tint: string; onOpen: () => void }) {
+  // The board needs the whole screen: the message keyboard goes away rather than covering it.
+  const onOpen = () => {
+    Keyboard.dismiss();
+    openBoard();
+  };
   const { t } = useT();
   const c = useColors();
   const game = message.game!;
