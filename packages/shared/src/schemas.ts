@@ -159,6 +159,8 @@ export const problemReportSchema = z.object({
 });
 
 export const changePasswordSchema = z.object({ currentPassword: z.string().min(1).max(200), newPassword: passwordSchema });
+/** A new email for the account, with the password to show it's you. The change waits for the link sent to it. */
+export const changeEmailSchema = z.object({ email: z.string().trim().toLowerCase().email().max(254), password: z.string().min(1).max(200) });
 
 export const tokenSchema = z.object({ token: z.string().min(20).max(200) });
 export const forgotPasswordSchema = z.object({ email: z.string().trim().toLowerCase().email() });

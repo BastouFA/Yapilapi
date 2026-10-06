@@ -22,6 +22,8 @@ export const pt: Record<string, string> = {
   'There’s no text to translate.': 'Não há texto para traduzir.',
   'This is already in that language.': 'Isto já está nesse idioma.',
   // apps/api/src/modules/auth.ts
+  'That’s already your email.': 'Esse já é o seu e-mail.',
+  'Another account already uses this email.': 'Outra conta já usa este e-mail.',
   'The email couldn’t be sent right now. Try again later.': 'Não foi possível enviar o e-mail agora. Tente de novo mais tarde.',
   'Translation isn’t available right now. Try again later.': 'A tradução não está disponível agora. Tente de novo mais tarde.',
   'This couldn’t be translated right now. Try again later.': 'Não foi possível traduzir isto agora. Tente de novo mais tarde.',

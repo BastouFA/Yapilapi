@@ -112,6 +112,21 @@ export const SECURITY_EMAILS: Record<string, { subject: MessageKey; body: Messag
   ].map((type) => [type, { subject: `email.security.${type}.subject` as MessageKey, body: `email.security.${type}.body` as MessageKey }]),
 );
 
+/** To the old address after an email change: which address the account moved to, and what to do if it wasn't you. */
+export function emailChangedNotice(to: string, newEmail: string, webOrigin: string, when = new Date(), locale = 'en'): Email {
+  return {
+    to,
+    subject: t('email.security.email_changed.subject', locale),
+    text: [
+      t('email.security.email_changed.body', locale, { email: newEmail }),
+      whenLine(when, locale),
+      '',
+      t('email.nothingToDo', locale),
+      t('email.security.ifNot', locale, { url: `${linkOrigin(webOrigin)}/forgot-password` }),
+    ].join('\n'),
+  };
+}
+
 /** The text of a security notice in the reader's language, with what to do if it wasn't you. */
 export function securityEmail(type: string, to: string, webOrigin: string, when = new Date(), locale = 'en'): Email | null {
   const e = SECURITY_EMAILS[type];

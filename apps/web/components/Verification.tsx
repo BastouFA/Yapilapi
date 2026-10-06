@@ -7,6 +7,7 @@ import type { VerificationStatus } from '@yapilapi/api-client';
 import type { MessageKey } from '@yapilapi/shared';
 import { api, ApiError, errorMessage, fieldErrors } from '@/lib/api';
 import { useSession } from '@/app/providers';
+import { PasswordField } from '@/components/PasswordField';
 
 /** True for the API's "confirm your email or phone first" refusal. */
 export const isVerificationError = (e: unknown) => e instanceof ApiError && e.code === 'verification_required';
@@ -43,6 +44,8 @@ export function VerificationCard() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
+  const [changing, setChanging] = useState(false);
+  const [changeSent, setChangeSent] = useState<string | null>(null);
 
   useEffect(() => {
     api.verification.status().then(
@@ -83,17 +86,48 @@ export function VerificationCard() {
               {status.email.address} · {status.email.verified ? t('m.verify.confirmed') : t('m.verify.notConfirmed')}
             </p>
           </div>
-          {!status.email.verified ? (
-            <Button
-              size="sm"
-              variant="secondary"
-              loading={busy}
-              onClick={() => run(async () => (await api.auth.resendVerification(), toast(t('m.verify.emailSent'))))}
-            >
-              {t('m.verify.resendEmail')}
+          <div className="row">
+            {!status.email.verified ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                loading={busy}
+                onClick={() => run(async () => (await api.auth.resendVerification(), toast(t('m.verify.emailSent'))))}
+              >
+                {t('m.verify.resendEmail')}
+              </Button>
+            ) : null}
+            <Button size="sm" variant="ghost" aria-expanded={changing} onClick={() => setChanging((v) => !v)}>
+              {t('m.verify.changeEmail')}
             </Button>
-          ) : null}
+          </div>
         </div>
+        {changing ? (
+          <form
+            className="stack-sm"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const form = new FormData(e.currentTarget);
+              void run(async () => {
+                const r = await api.auth.changeEmail(String(form.get('email') ?? ''), String(form.get('password') ?? ''));
+                setChanging(false);
+                setChangeSent(r.sentTo);
+              });
+            }}
+          >
+            <p className="muted" style={{ margin: 0 }}>
+              {t('m.verify.changeHint')}
+            </p>
+            <TextField label={t('m.verify.newEmail')} name="email" type="email" autoComplete="email" required />
+            <PasswordField label={t('m.verify.yourPassword')} name="password" autoComplete="current-password" required />
+            <div className="row">
+              <Button type="submit" size="sm" loading={busy}>
+                {t('m.verify.sendChangeLink')}
+              </Button>
+            </div>
+          </form>
+        ) : null}
+        {changeSent ? <Alert tone="success">{t('m.verify.changeSent', { email: changeSent })}</Alert> : null}
 
         <div className="verify-row">
           <div>

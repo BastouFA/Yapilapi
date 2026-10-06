@@ -75,6 +75,9 @@ export function VerificationCard() {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [changing, setChanging] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   useEffect(() => {
     client()
@@ -115,20 +118,61 @@ export function VerificationCard() {
       {error ? <Notice tone="danger">{error}</Notice> : null}
 
       {line(t('m.verify.email'), `${status.email.address} · ${status.email.verified ? t('m.verify.confirmed') : t('m.verify.notConfirmed')}`)}
-      {!status.email.verified ? (
-        <Button
-          size="sm"
-          variant="secondary"
-          label={t('m.verify.resendEmail')}
-          disabled={busy}
-          style={{ alignSelf: 'flex-start' }}
-          onPress={() =>
-            run(async () => {
-              await (await client()).auth.resendVerification();
-              setNote(t('m.verify.emailSent'));
-            })
-          }
-        />
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+        {!status.email.verified ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            label={t('m.verify.resendEmail')}
+            disabled={busy}
+            onPress={() =>
+              run(async () => {
+                await (await client()).auth.resendVerification();
+                setNote(t('m.verify.emailSent'));
+              })
+            }
+          />
+        ) : null}
+        <Button size="sm" variant="ghost" label={t('m.verify.changeEmail')} disabled={busy} onPress={() => setChanging((v) => !v)} />
+      </View>
+      {changing ? (
+        <View style={{ gap: space[2] }}>
+          <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('m.verify.changeHint')}</Text>
+          <Field
+            label={t('m.verify.newEmail')}
+            value={newEmail}
+            onChangeText={setNewEmail}
+            keyboardType="email-address"
+            textContentType="emailAddress"
+            autoComplete="email"
+            autoCapitalize="none"
+            autoCorrect={false}
+            maxLength={254}
+          />
+          <Field
+            label={t('m.verify.yourPassword')}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            textContentType="password"
+            autoComplete="current-password"
+            autoCapitalize="none"
+          />
+          <Button
+            size="sm"
+            label={t('m.verify.sendChangeLink')}
+            disabled={busy || !newEmail.includes('@') || !password}
+            style={{ alignSelf: 'flex-start' }}
+            onPress={() =>
+              run(async () => {
+                const r = await (await client()).auth.changeEmail(newEmail, password);
+                setPassword('');
+                setChanging(false);
+                setNote(t('m.verify.changeSent', { email: r.sentTo }));
+              })
+            }
+          />
+        </View>
       ) : null}
 
       {line(

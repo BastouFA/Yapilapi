@@ -22,6 +22,8 @@ export const ar: Record<string, string> = {
   'There’s no text to translate.': 'لا يوجد نص لترجمته.',
   'This is already in that language.': 'هذا النص مكتوب بتلك اللغة بالفعل.',
   // apps/api/src/modules/auth.ts
+  'That’s already your email.': 'هذا بريدك الإلكتروني بالفعل.',
+  'Another account already uses this email.': 'يستخدم حساب آخر هذا البريد الإلكتروني بالفعل.',
   'The email couldn’t be sent right now. Try again later.': 'تعذّر إرسال البريد الإلكتروني الآن. حاول مرة أخرى لاحقًا.',
   'Translation isn’t available right now. Try again later.': 'الترجمة غير متاحة الآن. حاول مرة أخرى لاحقًا.',
   'This couldn’t be translated right now. Try again later.': 'تعذرت ترجمة هذا الآن. حاول مرة أخرى لاحقًا.',

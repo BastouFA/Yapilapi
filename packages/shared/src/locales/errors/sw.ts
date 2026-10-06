@@ -22,6 +22,8 @@ export const sw: Record<string, string> = {
   'There’s no text to translate.': 'Hakuna maandishi ya kutafsiri.',
   'This is already in that language.': 'Hiki tayari kiko katika lugha hiyo.',
   // apps/api/src/modules/auth.ts
+  'That’s already your email.': 'Hiyo tayari ni barua pepe yako.',
+  'Another account already uses this email.': 'Akaunti nyingine tayari inatumia barua pepe hii.',
   'The email couldn’t be sent right now. Try again later.': 'Barua pepe haikuweza kutumwa sasa hivi. Jaribu tena baadaye.',
   'Translation isn’t available right now. Try again later.': 'Tafsiri haipatikani kwa sasa. Jaribu tena baadaye.',
   'This couldn’t be translated right now. Try again later.': 'Hiki hakikuweza kutafsiriwa kwa sasa. Jaribu tena baadaye.',

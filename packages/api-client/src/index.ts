@@ -291,7 +291,14 @@ export function createClient(opts: ClientOptions) {
       changePassword: (currentPassword: string, newPassword: string) => post<{ ok: true }>('/v1/auth/password/change', { currentPassword, newPassword }),
       /** Recent sign-ins and security changes (newest first, at most 50). */
       securityEvents: () => get<{ items: { type: string; ip: string | null; created_at: string }[] }>('/v1/auth/security-events'),
-      verifyEmail: (token: string) => post('/v1/auth/verify-email', { token }),
+      /** `changed`: the link was for a new address, which is now the account's (and confirmed). */
+      verifyEmail: (token: string) => post<{ ok: true; changed?: boolean }>('/v1/auth/verify-email', { token }),
+      /**
+       * Change the account's email: a link goes to `email`, and the email changes when it is opened.
+       * 400 with `fields.password` for a wrong password, 409 when another account uses the address,
+       * 503 `email_not_sent` when the link couldn't be sent.
+       */
+      changeEmail: (email: string, password: string) => post<{ ok: true; sentTo: string }>('/v1/auth/email/change', { email, password }),
       resendVerification: () => post('/v1/auth/verify-email/resend'),
       forgot: (email: string) => post<{ message: string }>('/v1/auth/password/forgot', { email }),
       reset: (token: string, password: string) => post('/v1/auth/password/reset', { token, password }),

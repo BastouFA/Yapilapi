@@ -8,14 +8,18 @@ import { api, errorMessage } from '@/lib/api';
 import { useSession } from '../../providers';
 
 function Verify() {
-  const { t } = useSession();
+  const { t, me, refresh } = useSession();
   const token = useSearchParams().get('token') ?? '';
-  const [state, setState] = useState<{ ok?: boolean; error?: string; incomplete?: boolean }>({});
+  const [state, setState] = useState<{ ok?: boolean; changed?: boolean; error?: string; incomplete?: boolean }>({});
   useEffect(() => {
     // Opened without the link's token (typed by hand, or cut short by a mail app): nothing to confirm.
     if (!token) return setState({ incomplete: true });
     api.auth.verifyEmail(token).then(
-      () => setState({ ok: true }),
+      (r) => {
+        setState({ ok: true, changed: !!r.changed });
+        // Signed in here: the account (its email, and "confirm your email") catches up.
+        if (me) void refresh();
+      },
       (e) => setState({ error: errorMessage(e) }),
     );
   }, [token]);
@@ -23,7 +27,7 @@ function Verify() {
     <div className="stack">
       <h1>{t('auth.verify.title')}</h1>
       {state.ok ? (
-        <Alert tone="success">{t('auth.verify.done')}</Alert>
+        <Alert tone="success">{state.changed ? t('verify.emailChanged') : t('auth.verify.done')}</Alert>
       ) : state.error || state.incomplete ? (
         <Alert tone="danger">{state.incomplete ? t('auth.verify.incomplete') : state.error}</Alert>
       ) : (

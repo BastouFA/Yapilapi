@@ -5,6 +5,7 @@ import { tx } from '@yapilapi/database';
 import {
   ADULT_AGE,
   birthDateSchema,
+  changeEmailSchema,
   changePasswordSchema,
   clientPlatformFrom,
   forgotPasswordSchema,
@@ -32,7 +33,7 @@ import { z } from 'zod';
 import { suspendedError } from '../lib/suspension.ts';
 import { AppError, badRequest, conflict, notFound, parse, unauthorized } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
-import { recipientLocale, userLocale } from '../lib/email.ts';
+import { deliverable, emailChangedNotice, recipientLocale, userLocale } from '../lib/email.ts';
 import { audit, securityEvent, track } from '../lib/services.ts';
 import { applyMinorDefaults, checkBirthDate } from '../lib/users.ts';
 import { announceReferral, applyReferral, inviterByCode, qualifyReferral } from '../lib/invites.ts';
@@ -360,20 +361,83 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
 
   app.post('/v1/auth/verify-email', { config: authLimit }, async (req) => {
     const { token } = parse(tokenSchema, req.body);
-    const { rows } = await ctx.db.query<{ user_id: string }>(
-      `UPDATE auth_tokens SET used_at = now() WHERE token_hash = $1 AND purpose = 'verify_email' AND used_at IS NULL AND expires_at > now() RETURNING user_id`,
+    // A sign-up's link confirms the email; a change's link (sent to the new address) also switches to it.
+    const { rows } = await ctx.db.query<{ user_id: string; purpose: string; new_email: string | null }>(
+      `UPDATE auth_tokens SET used_at = now() WHERE token_hash = $1 AND purpose IN ('verify_email', 'change_email') AND used_at IS NULL AND expires_at > now()
+       RETURNING user_id, purpose, new_email`,
       [hashToken(token)],
     );
     if (!rows[0]) throw badRequest('This link has expired or was already used. Request a new one from Settings.');
+    const { user_id: userId, new_email: newEmail } = rows[0];
+    let oldEmail: string | null = null;
     await tx(ctx.db, async (c) => {
-      await c.query(`UPDATE users SET email_verified_at = now() WHERE id = $1`, [rows[0]!.user_id]);
+      if (newEmail) {
+        // Someone else may have taken the address since the link was sent.
+        const taken = await c.query(`SELECT 1 FROM users WHERE lower(email) = $1 AND id <> $2`, [newEmail, userId]);
+        if (taken.rowCount) throw new AppError(409, 'conflict', 'Another account already uses this email.', { fields: { email: 'Taken.' } });
+        oldEmail = (await c.query<{ email: string }>(`SELECT email FROM users WHERE id = $1 FOR UPDATE`, [userId])).rows[0]?.email ?? null;
+        await c.query(`UPDATE users SET email = $2, email_verified_at = now() WHERE id = $1`, [userId, newEmail]);
+        // Other pending changes and old sign-up links are for an address that is no longer the account's.
+        await c.query(`UPDATE auth_tokens SET used_at = now() WHERE user_id = $1 AND purpose IN ('verify_email', 'change_email') AND used_at IS NULL`, [
+          userId,
+        ]);
+      } else await c.query(`UPDATE users SET email_verified_at = now() WHERE id = $1`, [userId]);
       // A confirmed email makes an invite count toward the inviter's free month.
-      await qualifyReferral(c, ctx.realtime, rows[0]!.user_id);
+      await qualifyReferral(c, ctx.realtime, userId);
     });
-    await securityEvent(ctx.db, rows[0].user_id, 'email_verified', req.ip);
+    await securityEvent(ctx.db, userId, newEmail ? 'email_changed' : 'email_verified', req.ip);
+    // The old address hears about it, so a change nobody asked for doesn't go unnoticed.
+    if (newEmail && deliverable(oldEmail)) {
+      const locale = recipientLocale((await ctx.db.query<{ locale: string }>(`SELECT locale FROM profiles WHERE user_id = $1`, [userId])).rows[0]?.locale);
+      void ctx.email
+        .send(emailChangedNotice(oldEmail, newEmail, webOrigin, new Date(), locale))
+        .catch((err: Error) => app.log.warn({ err: err.message }, 'email change notice not sent'));
+    }
     // An address listed in ADMIN_EMAILS becomes admin as soon as it is confirmed.
     await promoteListedAdmins(ctx.db, adminEmails(ctx.config.ADMIN_EMAILS));
-    return { ok: true };
+    return { ok: true, changed: !!newEmail };
+  });
+
+  /**
+   * Changing the account's email: the password shows it's you, and a link goes to the new address.
+   * Nothing changes until that link is opened (POST /v1/auth/verify-email), so a typo can't lock
+   * anyone out. Answers 503 email_not_sent when the link couldn't be sent.
+   */
+  app.post('/v1/auth/email/change', { preHandler: requireAuth, config: authLimit }, async (req) => {
+    const u = me(req);
+    const input = parse(changeEmailSchema, req.body);
+    const { rows } = await ctx.db.query<{ password_hash: string | null; email: string }>(`SELECT password_hash, email FROM users WHERE id = $1`, [u.id]);
+    if (!(await verifyPassword(input.password, rows[0]?.password_hash)))
+      throw badRequest('Your current password is incorrect.', { fields: { password: 'Incorrect.' } });
+    if (rows[0]!.email.toLowerCase() === input.email) throw badRequest('That’s already your email.', { fields: { email: 'That’s already your email.' } });
+    if ((await ctx.db.query(`SELECT 1 FROM users WHERE lower(email) = $1`, [input.email])).rowCount)
+      throw new AppError(409, 'conflict', 'Another account already uses this email.', { fields: { email: 'Taken.' } });
+    const { token, hash } = newToken();
+    await tx(ctx.db, async (c) => {
+      // Only the latest request counts.
+      await c.query(`UPDATE auth_tokens SET used_at = now() WHERE user_id = $1 AND purpose = 'change_email' AND used_at IS NULL`, [u.id]);
+      await c.query(
+        `INSERT INTO auth_tokens (user_id, purpose, token_hash, expires_at, new_email) VALUES ($1, 'change_email', $2, now() + interval '2 days', $3)`,
+        [u.id, hash, input.email],
+      );
+    });
+    const locale = await userLocale(ctx.db, u.id);
+    const sent = await ctx.email
+      .send({
+        to: input.email,
+        subject: t('email.changeEmail.subject', locale),
+        text: t('email.changeEmail.body', locale, { url: `${webOrigin}/verify-email?token=${token}` }),
+      })
+      .then(
+        () => true,
+        (err: Error) => {
+          app.log.error({ err: err.message }, 'email change link not sent');
+          return false;
+        },
+      );
+    if (!sent) throw new AppError(503, 'email_not_sent', 'The email couldn’t be sent right now. Try again later.');
+    await securityEvent(ctx.db, u.id, 'email_change_requested', req.ip);
+    return { ok: true, sentTo: input.email };
   });
 
   app.post('/v1/auth/verify-email/resend', { preHandler: requireAuth, config: authLimit }, async (req) => {

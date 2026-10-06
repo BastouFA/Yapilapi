@@ -22,6 +22,8 @@ export const yo: Record<string, string> = {
   'There’s no text to translate.': 'Kò sí ọ̀rọ̀ kankan láti túmọ̀.',
   'This is already in that language.': 'Èyí ti wà ní èdè yẹn tẹ́lẹ̀.',
   // apps/api/src/modules/auth.ts
+  'That’s already your email.': 'Ímeèlì rẹ nìyẹn tẹ́lẹ̀.',
+  'Another account already uses this email.': 'Àkáǹtì mìíràn ti ń lo ímeèlì yìí.',
   'The email couldn’t be sent right now. Try again later.': 'A kò lè fi ímeèlì ránṣẹ́ báyìí. Tún gbìyànjú nígbà míì.',
   'Translation isn’t available right now. Try again later.': 'Ìtumọ̀ kò sí báyìí. Gbìyànjú lẹ́ẹ̀kan sí i tó bá yá.',
   'This couldn’t be translated right now. Try again later.': 'A kò lè túmọ̀ èyí báyìí. Gbìyànjú lẹ́ẹ̀kan sí i tó bá yá.',
