@@ -245,3 +245,10 @@ services:
         sync: false
       - key: SAFETY_EMAIL
         sync: false
+      # Optional, once the phone apps exist: links on this site open the app when it's installed.
+      # Your Apple team id (10 characters), and the SHA-256 fingerprints of the Android signing keys,
+      # separated by commas. Read when a page is requested. docs/operations/real-device-testing.md.
+      - key: APPLE_TEAM_ID
+        sync: false
+      - key: ANDROID_CERT_SHA256
+        sync: false
