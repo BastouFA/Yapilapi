@@ -31,6 +31,7 @@ import { AppError, badRequest, conflict, forbidden, notFound, parse } from '../l
 import type { AppContext } from '../lib/context.ts';
 import { decodeCursor, encodeCursor } from '../lib/cursor.ts';
 import { notify, personalizationAllowed, track } from '../lib/services.ts';
+import { learn, learnQuietly } from '../lib/affinity.ts';
 import { emitWebhook } from '../lib/webhooks.ts';
 import { ageOf, areFriends, blockUser, isBlockedEitherWay, PUBLIC_USER_COLS, toPublicUser, usernameMatchSql, type PublicUserRow } from '../lib/users.ts';
 import { notBlockedSql, postVisibleSql } from '../lib/visibility.ts';
@@ -756,6 +757,8 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
         entityId: followee,
       });
     track(db, follower, 'follow', { followee });
+    // Following someone, from anywhere, tells the recommender you like their posts (with Personalization on).
+    await learnQuietly(learn(db, follower, [{ signal: 'follow', authorId: followee }]), app.log);
     await emitWebhook(db, followee, 'follower.new', { followerId: follower });
   }
 
@@ -763,7 +766,8 @@ export default async function profilesModule(app: FastifyInstance, ctx: AppConte
   app.delete('/v1/users/:id/follow', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
-    await db.query(`DELETE FROM follows WHERE follower_id = $1 AND followee_id = $2`, [u.id, id]);
+    const unfollowed = await db.query(`DELETE FROM follows WHERE follower_id = $1 AND followee_id = $2`, [u.id, id]);
+    if (unfollowed.rowCount) await learnQuietly(learn(db, u.id, [{ signal: 'unfollow', authorId: id }]), req.log);
     const took = await db.query(`DELETE FROM follow_requests WHERE follower_id = $1 AND followee_id = $2`, [u.id, id]);
     if (took.rowCount) await db.query(`DELETE FROM notifications WHERE user_id = $1 AND actor_id = $2 AND type = 'follow_request'`, [id, u.id]);
     return { following: false, requested: false };

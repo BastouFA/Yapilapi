@@ -49,6 +49,7 @@ export function ShareSheet({
   onWatch,
   onEcho,
   onEchoes,
+  onShared,
 }: {
   post: Post | null;
   mine: boolean;
@@ -64,6 +65,8 @@ export function ShareSheet({
   /** Answer it with your own video, and see the echoes of it. */
   onEcho?: (p: Post) => void;
   onEchoes?: (p: Post) => void;
+  /** Its link went out (the share sheet finished, or it was copied). */
+  onShared?: (p: Post) => void;
 }) {
   const { t, toast, locale } = useSession();
   if (!post) return null;
@@ -75,6 +78,7 @@ export function ShareSheet({
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(url);
+      onShared?.(post);
       toast(t('reel.share.copied'));
     } catch {
       toast(url);
@@ -92,7 +96,13 @@ export function ShareSheet({
           <SheetItem
             icon="send"
             label={t('reel.share.link')}
-            onClick={done(() => void navigator.share({ title: t('m.reels.shareTitle', { name: post.author.displayName }), url }).catch(() => {}))}
+            onClick={done(
+              () =>
+                void navigator.share({ title: t('m.reels.shareTitle', { name: post.author.displayName }), url }).then(
+                  () => onShared?.(post),
+                  () => {},
+                ),
+            )}
           />
         ) : null}
         <SheetItem icon="link" label={t('reel.share.copy')} onClick={done(() => void copy())} />

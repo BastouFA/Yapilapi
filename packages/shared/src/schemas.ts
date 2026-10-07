@@ -21,6 +21,9 @@ import {
   COMMUNITY_ROLES,
   FEED_MODES,
   FEEDBACK_SIGNALS,
+  FEED_EVENT_KINDS,
+  FEED_EVENT_SURFACES,
+  FEED_EVENTS_MAX_BATCH,
   NOW_STATUS_AUDIENCES,
   NOW_STATUS_ICONS,
   NOW_STATUS_MAX,
@@ -432,6 +435,22 @@ export const feedbackSchema = z.object({
   authorId: uuid.optional(),
   topic: z.string().max(40).optional(),
 });
+
+/** POST /v1/feed/events: what happened to posts on screen, in batches. Times over an hour are refused (the API caps them lower). */
+export const feedEventsSchema = z.object({
+  events: z
+    .array(
+      z.object({
+        postId: uuid,
+        surface: z.enum(FEED_EVENT_SURFACES),
+        kind: z.enum(FEED_EVENT_KINDS),
+        valueMs: z.number().int().min(0).max(3_600_000).optional(),
+      }),
+    )
+    .min(1)
+    .max(FEED_EVENTS_MAX_BATCH),
+});
+export type FeedEventsInput = z.infer<typeof feedEventsSchema>;
 
 export const circleSchema = z.object({ name: trimmed(40), kind: z.enum(CIRCLE_KINDS).default('custom') });
 /** Rename a circle or change its kind. */

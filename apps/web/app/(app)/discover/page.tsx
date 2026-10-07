@@ -224,6 +224,7 @@ function Discover() {
                   load={() => Promise.resolve({ items: posts, nextCursor: null })}
                   reloadKey={`${q}-${posts.map((p) => p.id).join()}`}
                   showEnd={false}
+                  surface="search"
                 />
               </section>
             ) : null}

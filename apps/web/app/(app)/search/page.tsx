@@ -269,6 +269,7 @@ function SearchPage() {
                 load={() => Promise.resolve({ items: posts, nextCursor: null })}
                 reloadKey={`${q}-${tab}-${posts.map((p) => p.id).join()}`}
                 showEnd={false}
+                surface="search"
               />
             </section>
           ) : null}

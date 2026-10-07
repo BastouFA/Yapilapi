@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { EmptyState, Skeleton } from '@yapilapi/design-system';
 import type { EchoPermission, Post, ReelHighlight, ReelMoment } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
+import { recordFeedEvent } from '@/lib/feed-events';
 import { CommentsSheet, ReportSheet } from '@/components/PostList';
 import { SaveToSheet } from '@/components/Boards';
 import { WatchChatPicker } from '@/components/WatchTogether';
@@ -210,10 +211,14 @@ export function ReelsViewer() {
     }
   }
 
+  /** Its link went out, or its video was saved to share: told to the recommender. */
+  const shared = (p: Post) => recordFeedEvent({ postId: p.id, surface: 'reels', kind: 'share' });
+
   const copyLink = async (p: Post) => {
     const url = `${location.origin}/reels?start=${p.id}`;
     try {
       await navigator.clipboard.writeText(url);
+      shared(p);
       toast(t('reel.share.copied'));
     } catch {
       toast(url);
@@ -241,6 +246,7 @@ export function ReelsViewer() {
       document.body.appendChild(a);
       a.click();
       a.remove();
+      shared(p);
     } catch (e) {
       toast(errorMessage(e));
     }
@@ -545,6 +551,7 @@ export function ReelsViewer() {
         onWatch={(p) => setSheet({ kind: 'watch', post: p })}
         onEcho={(p) => router.push(`/reels/${p.id}/echo`)}
         onEchoes={(p) => router.push(`/reels/${p.id}/echoes`)}
+        onShared={shared}
       />
       <WatchChatPicker post={open?.kind === 'watch' ? open.post : null} onClose={closeSheet} />
       <OptionsSheet

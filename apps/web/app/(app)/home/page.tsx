@@ -103,6 +103,7 @@ export default function Home() {
         load={load}
         reloadKey={mode}
         sponsored={mode === 'for_you'}
+        surface={mode === 'local' ? 'other' : mode}
         // Communities and Local fill up in their own ways: say how.
         {...(mode === 'communities'
           ? { emptyTitle: t('feed.empty.communities.title'), empty: t('feed.empty.communities.body') }

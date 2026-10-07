@@ -43,6 +43,7 @@ import { canWatch, useWatchStart } from './watch';
 import { QuestionQuoteView } from './ask';
 import { MixTile } from './mixes';
 import { clock } from './media';
+import { recordFeedEvent, useFeedSurface } from './feed-events';
 
 export { RichText };
 
@@ -67,11 +68,14 @@ export function AuthorNames({
   collaborators = [],
   style,
   numberOfLines,
+  onAuthorOpen,
 }: {
   author: PublicUser;
   collaborators?: PublicUser[];
   style?: StyleProp<TextStyle>;
   numberOfLines?: number;
+  /** When the author's own name is tapped (not a co-author's). */
+  onAuthorOpen?: () => void;
 }) {
   const { t } = useT();
   const people = [author, ...collaborators.filter((u) => u.id !== author.id)];
@@ -86,7 +90,10 @@ export function AuthorNames({
                 accessibilityRole="link"
                 accessibilityLabel={t('m.title.profile') + ': ' + u.displayName}
                 suppressHighlighting={false}
-                onPress={() => router.push(`/u/${u.username}`)}
+                onPress={() => {
+                  if (u.id === author.id) onAuthorOpen?.();
+                  router.push(`/u/${u.username}`);
+                }}
               >
                 {u.displayName}
               </Text>
@@ -191,6 +198,12 @@ function PostCardView({
   const [post, setPost] = useState(given);
   // Why it's in your feed ("Your post", "You follow Ada"), in your language.
   const reason = postReasonText(post, { t });
+  // Where this card is (a Pulse mode, a profile), for the recommender.
+  const surface = useFeedSurface();
+  const openAuthor = () => {
+    recordFeedEvent({ postId: post.id, surface, kind: 'profile_open' });
+    router.push(`/u/${post.author.username}`);
+  };
   const [editing, setEditing] = useState(false);
   const [history, setHistory] = useState(false);
   const [transcriptOpen, setTranscriptOpen] = useState(false);
@@ -453,16 +466,17 @@ function PostCardView({
       {coauthors.length ? (
         // With co-authors each name is its own link, so the row isn't one big link.
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}>
-          <Pressable
-            accessibilityRole="link"
-            accessibilityLabel={t('m.title.profile') + ': ' + post.author.displayName}
-            hitSlop={2}
-            onPress={() => router.push(`/u/${post.author.username}`)}
-          >
+          <Pressable accessibilityRole="link" accessibilityLabel={t('m.title.profile') + ': ' + post.author.displayName} hitSlop={2} onPress={openAuthor}>
             <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={40} />
           </Pressable>
           <View style={{ flex: 1 }}>
-            <AuthorNames author={post.author} collaborators={coauthors} numberOfLines={2} style={{ color: c.ink, fontWeight: '700', fontSize: 15 }} />
+            <AuthorNames
+              author={post.author}
+              collaborators={coauthors}
+              numberOfLines={2}
+              style={{ color: c.ink, fontWeight: '700', fontSize: 15 }}
+              onAuthorOpen={() => recordFeedEvent({ postId: post.id, surface, kind: 'profile_open' })}
+            />
             <Text style={[{ color: c.inkMuted, fontSize: 12 }, userText]} numberOfLines={1}>
               {timeAgo(post.createdAt)}
               {post.editedAt ? (
@@ -486,7 +500,7 @@ function PostCardView({
         <Pressable
           accessibilityRole="link"
           accessibilityLabel={t('m.title.profile') + ': ' + post.author.displayName}
-          onPress={() => router.push(`/u/${post.author.username}`)}
+          onPress={openAuthor}
           style={{ flexDirection: 'row', alignItems: 'center', gap: space[3] }}
         >
           <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={40} />
@@ -717,7 +731,8 @@ function PostCardView({
                 const title = t('m.reels.shareTitle', { name: post.author.displayName });
                 try {
                   // iOS shares the link as a link; Android only takes a message.
-                  await Share.share(Platform.OS === 'ios' ? { url, message: title } : { message: `${title}\n${url}`, title });
+                  const r = await Share.share(Platform.OS === 'ios' ? { url, message: title } : { message: `${title}\n${url}`, title });
+                  if (r.action === Share.sharedAction) recordFeedEvent({ postId: post.id, surface, kind: 'share' });
                 } catch {
                   // The person closed the share sheet.
                 }

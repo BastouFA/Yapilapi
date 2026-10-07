@@ -374,7 +374,9 @@ describe('analytics and personalization consents', () => {
     expect(on.body.items.find((p: { id: string }) => p.id === post.id)?.reason).toMatch(/^You follow /);
 
     await as(t.app, viewer).put('/v1/me/consents', { purpose: 'personalization', granted: false });
-    const off = await as(t.app, viewer).get('/v1/feed?mode=for_you&limit=20');
+    // The same ranking for everyone counts saves, shares and finished reels too, so on a busy database a post
+    // nobody engaged with yet sits a little further down: read a longer page.
+    const off = await as(t.app, viewer).get('/v1/feed?mode=for_you&limit=50');
     expect(off.status).toBe(200);
     expect(off.body.items.find((p: { id: string }) => p.id === post.id)?.reason).toBe('Popular with people on YAPILAPI right now');
     for (const p of off.body.items as { reason: string }[]) expect(p.reason).toMatch(/^(Your post|Popular with people on YAPILAPI right now|Popular in )/);

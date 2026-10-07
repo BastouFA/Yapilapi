@@ -54,6 +54,7 @@ import type {
   Conversation,
   EventItem,
   FeedMode,
+  FeedEvent,
   Me,
   Message,
   NotificationItem,
@@ -471,7 +472,18 @@ export function createClient(opts: ClientOptions) {
       verifyPhone: (code: string) => post<VerificationStatus>('/v1/me/phone/verify', { code }),
     },
     topics: () => get<{ items: { slug: string; name: string }[] }>('/v1/topics'),
-    feed: (mode: FeedMode, cursor?: string) => get<Page<Post> & { mode: FeedMode }>(`/v1/feed${qs({ mode, cursor })}`),
+    feed: Object.assign((mode: FeedMode, cursor?: string) => get<Page<Post> & { mode: FeedMode }>(`/v1/feed${qs({ mode, cursor })}`), {
+      /** What happened to posts on screen (seen, how long, watched, finished, skipped, shared), up to 50 at a time, for the recommender. */
+      events: (events: FeedEvent[]) => post<{ accepted: number }>('/v1/feed/events', { events }),
+      /** The same as the page closes: the request is sent even as the page goes away (no answer is read). */
+      eventsOnPageClose: (events: FeedEvent[]) => {
+        const headers: Record<string, string> = { 'content-type': 'application/json', ...baseHeaders() };
+        if (opts.token) headers.authorization = `Bearer ${opts.token}`;
+        void f(`${opts.baseUrl}/v1/feed/events`, { method: 'POST', headers, body: JSON.stringify({ events }), credentials: 'include', keepalive: true }).catch(
+          () => {},
+        );
+      },
+    }),
     feedback: (b: { signal: string; postId?: string; authorId?: string; topic?: string }) => post('/v1/feed/feedback', b),
     posts: {
       create: (b: Record<string, unknown>) => post<{ post: Post; moderation?: ModerationNotice }>('/v1/posts', b),

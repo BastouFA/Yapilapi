@@ -13,6 +13,7 @@ import { collectAccountFiles, removeAccountFiles } from '../lib/media-files.ts';
 import { refundUnspentBudget } from '../lib/ad-refunds.ts';
 import { releaseDropOrder } from '../lib/drops.ts';
 import { audit, notify, securityEvent } from '../lib/services.ts';
+import { forgetLearnedTaste } from '../lib/affinity.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 /** Privacy Center: inspect, export and delete your data; manage consent. */
@@ -45,6 +46,8 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
     );
     // Turning analytics off also unlinks the events already recorded: they stay in the totals without being yours.
     if (input.purpose === 'analytics' && !input.granted) await db.query(`UPDATE analytics_events SET user_id = NULL WHERE user_id = $1`, [me(req).id]);
+    // Turning personalization off forgets what the recommender learned about you (lib/affinity.ts) and your ranked feeds.
+    if (input.purpose === 'personalization' && !input.granted) await forgetLearnedTaste(db, me(req).id);
     await audit(db, { actorId: me(req).id, action: 'consent.update', entityType: 'consent', entityId: input.purpose, metadata: { granted: input.granted } });
     return { ok: true };
   });
@@ -407,6 +410,10 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
         `DELETE FROM usage_days WHERE user_id = $1`,
         `DELETE FROM pulse_visits WHERE user_id = $1`,
         `DELETE FROM reel_resume WHERE user_id = $1`,
+        `DELETE FROM feed_events WHERE user_id = $1`,
+        `DELETE FROM feed_sessions WHERE user_id = $1`,
+        `DELETE FROM user_topic_affinity WHERE user_id = $1`,
+        `DELETE FROM user_creator_affinity WHERE user_id = $1 OR author_id = $1`,
         `DELETE FROM user_preferences WHERE user_id = $1`,
         `DELETE FROM ai_catchups WHERE user_id = $1`,
         `DELETE FROM ai_reply_suggestions WHERE user_id = $1`,

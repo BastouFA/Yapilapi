@@ -64,6 +64,10 @@ export const RETENTION = {
   usernameHistoryDaysAfterHold: 30,
   /** Devices remembered for sign-in alerts, and the devices of sessions, after they were last seen. */
   signInDevicesDays: 395,
+  /** What happened to posts on feeds (seen, watched, finished, skipped, shared), for the recommender. Its counts per post stay. */
+  feedEventsDays: 90,
+  /** A feed's kept order for paging (feed_sessions). */
+  feedSessionsDays: 1,
   /** Visits to business pages, the times you opened Pulse, post and reel views, and ad impressions and clicks: 13 months. */
   visitsDays: 395,
   /** Market listings that ended without being renewed, and sold ones, are deleted after this (then erased like other deleted content). */
@@ -428,6 +432,8 @@ export async function runRetention(deps: RetentionDeps): Promise<{ counts: Recor
   await step('pulseVisits', () => deleteInBatches(db, 'pulse_visits', `last_seen_at < ${visits}`));
   // View counts stay on the post; only who viewed it goes.
   await step('postViews', () => deleteInBatches(db, 'post_views', `viewed_at < ${visits}`));
+  await step('feedEvents', () => deleteInBatches(db, 'feed_events', `created_at < ${days(RETENTION.feedEventsDays)}`));
+  await step('feedSessions', () => deleteInBatches(db, 'feed_sessions', `created_at < ${days(RETENTION.feedSessionsDays)}`));
   // "Hide this ad" is a choice, not an event: it stays while the campaign exists.
   await step('adEvents', () => deleteInBatches(db, 'ad_events', `kind <> 'hide' AND created_at < ${visits}`));
   return { counts, errors };

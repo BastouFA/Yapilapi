@@ -22,9 +22,12 @@ import {
 import { z } from 'zod';
 import { AppError, badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
-import { decodeCursor, encodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
+import { decodeCursor, keyCursorOf, type KeyCursor } from '../lib/cursor.ts';
 import { analyzeText, statusForRisk } from '../lib/moderation.ts';
 import { ENGLISH_REASONS, hydratePosts, type FeedReason } from '../lib/posts.ts';
+import { RANKING, rankedPage } from '../lib/ranking.ts';
+import { fadedScoreSql, learn, learnFromPost, learnQuietly } from '../lib/affinity.ts';
+import { bumpStats, trendSql, TREND } from '../lib/post-stats.ts';
 import { attachSaveNotes, savedFilterSql } from '../lib/saves.ts';
 import { notifyMentions } from '../lib/mentions.ts';
 import { coAuthoredIdsSql } from '../lib/collabs.ts';
@@ -62,22 +65,6 @@ const PERSONAL_FILTERS = `
          OR (ff.signal = 'mute_topic' AND ff.topic = ANY(p.topics))))`;
 const VISIBLE = postVisibleSql('$1');
 const UNLOCKED = postUnlockedSql('$1');
-/** For You scores posts from your connections plus this many of the newest other posts. */
-const RECENT_CANDIDATES = 1000;
-/**
- * Diversity in For you: an author's first posts rank on their own score; each one after the first
- * FEED_PER_AUTHOR goes down by FEED_DIVERSITY_STEP more, so one busy account spreads out through the
- * feed instead of filling it, and every post still has one place in the order (no post is skipped
- * between pages).
- */
-const FEED_PER_AUTHOR = 2;
-const FEED_DIVERSITY_STEP = 1.5;
-const diversified = (score: string, author: string, tiebreak: string) =>
-  `${score} - ${FEED_DIVERSITY_STEP} * greatest(0, row_number() OVER (PARTITION BY ${author} ORDER BY ${score} DESC, ${tiebreak}) - ${FEED_PER_AUTHOR})`;
-/** …and up to this many of the newest posts on the viewer's interests. */
-const INTEREST_CANDIDATES = 300;
-/** Reels ranks the newest this-many reels plus a month of reels from your follows and friends. */
-const REEL_CANDIDATES = 2000;
 const POST_FROM = `FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id`;
 
 /** The stricter of two moderation states. */
@@ -103,55 +90,32 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
 
   // ── Create ────────────────────────────────────────────────────────────
   /**
-   * Reels: short vertical videos in a full-screen feed. Ranked like For You
-   * (people you're close to, your interests, engagement, freshness) but only
-   * reels, with a stable window so paging never repeats or skips.
+   * Reels: short vertical videos in a full-screen feed, ranked by the recommender (lib/ranking.ts):
+   * people you're close to, what you watch, finish and skip, your interests and feedback, quality,
+   * momentum and freshness, with room for new creators. The order is kept while you page, so
+   * paging never repeats or skips.
    */
   app.get('/v1/reels', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const q = parse(z.object({ cursor: z.string().max(200).optional(), limit: z.coerce.number().int().min(1).max(20).default(8) }), req.query);
-    const c = decodeCursor<{ asOf: string; o: number }>(q.cursor) ?? {
-      asOf: ((await db.query<{ t: Date }>(`SELECT now() AS t`)).rows[0]!.t as Date).toISOString(),
-      o: 0,
-    };
-    // Candidates: the newest REEL_CANDIDATES reels plus the last month of reels from people you follow
-    // and friends, so the ranking below costs the same however many reels the platform holds. Your
-    // follows, friends and interests are built once instead of looked up for every reel.
-    const { rows } = await db.query(
-      `WITH followed AS (SELECT followee_id AS id FROM follows WHERE follower_id = $1),
-       friends AS (SELECT user_b AS id FROM friendships WHERE user_a = $1 UNION ALL SELECT user_a FROM friendships WHERE user_b = $1),
-       me AS (SELECT coalesce(array_agg(tp.slug), '{}') AS interests FROM user_interests ui JOIN topics tp ON tp.id = ui.topic_id WHERE ui.user_id = $1),
-       candidates AS (
-         (SELECT id FROM posts
-          WHERE format = 'reel' AND deleted_at IS NULL AND status = 'published' AND created_at <= $2::timestamptz
-          ORDER BY created_at DESC, id DESC LIMIT ${REEL_CANDIDATES})
-         UNION
-         SELECT p.id FROM (SELECT id FROM followed UNION SELECT id FROM friends) a
-         JOIN posts p ON p.author_id = a.id
-         WHERE p.format = 'reel' AND p.deleted_at IS NULL AND p.status = 'published'
-           AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '30 days'
-       )
-       SELECT p.id ${POST_FROM} CROSS JOIN me
-       WHERE p.id IN (SELECT id FROM candidates) AND p.format = 'reel' AND ${VISIBLE} AND p.moderation_status = 'normal' AND p.created_at <= $2::timestamptz
-         AND ($5 OR NOT EXISTS (SELECT 1 FROM post_media pm JOIN media m ON m.id = pm.media_id WHERE pm.post_id = p.id AND m.moderation = 'sensitive'))
-         ${PERSONAL_FILTERS}
-       ORDER BY (
-           -- People you're close to and your interests only count with Personalization on ($6).
-           CASE WHEN $6 AND p.author_id IN (SELECT id FROM friends) THEN 3 ELSE 0 END
-         + CASE WHEN $6 AND p.author_id IN (SELECT id FROM followed) THEN 2 ELSE 0 END
-         + (SELECT count(*) FROM unnest(p.topics) t WHERE $6 AND t = ANY(me.interests)) * 1.2
-         + ln(1 + p.like_count + 2 * p.comment_count) * 0.6
-         + 4.0 * exp(-extract(epoch FROM ($2::timestamptz - p.created_at)) / 86400.0)
-       ) DESC, p.created_at DESC, p.id DESC
-       LIMIT $3 OFFSET $4`,
-      // A reel is its video: people under 18 don't get reels whose video is marked sensitive.
-      [u.id, c.asOf, q.limit + 1, c.o, await seesSensitiveMedia(db, u.id), await personalizationAllowed(db, u.id)],
+    // A reel is its video: people under 18 don't get reels whose video is marked sensitive.
+    const ranked = await rankedPage(
+      db,
+      {
+        userId: u.id,
+        surface: 'reels',
+        personalized: await personalizationAllowed(db, u.id),
+        personal: PERSONAL_FILTERS,
+        sensitiveOk: await seesSensitiveMedia(db, u.id),
+      },
+      q.cursor,
+      q.limit,
     );
-    const page = rows.slice(0, q.limit);
     const items = await hydratePosts(
       db,
-      page.map((r) => r.id),
+      ranked.items.map((r) => r.id),
       u.id,
+      new Map(ranked.items.map((r) => [r.id, r.reason])),
     );
     // Each author's follower count, and whether you follow them, for the follow button on the reel.
     const stats = await db.query(
@@ -163,7 +127,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     return {
       items,
       authors: Object.fromEntries(stats.rows.map((r) => [r.user_id, { followers: r.followers, following: r.following }])),
-      nextCursor: rows.length > q.limit ? encodeCursor({ asOf: c.asOf, o: c.o + q.limit }) : null,
+      nextCursor: ranked.nextCursor,
     };
   });
 
@@ -638,183 +602,24 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
   });
 
   /**
-   * For You ranking. Score = affinity + interest match + engagement + freshness
-   * − negative feedback. The candidate window is fixed at the first page (asOf)
-   * so pagination is stable. Diversity: an author's posts after their first two
-   * rank lower and lower (see FEED_DIVERSITY_STEP).
-   * Not optimized for time spent: no autoplay loops, a clear end of feed.
+   * For you, ranked by the recommender (lib/ranking.ts, docs/product/recommendations.md): your
+   * connections, what you engage with and what people like you engage with, your interests and
+   * feedback, quality, momentum and freshness, with room for new creators, no more than a few
+   * posts in a row from one creator or topic, and a clear end of feed. With Personalization off
+   * it's the same for everyone (quality, momentum, freshness); your own filters still apply, and
+   * so does who may see what. "Fewer suggestions" keeps it to your connections and communities.
    */
   async function rankedFeed(userId: string, cursor: string | undefined, limit: number, personal: string, reduced: boolean, personalized: boolean) {
-    // The window starts at the database's clock, not this process's: a post written a moment ago must be inside it
-    // even when the two clocks drift (common with containers after the host sleeps).
-    const c = decodeCursor<{ asOf: string; o: number }>(cursor) ?? {
-      asOf: ((await db.query<{ t: Date }>(`SELECT now() AS t`)).rows[0]!.t as Date).toISOString(),
-      o: 0,
-    };
-    const connectionOnly = reduced
-      ? `AND (p.author_id = $1 OR p.author_id IN (SELECT id FROM followed)
-              OR EXISTS (SELECT 1 FROM community_members cm WHERE cm.community_id = p.community_id AND cm.user_id = $1))`
-      : '';
-    if (!personalized) return popularFeed(userId, c, limit, personal, connectionOnly);
-    // Candidates: everything in the window from you, people you follow, friends and your
-    // communities, plus the newest RECENT_CANDIDATES other posts. Scoring every post of the
-    // last 14 days made this query grow with the whole platform (docs/architecture/performance.md).
-    // The viewer's follows, friends and topic lists are built once (hashed sets and arrays)
-    // instead of being looked up with correlated subqueries for each post.
-    const { rows } = await db.query(
-      `WITH me AS (
-         SELECT coalesce((SELECT array_agg(t.slug) FROM user_interests ui JOIN topics t ON t.id = ui.topic_id WHERE ui.user_id = $1), '{}') AS interests,
-                coalesce((SELECT array_agg(DISTINCT x) FROM feed_feedback ff JOIN posts p2 ON p2.id = ff.post_id, unnest(p2.topics) x
-                          WHERE ff.user_id = $1 AND ff.signal = 'more_like_this'), '{}') AS more,
-                coalesce((SELECT array_agg(DISTINCT x) FROM feed_feedback ff JOIN posts p2 ON p2.id = ff.post_id, unnest(p2.topics) x
-                          WHERE ff.user_id = $1 AND ff.signal = 'less_like_this'), '{}') AS less
-       ),
-       followed AS (SELECT followee_id AS id FROM follows WHERE follower_id = $1),
-       friends AS (SELECT user_b AS id FROM friendships WHERE user_a = $1 UNION ALL SELECT user_a FROM friendships WHERE user_b = $1),
-       candidates AS (
-         SELECT p.id FROM (SELECT $1::uuid AS id UNION SELECT id FROM followed UNION SELECT id FROM friends) a
-         JOIN posts p ON p.author_id = a.id
-         WHERE p.deleted_at IS NULL AND p.status = 'published' AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '14 days'
-         UNION
-         SELECT pc.post_id FROM (SELECT $1::uuid AS id UNION SELECT id FROM followed UNION SELECT id FROM friends) a
-         JOIN post_collaborators pc ON pc.user_id = a.id AND pc.status = 'accepted'
-         JOIN posts p ON p.id = pc.post_id
-         WHERE p.deleted_at IS NULL AND p.status = 'published' AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '14 days'
-         UNION
-         SELECT p.id FROM community_members cm JOIN posts p ON p.community_id = cm.community_id
-         WHERE cm.user_id = $1 AND cm.status = 'active'
-           AND p.deleted_at IS NULL AND p.status = 'published' AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '14 days'
-         UNION
-         (SELECT id FROM posts
-          WHERE deleted_at IS NULL AND status = 'published' AND created_at <= $2::timestamptz AND created_at > $2::timestamptz - interval '14 days'
-          ORDER BY created_at DESC, id DESC LIMIT ${RECENT_CANDIDATES})
-         UNION
-         -- Posts about your interests, even when they're older than the newest window: someone who
-         -- just picked interests in onboarding sees them in For you straight away (topics GIN index).
-         (SELECT p.id FROM posts p CROSS JOIN me
-          WHERE cardinality(me.interests) > 0 AND p.topics && me.interests
-            AND p.deleted_at IS NULL AND p.status = 'published' AND p.created_at <= $2::timestamptz AND p.created_at > $2::timestamptz - interval '14 days'
-          ORDER BY p.created_at DESC, p.id DESC LIMIT ${INTEREST_CANDIDATES})
-       ),
-       scored AS (
-         SELECT p.id, p.author_id, p.created_at, p.topics, ap.display_name, cm_c.name AS community_name, (cm_self.user_id IS NOT NULL) AS member,
-                p.author_id IN (SELECT id FROM followed) AS followed,
-                p.author_id IN (SELECT id FROM friends) AS friend,
-                -- A co-author you follow or are friends with counts like the author for ranking.
-                (SELECT cpr.display_name FROM post_collaborators pc JOIN profiles cpr ON cpr.user_id = pc.user_id
-                 WHERE pc.post_id = p.id AND pc.status = 'accepted' AND (pc.user_id IN (SELECT id FROM followed) OR pc.user_id IN (SELECT id FROM friends))
-                 ORDER BY (pc.user_id IN (SELECT id FROM friends)) DESC, pc.created_at LIMIT 1) AS collab_name,
-                EXISTS (SELECT 1 FROM post_collaborators pc WHERE pc.post_id = p.id AND pc.status = 'accepted' AND pc.user_id IN (SELECT id FROM friends)) AS collab_friend,
-                (SELECT 1.2 * count(*) FILTER (WHERE t = ANY(me.interests)) + 1.0 * count(*) FILTER (WHERE t = ANY(me.more))
-                        - 2.0 * count(*) FILTER (WHERE t = ANY(me.less)) FROM unnest(p.topics) t)
-                + ln(1 + p.like_count + 2 * p.comment_count) * 0.6
-                + 4.0 * exp(-extract(epoch FROM ($2::timestamptz - p.created_at)) / 86400.0) AS base
-         ${POST_FROM}
-         CROSS JOIN me
-         LEFT JOIN communities cm_c ON cm_c.id = p.community_id
-         LEFT JOIN community_members cm_self ON cm_self.community_id = p.community_id AND cm_self.user_id = $1 AND cm_self.status = 'active'
-         WHERE p.id IN (SELECT id FROM candidates) AND ${VISIBLE} ${personal} ${connectionOnly}
-           AND (p.community_id IS NULL OR cm_self.user_id IS NOT NULL OR cm_c.visibility = 'public')
-       )
-       SELECT x.* FROM (
-         SELECT s.id, s.author_id, s.created_at, s.display_name, s.community_name, s.member, s.followed, s.friend, s.collab_name, s.collab_friend,
-                (SELECT t FROM unnest(s.topics) t WHERE t = ANY(me.interests) LIMIT 1) AS matched_topic,
-                s.base
-                  + CASE WHEN s.author_id = $1 THEN 1 ELSE 0 END
-                  + CASE WHEN s.friend OR s.collab_friend THEN 3 ELSE 0 END
-                  + CASE WHEN s.followed OR (s.collab_name IS NOT NULL AND NOT s.collab_friend) THEN 2 ELSE 0 END
-                  + CASE WHEN s.member THEN 1.5 ELSE 0 END AS score
-         FROM scored s CROSS JOIN me
-       ) x
-       ORDER BY ${diversified('x.score', 'x.author_id', 'x.created_at DESC, x.id DESC')} DESC, x.created_at DESC, x.id DESC
-       LIMIT $3 OFFSET $4`,
-      [userId, c.asOf, limit + 1, c.o],
-    );
-    const picked = rows.slice(0, limit);
-    const reasons = new Map<string, FeedReason>();
-    for (const r of picked)
-      reasons.set(
-        r.id,
-        r.author_id === userId
-          ? { code: 'own' }
-          : r.friend
-            ? { code: 'friend', params: { name: r.display_name } }
-            : r.collab_friend
-              ? { code: 'friend', params: { name: r.collab_name } }
-              : r.followed
-                ? { code: 'follow', params: { name: r.display_name } }
-                : r.collab_name
-                  ? { code: 'follow', params: { name: r.collab_name } }
-                  : r.community_name && r.member
-                    ? { code: 'community_member', params: { community: r.community_name } }
-                    : r.matched_topic
-                      ? { code: 'interest', params: { topic: r.matched_topic } }
-                      : r.community_name
-                        ? { code: 'community_popular', params: { community: r.community_name } }
-                        : { code: 'popular' },
-      );
+    const ranked = await rankedPage(db, { userId, surface: 'for_you', personalized, personal, reduced }, cursor, limit);
     return {
       mode: 'for_you',
       items: await hydratePosts(
         db,
-        picked.map((r) => r.id),
+        ranked.items.map((r) => r.id),
         userId,
-        reasons,
+        new Map(ranked.items.map((r) => [r.id, r.reason])),
       ),
-      nextCursor: rows.length > limit ? encodeCursor({ asOf: c.asOf, o: c.o + limit }) : null,
-    };
-  }
-
-  /**
-   * For you with "Personalization" off: the same for everyone, ranked by engagement and
-   * freshness only. Nothing about the viewer (interests, feedback topics, who they follow,
-   * their communities) moves a post up. Their own filters still apply (muted people, "not
-   * interested", muted topics, "Fewer suggestions"), and so does who may see what.
-   */
-  async function popularFeed(userId: string, c: { asOf: string; o: number }, limit: number, personal: string, connectionOnly: string) {
-    const { rows } = await db.query(
-      `WITH followed AS (SELECT followee_id AS id FROM follows WHERE follower_id = $1),
-       candidates AS (
-         (SELECT id FROM posts
-          WHERE deleted_at IS NULL AND status = 'published' AND created_at <= $2::timestamptz AND created_at > $2::timestamptz - interval '14 days'
-          ORDER BY created_at DESC, id DESC LIMIT ${RECENT_CANDIDATES})
-         UNION
-         SELECT id FROM posts
-         WHERE author_id = $1 AND deleted_at IS NULL AND status = 'published' AND created_at <= $2::timestamptz AND created_at > $2::timestamptz - interval '14 days'
-       )
-       SELECT x.* FROM (
-         SELECT p.id, p.author_id, p.created_at, cm_c.name AS community_name,
-                ln(1 + p.like_count + 2 * p.comment_count) * 0.6 + 4.0 * exp(-extract(epoch FROM ($2::timestamptz - p.created_at)) / 86400.0) AS score
-         ${POST_FROM}
-         LEFT JOIN communities cm_c ON cm_c.id = p.community_id
-         LEFT JOIN community_members cm_self ON cm_self.community_id = p.community_id AND cm_self.user_id = $1 AND cm_self.status = 'active'
-         WHERE p.id IN (SELECT id FROM candidates) AND ${VISIBLE} ${personal} ${connectionOnly}
-           AND (p.community_id IS NULL OR cm_self.user_id IS NOT NULL OR cm_c.visibility = 'public')
-       ) x
-       ORDER BY ${diversified('x.score', 'x.author_id', 'x.created_at DESC, x.id DESC')} DESC, x.created_at DESC, x.id DESC
-       LIMIT $3 OFFSET $4`,
-      [userId, c.asOf, limit + 1, c.o],
-    );
-    const picked = rows.slice(0, limit);
-    const reasons = new Map<string, FeedReason>(
-      picked.map((r) => [
-        r.id as string,
-        r.author_id === userId
-          ? { code: 'own' }
-          : r.community_name
-            ? { code: 'community_popular', params: { community: r.community_name } }
-            : { code: 'popular' },
-      ]),
-    );
-    return {
-      mode: 'for_you',
-      items: await hydratePosts(
-        db,
-        picked.map((r) => r.id),
-        userId,
-        reasons,
-      ),
-      nextCursor: rows.length > limit ? encodeCursor({ asOf: c.asOf, o: c.o + limit }) : null,
+      nextCursor: ranked.nextCursor,
     };
   }
 
@@ -835,6 +640,11 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       authorId,
       input.topic ?? null,
     ]);
+    // Feedback teaches the recommender too (with Personalization on): the post's topics and creator, or what you muted.
+    const s = input.signal;
+    if (s === 'mute_creator') await learnQuietly(learn(db, u.id, [{ signal: s, authorId }]), req.log);
+    else if (s === 'mute_topic') await learnQuietly(learn(db, u.id, [{ signal: s, topics: [input.topic!] }]), req.log);
+    else if (input.postId) await learnQuietly(learnFromPost(db, u.id, input.postId, s), req.log);
     return { ok: true };
   });
 
@@ -847,8 +657,25 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
         EXISTS (SELECT 1 FROM follows f WHERE f.follower_id = $1 AND f.followee_id = p.author_id) AS followed,
         EXISTS (SELECT 1 FROM friendships fr WHERE (fr.user_a = $1 AND fr.user_b = p.author_id) OR (fr.user_b = $1 AND fr.user_a = p.author_id)) AS friend,
         ARRAY(SELECT t FROM unnest(p.topics) t WHERE ${UNLOCKED} AND t IN (SELECT tp.slug FROM user_interests ui JOIN topics tp ON tp.id = ui.topic_id WHERE ui.user_id = $1)) AS matched,
-        EXISTS (SELECT 1 FROM community_members cm WHERE cm.community_id = p.community_id AND cm.user_id = $1) AS member
-       FROM posts p JOIN profiles pr ON pr.user_id = p.author_id LEFT JOIN communities c ON c.id = p.community_id WHERE p.id = $2`,
+        EXISTS (SELECT 1 FROM community_members cm WHERE cm.community_id = p.community_id AND cm.user_id = $1) AS member,
+        -- What the recommender learned (lib/affinity.ts), as of now.
+        coalesce((SELECT ${fadedScoreSql('a', 'now()')} FROM user_creator_affinity a WHERE a.user_id = $1 AND a.author_id = p.author_id), 0) AS creator_aff,
+        ARRAY(SELECT a.topic FROM user_topic_affinity a WHERE ${UNLOCKED} AND a.user_id = $1 AND a.topic = ANY(p.topics)
+                AND ${fadedScoreSql('a', 'now()')} >= ${RANKING.likedTopicReason} ORDER BY a.score DESC) AS learned,
+        -- Someone who liked or saved it also liked or saved something you did in the last 30 days.
+        EXISTS (SELECT 1 FROM (SELECT r.user_id FROM reactions r WHERE r.post_id = p.id UNION SELECT s.user_id FROM saves s WHERE s.post_id = p.id) other
+                WHERE other.user_id <> $1
+                  AND NOT EXISTS (SELECT 1 FROM consents cs WHERE cs.user_id = other.user_id AND cs.purpose = 'personalization' AND NOT cs.granted)
+                  AND EXISTS (SELECT 1 FROM (SELECT r.post_id FROM reactions r WHERE r.user_id = $1 AND r.created_at > now() - interval '30 days'
+                                             UNION SELECT s.post_id FROM saves s WHERE s.user_id = $1 AND s.created_at > now() - interval '30 days') m
+                              WHERE m.post_id <> p.id
+                                AND (EXISTS (SELECT 1 FROM reactions r2 WHERE r2.post_id = m.post_id AND r2.user_id = other.user_id)
+                                     OR EXISTS (SELECT 1 FROM saves s2 WHERE s2.post_id = m.post_id AND s2.user_id = other.user_id)))) AS alike,
+        (SELECT ${trendSql('now()')} FROM post_stats ps WHERE ps.post_id = p.id) AS trend,
+        (pu.created_at > now() - make_interval(days => ${RANKING.exploration.newCreatorDays})
+         OR (SELECT count(*) FROM (SELECT 1 FROM posts p3 WHERE p3.author_id = p.author_id AND p3.deleted_at IS NULL AND p3.status = 'published'
+                                   LIMIT ${RANKING.exploration.newCreatorPosts}) z) < ${RANKING.exploration.newCreatorPosts}) AS new_creator
+       FROM posts p JOIN profiles pr ON pr.user_id = p.author_id JOIN users pu ON pu.id = p.author_id LEFT JOIN communities c ON c.id = p.community_id WHERE p.id = $2`,
       [u.id, id],
     );
     const r = rows[0];
@@ -863,7 +690,14 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     else if (r.followed) details.push({ code: 'follow', params: { name: r.display_name } });
     if (r.member) details.push({ code: 'community', params: { community: r.community } });
     if (r.matched.length) details.push({ code: 'topics', params: { topics: r.matched } });
+    const close = r.friend || r.followed;
+    if (!close && r.creator_aff >= RANKING.likedCreatorReason) details.push({ code: 'learned_creator', params: { name: r.display_name } });
+    const learned = (r.learned as string[]).filter((t) => !r.matched.includes(t));
+    if (learned.length) details.push({ code: 'learned_topics', params: { topics: learned } });
+    if (r.alike) details.push({ code: 'similar_people' });
+    if ((r.trend ?? 0) >= RANKING.trendingReason) details.push({ code: 'trending' });
     if (r.like_count + r.comment_count > 5) details.push({ code: 'engagement' });
+    if (!close && !r.member && r.new_creator) details.push({ code: 'new_creator' });
     if (!details.length) details.push({ code: 'fallback' });
     return answer(['more_like_this', 'less_like_this', 'not_interested', 'mute_topic', 'mute_creator']);
   });
@@ -895,6 +729,9 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
         data: { kind },
       });
       track(db, u.id, 'post_reacted');
+      // What you like teaches the recommender (with Personalization on), and the post's momentum goes up.
+      await bumpStats(db, [{ postId: id, trend: TREND.weights.like }]);
+      await learnQuietly(learnFromPost(db, u.id, id, 'like'), req.log);
     }
     const likes = (await db.query(`SELECT like_count FROM posts WHERE id = $1`, [id])).rows[0].like_count;
     return { liked: true, likes };
@@ -903,10 +740,12 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
   app.delete('/v1/posts/:id/reaction', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
-    await tx(db, async (c) => {
+    const removed = await tx(db, async (c) => {
       const r = await c.query(`DELETE FROM reactions WHERE post_id = $1 AND user_id = $2`, [id, u.id]);
       if (r.rowCount) await c.query(`UPDATE posts SET like_count = greatest(like_count - 1, 0) WHERE id = $1`, [id]);
+      return !!r.rowCount;
     });
+    if (removed) await learnQuietly(learnFromPost(db, u.id, id, 'unlike'), req.log);
     const likes = (await db.query(`SELECT like_count FROM posts WHERE id = $1`, [id])).rows[0]?.like_count ?? 0;
     return { liked: false, likes };
   });
@@ -931,6 +770,9 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     if (inserted) {
       await notify(db, ctx.realtime, { userId: p.author_id, category: 'creators', type: 'post_repost', actorId: u.id, entityType: 'post', entityId: id });
       track(db, u.id, 'post_reposted');
+      // A repost is a share: it counts for the post and teaches the recommender.
+      await bumpStats(db, [{ postId: id, shares: 1, trend: TREND.weights.share }]);
+      await learnQuietly(learnFromPost(db, u.id, id, 'share'), req.log);
     }
     const reposts = (await db.query(`SELECT repost_count FROM posts WHERE id = $1`, [id])).rows[0].repost_count;
     return { reposted: true, reposts };
@@ -1013,7 +855,11 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
   app.put('/v1/posts/:id/save', { preHandler: requireAuth }, async (req) => {
     const { id } = parse(idParam, req.params);
     await assertVisible(id, me(req).id);
-    await db.query(`INSERT INTO saves (post_id, user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [id, me(req).id]);
+    const r = await db.query(`INSERT INTO saves (post_id, user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING`, [id, me(req).id]);
+    if (r.rowCount) {
+      await bumpStats(db, [{ postId: id, saves: 1, trend: TREND.weights.save }]);
+      await learnQuietly(learnFromPost(db, me(req).id, id, 'save'), req.log);
+    }
     return { saved: true };
   });
 
@@ -1021,10 +867,15 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
   app.delete('/v1/posts/:id/save', { preHandler: requireAuth }, async (req) => {
     const { id } = parse(idParam, req.params);
     const u = me(req);
-    await tx(db, async (c) => {
-      await c.query(`DELETE FROM saves WHERE post_id = $1 AND user_id = $2`, [id, u.id]);
+    const unsaved = await tx(db, async (c) => {
+      const r = await c.query(`DELETE FROM saves WHERE post_id = $1 AND user_id = $2`, [id, u.id]);
       await c.query(`DELETE FROM board_items bi USING boards bd WHERE bi.board_id = bd.id AND bd.owner_id = $2 AND bi.post_id = $1`, [id, u.id]);
+      return !!r.rowCount;
     });
+    if (unsaved) {
+      await bumpStats(db, [{ postId: id, saves: -1 }]);
+      await learnQuietly(learnFromPost(db, u.id, id, 'unsave'), req.log);
+    }
     return { saved: false };
   });
 
@@ -1070,6 +921,4 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     const [post] = await hydratePosts(db, [id], u.id);
     return { poll: post!.poll };
   });
-
-  void encodeCursor;
 }

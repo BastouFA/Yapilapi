@@ -26,6 +26,7 @@ import {
   REPORT_REASONS,
   whyReasonText,
   type MessageKey,
+  type FeedEventSurface,
   type Page,
   type PhotoTag,
   type Post,
@@ -33,6 +34,7 @@ import {
   type PublicUser,
 } from '@yapilapi/shared';
 import { api, errorMessage, fieldErrors, isGone } from '@/lib/api';
+import { recordFeedEvent, useImpression } from '@/lib/feed-events';
 import { NextLink } from '@/lib/link';
 import { AutocompleteText } from '@/components/Autocomplete';
 import { PeoplePicker } from '@/components/PeoplePicker';
@@ -63,6 +65,7 @@ export function PostList({
   showEnd = true,
   boost,
   openComments,
+  surface = 'other',
 }: {
   load: (cursor?: string) => Promise<Page<Post>>;
   empty?: string;
@@ -76,6 +79,8 @@ export function PostList({
   boost?: { postId: string; choices?: BoostChoices };
   /** Open this post's comments once it loads (a notification about a comment). */
   openComments?: string;
+  /** Where the list is, told to the recommender with what's seen, shared and opened in it. */
+  surface?: FeedEventSurface;
 }) {
   const { me, toast, t, tp, locale, flags } = useSession();
   const [memoryFor, setMemoryFor] = useState<Post | null>(null);
@@ -219,9 +224,11 @@ export function PostList({
     try {
       if (navigator.share) {
         await navigator.share({ title, text: p.body ? p.body.slice(0, 120) : title, url });
+        if (me) recordFeedEvent({ postId: p.id, surface, kind: 'share' });
         return;
       }
       await navigator.clipboard.writeText(url);
+      if (me) recordFeedEvent({ postId: p.id, surface, kind: 'share' });
       toast(t('invite.copied'));
     } catch (e) {
       // Closing the share sheet isn't an error.
@@ -399,53 +406,55 @@ export function PostList({
     <div className="stack">
       {posts.map((p, i) => (
         <Fragment key={p.id}>
-          <PostCard
-            key={p.id}
-            post={p}
-            locale={locale}
-            linkAs={NextLink}
-            isOwn={p.author.id === me?.id}
-            onLike={guard(like)}
-            onSave={guard(save)}
-            onSaveTo={me ? setSaveTo : undefined}
-            onRepost={guard(repost)}
-            onReposters={(p) => setRepostersOf(p.id)}
-            onShare={(post) => (me && hasVideo(post) ? setShareFor(post) : void share(post))}
-            onVote={guard(vote)}
-            onComment={setCommentsFor}
-            onFeedback={me ? feedback : undefined}
-            onWhy={
-              me
-                ? async (post) => {
-                    try {
-                      const why = await api.posts.why(post.id);
-                      // Each line in the reader's language; an older API only sends them in English.
-                      setWhy({
-                        post,
-                        reasons: why.details ? why.details.map((d) => whyReasonText(d, { t, tp, locale })) : why.reasons,
-                        controls: why.controls,
-                      });
-                    } catch (e) {
-                      toast(errorMessage(e));
+          <SeenPost post={p} surface={surface} enabled={!!me}>
+            <PostCard
+              key={p.id}
+              post={p}
+              locale={locale}
+              linkAs={NextLink}
+              isOwn={p.author.id === me?.id}
+              onLike={guard(like)}
+              onSave={guard(save)}
+              onSaveTo={me ? setSaveTo : undefined}
+              onRepost={guard(repost)}
+              onReposters={(p) => setRepostersOf(p.id)}
+              onShare={(post) => (me && hasVideo(post) ? setShareFor(post) : void share(post))}
+              onVote={guard(vote)}
+              onComment={setCommentsFor}
+              onFeedback={me ? feedback : undefined}
+              onWhy={
+                me
+                  ? async (post) => {
+                      try {
+                        const why = await api.posts.why(post.id);
+                        // Each line in the reader's language; an older API only sends them in English.
+                        setWhy({
+                          post,
+                          reasons: why.details ? why.details.map((d) => whyReasonText(d, { t, tp, locale })) : why.reasons,
+                          controls: why.controls,
+                        });
+                      } catch (e) {
+                        toast(errorMessage(e));
+                      }
                     }
-                  }
-                : undefined
-            }
-            onReport={guard(setReporting)}
-            onDelete={remove}
-            onPin={me ? pin : undefined}
-            onBoost={me && flags.ADS && flags.COMMERCE !== false ? setBoosting : undefined}
-            onAddToMemory={me && flags.MEMORY ? setMemoryFor : undefined}
-            viewerId={me?.id}
-            onAcceptCollab={me ? acceptCollab : undefined}
-            onDeclineCollab={me ? declineCollab : undefined}
-            onLeaveCollab={me ? leaveCollab : undefined}
-            onRemoveTag={me ? removeTag : undefined}
-            onManageCollaborators={me ? (post) => setCoauthorsFor(post.id) : undefined}
-            onEdit={me ? setEditing : undefined}
-            onHistory={setHistoryFor}
-            onEditTranscript={me ? setTranscriptFor : undefined}
-          />
+                  : undefined
+              }
+              onReport={guard(setReporting)}
+              onDelete={remove}
+              onPin={me ? pin : undefined}
+              onBoost={me && flags.ADS && flags.COMMERCE !== false ? setBoosting : undefined}
+              onAddToMemory={me && flags.MEMORY ? setMemoryFor : undefined}
+              viewerId={me?.id}
+              onAcceptCollab={me ? acceptCollab : undefined}
+              onDeclineCollab={me ? declineCollab : undefined}
+              onLeaveCollab={me ? leaveCollab : undefined}
+              onRemoveTag={me ? removeTag : undefined}
+              onManageCollaborators={me ? (post) => setCoauthorsFor(post.id) : undefined}
+              onEdit={me ? setEditing : undefined}
+              onHistory={setHistoryFor}
+              onEditTranscript={me ? setTranscriptFor : undefined}
+            />
+          </SeenPost>
           {ad && i === Math.min(2, posts.length - 1) ? renderAd(ad) : null}
         </Fragment>
       ))}
@@ -562,6 +571,27 @@ export function PostList({
           onChanged={(post) => patch(post.id, () => post)}
         />
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * A post in a list, watched for the recommender: seen (half of it for a second), for how long,
+ * and its author's profile opened from its name or picture. Only for people with an account.
+ */
+function SeenPost({ post, surface, enabled, children }: { post: Post; surface: FeedEventSurface; enabled: boolean; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useImpression(ref, post.id, surface, enabled);
+  return (
+    <div
+      ref={ref}
+      onClickCapture={(e) => {
+        if (!enabled) return;
+        const link = (e.target as Element).closest?.('.yp-post__head a[href]');
+        if (link?.getAttribute('href') === `/u/${post.author.username}`) recordFeedEvent({ postId: post.id, surface, kind: 'profile_open' });
+      }}
+    >
+      {children}
     </div>
   );
 }

@@ -39,6 +39,8 @@ import {
 import { notifyMentions } from '../lib/mentions.ts';
 import { langOf } from '../lib/translation.ts';
 import { notify, track } from '../lib/services.ts';
+import { learn, learnFromPost, learnQuietly } from '../lib/affinity.ts';
+import { bumpStats, TREND } from '../lib/post-stats.ts';
 import { flagContent, recordSignals } from '../lib/spam.ts';
 import { plusCol, publicUserFrom } from '../lib/users.ts';
 import { notBlockedSql, postUnlockedSql, postVisibleSql } from '../lib/visibility.ts';
@@ -297,6 +299,9 @@ export default async function commentsModule(app: FastifyInstance, ctx: AppConte
       await recordCommentFlags(c, u.id, rows[0].id, screening);
       return rows[0].id as string;
     });
+    // Commenting teaches the recommender about the post (with Personalization on); comments others see add to its momentum.
+    await learnQuietly(learnFromPost(db, u.id, id, 'comment'), req.log);
+    if (reachesOthers(screening)) await bumpStats(db, [{ postId: id, trend: TREND.weights.comment }]);
     // Hidden, held and limited comments reach no one else, so they notify no one.
     if (reachesOthers(screening)) {
       if (replyTo && replyTo.author_id !== u.id)

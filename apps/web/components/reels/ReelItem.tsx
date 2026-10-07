@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { Avatar, CaptionTracks, Icon, SensitiveCover, TaggedText, TranslatableText, useLongPress, videoCrossOrigin } from '@yapilapi/design-system';
 import { formatReelTime, videoPoster, videoSrc, type MessageKey, type Post, type ReelMoment } from '@yapilapi/shared';
+import { recordFeedEvent } from '@/lib/feed-events';
 import { NextLink } from '@/lib/link';
 import { musicHref, useMusicCredit, useMusicLoop } from '@/components/StoryMusic';
 import { useSession } from '@/app/providers';
@@ -45,6 +46,10 @@ const HOLD_MS = 380;
 const FADE_MS = 3000;
 /** Where subtitles end, as a percentage of the frame's height: just above the name, caption and scrubber. */
 const CAPTION_LINE = 80;
+/** Left sooner than this after it came on screen (and not watched to the end): a skip. */
+const SKIP_MS = 2000;
+/** Played this far through counts as watched to the end. */
+const COMPLETE_AT = 0.9;
 
 /** Keep a companion (the duet's original, or a borrowed sound) in step with the reel's own video. */
 function sync(v: HTMLVideoElement, other: HTMLMediaElement | null, event: 'play' | 'pause' | 'time') {
@@ -141,6 +146,61 @@ export function ReelItem({
   const highlights = post.highlights ?? [];
 
   const shouldPlay = active && pageVisible && !userPaused && !holding && !covered && !waiting && !scrubbing;
+
+  // For the recommender: seen when it becomes the reel on screen, then how long it actually played,
+  // whether it played to the end (once each time it's on screen), and whether it was left within
+  // two seconds. A watch is sent when it's left, the viewer closes, or the page is hidden.
+  const tracked = !!meId && !post.locked;
+  const session = useRef<{ since: number; playedMs: number; playingSince: number | null; completed: boolean } | null>(null);
+  const playStarted = () => {
+    const s = session.current;
+    if (s && s.playingSince === null) s.playingSince = performance.now();
+  };
+  const playStopped = () => {
+    const s = session.current;
+    if (!s || s.playingSince === null) return;
+    s.playedMs += performance.now() - s.playingSince;
+    s.playingSince = null;
+  };
+  const completed = () => {
+    const s = session.current;
+    if (!s || s.completed) return;
+    s.completed = true;
+    recordFeedEvent({ postId: post.id, surface: 'reels', kind: 'complete' });
+  };
+  useEffect(() => {
+    if (!active || !tracked) return;
+    const postId = post.id;
+    const begin = () => {
+      const now = performance.now();
+      const v = video.current;
+      session.current = { since: now, playedMs: 0, playingSince: v && !v.paused ? now : null, completed: false };
+    };
+    const end = (left: boolean) => {
+      const s = session.current;
+      if (!s) return;
+      session.current = null;
+      const now = performance.now();
+      const played = s.playedMs + (s.playingSince !== null ? now - s.playingSince : 0);
+      if (played > 0) recordFeedEvent({ postId, surface: 'reels', kind: 'watch', valueMs: played });
+      // Hiding the page isn't leaving the reel: only scrolling on or closing the viewer is a skip.
+      if (left && !s.completed && now - s.since < SKIP_MS) recordFeedEvent({ postId, surface: 'reels', kind: 'skip' });
+    };
+    begin();
+    recordFeedEvent({ postId, surface: 'reels', kind: 'impression' });
+    const onVisibility = () => (document.visibilityState === 'hidden' ? end(false) : session.current ? undefined : begin());
+    const onPageHide = () => end(false);
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', onPageHide);
+      end(true);
+    };
+  }, [active, tracked, post.id]);
+  const openedProfile = () => {
+    if (tracked) recordFeedEvent({ postId: post.id, surface: 'reels', kind: 'profile_open' });
+  };
   useMusicLoop(song ? { startMs: song.startMs, durationMs: song.durationMs, sound: { audioUrl: song.audioUrl } } : null, playing && !muted);
 
   // Vertical videos fill the frame; landscape and square ones are shown whole.
@@ -396,6 +456,7 @@ export function ReelItem({
     const cur = v.currentTime;
     const dur = Number.isFinite(v.duration) ? v.duration : 0;
     setTime({ current: cur, duration: dur });
+    if (dur && cur >= dur * COMPLETE_AT) completed();
     if (active && !clear && moments.length) {
       const prev = prevTime.current;
       const hit = moments.find((m) => m.atMs / 1000 > prev && m.atMs / 1000 <= cur && cur - prev < 1.5);
@@ -489,14 +550,17 @@ export function ReelItem({
               onPlay={(e) => {
                 sync(e.currentTarget, companion.current, 'play');
                 setPlaying(true);
+                playStarted();
               }}
               onPause={(e) => {
                 sync(e.currentTarget, companion.current, 'pause');
                 setPlaying(false);
+                playStopped();
               }}
               onSeeked={(e) => sync(e.currentTarget, companion.current, 'time')}
               onEnded={(e) => {
                 // Reels repeat; some files and browsers still end, so start again from the top.
+                completed();
                 const v = e.currentTarget;
                 v.currentTime = 0;
                 void v.play().catch(() => {});
@@ -609,7 +673,7 @@ export function ReelItem({
 
         <div className="reel__info">
           <div className="reel__byline">
-            <Link href={`/u/${post.author.username}`} className="reel__author">
+            <Link href={`/u/${post.author.username}`} className="reel__author" onClick={openedProfile}>
               <bdi>{post.author.displayName}</bdi>
             </Link>
             {post.collaborators?.length ? (
@@ -696,7 +760,7 @@ export function ReelItem({
         {details ? (
           <section className="reel__details" id={detailsId} aria-label={t('reel.details')}>
             <div className="reel__details-head">
-              <Link href={`/u/${post.author.username}`} className="reel__details-who">
+              <Link href={`/u/${post.author.username}`} className="reel__details-who" onClick={openedProfile}>
                 <Avatar name={post.author.displayName} src={post.author.avatarUrl} size="sm" />
                 <span>
                   <strong>
@@ -857,7 +921,12 @@ export function ReelItem({
 
       <div className="reel__rail">
         <div className="reel__who">
-          <Link href={`/u/${post.author.username}`} className="reel__avatar" aria-label={t('reel.profile', { name: post.author.displayName })}>
+          <Link
+            href={`/u/${post.author.username}`}
+            className="reel__avatar"
+            onClick={openedProfile}
+            aria-label={t('reel.profile', { name: post.author.displayName })}
+          >
             <Avatar name={post.author.displayName} src={post.author.avatarUrl} size="md" />
           </Link>
           {canFollow ? (
