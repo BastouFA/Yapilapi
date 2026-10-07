@@ -149,7 +149,7 @@ export default function TagPage() {
           { id: 'top', label: t('m.tag.top') },
         ]}
       />
-      <PostList load={load} reloadKey={`${tag}-${sort}`} empty={t('tag.empty', { tag })} />
+      <PostList load={load} reloadKey={`${tag}-${sort}`} surface="tag" empty={t('tag.empty', { tag })} />
     </div>
   );
 }

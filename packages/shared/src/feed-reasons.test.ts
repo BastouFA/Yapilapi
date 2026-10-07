@@ -16,6 +16,12 @@ describe('feed reasons', () => {
     interest: true,
     community_popular: true,
     popular: true,
+    liked_creator: true,
+    liked_topic: true,
+    watched_topic: true,
+    similar_people: true,
+    trending: true,
+    new_creator: true,
   };
   const whyCodes: Record<WhyReasonCode, true> = {
     personalization_off: true,
@@ -25,6 +31,11 @@ describe('feed reasons', () => {
     topics: true,
     engagement: true,
     fallback: true,
+    learned_creator: true,
+    learned_topics: true,
+    similar_people: true,
+    trending: true,
+    new_creator: true,
   };
 
   it('has a sentence in every language for every code', () => {
@@ -32,7 +43,7 @@ describe('feed reasons', () => {
       ...Object.keys(postCodes).map((c) => POST_REASON_KEYS[c as PostReasonCode]),
       ...Object.keys(whyCodes).flatMap((c) => {
         const key: string = WHY_REASON_KEYS[c as WhyReasonCode];
-        return c === 'topics' ? [`${key}.one`, `${key}.other`] : [key];
+        return c === 'topics' || c === 'learned_topics' ? [`${key}.one`, `${key}.other`] : [key];
       }),
     ];
     for (const locale of SUPPORTED_LOCALES) {

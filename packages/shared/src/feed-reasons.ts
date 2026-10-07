@@ -19,10 +19,20 @@ export const POST_REASON_KEYS: Record<PostReasonCode, MessageKey> = {
   interest: 'feed.reason.interest',
   community_popular: 'feed.reason.communityPopular',
   popular: 'feed.reason.popular',
+  liked_creator: 'feed.reason.likedCreator',
+  liked_topic: 'feed.reason.likedTopic',
+  watched_topic: 'feed.reason.watchedTopic',
+  similar_people: 'feed.reason.similarPeople',
+  trending: 'feed.reason.trending',
+  new_creator: 'feed.reason.newCreator',
 };
 
+/** Why lines that list topics: each comes in a plural pair, by how many topics it's in. */
+export const WHY_TOPIC_CODES = ['topics', 'learned_topics'] as const;
+type WhyTopicCode = (typeof WHY_TOPIC_CODES)[number];
+
 /** "Why am I seeing this?" lines. Topics come in a plural pair, by how many topics it's in. */
-export const WHY_REASON_KEYS: Record<Exclude<WhyReasonCode, 'topics'>, MessageKey> & { topics: PluralKey } = {
+export const WHY_REASON_KEYS: Record<Exclude<WhyReasonCode, WhyTopicCode>, MessageKey> & Record<WhyTopicCode, PluralKey> = {
   personalization_off: 'feed.why.personalizationOff',
   friend: 'feed.why.friend',
   follow: 'feed.why.follow',
@@ -30,6 +40,11 @@ export const WHY_REASON_KEYS: Record<Exclude<WhyReasonCode, 'topics'>, MessageKe
   topics: 'feed.why.topics',
   engagement: 'feed.why.engagement',
   fallback: 'feed.why.fallback',
+  learned_creator: 'feed.why.learnedCreator',
+  learned_topics: 'feed.why.learnedTopics',
+  similar_people: 'feed.why.similarPeople',
+  trending: 'feed.why.trending',
+  new_creator: 'feed.why.newCreator',
 };
 
 type Vars = Record<string, string | number>;
@@ -69,9 +84,9 @@ export function formatList(items: string[], locale: string | undefined, t?: (key
 /** One line of "Why am I seeing this?" in the reader's language. */
 export function whyReasonText(reason: WhyReason, tr: ReasonTranslator): string {
   const p = reason.params ?? {};
-  if (reason.code === 'topics') {
+  if (reason.code === 'topics' || reason.code === 'learned_topics') {
     const topics = p.topics ?? [];
-    return tr.tp(WHY_REASON_KEYS.topics, topics.length, { topics: formatList(topics, tr.locale, (k) => tr.t(k)) });
+    return tr.tp(WHY_REASON_KEYS[reason.code], topics.length, { topics: formatList(topics, tr.locale, (k) => tr.t(k)) });
   }
   const key = WHY_REASON_KEYS[reason.code];
   return key ? tr.t(key, { name: p.name ?? '', community: p.community ?? '' }) : '';

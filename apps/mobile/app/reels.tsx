@@ -73,6 +73,7 @@ import { CaptionOverlay, useCaptionCues } from '../lib/captions';
 import { canWatch, useWatchStart } from '../lib/watch';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import { ECHO_PERMISSIONS, type EchoPermission } from '../../../packages/shared/src/echoes';
+import { onAppAway, recordFeedEvent } from '../lib/feed-events';
 
 /** What a reel plays: on Data saver the lowest MP4, or the 360p stream for videos processed before it existed. */
 const reelSource = (m: MediaItem, saver: boolean) =>
@@ -85,6 +86,8 @@ const SUN = '#FFBE3D';
 const MINT = '#3DDBC2';
 const VIEWABILITY = { itemVisiblePercentThreshold: 60 };
 const TAP_MS = 260;
+// Left sooner than this after it came on screen (and not played to the end): a skip.
+const SKIP_MS = 2000;
 const FADE_MS = 3000;
 const SOUND_HINT_KEY = 'yp.reels.soundHint';
 /** How this person likes to watch reels (speed, captions), kept on this phone only. */
@@ -108,6 +111,7 @@ type ReelActions = {
   saveTo: (p: Post) => void;
   go: (index: number) => void;
   resumeSaved: (p: Post, ms: number | null) => void;
+  watched: (p: Post) => void;
   keepEchoPrivate: (p: Post) => void;
   deleteEcho: (p: Post) => void;
 };
@@ -328,7 +332,8 @@ export default function Reels() {
   async function copyLink(p: Post) {
     const url = `${webUrl}/reels?start=${p.id}`;
     try {
-      await Share.share(Platform.OS === 'ios' ? { url } : { message: url });
+      const r = await Share.share(Platform.OS === 'ios' ? { url } : { message: url });
+      if (r.action === Share.sharedAction) recordFeedEvent({ postId: p.id, surface: 'reels', kind: 'share' });
     } catch {
       // The person closed the share sheet.
     }
@@ -351,7 +356,8 @@ export default function Reels() {
     const title = t('m.reels.shareTitle', { name: p.author.displayName });
     try {
       // iOS shares the link as a link; Android only takes a message.
-      await Share.share(Platform.OS === 'ios' ? { url, message: title } : { message: `${title}\n${url}`, title });
+      const r = await Share.share(Platform.OS === 'ios' ? { url, message: title } : { message: `${title}\n${url}`, title });
+      if (r.action === Share.sharedAction) recordFeedEvent({ postId: p.id, surface: 'reels', kind: 'share' });
     } catch {
       // The person closed the share sheet.
     }
@@ -379,6 +385,7 @@ export default function Reels() {
       if (!alive.current) return;
       if (!(await Sharing.isAvailableAsync())) throw new Error(t('share.video.failed'));
       await Sharing.shareAsync(file.uri, { mimeType: 'video/mp4', UTI: 'public.mpeg-4', dialogTitle: t('share.video') });
+      recordFeedEvent({ postId: p.id, surface: 'reels', kind: 'share' });
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -459,6 +466,19 @@ export default function Reels() {
     return () => clearTimeout(id);
   }, [status]);
 
+  // A reel played for a couple of seconds counts as a view, once per reel while Reels is open (as on the web).
+  const viewed = useRef(new Set<string>());
+  const watched = (p: Post) => {
+    if (p.author.id === me?.id || viewed.current.has(p.id)) return;
+    viewed.current.add(p.id);
+    void client()
+      .then((api) => api.posts.view(p.id))
+      .then(
+        (r) => patch(p.id, (x) => ({ ...x, counts: { ...x.counts, views: r.views } })),
+        () => {},
+      );
+  };
+
   const go = (i: number) => {
     if (!items) return;
     const to = Math.max(0, Math.min(items.length - 1, i));
@@ -483,6 +503,7 @@ export default function Reels() {
     saveTo: (p) => boards.openSaveSheet(p, syncSaved(p.id)),
     go,
     resumeSaved: (p, ms) => patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, resumeMs: ms ?? undefined } })),
+    watched,
     keepEchoPrivate: (p) => void keepEchoPrivate(p),
     deleteEcho: (p) => deleteEcho(p),
   };
@@ -718,6 +739,7 @@ const ReelRow = memo(function ReelRow({ index, signedIn, actions, ...props }: Re
       onNext={() => actions.current.go(index + 1)}
       onPrevious={() => actions.current.go(index - 1)}
       onResumeSaved={(ms) => actions.current.resumeSaved(post, ms)}
+      onWatched={() => actions.current.watched(post)}
       onKeepEchoPrivate={() => actions.current.keepEchoPrivate(post)}
       onDeleteEcho={() => actions.current.deleteEcho(post)}
     />
@@ -754,6 +776,7 @@ function Reel({
   onNext,
   onPrevious,
   onResumeSaved,
+  onWatched,
   onKeepEchoPrivate,
   onDeleteEcho,
 }: {
@@ -793,6 +816,8 @@ function Reel({
   onNext: () => void;
   onPrevious: () => void;
   onResumeSaved: (ms: number | null) => void;
+  /** Played long enough to count as a view. */
+  onWatched: () => void;
   /** Your echo whose original is gone: keep it to yourself, or delete it. */
   onKeepEchoPrivate: () => void;
   onDeleteEcho: () => void;
@@ -933,11 +958,60 @@ function Reel({
     return () => clearTimeout(id);
   }, [resumed]);
 
+  // For the recommender: seen when it becomes the reel on screen, how long it played, played to the
+  // end (90% of it, or a loop), or left within two seconds. Leaving the app sends the time so far.
+  const watch = useRef({ on: false, since: 0, playedMs: 0, prev: -1, done: false, viewed: false });
+  const onWatchedRef = useRef(onWatched);
+  onWatchedRef.current = onWatched;
+  useEffect(() => {
+    if (!visible) return;
+    const w = watch.current;
+    Object.assign(w, { on: true, since: Date.now(), playedMs: 0, prev: -1, done: false });
+    recordFeedEvent({ postId: post.id, surface: 'reels', kind: 'impression' });
+    const sendWatch = () => {
+      if (w.playedMs > 0) recordFeedEvent({ postId: post.id, surface: 'reels', kind: 'watch', valueMs: w.playedMs });
+      w.playedMs = 0;
+    };
+    const off = onAppAway((away) => {
+      if (away) sendWatch();
+    });
+    return () => {
+      off();
+      sendWatch();
+      if (!w.done && Date.now() - w.since < SKIP_MS) recordFeedEvent({ postId: post.id, surface: 'reels', kind: 'skip' });
+      w.on = false;
+    };
+  }, [visible, post.id]);
+  const completed = () => {
+    const w = watch.current;
+    if (!w.on || w.done) return;
+    w.done = true;
+    recordFeedEvent({ postId: post.id, surface: 'reels', kind: 'complete' });
+  };
+  useEventListener(player, 'playToEnd', completed);
+  const openAuthor = () => {
+    recordFeedEvent({ postId: post.id, surface: 'reels', kind: 'profile_open' });
+    router.push(`/u/${post.author.username}`);
+  };
+
   // Time, and moment comments popping up as the video passes them.
   const prevTime = useRef(0);
   useEventListener(player, 'timeUpdate', ({ currentTime }) => {
     const dur = Number.isFinite(player.duration) ? player.duration : 0;
     setTime({ current: currentTime, duration: dur });
+    const w = watch.current;
+    if (w.on && dur > 0) {
+      // Small steps forward are playing time; a jump forward is a seek, and from the end back to the start is a loop.
+      const step = currentTime - w.prev;
+      if (w.prev >= 0 && step > 0 && step < 2) w.playedMs += step * 1000;
+      if ((w.playedMs > 0 && currentTime >= dur * 0.9) || (step < 0 && w.prev >= dur - 1 && currentTime < 1)) completed();
+      // Played for 2 seconds (or half of a shorter reel): counts as a view.
+      if (!w.viewed && w.playedMs >= Math.min(2, dur / 2) * 1000) {
+        w.viewed = true;
+        onWatchedRef.current();
+      }
+      w.prev = currentTime;
+    }
     if (visible && !clear && moments.length) {
       const prev = prevTime.current;
       const hit = moments.find((m) => m.atMs / 1000 > prev && m.atMs / 1000 <= currentTime && currentTime - prev < 1.5);
@@ -1199,13 +1273,14 @@ function Reel({
         <Animated.View style={[s.info, { bottom: bottom + 57, opacity: fade }]} pointerEvents={clear ? 'none' : 'box-none'}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
             {/* The name and Follow split the 8pt gap between them, so their touch areas don't overlap. */}
-            <Pressable
-              accessibilityRole="link"
-              onPress={() => router.push(`/u/${post.author.username}`)}
-              hitSlop={{ top: 12, bottom: 12, left: 4, right: 4 }}
-              style={{ flexShrink: 1 }}
-            >
-              <AuthorNames author={post.author} collaborators={post.collaborators} numberOfLines={1} style={s.author} />
+            <Pressable accessibilityRole="link" onPress={openAuthor} hitSlop={{ top: 12, bottom: 12, left: 4, right: 4 }} style={{ flexShrink: 1 }}>
+              <AuthorNames
+                author={post.author}
+                collaborators={post.collaborators}
+                numberOfLines={1}
+                style={s.author}
+                onAuthorOpen={() => recordFeedEvent({ postId: post.id, surface: 'reels', kind: 'profile_open' })}
+              />
             </Pressable>
             {canFollow ? (
               <Pressable
@@ -1279,7 +1354,7 @@ function Reel({
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
             <Pressable
               accessibilityRole="link"
-              onPress={() => router.push(`/u/${post.author.username}`)}
+              onPress={openAuthor}
               hitSlop={{ top: 6, bottom: 6 }}
               style={{ flex: 1, flexDirection: 'row', gap: space[2], alignItems: 'center' }}
             >
@@ -1441,7 +1516,7 @@ function Reel({
               accessibilityLabel={t('reel.profile', { name: post.author.displayName })}
               // The follow badge takes the avatar's lower part; the space above makes up the rest of 44.
               hitSlop={{ top: 30 }}
-              onPress={() => router.push(`/u/${post.author.username}`)}
+              onPress={openAuthor}
               style={{ borderRadius: 24, borderWidth: 2, borderColor: WHITE }}
             >
               <Avatar name={post.author.displayName} url={post.author.avatarUrl} size={42} />

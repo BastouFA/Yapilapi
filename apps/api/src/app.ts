@@ -31,6 +31,7 @@ import authModule from './modules/auth.ts';
 import { registerDataSaver } from './lib/data-saver.ts';
 import profilesModule from './modules/profiles.ts';
 import postsModule from './modules/posts.ts';
+import recommendationsModule from './modules/recommendations.ts';
 import commentsModule from './modules/comments.ts';
 import askModule from './modules/ask.ts';
 import mixesModule from './modules/mixes.ts';
@@ -434,6 +435,7 @@ export async function buildApp(
     authModule,
     profilesModule,
     postsModule,
+    recommendationsModule,
     commentsModule,
     askModule,
     draftsModule,

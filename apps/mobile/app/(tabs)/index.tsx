@@ -7,6 +7,7 @@ import type { Post } from '../../../../packages/shared/src/types';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
 import { client, errorMessage } from '../../lib/api';
 import { AnnouncementCard } from '../../lib/announcement';
+import { feedSurface, FeedSurfaceContext, useFeedViewability } from '../../lib/feed-events';
 import { onBackOnline } from '../../lib/network';
 import { PulseEmpty } from '../../lib/empty';
 import { useT } from '../../lib/i18n';
@@ -53,6 +54,9 @@ function Feed() {
   const [stories, setStories] = useState<StoryGroup[]>([]);
   const [viewing, setViewing] = useState<number | null>(null);
   const navigation = useNavigation();
+  // What's seen and for how long, for the recommender, under the mode on screen.
+  const surface = feedSurface(mode);
+  const viewability = useFeedViewability(surface);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -151,10 +155,11 @@ function Feed() {
   }, [posted]);
 
   return (
-    <>
+    <FeedSurfaceContext.Provider value={surface}>
       <FlatList
         keyboardShouldPersistTaps="handled"
         {...feedListProps}
+        {...viewability}
         style={{ backgroundColor: c.ground }}
         contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: bottom }}
         data={posts ?? []}
@@ -203,6 +208,6 @@ function Feed() {
         renderItem={renderPost}
       />
       <StoryViewer groups={stories} start={viewing} onClose={() => setViewing(null)} onChange={setStories} />
-    </>
+    </FeedSurfaceContext.Provider>
   );
 }

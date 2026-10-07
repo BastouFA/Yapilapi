@@ -23,6 +23,7 @@ import { pickOne, uploadPicked, type Picked } from './media';
 import { CoverEditor, CoverPhotoPicker, type CoverEditorTab } from './cover-editor';
 import { COVER_RATIO, type CoverRecipe } from '../../../packages/shared/src/cover';
 import { liveStatus, NowStatusLine, onStatusChanged } from './now-status';
+import { FeedSurfaceContext, useFeedViewability } from './feed-events';
 import { PostCard, RichText } from './post';
 import { radius, space } from './theme';
 import {
@@ -223,6 +224,9 @@ export function ProfileView({
       setPostsError(errorMessage(e));
     }
   };
+
+  // What's seen on the profile and for how long, for the recommender.
+  const viewability = useFeedViewability('profile');
 
   if (profile === undefined) return loadError ? <ScreenError message={loadError} onRetry={load} /> : <ProfileSkeleton bottom={bottom} />;
   if (profile === null)
@@ -621,10 +625,11 @@ export function ProfileView({
     </View>
   );
 
-  return (
+  const list = (
     <FlatList
       keyboardShouldPersistTaps="handled"
       {...feedListProps}
+      {...viewability}
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: bottom + space[4] }}
       data={
@@ -706,6 +711,7 @@ export function ProfileView({
       }
     />
   );
+  return <FeedSurfaceContext.Provider value="profile">{list}</FeedSurfaceContext.Provider>;
 }
 
 /** The shape of a profile while it loads: cover, photo, name, counts, then a couple of posts. */

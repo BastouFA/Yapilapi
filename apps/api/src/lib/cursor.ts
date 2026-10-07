@@ -17,7 +17,8 @@ const MOMENT = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?)?(
 /**
  * Whether the fields a cursor has are the kind the queries expect, so a cursor someone made up
  * is refused with a 400 instead of failing in the database: `t` and `asOf` are moments, `id` a
- * UUID (or the number of a table counted by bigserial), `o` an offset from 0 and `p` a position.
+ * UUID (or the number of a table counted by bigserial), `o` an offset from 0, `p` a position and
+ * `s` a kept feed order (a UUID).
  */
 function wellFormed(c: unknown): boolean {
   if (!c || typeof c !== 'object' || Array.isArray(c)) return false;
@@ -29,6 +30,7 @@ function wellFormed(c: unknown): boolean {
     return false;
   if ('o' in o && !(typeof o.o === 'number' && Number.isSafeInteger(o.o) && o.o >= 0)) return false;
   if ('p' in o && !(typeof o.p === 'number' && Number.isSafeInteger(o.p))) return false;
+  if ('s' in o && !(typeof o.s === 'string' && UUID.test(o.s))) return false;
   return true;
 }
 

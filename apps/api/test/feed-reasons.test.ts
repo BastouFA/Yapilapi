@@ -192,6 +192,11 @@ describe('"Why am I seeing this?" as codes', () => {
     const viewer = await signUp(t.app);
     const stranger = await signUp(t.app);
     const post = (await as(t.app, stranger).post('/v1/posts', { body: 'Hello there', visibility: 'public' })).body.post;
+    // A new creator is named as such (new voices get a chance to be seen)...
+    expect((await why(viewer, post.id)).details).toEqual([{ code: 'new_creator' }]);
+    // ...one who has been around for a while, with a few posts, isn't.
+    await t.ctx.db.query(`UPDATE users SET created_at = now() - interval '60 days' WHERE id = $1`, [stranger.id]);
+    for (let i = 0; i < 4; i++) await as(t.app, stranger).post('/v1/posts', { body: `Earlier post ${i}`, visibility: 'public' });
 
     const fallback = await why(viewer, post.id);
     expect(fallback.details).toEqual([{ code: 'fallback' }]);

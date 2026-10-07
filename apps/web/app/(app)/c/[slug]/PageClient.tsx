@@ -291,7 +291,7 @@ export default function CommunityPageClient({ isPublic }: { isPublic: boolean })
           c.visibility === 'private' && !isMember ? (
             <Alert tone="info">{t('m.community.locked.posts')}</Alert>
           ) : (
-            <PostList load={load} reloadKey={slug} empty={t('communityPage.noPosts')} />
+            <PostList load={load} reloadKey={slug} surface="communities" empty={t('communityPage.noPosts')} />
           )
         ) : tab === 'faq' ? (
           c.visibility === 'private' && !isMember ? (

@@ -10,6 +10,7 @@ import type { DrawReason, GameKind, GameState } from './games/types.ts';
 import type { MixCard } from './mixes.ts';
 import type { LocationShare } from './location.ts';
 import type { MarketChatCard, MarketOffer } from './market.ts';
+import type { FeedEventKind, FeedEventSurface } from './constants.ts';
 import type { CoverRecipe } from './cover.ts';
 import type { EchoPermission, EchoRef } from './echoes.ts';
 import type {
@@ -233,9 +234,25 @@ export interface CaptionTrackRef {
 /**
  * Why a post is in your feed: your own post, a friend's or someone you follow (or a co-author
  * who is), reposted by someone you follow, from a community you're in, in a topic you like,
- * popular in a public community, or popular on YAPILAPI. The apps put it into words.
+ * popular in a public community, or popular on YAPILAPI. The recommender adds: a creator whose
+ * posts you often enjoy, a topic you spend time on (or, in Reels, watch), popular with people who
+ * like what you like, trending now, and a new creator. The apps put it into words.
  */
-export type PostReasonCode = 'own' | 'friend' | 'follow' | 'reposted' | 'community_member' | 'interest' | 'community_popular' | 'popular';
+export type PostReasonCode =
+  | 'own'
+  | 'friend'
+  | 'follow'
+  | 'reposted'
+  | 'community_member'
+  | 'interest'
+  | 'community_popular'
+  | 'popular'
+  | 'liked_creator'
+  | 'liked_topic'
+  | 'watched_topic'
+  | 'similar_people'
+  | 'trending'
+  | 'new_creator';
 
 /** The names a feed reason mentions: `name` a person, `community` a community's name, `topic` a topic. */
 export interface PostReasonParams {
@@ -247,14 +264,37 @@ export interface PostReasonParams {
 /**
  * One line of "Why am I seeing this?": personalization is off, a friend's post or someone you
  * follow, from a community you joined, in topics you follow, people are engaging with it, or
- * the fallback (recent and public).
+ * the fallback (recent and public). What the recommender learned: a creator you often engage
+ * with, topics you spend time on, people who like what you like engaged with it, it's trending,
+ * or it's from a new creator.
  */
-export type WhyReasonCode = 'personalization_off' | 'friend' | 'follow' | 'community' | 'topics' | 'engagement' | 'fallback';
+export type WhyReasonCode =
+  | 'personalization_off'
+  | 'friend'
+  | 'follow'
+  | 'community'
+  | 'topics'
+  | 'engagement'
+  | 'fallback'
+  | 'learned_creator'
+  | 'learned_topics'
+  | 'similar_people'
+  | 'trending'
+  | 'new_creator';
 
 export interface WhyReason {
   code: WhyReasonCode;
-  /** `name` a person, `community` a community's name, `topics` the topics you follow that it's in. */
+  /** `name` a person, `community` a community's name, `topics` the topics you follow (or, for learned_topics, spend time on) that it's in. */
   params?: { name?: string; community?: string; topics?: string[] };
+}
+
+/** One thing that happened to a post on screen, for the recommender (POST /v1/feed/events). */
+export interface FeedEvent {
+  postId: string;
+  surface: FeedEventSurface;
+  kind: FeedEventKind;
+  /** For dwell and watch: how long, in milliseconds. */
+  valueMs?: number;
 }
 
 /** GET /v1/posts/:id/why. */

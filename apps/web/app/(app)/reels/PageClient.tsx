@@ -27,7 +27,7 @@ function SharedReel({ id }: { id: string }) {
       <div className="yp-topbar">
         <h1>{t('reel.single')}</h1>
       </div>
-      <PostList load={load} reloadKey={id} empty={t('reel.unavailable')} />
+      <PostList load={load} reloadKey={id} surface="reels" empty={t('reel.unavailable')} />
       <JoinNote text={t('reel.join')} />
     </div>
   );

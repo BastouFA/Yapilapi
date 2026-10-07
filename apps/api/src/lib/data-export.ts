@@ -301,6 +301,19 @@ export async function exportSections(db: Q, userId: string) {
     reelsResumeAt: await q(
       `SELECT post_id, position_ms, updated_at FROM reel_resume WHERE user_id = $1 ORDER BY updated_at DESC LIMIT ${EXPORT_LIMITS.reelResume}`,
     ),
+    // What you did on your feeds (seen, watched, finished, skipped, shared), counted per day and kind.
+    feedEventsPerDay: await perDay(
+      'feed_events',
+      'user_id',
+      'created_at',
+      `, count(*) FILTER (WHERE kind = 'impression')::int AS seen, count(*) FILTER (WHERE kind = 'complete')::int AS finished,
+         count(*) FILTER (WHERE kind = 'skip')::int AS skipped, count(*) FILTER (WHERE kind = 'share')::int AS shared`,
+    ),
+    // What the recommender learned you like (and don't), with Personalization on.
+    learnedTopics: await q(`SELECT topic, round(score::numeric, 2) AS score, updated_at FROM user_topic_affinity WHERE user_id = $1 ORDER BY score DESC`),
+    learnedCreators: await q(
+      `SELECT ${un('user_creator_affinity.author_id')} AS creator, round(score::numeric, 2) AS score, updated_at FROM user_creator_affinity WHERE user_id = $1 ORDER BY score DESC`,
+    ),
     feedFeedback: await q(
       `SELECT signal, post_id, ${un('feed_feedback.author_id')} AS author, topic, created_at FROM feed_feedback WHERE user_id = $1 ORDER BY created_at DESC LIMIT ${EXPORT_LIMITS.feedFeedback}`,
     ),
@@ -547,7 +560,8 @@ export const EXPORT_README = {
       'Stories, chapters, boards, saves, memories, recaps, lives, rooms, products, drops, places, businesses, photos and videos, and more you made; your event tickets, tickets given or received, events you co-host and how many people you checked in.',
     chats:
       'Chats you are in, and the polls, lists, plans, games, calls and watch together sessions you took part in (your side only), and when you shared where you were, with whom (never the place).',
-    activity: 'Reposts, votes, notifications, feed feedback, daily minutes, and views counted per day.',
+    activity:
+      'Reposts, votes, notifications, feed feedback, what the recommender learned you like, daily minutes, and views and feed activity counted per day.',
     relationships: 'Friends, friend requests, blocks, mutes, restrictions and family links.',
     money: 'Orders (bought and sold), payments, refunds, tips, subscriptions, payouts, bookings and Plus.',
     safety: 'Reports you made, decisions about your content and account, and your appeals.',

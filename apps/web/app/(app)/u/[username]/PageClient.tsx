@@ -396,7 +396,12 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
       {rel.blocked ? null : locked && (current === 'posts' || current === 'reels' || current === 'reposts') ? (
         <EmptyState title={t('profilePage.tagged.privateTitle')} body={lockedBody} />
       ) : current === 'posts' ? (
-        <PostList load={load} reloadKey={`${username}-${version}`} empty={rel.isSelf ? t('profilePage.empty.postsSelf') : t('m.profile.noPosts')} />
+        <PostList
+          load={load}
+          reloadKey={`${username}-${version}`}
+          surface="profile"
+          empty={rel.isSelf ? t('profilePage.empty.postsSelf') : t('m.profile.noPosts')}
+        />
       ) : current === 'reels' ? (
         <ReelGrid load={loadReels} reloadKey={`${username}-reels`} empty={t('ps.empty.reels')} />
       ) : current === 'chapters' ? (
@@ -404,6 +409,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
       ) : current === 'tagged' ? (
         <PostList
           load={loadTagged}
+          surface="profile"
           reloadKey={`${username}-tagged`}
           emptyTitle={taggedHidden ? t('profilePage.tagged.privateTitle') : t('profilePage.tagged.emptyTitle')}
           empty={
@@ -427,6 +433,7 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
       ) : (
         <PostList
           load={loadReposts}
+          surface="profile"
           reloadKey={`${username}-reposts`}
           empty={rel.isSelf ? t('profilePage.reposts.emptySelf') : t('profilePage.reposts.emptyOther', { name: profile.displayName })}
         />

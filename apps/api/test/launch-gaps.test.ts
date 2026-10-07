@@ -388,7 +388,9 @@ describe('analytics and personalization consents', () => {
     expect(on.body.items.find((p: { id: string }) => p.id === post.id)?.reason).toMatch(/^You follow /);
 
     await as(t.app, viewer).put('/v1/me/consents', { purpose: 'personalization', granted: false });
-    const off = await as(t.app, viewer).get('/v1/feed?mode=for_you&limit=20');
+    // The same ranking for everyone counts saves, shares and finished reels too, so on a busy database a post
+    // nobody engaged with yet sits a little further down: read a longer page.
+    const off = await as(t.app, viewer).get('/v1/feed?mode=for_you&limit=50');
     expect(off.status).toBe(200);
     // Under a full suite other tests' posts can outrank this one, so it may not be on the page;
     // when it is, it's there for the same non-personal reason as everything else.

@@ -138,6 +138,20 @@ export const REPORT_TARGETS = [
 
 export const FEEDBACK_SIGNALS = ['more_like_this', 'less_like_this', 'not_interested', 'mute_topic', 'mute_creator'] as const;
 
+/**
+ * What the apps tell the recommender about how people use their feeds (POST /v1/feed/events):
+ * where it happened, and what. `impression` a post was on screen (half of it for a second),
+ * `dwell` how long it stayed there (valueMs), `watch` how long a reel or video played (valueMs),
+ * `complete` it played to the end (or looped), `skip` it was left within two seconds, `share`
+ * it was shared or its link copied, `profile_open` its author's profile was opened from it.
+ */
+export const FEED_EVENT_SURFACES = ['for_you', 'reels', 'following', 'friends', 'communities', 'profile', 'tag', 'search', 'other'] as const;
+export type FeedEventSurface = (typeof FEED_EVENT_SURFACES)[number];
+export const FEED_EVENT_KINDS = ['impression', 'dwell', 'watch', 'complete', 'skip', 'share', 'profile_open'] as const;
+export type FeedEventKind = (typeof FEED_EVENT_KINDS)[number];
+/** The most events in one POST /v1/feed/events. */
+export const FEED_EVENTS_MAX_BATCH = 50;
+
 export const PRODUCT_KINDS = ['product', 'service', 'ticket', 'booking', 'digital'] as const;
 
 export const PLACE_CATEGORIES = ['restaurant', 'store', 'venue', 'attraction', 'service'] as const;

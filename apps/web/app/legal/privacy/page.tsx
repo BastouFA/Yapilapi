@@ -142,6 +142,13 @@ export default async function PrivacyPage() {
           address. We use these to run your feed and to understand how YAPILAPI is used. If you turn off “Analytics” in Settings (Privacy), we stop recording
           these events for you and unlink the ones already recorded from your account.
         </li>
+        <li>
+          Feed activity: which posts were on your screen and for how long, how much of a reel or video you watched, whether you finished or skipped it, when you
+          shared a post or opened its author’s profile from it. Each post’s totals (how often it was seen, finished, skipped, shared and saved) help rank it for
+          everyone. With “Personalization” on (Settings, Privacy), we also use your activity, likes, comments, saves, follows and feed feedback to learn which
+          topics and creators you like, and to rank For you and Reels for you. When you turn Personalization off, we stop learning and delete what was learned;
+          you can see what we learned in your data download.
+        </li>
         <li>Story views: the person who posted a story can see who viewed it.</li>
         <li>
           Visits to business and place pages: which signed-in accounts visited on which day. Business owners see only totals (visitors per day), never who
@@ -324,6 +331,7 @@ export default async function PrivacyPage() {
             <li>Security events (sign-ins, failed sign-ins, password and two-step changes) with their IP address and device: 12 months.</li>
             <li>Activity events (see “How you use YAPILAPI”): 13 months. The minutes you use YAPILAPI each day: 13 months.</li>
             <li>Notifications: 12 months. Phone number checks: 90 days. The log of AI requests: 90 days.</li>
+            <li>Feed activity (what was on your screen, watched, finished, skipped or shared): 90 days. The order of a feed you are scrolling: 1 day.</li>
             <li>AI summaries and suggested replies: 7 days.</li>
             <li>Email and password reset links, sign-in challenges, download links and unfinished uploads: 7 days after they are used or expire.</li>
             <li>View-once photos and videos that were never sent: 24 hours. The raw recording of a live on our video server: 2 days after it ends.</li>

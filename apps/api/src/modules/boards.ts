@@ -23,6 +23,8 @@ import { analyzeText } from '../lib/moderation.ts';
 import { hydratePosts } from '../lib/posts.ts';
 import { attachSaveNotes, savedFilterSql } from '../lib/saves.ts';
 import { notify, track } from '../lib/services.ts';
+import { learn, learnQuietly } from '../lib/affinity.ts';
+import { bumpStats, TREND } from '../lib/post-stats.ts';
 import { ageOf, plusCol, publicUserFrom } from '../lib/users.ts';
 import { notBlockedSql, postUnlockedSql, postVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
@@ -225,7 +227,23 @@ export default async function boardsModule(app: FastifyInstance, ctx: AppContext
         );
         await c.query(`UPDATE boards SET updated_at = now() WHERE id = $1`, [boardId]);
       }
-      await c.query(`INSERT INTO saves (post_id, user_id) SELECT unnest($1::uuid[]), $2 ON CONFLICT DO NOTHING`, [ids, userId]);
+      const saved = await c.query<{ post_id: string; author_id: string; topics: string[] }>(
+        `WITH ins AS (INSERT INTO saves (post_id, user_id) SELECT unnest($1::uuid[]), $2 ON CONFLICT DO NOTHING RETURNING post_id)
+         SELECT ins.post_id, p.author_id, p.topics FROM ins JOIN posts p ON p.id = ins.post_id`,
+        [ids, userId],
+      );
+      // New saves count for the posts and teach the recommender, as saving one does (routes in posts.ts).
+      if (saved.rowCount) {
+        await bumpStats(
+          c,
+          saved.rows.map((r) => ({ postId: r.post_id, saves: 1, trend: TREND.weights.save })),
+        );
+        await learn(
+          c,
+          userId,
+          saved.rows.map((r) => ({ signal: 'save' as const, authorId: r.author_id, topics: r.topics })),
+        );
+      }
       return fresh;
     });
   }
@@ -590,11 +608,16 @@ export default async function boardsModule(app: FastifyInstance, ctx: AppContext
       [u.id, id],
     );
     if (!visible.rowCount) throw notFound('That post');
-    await db.query(
+    const r = await db.query(
       `INSERT INTO saves (post_id, user_id, note, note_updated_at) VALUES ($1,$2,$3,now())
-       ON CONFLICT (post_id, user_id) DO UPDATE SET note = EXCLUDED.note, note_updated_at = now()`,
+       ON CONFLICT (post_id, user_id) DO UPDATE SET note = EXCLUDED.note, note_updated_at = now() RETURNING (xmax = 0) AS inserted`,
       [id, u.id, note],
     );
+    if (r.rows[0]?.inserted) {
+      await bumpStats(db, [{ postId: id, saves: 1, trend: TREND.weights.save }]);
+      const p = (await db.query<{ author_id: string; topics: string[] }>(`SELECT author_id, topics FROM posts WHERE id = $1`, [id])).rows[0];
+      if (p) await learnQuietly(learn(db, u.id, [{ signal: 'save', authorId: p.author_id, topics: p.topics }]), req.log);
+    }
     return { saved: true, note };
   });
 }
