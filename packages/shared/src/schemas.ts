@@ -127,6 +127,8 @@ export const registerSchema = z.object({
   inviteCode: z.string().trim().max(32).optional(),
   /** Honeypot: a field hidden from people on the web sign-up form. Anything in it means a bot filled the form. */
   website: z.string().max(500).optional(),
+  /** Web "Add account": the accounts already signed in on this browser stay, up to MAX_DEVICE_ACCOUNTS. */
+  addAccount: z.boolean().optional(),
 });
 
 export const loginSchema = z.object({
@@ -134,6 +136,8 @@ export const loginSchema = z.object({
   password: z.string().min(1).max(200),
   /** "Stay signed in" (the default). false: the web session ends when the browser closes, and after a day at most. */
   remember: z.boolean().optional(),
+  /** Web "Add account": the accounts already signed in on this browser stay, up to MAX_DEVICE_ACCOUNTS. */
+  addAccount: z.boolean().optional(),
 });
 
 const clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use a time like 22:00.');

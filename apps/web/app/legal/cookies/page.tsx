@@ -5,7 +5,7 @@ import { legalContacts, legalMetadata, Mail } from '@/lib/legal';
 export const generateMetadata = () => legalMetadata('cookies');
 
 /**
- * Cookie notice: the session cookie (packages/auth, SESSION_COOKIE), the browser storage keys the
+ * Cookie notice: the session cookies (packages/auth, SESSION_COOKIE and ACCOUNTS_COOKIE), the browser storage keys the
  * web app uses (apps/web: lib/theme.ts, lib/data-saver.ts, components/UsageHeartbeat.tsx,
  * WeeklyWrap.tsx, SuggestedPeople.tsx, Yap.tsx, reels, search, stories, live), what the phone app
  * keeps (apps/mobile, SecureStore keys) and the third parties the website loads. Update it when
@@ -15,7 +15,7 @@ export default async function CookiesPage() {
   const c = await legalContacts();
   return (
     <LegalDoc slug="cookies">
-      <h2>The one cookie we set</h2>
+      <h2>The cookies we set</h2>
       <table className="legal-table">
         <thead>
           <tr>
@@ -31,6 +31,16 @@ export default async function CookiesPage() {
             </td>
             <td>Keeps you signed in. It can’t be read by scripts on the page and is only sent to YAPILAPI. The website doesn’t work signed in without it.</td>
             <td>30 days, or until you sign out</td>
+          </tr>
+          <tr>
+            <td>
+              <code>ypl_accounts</code>
+            </td>
+            <td>
+              Keeps the accounts signed in on this browser (up to five), so you can add another one and switch between them. Like the first, it can’t be read by
+              scripts on the page and is only sent to YAPILAPI.
+            </td>
+            <td>30 days, or until you sign out of them</td>
           </tr>
         </tbody>
       </table>

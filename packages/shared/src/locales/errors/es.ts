@@ -275,6 +275,8 @@ export const es: Record<string, string> = {
   'This reset link has expired or was already used. Request a new one.': 'Este enlace para restablecer la contraseña caducó o ya se usó. Pide uno nuevo.',
   'Your current password is incorrect.': 'Tu contraseña actual es incorrecta.',
   "Session doesn't exist or isn't visible to you.": 'La sesión no existe o no puedes verla.',
+  // apps/api/src/modules/browser-accounts.ts
+  'You can keep up to 5 accounts in this browser.': 'Puedes tener hasta 5 cuentas en este navegador.',
   // apps/api/src/modules/boards.ts
   'This post is for subscribers. Subscribe to add it to a board.': 'Esta publicación es para suscriptores. Suscríbete para añadirla a un tablero.',
   'This board changed while you were arranging it. Refresh and try again.': 'Este tablero cambió mientras lo ordenabas. Actualiza e inténtalo de nuevo.',

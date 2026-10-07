@@ -264,6 +264,8 @@ export const ar: Record<string, string> = {
   'This reset link has expired or was already used. Request a new one.': 'انتهت صلاحية رابط إعادة التعيين هذا أو استُخدم بالفعل. اطلب رابطًا جديدًا.',
   'Your current password is incorrect.': 'كلمة المرور الحالية غير صحيحة.',
   "Session doesn't exist or isn't visible to you.": 'الجلسة غير موجودة أو لا يمكنك رؤيتها.',
+  // apps/api/src/modules/browser-accounts.ts
+  'You can keep up to 5 accounts in this browser.': 'يمكنك الاحتفاظ بما يصل إلى 5 حسابات على هذا المتصفح.',
   // apps/api/src/modules/boards.ts
   'This post is for subscribers. Subscribe to add it to a board.': 'هذا المنشور للمشتركين. اشترك لإضافته إلى لوحة.',
   'This board changed while you were arranging it. Refresh and try again.': 'تغيّرت هذه اللوحة أثناء ترتيبك لها. حدّث الصفحة وحاول مرة أخرى.',

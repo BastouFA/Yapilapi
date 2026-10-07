@@ -3505,6 +3505,8 @@ export const yo: Catalog = {
   'acct.logoutOne': 'Jáde kúrò ní @{username}',
   'acct.logoutOne.body': 'A ó yọ àkáǹtì yìí kúrò lórí fóònù yìí. O lè tún fi kún un nígbàkúùgbà.',
   'acct.loggedOut': 'O ti jáde.',
+  'acct.maxBrowser': 'O lè ní àkáǹtì tó tó {count} lórí aṣàwákiri yìí.',
+  'acct.logoutAll': 'Jáde kúrò ní gbogbo àkáǹtì',
   'auth.remember': 'Dúró ní wíwọlé',
   'auth.rememberHint': 'Pa èyí lórí kọ̀ǹpútà tí ẹ jọ ń lò tàbí ti gbogbo ènìyàn.',
   'auth.passkey': 'Wọlé pẹ̀lú kọ́kọ́rọ́ ìwọlé',

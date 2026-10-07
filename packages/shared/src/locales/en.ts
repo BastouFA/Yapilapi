@@ -3510,6 +3510,8 @@ export const en = {
   'acct.logoutOne': 'Log out of @{username}',
   'acct.logoutOne.body': 'This account will be removed from this phone. You can add it again any time.',
   'acct.loggedOut': 'You’re logged out.',
+  'acct.maxBrowser': 'You can keep up to {count} accounts in this browser.',
+  'acct.logoutAll': 'Log out of all accounts',
   'auth.remember': 'Stay signed in',
   'auth.rememberHint': 'Turn this off on a shared or public computer.',
   'auth.passkey': 'Log in with a passkey',

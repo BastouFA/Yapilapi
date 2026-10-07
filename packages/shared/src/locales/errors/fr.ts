@@ -278,6 +278,8 @@ export const fr: Record<string, string> = {
   'This reset link has expired or was already used. Request a new one.': 'Ce lien de réinitialisation a expiré ou a déjà été utilisé. Demandes-en un nouveau.',
   'Your current password is incorrect.': 'Ton mot de passe actuel est incorrect.',
   "Session doesn't exist or isn't visible to you.": 'Cette session n’existe pas ou tu ne peux pas la voir.',
+  // apps/api/src/modules/browser-accounts.ts
+  'You can keep up to 5 accounts in this browser.': 'Tu peux garder jusqu’à 5 comptes sur ce navigateur.',
   // apps/api/src/modules/boards.ts
   'This post is for subscribers. Subscribe to add it to a board.':
     'Cette publication est réservée aux abonnés payants. Souscris un abonnement pour l’ajouter à un tableau.',

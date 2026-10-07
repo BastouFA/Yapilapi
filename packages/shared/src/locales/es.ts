@@ -3514,6 +3514,8 @@ export const es: Catalog = {
   'acct.logoutOne': 'Cerrar sesión de @{username}',
   'acct.logoutOne.body': 'Esta cuenta se quitará de este teléfono. Puedes volver a añadirla cuando quieras.',
   'acct.loggedOut': 'Has cerrado sesión.',
+  'acct.maxBrowser': 'Puedes tener hasta {count} cuentas en este navegador.',
+  'acct.logoutAll': 'Cerrar sesión en todas las cuentas',
   'auth.remember': 'Mantener la sesión iniciada',
   'auth.rememberHint': 'Desactívalo en un ordenador compartido o público.',
   'auth.passkey': 'Iniciar sesión con una llave de acceso',

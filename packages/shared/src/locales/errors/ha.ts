@@ -273,6 +273,8 @@ export const ha: Record<string, string> = {
   'This reset link has expired or was already used. Request a new one.': 'Wannan mahaɗin sake saitawa ya ƙare ko an riga an yi amfani da shi. Ku nemi sabo.',
   'Your current password is incorrect.': 'Kalmar sirrinku ta yanzu ba daidai ba ce.',
   "Session doesn't exist or isn't visible to you.": 'Ba a sami zaman shigar ba, ko kuma ba za ku iya ganinsa ba.',
+  // apps/api/src/modules/browser-accounts.ts
+  'You can keep up to 5 accounts in this browser.': 'Za ka iya ajiye asusu har 5 a wannan burauza.',
   // apps/api/src/modules/boards.ts
   'This post is for subscribers. Subscribe to add it to a board.': 'Wannan rubutun na masu biyan kuɗi ne. Yi rajista don ƙara shi a allo.',
   'This board changed while you were arranging it. Refresh and try again.':

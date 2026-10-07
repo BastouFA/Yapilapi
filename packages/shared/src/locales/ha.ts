@@ -3515,6 +3515,8 @@ export const ha: Catalog = {
   'acct.logoutOne': 'Fita daga @{username}',
   'acct.logoutOne.body': 'Za a cire wannan asusu daga wannan waya. Za ka iya sake ƙara shi kowane lokaci.',
   'acct.loggedOut': 'Ka fita.',
+  'acct.maxBrowser': 'Za ka iya ajiye asusu har {count} a wannan burauza.',
+  'acct.logoutAll': 'Fita daga dukkan asusu',
   'auth.remember': 'Ci gaba da kasancewa a ciki',
   'auth.rememberHint': 'Kashe wannan a kwamfutar da ake rabawa ko ta jama’a.',
   'auth.passkey': 'Shiga da maɓallin shiga',

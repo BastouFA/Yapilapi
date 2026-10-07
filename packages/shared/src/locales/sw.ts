@@ -3513,6 +3513,8 @@ export const sw: Catalog = {
   'acct.logoutOne': 'Toka kwenye @{username}',
   'acct.logoutOne.body': 'Akaunti hii itaondolewa kwenye simu hii. Unaweza kuiongeza tena wakati wowote.',
   'acct.loggedOut': 'Umetoka.',
+  'acct.maxBrowser': 'Unaweza kuweka hadi akaunti {count} kwenye kivinjari hiki.',
+  'acct.logoutAll': 'Toka kwenye akaunti zote',
   'auth.remember': 'Endelea kuwa umeingia',
   'auth.rememberHint': 'Zima hii kwenye kompyuta ya pamoja au ya umma.',
   'auth.passkey': 'Ingia kwa ufunguo wa siri',

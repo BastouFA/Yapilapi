@@ -273,6 +273,8 @@ export const sw: Record<string, string> = {
   'This reset link has expired or was already used. Request a new one.': 'Kiungo hiki cha kuweka upya kimeisha muda au tayari kimetumika. Omba kipya.',
   'Your current password is incorrect.': 'Nenosiri lako la sasa si sahihi.',
   "Session doesn't exist or isn't visible to you.": 'Kipindi cha kuingia hakipo au huwezi kukiona.',
+  // apps/api/src/modules/browser-accounts.ts
+  'You can keep up to 5 accounts in this browser.': 'Unaweza kuweka hadi akaunti 5 kwenye kivinjari hiki.',
   // apps/api/src/modules/boards.ts
   'This post is for subscribers. Subscribe to add it to a board.': 'Chapisho hili ni kwa waliojisajili. Jisajili ili uliongeze kwenye ubao.',
   'This board changed while you were arranging it. Refresh and try again.': 'Ubao huu umebadilika ulipokuwa ukiupanga. Onyesha upya kisha ujaribu tena.',

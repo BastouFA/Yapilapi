@@ -46,4 +46,6 @@ export function hashToken(token: string): string {
 }
 
 export const SESSION_COOKIE = 'ypl_session';
+/** The session tokens of every account signed in on one browser (the website's account switcher). httpOnly, like the session cookie. */
+export const ACCOUNTS_COOKIE = 'ypl_accounts';
 export * from './totp.ts';

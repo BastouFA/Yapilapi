@@ -3613,6 +3613,8 @@ export const ar: Catalog = {
   'acct.logoutOne': 'تسجيل الخروج من ‎@{username}',
   'acct.logoutOne.body': 'ستتم إزالة هذا الحساب من هذا الهاتف. يمكنك إضافته مجددًا في أي وقت.',
   'acct.loggedOut': 'لقد سجّلت الخروج.',
+  'acct.maxBrowser': 'يمكنك الاحتفاظ بما يصل إلى {count} حسابات على هذا المتصفح.',
+  'acct.logoutAll': 'تسجيل الخروج من كل الحسابات',
   'auth.remember': 'البقاء متصلًا',
   'auth.rememberHint': 'أوقف هذا الخيار على جهاز كمبيوتر مشترك أو عام.',
   'auth.passkey': 'تسجيل الدخول بمفتاح مرور',

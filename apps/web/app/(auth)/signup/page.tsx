@@ -5,18 +5,21 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { Alert, Button, TextField } from '@yapilapi/design-system';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
+import { authHref, startAs } from '@/lib/accounts';
 import { SignupConsent } from '@/components/Legal';
 import { PasswordField } from '@/components/PasswordField';
 import { useSession } from '../../providers';
 
 function SignupForm() {
-  const { setMe, locale, t } = useSession();
+  const { me, setMe, locale, t } = useSession();
   const router = useRouter();
   // From an invite link (/join/<code>): the code comes along, and we show who invited you.
   const params = useSearchParams();
   const invite = params.get('invite') ?? '';
   // Passed along to Log in, so moving between the two keeps where you were going (Log in checks it).
   const next = params.get('next');
+  // Add account (from the login page in add-account mode): the accounts already signed in here stay.
+  const adding = params.get('add') === '1';
   const [invitedBy, setInvitedBy] = useState<string | null>(null);
   useEffect(() => {
     if (invite)
@@ -59,7 +62,10 @@ function SignupForm() {
         locale,
         inviteCode: String(f.get('inviteCode') ?? '').trim() || undefined,
         website: String(f.get('website') ?? '') || undefined,
+        ...(adding ? { addAccount: true } : {}),
       });
+      // Another account was in use: the page starts again as the new one.
+      if (adding && me) return void startAs('/onboarding');
       setMe(user);
       router.replace('/onboarding');
     } catch (err) {
@@ -128,7 +134,7 @@ function SignupForm() {
         {t('auth.signup.submit')}
       </Button>
       <p className="auth__foot" style={{ textAlign: 'center' }}>
-        {t('auth.haveAccount')} <Link href={next ? `/login?next=${encodeURIComponent(next)}` : '/login'}>{t('auth.login.submit')}</Link>
+        {t('auth.haveAccount')} <Link href={authHref('/login', next, adding)}>{t('auth.login.submit')}</Link>
       </p>
     </form>
   );

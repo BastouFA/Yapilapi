@@ -270,6 +270,8 @@ export const yo: Record<string, string> = {
   'This reset link has expired or was already used. Request a new one.': 'Ìjápọ̀ àtúnṣe yìí ti parí àsìkò rẹ̀ tàbí a ti lò ó tẹ́lẹ̀. Béèrè òmíràn.',
   'Your current password is incorrect.': 'Ọ̀rọ̀ aṣínà rẹ lọ́wọ́lọ́wọ́ kò tọ́.',
   "Session doesn't exist or isn't visible to you.": 'Ìwọlé náà kò sí, tàbí o kò lè rí i.',
+  // apps/api/src/modules/browser-accounts.ts
+  'You can keep up to 5 accounts in this browser.': 'O lè ní àkáǹtì tó tó 5 lórí aṣàwákiri yìí.',
   // apps/api/src/modules/boards.ts
   'This post is for subscribers. Subscribe to add it to a board.': 'Àtẹ̀jáde yìí wà fún àwọn alábàápín. Forúkọsílẹ̀ láti fi í kún pátákó kan.',
   'This board changed while you were arranging it. Refresh and try again.': 'Pátákó yìí yí padà nígbà tí o ń tò ó. Sọ ọ́ dọ̀tun kí o sì gbìyànjú lẹ́ẹ̀kan sí i.',

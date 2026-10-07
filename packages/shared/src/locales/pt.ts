@@ -3510,6 +3510,8 @@ export const pt: Catalog = {
   'acct.logoutOne': 'Sair de @{username}',
   'acct.logoutOne.body': 'Esta conta será removida deste telefone. Você pode adicioná-la de novo quando quiser.',
   'acct.loggedOut': 'Você saiu.',
+  'acct.maxBrowser': 'Você pode manter até {count} contas neste navegador.',
+  'acct.logoutAll': 'Sair de todas as contas',
   'auth.remember': 'Continuar conectado',
   'auth.rememberHint': 'Desative isso em um computador compartilhado ou público.',
   'auth.passkey': 'Entrar com uma chave de acesso',

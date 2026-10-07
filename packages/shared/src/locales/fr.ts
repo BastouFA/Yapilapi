@@ -3530,6 +3530,8 @@ export const fr: Catalog = {
   'acct.logoutOne': 'Se déconnecter de @{username}',
   'acct.logoutOne.body': 'Ce compte sera retiré de ce téléphone. Tu pourras l’ajouter à nouveau quand tu veux.',
   'acct.loggedOut': 'Tu es déconnecté.',
+  'acct.maxBrowser': 'Tu peux garder jusqu’à {count} comptes sur ce navigateur.',
+  'acct.logoutAll': 'Se déconnecter de tous les comptes',
   'auth.remember': 'Rester connecté',
   'auth.rememberHint': 'Désactive cette option sur un ordinateur partagé ou public.',
   'auth.passkey': 'Se connecter avec une clé d’accès',

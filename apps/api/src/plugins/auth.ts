@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { hashToken, SESSION_COOKIE } from '@yapilapi/auth';
+import { ACCOUNTS_COOKIE, hashToken, SESSION_COOKIE } from '@yapilapi/auth';
 import type { UserRole } from '@yapilapi/shared';
 import { forbidden, unauthorized } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
@@ -40,7 +40,8 @@ export function sessionTokenOf(req: FastifyRequest): string | undefined {
  * and requests that send the token themselves (Bearer) aren't affected.
  */
 export function crossOriginCookieRequest(req: FastifyRequest, allowedOrigins: string[]): boolean {
-  if (!req.cookies?.[SESSION_COOKIE]) return false;
+  // The other accounts signed in on this browser count too: they can be switched to.
+  if (!req.cookies?.[SESSION_COOKIE] && !req.cookies?.[ACCOUNTS_COOKIE]) return false;
   const origin = req.headers.origin;
   if (origin === undefined) return false;
   return !allowedOrigins.includes(origin.replace(/\/+$/, ''));

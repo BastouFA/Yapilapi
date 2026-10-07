@@ -274,6 +274,8 @@ export const pt: Record<string, string> = {
   'This reset link has expired or was already used. Request a new one.': 'Este link de redefinição expirou ou já foi usado. Peça um novo.',
   'Your current password is incorrect.': 'Sua senha atual está incorreta.',
   "Session doesn't exist or isn't visible to you.": 'A sessão não existe ou não está visível para você.',
+  // apps/api/src/modules/browser-accounts.ts
+  'You can keep up to 5 accounts in this browser.': 'Você pode manter até 5 contas neste navegador.',
   // apps/api/src/modules/boards.ts
   'This post is for subscribers. Subscribe to add it to a board.': 'Esta publicação é para assinantes. Assine para adicioná-la a um quadro.',
   'This board changed while you were arranging it. Refresh and try again.': 'Este quadro mudou enquanto você o organizava. Atualize e tente de novo.',

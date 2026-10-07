@@ -31,6 +31,14 @@ import { me, requireAuth } from '../plugins/auth.ts';
 /** Notifications (aliased `n`, for $1) from someone blocked either way stay out of the list and the count while the block lasts. */
 const SHOWN = `(n.actor_id IS NULL OR ${notBlockedSql('n.actor_id', '$1')})`;
 
+/** How many of an account's notifications are unread, counted like the list's `unread`. */
+export async function unreadNotifications(db: AppContext['db'], userId: string): Promise<number> {
+  const { rows } = await db.query<{ n: number }>(`SELECT count(*)::int AS n FROM notifications n WHERE n.user_id = $1 AND n.read_at IS NULL AND ${SHOWN}`, [
+    userId,
+  ]);
+  return rows[0]?.n ?? 0;
+}
+
 export default async function notificationsModule(app: FastifyInstance, ctx: AppContext) {
   const db = ctx.db;
 

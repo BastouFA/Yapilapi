@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Button, EmptyState } from '@yapilapi/design-system';
 import Inbox from '@/app/(app)/inbox/page';
+import { YapAccountButton } from '@/components/AccountMenu';
 import { useSession } from '@/app/providers';
 
 type InstallPrompt = Event & { prompt: () => Promise<void> };
@@ -12,7 +13,8 @@ type InstallPrompt = Event & { prompt: () => Promise<void> };
 /**
  * Yap mode: your chats on their own, like a messenger app. The list on the left and the open
  * chat on the right (one at a time on a phone), with no feed, rail or sidebar around them.
- * It installs as its own "Yap" app (app/(app)/yap/layout.tsx); YAPILAPI is one tap away.
+ * It installs as its own "Yap" app (app/(app)/yap/layout.tsx); YAPILAPI is one tap away, and
+ * your avatar switches between the accounts signed in on this browser.
  */
 export function YapShell({ children }: { children: React.ReactNode }) {
   const { t } = useSession();
@@ -58,6 +60,7 @@ export function YapShell({ children }: { children: React.ReactNode }) {
             <img src="/mark.svg" alt="" width={18} height={18} />
             {t('yapMode.backToApp')}
           </Link>
+          <YapAccountButton />
         </div>
       </header>
       {iosHint ? <p className="yap-mode__hint muted">{t('yapMode.installIos')}</p> : null}

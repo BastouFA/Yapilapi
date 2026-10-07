@@ -42,6 +42,7 @@ import { deviceLabel, deviceName, deviceNameLabel, recordSignIn } from '../lib/s
 import { me, requireAuth } from '../plugins/auth.ts';
 import { registerMfa } from './mfa.ts';
 import { registerPasskeys } from './passkeys.ts';
+import { browserAccounts } from './browser-accounts.ts';
 
 const authLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } };
 /** Wrong passwords for one account, from any address, before it waits LOGIN_LOCK_MINUTES. */
@@ -86,14 +87,18 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
   const ttlMs = ctx.config.SESSION_TTL_DAYS * 86400_000;
   // Links in emails open the web app (the first origin when several are allowed).
   const webOrigin = ctx.config.WEB_ORIGIN.split(',')[0]!.replace(/\/+$/, '');
+  // The accounts signed in on one browser, and switching between them (modules/browser-accounts.ts).
+  const accounts = browserAccounts(app, ctx, loadMe);
 
   /**
    * A new session. "Stay signed in" is the default; a web sign-in that turns it off
    * (`remember: false` in the body) gets a cookie that ends with the browser, and a session
-   * that ends after a day at most.
+   * that ends after a day at most. On the web the new session joins the accounts already signed
+   * in on this browser (`addAccount: true` refuses past the limit instead of making room).
    */
   async function startSession(req: FastifyRequest, reply: FastifyReply, userId: string, o: { signUp?: boolean } = {}) {
     const remember = (req.body as { remember?: unknown } | undefined)?.remember !== false;
+    await accounts.checkRoom(req);
     const lifetime = remember ? ttlMs : Math.min(ttlMs, 86400_000);
     const { token, hash } = newToken();
     const ua = req.headers['user-agent']?.slice(0, 300) ?? null;
@@ -106,13 +111,8 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
       `INSERT INTO sessions (user_id, device_id, token_hash, user_agent, ip, expires_at) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
       [userId, device.rows[0]!.id, hash, ua, req.ip, new Date(Date.now() + lifetime)],
     );
-    reply.setCookie(SESSION_COOKIE, token, {
-      httpOnly: true,
-      secure: ctx.config.COOKIE_SECURE,
-      sameSite: 'lax',
-      path: '/',
-      ...(remember ? { maxAge: Math.floor(ttlMs / 1000) } : {}),
-    });
+    reply.setCookie(SESSION_COOKIE, token, accounts.cookieOptions(remember));
+    await accounts.signedIn(req, reply, { token, userId, remembered: remember });
     // A sign-in from a device (or country) this account hasn't used before is announced; the sign-up itself isn't.
     await recordSignIn(
       { db: ctx.db, realtime: ctx.realtime, email: ctx.email, webOrigin, log: app.log },
@@ -156,6 +156,7 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
 
   app.post('/v1/auth/register', { config: authLimit }, async (req, reply) => {
     const input = parse(registerSchema, req.body);
+    await accounts.checkRoom(req);
     // The web form has a field people never see or fill in; bots that fill every field get a plain refusal.
     if (input.website) {
       await securityEvent(ctx.db, null, 'signup_blocked', req.ip, req.headers['user-agent'], { reason: 'honeypot' });
@@ -224,6 +225,7 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
 
   app.post('/v1/auth/login', { config: authLimit }, async (req, reply) => {
     const input = parse(loginSchema, req.body);
+    await accounts.checkRoom(req);
     const { rows } = await ctx.db.query<{ id: string; password_hash: string | null; status: string }>(
       `SELECT id, password_hash, status FROM users WHERE lower(email) = $1 AND deleted_at IS NULL`,
       [input.email],
@@ -279,6 +281,8 @@ export default async function authModule(app: FastifyInstance, ctx: AppContext) 
   app.post('/v1/auth/logout', async (req, reply) => {
     if (req.user) await ctx.db.query(`UPDATE sessions SET revoked_at = now() WHERE id = $1`, [req.user.sessionId]);
     reply.clearCookie(SESSION_COOKIE, { path: '/' });
+    // Other accounts signed in on this browser stay, to switch to (or log back in with a tap).
+    await accounts.loggedOut(req, reply);
     return { ok: true };
   });
 

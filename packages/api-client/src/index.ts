@@ -1,4 +1,5 @@
 import type {
+  BrowserAccount,
   CaptionErrorCode,
   MediaEditErrorCode,
   MessageFailureCode,
@@ -277,9 +278,15 @@ export function createClient(opts: ClientOptions) {
         locale?: string;
         inviteCode?: string;
         website?: string;
+        /** Web "Add account": the accounts already signed in on this browser stay. */
+        addAccount?: boolean;
       }) => post<{ user: Me; token: string }>('/v1/auth/register', b),
-      /** `remember: false` ("Stay signed in" off): the web session ends when the browser closes. */
-      login: (b: { email: string; password: string; remember?: boolean }) =>
+      /**
+       * `remember: false` ("Stay signed in" off): the web session ends when the browser closes.
+       * `addAccount` (web "Add account"): the accounts already signed in on this browser stay, and a
+       * browser that has the most it can keep answers `too_many_accounts`.
+       */
+      login: (b: { email: string; password: string; remember?: boolean; addAccount?: boolean }) =>
         post<{ user?: Me; token?: string; mfaRequired?: boolean; challengeToken?: string }>('/v1/auth/login', b),
       /**
        * A suspended account signing in with the right password gets `account_suspended` with
@@ -287,6 +294,14 @@ export function createClient(opts: ClientOptions) {
        */
       appealSuspension: (token: string, statement: string) => post<{ status: 'appealed'; message: string }>('/v1/appeals/suspension', { token, statement }),
       logout: () => post<{ ok: true }>('/v1/auth/logout'),
+      /** The accounts signed in on this browser (the website's account switcher), the one in use marked. */
+      accounts: () => get<{ items: BrowserAccount[]; max: number }>('/v1/auth/accounts'),
+      /** Use another account signed in on this browser. */
+      switchAccount: (userId: string) => post<{ user: Me }>('/v1/auth/accounts/switch', { userId }),
+      /** Log out of one account on this browser. `current`: the account in use afterwards (the next one, when it was this one), or null. */
+      logoutAccount: (userId: string) => post<{ ok: true; current: Me | null }>('/v1/auth/accounts/logout', { userId }),
+      /** Log out of every account on this browser. */
+      logoutAllAccounts: () => post<{ ok: true; count: number }>('/v1/auth/accounts/logout-all'),
       /** Ends every session of the account, this one included. */
       logoutAll: () => post<{ ok: true; revoked: number }>('/v1/auth/logout-all'),
       /** Ends every other session; this one stays signed in. */
@@ -1387,8 +1402,13 @@ export function createClient(opts: ClientOptions) {
       registerVerify: (challengeId: string, response: unknown, label: string) => post('/v1/auth/passkeys/register/verify', { challengeId, response, label }),
       remove: (id: string) => del(`/v1/auth/passkeys/${id}`),
       loginOptions: () => post<{ options: any; challengeId: string }>('/v1/auth/passkeys/login/options'),
-      loginVerify: (challengeId: string, response: unknown, remember?: boolean) =>
-        post<{ user: Me; token: string }>('/v1/auth/passkeys/login/verify', { challengeId, response, ...(remember === false ? { remember } : {}) }),
+      loginVerify: (challengeId: string, response: unknown, remember?: boolean, addAccount?: boolean) =>
+        post<{ user: Me; token: string }>('/v1/auth/passkeys/login/verify', {
+          challengeId,
+          response,
+          ...(remember === false ? { remember } : {}),
+          ...(addAccount ? { addAccount } : {}),
+        }),
     },
     push: {
       config: () => get<{ webPush: boolean; vapidPublicKey: string | null }>('/v1/push/config'),
@@ -1585,8 +1605,13 @@ export function createClient(opts: ClientOptions) {
         ),
       setup: () => post<{ secret: string; otpauthUri: string }>('/v1/auth/mfa/totp/setup'),
       confirm: (code: string) => post<{ enabled: true; recoveryCodes: string[] }>('/v1/auth/mfa/totp/confirm', { code }),
-      verify: (challengeToken: string, code: string, remember?: boolean) =>
-        post<{ user: Me; token: string }>('/v1/auth/mfa/verify', { challengeToken, code, ...(remember === false ? { remember } : {}) }),
+      verify: (challengeToken: string, code: string, remember?: boolean, addAccount?: boolean) =>
+        post<{ user: Me; token: string }>('/v1/auth/mfa/verify', {
+          challengeToken,
+          code,
+          ...(remember === false ? { remember } : {}),
+          ...(addAccount ? { addAccount } : {}),
+        }),
       disable: (password: string, code: string) => post('/v1/auth/mfa/disable', { password, code }),
       newRecoveryCodes: (code: string) => post<{ recoveryCodes: string[] }>('/v1/auth/mfa/recovery-codes', { code }),
     },

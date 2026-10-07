@@ -15,6 +15,16 @@ export interface DeviceAccount {
   avatarUrl: string | null;
 }
 
+/**
+ * An account signed in on this browser (the website's account switcher, GET /v1/auth/accounts).
+ * The API keeps the sessions in an httpOnly cookie and switches between them; the page never
+ * sees a token. `unread`: its unread notifications, for the accounts not in use (0 for the one in use).
+ */
+export interface BrowserAccount extends DeviceAccount {
+  current: boolean;
+  unread: number;
+}
+
 function isAccount(a: unknown): a is DeviceAccount {
   if (!a || typeof a !== 'object') return false;
   const x = a as Record<string, unknown>;

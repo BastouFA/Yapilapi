@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
-import { Alert, Button, Checkbox, TextField } from '@yapilapi/design-system';
-import type { Me, MessageKey } from '@yapilapi/shared';
+import { Alert, Avatar, Button, Checkbox, TextField } from '@yapilapi/design-system';
+import type { BrowserAccount, Me, MessageKey } from '@yapilapi/shared';
 import { browserSupportsWebAuthn, startAuthentication } from '@simplewebauthn/browser';
 import { ApiError } from '@yapilapi/api-client';
 import { api, errorMessage } from '@/lib/api';
+import { authHref, startAs, switchAccount } from '@/lib/accounts';
 import { PasswordField } from '@/components/PasswordField';
 import { useSession } from '../../providers';
 
@@ -31,7 +32,10 @@ function problem(e: unknown, t: (k: MessageKey) => string, twoStep = false): str
  * Log in: email and password (show or hide it), "Stay signed in" (on unless you turn it off, for a
  * shared computer), a passkey where the browser has them, and the two-step code for accounts that
  * use it. After logging in you go back to where you were (a same-site `next` only). After logging
- * out, it says so.
+ * out, it says so, and accounts still signed in on this browser can be continued with a tap.
+ *
+ * `?add=1` (Add account, from the account menu): logging in to another account keeps the ones
+ * already signed in on this browser, and the page starts again as the new one. Cancel goes back.
  */
 function LoginForm() {
   const { me, loading, setMe, t } = useSession();
@@ -39,6 +43,9 @@ function LoginForm() {
   const params = useSearchParams();
   const next = safeNext(params.get('next'));
   const loggedOut = params.get('loggedOut') === '1';
+  const adding = params.get('add') === '1';
+  // The accounts signed in on this browser: to continue as one (signed out), or to know the browser is full (adding).
+  const [accounts, setAccounts] = useState<{ items: BrowserAccount[]; max: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [challenge, setChallenge] = useState<string | null>(null);
@@ -47,15 +54,22 @@ function LoginForm() {
   // A suspended account signed in with the right password: it can appeal from here (it can't reach Settings).
   const [appealToken, setAppealToken] = useState<string | null>(null);
   useEffect(() => setPasskeys(browserSupportsWebAuthn()), []);
-
-  // Already signed in (another tab logged in): carry on to where you were going.
   useEffect(() => {
-    if (!loading && me && !busy) router.replace(!me.onboarded ? '/onboarding' : (next ?? '/home'));
-  }, [loading, me, busy, next, router]);
+    if (loading || (me && !adding)) return;
+    api.auth.accounts().then(setAccounts, () => {});
+  }, [loading, me, adding]);
+
+  // Already signed in (another tab logged in): carry on to where you were going. Not when adding an account.
+  useEffect(() => {
+    if (!loading && me && !busy && !adding) router.replace(!me.onboarded ? '/onboarding' : (next ?? '/home'));
+  }, [loading, me, busy, next, router, adding]);
 
   function done(user: Me) {
+    const dest = !user.onboarded ? '/onboarding' : (next ?? '/home');
+    // Another account was in use: the page starts again as this one, so nothing of the other stays.
+    if (adding && me) return void startAs(dest);
     setMe(user);
-    router.replace(!user.onboarded ? '/onboarding' : (next ?? '/home'));
+    router.replace(dest);
   }
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -66,10 +80,15 @@ function LoginForm() {
     setAppealToken(null);
     try {
       if (challenge) {
-        done((await api.mfa.verify(challenge, String(f.get('code')).replace(/\s+/g, ''), remember)).user);
+        done((await api.mfa.verify(challenge, String(f.get('code')).replace(/\s+/g, ''), remember, adding)).user);
         return;
       }
-      const r = await api.auth.login({ email: String(f.get('email')).trim(), password: String(f.get('password')), ...(remember ? {} : { remember: false }) });
+      const r = await api.auth.login({
+        email: String(f.get('email')).trim(),
+        password: String(f.get('password')),
+        ...(remember ? {} : { remember: false }),
+        ...(adding ? { addAccount: true } : {}),
+      });
       if (r.mfaRequired && r.challengeToken) {
         setChallenge(r.challengeToken);
         setBusy(false);
@@ -113,16 +132,53 @@ function LoginForm() {
       </form>
     );
 
+  // Signed out with other accounts still signed in on this browser: one tap continues as one of them.
+  const waiting = !adding && !me ? (accounts?.items ?? []) : [];
+  const full = adding && !!accounts && accounts.items.length >= accounts.max;
+
   return (
     <form className="stack" onSubmit={submit} noValidate>
       <div className="stack-sm" style={{ gap: 4 }}>
-        <h1>{t('auth.login.title')}</h1>
+        <h1>{adding ? t('acct.addTitle') : t('auth.login.title')}</h1>
         <p className="muted" style={{ margin: 0 }}>
-          {t('m.auth.login.body')}
+          {adding ? t('acct.addHint') : t('m.auth.login.body')}
         </p>
       </div>
       {loggedOut && !error ? <Alert tone="success">{t('acct.loggedOut')}</Alert> : null}
+      {full && !error ? <Alert tone="warning">{t('acct.maxBrowser', { count: accounts!.max })}</Alert> : null}
       {error ? <Alert tone="danger">{error}</Alert> : null}
+      {waiting.length ? (
+        <ul className="auth__accounts">
+          {waiting.map((a) => (
+            <li key={a.id}>
+              <button
+                type="button"
+                className="auth__account"
+                aria-label={t('acct.switchTo', { username: a.username })}
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  setError(null);
+                  try {
+                    await switchAccount(a.id, next ?? '/home');
+                  } catch (err) {
+                    // Its session ended since: it has left the list.
+                    setError(problem(err, t));
+                    setAccounts((l) => (l ? { ...l, items: l.items.filter((x) => x.id !== a.id) } : l));
+                    setBusy(false);
+                  }
+                }}
+              >
+                <Avatar name={a.displayName} src={a.avatarUrl} size="md" />
+                <span className="account-menu__names">
+                  <bdi className="account-menu__name">{a.displayName}</bdi>
+                  <span className="account-menu__handle">@{a.username}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {appealToken ? <SuspensionAppeal token={appealToken} onDone={() => setAppealToken(null)} /> : null}
       <TextField
         label={t('auth.email')}
@@ -159,7 +215,7 @@ function LoginForm() {
               try {
                 const { options, challengeId } = await api.passkeys.loginOptions();
                 const response = await startAuthentication({ optionsJSON: options });
-                done((await api.passkeys.loginVerify(challengeId, response, remember)).user);
+                done((await api.passkeys.loginVerify(challengeId, response, remember, adding)).user);
               } catch (err) {
                 if ((err as Error).name !== 'NotAllowedError') setError(problem(err, t));
               }
@@ -170,8 +226,13 @@ function LoginForm() {
         </>
       ) : null}
       <p className="auth__foot" style={{ textAlign: 'center' }}>
-        {t('auth.noAccount')} <Link href={next ? `/signup?next=${encodeURIComponent(next)}` : '/signup'}>{t('auth.signup.submit')}</Link>
+        {t('auth.noAccount')} <Link href={authHref('/signup', next, adding)}>{t('auth.signup.submit')}</Link>
       </p>
+      {adding ? (
+        <p className="auth__foot" style={{ textAlign: 'center' }}>
+          <Link href={next ?? '/home'}>{t('common.cancel')}</Link>
+        </p>
+      ) : null}
     </form>
   );
 }
