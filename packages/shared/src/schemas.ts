@@ -311,6 +311,8 @@ export const createPostSchema = z
     allowEchoes: z.enum(ECHO_PERMISSIONS).optional(),
     /** Reels: post an echo video you made (POST /v1/posts/:id/echoes) as a reel linked to the reel it answers. */
     echo: uuid.optional(),
+    /** Hide the like and view counts from everyone but you. Left out, your account's choice (Settings, Privacy). */
+    hideCounts: z.boolean().optional(),
   })
   .superRefine((v, ctx) => {
     if (v.echo) {
@@ -851,8 +853,22 @@ export const sharingSettingsSchema = z
   .object({
     findableByContacts: z.boolean(),
     allowDownload: z.boolean(),
+    /** Hide the like and view counts on your posts, reels and stories from everyone but you (each post can differ). */
+    hideCounts: z.boolean(),
   })
   .partial();
+
+/** Your post's like and view counts: hidden from everyone but you, or shown. */
+export const postCountsSchema = z.object({ hidden: z.boolean() });
+
+/** Send a post or reel into chats (its link, with your words): to people (a one-to-one chat) or to chats you're in. */
+export const sendPostSchema = z
+  .object({
+    userIds: z.array(uuid).max(20).default([]),
+    conversationIds: z.array(uuid).max(20).default([]),
+    body: z.string().trim().max(1000).default(''),
+  })
+  .refine((v) => v.userIds.length + v.conversationIds.length > 0, { message: 'Choose someone to send it to.', path: ['userIds'] });
 
 export const ONBOARDING_STEPS = ['interests', 'follow', 'friends'] as const;
 

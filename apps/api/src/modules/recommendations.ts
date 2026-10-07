@@ -1,9 +1,11 @@
 import type { FastifyInstance } from 'fastify';
+import type { Pool, PoolClient } from 'pg';
 import { feedEventsSchema, type FeedEventKind } from '@yapilapi/shared';
 import { parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { AFFINITY, learn, type Learning } from '../lib/affinity.ts';
 import { bumpStats, TREND, type StatDelta } from '../lib/post-stats.ts';
+import { checkMilestones } from '../lib/milestones.ts';
 import { personalizationAllowed } from '../lib/services.ts';
 import { postVisibleSql } from '../lib/visibility.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
@@ -20,6 +22,24 @@ export const FEED_EVENT_RULES = {
 } as const;
 
 const ONCE: FeedEventKind[] = ['impression', 'complete', 'skip', 'share', 'profile_open'];
+
+/**
+ * A share that didn't come through the apps' feed events (a post sent into chats): written as a
+ * 'share' event like the others and counted once per person and post in FEED_EVENT_RULES.dedupeMinutes.
+ * Returns whether it counted. The caller checks the post is someone else's and visible to them.
+ */
+export async function recordShare(db: Pool | PoolClient, userId: string, postId: string): Promise<boolean> {
+  const { rowCount } = await db.query(
+    `INSERT INTO feed_events (user_id, post_id, surface, kind)
+     SELECT $1, $2, 'other', 'share'
+     WHERE NOT EXISTS (SELECT 1 FROM feed_events WHERE user_id = $1 AND post_id = $2 AND kind = 'share' AND surface = 'other'
+                         AND created_at > now() - make_interval(mins => $3))`,
+    [userId, postId, FEED_EVENT_RULES.dedupeMinutes],
+  );
+  if (!rowCount) return false;
+  await bumpStats(db, [{ postId, shares: 1, sends: 1, trend: TREND.weights.share }]);
+  return true;
+}
 
 /**
  * What happened to posts on screen, from the apps (lib/feed-events.ts on the web and the phone):
@@ -61,6 +81,7 @@ export default async function recommendationsModule(app: FastifyInstance, ctx: A
     const kept: { postId: string; surface: string; kind: FeedEventKind; valueMs: number | null }[] = [];
     const stats: StatDelta[] = [];
     const learned: Learning[] = [];
+    const seen = new Set<string>();
     for (const e of events) {
       const p = posts.get(e.postId);
       if (!p) continue;
@@ -84,6 +105,7 @@ export default async function recommendationsModule(app: FastifyInstance, ctx: A
         case 'impression':
           stats.push({ postId: p.id, impressions: 1, viewers: viewed.has(p.id) ? 0 : 1 });
           viewed.add(p.id);
+          seen.add(p.id);
           break;
         case 'dwell':
           stats.push({ postId: p.id, dwellMs: valueMs! });
@@ -104,7 +126,8 @@ export default async function recommendationsModule(app: FastifyInstance, ctx: A
           learned.push({ signal: 'skip', ...about });
           break;
         case 'share':
-          stats.push({ postId: p.id, shares: 1, trend: TREND.weights.share });
+          // From the share sheet or a copied link: a share people see (sends), and one for ranking.
+          stats.push({ postId: p.id, shares: 1, sends: 1, trend: TREND.weights.share });
           learned.push({ signal: 'share', ...about });
           break;
         case 'profile_open':
@@ -119,6 +142,22 @@ export default async function recommendationsModule(app: FastifyInstance, ctx: A
       [u.id, kept.map((k) => k.postId), kept.map((k) => k.surface), kept.map((k) => k.kind), kept.map((k) => k.valueMs)],
     );
     await bumpStats(db, stats);
+    // A post on screen is a view (once per person, like a reel watched: POST /v1/posts/:id/view), and passing 100, 1,000… tells the author.
+    if (seen.size) {
+      const added = await db.query<{ id: string }>(
+        `WITH ins AS (INSERT INTO post_views (post_id, viewer_id) SELECT x, $1 FROM unnest($2::uuid[]) x ON CONFLICT DO NOTHING RETURNING post_id)
+         UPDATE posts p SET view_count = p.view_count + x.n FROM (SELECT post_id, count(*)::int AS n FROM ins GROUP BY post_id) x
+         WHERE p.id = x.post_id RETURNING p.id`,
+        [u.id, [...seen]],
+      );
+      if (added.rows.length)
+        await checkMilestones(
+          db,
+          ctx.realtime,
+          added.rows.map((r) => r.id),
+          'views',
+        );
+    }
     // The post's numbers count for everyone; what you like is only learned with Personalization on.
     await learn(db, u.id, learned, await personalizationAllowed(db, u.id));
     return { accepted: kept.length };

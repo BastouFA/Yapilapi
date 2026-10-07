@@ -2,6 +2,7 @@ import webpush from 'web-push';
 import type { Pool } from 'pg';
 // Every language, loaded up front: a push is written in its recipient's.
 import { t, tp, type MessageKey } from '@yapilapi/shared/i18n';
+import { milestoneNoticeText } from '@yapilapi/shared';
 import type { Config } from '../config.ts';
 
 export interface PushMessage {
@@ -177,6 +178,9 @@ const TEXT: Record<string, Text> = {
     tp('push.market_expiring', Number(d.days ?? 3), locale, { title: capitalized(listing(d, 'push.market.yourListing', locale), locale) }),
   market_expired: (_n, d, locale) => t('push.market_expired', locale, { title: capitalized(listing(d, 'push.market.yourListing', locale), locale) }),
   weekly_wrap: say('push.weekly_wrap'),
+  // "Your reel passed 1,000 views": once per post and milestone (lib/milestones.ts).
+  post_milestone: (_n, d, locale) =>
+    d.threshold ? milestoneNoticeText({ type: 'post_milestone', data: d }, (key, vars) => t(key, locale, vars), locale)! : t('push.post_milestone', locale),
   // Questions asked without a name have no actor, so they read "Someone asked you a question".
   question_received: say('push.question_received'),
   question_answered: say('push.question_answered'),

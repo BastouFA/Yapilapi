@@ -144,6 +144,10 @@ export default function Create() {
   // Who can comment on the post or reel, and (reels) whether others may duet or remix it.
   const [commentPolicy, setCommentPolicy] = useState<CommentPolicy>('everyone');
   const [allowRemix, setAllowRemix] = useState(true);
+  // "Hide like and view counts": starts at the account's choice (Settings, Privacy), or a draft's own.
+  const [hideCounts, setHideCounts] = useState(false);
+  const [hideCountsDefault, setHideCountsDefault] = useState(false);
+  const hideCountsSet = useRef(false);
   // Reels: who may echo it; 'default' keeps the default for the account (everyone, or nobody for private and under-18 accounts).
   const [allowEchoes, setAllowEchoes] = useState<EchoPermission | 'default'>('default');
   // A duet or remix of another reel ("Duet side by side" and "Remix with this sound" in Reels).
@@ -173,6 +177,21 @@ export default function Create() {
       .then((r) => setHasPlans(r.items.length > 0))
       .catch(() => {});
   }, [me]);
+  useEffect(() => {
+    if (!me) return;
+    void client()
+      .then((api) => api.me.sharing())
+      .then((r) => {
+        const hide = !!r.settings.hideCounts;
+        setHideCountsDefault(hide);
+        if (!hideCountsSet.current) setHideCounts(hide);
+      })
+      .catch(() => {});
+  }, [me]);
+  const chooseHideCounts = (v: boolean) => {
+    hideCountsSet.current = true;
+    setHideCounts(v);
+  };
   // Your circles, for sharing a post or reel with one of them. null until loaded.
   const [circles, setCircles] = useState<Circle[] | null>(null);
   const [circleId, setCircleId] = useState<string | null>(null);
@@ -299,6 +318,7 @@ export default function Create() {
           setCoauthors(post.pendingCollaborators ?? []);
           setCommentPolicy(post.commentPolicy ?? 'everyone');
           setAllowRemix(post.allowRemix ?? true);
+          chooseHideCounts(!!post.countsHidden);
           setAllowEchoes(post.allowEchoes ?? 'default');
           const from = post.remixOf?.post;
           setRemix(post.format === 'reel' && post.remixOf && from ? { id: from.id, mode: post.remixOf.mode } : null);
@@ -540,6 +560,8 @@ export default function Create() {
       : { visibility, ...(visibility === 'circle' && circleId ? { circleId } : {}) };
     const described = altText.trim() ? { altText: altText.trim() } : {};
     const assisted = aiUsed ? { aiAssisted: true } : {};
+    // Only when it differs from the account's choice: left out, the post follows the account.
+    const countsChoice = hideCounts !== hideCountsDefault ? { hideCounts } : {};
     if (kind === 'reel') {
       const v = media!;
       return {
@@ -551,6 +573,7 @@ export default function Create() {
         allowRemix,
         ...(allowEchoes !== 'default' ? { allowEchoes } : {}),
         commentPolicy,
+        ...countsChoice,
         // A duet or remix uses the original; otherwise a sound plays in full instead of the video's own, and a song plays the chosen part.
         ...(remix && original
           ? { remixOf: remix.id, remixMode: remix.mode }
@@ -591,6 +614,7 @@ export default function Create() {
       ...(all.length ? { media: all } : {}),
       ...(coauthors.length ? { collaborators: coauthors.map((u) => u.id) } : {}),
       commentPolicy,
+      ...countsChoice,
       ...(music && postCanHaveMusic
         ? {
             music: {
@@ -619,6 +643,8 @@ export default function Create() {
     setLink(null);
     setCommentPolicy('everyone');
     setAllowRemix(true);
+    hideCountsSet.current = false;
+    setHideCounts(hideCountsDefault);
     setAllowEchoes('default');
     setRemix(null);
     setOriginal(null);
@@ -1111,6 +1137,9 @@ export default function Create() {
                 onChange={(p) => p && setCommentPolicy(p)}
               />
             </View>
+          ) : null}
+          {kind !== 'story' ? (
+            <SwitchRow label={t('post.hideCounts')} hint={t('post.hideCounts.hint')} value={hideCounts} onValueChange={chooseHideCounts} />
           ) : null}
           {kind === 'reel' ? (
             <SwitchRow label={t('compose.allowRemix')} hint={t('compose.allowRemixHint')} value={allowRemix} onValueChange={setAllowRemix} />

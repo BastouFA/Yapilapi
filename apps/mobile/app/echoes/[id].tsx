@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Image, Pressable, Text, View } from 'react-native';
 import type { Post } from '../../../../packages/shared/src/types';
+import { compactCount } from '../../../../packages/shared/src/post-stats';
 import { client, errorMessage, isGone, mediaUrl } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { radius, space } from '../../lib/theme';
@@ -11,7 +12,7 @@ import { Button, EmptyState, ErrorState, Icon, Loading, ScreenError, useColors, 
 export default function EchoesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const c = useColors();
-  const { t, tp, number } = useT();
+  const { t, tp, number, locale } = useT();
   const [original, setOriginal] = useState<Post | null | undefined>(undefined);
   // Why it couldn't load, when that isn't because it's gone or private; a reel already showing stays.
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -89,8 +90,13 @@ export default function EchoesScreen() {
           >
             {m?.posterUrl ? <Image source={{ uri: mediaUrl(m.posterUrl) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" /> : null}
             <View style={{ position: 'absolute', bottom: 6, start: 6, end: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Icon name="heart" size={12} color="#FFFFFF" />
-              <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>{number(item.counts.likes)}</Text>
+              {/* No number when the author hid their like counts. */}
+              {item.counts.likes !== undefined ? (
+                <>
+                  <Icon name="heart" size={12} color="#FFFFFF" />
+                  <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>{compactCount(item.counts.likes, locale)}</Text>
+                </>
+              ) : null}
               <Text style={[{ color: '#FFFFFF', fontSize: 12, flexShrink: 1 }, userText]} numberOfLines={1}>
                 @{item.author.username}
               </Text>

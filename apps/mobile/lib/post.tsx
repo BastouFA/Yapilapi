@@ -44,6 +44,9 @@ import { QuestionQuoteView } from './ask';
 import { MixTile } from './mixes';
 import { clock } from './media';
 import { recordFeedEvent, useFeedSurface } from './feed-events';
+import { compactCount } from '../../../packages/shared/src/post-stats';
+import { PostStats } from './post-stats';
+import { useSendPost } from './post-send';
 
 export { RichText };
 
@@ -193,7 +196,7 @@ function PostCardView({
   onDeleted?: () => void;
 }) {
   const c = useColors();
-  const { t, tp, number, timeAgo, dateTime, locale } = useT();
+  const { t, tp, timeAgo, dateTime, locale } = useT();
   // The post as shown: the one given, or the version you just saved.
   const [post, setPost] = useState(given);
   // Why it's in your feed ("Your post", "You follow Ada"), in your language.
@@ -208,6 +211,7 @@ function PostCardView({
   const [history, setHistory] = useState(false);
   const [transcriptOpen, setTranscriptOpen] = useState(false);
   const [liked, setLiked] = useState(post.viewer.liked);
+  // Absent when the author hid their like count: no number, the button still works.
   const [likes, setLikes] = useState(post.counts.likes);
   const [saved, setSaved] = useState(post.viewer.saved);
   const boards = useBoards();
@@ -393,6 +397,42 @@ function PostCardView({
   }
   const report = useReport({ onBlocked: () => setBlockedAuthor(true) });
 
+  // Your own post: hide its like and view counts from everyone else, or show them again.
+  async function toggleCounts() {
+    const hidden = !post.countsHidden;
+    try {
+      const r = await (await client()).posts.setCountsHidden(post.id, hidden);
+      setPost((p) => ({ ...p, countsHidden: r.countsHidden }));
+      setTuneNote(t(r.countsHidden ? 'post.hideCounts.done' : 'post.showCounts.done'));
+    } catch (e) {
+      setTuneNote(errorMessage(e));
+    }
+  }
+
+  // Share: send it in one of your chats (the server counts that share), or the phone's share sheet.
+  const sender = useSendPost(setTuneNote);
+  const link = `${webUrl}${post.format === 'reel' ? `/reels?start=${post.id}` : `/p/${post.id}`}`;
+  async function shareSheet() {
+    const title = t('m.reels.shareTitle', { name: post.author.displayName });
+    try {
+      // iOS shares the link as a link; Android only takes a message.
+      const r = await Share.share(Platform.OS === 'ios' ? { url: link, message: title } : { message: `${title}\n${link}`, title });
+      if (r.action === Share.sharedAction) recordFeedEvent({ postId: post.id, surface, kind: 'share' });
+    } catch {
+      // The person closed the share sheet.
+    }
+  }
+  function share() {
+    if (!me) return void shareSheet();
+    menu.show({
+      title: t('m.common.share'),
+      actions: [
+        { label: t('post.send.action'), icon: 'chatbubbles-outline', hint: t('post.send.hint'), onPress: () => sender.open(post) },
+        { label: t('reel.share.link'), icon: 'share-outline', onPress: () => void shareSheet() },
+      ],
+    });
+  }
+
   /**
    * More: insights and boost, edit your post or its transcript, save to a board, add to a memory, leave as
    * co-author, remove your photo tag, report someone else's post.
@@ -407,6 +447,13 @@ function PostCardView({
     if (canEdit) actions.push({ label: t('m.post.edit'), icon: 'create-outline', onPress: () => setEditing(true) });
     if (canEditTranscript) actions.push({ label: t('transcript.edit'), icon: 'mic-outline', onPress: () => setTranscriptOpen(true) });
     if (canPin) actions.push({ label: t(pinned ? 'post.unpin' : 'post.pin'), icon: 'pin-outline', onPress: () => void togglePin() });
+    if (canEdit)
+      actions.push({
+        label: t(post.countsHidden ? 'post.showCounts' : 'post.hideCounts'),
+        icon: post.countsHidden ? 'eye-outline' : 'eye-off-outline',
+        hint: post.countsHidden ? undefined : t('post.hideCounts.hint'),
+        onPress: () => void toggleCounts(),
+      });
     if (me) actions.push({ label: t('m.boards.saveTo'), icon: 'bookmarks-outline', onPress: saveTo });
     // Watch together: a reel or video post, with people in a chat at the same time.
     if (me && canWatch(post))
@@ -651,36 +698,38 @@ function PostCardView({
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[4] }}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={liked ? t('post.unlike') : t('post.like')}
+            accessibilityLabel={(liked ? t('post.unlike') : t('post.like')) + (likes !== undefined ? `, ${tp('post.stats.likes', likes)}` : '')}
             accessibilityState={{ selected: liked }}
             hitSlop={slop({ ...ACTION_SLOP, start: 16, end: 8 })}
             onPress={async () => {
               const next = !liked;
+              // A hidden count stays hidden.
+              const bump = (d: number) => setLikes((n) => (n === undefined ? n : Math.max(0, n + d)));
               setLiked(next);
-              setLikes((n) => n + (next ? 1 : -1));
+              bump(next ? 1 : -1);
               try {
                 const api = await client();
                 const r = next ? await api.posts.like(post.id) : await api.posts.unlike(post.id);
                 setLiked(r.liked);
-                setLikes(r.likes);
+                setLikes((n) => (n === undefined || r.likes === undefined ? n : r.likes));
               } catch {
                 setLiked(!next);
-                setLikes((n) => n + (next ? -1 : 1));
+                bump(next ? -1 : 1);
               }
             }}
             style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
           >
             <Icon name={liked ? 'heart' : 'heart-outline'} size={20} color={liked ? c.yapi : c.inkMuted} />
-            <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>{number(likes)}</Text>
+            {likes !== undefined ? <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>{compactCount(likes, locale)}</Text> : null}
           </Pressable>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} accessible accessibilityLabel={tp('m.post.commentCount', comments)}>
             <Icon name="chatbubble-outline" size={19} color={c.inkMuted} />
-            <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>{number(comments)}</Text>
+            <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>{compactCount(comments, locale)}</Text>
           </View>
           {canRepost ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={reposted ? t('m.reels.undoRepost') : t('m.reels.repost')}
+              accessibilityLabel={(reposted ? t('m.reels.undoRepost') : t('m.reels.repost')) + (reposts ? `, ${tp('post.stats.reposts', reposts)}` : '')}
               accessibilityState={{ selected: reposted }}
               hitSlop={slop({ ...ACTION_SLOP, start: 8, end: 3 })}
               onPress={async () => {
@@ -700,25 +749,25 @@ function PostCardView({
               style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
             >
               <Icon name="repeat" size={20} color={reposted ? c.success : c.inkMuted} />
-              <Text style={{ color: reposted ? c.success : c.inkMuted, fontSize: 13, fontWeight: '600' }}>{number(reposts)}</Text>
+              <Text style={{ color: reposted ? c.success : c.inkMuted, fontSize: 13, fontWeight: '600' }}>{compactCount(reposts, locale)}</Text>
             </Pressable>
           ) : reposts && isAuthor ? (
             // Your own post: the count opens who reposted it.
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`${t('post.reposts')}, ${number(reposts)}`}
+              accessibilityLabel={tp('post.stats.reposts', reposts)}
               accessibilityHint={t('m.post.repostersHint')}
               hitSlop={slop({ ...ACTION_SLOP, start: 8, end: 3 })}
               onPress={() => setRepostersOpen(true)}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 32 }}
             >
               <Icon name="repeat" size={20} color={c.inkMuted} />
-              <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' }}>{number(reposts)}</Text>
+              <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' }}>{compactCount(reposts, locale)}</Text>
             </Pressable>
           ) : reposts ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} accessible accessibilityLabel={`${t('post.reposts')}, ${number(reposts)}`}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }} accessible accessibilityLabel={tp('post.stats.reposts', reposts)}>
               <Icon name="repeat" size={20} color={c.inkMuted} />
-              <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>{number(reposts)}</Text>
+              <Text style={{ color: c.inkMuted, fontSize: 13, fontWeight: '600' }}>{compactCount(reposts, locale)}</Text>
             </View>
           ) : null}
           {post.visibility !== 'private' ? (
@@ -726,17 +775,7 @@ function PostCardView({
               accessibilityRole="button"
               accessibilityLabel={t('m.common.share')}
               hitSlop={slop({ ...ACTION_SLOP, start: 13, end: 12 })}
-              onPress={async () => {
-                const url = `${webUrl}${post.format === 'reel' ? `/reels?start=${post.id}` : `/p/${post.id}`}`;
-                const title = t('m.reels.shareTitle', { name: post.author.displayName });
-                try {
-                  // iOS shares the link as a link; Android only takes a message.
-                  const r = await Share.share(Platform.OS === 'ios' ? { url, message: title } : { message: `${title}\n${url}`, title });
-                  if (r.action === Share.sharedAction) recordFeedEvent({ postId: post.id, surface, kind: 'share' });
-                } catch {
-                  // The person closed the share sheet.
-                }
-              }}
+              onPress={share}
             >
               <Icon name="paper-plane-outline" size={19} color={c.inkMuted} />
             </Pressable>
@@ -776,6 +815,7 @@ function PostCardView({
           </Pressable>
         </View>
       )}
+      {post.status ? null : <PostStats post={post} isAuthor={isAuthor} />}
       {editing ? (
         <EditPostSheet
           post={post}
@@ -791,6 +831,7 @@ function PostCardView({
       {repostersOpen ? <RepostersSheet postId={post.id} onClose={() => setRepostersOpen(false)} /> : null}
       {remembering ? <AddToMemorySheet postId={post.id} onClose={() => setRemembering(false)} /> : null}
       {menu.sheet}
+      {sender.sheet}
       {watchTogether.sheet}
       {report.sheet}
       {tuneNote ? (

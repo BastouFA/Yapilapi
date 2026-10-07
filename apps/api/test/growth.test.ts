@@ -96,9 +96,19 @@ describe('contact matching', () => {
 
   it('keeps the setting on by default for adults and off, unchangeable, for under-18s', async () => {
     const grown = await adult();
-    expect((await as(t.app, grown).get('/v1/me/sharing')).body.settings).toEqual({ findableByContacts: true, allowDownload: true, locked: false });
+    expect((await as(t.app, grown).get('/v1/me/sharing')).body.settings).toEqual({
+      findableByContacts: true,
+      allowDownload: true,
+      hideCounts: false,
+      locked: false,
+    });
     const teen = await signUp(t.app, { birthDate: new Date(Date.now() - 16 * 365.25 * 86400_000).toISOString().slice(0, 10) });
-    expect((await as(t.app, teen).get('/v1/me/sharing')).body.settings).toEqual({ findableByContacts: false, allowDownload: false, locked: true });
+    expect((await as(t.app, teen).get('/v1/me/sharing')).body.settings).toEqual({
+      findableByContacts: false,
+      allowDownload: false,
+      hideCounts: false,
+      locked: true,
+    });
     expect((await as(t.app, teen).put('/v1/me/sharing', { findableByContacts: true })).status).toBe(403);
     expect((await as(t.app, teen).put('/v1/me/sharing', { allowDownload: true })).status).toBe(403);
   });

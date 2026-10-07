@@ -353,7 +353,8 @@ export function createClient(opts: ClientOptions) {
       /** `kind: 'creators'` suggests people who post publicly, for onboarding. */
       suggestions: (o: { kind?: 'people' | 'creators'; limit?: number } = {}) => get<{ items: PeopleSuggestion[] }>(`/v1/me/suggestions${qs(o)}`),
       sharing: () => get<{ settings: SharingSettings }>('/v1/me/sharing'),
-      setSharing: (b: Partial<Pick<SharingSettings, 'findableByContacts' | 'allowDownload'>>) => put<{ settings: SharingSettings }>('/v1/me/sharing', b),
+      setSharing: (b: Partial<Pick<SharingSettings, 'findableByContacts' | 'allowDownload' | 'hideCounts'>>) =>
+        put<{ settings: SharingSettings }>('/v1/me/sharing', b),
       /** Who may tag you in photos. */
       tagging: () => get<{ allowFrom: TagPermission }>('/v1/me/tagging'),
       setTagging: (allowFrom: TagPermission) => put<{ allowFrom: TagPermission }>('/v1/me/tagging', { allowFrom }),
@@ -495,10 +496,17 @@ export function createClient(opts: ClientOptions) {
       edit: (id: string, b: EditPostInput) => patch<{ post: Post; moderation?: ModerationNotice }>(`/v1/posts/${id}`, b),
       /** Every version of an edited post's text, newest first. */
       history: (id: string) => get<{ items: PostVersion[] }>(`/v1/posts/${id}/history`),
-      like: (id: string) => put<{ liked: boolean; likes: number }>(`/v1/posts/${id}/reaction`, { kind: 'like' }),
-      unlike: (id: string) => del<{ liked: boolean; likes: number }>(`/v1/posts/${id}/reaction`),
+      /** `likes` is left out when the author hid the count. */
+      like: (id: string) => put<{ liked: boolean; likes?: number }>(`/v1/posts/${id}/reaction`, { kind: 'like' }),
+      unlike: (id: string) => del<{ liked: boolean; likes?: number }>(`/v1/posts/${id}/reaction`),
       save: (id: string) => put(`/v1/posts/${id}/save`),
-      view: (id: string) => post<{ views: number }>(`/v1/posts/${id}/view`),
+      /** `views` is left out when the author hid the count. */
+      view: (id: string) => post<{ views?: number }>(`/v1/posts/${id}/view`),
+      /** Your post's like and view counts: hidden from everyone but you, or shown again. */
+      setCountsHidden: (id: string, hidden: boolean) => put<{ countsHidden: boolean }>(`/v1/posts/${id}/counts`, { hidden }),
+      /** Send a post or reel into chats as a message with its link (it counts as a share). */
+      send: (id: string, b: { userIds?: string[]; conversationIds?: string[]; body?: string }) =>
+        post<{ conversationIds: string[]; failed: { id: string; code?: MessageFailureCode; message: string }[] }>(`/v1/posts/${id}/send`, b),
       pin: (postId: string | null) => put<{ pinnedPostId: string | null }>('/v1/me/pinned-post', { postId }),
       repost: (id: string) => put<{ reposted: boolean; reposts: number }>(`/v1/posts/${id}/repost`),
       unrepost: (id: string) => del<{ reposted: boolean; reposts: number }>(`/v1/posts/${id}/repost`),
@@ -2693,6 +2701,11 @@ export interface Story {
   liked: boolean;
   /** Only on your own stories. */
   views?: number;
+  /** How many people liked it: for everyone, unless its author hid like counts (then only for the author). */
+  likes?: number;
+  /** Only on your own stories: replies sent to you, and times it was sent to a chat or added to someone's story. */
+  replies?: number;
+  shares?: number;
   /** Its photo or video is marked sensitive: show it blurred until the viewer chooses to see it. */
   sensitive?: boolean;
   /** Shared with everyone (can be reshared, and shows on tag pages). */
@@ -2780,7 +2793,9 @@ export interface SharingSettings {
   findableByContacts: boolean;
   /** Others can save your reels as a video to share elsewhere. */
   allowDownload: boolean;
-  /** Both stay off for people under 18. */
+  /** "Hide like and view counts": the default for your posts, reels and stories (each post can differ). */
+  hideCounts: boolean;
+  /** findableByContacts and allowDownload stay off for people under 18. */
   locked: boolean;
 }
 

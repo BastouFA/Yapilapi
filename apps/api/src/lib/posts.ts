@@ -2,7 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 import type { MediaItem, Post, RemixRef } from '@yapilapi/shared';
 import { plusCol, publicUserFrom } from './users.ts';
 import { seesSensitiveMedia } from './interactions.ts';
-import { allowDownloadSql, postUnlockedSql, postVisibleSql } from './visibility.ts';
+import { allowDownloadSql, notBlockedSql, postUnlockedSql, postVisibleSql } from './visibility.ts';
 import { attachCollabsAndTags } from './collabs.ts';
 import { mediaSizesSql, withSmallVariants } from './data-saver.ts';
 import { commentAllowedSql } from './comments.ts';
@@ -15,6 +15,8 @@ import type { EchoRef, PostMusic, PostReasonCode, PostReasonParams, ReelHighligh
 import { postReasonText, type ReasonTranslator } from '@yapilapi/shared';
 import { t, tp } from '@yapilapi/shared/i18n';
 import { echoAllowedSql, echoPermissionSql } from './echoes.ts';
+import { trendSql } from './post-stats.ts';
+import { isRising, risingCutoff, RISING } from './rising.ts';
 
 type Q = Pool | PoolClient;
 
@@ -53,6 +55,9 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
             EXISTS (SELECT 1 FROM reactions r WHERE r.post_id = p.id AND r.user_id = $2) AS liked,
             EXISTS (SELECT 1 FROM saves s WHERE s.post_id = p.id AND s.user_id = $2) AS saved,
             EXISTS (SELECT 1 FROM post_reposts rp WHERE rp.post_id = p.id AND rp.user_id = $2) AS reposted, p.repost_count,
+            -- The numbers under it (docs/product/post-stats.md): like and view counts the author hid, shares, and momentum for Rising.
+            coalesce(p.hide_counts, pr.hide_counts) AS counts_hidden, (p.author_id IS NOT DISTINCT FROM $2) AS is_author,
+            coalesce(ps.sends, 0) AS sends, ${trendSql('now()')} AS momentum,
             (SELECT coalesce(json_agg(json_build_object('id', m.id, 'kind', m.kind, 'url', m.url, 'altText', m.alt_text, 'width', m.width, 'height', m.height, 'variants', m.variants, 'sizes', ${mediaSizesSql()}, 'posterUrl', m.poster_url, 'hlsUrl', m.hls_url, 'placeholder', m.blurhash, 'sensitive', m.moderation = 'sensitive',
                                                    'captions', (SELECT coalesce(json_agg(json_build_object('lang', ct.lang, 'label', ct.label, 'url', ct.url) ORDER BY ct.lang), '[]')
                                                                 FROM caption_tracks ct WHERE ct.media_id = m.id AND ct.status = 'ready')) ORDER BY pm.position), '[]')
@@ -102,9 +107,16 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
      LEFT JOIN communities c ON c.id = p.community_id
      LEFT JOIN events e ON e.id = p.event_id AND e.deleted_at IS NULL
      LEFT JOIN products pd ON pd.id = p.product_id AND pd.deleted_at IS NULL
+     LEFT JOIN post_stats ps ON ps.post_id = p.id
      WHERE p.id = ANY($1)`,
     [ids, viewer, adult],
   );
+  // Rising: only worth working out the cut-off when a post could be (lib/rising.ts).
+  const maybeRising = rows.filter((r) => r.status === 'published' && Number(r.momentum) >= RISING.minMomentum && (r.view_count ?? 0) >= RISING.minViewers);
+  if (maybeRising.length) {
+    const cutoff = await risingCutoff(db);
+    for (const r of maybeRising) r.rising = isRising(Number(r.momentum), r.view_count ?? 0, cutoff);
+  }
   const originals = await remixOriginals(
     db,
     rows
@@ -141,7 +153,67 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
   }
   // Co-authors ("Ada and Bola") and people tagged in photos (none on locked posts, which carry no media).
   await attachCollabsAndTags(db, [...new Set(posts)], viewer);
+  // "Liked by Amara and 12 others", where the like count is shown to the viewer.
+  if (viewer) {
+    const liked = rows.filter((r) => r.unlocked && r.like_count > 0 && (!r.counts_hidden || r.is_author) && r.status === 'published');
+    if (liked.length) {
+      const likers = await likedBy(
+        db,
+        liked.map((r) => r.id as string),
+        viewer,
+      );
+      for (const r of liked) {
+        const who = likers.get(r.id);
+        if (who) byId.get(r.id)!.likedBy = { user: who, others: Math.max(0, r.like_count - 1) };
+      }
+    }
+  }
   return posts;
+}
+
+/**
+ * For each post, the latest person who liked it whom the viewer follows or is friends with, as
+ * long as the viewer may see them there: never the author or the viewer, nobody blocked either
+ * way or muted by the viewer, no suspended account, a private account only when the viewer
+ * follows it, and someone under 18 only when they're friends with the viewer.
+ */
+async function likedBy(db: Q, postIds: string[], viewer: string): Promise<Map<string, ReturnType<typeof publicUserFrom>>> {
+  const { rows } = await db.query(
+    `SELECT DISTINCT ON (r.post_id) r.post_id, pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name,
+            pr.avatar_url AS a_avatar_url, pr.mode AS a_mode, ${plusCol('a_')}
+     FROM reactions r
+     JOIN posts p ON p.id = r.post_id
+     JOIN profiles pr ON pr.user_id = r.user_id
+     JOIN users u ON u.id = r.user_id
+     LEFT JOIN follows f ON f.follower_id = $2 AND f.followee_id = r.user_id
+     LEFT JOIN friendships fr ON fr.user_a = least($2::uuid, r.user_id) AND fr.user_b = greatest($2::uuid, r.user_id)
+     WHERE r.post_id = ANY($1::uuid[]) AND r.user_id <> $2 AND r.user_id <> p.author_id AND u.status = 'active'
+       AND (f.follower_id IS NOT NULL OR fr.user_a IS NOT NULL)
+       AND (NOT pr.is_private OR f.follower_id IS NOT NULL)
+       AND (fr.user_a IS NOT NULL OR NOT coalesce(u.birth_date > current_date - interval '18 years', true))
+       AND ${notBlockedSql('r.user_id', '$2')}
+       AND NOT EXISTS (SELECT 1 FROM mutes mu WHERE mu.muter_id = $2 AND mu.muted_id = r.user_id)
+     ORDER BY r.post_id, r.created_at DESC`,
+    [postIds, viewer],
+  );
+  return new Map(rows.map((r) => [r.post_id as string, publicUserFrom(r, 'a_')]));
+}
+
+/** A post's counts for this viewer: likes and views only when the author didn't hide them, or it's the author. */
+function countsOf(r: Record<string, any>): Pick<Post['counts'], 'likes' | 'views' | 'comments' | 'reposts' | 'shares'> {
+  const shown = !r.counts_hidden || r.is_author;
+  return {
+    ...(shown ? { likes: r.like_count } : {}),
+    comments: r.comment_count,
+    reposts: r.repost_count ?? 0,
+    ...(shown ? { views: r.view_count ?? 0 } : {}),
+    shares: Number(r.sends ?? 0),
+  };
+}
+
+/** Whether the author hid the like and view counts, and whether it's Rising. */
+function numbersOf(r: Record<string, any>): Pick<Post, 'countsHidden' | 'rising'> {
+  return { ...(r.counts_hidden ? { countsHidden: true } : {}), ...(r.rising ? { rising: true } : {}) };
 }
 
 function toPost(r: Record<string, any>, originals: Map<string, NonNullable<RemixRef['post']>>, reasons?: Map<string, FeedReason>): Post {
@@ -160,13 +232,11 @@ function toPost(r: Record<string, any>, originals: Map<string, NonNullable<Remix
     event: r.e_id ? { id: r.e_id, title: r.e_title, startsAt: r.e_starts_at.toISOString() } : null,
     product: r.pd_id ? { id: r.pd_id, title: r.pd_title, priceCents: r.pd_price, currency: r.pd_currency } : null,
     counts: {
-      likes: r.like_count,
-      comments: r.comment_count,
-      reposts: r.repost_count ?? 0,
-      views: r.view_count ?? 0,
+      ...countsOf(r),
       ...(r.remix_count === null ? {} : { remixes: r.remix_count }),
       ...(r.echo_count === null || r.echo_count === undefined ? {} : { echoes: r.echo_count }),
     },
+    ...numbersOf(r),
     commentPolicy: r.comment_policy,
     viewer: {
       liked: r.liked,
@@ -273,7 +343,8 @@ function lockedPost(r: Record<string, any>, reasons?: Map<string, FeedReason>): 
     community: r.c_id ? { id: r.c_id, slug: r.c_slug, name: r.c_name } : null,
     event: null,
     product: null,
-    counts: { likes: r.like_count, comments: r.comment_count, reposts: r.repost_count ?? 0, views: r.view_count ?? 0 },
+    counts: countsOf(r),
+    ...numbersOf(r),
     viewer: { liked: r.liked, saved: r.saved, reposted: r.reposted },
     aiAssisted: false,
     real: null,

@@ -22,6 +22,8 @@ export type NotificationTarget = {
 export function notificationHref(n: NotificationTarget): string | null {
   const id = n.entityId ? encodeURIComponent(n.entityId) : null;
   if ((n.type === 'reel_duet' || n.type === 'reel_remix') && id) return `/reels?start=${id}`;
+  // A milestone on your post or reel opens it (a push carries no format: it opens the post's page).
+  if (n.type === 'post_milestone' && id) return n.data?.format === 'reel' ? `/reels?start=${id}` : `/p/${id}`;
   // A call opens the chat it was in (older call notifications open the caller).
   if (n.type === 'call_incoming' && typeof n.data?.conversationId === 'string') return `/chat/${encodeURIComponent(n.data.conversationId)}`;
   // Echoes of your reel (batched): all of them, or the one when only one person echoed it.

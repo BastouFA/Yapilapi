@@ -531,7 +531,7 @@ export default async function momentsModule(app: FastifyInstance, ctx: AppContex
 }
 
 /** The caller's own credentials, for an internal call made on their behalf. */
-function asSameUser(req: FastifyRequest): Record<string, string> {
+export function asSameUser(req: FastifyRequest): Record<string, string> {
   const h: Record<string, string> = { 'content-type': 'application/json' };
   if (req.headers.authorization) h.authorization = req.headers.authorization;
   if (req.headers.cookie) h.cookie = req.headers.cookie;

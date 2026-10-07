@@ -72,7 +72,7 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       profile: (
         await q(
           `SELECT username, display_name, bio, avatar_url, cover_url, cover_alt, cover_media_id, cover_edit, links, mode, locale, is_private, pronouns, city, accent, header_style, tabs, featured_post_ids,
-                  song_sound_id, song_track_id, song_part, country, country_source, cdn_country, plus_until, allow_download, tag_permission, pinned_post_id, created_at
+                  song_sound_id, song_track_id, song_part, country, country_source, cdn_country, plus_until, allow_download, hide_counts, tag_permission, pinned_post_id, created_at
            FROM profiles WHERE user_id = $1`,
         )
       )[0],
@@ -86,7 +86,7 @@ export default async function privacyModule(app: FastifyInstance, ctx: AppContex
       closeFriends: await q(`SELECT friend_id, created_at FROM close_friends WHERE owner_id = $1`),
       posts: await q(
         `SELECT id, kind, format, body, visibility, topics, allow_remix, remix_of_post_id, remix_mode, sound_id, allow_echoes, is_echo, echo_of_post_id, status, scheduled_at,
-                created_at, edited_at, deleted_at
+                hide_counts, created_at, edited_at, deleted_at
          FROM posts WHERE author_id = $1`,
       ),
       // Earlier versions of your posts' text.

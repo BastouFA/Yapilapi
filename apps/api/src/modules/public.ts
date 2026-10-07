@@ -75,7 +75,7 @@ export default async function publicModule(app: FastifyInstance, ctx: AppContext
     const { id } = parse(idParam, req.params);
     reply.header('cache-control', 'no-store');
     const { rows } = await db.query(
-      `SELECT p.id, p.format, p.kind, p.visibility, p.like_count, p.comment_count, p.repost_count, p.created_at,
+      `SELECT p.id, p.format, p.kind, p.visibility, p.like_count, p.comment_count, p.repost_count, p.created_at, coalesce(p.hide_counts, ap.hide_counts) AS counts_hidden,
               CASE WHEN p.visibility = 'public' THEN p.body ELSE '' END AS body,
               ap.username, ap.display_name, ap.avatar_url, c.slug AS c_slug, c.name AS c_name,
               (SELECT json_build_object('kind', m.kind, 'url', m.url, 'mime', m.mime, 'posterUrl', m.poster_url, 'mp4', m.variants->>'mp4',
@@ -116,7 +116,8 @@ export default async function publicModule(app: FastifyInstance, ctx: AppContext
       author: { username: r.username, displayName: r.display_name, avatarUrl: r.avatar_url },
       image: imageUrl ? { url: imageUrl, width: m!.width, height: m!.height, alt: m!.alt } : null,
       video: videoUrl ? { url: videoUrl, width: m!.width, height: m!.height, durationMs: m!.durationMs } : null,
-      counts: { likes: r.like_count, comments: r.comment_count, reposts: r.repost_count ?? 0 },
+      // The like count stays out when its author hid it.
+      counts: { ...(r.counts_hidden ? {} : { likes: r.like_count }), comments: r.comment_count, reposts: r.repost_count ?? 0 },
       community: r.c_slug ? { slug: r.c_slug, name: r.c_name } : null,
       createdAt: r.created_at.toISOString(),
       ...(r.visibility === 'subscribers' ? { locked: true } : {}),

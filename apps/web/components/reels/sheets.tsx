@@ -50,6 +50,7 @@ export function ShareSheet({
   onEcho,
   onEchoes,
   onShared,
+  onSend,
 }: {
   post: Post | null;
   mine: boolean;
@@ -67,6 +68,8 @@ export function ShareSheet({
   onEchoes?: (p: Post) => void;
   /** Its link went out (the share sheet finished, or it was copied). */
   onShared?: (p: Post) => void;
+  /** Send it into one of your chats (the server counts that share itself). */
+  onSend?: (p: Post) => void;
 }) {
   const { t, toast, locale } = useSession();
   if (!post) return null;
@@ -106,13 +109,16 @@ export function ShareSheet({
           />
         ) : null}
         <SheetItem icon="link" label={t('reel.share.copy')} onClick={done(() => void copy())} />
+        {signedIn && onSend && post.visibility !== 'private' ? (
+          <SheetItem icon="message" label={t('post.send.action')} onClick={done(() => onSend(post))} />
+        ) : null}
         {signedIn && onWatch && post.media.some((m) => m.kind === 'video') ? (
           <SheetItem icon="play" label={t('watch.start')} onClick={done(() => onWatch(post))} />
         ) : null}
         {!mine && publicReel && signedIn ? (
           <SheetItem
             icon="repost"
-            label={post.viewer.reposted ? t('reel.share.undoRepost') : t('reel.share.repost')}
+            label={`${post.viewer.reposted ? t('reel.share.undoRepost') : t('reel.share.repost')}${post.counts.reposts ? ` (${compact.format(post.counts.reposts)})` : ''}`}
             pressed={post.viewer.reposted}
             onClick={done(() => onRepost(post))}
           />
@@ -154,6 +160,7 @@ export function OptionsSheet({
   onAllowEchoes,
   onLeaveCollab,
   onReport,
+  onToggleCounts,
 }: {
   post: Post | null;
   mine: boolean;
@@ -172,6 +179,8 @@ export function OptionsSheet({
   onAllowEchoes?: (p: Post, allow: EchoPermission) => void;
   onLeaveCollab: (p: Post) => void;
   onReport: (p: Post) => void;
+  /** The creator: hide the like and view counts from everyone else, or show them again. */
+  onToggleCounts?: (p: Post) => void;
 }) {
   const { t, locale } = useSession();
   if (!post) return null;
@@ -244,6 +253,13 @@ export function OptionsSheet({
           ) : (
             <SheetItem icon="eye" label={t('reel.notInterested')} onClick={done(() => onNotInterested(post))} />
           )}
+          {mine && onToggleCounts ? (
+            <SheetItem
+              icon={post.countsHidden ? 'eye' : 'eye-off'}
+              label={t(post.countsHidden ? 'post.showCounts' : 'post.hideCounts')}
+              onClick={done(() => onToggleCounts(post))}
+            />
+          ) : null}
           {post.viewer.collab === 'accepted' && !mine ? (
             <SheetItem icon="logout" label={t('reel.collab.leave')} onClick={done(() => onLeaveCollab(post))} />
           ) : null}

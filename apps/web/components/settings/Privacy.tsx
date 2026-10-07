@@ -198,7 +198,7 @@ export function MutedCard() {
   );
 }
 
-/** Let people who have your email or phone number find you; allow downloads of your reels. */
+/** Let people who have your email or phone number find you; allow downloads of your reels; hide your like and view counts. */
 export function SharingCard() {
   const { toast, t } = useSession();
   const [settings, setSettings] = useState<SharingSettingsState | null>(null);
@@ -209,7 +209,7 @@ export function SharingCard() {
     );
   }, []);
   if (!settings) return null;
-  const set = async (k: 'findableByContacts' | 'allowDownload', v: boolean) => {
+  const set = async (k: 'findableByContacts' | 'allowDownload' | 'hideCounts', v: boolean) => {
     const before = settings;
     setSettings({ ...settings, [k]: v });
     try {
@@ -235,6 +235,11 @@ export function SharingCard() {
           <div className="stack-sm">
             <Switch label={t('sharing.allowDownload')} checked={settings.allowDownload} disabled={settings.locked} onChange={(v) => set('allowDownload', v)} />
             <p className="muted setting-hint">{t('sharing.allowDownload.hint')}</p>
+          </div>
+          {/* Anyone can hide their numbers, people under 18 too. */}
+          <div className="stack-sm">
+            <Switch label={t('sharing.hideCounts')} checked={!!settings.hideCounts} onChange={(v) => set('hideCounts', v)} />
+            <p className="muted setting-hint">{t('sharing.hideCounts.hint')}</p>
           </div>
         </div>
       </Card>

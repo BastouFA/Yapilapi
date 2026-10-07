@@ -3,6 +3,7 @@ import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Image, Pressable, Text, View } from 'react-native';
 import type { Post, Sound } from '../../../../packages/shared/src/types';
+import { compactCount } from '../../../../packages/shared/src/post-stats';
 import { client, errorMessage, isGone, mediaUrl } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { clock } from '../../lib/media';
@@ -201,7 +202,7 @@ export default function SoundScreen() {
 /** One reel in the grid: its poster frame; opens in Reels. */
 function ReelTile({ post }: { post: Post }) {
   const c = useColors();
-  const { t, number } = useT();
+  const { t, locale } = useT();
   const m = post.media[0];
   return (
     <Pressable
@@ -211,10 +212,13 @@ function ReelTile({ post }: { post: Post }) {
       style={{ flex: 1 / 3, aspectRatio: 9 / 16, borderRadius: radius.md, overflow: 'hidden', backgroundColor: '#05060B' }}
     >
       {m?.posterUrl ? <Image source={{ uri: mediaUrl(m.posterUrl) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" /> : null}
-      <View style={{ position: 'absolute', bottom: 6, start: 6, end: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-        <Icon name="heart" size={12} color="#FFFFFF" />
-        <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>{number(post.counts.likes)}</Text>
-      </View>
+      {/* No number when the author hid their like counts. */}
+      {post.counts.likes !== undefined ? (
+        <View style={{ position: 'absolute', bottom: 6, start: 6, end: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Icon name="heart" size={12} color="#FFFFFF" />
+          <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>{compactCount(post.counts.likes, locale)}</Text>
+        </View>
+      ) : null}
       {post.remixOf ? (
         <View style={{ position: 'absolute', top: 6, start: 6, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: radius.full, padding: 4 }}>
           <Icon name="copy-outline" size={12} color={c.onYapi} />

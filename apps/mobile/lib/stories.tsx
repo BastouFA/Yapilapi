@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Story, StoryGroup } from '../../../packages/api-client/src/index';
 import type { StickerResults, StorySticker } from '../../../packages/shared/src/stories';
 import type { PublicUser } from '../../../packages/shared/src/types';
+import { compactCount } from '../../../packages/shared/src/post-stats';
 import { client, errorMessage, mediaUrl, webUrl } from './api';
 import { useDataSaver } from './data-saver';
 import { useT } from './i18n';
@@ -175,7 +176,7 @@ function Viewer({
   backRef: { current: (() => boolean) | null };
 }) {
   const c = useColors();
-  const { t, tp, timeAgo } = useT();
+  const { t, tp, timeAgo, locale } = useT();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [g, setG] = useState(start);
@@ -577,8 +578,15 @@ function Viewer({
           ) : null}
           {group.mine ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+              {/* Your story's numbers, short on screen and in full for screen readers; it opens who saw it. */}
               <Pressable
                 accessibilityRole="button"
+                accessibilityLabel={[
+                  t('m.stories.seenBy', { count: story.views ?? 0 }),
+                  ...(story.likes ? [tp('post.stats.likes', story.likes)] : []),
+                  ...(story.replies ? [tp('post.stats.replies', story.replies)] : []),
+                  ...(story.shares ? [tp('post.stats.shares', story.shares)] : []),
+                ].join(', ')}
                 onPress={async () => {
                   // A list that couldn't load says why, rather than showing as "no viewers yet".
                   try {
@@ -588,10 +596,12 @@ function Viewer({
                   }
                 }}
                 hitSlop={2}
-                style={st.pill}
+                style={[st.pill, { gap: space[3] }]}
               >
-                <Icon name="eye-outline" size={18} color={WHITE} />
-                <Text style={st.pillText}>{t('m.stories.seenBy', { count: story.views ?? 0 })}</Text>
+                <StoryStat icon="eye-outline" value={compactCount(story.views ?? 0, locale)} />
+                {story.likes ? <StoryStat icon="heart-outline" value={compactCount(story.likes, locale)} /> : null}
+                {story.replies ? <StoryStat icon="chatbubble-outline" value={compactCount(story.replies, locale)} /> : null}
+                {story.shares ? <StoryStat icon="paper-plane-outline" value={compactCount(story.shares, locale)} /> : null}
               </Pressable>
               <Pressable accessibilityRole="button" hitSlop={2} onPress={() => setChapterFor(story.id)} style={st.pill}>
                 <Icon name="albums-outline" size={18} color={WHITE} />
@@ -644,13 +654,27 @@ function Viewer({
                 />
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={story.liked ? t('post.unlike') : t('post.like')}
+                  accessibilityLabel={(story.liked ? t('post.unlike') : t('post.like')) + (story.likes ? `, ${tp('post.stats.likes', story.likes)}` : '')}
                   accessibilityState={{ selected: story.liked }}
                   hitSlop={ICON_SLOP}
                   onPress={async () => {
                     const liked = !story.liked;
+                    // The like count moves with the heart, when the story has one (its author can hide it).
                     const set = (v: boolean) =>
-                      onChange(groups.map((x, gi) => (gi !== g ? x : { ...x, moments: x.moments.map((m, mi) => (mi === i ? { ...m, liked: v } : m)) })));
+                      onChange(
+                        groups.map((x, gi) =>
+                          gi !== g
+                            ? x
+                            : {
+                                ...x,
+                                moments: x.moments.map((m, mi) =>
+                                  mi !== i || m.liked === v
+                                    ? m
+                                    : { ...m, liked: v, likes: m.likes === undefined ? undefined : Math.max(0, m.likes + (v ? 1 : -1)) },
+                                ),
+                              },
+                        ),
+                      );
                     set(liked);
                     try {
                       await (await client()).moments.like(story.id, liked);
@@ -658,9 +682,14 @@ function Viewer({
                       set(!liked);
                     }
                   }}
-                  style={st.icon}
+                  style={story.likes ? st.iconCount : st.icon}
                 >
                   <Icon name={story.liked ? 'heart' : 'heart-outline'} size={26} color={story.liked ? c.yapi : WHITE} />
+                  {story.likes ? (
+                    <Text style={st.likes} numberOfLines={1}>
+                      {compactCount(story.likes, locale)}
+                    </Text>
+                  ) : null}
                 </Pressable>
                 {reply.trim() ? (
                   <Pressable
@@ -795,6 +824,16 @@ function Viewer({
   }
 }
 
+/** One of your story's numbers in its pill: an icon and the short number (the pill has the full label). */
+function StoryStat({ icon, value }: { icon: 'eye-outline' | 'heart-outline' | 'chatbubble-outline' | 'paper-plane-outline'; value: string }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      <Icon name={icon} size={18} color={WHITE} directional={icon === 'paper-plane-outline'} />
+      <Text style={st.pillText}>{value}</Text>
+    </View>
+  );
+}
+
 /** A story video: plays once to the end, reporting progress, and pauses while held. Muted when the story has music. */
 function StoryVideo({
   uri,
@@ -850,6 +889,8 @@ const st = StyleSheet.create({
   who: { color: WHITE, fontWeight: '700', fontSize: 14 },
   when: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
   icon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  // The heart with its like count beside it: as tall as the other icons, as wide as the number needs.
+  iconCount: { minWidth: 40, height: 40, borderRadius: 20, flexDirection: 'row', gap: 4, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
   closeFriends: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.full },
   caption: {
     color: WHITE,
@@ -895,6 +936,7 @@ const st = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.4)',
   },
   pillText: { color: WHITE, fontWeight: '700', fontSize: 14 },
+  likes: { color: WHITE, fontWeight: '700', fontSize: 13, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 3 },
   search: { height: 44, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: space[3], fontSize: 15 },
   sheetButton: { height: 44, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
 });

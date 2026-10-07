@@ -19,7 +19,9 @@ import {
 } from '@yapilapi/design-system';
 import type { Story, StoryGroup } from '@yapilapi/api-client';
 import {
+  compactCount,
   formatRelativeTime,
+  fullCount,
   isRtl,
   storySendFailureText,
   type MessageFailureCode,
@@ -358,7 +360,8 @@ export function StoryViewer({
         </div>
 
         {group.mine ? (
-          <div className="story__foot">
+          <div className="story__foot story__foot--mine">
+            <StoryStats story={story} />
             <Button
               size="sm"
               variant="secondary"
@@ -434,17 +437,20 @@ export function StoryViewer({
             />
             <button
               type="button"
-              className="story__icon"
-              // A toggle: aria-pressed says whether you like it, so the name stays "Like".
+              className={story.likes ? 'story__icon story__icon--count' : 'story__icon'}
+              // A toggle: aria-pressed says whether you like it, so the name stays "Like" (with the count when there is one).
               aria-pressed={story.liked}
-              aria-label={t('post.like')}
+              aria-label={story.likes ? `${t('post.like')}${t('m.collab.joinSep')}${fullCount(story.likes, locale)}` : t('post.like')}
               onClick={async () => {
                 const liked = !story.liked;
-                patchStory({ liked });
+                // The count moves with the heart where there is one (the author may have hidden it).
+                const likes = story.likes === undefined ? undefined : Math.max(0, story.likes + (liked ? 1 : -1));
+                patchStory({ liked, likes });
                 await api.moments.like(story.id, liked).catch((err) => toast(errorMessage(err)));
               }}
             >
               <Icon name="heart" filled={story.liked} />
+              {story.likes ? <span aria-hidden>{compactCount(story.likes, locale)}</span> : null}
             </button>
             {reply.trim() ? (
               <button type="submit" className="story__icon" aria-label={t('m.stories.sendReply')}>
@@ -498,6 +504,31 @@ export function StoryViewer({
           <p className="muted">{t('m.stories.noViewers')}</p>
         )}
       </BottomSheet>
+    </div>
+  );
+}
+
+/** Your own story's numbers along the bottom: views, likes, replies and shares (short, read out in full). */
+function StoryStats({ story }: { story: Story }) {
+  const { tp, locale, t } = useSession();
+  const rows = (
+    [
+      ['eye', 'post.stats.views', story.views],
+      ['heart', 'post.stats.likes', story.likes],
+      ['message', 'post.stats.replies', story.replies],
+      ['send', 'post.stats.shares', story.shares],
+    ] as const
+  ).filter((r) => r[2] !== undefined);
+  if (!rows.length) return null;
+  return (
+    <div className="story__stats" role="group" aria-label={t('post.stats.label')}>
+      {rows.map(([icon, key, n]) => (
+        <span key={key} className="story__stat">
+          <Icon name={icon} size={16} />
+          <span aria-hidden>{compactCount(n!, locale)}</span>
+          <span className="yp-visually-hidden">{tp(key, n!, { count: fullCount(n!, locale) })}</span>
+        </span>
+      ))}
     </div>
   );
 }

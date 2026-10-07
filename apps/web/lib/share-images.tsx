@@ -19,7 +19,10 @@ export async function postShareImage(id: string) {
       : post.excerpt || (post.format === 'reel' ? 'Watch the reel on YAPILAPI.' : 'See the post on YAPILAPI.'),
     avatar: { src: avatar, name: post.author.displayName },
     image,
-    footer: `${plural(post.counts.likes, 'like', 'likes')} · ${plural(post.counts.comments, 'comment', 'comments')}`,
+    // A like count the author hid stays off the image too.
+    footer: [post.counts.likes === undefined ? null : plural(post.counts.likes, 'like', 'likes'), plural(post.counts.comments, 'comment', 'comments')]
+      .filter(Boolean)
+      .join(' · '),
   });
 }
 

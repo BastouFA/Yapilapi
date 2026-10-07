@@ -2,8 +2,18 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { Avatar, CaptionTracks, Icon, SensitiveCover, TaggedText, TranslatableText, useLongPress, videoCrossOrigin } from '@yapilapi/design-system';
-import { formatReelTime, videoPoster, videoSrc, type MessageKey, type Post, type ReelMoment } from '@yapilapi/shared';
+import {
+  Avatar,
+  CaptionTracks,
+  Icon,
+  RisingBadge,
+  SensitiveCover,
+  TaggedText,
+  TranslatableText,
+  useLongPress,
+  videoCrossOrigin,
+} from '@yapilapi/design-system';
+import { compactCount, formatReelTime, fullCount, videoPoster, videoSrc, type MessageKey, type Post, type ReelMoment } from '@yapilapi/shared';
 import { recordFeedEvent } from '@/lib/feed-events';
 import { NextLink } from '@/lib/link';
 import { musicHref, useMusicCredit, useMusicLoop } from '@/components/StoryMusic';
@@ -693,6 +703,7 @@ export function ReelItem({
               </button>
             ) : null}
           </div>
+          <ReelStats post={post} mine={mine} />
           <div className="reel__caption-row">
             {caption ? (
               <p className="reel__caption" dir="auto">
@@ -944,21 +955,15 @@ export function ReelItem({
           label={post.viewer.liked ? t('post.unlike') : t('post.like')}
           pressed={post.viewer.liked}
           count={post.counts.likes}
-          fmt={compact}
           tone="like"
           onClick={() => viewer.like(post)}
         >
           <Icon name="heart" filled={post.viewer.liked} size={24} />
         </RailButton>
-        <RailButton
-          label={t('post.comments')}
-          count={post.counts.comments}
-          fmt={compact}
-          onClick={() => viewer.comments(post, Math.round(time.current * 1000))}
-        >
+        <RailButton label={t('post.comments')} count={post.counts.comments} onClick={() => viewer.comments(post, Math.round(time.current * 1000))}>
           <Icon name="message" size={24} />
         </RailButton>
-        <RailButton label={t('m.common.share')} count={post.counts.reposts || undefined} fmt={compact} onClick={() => viewer.share(post)} haspopup>
+        <RailButton label={t('m.common.share')} count={post.counts.shares} onClick={() => viewer.share(post)} haspopup>
           <Icon name="send" size={24} />
         </RailButton>
         <RailButton
@@ -990,7 +995,6 @@ function RailButton({
   label,
   pressed,
   count,
-  fmt,
   onClick,
   hold,
   tone,
@@ -999,8 +1003,8 @@ function RailButton({
 }: {
   label: string;
   pressed?: boolean;
+  /** Shown short under the button (1.2K) and read out in full; none when it's 0 or hidden by the author. */
   count?: number;
-  fmt?: Intl.NumberFormat;
   onClick: () => void;
   /** A long press or right-click (the save button opens "Save to a board"). */
   hold?: ReturnType<typeof useLongPress>;
@@ -1008,6 +1012,7 @@ function RailButton({
   haspopup?: boolean;
   children: React.ReactNode;
 }) {
+  const { t, locale } = useSession();
   return (
     <button
       type="button"
@@ -1019,13 +1024,50 @@ function RailButton({
       }}
       aria-pressed={pressed}
       aria-haspopup={haspopup ? 'dialog' : undefined}
-      aria-label={count ? `${label}, ${count}` : label}
+      aria-label={count ? `${label}${t('m.collab.joinSep')}${fullCount(count, locale)}` : label}
     >
       <span className="reel__disc">{children}</span>
       <span className="reel__count" aria-hidden>
-        {count ? fmt?.format(count) : ''}
+        {count ? compactCount(count, locale) : ''}
       </span>
     </button>
+  );
+}
+
+/**
+ * Under the author's name: the reel's views and reposts (short, read out in full), Rising when it's
+ * picking up fast, and on your own reel with hidden counts a note that only you see them.
+ */
+function ReelStats({ post, mine }: { post: Post; mine: boolean }) {
+  const { t, tp, locale } = useSession();
+  const views = post.counts.views ?? 0;
+  const reposts = post.counts.reposts;
+  const onlyYou = mine && !!post.countsHidden;
+  if (!views && !reposts && !post.rising && !onlyYou) return null;
+  return (
+    <div className="reel__stats" role="group" aria-label={t('post.stats.label')}>
+      {views ? (
+        <span className="reel__stat">
+          <Icon name="eye" size={14} />
+          <span aria-hidden>{compactCount(views, locale)}</span>
+          <span className="yp-visually-hidden">{tp('post.stats.views', views, { count: fullCount(views, locale) })}</span>
+        </span>
+      ) : null}
+      {reposts ? (
+        <span className="reel__stat">
+          <Icon name="repost" size={14} />
+          <span aria-hidden>{compactCount(reposts, locale)}</span>
+          <span className="yp-visually-hidden">{tp('post.stats.reposts', reposts, { count: fullCount(reposts, locale) })}</span>
+        </span>
+      ) : null}
+      {post.rising ? <RisingBadge locale={locale} /> : null}
+      {onlyYou ? (
+        <span className="reel__stat reel__stat--note">
+          <Icon name="eye-off" size={14} />
+          {t('post.stats.onlyYou')}
+        </span>
+      ) : null}
+    </div>
   );
 }
 

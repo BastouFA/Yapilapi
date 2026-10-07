@@ -225,6 +225,8 @@ export async function writePost(
     );
     id = rows[0]!.id;
   }
+  // "Hide like and view counts" for this post; left out, the account's choice applies (and a draft keeps its own).
+  if (input.hideCounts !== undefined) await c.query(`UPDATE posts SET hide_counts = $2 WHERE id = $1`, [id, input.hideCounts]);
   if (echo && input.echo) await linkEcho(c, id, input.echo, echo.originalId, echo.song);
   const mediaIds: string[] = [];
   for (const [i, m] of input.media.entries()) {

@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Avatar, Button, EmptyState, List, ListItem, Skeleton } from '@yapilapi/design-system';
+import { Avatar, Button, EmptyState, Icon, List, ListItem, Skeleton } from '@yapilapi/design-system';
 import {
   echoNoticeText,
   formatRelativeTime,
+  fullCount,
+  milestoneNoticeText,
   miniAppNoticeText,
   reportOutcomeText,
   appealDecidedText,
@@ -435,6 +437,32 @@ export default function Notifications() {
                       {unread ? <span className="yp-unread" aria-label={t('m.notif.unread')} style={{ minWidth: 8, height: 8, padding: 0 }} /> : null}
                     </>
                   );
+                  if (n.type === 'post_milestone' && n.entityId) {
+                    // A small card of its own: the number, the sentence and a way to the post.
+                    const reel = n.data.format === 'reel';
+                    const threshold = Number(n.data.threshold) || 0;
+                    return (
+                      <li key={g.key} className="notif-milestone">
+                        <p className="notif-milestone__label">
+                          <Icon name="star" size={14} />
+                          {t('milestone.card.label')}
+                        </p>
+                        {/* The sentence says the same in words, for screen readers. */}
+                        <p className="notif-milestone__figure" aria-hidden>
+                          <span className="notif-milestone__number">{fullCount(threshold, locale)}</span>{' '}
+                          <span>{t(n.data.metric === 'likes' ? 'milestone.card.likes' : 'milestone.card.views')}</span>
+                        </p>
+                        <p className="notif-milestone__text" style={{ fontWeight: unread ? 600 : 400 }}>
+                          {milestoneNoticeText(n, t, locale)}
+                          <span className="notif-milestone__when">{when}</span>
+                        </p>
+                        <Link href={reel ? `/reels?start=${n.entityId}` : `/p/${n.entityId}`} className="notif-milestone__link">
+                          {t(reel ? 'milestone.card.see.reel' : 'milestone.card.see.post')}
+                          <Icon name="chevron-right" size={16} className="notif-milestone__chevron" />
+                        </Link>
+                      </li>
+                    );
+                  }
                   if (n.type === 'collab_invite' && n.entityId) {
                     const postId = n.entityId;
                     const outcome = answered[postId];
