@@ -7,6 +7,7 @@ import type { Post } from '../../../../packages/shared/src/types';
 import { client, errorMessage, isGone } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { PostCard } from '../../lib/post';
+import { FeedSurfaceContext, useFeedViewability } from '../../lib/feed-events';
 import { StoriesStrip, StoryViewer } from '../../lib/stories';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
@@ -24,6 +25,8 @@ const decoded = (raw: string) => {
 
 /** A hashtag: how many people use it, related tags, public stories with it now, recent or top posts, and following it. */
 export default function TagScreen() {
+  // What people look at here teaches the recommender (POST /v1/feed/events).
+  const viewability = useFeedViewability('tag');
   const params = useLocalSearchParams<{ tag: string }>();
   const tag = normalizeTag(decoded(params.tag));
   const c = useColors();
@@ -175,10 +178,11 @@ export default function TagScreen() {
   );
 
   return (
-    <>
+    <FeedSurfaceContext.Provider value="tag">
       <FlatList
         keyboardShouldPersistTaps="handled"
         {...feedListProps}
+        {...viewability}
         style={{ backgroundColor: c.ground }}
         contentContainerStyle={{ padding: space[4], gap: space[3] }}
         data={posts ?? []}
@@ -191,6 +195,6 @@ export default function TagScreen() {
         ListEmptyComponent={posts === null ? <Loading /> : error ? null : <EmptyState title={t('m.tag.empty')} />}
       />
       <StoryViewer groups={stories} start={viewing} onClose={() => setViewing(null)} onChange={setStories} />
-    </>
+    </FeedSurfaceContext.Provider>
   );
 }

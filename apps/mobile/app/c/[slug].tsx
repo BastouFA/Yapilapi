@@ -10,6 +10,7 @@ import { canManage, canOrganize, roleName } from '../../lib/community-roles';
 import { useT } from '../../lib/i18n';
 import { useReport } from '../../lib/report';
 import { PostCard } from '../../lib/post';
+import { FeedSurfaceContext, useFeedViewability } from '../../lib/feed-events';
 import { CommunityCatchUp } from '../../lib/ai-helpers';
 import { roomDuration, roomStatusLabel } from '../../lib/rooms';
 import { MiniAppsSheet, useMiniAppsOn } from '../../lib/miniapps';
@@ -49,7 +50,12 @@ const LOCKED = {
 } as const;
 
 /** A community: posts, its FAQ, audio rooms, events and members, with join and leave, and its group chat for members. */
+/** Only the community's posts count as seen; its FAQ, rooms, events and members don't. */
+const postOf = (item: unknown) => (item as Item | undefined)?.post?.id;
+
 export default function CommunityScreen() {
+  // What people look at here teaches the recommender (POST /v1/feed/events).
+  const viewability = useFeedViewability('communities', postOf);
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const c = useColors();
   const { t, tp, dateTime } = useT();
@@ -315,102 +321,105 @@ export default function CommunityScreen() {
   );
 
   return (
-    <KeyboardAvoid>
-      <FlatList
-        keyboardShouldPersistTaps="handled"
-        // Scrolling tucks the keyboard away, so the whole conversation is readable again.
-        keyboardDismissMode="on-drag"
-        {...feedListProps}
-        style={{ backgroundColor: c.ground }}
-        contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: space[8] }}
-        data={locked ? [] : items}
-        keyExtractor={(x) => x.key}
-        refreshControl={refresh}
-        ListHeaderComponent={header}
-        ListEmptyComponent={
-          locked ? null : loadingTab ? (
-            <Loading />
-          ) : tab === 'posts' ? (
-            <EmptyState title={t('m.community.noPosts.title')} body={community?.myRole ? t('m.community.noPosts.member') : t('m.community.noPosts.body')} />
-          ) : tab === 'faq' ? (
-            <EmptyState title={t('m.community.noFaq.title')} body={faq?.canEdit ? t('m.community.noFaq.editor') : t('m.community.noFaq.body')} />
-          ) : tab === 'rooms' ? (
-            <EmptyState title={t('m.rooms.none')} body={t('m.rooms.noneBody')} />
-          ) : tab === 'events' ? (
-            <EmptyState title={t('m.events.none')} body={t('m.community.noEvents')} />
-          ) : (
-            <EmptyState title={t('m.community.noMembers')} />
-          )
-        }
-        ListFooterComponent={
-          tab === 'faq' && faq?.canEdit && !locked ? (
-            <AddFaq slug={slug} onAdded={loadFaq} />
-          ) : tab === 'rooms' && rooms?.canStart && !locked ? (
-            <StartRoom
-              slug={slug}
-              onScheduled={() =>
-                void client()
-                  .then((api) => api.communities.rooms(slug))
-                  .then(setRooms, () => {})
-              }
-            />
-          ) : null
-        }
-        onEndReached={async () => {
-          if (tab !== 'posts' || !cursor) return;
-          const page = await (await client()).communities.posts(slug, cursor).catch(() => null);
-          if (page) {
-            setPosts((cur) => [...(cur ?? []), ...page.items]);
-            setCursor(page.nextCursor);
+    <FeedSurfaceContext.Provider value="communities">
+      <KeyboardAvoid>
+        <FlatList
+          keyboardShouldPersistTaps="handled"
+          // Scrolling tucks the keyboard away, so the whole conversation is readable again.
+          keyboardDismissMode="on-drag"
+          {...feedListProps}
+          {...viewability}
+          style={{ backgroundColor: c.ground }}
+          contentContainerStyle={{ padding: space[4], gap: space[3], paddingBottom: space[8] }}
+          data={locked ? [] : items}
+          keyExtractor={(x) => x.key}
+          refreshControl={refresh}
+          ListHeaderComponent={header}
+          ListEmptyComponent={
+            locked ? null : loadingTab ? (
+              <Loading />
+            ) : tab === 'posts' ? (
+              <EmptyState title={t('m.community.noPosts.title')} body={community?.myRole ? t('m.community.noPosts.member') : t('m.community.noPosts.body')} />
+            ) : tab === 'faq' ? (
+              <EmptyState title={t('m.community.noFaq.title')} body={faq?.canEdit ? t('m.community.noFaq.editor') : t('m.community.noFaq.body')} />
+            ) : tab === 'rooms' ? (
+              <EmptyState title={t('m.rooms.none')} body={t('m.rooms.noneBody')} />
+            ) : tab === 'events' ? (
+              <EmptyState title={t('m.events.none')} body={t('m.community.noEvents')} />
+            ) : (
+              <EmptyState title={t('m.community.noMembers')} />
+            )
           }
-        }}
-        renderItem={({ item }) =>
-          item.post ? (
-            <PostCard post={item.post} />
-          ) : item.faq ? (
-            <FaqItem
-              entry={item.faq}
-              canEdit={!!faq?.canEdit}
-              onRemove={async () => {
-                try {
-                  await (await client()).communities.deleteFaq(slug, item.faq!.id);
-                  await loadFaq();
-                } catch (e) {
-                  setError(errorMessage(e));
+          ListFooterComponent={
+            tab === 'faq' && faq?.canEdit && !locked ? (
+              <AddFaq slug={slug} onAdded={loadFaq} />
+            ) : tab === 'rooms' && rooms?.canStart && !locked ? (
+              <StartRoom
+                slug={slug}
+                onScheduled={() =>
+                  void client()
+                    .then((api) => api.communities.rooms(slug))
+                    .then(setRooms, () => {})
                 }
-              }}
-            />
-          ) : item.room ? (
-            <RoomCard room={item.room} />
-          ) : item.event ? (
-            <Row
-              title={item.event.title}
-              subtitle={[dateTime(item.event.startsAt), item.event.online ? t('m.event.online') : (item.event.place?.name ?? item.event.locationText)]
-                .filter(Boolean)
-                .join(' · ')}
-              start={<Icon name="calendar-outline" size={22} color={c.yapi} />}
-              onPress={() => router.push(`/event/${item.event!.id}`)}
-            />
-          ) : item.member ? (
-            <Row
-              title={item.member.user.displayName}
-              subtitle={`@${item.member.user.username}${item.member.role !== 'member' ? ` · ${roleName(item.member.role, t)}` : ''}`}
-              start={<Avatar name={item.member.user.displayName} url={item.member.user.avatarUrl} size={36} />}
-              onPress={() => router.push(`/u/${encodeURIComponent(item.member!.user.username)}`)}
-            />
-          ) : null
-        }
-      />
-      {menu.sheet}
-      {report.sheet}
-      <MiniAppsSheet
-        visible={appsOpen}
-        onClose={() => setAppsOpen(false)}
-        surface="community"
-        surfaceId={community.id}
-        canManage={community.myRole === 'owner' || community.myRole === 'admin'}
-      />
-    </KeyboardAvoid>
+              />
+            ) : null
+          }
+          onEndReached={async () => {
+            if (tab !== 'posts' || !cursor) return;
+            const page = await (await client()).communities.posts(slug, cursor).catch(() => null);
+            if (page) {
+              setPosts((cur) => [...(cur ?? []), ...page.items]);
+              setCursor(page.nextCursor);
+            }
+          }}
+          renderItem={({ item }) =>
+            item.post ? (
+              <PostCard post={item.post} />
+            ) : item.faq ? (
+              <FaqItem
+                entry={item.faq}
+                canEdit={!!faq?.canEdit}
+                onRemove={async () => {
+                  try {
+                    await (await client()).communities.deleteFaq(slug, item.faq!.id);
+                    await loadFaq();
+                  } catch (e) {
+                    setError(errorMessage(e));
+                  }
+                }}
+              />
+            ) : item.room ? (
+              <RoomCard room={item.room} />
+            ) : item.event ? (
+              <Row
+                title={item.event.title}
+                subtitle={[dateTime(item.event.startsAt), item.event.online ? t('m.event.online') : (item.event.place?.name ?? item.event.locationText)]
+                  .filter(Boolean)
+                  .join(' · ')}
+                start={<Icon name="calendar-outline" size={22} color={c.yapi} />}
+                onPress={() => router.push(`/event/${item.event!.id}`)}
+              />
+            ) : item.member ? (
+              <Row
+                title={item.member.user.displayName}
+                subtitle={`@${item.member.user.username}${item.member.role !== 'member' ? ` · ${roleName(item.member.role, t)}` : ''}`}
+                start={<Avatar name={item.member.user.displayName} url={item.member.user.avatarUrl} size={36} />}
+                onPress={() => router.push(`/u/${encodeURIComponent(item.member!.user.username)}`)}
+              />
+            ) : null
+          }
+        />
+        {menu.sheet}
+        {report.sheet}
+        <MiniAppsSheet
+          visible={appsOpen}
+          onClose={() => setAppsOpen(false)}
+          surface="community"
+          surfaceId={community.id}
+          canManage={community.myRole === 'owner' || community.myRole === 'admin'}
+        />
+      </KeyboardAvoid>
+    </FeedSurfaceContext.Provider>
   );
 }
 

@@ -99,12 +99,12 @@ export const useFeedSurface = () => useContext(FeedSurfaceContext);
 const VIEWABILITY = { itemVisiblePercentThreshold: 50, minimumViewTime: 1000 };
 
 /**
- * For a FlatList of posts whose keys are the post ids: `impression` when a post has been half on
+ * For a FlatList of posts whose keys are the post ids (or with `idOf` to find the post in an item): `impression` when a post has been half on
  * screen for a second, `dwell` with how long it stayed when it goes. Time on another screen or
  * with the app in the background doesn't count. Spread the result on the list; both props stay
  * the same objects, as React Native requires.
  */
-export function useFeedViewability(surface: FeedEventSurface) {
+export function useFeedViewability(surface: FeedEventSurface, idOf?: (item: unknown) => string | null | undefined) {
   const state = useRef({ surface, viewable: new Set<string>(), since: new Map<string, number>(), blurred: false, away: false }).current;
 
   const end = useCallback(
@@ -127,7 +127,9 @@ export function useFeedViewability(surface: FeedEventSurface) {
 
   const onViewableItemsChanged = useRef(({ changed }: { changed: ViewToken[] }) => {
     for (const v of changed) {
-      const id = v.key;
+      // Lists keyed by something else (a community's mixed list) say which post an item is.
+      const id = idOf ? idOf(v.item) : v.key;
+      if (!id) continue;
       if (v.isViewable) {
         if (state.viewable.has(id)) continue;
         state.viewable.add(id);

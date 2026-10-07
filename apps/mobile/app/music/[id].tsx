@@ -9,6 +9,7 @@ import { useT } from '../../lib/i18n';
 import { clock } from '../../lib/media';
 import { useMusicCredit, useMusicLoop } from '../../lib/music';
 import { PostCard } from '../../lib/post';
+import { useFeedViewability } from '../../lib/feed-events';
 import { useSession } from '../../lib/session';
 import { radius, space } from '../../lib/theme';
 import { Button, EmptyState, ErrorState, ScreenError, feedListProps, Icon, Loading, useColors, useRefresh, userText } from '../../lib/ui';
@@ -19,6 +20,8 @@ import { Button, EmptyState, ErrorState, ScreenError, feedListProps, Icon, Loadi
  * that play it.
  */
 export default function MusicTrackScreen() {
+  // What people look at here teaches the recommender (POST /v1/feed/events).
+  const viewability = useFeedViewability('other');
   const { id } = useLocalSearchParams<{ id: string }>();
   const c = useColors();
   const { t, tp } = useT();
@@ -175,6 +178,7 @@ export default function MusicTrackScreen() {
     <FlatList
       keyboardShouldPersistTaps="handled"
       {...feedListProps}
+      {...viewability}
       style={{ backgroundColor: c.ground }}
       contentContainerStyle={{ padding: space[4], gap: space[3] }}
       data={posts ?? []}
