@@ -162,9 +162,12 @@ export function pluralFormKey(key: PluralKey, category: PluralCategory, locale =
   return `${key}.other`;
 }
 
-/** Plural-aware t(): picks the form of `key` for `count` (`.one`, `.other`, or Arabic's `.two`, `.few`…), and passes {count}. */
+/**
+ * Plural-aware t(): picks the form of `key` for `count` (`.one`, `.other`, or Arabic's `.two`, `.few`…), and passes {count}.
+ * A {count} in `vars` (the number written for the reader: "1,234" or "1.2K") is used instead of the bare number.
+ */
 export function tp(key: PluralKey, count: number, locale = 'en', vars?: Record<string, string | number>): string {
-  return t(pluralFormKey(key, pluralCategory(locale, count), locale), locale, { ...vars, count });
+  return t(pluralFormKey(key, pluralCategory(locale, count), locale), locale, { count, ...vars });
 }
 
 export function isRtl(locale: string): boolean {

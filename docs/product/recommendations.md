@@ -36,7 +36,8 @@ less", "Not interested", mute a topic or creator).
 `post_stats` keeps, per post, impressions, people who saw it, time on screen, time watched, finished watches, skips, shares and saves, updated as
 things happen. It also keeps the post's **momentum**: every like (1), comment (2), save (3), share (3) and finished watch (2) adds to it, and it fades
 by e (about two thirds) every 6 hours. Momentum is what "trending now" means. These counts are about posts, not people, and count for everyone,
-including people who turned Personalization off.
+including people who turned Personalization off. The numbers people see under posts (views, shares, Rising) are built on them:
+see docs/product/post-stats.md.
 
 ## 3. What is learned about each person (affinity)
 

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Button, EmptyState, Icon, Skeleton } from '@yapilapi/design-system';
-import { videoPoster, type Page, type Post } from '@yapilapi/shared';
+import { compactCount, videoPoster, type Page, type Post } from '@yapilapi/shared';
 import { errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 
@@ -16,7 +16,6 @@ export function ReelGrid({ load, reloadKey, empty }: { load: (cursor?: string) =
   const [items, setItems] = useState<Post[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const n = new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 });
 
   useEffect(() => {
     let live = true;
@@ -72,9 +71,16 @@ export function ReelGrid({ load, reloadKey, empty }: { load: (cursor?: string) =
                 ) : null}
                 <span className="reel-grid__meta">
                   <bdi>@{p.author.username}</bdi>
-                  <span>
-                    <Icon name="heart" size={12} filled /> {n.format(p.counts.likes)}
-                  </span>
+                  {/* Views where there are some (likes otherwise); nothing when the author hid both. */}
+                  {p.counts.views ? (
+                    <span>
+                      <Icon name="eye" size={12} /> {compactCount(p.counts.views, locale)}
+                    </span>
+                  ) : p.counts.likes !== undefined ? (
+                    <span>
+                      <Icon name="heart" size={12} filled /> {compactCount(p.counts.likes, locale)}
+                    </span>
+                  ) : null}
                 </span>
               </Link>
             </li>

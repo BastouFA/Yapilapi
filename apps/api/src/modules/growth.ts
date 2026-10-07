@@ -78,7 +78,7 @@ export default async function growthModule(app: FastifyInstance, ctx: AppContext
   async function sharingSettings(userId: string) {
     const r = (
       await db.query(
-        `SELECT us.findable_by_contacts, us.birth_date, pr.allow_download, pr.is_private
+        `SELECT us.findable_by_contacts, us.birth_date, pr.allow_download, pr.is_private, pr.hide_counts
          FROM users us JOIN profiles pr ON pr.user_id = us.id WHERE us.id = $1`,
         [userId],
       )
@@ -90,7 +90,9 @@ export default async function growthModule(app: FastifyInstance, ctx: AppContext
       findableByContacts: !minor && !!r.findable_by_contacts,
       /** "Allow downloads of my reels": others can save your reels as a video to share. */
       allowDownload: !minor && (r.allow_download ?? !r.is_private),
-      /** Both stay off for people under 18. */
+      /** "Hide like and view counts": the default for your posts, reels and stories (anyone may turn it on). */
+      hideCounts: !!r.hide_counts,
+      /** The first two stay off for people under 18. */
       locked: minor,
     };
   }
@@ -106,6 +108,7 @@ export default async function growthModule(app: FastifyInstance, ctx: AppContext
     await tx(db, async (c) => {
       if (input.findableByContacts !== undefined) await c.query(`UPDATE users SET findable_by_contacts = $2 WHERE id = $1`, [u.id, input.findableByContacts]);
       if (input.allowDownload !== undefined) await c.query(`UPDATE profiles SET allow_download = $2 WHERE user_id = $1`, [u.id, input.allowDownload]);
+      if (input.hideCounts !== undefined) await c.query(`UPDATE profiles SET hide_counts = $2 WHERE user_id = $1`, [u.id, input.hideCounts]);
     });
     return { settings: await sharingSettings(u.id) };
   });

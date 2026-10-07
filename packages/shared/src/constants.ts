@@ -60,7 +60,18 @@ export const COMMUNITY_ROLE_RANK: Record<CommunityRole, number> = {
 
 export const RSVP_STATUSES = ['going', 'interested', 'not_going'] as const;
 
-export const NOTIFICATION_CATEGORIES = ['messages', 'friends', 'creators', 'communities', 'events', 'commerce', 'security', 'moderation', 'system'] as const;
+export const NOTIFICATION_CATEGORIES = [
+  'messages',
+  'friends',
+  'creators',
+  'milestones',
+  'communities',
+  'events',
+  'commerce',
+  'security',
+  'moderation',
+  'system',
+] as const;
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
 
 /**

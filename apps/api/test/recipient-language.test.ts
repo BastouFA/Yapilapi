@@ -51,6 +51,7 @@ const SAMPLE: Record<string, object> = {
   together_approved: { title: 'Lagos weekend' },
   plus_referral_reward: { days: 30 },
   market_expiring: { title: 'Bike', days: 3 },
+  post_milestone: { metric: 'views', threshold: 1000, format: 'reel' },
 };
 
 describe('push and email text in every language', () => {

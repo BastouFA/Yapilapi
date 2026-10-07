@@ -382,10 +382,27 @@ export interface Post {
   event: { id: string; title: string; startsAt: string } | null;
   product: { id: string; title: string; priceCents: number; currency: string } | null;
   /**
-   * Views count each person once and never the author; recorded for reels. Remixes counts duets and remixes of a reel;
-   * echoes counts the echoes of a reel that are up (the list shows the ones you can see).
+   * The numbers under a post (docs/product/post-stats.md). Views: different people other than the
+   * author who had it on screen or watched it, each counted once. Shares: times it was sent to a
+   * chat, through the share sheet or as a copied link (reposts are counted on their own). Likes
+   * and views are left out for everyone but the author when the author hid them (`countsHidden`).
+   * Remixes counts duets and remixes of a reel; echoes counts the echoes of a reel that are up
+   * (the list shows the ones you can see).
    */
-  counts: { likes: number; comments: number; reposts: number; views: number; remixes?: number; echoes?: number };
+  counts: { likes?: number; comments: number; reposts: number; views?: number; shares: number; remixes?: number; echoes?: number };
+  /**
+   * The author hid the like and view counts: others don't get them, the author still does (and
+   * sees this to know only they can). The author's own choice for the post, or their account's.
+   */
+  countsHidden?: boolean;
+  /** Its momentum is in the top few percent of the last 48 hours, with enough viewers (docs/product/post-stats.md). */
+  rising?: boolean;
+  /**
+   * "Liked by Amara and 12 others": someone the viewer follows or is friends with who liked it
+   * (never someone blocked, or a private account the viewer doesn't follow), and how many others
+   * did. Left out when there's nobody to show, or the like count is hidden from the viewer.
+   */
+  likedBy?: { user: PublicUser; others: number };
   /** Reels: whether other people may duet or remix it. */
   allowRemix?: boolean;
   /** Reels posted as a duet or remix of another reel. */
@@ -1086,7 +1103,8 @@ export interface PublicPostPreview {
   image: PublicPreviewImage | null;
   /** A direct MP4 file for the first video, when one exists. */
   video: { url: string; width: number | null; height: number | null; durationMs: number | null } | null;
-  counts: { likes: number; comments: number; reposts: number };
+  /** `likes` is left out when the author hid like counts. */
+  counts: { likes?: number; comments: number; reposts: number };
   community: { slug: string; name: string } | null;
   createdAt: string;
   /** For subscribers only: the preview has no text, image or video. */

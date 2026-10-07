@@ -51,6 +51,7 @@ import { TranscriptSheet } from './TranscriptEditor';
 export { ReportSheet };
 import { SuggestAltText } from './AiHelpers';
 import { hasVideo, WatchChatPicker } from './WatchTogether';
+import { SendToChatSheet } from './SendToChat';
 
 export { CommentsSheet };
 
@@ -103,9 +104,10 @@ export function PostList({
   const [editing, setEditing] = useState<Post | null>(null);
   const [historyFor, setHistoryFor] = useState<Post | null>(null);
   const [transcriptFor, setTranscriptFor] = useState<Post | null>(null);
-  // Video posts: sharing offers "Watch together" too, which picks a chat.
+  // Signed in, sharing offers the link, "Send in a chat" and, for video posts, "Watch together".
   const [shareFor, setShareFor] = useState<Post | null>(null);
   const [watchFor, setWatchFor] = useState<Post | null>(null);
+  const [sendFor, setSendFor] = useState<Post | null>(null);
   const sentinel = useRef<HTMLDivElement>(null);
   const [ad, setAd] = useState<SponsoredAd | null>(null);
   const [adWhy, setAdWhy] = useState(false);
@@ -196,10 +198,16 @@ export function PostList({
 
   async function like(p: Post) {
     const liked = !p.viewer.liked;
-    patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, liked }, counts: { ...x.counts, likes: x.counts.likes + (liked ? 1 : -1) } }));
+    // A hidden like count (the author hid it) stays hidden: only the heart changes.
+    const hidden = p.counts.likes === undefined;
+    patch(p.id, (x) => ({
+      ...x,
+      viewer: { ...x.viewer, liked },
+      counts: { ...x.counts, likes: x.counts.likes === undefined ? undefined : Math.max(0, x.counts.likes + (liked ? 1 : -1)) },
+    }));
     try {
       const r = liked ? await api.posts.like(p.id) : await api.posts.unlike(p.id);
-      patch(p.id, (x) => ({ ...x, counts: { ...x.counts, likes: r.likes } }));
+      if (!hidden) patch(p.id, (x) => ({ ...x, counts: { ...x.counts, likes: r.likes } }));
     } catch (e) {
       patch(p.id, () => p);
       toast(errorMessage(e));
@@ -226,15 +234,34 @@ export function PostList({
     try {
       if (navigator.share) {
         await navigator.share({ title, text: p.body ? p.body.slice(0, 120) : title, url });
-        if (me) recordFeedEvent({ postId: p.id, surface, kind: 'share' });
+        shared(p);
         return;
       }
       await navigator.clipboard.writeText(url);
-      if (me) recordFeedEvent({ postId: p.id, surface, kind: 'share' });
+      shared(p);
       toast(t('invite.copied'));
     } catch (e) {
       // Closing the share sheet isn't an error.
       if ((e as Error).name !== 'AbortError') toast(t('postList.shareFailed'));
+    }
+  }
+
+  /** Counts a share with the recommender (the server ignores your own) and on the post right away. */
+  function shared(p: Post) {
+    if (!me) return;
+    recordFeedEvent({ postId: p.id, surface, kind: 'share' });
+    if (p.author.id !== me.id) bumpShares(p.id, 1);
+  }
+  const bumpShares = (id: string, n: number) => patch(id, (x) => ({ ...x, counts: { ...x.counts, shares: (x.counts.shares ?? 0) + n } }));
+
+  async function toggleCounts(p: Post) {
+    const hidden = !p.countsHidden;
+    try {
+      const r = await api.posts.setCountsHidden(p.id, hidden);
+      patch(p.id, (x) => ({ ...x, countsHidden: r.countsHidden }));
+      toast(t(r.countsHidden ? 'post.hideCounts.done' : 'post.showCounts.done'));
+    } catch (e) {
+      toast(errorMessage(e));
     }
   }
 
@@ -420,7 +447,8 @@ export function PostList({
               onSaveTo={me ? setSaveTo : undefined}
               onRepost={guard(repost)}
               onReposters={(p) => setRepostersOf(p.id)}
-              onShare={(post) => (me && hasVideo(post) ? setShareFor(post) : void share(post))}
+              onShare={(post) => (me ? setShareFor(post) : void share(post))}
+              onSend={me ? setSendFor : undefined}
               onVote={guard(vote)}
               onComment={setCommentsFor}
               onFeedback={me ? feedback : undefined}
@@ -455,6 +483,7 @@ export function PostList({
               onEdit={me ? setEditing : undefined}
               onHistory={setHistoryFor}
               onEditTranscript={me ? setTranscriptFor : undefined}
+              onToggleCounts={me ? toggleCounts : undefined}
             />
           </SeenPost>
           {ad && i === Math.min(2, posts.length - 1) ? renderAd(ad) : null}
@@ -497,24 +526,50 @@ export function PostList({
               <span>{t('reel.share.link')}</span>
             </button>
           </li>
-          <li>
-            <button
-              type="button"
-              className="reel-sheet__item"
-              onClick={() => {
-                setWatchFor(shareFor);
-                setShareFor(null);
-              }}
-            >
-              <span className="reel-sheet__icon">
-                <Icon name="play" size={20} />
-              </span>
-              <span>{t('watch.start')}</span>
-            </button>
-          </li>
+          {shareFor && shareFor.visibility !== 'private' ? (
+            <li>
+              <button
+                type="button"
+                className="reel-sheet__item"
+                onClick={() => {
+                  setSendFor(shareFor);
+                  setShareFor(null);
+                }}
+              >
+                <span className="reel-sheet__icon">
+                  <Icon name="message" size={20} />
+                </span>
+                <span>{t('post.send.action')}</span>
+              </button>
+            </li>
+          ) : null}
+          {shareFor && hasVideo(shareFor) ? (
+            <li>
+              <button
+                type="button"
+                className="reel-sheet__item"
+                onClick={() => {
+                  setWatchFor(shareFor);
+                  setShareFor(null);
+                }}
+              >
+                <span className="reel-sheet__icon">
+                  <Icon name="play" size={20} />
+                </span>
+                <span>{t('watch.start')}</span>
+              </button>
+            </li>
+          ) : null}
         </ul>
       </BottomSheet>
       <WatchChatPicker post={watchFor} onClose={() => setWatchFor(null)} />
+      <SendToChatSheet
+        post={sendFor}
+        onClose={() => setSendFor(null)}
+        onSent={(p, n) => {
+          if (p.author.id !== me?.id) bumpShares(p.id, n);
+        }}
+      />
 
       <TranscriptSheet post={transcriptFor} onClose={() => setTranscriptFor(null)} onChanged={(p) => patch(p.id, () => p)} />
       <Reposters postId={repostersOf} onClose={() => setRepostersOf(null)} />

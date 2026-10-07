@@ -10,6 +10,7 @@ import { recordFeedEvent } from '@/lib/feed-events';
 import { CommentsSheet, ReportSheet } from '@/components/PostList';
 import { SaveToSheet } from '@/components/Boards';
 import { WatchChatPicker } from '@/components/WatchTogether';
+import { SendToChatSheet } from '@/components/SendToChat';
 import { useSession } from '@/app/providers';
 import { ReelItem, type ReelViewerApi } from './ReelItem';
 import { HighlightsSheet, OptionsSheet, ShareSheet } from './sheets';
@@ -26,6 +27,7 @@ type Sheet =
   | { kind: 'report'; post: Post }
   | { kind: 'saveTo'; post: Post }
   | { kind: 'watch'; post: Post }
+  | { kind: 'send'; post: Post }
   | null;
 
 /** Keys that belong to what has focus (typing, a menu), not to the viewer. */
@@ -180,12 +182,20 @@ export function ReelsViewer() {
     patch(p.id, (x) => ({
       ...x,
       viewer: { ...x.viewer, ...(what === 'like' ? { liked: on } : what === 'repost' ? { reposted: on } : { saved: on }) },
-      counts: { ...x.counts, ...(what === 'like' ? { likes: x.counts.likes + d } : what === 'repost' ? { reposts: x.counts.reposts + d } : {}) },
+      // A like count the author hid stays hidden: only the heart changes.
+      counts: {
+        ...x.counts,
+        ...(what === 'like'
+          ? { likes: x.counts.likes === undefined ? undefined : Math.max(0, x.counts.likes + d) }
+          : what === 'repost'
+            ? { reposts: Math.max(0, x.counts.reposts + d) }
+            : {}),
+      },
     }));
     try {
       if (what === 'like') {
         const r = on ? await api.posts.like(p.id) : await api.posts.unlike(p.id);
-        patch(p.id, (x) => ({ ...x, counts: { ...x.counts, likes: r.likes } }));
+        if (p.counts.likes !== undefined) patch(p.id, (x) => ({ ...x, counts: { ...x.counts, likes: r.likes } }));
       } else if (what === 'repost') {
         const r = on ? await api.posts.repost(p.id) : await api.posts.unrepost(p.id);
         patch(p.id, (x) => ({ ...x, counts: { ...x.counts, reposts: r.reposts } }));
@@ -213,8 +223,23 @@ export function ReelsViewer() {
     }
   }
 
-  /** Its link went out, or its video was saved to share: told to the recommender. */
-  const shared = (p: Post) => recordFeedEvent({ postId: p.id, surface: 'reels', kind: 'share' });
+  const bumpShares = (id: string, n: number) => patch(id, (x) => ({ ...x, counts: { ...x.counts, shares: (x.counts.shares ?? 0) + n } }));
+
+  /** Its link went out, or its video was saved to share: told to the recommender, and counted on the reel (not your own). */
+  const shared = (p: Post) => {
+    recordFeedEvent({ postId: p.id, surface: 'reels', kind: 'share' });
+    if (me && p.author.id !== me.id) bumpShares(p.id, 1);
+  };
+
+  async function toggleCounts(p: Post) {
+    try {
+      const r = await api.posts.setCountsHidden(p.id, !p.countsHidden);
+      patch(p.id, (x) => ({ ...x, countsHidden: r.countsHidden }));
+      toast(t(r.countsHidden ? 'post.hideCounts.done' : 'post.showCounts.done'));
+    } catch (e) {
+      toast(errorMessage(e));
+    }
+  }
 
   const copyLink = async (p: Post) => {
     const url = `${location.origin}/reels?start=${p.id}`;
@@ -353,7 +378,8 @@ export function ReelsViewer() {
       if (p.author.id === me?.id || watched.current.has(p.id)) return;
       watched.current.add(p.id);
       void api.posts.view(p.id).then(
-        (r) => patch(p.id, (x) => ({ ...x, counts: { ...x.counts, views: r.views } })),
+        // A view count the author hid stays hidden.
+        (r) => patch(p.id, (x) => (x.counts.views === undefined ? x : { ...x, counts: { ...x.counts, views: r.views } })),
         () => {},
       );
     },
@@ -554,8 +580,16 @@ export function ReelsViewer() {
         onEcho={(p) => router.push(`/reels/${p.id}/echo`)}
         onEchoes={(p) => router.push(`/reels/${p.id}/echoes`)}
         onShared={shared}
+        onSend={(p) => setSheet({ kind: 'send', post: p })}
       />
       <WatchChatPicker post={open?.kind === 'watch' ? open.post : null} onClose={closeSheet} />
+      <SendToChatSheet
+        post={open?.kind === 'send' ? open.post : null}
+        onClose={closeSheet}
+        onSent={(p, n) => {
+          if (p.author.id !== me?.id) bumpShares(p.id, n);
+        }}
+      />
       <OptionsSheet
         post={open?.kind === 'options' ? open.post : null}
         mine={open?.post.author.id === me?.id}
@@ -583,6 +617,7 @@ export function ReelsViewer() {
         onAllowEchoes={(p, allow) => void setAllowEchoes(p, allow)}
         onLeaveCollab={(p) => void leaveCollab(p)}
         onReport={(p) => setSheet({ kind: 'report', post: p })}
+        onToggleCounts={(p) => void toggleCounts(p)}
       />
       {open?.kind === 'highlights' ? (
         <HighlightsSheet

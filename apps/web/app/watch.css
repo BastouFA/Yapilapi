@@ -864,3 +864,30 @@
 .wrap-song__title {
   font-weight: 600;
 }
+
+/* "Send in a chat": the same chat rows, picked with a checkbox, then a note and Send. */
+.send-pick__row {
+  position: relative;
+}
+.send-pick__check {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--yapi);
+  cursor: pointer;
+}
+.send-pick__row:has(.send-pick__check:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+.send-pick__row:has(.send-pick__check:checked) {
+  background: var(--yapi-soft);
+}
+.send-pick__note {
+  margin-top: var(--space-3);
+}
+.send-pick__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-3);
+}

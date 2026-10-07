@@ -16,7 +16,10 @@ import { HIDDEN_WORD_MAX, HIDDEN_WORDS_MAX } from '../../../packages/shared/src/
 import { baseLanguage, languageName, MAX_UNDERSTOOD_LANGUAGES, TRANSLATION_LANGUAGES } from '../../../packages/shared/src/translation';
 import { useTranslationSettings } from './translation';
 
-/** "Let people who have my email or phone number find me" and "Allow downloads of my reels". Both stay off under 18. */
+/**
+ * "Let people who have my email or phone number find me" and "Allow downloads of my reels" (both
+ * stay off under 18), and "Hide like and view counts" (anyone can, minors too).
+ */
 export function Sharing() {
   const { t } = useT();
   const [settings, setSettings] = useState<SharingSettings | null>(null);
@@ -27,7 +30,7 @@ export function Sharing() {
       .then((r) => setSettings(r.settings))
       .catch((e) => setError(errorMessage(e)));
   }, []);
-  const set = async (k: 'findableByContacts' | 'allowDownload', v: boolean) => {
+  const set = async (k: 'findableByContacts' | 'allowDownload' | 'hideCounts', v: boolean) => {
     if (!settings) return;
     const before = settings;
     setSettings({ ...settings, [k]: v });
@@ -58,6 +61,12 @@ export function Sharing() {
             value={settings.allowDownload}
             disabled={settings.locked}
             onValueChange={(v) => void set('allowDownload', v)}
+          />
+          <SwitchRow
+            label={t('sharing.hideCounts')}
+            hint={t('sharing.hideCounts.hint')}
+            value={!!settings.hideCounts}
+            onValueChange={(v) => void set('hideCounts', v)}
           />
         </>
       ) : !error ? (

@@ -71,6 +71,11 @@ export const STORY_SELECT = `m.id, m.author_id, m.body, m.lang, m.media_url, m.m
   md.poster_url, md.hls_url, md.variants, md.duration_ms, md.moderation, ${mediaSizesSql('md')} AS sizes,
   v.viewer_id IS NOT NULL AS seen, coalesce(v.liked, false) AS liked,
   CASE WHEN m.author_id = $1 THEN (SELECT count(*) FROM moment_views mv WHERE mv.moment_id = m.id AND mv.viewer_id <> $1) END AS views,
+  -- Likes for everyone unless the author hid like counts; replies and shares (sent into chats, added to stories) for the author.
+  CASE WHEN m.author_id = $1 OR NOT pr.hide_counts THEN (SELECT count(*) FROM moment_views mv WHERE mv.moment_id = m.id AND mv.liked AND mv.viewer_id <> m.author_id) END AS likes,
+  CASE WHEN m.author_id = $1 THEN (SELECT count(*) FROM messages mm WHERE mm.meta ? 'storyReply' AND (mm.meta->'storyReply'->>'storyId') = m.id::text AND mm.deleted_at IS NULL) END AS replies,
+  CASE WHEN m.author_id = $1 THEN (SELECT count(*) FROM messages mm WHERE mm.story_id = m.id AND mm.deleted_at IS NULL)
+                                + (SELECT count(*) FROM moments rm WHERE rm.reshare_of = m.id AND rm.deleted_at IS NULL) END AS shares,
   pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode`;
 export const STORY_FROM = `FROM moments m JOIN profiles pr ON pr.user_id = m.author_id JOIN users au ON au.id = m.author_id
   LEFT JOIN media md ON md.id = m.media_id
@@ -260,6 +265,11 @@ export interface StoryOut {
   seen: boolean;
   liked: boolean;
   views?: number;
+  /** How many liked it: for everyone, unless its author hid like counts. */
+  likes?: number;
+  /** Only on your own stories: replies, and times it was sent into chats or added to someone's story. */
+  replies?: number;
+  shares?: number;
   tags: string[];
   stickers: StorySticker[];
   reshareOf: StoryCard | null;
@@ -471,6 +481,8 @@ export async function hydrateStories(db: Q, rows: Record<string, any>[], viewer:
       seen: isAuthor || !!r.seen,
       liked: !!r.liked,
       views: r.views === null || r.views === undefined ? undefined : Number(r.views),
+      ...(r.likes === null || r.likes === undefined ? {} : { likes: Number(r.likes) }),
+      ...(r.replies === null || r.replies === undefined ? {} : { replies: Number(r.replies), shares: Number(r.shares ?? 0) }),
       tags: r.tags ?? [],
       stickers,
       reshareOf: r.reshare_of ? (cards.get(r.reshare_of) ?? { id: r.reshare_of, available: false }) : null,

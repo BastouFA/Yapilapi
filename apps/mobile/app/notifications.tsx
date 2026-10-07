@@ -9,6 +9,7 @@ import { togetherNoticeText } from '../../../packages/shared/src/together';
 import { echoNoticeText } from '../../../packages/shared/src/echoes';
 import { scheduledPostFailedText } from '../../../packages/shared/src/job-failures';
 import { signInNoticeText } from '../../../packages/shared/src/server-text';
+import { fullCount, milestoneNoticeText } from '../../../packages/shared/src/post-stats';
 import { client, errorMessage } from '../lib/api';
 import { SectionHeader } from '../lib/chips';
 import { useT, type Translator } from '../lib/i18n';
@@ -16,7 +17,7 @@ import { notificationHref } from '../lib/links';
 import { marketNoticeText } from '../lib/market';
 import { useRealtime, useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
-import { Avatar, Button, EmptyState, ErrorState, Notice, SkeletonList, useColors, userText } from '../lib/ui';
+import { Avatar, Button, EmptyState, ErrorState, Icon, Notice, SkeletonList, useColors, userText } from '../lib/ui';
 
 /** What each kind of notification says; {name} is the person (or the people, for grouped ones). */
 const TEXT: Record<string, MessageKey> = {
@@ -145,6 +146,9 @@ function describe(g: Group, tr: Translator): string {
   const name = n.actor?.displayName ?? '';
   const title = typeof n.data.title === 'string' ? n.data.title : typeof n.data.name === 'string' ? n.data.name : '';
   if (g.actors.length > 1 && GROUP_TEXT[n.type]) return t(GROUP_TEXT[n.type]!, { names: names(g.actors, tr) });
+  // "Your reel passed 1,000 views".
+  const milestone = milestoneNoticeText(n, t, tr.locale);
+  if (milestone) return milestone;
   // Together albums: whole sentences with the album's name ("Ada added 12 photos to Lagos weekend").
   const together = togetherNoticeText(n, t, tp);
   if (together) return together;
@@ -423,6 +427,7 @@ const NotificationRow = memo(function NotificationRow({
   const invite = (n.type === 'collab_invite' || boardInvite) && !!n.entityId;
   const single = g.actors.length === 1 ? g.actors[0]! : null;
   const canFollowBack = n.type === 'follow' && !!single && !n.followsActor;
+  if (n.type === 'post_milestone') return <MilestoneCard n={n} text={text} href={href} unread={unread} />;
   return (
     <View style={{ backgroundColor: c.surface, borderRadius: radius.md, padding: space[3], gap: space[2] }}>
       <Pressable
@@ -465,6 +470,61 @@ const NotificationRow = memo(function NotificationRow({
     </View>
   );
 });
+
+/**
+ * A milestone on your post or reel, as a small card of its own: "Milestone", the number it
+ * passed, the sentence, and a link to it. Never grouped with other rows.
+ */
+function MilestoneCard({ n, text, href, unread }: { n: NotificationItem; text: string; href: string | null; unread: boolean }) {
+  const c = useColors();
+  const { t, timeAgo, locale } = useT();
+  const reel = n.data.format === 'reel';
+  const likes = n.data.metric === 'likes';
+  const see = t(reel ? 'milestone.card.see.reel' : 'milestone.card.see.post');
+  return (
+    <Pressable
+      accessibilityRole={href ? 'link' : undefined}
+      accessibilityLabel={`${text}. ${href ? `${see}. ` : ''}${timeAgo(n.createdAt)}${unread ? `. ${t('m.notif.unread')}` : ''}`}
+      disabled={!href}
+      onPress={() => href && router.push(href as never)}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        gap: space[3],
+        backgroundColor: pressed ? c.surfaceSunken : c.surface,
+        borderRadius: radius.md,
+        borderWidth: 1,
+        borderColor: c.line,
+        padding: space[3],
+      })}
+    >
+      <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: c.yapiSoft }}>
+        <Icon name={likes ? 'heart-outline' : 'trending-up'} size={20} color={c.yapi} />
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+          <Text style={{ flex: 1, color: c.yapi, fontSize: 12, fontWeight: '700' }}>{t('milestone.card.label')}</Text>
+          {unread ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.yapi }} /> : null}
+        </View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6 }}>
+          <Text style={{ color: c.ink, fontSize: 26, lineHeight: 32, fontWeight: '800', fontVariant: ['tabular-nums'] }}>
+            {fullCount(Number(n.data.threshold) || 0, locale)}
+          </Text>
+          <Text style={{ color: c.inkMuted, fontSize: 15, fontWeight: '600' }}>{t(likes ? 'milestone.card.likes' : 'milestone.card.views')}</Text>
+        </View>
+        <Text style={{ color: c.ink, fontSize: 15, lineHeight: 20 }}>{text}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: space[2], marginTop: 2 }}>
+          {href ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+              <Text style={{ color: c.yapi, fontSize: 14, fontWeight: '700' }}>{see}</Text>
+              <Icon name="chevron-forward" size={14} color={c.yapi} directional />
+            </View>
+          ) : null}
+          <Text style={{ color: c.inkMuted, fontSize: 12 }}>{timeAgo(n.createdAt)}</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
 
 /** One face, or up to three overlapping for a grouped row. */
 function Faces({ actors }: { actors: PublicUser[] }) {

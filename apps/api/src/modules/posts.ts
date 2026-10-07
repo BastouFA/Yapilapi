@@ -6,7 +6,9 @@ import {
   feedbackSchema,
   feedQuerySchema,
   pageQuerySchema,
+  postCountsSchema,
   reactionSchema,
+  sendPostSchema,
   SAVED_FILTERS,
   usernameSchema,
   extractHashtags,
@@ -15,6 +17,7 @@ import {
   reelResumeSchema,
   resumeWorthKeeping,
   whyReasonText,
+  type MessageFailureCode,
   type PostVersion,
   type PostWhy,
   type WhyReason,
@@ -53,6 +56,10 @@ import {
 import { me, requireAuth } from '../plugins/auth.ts';
 import { langOf } from '../lib/translation.ts';
 import { checkEchoSong } from '../lib/echoes.ts';
+import { checkMilestones } from '../lib/milestones.ts';
+import { messageFailureCode, messageFailureEnglish } from '../lib/failures.ts';
+import { asSameUser } from './moments.ts';
+import { recordShare } from './recommendations.ts';
 
 const idParam = z.object({ id: z.string().uuid() });
 
@@ -402,17 +409,83 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
     return { pinnedPostId: postId };
   });
 
-  /** Someone watched a reel or opened a post: counted once per person, never for the author. */
+  /**
+   * Someone watched a reel or opened a post: counted once per person, never for the author (posts
+   * seen in a feed count too, from POST /v1/feed/events). Passing 100, 1,000… views tells the author.
+   * The count comes back only where the viewer may see it (the author can hide it).
+   */
   app.post('/v1/posts/:id/view', { preHandler: requireAuth, config: { rateLimit: { max: 600, timeWindow: '1 minute' } } }, async (req) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
     await assertVisible(id, u.id);
     const r = await db.query(
       `WITH ins AS (INSERT INTO post_views (post_id, viewer_id) SELECT $1, $2 FROM posts WHERE id = $1 AND author_id <> $2 ON CONFLICT DO NOTHING RETURNING 1)
-       UPDATE posts SET view_count = view_count + (SELECT count(*) FROM ins) WHERE id = $1 RETURNING view_count`,
+       UPDATE posts p SET view_count = view_count + (SELECT count(*) FROM ins) FROM profiles pr
+       WHERE p.id = $1 AND pr.user_id = p.author_id
+       RETURNING p.view_count, (SELECT count(*) FROM ins)::int AS added, coalesce(p.hide_counts, pr.hide_counts) AND p.author_id <> $2 AS hidden`,
       [id, u.id],
     );
-    return { views: r.rows[0]?.view_count ?? 0 };
+    const row = r.rows[0];
+    if (row?.added) await checkMilestones(db, ctx.realtime, [id], 'views');
+    return row?.hidden ? {} : { views: row?.view_count ?? 0 };
+  });
+
+  /** Hide your post's like and view counts from everyone but you, or show them again (it overrides your account's choice). */
+  app.put('/v1/posts/:id/counts', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const { hidden } = parse(postCountsSchema, req.body);
+    const r = await db.query(`UPDATE posts SET hide_counts = $3 WHERE id = $1 AND author_id = $2 AND deleted_at IS NULL`, [id, u.id, hidden]);
+    if (!r.rowCount) throw notFound('That post');
+    return { countsHidden: hidden };
+  });
+
+  /**
+   * Send a post or reel into chats: a message with its link (and your words), sent through the
+   * messaging endpoints as you, so blocks, minor protection and who can message whom apply as for
+   * any message. The link opens only for people who can see the post. It counts as a share once
+   * per person and post in FEED_EVENT_RULES.dedupeMinutes, like a share from the share sheet.
+   */
+  app.post('/v1/posts/:id/send', { preHandler: requireAuth, config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const u = me(req);
+    const { id } = parse(idParam, req.params);
+    const input = parse(sendPostSchema, req.body);
+    await assertVisible(id, u.id);
+    const p = (await db.query<{ author_id: string; format: string; status: string }>(`SELECT author_id, format, status FROM posts WHERE id = $1`, [id]))
+      .rows[0]!;
+    if (p.status !== 'published') throw notFound('That post');
+    const origin = ctx.config.WEB_ORIGIN.replace(/\/+$/, '');
+    const link = `${origin}${p.format === 'reel' ? `/reels?start=${id}` : `/p/${id}`}`;
+    const body = input.body ? `${input.body}\n${link}` : link;
+    const asSender = asSameUser(req);
+    const targets = [...new Set(input.conversationIds)];
+    // Why each one wasn't sent, as a code the app says in your language (the English for older apps).
+    const failed: { id: string; code: MessageFailureCode; message: string }[] = [];
+    const refused = (to: string, r: { statusCode: number; json: () => { error?: { code?: string } } }) => {
+      const code = messageFailureCode({ status: r.statusCode, code: r.json().error?.code });
+      failed.push({ id: to, code, message: messageFailureEnglish(code) });
+    };
+    for (const userId of new Set(input.userIds.filter((x) => x !== u.id))) {
+      const convo = await app.inject({ method: 'POST', url: '/v1/conversations', headers: asSender, payload: { memberIds: [userId] } });
+      if (convo.statusCode >= 300) refused(userId, convo);
+      else targets.push(convo.json().conversation.id as string);
+    }
+    const sent: string[] = [];
+    for (const conversationId of new Set(targets)) {
+      const r = await app.inject({
+        method: 'POST',
+        url: `/v1/conversations/${conversationId}/messages`,
+        headers: asSender,
+        payload: { body, clientId: `post-share-${id.slice(0, 8)}-${conversationId.slice(0, 8)}-${Date.now()}` },
+      });
+      if (r.statusCode >= 300) refused(conversationId, r);
+      else sent.push(conversationId);
+    }
+    if (!sent.length) throw new AppError(403, 'not_sent', failed[0]?.message ?? 'Not sent.', { reason: failed[0]?.code ?? 'not_sent' });
+    if (p.author_id !== u.id && (await recordShare(db, u.id, id))) await learnQuietly(learnFromPost(db, u.id, id, 'share'), req.log);
+    track(db, u.id, 'post_sent', { to: sent.length });
+    reply.code(201);
+    return { conversationIds: sent, failed };
   });
 
   // ── Reels plus: highlights and continue where you left off ────────────
@@ -703,6 +776,17 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
   });
 
   // ── Reactions, saves, polls ───────────────────────────────────────────
+  /** A post's like count for the viewer: left out when its author hid it (and the viewer isn't the author). */
+  async function likesFor(id: string, viewer: string): Promise<{ likes?: number }> {
+    const r = (
+      await db.query(
+        `SELECT p.like_count, coalesce(p.hide_counts, pr.hide_counts) AND p.author_id <> $2 AS hidden FROM posts p JOIN profiles pr ON pr.user_id = p.author_id WHERE p.id = $1`,
+        [id, viewer],
+      )
+    ).rows[0];
+    return !r ? { likes: 0 } : r.hidden ? {} : { likes: r.like_count as number };
+  }
+
   app.put('/v1/posts/:id/reaction', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const { id } = parse(idParam, req.params);
@@ -732,9 +816,10 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       // What you like teaches the recommender (with Personalization on), and the post's momentum goes up.
       await bumpStats(db, [{ postId: id, trend: TREND.weights.like }]);
       await learnQuietly(learnFromPost(db, u.id, id, 'like'), req.log);
+      // Passing 100, 1,000… likes tells the author once.
+      await checkMilestones(db, ctx.realtime, [id], 'likes');
     }
-    const likes = (await db.query(`SELECT like_count FROM posts WHERE id = $1`, [id])).rows[0].like_count;
-    return { liked: true, likes };
+    return { liked: true, ...(await likesFor(id, u.id)) };
   });
 
   app.delete('/v1/posts/:id/reaction', { preHandler: requireAuth }, async (req) => {
@@ -746,8 +831,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
       return !!r.rowCount;
     });
     if (removed) await learnQuietly(learnFromPost(db, u.id, id, 'unlike'), req.log);
-    const likes = (await db.query(`SELECT like_count FROM posts WHERE id = $1`, [id])).rows[0]?.like_count ?? 0;
-    return { liked: false, likes };
+    return { liked: false, ...(await likesFor(id, u.id)) };
   });
 
   /**

@@ -23,6 +23,8 @@ export interface StatDelta {
   completes?: number;
   skips?: number;
   shares?: number;
+  /** Shares people see: sent to a chat, through the share sheet or as a copied link (not reposts). */
+  sends?: number;
   saves?: number;
   /** Momentum to add (TREND.weights). */
   trend?: number;
@@ -31,7 +33,7 @@ export interface StatDelta {
 /** A post's momentum as of `at` (SQL), from post_stats aliased `ps`; 0 without a row. */
 export const trendSql = (at: string) => `coalesce(ps.trend * exp(-greatest(0, extract(epoch FROM (${at} - ps.trend_at))) / 3600.0 / ${TREND.fadeHours}), 0)`;
 
-const COLS = ['impressions', 'viewers', 'dwell_ms', 'watch_ms', 'completes', 'skips', 'shares', 'saves'] as const;
+const COLS = ['impressions', 'viewers', 'dwell_ms', 'watch_ms', 'completes', 'skips', 'shares', 'sends', 'saves'] as const;
 const FIELD: Record<(typeof COLS)[number], keyof StatDelta> = {
   impressions: 'impressions',
   viewers: 'viewers',
@@ -40,6 +42,7 @@ const FIELD: Record<(typeof COLS)[number], keyof StatDelta> = {
   completes: 'completes',
   skips: 'skips',
   shares: 'shares',
+  sends: 'sends',
   saves: 'saves',
 };
 

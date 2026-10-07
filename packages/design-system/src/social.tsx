@@ -12,6 +12,7 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  compactCount,
   extractHashtags,
   formatBytes,
   formatMoney,
@@ -902,6 +903,10 @@ export interface PostCardProps {
   onHistory?: (post: Post) => void;
   /** Your own audio post: see and fix its recording's transcript. */
   onEditTranscript?: (post: Post) => void;
+  /** Your own post: hide its like and view counts from everyone else, or show them again. */
+  onToggleCounts?: (post: Post) => void;
+  /** Send the post into one of your chats ("Send in a chat"). */
+  onSend?: (post: Post) => void;
 }
 
 type Person = Pick<PublicUser, 'id' | 'username' | 'displayName'>;
@@ -1223,12 +1228,17 @@ export function PostCard({
   onEdit,
   onHistory,
   onEditTranscript,
+  onToggleCounts,
+  onSend,
 }: PostCardProps) {
   const tt = (k: MessageKey) => t(k, locale);
   // Why it's in your feed, in your language.
   const reason = postReasonText(post, { t: (k, vars) => tr(k, locale, vars) });
-  /** "Like, 12": an action's name and its count, for screen readers. */
-  const counted = (label: string, n: number) => `${label}${tt('m.collab.joinSep')}${new Intl.NumberFormat(locale).format(n)}`;
+  /** "Like, 12": an action's name and its count in full, for screen readers. No count (hidden by the author), just the name. */
+  const counted = (label: string, n: number | undefined) =>
+    n === undefined ? label : `${label}${tt('m.collab.joinSep')}${new Intl.NumberFormat(locale).format(n)}`;
+  /** A count on a button, short in the reader's language (1.2K); nothing for none or a hidden count. */
+  const short = (n: number | undefined) => (n ? compactCount(n, locale) : '');
   const coauthors = post.collaborators ?? [];
   const pendingCoauthors = isOwn ? (post.pendingCollaborators ?? []) : [];
   // A co-author shares the post but only the original author can change or delete it.
@@ -1237,6 +1247,7 @@ export function PostCard({
   const menu: MenuAction[] = [];
   const saveHold = useLongPress(onSaveTo ? () => onSaveTo(post) : undefined);
   if (onWhy) menu.push({ label: tt('post.why'), icon: 'info', onSelect: () => onWhy(post) });
+  if (onSend && !post.status && post.visibility !== 'private') menu.push({ label: tt('post.send.action'), icon: 'send', onSelect: () => onSend(post) });
   if (onSaveTo) menu.push({ label: tt('m.boards.saveTo'), icon: 'bookmark', onSelect: () => onSaveTo(post) });
   if (onAddToMemory) menu.push({ label: tt('post.addToMemory'), icon: 'bookmark', onSelect: () => onAddToMemory(post) });
   if (onLeaveCollab && coauthor && !isOwn) menu.push({ label: tt('m.collab.leave'), icon: 'logout', onSelect: () => onLeaveCollab(post) });
@@ -1250,6 +1261,12 @@ export function PostCard({
   if (onEdit && isOwn && !post.status) menu.push({ label: tt('m.post.edit'), icon: 'edit', onSelect: () => onEdit(post) });
   if (onEditTranscript && isOwn && post.media.length === 1 && post.media[0]!.kind === 'audio')
     menu.push({ label: tt('transcript.edit'), icon: 'mic', onSelect: () => onEditTranscript(post) });
+  if (onToggleCounts && isOwn)
+    menu.push({
+      label: tt(post.countsHidden ? 'post.showCounts' : 'post.hideCounts'),
+      icon: post.countsHidden ? 'eye' : 'eye-off',
+      onSelect: () => onToggleCounts(post),
+    });
   if (onPin && isOwn && !post.community) menu.push({ label: tt(post.pinned ? 'post.unpin' : 'post.pin'), icon: 'bookmark', onSelect: () => onPin(post) });
   if (onManageCollaborators && isOwn && !post.community)
     menu.push({
@@ -1539,11 +1556,11 @@ export function PostCard({
             aria-label={counted(post.viewer.liked ? tt('post.unlike') : tt('post.like'), post.counts.likes)}
           >
             <Icon name="heart" filled={post.viewer.liked} />
-            {post.counts.likes || ''}
+            {short(post.counts.likes)}
           </button>
           <button type="button" className="yp-action" onClick={() => onComment?.(post)} aria-label={counted(tt('post.comments'), post.counts.comments)}>
             <Icon name="message" />
-            {post.counts.comments || ''}
+            {short(post.counts.comments)}
           </button>
           {onRepost && !isOwn && !coauthor && post.visibility === 'public' ? (
             <button
@@ -1555,7 +1572,7 @@ export function PostCard({
               aria-label={counted(tt('m.reels.repost'), post.counts.reposts)}
             >
               <Icon name="repost" />
-              {post.counts.reposts || ''}
+              {short(post.counts.reposts)}
             </button>
           ) : post.counts.reposts && onReposters ? (
             <button
@@ -1566,12 +1583,12 @@ export function PostCard({
               aria-haspopup="dialog"
             >
               <Icon name="repost" />
-              {post.counts.reposts}
+              {short(post.counts.reposts)}
             </button>
           ) : post.counts.reposts ? (
             <span className="yp-action yp-action--static" aria-label={counted(tt('post.reposts'), post.counts.reposts)}>
               <Icon name="repost" />
-              {post.counts.reposts}
+              {short(post.counts.reposts)}
             </span>
           ) : null}
           {onShare && post.visibility !== 'private' ? (
@@ -1595,7 +1612,79 @@ export function PostCard({
           </button>
         </div>
       )}
+      {post.status ? null : <PostStats post={post} isOwn={!!isOwn} locale={locale} />}
     </article>
+  );
+}
+
+/**
+ * The quiet line under a post's buttons: "Liked by Amara and 12 others", then its views and shares
+ * (short numbers, read out in full), the Rising badge, and on your own post with hidden counts a
+ * note that only you see them. Nothing when there's nothing to say.
+ */
+export function PostStats({ post, isOwn, locale = 'en' }: { post: Post; isOwn?: boolean; locale?: string }) {
+  const views = post.counts.views ?? 0;
+  const shares = post.counts.shares ?? 0;
+  const onlyYou = !!isOwn && !!post.countsHidden;
+  const liked = post.likedBy;
+  if (!views && !shares && !post.rising && !onlyYou && !liked) return null;
+  const likedText = liked
+    ? liked.others
+      ? t(pluralFormKey('post.likedBy.others', pluralCategory(locale, liked.others), locale), locale, {
+          count: new Intl.NumberFormat(locale).format(liked.others),
+        })
+      : t('post.likedBy', locale)
+    : '';
+  return (
+    <div className="yp-post__foot">
+      {liked ? (
+        <p className="yp-post__likedby">
+          <span className="yp-post__likedby-face" aria-hidden>
+            <Avatar name={liked.user.displayName} src={liked.user.avatarUrl} size="sm" />
+          </span>
+          <span>
+            {fill(likedText, 'name', () => (
+              <bdi className="yp-post__likedby-name">{liked.user.displayName}</bdi>
+            ))}
+          </span>
+        </p>
+      ) : null}
+      {views || shares || post.rising || onlyYou ? (
+        <div className="yp-post__stats" role="group" aria-label={t('post.stats.label', locale)}>
+          {views ? <StatCount icon="eye" n={views} label={trp('post.stats.views', views, locale)} locale={locale} /> : null}
+          {shares ? <StatCount icon="send" n={shares} label={trp('post.stats.shares', shares, locale)} locale={locale} /> : null}
+          {post.rising ? <RisingBadge locale={locale} /> : null}
+          {onlyYou ? (
+            <span className="yp-post__stats-note">
+              <Icon name="eye-off" size={14} />
+              {t('post.stats.onlyYou', locale)}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** One number on the stats line: an icon and a short number, read out as "1,234 views". */
+function StatCount({ icon, n, label, locale }: { icon: IconName; n: number; label: string; locale: string }) {
+  return (
+    <span className="yp-post__stat">
+      <Icon name={icon} size={14} />
+      <span aria-hidden>{compactCount(n, locale)}</span>
+      <span className="yp-visually-hidden">{label}</span>
+    </span>
+  );
+}
+
+/** "Rising": the post is picking up fast right now. The longer reason is what screen readers hear. */
+export function RisingBadge({ locale = 'en', className }: { locale?: string; className?: string }) {
+  return (
+    <span className={cx('yp-rising', className)} title={t('post.rising.label', locale)}>
+      <Icon name="signal" size={12} />
+      <span aria-hidden>{t('post.rising', locale)}</span>
+      <span className="yp-visually-hidden">{t('post.rising.label', locale)}</span>
+    </span>
   );
 }
 

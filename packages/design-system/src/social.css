@@ -2127,6 +2127,83 @@ a.yp-ecard:hover {
   cursor: default;
 }
 
+/* Under a post's buttons: "Liked by…", then views, shares, Rising and the "only you" note. */
+.yp-post__foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 0 var(--space-4) var(--space-3);
+  margin-top: calc(-1 * var(--space-1));
+}
+.yp-post__likedby {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  min-width: 0;
+  font: 500 13px/18px var(--font-sans);
+  color: var(--ink);
+}
+.yp-post__likedby > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.yp-post__likedby-face {
+  display: inline-flex;
+  flex: none;
+}
+.yp-post__likedby-face .yp-avatar {
+  width: 20px;
+  height: 20px;
+  font-size: 9px;
+}
+.yp-post__likedby-name {
+  font-weight: 700;
+}
+.yp-post__stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  min-width: 0;
+  font: 500 13px/18px var(--font-sans);
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+.yp-post__stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.yp-post__stats-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 16px;
+}
+.yp-post__stats-note svg,
+.yp-post__stat svg {
+  flex: none;
+}
+/* "Rising": a small warm pill (ink on the soft saffron reads well in light and dark). */
+.yp-rising {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius-full);
+  background: var(--saffron-soft);
+  color: var(--ink);
+  font: 700 12px/1 var(--font-sans);
+  white-space: nowrap;
+}
+.yp-rising svg {
+  color: var(--grad-end);
+}
+
 @media (min-width: 900px) {
   .yp-nav__search {
     display: flex;

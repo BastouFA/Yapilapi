@@ -75,6 +75,9 @@ import { canWatch, useWatchStart } from '../lib/watch';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import { ECHO_PERMISSIONS, type EchoPermission } from '../../../packages/shared/src/echoes';
 import { onAppAway, recordFeedEvent } from '../lib/feed-events';
+import { compactCount } from '../../../packages/shared/src/post-stats';
+import { RisingBadge } from '../lib/post-stats';
+import { useSendPost } from '../lib/post-send';
 
 /** What a reel plays: on Data saver the lowest MP4, or the 360p stream for videos processed before it existed. */
 const reelSource = (m: MediaItem, saver: boolean) =>
@@ -136,7 +139,7 @@ function useReducedMotion() {
  */
 export default function Reels() {
   const c = useColors();
-  const { t, number } = useT();
+  const { t, number, locale } = useT();
   const insets = useSafeAreaInsets();
   const focused = useIsFocused();
   const { start, at } = useLocalSearchParams<{ start?: string; at?: string }>();
@@ -274,11 +277,17 @@ export default function Reels() {
   async function like(p: Post, force?: boolean) {
     const liked = force ?? !p.viewer.liked;
     if (liked === p.viewer.liked) return;
-    patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, liked }, counts: { ...x.counts, likes: x.counts.likes + (liked ? 1 : -1) } }));
+    // A hidden like count (absent) stays hidden.
+    const likes = (x: Post, n: number | undefined) => (x.counts.likes === undefined || n === undefined ? x.counts.likes : n);
+    patch(p.id, (x) => ({
+      ...x,
+      viewer: { ...x.viewer, liked },
+      counts: { ...x.counts, likes: likes(x, Math.max(0, (x.counts.likes ?? 0) + (liked ? 1 : -1))) },
+    }));
     try {
       const api = await client();
       const r = liked ? await api.posts.like(p.id) : await api.posts.unlike(p.id);
-      patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, liked: r.liked }, counts: { ...x.counts, likes: r.likes } }));
+      patch(p.id, (x) => ({ ...x, viewer: { ...x.viewer, liked: r.liked }, counts: { ...x.counts, likes: likes(x, r.likes) } }));
     } catch {
       patch(p.id, () => p);
     }
@@ -450,6 +459,20 @@ export default function Reels() {
     ]);
   }
 
+  // Your own reel: hide its like and view counts from everyone else, or show them again.
+  async function setCountsHidden(p: Post, hidden: boolean) {
+    try {
+      const r = await (await client()).posts.setCountsHidden(p.id, hidden);
+      patch(p.id, (x) => ({ ...x, countsHidden: r.countsHidden }));
+      setStatus(t(r.countsHidden ? 'post.hideCounts.done' : 'post.showCounts.done'));
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  }
+
+  // Send in a chat: the server counts the share.
+  const sender = useSendPost(setStatus);
+
   async function setAllowRemix(p: Post, allowRemix: boolean) {
     patch(p.id, (x) => ({ ...x, allowRemix }));
     try {
@@ -475,7 +498,8 @@ export default function Reels() {
     void client()
       .then((api) => api.posts.view(p.id))
       .then(
-        (r) => patch(p.id, (x) => ({ ...x, counts: { ...x.counts, views: r.views } })),
+        // A hidden view count (absent) stays hidden.
+        (r) => patch(p.id, (x) => (x.counts.views === undefined || r.views === undefined ? x : { ...x, counts: { ...x.counts, views: r.views } })),
         () => {},
       );
   };
@@ -614,6 +638,18 @@ export default function Reels() {
       <BottomSheet done gap={space[2]} visible={sheet?.kind === 'share'} title={t('reel.share.title')} onClose={() => setSheet(null)}>
         {sheetPost ? (
           <>
+            {me && sheetPost.visibility !== 'private' ? (
+              <SheetItem
+                icon="chatbubbles-outline"
+                label={t('post.send.action')}
+                onPress={() => {
+                  const p = sheetPost;
+                  setSheet(null);
+                  // iOS can't show the chat picker while this sheet is still sliding away.
+                  setTimeout(() => sender.open(p), SHEET_SWAP_MS);
+                }}
+              />
+            ) : null}
             <SheetItem icon="share-outline" label={t('reel.share.link')} onPress={() => (setSheet(null), void shareLink(sheetPost))} />
             {me && canWatch(sheetPost) ? (
               <SheetItem
@@ -630,7 +666,10 @@ export default function Reels() {
             {sheetPost.author.id !== me?.id && sheetPost.visibility === 'public' ? (
               <SheetItem
                 icon="repeat"
-                label={sheetPost.viewer.reposted ? t('reel.share.undoRepost') : t('reel.share.repost')}
+                label={
+                  (sheetPost.viewer.reposted ? t('reel.share.undoRepost') : t('reel.share.repost')) +
+                  (sheetPost.counts.reposts ? ` (${compactCount(sheetPost.counts.reposts, locale)})` : '')
+                }
                 selected={sheetPost.viewer.reposted}
                 onPress={() => (setSheet(null), void repost(sheetPost))}
               />
@@ -697,9 +736,11 @@ export default function Reels() {
         onDownload={(p) => void shareVideo(p)}
         onAllowRemix={(p, v) => void setAllowRemix(p, v)}
         onAllowEchoes={(p, v) => void setAllowEchoes(p, v)}
+        onCountsHidden={(p, v) => void setCountsHidden(p, v)}
       />
       {reporter.sheet}
       {watchTogether.sheet}
+      {sender.sheet}
       {sheet?.kind === 'highlights' && sheetPost ? (
         <HighlightsSheet
           post={sheetPost}
@@ -828,7 +869,7 @@ function Reel({
   onDeleteEcho: () => void;
 }) {
   const c = useColors();
-  const { t, tp, number } = useT();
+  const { t, tp, number, locale } = useT();
   const credit = useMusicCredit();
   const insets = useSafeAreaInsets();
   const reduce = useReducedMotion();
@@ -1146,6 +1187,12 @@ function Reel({
   const fit: 'cover' | 'contain' = !originalSrc && ratio && ratio > frameRatio * 1.25 ? 'contain' : 'cover';
   const poster = media ? (saver ? (media.variants?.thumb ?? media.posterUrl) : media.posterUrl) : null;
   const canFollow = !mine && !following;
+  // Under the name: views, Rising, and on your own reel with hidden counts, that only you see them.
+  const stats = [
+    ...(post.counts.views ? [tp('post.stats.views', post.counts.views)] : []),
+    ...(post.rising ? [t('post.rising.label')] : []),
+    ...(mine && post.countsHidden ? [t('post.stats.onlyYou')] : []),
+  ];
   const bottom = insets.bottom + space[1];
 
   return (
@@ -1299,6 +1346,23 @@ function Reel({
               </Pressable>
             ) : null}
           </View>
+          {stats.length ? (
+            // Views and Rising by the name; one stop for screen readers, with the full number.
+            <View
+              accessible
+              accessibilityLabel={stats.join(', ')}
+              style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: space[2], rowGap: 4 }}
+            >
+              {post.counts.views ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Icon name="eye-outline" size={14} color={WHITE} />
+                  <Text style={s.stat}>{compactCount(post.counts.views, locale)}</Text>
+                </View>
+              ) : null}
+              {post.rising ? <RisingBadge onMedia /> : null}
+              {mine && post.countsHidden ? <Icon name="eye-off-outline" size={14} color={WHITE} /> : null}
+            </View>
+          ) : null}
           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space[2] }}>
             {post.body ? (
               <View style={{ flex: 1 }}>
@@ -1542,18 +1606,24 @@ function Reel({
           <Action
             icon={post.viewer.liked ? 'heart' : 'heart-outline'}
             tint={post.viewer.liked ? ACCENT : undefined}
-            label={post.viewer.liked ? t('post.unlike') : t('post.like')}
-            count={post.counts.likes ? number(post.counts.likes) : ''}
+            label={(post.viewer.liked ? t('post.unlike') : t('post.like')) + (post.counts.likes ? `, ${tp('post.stats.likes', post.counts.likes)}` : '')}
+            // No number when the author hid it.
+            count={post.counts.likes ? compactCount(post.counts.likes, locale) : ''}
             selected={post.viewer.liked}
             onPress={() => onLike()}
           />
           <Action
             icon="chatbubble-outline"
             label={tp('m.post.commentCount', post.counts.comments)}
-            count={post.counts.comments ? number(post.counts.comments) : ''}
+            count={post.counts.comments ? compactCount(post.counts.comments, locale) : ''}
             onPress={() => onComments(Math.round(time.current * 1000))}
           />
-          <Action icon="paper-plane-outline" label={t('m.common.share')} count={post.counts.reposts ? number(post.counts.reposts) : ''} onPress={onShare} />
+          <Action
+            icon="paper-plane-outline"
+            label={t('m.common.share') + (post.counts.shares ? `, ${tp('post.stats.shares', post.counts.shares)}` : '')}
+            count={post.counts.shares ? compactCount(post.counts.shares, locale) : ''}
+            onPress={onShare}
+          />
           <Action
             icon={post.viewer.saved ? 'bookmark' : 'bookmark-outline'}
             tint={post.viewer.saved ? SUN : undefined}
@@ -1793,7 +1863,9 @@ function Action({
       <View style={[s.actionIcon, tint ? { backgroundColor: tint, borderColor: 'transparent' } : null]}>
         <Icon name={icon} size={24} color={tint ? (dark ? '#0B0C14' : WHITE) : WHITE} />
       </View>
-      <Text style={s.count}>{count ?? ''}</Text>
+      <Text style={s.count} numberOfLines={1}>
+        {count ?? ''}
+      </Text>
     </Pressable>
   );
 }
@@ -1837,6 +1909,7 @@ function OptionsSheet({
   onDownload,
   onAllowRemix,
   onAllowEchoes,
+  onCountsHidden,
 }: {
   post: Post | null;
   mine: boolean;
@@ -1856,6 +1929,7 @@ function OptionsSheet({
   onDownload: (p: Post) => void;
   onAllowRemix: (p: Post, allow: boolean) => void;
   onAllowEchoes: (p: Post, allow: EchoPermission) => void;
+  onCountsHidden: (p: Post, hidden: boolean) => void;
 }) {
   const c = useColors();
   const { t, number } = useT();
@@ -1896,6 +1970,13 @@ function OptionsSheet({
           <View style={{ height: space[2] }} />
           {post.visibility !== 'private' ? <SheetItem icon="link-outline" label={t('reel.share.copy')} onPress={done(() => onCopy(post))} /> : null}
           {post.downloadable ? <SheetItem icon="download-outline" label={t('share.video.download')} onPress={done(() => onDownload(post))} /> : null}
+          {mine && !post.status ? (
+            <SheetItem
+              icon={post.countsHidden ? 'eye-outline' : 'eye-off-outline'}
+              label={post.countsHidden ? t('post.showCounts') : t('post.hideCounts')}
+              onPress={done(() => onCountsHidden(post, !post.countsHidden))}
+            />
+          ) : null}
           {mine ? (
             <>
               <SheetItem icon="star-outline" label={t('reel.highlights.edit')} onPress={() => onHighlights(post)} />
@@ -2147,6 +2228,7 @@ const s = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.14)',
   },
   count: { color: WHITE, fontSize: 12, fontWeight: '700', minHeight: 14, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 3 },
+  stat: { color: WHITE, fontSize: 12, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 3 },
   srOnly: { position: 'absolute', width: 1, height: 1, opacity: 0 },
   controls: { position: 'absolute', start: space[2], end: space[2], height: 44, flexDirection: 'row', alignItems: 'center', gap: space[1] },
   time: { color: WHITE, fontSize: 11, fontWeight: '600', minWidth: 72, textAlign: 'right', fontVariant: ['tabular-nums'] },

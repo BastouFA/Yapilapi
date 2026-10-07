@@ -1827,6 +1827,33 @@ html[data-locale-pending] body {
   gap: var(--space-2);
   padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
 }
+/* Your own story: its numbers on a line of their own above the buttons. */
+.story__foot--mine {
+  flex-wrap: wrap;
+}
+.story__stats {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  font: 600 14px/20px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.story__stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* The heart with its like count beside it. */
+.story__icon--count {
+  display: inline-flex;
+  gap: 6px;
+  min-width: 44px;
+  padding: 0 12px;
+  font: 600 14px/1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
 /* The viewer is dark in both themes: the light theme's brand red is too dark on it (3.7:1). */
 .story__foot .yp-btn--ghost {
   color: #ff5c7a;
@@ -2106,6 +2133,74 @@ html[data-locale-pending] body {
 }
 .notif__link:hover {
   text-decoration: underline;
+}
+/* A milestone ("Your reel passed 1,000 views"): a small warm card in the list, no confetti. */
+.notif-milestone {
+  display: grid;
+  gap: 4px;
+  margin: 4px 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--saffron-soft);
+  color: var(--ink);
+}
+.notif-milestone p {
+  margin: 0;
+}
+.notif-milestone__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 700 12px/16px var(--font-sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.notif-milestone__label svg {
+  color: var(--grad-end);
+}
+.notif-milestone__figure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 6px;
+  font: 600 15px/20px var(--font-sans);
+}
+.notif-milestone__number {
+  font: 800 30px/36px var(--font-display);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.notif-milestone__text {
+  font-size: 14px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.notif-milestone__when {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: 8px;
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+.notif-milestone__link {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  color: var(--ink);
+  font: 700 14px/20px var(--font-sans);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.notif-milestone__link:focus-visible {
+  outline: none;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--focus-ring);
+}
+[dir='rtl'] .notif-milestone__chevron {
+  transform: scaleX(-1);
 }
 
 /* Suggested people */
@@ -7330,6 +7425,33 @@ button.yp-chip[aria-pressed='true'] {
 .reel__follow:hover {
   background: #fff;
   color: #0b0c14;
+}
+/* Views, reposts and Rising under the name (white on the video, with the strip's shadow). */
+.reel__stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  min-width: 0;
+  font: 600 13px/18px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.reel__stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.reel__stat svg {
+  flex: none;
+  filter: drop-shadow(0 1px 3px #0009);
+}
+.reel__stat--note {
+  font-size: 12px;
+  font-weight: 500;
+}
+.reel__stats .yp-rising {
+  text-shadow: none;
 }
 .reel__caption-row {
   display: flex;

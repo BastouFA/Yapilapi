@@ -122,6 +122,9 @@ function Create() {
   // Who may echo the reel; '' keeps the default for the account (everyone, or nobody for private and under-18 accounts).
   const [allowEchoes, setAllowEchoes] = useState<EchoPermission | ''>('');
   const [commentPolicy, setCommentPolicy] = useState<CommentPolicy>('everyone');
+  // Hide the like and view counts: starts at the account's choice (Settings, Privacy), sent only when changed from it.
+  const [hideCountsDefault, setHideCountsDefault] = useState(false);
+  const [hideCounts, setHideCounts] = useState<boolean | null>(null);
   const [communityId, setCommunityId] = useState(params.get('community') ?? '');
   const [communities, setCommunities] = useState<Community[]>([]);
   const [circles, setCircles] = useState<{ id: string; name: string }[]>([]);
@@ -217,6 +220,7 @@ function Create() {
         if (post.allowRemix !== undefined) setAllowRemix(post.allowRemix);
         if (post.allowEchoes) setAllowEchoes(post.allowEchoes);
         if (post.commentPolicy) setCommentPolicy(post.commentPolicy);
+        setHideCounts(!!post.countsHidden);
         if (post.sound?.original) setSoundTitle(post.sound.title);
         // Music on the draft: the song or sound as the picker has it, with the part it plays.
         const use = post.format === 'reel' ? 'reel' : 'post';
@@ -279,6 +283,10 @@ function Create() {
       .circles()
       .then((r) => setCircles(r.items))
       .catch(() => {});
+    api.me.sharing().then(
+      (r) => setHideCountsDefault(!!r.settings.hideCounts),
+      () => {},
+    );
     if (me)
       api.economy
         .plans(me.id)
@@ -435,6 +443,10 @@ function Create() {
       .filter(Boolean)
       .slice(0, 5);
 
+  const countsHidden = hideCounts ?? hideCountsDefault;
+  // Left out when it's the account's choice, so the post follows the account.
+  const hideCountsField = countsHidden !== hideCountsDefault ? { hideCounts: countsHidden } : {};
+
   // Music goes on photo and text posts (not videos, polls or links).
   const postCanHaveMusic = !poll && !link?.trim() && media.every((m) => m.kind === 'image');
 
@@ -450,6 +462,7 @@ function Create() {
         allowRemix,
         ...(allowEchoes ? { allowEchoes } : {}),
         commentPolicy,
+        ...hideCountsField,
         // A sound plays in full instead of the video's own; a song plays the chosen part.
         ...(remixOf && original
           ? { remixOf, remixMode }
@@ -487,6 +500,7 @@ function Create() {
       topics: topicList(),
       aiAssisted: aiUsed,
       commentPolicy,
+      ...hideCountsField,
     };
   }
 
@@ -1004,6 +1018,14 @@ function Create() {
                 </option>
               ))}
             </Select>
+          ) : null}
+          {kind !== 'story' ? (
+            <Checkbox
+              label={t('post.hideCounts')}
+              description={t('post.hideCounts.hint')}
+              checked={countsHidden}
+              onChange={(e) => setHideCounts(e.currentTarget.checked)}
+            />
           ) : null}
           {kind === 'story' ? (
             <Checkbox
