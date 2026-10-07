@@ -1,0 +1,16 @@
+{
+  "id": "/",
+  "name": "YAPILAPI",
+  "short_name": "YAPILAPI",
+  "description": "Your social world. One place.",
+  "start_url": "/home",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#EFEBE6",
+  "theme_color": "#EFEBE6",
+  "icons": [
+    { "src": "/yapilapi-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/yapilapi-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/mark.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

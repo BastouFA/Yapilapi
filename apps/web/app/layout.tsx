@@ -25,6 +25,10 @@ export const metadata: Metadata = {
   title: { default: 'YAPILAPI', template: '%s · YAPILAPI' },
   description: 'Your social world. One place.',
   applicationName: 'YAPILAPI',
+  // "Add to Home Screen" installs YAPILAPI with its own icon (Yap mode has its own: app/(app)/yap/layout.tsx).
+  manifest: '/manifest.webmanifest',
+  appleWebApp: { capable: true, title: 'YAPILAPI', statusBarStyle: 'default' },
+  icons: { apple: '/yapilapi-icon-180.png' },
   openGraph: { siteName: 'YAPILAPI', type: 'website', title: 'YAPILAPI', description: 'Your social world. One place.' },
   twitter: { card: 'summary_large_image', title: 'YAPILAPI', description: 'Your social world. One place.' },
 };
