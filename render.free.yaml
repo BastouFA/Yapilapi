@@ -36,6 +36,9 @@ services:
 
   - type: web
     name: yapilapi-api
+    # The API's own address (realtime sockets go here); Cloudflare's DNS points api at this service.
+    domains:
+      - api.yapilapi.com
     runtime: docker
     dockerfilePath: infrastructure/docker/api.Dockerfile
     dockerContext: .
@@ -211,6 +214,9 @@ services:
 
   - type: web
     name: yapilapi-web
+    domains:
+      - yapilapi.com
+      - www.yapilapi.com
     runtime: docker
     dockerfilePath: infrastructure/docker/web.Dockerfile
     dockerContext: .
