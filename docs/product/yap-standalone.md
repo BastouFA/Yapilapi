@@ -18,17 +18,37 @@ Yap (chats) can be used on its own, like a messenger app, in two steps.
 Code: `apps/web/app/(app)/yap/`, `apps/web/components/YapShell.tsx`, `apps/web/lib/chat-base.ts`
 (chat links stay in whichever mode you're in).
 
-## Step 2: a separate Yap phone app (later)
+## Step 2: a separate Yap phone app (built; run on the iOS simulator, not yet on a phone)
 
-When Yap has enough people who use it on its own, build `apps/yap`, a second Expo app:
+`apps/yap` is a second Expo app, "Yap" (`com.yapilapi.yap`, scheme `yap`, the Yap icon), with the
+same accounts, API and chats as YAPILAPI. Details and how to run it: `apps/yap/README.md`.
 
-- It reuses what the phone app's chats already use: `@yapilapi/api-client`, `@yapilapi/shared`
-  (messages in eight languages, games, chat themes) and the chat screens in `apps/mobile`
-  (`app/chat/[id].tsx` and `lib/`), moved into a shared package so both apps import them.
-- Same API and same accounts. Signing in once can cover both apps through a shared keychain
-  group (iOS) and account manager (Android).
-- Its own bundle ID (for example `com.yapilapi.yap`), App Store and Google Play listings, and push
-  notification channel. Your Apple developer membership covers a second app, and Google Play
-  needs no new fee.
-- The main app's Yap tab can then offer "Open in Yap" when Yap is installed, as Facebook does
-  with Messenger.
+- **Tabs, like a messenger:** Chats (unread counts, search, New chat and New group), Calls (your
+  recent calls from the new `GET /v1/calls`, call again, New call), Stories (yours, then new and seen
+  ones from people you follow, in the phone app's viewer) and Settings (photo and name, who can
+  message you and read receipts, blocked people, notifications and quiet hours, language,
+  appearance, your data and deleting your account, log out, "More in YAPILAPI").
+- **One copy of the code:** the chat, sign-in, new group, group info, edit profile and your data
+  screens are the phone app's own (`apps/mobile/app/*`, re-exported), and so are the helpers in
+  `apps/mobile/lib`. Metro and TypeScript take every package from Yap's own `node_modules`, so there
+  is one React Native. Nothing moved: `apps/mobile` works as before.
+- **Its own install:** `apps/yap` is outside the pnpm workspace like `apps/mobile`, with its own
+  lockfile and exactly the phone app's package versions (fewer packages: no camera, contacts or
+  phone-number libraries).
+- **Links out:** anything that isn't a chat or a call (a shared post, a profile) opens YAPILAPI when
+  it's installed (`yapilapi://…`), and the web otherwise. `yap://chat/<id>` and the web's `/yap/<id>`
+  open a chat in Yap.
+- **Push:** Yap registers its phone with `app: 'yap'`, and the API sends it only chats and calls
+  (calls, Yaps, chat reminders, view-once screenshots, location, Market offers) and sign-in alerts,
+  titled "Yap". YAPILAPI still gets everything. Plain text messages don't push in either app yet.
+- **Store setup:** `apps/yap/eas.json` mirrors the phone app's (production and preview point at
+  `https://api.yapilapi.com` and `https://yapilapi.com`). Yap needs its own `eas init` (EAS project id),
+  App Store and Google Play listings, push credentials and `google-services.json`.
+
+Not done yet:
+
+- Signing in once for both apps (a shared keychain group on iOS, account manager on Android); each
+  app signs in on its own today.
+- Web links opening Yap (associated domains / Android app links for `/yap/*`), and "Open in Yap"
+  from YAPILAPI's Yap tab when Yap is installed.
+- An archive of chats (the API has none), and pushes for plain text messages.

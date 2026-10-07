@@ -180,6 +180,36 @@ describe('push notifications', () => {
     await push(u.id, { title: 'YAPILAPI', body: 'again' });
     expect((await t.ctx.db.query(`SELECT 1 FROM push_subscriptions WHERE user_id = $1`, [u.id])).rowCount).toBe(0);
   });
+
+  it('sends the Yap phone app only chats, calls and sign-in alerts', async () => {
+    const u = await signUp(t.app);
+    const yap = 'ExponentPushToken[yap123]';
+    const main = 'ExponentPushToken[main123]';
+    expect((await as(t.app, u).post('/v1/push/subscriptions', { kind: 'expo', endpoint: yap, app: 'other' })).status).toBe(400);
+    expect((await as(t.app, u).post('/v1/push/subscriptions', { kind: 'expo', endpoint: yap, app: 'yap' })).status).toBe(201);
+    expect((await as(t.app, u).post('/v1/push/subscriptions', { kind: 'expo', endpoint: main })).status).toBe(201);
+    const sent: { to: string; title: string; body: string }[] = [];
+    const fakeFetch = (async (_url: string, init: RequestInit) => {
+      sent.push(JSON.parse(String(init.body)));
+      return new Response(JSON.stringify({ data: { status: 'ok' } }));
+    }) as typeof fetch;
+    const push = createPushSender(t.ctx.db, t.ctx.config, fakeFetch);
+    await push(u.id, { title: 'YAPILAPI', body: 'Ada liked your post', tag: 'post_reaction' });
+    expect(sent.map((s) => s.to)).toEqual([main]);
+    sent.length = 0;
+    await push(u.id, { title: 'YAPILAPI', body: 'Ada sent you a Yap', tag: 'yap_received' });
+    await push(u.id, { title: 'YAPILAPI', body: 'Ada is calling you', tag: 'call_incoming' });
+    expect(sent.filter((s) => s.to === yap).map((s) => [s.title, s.body])).toEqual([
+      ['Yap', 'Ada sent you a Yap'],
+      ['Yap', 'Ada is calling you'],
+    ]);
+    expect(sent.filter((s) => s.to === main).map((s) => s.title)).toEqual(['YAPILAPI', 'YAPILAPI']);
+    // Registering the same phone again without the tag (YAPILAPI took it over) sends it everything.
+    await as(t.app, u).post('/v1/push/subscriptions', { kind: 'expo', endpoint: yap });
+    sent.length = 0;
+    await push(u.id, { title: 'YAPILAPI', body: 'Ada liked your post', tag: 'post_reaction' });
+    expect(sent.map((s) => s.to).sort()).toEqual([main, yap].sort());
+  });
 });
 
 describe('Mini Apps', () => {

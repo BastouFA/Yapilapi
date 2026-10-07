@@ -1392,8 +1392,10 @@ export function createClient(opts: ClientOptions) {
     },
     push: {
       config: () => get<{ webPush: boolean; vapidPublicKey: string | null }>('/v1/push/config'),
-      subscribe: (b: { kind: 'webpush'; endpoint: string; keys: { p256dh: string; auth: string } } | { kind: 'expo'; endpoint: string }) =>
-        post('/v1/push/subscriptions', b),
+      /** `app: 'yap'` from the Yap phone app: it gets pushes about chats and calls only. */
+      subscribe: (
+        b: { kind: 'webpush'; endpoint: string; keys: { p256dh: string; auth: string } } | { kind: 'expo'; endpoint: string; app?: 'yapilapi' | 'yap' },
+      ) => post('/v1/push/subscriptions', b),
       unsubscribe: (endpoint: string) => del('/v1/push/subscriptions', { endpoint }),
     },
     miniApps: {
@@ -1497,6 +1499,10 @@ export function createClient(opts: ClientOptions) {
       decline: (id: string, busy = false) => post(`/v1/calls/${id}/decline`, busy ? { busy } : {}),
       end: (id: string) => post(`/v1/calls/${id}/end`),
       signal: (id: string, toUserId: string, type: 'offer' | 'answer' | 'candidate', data: unknown) => post(`/v1/calls/${id}/signal`, { toUserId, type, data }),
+      /** Your recent calls in the chats you're still in, newest first. */
+      list: () => get<{ items: CallInfo[] }>('/v1/calls'),
+      /** Calls in one chat that you were in, newest first. */
+      forConversation: (conversationId: string) => get<{ items: CallInfo[] }>(`/v1/conversations/${conversationId}/calls`),
     },
     real: {
       /** `remaining`: how many more Reals you can share now (three in 24 hours). */
@@ -2083,6 +2089,10 @@ export interface CallInfo {
   kind: 'audio' | 'video';
   status: 'ringing' | 'active' | 'ended' | 'missed' | 'declined';
   participants: string[];
+  /** In call lists (calls.list, calls.forConversation). */
+  createdAt?: string;
+  answeredAt?: string | null;
+  endedAt?: string | null;
 }
 
 /** Together shapes live in @yapilapi/shared (together.ts); re-exported for older imports. */

@@ -1,0 +1,13 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    // The phone app's files that Yap reuses (../mobile/app, ../mobile/lib) take their packages from
+    // Yap's node_modules, as Metro does (metro.config.js), so there is one React Native's types.
+    "paths": { "*": ["./node_modules/@types/*", "./node_modules/*"] }
+  },
+  "include": ["**/*.ts", "**/*.tsx"]
+}

@@ -1,6 +1,7 @@
 // Draws every app icon from one place, so YAPILAPI and Yap look like one family everywhere:
 // the web favicon and brand mark, the home-screen icons (web "Add to Home Screen" for YAPILAPI and
-// for Yap mode) and the phone app's icon, Android adaptive icon and splash.
+// for Yap mode), and each phone app's icon, Android adaptive icon and splash (YAPILAPI in
+// apps/mobile, Yap in apps/yap).
 // Run: pnpm --filter @yapilapi/api exec tsx scripts/build-icons.ts
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -11,6 +12,7 @@ import { glyphPath, NAV_GLYPHS } from '@yapilapi/shared';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const web = (f: string) => path.join(root, 'apps/web', f);
 const phone = (f: string) => path.join(root, 'apps/mobile/assets', f);
+const yapPhone = (f: string) => path.join(root, 'apps/yap/assets', f);
 
 /** The brand gradient: the accent (--yapi) warming into saffron, as in the light theme. */
 const STOPS = [
@@ -71,14 +73,17 @@ for (const size of [180, 192, 512]) {
   await png(yapBleed, size, web(`public/yap-icon-${size}.png`));
 }
 
-// Phone app: icon, Android adaptive icon (foreground + background), splash.
-await png(yapilapiBleed, 1024, phone('icon.png'), { flatten: true });
-await png(foreground(yapilapiMark), 1024, phone('adaptive-icon.png'));
-await png(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs>${gradient(48)}</defs><rect width="48" height="48" fill="url(#g)"/></svg>`,
-  1024,
-  phone('adaptive-background.png'),
-);
-await png(yapilapiRounded, 1024, phone('splash-icon.png'));
+// Phone apps: icon, Android adaptive icon (foreground + background), splash, with the same warm
+// gradient behind both marks.
+const background = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><defs>${gradient(48)}</defs><rect width="48" height="48" fill="url(#g)"/></svg>`;
+for (const [file, mark, bleed, rounded] of [
+  [phone, yapilapiMark, yapilapiBleed, yapilapiRounded],
+  [yapPhone, yapMark(), yapBleed, yapRounded],
+] as const) {
+  await png(bleed, 1024, file('icon.png'), { flatten: true });
+  await png(foreground(mark), 1024, file('adaptive-icon.png'));
+  await png(background, 1024, file('adaptive-background.png'));
+  await png(rounded, 1024, file('splash-icon.png'));
+}
 
 console.log('icons written');

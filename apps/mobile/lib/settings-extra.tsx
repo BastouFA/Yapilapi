@@ -137,7 +137,7 @@ export function Choices<T extends string>({
 }
 
 /** Loads the interaction settings (who can reach you, quiet hours, sensitive media) and saves changes. */
-function useInteractions() {
+export function useInteractions() {
   const [settings, setSettings] = useState<InteractionSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {

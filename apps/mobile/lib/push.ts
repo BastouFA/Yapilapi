@@ -55,12 +55,18 @@ export async function registerForPush(): Promise<'registered' | 'denied' | 'unav
   const projectId = (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId;
   if (!projectId) return 'unavailable';
   const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-  await (await client()).push.subscribe({ kind: 'expo', endpoint: token });
+  await (await client()).push.subscribe({ kind: 'expo', endpoint: token, ...appTag() });
   await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token).catch(() => {});
   return 'registered';
 }
 
 const PUSH_TOKEN_KEY = 'ypl_push_token';
+
+/**
+ * Which app registers: the Yap phone app (apps/yap, `extra.app` in its app.json) shares this file
+ * and says so, and the API then sends it only pushes about chats and calls. YAPILAPI says nothing.
+ */
+const appTag = (): { app?: 'yap' } => ((Constants.expoConfig?.extra as { app?: string } | undefined)?.app === 'yap' ? { app: 'yap' } : {});
 
 /**
  * Notifications follow the account in use: after switching accounts (or logging in to another),
@@ -74,7 +80,7 @@ export async function followActiveAccount() {
     const projectId = (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId;
     const token = (await SecureStore.getItemAsync(PUSH_TOKEN_KEY)) ?? (projectId ? (await Notifications.getExpoPushTokenAsync({ projectId })).data : null);
     if (!token) return;
-    await (await client()).push.subscribe({ kind: 'expo', endpoint: token });
+    await (await client()).push.subscribe({ kind: 'expo', endpoint: token, ...appTag() });
     await SecureStore.setItemAsync(PUSH_TOKEN_KEY, token);
   } catch {
     // Offline or no push service: tried again at the next switch or sign-in.

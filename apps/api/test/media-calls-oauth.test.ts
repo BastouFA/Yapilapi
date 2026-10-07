@@ -138,6 +138,11 @@ describe('calls', () => {
     await as(t.app, a).post(`/v1/calls/${callId}/end`);
     const history = await as(t.app, b).get(`/v1/conversations/${conv}/calls`);
     expect(history.body.items[0]).toMatchObject({ id: callId, status: 'ended' });
+    // Everyone's own call list (the Yap app's Calls tab): the call, with its chat; not for others.
+    const mine = await as(t.app, b).get('/v1/calls');
+    expect(mine.body.items[0]).toMatchObject({ id: callId, conversationId: conv, callerId: a.id, kind: 'video', status: 'ended' });
+    expect(mine.body.items[0].createdAt).toBeTruthy();
+    expect((await as(t.app, c).get('/v1/calls')).body.items).toEqual([]);
     // Blocked people can't call each other.
     await as(t.app, b).post(`/v1/users/${a.id}/block`);
     expect((await as(t.app, a).post(`/v1/conversations/${conv}/calls`, {})).status).toBe(403);

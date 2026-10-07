@@ -18,14 +18,16 @@ export default async function pushModule(app: FastifyInstance, ctx: AppContext) 
           endpoint: z.string().url().startsWith('https://').max(1000),
           keys: z.object({ p256dh: z.string().max(200), auth: z.string().max(100) }),
         }),
-        z.object({ kind: z.literal('expo'), endpoint: z.string().regex(/^Expo(nent)?PushToken\[[\w-]+\]$/) }),
+        // `app: 'yap'`: the Yap phone app, which only gets pushes about chats and calls (lib/push.ts).
+        z.object({ kind: z.literal('expo'), endpoint: z.string().regex(/^Expo(nent)?PushToken\[[\w-]+\]$/), app: z.enum(['yapilapi', 'yap']).optional() }),
       ]),
       req.body,
     );
+    const keys = input.kind === 'webpush' ? input.keys : input.app === 'yap' ? { app: 'yap' } : {};
     await db.query(
       `INSERT INTO push_subscriptions (user_id, kind, endpoint, keys) VALUES ($1,$2,$3,$4)
        ON CONFLICT (kind, endpoint) DO UPDATE SET user_id = EXCLUDED.user_id, keys = EXCLUDED.keys`,
-      [me(req).id, input.kind, input.endpoint, input.kind === 'webpush' ? input.keys : {}],
+      [me(req).id, input.kind, input.endpoint, keys],
     );
     reply.code(201);
     return { ok: true };

@@ -17,6 +17,25 @@ export interface PushMessage {
 export type PushSender = (userId: string, msg: PushMessage) => Promise<void>;
 
 /**
+ * What the Yap phone app (apps/yap, a messenger on its own) is sent: chats and calls, and sign-in
+ * alerts, which go to every device. Phones running Yap register with `app: 'yap'`
+ * (modules/push.ts); everything else goes to YAPILAPI and the browser only.
+ */
+export const YAP_APP_PUSH_TYPES: ReadonlySet<string> = new Set([
+  'call_incoming',
+  'yap_received',
+  'view_once_screenshot',
+  'chat_reminder',
+  'scheduled_message_failed',
+  'location_shared',
+  'market_offer',
+  'market_offer_accepted',
+  'market_offer_declined',
+  'market_offer_countered',
+  'new_sign_in',
+]);
+
+/**
  * Sends a notification to every device a person registered: browsers via Web Push
  * (VAPID), phones via Expo's push service. Dead subscriptions are removed.
  */
@@ -30,12 +49,14 @@ export function createPushSender(db: Pool, config: Config, fetchImpl: typeof fet
         if (s.kind === 'webpush' && vapid) {
           await webpush.sendNotification({ endpoint: s.endpoint, keys: s.keys }, JSON.stringify(msg), { TTL: 3600 });
         } else if (s.kind === 'expo') {
+          const yap = s.keys?.app === 'yap';
+          if (yap && !YAP_APP_PUSH_TYPES.has(msg.tag ?? '')) continue;
           const res = await fetchImpl('https://exp.host/--/api/v2/push/send', {
             method: 'POST',
             headers: { 'content-type': 'application/json', accept: 'application/json' },
             body: JSON.stringify({
               to: s.endpoint,
-              title: msg.title,
+              title: yap ? 'Yap' : msg.title,
               body: msg.body,
               data: { url: msg.url, ...msg.data },
               // Incoming calls ring: high priority, a sound, the "calls" Android channel and

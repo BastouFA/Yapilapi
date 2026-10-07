@@ -256,6 +256,23 @@ export default async function callsModule(app: FastifyInstance, ctx: AppContext)
     return { ok: true };
   });
 
+  /**
+   * Your recent calls in every chat you're still in, newest first (the Calls tab in the Yap phone
+   * app). Each names its chat, so the app shows who it was with from your chat list.
+   */
+  app.get('/v1/calls', { preHandler: requireAuth }, async (req) => {
+    const u = me(req);
+    const { rows } = await db.query(
+      `SELECT c.*, (SELECT array_agg(user_id) FROM call_participants WHERE call_id = c.id) AS participants
+       FROM call_participants p JOIN calls c ON c.id = p.call_id
+       WHERE p.user_id = $1
+         AND EXISTS (SELECT 1 FROM conversation_members m WHERE m.conversation_id = c.conversation_id AND m.user_id = $1 AND m.left_at IS NULL)
+       ORDER BY c.created_at DESC LIMIT 100`,
+      [u.id],
+    );
+    return { items: rows.map(dto) };
+  });
+
   app.get('/v1/conversations/:id/calls', { preHandler: requireAuth }, async (req) => {
     const u = me(req);
     const { id } = parse(z.object({ id: z.string().uuid() }), req.params);

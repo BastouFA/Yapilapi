@@ -5,9 +5,10 @@
 // is meant (the room is taken by a bigger target around it, say), put `// targets-ok: why` on the
 // line above the element.
 // Run: node scripts/check-targets.mjs (from apps/mobile). Exits 1 when something is flagged.
+// Another app's folder as the argument checks its app/ and lib/ instead (apps/yap: npm run check-targets).
 import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join, relative } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 
 const require = createRequire(import.meta.url);
 let ts;
@@ -19,7 +20,7 @@ try {
 }
 
 const MIN = 44;
-const root = new URL('..', import.meta.url).pathname;
+const root = process.argv[2] ? resolve(process.argv[2]) : new URL('..', import.meta.url).pathname;
 const TAGS = new Set(['Pressable', 'TouchableOpacity', 'TouchableHighlight', 'TouchableWithoutFeedback']);
 const ICONS = new Set(['Icon', 'Ionicons']);
 const tokens = JSON.parse(readFileSync(new URL('../../../packages/design-system/tokens.json', import.meta.url), 'utf8'));

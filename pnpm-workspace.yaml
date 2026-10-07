@@ -1,7 +1,8 @@
 packages:
   - 'apps/*'
-  # The Expo app installs on its own (see apps/mobile/README.md) to keep web/API installs light.
+  # The Expo apps install on their own (see apps/mobile/README.md and apps/yap/README.md) to keep web/API installs light.
   - '!apps/mobile'
+  - '!apps/yap'
   - 'packages/*'
 allowBuilds:
   esbuild: true

@@ -1,0 +1,146 @@
+{
+  "expo": {
+    "name": "Yap",
+    "slug": "yap",
+    "scheme": "yap",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "experiments": {
+      "tsconfigPaths": false
+    },
+    "ios": {
+      "bundleIdentifier": "com.yapilapi.yap",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Yap uses the camera when you take a photo or video to send in a chat, and for video calls.",
+        "NSMicrophoneUsageDescription": "Yap uses the microphone when you record a voice message or a Yap, or make a call.",
+        "NSPhotoLibraryUsageDescription": "Yap opens your photo library when you choose photos and videos to send in a chat.",
+        "NSPhotoLibraryAddUsageDescription": "Yap saves a photo or video to your library only when you choose to save it.",
+        "UIBackgroundModes": ["audio"],
+        "NSLocationWhenInUseUsageDescription": "Yap uses where you are only when you choose to share it with a chat. It isn't used in the background.",
+        "LSApplicationQueriesSchemes": ["yapilapi"]
+      },
+      "buildNumber": "1",
+      "privacyManifests": {
+        "NSPrivacyTracking": false,
+        "NSPrivacyTrackingDomains": [],
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+            "NSPrivacyAccessedAPITypeReasons": ["C617.1", "0A2A.1", "3B52.1"]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategorySystemBootTime",
+            "NSPrivacyAccessedAPITypeReasons": ["35F9.1"]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryDiskSpace",
+            "NSPrivacyAccessedAPITypeReasons": ["E174.1", "85F4.1"]
+          }
+        ]
+      }
+    },
+    "android": {
+      "package": "com.yapilapi.yap",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.WAKE_LOCK",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.ACCESS_BACKGROUND_LOCATION"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundImage": "./assets/adaptive-background.png",
+        "backgroundColor": "#B42A4E"
+      },
+      "versionCode": 1
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-notifications",
+      "expo-status-bar",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "Yap uses the camera when you take a photo or video to send in a chat, and for video calls.",
+          "microphonePermission": "Yap uses the microphone when you record a voice message or a Yap, or make a call."
+        }
+      ],
+      "expo-dev-client",
+      "expo-font",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": ["en", "fr", "ar", "es", "pt", "sw", "yo", "ha"]
+        }
+      ],
+      "expo-video",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Yap opens your photo library when you choose photos and videos to send in a chat.",
+          "cameraPermission": "Yap uses the camera when you take a photo or video to send in a chat, and for video calls.",
+          "microphonePermission": "Yap uses the microphone when you record a voice message or a Yap, or make a call."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Yap uses the microphone when you record a voice message or a Yap, or make a call.",
+          "recordAudioAndroid": true
+        }
+      ],
+      "expo-sharing",
+      "./plugins/with-scene-lifecycle",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 120,
+          "resizeMode": "contain",
+          "backgroundColor": "#EFEBE6",
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#0B0C14"
+          }
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Yap uses where you are only when you choose to share it with a chat. It isn't used in the background.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
+        }
+      ]
+    ],
+    "extra": {
+      "apiUrl": "http://localhost:4000",
+      "webUrl": "http://localhost:3000",
+      "app": "yap",
+      "eas": {
+        "projectId": ""
+      }
+    },
+    "icon": "./assets/icon.png"
+  }
+}
