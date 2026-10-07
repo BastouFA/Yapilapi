@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { Button, EmptyState, NavBar, Skeleton, type NavEntry } from '@yapilapi/design-system';
 import { NextLink } from '@/lib/link';
 import { RailAccountButton } from '@/components/AccountMenu';
+import { AnnouncementBanner } from '@/components/AnnouncementBanner';
 import { BirthDateGate } from '@/components/BirthDateGate';
 import { CallsProvider } from '@/components/Calls';
 import { CheckoutProvider } from '@/components/Checkout';
@@ -117,6 +118,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               footer={<RailAccountButton />}
             />
             <main className="yp-shell__main" id="main">
+              {/* A note from the team to everyone, until it ends or you close it. */}
+              <AnnouncementBanner />
               {children}
             </main>
             <Sidebar />

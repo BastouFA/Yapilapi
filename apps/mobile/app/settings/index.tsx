@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ScrollView, Text, TextInput, View } from 'react-native';
+import { Linking, ScrollView, Text, TextInput, View } from 'react-native';
 import { t as translate } from '../../../../packages/shared/src/i18n';
 import { useConfirmLogout } from '../../lib/account-menu';
+import { webUrl } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { useSession } from '../../lib/session';
 import { GROUPS, SECTIONS, SETTINGS } from '../../lib/settings-catalog';
@@ -128,6 +129,18 @@ export default function SettingsHome() {
               ) : null}
             </SettingsGroup>
           ))}
+          {/* For the team: the admin console is on the web, opened in the browser (there is no console in the app). */}
+          {me?.role === 'admin' || me?.role === 'moderator' ? (
+            <SettingsGroup title={t('m.admin.group')}>
+              <SettingsLinkRow
+                icon="shield-checkmark-outline"
+                title={t('m.admin.title')}
+                desc={t('m.admin.desc')}
+                external
+                onPress={() => void Linking.openURL(`${webUrl}/admin`).catch(() => {})}
+              />
+            </SettingsGroup>
+          ) : null}
           <About />
         </>
       )}

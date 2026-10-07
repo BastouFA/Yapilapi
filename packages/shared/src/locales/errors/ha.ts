@@ -1288,4 +1288,14 @@ export const ha: Record<string, string> = {
   'This recording is too short.': 'Wannan rikodin ya yi gajarta sosai.',
   'Recordings can be up to 5 minutes, or 10 minutes with YAPILAPI Plus.': 'Rikodi zai iya kai minti 5, ko minti 10 da YAPILAPI Plus.',
   'Recordings can be up to 10 minutes.': 'Rikodi zai iya kai minti 10.',
+  // apps/api/src/modules/admin.ts and safety.ts (the admin console)
+  "Announcement doesn't exist or isn't visible to you.": 'Wannan sanarwar babu ita ko ba za ka iya ganinta ba.',
+  'Choose 7, 30 or 90 days.': 'Zaɓi kwanaki 7, 30 ko 90.',
+  'Its owner deleted this, so it can’t be restored.': 'Mai shi ya goge shi, don haka ba za a iya mayar da shi ba.',
+  "Problem report doesn't exist or isn't visible to you.": 'Wannan rahoton matsala babu shi ko ba za ka iya ganinsa ba.',
+  'This is already removed.': 'An riga an cire wannan.',
+  "This isn't removed.": 'Ba a cire wannan ba.',
+  'Use a web address that starts with https://, or a path in the app that starts with /.':
+    'Yi amfani da adireshin yanar gizo da ya fara da https://, ko hanya a cikin manhajar da ta fara da /.',
+  "You can't do this to your own account here.": 'Ba za ka iya yin wannan ga asusunka a nan ba.',
 };

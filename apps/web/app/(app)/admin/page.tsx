@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
   Badge,
@@ -13,7 +13,6 @@ import {
   SensitiveCover,
   Select,
   Skeleton,
-  Stat,
   Switch,
   Tabs,
   TextField,
@@ -30,6 +29,14 @@ import {
   type StorePurchasePolicy,
 } from '@yapilapi/shared';
 import { api, errorMessage, sharedRequest } from '@/lib/api';
+import { Announcements } from '@/components/admin/Announcements';
+import { Audit } from '@/components/admin/Audit';
+import { Content } from '@/components/admin/Content';
+import { Overview } from '@/components/admin/Overview';
+import { Payments } from '@/components/admin/Payments';
+import { Problems } from '@/components/admin/Problems';
+import { Choice, LoadFailed, Loading, useLoad } from '@/components/admin/shared';
+import { System } from '@/components/admin/System';
 import { useSession, type Session } from '../../providers';
 
 /** Moderation decisions (the server's codes) in plain words. Unknown codes are shown as they are. */
@@ -124,90 +131,55 @@ function caseHref(c: Record<string, any>): string | null {
 }
 
 /**
- * Something loaded from the API, with its error and a way to load it again. `data` is null while
- * loading (and after a failure until the next load succeeds).
- */
-function useLoad<T>(load: () => Promise<T>, deps: unknown[]) {
-  const [data, setData] = useState<T | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [attempt, setAttempt] = useState(0);
-  useEffect(() => {
-    let live = true;
-    setError(null);
-    load().then(
-      (r) => live && setData(r),
-      (e) => {
-        if (!live) return;
-        setData(null);
-        setError(errorMessage(e));
-      },
-    );
-    return () => {
-      live = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...deps, attempt]);
-  const reload = useCallback(() => setAttempt((n) => n + 1), []);
-  return { data, setData, error, reload };
-}
-
-/** Why a section couldn't load, with Try again. */
-function LoadFailed({ error, onRetry }: { error: string; onRetry: () => void }) {
-  const { t } = useSession();
-  return (
-    <Alert tone="danger" title={t('admin.loadFailed')}>
-      <span role="alert">{error}</span>{' '}
-      <Button size="sm" variant="secondary" onClick={onRetry}>
-        {t('m.common.retry')}
-      </Button>
-    </Alert>
-  );
-}
-
-function Loading() {
-  const { t } = useSession();
-  return (
-    <div className="stack" aria-busy aria-label={t('common.loading')}>
-      <Skeleton height={120} />
-      <Skeleton height={120} />
-    </div>
-  );
-}
-
-/**
  * Admin and moderation console. The UI is only a convenience: every endpoint
  * it calls enforces the moderator/admin role on the server.
  */
+const MOD_TABS = ['moderation', 'accounts', 'problems'] as const;
+const ADMIN_TABS = ['people', 'content', 'overview', 'system', 'flags', 'miniapps', 'regions', 'payments', 'payouts', 'announcements', 'audit'] as const;
+type Tab = (typeof MOD_TABS)[number] | (typeof ADMIN_TABS)[number];
+const TAB_LABELS: Record<Tab, MessageKey> = {
+  moderation: 'admin.tab.moderation',
+  accounts: 'admin.tab.accounts',
+  problems: 'admin.tab.problems',
+  people: 'admin.tab.people',
+  content: 'admin.tab.content',
+  overview: 'admin.tab.overview',
+  system: 'admin.tab.system',
+  flags: 'admin.tab.flags',
+  miniapps: 'admin.tab.miniApps',
+  regions: 'admin.tab.regions',
+  payments: 'admin.tab.payments',
+  payouts: 'admin.tab.payouts',
+  announcements: 'admin.tab.announcements',
+  audit: 'admin.tab.audit',
+};
+
 export default function Admin() {
   const { me, t } = useSession();
-  const [tab, setTab] = useState('moderation');
+  const tabs: Tab[] = me?.role === 'admin' ? [...MOD_TABS, ...ADMIN_TABS] : [...MOD_TABS];
+  const [tab, setTab] = useState<Tab>('moderation');
+  // The tab is in the address (/admin#people), so a link (back from an account's page) opens it.
+  useEffect(() => {
+    const fromHash = () => {
+      const h = location.hash.slice(1) as Tab;
+      if (tabs.includes(h)) setTab(h);
+    };
+    fromHash();
+    addEventListener('hashchange', fromHash);
+    return () => removeEventListener('hashchange', fromHash);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.role]);
   if (me?.role === 'user') return <EmptyState level={1} title={t('admin.only')} body={t('admin.onlyBody')} />;
+  const choose = (id: string) => {
+    setTab(id as Tab);
+    history.replaceState(null, '', `#${id}`);
+  };
   return (
     <div className="yp-shell__inner yp-shell__inner--wide">
       <div className="yp-topbar">
         <h1>{t('m.role.admin')}</h1>
       </div>
-      <Tabs
-        id="admin-tabs"
-        panelId="admin-panel"
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          { id: 'moderation', label: t('admin.tab.moderation') },
-          { id: 'accounts', label: t('admin.tab.accounts') },
-          ...(me?.role === 'admin'
-            ? [
-                { id: 'people', label: t('admin.tab.people') },
-                { id: 'overview', label: t('admin.tab.overview') },
-                { id: 'flags', label: t('admin.tab.flags') },
-                { id: 'miniapps', label: t('admin.tab.miniApps') },
-                { id: 'regions', label: t('admin.tab.regions') },
-                { id: 'payouts', label: t('admin.tab.payouts') },
-                { id: 'audit', label: t('admin.tab.audit') },
-              ]
-            : []),
-        ]}
-      />
+      <Tabs id="admin-tabs" panelId="admin-panel" value={tab} onChange={choose} tabs={tabs.map((id) => ({ id, label: t(TAB_LABELS[id]) }))} />
       {/* Cards in every tab sit straight under the page's h1. */}
       <CardHeadings level={2}>
         <div role="tabpanel" id="admin-panel" aria-labelledby={`admin-tabs-${tab}`}>
@@ -215,10 +187,16 @@ export default function Admin() {
             <Moderation />
           ) : tab === 'accounts' ? (
             <AccountSignals />
+          ) : tab === 'problems' ? (
+            <Problems />
           ) : tab === 'people' ? (
             <People />
+          ) : tab === 'content' ? (
+            <Content />
           ) : tab === 'overview' ? (
             <Overview />
+          ) : tab === 'system' ? (
+            <System />
           ) : tab === 'flags' ? (
             <div className="stack">
               <Flags />
@@ -228,8 +206,12 @@ export default function Admin() {
             <MiniAppReview />
           ) : tab === 'regions' ? (
             <RegionalRules />
+          ) : tab === 'payments' ? (
+            <Payments />
           ) : tab === 'payouts' ? (
             <Payouts />
+          ) : tab === 'announcements' ? (
+            <Announcements />
           ) : (
             <Audit />
           )}
@@ -624,7 +606,10 @@ function People() {
                 )
               }
             >
-              <Link href={`/u/${u.username}`}>{t('admin.people.profile')}</Link>
+              <div className="row">
+                <Link href={`/admin/users/${u.id}`}>{t('admin.people.details')}</Link>
+                <Link href={`/u/${u.username}`}>{t('admin.people.profile')}</Link>
+              </div>
             </Card>
           );
         })
@@ -658,44 +643,6 @@ function People() {
           <TextField label={t('admin.case.note')} multiline value={note} onChange={(e) => setNote(e.currentTarget.value)} maxLength={2000} />
         </div>
       </Dialog>
-    </div>
-  );
-}
-
-function Overview() {
-  const { t } = useSession();
-  const { data, error, reload } = useLoad(() => api.admin.summary(), []);
-  if (error) return <LoadFailed error={error} onRetry={reload} />;
-  if (!data) return <Loading />;
-  return (
-    <div className="stack">
-      <p className="muted">{t('admin.overview.northStar')}</p>
-      <div className="stats">
-        <Stat label={t('admin.overview.actions24h')} value={data.summary.meaningful_actions_24h} />
-        <Stat label={t('admin.overview.dau')} value={data.summary.dau} />
-        <Stat label={t('admin.overview.users')} value={data.summary.users} />
-        <Stat label={t('admin.overview.signups7d')} value={data.summary.signups_7d} />
-        <Stat label={t('admin.overview.openCases')} value={data.summary.open_cases} />
-        <Stat label={t('admin.overview.paidOrders7d')} value={data.summary.paid_orders_7d} />
-      </div>
-      <div className="table-wrap">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>{t('admin.overview.action7d')}</th>
-              <th>{t('admin.overview.count')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.meaningfulByAction.map((r) => (
-              <tr key={r.name}>
-                <td>{r.name.replace(/_/g, ' ')}</td>
-                <td style={{ fontVariantNumeric: 'tabular-nums' }}>{r.n}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }
@@ -841,40 +788,6 @@ function MiniAppReview() {
           </p>
         </Card>
       ))}
-    </div>
-  );
-}
-
-function Audit() {
-  const { t, locale } = useSession();
-  const { data, error, reload } = useLoad(() => api.admin.auditLogs(), []);
-  if (error) return <LoadFailed error={error} onRetry={reload} />;
-  if (!data) return <Loading />;
-  return (
-    // It scrolls sideways on a phone, so it can be focused and scrolled with the arrow keys.
-    <div className="table-wrap" tabIndex={0} role="region" aria-label={t('admin.tab.audit')}>
-      <table className="table">
-        <thead>
-          <tr>
-            <th>{t('admin.audit.when')}</th>
-            <th>{t('admin.audit.action')}</th>
-            <th>{t('admin.audit.entity')}</th>
-            <th>{t('admin.audit.actor')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.items.map((l) => (
-            <tr key={l.id}>
-              <td>{new Date(l.created_at).toLocaleString(locale)}</td>
-              <td>{l.action}</td>
-              <td>
-                {l.entity_type} {l.entity_id?.slice(0, 8)}
-              </td>
-              <td>{l.actor_username ? `@${l.actor_username}` : (l.actor_id?.slice(0, 8) ?? t('admin.audit.system'))}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
@@ -1076,9 +989,19 @@ function RegionalRules() {
 }
 
 /** Payouts waiting for a decision: who asked, what they still have in that currency, and where it would go. Approving sends it. */
+const PAYOUT_STATUS: Record<AdminPayout['status'], MessageKey> = {
+  pending: 'admin.payouts.status.pending',
+  verified: 'admin.payouts.status.verified',
+  processing: 'admin.payouts.status.processing',
+  paid: 'admin.payouts.status.paid',
+  failed: 'admin.payouts.status.failed',
+};
+
+/** Payouts by status, waiting ones first. Waiting ones can be approved (which sends them) or turned down. */
 function Payouts() {
   const { toast, locale, t } = useSession();
-  const { data, error, reload } = useLoad(() => api.admin.payouts(), []);
+  const [status, setStatus] = useState<AdminPayout['status']>('pending');
+  const { data, error, reload } = useLoad(() => api.admin.payouts(status), [status]);
   const items: AdminPayout[] | null = data?.items ?? null;
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const act = async (run: () => Promise<unknown>) => {
@@ -1091,19 +1014,25 @@ function Payouts() {
   };
   return (
     <Card title={t('admin.tab.payouts')} subtitle={t('admin.payouts.subtitle')}>
+      <Choice
+        label={t('admin.case.show')}
+        value={status}
+        onChange={setStatus}
+        options={(Object.keys(PAYOUT_STATUS) as AdminPayout['status'][]).map((id) => ({ id, label: t(PAYOUT_STATUS[id]) }))}
+      />
       {error ? (
         <LoadFailed error={error} onRetry={reload} />
       ) : items === null ? (
         <Loading />
       ) : !items.length ? (
-        <EmptyState title={t('admin.payouts.empty')} />
+        <EmptyState title={status === 'pending' ? t('admin.payouts.empty') : t('admin.payouts.emptyOther')} />
       ) : null}
       <div className="stack">
         {items?.map((p) => (
           <div key={p.id} className="stack-sm" style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
             <div className="row" style={{ alignItems: 'baseline' }}>
               <strong>{formatMoney(p.amount_cents, p.currency, locale)}</strong>
-              <span>@{p.username ?? p.user_id}</span>
+              <Link href={`/admin/users/${p.user_id}`}>@{p.username ?? p.user_id}</Link>
               <span className="muted">{formatRelativeTime(p.created_at, locale)}</span>
             </div>
             <div className="row">
@@ -1111,25 +1040,36 @@ function Payouts() {
                 {t('admin.payouts.available', { amount: formatMoney(p.available_cents, p.currency, locale) })}
               </Badge>
               <Badge tone={p.account_ready ? 'neutral' : 'danger'}>{p.account_ready ? (p.account_label ?? p.currency) : t('admin.payouts.noAccount')}</Badge>
+              {p.status !== 'pending' ? (
+                <Badge tone={p.status === 'failed' ? 'danger' : p.status === 'paid' ? 'success' : 'neutral'}>{t(PAYOUT_STATUS[p.status])}</Badge>
+              ) : null}
             </div>
-            <div className="row" style={{ alignItems: 'flex-end' }}>
-              <Button disabled={!p.account_ready || p.available_cents < 0} onClick={() => act(() => api.admin.approvePayout(p.id))}>
-                {t('admin.payouts.approve')}
-              </Button>
-              <TextField
-                label={t('admin.payouts.reason')}
-                value={reasons[p.id] ?? ''}
-                onChange={(e) => setReasons({ ...reasons, [p.id]: e.currentTarget.value })}
-                maxLength={300}
-              />
-              <Button
-                variant="secondary"
-                disabled={(reasons[p.id] ?? '').trim().length < 3}
-                onClick={() => act(() => api.admin.rejectPayout(p.id, reasons[p.id]!.trim()))}
-              >
-                {t('admin.payouts.reject')}
-              </Button>
-            </div>
+            {p.status !== 'pending' ? (
+              p.failure_reason || p.paid_at ? (
+                <p className="muted" style={{ margin: 0 }}>
+                  {p.failure_reason ?? t('admin.payouts.paidOn', { when: formatRelativeTime(p.paid_at!, locale) })}
+                </p>
+              ) : null
+            ) : (
+              <div className="row" style={{ alignItems: 'flex-end' }}>
+                <Button disabled={!p.account_ready || p.available_cents < 0} onClick={() => act(() => api.admin.approvePayout(p.id))}>
+                  {t('admin.payouts.approve')}
+                </Button>
+                <TextField
+                  label={t('admin.payouts.reason')}
+                  value={reasons[p.id] ?? ''}
+                  onChange={(e) => setReasons({ ...reasons, [p.id]: e.currentTarget.value })}
+                  maxLength={300}
+                />
+                <Button
+                  variant="secondary"
+                  disabled={(reasons[p.id] ?? '').trim().length < 3}
+                  onClick={() => act(() => api.admin.rejectPayout(p.id, reasons[p.id]!.trim()))}
+                >
+                  {t('admin.payouts.reject')}
+                </Button>
+              </div>
+            )}
           </div>
         ))}
       </div>

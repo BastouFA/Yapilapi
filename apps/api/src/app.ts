@@ -43,6 +43,7 @@ import commerceModule from './modules/commerce.ts';
 import searchModule from './modules/search.ts';
 import notificationsModule from './modules/notifications.ts';
 import safetyModule from './modules/safety.ts';
+import adminModule from './modules/admin.ts';
 import privacyModule from './modules/privacy.ts';
 import aiModule from './modules/ai.ts';
 import momentsModule from './modules/moments.ts';
@@ -444,6 +445,7 @@ export async function buildApp(
     searchModule,
     notificationsModule,
     safetyModule,
+    adminModule,
     privacyModule,
     aiModule,
     momentsModule,

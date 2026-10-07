@@ -152,6 +152,8 @@ import type {
   MarketRadius,
   MarketRating,
   PublicListingPreview,
+  AdminContentKind,
+  AdminPeriod,
 } from '@yapilapi/shared';
 
 export class ApiError extends Error {
@@ -1871,6 +1873,11 @@ export function createClient(opts: ClientOptions) {
           `/v1/ads/campaigns/${id}/stats`,
         ),
     },
+    /** A note from the team to everyone, shown at the top of the app until it ends or you close it. */
+    announcements: {
+      current: () => get<{ announcement: Announcement | null }>('/v1/announcements/current'),
+      dismiss: (id: string) => post<{ dismissed: true }>(`/v1/announcements/${id}/dismiss`),
+    },
     family: {
       list: () => get<{ items: FamilyLink[] }>('/v1/family'),
       invite: (username: string) => post<{ link: { id: string; status: string } }>('/v1/family/invite', { username }),
@@ -1893,7 +1900,33 @@ export function createClient(opts: ClientOptions) {
       /** Approve or turn down a Mini App; a reason for turning it down is shown to its developer. */
       decideMiniApp: (id: string, approve: boolean, reason?: string) =>
         post<{ id: string; status: string }>(`/v1/admin/mini-apps/${id}/decide`, reason ? { approve, reason } : { approve }),
-      auditLogs: () => get<{ items: Record<string, any>[] }>('/v1/admin/audit-logs'),
+      /** The audit trail, newest first, 100 at a time; `action` matches from its start ("user." for every account change). */
+      auditLogs: (f: AuditLogFilters = {}) => get<{ items: AuditLogEntry[]; nextCursor: string | null }>(`/v1/admin/audit-logs${qs({ ...f })}`),
+      /** Counts per day over 7, 30 or 90 days, with totals and the change from the period before. */
+      series: (days: AdminPeriod = 30) => get<AdminSeries>(`/v1/admin/analytics/series${qs({ days })}`),
+      /** The database, Redis, the job queue, webhooks and the build that is running. */
+      system: () => get<AdminSystem>('/v1/admin/system'),
+      /** One account in detail: profile, sign-ins (never tokens), posts, cases, money and risk. */
+      user: (id: string) => get<AdminUserDetail>(`/v1/admin/users/${id}`),
+      signOutEverywhere: (id: string) => post<{ revoked: number }>(`/v1/admin/users/${id}/sign-out-everywhere`),
+      confirmEmail: (id: string) => post<{ emailConfirmed: true }>(`/v1/admin/users/${id}/confirm-email`),
+      /** Posts, reels, comments, listings, communities and events, newest first. */
+      content: (f: { kind: AdminContentKind; q?: string; status?: 'all' | 'visible' | 'removed'; cursor?: string }) =>
+        get<{ items: AdminContentItem[]; nextCursor: string | null }>(`/v1/admin/content${qs({ ...f })}`),
+      /** Remove one thing, the way a moderation decision does: the author is told and can appeal. */
+      removeContent: (kind: AdminContentKind, id: string, reason: string) => post<{ removed: true }>(`/v1/admin/content/${kind}/${id}/remove`, { reason }),
+      restoreContent: (kind: AdminContentKind, id: string) => post<{ removed: false }>(`/v1/admin/content/${kind}/${id}/restore`),
+      announcements: () => get<{ items: AdminAnnouncement[] }>('/v1/admin/announcements'),
+      createAnnouncement: (b: { title: string; body: string; linkUrl?: string | null; startsAt?: string; endsAt?: string | null }) =>
+        post<{ announcement: Announcement }>('/v1/admin/announcements', b),
+      endAnnouncement: (id: string) => post<{ announcement: Announcement }>(`/v1/admin/announcements/${id}/end`),
+      /** Orders, payments and refunds over 7, 30 or 90 days, and the newest orders. */
+      payments: (days: AdminPeriod = 30) => get<AdminPayments>(`/v1/admin/payments${qs({ days })}`),
+      /** Open problem reports from Settings > Help (moderators too). */
+      problems: () => get<{ items: ProblemReportItem[] }>('/v1/admin/problems'),
+      closeProblem: (id: string) => post<{ status: 'closed' }>(`/v1/admin/problems/${id}/close`),
+      /** AI calls over the last 7 days, by task, provider, model and outcome. */
+      aiCalls: () => get<{ items: AiCallSummary[] }>('/v1/admin/ai/calls'),
       payouts: (status: AdminPayout['status'] = 'pending') => get<{ items: AdminPayout[] }>(`/v1/admin/payouts${qs({ status })}`),
       approvePayout: (id: string) => post<{ status: 'verified' }>(`/v1/admin/payouts/${id}/verify`),
       rejectPayout: (id: string, reason: string) => post<{ status: 'failed' }>(`/v1/admin/payouts/${id}/reject`, { reason }),
@@ -2115,6 +2148,204 @@ export interface PayoutAccount {
   label: string | null;
   /** The smallest payout in this currency. */
   minCents?: number;
+}
+
+/** An announcement as written by the team (shown as-is, in the language it was written in). */
+export interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  /** https://… or a path in the app (/settings/privacy). */
+  linkUrl: string | null;
+  startsAt: string;
+  endsAt: string | null;
+  createdAt: string;
+}
+
+export interface AdminAnnouncement extends Announcement {
+  createdBy: string | null;
+  dismissals: number;
+  state: 'active' | 'scheduled' | 'ended';
+}
+
+export type AdminSeriesMetric = 'signups' | 'active' | 'posts' | 'reels' | 'comments' | 'messages' | 'reports' | 'paidOrders';
+
+export interface AdminSeries {
+  days: number;
+  from: string;
+  to: string;
+  series: ({ day: string } & Record<AdminSeriesMetric, number>)[];
+  totals: Record<AdminSeriesMetric, number>;
+  previous: Record<AdminSeriesMetric, number>;
+  /** Whole percent from the period before; null when there was nothing to compare with. */
+  change: Record<AdminSeriesMetric, number | null>;
+}
+
+export interface AdminSystem {
+  database: { ok: boolean; latencyMs: number | null };
+  redis: 'ok' | 'degraded' | 'not_configured';
+  jobs: {
+    pending: number;
+    due: number;
+    scheduled: number;
+    running: number;
+    failed: number;
+    failed24h: number;
+    oldestPendingSeconds: number | null;
+    recentFailures: { id: string; kind: string; attempts: number; error: string; createdAt: string; finishedAt: string | null }[];
+  };
+  webhooks: { failed: number; pending: number };
+  app: { commit: string | null; environment: string; node: string; uptimeSeconds: number; ai: string; email: string; payments: string; storage: string };
+  serverTime: string;
+}
+
+export interface AdminMoney {
+  currency: string;
+  count: number;
+  cents: number;
+}
+
+export interface AdminUserDetail {
+  user: {
+    id: string;
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+    bio: string;
+    isPrivate: boolean;
+    profileType: 'personal' | 'creator' | 'professional' | 'business';
+    country: string | null;
+    locale: string | null;
+    email: string;
+    emailConfirmed: boolean;
+    phone: string | null;
+    phoneConfirmed: boolean;
+    twoStep: boolean;
+    minor: boolean;
+    role: 'user' | 'moderator' | 'admin';
+    status: 'active' | 'suspended' | 'deleted';
+    deleted: boolean;
+    devData: boolean;
+    createdAt: string;
+    lastActiveAt: string | null;
+  };
+  /** The admin is looking at their own account: actions on it are refused. */
+  self: boolean;
+  counts: { posts: number; reels: number; followers: number; following: number; friends: number; reportsMade: number; reportsAgainst: number };
+  posts: {
+    id: string;
+    format: 'post' | 'reel';
+    kind: string;
+    body: string;
+    visibility: string;
+    moderationStatus: 'normal' | 'review' | 'restricted' | 'removed';
+    deleted: boolean;
+    createdAt: string;
+  }[];
+  cases: {
+    id: string;
+    targetType: string;
+    targetId: string;
+    source: string;
+    status: string;
+    decision: string | null;
+    note: string | null;
+    createdAt: string;
+    decidedAt: string | null;
+  }[];
+  sessions: {
+    id: string;
+    userAgent: string | null;
+    ip: string | null;
+    device: string | null;
+    platform: string | null;
+    createdAt: string;
+    lastSeenAt: string;
+    expiresAt: string;
+  }[];
+  devices: { id: string; name: string | null; platform: string | null; createdAt: string; lastSeenAt: string | null }[];
+  securityEvents: { id: string; type: string; ip: string | null; userAgent: string | null; createdAt: string }[];
+  money: { bought: AdminMoney[]; sold: AdminMoney[]; payouts: (AdminMoney & { status: string })[] };
+  risk: { score: number; openSignals: number; restrictedAt: string | null };
+  /** What the team did to this account (the audit log). */
+  adminActions: { id: string; action: string; actor: string | null; metadata: Record<string, unknown>; createdAt: string }[];
+}
+
+export interface AdminContentItem {
+  kind: AdminContentKind;
+  id: string;
+  text: string;
+  author: { id: string; username: string; displayName: string } | null;
+  createdAt: string;
+  moderationStatus: 'normal' | 'review' | 'restricted' | 'removed';
+  removed: boolean;
+  /** Deleted by its author, not by moderation: there is nothing to restore. */
+  deletedByOwner: boolean;
+  href: string | null;
+}
+
+export interface AdminPayments {
+  days: number;
+  byStatus: (AdminMoney & { status: string })[];
+  byProvider: (AdminMoney & { provider: string; status: string })[];
+  refunds: (AdminMoney & { status: string })[];
+  recent: {
+    id: string;
+    status: string;
+    purpose: string;
+    amountCents: number;
+    feeCents: number;
+    currency: string;
+    provider: string | null;
+    buyer: { id: string; username: string | null } | null;
+    seller: { id: string; username: string | null } | null;
+    createdAt: string;
+    paidAt: string | null;
+  }[];
+}
+
+export interface AuditLogFilters {
+  action?: string;
+  actor?: string;
+  entityType?: string;
+  entityId?: string;
+  /** YYYY-MM-DD, UTC, both included. */
+  from?: string;
+  to?: string;
+  cursor?: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  actor_id: string | null;
+  actor_username: string | null;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  ip: string | null;
+  request_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface ProblemReportItem {
+  id: string;
+  body: string;
+  platform: 'web' | 'ios' | 'android' | 'other';
+  app_version: string | null;
+  page: string | null;
+  status: string;
+  created_at: string;
+  username: string | null;
+}
+
+export interface AiCallSummary {
+  task: string;
+  provider: string;
+  model: string;
+  status: string;
+  n: string | number;
+  avg_ms: number | null;
 }
 
 export interface AdminPayout {

@@ -3,6 +3,8 @@ import { refundUnspentBudget } from '../lib/ad-refunds.ts';
 import type { FastifyInstance } from 'fastify';
 import { tx } from '@yapilapi/database';
 import {
+  ADMIN_CONTENT_KINDS,
+  type AdminContentKind,
   appealSchema,
   decisionsFor,
   FEATURE_FLAG_KEYS,
@@ -16,6 +18,7 @@ import { z } from 'zod';
 import { AppError, badRequest, conflict, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { audit, getFlags, notify } from '../lib/services.ts';
+import { decodeCursor, encodeCursor } from '../lib/cursor.ts';
 import { storePurchasePolicy } from '../lib/store-purchases.ts';
 import { applyMediaDecision } from '../lib/media-moderation.ts';
 import { notifyReleasedPosts } from '../lib/collabs.ts';
@@ -198,6 +201,15 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
        FROM problem_reports r LEFT JOIN profiles pr ON pr.user_id = r.user_id WHERE r.status = 'open' ORDER BY r.created_at DESC LIMIT 200`,
     );
     return { items: rows };
+  });
+
+  /** A problem report that has been looked at leaves the list. */
+  app.post('/v1/admin/problems/:id/close', { preHandler: requireRole('moderator', 'admin') }, async (req) => {
+    const { id } = parse(idParam, req.params);
+    const r = await db.query(`UPDATE problem_reports SET status = 'closed' WHERE id = $1 AND status = 'open' RETURNING id`, [id]);
+    if (!r.rowCount) throw notFound('Problem report');
+    await audit(db, { actorId: me(req).id, action: 'problem_report.close', entityType: 'problem_report', entityId: id, ip: req.ip, requestId: req.id });
+    return { status: 'closed' };
   });
 
   // ── Moderator console ─────────────────────────────────────────────────
@@ -532,6 +544,114 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       );
     }
   }
+
+  // ── Content browser (admin console) ───────────────────────────────────
+  /**
+   * An admin removes or restores one thing directly, without a report. A removal is recorded as a
+   * decided case about it, like one from the queue, and goes through the same steps (applyDecision):
+   * feeds and counts follow, the author is told and can appeal. Restoring undoes the latest removal
+   * (undoDecision), so something its author deleted first stays deleted.
+   */
+  const contentKind = z.object({ kind: z.enum(ADMIN_CONTENT_KINDS), id: z.string().uuid() });
+  async function contentTarget(c: PoolClient, kind: AdminContentKind, id: string) {
+    const q: Record<AdminContentKind, string> = {
+      post: `SELECT author_id AS uid, moderation_status, deleted_at FROM posts WHERE id = $1 AND format = 'post' AND status = 'published' FOR UPDATE`,
+      reel: `SELECT author_id AS uid, moderation_status, deleted_at FROM posts WHERE id = $1 AND format = 'reel' AND status = 'published' FOR UPDATE`,
+      comment: `SELECT author_id AS uid, moderation_status, deleted_at FROM comments WHERE id = $1 FOR UPDATE`,
+      listing: `SELECT seller_id AS uid, moderation_status, deleted_at FROM market_listings WHERE id = $1 FOR UPDATE`,
+      community: `SELECT owner_id AS uid, NULL AS moderation_status, deleted_at FROM communities WHERE id = $1 FOR UPDATE`,
+      event: `SELECT host_id AS uid, NULL AS moderation_status, deleted_at FROM events WHERE id = $1 FOR UPDATE`,
+    };
+    const { rows } = await c.query<{ uid: string | null; moderation_status: string | null; deleted_at: Date | null }>(q[kind], [id]);
+    if (!rows[0]) throw notFound('That item');
+    return { targetType: kind === 'reel' ? 'post' : kind, ...rows[0] };
+  }
+
+  app.post('/v1/admin/content/:kind/:id/remove', { preHandler: requireRole('admin') }, async (req) => {
+    const admin = me(req);
+    const { kind, id } = parse(contentKind, req.params);
+    const { reason } = parse(z.object({ reason: z.string().trim().min(3).max(2000) }), req.body);
+    await tx(db, async (c) => {
+      const target = await contentTarget(c, kind, id);
+      if (target.moderation_status === 'removed' || (target.moderation_status === null && target.deleted_at)) throw badRequest('This is already removed.');
+      const mc = await c.query<{ id: string }>(
+        `INSERT INTO moderation_cases (target_type, target_id, subject_user_id, source, risk, status, decision, reviewer_id, note, decided_at)
+         VALUES ($1, $2, $3, 'admin', 'review', 'decided', 'remove', $4, $5, now()) RETURNING id`,
+        [target.targetType, id, target.uid, admin.id, reason],
+      );
+      const caseId = mc.rows[0]!.id;
+      await applyDecision(c, { target_type: target.targetType, target_id: id, subject_user_id: target.uid }, 'remove');
+      if (target.uid) {
+        await c.query(`INSERT INTO enforcements (case_id, user_id, action) VALUES ($1, $2, 'remove')`, [caseId, target.uid]);
+        // Told the same way as a decision from the queue, and they can appeal it.
+        await notify(c, ctx.realtime, {
+          userId: target.uid,
+          category: 'moderation',
+          type: 'enforcement',
+          entityType: 'moderation_case',
+          entityId: caseId,
+          data: { decision: 'remove', canAppeal: true, targetType: target.targetType },
+        });
+      }
+      await audit(c, {
+        actorId: admin.id,
+        action: 'content.remove',
+        entityType: target.targetType,
+        entityId: id,
+        ip: req.ip,
+        requestId: req.id,
+        metadata: { kind, caseId, reason, authorId: target.uid },
+      });
+    });
+    return { removed: true };
+  });
+
+  app.post('/v1/admin/content/:kind/:id/restore', { preHandler: requireRole('admin') }, async (req) => {
+    const admin = me(req);
+    const { kind, id } = parse(contentKind, req.params);
+    await tx(db, async (c) => {
+      const target = await contentTarget(c, kind, id);
+      const removed = target.moderation_status === 'removed' || (target.moderation_status === null && !!target.deleted_at);
+      if (!removed) throw badRequest("This isn't removed.");
+      const mc = (
+        await c.query<{ id: string; target_type: string; target_id: string; subject_user_id: string | null; status: string; decided_at: Date }>(
+          `SELECT id, target_type, target_id, subject_user_id, status, decided_at FROM moderation_cases
+           WHERE target_type = $1 AND target_id = $2 AND decision = 'remove' AND status IN ('decided', 'appealed', 'final')
+           ORDER BY decided_at DESC LIMIT 1 FOR UPDATE`,
+          [target.targetType, id],
+        )
+      ).rows[0];
+      if (mc) {
+        await undoDecision(c, mc, 'remove');
+        // The removal's penalty ends, an appeal waiting on it is answered, and the case says it was reversed.
+        await c.query(`UPDATE enforcements SET expires_at = now() WHERE case_id = $1 AND (expires_at IS NULL OR expires_at > now())`, [mc.id]);
+        await c.query(`UPDATE appeals SET status = 'overturned', reviewer_id = $2, decided_at = now() WHERE case_id = $1 AND status = 'open'`, [
+          mc.id,
+          admin.id,
+        ]);
+        await c.query(`UPDATE moderation_cases SET status = 'final', decision = 'no_action', reviewer_id = $2 WHERE id = $1`, [mc.id, admin.id]);
+      } else if (target.moderation_status === 'removed') {
+        // Removed without a case (a confirmed spam signal): only its state changes.
+        await c.query(`UPDATE ${CONTENT_TABLES[target.targetType]} SET moderation_status = 'normal' WHERE id = $1 AND moderation_status = 'removed'`, [id]);
+      }
+      const after = await contentTarget(c, kind, id);
+      if (after.moderation_status === 'removed' || after.deleted_at) throw badRequest('Its owner deleted this, so it can’t be restored.');
+      if (target.targetType === 'comment') {
+        const post = await c.query(`SELECT post_id FROM comments WHERE id = $1`, [id]);
+        if (post.rows[0]) await syncCommentCounts(c, post.rows[0].post_id);
+      }
+      await audit(c, {
+        actorId: admin.id,
+        action: 'content.restore',
+        entityType: target.targetType,
+        entityId: id,
+        ip: req.ip,
+        requestId: req.id,
+        metadata: { kind, caseId: mc?.id ?? null, authorId: target.uid },
+      });
+    });
+    return { removed: false };
+  });
 
   // ── Account risk (spam and bot signals) ───────────────────────────────
   // Accounts with open signals, or limited after repeated flags. Moderators clear
@@ -872,12 +992,45 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
     return { role };
   });
 
-  app.get('/v1/admin/audit-logs', { preHandler: requireRole('admin') }, async () => {
-    const { rows } = await db.query(
-      `SELECT l.id, l.actor_id, pr.username AS actor_username, l.action, l.entity_type, l.entity_id, host(l.ip) AS ip, l.request_id, l.metadata, l.created_at
-       FROM audit_logs l LEFT JOIN profiles pr ON pr.user_id = l.actor_id ORDER BY l.id DESC LIMIT 200`,
+  /**
+   * The audit trail, newest first, 100 at a time. Filters: what was done (`action`, from its start:
+   * "user." finds every change to accounts), who did it (`actor`, a username), what it was about
+   * (`entityType`, and `entityId` for one thing) and when (`from` and `to`, days in UTC, both included).
+   */
+  app.get('/v1/admin/audit-logs', { preHandler: requireRole('admin') }, async (req) => {
+    const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+    const q = parse(
+      z.object({
+        action: z.string().trim().max(100).optional(),
+        actor: z.string().trim().max(100).optional(),
+        entityType: z.string().trim().max(50).optional(),
+        entityId: z.string().trim().max(100).optional(),
+        from: day.optional(),
+        to: day.optional(),
+        cursor: z.string().max(200).optional(),
+      }),
+      req.query,
     );
-    return { items: rows };
+    const c = decodeCursor<{ id: string }>(q.cursor);
+    const where: string[] = [];
+    const args: unknown[] = [];
+    const arg = (v: unknown) => `$${args.push(v)}`;
+    if (q.action) where.push(`l.action LIKE ${arg(q.action.replace(/[\\%_]/g, '\\$&') + '%')}`);
+    if (q.actor) where.push(`lower(pr.username) = lower(${arg(q.actor.replace(/^@/, ''))})`);
+    if (q.entityType) where.push(`l.entity_type = ${arg(q.entityType)}`);
+    if (q.entityId) where.push(`l.entity_id = ${arg(q.entityId)}`);
+    if (q.from) where.push(`l.created_at >= ${arg(q.from)}::date::timestamp AT TIME ZONE 'UTC'`);
+    if (q.to) where.push(`l.created_at < (${arg(q.to)}::date + 1)::timestamp AT TIME ZONE 'UTC'`);
+    if (c) where.push(`l.id < ${arg(c.id)}::bigint`);
+    const limit = 100;
+    const { rows } = await db.query(
+      `SELECT l.id::text AS id, l.actor_id, pr.username AS actor_username, l.action, l.entity_type, l.entity_id, host(l.ip) AS ip, l.request_id, l.metadata, l.created_at
+       FROM audit_logs l LEFT JOIN profiles pr ON pr.user_id = l.actor_id
+       ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY l.id DESC LIMIT ${limit + 1}`,
+      args,
+    );
+    const page = rows.slice(0, limit);
+    return { items: page, nextCursor: rows.length > limit ? encodeCursor({ id: page[page.length - 1]!.id }) : null };
   });
 
   app.get('/v1/admin/analytics/summary', { preHandler: requireRole('admin') }, async () => {

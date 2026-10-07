@@ -1284,4 +1284,14 @@ export const sw: Record<string, string> = {
   'This recording is too short.': 'Rekodi hii ni fupi mno.',
   'Recordings can be up to 5 minutes, or 10 minutes with YAPILAPI Plus.': 'Rekodi zinaweza kuwa hadi dakika 5, au dakika 10 ukiwa na YAPILAPI Plus.',
   'Recordings can be up to 10 minutes.': 'Rekodi zinaweza kuwa hadi dakika 10.',
+  // apps/api/src/modules/admin.ts and safety.ts (the admin console)
+  "Announcement doesn't exist or isn't visible to you.": 'Tangazo hili halipo au huwezi kuliona.',
+  'Choose 7, 30 or 90 days.': 'Chagua siku 7, 30 au 90.',
+  'Its owner deleted this, so it can’t be restored.': 'Mmiliki wake alilifuta, kwa hiyo haliwezi kurejeshwa.',
+  "Problem report doesn't exist or isn't visible to you.": 'Ripoti hii ya tatizo haipo au huwezi kuiona.',
+  'This is already removed.': 'Hiki tayari kimeondolewa.',
+  "This isn't removed.": 'Hiki hakijaondolewa.',
+  'Use a web address that starts with https://, or a path in the app that starts with /.':
+    'Tumia anwani ya wavuti inayoanza na https://, au njia ndani ya programu inayoanza na /.',
+  "You can't do this to your own account here.": 'Huwezi kufanya hivi kwa akaunti yako mwenyewe hapa.',
 };

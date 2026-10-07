@@ -1256,4 +1256,13 @@ export const ar: Record<string, string> = {
   'This recording is too short.': 'هذا التسجيل قصير جدًا.',
   'Recordings can be up to 5 minutes, or 10 minutes with YAPILAPI Plus.': 'يمكن أن تصل مدة التسجيل إلى 5 دقائق، أو 10 دقائق مع YAPILAPI Plus.',
   'Recordings can be up to 10 minutes.': 'يمكن أن تصل مدة التسجيل إلى 10 دقائق.',
+  // apps/api/src/modules/admin.ts and safety.ts (the admin console)
+  "Announcement doesn't exist or isn't visible to you.": 'هذا الإعلان غير موجود أو لا يمكنك رؤيته.',
+  'Choose 7, 30 or 90 days.': 'اختر 7 أو 30 أو 90 يومًا.',
+  'Its owner deleted this, so it can’t be restored.': 'حذفه صاحبه، لذا لا يمكن استعادته.',
+  "Problem report doesn't exist or isn't visible to you.": 'بلاغ المشكلة هذا غير موجود أو لا يمكنك رؤيته.',
+  'This is already removed.': 'تمت إزالته بالفعل.',
+  "This isn't removed.": 'لم تتم إزالته.',
+  'Use a web address that starts with https://, or a path in the app that starts with /.': 'استخدم عنوان ويب يبدأ بـ https://، أو مسارًا في التطبيق يبدأ بـ /.',
+  "You can't do this to your own account here.": 'لا يمكنك فعل هذا بحسابك هنا.',
 };

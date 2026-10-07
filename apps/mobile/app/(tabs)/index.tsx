@@ -6,6 +6,7 @@ import type { FeedMode } from '../../../../packages/shared/src/constants';
 import type { Post } from '../../../../packages/shared/src/types';
 import type { MessageKey } from '../../../../packages/shared/src/i18n';
 import { client, errorMessage } from '../../lib/api';
+import { AnnouncementCard } from '../../lib/announcement';
 import { onBackOnline } from '../../lib/network';
 import { PulseEmpty } from '../../lib/empty';
 import { useT } from '../../lib/i18n';
@@ -160,6 +161,8 @@ function Feed() {
         keyExtractor={(p) => p.id}
         ListHeaderComponent={
           <View style={{ gap: space[3] }}>
+            {/* A note from the team to everyone, until it ends or you close it. */}
+            <AnnouncementCard />
             <StoriesStrip groups={stories} onOpen={setViewing} onCreate={() => router.push({ pathname: '/camera', params: { mode: 'story' } })} />
             {/* After 12 hours or more away: a summary of what your people shared, on request. */}
             <CatchUpCard />
