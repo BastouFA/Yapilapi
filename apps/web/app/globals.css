@@ -11645,3 +11645,10 @@ button.profile-song__play::after {
   max-width: 640px;
   margin: 0 auto var(--space-2);
 }
+/* A page's title bar pulls itself up to the top edge (a negative margin); under Back it stays
+   below it instead, so it never covers the button. */
+.page-back + * > .yp-topbar:first-child,
+.page-back + .yp-topbar {
+  margin-top: 0;
+  padding-top: var(--space-2);
+}
