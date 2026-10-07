@@ -370,3 +370,15 @@ export const ROOM_TITLE_MAX = 120;
 export const ROOM_REACTIONS = ['heart', 'star', 'sparkle', 'check', 'music'] as const;
 export type RoomReaction = (typeof ROOM_REACTIONS)[number];
 export type RoomStatus = 'scheduled' | 'live' | 'ended' | 'cancelled';
+/**
+ * Admin console. What the Content tab lists, and can remove and restore through the same steps as a
+ * moderation decision (a post or reel, a comment, a Market listing, a community, an event).
+ */
+export const ADMIN_CONTENT_KINDS = ['post', 'reel', 'comment', 'listing', 'community', 'event'] as const;
+export type AdminContentKind = (typeof ADMIN_CONTENT_KINDS)[number];
+/** The periods the Overview's trends and the Payments summary cover, in days. */
+export const ADMIN_PERIODS = [7, 30, 90] as const;
+export type AdminPeriod = (typeof ADMIN_PERIODS)[number];
+/** Announcements to everyone: a title, a few lines, and an optional link (https://, or a path in the app). */
+export const ANNOUNCEMENT_TITLE_MAX = 120;
+export const ANNOUNCEMENT_BODY_MAX = 2000;

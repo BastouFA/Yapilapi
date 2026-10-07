@@ -3466,6 +3466,213 @@ video.chat-att__media {
   max-height: 320px;
   object-fit: contain;
 }
+.admin-trends .yp-stat__delta {
+  color: var(--ink-muted);
+}
+.admin-charts {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+}
+.admin-chart {
+  margin: 0;
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.admin-chart__title {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: 14px;
+  font-weight: 600;
+}
+.admin-chart__title .muted {
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.admin-chart__plot {
+  display: block;
+  width: 100%;
+  height: 96px;
+}
+.admin-chart__base {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.admin-chart__bar {
+  fill: var(--yapi);
+  opacity: 0.85;
+}
+.admin-chart__bar--on {
+  opacity: 1;
+  fill: var(--yapi-strong);
+}
+.admin-chart__axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+.admin-facts {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  margin: 0;
+}
+.admin-facts dt {
+  font: 600 12px/16px var(--font-sans);
+  color: var(--ink-muted);
+}
+.admin-facts dd {
+  margin: 2px 0 0;
+}
+.admin-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.admin-list__item {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  min-width: 0;
+}
+.admin-list__text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.admin-plain {
+  margin: 0;
+  padding-inline-start: var(--space-4);
+  display: grid;
+  gap: var(--space-1);
+  overflow-wrap: anywhere;
+}
+.admin-subhead {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: 14px;
+}
+.admin-quote {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-inline-start: 3px solid var(--line-strong);
+  background: var(--surface-sunken);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 160px;
+  overflow: auto;
+}
+.admin-pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.admin-json {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  font: 12px/18px var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.admin-caption {
+  caption-side: top;
+  text-align: start;
+  padding: var(--space-3) 0 var(--space-2);
+  font-weight: 600;
+}
+.admin-filters {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr));
+  align-items: start;
+}
+.admin-filters__buttons {
+  align-self: end;
+}
+.admin-user__head {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.admin-user__head h1 {
+  font-size: 24px;
+  line-height: 30px;
+  overflow-wrap: anywhere;
+}
+
+/* An announcement from the team, at the top of the signed-in app. */
+.announcement-slot {
+  max-width: 640px;
+  margin: 0 auto var(--space-4);
+}
+.announcement {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-inline-start: 4px solid var(--saffron);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 21px;
+}
+.announcement > svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  margin-top: 1px;
+  color: var(--ink-muted);
+}
+.announcement__body {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+}
+.announcement__title {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.announcement__text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.announcement__close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-block: -10px;
+  margin-inline-end: -12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.announcement__close:hover {
+  color: var(--ink);
+}
+.announcement__close:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
 
 /* ─── Photo and video editor (Create) ───────────────────────────────── */
 .ed {

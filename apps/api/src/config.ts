@@ -173,6 +173,8 @@ const schema = z.object({
   MUSIC_LICENSED_API_KEY: z.string().default(''),
   /** The partner's name as the music picker shows it. */
   MUSIC_LICENSED_NAME: z.string().default('Licensed catalogue'),
+  /** The commit being run, which Render sets on every deploy; shown in the admin console's System tab. Unset elsewhere. */
+  RENDER_GIT_COMMIT: z.string().default(''),
   /** Generated "[Dev data]" tones for development and tests. Unset: on outside production; never on in production. */
   MUSIC_DEV_PROVIDER: z
     .string()

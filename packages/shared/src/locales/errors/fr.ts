@@ -1303,4 +1303,14 @@ export const fr: Record<string, string> = {
   'This recording is too short.': 'Cet enregistrement est trop court.',
   'Recordings can be up to 5 minutes, or 10 minutes with YAPILAPI Plus.': 'Un enregistrement peut durer jusqu’à 5 minutes, ou 10 minutes avec YAPILAPI Plus.',
   'Recordings can be up to 10 minutes.': 'Un enregistrement peut durer jusqu’à 10 minutes.',
+  // apps/api/src/modules/admin.ts and safety.ts (the admin console)
+  "Announcement doesn't exist or isn't visible to you.": 'Cette annonce n’existe pas ou tu ne peux pas la voir.',
+  'Choose 7, 30 or 90 days.': 'Choisis 7, 30 ou 90 jours.',
+  'Its owner deleted this, so it can’t be restored.': 'Son propriétaire l’a supprimé, il ne peut donc pas être rétabli.',
+  "Problem report doesn't exist or isn't visible to you.": 'Ce signalement de problème n’existe pas ou tu ne peux pas le voir.',
+  'This is already removed.': 'C’est déjà retiré.',
+  "This isn't removed.": 'Ce n’est pas retiré.',
+  'Use a web address that starts with https://, or a path in the app that starts with /.':
+    'Utilise une adresse web qui commence par https://, ou un chemin de l’app qui commence par /.',
+  "You can't do this to your own account here.": 'Tu ne peux pas faire ça à ton propre compte ici.',
 };

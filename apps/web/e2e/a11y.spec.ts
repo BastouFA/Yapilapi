@@ -866,12 +866,17 @@ const ADMIN_TABS: [string, string, (page: Page) => Promise<void>][] = [
     },
   ],
   ['account signals', 'Account signals', async () => {}],
+  ['problems', 'Problems', async () => {}],
   ['people', 'People', async (page) => void (await expect(page.getByRole('searchbox', { name: 'Username or email' })).toBeVisible())],
-  ['overview', 'Overview', async () => {}],
+  ['content', 'Content', async (page) => void (await expect(page.getByRole('searchbox', { name: 'Search the text or a username' })).toBeVisible())],
+  ['overview', 'Overview', async (page) => void (await expect(page.getByRole('figure').first()).toBeVisible())],
+  ['system', 'System', async (page) => void (await expect(page.getByText('Background jobs')).toBeVisible())],
   ['flags', 'Feature flags', async (page) => void (await expect(page.getByRole('switch').first()).toBeVisible())],
   ['mini apps', 'Mini Apps', async (page) => void (await expect(page.getByText('Supper polls').first()).toBeVisible())],
   ['regional rules', 'Regional rules', async () => {}],
+  ['payments', 'Payments', async (page) => void (await expect(page.getByText('Orders by status')).toBeVisible())],
   ['payouts', 'Payouts', async () => {}],
+  ['announcements', 'Announcements', async (page) => void (await expect(page.getByRole('textbox', { name: 'Title' })).toBeVisible())],
   ['audit log', 'Audit log', async (page) => void (await expect(page.getByRole('table')).toBeVisible())],
 ];
 

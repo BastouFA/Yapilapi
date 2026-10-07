@@ -1269,4 +1269,14 @@ export const yo: Record<string, string> = {
   'This recording is too short.': 'Ohùn yìí kúrú jù.',
   'Recordings can be up to 5 minutes, or 10 minutes with YAPILAPI Plus.': 'Ohùn tí a gbà sílẹ̀ lè gùn tó ìṣẹ́jú 5, tàbí ìṣẹ́jú 10 pẹ̀lú YAPILAPI Plus.',
   'Recordings can be up to 10 minutes.': 'Ohùn tí a gbà sílẹ̀ lè gùn tó ìṣẹ́jú 10.',
+  // apps/api/src/modules/admin.ts and safety.ts (the admin console)
+  "Announcement doesn't exist or isn't visible to you.": 'Ìkéde yìí kò sí tàbí o kò lè rí i.',
+  'Choose 7, 30 or 90 days.': 'Yan ọjọ́ 7, 30 tàbí 90.',
+  'Its owner deleted this, so it can’t be restored.': 'Ẹni tó ni ín ti pa á rẹ́, nítorí náà a kò lè dá a padà.',
+  "Problem report doesn't exist or isn't visible to you.": 'Ìròyìn ìṣòro yìí kò sí tàbí o kò lè rí i.',
+  'This is already removed.': 'A ti yọ èyí kúrò tẹ́lẹ̀.',
+  "This isn't removed.": 'A kò yọ èyí kúrò.',
+  'Use a web address that starts with https://, or a path in the app that starts with /.':
+    'Lo àdírẹ́sì wẹ́ẹ̀bù tí ó bẹ̀rẹ̀ pẹ̀lú https://, tàbí ọ̀nà inú áàpù tí ó bẹ̀rẹ̀ pẹ̀lú /.',
+  "You can't do this to your own account here.": 'O kò lè ṣe èyí sí àkọọ́lẹ̀ tìrẹ níbí.',
 };
