@@ -146,16 +146,27 @@ h3 {
   align-items: center;
   color: var(--ink-muted);
 }
-.lang-pick > svg {
+/* The globe and the arrow are drawn over the box, the same in every browser: the box itself has
+   no native look (Safari's own select ignored the room left for the globe and drew over it). */
+.lang-pick__globe,
+.lang-pick__chevron {
   position: absolute;
-  inset-inline-start: 12px;
+  z-index: 1;
   pointer-events: none;
 }
+.lang-pick__globe {
+  inset-inline-start: 12px;
+}
+.lang-pick__chevron {
+  inset-inline-end: 12px;
+}
 .lang-pick__select {
+  -webkit-appearance: none;
+  appearance: none;
   min-height: 44px;
   max-width: 100%;
   padding-block: 0;
-  padding-inline: 38px 12px;
+  padding-inline: 38px 36px;
   font: 500 14px/20px var(--font-sans);
   color: var(--ink);
   background: var(--surface);

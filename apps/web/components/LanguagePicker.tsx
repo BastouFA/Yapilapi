@@ -24,7 +24,7 @@ export function LanguagePicker({ className }: { className?: string }) {
   const current = picked ?? (SUPPORTED_LOCALES.includes(locale.split('-')[0]!) ? locale.split('-')[0]! : 'en');
   return (
     <div className={['lang-pick', className].filter(Boolean).join(' ')}>
-      <Icon name="globe" size={18} />
+      <Icon name="globe" size={18} className="lang-pick__globe" />
       <label htmlFor={id} className="yp-visually-hidden">
         {t('settings.language')}
       </label>
@@ -44,6 +44,7 @@ export function LanguagePicker({ className }: { className?: string }) {
           </option>
         ))}
       </select>
+      <Icon name="chevron-down" size={16} className="lang-pick__chevron" />
     </div>
   );
 }
