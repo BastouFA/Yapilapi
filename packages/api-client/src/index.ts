@@ -62,6 +62,7 @@ import type {
   PostVersion,
   DraftDetail,
   EditPostInput,
+  PostCoverInput,
   Profile,
   PublicCommunityPreview,
   PublicSitemap,
@@ -481,6 +482,24 @@ export function createClient(opts: ClientOptions) {
       remove: (id: string) => del(`/v1/posts/${id}`),
       /** Change your post's text, who can see it, or its photo descriptions. */
       edit: (id: string, b: EditPostInput) => patch<{ post: Post; moderation?: ModerationNotice }>(`/v1/posts/${id}`, b),
+      /**
+       * Change the cover of your post or reel. A video of it (`mediaId`): a moment (`atMs`), one of
+       * your uploaded photos (`imageMediaId`, optional `crop`; fitted to the video's shape) or back
+       * to the default (`reset: true`). A post with several photos or videos: which comes first (`coverMediaId`).
+       */
+      setCover: (id: string, b: PostCoverInput) => put<{ post: Post }>(`/v1/posts/${id}/cover`, b),
+      /** setCover, trying again while a just-uploaded photo (or the video) is still being prepared (up to about a minute). */
+      setCoverWhenReady: async (id: string, b: PostCoverInput, o: { intervalMs?: number; timeoutMs?: number } = {}) => {
+        const started = Date.now();
+        for (;;) {
+          try {
+            return await put<{ post: Post }>(`/v1/posts/${id}/cover`, b);
+          } catch (e) {
+            if (!(e instanceof ApiError) || e.code !== 'media_processing' || Date.now() - started > (o.timeoutMs ?? 60_000)) throw e;
+          }
+          await new Promise((r) => setTimeout(r, o.intervalMs ?? 1200));
+        }
+      },
       /** Every version of an edited post's text, newest first. */
       history: (id: string) => get<{ items: PostVersion[] }>(`/v1/posts/${id}/history`),
       like: (id: string) => put<{ liked: boolean; likes: number }>(`/v1/posts/${id}/reaction`, { kind: 'like' }),

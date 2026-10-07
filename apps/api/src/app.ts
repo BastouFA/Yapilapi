@@ -73,6 +73,7 @@ import collagesModule from './modules/collages.ts';
 import echoesModule from './modules/echoes.ts';
 import tagsModule from './modules/tags.ts';
 import collabsModule from './modules/collabs.ts';
+import postCoversModule from './modules/post-covers.ts';
 import soundsModule from './modules/sounds.ts';
 import plusModule from './modules/plus.ts';
 import invitesModule from './modules/invites.ts';
@@ -92,6 +93,7 @@ import { sweepTogethers } from './lib/together.ts';
 import { mediaJobHandlers } from './lib/media-processing.ts';
 import { studioJobHandlers } from './lib/studio.ts';
 import { editorJobHandlers } from './lib/media-edit.ts';
+import { videoCoverJobHandlers } from './lib/video-covers.ts';
 import { liveRecordingJobHandlers } from './lib/live-recording.ts';
 import { shareVideoJobHandlers } from './lib/share-video.ts';
 import { recapJobHandlers } from './lib/recaps.ts';
@@ -460,6 +462,7 @@ export async function buildApp(
     wrapsModule,
     tagsModule,
     collabsModule,
+    postCoversModule,
     soundsModule,
     musicModule,
     mixesModule,
@@ -513,6 +516,7 @@ export async function buildApp(
     ...mediaJobHandlers({ db, storage, moderator: ctx.mediaModerator, realtime: ctx.realtime }),
     ...studioJobHandlers({ db, storage, transcription: ctx.transcription, log: app.log }),
     ...editorJobHandlers({ db, storage, log: app.log }),
+    ...videoCoverJobHandlers({ storage }),
     ...liveRecordingJobHandlers({ db, storage, recordingsDir: config.LIVE_RECORDINGS_DIR }),
     ...shareVideoJobHandlers({ db, storage }),
     // Recap videos from Memories and Chapters.

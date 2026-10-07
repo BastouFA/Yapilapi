@@ -1265,4 +1265,13 @@ export const ar: Record<string, string> = {
   "This isn't removed.": 'لم تتم إزالته.',
   'Use a web address that starts with https://, or a path in the app that starts with /.': 'استخدم عنوان ويب يبدأ بـ https://، أو مسارًا في التطبيق يبدأ بـ /.',
   "You can't do this to your own account here.": 'لا يمكنك فعل هذا بحسابك هنا.',
+  'Your video is still being prepared. Try again in a moment.': 'لا يزال الفيديو الخاص بك قيد التجهيز. حاول مرة أخرى بعد لحظات.',
+  'Choose a moment in the video.': 'اختر لحظة من الفيديو.',
+  'We couldn’t take a cover from this moment. Try another one.': 'لم نتمكن من أخذ غلاف من هذه اللحظة. جرّب لحظة أخرى.',
+  'Only the person who shared this post can change its cover.': 'يمكن فقط للشخص الذي شارك هذا المنشور تغيير غلافه.',
+  'Only a post with more than one photo or video has a cover to choose.': 'فقط المنشور الذي يضم أكثر من صورة أو فيديو له غلاف يمكن اختياره.',
+  'Choose a video of this post.': 'اختر فيديو من هذا المنشور.',
+  'This video was not uploaded here, so its cover can’t be changed.': 'لم يُرفع هذا الفيديو هنا، لذا لا يمكن تغيير غلافه.',
+  'Choose one cover.': 'اختر غلافًا واحدًا.',
+  'Choose a video or a photo.': 'اختر فيديو أو صورة.',
 };

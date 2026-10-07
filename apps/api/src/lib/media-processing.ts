@@ -126,6 +126,41 @@ async function processImage(deps: ProcessDeps, m: MediaRow) {
   }
 }
 
+export interface StoredPoster {
+  url: string;
+  /** The small poster for feeds on Data saver (variants.thumb), when it could be made. */
+  thumb: string | null;
+  /** The tiny blurred preview (data URI), when it could be made. */
+  placeholder: string | null;
+  bytes: { poster: number; thumb?: number };
+}
+
+/**
+ * Store a video's poster frame and what is made from it: a small poster for feeds on Data saver
+ * and a tiny blurred preview, like photos have (shown while loading, and as the locked preview of a
+ * reel for subscribers). Used for the default poster and for covers people choose (lib/video-covers.ts).
+ */
+export async function storePoster(storage: MediaStorage, jpg: Buffer, keys: { poster: string; thumb: string }): Promise<StoredPoster> {
+  const poster = await storage.putKey(keys.poster, jpg, 'image/jpeg');
+  const tiny = await sharp(jpg)
+    .resize({ width: 16 })
+    .webp({ quality: 40 })
+    .toBuffer()
+    .catch(() => null);
+  const thumbWebp = await sharp(jpg)
+    .resize({ width: IMAGE_SIZES.thumb, withoutEnlargement: true })
+    .webp({ quality: 70 })
+    .toBuffer()
+    .catch(() => null);
+  const thumb = thumbWebp ? (await storage.putKey(keys.thumb, thumbWebp, 'image/webp')).url : null;
+  return {
+    url: poster.url,
+    thumb,
+    placeholder: tiny ? `data:image/webp;base64,${tiny.toString('base64')}` : null,
+    bytes: thumbWebp ? { poster: jpg.length, thumb: thumbWebp.length } : { poster: jpg.length },
+  };
+}
+
 async function processVideo(deps: ProcessDeps, m: MediaRow) {
   const { id, key } = m;
   const dir = await mkdtemp(path.join(tmpdir(), 'ypl-video-'));
@@ -255,30 +290,15 @@ async function processVideo(deps: ProcessDeps, m: MediaRow) {
       () => false,
     );
     const posterJpg = await readFile(path.join(dir, 'poster.jpg'));
-    const poster = await deps.storage.putKey(`${base}_poster.jpg`, posterJpg, 'image/jpeg');
-    // A tiny blurred preview of the poster frame, like photos have: shown while loading, and as the locked preview of a reel for subscribers.
-    const tiny = await sharp(posterJpg)
-      .resize({ width: 16 })
-      .webp({ quality: 40 })
-      .toBuffer()
-      .catch(() => null);
-    // A small poster for feeds on Data saver.
-    const thumbWebp = await sharp(posterJpg)
-      .resize({ width: IMAGE_SIZES.thumb, withoutEnlargement: true })
-      .webp({ quality: 70 })
-      .toBuffer()
-      .catch(() => null);
+    const poster = await storePoster(deps.storage, posterJpg, { poster: `${base}_poster.jpg`, thumb: `${base}_thumb.webp` });
     const mp4 = await deps.storage.putFile(path.join(dir, 'web.mp4'), 'mp4', 'video/mp4', `${base}_web.mp4`);
     const variants: Record<string, string> = { mp4: mp4.url };
     const bytes: Record<string, number> = {
       original: (await stat(input)).size,
       mp4: (await stat(path.join(dir, 'web.mp4'))).size,
-      poster: posterJpg.length,
+      ...poster.bytes,
     };
-    if (thumbWebp) {
-      variants.thumb = (await deps.storage.putKey(`${base}_thumb.webp`, thumbWebp, 'image/webp')).url;
-      bytes.thumb = thumbWebp.length;
-    }
+    if (poster.thumb) variants.thumb = poster.thumb;
     if (low) {
       variants.mp4_360 = (await deps.storage.putFile(path.join(dir, 'low.mp4'), 'mp4', 'video/mp4', `${base}_360.mp4`)).url;
       bytes.mp4_360 = (await stat(path.join(dir, 'low.mp4'))).size;
@@ -301,7 +321,7 @@ async function processVideo(deps: ProcessDeps, m: MediaRow) {
       `UPDATE media SET poster_url = $2, hls_url = $3, variants = $4, status = 'ready',
                         duration_ms = coalesce($5, duration_ms), width = coalesce(width, $6), height = coalesce(height, $7),
                         blurhash = coalesce($8, blurhash), variant_bytes = $9 WHERE id = $1`,
-      [id, poster.url, hls, variants, info.durationMs, info.width, info.height, tiny ? `data:image/webp;base64,${tiny.toString('base64')}` : null, bytes],
+      [id, poster.url, hls, variants, info.durationMs, info.width, info.height, poster.placeholder, bytes],
     );
     if (deps.moderator && deps.moderator.name !== 'none') {
       // The poster plus a few frames sampled across the video.

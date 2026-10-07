@@ -3834,6 +3834,68 @@ video.chat-att__media {
   margin: 0;
   font-size: 13px;
 }
+/* Covers of posts and reels: the cover now, and the photo or video chosen to come first. */
+.cover-ed__current {
+  flex: none;
+  width: 44px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+.cover-pick {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.cover-pick__row {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding: 4px 2px;
+}
+.cover-pick__item {
+  position: relative;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--surface-sunken);
+}
+.cover-pick__item[data-on] {
+  border-color: var(--yapi);
+}
+.cover-pick__item:focus-within {
+  box-shadow: var(--focus-ring);
+}
+.cover-pick__item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cover-pick__radio {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.cover-pick__badge {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  padding: 1px 4px;
+  background: rgb(0 0 0 / 0.72);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  pointer-events: none;
+}
 .ed__filters {
   display: flex;
   gap: var(--space-2);
@@ -4200,6 +4262,28 @@ span.cam__icon {
   cursor: pointer;
 }
 .thumb-tag:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+/* Which photo comes first, and so is the post's cover. */
+.thumb-cover {
+  min-height: 44px;
+  padding: 4px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--ink);
+  font: 600 12px/1.2 var(--font-sans);
+  cursor: pointer;
+}
+.thumb-cover--on {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-color: var(--yapi);
+  cursor: default;
+}
+.thumb-cover:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }

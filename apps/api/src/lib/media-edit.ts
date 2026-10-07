@@ -26,6 +26,9 @@ import {
 import type { MediaStorage } from './storage.ts';
 import { mediaJobHandlers, probe, run } from './media-processing.ts';
 import type { JobLog } from './failures.ts';
+import { tx } from '@yapilapi/database';
+import { frameOf, storeCover } from './video-cover-render.ts';
+import { putCover } from './video-covers.ts';
 
 /**
  * The photo and video editor's renderer. A look (filter) and the colour adjustments are one
@@ -393,7 +396,8 @@ export async function renderEditorJob(deps: EditDeps, renderId: string): Promise
   const resultId = job.result_media_id as string;
   try {
     if (!job.storage_key || (job.second_media_id && !job.second_key)) throw new Error('The original file is no longer stored.');
-    let cover: Buffer | null = null;
+    // Set inside the render's temp folder callback (so TypeScript can't follow it).
+    const chosen: { cover: { jpg: Buffer; atMs: number } | null } = { cover: null };
     if (job.kind === 'image') {
       const out = p.dual
         ? await renderDual(await deps.storage.read(job.storage_key), await deps.storage.read(job.second_key), p.dual.corner)
@@ -416,9 +420,7 @@ export async function renderEditorJob(deps: EditDeps, renderId: string): Promise
         if (p.coverMs !== undefined) {
           // The cover is picked on the original's timeline; take it from the edited video so it has the look and text.
           const at = Math.max(0, Math.min(durationMs - 50, p.coverMs - (p.trim?.startMs ?? 0)));
-          const poster = path.join(dir, 'cover.jpg');
-          await run(['-ss', (at / 1000).toFixed(3), '-i', output, '-frames:v', '1', '-vf', 'scale=1280:-2', '-q:v', '3', poster]);
-          cover = await readFile(poster);
+          chosen.cover = { jpg: await frameOf(output, dir, at), atMs: at };
         }
         const stored = await deps.storage.putFile(output, 'mp4', 'video/mp4');
         await deps.db.query(`UPDATE media SET url = $2, storage_key = $3, mime = 'video/mp4', size_bytes = $4, duration_ms = $5 WHERE id = $1`, [
@@ -432,10 +434,12 @@ export async function renderEditorJob(deps: EditDeps, renderId: string): Promise
     }
     // The normal processing, run here so the cover and the finished state land after it.
     await mediaJobHandlers(deps)['media.process']({ mediaId: resultId });
+    const cover = chosen.cover;
     if (cover) {
+      // Put up like a cover chosen after posting (poster, thumb and preview), so it can be changed or reset the same way.
       const key = (await deps.db.query(`SELECT storage_key FROM media WHERE id = $1`, [resultId])).rows[0].storage_key as string;
-      const poster = await deps.storage.putKey(`${key.replace(/\.[^.]+$/, '')}_cover.jpg`, cover, 'image/jpeg');
-      await deps.db.query(`UPDATE media SET poster_url = $2 WHERE id = $1`, [resultId, poster.url]);
+      const stored = await storeCover(deps.storage, key, cover.jpg);
+      await tx(deps.db, (c) => putCover(c, resultId, stored, { atMs: cover.atMs, imageMediaId: null }));
     }
     await deps.db.query(`UPDATE media_editor_renders SET status = 'done', finished_at = now() WHERE id = $1`, [renderId]);
   } catch (err) {

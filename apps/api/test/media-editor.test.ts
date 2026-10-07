@@ -359,7 +359,8 @@ describe('POST /v1/media/:id/edit', () => {
     expect(m.durationMs).toBeLessThan(1400);
     expect(m.variants.mp4).toBeTruthy();
     expect(m.hlsUrl).toBeTruthy();
-    expect(m.posterUrl).toMatch(/_cover\.jpg$/);
+    expect(m.posterUrl).toMatch(/_cover_[0-9a-f]{8}\.jpg$/);
+    expect(m.variants.thumb).toMatch(/_cover_[0-9a-f]{8}_thumb\.webp$/);
     // Check the stored file itself: length after the trim, no sound.
     const key = (await t.ctx.db.query(`SELECT storage_key FROM media WHERE id = $1`, [id])).rows[0].storage_key;
     const file = path.join(dir, 'out.mp4');

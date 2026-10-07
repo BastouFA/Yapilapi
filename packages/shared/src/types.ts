@@ -207,6 +207,10 @@ export interface MediaItem {
   sensitive?: boolean;
   /** Photos in a post: people tagged in it. Absent when nobody is. */
   tags?: PhotoTag[];
+  /** Videos: the person who shared it chose the cover (a moment, or a photo) instead of the default one. */
+  customCover?: true;
+  /** Videos with a chosen moment as their cover: where it is, in ms from the start. */
+  coverMs?: number;
 }
 
 /** A person tagged in a photo, at a spot given as fractions of the photo's width and height (0 to 1, from the top left). */
