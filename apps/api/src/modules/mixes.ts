@@ -22,6 +22,7 @@ import type { AppContext } from '../lib/context.ts';
 import { isLite } from '../lib/data-saver.ts';
 import { AppError, badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import { enqueue } from '../lib/jobs.ts';
+import { pushNewMessage } from '../lib/message-push.ts';
 import {
   MIX_FROM,
   MIX_SUMMARY,
@@ -503,6 +504,7 @@ export function registerMixChats(app: FastifyInstance, ctx: AppContext, h: ChatH
       const others = (await h.notBlocking(u.id, await h.memberIds(input.conversationId))).filter((m) => m !== u.id);
       await ctx.realtime.publish([u.id], { type: 'message.created', data: message });
       await ctx.realtime.publish(others, { type: 'message.created', data: forOthers });
+      await pushNewMessage({ db, realtime: ctx.realtime }, sent.id);
       track(db, u.id, 'mix_shared', { to: 'chat' });
     }
     reply.code(sent.inserted ? 201 : 200);

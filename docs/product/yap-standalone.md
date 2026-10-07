@@ -39,8 +39,9 @@ same accounts, API and chats as YAPILAPI. Details and how to run it: `apps/yap/R
   it's installed (`yapilapi://…`), and the web otherwise. `yap://chat/<id>` and the web's `/yap/<id>`
   open a chat in Yap.
 - **Push:** Yap registers its phone with `app: 'yap'`, and the API sends it only chats and calls
-  (calls, Yaps, chat reminders, view-once screenshots, location, Market offers) and sign-in alerts,
-  titled "Yap". YAPILAPI still gets everything. Plain text messages don't push in either app yet.
+  (new messages, calls, Yaps, chat reminders, view-once screenshots, location, Market offers) and
+  sign-in alerts, titled "Yap". YAPILAPI still gets everything. New messages push in both apps
+  (`apps/api/src/lib/message-push.ts`), one per chat while it's unread.
 - **Store setup:** `apps/yap/eas.json` mirrors the phone app's (production and preview point at
   `https://api.yapilapi.com` and `https://yapilapi.com`). Yap needs its own `eas init` (EAS project id),
   App Store and Google Play listings, push credentials and `google-services.json`.
@@ -51,4 +52,4 @@ Not done yet:
   app signs in on its own today.
 - Web links opening Yap (associated domains / Android app links for `/yap/*`), and "Open in Yap"
   from YAPILAPI's Yap tab when Yap is installed.
-- An archive of chats (the API has none), and pushes for plain text messages.
+- An archive of chats (the API has none), and muting one chat.

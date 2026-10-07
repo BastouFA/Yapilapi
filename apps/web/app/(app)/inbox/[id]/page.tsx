@@ -19,6 +19,7 @@ import { AIPanel, BottomSheet, Button, ChatBubble, EmptyState, Icon, Menu, Skele
 import type { ChatGame, Conversation, Message, ScheduledMessage } from '@yapilapi/shared';
 import { api, errorMessage, isGone } from '@/lib/api';
 import { useChatBase } from '@/lib/chat-base';
+import { closeChatNotifications } from '@/lib/push';
 import { GroupInfoSheet } from '@/components/GroupInfo';
 import { ReportSheet } from '@/components/PostList';
 import { useRealtime, useSession } from '../../../providers';
@@ -170,6 +171,7 @@ export default function ChatPage() {
         setMessages(r.items);
         setCursor(r.nextCursor);
         void api.conversations.read(id).catch(() => {});
+        void closeChatNotifications(id);
         // What was unread here is read now.
         setUnread({ messages: Math.max(0, unread.messages - c.conversation.unreadCount) });
       },

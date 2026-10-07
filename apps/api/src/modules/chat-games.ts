@@ -23,6 +23,7 @@ import type { AppContext } from '../lib/context.ts';
 import { GAME_COLS, gameById, presentGames, publishGame, publishLine, saveGameMove, scheduleIdleEnd, type GameRow } from '../lib/chat-games.ts';
 import { AppError, badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import { enqueue } from '../lib/jobs.ts';
+import { pushNewMessage } from '../lib/message-push.ts';
 import { assertMessagePace } from '../lib/spam.ts';
 import { isBlockedEitherWay } from '../lib/users.ts';
 import { me, requireAuth, type AuthUser } from '../plugins/auth.ts';
@@ -174,8 +175,11 @@ export function registerChatGames(app: FastifyInstance, ctx: AppContext, h: Chat
     });
     const message = await h.loadMessage(messageId.id, u.id);
     if (!message) throw notFound('Message');
-    if (messageId.inserted)
+    if (messageId.inserted) {
       await ctx.realtime.publish(await h.notBlocking(u.id, await h.memberIds(conversationId)), { type: 'message.created', data: message });
+      // A new game pushes like any message (moves don't).
+      await pushNewMessage({ db, realtime: ctx.realtime }, messageId.id);
+    }
     return message;
   }
 

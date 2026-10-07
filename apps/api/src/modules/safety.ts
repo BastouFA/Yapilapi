@@ -18,6 +18,7 @@ import { z } from 'zod';
 import { AppError, badRequest, conflict, notFound, parse } from '../lib/errors.ts';
 import type { AppContext } from '../lib/context.ts';
 import { audit, getFlags, notify } from '../lib/services.ts';
+import { pushNewMessage } from '../lib/message-push.ts';
 import { decodeCursor, encodeCursor } from '../lib/cursor.ts';
 import { storePurchasePolicy } from '../lib/store-purchases.ts';
 import { applyMediaDecision } from '../lib/media-moderation.ts';
@@ -528,7 +529,7 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       });
   }
 
-  /** Let held messages through and tell the conversation, so they show up without a reload. */
+  /** Let held messages through and tell the conversation, so they show up without a reload (and push, like a new message). */
   async function releaseMessages(c: { query: typeof db.query }, ids: string[]) {
     if (!ids.length) return;
     const { rows } = await c.query(
@@ -542,6 +543,7 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
         members.rows.map((m) => m.user_id),
         { type: 'message.released', data: { id: r.id, conversationId: r.conversation_id } },
       );
+      await pushNewMessage({ db: c as PoolClient, realtime: ctx.realtime }, r.id);
     }
   }
 

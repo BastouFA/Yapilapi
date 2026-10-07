@@ -96,3 +96,19 @@ export async function stopPushForThisAccount() {
     // The API also forgets addresses that stop working.
   }
 }
+
+/**
+ * Opening a chat: the notifications about its new messages already on this phone go (the API
+ * clears its own when the chat is read). Calls are left alone.
+ */
+export async function dismissChatNotifications(conversationId: string) {
+  try {
+    for (const n of await Notifications.getPresentedNotificationsAsync()) {
+      const data = (n.request.content.data ?? {}) as { type?: string; entityType?: string; entityId?: string };
+      if ((data.type === 'message' || data.type === 'yap_received') && data.entityType === 'conversation' && data.entityId === conversationId)
+        await Notifications.dismissNotificationAsync(n.request.identifier);
+    }
+  } catch {
+    // Not available in this environment (for example a web preview).
+  }
+}

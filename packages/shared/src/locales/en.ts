@@ -6518,6 +6518,11 @@ export const en = {
   'push.board_invite': '{name} invited you to add to a board',
   'push.chapter_opened': 'A time capsule you are part of has opened',
   'push.yap_received': '{name} sent you a Yap',
+  // A new message: who sent it (and in which group) and what it is, or how many came in.
+  'push.message': '{name}: {text}',
+  'push.message.group': '{name} in {group}: {text}',
+  'push.message.count.one': 'New message',
+  'push.message.count.other': '{count} new messages',
   'push.view_once_screenshot': '{name} took a screenshot of your view-once photo or video',
   'push.chat_reminder': 'You asked to be reminded about a message',
   'push.scheduled_post_failed': "A scheduled post couldn't be published. It's back in your drafts",

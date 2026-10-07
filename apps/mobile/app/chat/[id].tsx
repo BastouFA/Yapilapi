@@ -40,6 +40,7 @@ import {
   userText,
 } from '../../lib/ui';
 import { onBackOnline } from '../../lib/network';
+import { dismissChatNotifications } from '../../lib/push';
 import { formatList } from '../../../../packages/shared/src/feed-reasons';
 import { ViewOnceBubble } from '../../lib/view-once';
 import { useMicInUse, Waveform, YAP_MAX_MS, YAP_MIN_MS } from '../../lib/yaps';
@@ -185,6 +186,7 @@ export default function Chat() {
       atBottom.current = true;
       for (const ms of [150, 500, 1200]) setTimeout(() => atBottom.current && list.current?.scrollToEnd({ animated: false }), ms);
       void api.conversations.read(id).catch(() => {});
+      void dismissChatNotifications(id);
       void loadPins();
       setError(null);
     } catch (e) {

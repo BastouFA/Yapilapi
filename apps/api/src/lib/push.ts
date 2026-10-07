@@ -2,7 +2,7 @@ import webpush from 'web-push';
 import type { Pool } from 'pg';
 // Every language, loaded up front: a push is written in its recipient's.
 import { t, tp, type MessageKey } from '@yapilapi/shared/i18n';
-import { milestoneNoticeText } from '@yapilapi/shared';
+import { messagePreviewText, milestoneNoticeText, type MessagePreview } from '@yapilapi/shared';
 import type { Config } from '../config.ts';
 
 export interface PushMessage {
@@ -22,6 +22,7 @@ export type PushSender = (userId: string, msg: PushMessage) => Promise<void>;
  * (modules/push.ts); everything else goes to YAPILAPI and the browser only.
  */
 export const YAP_APP_PUSH_TYPES: ReadonlySet<string> = new Set([
+  'message',
   'call_incoming',
   'yap_received',
   'view_once_screenshot',
@@ -50,7 +51,8 @@ export function createPushSender(db: Pool, config: Config, fetchImpl: typeof fet
           await webpush.sendNotification({ endpoint: s.endpoint, keys: s.keys }, JSON.stringify(msg), { TTL: 3600 });
         } else if (s.kind === 'expo') {
           const yap = s.keys?.app === 'yap';
-          if (yap && !YAP_APP_PUSH_TYPES.has(msg.tag ?? '')) continue;
+          // The notification's type (a new message's tag also names its chat).
+          if (yap && !YAP_APP_PUSH_TYPES.has(msg.data?.type ?? msg.tag ?? '')) continue;
           const res = await fetchImpl('https://exp.host/--/api/v2/push/send', {
             method: 'POST',
             headers: { 'content-type': 'application/json', accept: 'application/json' },
@@ -102,6 +104,35 @@ function addedText(name: string, d: Data, locale: string): string {
 function listing(d: Data, fallback: MessageKey, locale: string): string {
   return typeof d.title === 'string' && d.title ? d.title : t(fallback, locale);
 }
+/**
+ * A new message (lib/message-push.ts): "Ada: See you at six", "Ada in Family: Photo", or "Ada: 3 new
+ * messages" once several came in. `d.preview` is the message as the recipient sees it, `d.chat` a
+ * group's name, `d.private` a disappearing message.
+ */
+function messageText(name: string, d: Data, locale: string): string {
+  const count = Math.max(1, Number(d.count ?? 1) || 1);
+  const preview = d.preview as MessagePreview | undefined;
+  const text = count > 1 || !preview ? tp('push.message.count', count, locale) : messageLine(preview, !!d.private, locale);
+  const chat = typeof d.chat === 'string' && d.chat ? d.chat : null;
+  return chat ? t('push.message.group', locale, { name, group: chat, text }) : t('push.message', locale, { name, text });
+}
+
+/**
+ * One message, as the chat list says it (a photo, a poll, a reply to your story), shortened. A
+ * disappearing message only says what it is ("Photo", "Voice message", "New message"), never its
+ * words, a poll's question or a title; view once already never says more.
+ */
+function messageLine(p: MessagePreview, hidden: boolean, locale: string): string {
+  const tr = { t: (key: MessageKey, vars?: Record<string, string | number>) => t(key, locale, vars), locale };
+  if (hidden) {
+    if (p.viewOnce || p.yap || p.kind === 'location' || p.kind === 'game') return messagePreviewText(p, tr);
+    if (!p.kind && !p.storyReply && p.attachmentKind) return messagePreviewText({ ...p, body: '' }, tr);
+    return tp('push.message.count', 1, locale);
+  }
+  const line = [...messagePreviewText(p, tr).replace(/\s+/g, ' ').trim()];
+  return line.length > 100 ? `${line.slice(0, 99).join('').trimEnd()}…` : line.join('');
+}
+
 /** The stand-in at the start of a sentence ("Your listing ends in 3 days"). */
 const capitalized = (s: string, locale: string) => (s ? s[0]!.toLocaleUpperCase(locale) + s.slice(1) : s);
 
@@ -176,6 +207,8 @@ const TEXT: Record<string, Text> = {
   // Posts added to a shared board are batched in the inbox and never pushed.
   board_invite: say('push.board_invite'),
   chapter_opened: say('push.chapter_opened'),
+  // New messages in a chat: one per chat while unread, saying how many (lib/message-push.ts).
+  message: messageText,
   yap_received: say('push.yap_received'),
   view_once_screenshot: say('push.view_once_screenshot'),
   // A reminder you set yourself on a chat message (there is no one else in it).

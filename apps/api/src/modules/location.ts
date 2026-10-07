@@ -15,6 +15,7 @@ import type { AppContext } from '../lib/context.ts';
 import { AppError, badRequest, notFound, parse } from '../lib/errors.ts';
 import { enqueue } from '../lib/jobs.ts';
 import { LOCATION_EXPIRE_JOB, locationReaders, publishShare, SHARE_COLS, shareById, presentShares, stopShare, type ShareRow } from '../lib/location.ts';
+import { pushNewMessage } from '../lib/message-push.ts';
 import { notify } from '../lib/services.ts';
 import { assertMessagePace } from '../lib/spam.ts';
 import { ageOf, areFriends } from '../lib/users.ts';
@@ -164,6 +165,8 @@ export function registerLocation(app: FastifyInstance, ctx: AppContext, h: ChatH
       if (live)
         for (const r of readers.filter((x) => x !== u.id))
           await notify(db, ctx.realtime, { userId: r, category: 'friends', type: 'location_shared', actorId: u.id, entityType: 'conversation', entityId: id });
+      // A place sent once pushes like any message ("Location").
+      else await pushNewMessage({ db, realtime: ctx.realtime }, made.messageId);
     }
     reply.code(201);
     return { message };

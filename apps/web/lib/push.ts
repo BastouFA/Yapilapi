@@ -36,3 +36,17 @@ export async function disableBrowserPush() {
   await api.push.unsubscribe(sub.endpoint).catch(() => {});
   await sub.unsubscribe();
 }
+
+/**
+ * Opening a chat: the browser's notification about its new messages goes (the API sends them with
+ * the tag `message:<chat id>`, and clears its own when the chat is read).
+ */
+export async function closeChatNotifications(conversationId: string) {
+  if (!pushSupported()) return;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration('/sw.js');
+    for (const n of (await reg?.getNotifications({ tag: `message:${conversationId}` })) ?? []) n.close();
+  } catch {
+    // Nothing to close.
+  }
+}

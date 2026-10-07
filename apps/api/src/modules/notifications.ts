@@ -26,10 +26,14 @@ import { plusCol, publicUserFrom } from '../lib/users.ts';
 import { userLocale } from '../lib/email.ts';
 import { notBlockedSql } from '../lib/visibility.ts';
 import { signInLabels } from '../lib/sign-in-alerts.ts';
+import { PUSH_ONLY_TYPES } from '../lib/services.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
 
-/** Notifications (aliased `n`, for $1) from someone blocked either way stay out of the list and the count while the block lasts. */
-const SHOWN = `(n.actor_id IS NULL OR ${notBlockedSql('n.actor_id', '$1')})`;
+/**
+ * Notifications (aliased `n`, for $1) from someone blocked either way stay out of the list and the count while the block lasts.
+ * So do the ones that only push (new chat messages: the chat list's unread count says those).
+ */
+const SHOWN = `(n.actor_id IS NULL OR ${notBlockedSql('n.actor_id', '$1')}) AND n.type NOT IN (${PUSH_ONLY_TYPES.map((x) => `'${x}'`).join(', ')})`;
 
 /** How many of an account's notifications are unread, counted like the list's `unread`. */
 export async function unreadNotifications(db: AppContext['db'], userId: string): Promise<number> {
@@ -78,7 +82,9 @@ export default async function notificationsModule(app: FastifyInstance, ctx: App
     const body = (req.body ?? {}) as { ids?: string[] };
     if (body.ids?.length)
       await db.query(`UPDATE notifications SET read_at = now() WHERE user_id = $1 AND id = ANY($2::uuid[]) AND read_at IS NULL`, [me(req).id, body.ids]);
-    else await db.query(`UPDATE notifications SET read_at = now() WHERE user_id = $1 AND read_at IS NULL`, [me(req).id]);
+    // Everything in the list; a chat's message push is read with the chat.
+    else
+      await db.query(`UPDATE notifications SET read_at = now() WHERE user_id = $1 AND read_at IS NULL AND NOT (type = ANY($2))`, [me(req).id, PUSH_ONLY_TYPES]);
     return { ok: true };
   });
 

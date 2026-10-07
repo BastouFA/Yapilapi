@@ -23,6 +23,7 @@ import {
 import { z } from 'zod';
 import { activeControls } from '../lib/family.ts';
 import { enqueue } from '../lib/jobs.ts';
+import { clearMessagePushes, pushNewMessage } from '../lib/message-push.ts';
 import { openPrivate } from '../lib/private-files.ts';
 import { assertRecapUse } from '../lib/recap-sharing.ts';
 import { issueViewToken, OPEN_WINDOW_MINUTES, publishViewOnce, readViewToken, VIEW_ONCE_DAYS, viewOnceFor } from '../lib/view-once.ts';
@@ -853,6 +854,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
       );
     }
     if (yap && row.inserted) await deliverYap(u.id, id, members, (userId) => (adults.has(userId) ? forAdults! : forOthers!));
+    // Everyone here who isn't connected gets a push (a Yap pushes as itself, above).
+    else if (row.inserted) await pushNewMessage({ db, realtime: ctx.realtime }, row.id);
     track(db, u.id, row.kind === 'yap' ? 'yap_sent' : 'message_sent', { kind: conv.kind, ...(row.view_once ? { viewOnce: true } : {}) });
     return { message: await ownCopy(adults.has(u.id) ? forAdults! : forOthers!) };
   }
@@ -894,7 +897,8 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
 
   /**
    * Read up to now: the others here see "Seen" under their messages (not in community chats, never
-   * people with a block between them, and not when either side has read receipts off).
+   * people with a block between them, and not when either side has read receipts off). The push
+   * about new messages here is done with (lib/message-push.ts).
    */
   async function markRead(conversationId: string, userId: string) {
     const { rows } = await db.query<{ last_read_at: Date; kind: string }>(
@@ -902,6 +906,7 @@ export default async function messagingModule(app: FastifyInstance, ctx: AppCont
        WHERE cm.conversation_id = $1 AND cm.user_id = $2 AND c.id = cm.conversation_id RETURNING cm.last_read_at, c.kind`,
       [conversationId, userId],
     );
+    await clearMessagePushes(db, userId, conversationId);
     const row = rows[0];
     if (!row || row.kind === 'community') return;
     const { rows: mine } = await db.query<{ on: boolean }>(`SELECT ${READ_RECEIPTS_ON('$1')} AS on`, [userId]);

@@ -24,6 +24,7 @@ import { messagePreviews } from '../lib/chat.ts';
 import { listsFor, pollsFor, publishList, publishMyReminder, publishPoll } from '../lib/chat-polls.ts';
 import { AppError, badRequest, forbidden, notFound, parse } from '../lib/errors.ts';
 import { enqueue, enqueueAt } from '../lib/jobs.ts';
+import { pushNewMessage } from '../lib/message-push.ts';
 import { analyzeText } from '../lib/moderation.ts';
 import { assertMessagePace, assessMessage } from '../lib/spam.ts';
 import { areFriends, isBlockedEitherWay } from '../lib/users.ts';
@@ -49,8 +50,8 @@ const pollEnded = () => new AppError(409, 'poll_ended', 'This poll has ended.');
 
 /**
  * Polls, shared lists and reminders in chats (one-to-one and groups). Only people in the chat
- * can see or change them; each change goes live to the members who can see the message, and
- * none of it sends a push (a reminder you set does, at its time).
+ * can see or change them; each change goes live to the members who can see the message. A new
+ * poll or list pushes like any message; nothing else here does (a reminder you set does, at its time).
  */
 export function registerChatPollsLists(app: FastifyInstance, ctx: AppContext, h: ChatHelpers) {
   const db = ctx.db;
@@ -129,7 +130,11 @@ export function registerChatPollsLists(app: FastifyInstance, ctx: AppContext, h:
     const message = await h.loadMessage(row.id, u.id);
     if (!message) throw notFound('Message');
     // Nobody has voted or ticked anything yet, so everyone sees the same thing.
-    if (row.inserted) await ctx.realtime.publish(await h.notBlocking(u.id, await h.memberIds(conversationId)), { type: 'message.created', data: message });
+    if (row.inserted) {
+      await ctx.realtime.publish(await h.notBlocking(u.id, await h.memberIds(conversationId)), { type: 'message.created', data: message });
+      // A new poll or list pushes like any message (votes and ticks never do).
+      await pushNewMessage(deps, row.id);
+    }
     return message;
   }
 

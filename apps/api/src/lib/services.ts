@@ -117,16 +117,39 @@ export async function personalizationAllowed(db: Q, userId: string): Promise<boo
 }
 
 /**
+ * Notification types that only push: they never show in the Activity list or its count and send
+ * no `notification.created`. A new chat message is one: in the apps, the chat list's unread count
+ * says it, and its row only keeps track of what was pushed (lib/message-push.ts).
+ */
+export const PUSH_ONLY_TYPES: readonly string[] = ['message'];
+
+type Notice = {
+  userId: string;
+  category: string;
+  type: string;
+  actorId?: string;
+  entityType?: string;
+  entityId?: string;
+  data?: object;
+  group?: string;
+  /**
+   * New messages in a chat (with `group`): every one counts, whoever sent it ("3 new messages"),
+   * and a grouped one pushes again once the last push for it is `repushAfterSeconds` old, or
+   * never went out (during quiet hours, say).
+   */
+  messages?: { repushAfterSeconds: number };
+  /** For the push's text only; never stored. */
+  pushData?: object;
+};
+
+/**
  * Create a notification unless the recipient disabled the category or paused notifications.
  * With `group`, it joins an unread notification of the same type and group from the last day
  * instead ("Ada and 3 others liked your comment"): the newest person becomes its actor,
- * `data.count` says how many people, and it isn't pushed again. The same person counts once.
+ * `data.count` says how many people, and it isn't pushed again. The same person counts once
+ * (except with `messages`, see above).
  */
-export async function notify(
-  db: Q,
-  realtime: RealtimeHub,
-  n: { userId: string; category: string; type: string; actorId?: string; entityType?: string; entityId?: string; data?: object; group?: string },
-): Promise<void> {
+export async function notify(db: Q, realtime: RealtimeHub, n: Notice): Promise<void> {
   if (n.actorId && n.actorId === n.userId) return;
   const prefs = await db.query<{ notification_categories: Record<string, boolean>; notifications_paused_until: Date | null; focus_mode: boolean }>(
     `SELECT notification_categories, notifications_paused_until, focus_mode FROM user_preferences WHERE user_id = $1`,
@@ -142,26 +165,31 @@ export async function notify(
     );
     if (blocked.rowCount) return;
   }
+  const inbox = !PUSH_ONLY_TYPES.includes(n.type);
   if (n.group && n.actorId) {
-    const open = await db.query<{ id: string; actors: string[] }>(
-      `SELECT id, coalesce(data->'actors', '[]'::jsonb) AS actors FROM notifications
+    const open = await db.query<{ id: string; actors: string[]; count: number; pushed_at: string | null }>(
+      `SELECT id, coalesce(data->'actors', '[]'::jsonb) AS actors, coalesce((data->>'count')::int, 1) AS count, data->>'pushedAt' AS pushed_at
+       FROM notifications
        WHERE user_id = $1 AND type = $2 AND data->>'group' = $3 AND read_at IS NULL AND created_at > now() - interval '1 day'
        ORDER BY created_at DESC LIMIT 1`,
       [n.userId, n.type, n.group],
     );
     const row = open.rows[0];
     if (row) {
-      if (row.actors.includes(n.actorId)) return;
+      if (!n.messages && row.actors.includes(n.actorId)) return;
+      const count = n.messages ? row.count + 1 : row.actors.length + 1;
       await db.query(
         `UPDATE notifications SET actor_id = $2, created_at = now(),
                 data = data || jsonb_build_object('count', $3::int, 'actors', $4::jsonb)
          WHERE id = $1`,
-        [row.id, n.actorId, row.actors.length + 1, JSON.stringify([...row.actors, n.actorId].slice(-50))],
+        [row.id, n.actorId, count, JSON.stringify([...row.actors.filter((a) => a !== n.actorId), n.actorId].slice(-50))],
       );
       const pausedNow = p?.notifications_paused_until && p.notifications_paused_until > new Date();
+      if (pausedNow) return;
       // `grouped`: it joined a row that was already unread, so the unread count stays the same.
-      if (!pausedNow)
-        await realtime.publish([n.userId], { type: 'notification.created', data: { id: row.id, category: n.category, type: n.type, grouped: true } });
+      if (inbox) await realtime.publish([n.userId], { type: 'notification.created', data: { id: row.id, category: n.category, type: n.type, grouped: true } });
+      if (n.messages && (row.pushed_at == null || Date.now() - Number(row.pushed_at) >= n.messages.repushAfterSeconds * 1000))
+        await push(db, row.id, n, p, { count });
       return;
     }
   }
@@ -174,21 +202,34 @@ export async function notify(
   // Security notifications always go out; others respect a pause.
   const paused = p?.notifications_paused_until && p.notifications_paused_until > new Date() && n.category !== 'security';
   if (paused) return;
-  await realtime.publish([n.userId], { type: 'notification.created', data: { id: rows[0]!.id, category: n.category, type: n.type } });
-  // Push to devices, except when the person is in focus mode. Fire and forget.
-  // A supervised teen's quiet hours, and the person's own, hold pushes too; the notification still lands in the inbox.
-  if (pushSender && !p?.focus_mode && !(n.category !== 'security' && ((await activeControls(db, n.userId))?.quietNow || (await inQuietHours(db, n.userId))))) {
-    // The recipient's language and the actor's name, in one query.
-    const who = await db.query<{ locale: string | null; actor: string | null }>(
-      `SELECT (SELECT locale FROM profiles WHERE user_id = $1) AS locale, (SELECT display_name FROM profiles WHERE user_id = $2) AS actor`,
-      [n.userId, n.actorId ?? null],
-    );
-    const text = pushTextFor(n.type, who.rows[0]?.actor ?? null, n.data, recipientLocale(who.rows[0]?.locale));
-    const data: Record<string, string> = { type: n.type };
-    if (n.entityType) data.entityType = n.entityType;
-    if (n.entityId) data.entityId = n.entityId;
-    if (text) void pushSender(n.userId, { title: 'YAPILAPI', body: text, tag: n.type, url: '/notifications', data }).catch(() => {});
-  }
+  if (inbox) await realtime.publish([n.userId], { type: 'notification.created', data: { id: rows[0]!.id, category: n.category, type: n.type } });
+  await push(db, rows[0]!.id, n, p, n.messages ? { count: 1 } : {});
+}
+
+/**
+ * Push a notification to the person's devices, except when they are in focus mode. Fire and forget.
+ * A supervised teen's quiet hours, and the person's own, hold pushes too; the notification still
+ * lands in the inbox. `extra` goes with its data into the text. One that can push again when
+ * grouped (`messages`) notes when it went out, and its own tag lets a browser replace the last one.
+ */
+async function push(db: Q, id: string, n: Notice, p: { focus_mode: boolean } | undefined, extra: object): Promise<void> {
+  if (!pushSender || p?.focus_mode) return;
+  if (n.category !== 'security' && ((await activeControls(db, n.userId))?.quietNow || (await inQuietHours(db, n.userId)))) return;
+  // The recipient's language and the actor's name, in one query.
+  const who = await db.query<{ locale: string | null; actor: string | null }>(
+    `SELECT (SELECT locale FROM profiles WHERE user_id = $1) AS locale, (SELECT display_name FROM profiles WHERE user_id = $2) AS actor`,
+    [n.userId, n.actorId ?? null],
+  );
+  const text = pushTextFor(n.type, who.rows[0]?.actor ?? null, { ...(n.data ?? {}), ...extra, ...(n.pushData ?? {}) }, recipientLocale(who.rows[0]?.locale));
+  if (!text) return;
+  const data: Record<string, string> = { type: n.type };
+  if (n.entityType) data.entityType = n.entityType;
+  if (n.entityId) data.entityId = n.entityId;
+  if (n.messages) await db.query(`UPDATE notifications SET data = data || jsonb_build_object('pushedAt', $2::bigint) WHERE id = $1`, [id, Date.now()]);
+  // A push about a chat opens the chat.
+  const url = n.entityType === 'conversation' && n.entityId ? `/inbox/${n.entityId}` : '/notifications';
+  const tag = n.messages && n.group ? `${n.type}:${n.group}` : n.type;
+  void pushSender(n.userId, { title: 'YAPILAPI', body: text, tag, url, data }).catch(() => {});
 }
 
 let pushSender: PushSender | null = null;
