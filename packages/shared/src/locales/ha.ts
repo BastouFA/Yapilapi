@@ -994,6 +994,7 @@ export const ha: Catalog = {
   'm.sound.recent': 'Mafi sabo',
   'm.sound.top': 'Mafiya shahara',
   'm.sound.use': 'Yi amfani da wannan sauti',
+  'm.sound.saved': 'An ajiye',
   'm.sound.cantUse': 'Ba za a iya amfani da wannan sauti a sabbin reels ba.',
   'm.sound.play': 'Kunna sauti',
   'm.sound.pause': 'Dakatar da sauti',

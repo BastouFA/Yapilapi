@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTransport } from 'nodemailer';
 import ffmpegPath from '../src/lib/ffmpeg-path.ts';
 import type { BuiltApp } from '../src/app.ts';
+import { createPool } from '@yapilapi/database';
 import { loadConfig } from '../src/config.ts';
 import { smtpEmailSender, type MailTransport } from '../src/lib/email.ts';
 import { detectMedia, toWebFormat } from '../src/lib/media-formats.ts';
@@ -202,6 +203,19 @@ describe('location metadata', () => {
 });
 
 // ─── 3. Email ────────────────────────────────────────────────────────────
+
+describe('database connections', () => {
+  it('keeps running when the database drops an idle connection', async () => {
+    const pool = createPool(process.env.TEST_DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5432/yapilapi_test');
+    try {
+      // What pg emits when a restart or failover closes an idle connection: unhandled, it ends the process.
+      expect(() => pool.emit('error', new Error('Connection terminated unexpectedly'))).not.toThrow();
+      expect((await pool.query('SELECT 1 AS ok')).rows[0].ok).toBe(1);
+    } finally {
+      await pool.end();
+    }
+  });
+});
 
 describe('email delivery', () => {
   it('sends through SMTP with nodemailer', async () => {

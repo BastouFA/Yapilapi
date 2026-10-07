@@ -993,6 +993,7 @@ export const yo: Catalog = {
   'm.sound.recent': 'Tuntun jùlọ',
   'm.sound.top': 'Tó gbajúmọ̀ jùlọ',
   'm.sound.use': 'Lo ohùn yìí',
+  'm.sound.saved': 'Ti fipamọ́',
   'm.sound.cantUse': 'A kò lè lo ohùn yìí nínú reel tuntun.',
   'm.sound.play': 'Ṣí ohùn',
   'm.sound.pause': 'Dá ohùn dúró',

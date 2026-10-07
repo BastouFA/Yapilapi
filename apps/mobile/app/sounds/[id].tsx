@@ -71,6 +71,28 @@ export default function SoundScreen() {
       </View>
     );
 
+  // Keep it in your saved music (the music picker's Saved list), or take it out.
+  const toggleSave = async () => {
+    if (!sound) return;
+    const next = !sound.saved;
+    setSound({ ...sound, saved: next });
+    try {
+      await (await client()).music.save({ id: sound.id, source: 'library' }, next);
+    } catch (e) {
+      setSound({ ...sound, saved: !next });
+      setError(errorMessage(e));
+    }
+  };
+  const saveButton = sound ? (
+    <Button
+      label={sound.saved ? t('m.sound.saved') : t('post.save')}
+      accessibilityLabel={t(sound.saved ? 'music.unsave' : 'music.save', { title: sound.title })}
+      icon={sound.saved ? 'bookmark' : 'bookmark-outline'}
+      variant="secondary"
+      onPress={() => void toggleSave()}
+    />
+  ) : null;
+
   const header = (
     <View style={{ gap: space[3], marginBottom: space[3] }}>
       <View style={{ flexDirection: 'row', gap: space[4], alignItems: 'center' }}>
@@ -135,9 +157,13 @@ export default function SoundScreen() {
             variant="secondary"
             onPress={() => router.navigate({ pathname: '/create', params: { mode: 'post', sound: sound.id } })}
           />
+          {saveButton}
         </View>
       ) : me ? (
-        <Text style={{ color: c.inkMuted, fontSize: 14 }}>{t('m.sound.cantUse')}</Text>
+        <View style={{ gap: space[2] }}>
+          <Text style={{ color: c.inkMuted, fontSize: 14 }}>{t('m.sound.cantUse')}</Text>
+          {saveButton}
+        </View>
       ) : null}
       <Segmented
         label={t('m.sound.title')}

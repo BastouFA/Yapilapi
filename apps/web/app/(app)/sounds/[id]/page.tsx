@@ -8,12 +8,13 @@ import type { Sound } from '@yapilapi/shared';
 import { api, errorMessage, isGone } from '@/lib/api';
 import { ReelGrid } from '@/components/ReelGrid';
 import { SoundPlayButton, soundLength } from '@/components/SoundPicker';
+import { BackButton } from '@/components/BackButton';
 import { useSession } from '../../../providers';
 
 /** A sound: play it, see who made it and the reels that use it (most recent or top), and make your own reel or story with it. */
 export default function SoundPage() {
   const { id } = useParams<{ id: string }>();
-  const { me, locale, t, tp } = useSession();
+  const { me, locale, t, tp, toast } = useSession();
   const [sound, setSound] = useState<Sound | null>(null);
   const [missing, setMissing] = useState<string | null>(null);
   // Why it couldn't load, when that isn't because it's gone or private.
@@ -51,8 +52,22 @@ export default function SoundPage() {
   if (!sound && loadError) return <EmptyState level={1} title={loadError} action={<Button onClick={loadSound}>{t('m.common.retry')}</Button>} />;
   if (!sound) return <Skeleton height={240} />;
 
+  // Keep it in your saved music (the music picker's Saved list), or take it out.
+  async function toggleSave() {
+    if (!sound) return;
+    const next = !sound.saved;
+    setSound({ ...sound, saved: next });
+    try {
+      await api.music.save({ id: sound.id, source: 'library' }, next);
+    } catch (e) {
+      setSound({ ...sound, saved: !next });
+      toast(errorMessage(e));
+    }
+  }
+
   return (
     <div className="yp-shell__inner stack">
+      <BackButton fallback="/reels" />
       <section className="sound-hero" aria-labelledby="sound-title">
         <div className="sound-hero__cover" style={sound.coverUrl ? { backgroundImage: `url(${sound.coverUrl})` } : undefined}>
           <SoundPlayButton sound={sound} size="lg" />
@@ -93,11 +108,17 @@ export default function SoundPage() {
               <Link href={`/create?mode=post&sound=${sound.id}`} className="yp-btn yp-btn--secondary yp-btn--sm">
                 {t('music.track.inPost')}
               </Link>
+              <SaveSoundButton saved={!!sound.saved} title={sound.title} onToggle={() => void toggleSave()} />
             </div>
           ) : me ? (
-            <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-              {t('soundPage.cantUse')}
-            </p>
+            <div className="stack-sm">
+              <p className="muted" style={{ margin: 0, fontSize: 14 }}>
+                {t('soundPage.cantUse')}
+              </p>
+              <div className="row">
+                <SaveSoundButton saved={!!sound.saved} title={sound.title} onToggle={() => void toggleSave()} />
+              </div>
+            </div>
           ) : (
             <Link href="/login" className="yp-btn yp-btn--secondary yp-btn--sm" style={{ alignSelf: 'flex-start' }}>
               {t('soundPage.signIn')}
@@ -116,5 +137,22 @@ export default function SoundPage() {
       />
       <ReelGrid load={load} reloadKey={`${id}:${sort}`} empty={t('m.sound.empty')} />
     </div>
+  );
+}
+
+/** Save or unsave: says which, with the bookmark filled when saved. */
+function SaveSoundButton({ saved, title, onToggle }: { saved: boolean; title: string; onToggle: () => void }) {
+  const { t } = useSession();
+  return (
+    <button
+      type="button"
+      className="yp-btn yp-btn--secondary yp-btn--sm"
+      aria-pressed={saved}
+      aria-label={t(saved ? 'music.unsave' : 'music.save', { title })}
+      onClick={onToggle}
+    >
+      <Icon name="bookmark" filled={saved} size={16} />
+      {saved ? t('m.sound.saved') : t('post.save')}
+    </button>
   );
 }

@@ -994,6 +994,7 @@ export const sw: Catalog = {
   'm.sound.recent': 'Za karibuni',
   'm.sound.top': 'Bora',
   'm.sound.use': 'Tumia sauti hii',
+  'm.sound.saved': 'Imehifadhiwa',
   'm.sound.cantUse': 'Sauti hii haiwezi kutumika katika reels mpya.',
   'm.sound.play': 'Cheza sauti',
   'm.sound.pause': 'Sitisha sauti',

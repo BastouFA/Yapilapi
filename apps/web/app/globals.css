@@ -11344,3 +11344,9 @@ button.profile-song__play::after {
     max-width: 860px;
   }
 }
+
+/* Back to the reel or post you came from (components/BackButton.tsx). */
+.back-button {
+  align-self: flex-start;
+  min-height: 44px;
+}

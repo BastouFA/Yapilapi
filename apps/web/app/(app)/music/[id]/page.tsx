@@ -8,6 +8,7 @@ import type { MessageKey, MusicTrack } from '@yapilapi/shared';
 import { api, errorMessage, isGone } from '@/lib/api';
 import { PostList } from '@/components/PostList';
 import { SoundPlayButton, soundLength } from '@/components/SoundPicker';
+import { BackButton } from '@/components/BackButton';
 import { useMusicCredit } from '@/components/StoryMusic';
 import { useSession } from '../../../providers';
 
@@ -58,6 +59,7 @@ export default function MusicTrackPage() {
 
   return (
     <div className="yp-shell__inner stack">
+      <BackButton fallback="/reels" />
       <section className="sound-hero" aria-labelledby="track-title">
         <div className="sound-hero__cover" style={track.coverUrl ? { backgroundImage: `url(${track.coverUrl})` } : undefined}>
           <SoundPlayButton sound={{ title: track.title, audioUrl: track.previewUrl }} size="lg" />

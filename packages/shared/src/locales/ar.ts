@@ -1006,6 +1006,7 @@ export const ar: Catalog = {
   'm.sound.recent': 'الأحدث',
   'm.sound.top': 'الأبرز',
   'm.sound.use': 'استخدم هذا الصوت',
+  'm.sound.saved': 'محفوظ',
   'm.sound.cantUse': 'لا يمكن استخدام هذا الصوت في ريلز جديدة.',
   'm.sound.play': 'شغّل الصوت',
   'm.sound.pause': 'أوقف الصوت مؤقتًا',

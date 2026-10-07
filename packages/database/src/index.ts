@@ -17,7 +17,7 @@ export function createPool(connectionString: string, max = 10): pg.Pool {
   // JIT off: our queries are short OLTP reads and writes. On larger tables the planner's
   // cost estimate for the ranked feed crosses jit_above_cost and Postgres spent over a
   // second compiling a query that runs in a fraction of that (docs/architecture/performance.md).
-  return new pg.Pool({
+  const pool = new pg.Pool({
     connectionString,
     max,
     idleTimeoutMillis: 30_000,
@@ -28,6 +28,11 @@ export function createPool(connectionString: string, max = 10): pg.Pool {
     query_timeout: 65_000,
     options: '-c jit=off',
   });
+  // An idle connection the database closes (a restart, a failover, a network blip) is reported
+  // here. Unhandled, it would crash the whole process; the pool drops that connection and opens a
+  // new one for the next query.
+  pool.on('error', (err) => console.warn(`database connection lost: ${err.message}`));
+  return pool;
 }
 
 /** Run fn inside a transaction; rolls back on any thrown error. */

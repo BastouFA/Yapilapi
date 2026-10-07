@@ -994,6 +994,7 @@ export const pt: Catalog = {
   'm.sound.recent': 'Mais recentes',
   'm.sound.top': 'Em alta',
   'm.sound.use': 'Usar este som',
+  'm.sound.saved': 'Salvo',
   'm.sound.cantUse': 'Este som não pode ser usado em novos reels.',
   'm.sound.play': 'Reproduzir som',
   'm.sound.pause': 'Pausar som',

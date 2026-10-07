@@ -997,6 +997,7 @@ export const en = {
   'm.sound.recent': 'Most recent',
   'm.sound.top': 'Top',
   'm.sound.use': 'Use this sound',
+  'm.sound.saved': 'Saved',
   'm.sound.cantUse': "This sound can't be used in new reels.",
   'm.sound.play': 'Play sound',
   'm.sound.pause': 'Pause sound',

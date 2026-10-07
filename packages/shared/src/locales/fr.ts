@@ -999,6 +999,7 @@ export const fr: Catalog = {
   'm.sound.recent': 'Plus récents',
   'm.sound.top': 'Populaires',
   'm.sound.use': 'Utiliser ce son',
+  'm.sound.saved': 'Enregistré',
   'm.sound.cantUse': 'Ce son ne peut pas être utilisé dans de nouveaux reels.',
   'm.sound.play': 'Écouter le son',
   'm.sound.pause': 'Mettre le son en pause',
