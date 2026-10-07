@@ -11552,8 +11552,12 @@ button.profile-song__play::after {
   }
 }
 
-/* Back to the reel or post you came from (components/BackButton.tsx). */
+/* Back at the top of every page that isn't a main tab (components/BackButton.tsx). */
 .back-button {
   align-self: flex-start;
   min-height: 44px;
+}
+.page-back {
+  max-width: 640px;
+  margin: 0 auto var(--space-2);
 }

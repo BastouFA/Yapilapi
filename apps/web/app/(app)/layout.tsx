@@ -14,6 +14,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { isPublicPath, SignedOutShell } from '@/components/SignedOut';
 import { UsageHeartbeat } from '@/components/UsageHeartbeat';
 import { YapPlayer } from '@/components/Yap';
+import { PageBack } from '@/components/BackButton';
 import { useSession } from '../providers';
 
 function currentTab(path: string, username?: string): NavEntry['id'] | undefined {
@@ -120,6 +121,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <main className="yp-shell__main" id="main">
               {/* A note from the team to everyone, until it ends or you close it. */}
               <AnnouncementBanner />
+              <PageBack />
               {children}
             </main>
             <Sidebar />

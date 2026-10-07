@@ -8,7 +8,6 @@ import type { Sound } from '@yapilapi/shared';
 import { api, errorMessage, isGone } from '@/lib/api';
 import { ReelGrid } from '@/components/ReelGrid';
 import { SoundPlayButton, soundLength } from '@/components/SoundPicker';
-import { BackButton } from '@/components/BackButton';
 import { useSession } from '../../../providers';
 
 /** A sound: play it, see who made it and the reels that use it (most recent or top), and make your own reel or story with it. */
@@ -67,7 +66,6 @@ export default function SoundPage() {
 
   return (
     <div className="yp-shell__inner stack">
-      <BackButton fallback="/reels" />
       <section className="sound-hero" aria-labelledby="sound-title">
         <div className="sound-hero__cover" style={sound.coverUrl ? { backgroundImage: `url(${sound.coverUrl})` } : undefined}>
           <SoundPlayButton sound={sound} size="lg" />

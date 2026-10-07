@@ -6,6 +6,7 @@ import { useCallback } from 'react';
 import { EmptyState } from '@yapilapi/design-system';
 import { useSession } from '@/app/providers';
 import { LanguagePicker } from './LanguagePicker';
+import { PageBack } from './BackButton';
 import { LegalLinks } from './Legal';
 
 /**
@@ -71,6 +72,7 @@ export function SignedOutShell({ children }: { children: React.ReactNode }) {
     <div className="public-shell">
       <SignedOutBar />
       <main className="yp-shell__main" id="main">
+        <PageBack />
         {children}
       </main>
       <footer className="legal-foot">
