@@ -25,6 +25,7 @@ import {
   MAX_COLLABORATORS,
   REPORT_REASONS,
   whyReasonText,
+  type MediaItem,
   type MessageKey,
   type FeedEventSurface,
   type Page,
@@ -36,6 +37,7 @@ import {
 import { api, errorMessage, fieldErrors, isGone } from '@/lib/api';
 import { recordFeedEvent, useImpression } from '@/lib/feed-events';
 import { NextLink } from '@/lib/link';
+import { VideoCoverEditor } from '@/components/editor/VideoCoverEditor';
 import { AutocompleteText } from '@/components/Autocomplete';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { useSession } from '@/app/providers';
@@ -629,6 +631,10 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
+  // The post as it is now: a cover changed in the cover editor is saved there and then.
+  const [current, setCurrent] = useState(post);
+  const [coverFirst, setCoverFirst] = useState(post.media[0]?.id ?? null);
+  const [coverOf, setCoverOf] = useState<MediaItem | null>(null);
   useEffect(() => {
     if (me && post.visibility !== 'subscribers')
       api.economy.plans(me.id).then(
@@ -636,9 +642,25 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
         () => {},
       );
   }, [me, post.visibility]);
-  const describable = post.media.filter((m) => m.kind !== 'audio');
+  const describable = current.media.filter((m) => m.kind !== 'audio');
   const changedAlts = describable.filter((m) => (alts[m.id] ?? '') !== (m.altText ?? ''));
-  const changed = body.trim() !== post.body || visibility !== post.visibility || changedAlts.length > 0;
+  // A post with several photos or videos: the one shown first is its cover.
+  const choosable = current.format !== 'reel' && describable.length > 1 && describable.length === current.media.length;
+  const coverChanged = choosable && !!coverFirst && coverFirst !== current.media[0]?.id;
+  const changed = body.trim() !== post.body || visibility !== post.visibility || changedAlts.length > 0 || coverChanged;
+  const textChanged = body.trim() !== post.body || visibility !== post.visibility || changedAlts.length > 0;
+  if (coverOf)
+    return (
+      <VideoCoverEditor
+        post={current}
+        media={coverOf}
+        onClose={() => setCoverOf(null)}
+        onSaved={(p) => {
+          setCurrent(p);
+          onSaved(p);
+        }}
+      />
+    );
   const audiences = EDIT_AUDIENCES.filter((v) => v !== 'subscribers' || hasPlans);
   return (
     <BottomSheet open onClose={onClose} title={t('m.post.editTitle')}>
@@ -650,11 +672,15 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
           setError(null);
           setFields({});
           try {
-            const r = await api.posts.edit(post.id, {
-              ...(body.trim() !== post.body ? { body: body.trim() } : {}),
-              ...(visibility !== post.visibility ? { visibility: visibility as (typeof EDIT_AUDIENCES)[number] } : {}),
-              ...(changedAlts.length ? { media: changedAlts.map((m) => ({ id: m.id, altText: (alts[m.id] ?? '').trim() })) } : {}),
-            });
+            let saved = current;
+            if (coverChanged && coverFirst) saved = (await api.posts.setCover(post.id, { coverMediaId: coverFirst })).post;
+            const r = textChanged
+              ? await api.posts.edit(post.id, {
+                  ...(body.trim() !== post.body ? { body: body.trim() } : {}),
+                  ...(visibility !== post.visibility ? { visibility: visibility as (typeof EDIT_AUDIENCES)[number] } : {}),
+                  ...(changedAlts.length ? { media: changedAlts.map((m) => ({ id: m.id, altText: (alts[m.id] ?? '').trim() })) } : {}),
+                })
+              : { post: saved, moderation: undefined };
             onSaved(r.post);
             toast(noticeText(r.moderation, t) ?? t('m.post.updated'));
             onClose();
@@ -710,9 +736,38 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: Post; onClose:
                 {m.kind === 'image' && post.author.id === me?.id ? (
                   <SuggestAltText mediaId={m.id} index={i} compact onSuggested={(text) => setAlts((cur) => ({ ...cur, [m.id]: text.slice(0, 500) }))} />
                 ) : null}
+                {m.kind === 'video' && post.author.id === me?.id ? (
+                  <Button variant="secondary" size="sm" onClick={() => setCoverOf(m)} aria-label={t('postCover.editVideo', { index: i + 1 })}>
+                    {t('postCover.edit')}
+                  </Button>
+                ) : null}
               </div>
             ))}
           </div>
+        ) : null}
+        {choosable ? (
+          <fieldset className="stack-sm cover-pick">
+            <legend className="yp-field__label">{t('postCover.choose')}</legend>
+            <div className="cover-pick__row" role="radiogroup" aria-label={t('postCover.choose')}>
+              {describable.map((m, i) => (
+                <label key={m.id} className="cover-pick__item" data-on={coverFirst === m.id || undefined}>
+                  <input
+                    type="radio"
+                    name={`cover-${post.id}`}
+                    className="cover-pick__radio"
+                    checked={coverFirst === m.id}
+                    onChange={() => setCoverFirst(m.id)}
+                    aria-label={t(m.kind === 'video' ? 'postCover.videoN' : 'postCover.photoN', { index: i + 1 })}
+                  />
+                  <img src={m.kind === 'video' ? (m.variants?.thumb ?? m.posterUrl ?? '') : (m.variants?.thumb ?? m.url)} alt="" />
+                  {coverFirst === m.id ? <span className="cover-pick__badge">{t('m.chapters.cover')}</span> : null}
+                </label>
+              ))}
+            </div>
+            <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+              {t('postCover.chooseHint')}
+            </p>
+          </fieldset>
         ) : null}
         {post.community ? (
           <p className="muted" style={{ margin: 0, fontSize: 13 }}>

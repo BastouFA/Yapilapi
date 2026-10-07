@@ -54,6 +54,7 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
             EXISTS (SELECT 1 FROM saves s WHERE s.post_id = p.id AND s.user_id = $2) AS saved,
             EXISTS (SELECT 1 FROM post_reposts rp WHERE rp.post_id = p.id AND rp.user_id = $2) AS reposted, p.repost_count,
             (SELECT coalesce(json_agg(json_build_object('id', m.id, 'kind', m.kind, 'url', m.url, 'altText', m.alt_text, 'width', m.width, 'height', m.height, 'variants', m.variants, 'sizes', ${mediaSizesSql()}, 'posterUrl', m.poster_url, 'hlsUrl', m.hls_url, 'placeholder', m.blurhash, 'sensitive', m.moderation = 'sensitive',
+                                                   'customCover', m.kind = 'video' AND m.default_poster IS NOT NULL, 'coverMs', m.cover_ms,
                                                    'captions', (SELECT coalesce(json_agg(json_build_object('lang', ct.lang, 'label', ct.label, 'url', ct.url) ORDER BY ct.lang), '[]')
                                                                 FROM caption_tracks ct WHERE ct.media_id = m.id AND ct.status = 'ready')) ORDER BY pm.position), '[]')
                FROM post_media pm JOIN media m ON m.id = pm.media_id
@@ -152,7 +153,13 @@ function toPost(r: Record<string, any>, originals: Map<string, NonNullable<Remix
     lang: r.lang ?? langOf(r.body),
     visibility: r.visibility,
     author: publicUserFrom(r, 'a_'),
-    media: (r.media as (MediaItem & { sensitive: boolean })[]).map(({ sensitive, ...m }) => withSmallVariants(sensitive ? { ...m, sensitive: true } : m)),
+    media: (r.media as (MediaItem & { sensitive: boolean })[]).map(({ sensitive, customCover, coverMs, ...m }) =>
+      withSmallVariants({
+        ...m,
+        ...(sensitive ? { sensitive: true } : {}),
+        ...(customCover ? { customCover: true, ...(coverMs != null ? { coverMs } : {}) } : {}),
+      }),
+    ),
     linkUrl: typeof r.link_url === 'string' && /^https?:\/\//i.test(r.link_url) ? r.link_url : null,
     poll: r.poll_options ? { options: r.poll_options, myVote: r.my_vote } : null,
     topics: r.topics,

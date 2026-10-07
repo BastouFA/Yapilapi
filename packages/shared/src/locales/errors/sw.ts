@@ -1294,4 +1294,13 @@ export const sw: Record<string, string> = {
   'Use a web address that starts with https://, or a path in the app that starts with /.':
     'Tumia anwani ya wavuti inayoanza na https://, au njia ndani ya programu inayoanza na /.',
   "You can't do this to your own account here.": 'Huwezi kufanya hivi kwa akaunti yako mwenyewe hapa.',
+  'Your video is still being prepared. Try again in a moment.': 'Video yako bado inaandaliwa. Jaribu tena baada ya muda mfupi.',
+  'Choose a moment in the video.': 'Chagua wakati ndani ya video.',
+  'We couldn’t take a cover from this moment. Try another one.': 'Hatukuweza kupata jalada kutoka wakati huu. Jaribu mwingine.',
+  'Only the person who shared this post can change its cover.': 'Ni mtu aliyeshiriki chapisho hili pekee anayeweza kubadilisha jalada lake.',
+  'Only a post with more than one photo or video has a cover to choose.': 'Ni chapisho lenye picha au video zaidi ya moja pekee lenye jalada la kuchagua.',
+  'Choose a video of this post.': 'Chagua video ya chapisho hili.',
+  'This video was not uploaded here, so its cover can’t be changed.': 'Video hii haikupakiwa hapa, kwa hivyo jalada lake haliwezi kubadilishwa.',
+  'Choose one cover.': 'Chagua jalada moja.',
+  'Choose a video or a photo.': 'Chagua video au picha.',
 };

@@ -1279,4 +1279,13 @@ export const yo: Record<string, string> = {
   'Use a web address that starts with https://, or a path in the app that starts with /.':
     'Lo àdírẹ́sì wẹ́ẹ̀bù tí ó bẹ̀rẹ̀ pẹ̀lú https://, tàbí ọ̀nà inú áàpù tí ó bẹ̀rẹ̀ pẹ̀lú /.',
   "You can't do this to your own account here.": 'O kò lè ṣe èyí sí àkọọ́lẹ̀ tìrẹ níbí.',
+  'Your video is still being prepared. Try again in a moment.': 'À ń ṣètò fídíò rẹ lọ́wọ́. Gbìyànjú lẹ́ẹ̀kan sí i láìpẹ́.',
+  'Choose a moment in the video.': 'Yan àkókò kan nínú fídíò náà.',
+  'We couldn’t take a cover from this moment. Try another one.': 'A kò lè mú àwòrán iwájú láti àkókò yìí. Gbìyànjú òmíràn.',
+  'Only the person who shared this post can change its cover.': 'Ẹni tó pín ìfiránṣẹ́ yìí nìkan ló lè yí àwòrán iwájú rẹ̀ padà.',
+  'Only a post with more than one photo or video has a cover to choose.': 'Ìfiránṣẹ́ tó ní ju fọ́tò tàbí fídíò kan lọ nìkan ló ní àwòrán iwájú láti yàn.',
+  'Choose a video of this post.': 'Yan fídíò kan nínú ìfiránṣẹ́ yìí.',
+  'This video was not uploaded here, so its cover can’t be changed.': 'A kò gbé fídíò yìí sókè níbí, nítorí náà a kò lè yí àwòrán iwájú rẹ̀ padà.',
+  'Choose one cover.': 'Yan àwòrán iwájú kan ṣoṣo.',
+  'Choose a video or a photo.': 'Yan fídíò tàbí fọ́tò kan.',
 };

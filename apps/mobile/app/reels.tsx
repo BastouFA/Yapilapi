@@ -46,6 +46,7 @@ import { useDataSaver } from '../lib/data-saver';
 import { useSession } from '../lib/session';
 import { useT } from '../lib/i18n';
 import { radius, space } from '../lib/theme';
+import { VideoCoverEditor } from '../lib/video-cover';
 import {
   Avatar,
   BottomSheet,
@@ -153,7 +154,7 @@ export default function Reels() {
   const [active, setActive] = useState(0);
   const [height, setHeight] = useState(0);
   const [moments, setMoments] = useState<Record<string, ReelMoment[]>>({});
-  const [sheet, setSheet] = useState<{ kind: 'share' | 'options' | 'highlights'; post: Post } | null>(null);
+  const [sheet, setSheet] = useState<{ kind: 'share' | 'options' | 'highlights' | 'cover'; post: Post } | null>(null);
   // The reel on screen registers what the highlights editor needs from it.
   const controls = useRef<Record<string, ReelControls>>({});
   const loading = useRef(false);
@@ -346,7 +347,7 @@ export default function Reels() {
   }
 
   /** Close the sheet on screen and open another once it has slid away. */
-  const swapSheet = (next: { kind: 'share' | 'options' | 'highlights'; post: Post }) => {
+  const swapSheet = (next: { kind: 'share' | 'options' | 'highlights' | 'cover'; post: Post }) => {
     setSheet(null);
     setTimeout(() => setSheet(next), SHEET_SWAP_MS);
   };
@@ -509,7 +510,7 @@ export default function Reels() {
   };
   const actions = useRef(rowActions);
   actions.current = rowActions;
-  const holdId = sheet?.kind === 'highlights' ? sheet.post.id : null;
+  const holdId = sheet?.kind === 'highlights' || sheet?.kind === 'cover' ? sheet.post.id : null;
   const signedIn = !!me;
   const renderReel = useCallback(
     ({ item, index }: { item: Post; index: number }) => (
@@ -690,6 +691,7 @@ export default function Reels() {
         onClose={() => setSheet(null)}
         onCopy={(p) => void copyLink(p)}
         onHighlights={(p) => swapSheet({ kind: 'highlights', post: p })}
+        onEditCover={(p) => swapSheet({ kind: 'cover', post: p })}
         onNotInterested={(p) => void notInterested(p)}
         onReport={report}
         onDownload={(p) => void shareVideo(p)}
@@ -706,6 +708,9 @@ export default function Reels() {
           onSave={(list) => saveHighlights(sheetPost, list)}
           onClose={() => setSheet(null)}
         />
+      ) : null}
+      {sheet?.kind === 'cover' && sheetPost?.media[0] ? (
+        <VideoCoverEditor post={sheetPost} media={sheetPost.media[0]} onClose={() => setSheet(null)} onSaved={(p) => patch(p.id, () => p)} />
       ) : null}
     </View>
   );
@@ -1826,6 +1831,7 @@ function OptionsSheet({
   onClose,
   onCopy,
   onHighlights,
+  onEditCover,
   onNotInterested,
   onReport,
   onDownload,
@@ -1843,6 +1849,8 @@ function OptionsSheet({
   onClose: () => void;
   onCopy: (p: Post) => void;
   onHighlights: (p: Post) => void;
+  /** The creator: choose the reel's cover (a moment, a photo or the default). */
+  onEditCover: (p: Post) => void;
   onNotInterested: (p: Post) => void;
   onReport: (p: Post) => void;
   onDownload: (p: Post) => void;
@@ -1891,6 +1899,7 @@ function OptionsSheet({
           {mine ? (
             <>
               <SheetItem icon="star-outline" label={t('reel.highlights.edit')} onPress={() => onHighlights(post)} />
+              {post.media[0]?.kind === 'video' ? <SheetItem icon="image-outline" label={t('postCover.edit')} onPress={() => onEditCover(post)} /> : null}
               <SheetItem
                 icon="copy-outline"
                 label={post.allowRemix ? t('reel.remixes.stop') : t('reel.remixes.allow')}

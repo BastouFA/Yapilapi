@@ -110,8 +110,9 @@ export function EditorShell({
   onDone: () => void;
   doneLabel?: string;
   canUndo: boolean;
-  onUndo: () => void;
-  onReset: () => void;
+  /** Without undo (an editor whose every change is saved as it is made), there are no Undo and Reset buttons. */
+  onUndo?: () => void;
+  onReset?: () => void;
   busy?: boolean;
   stage: ReactNode;
   tools: ReactNode;
@@ -141,7 +142,7 @@ export function EditorShell({
         const typing = e.target instanceof HTMLInputElement && e.target.type === 'text';
         if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey && !typing) {
           e.preventDefault();
-          onUndo();
+          onUndo?.();
         }
       }}
     >
@@ -153,12 +154,16 @@ export function EditorShell({
           {title}
         </h2>
         <div className="ed__actions">
-          <Button variant="ghost" size="sm" onClick={onUndo} disabled={!canUndo || busy} aria-keyshortcuts="Control+Z Meta+Z">
-            {t('m.editor.undo')}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onReset} disabled={!canUndo || busy}>
-            {t('m.editor.reset')}
-          </Button>
+          {onUndo ? (
+            <Button variant="ghost" size="sm" onClick={onUndo} disabled={!canUndo || busy} aria-keyshortcuts="Control+Z Meta+Z">
+              {t('m.editor.undo')}
+            </Button>
+          ) : null}
+          {onReset ? (
+            <Button variant="ghost" size="sm" onClick={onReset} disabled={!canUndo || busy}>
+              {t('m.editor.reset')}
+            </Button>
+          ) : null}
           <Button size="sm" onClick={onDone} loading={busy}>
             {doneLabel ?? t('m.common.done')}
           </Button>

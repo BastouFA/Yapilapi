@@ -696,6 +696,20 @@ function Create() {
                       {m.tags.length ? t('compose.tagged', { count: m.tags.length }) : t('m.tags.add')}
                     </button>
                   ) : null}
+                  {media.length > 1 && kind === 'post' ? (
+                    i === 0 ? (
+                      <span className="thumb-cover thumb-cover--on">{t('m.chapters.cover')}</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="thumb-cover"
+                        aria-label={t('postCover.makeCoverN', { index: i + 1 })}
+                        onClick={() => setMedia((cur) => [m, ...cur.filter((x) => x.id !== m.id)])}
+                      >
+                        {t('postCover.makeCover')}
+                      </button>
+                    )
+                  ) : null}
                 </div>
               ))}
             </div>

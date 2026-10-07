@@ -150,6 +150,7 @@ export function OptionsSheet({
   onCopy,
   onDownload,
   onHighlights,
+  onEditCover,
   onAllowRemix,
   onAllowEchoes,
   onLeaveCollab,
@@ -167,6 +168,8 @@ export function OptionsSheet({
   onCopy: (p: Post) => void;
   onDownload: (p: Post) => void;
   onHighlights: (p: Post) => void;
+  /** The creator: choose the reel's cover (a moment, a photo or the default). */
+  onEditCover?: (p: Post) => void;
   onAllowRemix: (p: Post, allow: boolean) => void;
   /** The creator: who may echo the reel. */
   onAllowEchoes?: (p: Post, allow: EchoPermission) => void;
@@ -235,6 +238,9 @@ export function OptionsSheet({
           {mine ? (
             <>
               <SheetItem icon="star" label={t('reel.highlights.edit')} onClick={done(() => onHighlights(post))} />
+              {onEditCover && post.media[0]?.kind === 'video' ? (
+                <SheetItem icon="image" label={t('postCover.edit')} onClick={done(() => onEditCover(post))} />
+              ) : null}
               <SheetItem
                 icon="duet"
                 label={post.allowRemix ? t('reel.remixes.stop') : t('reel.remixes.allow')}

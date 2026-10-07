@@ -1292,4 +1292,13 @@ export const pt: Record<string, string> = {
   'Use a web address that starts with https://, or a path in the app that starts with /.':
     'Use um endereço da web que comece com https://, ou um caminho do app que comece com /.',
   "You can't do this to your own account here.": 'Você não pode fazer isso com a sua própria conta aqui.',
+  'Your video is still being prepared. Try again in a moment.': 'Seu vídeo ainda está sendo preparado. Tente de novo daqui a pouco.',
+  'Choose a moment in the video.': 'Escolha um momento do vídeo.',
+  'We couldn’t take a cover from this moment. Try another one.': 'Não conseguimos tirar uma capa deste momento. Tente outro.',
+  'Only the person who shared this post can change its cover.': 'Só a pessoa que compartilhou esta publicação pode mudar a capa dela.',
+  'Only a post with more than one photo or video has a cover to choose.': 'Só uma publicação com mais de uma foto ou vídeo tem uma capa para escolher.',
+  'Choose a video of this post.': 'Escolha um vídeo desta publicação.',
+  'This video was not uploaded here, so its cover can’t be changed.': 'Este vídeo não foi enviado aqui, então a capa dele não pode ser mudada.',
+  'Choose one cover.': 'Escolha uma só capa.',
+  'Choose a video or a photo.': 'Escolha um vídeo ou uma foto.',
 };

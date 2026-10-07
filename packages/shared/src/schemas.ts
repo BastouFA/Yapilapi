@@ -366,6 +366,33 @@ export const editPostSchema = z
   .refine((v) => v.body !== undefined || v.visibility !== undefined || v.media !== undefined, { message: 'Nothing to change.', path: ['body'] })
   .refine((v) => !v.media || new Set(v.media.map((m) => m.id)).size === v.media.length, { message: 'Describe each photo once.', path: ['media'] });
 
+/**
+ * PUT /v1/posts/:id/cover. For a video of the post (`mediaId`): a moment of it (`atMs`),
+ * one of your own photos (`imageMediaId`, with an optional `crop` of it; it is fitted to the
+ * video's shape), or back to the default (`reset`). For a post with several photos or videos:
+ * which one comes first (`coverMediaId`).
+ */
+export const postCoverSchema = z
+  .object({
+    mediaId: uuid.optional(),
+    atMs: z.number().int().min(0).max(36_000_000).optional(),
+    imageMediaId: uuid.optional(),
+    crop: cropSchema.optional(),
+    reset: z.literal(true).optional(),
+    coverMediaId: uuid.optional(),
+  })
+  .strict()
+  .superRefine((v, ctx) => {
+    const choices = [v.atMs !== undefined, v.imageMediaId !== undefined, v.reset === true].filter(Boolean).length;
+    if (v.coverMediaId !== undefined) {
+      if (v.mediaId !== undefined || choices || v.crop) ctx.addIssue({ code: 'custom', message: 'Choose one cover.', path: ['coverMediaId'] });
+      return;
+    }
+    if (v.mediaId === undefined) ctx.addIssue({ code: 'custom', message: 'Choose a video or a photo.', path: ['mediaId'] });
+    else if (choices !== 1) ctx.addIssue({ code: 'custom', message: 'Choose one cover.', path: ['atMs'] });
+    if (v.crop && v.imageMediaId === undefined) ctx.addIssue({ code: 'custom', message: 'Choose one cover.', path: ['crop'] });
+  });
+
 /** Publish a draft later, or move a scheduled post to another time. */
 export const schedulePostSchema = z.object({ scheduledAt: scheduleTime });
 
@@ -874,6 +901,7 @@ export const onboardingCompleteSchema = z.object({
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type CreatePostInput = z.infer<typeof createPostSchema>;
 export type EditPostInput = z.infer<typeof editPostSchema>;
+export type PostCoverInput = z.input<typeof postCoverSchema>;
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 
 /**

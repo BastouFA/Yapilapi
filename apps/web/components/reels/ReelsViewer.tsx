@@ -13,6 +13,7 @@ import { WatchChatPicker } from '@/components/WatchTogether';
 import { useSession } from '@/app/providers';
 import { ReelItem, type ReelViewerApi } from './ReelItem';
 import { HighlightsSheet, OptionsSheet, ShareSheet } from './sheets';
+import { VideoCoverEditor } from '@/components/editor/VideoCoverEditor';
 import { prefersReducedMotion, readPrefs, writePrefs, DEFAULT_PREFS, type ReelPrefs } from './prefs';
 
 type AuthorStats = Record<string, { followers: number; following: boolean }>;
@@ -21,6 +22,7 @@ type Sheet =
   | { kind: 'share'; post: Post }
   | { kind: 'options'; post: Post }
   | { kind: 'highlights'; post: Post }
+  | { kind: 'cover'; post: Post }
   | { kind: 'report'; post: Post }
   | { kind: 'saveTo'; post: Post }
   | { kind: 'watch'; post: Post }
@@ -576,6 +578,7 @@ export function ReelsViewer() {
         onCopy={(p) => void copyLink(p)}
         onDownload={(p) => void downloadToShare(p)}
         onHighlights={(p) => setSheet({ kind: 'highlights', post: p })}
+        onEditCover={(p) => setSheet({ kind: 'cover', post: p })}
         onAllowRemix={(p, allow) => void setAllowRemix(p, allow)}
         onAllowEchoes={(p, allow) => void setAllowEchoes(p, allow)}
         onLeaveCollab={(p) => void leaveCollab(p)}
@@ -589,6 +592,9 @@ export function ReelsViewer() {
           onSeek={(ms) => seekTo(open.post.id, ms)}
           onSaved={(p, h: ReelHighlight[]) => patch(p.id, (x) => ({ ...x, highlights: h.length ? h : undefined }))}
         />
+      ) : null}
+      {open?.kind === 'cover' && open.post.media[0] ? (
+        <VideoCoverEditor post={open.post} media={open.post.media[0]} onClose={closeSheet} onSaved={(p) => patch(p.id, () => p)} />
       ) : null}
       <ReportSheet target={open?.kind === 'report' ? { type: 'post', id: open.post.id } : null} onClose={closeSheet} />
       <SaveToSheet

@@ -152,16 +152,21 @@ export function PhotoEditor({
   onDone,
   onCancel,
   square = false,
+  lockRatio,
 }: {
   file: File;
   title?: string;
   /** A profile photo: the crop stays square, and there's no tagging. */
   square?: boolean;
+  /** A cover for a video: the crop keeps the video's shape (width / height), and there's no tagging. */
+  lockRatio?: number;
   /** The edited photo, and anyone tagged in it (spots on the finished, cropped photo). */
   onDone: (f: File, tags: DraftTag[]) => void;
   onCancel: () => void;
 }) {
   const { t } = useSession();
+  // A fixed shape the person can't change: square for a profile photo, the video's shape for a cover.
+  const lock = lockRatio ?? (square ? 1 : null);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [failed, setFailed] = useState(false);
   const [tab, setTab] = useState('crop');
@@ -180,17 +185,26 @@ export function PhotoEditor({
     setFailed(false);
     const url = URL.createObjectURL(file);
     const el = new Image();
+    // The address goes once the picture has loaded (or failed to): taken back while it is still loading
+    // (React mounting twice in development), the browser reports a failed request.
+    let settled = false;
     el.onload = () => {
-      if (!live) return;
+      settled = true;
+      if (!live) return URL.revokeObjectURL(url);
       setImg(el);
-      // A profile photo starts on a square crop in the middle, which the person moves and resizes.
-      if (square) h.set((cur) => ({ ...cur, aspect: '1:1', crop: fitCrop(1, el.naturalWidth, el.naturalHeight) }));
+      // A profile photo starts on a square crop in the middle (a cover on one in the video's shape), which the person moves and resizes.
+      if (lockRatio) h.replace({ ...INITIAL, crop: fitCrop(lockRatio, el.naturalWidth, el.naturalHeight) });
+      else if (square) h.set((cur) => ({ ...cur, aspect: '1:1', crop: fitCrop(1, el.naturalWidth, el.naturalHeight) }));
     };
-    el.onerror = () => live && setFailed(true);
+    el.onerror = () => {
+      settled = true;
+      if (live) setFailed(true);
+      else URL.revokeObjectURL(url);
+    };
     el.src = url;
     return () => {
       live = false;
-      URL.revokeObjectURL(url);
+      if (settled) URL.revokeObjectURL(url);
     };
   }, [file]);
 
@@ -215,7 +229,7 @@ export function PhotoEditor({
     h.set((cur) => {
       const rotate = ((((cur.rotate + dir * 90) % 360) + 360) % 360) as Turn;
       const size = img ? turnedSize(img, rotate) : { W: 1, H: 1 };
-      const ratio = ASPECTS.find((a) => a.id === cur.aspect)!.ratio;
+      const ratio = lock ?? ASPECTS.find((a) => a.id === cur.aspect)!.ratio;
       // Keep a free crop on the same part of the picture; refit a fixed shape.
       const c = cur.crop;
       const crop = ratio
@@ -239,7 +253,8 @@ export function PhotoEditor({
 
   async function done() {
     if (!img) return;
-    if (!h.changed) return onDone(file, tags);
+    // A cover is always cut to the video's shape, even when nothing else changed.
+    if (!h.changed && !lockRatio) return onDone(file, tags);
     setBusy(true);
     setError(null);
     try {
@@ -263,7 +278,7 @@ export function PhotoEditor({
             label: t('m.editor.tab.crop'),
             content: (
               <div className="stack-sm">
-                {square ? null : (
+                {lock ? null : (
                   <Segments
                     label={t('photoEditor.cropShape')}
                     value={s.aspect}
@@ -306,7 +321,7 @@ export function PhotoEditor({
             label: t('m.post.text'),
             content: <TextPanel text={s.text} onChange={(text, group) => h.set((cur) => ({ ...cur, text }), group ?? null)} />,
           },
-          ...(square
+          ...(lock
             ? []
             : [
                 {
@@ -345,6 +360,7 @@ export function PhotoEditor({
               <CropStage
                 img={img}
                 state={s}
+                lock={lock}
                 filterCss={previewFilter(s.filter, s.adjustments, sharpenId)}
                 onCrop={(crop) => h.set((cur) => ({ ...cur, crop }), 'crop')}
               />
@@ -452,11 +468,23 @@ function adjustCrop(c: Crop, handle: Handle, dx: number, dy: number, ratio: numb
 }
 
 /** The whole turned picture with the crop frame on top. */
-function CropStage({ img, state: s, filterCss, onCrop }: { img: HTMLImageElement; state: PhotoState; filterCss: string; onCrop: (c: Crop) => void }) {
+function CropStage({
+  img,
+  state: s,
+  lock,
+  filterCss,
+  onCrop,
+}: {
+  img: HTMLImageElement;
+  state: PhotoState;
+  lock: number | null;
+  filterCss: string;
+  onCrop: (c: Crop) => void;
+}) {
   const { t, locale } = useSession();
   const { W, H } = turnedSize(img, s.rotate);
   const fit = useFit(W, H);
-  const ratio = ASPECTS.find((a) => a.id === s.aspect)!.ratio;
+  const ratio = lock ?? ASPECTS.find((a) => a.id === s.aspect)!.ratio;
   const canvas = usePreviewCanvas(
     (ctx, w) => {
       drawTurned(ctx, img, s, w / W);

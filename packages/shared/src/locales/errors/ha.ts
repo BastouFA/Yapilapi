@@ -1298,4 +1298,13 @@ export const ha: Record<string, string> = {
   'Use a web address that starts with https://, or a path in the app that starts with /.':
     'Yi amfani da adireshin yanar gizo da ya fara da https://, ko hanya a cikin manhajar da ta fara da /.',
   "You can't do this to your own account here.": 'Ba za ka iya yin wannan ga asusunka a nan ba.',
+  'Your video is still being prepared. Try again in a moment.': 'Ana shirya bidiyonka har yanzu. Sake gwadawa nan da ɗan lokaci.',
+  'Choose a moment in the video.': 'Zaɓi wani lokaci a cikin bidiyon.',
+  'We couldn’t take a cover from this moment. Try another one.': 'Ba mu iya ɗaukar murfi daga wannan lokacin ba. Gwada wani.',
+  'Only the person who shared this post can change its cover.': 'Wanda ya raba wannan rubutu ne kaɗai zai iya canza murfinsa.',
+  'Only a post with more than one photo or video has a cover to choose.': 'Rubutu mai hoto ko bidiyo fiye da ɗaya ne kaɗai ke da murfin da za a zaɓa.',
+  'Choose a video of this post.': 'Zaɓi bidiyon wannan rubutu.',
+  'This video was not uploaded here, so its cover can’t be changed.': 'Ba a ɗora wannan bidiyon a nan ba, don haka ba za a iya canza murfinsa ba.',
+  'Choose one cover.': 'Zaɓi murfi ɗaya kawai.',
+  'Choose a video or a photo.': 'Zaɓi bidiyo ko hoto.',
 };
