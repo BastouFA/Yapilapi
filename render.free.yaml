@@ -142,6 +142,9 @@ services:
         value: anthropic
       - key: ANTHROPIC_API_KEY
         sync: false
+      # New automatic translations a day for everyone (about $1–2 per 1,000); raise it as the app grows.
+      - key: AUTO_TRANSLATE_DAILY_LIMIT
+        value: '5000'
 
       # Optional: automatic captions (speech-to-text). Any OpenAI-compatible service (OpenAI, Groq, a
       # Whisper server). Paste the key, then change TRANSCRIBE_PROVIDER to openai-compatible.
