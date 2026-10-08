@@ -30,7 +30,8 @@ import { vi } from './vi.ts';
 import { yo } from './yo.ts';
 import { zh } from './zh.ts';
 import { zu } from './zu.ts';
+import { nl } from './nl.ts';
 
 export type ErrorMessages = Record<string, string>;
 
-export const ERROR_MESSAGES: Record<string, ErrorMessages> = { fr, ar, es, pt, sw, yo, ha, zh, hi, bn, ru, ja, de, id, tr, ko, it, vi, ur, am, ig, zu };
+export const ERROR_MESSAGES: Record<string, ErrorMessages> = { fr, ar, es, pt, sw, yo, ha, zh, hi, bn, ru, ja, de, id, tr, ko, it, vi, ur, am, ig, zu, nl };

@@ -29,8 +29,9 @@ import { vi } from './locales/vi.ts';
 import { yo } from './locales/yo.ts';
 import { zh } from './locales/zh.ts';
 import { zu } from './locales/zu.ts';
+import { nl } from './locales/nl.ts';
 
 export * from './i18n-core.ts';
 
-export const CATALOGS: Record<string, Catalog> = { en, fr, ar, es, pt, sw, yo, ha, zh, hi, bn, ru, ja, de, id, tr, ko, it, vi, ur, am, ig, zu };
+export const CATALOGS: Record<string, Catalog> = { en, fr, ar, es, pt, sw, yo, ha, zh, hi, bn, ru, ja, de, id, tr, ko, it, vi, ur, am, ig, zu, nl };
 for (const [code, catalog] of Object.entries(CATALOGS)) registerLocale(code, catalog);

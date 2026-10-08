@@ -71,7 +71,8 @@ describe('the phone', () => {
 describe("a visitor's language", () => {
   it('takes the first preferred language the app has, by base language', () => {
     expect(preferredLocale(['fr-CA', 'en-US'])).toBe('fr');
-    expect(preferredLocale(['nl-NL', 'nl', 'ar-EG'])).toBe('ar');
+    expect(preferredLocale(['pl-PL', 'pl', 'ar-EG'])).toBe('ar');
+    expect(preferredLocale(['nl-BE', 'fr'])).toBe('nl');
     expect(preferredLocale(['de-DE', 'ar-EG'])).toBe('de');
     expect(preferredLocale(['zh-Hans-CN'])).toBe('zh');
     expect(preferredLocale(['pt_BR'])).toBe('pt');
@@ -79,7 +80,7 @@ describe("a visitor's language", () => {
   });
 
   it('is English when none of them is available', () => {
-    expect(preferredLocale(['nl', 'th'])).toBe('en');
+    expect(preferredLocale(['pl', 'th'])).toBe('en');
     expect(preferredLocale([])).toBe('en');
     expect(preferredLocale(['', null, undefined])).toBe('en');
   });

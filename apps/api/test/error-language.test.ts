@@ -111,7 +111,8 @@ describe('errors in the reader’s language', () => {
     expect(app.json().error.message).toBe(ERROR_MESSAGES.fr![wrong]);
 
     // A language without a table reads English.
-    expect((await login({ 'accept-language': 'nl-NL,nl;q=0.9' })).json().error.message).toBe(wrong);
+    expect((await login({ 'accept-language': 'pl-PL,pl;q=0.9' })).json().error.message).toBe(wrong);
+    expect((await login({ 'accept-language': 'nl-NL,nl;q=0.9' })).json().error.message).toBe(ERROR_MESSAGES.nl![wrong]);
     expect((await login({ 'accept-language': 'hi-IN,hi;q=0.9' })).json().error.message).toBe(ERROR_MESSAGES.hi![wrong]);
   });
 

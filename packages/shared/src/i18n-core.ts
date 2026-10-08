@@ -40,6 +40,7 @@ const LOADERS: Record<string, () => Promise<Catalog>> = {
   am: () => import('./locales/am.ts').then((m) => m.am),
   ig: () => import('./locales/ig.ts').then((m) => m.ig),
   zu: () => import('./locales/zu.ts').then((m) => m.zu),
+  nl: () => import('./locales/nl.ts').then((m) => m.nl),
 };
 
 export const SUPPORTED_LOCALES: string[] = ['en', ...Object.keys(LOADERS)];
@@ -176,7 +177,7 @@ export function pluralCategory(locale: string, count: number): PluralCategory {
     case 'id':
       return 'other';
     default:
-      // English, German, Turkish, Urdu, Swahili, Hausa, and any language without a catalog.
+      // English, German, Dutch, Turkish, Urdu, Swahili, Hausa, and any language without a catalog.
       return n === 1 ? 'one' : 'other';
   }
 }

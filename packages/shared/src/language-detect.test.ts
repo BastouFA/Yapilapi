@@ -33,7 +33,7 @@ describe('language detection', () => {
 
 describe('language names', () => {
   it('names each language in itself', () => {
-    expect(['zh', 'hi', 'bn', 'ru', 'ja', 'de', 'id', 'tr', 'ko', 'it', 'vi', 'ur', 'am', 'ig', 'zu'].map(autonym)).toEqual([
+    expect(['zh', 'hi', 'bn', 'ru', 'ja', 'de', 'id', 'tr', 'ko', 'it', 'vi', 'ur', 'am', 'ig', 'zu', 'nl'].map(autonym)).toEqual([
       '中文',
       'हिन्दी',
       'বাংলা',
@@ -49,6 +49,7 @@ describe('language names', () => {
       'አማርኛ',
       'Igbo',
       'isiZulu',
+      'Nederlands',
     ]);
     expect(autonym('xx')).toBe('xx');
   });
@@ -65,6 +66,7 @@ describe('language names', () => {
       'isiZulu',
       'Italiano',
       'Kiswahili',
+      'Nederlands',
       'Português',
       'Tiếng Việt',
       'Türkçe',

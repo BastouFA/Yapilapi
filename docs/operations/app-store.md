@@ -53,7 +53,7 @@ Before launch:
   - Until these are set, the pages show bracketed placeholders.
 - [ ] If you serve people in the United States, register a DMCA designated agent with the U.S. Copyright Office (dmca.copyright.gov) and put its details on the copyright page.
 - [ ] When the pages change, update `LEGAL_UPDATED` in `packages/shared/src/legal.ts`. That date is the "Last updated" line on every page.
-- [ ] Translations. The page text is English only. The page frame (titles, navigation and the "this page is in English" note) is translated into every app language (23). If a lawyer approves translated versions, add them per language.
+- [ ] Translations. The page text is English only. The page frame (titles, navigation and the "this page is in English" note) is translated into every app language (24). If a lawyer approves translated versions, add them per language.
 
 In development builds, a yellow banner on every legal page says they are templates. It never shows in production builds (`NODE_ENV=production`).
 

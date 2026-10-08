@@ -19,9 +19,9 @@ const keys = Object.keys(en).sort();
 const placeholders = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!).sort();
 
 describe('message catalogs', () => {
-  it('has the 23 supported languages', () => {
+  it('has the 24 supported languages', () => {
     expect([...SUPPORTED_LOCALES].sort()).toEqual(
-      ['am', 'ar', 'bn', 'de', 'en', 'es', 'fr', 'ha', 'hi', 'id', 'ig', 'it', 'ja', 'ko', 'pt', 'ru', 'sw', 'tr', 'ur', 'vi', 'yo', 'zh', 'zu'].sort(),
+      ['am', 'ar', 'bn', 'de', 'en', 'es', 'fr', 'ha', 'hi', 'id', 'ig', 'it', 'ja', 'ko', 'nl', 'pt', 'ru', 'sw', 'tr', 'ur', 'vi', 'yo', 'zh', 'zu'].sort(),
     );
     // The phone and the API load every catalog up front: the same languages the web loads on demand.
     expect(Object.keys(CATALOGS).sort()).toEqual([...SUPPORTED_LOCALES].sort());

@@ -4,7 +4,7 @@
 import { writeFileSync } from 'node:fs';
 
 // The app's languages (SUPPORTED_LOCALES in packages/shared/src/i18n-core.ts).
-const LANGS = ['en', 'fr', 'ar', 'es', 'pt', 'sw', 'yo', 'ha', 'zh', 'hi', 'bn', 'ru', 'ja', 'de', 'id', 'tr', 'ko', 'it', 'vi', 'ur', 'am', 'ig', 'zu'];
+const LANGS = ['en', 'fr', 'ar', 'es', 'pt', 'sw', 'yo', 'ha', 'zh', 'hi', 'bn', 'ru', 'ja', 'de', 'id', 'tr', 'ko', 'it', 'vi', 'ur', 'am', 'ig', 'zu', 'nl'];
 const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const en = new Intl.DisplayNames(['en'], { type: 'region', fallback: 'none' });
 const codes = [];

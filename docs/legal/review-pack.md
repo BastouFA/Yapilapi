@@ -18,7 +18,7 @@ Some features are optional helpers that use a third-party AI model: summaries, s
 ## 2. Who it is for, and where
 
 - **Minimum age:** 13. People from 13 to 17 get extra protections (section 6). Selling, receiving money and payouts are 18 and over.
-- **Languages:** the app ships in English, French, Arabic, Spanish, Portuguese (Brazil), Swahili, Yorùbá and Hausa. Arabic is right-to-left. Push notifications and emails (security notices, sign-in alerts, password reset, email confirmation, the account deletion note) go out in the person's app language.
+- **Languages:** the app ships in 24 languages: English, French, Arabic, Spanish, Portuguese (Brazil), Swahili, Yorùbá, Hausa, Chinese (Simplified), Hindi, Bengali, Russian, Japanese, German, Dutch, Indonesian, Turkish, Korean, Italian, Vietnamese, Urdu, Amharic, Igbo and Zulu. Arabic and Urdu are right-to-left. Push notifications and emails (security notices, sign-in alerts, password reset, email confirmation, the account deletion note) go out in the person's app language.
 - **Likely markets:** Nigeria, Ghana, Kenya and South Africa. Paystack is wired for NGN, GHS, KES and ZAR, and Yorùbá, Hausa and Swahili are supported.
 - **Other markets the languages point to:**
   - French-speaking West and Central Africa, and France;
@@ -28,7 +28,7 @@ Some features are optional helpers that use a third-party AI model: summaries, s
   - Arabic-speaking North Africa and the Middle East.
 - **Europe and the United States:** some users there are likely, since the web app is open to anyone.
 - **Launch countries:** the owner has not yet chosen them. Both stores let you pick countries. The app-store guide suggests starting with the countries the lawyer has reviewed.
-- **Language of the legal texts:** the page text is English only. The page frame is translated into every app language (23) and marked, in each language, as English-only text: titles, navigation, "Last updated" and a note that the text is in English. See question 40.
+- **Language of the legal texts:** the page text is English only. The page frame is translated into every app language (24) and marked, in each language, as English-only text: titles, navigation, "Last updated" and a note that the text is in English. See question 40.
 
 ## 3. The documents
 
