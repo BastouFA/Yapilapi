@@ -1219,6 +1219,7 @@ export const hi: Record<string, string> = {
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'आज आपने चेन में बहुत सारी रील जोड़ी हैं। कल फिर से कोशिश करें।',
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'आपके आस-पास चालू नहीं है।',
+  'Yap Radio is not enabled.': 'Yap Radio चालू नहीं है।',
   'Zoom in to see what’s here.': 'यहाँ क्या है यह देखने के लिए ज़ूम इन करें।',
   // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
   "Squad doesn't exist or isn't visible to you.": 'यह स्क्वाड मौजूद नहीं है या आपको नहीं दिखता।',

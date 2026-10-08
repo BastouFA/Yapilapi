@@ -11,6 +11,7 @@ import { client, mediaUrl } from '../../lib/api';
 import { useT } from '../../lib/i18n';
 import { useReducedMotion } from '../../lib/motion';
 import { NavGlyph } from '../../lib/nav-glyphs';
+import { RadioMiniBar } from '../../lib/radio';
 import { useRealtime, useSession } from '../../lib/session';
 import { elevation, gradient, type Palette } from '../../lib/theme';
 import { DOCK, NavTour } from '../../lib/tour';
@@ -142,6 +143,8 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
 
   return (
     <>
+      {/* Yap Radio, while it has a Yap: just above the dock and its raised middle button. */}
+      <RadioMiniBar bottom={Math.max(insets.bottom, 12) + ROW + PAD * 2 + 2 + 38} />
       <View pointerEvents="box-none" style={[s.wrap, { bottom: Math.max(insets.bottom, 12) }]}>
         <View
           accessibilityRole="tablist"

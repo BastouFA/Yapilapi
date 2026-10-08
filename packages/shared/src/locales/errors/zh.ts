@@ -1164,6 +1164,7 @@ export const zh: Record<string, string> = {
   'You’ve added a lot of reels to chains today. Try again tomorrow.': '你今天已经往接力里添加了很多短视频。请明天再试。',
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': '“你附近”未启用。',
+  'Yap Radio is not enabled.': 'Yap 电台未开启。',
   'Zoom in to see what’s here.': '放大地图即可查看这里有什么。',
   // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
   "Squad doesn't exist or isn't visible to you.": '这个小队不存在，或者你无法查看。',

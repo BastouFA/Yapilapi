@@ -20,6 +20,7 @@ import {
   type SquadMemory,
 } from '@yapilapi/shared';
 import { api, errorMessage, fieldErrors } from '@/lib/api';
+import { PlayAsRadio } from '@/components/Radio';
 import { useSession } from '@/app/providers';
 import { PostList, StaticPostList } from '@/components/PostList';
 
@@ -465,6 +466,7 @@ export function SquadPage({ id }: { id: string }) {
                 {t('mixes.share.open')}
               </Link>
             ) : null}
+            <PlayAsRadio station={{ kind: 'squad', key: squad.id }} />
           </div>
         </div>
       </div>

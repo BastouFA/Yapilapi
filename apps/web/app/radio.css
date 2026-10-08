@@ -1,0 +1,317 @@
+/* Yap Radio (components/Radio.tsx, app/(app)/radio/page.tsx): the bar on every page and the Radio page. */
+
+/* ── The bar: above the dock (clear of its raised Yap button) on phones, at the foot of the main column on wide screens ── */
+.radio-bar {
+  position: fixed;
+  z-index: 49;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  max-width: 460px;
+  margin-inline: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 6px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  backdrop-filter: blur(24px) saturate(1.8);
+  box-shadow: var(--shadow-lg);
+  color: var(--ink);
+}
+.radio-bar__progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--yapi);
+  transform-origin: left center;
+}
+[dir='rtl'] .radio-bar__progress {
+  transform-origin: right center;
+}
+.radio-bar__open {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-1);
+  border-radius: 14px;
+  color: inherit;
+  text-decoration: none;
+}
+.radio-bar__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.radio-bar__name,
+.radio-bar__station {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.radio-bar__name {
+  font: 700 14px/1.3 var(--font-sans);
+}
+.radio-bar__station {
+  color: var(--ink-muted);
+  font: 500 12px/1.3 var(--font-sans);
+}
+.radio-bar__btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+.radio-bar__btn--main {
+  background: var(--yapi);
+  color: var(--on-yapi);
+}
+.radio-bar__btn:hover {
+  background: var(--surface-sunken);
+}
+.radio-bar__btn--main:hover {
+  background: var(--yapi-strong);
+}
+.radio-bar__open:focus-visible,
+.radio-bar__btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+/* Room under the page for the bar. */
+.yp-shell:has(.radio-bar) .yp-shell__main {
+  padding-bottom: calc(176px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 900px) {
+  .radio-bar {
+    left: calc(248px + var(--space-8));
+    right: var(--space-8);
+    bottom: var(--space-4);
+    max-width: 640px;
+  }
+  .yp-shell:has(.radio-bar) .yp-shell__main {
+    padding-bottom: 120px;
+  }
+}
+@media (min-width: 1220px) {
+  .radio-bar {
+    left: calc(264px + var(--space-8));
+    right: calc(340px + var(--space-8));
+  }
+}
+/* Yap mode (chats on their own) has no dock. */
+.yap-mode__main ~ .radio-bar {
+  bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  left: var(--space-3);
+  right: var(--space-3);
+}
+
+/* ── The Radio page ── */
+.radio__stations {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.radio__station {
+  flex: none;
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--ink);
+  font: 600 14px/1 var(--font-sans);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.radio__station[aria-pressed='true'] {
+  border-color: var(--yapi);
+  background: var(--yapi);
+  color: var(--on-yapi);
+}
+.radio__station:focus-visible,
+.radio__ctl:focus-visible,
+.radio__big:focus-visible,
+.radio__wave:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.radio__start {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+}
+.radio__big {
+  display: grid;
+  place-items: center;
+  width: 112px;
+  height: 112px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--grad);
+  color: var(--on-yapi);
+  cursor: pointer;
+}
+.radio__now {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.radio__on {
+  margin: 0;
+  color: var(--ink-muted);
+  font: 600 13px/1.3 var(--font-sans);
+  text-align: center;
+}
+.radio__speaker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: center;
+  color: inherit;
+  text-decoration: none;
+}
+.radio__speaker--loading {
+  width: 88px;
+  height: 88px;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+}
+.radio__name {
+  font: 800 22px/1.2 var(--font-display);
+  text-align: center;
+}
+.radio__line {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.5;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.radio__wave {
+  height: 64px;
+}
+.radio__wave svg {
+  height: 56px;
+}
+.radio__clock {
+  margin: 0;
+  color: var(--ink-muted);
+  font: 500 13px/1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.radio__controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-4);
+}
+.radio__ctl {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  color: var(--ink);
+  cursor: pointer;
+}
+.radio__ctl--main {
+  width: 72px;
+  height: 72px;
+  background: var(--yapi);
+  color: var(--on-yapi);
+}
+.radio__ctl--main:hover {
+  background: var(--yapi-strong);
+}
+[dir='rtl'] .radio__ctl svg {
+  transform: scaleX(-1);
+}
+.radio__actions,
+.radio__settings {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-2);
+}
+.radio__sleep {
+  min-width: 180px;
+}
+.radio__words {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+.radio__h2 {
+  margin: 0 0 var(--space-2);
+  font: 700 16px/1.3 var(--font-sans);
+}
+.radio__next ol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.radio__next li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.radio__next li > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.radio__muted {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.radio__keys {
+  display: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .radio__keys {
+    display: block;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .radio__words {
+    scroll-behavior: auto;
+  }
+}

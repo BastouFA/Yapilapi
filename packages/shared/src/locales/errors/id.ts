@@ -1217,6 +1217,7 @@ export const id: Record<string, string> = {
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Anda sudah menambahkan banyak reel ke rantai hari ini. Coba lagi besok.',
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'Di dekat Anda tidak diaktifkan.',
+  'Yap Radio is not enabled.': 'Yap Radio belum diaktifkan.',
   'Zoom in to see what’s here.': 'Perbesar untuk melihat apa yang ada di sini.',
   // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
   "Squad doesn't exist or isn't visible to you.": 'Squad ini tidak ada atau tidak terlihat oleh Anda.',

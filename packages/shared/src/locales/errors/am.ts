@@ -1169,6 +1169,7 @@ export const am: Record<string, string> = {
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'ዛሬ ብዙ ሪሎችን ወደ ሰንሰለቶች አክለዋል። ነገ እንደገና ይሞክሩ።',
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'በአቅራቢያዎ አልበራም።',
+  'Yap Radio is not enabled.': 'Yap Radio አልበራም።',
   'Zoom in to see what’s here.': 'እዚህ ያለውን ለማየት ያጉሉ።',
   // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
   "Squad doesn't exist or isn't visible to you.": 'ይህ ስኳድ የለም ወይም ሊያዩት አይችሉም።',

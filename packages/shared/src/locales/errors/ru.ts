@@ -1214,6 +1214,7 @@ export const ru: Record<string, string> = {
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Сегодня вы добавили в цепочки много рилсов. Попробуйте завтра.',
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'Функция «Рядом с вами» не включена.',
+  'Yap Radio is not enabled.': 'Радио Yap не включено.',
   'Zoom in to see what’s here.': 'Приблизьте карту, чтобы увидеть, что здесь есть.',
   // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
   "Squad doesn't exist or isn't visible to you.": 'Такого сквада нет, или он вам недоступен.',

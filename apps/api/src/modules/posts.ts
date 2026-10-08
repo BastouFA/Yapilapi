@@ -66,7 +66,7 @@ import { assertYapPace, forgetVoice } from '../lib/voice.ts';
 const idParam = z.object({ id: z.string().uuid() });
 
 /** Personal filters for every feed (the viewer is $1): muted people, "not interested", muted creators and topics. */
-const PERSONAL_FILTERS = `
+export const PERSONAL_FILTERS = `
       AND NOT EXISTS (SELECT 1 FROM mutes m WHERE m.muter_id = $1 AND m.muted_id = p.author_id)
       AND NOT EXISTS (SELECT 1 FROM feed_feedback ff WHERE ff.user_id = $1 AND (
             (ff.signal = 'not_interested' AND ff.post_id = p.id)

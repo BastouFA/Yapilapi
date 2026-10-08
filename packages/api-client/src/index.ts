@@ -177,6 +177,9 @@ import type {
   TranscriptStatus,
   VoiceClip,
   VoicePurpose,
+  RadioPage,
+  RadioStation,
+  RadioStations,
 } from '@yapilapi/shared';
 
 export class ApiError extends Error {
@@ -773,6 +776,25 @@ export function createClient(opts: ClientOptions) {
       get: (id: string) => get<{ voice: VoiceClip }>(`/v1/voice/${id}`),
       /** "Listen in English": the translation of a clip's transcript, read out (flags voice.listen). */
       speech: (id: string, target: string) => post<{ url: string; language: string }>(`/v1/voice/${id}/speech`, { target }),
+    },
+    /**
+     * Yap Radio (docs/product/yap-radio.md): the stations offered to you, and a station's next Yaps
+     * in order (never one you've finished). `start` puts a Yap first (to carry on where you left off);
+     * `lat`/`lng` (rounded) place Near you, which otherwise uses your profile's city.
+     */
+    radio: {
+      stations: () => get<RadioStations>('/v1/radio'),
+      next: (station: RadioStation, o: { cursor?: string | null; limit?: number; start?: string | null; lat?: number; lng?: number } = {}) =>
+        get<RadioPage>(
+          `/v1/radio/${station.kind}${qs({
+            key: station.key,
+            cursor: o.cursor,
+            limit: o.limit,
+            start: o.start,
+            lat: o.lat === undefined ? undefined : o.lat.toFixed(3),
+            lng: o.lng === undefined ? undefined : o.lng.toFixed(3),
+          })}`,
+        ),
     },
     media: {
       /** `viewOnce`: stored privately for a view-once chat message (no public address; url is empty). */

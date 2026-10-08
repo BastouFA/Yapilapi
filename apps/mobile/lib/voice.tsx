@@ -99,6 +99,24 @@ export function pauseVoice() {
   }
 }
 
+/** Others that play sound app-wide (Yap Radio), told when a clip here starts or a recording begins, so they pause. */
+const voiceStarts = new Set<() => void>();
+export function onVoicePlay(listener: () => void) {
+  voiceStarts.add(listener);
+  return () => {
+    voiceStarts.delete(listener);
+  };
+}
+function tellVoiceStart() {
+  for (const l of voiceStarts) {
+    try {
+      l();
+    } catch {
+      // One listener never stops the others.
+    }
+  }
+}
+
 /** Files recorded on this phone play as they are; the API's addresses may be relative to it. */
 const sourceOf = (url: string) => (/^(file|content|ph|assets-library):/i.test(url) ? url : mediaUrl(url));
 
@@ -266,6 +284,7 @@ export function VoicePlayer({
   const play = () => {
     if (current && current !== entry) pauseVoice();
     current = entry;
+    tellVoiceStart();
     load();
     void setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).catch(() => {});
     if (!started.current) {
@@ -460,7 +479,7 @@ export function VoicePlayer({
  * spoken is marked as it plays, and tapping a line plays from there (the original only: a
  * translation has no timings).
  */
-function TranscriptText({
+export function TranscriptText({
   id,
   text,
   lang,
@@ -468,6 +487,7 @@ function TranscriptText({
   own,
   atMs,
   onSeek,
+  listen = true,
 }: {
   id: string;
   text: string;
@@ -477,6 +497,8 @@ function TranscriptText({
   /** Where it's playing, or -1 when it isn't. */
   atMs: number;
   onSeek: (ms: number) => void;
+  /** Offer "Listen in …" under a translation (off on the radio, which reads it out itself). */
+  listen?: boolean;
 }) {
   const c = useColors();
   const { voice } = useTranslationSettings();
@@ -505,7 +527,7 @@ function TranscriptText({
         </Text>
       )}
       <TranslationBar state={state} />
-      {translated && voice.listen ? <Listen kind="voice" id={id} target={state.translation!.targetLanguage} tint={c.yapi} /> : null}
+      {translated && voice.listen && listen ? <Listen kind="voice" id={id} target={state.translation!.targetLanguage} tint={c.yapi} /> : null}
     </View>
   );
 }
@@ -584,8 +606,9 @@ export function VoiceRecorder({
     want.current = true;
     locked.current = handsFree;
     setPhase('starting');
-    // No Yap plays over a recording.
+    // No Yap plays over a recording (nor the radio).
     pauseVoice();
+    tellVoiceStart();
     try {
       const perm = await requestRecordingPermissionsAsync();
       if (!perm.granted) {

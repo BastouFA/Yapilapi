@@ -1324,6 +1324,7 @@ export const ha: Record<string, string> = {
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Ka ƙara reels da yawa a sarƙoƙi yau. Sake gwadawa gobe.',
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'Ba a kunna Kusa da kai ba.',
+  'Yap Radio is not enabled.': 'Ba a kunna Yap Radio ba.',
   'Zoom in to see what’s here.': 'Zuƙo don ganin abin da ke nan.',
   // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
   "Squad doesn't exist or isn't visible to you.": 'Wannan squad ɗin babu shi ko ba za ka iya ganinsa ba.',

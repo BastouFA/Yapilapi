@@ -1204,6 +1204,7 @@ export const bn: Record<string, string> = {
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'আজ আপনি চেইনে অনেক রিল যোগ করেছেন। আগামীকাল আবার চেষ্টা করুন।',
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'আপনার কাছাকাছি চালু নেই।',
+  'Yap Radio is not enabled.': 'Yap Radio চালু নেই।',
   'Zoom in to see what’s here.': 'এখানে কী আছে দেখতে জুম ইন করুন।',
   // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
   "Squad doesn't exist or isn't visible to you.": 'এই স্কোয়াড নেই, অথবা আপনি এটি দেখতে পারবেন না।',

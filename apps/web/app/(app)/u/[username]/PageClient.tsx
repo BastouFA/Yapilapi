@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Avatar, Badge, Button, EmptyState, Menu, PlusBadge, Segments, Skeleton, VoicePlayer } from '@yapilapi/design-system';
+import { PlayAsRadio } from '@/components/Radio';
 import { FollowList } from '@/components/FollowList';
 import type { Profile, ProfileTab } from '@yapilapi/shared';
 import { api, errorMessage, isGone, onFollowChange } from '@/lib/api';
@@ -315,6 +316,12 @@ export default function ProfilePageClient({ isPublic }: { isPublic: boolean }) {
             <VoicePlayer clip={profile.voiceIntro} label={t('voice.intro.play')} locale={locale} size="sm" own={rel.isSelf} />
           </div>
         ) : null}
+        {/* Yap Radio: their Yaps one after another (shown only when the radio is on for the viewer). */}
+        {rel.blocked || signedOut ? null : (
+          <div className="row">
+            <PlayAsRadio station={{ kind: 'person', key: profile.username }} />
+          </div>
+        )}
         <ProfileLinks links={profile.links} />
         <ProfileAbout profile={profile} />
         {/* Someone you blocked shows nothing of theirs, not even counts. */}

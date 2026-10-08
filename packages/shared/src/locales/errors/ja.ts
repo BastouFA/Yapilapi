@@ -1207,6 +1207,7 @@ export const ja: Record<string, string> = {
   'You’ve added a lot of reels to chains today. Try again tomorrow.': '今日はたくさんのリールをリレーに追加しました。明日もう一度お試しください。',
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': '「あなたの近く」は有効になっていません。',
+  'Yap Radio is not enabled.': 'Yapラジオは有効になっていません。',
   'Zoom in to see what’s here.': '拡大すると、ここにあるものが表示されます。',
   // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
   "Squad doesn't exist or isn't visible to you.": 'このスクワッドは存在しないか、表示できません。',

@@ -1204,6 +1204,7 @@ export const ig: Record<string, string> = {
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Ị tinyela ọtụtụ reel n’agbụ taa. Nwaa ọzọ echi.',
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'Agbanyeghị Nso gị.',
+  'Yap Radio is not enabled.': 'Agbanyebeghị Yap Radio.',
   'Zoom in to see what’s here.': 'Mee ka ọ buo ibu ka ị hụ ihe dị ebe a.',
   // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
   "Squad doesn't exist or isn't visible to you.": 'Squad a adịghị ma ọ bụ na ị nweghị ike ịhụ ya.',

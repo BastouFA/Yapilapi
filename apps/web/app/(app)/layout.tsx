@@ -16,6 +16,7 @@ import { isPublicPath, SignedOutShell } from '@/components/SignedOut';
 import { UsageHeartbeat } from '@/components/UsageHeartbeat';
 import { YapPlayer } from '@/components/Yap';
 import { PageBack } from '@/components/BackButton';
+import { RadioBar, RadioProvider } from '@/components/Radio';
 import { useSession } from '../providers';
 
 function currentTab(path: string, username?: string, yaps = true): NavEntry['id'] | undefined {
@@ -102,10 +103,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <CallsProvider>
         <RoomsProvider>
           <CheckoutProvider>
-            <main className="yap-mode__main" id="main">
-              {children}
-            </main>
-            <YapPlayer />
+            {/* Yap Radio keeps playing between Yap mode and the rest of the app (the same element in both). */}
+            <RadioProvider>
+              <main className="yap-mode__main" id="main">
+                {children}
+              </main>
+              <YapPlayer />
+              <RadioBar />
+            </RadioProvider>
           </CheckoutProvider>
         </RoomsProvider>
       </CallsProvider>
@@ -115,27 +120,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <CallsProvider>
       <RoomsProvider>
         <CheckoutProvider>
-          <div className="yp-shell">
-            <NavBar
-              items={items}
-              current={currentTab(path, me.username, yaps)}
-              linkAs={NextLink}
-              locale={locale}
-              logoSrc="/mark.svg"
-              searchHref="/search"
-              footer={<RailAccountButton />}
-            />
-            <main className="yp-shell__main" id="main">
-              {/* A note from the team to everyone, until it ends or you close it. */}
-              <AnnouncementBanner />
-              <PageBack />
-              {children}
-            </main>
-            <Sidebar />
-            <CreateMenu open={creating} onClose={() => setCreating(false)} />
-            <UsageHeartbeat />
-            <YapPlayer />
-          </div>
+          <RadioProvider>
+            <div className="yp-shell">
+              <NavBar
+                items={items}
+                current={currentTab(path, me.username, yaps)}
+                linkAs={NextLink}
+                locale={locale}
+                logoSrc="/mark.svg"
+                searchHref="/search"
+                footer={<RailAccountButton />}
+              />
+              <main className="yp-shell__main" id="main">
+                {/* A note from the team to everyone, until it ends or you close it. */}
+                <AnnouncementBanner />
+                <PageBack />
+                {children}
+              </main>
+              <Sidebar />
+              <CreateMenu open={creating} onClose={() => setCreating(false)} />
+              <UsageHeartbeat />
+              <YapPlayer />
+              <RadioBar />
+            </div>
+          </RadioProvider>
         </CheckoutProvider>
       </RoomsProvider>
     </CallsProvider>

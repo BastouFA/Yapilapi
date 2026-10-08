@@ -355,7 +355,15 @@ export function VoicePlayer({
           <div id={transcriptId} className="yp-voice__words" role="region" aria-label={tt('voice.transcript')} hidden={!open}>
             {open ? (
               st.status === 'ready' && st.text ? (
-                <Transcript clip={clip} own={own} locale={locale} at={pos / 1000} playing={playing || pos > 0} onSeek={(s) => seek(s * 1000)} speak={speak} />
+                <VoiceTranscript
+                  clip={clip}
+                  own={own}
+                  locale={locale}
+                  at={pos / 1000}
+                  playing={playing || pos > 0}
+                  onSeek={(s) => seek(s * 1000)}
+                  speak={speak}
+                />
               ) : (
                 <p className="yp-voice__note" role="status">
                   {tt(st.status === 'pending' ? 'voice.transcript.pending' : 'voice.transcript.unavailable')}
@@ -374,7 +382,7 @@ export function VoicePlayer({
  * ("Translated from French · See original"). In the original, each timed line can be pressed to
  * go to it, and the line being spoken is marked while it plays.
  */
-function Transcript({
+export function VoiceTranscript({
   clip,
   own,
   locale,

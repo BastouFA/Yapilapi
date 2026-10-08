@@ -16,7 +16,7 @@ export {
   type Translatable,
   type TranslationContextValue,
 } from './translation.tsx';
-export { VoicePlayer, type VoiceListenEvent, type VoicePlayerProps } from './voice.tsx';
+export { VoicePlayer, VoiceTranscript, type VoiceListenEvent, type VoicePlayerProps } from './voice.tsx';
 export {
   Alert,
   Avatar,

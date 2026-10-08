@@ -1234,6 +1234,7 @@ export const zu: Record<string, string> = {
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Wengeze ama-reel amaningi ezinchungechungeni namuhla. Zama futhi kusasa.',
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'Eduze nawe akuvuliwe.',
+  'Yap Radio is not enabled.': 'Umsakazo we-Yap awuvuliwe.',
   'Zoom in to see what’s here.': 'Sondeza ukuze ubone okulapha.',
   // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
   "Squad doesn't exist or isn't visible to you.": 'Le squad ayikho noma awukwazi ukuyibona.',

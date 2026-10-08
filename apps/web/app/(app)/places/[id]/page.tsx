@@ -10,6 +10,7 @@ import { NextLink } from '@/lib/link';
 import { BuyButton } from '@/components/BuyButton';
 import { BookTable, ManageBookings, MyBookings, PlaceReviews } from '@/components/PlaceExtras';
 import { EditPlace } from '@/components/EditPlace';
+import { PlayAsRadio } from '@/components/Radio';
 import { ProductCard } from '@yapilapi/design-system';
 import { useSession } from '../../../providers';
 
@@ -55,6 +56,10 @@ export default function PlacePage() {
             {t('m.place.openMap')}
           </a>
         ) : null}
+        {/* Yap Radio: the Yaps tagged here, one after another. */}
+        <div className="row">
+          <PlayAsRadio station={{ kind: 'place', key: place.id }} />
+        </div>
       </div>
       {hours.length ? (
         <section className="stack-sm">

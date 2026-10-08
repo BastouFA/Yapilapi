@@ -15,6 +15,7 @@ import { SuggestedPeople } from '@/components/SuggestedPeople';
 import { PulseCards } from '@/components/WeeklyWrap';
 import { FollowingDrops } from '@/components/Drops';
 import { ScreenLoading } from '@/components/Loading';
+import { PlayAsRadio } from '@/components/Radio';
 import { useSession } from '../../providers';
 
 // The story viewer opens full screen when a story is tapped, so it downloads then.
@@ -104,6 +105,13 @@ export default function Home() {
       <StarterRow />
 
       {mode === 'for_you' || mode === 'following' ? <SuggestedPeople /> : null}
+
+      {/* Yaps: or press play once and listen hands-free (Yap Radio). */}
+      {mode === 'yaps' ? (
+        <div className="row">
+          <PlayAsRadio station={{ kind: 'for_you' }} label={t('radio.title')} variant="primary" />
+        </div>
+      ) : null}
 
       <PostList
         load={load}

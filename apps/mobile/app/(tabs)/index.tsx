@@ -12,6 +12,7 @@ import { onBackOnline } from '../../lib/network';
 import { PulseEmpty } from '../../lib/empty';
 import { useT } from '../../lib/i18n';
 import { PostCard } from '../../lib/post';
+import { RadioButton } from '../../lib/radio';
 import { orderStories, StoriesStrip, StoryViewer } from '../../lib/stories';
 import { useSession } from '../../lib/session';
 import { StarterRow } from '../../lib/starter';
@@ -187,6 +188,12 @@ function Feed() {
             {/* With nothing in the feed, the empty state below does the starter row's job. */}
             {posts?.length ? <StarterRow /> : null}
             <Segmented label={t('m.feed.label')} options={modes.map((m) => ({ id: m.id, label: t(m.label) }))} value={mode} onChange={setMode} />
+            {/* Yaps: listen to them one after another, hands-free. */}
+            {mode === 'yaps' ? (
+              <View style={{ alignItems: 'flex-start' }}>
+                <RadioButton station={{ kind: 'for_you' }} />
+              </View>
+            ) : null}
             {error ? <ErrorState message={error} onRetry={() => Promise.all([load(), loadStories()])} /> : null}
           </View>
         }

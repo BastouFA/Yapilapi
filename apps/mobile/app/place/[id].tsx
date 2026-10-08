@@ -10,6 +10,7 @@ import { client, errorMessage, isGone } from '../../lib/api';
 import { BookPlace, ManageBookings, MyBookings, PlaceReviews, RatingLine, usePlaceOwner, type ReviewData } from '../../lib/place-extras';
 import { SectionHeader } from '../../lib/chips';
 import { useT } from '../../lib/i18n';
+import { RadioButton } from '../../lib/radio';
 import { space } from '../../lib/theme';
 import { Button, Card, EmptyState, Icon, KeyboardAvoid, Loading, Row, ScreenError, useColors, useRefresh, userText } from '../../lib/ui';
 
@@ -105,6 +106,10 @@ export default function PlaceScreen() {
               onPress={() => Linking.openURL(`https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lng}#map=17/${place.lat}/${place.lng}`)}
             />
           ) : null}
+          {/* Yaps tagged here, one after another. */}
+          <View style={{ alignSelf: 'flex-start' }}>
+            <RadioButton station={{ kind: 'place', key: id }} />
+          </View>
         </Card>
 
         {owner.bookings ? <ManageBookings items={owner.bookings} reload={owner.reload} /> : null}

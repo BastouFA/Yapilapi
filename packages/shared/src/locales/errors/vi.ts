@@ -1210,6 +1210,7 @@ export const vi: Record<string, string> = {
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Hôm nay bạn đã thêm nhiều reel vào các chuỗi. Hãy thử lại vào ngày mai.',
   // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
   'Near you is not enabled.': 'Gần bạn chưa được bật.',
+  'Yap Radio is not enabled.': 'Yap Radio chưa được bật.',
   'Zoom in to see what’s here.': 'Phóng to để xem có gì ở đây.',
   // Squads (lib/squads.ts, and where posts, stories, chats and chains meet them)
   "Squad doesn't exist or isn't visible to you.": 'Squad này không tồn tại hoặc bạn không xem được.',

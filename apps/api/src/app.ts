@@ -77,6 +77,7 @@ import passTheMicModule from './modules/pass-the-mic.ts';
 import squadsModule from './modules/squads.ts';
 import voiceModule from './modules/voice.ts';
 import cityMapModule from './modules/city-map.ts';
+import radioModule from './modules/radio.ts';
 import tagsModule from './modules/tags.ts';
 import collabsModule from './modules/collabs.ts';
 import postCoversModule from './modules/post-covers.ts';
@@ -502,6 +503,7 @@ export async function buildApp(
     squadsModule,
     voiceModule,
     cityMapModule,
+    radioModule,
     plusModule,
     invitesModule,
     growthModule,

@@ -79,12 +79,23 @@ export function CommentsSheet({
  * edits within 15 minutes, and the post author's tools (who can comment, pin,
  * hidden comments). Replying to a reply stays in the thread and starts with an @mention.
  */
-export function Comments({ post, onCountChange, moment }: { post: Post; onCountChange: (delta: number) => void; moment?: CommentMoment }) {
+export function Comments({
+  post,
+  onCountChange,
+  moment,
+  startVoice,
+}: {
+  post: Post;
+  onCountChange: (delta: number) => void;
+  moment?: CommentMoment;
+  /** Open with the voice reply recorder showing (Yap Radio's "Reply by voice"). */
+  startVoice?: boolean;
+}) {
   const { toast, t, tp, locale, me, flags, voice } = useSession();
   const signIn = useSignIn();
   // Talk back: a voice reply, recorded here (with the words typed so far, if any).
   const voiceOn = flags.YAPS !== false;
-  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(!!startVoice);
   const [voiceRec, setVoiceRec] = useState<Recording | null>(null);
   const [voiceBusy, setVoiceBusy] = useState(false);
   const [sort, setSort] = useState<CommentSort>('top');
