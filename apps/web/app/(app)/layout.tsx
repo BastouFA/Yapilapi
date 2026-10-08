@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, EmptyState, NavBar, Skeleton, type NavEntry } from '@yapilapi/design-system';
 import { NextLink } from '@/lib/link';
 import { RailAccountButton } from '@/components/AccountMenu';
@@ -9,6 +9,7 @@ import { AnnouncementBanner } from '@/components/AnnouncementBanner';
 import { BirthDateGate } from '@/components/BirthDateGate';
 import { CallsProvider } from '@/components/Calls';
 import { CheckoutProvider } from '@/components/Checkout';
+import { CreateMenu } from '@/components/CreateMenu';
 import { RoomsProvider } from '@/components/Rooms';
 import { Sidebar } from '@/components/Sidebar';
 import { isPublicPath, SignedOutShell } from '@/components/SignedOut';
@@ -17,7 +18,7 @@ import { YapPlayer } from '@/components/Yap';
 import { PageBack } from '@/components/BackButton';
 import { useSession } from '../providers';
 
-function currentTab(path: string, username?: string): NavEntry['id'] | undefined {
+function currentTab(path: string, username?: string, yaps = true): NavEntry['id'] | undefined {
   if (path.startsWith('/home')) return 'home';
   if (
     path.startsWith('/discover') ||
@@ -31,7 +32,8 @@ function currentTab(path: string, username?: string): NavEntry['id'] | undefined
     path.startsWith('/map')
   )
     return 'discover';
-  if (path.startsWith('/create') || path.startsWith('/camera')) return 'create';
+  // The middle button: Yap (it opens the recorder, and holds the other ways to create), or Spark while Yaps are off.
+  if (path.startsWith('/create') || path.startsWith('/camera')) return yaps ? 'yap' : 'create';
   if (path.startsWith('/inbox') || path.startsWith('/yap') || path.startsWith('/notifications')) return 'inbox';
   if (username && path.startsWith(`/u/${username}`)) return 'profile';
   if (path.startsWith('/settings') || path.startsWith('/studio') || path.startsWith('/saved')) return 'profile';
@@ -39,7 +41,8 @@ function currentTab(path: string, username?: string): NavEntry['id'] | undefined
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { me, loading, unread, locale, sessionError, refresh, t } = useSession();
+  const { me, loading, unread, locale, sessionError, refresh, t, flags } = useSession();
+  const [creating, setCreating] = useState(false);
   const router = useRouter();
   const path = usePathname();
 
@@ -81,11 +84,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
     );
 
+  // Pulse · Wander · Yap · Chats · You (docs/product/yaps.md, "Naming"). The Yap button opens the
+  // recorder; held down (or with the + beside it on a computer) it offers a post, reel, story or live.
+  // While Yaps are off, Spark takes the middle and opens the camera, as before.
+  const yaps = flags.YAPS !== false;
   const items: NavEntry[] = [
     { id: 'home', href: '/home' },
     { id: 'discover', href: '/discover' },
-    // Spark opens the camera, where you choose Post, Reel or Story (or the gallery, or writing).
-    { id: 'create', href: '/camera' },
+    yaps ? { id: 'yap', href: '/create?mode=yap', menu: { label: t('nav.createMore'), open: () => setCreating(true) } } : { id: 'create', href: '/camera' },
     { id: 'inbox', href: '/inbox', badge: unread.messages + unread.notifications },
     { id: 'profile', href: `/u/${me.username}`, avatar: { name: me.displayName, src: me.avatarUrl } },
   ];
@@ -112,7 +118,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="yp-shell">
             <NavBar
               items={items}
-              current={currentTab(path, me.username)}
+              current={currentTab(path, me.username, yaps)}
               linkAs={NextLink}
               locale={locale}
               logoSrc="/mark.svg"
@@ -126,6 +132,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               {children}
             </main>
             <Sidebar />
+            <CreateMenu open={creating} onClose={() => setCreating(false)} />
             <UsageHeartbeat />
             <YapPlayer />
           </div>

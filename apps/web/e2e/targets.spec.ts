@@ -39,6 +39,7 @@ const PAGES: [string, (d: SeedData) => string][] = [
   ['settings: account', () => '/settings/account'],
   ['settings: privacy', () => '/settings/privacy'],
   ['create', () => '/create'],
+  ['record a Yap', () => '/create?mode=yap'],
   ['market', () => '/market'],
   ['near you', () => '/map'],
   ['market listing', (d) => `/market/${d.listingId}`],
@@ -211,6 +212,14 @@ async function open(page: Page, url: string) {
  * the controls inside it are measured.
  */
 const STATES: [string, string, (page: Page, d: SeedData) => Promise<void>][] = [
+  [
+    'more ways to create',
+    '[role="dialog"]',
+    async (page) => {
+      await open(page, '/home');
+      await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Yap', exact: true }).click({ button: 'right' });
+    },
+  ],
   [
     'post options menu',
     '[role="menu"]',

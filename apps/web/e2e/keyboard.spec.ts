@@ -56,11 +56,26 @@ test('skip link and primary navigation', async ({ page, isMobile }) => {
   await page.waitForLoadState('networkidle');
   // On phones the wordmark is hidden and the bar sits at the bottom, but it still comes first in tab order.
   // Search sits under the wordmark on wide screens; phones have it in the page header instead.
-  const expected = ['Skip to content', ...(isMobile ? [] : ['YAPILAPI', 'Search']), 'Pulse', 'Wander', 'Spark', 'Yap', 'You'];
+  // The Yap button sits in the middle; on wide screens its "More ways to create" button comes right after it.
+  const expected = [
+    'Skip to content',
+    ...(isMobile ? [] : ['YAPILAPI', 'Search']),
+    'Pulse',
+    'Wander',
+    'Yap',
+    ...(isMobile ? [] : ['More ways to create']),
+    'Chats',
+    'You',
+  ];
   const order: string[] = [];
   for (const _ of expected) {
     await page.keyboard.press('Tab');
-    order.push(await page.evaluate(() => (document.activeElement as HTMLElement | null)?.innerText?.trim().split('\n')[0] ?? ''));
+    order.push(
+      await page.evaluate(() => {
+        const el = document.activeElement as HTMLElement | null;
+        return el?.innerText?.trim().split('\n')[0] || el?.getAttribute('aria-label') || '';
+      }),
+    );
   }
   expect(order).toEqual(expected);
 });

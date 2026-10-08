@@ -368,10 +368,10 @@ export function ChainShelf({ refreshKey }: { refreshKey?: number }) {
 }
 
 /**
- * A reel's fair start, on its insights: while it runs, how many people it reached of the target (a
+ * A reel's (or Yap's) fair start, on its insights: while it runs, how many people it reached of the target (a
  * progress bar); when it's over, what those people did.
  */
-export function FairStartCard({ fairStart: f }: { fairStart: FairStart }) {
+export function FairStartCard({ fairStart: f, format = 'reel' }: { fairStart: FairStart; format?: string }) {
   const c = useColors();
   const { t, tp, number } = useT();
   const reached = Math.min(f.reached, f.target);
@@ -400,7 +400,7 @@ export function FairStartCard({ fairStart: f }: { fairStart: FairStart }) {
           {f.slowed ? <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t('fair.slowed')}</Text> : null}
         </>
       ) : (
-        <Text style={{ color: c.ink, lineHeight: 22 }}>{fairStartLines(f.report, tp, (n) => number(n)).join(' · ')}</Text>
+        <Text style={{ color: c.ink, lineHeight: 22 }}>{fairStartLines(f.report, tp, (n) => number(n), format).join(' · ')}</Text>
       )}
     </Card>
   );

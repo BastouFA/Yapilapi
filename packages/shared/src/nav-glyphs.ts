@@ -1,5 +1,5 @@
 /**
- * The primary navigation's own symbols (Pulse, Wander, Spark, Yap), drawn once as simple
+ * The primary navigation's own symbols (Pulse, Wander, Spark, Chats and the Yap button), drawn once as simple
  * geometry on a 24px grid so the web (SVG) and the mobile app (plain Views, no SVG library)
  * render exactly the same shapes. "You" is the person's own avatar, so it has no glyph.
  *
@@ -17,7 +17,7 @@ export type GlyphShape =
   | { kind: 'dot'; cx: number; cy: number; d: number }
   | { kind: 'drop'; cx: number; cy: number; r: number; fill: 'outline' | 'solid' };
 
-export type NavGlyphName = 'pulse' | 'wander' | 'spark' | 'yap';
+export type NavGlyphName = 'pulse' | 'wander' | 'spark' | 'yap' | 'voice';
 
 export const NAV_GLYPHS: Record<NavGlyphName, readonly GlyphShape[]> = {
   /** Pulse: three rounded bars in a rising and falling beat (what your people are up to now). */
@@ -41,12 +41,20 @@ export const NAV_GLYPHS: Record<NavGlyphName, readonly GlyphShape[]> = {
     { kind: 'box', x: 13.4, y: 3.4, w: 7.2, h: 7.2, r: 2.4, fill: 'outline' },
     { kind: 'box', x: 8.4, y: 12.6, w: 7.2, h: 8.4, r: 2.4, fill: 'outline' },
   ],
-  /** Yap: a soft speech shape (one tighter corner is its tail) with a sound wave inside. */
+  /** Chats (the tab was called Yap): a soft speech shape (one tighter corner is its tail) with a sound wave inside. */
   yap: [
     { kind: 'box', x: 3, y: 4.25, w: 18, h: 14.5, r: [6.5, 6.5, 6.5, 1.75], fill: 'outline' },
     { kind: 'box', x: 7.375, y: 10, w: 1.75, h: 3.5, r: 0.875, fill: 'solid' },
     { kind: 'box', x: 11.125, y: 7.75, w: 1.75, h: 8, r: 0.875, fill: 'solid' },
     { kind: 'box', x: 14.875, y: 9.25, w: 1.75, h: 5, r: 0.875, fill: 'solid' },
+  ],
+  /** The Yap button (record a voice post): a microphone on its stand, a short sound wave either side. */
+  voice: [
+    { kind: 'box', x: 8.25, y: 2.5, w: 7.5, h: 12, r: 3.75, fill: 'outline' },
+    { kind: 'box', x: 11.125, y: 15.25, w: 1.75, h: 3.75, r: 0.875, fill: 'solid' },
+    { kind: 'box', x: 7.75, y: 19.5, w: 8.5, h: 1.75, r: 0.875, fill: 'solid' },
+    { kind: 'box', x: 3.5, y: 6.75, w: 1.75, h: 5, r: 0.875, fill: 'solid' },
+    { kind: 'box', x: 18.75, y: 6.75, w: 1.75, h: 5, r: 0.875, fill: 'solid' },
   ],
 };
 

@@ -13,14 +13,52 @@ Behind the `YAPS` flag (on). Migration `0090_yaps.sql` (0088 is unused). Code: `
 `apps/api/src/lib/voice.ts`, `apps/api/src/modules/voice.ts`, `packages/design-system/src/voice.tsx`
 (the web player), `apps/web/components/YapRecorder.tsx`, `apps/mobile/lib/voice.tsx` (player,
 recorder, upload). Tests: `apps/api/test/yaps.test.ts`, `packages/shared/src/voice.test.ts`,
-`apps/web/e2e/yaps.spec.ts`.
+`apps/web/e2e/yaps.spec.ts`; the voice-first navigation, landing page and onboarding step: `apps/web/e2e/identity.spec.ts`.
 
 Not to be confused with Yap in chats (hold to talk, plays out loud like a walkie-talkie:
 `apps/api/src/lib/yaps.ts`), whose voice messages are transcribed by `lib/voice-transcripts.ts`.
 
+## Naming (decided 2026-10-08)
+
+"Yap" used to name three things inside YAPILAPI: the chats tab, the walkie-talkie clips in chats,
+and the voice post. With voice leading, the clearest scheme is:
+
+| Name | What it is |
+| --- | --- |
+| **Yap** / **Yaps** | Something you say out loud. Above all the voice post (a Yap on Pulse), and the big button in the middle of the navigation that records one. The walkie-talkie clips in a chat stay "Yaps" too ("Ana sent you a Yap"): the same idea, said to a chat instead of to Pulse. |
+| **Chats** | The tab with your conversations and notifications (it was called Yap). Its route stays `/inbox` (web) and `inbox` (phone), and every chat link (`/inbox/<id>`, `/yap/<id>`, `yapilapi://chat/<id>`) works as before. |
+| **Yap** (the app) | The standalone messenger (`/yap` on the web, `apps/yap`) keeps its name: it is its own product, with its own icon and store listing. |
+| **Spark** | Create (the camera, posts, reels, stories). It no longer has a tab: it is behind the Yap button ("More ways to create"), and it takes the middle again only while the `YAPS` flag is off. |
+
+So the navigation reads **Pulse · Wander · Yap · Chats · You** on the web (rail and phone-width
+bar) and in the phone app (dock). Message keys: `nav.yap`, `nav.hint.yap`, `nav.createMore` are new;
+`nav.inbox` and `inbox.title` now say Chats in all 24 languages; `nav.create` (Spark) is unchanged.
+Ids and URLs keep their old names (`NavEntry` ids `home`, `discover`, `yap` or `create`, `inbox`,
+`profile`), so nothing that links into the app breaks.
+
+## The Yap button
+
+- **Web** (`packages/design-system` `NavBar`, `apps/web/app/(app)/layout.tsx`): the raised
+  brand-gradient squircle in the middle, with a microphone glyph (`NAV_GLYPHS.voice`, shared with
+  the phone) and a soft halo. A tap opens the recorder (`/create?mode=yap`, which also switches an
+  open Create back to the recorder). Held down, right-clicked or with the context-menu key it opens
+  "More ways to create" (`components/CreateMenu.tsx`: post, reel, story, live). On wide screens the
+  rail also has a small + button on the Yap row for the same menu, next in the tab order.
+- **Phone** (`apps/mobile/app/(tabs)/_layout.tsx`): the same button in the dock. A tap opens Create
+  on the recorder; a long press (a named action for screen readers) opens the same menu as a sheet.
+- **Pulse** puts Yaps first after For you, and an empty Yaps feed says "Say something. Hold the button
+  and talk." with a Record a Yap button.
+- **Onboarding** starts with "Say hi to YAPILAPI" (web: first step; phone: right after choosing the
+  language): a voice intro of up to 15 seconds, skippable, with one line saying that whatever you say
+  reaches people in their own language. It counts as the onboarding step `voice`.
+- **Shared links** to a Yap (`/p/:id`) show the speaker, "Yap · 0:42", the waveform and the first
+  words of the transcript (only once they have passed the text checks) in the share image and the
+  description (`PublicPostPreview.voice`).
+
 ## What people can do
 
-- **Record a Yap.** Yap is the first option in Create (Spark) on the web and the phone. Hold the big
+- **Record a Yap.** The Yap button in the middle of the navigation opens the recorder (see "The Yap
+  button"); Yap is also the first option in Create. Hold the big
   button to talk and let go to stop; or tap once to start and again to stop (the keyboard's Enter or
   Space, and screen readers, use this). A live waveform and a countdown show while recording; it
   stops by itself at 60 seconds. On the phone, slide left to cancel and slide up to lock for
@@ -34,8 +72,8 @@ Not to be confused with Yap in chats (hold to talk, plays out loud like a walkie
   ("Translated from French · See original"), with "Listen in English" when listening is on; in
   the original, the line being spoken is marked and pressing a line plays from there. A Yap's own
   page (`/p/:id`) has the big player with the transcript open.
-- **Pulse, Yaps only.** A "Yaps" filter next to For you and Following (`GET /v1/feed?mode=yaps`),
-  ranked like For you.
+- **Pulse, Yaps only.** A "Yaps" filter right after For you (`GET /v1/feed?mode=yaps`), ranked like
+  For you.
 - **Talk back.** Any post (not only a Yap) can be answered by voice: a voice reply of up to a minute,
   with or without words, in threads that mix voice and text. Notifications as for comments.
 - **Voice intro.** Up to 15 seconds on your profile, played from the header; recorded, replaced or
@@ -117,8 +155,9 @@ towards a prior until it has been heard enough) and the voice replies it started
 count like finished reels for "people like you", and listening long enough teaches the recommender
 like watching. Yaps make their own "format" for the variety rule. A creator's first Yaps get a fair
 start like reels (`lib/fair-start.ts`), once their words have passed (or there will be none); the
-Reels feed only takes fair-start reels and the Yaps filter only fair-start Yaps. (The "fair start is
-done" notification still says reel.)
+Reels feed only takes fair-start reels and the Yaps filter only fair-start Yaps. The "fair start is
+done" notification carries the post's format, so a Yap's says "heard your Yap" (and opens the Yap's
+page) where a reel's says "saw your reel"; its report says "listened to the end".
 
 ## Files and data
 

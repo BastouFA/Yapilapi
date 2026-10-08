@@ -24,12 +24,12 @@ import { ErrorState, feedListProps, Icon, Loading, Segmented, SkeletonList, slop
 
 const MODES = [
   { id: 'for_you', label: 'feed.for_you' },
+  // Yaps only (voice posts), first after For you; not shown while the YAPS flag is off.
+  { id: 'yaps', label: 'feed.yaps' },
   { id: 'following', label: 'feed.following' },
   { id: 'friends', label: 'feed.friends' },
   { id: 'communities', label: 'feed.communities' },
   { id: 'local', label: 'feed.local' },
-  // Yaps only (voice posts); not shown while the YAPS flag is off.
-  { id: 'yaps', label: 'feed.yaps' },
 ] as const satisfies readonly { id: FeedMode; label: MessageKey }[];
 
 /** Home: the welcome screen if signed out, then stories and the feed with cursor pagination. */

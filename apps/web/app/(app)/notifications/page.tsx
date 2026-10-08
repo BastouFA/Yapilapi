@@ -124,7 +124,7 @@ function hrefFor(n: NotificationItem, meUsername?: string): string | undefined {
   if (squad) return `/squads/${squad}`;
   // Pass the Mic and Fair start: the chain's page, or the reel.
   const mic = micNoticeHref(n);
-  if (mic) return 'chain' in mic ? `/chains/${mic.chain}` : `/reels?start=${mic.reel}`;
+  if (mic) return 'chain' in mic ? `/chains/${mic.chain}` : 'post' in mic ? `/p/${mic.post}` : `/reels?start=${mic.reel}`;
   // A call opens the chat it was in (older call notifications open the caller).
   if (n.type === 'call_incoming' && typeof n.data.conversationId === 'string') return `/inbox/${n.data.conversationId}`;
   // Market: a rating opens your profile's Market tab; the rest open the listing (offers open the chat, below).

@@ -51,5 +51,5 @@ Not done yet:
 - Signing in once for both apps (a shared keychain group on iOS, account manager on Android); each
   app signs in on its own today.
 - Web links opening Yap (associated domains / Android app links for `/yap/*`), and "Open in Yap"
-  from YAPILAPI's Yap tab when Yap is installed.
+  from YAPILAPI's Chats tab when Yap is installed.
 - An archive of chats (the API has none), and muting one chat.

@@ -2,7 +2,7 @@
   "id": "/",
   "name": "YAPILAPI",
   "short_name": "YAPILAPI",
-  "description": "Your social world. One place.",
+  "description": "Speak. The world understands. The social network you speak.",
   "start_url": "/home",
   "scope": "/",
   "display": "standalone",

@@ -114,11 +114,62 @@ export interface CardProps {
   avatar?: { src: string | null; name: string } | null;
   /** Picture shown beside the text (a photo from the post, or a video's poster). */
   image?: string | null;
+  /** A Yap: its waveform and length, drawn where a picture would be. */
+  voice?: { peaks: number[]; duration: string } | null;
+}
+
+/** A Yap's waveform (loudness bars, 0 to 100) and its length, in the card's picture slot. */
+function Wave({ peaks, duration }: { peaks: number[]; duration: string }) {
+  // 32 bars fit the slot: each the loudest of its share of the clip.
+  const src = peaks.length ? peaks : [40];
+  const bars = Array.from({ length: 32 }, (_, i) => {
+    const from = Math.floor((i * src.length) / 32);
+    return Math.max(...src.slice(from, Math.max(from + 1, Math.floor(((i + 1) * src.length) / 32))));
+  });
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        gap: 28,
+        width: 400,
+        height: 440,
+        padding: 36,
+        borderRadius: 32,
+        background: SURFACE,
+        flexShrink: 0,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, height: 200, overflow: 'hidden' }}>
+        {bars.map((p, i) => (
+          <div
+            key={i}
+            style={{
+              display: 'flex',
+              width: 6,
+              height: Math.max(8, Math.round((Math.min(100, Math.max(0, p)) / 100) * 200)),
+              borderRadius: 4,
+              backgroundImage: GRADIENT,
+            }}
+          />
+        ))}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 64, height: 64, borderRadius: 64, backgroundImage: GRADIENT }}>
+          <svg width="24" height="28" viewBox="0 0 24 28" style={{ marginLeft: 6 }}>
+            <path d="M2 1L23 14L2 27Z" fill="#fff" />
+          </svg>
+        </div>
+        <div style={{ display: 'flex', fontSize: 40, color: INK }}>{duration}</div>
+      </div>
+    </div>
+  );
 }
 
 /** The card: brand bar, optional avatar and picture, title, subtitle, text, footer. */
-export function card({ eyebrow, title, subtitle, body, footer, avatar, image }: CardProps): ImageResponse {
-  const textWidth = image ? 640 : 1040;
+export function card({ eyebrow, title, subtitle, body, footer, avatar, image, voice }: CardProps): ImageResponse {
+  const textWidth = image || voice ? 640 : 1040;
   return new ImageResponse(
     <div style={{ width: '100%', height: '100%', display: 'flex', background: GROUND, color: INK, position: 'relative', fontSize: 32 }}>
       {/* Warm glow, like the profile cover. */}
@@ -154,9 +205,11 @@ export function card({ eyebrow, title, subtitle, body, footer, avatar, image }: 
                 {subtitle ? <div style={{ fontSize: 28, color: MUTED }}>{clip(subtitle, 80)}</div> : null}
               </div>
             </div>
-            {body ? <div style={{ fontSize: 34, lineHeight: 1.35, color: INK, opacity: 0.92 }}>{clip(body, image ? 150 : 200)}</div> : null}
+            {body ? <div style={{ fontSize: 34, lineHeight: 1.35, color: INK, opacity: 0.92 }}>{clip(body, image || voice ? 150 : 200)}</div> : null}
           </div>
-          {image ? (
+          {voice ? (
+            <Wave peaks={voice.peaks} duration={voice.duration} />
+          ) : image ? (
             <div style={{ display: 'flex', width: 400, height: 440, borderRadius: 32, overflow: 'hidden', background: SURFACE, flexShrink: 0 }}>
               <img src={image} width={400} height={440} alt="" style={{ width: 400, height: 440, objectFit: 'cover' }} />
             </div>
@@ -207,11 +260,11 @@ export function siteCard(): ImageResponse {
         <div style={{ fontSize: 64, letterSpacing: 4 }}>YAPILAPI</div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', marginTop: 48, fontSize: 72, lineHeight: 1.1 }}>
-        <div style={{ display: 'flex' }}>Your social world.</div>
-        <div style={{ display: 'flex', backgroundImage: GRADIENT, backgroundClip: 'text', color: 'transparent' }}>One place.</div>
+        <div style={{ display: 'flex' }}>Speak.</div>
+        <div style={{ display: 'flex', backgroundImage: GRADIENT, backgroundClip: 'text', color: 'transparent' }}>The world understands.</div>
       </div>
       <div style={{ display: 'flex', marginTop: 32, fontSize: 30, color: MUTED }}>
-        People, communities, events and places you love, in one place you control.
+        The social network you speak. Hold to talk, and be heard in 24 languages.
       </div>
       <div style={{ position: 'absolute', left: 0, bottom: 0, right: 0, height: 14, backgroundImage: GRADIENT, display: 'flex' }} />
     </div>,

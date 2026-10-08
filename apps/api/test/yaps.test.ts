@@ -3,8 +3,10 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { VOICE_CLIPS_PER_HOUR, VOICE_PEAKS, YAPS_PER_HOUR } from '@yapilapi/shared';
+import { fairStartLines, micNoticeHref, micNoticeText, VOICE_CLIPS_PER_HOUR, VOICE_PEAKS, YAPS_PER_HOUR } from '@yapilapi/shared';
+import { t as tr, tp as trp } from '@yapilapi/shared/i18n';
 import ffmpegPath from '../src/lib/ffmpeg-path.ts';
+import { sweepFairStarts } from '../src/lib/fair-start.ts';
 import { loadTranslatables } from '../src/lib/translation.ts';
 import type { TranscriptionProvider } from '../src/lib/transcription.ts';
 import type { SpeechProvider } from '../src/lib/speech.ts';
@@ -381,6 +383,46 @@ describe('transcripts', () => {
     const r = await yap(ada, await clip(ada));
     expect(r.body.post.voice.transcript.status).toBe('unavailable');
     expect(await fairStart(r.body.post.id)).toBe('active');
+  });
+
+  it('show their length, waveform and first words in a shared link preview', async () => {
+    t.ctx.transcription = provider(() => vtt('Good morning from the market, the mangoes are sweet today'));
+    try {
+      const ada = await signUp(t.app);
+      const id = (await yap(ada, await clip(ada))).body.post.id as string;
+      // No words before they have been heard and checked.
+      const before = (await as(t.app, null).get(`/v1/public/posts/${id}`)).body.post;
+      expect(before.format).toBe('yap');
+      expect(before.voice.words).toBe('');
+      expect(before.voice.durationMs).toBeGreaterThan(1500);
+      expect(before.voice.peaks).toHaveLength(VOICE_PEAKS);
+      await drain();
+      expect((await as(t.app, null).get(`/v1/public/posts/${id}`)).body.post.voice.words).toBe('Good morning from the market, the mangoes are sweet today');
+    } finally {
+      t.ctx.transcription = null;
+    }
+  });
+
+  it('finish their fair start with a notification that says Yap, not reel', async () => {
+    t.ctx.transcription = null;
+    const ada = await creator();
+    const id = (await yap(ada, await clip(ada))).body.post.id as string;
+    expect(await fairStart(id)).toBe('active');
+    await db().query(`UPDATE fair_start_reels SET ends_at = now() - interval '1 minute' WHERE post_id = $1`, [id]);
+    await sweepFairStarts({ db: db(), realtime: t.ctx.realtime });
+    const told = (await as(t.app, ada).get('/v1/notifications')).body.items.filter((n: { type: string }) => n.type === 'fair_start_done');
+    expect(told).toHaveLength(1);
+    expect(told[0]).toMatchObject({ entityId: id, data: { format: 'yap', reached: 0 } });
+    const sayN = (k: Parameters<typeof trp>[0], n: number, v?: Record<string, string | number>) => trp(k, n, 'en', v);
+    expect(micNoticeText({ ...told[0], data: { ...told[0].data, reached: 2 } }, (k, v) => tr(k, 'en', v), sayN)).toBe(
+      'Fair start finished: 2 people heard your Yap',
+    );
+    // It opens the Yap's own page, not Reels.
+    expect(micNoticeHref(told[0])).toEqual({ post: id });
+    expect(fairStartLines({ reached: 1, finished: 1, shared: 0, followed: 0 }, sayN, String, 'yap').slice(0, 2)).toEqual([
+      '1 person heard your Yap',
+      '1 listened to the end',
+    ]);
   });
 
   it('are translated only for people who can hear the recording', async () => {

@@ -43,7 +43,7 @@ test('records, posts, plays and transcribes a Yap, and takes a voice reply', asy
   test.setTimeout(120_000);
   const speakerName = await account(page.request, 'speaker');
 
-  // Create opens on Yap from Spark; the big button records.
+  // The Yap button opens Create on the recorder; the big button records.
   await page.goto('/create?mode=yap');
   await record(page, 2500);
   await page.getByLabel('Add a line (optional)').fill('[Dev data] Good morning from the test microphone #mornings');

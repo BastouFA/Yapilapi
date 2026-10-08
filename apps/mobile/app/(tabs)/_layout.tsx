@@ -14,7 +14,8 @@ import { NavGlyph } from '../../lib/nav-glyphs';
 import { useRealtime, useSession } from '../../lib/session';
 import { elevation, gradient, type Palette } from '../../lib/theme';
 import { DOCK, NavTour } from '../../lib/tour';
-import { useColors } from '../../lib/ui';
+import { useActionSheet, useColors } from '../../lib/ui';
+import { useFlag } from '../../lib/flags';
 import { useAccountMenu, YouHeaderActions, YouHeaderTitle } from '../../lib/account-menu';
 
 type TabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0];
@@ -31,7 +32,7 @@ const TABS: Record<string, { id: 'home' | 'discover' | 'create' | 'inbox' | 'pro
 const PAD = DOCK.pad;
 const ROW = DOCK.row;
 
-/** Unread messages across your chats, for the dot-number on Yap. Refreshed when tabs change and on new messages. */
+/** Unread messages across your chats, for the dot-number on Chats. Refreshed when tabs change and on new messages. */
 function useUnreadChats(signedIn: boolean, tab: number) {
   const [count, setCount] = useState(0);
   const load = useCallback(() => {
@@ -81,10 +82,12 @@ function YouAvatar({ c, focused }: { c: Palette; focused: boolean }) {
 }
 
 /**
- * The floating dock: Pulse · Wander · [Spark] · Yap · You. Icons only, except the current tab,
- * whose label sits under its icon in a squircle highlight that springs from tab to tab. Spark is a
- * raised brand-gradient squircle, tilted like a spark, that straightens while pressed and opens
- * the camera. Every tab keeps its name, hint and unread count for screen readers.
+ * The floating dock: Pulse · Wander · [Yap] · Chats · You (docs/product/yaps.md, "Naming"). Icons
+ * only, except the current tab, whose label sits under its icon in a squircle highlight that springs
+ * from tab to tab. The Yap button is a raised brand-gradient squircle with a microphone: a tap opens
+ * the recorder in Create, and holding it down offers a post, reel, story or live. While Yaps are off
+ * it is Spark again, tilted like a spark, opening the camera. Every tab keeps its name, hint and
+ * unread count for screen readers; the Yap button's menu is a named action for them too.
  */
 function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
   const c = useColors();
@@ -93,6 +96,19 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
   const reduce = useReducedMotion();
   const unread = useUnreadChats(!!me, state.index);
+  const yaps = useFlag('YAPS') !== false;
+  const more = useActionSheet();
+  // The other ways to create, behind the Yap button.
+  const openMore = () =>
+    more.show({
+      title: t('nav.createMore'),
+      actions: [
+        { label: t('m.create.mode.post'), icon: 'image-outline', onPress: () => router.push('/camera') },
+        { label: t('m.create.mode.reel'), icon: 'videocam-outline', onPress: () => router.push({ pathname: '/camera', params: { mode: 'reel' } }) },
+        { label: t('m.create.mode.story'), icon: 'sparkles-outline', onPress: () => router.push({ pathname: '/camera', params: { mode: 'story' } }) },
+        { label: t('m.live.title'), icon: 'radio-outline', onPress: () => router.push('/live') },
+      ],
+    });
   const [keyboard, setKeyboard] = useState(false);
   const [width, setWidth] = useState(0);
   const slide = useRef(new Animated.Value(0)).current;
@@ -153,10 +169,16 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
                 <Pressable
                   key={route.key}
                   accessibilityRole="button"
-                  accessibilityLabel={label}
-                  accessibilityHint={hint}
-                  // Straight to the camera; what is taken there opens in Create.
-                  onPress={() => router.push('/camera')}
+                  accessibilityLabel={yaps ? t('nav.yap') : label}
+                  accessibilityHint={yaps ? t('nav.hint.yap') : hint}
+                  // Yaps on: straight to the recorder in Create (held down: the other ways to create).
+                  // Off: straight to the camera; what is taken there opens in Create.
+                  onPress={() => (yaps ? navigation.navigate(route.name, { mode: 'yap' }) : router.push('/camera'))}
+                  onLongPress={yaps ? openMore : undefined}
+                  accessibilityActions={yaps ? [{ name: 'longpress', label: t('nav.createMore') }] : undefined}
+                  onAccessibilityAction={(e) => {
+                    if (yaps && e.nativeEvent.actionName === 'longpress') openMore();
+                  }}
                   onPressIn={() => press(1)}
                   onPressOut={() => press(0)}
                   style={s.sparkHit}
@@ -166,16 +188,18 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
                       s.sparkLift,
                       // A coral glow under it in light mode; dark mode has no shadows (and no border here).
                       c.theme === 'light' && { ...elevation(c, 'lg'), shadowColor: c.yapi, shadowOpacity: 0.35 },
+                      // The Yap button stands upright like a microphone, in a soft halo of the brand colour.
+                      yaps && { padding: 4, borderRadius: 24, backgroundColor: c.yapiSoft },
                       {
                         transform: [
-                          { rotate: spark.interpolate({ inputRange: [0, 1], outputRange: ['-8deg', '0deg'] }) },
+                          { rotate: spark.interpolate({ inputRange: [0, 1], outputRange: [yaps ? '0deg' : '-8deg', '0deg'] }) },
                           { scale: spark.interpolate({ inputRange: [0, 1], outputRange: [1, 0.93] }) },
                         ],
                       },
                     ]}
                   >
-                    <LinearGradient {...gradient(c)} style={s.spark}>
-                      <NavGlyph name="spark" size={27} color={c.onYapi} tone="solid" />
+                    <LinearGradient {...gradient(c)} style={[s.spark, yaps && s.yap]}>
+                      <NavGlyph name={yaps ? 'voice' : 'spark'} size={yaps ? 28 : 27} color={c.onYapi} tone="solid" />
                     </LinearGradient>
                   </Animated.View>
                 </Pressable>
@@ -228,16 +252,18 @@ function FloatingTabBar({ state, descriptors, navigation }: TabBarProps) {
       </View>
       {/* First launch: four small marks pointing at the tabs (shown once). */}
       <NavTour tabCount={count} active={current === 'index'} />
+      {more.sheet}
     </>
   );
 }
 
-// Primary navigation: Pulse | Wander | Spark | Yap | You (route files keep their names: index, discover, create, inbox, profile).
+// Primary navigation: Pulse | Wander | Yap | Chats | You (route files keep their names: index, discover, create, inbox, profile).
 export default function TabsLayout() {
   const c = useColors();
   const { t } = useT();
   const { me } = useSession();
   const accountMenu = useAccountMenu();
+  const yaps = useFlag('YAPS') !== false;
   return (
     <Tabs
       // Another account in use: every tab starts over with that account's feed, chats and profile.
@@ -253,7 +279,8 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="index" options={{ title: t('nav.home') }} />
       <Tabs.Screen name="discover" options={{ title: t('nav.discover') }} />
-      <Tabs.Screen name="create" options={{ title: t('nav.create') }} />
+      {/* Create is where the Yap button leads (to its recorder); Spark names it while Yaps are off. */}
+      <Tabs.Screen name="create" options={{ title: yaps ? t('create.title') : t('nav.create') }} />
       <Tabs.Screen name="inbox" options={{ title: t('nav.inbox') }} />
       <Tabs.Screen
         name="profile"
@@ -286,6 +313,7 @@ const s = StyleSheet.create({
   sparkHit: { flex: 1, alignItems: 'center', justifyContent: 'center', height: ROW + 30, marginTop: -30 },
   sparkLift: { borderRadius: 19 },
   spark: { width: 54, height: 54, borderRadius: 19, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  yap: { width: 56, height: 56, borderRadius: 20 },
   badge: {
     position: 'absolute',
     top: -7,

@@ -1123,7 +1123,7 @@ export interface PublicPreviewImage {
 
 export interface PublicPostPreview {
   id: string;
-  format: 'post' | 'reel';
+  format: 'post' | 'reel' | 'yap';
   kind: PostKind;
   /** The post text, trimmed to about 200 characters. */
   excerpt: string;
@@ -1138,6 +1138,11 @@ export interface PublicPostPreview {
   createdAt: string;
   /** For subscribers only: the preview has no text, image or video. */
   locked?: boolean;
+  /**
+   * A Yap (format 'yap'): how long it is, its waveform, and the first words of its transcript (only
+   * once they have passed the text checks; empty otherwise), so a shared link looks like voice.
+   */
+  voice?: { durationMs: number; peaks: number[]; words: string } | null;
 }
 
 export interface PublicProfilePreview {

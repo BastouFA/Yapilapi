@@ -166,8 +166,8 @@ export async function refreshFairStarts(db: Q, realtime: RealtimeHub, postIds?: 
                 WHERE e.post_id = f.post_id AND e.kind = 'skip')::real / f.reached > ${F.skipShare}))`,
     params,
   );
-  const due = await db.query<{ post_id: string; author_id: string }>(
-    `SELECT f.post_id, f.author_id FROM fair_start_reels f
+  const due = await db.query<{ post_id: string; author_id: string; format: string | null }>(
+    `SELECT f.post_id, f.author_id, (SELECT p.format FROM posts p WHERE p.id = f.post_id) AS format FROM fair_start_reels f
      WHERE f.status = 'active' AND (${which}) AND (f.ends_at <= now() OR f.reached >= CASE WHEN f.slowed THEN least(f.target, ${F.minimum}) ELSE f.target END)`,
     params,
   );
@@ -184,7 +184,8 @@ export async function refreshFairStarts(db: Q, realtime: RealtimeHub, postIds?: 
       type: 'fair_start_done',
       entityType: 'post',
       entityId: d.post_id,
-      data: { ...report, format: 'reel' },
+      // A Yap's report says "heard your Yap", a reel's "saw your reel".
+      data: { ...report, format: d.format === 'yap' ? 'yap' : 'reel' },
     });
   }
 }

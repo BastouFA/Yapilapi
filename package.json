@@ -2,7 +2,7 @@
   "name": "yapilapi",
   "private": true,
   "version": "0.1.0",
-  "description": "YAPILAPI — Your social world. One place.",
+  "description": "YAPILAPI — the social network you speak.",
   "packageManager": "pnpm@12.6.0",
   "engines": {
     "node": ">=22"

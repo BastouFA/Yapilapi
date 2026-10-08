@@ -2,28 +2,34 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Alert, Avatar, Button, Skeleton } from '@yapilapi/design-system';
+import { Alert, Avatar, Button, Icon, Skeleton } from '@yapilapi/design-system';
 import type { OnboardingStep } from '@yapilapi/api-client';
-import { suggestionReasonText, topicName, type PeopleSuggestion } from '@yapilapi/shared';
+import { suggestionReasonText, topicName, VOICE_INTRO_MAX_MS, type PeopleSuggestion } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { FindFriends } from '@/components/FindFriends';
+import { uploadVoice, voiceError, YapRecorder, type Recording } from '@/components/YapRecorder';
 import { useSession } from '../providers';
 
 type Suggestion = PeopleSuggestion;
-const STEPS = 3;
 /** How many suggested creators start ticked. */
 const PRESELECTED = 5;
 
 /**
- * Three short steps after sign-up, so Home is full from the first minute:
+ * Short steps after sign-up, so Home is full from the first minute:
+ * 0. "Say hi to YAPILAPI": a voice intro of up to 15 seconds for the profile (skippable; only
+ *    while Yaps are on). YAPILAPI is the social network you speak, so the first thing is to speak;
  * 1. interests (topics and what's trending), which For you uses straight away;
  * 2. creators who post about them, the top five ticked (untick freely);
  * 3. find friends from a pasted list of emails (optional).
  */
 export default function Onboarding() {
-  const { me, loading, refresh, t, tp } = useSession();
+  const { me, loading, refresh, t, tp, flags } = useSession();
   const router = useRouter();
-  const [step, setStep] = useState(0);
+  // The voice step is first while Yaps are on; `step` counts from it either way.
+  const voice = flags.YAPS !== false;
+  const [step, setStep] = useState(voice ? -1 : 0);
+  const STEPS = voice ? 4 : 3;
+  const shown = step + (voice ? 2 : 1);
   const [topics, setTopics] = useState<{ slug: string; name: string }[] | null>(null);
   const [trending, setTrending] = useState<string[]>([]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -113,14 +119,21 @@ export default function Onboarding() {
     <main className="auth" id="main">
       <div className="auth__card onboarding" style={{ maxWidth: 560 }}>
         <div className="onboarding__progress">
-          <span className="muted">{t('onboarding.step', { step: step + 1, total: STEPS })}</span>
-          <div className="onboarding__bar" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS} aria-valuenow={step + 1}>
-            <span style={{ width: `${((step + 1) / STEPS) * 100}%` }} />
+          <span className="muted">{t('onboarding.step', { step: shown, total: STEPS })}</span>
+          <div className="onboarding__bar" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS} aria-valuenow={shown}>
+            <span style={{ width: `${(shown / STEPS) * 100}%` }} />
           </div>
         </div>
         {error ? <Alert tone="danger">{error}</Alert> : null}
 
-        {step === 0 ? (
+        {step === -1 ? (
+          <VoiceHello
+            onDone={(recorded) => {
+              record({ step: 'voice', skipped: !recorded, count: recorded ? 1 : 0 });
+              setStep(0);
+            }}
+          />
+        ) : step === 0 ? (
           <div className="stack">
             <h1>{t('onboarding.interests.title')}</h1>
             <p className="muted">{t('onboarding.interests.body')}</p>
@@ -216,5 +229,63 @@ export default function Onboarding() {
         )}
       </div>
     </main>
+  );
+}
+
+/**
+ * "Say hi to YAPILAPI": record a hello of up to 15 seconds, hear it back, and keep it as the
+ * profile's voice intro (docs/product/yaps.md), or skip. Everything said on YAPILAPI reaches
+ * people in their own language, and the step says so in one line.
+ */
+function VoiceHello({ onDone }: { onDone: (recorded: boolean) => void }) {
+  const { t } = useSession();
+  const [clip, setClip] = useState<Recording | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    if (!clip) return;
+    setBusy(true);
+    setError(null);
+    try {
+      let id: string;
+      try {
+        id = (await uploadVoice(clip, 'intro')).id;
+      } catch (e) {
+        setError(voiceError(e, t));
+        return;
+      }
+      await api.me.updateProfile({ voiceIntroId: id });
+      onDone(true);
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="stack">
+      <h1>{t('onboarding.voice.title')}</h1>
+      <p className="muted">{t('onboarding.voice.body')}</p>
+      <p className="onboarding__languages">
+        <Icon name="globe" size={18} />
+        {t('onboarding.voice.languages')}
+      </p>
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+      <YapRecorder
+        maxMs={VOICE_INTRO_MAX_MS}
+        label={t('voice.intro.record')}
+        onDone={(blob, durationMs, filename) => setClip({ blob, durationMs, filename })}
+        onReset={() => setClip(null)}
+        disabled={busy}
+      />
+      <Button block disabled={!clip} loading={busy} onClick={() => void save()}>
+        {t('onboarding.continue')}
+      </Button>
+      <Button block variant="ghost" disabled={busy} onClick={() => onDone(false)}>
+        {t('onboarding.skip')}
+      </Button>
+    </div>
   );
 }

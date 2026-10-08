@@ -1,6 +1,6 @@
 # YAPILAPI
 
-**Your social world. One place.** A social operating system that connects people, content, communities, communication, places, events, commerce, AI and memories.
+**Speak. The world understands.** YAPILAPI is the social network you speak: hold one button and talk, and be heard in 24 languages. Around voice it connects people, content, communities, communication, places, events, commerce, AI and memories.
 
 This monorepo holds the API, web app, mobile foundation, shared packages, database migrations, infrastructure and docs. See [docs/product/status.md](docs/product/status.md) for exactly what is built, what is architected, and what is still to do.
 

@@ -124,13 +124,13 @@ export function PulseEmpty({ mode, onFollowed, onShowForYou }: { mode: FeedMode;
   return (
     <View style={{ gap: space[3] }}>
       <EmptyState
-        icon="sparkles-outline"
+        icon={mode === 'yaps' ? 'mic-outline' : 'sparkles-outline'}
         title={title}
         body={body}
         action={
           // No Yaps yet: record one.
           mode === 'yaps'
-            ? { label: t('m.create.mode.yap'), icon: 'mic-outline', onPress: () => router.navigate({ pathname: '/create', params: { mode: 'yap' } }) }
+            ? { label: t('voice.recordYap'), icon: 'mic-outline', onPress: () => router.navigate({ pathname: '/create', params: { mode: 'yap' } }) }
             : { label: t('friends.title'), icon: 'people-outline', onPress: () => router.push('/find-friends') }
         }
         secondary={

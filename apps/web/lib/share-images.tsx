@@ -4,21 +4,30 @@
  */
 import { getPublicCommunity, getPublicDrop, getPublicEvent, getPublicPost, getPublicProfile } from './public';
 import { dropWhen, eventWhen, eventWhere } from './metadata';
+import { voiceClock } from '@yapilapi/shared';
 import { card, embeddableImage, plural, siteCard } from './og';
 
 export async function postShareImage(id: string) {
   const post = await getPublicPost(id);
   if (!post) return siteCard();
   const [avatar, image] = await Promise.all([embeddableImage(post.author.avatarUrl), embeddableImage(post.image?.url)]);
+  // A Yap looks like voice: the speaker, its length and waveform, and its first words.
+  const voice = post.format === 'yap' && post.voice && !post.locked ? post.voice : null;
+  const length = voice ? voiceClock(voice.durationMs) : '';
   return card({
-    eyebrow: post.format === 'reel' ? 'Reel' : (post.community?.name ?? undefined),
+    eyebrow: voice ? `Yap · ${length}` : post.format === 'reel' ? 'Reel' : (post.community?.name ?? undefined),
     title: post.author.displayName,
     subtitle: `@${post.author.username}`,
     body: post.locked
       ? `For ${post.author.displayName}'s subscribers. Subscribe on YAPILAPI to see it.`
-      : post.excerpt || (post.format === 'reel' ? 'Watch the reel on YAPILAPI.' : 'See the post on YAPILAPI.'),
+      : voice
+        ? voice.words
+          ? `“${voice.words}”`
+          : post.excerpt || 'Listen on YAPILAPI, in your own language.'
+        : post.excerpt || (post.format === 'reel' ? 'Watch the reel on YAPILAPI.' : 'See the post on YAPILAPI.'),
     avatar: { src: avatar, name: post.author.displayName },
-    image,
+    image: voice ? null : image,
+    voice: voice ? { peaks: voice.peaks, duration: length } : null,
     // A like count the author hid stays off the image too.
     footer: [post.counts.likes === undefined ? null : plural(post.counts.likes, 'like', 'likes'), plural(post.counts.comments, 'comment', 'comments')]
       .filter(Boolean)

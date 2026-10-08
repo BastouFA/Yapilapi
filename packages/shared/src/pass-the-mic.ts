@@ -93,11 +93,15 @@ export function chainBarText(
   return c.countries > 0 ? `${where} · ${tp('mic.countries', c.countries, { count: number(c.countries) })}` : where;
 }
 
-/** The report's parts: "1,000 people saw your reel", "630 watched to the end", "24 shared", "12 followed you". */
-export function fairStartLines(r: FairStartReport, tp: TrPlural, number: (n: number) => string = String): string[] {
+/**
+ * The report's parts: "1,000 people saw your reel", "630 watched to the end", "24 shared", "12 followed you".
+ * A Yap's say "heard your Yap" and "listened to the end".
+ */
+export function fairStartLines(r: FairStartReport, tp: TrPlural, number: (n: number) => string = String, format: string = 'reel'): string[] {
+  const yap = format === 'yap';
   return [
-    tp('fair.seen', r.reached, { count: number(r.reached) }),
-    tp('fair.finished', r.finished, { count: number(r.finished) }),
+    tp(yap ? 'fair.heard' : 'fair.seen', r.reached, { count: number(r.reached) }),
+    tp(yap ? 'fair.listened' : 'fair.finished', r.finished, { count: number(r.finished) }),
     tp('fair.shared', r.shared, { count: number(r.shared) }),
     tp('fair.followed', r.followed, { count: number(r.followed) }),
   ];
@@ -116,16 +120,20 @@ export function micNoticeText(n: { type: string; actor?: { displayName: string }
       return t('mic.notif.pass', { name, prompt: String(n.data.prompt ?? '') });
     case 'fair_start_done': {
       const reached = Number(n.data.reached ?? 0) || 0;
-      return tp('fair.notif', reached, { count: reached });
+      return tp(n.data.format === 'yap' ? 'fair.notifYap' : 'fair.notif', reached, { count: reached });
     }
     default:
       return null;
   }
 }
 
-/** Where a chain or fair-start notification opens: the chain's page, or the reel. */
-export function micNoticeHref(n: { type: string; entityId?: string | null; data: Record<string, unknown> }): { chain: string } | { reel: string } | null {
-  if (n.type === 'fair_start_done') return n.entityId ? { reel: n.entityId } : null;
+/** Where a chain or fair-start notification opens: the chain's page, the reel, or the Yap's own page. */
+export function micNoticeHref(n: {
+  type: string;
+  entityId?: string | null;
+  data: Record<string, unknown>;
+}): { chain: string } | { reel: string } | { post: string } | null {
+  if (n.type === 'fair_start_done') return n.entityId ? (n.data.format === 'yap' ? { post: n.entityId } : { reel: n.entityId }) : null;
   if (n.type !== 'chain_link' && n.type !== 'chain_next' && n.type !== 'chain_pass') return null;
   const chain = typeof n.data.chainId === 'string' ? n.data.chainId : null;
   // One person: their reel. Several (grouped), or a pass: the chain.

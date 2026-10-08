@@ -265,13 +265,13 @@ Upload PNG or JPEG files with no transparency.
 
 Suggested set (the same for Google Play):
 
-1. Pulse, with stories on top.
-2. Wander.
-3. Spark: the camera with Post, Reel and Story.
-4. A Yap chat with a voice message.
-5. A profile with Chapters.
-6. A Room.
-7. A Board.
+1. The Yap recorder: holding the big button, the live waveform and the countdown.
+2. Pulse on Yaps, with a transcript open and "Listen in …".
+3. Pulse, with stories on top.
+4. Wander.
+5. A chat in Chats with a voice message.
+6. A profile with its voice intro and Chapters.
+7. A Squad.
 8. Settings > Data saver.
 
 Use the seeded demo data and a clean status bar (in the Simulator: `xcrun simctl status_bar booted override --time 9:41`).
@@ -320,7 +320,7 @@ Create a demo account on the production server before submitting. Don't reuse a 
 
 Review notes to paste. Replace the placeholders.
 
-> YAPILAPI is a social app: posts, reels, stories (Pulse), discovery (Wander), creation (Spark), chats and calls (Yap), and your profile (You).
+> YAPILAPI is a social app you speak: voice posts called Yaps (the button in the middle records one; holding it offers posts, reels, stories and live), the feed (Pulse), discovery (Wander), chats and calls (Chats), and your profile (You). Every Yap is transcribed and its words go through the same checks as written posts.
 > Demo account: see the sign-in fields. It is an adult account with sample content.
 > User-generated content safeguards:
 > Report: the "..." menu on reels and profiles (Report), and on the web on posts, messages and profiles. Reports open a moderation case reviewed by our team in the admin console (/admin on the web).

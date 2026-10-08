@@ -124,7 +124,7 @@ export default function InsightsScreen() {
       <Text style={{ color: c.inkMuted, fontSize: 13, lineHeight: 18 }}>{t('m.insights.viewsNote')}</Text>
 
       {/* A new creator's reel shown to up to 1,000 people: how far it got, or what came of it. */}
-      {s.fairStart && fair !== false ? <FairStartCard fairStart={s.fairStart} /> : null}
+      {s.fairStart && fair !== false ? <FairStartCard fairStart={s.fairStart} format={s.format} /> : null}
 
       <View style={{ gap: space[2] }}>
         <SectionHeader title={t('m.insights.viewsByDay')} />

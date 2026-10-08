@@ -147,6 +147,15 @@ function Create() {
   const [hideCountsDefault, setHideCountsDefault] = useState(false);
   const [hideCounts, setHideCounts] = useState<boolean | null>(null);
   const [communityId, setCommunityId] = useState(initialMode === 'yap' ? '' : (params.get('community') ?? ''));
+  // The Yap button pressed while already here (on a post, say): back to the recorder.
+  const askedFor = params.get('mode');
+  useEffect(() => {
+    if (askedFor !== 'yap' || !yapsOn || remixOf || params.get('draft')) return;
+    setKind('yap');
+    setCommunityId('');
+    // Only when the address changes to ?mode=yap, not on every flag or draft change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askedFor]);
   const [communities, setCommunities] = useState<Community[]>([]);
   const [circles, setCircles] = useState<{ id: string; name: string }[]>([]);
   const [circleId, setCircleId] = useState('');
@@ -734,6 +743,8 @@ function Create() {
             value={kind}
             onChange={(k) => {
               setKind(k);
+              // Away from the recorder: the address forgets ?mode=yap, so the Yap button brings it back.
+              if (k !== 'yap' && askedFor === 'yap') window.history.replaceState(null, '', '/create');
               // Keep only what the new kind can hold.
               if (k !== 'post') {
                 setPoll(null);

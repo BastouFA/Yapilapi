@@ -14,12 +14,13 @@ import {
   type PublicListingPreview,
   type PublicPostPreview,
   type PublicProfilePreview,
+  voiceClock,
 } from '@yapilapi/shared';
 import { absolute, siteOrigin } from './public';
 import { compact, plural } from './og';
 
 export const SITE_NAME = 'YAPILAPI';
-export const SITE_DESCRIPTION = 'Your social world. One place.';
+export const SITE_DESCRIPTION = 'Speak. The world understands. YAPILAPI is the social network you speak: hold to talk, and be heard in 24 languages.';
 const SHORT_TITLE = 60;
 
 function short(text: string, max = SHORT_TITLE): string {
@@ -50,8 +51,9 @@ export async function privateMetadata(title: string): Promise<Metadata> {
 }
 
 function postWhat(p: PublicPostPreview): string {
-  if (p.locked) return p.format === 'reel' ? 'A reel for subscribers' : 'A post for subscribers';
+  if (p.locked) return p.format === 'reel' ? 'A reel for subscribers' : p.format === 'yap' ? 'A Yap for subscribers' : 'A post for subscribers';
   if (p.format === 'reel') return 'A reel';
+  if (p.format === 'yap') return 'A Yap';
   if (p.kind === 'photo' || p.kind === 'carousel') return 'A photo';
   if (p.kind === 'video') return 'A video';
   if (p.kind === 'poll') return 'A poll';
@@ -68,12 +70,16 @@ export async function postMetadata(p: PublicPostPreview, path: string, withImage
   const origin = await siteOrigin();
   const name = p.author.displayName;
   const title = `${name} on ${SITE_NAME}`;
-  const description = p.excerpt || `${postWhat(p)} by ${name} (@${p.author.username}).`;
+  // A Yap says how long it is and its first words: "A Yap by Ada (@ada), 0:42: “Good morning…”".
+  const yap = p.format === 'yap' && p.voice && !p.locked ? p.voice : null;
+  const description = yap
+    ? `${postWhat(p)} by ${name} (@${p.author.username}), ${voiceClock(yap.durationMs)}${yap.words ? `: “${yap.words}”` : p.excerpt ? `: ${p.excerpt}` : '.'}`
+    : p.excerpt || `${postWhat(p)} by ${name} (@${p.author.username}).`;
   const video = absolute(p.video?.url, origin);
   const images = withImages ? [{ url: `/og/post/${p.id}`, width: 1200, height: 630, alt: `${postWhat(p)} by ${name}` }] : undefined;
   return {
     metadataBase: new URL(origin),
-    title: { absolute: p.excerpt ? `${title}: “${short(p.excerpt)}”` : title },
+    title: { absolute: p.excerpt || yap?.words ? `${title}: “${short(p.excerpt || yap!.words)}”` : title },
     description,
     alternates: { canonical: path },
     openGraph: {

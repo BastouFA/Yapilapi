@@ -960,7 +960,8 @@ export const sendPostSchema = z
   })
   .refine((v) => v.userIds.length + v.conversationIds.length > 0, { message: 'Choose someone to send it to.', path: ['userIds'] });
 
-export const ONBOARDING_STEPS = ['interests', 'follow', 'friends'] as const;
+// 'voice': "Say hi to YAPILAPI", a voice intro recorded as the first step (while Yaps are on).
+export const ONBOARDING_STEPS = ['voice', 'interests', 'follow', 'friends'] as const;
 
 /** What happened in onboarding, for the onboarding_completed analytics event. Counts only. */
 export const onboardingCompleteSchema = z.object({

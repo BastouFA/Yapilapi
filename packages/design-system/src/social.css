@@ -129,7 +129,7 @@ a.yp-aside-row__meta {
 }
 
 /* ── Navigation ───────────────────────────────────────────────────────── */
-/* Phones: a floating glass dock. Pulse · Wander · [Spark] · Yap · You. Icons only, except the
+/* Phones: a floating glass dock. Pulse · Wander · [Yap] · Chats · You. Icons only, except the
    current page: its label sits under its icon inside a squircle highlight (.yp-nav__glow) that
    slides from tab to tab. Other labels appear as a small tag on hover and keyboard focus. */
 .yp-nav {
@@ -337,6 +337,52 @@ a.yp-aside-row__meta {
 .yp-nav__item--create:active .yp-nav__icon {
   transform: translateY(-11px) rotate(0deg) scale(0.93);
   transition-duration: 120ms;
+}
+/* The Yap button takes Spark's place: a little bigger, upright like a microphone, with a soft halo
+   of the brand colour so it reads as "press here and talk". Held down, it opens the other ways to
+   create, so the phone's own long-press callout and text selection stay off it. */
+.yp-nav__item--yap {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.yp-nav__item--yap .yp-nav__icon {
+  width: 58px;
+  height: 58px;
+  border-radius: 20px;
+  box-shadow:
+    0 0 0 4px var(--yapi-soft),
+    0 14px 24px -10px color-mix(in oklab, var(--yapi) 85%, transparent),
+    inset 0 1px 0 color-mix(in oklab, #fff 40%, transparent),
+    inset 0 -2px 0 color-mix(in oklab, #000 10%, transparent);
+  transform: translateY(-16px);
+}
+.yp-nav__item--yap svg {
+  width: 28px;
+  height: 28px;
+}
+.yp-nav__item--yap .yp-nav__label {
+  bottom: calc(100% + 32px);
+}
+@media (hover: hover) {
+  .yp-nav__item--yap:hover .yp-nav__icon {
+    transform: translateY(-18px);
+  }
+}
+.yp-nav__item--yap[aria-current='page'] .yp-nav__icon {
+  transform: translateY(-16px);
+}
+.yp-nav__item--yap:active .yp-nav__icon {
+  transform: translateY(-14px) scale(0.93);
+}
+.yp-nav__item--yap:focus-visible .yp-nav__icon {
+  box-shadow:
+    var(--focus-ring),
+    0 14px 24px -10px color-mix(in oklab, var(--yapi) 85%, transparent);
+}
+/* The other ways to create have their own button on wide screens only (phones hold the Yap button). */
+.yp-nav__more {
+  display: none;
 }
 
 /* Unread count: a small squircle with the number, up at the icon's shoulder. */
@@ -576,6 +622,39 @@ a.yp-aside-row__meta {
     width: 22px;
     height: 22px;
     color: var(--on-yapi);
+  }
+  /* The Yap row stands upright and leaves room at its end for its menu's button. */
+  .yp-nav__item--yap .yp-nav__icon,
+  .yp-nav__item--yap:hover .yp-nav__icon,
+  .yp-nav__item--yap[aria-current='page'] .yp-nav__icon {
+    transform: none;
+  }
+  .yp-nav__item--yap:has(~ .yp-nav__more) {
+    padding-inline-end: 56px;
+  }
+  /* Rows are 52px apart and the middle one has 10px above it: the button sits on its end. */
+  .yp-nav__more {
+    position: absolute;
+    top: calc(var(--yp-nav-spark-i, 2) * 52px + 12px);
+    inset-inline-end: 2px;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 14px;
+    background: color-mix(in oklab, var(--on-yapi) 18%, transparent);
+    color: var(--on-yapi);
+    cursor: pointer;
+    transition: background var(--duration-fast);
+  }
+  .yp-nav__more:hover {
+    background: color-mix(in oklab, var(--on-yapi) 28%, transparent);
+  }
+  .yp-nav__more:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
   }
   .yp-nav__badge {
     position: static;

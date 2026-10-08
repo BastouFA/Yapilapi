@@ -9,6 +9,8 @@ import {
   type ComponentType,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
 import {
@@ -95,6 +97,13 @@ export type LinkLike = ComponentType<{
   'aria-current'?: 'page' | undefined;
   'aria-label'?: string;
   'aria-describedby'?: string;
+  // The middle button's long press (NavBar): a press held down opens the other ways to create.
+  onClick?: (e: ReactMouseEvent<HTMLAnchorElement>) => void;
+  onContextMenu?: (e: ReactMouseEvent<HTMLAnchorElement>) => void;
+  onPointerDown?: (e: ReactPointerEvent<HTMLAnchorElement>) => void;
+  onPointerUp?: () => void;
+  onPointerLeave?: () => void;
+  onPointerCancel?: () => void;
 }>;
 const A: LinkLike = ({ href, children, ...rest }) => (
   <a href={href} {...rest}>
@@ -104,14 +113,26 @@ const A: LinkLike = ({ href, children, ...rest }) => (
 
 // ── Navigation ──────────────────────────────────────────────────────────
 export interface NavEntry {
-  /** Pulse, Wander, Spark, Yap and You; the ids (and URLs) keep their original names. */
-  id: 'home' | 'discover' | 'create' | 'inbox' | 'profile';
+  /**
+   * Pulse, Wander, the Yap button (Spark while Yaps are off), Chats and You. The ids (and URLs)
+   * keep their original names: `inbox` is Chats, `create` is Spark, `yap` records a Yap.
+   */
+  id: 'home' | 'discover' | 'create' | 'yap' | 'inbox' | 'profile';
   href: string;
   badge?: number;
   /** "You" shows the signed-in person's own avatar (their initials when there is no photo). */
   avatar?: { name: string; src?: string | null };
+  /**
+   * The middle button's other ways to create (a post, reel, story or live): opened by holding it
+   * down or a right click on it (the context-menu key too), and by a small button beside it on wide screens.
+   */
+  menu?: { label: string; open: () => void };
 }
-const NAV_GLYPH: Record<Exclude<NavEntry['id'], 'profile'>, IconName> = { home: 'pulse', discover: 'wander', create: 'spark', inbox: 'yap' };
+const NAV_GLYPH: Record<Exclude<NavEntry['id'], 'profile'>, IconName> = { home: 'pulse', discover: 'wander', create: 'spark', yap: 'voice', inbox: 'yap' };
+/** The raised button in the middle: the Yap button, or Spark while Yaps are off. */
+const isCentre = (id: NavEntry['id']) => id === 'create' || id === 'yap';
+/** How long a press is held before it counts as a long press. */
+const LONG_PRESS_MS = 450;
 
 /** The person's avatar in a soft squircle; a thin brand-gradient ring when "You" is the current page. */
 function NavAvatar({ name, src }: { name: string; src?: string | null }) {
@@ -126,12 +147,50 @@ function NavAvatar({ name, src }: { name: string; src?: string | null }) {
   );
 }
 
+function NavItem({ it, on, hint, L, locale }: { it: NavEntry; on: boolean; hint: string; L: LinkLike; locale: string }) {
+  // Held down (or right-clicked, or the context-menu key), the middle button opens its menu
+  // instead of following the link; a quick tap still follows it.
+  const hold = useLongPress(it.menu?.open, LONG_PRESS_MS);
+  return (
+    <L
+      href={it.href}
+      className={cx('yp-nav__item', `yp-nav__item--${it.id}`, isCentre(it.id) && 'yp-nav__item--create')}
+      aria-current={on ? 'page' : undefined}
+      aria-describedby={hint}
+      {...hold.handlers}
+      onClick={it.menu ? (e) => hold.wasHeld() && e.preventDefault() : undefined}
+    >
+      <span className="yp-nav__icon">
+        {it.id === 'profile' ? (
+          <NavAvatar name={it.avatar?.name ?? ''} src={it.avatar?.src} />
+        ) : (
+          <Icon name={NAV_GLYPH[it.id]} size={24} filled={on || isCentre(it.id)} />
+        )}
+      </span>
+      <span className="yp-nav__label">{t(`nav.${it.id}` as MessageKey, locale)}</span>
+      {it.badge ? (
+        <>
+          <span className="yp-nav__badge" aria-hidden>
+            {it.badge > 99 ? '99+' : new Intl.NumberFormat(locale).format(it.badge)}
+          </span>
+          <span className="yp-visually-hidden">
+            {t('m.collab.joinSep', locale)}
+            {t('m.inbox.unread', locale, { count: new Intl.NumberFormat(locale).format(it.badge) })}
+          </span>
+        </>
+      ) : null}
+    </L>
+  );
+}
+
 /**
- * Primary navigation: Pulse | Wander | Spark | Yap | You (ids home, discover, create, inbox, profile).
+ * Primary navigation: Pulse | Wander | Yap | Chats | You (ids home, discover, yap, inbox, profile;
+ * while Yaps are off, Spark, id create, takes the middle).
  * Phones: a floating dock. Icons only, except the current page, whose label sits with its icon
  * in a squircle highlight that slides between tabs; other labels show on hover and keyboard focus
- * and are always in the links' accessible names. Spark is a raised, slightly tilted brand-gradient
- * squircle that straightens when pressed. Wide screens: a side rail with every label visible.
+ * and are always in the links' accessible names. The middle button is a raised, slightly tilted
+ * brand-gradient squircle that straightens when pressed; held down, it opens its menu. Wide
+ * screens: a side rail with every label visible, and the menu's own small button beside the middle one.
  */
 export function NavBar({
   items,
@@ -155,13 +214,14 @@ export function NavBar({
   footer?: ReactNode;
 }) {
   const hints = useId();
-  // Where the highlight sits: the current tab, unless that is Spark (which has its own look).
-  const at = items.findIndex((it) => it.id === current && it.id !== 'create');
-  const sparkAt = items.findIndex((it) => it.id === 'create');
+  // Where the highlight sits: the current tab, unless that is the middle button (which has its own look).
+  const at = items.findIndex((it) => it.id === current && !isCentre(it.id));
+  const sparkAt = items.findIndex((it) => isCentre(it.id));
   const place = {
     '--yp-nav-n': items.length,
     '--yp-nav-i': Math.max(at, 0),
     '--yp-nav-past-spark': sparkAt >= 0 && at > sparkAt ? 1 : 0,
+    '--yp-nav-spark-i': Math.max(sparkAt, 0),
   } as CSSProperties;
   return (
     <nav className="yp-nav" aria-label={t('ds.nav.primary', locale)}>
@@ -177,38 +237,18 @@ export function NavBar({
       ) : null}
       <div className={cx('yp-nav__list', at >= 0 && 'yp-nav__list--placed')} style={place}>
         <span className="yp-nav__glow" aria-hidden />
-        {items.map((it) => {
-          const on = it.id === current;
-          return (
-            <L
-              key={it.id}
-              href={it.href}
-              className={cx('yp-nav__item', `yp-nav__item--${it.id}`)}
-              aria-current={on ? 'page' : undefined}
-              aria-describedby={`${hints}-${it.id}`}
-            >
-              <span className="yp-nav__icon">
-                {it.id === 'profile' ? (
-                  <NavAvatar name={it.avatar?.name ?? ''} src={it.avatar?.src} />
-                ) : (
-                  <Icon name={NAV_GLYPH[it.id]} size={24} filled={on || it.id === 'create'} />
-                )}
-              </span>
-              <span className="yp-nav__label">{t(`nav.${it.id}` as MessageKey, locale)}</span>
-              {it.badge ? (
-                <>
-                  <span className="yp-nav__badge" aria-hidden>
-                    {it.badge > 99 ? '99+' : new Intl.NumberFormat(locale).format(it.badge)}
-                  </span>
-                  <span className="yp-visually-hidden">
-                    {t('m.collab.joinSep', locale)}
-                    {t('m.inbox.unread', locale, { count: new Intl.NumberFormat(locale).format(it.badge) })}
-                  </span>
-                </>
-              ) : null}
-            </L>
-          );
-        })}
+        {items.map((it) => (
+          <Fragment key={it.id}>
+            <NavItem it={it} on={it.id === current} hint={`${hints}-${it.id}`} L={L} locale={locale} />
+            {/* Wide screens: the other ways to create, on the middle button's row and next in the
+                tab order (phones hold the button down instead). */}
+            {it.menu ? (
+              <button type="button" className="yp-nav__more" aria-label={it.menu.label} title={it.menu.label} aria-haspopup="dialog" onClick={it.menu.open}>
+                <Icon name="plus" size={20} />
+              </button>
+            ) : null}
+          </Fragment>
+        ))}
       </div>
       {footer ? <div className="yp-nav__foot">{footer}</div> : null}
       {/* What each place is for, read after its name ("Pulse, link, What your people are up to"). */}

@@ -31,7 +31,8 @@ export default function Home() {
   const [viewing, setViewing] = useState<number | null>(null);
   // Yaps (voice posts) have their own feed while the feature is on.
   const yapsOn = flags.YAPS !== false;
-  const modes: FeedMode[] = ['for_you', 'following', 'friends', 'communities', 'local', ...(yapsOn ? (['yaps'] as const) : [])];
+  // Yaps come first after For you: YAPILAPI is the social network you speak.
+  const modes: FeedMode[] = ['for_you', ...(yapsOn ? (['yaps'] as const) : []), 'following', 'friends', 'communities', 'local'];
   // ?mode=yaps (after posting a Yap) opens that feed.
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('mode') === 'yaps') setMode('yaps');
@@ -115,7 +116,16 @@ export default function Home() {
           : mode === 'local'
             ? { emptyTitle: t('feed.empty.local.title'), empty: t('feed.empty.local.body') }
             : mode === 'yaps'
-              ? { emptyTitle: t('feed.empty.yaps.title'), empty: t('feed.empty.yaps.body') }
+              ? {
+                  emptyTitle: t('feed.empty.yaps.title'),
+                  empty: t('feed.empty.yaps.body'),
+                  emptyAction: (
+                    <Link href="/create?mode=yap" className="yp-btn yp-btn--primary">
+                      <Icon name="mic" />
+                      {t('voice.recordYap')}
+                    </Link>
+                  ),
+                }
               : {})}
       />
 

@@ -84,7 +84,14 @@ export default async function publicModule(app: FastifyInstance, ctx: AppContext
                  WHERE pm.post_id = p.id AND p.visibility = 'public' AND m.kind IN ('image', 'video') AND m.status = 'ready'
                    -- Link previews are seen by anyone, whatever their age: never sensitive or blocked media.
                    AND m.moderation NOT IN ('sensitive', 'blocked')
-                 ORDER BY pm.position LIMIT 1) AS media
+                 ORDER BY pm.position LIMIT 1) AS media,
+              -- A Yap: its length and waveform, and its words once they have passed the text checks.
+              (SELECT json_build_object('durationMs', vc.duration_ms, 'peaks', vc.peaks,
+                                        'words', CASE WHEN p.visibility = 'public' AND vc.transcript_status = 'ready' AND vc.screened = 'passed'
+                                                      THEN vc.transcript ELSE '' END)
+                 FROM post_media pm JOIN voice_clips vc ON vc.media_id = pm.media_id
+                 WHERE pm.post_id = p.id AND p.format = 'yap'
+                 ORDER BY pm.position LIMIT 1) AS voice
        FROM posts p JOIN profiles ap ON ap.user_id = p.author_id JOIN users au ON au.id = p.author_id
        LEFT JOIN communities c ON c.id = p.community_id
        WHERE p.id = $2 AND ${postVisibleSql('$1')}
@@ -121,6 +128,7 @@ export default async function publicModule(app: FastifyInstance, ctx: AppContext
       community: r.c_slug ? { slug: r.c_slug, name: r.c_name } : null,
       createdAt: r.created_at.toISOString(),
       ...(r.visibility === 'subscribers' ? { locked: true } : {}),
+      ...(r.voice ? { voice: { durationMs: r.voice.durationMs, peaks: r.voice.peaks ?? [], words: excerpt(r.voice.words, 140) } } : {}),
     };
     cacheable(reply);
     return { post };

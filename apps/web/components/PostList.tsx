@@ -63,6 +63,7 @@ export function PostList({
   load,
   empty,
   emptyTitle,
+  emptyAction,
   reloadKey,
   sponsored = false,
   showEnd = true,
@@ -74,6 +75,8 @@ export function PostList({
   load: (cursor?: string) => Promise<Page<Post>>;
   empty?: string;
   emptyTitle?: string;
+  /** A button under the empty state (Pulse's Yaps: Record a Yap). */
+  emptyAction?: React.ReactNode;
   reloadKey?: string;
   /** Allow one labelled sponsored post (only served to adults who opted in to advertising). */
   sponsored?: boolean;
@@ -432,7 +435,7 @@ export function PostList({
         ))}
       </div>
     );
-  if (!posts.length) return <EmptyState title={emptyTitle ?? t('m.feed.empty.title')} body={empty ?? t('m.feed.empty.body')} />;
+  if (!posts.length) return <EmptyState title={emptyTitle ?? t('m.feed.empty.title')} body={empty ?? t('m.feed.empty.body')} action={emptyAction} />;
 
   return (
     <div className="stack">

@@ -346,7 +346,7 @@ export function chainCounts(
  * A reel's Fair start, for its creator: how far it got while it runs, and the report once it's
  * done. Nothing when the reel has none (or the FAIR_START flag is off).
  */
-export function FairStartCard({ postId }: { postId: string }) {
+export function FairStartCard({ postId, format = 'reel' }: { postId: string; format?: 'reel' | 'yap' }) {
   const { t, tp, locale, flags } = useSession();
   const [fair, setFair] = useState<FairStart | null>(null);
   const on = !!flags.FAIR_START;
@@ -388,7 +388,7 @@ export function FairStartCard({ postId }: { postId: string }) {
           {fair.slowed ? <p className="fair-card__note">{t('fair.slowed')}</p> : null}
         </>
       ) : (
-        <p className="fair-card__line">{fairStartLines(fair.report, tp, num).join(' · ')}</p>
+        <p className="fair-card__line">{fairStartLines(fair.report, tp, num, format).join(' · ')}</p>
       )}
     </section>
   );

@@ -9,6 +9,7 @@ Before publishing:
 - Check every claim against the build you submit.
 - If Plus, subscriptions or tips are hidden in the iOS app (App Store guideline 3.1.1, see app-store.md), remove them from the iOS text.
 - Apple rejects descriptions that mention other platforms or prices that aren't sold through the App Store.
+- Lead with voice: YAPILAPI is "the social network you speak" (docs/product/status.md, Strategy). The landing page (apps/web/app/page.tsx) says the same things in the same order.
 
 Character limits:
 
@@ -31,38 +32,47 @@ Each count below was checked by hand. Count again after any edit.
 
 **Name** (8): YAPILAPI
 
-**Subtitle** (29): Your social world. One place.
+**Subtitle** (29): Speak. The world understands.
 
-**Google Play short description** (80): Share, chat and meet up with your people. Posts, reels, stories, rooms and more.
+**Google Play short description** (73): The social network you speak. Hold to talk, and be heard in 24 languages.
 
-**Promotional text** (133): Chapters turn your stories into keepsakes, Boards collect what you save, and Rooms bring people together to talk. Now in 24 languages.
+**Promotional text** (142): Hold one button and talk. Your Yap reaches people in their own language, with its words written out. Light on data, made for slow connections.
 
-**Keywords** (100): social,friends,chat,stories,reels,photos,video,community,events,rooms,voice,messages,creators,africa
+**Keywords** (99): voice,social,talk,audio,translation,languages,friends,chat,squads,radio,community,transcript,africa
 
 ### Description
 
-YAPILAPI is where you share your life with your people, find the communities you care about, and plan what happens next. It's made to be calm, clear and yours to control.
+YAPILAPI is the social network you speak. Hold one button and talk: no camera, no face, no typing. What you say reaches people in their own language, and it is light enough for any connection.
+
+Speak:
+
+- Yaps. A Yap is up to a minute of your voice. Tap the big Yap button in the middle of the app, hold to talk, and let go. Play it back, add a line if you like, choose who hears it, and post.
+- Heard in every language. Every Yap comes with its words written out, so it can be searched and read as well as heard. People who speak another language read it or hear it in theirs ("Listen in …"), in 24 languages.
+- Light on data. A minute of voice is about 240 KB, some fifty times lighter than a minute of video. Nothing loads until you press play.
+- Talk back. Answer any post with a voice reply, and put a voice intro of up to 15 seconds on your profile.
+- Yap Radio. Put your phone away and listen to Yaps one after another, hands-free.
+- Ask the city. Ask a question out loud and hear back from people near you.
+- Pass the Mic. Start a chain, pass the mic, and hear it travel from person to person and country to country.
+- Squads. A small private group for your friends, with its own feed, story, chat and a memory of the week.
 
 Five places, one tap away:
 
-- Pulse: what your people are up to. Choose For you, Following or Friends, and see why any post is there.
+- Pulse: what your people are saying and sharing. For you, Yaps, Following or Friends, and you can see why any post is there.
 - Wander: find people, places, tags, communities and events.
-- Spark: the camera. Make a post, a reel, a story or a Real in a few taps.
-- Yap: your chats and notifications. Voice messages, polls, photos, audio and video calls.
-- You: your profile, your Chapters and your Boards.
+- Yap: the big button in the middle. Tap it to record a Yap; hold it for a post, a reel, a story or a live.
+- Chats: your conversations and notifications. Voice messages that play out loud like a walkie-talkie, polls, photos, audio and video calls.
+- You: your profile, your voice intro, your Chapters and your Boards.
 
-What you won't find elsewhere:
+Photos and reels are here too:
 
-- Yaps. Hold to talk, and your voice plays out loud for your friends as it arrives, like a walkie-talkie. It stays in the chat as a voice message.
-- Chapters. Group your stories into a lasting collection, or seal one as a time capsule to open later.
-- Boards. Save posts and reels into named collections, add private notes, and build boards with friends.
-- Rooms. Live audio rooms for your community, with hosts, speakers and listeners. Schedule one or start it now.
-- Recaps. Turn a trip, a week or an event into a short video to keep or share.
-- Watch together. Play reels and videos in sync with a chat, react as you watch, and talk in the chat at the same time.
-- Games in chats. Four up, Noughts, Word ladder and Chess, turn by turn, right inside a conversation.
-- Ask me. Turn on a question box on your profile and answer the questions you choose to.
-- Data saver. Photos load small until you ask for more, videos wait for a tap, and uploads are made smaller on your phone. It turns on by itself on slow connections if you want.
-- 24 languages. English, French, Arabic, Spanish, Portuguese, Swahili, Yorùbá, Hausa, Chinese, Hindi, Bengali, Russian, Japanese, German, Dutch, Indonesian, Turkish, Korean, Italian, Vietnamese, Urdu, Amharic, Igbo and Zulu, with right-to-left support. "See translation" translates posts, comments and messages written in a language you don't read.
+- Posts, reels and stories, with music cleared for use.
+- Chapters. Group your stories into a lasting collection, or seal one as a time capsule.
+- Boards. Save posts and reels into named collections, alone or with friends.
+- Rooms. Live audio rooms for your community, with hosts, speakers and listeners.
+- Recaps. Turn a trip or an event into a short video.
+- Watch together, and games in chats.
+- Data saver. Photos load small, videos wait for a tap, and uploads are made smaller on your phone.
+- 24 languages, from Swahili, Yorùbá, Hausa, Igbo, Zulu and Amharic to Arabic, Hindi and Chinese, with right-to-left support. "See translation" works on posts, comments and messages too.
 
 Also inside:
 
@@ -71,16 +81,11 @@ Also inside:
 - A shop tab for creators and businesses.
 - Subscriber-only posts and tips for creators.
 - Live video.
-- Drops: creators announce a launch ahead of time, and you can ask to be told when it opens.
-- Music on posts, reels and stories, from songs cleared for use.
-- Send a message later, and give each chat its own wallpaper and colours.
-- Your profile, your way: a colour, a header style, links and a profile song.
-- A private look back at your week, every Sunday, if you want it.
-- An assistant that suggests plans and answers questions using what you allow it to see.
 
 You're in control:
 
-- Choose who sees every post: everyone, followers, friends, a circle, or chosen people.
+- Choose who hears or sees every post: everyone, followers, friends, a circle, a squad, or chosen people.
+- Every Yap's words go through the same checks as written posts.
 - Private accounts, close friends, hidden words, muting and blocking.
 - Report anything that breaks the rules; reports are confidential.
 - Download a copy of your data or delete your account from Settings at any time.
@@ -94,7 +99,7 @@ Community guidelines: https://[your site]/legal/guidelines
 
 ### What's new (1.0.0)
 
-The first release of YAPILAPI. Share posts, reels and stories, chat and call your people, join communities and rooms, keep your stories in Chapters and your saves in Boards, and use it in 24 languages.
+The first release of YAPILAPI, the social network you speak. Hold the Yap button and talk, and be heard in 24 languages. Share posts, reels and stories, chat and call your people, join communities, squads and rooms, and keep your stories in Chapters and your saves in Boards.
 
 ### Support and marketing URLs
 
@@ -108,62 +113,62 @@ The first release of YAPILAPI. Share posts, reels and stories, chat and call you
 
 **Nom** (8) : YAPILAPI
 
-**Sous-titre** (29) : Ton monde social, en un lieu.
+**Sous-titre** (25) : Parle. Le monde comprend.
 
-(The app's tagline, « Ton monde social. Un seul endroit. », is 34 characters, over the 30-character limit.)
+**Description courte Google Play** (76) : Le réseau social où tu parles. Maintiens pour parler, entendu en 24 langues.
 
-**Description courte Google Play** (80) : Partage, discute et retrouve tes proches. Posts, reels, stories, salons et plus.
+**Texte promotionnel** (146) : Maintiens un bouton et parle. Ton Yap arrive chez chacun dans sa langue, avec ses mots écrits. Léger en données, pensé pour les connexions lentes.
 
-**Texte promotionnel** (153) : Les Chapitres gardent tes stories, les Tableaux rassemblent ce que tu enregistres et les Salons réunissent les gens pour parler. Disponible en 8 langues.
-
-**Mots-clés** (96) : social,amis,discussion,stories,reels,photos,vidéo,communauté,événements,audio,messages,créateurs
+**Mots-clés** (91) : voix,social,parler,audio,traduction,langues,amis,discussion,squads,radio,communauté,afrique
 
 ### Description
 
-YAPILAPI, c'est l'endroit où tu partages ta vie avec tes proches, trouves les communautés qui comptent pour toi et prévois la suite. Il est pensé pour être calme, clair, et c'est toi qui décides.
+YAPILAPI, c'est le réseau social où tu parles. Maintiens un bouton et parle : pas d'appareil photo, pas de visage, rien à taper. Ce que tu dis arrive chez chacun dans sa propre langue, et c'est assez léger pour toutes les connexions.
+
+Parle :
+
+- Les Yaps. Un Yap, c'est jusqu'à une minute de ta voix. Touche le grand bouton Yap au milieu de l'app, maintiens pour parler, puis relâche. Réécoute-le, ajoute une ligne si tu veux, choisis qui l'entend, et publie.
+- Entendu dans toutes les langues. Chaque Yap arrive avec ses mots écrits : on peut le chercher et le lire autant que l'écouter. Ceux qui parlent une autre langue le lisent ou l'écoutent dans la leur (« Écouter en … »), parmi 24 langues.
+- Léger en données. Une minute de voix pèse environ 240 Ko, une cinquantaine de fois moins qu'une minute de vidéo. Rien ne se charge avant que tu appuies sur lecture.
+- Réponds de vive voix à n'importe quelle publication, et mets une présentation vocale sur ton profil.
+- Radio Yap. Range ton téléphone et écoute des Yaps l'un après l'autre, en mains libres.
+- Demande à la ville. Pose une question à voix haute et reçois des réponses des gens près de toi.
+- Passe le micro. Lance une chaîne, passe le micro, et écoute-la voyager de personne en personne et de pays en pays.
+- Les Squads. Un petit groupe privé pour tes amis, avec son fil, sa story, sa discussion et son souvenir de la semaine.
 
 Cinq espaces, à un geste :
 
-- Pouls : ce que font tes proches. Choisis Pour toi, Abonnements ou Amis, et découvre pourquoi chaque publication est là.
+- Pouls : ce que disent et partagent tes proches. Pour toi, Yaps, Abonnements ou Amis, et tu vois pourquoi chaque publication est là.
 - Balade : trouve des personnes, des lieux, des tags, des communautés et des événements.
-- Étincelle : l'appareil photo. Crée une publication, un reel, une story ou un Real en quelques gestes.
-- Yap : tes discussions et notifications. Messages vocaux, sondages, photos, appels audio et vidéo.
-- Toi : ton profil, tes Chapitres et tes Tableaux.
+- Yap : le grand bouton au milieu. Touche-le pour enregistrer un Yap ; maintiens-le pour une publication, un reel, une story ou un direct.
+- Discussions : tes conversations et notifications, avec messages vocaux, sondages, photos et appels.
+- Toi : ton profil, ta présentation vocale, tes Chapitres et tes Tableaux.
 
-Ce que tu ne trouveras pas ailleurs :
+Les photos et les reels sont là aussi :
 
-- Les Yaps. Maintiens pour parler : ta voix est jouée à voix haute chez tes amis dès qu'elle arrive, comme un talkie-walkie. Elle reste dans la discussion comme message vocal.
-- Les Chapitres. Regroupe tes stories en une collection durable, ou scelle-en une comme capsule temporelle à ouvrir plus tard.
-- Les Tableaux. Enregistre des publications et des reels dans des collections nommées, ajoute des notes privées, et crée des tableaux à plusieurs.
-- Les Salons. Des salons audio en direct pour ta communauté, avec hôtes, intervenants et auditeurs. Programme-en un ou lance-le maintenant.
-- Les vidéos récap. Transforme un voyage, une semaine ou un événement en une courte vidéo à garder ou partager.
-- Regarder ensemble. Des vidéos en même temps que ta discussion.
-- Des jeux dans tes discussions, chacun son tour.
-- Demande-moi : une boîte à questions sur ton profil.
-- L'économiseur de données. Les photos se chargent en petit jusqu'à ce que tu en demandes plus, les vidéos attendent un geste, et les envois sont allégés sur ton téléphone. Il peut s'activer tout seul quand la connexion est lente.
-- 8 langues. Anglais, français, arabe, espagnol, portugais, swahili, yoruba et haoussa, avec prise en charge de l'écriture de droite à gauche. « Voir la traduction » traduit les publications, commentaires et messages écrits dans une langue que tu ne lis pas.
+- Publications, reels et stories, avec de la musique autorisée.
+- Les Chapitres. Regroupe tes stories en une collection durable, ou en une capsule temporelle.
+- Les Tableaux. Range des publications et des reels dans des collections, seul ou à plusieurs.
+- Les Salons audio en direct pour ta communauté.
+- Les vidéos récap. Un voyage ou un événement en une courte vidéo.
+- L'économiseur de données. Les photos se chargent en petit, les vidéos attendent un geste, et les envois sont allégés.
+- 24 langues, avec l'écriture de droite à gauche. « Voir la traduction » marche aussi sur les publications, commentaires et messages.
 
 Et aussi :
 
-- Des communautés avec FAQ, événements et salons.
-- Des événements avec réponses, et des lieux avec avis et réservations.
-- Une boutique pour les créateurs et les entreprises.
-- Des publications réservées aux abonnés et des pourboires pour les créateurs.
-- La vidéo en direct.
-- Les lancements annoncés à l'avance par les créateurs.
-- De la musique sur tes publications et stories.
-- Des messages programmés et un fond pour chaque discussion.
-- Un assistant qui propose des plans et répond à tes questions à partir de ce que tu lui permets de voir.
+- Des communautés, des événements et des lieux avec avis et réservations.
+- Des publications pour les abonnés, des pourboires et la vidéo en direct.
 
 C'est toi qui décides :
 
-- Choisis qui voit chaque publication : tout le monde, tes abonnés, tes amis, un cercle ou des personnes choisies.
-- Compte privé, amis proches, mots masqués, masquer et bloquer.
+- Choisis qui entend ou voit chaque publication : tout le monde, tes abonnés, tes amis, un cercle, une squad ou des personnes choisies.
+- Les mots de chaque Yap passent par les mêmes vérifications que les publications écrites.
+- Compte privé, amis proches, mots masqués, bloquer.
 - Signale tout ce qui enfreint les règles ; les signalements sont confidentiels.
 - Télécharge une copie de tes données ou supprime ton compte depuis les Réglages, à tout moment.
 - Les publicités sont désactivées sauf si tu les actives.
 
-La sécurité des plus jeunes : YAPILAPI est réservé aux personnes de 13 ans et plus. Les comptes des moins de 18 ans sont privés, ne peuvent pas recevoir de messages d'adultes qui ne sont pas leurs amis, et n'apparaissent jamais dans les aperçus publics ni dans les moteurs de recherche. Les liens familiaux permettent à un parent de limiter les messages, de fixer un rappel quotidien et des heures calmes, sans jamais voir les messages.
+La sécurité des plus jeunes : YAPILAPI est réservé aux personnes de 13 ans et plus. Les comptes des moins de 18 ans sont privés, ne peuvent pas recevoir de messages d'adultes qui ne sont pas leurs amis, et n'apparaissent jamais dans les aperçus publics ni dans les moteurs de recherche. Les liens familiaux permettent à un parent de fixer des limites et des heures calmes, sans jamais voir les messages.
 
 Conditions d'utilisation : https://[ton site]/legal/terms
 Politique de confidentialité : https://[ton site]/legal/privacy
@@ -173,13 +178,14 @@ Règles de la communauté : https://[ton site]/legal/guidelines
 
 ### Nouveautés (1.0.0)
 
-Première version de YAPILAPI. Partage des publications, des reels et des stories, discute et appelle tes proches, rejoins des communautés et des salons, garde tes stories dans des Chapitres et tes enregistrements dans des Tableaux, le tout en 8 langues.
+Première version de YAPILAPI, le réseau social où tu parles. Maintiens le bouton Yap et parle, et sois entendu en 24 langues. Partage des publications, des reels et des stories, discute et appelle tes proches, rejoins des communautés, des squads et des salons, et garde tes stories dans des Chapitres et tes enregistrements dans des Tableaux.
 
 ---
 
 ## Notes for the owner
 
-- **Names in the app:** the listing uses the names each language's catalog uses (`packages/shared/src/locales/`). In English: Pulse, Wander, Spark, Yap, You, Chapters, Boards, Rooms, Recap videos. In French: Pouls, Balade, Étincelle, Yap, Toi, Chapitres, Tableaux, Salons, Vidéos récap. If a catalog changes before submission, change the listing to match.
+- **Names in the app:** the listing uses the names each language's catalog uses (`packages/shared/src/locales/`). In English: Pulse, Wander, Yap (the button and the voice posts), Chats, You, Chapters, Boards, Rooms, Squads, Recap videos. In French: Pouls, Balade, Yap, Discussions, Toi, Chapitres, Tableaux, Salons, Squads, Vidéos récap. Naming is explained in docs/product/yaps.md ("Naming"). If a catalog changes before submission, change the listing to match.
+- **Check the voice features against the build:** Yap Radio and Ask the city are being built alongside this listing. If either isn't in the build you submit, take its line out of the description (and the landing page keeps describing it only once it exists).
 - **"Real":** a photo taken with both cameras at once. Keep it capitalised, like in the app.
 - **Screenshots:** sizes and a suggested order are in app-store.md.
 - **Localised listings:** add Arabic, Spanish, Portuguese, Swahili, Yorùbá and Hausa listings later, from the same text. The app itself is already translated. Google Play can machine-translate listings, but a person should review them.

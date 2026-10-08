@@ -8,13 +8,16 @@ import type { OnboardingStep } from '../../../packages/api-client/src/index';
 import { SUPPORTED_LOCALES, type MessageKey } from '../../../packages/shared/src/i18n-core';
 import { autonym as autonymOf, byAutonym, languageName } from '../../../packages/shared/src/translation';
 import type { Community, PeopleSuggestion } from '../../../packages/shared/src/types';
+import { VOICE_INTRO_MAX_MS } from '../../../packages/shared/src/voice';
 import { client, errorMessage, mediaUrl } from '../lib/api';
+import { useFlag } from '../lib/flags';
 import { FriendsFinder } from '../lib/friends';
 import { useT } from '../lib/i18n';
 import { pickOne, uploadPicked } from '../lib/media';
 import { registerForPush } from '../lib/push';
 import { useSession } from '../lib/session';
 import { radius, space } from '../lib/theme';
+import { uploadVoice, VoiceRecorder } from '../lib/voice';
 import { Avatar, Button, Field, Icon, KeyboardAvoid, Notice, Skeleton, Title, useColors, userText } from '../lib/ui';
 import { suggestionReasonText } from '../../../packages/shared/src/server-text';
 
@@ -24,10 +27,13 @@ const PRESELECTED = 5;
 /** Communities offered on the follow step. */
 const COMMUNITIES = 6;
 
-const STEPS = ['language', 'interests', 'follow', 'friends', 'profile', 'notifications'] as const;
+// 'voice' ("Say hi to YAPILAPI", a voice intro) comes right after the language, so its one line about
+// being heard in every language is already in yours; it is left out while Yaps are off.
+const STEPS = ['language', 'voice', 'interests', 'follow', 'friends', 'profile', 'notifications'] as const;
 type StepId = (typeof STEPS)[number];
 const TITLES: Record<StepId, MessageKey> = {
   language: 'm.onb.language.title',
+  voice: 'onboarding.voice.title',
   interests: 'onboarding.interests.title',
   follow: 'm.onb.follow.title',
   friends: 'friends.title',
@@ -40,8 +46,8 @@ type Saved = { step: number; log: OnboardingStep[]; picked: string[] };
 const storeKey = (userId: string) => `ypl_onboarding_${userId.replace(/[^A-Za-z0-9_.-]/g, '')}`;
 
 /**
- * Six short steps for a new account, each one skippable, with progress at the top and a way back:
- * the app's language, interests (topics and what's trending), people and communities to follow (the
+ * Seven short steps for a new account, each one skippable, with progress at the top and a way back:
+ * the app's language, "Say hi to YAPILAPI" (a voice intro of up to 15 seconds), interests (topics and what's trending), people and communities to follow (the
  * top five people ticked), friends from contacts or an invite link, a profile photo and name, then
  * notifications with what they are for. Where you got to is saved, so closing the app doesn't
  * start it over.
@@ -53,6 +59,8 @@ export default function Onboarding() {
   const { me, refresh } = useSession();
   const scroll = useRef<ScrollView>(null);
   const [restored, setRestored] = useState(false);
+  const yapsOn = useFlag('YAPS') !== false;
+  const steps = yapsOn ? STEPS : STEPS.filter((s) => s !== 'voice');
   const [step, setStep] = useState(0);
   const [log, setLog] = useState<OnboardingStep[]>([]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -66,7 +74,7 @@ export default function Onboarding() {
       .then((raw) => {
         if (!raw) return;
         const s = JSON.parse(raw) as Saved;
-        if (Number.isInteger(s.step)) setStep(Math.min(Math.max(0, s.step), STEPS.length - 1));
+        if (Number.isInteger(s.step)) setStep(Math.min(Math.max(0, s.step), steps.length - 1));
         if (Array.isArray(s.log)) setLog(s.log);
         if (Array.isArray(s.picked)) setPicked(new Set(s.picked));
       })
@@ -80,17 +88,17 @@ export default function Onboarding() {
     void SecureStore.setItemAsync(storeKey(me.id), JSON.stringify(saved)).catch(() => {});
   }, [me, restored, step, log, picked]);
 
-  const id = STEPS[step]!;
+  const id = steps[Math.min(step, steps.length - 1)]!;
   // New step: back to the top, and screen readers hear where they are.
   useEffect(() => {
     if (!restored) return;
     scroll.current?.scrollTo({ y: 0, animated: false });
-    AccessibilityInfo.announceForAccessibility(`${t('onboarding.step', { step: step + 1, total: STEPS.length })}. ${t(TITLES[id])}`);
+    AccessibilityInfo.announceForAccessibility(`${t('onboarding.step', { step: step + 1, total: steps.length })}. ${t(TITLES[id])}`);
   }, [step, restored]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const record = (s: OnboardingStep) => setLog((l) => [...l.filter((x) => x.step !== s.step), s]);
   // A problem from one step (some follows that didn't go through) stays readable on the next.
-  const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
+  const next = () => setStep((s) => Math.min(s + 1, steps.length - 1));
   const back = () => {
     setError(null);
     setStep((s) => Math.max(0, s - 1));
@@ -101,9 +109,11 @@ export default function Onboarding() {
     setBusy(true);
     setError(null);
     try {
-      // Only interests, follow and friends are counted (the analytics event knows those three).
-      const steps = (['interests', 'follow', 'friends'] as const).map((s) => log.find((x) => x.step === s) ?? { step: s, skipped: true, count: 0 });
-      await (await client()).me.completeOnboarding({ platform: 'mobile', steps });
+      // The voice intro, interests, follow and friends are counted (the analytics event knows those four).
+      const counted = ([...(yapsOn ? (['voice'] as const) : []), 'interests', 'follow', 'friends'] as const).map(
+        (s) => log.find((x) => x.step === s) ?? { step: s, skipped: true, count: 0 },
+      );
+      await (await client()).me.completeOnboarding({ platform: 'mobile', steps: counted });
       await SecureStore.deleteItemAsync(storeKey(me.id)).catch(() => {});
       await refresh();
       router.replace('/');
@@ -142,16 +152,16 @@ export default function Onboarding() {
                 <Icon name="chevron-back" size={24} color={c.ink} directional />
               </Pressable>
             ) : null}
-            <Text style={{ color: c.inkMuted, fontSize: 13, flex: 1 }}>{t('onboarding.step', { step: step + 1, total: STEPS.length })}</Text>
+            <Text style={{ color: c.inkMuted, fontSize: 13, flex: 1 }}>{t('onboarding.step', { step: step + 1, total: steps.length })}</Text>
           </View>
           <View
             accessible
             accessibilityRole="progressbar"
             accessibilityLabel={t('m.onb.progress')}
-            accessibilityValue={{ min: 1, max: STEPS.length, now: step + 1 }}
+            accessibilityValue={{ min: 1, max: steps.length, now: step + 1 }}
             style={{ flexDirection: 'row', gap: 4 }}
           >
-            {STEPS.map((s, i) => (
+            {steps.map((s, i) => (
               <View key={s} style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: i <= step ? c.yapi : c.surfaceSunken }} />
             ))}
           </View>
@@ -160,6 +170,8 @@ export default function Onboarding() {
 
         {id === 'language' ? (
           <LanguageStep onNext={next} setError={setError} />
+        ) : id === 'voice' ? (
+          <VoiceStep record={record} onNext={next} setError={setError} />
         ) : id === 'interests' ? (
           <InterestsStep picked={picked} setPicked={setPicked} record={record} onNext={next} setError={setError} />
         ) : id === 'follow' ? (
@@ -252,6 +264,54 @@ function LanguageStep({ onNext, setError }: StepProps) {
         })}
       </View>
       <Button label={t('onboarding.continue')} disabled={!!saving} onPress={onNext} />
+    </>
+  );
+}
+
+/**
+ * "Say hi to YAPILAPI": a hello of up to 15 seconds, kept as the profile's voice intro
+ * (docs/product/yaps.md), with one line on being heard in every language. Skippable.
+ */
+function VoiceStep({ record, onNext, setError }: StepProps & { record: (s: OnboardingStep) => void }) {
+  const c = useColors();
+  const { t } = useT();
+  const [uri, setUri] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    if (!uri) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const voice = await uploadVoice(uri, 'intro');
+      await (await client()).me.updateProfile({ voiceIntroId: voice.id });
+      record({ step: 'voice', skipped: false, count: 1 });
+      onNext();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <Title sub={t('onboarding.voice.body')}>{t('onboarding.voice.title')}</Title>
+      <View style={{ flexDirection: 'row', gap: space[2], padding: space[3], borderRadius: radius.md, backgroundColor: c.yapiSoft }}>
+        <Icon name="globe-outline" size={18} color={c.yapi} />
+        <Text style={{ color: c.ink, fontSize: 14, lineHeight: 20, flex: 1 }}>{t('onboarding.voice.languages')}</Text>
+      </View>
+      <VoiceRecorder maxMs={VOICE_INTRO_MAX_MS} purpose="intro" busy={busy} onDone={(u) => setUri(u)} onCancel={() => setUri(null)} />
+      <Button label={busy ? t('m.common.saving') : t('onboarding.continue')} disabled={!uri || busy} onPress={() => void save()} />
+      <Button
+        label={t('onboarding.skip')}
+        variant="ghost"
+        disabled={busy}
+        onPress={() => {
+          record({ step: 'voice', skipped: true, count: 0 });
+          onNext();
+        }}
+      />
     </>
   );
 }

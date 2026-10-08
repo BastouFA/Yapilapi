@@ -13,8 +13,9 @@ import { Button, useColors } from '../lib/ui';
 const logo = require('../assets/splash-icon.png');
 
 /**
- * The first screen for someone who isn't signed in: the brand, what the app is for in three
- * lines (Pulse, Wander, Yap, with their own symbols), then Create account or Log in.
+ * The first screen for someone who isn't signed in: the brand and "Speak. The world understands.",
+ * what the app is for in four lines (Yap, Pulse, Wander, Chats, with their own symbols), then
+ * Create account or Log in.
  */
 export default function Welcome() {
   const c = useColors();
@@ -28,7 +29,9 @@ export default function Welcome() {
     Animated.timing(rise, { toValue: 1, duration: 520, useNativeDriver: true }).start();
   }, [reduce, rise]);
 
+  // Voice first: YAPILAPI is the social network you speak.
   const lines: { glyph: NavGlyphName; title: string; body: string }[] = [
+    { glyph: 'voice', title: t('nav.yap'), body: t('landing.talk.body') },
     { glyph: 'pulse', title: t('nav.home'), body: t('m.welcome.pulse') },
     { glyph: 'wander', title: t('nav.discover'), body: t('m.welcome.wander') },
     { glyph: 'yap', title: t('nav.inbox'), body: t('m.welcome.yap') },

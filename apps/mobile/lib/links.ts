@@ -33,7 +33,12 @@ export function notificationHref(n: NotificationTarget): string | null {
   if (n.type === 'fair_start_done') return id ? `/insights/${id}` : null;
   if (n.type === 'chain_pass' && n.entityType === 'chain' && id) return `/chain/${id}`;
   const mic = micNoticeHref({ type: n.type, entityId: n.entityId, data: n.data ?? {} });
-  if (mic) return 'chain' in mic ? `/chain/${encodeURIComponent(mic.chain)}` : `/reels?start=${encodeURIComponent(mic.reel)}`;
+  if (mic)
+    return 'chain' in mic
+      ? `/chain/${encodeURIComponent(mic.chain)}`
+      : 'post' in mic
+        ? `/p/${encodeURIComponent(mic.post)}`
+        : `/reels?start=${encodeURIComponent(mic.reel)}`;
   // A milestone on your post or reel opens it (a push carries no format: it opens the post's page).
   if (n.type === 'post_milestone' && id) return n.data?.format === 'reel' ? `/reels?start=${id}` : `/p/${id}`;
   // A call opens the chat it was in (older call notifications open the caller).

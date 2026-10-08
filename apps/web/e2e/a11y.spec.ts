@@ -85,6 +85,9 @@ const APP_PAGES: [string, (d: SeedData) => string][] = [
  * narrowest common phone, and must not scroll sideways there.
  */
 const NEW_PAGES: [string, (d: SeedData) => string][] = [
+  // The Yap button opens the recorder; Pulse has Yaps right after For you.
+  ['record a Yap', () => '/create?mode=yap'],
+  ['home: Yaps', () => '/home?mode=yaps'],
   ['wraps', () => '/wraps'],
   ['wrap', (d) => (d.wrapId ? `/wraps/${d.wrapId}` : '/wraps')],
   ['questions', () => '/questions'],
@@ -534,6 +537,15 @@ const STATES: [string, (page: Page, d: SeedData) => Promise<void>][] = [
 
 /** Newer states (audited at 375px on phones, like NEW_PAGES). */
 const NEW_STATES: [string, (page: Page, d: SeedData) => Promise<void>][] = [
+  [
+    'nav: more ways to create',
+    async (page) => {
+      await open(page, '/home');
+      // A right click (a long press on a phone) on the Yap button opens the other ways to create.
+      await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Yap', exact: true }).click({ button: 'right' });
+      await expect(page.getByRole('dialog', { name: 'More ways to create' })).toBeVisible();
+    },
+  ],
   [
     'home: pulse cards and drops',
     async (page, d) => {

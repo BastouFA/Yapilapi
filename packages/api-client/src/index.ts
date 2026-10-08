@@ -2997,7 +2997,7 @@ export interface InvitesInfo {
 }
 
 export interface OnboardingStep {
-  step: 'interests' | 'follow' | 'friends';
+  step: 'voice' | 'interests' | 'follow' | 'friends';
   skipped: boolean;
   count: number;
 }

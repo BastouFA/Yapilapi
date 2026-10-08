@@ -225,10 +225,12 @@ html[data-locale-pending] body {
   width: 100%;
   margin: 0 auto;
 }
-.landing__hero {
+.landing__main {
   max-width: 1160px;
   width: 100%;
   margin: 0 auto;
+}
+.landing__hero {
   display: grid;
   gap: var(--space-12);
   align-items: center;
@@ -240,7 +242,7 @@ html[data-locale-pending] body {
   gap: var(--space-2);
   width: fit-content;
   padding-block: 6px;
-  padding-inline: 8px 14px;
+  padding-inline: 6px 14px;
   border-radius: var(--radius-full);
   background: var(--surface);
   border: 1px solid var(--line);
@@ -248,12 +250,13 @@ html[data-locale-pending] body {
   font: 600 13px/1 var(--font-sans);
 }
 .landing__eyebrow b {
-  padding: 4px 8px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
   border-radius: var(--radius-full);
   background: var(--grad);
   color: var(--on-yapi);
-  font-size: 11px;
-  letter-spacing: 0.04em;
 }
 .landing__hero h1 {
   margin: 0;
@@ -267,28 +270,58 @@ html[data-locale-pending] body {
   line-height: 29px;
   color: var(--ink-muted);
 }
-.landing__journey {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  padding: 0;
+/* What it is, in seven short cards: voice first. */
+.landing__features {
+  display: grid;
+  gap: var(--space-6);
+  padding-bottom: var(--space-12);
+}
+.landing__features-title {
   margin: 0;
+  font: 800 clamp(28px, 4vw, 40px)/1.05 var(--font-display);
+  letter-spacing: -0.03em;
+}
+.landing__features ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
   list-style: none;
 }
-.landing__journey li {
-  padding: 9px 14px;
-  border-radius: var(--radius-full);
+.landing__features li {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
   background: var(--surface);
   border: 1px solid var(--line);
-  font: 600 13px/1 var(--font-sans);
+  box-shadow: var(--shadow-sm);
 }
-.landing__journey li:nth-child(3n + 1) {
+/* The first one, hold to talk, leads: on the brand's soft colour. */
+.landing__features li:first-child {
   background: var(--yapi-soft);
   border-color: transparent;
 }
-.landing__journey li:nth-child(4) {
-  background: var(--saffron-soft);
-  border-color: transparent;
+.landing__features h3 {
+  margin: 0;
+  font: 700 18px/24px var(--font-display);
+}
+.landing__features p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--ink-muted);
+}
+.landing__feature-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  background: var(--grad);
+  color: var(--on-yapi);
 }
 
 /* CSS-only phone collage: illustrative, contains no user data */
@@ -380,6 +413,46 @@ html[data-locale-pending] body {
   background: var(--grad);
   border: 0;
   color: var(--on-yapi);
+}
+/* The illustrated Yaps: a play button, a waveform and the words under it. */
+.phone__yap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 14px;
+  background: var(--surface);
+}
+.phone__play {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--grad);
+}
+.phone__wave {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  height: 34px;
+}
+.phone__wave i {
+  flex: 1;
+  min-height: 3px;
+  border-radius: 2px;
+  background: var(--grad-fx);
+}
+.phone__wave--sm {
+  height: 18px;
+  margin-bottom: 6px;
+}
+.phone__bubble--me .phone__wave i {
+  background: color-mix(in oklab, var(--on-yapi) 80%, transparent);
+}
+.phone__words {
+  font: 500 12px/16px var(--font-sans);
+  color: var(--ink);
 }
 .phone__live {
   position: relative;
@@ -2772,6 +2845,24 @@ video.chat-att__media {
   overflow: hidden;
   border-radius: var(--radius-full);
   background: var(--surface-sunken);
+}
+/* "Say hi to YAPILAPI": the one line about being heard in every language. */
+.onboarding__languages {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--yapi-soft);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 20px;
+}
+.onboarding__languages svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--yapi);
 }
 .onboarding__bar span {
   display: block;

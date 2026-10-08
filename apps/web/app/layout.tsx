@@ -22,19 +22,22 @@ const sans = Figtree({ subsets: ['latin', 'latin-ext'], variable: '--font-figtre
 const display = Bricolage_Grotesque({ subsets: ['latin', 'latin-ext'], axes: ['opsz'], variable: '--font-bricolage', display: 'swap' });
 const mono = JetBrains_Mono({ subsets: ['latin', 'latin-ext'], weight: '400', variable: '--font-jetbrains-mono', display: 'swap' });
 
+// The same words as lib/metadata.ts's SITE_DESCRIPTION and the landing page.
+const SITE_DESCRIPTION = 'Speak. The world understands. YAPILAPI is the social network you speak: hold to talk, and be heard in 24 languages.';
+
 const SITE_URL = (process.env.SITE_URL || process.env.WEB_ORIGIN?.split(',')[0] || 'http://localhost:3000').replace(/\/+$/, '');
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: { default: 'YAPILAPI', template: '%s · YAPILAPI' },
-  description: 'Your social world. One place.',
+  title: { default: 'YAPILAPI: the social network you speak', template: '%s · YAPILAPI' },
+  description: SITE_DESCRIPTION,
   applicationName: 'YAPILAPI',
   // "Add to Home Screen" installs YAPILAPI with its own icon (Yap mode has its own: app/(app)/yap/layout.tsx).
   manifest: '/manifest.webmanifest',
   appleWebApp: { capable: true, title: 'YAPILAPI', statusBarStyle: 'default' },
   icons: { apple: '/yapilapi-icon-180.png' },
-  openGraph: { siteName: 'YAPILAPI', type: 'website', title: 'YAPILAPI', description: 'Your social world. One place.' },
-  twitter: { card: 'summary_large_image', title: 'YAPILAPI', description: 'Your social world. One place.' },
+  openGraph: { siteName: 'YAPILAPI', type: 'website', title: 'YAPILAPI: the social network you speak', description: SITE_DESCRIPTION },
+  twitter: { card: 'summary_large_image', title: 'YAPILAPI: the social network you speak', description: SITE_DESCRIPTION },
 };
 
 export const viewport: Viewport = {
