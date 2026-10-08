@@ -39,6 +39,8 @@ const schema = z.object({
   EMAIL_FROM: z.string().default('YAPILAPI <no-reply@yapilapi.local>'),
   AI_PROVIDER: z.enum(['dev', 'anthropic']).default('dev'),
   AI_MODEL: z.string().default('claude-opus-5'),
+  /** The model for translations only (posts, comments, stories, messages and caption tracks): many short requests. */
+  AI_TRANSLATE_MODEL: z.string().default('claude-sonnet-5-5'),
   ANTHROPIC_API_KEY: z.string().optional().default(''),
   PAYMENTS_PROVIDER: z.enum(['dev', 'stripe']).default('dev'),
   /** Stripe (PAYMENTS_PROVIDER=stripe): secret key, webhook signing secret, and the publishable key the browser uses. */
@@ -128,6 +130,16 @@ const schema = z.object({
     .transform((v) => trustProxySetting(v)),
   /** "See translation": how many translations one person can ask for in an hour (answers from the cache count too). */
   TRANSLATE_PER_HOUR: z.coerce.number().int().positive().default(300),
+  /**
+   * Automatic translation: how many new translations (not already made for someone else) one
+   * person's screens may cause in an hour. Past it, "See translation" again until the hour moves on.
+   */
+  AUTO_TRANSLATE_PER_HOUR: z.coerce.number().int().min(0).default(200),
+  /**
+   * Automatic translation: new translations a day (UTC) for everyone together, caption tracks
+   * included (one per 50 lines). Past it, everyone gets "See translation" until midnight UTC.
+   */
+  AUTO_TRANSLATE_DAILY_LIMIT: z.coerce.number().int().min(0).default(20000),
   /**
    * Run the background workers (media processing, recap videos, scheduled posts, webhooks, room
    * housekeeping) in this process. Unset: on everywhere except tests, which drive them directly.

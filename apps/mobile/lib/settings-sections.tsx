@@ -288,7 +288,7 @@ export function DataSaver() {
 
 /**
  * "Languages I understand" (the app's language always counts, so it's ticked and fixed)
- * and "Translate automatically" (off by default). Saved on the account.
+ * and "Translate automatically" (on by default). Saved on the account; the Yap app shows it too.
  */
 export function Translation() {
   const c = useColors();

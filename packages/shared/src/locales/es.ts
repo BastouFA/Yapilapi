@@ -2757,9 +2757,10 @@ export const es: Catalog = {
     'No te ofreceremos traducir publicaciones, comentarios, historias ni mensajes en estos idiomas. {language}, el idioma de la app, siempre está incluido.',
   'translate.appLanguage': 'Idioma de la app',
   'translate.auto': 'Traducir automáticamente',
-  'translate.autoHint': 'Muestra la traducción directamente, con un enlace al original. Desactivado de forma predeterminada.',
+  'translate.autoHint': 'Muestra la traducción directamente, con un enlace al original.',
   'translate.max': 'Puedes elegir hasta {count} idiomas.',
   'translate.saved': 'Ajustes de traducción guardados.',
+  'translate.captionTrack': '{language} (traducido)',
   // Chats: polls, shared lists and reminders.
   'm.chat.addMenu': 'Añadir a este chat',
   'm.chat.poll.new': 'Encuesta',

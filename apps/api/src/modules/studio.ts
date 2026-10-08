@@ -8,7 +8,10 @@ import { enqueue } from '../lib/jobs.ts';
 import { assertRecapUse } from '../lib/recap-sharing.ts';
 import { saveCaptionTrack, videoDurationMs } from '../lib/studio.ts';
 import { mediaVisibleSql } from '../lib/visibility.ts';
-import { decodeCueText, MAX_CUE_TEXT, MAX_CUES, MAX_VTT_BYTES, parseVtt, sanitizeCueText, VttError } from '../lib/webvtt.ts';
+import { decodeCueText, MAX_CUE_TEXT, MAX_CUES, MAX_VTT_BYTES, parseVtt, sanitizeCueText, serializeVtt, VttError } from '../lib/webvtt.ts';
+import { cachedTranslation, storeTranslation, takeTranslationBudget, translationsLastHour } from '../lib/translation.ts';
+import { isEnabled } from '../lib/services.ts';
+import { baseLanguage, captionTranslationQuerySchema } from '@yapilapi/shared';
 import { me, requireAuth } from '../plugins/auth.ts';
 
 export const MAX_CLIPS = 20;
@@ -210,6 +213,55 @@ export default async function studioModule(app: FastifyInstance, ctx: AppContext
       cues: cues.map((c) => ({ start: c.start, end: c.end, text: decodeCueText(c.text) })),
     };
   });
+
+  /**
+   * A caption track in the reader's language, which players offer as "French (translated)".
+   * Made the first time anyone asks, then kept for everyone until the track gets a new file.
+   * Only for people who can see the video; a new translation counts once against the
+   * person's hourly translation limit and, per 50 lines, against the day's budget. Cues as
+   * JSON (the phone draws them), or WebVTT with format=vtt (for a <track> on the web).
+   */
+  app.get(
+    '/v1/media/:id/captions/:lang/translation',
+    { preHandler: requireAuth, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    async (req, reply) => {
+      const u = me(req);
+      const { id, lang } = parse(langParam, req.params);
+      const q = parse(captionTranslationQuerySchema, req.query);
+      await visibleVideo(id, u.id);
+      const { rows } = await db.query(`SELECT id, lang, storage_key FROM caption_tracks WHERE media_id = $1 AND lang = $2 AND status = 'ready'`, [id, lang]);
+      const track = rows[0];
+      if (!track?.storage_key) throw notFound('Those captions');
+      const source = baseLanguage(track.lang);
+      if (source === q.target) throw new AppError(400, 'same_language', 'This is already in that language.');
+      if (!(await isEnabled(db, 'AI_TRANSLATION'))) throw new AppError(503, 'translation_off', 'Translation is turned off right now.');
+      const original = (await ctx.storage.read(track.storage_key)).toString('utf8');
+      const item = { kind: 'caption' as const, id: track.id as string, text: original };
+      let vtt = (await cachedTranslation(db, item, q.target, { standIn: !ctx.ai.machineTranslation }))?.body;
+      if (!vtt) {
+        if ((await translationsLastHour(db, u.id)) >= ctx.config.TRANSLATE_PER_HOUR)
+          throw new AppError(429, 'translation_limit', 'You’ve translated a lot in the last hour. Try again later.');
+        const cues = parseVtt(original);
+        if (ctx.ai.machineTranslation && !(await takeTranslationBudget(db, Math.max(1, Math.ceil(cues.length / 50)), ctx.config.AUTO_TRANSLATE_DAILY_LIMIT)))
+          throw new AppError(503, 'translation_unavailable', 'Translation isn’t available right now. Try again later.');
+        // The words only: cue tags (italics, speakers) don't survive a translation.
+        const lines = cues.map((c) => decodeCueText(c.text.replace(/<[^>]*>/g, '')));
+        const out = await ctx.ai.translateLines({ userId: u.id, scope: `caption:${track.id}`, lines, source, target: q.target });
+        vtt = serializeVtt(cues.map((c, i) => ({ start: c.start, end: c.end, settings: c.settings, text: out.lines[i] ?? lines[i]! })));
+        await storeTranslation(db, { ...item, target: q.target, sourceLanguage: source, body: vtt, provider: out.provider, model: out.model });
+      }
+      if (q.format === 'vtt') {
+        reply.type('text/vtt; charset=utf-8').header('cache-control', 'private, max-age=3600');
+        return vtt;
+      }
+      return {
+        sourceLanguage: source,
+        targetLanguage: q.target,
+        machine: true,
+        cues: parseVtt(vtt).map((c) => ({ start: c.start, end: c.end, text: decodeCueText(c.text) })),
+      };
+    },
+  );
 
   async function trackRow(mediaId: string, lang: string) {
     return (await db.query(`SELECT * FROM caption_tracks WHERE media_id = $1 AND lang = $2`, [mediaId, lang])).rows[0];

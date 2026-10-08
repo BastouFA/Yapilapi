@@ -108,6 +108,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [meLoading, setMeLoading] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [flags, setFlags] = useState<Record<string, boolean>>({});
+  // Automatic translation works on the server now (both flags on, and a real model).
+  const [autoTranslation, setAutoTranslation] = useState(false);
   const [unread, setUnreadState] = useState({ notifications: 0, messages: 0 });
   const [toastState, setToastState] = useState<{ id: number; message: string; action?: ToastAction } | null>(null);
   const toastId = useRef(0);
@@ -193,7 +195,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     () =>
       api
         .flags()
-        .then((r) => setFlags(r.flags))
+        .then((r) => {
+          setFlags(r.flags);
+          setAutoTranslation(!!r.autoTranslation);
+        })
         .catch(() => {}),
     [],
   );
@@ -319,7 +324,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
     [locale],
   );
 
-  // "See translation": signed in, and while translation is turned on.
+  // "See translation": signed in, and while translation is turned on. Automatic translation (and
+  // translated caption tracks) when the server can, and the reader hasn't turned it off.
   const translationOn = !!me && !!flags.AI_TRANSLATION;
   const translation = useMemo<TranslationContextValue | null>(
     () =>
@@ -327,11 +333,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
         ? {
             locale,
             languages: me.translation?.languages ?? [],
-            auto: !!me.translation?.auto,
+            auto: autoTranslation && (me.translation?.auto ?? true),
             translate: (kind, id, target) => api.translate({ kind, id, target }).then((r) => r.translation),
+            translateMany: (items, target) => api.translations({ target, items }),
+            captionUrl: autoTranslation ? (mediaId, lang, target) => api.studio.translatedCaptionUrl(mediaId, lang, target) : undefined,
           }
         : null,
-    [translationOn, locale, me],
+    [translationOn, autoTranslation, locale, me],
   );
 
   return (

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPoi
 import {
   Avatar,
   CaptionTracks,
+  captionTrackMode,
   Icon,
   RisingBadge,
   SensitiveCover,
@@ -258,7 +259,7 @@ export function ReelItem({
     const tracks = [...v.textTracks];
     const base = locale.split('-')[0];
     const pick = tracks.find((x) => x.language === base) ?? tracks[0];
-    for (const tr of tracks) tr.mode = prefs.captions && tr === pick ? 'showing' : 'hidden';
+    for (const tr of tracks) tr.mode = captionTrackMode(tr, prefs.captions && tr === pick);
     // The browser puts subtitles on the bottom line, under the name, caption and scrubber, which
     // cover them: lift every cue above them once its file has loaded.
     const lift = () => {
@@ -585,7 +586,7 @@ export function ReelItem({
                 }
               }}
             >
-              <CaptionTracks captions={captions} />
+              <CaptionTracks captions={captions} mediaId={media?.id} />
             </video>
           ) : null}
         </div>

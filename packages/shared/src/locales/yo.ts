@@ -2752,9 +2752,10 @@ export const yo: Catalog = {
     'A kò ní fún ọ láti túmọ̀ àwọn ìfìwéránṣẹ́, ọ̀rọ̀ ìwòye, ìtàn àti ìfiránṣẹ́ ní àwọn èdè wọ̀nyí. {language}, èdè áàpù, wà nínú rẹ̀ nígbà gbogbo.',
   'translate.appLanguage': 'Èdè áàpù',
   'translate.auto': 'Túmọ̀ láìfọwọ́yí',
-  'translate.autoHint': 'Fi ìtumọ̀ hàn lẹ́sẹ̀kẹsẹ̀, pẹ̀lú ìjápọ̀ sí ojúlówó. Ó wà ní pípa ní àkọ́kọ́.',
+  'translate.autoHint': 'Fi ìtumọ̀ hàn lẹ́sẹ̀kẹsẹ̀, pẹ̀lú ìjápọ̀ sí ojúlówó.',
   'translate.max': 'O lè yan tó èdè {count}.',
   'translate.saved': 'A ti fi ètò ìtumọ̀ pamọ́.',
+  'translate.captionTrack': '{language} (ìtumọ̀)',
   // Chats: polls, shared lists and reminders.
   'm.chat.addMenu': 'Ṣafikun sí ìjíròrò yìí',
   'm.chat.poll.new': 'Ìbò èrò',

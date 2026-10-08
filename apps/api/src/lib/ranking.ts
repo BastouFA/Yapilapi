@@ -52,6 +52,13 @@ export const RANKING = {
     skip: 2.0,
     /** × exp(−age in hours / freshnessHours). */
     freshness: 4.0,
+    /**
+     * A suggestion (not from your connections or communities) in a language you don't understand:
+     * a mild preference for what you can read when it reaches you translated ("Translate
+     * automatically"), a stronger one when you'd have to tap "See translation" for every post.
+     */
+    unreadLanguageTranslated: -0.4,
+    unreadLanguage: -1.5,
   },
   topicScale: 8,
   freshnessHours: 36,
@@ -141,6 +148,8 @@ export interface RankOptions {
   reduced?: boolean;
   /** Reels: whether the viewer may see videos marked sensitive. */
   sensitiveOk?: boolean;
+  /** The languages the viewer understands, and whether others reach them translated (lib/translation.ts readerLanguages). */
+  reader?: { understood: string[]; translated: boolean };
 }
 
 /** What the scoring needs to know about one candidate. */
@@ -173,6 +182,8 @@ export interface Features {
   trend: number;
   ageHours: number;
   newCreator: boolean;
+  /** In a language the viewer doesn't understand: 'translated' when it reaches them translated, 'unread' when it doesn't. */
+  unreadLanguage?: 'translated' | 'unread' | null;
   /** For the reason: names and topics. */
   displayName?: string;
   collabName?: string | null;
@@ -215,6 +226,8 @@ export function scoreOf(f: Features, personalized: boolean): number {
   if (f.friend || f.collabFriend) p += W.friend;
   if (f.followed || (f.collabFollowed && !f.collabFriend)) p += W.follow;
   if (f.member) p += W.community;
+  const connected = f.own || f.friend || f.followed || f.member || f.collabFriend || f.collabFollowed;
+  if (f.unreadLanguage && !connected) p += f.unreadLanguage === 'translated' ? W.unreadLanguageTranslated : W.unreadLanguage;
   return s + p;
 }
 
@@ -462,7 +475,7 @@ function rankingSql(o: RankOptions): { sql: string; params: unknown[] } {
     friends AS (SELECT user_b AS id FROM friendships WHERE user_a = $1 UNION ALL SELECT user_a FROM friendships WHERE user_b = $1),
     ${personalCtes}
     candidates AS (${sources.join('\n UNION \n')})
-    SELECT p.id, p.author_id, p.created_at, p.topics, p.kind, p.format, ap.display_name, cm_c.name AS community_name, (cm_self.user_id IS NOT NULL) AS member,
+    SELECT p.id, p.author_id, p.created_at, p.topics, p.kind, p.format, p.lang, ap.display_name, cm_c.name AS community_name, (cm_self.user_id IS NOT NULL) AS member,
            p.author_id IN (SELECT id FROM followed) AS followed,
            p.author_id IN (SELECT id FROM friends) AS friend,
            -- A co-author you follow or are friends with counts like the author.
@@ -539,6 +552,7 @@ export async function rankFeed(db: Q, o: RankOptions): Promise<Arranged[]> {
     trend: Number(r.trend),
     ageHours: Number(r.age_hours),
     newCreator: r.new_creator,
+    unreadLanguage: o.reader && r.lang && !o.reader.understood.includes(r.lang) ? (o.reader.translated ? 'translated' : 'unread') : null,
     displayName: r.display_name,
     collabName: r.collab_name,
     communityName: r.community_name,

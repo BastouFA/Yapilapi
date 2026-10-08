@@ -3,6 +3,10 @@ export const FEATURE_FLAGS = {
   LIVE: { default: false, description: 'Live sessions (host, co-hosts, audience).' },
   COMMERCE: { default: true, description: 'Products, orders and checkout.' },
   AI_TRANSLATION: { default: true, description: 'Translate posts, messages and captions.' },
+  AUTO_TRANSLATE: {
+    default: true,
+    description: 'Show posts, comments, stories and messages in each reader’s language without a tap (needs AI_TRANSLATION and a translation model).',
+  },
   AI_CATCH_UP: { default: true, description: 'Catch me up on Pulse: a short summary of what your people shared while you were away.' },
   AI_SMART_REPLIES: { default: true, description: 'Suggested short replies under the last message you received in a chat.' },
   AI_ALT_TEXT: { default: true, description: 'Suggest a description of a photo for people using screen readers.' },

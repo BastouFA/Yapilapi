@@ -7,14 +7,14 @@ import { useSession } from '@/app/providers';
 
 /**
  * Settings: "Languages I understand" (the app's language always counts, so it's
- * ticked and fixed) and "Translate automatically" (off by default). Saved on the
- * account, so every device offers "See translation" the same way.
+ * ticked and fixed) and "Translate automatically" (on by default). Saved on the
+ * account, so every device translates (or offers "See translation") the same way.
  */
 export function TranslationCard() {
   const { me, setMe, toast, t, locale, flags } = useSession();
   if (!me) return null;
   const app = baseLanguage(locale);
-  const settings: TranslationSettings = me.translation ?? { languages: [], auto: false };
+  const settings: TranslationSettings = me.translation ?? { languages: [], auto: true };
   const listed = settings.languages.filter((l) => l !== app);
   const full = listed.length >= MAX_UNDERSTOOD_LANGUAGES;
 

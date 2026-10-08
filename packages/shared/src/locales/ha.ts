@@ -2759,9 +2759,10 @@ export const ha: Catalog = {
     'Ba za mu ba ka damar fassara rubuce-rubuce, sharhi, labarai da saƙonni a waɗannan harsunan ba. {language}, harshen manhajar, yana ciki koyaushe.',
   'translate.appLanguage': 'Harshen manhajar',
   'translate.auto': 'Fassara kai tsaye',
-  'translate.autoHint': 'Nuna fassarar nan take, tare da hanyar komawa ga asali. A kashe yake da farko.',
+  'translate.autoHint': 'Nuna fassarar nan take, tare da hanyar komawa ga asali.',
   'translate.max': 'Za ka iya zaɓar harsuna har {count}.',
   'translate.saved': 'An adana saitunan fassara.',
+  'translate.captionTrack': '{language} (fassara)',
   // Chats: polls, shared lists and reminders.
   'm.chat.addMenu': 'Ƙara zuwa wannan hira',
   'm.chat.poll.new': 'Ƙuri’ar jin ra’ayi',

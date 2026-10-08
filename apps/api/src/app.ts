@@ -18,7 +18,7 @@ import { AppError } from './lib/errors.ts';
 import { requestLocale, translateDetails, translateMessage } from './lib/error-language.ts';
 import { RealtimeHub } from './lib/realtime.ts';
 import { AiGateway } from './lib/ai/gateway.ts';
-import { anthropicProvider, devProvider } from './lib/ai/providers.ts';
+import { anthropicProvider, devProvider, type AiProvider } from './lib/ai/providers.ts';
 import { logEmailSender, smtpEmailSender, type MailTransport } from './lib/email.ts';
 import { localDiskStorage, s3Storage } from './lib/storage.ts';
 import { devPaymentProvider, paymentRegistry, paystackPaymentProvider, stripePaymentProvider } from './lib/payments.ts';
@@ -135,6 +135,8 @@ export async function buildApp(
     musicFetch?: typeof fetch;
     /** Replaces the SMTP connection with EMAIL_TRANSPORT=smtp (tests pass a fake). */
     mailTransport?: MailTransport;
+    /** Replaces the model used for translations (tests and local checks pass a stand-in that isn't 'dev'). */
+    translator?: AiProvider;
   } = {},
 ): Promise<BuiltApp> {
   const app = Fastify({
@@ -190,6 +192,10 @@ export async function buildApp(
     config.AI_PROVIDER === 'anthropic' && config.ANTHROPIC_API_KEY ? anthropicProvider(config.ANTHROPIC_API_KEY, config.AI_MODEL) : devProvider();
   if (config.AI_PROVIDER === 'anthropic' && !config.ANTHROPIC_API_KEY)
     app.log.warn('AI_PROVIDER=anthropic but ANTHROPIC_API_KEY is empty; using the dev provider.');
+  // Translations use a model of their own (many short requests). With the stand-in, automatic translation stays off.
+  const translator =
+    opts.translator ??
+    (config.AI_PROVIDER === 'anthropic' && config.ANTHROPIC_API_KEY ? anthropicProvider(config.ANTHROPIC_API_KEY, config.AI_TRANSLATE_MODEL) : provider);
 
   const storage =
     config.STORAGE_DRIVER === 's3'
@@ -246,7 +252,7 @@ export async function buildApp(
     db,
     redis,
     realtime,
-    ai: new AiGateway(db, provider, storage),
+    ai: new AiGateway(db, provider, storage, { translator, realTranslationsOnly: config.APP_ENV === 'production' }),
     email:
       config.EMAIL_TRANSPORT === 'smtp'
         ? smtpEmailSender({ url: config.SMTP_URL, from: config.EMAIL_FROM, transport: opts.mailTransport })

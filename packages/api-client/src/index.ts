@@ -34,6 +34,7 @@ import type {
   DataSaverMode,
   TranslatableKind,
   Translation,
+  TranslationBatch,
   TranslationSettings,
   NowStatus,
   NowStatusAudience,
@@ -832,6 +833,14 @@ export function createClient(opts: ClientOptions) {
       captions: (mediaId: string) => get<{ items: CaptionTrack[]; autoCaptions?: boolean }>(`/v1/media/${mediaId}/captions`),
       captionCues: (mediaId: string, lang: string) =>
         get<{ track: CaptionTrack; cues: CaptionCue[] }>(`/v1/media/${mediaId}/captions/${encodeURIComponent(lang)}`),
+      /** A caption track machine-translated into `target` (made once, kept for everyone). */
+      translatedCaptionCues: (mediaId: string, lang: string, target: string) =>
+        get<{ sourceLanguage: string; targetLanguage: string; machine: true; cues: CaptionCue[] }>(
+          `/v1/media/${mediaId}/captions/${encodeURIComponent(lang)}/translation${qs({ target })}`,
+        ),
+      /** The same as WebVTT, for a <track> (the web app's own origin, so the session cookie goes with it). */
+      translatedCaptionUrl: (mediaId: string, lang: string, target: string) =>
+        `${opts.baseUrl}/v1/media/${mediaId}/captions/${encodeURIComponent(lang)}/translation${qs({ target, format: 'vtt' })}`,
       saveCaptions: (mediaId: string, lang: string, b: { label: string; cues: CaptionCue[] }) =>
         put<{ track: CaptionTrack }>(`/v1/media/${mediaId}/captions/${encodeURIComponent(lang)}`, b),
       uploadCaptions: (mediaId: string, lang: string, file: File | Blob, label: string) => {
@@ -1340,6 +1349,12 @@ export function createClient(opts: ClientOptions) {
      * Errors: 503 translation_off (turned off) or translation_unavailable (not working right now), 429 translation_limit, 404 when not visible.
      */
     translate: (b: { kind: TranslatableKind; id: string; target: string }) => post<{ translation: Translation }>('/v1/translate', b),
+    /**
+     * Automatic translation of the items on screen (up to 50) into `target`: the ones ready now,
+     * the ones still being made (`pending`, ask again shortly), and `auto: false` when it's off or
+     * paused for now. Items left out keep "See translation".
+     */
+    translations: (b: { target: string; items: { kind: TranslatableKind; id: string }[] }) => post<TranslationBatch>('/v1/translations', b),
     ai: {
       assist: (b: { task: string; input?: string; conversationId?: string; communityId?: string; targetLanguage?: string }) =>
         post<{ output: unknown; provider: string; model: string; notice?: string; contextScopes: string[] }>('/v1/ai/assist', b),
@@ -1383,8 +1398,8 @@ export function createClient(opts: ClientOptions) {
       /** Paid tips you got or sent; ones sent during a live are gifts. */
       tips: (direction: 'received' | 'sent' = 'received') => get<{ direction: 'received' | 'sent'; items: TipRecord[] }>(`/v1/me/tips${qs({ direction })}`),
     },
-    /** Feature flags, and how the phone apps offer digital goods (`purchases`; missing from older servers). */
-    flags: () => get<{ flags: Record<string, boolean>; purchases?: StorePurchasePolicy }>('/v1/flags'),
+    /** Feature flags, how the phone apps offer digital goods (`purchases`), and whether automatic translation works here now (`autoTranslation`); both missing from older servers. */
+    flags: () => get<{ flags: Record<string, boolean>; purchases?: StorePurchasePolicy; autoTranslation?: boolean }>('/v1/flags'),
     /** What anyone can see of a shared link without an account (link previews, signed-out views). */
     public: {
       post: (id: string) => get<{ post: PublicPostPreview }>(`/v1/public/posts/${encodeURIComponent(id)}`),

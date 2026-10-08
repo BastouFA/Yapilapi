@@ -4,7 +4,7 @@ import { CHAT_ACCENTS, CHAT_WALLPAPERS } from './chat-theme.ts';
 import { GAME_KINDS, GAME_PLAYERS } from './games/types.ts';
 import { USERNAME_PROBLEM_MESSAGES, usernameProblem } from './usernames.ts';
 import { REEL_LONGEST_MS, reelHighlightsSchema } from './reels.ts';
-import { MAX_UNDERSTOOD_LANGUAGES, TRANSLATABLE_KINDS, TRANSLATION_LANGUAGE_CODES } from './translation.ts';
+import { MAX_UNDERSTOOD_LANGUAGES, TRANSLATABLE_KINDS, TRANSLATION_BATCH_MAX, TRANSLATION_LANGUAGE_CODES } from './translation.ts';
 import { cropSchema, mediaEditSchema } from './filters.ts';
 import { COVER_MAX_STRAIGHTEN } from './cover.ts';
 import { ECHO_PERMISSIONS } from './echoes.ts';
@@ -424,6 +424,21 @@ export const translateSchema = z.object({
   kind: z.enum(TRANSLATABLE_KINDS),
   id: z.string().uuid(),
   target: translationLanguage,
+});
+
+/** POST /v1/translations: automatic translation of the items on screen, into the reader's language. */
+export const translateBatchSchema = z.object({
+  target: translationLanguage,
+  items: z
+    .array(z.object({ kind: z.enum(TRANSLATABLE_KINDS), id: z.string().uuid() }))
+    .min(1)
+    .max(TRANSLATION_BATCH_MAX),
+});
+
+/** GET /v1/media/:id/captions/:lang/translation: a caption track in the reader's language. */
+export const captionTranslationQuerySchema = z.object({
+  target: translationLanguage,
+  format: z.enum(['json', 'vtt']).default('json'),
 });
 
 /** PUT /v1/me/translation: "Languages I understand" and "Translate automatically". */

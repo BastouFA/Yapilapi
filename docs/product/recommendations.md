@@ -97,6 +97,9 @@ Each candidate gets a score, the sum of (weights in `RANKING.weights`):
 - **Momentum**: engagement in about the last six hours.
 - **Reels only**: how often it's watched to the end and how often it's skipped, pulled towards normal values until a reel has been seen enough.
 - **Freshness**: up to +4 for a brand-new post, fading over a day and a half.
+- **Language**: a suggestion (not from people or communities you follow) in a language you don't understand: −0.4 when it reaches you
+  translated ("Translate automatically", see `docs/product/speak-any-language.md`), −1.5 when you'd have to tap "See translation".
+  Posts in any language can still reach you; ones you can read are mildly preferred.
 
 With Personalization off, only quality, popularity, momentum, the reels rates and freshness count: everyone gets the same ranking.
 

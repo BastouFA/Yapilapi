@@ -45,7 +45,7 @@ import {
 import { Icon, type IconName } from './icons.tsx';
 import { Avatar, Badge, Button, cx, PlusBadge, useModalFocus } from './primitives.tsx';
 import { useDataSaver } from './data-saver.tsx';
-import { TranslatableText } from './translation.tsx';
+import { TranslatableText, TRANSLATED_TRACK_ID, useTranslatedCaptions } from './translation.tsx';
 
 // ── Translation helpers ─────────────────────────────────────────────────
 type Vars = Record<string, string | number>;
@@ -569,17 +569,28 @@ function TaggedPhoto({
 /**
  * Subtitle tracks for a <video>. Caption files live on the media origin, so a
  * video that has tracks must set crossOrigin="anonymous" (see videoCrossOrigin);
- * the media route answers with CORS headers for the web app.
+ * the media route answers with CORS headers for the web app. With `mediaId`, a video
+ * with no track in the reader's language also offers one translated into it
+ * ("French (translated)", from the app's own origin); it's only made once chosen.
  */
-export function CaptionTracks({ captions }: { captions?: CaptionTrackRef[] | null }) {
+export function CaptionTracks({ captions, mediaId }: { captions?: CaptionTrackRef[] | null; mediaId?: string }) {
+  const translated = useTranslatedCaptions(mediaId, captions);
   return (
     <>
       {(captions ?? []).map((c) => (
         <track key={c.lang} kind="subtitles" src={c.url} srcLang={c.lang} label={c.label} />
       ))}
+      {translated ? <track id={TRANSLATED_TRACK_ID} kind="subtitles" src={translated.src} srcLang={translated.lang} label={translated.label} /> : null}
     </>
   );
 }
+
+/**
+ * For players that pick a track themselves: the mode for each one. The translated track stays
+ * off (and isn't downloaded, so not made) unless it's the one shown.
+ */
+export const captionTrackMode = (track: TextTrack, show: boolean): TextTrackMode =>
+  show ? 'showing' : track.id === TRANSLATED_TRACK_ID ? 'disabled' : 'hidden';
 
 /** crossOrigin for a <video>: only needed (and only set) when it has caption tracks. */
 export const videoCrossOrigin = (captions?: CaptionTrackRef[] | null) => (captions?.length ? ('anonymous' as const) : undefined);
@@ -628,7 +639,7 @@ export function MediaViewer({ media, index, onClose, locale = 'en' }: { media: M
             preload={saver ? 'none' : undefined}
             playsInline
           >
-            <CaptionTracks captions={m.captions} />
+            <CaptionTracks captions={m.captions} mediaId={m.id} />
           </video>
         ) : m.kind === 'audio' ? (
           <audio src={m.url} controls />

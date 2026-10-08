@@ -246,8 +246,10 @@ export default async function PrivacyPage() {
           marks the post as made with AI assistance.
         </li>
         <li>
-          See translation: the text you ask to translate. Summaries of a chat or a memory: the messages or posts in it that you can see. Captions and plans: the
-          text you give. The assistants: your request, your interests, language and upcoming events, and what their tools find for you.
+          Translation: the text you ask to translate and, with Translate automatically on (Settings), the posts, comments, story text, messages and video
+          captions on your screen in a language you haven’t said you understand. Each is translated once and the translation is shared with everyone who can see
+          the original; it’s deleted when the original is edited or removed. Summaries of a chat or a memory: the messages or posts in it that you can see.
+          Captions and plans: the text you give. The assistants: your request, your interests, language and upcoming events, and what their tools find for you.
         </li>
       </ul>
       <p>

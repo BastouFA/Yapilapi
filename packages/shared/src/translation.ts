@@ -1,6 +1,7 @@
 /**
- * "See translation": which languages people can say they understand, how a
- * language is named, and whether a piece of text needs translating for a reader.
+ * "See translation" and automatic translation: which languages people can say they
+ * understand, how a language is named, and whether a piece of text needs translating
+ * for a reader. docs/product/speak-any-language.md explains the whole of it.
  * No zod and no Unicode property escapes here: the mobile app imports this file
  * directly. Request schemas are in schemas.ts; the detector, and keeping #tags,
  * @names and links out of the model's reach, are in language-detect.ts.
@@ -104,6 +105,31 @@ export function needsTranslation(textLanguage: string | null | undefined, appLan
   return !understoodLanguages(appLanguage, listed).includes(textLanguage);
 }
 
+/**
+ * Whether text is worth translating automatically: not only emoji, #tags, @names, links
+ * or numbers, and not a single capitalised word (most often a name: "Lagos", "Ada").
+ * Such text still gets "See translation" when its language is known.
+ */
+export function worthTranslating(text: string | null | undefined): boolean {
+  const words = (text ?? '')
+    // Links, email addresses, @names and #tags are never translated.
+    .replace(/https?:\/\/\S+|www\.\S+|\S+@\S+\.\S+|[@#]\S+/g, ' ')
+    // Emoji (with their joiners and variation selectors), digits and ASCII punctuation.
+    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]|[☀-➿‍️⃣]|[0-9!-/:-@[-`{-~]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.join('').length < 2) return false;
+  if (words.length === 1) {
+    const first = words[0]!.charAt(0);
+    // One word starting with a capital letter (scripts without capitals never match).
+    if (first !== first.toLowerCase()) return false;
+  }
+  return true;
+}
+
+/** How many items one POST /v1/translations asks about. */
+export const TRANSLATION_BATCH_MAX = 50;
+
 /** A translation as POST /v1/translate returns it. */
 export interface Translation {
   kind: TranslatableKind;
@@ -120,10 +146,24 @@ export interface Translation {
   cached: boolean;
 }
 
+/**
+ * POST /v1/translations: automatic translation of what's on screen. `items` has the
+ * translations ready now (made earlier for anyone, or just made); `pending` the ones still
+ * being made, to ask about again shortly. Anything else (not visible, in a language the
+ * reader understands, too short, or past a limit) is left out and keeps "See translation".
+ * `auto` is false when automatic translation is off or paused (the reader's setting, the
+ * AUTO_TRANSLATE flag, no translation model, or a limit): stop asking for a while.
+ */
+export interface TranslationBatch {
+  items: Translation[];
+  pending: { kind: TranslatableKind; id: string }[];
+  auto: boolean;
+}
+
 /** The reader's translation settings (Me.translation, PUT /v1/me/translation). */
 export interface TranslationSettings {
   /** Languages they understand besides the app's language. Empty means just the app's language. */
   languages: string[];
-  /** Show translations straight away instead of "See translation". Off by default. */
+  /** Show translations straight away instead of "See translation". On by default. */
   auto: boolean;
 }

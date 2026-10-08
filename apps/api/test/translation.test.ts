@@ -228,10 +228,11 @@ describe('translation', () => {
 
   it('keeps "Languages I understand" and "Translate automatically" on the account', async () => {
     const me0 = (await as(t.app, eve).get('/v1/auth/me')).body.user;
-    expect(me0.translation).toEqual({ languages: [], auto: false });
-    const saved = await as(t.app, eve).put('/v1/me/translation', { languages: ['fr', 'yo', 'fr'], auto: true });
-    expect(saved.body).toEqual({ languages: ['fr', 'yo'], auto: true });
-    expect((await as(t.app, eve).get('/v1/auth/me')).body.user.translation).toEqual({ languages: ['fr', 'yo'], auto: true });
+    // "Translate automatically" is on until the person turns it off.
+    expect(me0.translation).toEqual({ languages: [], auto: true });
+    const saved = await as(t.app, eve).put('/v1/me/translation', { languages: ['fr', 'yo', 'fr'], auto: false });
+    expect(saved.body).toEqual({ languages: ['fr', 'yo'], auto: false });
+    expect((await as(t.app, eve).get('/v1/auth/me')).body.user.translation).toEqual({ languages: ['fr', 'yo'], auto: false });
     expect((await as(t.app, eve).put('/v1/me/translation', { languages: ['klingon'], auto: false })).status).toBe(400);
   });
 });

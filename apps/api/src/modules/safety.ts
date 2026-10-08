@@ -1060,7 +1060,11 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
 
   // ── Feature flags ─────────────────────────────────────────────────────
   // `purchases`: how the phone apps offer digital goods (lib/store-purchases.ts), set in the API's configuration.
-  app.get('/v1/flags', async () => ({ flags: await getFlags(db), purchases: storePurchasePolicy(ctx.config) }));
+  app.get('/v1/flags', async () => {
+    const flags = await getFlags(db);
+    // Automatic translation works here right now: both flags on, and a real model to translate with.
+    return { flags, purchases: storePurchasePolicy(ctx.config), autoTranslation: flags.AI_TRANSLATION && flags.AUTO_TRANSLATE && ctx.ai.machineTranslation };
+  });
 
   app.put('/v1/admin/flags/:key', { preHandler: requireRole('admin') }, async (req) => {
     const { key } = parse(z.object({ key: z.enum(FEATURE_FLAG_KEYS as [string, ...string[]]) }), req.params);

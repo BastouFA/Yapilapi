@@ -70,7 +70,7 @@ import { useReport } from '../lib/report';
 import { SensitiveCover } from '../lib/safety';
 import { TranslatableText } from '../lib/translation';
 import { openMusic, useMusicCredit, useMusicLoop } from '../lib/music';
-import { CaptionOverlay, useCaptionCues } from '../lib/captions';
+import { CaptionOverlay, useCaptionCues, useCaptionTrack } from '../lib/captions';
 import { canWatch, useWatchStart } from '../lib/watch';
 import type { MessageKey } from '../../../packages/shared/src/i18n';
 import { ECHO_PERMISSIONS, type EchoPermission } from '../../../packages/shared/src/echoes';
@@ -1933,6 +1933,8 @@ function OptionsSheet({
 }) {
   const c = useColors();
   const { t, number } = useT();
+  // Subtitles from a track in another language come translated into the app's ("French (translated)").
+  const captionTrack = useCaptionTrack(post?.media.find((m) => m.kind === 'video'));
   const done = (fn: () => void) => () => {
     onClose();
     fn();
@@ -1950,7 +1952,7 @@ function OptionsSheet({
           />
           <Text style={{ color: c.inkMuted, fontWeight: '700', fontSize: 13, marginTop: space[2] }}>{t('reel.captions')}</Text>
           {post.media.find((m) => m.kind === 'video')?.captions?.length ? (
-            <SwitchRow label={t('reel.captions.show')} value={captions} onValueChange={onCaptions} />
+            <SwitchRow label={t('reel.captions.show')} hint={captionTrack.label ?? undefined} value={captions} onValueChange={onCaptions} />
           ) : (
             <Text style={{ color: c.inkMuted, fontSize: 14, lineHeight: 20 }}>{t('reel.captions.none')}</Text>
           )}

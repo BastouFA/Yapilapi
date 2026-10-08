@@ -3,7 +3,19 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import { Avatar, Badge, Button, CaptionTracks, ChatBubble, EmptyState, Icon, Segments, Skeleton, videoCrossOrigin } from '@yapilapi/design-system';
+import {
+  Avatar,
+  Badge,
+  Button,
+  CaptionTracks,
+  captionTrackMode,
+  ChatBubble,
+  EmptyState,
+  Icon,
+  Segments,
+  Skeleton,
+  videoCrossOrigin,
+} from '@yapilapi/design-system';
 import {
   noticeText,
   betterClock,
@@ -774,7 +786,7 @@ export function WatchScreen({ id }: { id: string }) {
     const tracks = Array.from(video.textTracks);
     const lang = locale.split('-')[0];
     const pick = tracks.find((tr) => tr.language.split('-')[0] === lang) ?? tracks[0];
-    for (const tr of tracks) tr.mode = captionsOn && tr === pick ? 'showing' : 'hidden';
+    for (const tr of tracks) tr.mode = captionTrackMode(tr, captionsOn && tr === pick);
   }, [video, captionsOn, locale, src, captions.length]);
 
   if (w.status === 'loading' && !session)
@@ -915,7 +927,7 @@ export function WatchScreen({ id }: { id: string }) {
                 aria-label={`${t('watch.nowPlaying')}: ${current.post.author.displayName}`}
                 {...w.videoEvents}
               >
-                <CaptionTracks captions={captions} />
+                <CaptionTracks captions={captions} mediaId={media?.id} />
               </video>
             ) : (
               <div className="watch-stage__empty">

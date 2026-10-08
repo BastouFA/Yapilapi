@@ -2758,9 +2758,10 @@ export const sw: Catalog = {
     'Hatutakupa chaguo la kutafsiri machapisho, maoni, hadithi na ujumbe katika lugha hizi. {language}, lugha ya programu, imejumuishwa kila wakati.',
   'translate.appLanguage': 'Lugha ya programu',
   'translate.auto': 'Tafsiri kiotomatiki',
-  'translate.autoHint': 'Onyesha tafsiri moja kwa moja, pamoja na kiungo cha maandishi asili. Imezimwa kwa chaguo-msingi.',
+  'translate.autoHint': 'Onyesha tafsiri moja kwa moja, pamoja na kiungo cha maandishi asili.',
   'translate.max': 'Unaweza kuchagua hadi lugha {count}.',
   'translate.saved': 'Mipangilio ya tafsiri imehifadhiwa.',
+  'translate.captionTrack': '{language} (imetafsiriwa)',
   // Chats: polls, shared lists and reminders.
   'm.chat.addMenu': 'Ongeza kwenye mazungumzo haya',
   'm.chat.poll.new': 'Kura ya maoni',

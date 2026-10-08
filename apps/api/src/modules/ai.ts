@@ -5,17 +5,20 @@ import {
   altTextSuggestSchema,
   captionIdeasSchema,
   conversationSmartRepliesSchema,
+  translateBatchSchema,
   translateSchema,
   translationSettingsSchema,
+  understoodLanguages,
   type AiSettings,
   type CatchUpOffer,
+  type TranslationBatch,
   type TranslationSettings,
 } from '@yapilapi/shared';
 import { z } from 'zod';
 import { AppError, featureDisabled, notFound, parse } from '../lib/errors.ts';
 import { translationSettings, translationsLastHour } from '../lib/translation.ts';
 import type { AppContext } from '../lib/context.ts';
-import { isEnabled } from '../lib/services.ts';
+import { getFlags, isEnabled } from '../lib/services.ts';
 import { AGENT_KINDS } from '../lib/ai/agents.ts';
 import { smartRepliesEverywhereSql, smartRepliesState } from '../lib/ai/assists.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
@@ -44,6 +47,35 @@ export default async function aiModule(app: FastifyInstance, ctx: AppContext) {
       throw new AppError(429, 'translation_limit', 'You’ve translated a lot in the last hour. Try again later.');
     return { translation: await ctx.ai.translateItem({ userId: u.id, kind: input.kind, id: input.id, target: input.target }) };
   });
+
+  /**
+   * Automatic translation of what's on the reader's screen (up to TRANSLATION_BATCH_MAX items),
+   * into `target`, their app's language. Items they can't see right now (audience, blocks,
+   * private accounts, chats they're not in) are left out exactly as "See translation" refuses
+   * them, without saying which; so are items in a language they understand. Cached translations
+   * come back at once; new ones within AUTO_TRANSLATE_PER_HOUR for the person and
+   * AUTO_TRANSLATE_DAILY_LIMIT for everyone, and only from a real model. `auto: false` means
+   * automatic translation is off or paused for now and the apps keep "See translation".
+   */
+  app.post(
+    '/v1/translations',
+    { preHandler: requireAuth, config: { rateLimit: { max: 120, timeWindow: '1 minute' } } },
+    async (req): Promise<TranslationBatch> => {
+      const u = me(req);
+      const input = parse(translateBatchSchema, req.body);
+      const flags = await getFlags(db);
+      const settings = await translationSettings(db, u.id);
+      if (!flags.AI_TRANSLATION || !flags.AUTO_TRANSLATE || !settings.auto) return { items: [], pending: [], auto: false };
+      return ctx.ai.translateMany({
+        userId: u.id,
+        target: input.target,
+        items: input.items,
+        understood: understoodLanguages(input.target, settings.languages),
+        perHour: ctx.config.AUTO_TRANSLATE_PER_HOUR,
+        dailyLimit: ctx.config.AUTO_TRANSLATE_DAILY_LIMIT,
+      });
+    },
+  );
 
   /** "Languages I understand" (the app's language always counts) and "Translate automatically". Also in /v1/auth/me. */
   app.get('/v1/me/translation', { preHandler: requireAuth }, async (req): Promise<TranslationSettings> => translationSettings(db, me(req).id));

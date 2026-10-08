@@ -17,6 +17,7 @@ import {
   useInteractions,
 } from '../../../mobile/lib/settings-extra';
 import { BlockedAccounts } from '../../../mobile/lib/settings-more';
+import { Translation } from '../../../mobile/lib/settings-sections';
 import { space } from '../../../mobile/lib/theme';
 import { Button, Card, Icon, Loading, Notice, SwitchRow, Title, useColors } from '../../../mobile/lib/ui';
 import { openInYapilapi } from '../../lib/elsewhere';
@@ -80,7 +81,7 @@ function PushOnThisPhone() {
 
 /**
  * Settings: your photo and name (Edit profile), who can message you and read receipts, blocked
- * people, notifications on this phone and quiet hours, language and appearance; everything else
+ * people, notifications on this phone and quiet hours, language and translation, and appearance; everything else
  * (posts, the rest of privacy, security) opens in YAPILAPI. Your data and deleting your account are
  * here too, as the stores ask of any app you can sign up in.
  */
@@ -103,6 +104,7 @@ export default function Settings() {
         <QuietHours />
       </View>
       <AppLanguage />
+      <Translation />
       <AppearanceCard />
       <SettingsGroup>
         <SettingsLinkRow

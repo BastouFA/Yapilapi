@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { CaptionCue } from '../../../packages/api-client/src/index';
 import type { CaptionTrackRef, MediaItem } from '../../../packages/shared/src/types';
+import { baseLanguage, languageName } from '../../../packages/shared/src/translation';
 import { client } from './api';
 import { useT } from './i18n';
+import { useTranslationSettings } from './translation';
 import { userText } from './ui';
 
 /**
@@ -22,11 +24,23 @@ export function pickTrack(tracks: CaptionTrackRef[] | undefined, locale: string)
   return tracks.find((x) => x.lang.toLowerCase() === locale.toLowerCase()) ?? tracks.find((x) => x.lang.split('-')[0]!.toLowerCase() === base) ?? tracks[0]!;
 }
 
+/**
+ * The track a video's subtitles come from, and the language they're translated into when it
+ * has none in the app's language and automatic translation works ("French (translated)").
+ */
+export function useCaptionTrack(media: MediaItem | null | undefined): { track: CaptionTrackRef | null; translatedTo: string | null; label: string | null } {
+  const { locale, lang, t } = useT();
+  const { available } = useTranslationSettings();
+  const track = media ? pickTrack(media.captions, locale) : null;
+  const target = baseLanguage(lang);
+  const translatedTo = track && available && baseLanguage(track.lang) !== target ? target : null;
+  return { track, translatedTo, label: translatedTo ? t('translate.captionTrack', { language: languageName(translatedTo, locale) }) : null };
+}
+
 /** The cues of a video's subtitles when `enabled` (nothing loads otherwise); null until loaded or when it has none. */
 export function useCaptionCues(media: MediaItem | null | undefined, enabled: boolean): CaptionCue[] | null {
-  const { locale } = useT();
-  const track = media ? pickTrack(media.captions, locale) : null;
-  const key = media && track ? `${media.id}:${track.lang}` : null;
+  const { track, translatedTo } = useCaptionTrack(media);
+  const key = media && track ? `${media.id}:${track.lang}${translatedTo ? `>${translatedTo}` : ''}` : null;
   const [cues, setCues] = useState<CaptionCue[] | null>(key ? (loaded.get(key) ?? null) : null);
   useEffect(() => {
     if (!enabled || !key || !media || !track) return setCues(null);
@@ -34,7 +48,14 @@ export function useCaptionCues(media: MediaItem | null | undefined, enabled: boo
     if (have) return setCues(have);
     let current = true;
     void client()
-      .then((api) => api.studio.captionCues(media.id, track.lang))
+      .then(async (api) => {
+        // Translated into the app's language (made once for everyone); the track as it is when that can't be done.
+        if (translatedTo) {
+          const r = await api.studio.translatedCaptionCues(media.id, track.lang, translatedTo).catch(() => null);
+          if (r) return r;
+        }
+        return api.studio.captionCues(media.id, track.lang);
+      })
       .then(
         (r) => {
           loaded.set(key, r.cues);

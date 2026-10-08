@@ -2757,9 +2757,10 @@ export const en = {
     'We won’t offer to translate posts, comments, stories and messages in these languages. {language}, the app’s language, is always included.',
   'translate.appLanguage': 'App language',
   'translate.auto': 'Translate automatically',
-  'translate.autoHint': 'Show the translation straight away, with a link back to the original. Off by default.',
+  'translate.autoHint': 'Show the translation straight away, with a link back to the original.',
   'translate.max': 'You can choose up to {count} languages.',
   'translate.saved': 'Translation settings saved.',
+  'translate.captionTrack': '{language} (translated)',
   // Chats: polls, shared lists and reminders.
   'm.chat.addMenu': 'Add to this chat',
   'm.chat.poll.new': 'Poll',

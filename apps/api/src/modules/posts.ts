@@ -54,7 +54,7 @@ import {
   type Screening,
 } from '../lib/publishing.ts';
 import { me, requireAuth } from '../plugins/auth.ts';
-import { langOf } from '../lib/translation.ts';
+import { langOf, readerLanguages } from '../lib/translation.ts';
 import { checkEchoSong } from '../lib/echoes.ts';
 import { checkMilestones } from '../lib/milestones.ts';
 import { messageFailureCode, messageFailureEnglish } from '../lib/failures.ts';
@@ -114,6 +114,7 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
         personalized: await personalizationAllowed(db, u.id),
         personal: PERSONAL_FILTERS,
         sensitiveOk: await seesSensitiveMedia(db, u.id),
+        reader: await readerLanguages(db, u.id, ctx.ai.machineTranslation),
       },
       q.cursor,
       q.limit,
@@ -683,7 +684,8 @@ export default async function postsModule(app: FastifyInstance, ctx: AppContext)
    * so does who may see what. "Fewer suggestions" keeps it to your connections and communities.
    */
   async function rankedFeed(userId: string, cursor: string | undefined, limit: number, personal: string, reduced: boolean, personalized: boolean) {
-    const ranked = await rankedPage(db, { userId, surface: 'for_you', personalized, personal, reduced }, cursor, limit);
+    const reader = await readerLanguages(db, userId, ctx.ai.machineTranslation);
+    const ranked = await rankedPage(db, { userId, surface: 'for_you', personalized, personal, reduced, reader }, cursor, limit);
     return {
       mode: 'for_you',
       items: await hydratePosts(

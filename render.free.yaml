@@ -136,7 +136,8 @@ services:
         value: 'true'
 
       # Optional: the AI helpers use Claude once a key is pasted here; while it is empty they use the
-      # built-in stand-in (the API logs a warning). AI_MODEL can be added to choose another model.
+      # built-in stand-in (the API logs a warning) and automatic translation stays off. AI_MODEL can be added
+      # to choose another model; AI_TRANSLATE_MODEL (default claude-sonnet-5-5) is the one for translations.
       - key: AI_PROVIDER
         value: anthropic
       - key: ANTHROPIC_API_KEY

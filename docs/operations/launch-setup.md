@@ -97,6 +97,13 @@ With a key they use Claude.
    `claude-opus-5` gives the best answers. The helpers are short, so the cost per request is small,
    but if the monthly bill matters more than quality, a smaller model can be set in `AI_MODEL`;
    check the current model list and prices on the Anthropic site.
+
+   Translations have a model of their own, `AI_TRANSLATE_MODEL` (default `claude-sonnet-5-5`):
+   with a key set, posts, comments, stories and messages are translated for readers
+   automatically (docs/product/speak-any-language.md). Until then automatic translation stays
+   off and "See translation" says translation isn't available. The spend is capped by
+   `AUTO_TRANSLATE_DAILY_LIMIT` (default 20,000 new translations a day, roughly $20 to $40) and
+   `AUTO_TRANSLATE_PER_HOUR` per person; Admin > Feature flags > `AUTO_TRANSLATE` turns it off.
 5. Check it: the launch check sends one tiny request and shows the model that answered.
 
 What is sent: only what a helper needs at that moment (the recent messages of the chat you are in,

@@ -2828,9 +2828,10 @@ export const ar: Catalog = {
   'translate.languagesHint': 'لن نعرض ترجمة المنشورات والتعليقات والقصص والرسائل المكتوبة بهذه اللغات. {language}، لغة التطبيق، مضمّنة دائمًا.',
   'translate.appLanguage': 'لغة التطبيق',
   'translate.auto': 'الترجمة تلقائيًا',
-  'translate.autoHint': 'اعرض الترجمة مباشرةً مع رابط إلى النص الأصلي. متوقفة افتراضيًا.',
+  'translate.autoHint': 'اعرض الترجمة مباشرةً مع رابط إلى النص الأصلي.',
   'translate.max': 'يمكنك اختيار ما يصل إلى {count} لغة.',
   'translate.saved': 'تم حفظ إعدادات الترجمة.',
+  'translate.captionTrack': '{language} (مترجمة)',
   // Chats: polls, shared lists and reminders.
   'm.chat.addMenu': 'إضافة إلى هذه الدردشة',
   'm.chat.poll.new': 'استطلاع',
