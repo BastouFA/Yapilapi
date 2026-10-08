@@ -1208,4 +1208,7 @@ export const vi: Record<string, string> = {
   'You can pass the mic on one chain to up to {max} people.': 'Trong một chuỗi, bạn có thể chuyền micro cho tối đa {max} người.',
   'You can’t take the mic on this chain.': 'Bạn không thể nhận micro trong chuỗi này.',
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Hôm nay bạn đã thêm nhiều reel vào các chuỗi. Hãy thử lại vào ngày mai.',
+  // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
+  'Near you is not enabled.': 'Gần bạn chưa được bật.',
+  'Zoom in to see what’s here.': 'Phóng to để xem có gì ở đây.',
 };

@@ -1223,4 +1223,7 @@ export const nl: Record<string, string> = {
   'You can pass the mic on one chain to up to {max} people.': 'Je kunt de mic in één keten aan maximaal {max} mensen doorgeven.',
   'You can’t take the mic on this chain.': 'Je kunt de mic in deze keten niet pakken.',
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Je hebt vandaag veel reels aan ketens toegevoegd. Probeer het morgen opnieuw.',
+  // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
+  'Near you is not enabled.': 'In je buurt staat niet aan.',
+  'Zoom in to see what’s here.': 'Zoom in om te zien wat hier is.',
 };

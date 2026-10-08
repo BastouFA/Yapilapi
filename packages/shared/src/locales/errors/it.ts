@@ -1219,4 +1219,7 @@ export const it: Record<string, string> = {
   'You can pass the mic on one chain to up to {max} people.': 'In una catena puoi passare il microfono a {max} persone al massimo.',
   'You can’t take the mic on this chain.': 'Non puoi prendere il microfono in questa catena.',
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Oggi hai aggiunto molti reel alle catene. Riprova domani.',
+  // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
+  'Near you is not enabled.': 'Vicino a te non è attivo.',
+  'Zoom in to see what’s here.': 'Ingrandisci per vedere cosa c’è qui.',
 };

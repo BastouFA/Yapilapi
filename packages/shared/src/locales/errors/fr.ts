@@ -1338,4 +1338,7 @@ export const fr: Record<string, string> = {
   'You can pass the mic on one chain to up to {max} people.': 'Tu peux passer le micro sur une même chaîne à {max} personnes au maximum.',
   'You can’t take the mic on this chain.': 'Tu ne peux pas prendre le micro sur cette chaîne.',
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Tu as ajouté beaucoup de reels à des chaînes aujourd’hui. Réessaie demain.',
+  // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
+  'Near you is not enabled.': 'Près de toi n’est pas activé.',
+  'Zoom in to see what’s here.': 'Zoome pour voir ce qu’il y a ici.',
 };

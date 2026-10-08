@@ -1316,4 +1316,7 @@ export const es: Record<string, string> = {
   'You can pass the mic on one chain to up to {max} people.': 'Puedes pasar el micro de una misma cadena a hasta {max} personas.',
   'You can’t take the mic on this chain.': 'No puedes tomar el micro en esta cadena.',
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Hoy añadiste muchos reels a cadenas. Inténtalo de nuevo mañana.',
+  // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
+  'Near you is not enabled.': 'Cerca de ti no está activado.',
+  'Zoom in to see what’s here.': 'Acerca el mapa para ver lo que hay aquí.',
 };

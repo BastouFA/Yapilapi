@@ -266,6 +266,8 @@ export const createPostSchema = z
     communityId: uuid.optional(),
     eventId: uuid.optional(),
     productId: uuid.optional(),
+    /** A place page it was made at: shown on the post, and it puts the post on the Near you map. */
+    placeId: uuid.optional(),
     linkUrl: webUrl(1000).optional(),
     media: z
       .array(

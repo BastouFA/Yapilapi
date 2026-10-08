@@ -1318,4 +1318,7 @@ export const sw: Record<string, string> = {
   'You can pass the mic on one chain to up to {max} people.': 'Unaweza kupitisha maikrofoni ya mnyororo mmoja kwa hadi watu {max}.',
   'You can’t take the mic on this chain.': 'Huwezi kuchukua maikrofoni kwenye mnyororo huu.',
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Umeongeza reel nyingi kwenye minyororo leo. Jaribu tena kesho.',
+  // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
+  'Near you is not enabled.': 'Karibu nawe haijawashwa.',
+  'Zoom in to see what’s here.': 'Kuza ili uone kilichopo hapa.',
 };

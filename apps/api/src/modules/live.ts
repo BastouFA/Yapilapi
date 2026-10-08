@@ -88,12 +88,14 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
       (SELECT role FROM live_participants p WHERE p.session_id = l.id AND p.user_id = $1) AS my_role,
       (SELECT banned FROM live_participants p WHERE p.session_id = l.id AND p.user_id = $1) AS banned,
       tp.price_cents AS ticket_price_cents, tp.currency AS ticket_currency, tp.title AS ticket_title,
+      lpl.name AS place_name, lpl.city AS place_city,
       (l.ticket_product_id IS NULL OR l.host_id = $1
         OR EXISTS (SELECT 1 FROM live_participants p WHERE p.session_id = l.id AND p.user_id = $1 AND p.role IN ('cohost','moderator'))
         OR EXISTS (SELECT 1 FROM orders o JOIN order_items oi ON oi.order_id = o.id
                    WHERE o.buyer_id = $1 AND o.status = 'paid' AND o.live_session_id = l.id AND oi.product_id = l.ticket_product_id)
       ) AS has_access
-    FROM live_sessions l JOIN profiles pr ON pr.user_id = l.host_id LEFT JOIN products tp ON tp.id = l.ticket_product_id`;
+    FROM live_sessions l JOIN profiles pr ON pr.user_id = l.host_id LEFT JOIN products tp ON tp.id = l.ticket_product_id
+      LEFT JOIN places lpl ON lpl.id = l.place_id AND lpl.deleted_at IS NULL`;
 
   function dto(r: Record<string, any>, viewerId: string) {
     return {
@@ -111,6 +113,8 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
       ticket: r.ticket_product_id
         ? { productId: r.ticket_product_id, title: r.ticket_title, priceCents: r.ticket_price_cents, currency: r.ticket_currency, hasTicket: !!r.has_access }
         : null,
+      // The place it's at (a place page), which also puts it on the Near you map while it's on.
+      place: r.place_name ? { id: r.place_id, name: r.place_name, city: r.place_city } : null,
       // Ticketed lives only hand out a signed playback link to ticket holders; the video server checks that token.
       playbackUrl: r.status === 'live' && !r.banned && r.has_access ? video.playback(r.id, signView(r.id, viewerId)) : null,
     };
@@ -243,19 +247,22 @@ export default async function liveModule(app: FastifyInstance, ctx: AppContext, 
         visibility: z.enum(['public', 'followers', 'friends']).default('public'),
         scheduledFor: z.string().datetime({ offset: true }).optional(),
         ticketProductId: z.string().uuid().optional(),
+        /** A place page it's at: shown on the live, and it puts the live on the Near you map while it's on. */
+        placeId: z.string().uuid().optional(),
       }),
       req.body,
     );
     await canGoLive(u.id);
     if (input.ticketProductId) await assertTicket(input.ticketProductId, u.id);
+    if (input.placeId && !(await db.query(`SELECT 1 FROM places WHERE id = $1 AND deleted_at IS NULL`, [input.placeId])).rowCount) throw notFound('Place');
     // Accounts of people under 18 stay private, so their lives are never for everyone: "Everyone" means their followers.
     const age = ageOf(u.birthDate);
     const visibility = age !== null && age < 18 && input.visibility === 'public' ? 'followers' : input.visibility;
     const streamKey = `sk_${randomBytes(20).toString('base64url')}`;
     const id = await tx(db, async (c) => {
       const { rows } = await c.query(
-        `INSERT INTO live_sessions (host_id, title, visibility, scheduled_for, stream_key_hash, ticket_product_id) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-        [u.id, input.title, visibility, input.scheduledFor ?? null, hashToken(streamKey), input.ticketProductId ?? null],
+        `INSERT INTO live_sessions (host_id, title, visibility, scheduled_for, stream_key_hash, ticket_product_id, place_id) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+        [u.id, input.title, visibility, input.scheduledFor ?? null, hashToken(streamKey), input.ticketProductId ?? null, input.placeId ?? null],
       );
       await c.query(`INSERT INTO live_participants (session_id, user_id, role) VALUES ($1,$2,'host')`, [rows[0].id, u.id]);
       return rows[0].id as string;

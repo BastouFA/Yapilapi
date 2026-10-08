@@ -671,6 +671,18 @@ Dutch (Nederlands) is the 24th language, on the web, the phone app and Yap, in p
 - **Where it shows**: every language picker lists Nederlands, sorted by its own name between Kiswahili and Português; the phones' per-app language setting lists it (`supportedLocales`), and country names on the phone are in Dutch too (`region-names.ts`). Accept-Language `nl` and `nl-BE` find it; plurals count like English.
 - The translation was checked against English by script (keys, placeholders, plural forms, no exclamation marks), not by a native speaker: it needs a review.
 
+## Near you: the live city map (2026-10-08, migration 0087, `apps/api/test/city-map.test.ts`)
+
+What's happening around you right now (docs/product/city-map.md; flag `CITY_MAP`, on by default). Web `/map` and the phone's `map` screen, from Wander.
+
+- **Layers** with toggles: Live now (lives at a place), Today (events at a place on now or before the viewer's midnight), Market (listings by pickup area, on a 2 km grid), Places buzzing (3 or more people posted publicly there in 24 hours), Chains near you (active Pass the Mic chains with reels made there), Friends out (only friends sharing a live location with a chat you're in, or who turned on "Show me on the map to friends"; always rounded to about 1 km; adults and under-18s never see each other unless family-linked).
+- **`GET /v1/map`** by box (at most 1 degree each way, 40 items a layer, 60 a minute): candidates per area cached 30 seconds, then filtered for each viewer by the usual visibility rules (blocks both ways, audiences, minors, regional rules). `GET /v1/map/center` starts at the profile's city or a city searched for. Where the viewer is never goes to the server for the map.
+- **Show me on the map to friends**: off by default; 1 hour, 4 hours or until midnight; stop any time; one rounded point, deleted when it ends (job worker sweep). In the data export without the place.
+- **Map**: OpenStreetMap tiles drawn without a map library (web: images with drag, wheel, buttons and keys; phone: React Native images, drag and buttons), pins that group with a count, a card per pin, and the same results as a list. Set `NEXT_PUBLIC_MAP_TILE_URL` / the phone's `mapTileUrl` for a tile provider in production.
+- **Places on posts and lives**: `placeId` on `POST /v1/posts` and `POST /v1/live`; posts show the place (web and phone); "Add a place" in the web composer and Go live form.
+
+**Not done:** "Add a place" on the phone; the phone screen hasn't been run on a device.
+
 ## Not built yet
 
 - Mainstream music: needs a licensing deal (docs/operations/music.md). Reporting song use to a licensing partner is not built.

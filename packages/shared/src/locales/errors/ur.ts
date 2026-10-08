@@ -1217,4 +1217,7 @@ export const ur: Record<string, string> = {
   'You can pass the mic on one chain to up to {max} people.': 'آپ ایک سلسلے میں زیادہ سے زیادہ {max} لوگوں کو مائیک دے سکتے ہیں۔',
   'You can’t take the mic on this chain.': 'آپ اس سلسلے میں مائیک نہیں لے سکتے۔',
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'آج آپ نے سلسلوں میں بہت سی ریلز شامل کی ہیں۔ کل دوبارہ کوشش کریں۔',
+  // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
+  'Near you is not enabled.': 'آپ کے آس پاس فعال نہیں ہے۔',
+  'Zoom in to see what’s here.': 'یہاں کیا ہے دیکھنے کے لیے زوم ان کریں۔',
 };

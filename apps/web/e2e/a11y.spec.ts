@@ -96,6 +96,7 @@ const NEW_PAGES: [string, (d: SeedData) => string][] = [
   ['chat with games', (d) => `/inbox/${d.gamesChatId}`],
   // Market, tickets and check-in, Together albums and echoes.
   ['market', () => '/market'],
+  ['near you', () => '/map'],
   ['market: sell something', () => '/market/new'],
   ['market listing', (d) => `/market/${d.listingId}`],
   ['your market listing', (d) => `/market/${d.myListingId}`],

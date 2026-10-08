@@ -173,6 +173,11 @@ export async function writePost(
     const seen = await c.query(`SELECT 1 FROM events e WHERE e.id = $2 AND ${eventVisibleSql('$1')}`, [userId, input.eventId]);
     if (!seen.rowCount) throw notFound('That event');
   }
+  // A place page (public already): the post shows it, and the Near you map finds the post there.
+  if (input.placeId) {
+    const place = await c.query(`SELECT 1 FROM places WHERE id = $1 AND deleted_at IS NULL`, [input.placeId]);
+    if (!place.rowCount) throw notFound('Place');
+  }
   // What the post says and where it goes; the same for a new post and a draft saved again.
   const content = [
     kind,
@@ -233,6 +238,8 @@ export async function writePost(
   }
   // "Hide like and view counts" for this post; left out, the account's choice applies (and a draft keeps its own).
   if (input.hideCounts !== undefined) await c.query(`UPDATE posts SET hide_counts = $2 WHERE id = $1`, [id, input.hideCounts]);
+  // A draft saved again takes the place it has now (or none).
+  if (input.placeId || opts.id) await c.query(`UPDATE posts SET place_id = $2 WHERE id = $1`, [id, input.placeId ?? null]);
   if (echo && input.echo) await linkEcho(c, id, input.echo, echo.originalId, echo.song);
   const mediaIds: string[] = [];
   for (const [i, m] of input.media.entries()) {

@@ -5,7 +5,7 @@ import { AgentPanel } from '@/components/AgentPanel';
 import { MoreResults, SearchFailed, type BusinessResult, type PlaceResult, type ProductResult } from '@/components/SearchMore';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
-import { Avatar, Button, CommunityCard, EmptyState, EventCard, List, ListItem, Skeleton } from '@yapilapi/design-system';
+import { Avatar, Button, CommunityCard, EmptyState, EventCard, Icon, List, ListItem, Skeleton } from '@yapilapi/design-system';
 import type { Chain, Community, EventItem, MessageKey, Post, PublicUser } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { NextLink } from '@/lib/link';
@@ -130,6 +130,11 @@ function Discover() {
           <Link href="/assistant" className="yp-btn yp-btn--ghost yp-btn--sm">
             {t('m.title.assistant')}
           </Link>
+          {flags.CITY_MAP !== false ? (
+            <Link href="/map" className="yp-btn yp-btn--ghost yp-btn--sm" title={t('map.hint')}>
+              <Icon name="map-pin" size={16} /> {t('map.title')}
+            </Link>
+          ) : null}
           <Link href="/market" className="yp-btn yp-btn--ghost yp-btn--sm">
             {t('market.title')}
           </Link>

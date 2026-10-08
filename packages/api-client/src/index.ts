@@ -117,6 +117,12 @@ import type {
   EchoOptions,
   EchoPermission,
   Chain,
+  MapAnswer,
+  MapBox,
+  MapCenter,
+  MapLayer,
+  MapPresence,
+  MapPresenceInput,
   ChainEditInput,
   ChainJoin,
   FairStart,
@@ -830,6 +836,20 @@ export function createClient(opts: ClientOptions) {
       removeLink: (id: string, postId: string) => del<{ removed: boolean }>(`/v1/chains/${id}/links/${postId}`),
       /** Invite people you follow or are friends with to add the next reel (those who can't are skipped). */
       pass: (id: string, userIds: string[]) => post<{ passed: number }>(`/v1/chains/${id}/pass`, { userIds }),
+    },
+    /**
+     * Near you: what's happening in a box on the map (docs/product/city-map.md). Only the box goes to
+     * the server, never where you are; `layers` left out means all of them.
+     */
+    map: {
+      items: (box: MapBox, layers?: MapLayer[], tz?: string) => get<MapAnswer>(`/v1/map${qs({ ...box, layers: layers?.join(','), tz })}`),
+      /** Where to start without the device's position: a city searched for, or your profile's city. */
+      center: (city?: string) => get<{ center: MapCenter | null }>(`/v1/map/center${qs({ city })}`),
+      /** "Show me on the map to friends": yours, or null when it's off. */
+      presence: () => get<{ presence: MapPresence | null }>('/v1/map/presence'),
+      /** Turn it on (or move it, without `duration`); the point is rounded to about a kilometre before it's kept. */
+      showMe: (b: MapPresenceInput) => put<{ presence: MapPresence }>('/v1/map/presence', b),
+      stop: () => del<{ presence: null }>('/v1/map/presence'),
     },
     /** Fair start: whether your next reel gets one, and how one of yours is doing. */
     fairStart: {
@@ -1743,7 +1763,7 @@ export function createClient(opts: ClientOptions) {
       products: (id: string) => get<{ items: LiveProduct[] }>(`/v1/live/${id}/products`),
       pin: (id: string, productId: string) => post(`/v1/live/${id}/products`, { productId }),
       unpin: (id: string, productId: string) => del(`/v1/live/${id}/products/${productId}`),
-      create: (b: { title: string; visibility?: string; ticketProductId?: string }) =>
+      create: (b: { title: string; visibility?: string; ticketProductId?: string; placeId?: string }) =>
         post<{ live: LiveSummary; ingest: { url: string; streamKey: string }; message: string }>('/v1/live', b),
       /** The host gets a new stream key (the old one stops working for new connections). */
       newKey: (id: string) => post<{ ingest: { url: string; streamKey: string }; message: string }>(`/v1/live/${id}/key`),
@@ -2126,6 +2146,8 @@ export interface LiveSummary {
   myRole: 'host' | 'cohost' | 'moderator' | 'viewer' | null;
   /** Ticketed lives: playbackUrl stays null until the viewer holds a paid ticket. */
   ticket: { productId: string; title: string; priceCents: number; currency: string; hasTicket: boolean } | null;
+  /** The place it's at, which puts it on the Near you map while it's on. */
+  place?: { id: string; name: string; city: string | null } | null;
   playbackUrl: string | null;
 }
 

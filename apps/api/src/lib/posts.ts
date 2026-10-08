@@ -53,6 +53,7 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
             pr.user_id AS a_id, pr.username AS a_username, pr.display_name AS a_display_name, pr.avatar_url AS a_avatar_url, pr.mode AS a_mode, ${plusCol('a_')},
             c.id AS c_id, c.slug AS c_slug, c.name AS c_name,
             e.id AS e_id, e.title AS e_title, e.starts_at AS e_starts_at,
+            tpl.id AS tpl_id, tpl.name AS tpl_name, tpl.city AS tpl_city,
             pd.id AS pd_id, pd.title AS pd_title, pd.price_cents AS pd_price, pd.currency AS pd_currency,
             EXISTS (SELECT 1 FROM reactions r WHERE r.post_id = p.id AND r.user_id = $2) AS liked,
             EXISTS (SELECT 1 FROM saves s WHERE s.post_id = p.id AND s.user_id = $2) AS saved,
@@ -109,6 +110,7 @@ export async function hydratePosts(db: Q, ids: string[], viewer: string | null, 
      LEFT JOIN music_tracks mt ON mt.id = p.music_track_id
      LEFT JOIN communities c ON c.id = p.community_id
      LEFT JOIN events e ON e.id = p.event_id AND e.deleted_at IS NULL
+     LEFT JOIN places tpl ON tpl.id = p.place_id AND tpl.deleted_at IS NULL
      LEFT JOIN products pd ON pd.id = p.product_id AND pd.deleted_at IS NULL
      LEFT JOIN post_stats ps ON ps.post_id = p.id
      WHERE p.id = ANY($1)`,
@@ -246,6 +248,7 @@ function toPost(r: Record<string, any>, originals: Map<string, NonNullable<Remix
     community: r.c_id ? { id: r.c_id, slug: r.c_slug, name: r.c_name } : null,
     event: r.e_id ? { id: r.e_id, title: r.e_title, startsAt: r.e_starts_at.toISOString() } : null,
     product: r.pd_id ? { id: r.pd_id, title: r.pd_title, priceCents: r.pd_price, currency: r.pd_currency } : null,
+    place: r.tpl_id ? { id: r.tpl_id, name: r.tpl_name, city: r.tpl_city } : null,
     counts: {
       ...countsOf(r),
       ...(r.remix_count === null ? {} : { remixes: r.remix_count }),

@@ -673,13 +673,20 @@ function PostCardView({
 
       {poll ? <PostPoll poll={poll} canVote={canVote} onVote={(id) => void vote(id)} /> : null}
 
-      {post.linkUrl || post.event || post.product ? (
+      {post.linkUrl || post.event || post.place || post.product ? (
         // Wrapped lines 12pt apart, so the chips' touch areas (44 tall) don't overlap.
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: space[2], rowGap: space[3] }}>
           {post.linkUrl ? (
             <PostChip icon="globe-outline" label={hostOf(post.linkUrl)} onPress={() => void Linking.openURL(post.linkUrl!).catch(() => {})} />
           ) : null}
           {post.event ? <PostChip icon="calendar-outline" label={post.event.title} onPress={() => router.push(`/event/${post.event!.id}`)} /> : null}
+          {post.place ? (
+            <PostChip
+              icon="location-outline"
+              label={post.place.city ? `${post.place.name}, ${post.place.city}` : post.place.name}
+              onPress={() => router.push(`/place/${post.place!.id}`)}
+            />
+          ) : null}
           {post.product ? (
             // What's shared is always the author's own: it opens in their shop.
             <PostChip

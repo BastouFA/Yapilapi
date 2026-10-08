@@ -1322,4 +1322,7 @@ export const ha: Record<string, string> = {
   'You can pass the mic on one chain to up to {max} people.': 'Za ka iya mika makirufo na sarƙa ɗaya ga mutane har {max}.',
   'You can’t take the mic on this chain.': 'Ba za ka iya karɓar makirufo a wannan sarƙar ba.',
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Ka ƙara reels da yawa a sarƙoƙi yau. Sake gwadawa gobe.',
+  // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
+  'Near you is not enabled.': 'Ba a kunna Kusa da kai ba.',
+  'Zoom in to see what’s here.': 'Zuƙo don ganin abin da ke nan.',
 };

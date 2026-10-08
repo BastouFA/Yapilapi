@@ -282,6 +282,8 @@ export async function exportSections(db: Q, userId: string) {
                         WHERE cm.conversation_id = s.conversation_id AND cm.user_id <> $1), '{}') AS shared_with
        FROM location_shares s WHERE s.user_id = $1 ORDER BY s.started_at DESC`,
     ),
+    // "Show me on the map to friends", while it's on: when it started and ends, never the place.
+    mapPresence: await q(`SELECT started_at, ends_at FROM map_presence WHERE user_id = $1`),
   };
 
   // Pass the Mic and Fair start: chains you started, your reels in chains, who you passed the mic to, your reels' fair starts.

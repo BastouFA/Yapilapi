@@ -1162,4 +1162,7 @@ export const zh: Record<string, string> = {
   'You can pass the mic on one chain to up to {max} people.': '在一个接力中，你最多可以把麦传给 {max} 个人。',
   'You can’t take the mic on this chain.': '你不能在这个接力中接麦。',
   'You’ve added a lot of reels to chains today. Try again tomorrow.': '你今天已经往接力里添加了很多短视频。请明天再试。',
+  // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
+  'Near you is not enabled.': '“你附近”未启用。',
+  'Zoom in to see what’s here.': '放大地图即可查看这里有什么。',
 };

@@ -1202,4 +1202,7 @@ export const ig: Record<string, string> = {
   'You can pass the mic on one chain to up to {max} people.': 'N’otu agbụ, ị nwere ike inyefe igwe okwu ihe ruru mmadụ {max}.',
   'You can’t take the mic on this chain.': 'Ị nweghị ike iwere igwe okwu n’agbụ a.',
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Ị tinyela ọtụtụ reel n’agbụ taa. Nwaa ọzọ echi.',
+  // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
+  'Near you is not enabled.': 'Agbanyeghị Nso gị.',
+  'Zoom in to see what’s here.': 'Mee ka ọ buo ibu ka ị hụ ihe dị ebe a.',
 };

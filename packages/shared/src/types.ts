@@ -382,6 +382,8 @@ export interface Post {
   community: { id: string; slug: string; name: string } | null;
   event: { id: string; title: string; startsAt: string } | null;
   product: { id: string; title: string; priceCents: number; currency: string } | null;
+  /** The place it was tagged at (a place page), which also puts it on the Near you map. */
+  place?: { id: string; name: string; city: string | null } | null;
   /**
    * The numbers under a post (docs/product/post-stats.md). Views: different people other than the
    * author who had it on screen or watched it, each counted once. Shares: times it was sent to a

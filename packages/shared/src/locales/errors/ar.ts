@@ -1289,4 +1289,7 @@ export const ar: Record<string, string> = {
   'You can pass the mic on one chain to up to {max} people.': 'يمكنك تمرير الميكروفون في سلسلة واحدة إلى ما يصل إلى {max} أشخاص.',
   'You can’t take the mic on this chain.': 'لا يمكنك أخذ الميكروفون في هذه السلسلة.',
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'أضفت الكثير من المقاطع إلى السلاسل اليوم. حاول مجددًا غدًا.',
+  // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
+  'Near you is not enabled.': 'ميزة «بالقرب منك» غير مفعّلة.',
+  'Zoom in to see what’s here.': 'كبّر الخريطة لترى ما هنا.',
 };

@@ -1216,4 +1216,7 @@ export const tr: Record<string, string> = {
   'You can pass the mic on one chain to up to {max} people.': 'Bir zincirde mikrofonu en fazla {max} kişiye uzatabilirsin.',
   'You can’t take the mic on this chain.': 'Bu zincirde mikrofonu alamazsın.',
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Bugün zincirlere çok sayıda reel ekledin. Yarın tekrar dene.',
+  // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
+  'Near you is not enabled.': 'Yakınında özelliği etkin değil.',
+  'Zoom in to see what’s here.': 'Burada ne olduğunu görmek için yakınlaştır.',
 };

@@ -1212,4 +1212,7 @@ export const ru: Record<string, string> = {
   'You can pass the mic on one chain to up to {max} people.': 'Максимум получателей микрофона в одной цепочке: {max}.',
   'You can’t take the mic on this chain.': 'Вы не можете взять микрофон в этой цепочке.',
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Сегодня вы добавили в цепочки много рилсов. Попробуйте завтра.',
+  // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
+  'Near you is not enabled.': 'Функция «Рядом с вами» не включена.',
+  'Zoom in to see what’s here.': 'Приблизьте карту, чтобы увидеть, что здесь есть.',
 };

@@ -27,7 +27,8 @@ function currentTab(path: string, username?: string): NavEntry['id'] | undefined
     path.startsWith('/communities') ||
     path.startsWith('/events') ||
     path.startsWith('/places') ||
-    path.startsWith('/market')
+    path.startsWith('/market') ||
+    path.startsWith('/map')
   )
     return 'discover';
   if (path.startsWith('/create') || path.startsWith('/camera')) return 'create';

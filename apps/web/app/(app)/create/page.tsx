@@ -51,6 +51,7 @@ type Audience = Visibility | StoryVisibility;
 import { api, errorMessage, fieldErrors } from '@/lib/api';
 import { isVerificationError, VerifyPrompt } from '@/components/Verification';
 import { SimilarQuestions } from '@/components/CommunityExtras';
+import { PlacePicker, type TaggedPlace } from '@/components/CityMap';
 import { CaptionIdeasPanel, SuggestAltText } from '@/components/AiHelpers';
 import type { CollagePhoto } from '@/components/Collage';
 import { EditorLoading } from '@/components/Loading';
@@ -155,6 +156,8 @@ function Create() {
     return eventId ? { eventId } : {};
   });
   const [linkedEventTitle, setLinkedEventTitle] = useState<string | null>(null);
+  // A place page it was made at (shown on the post, and on the Near you map).
+  const [place, setPlace] = useState<TaggedPlace | null>(null);
   useEffect(() => {
     if (!linked.eventId) return setLinkedEventTitle(null);
     let live = true;
@@ -262,6 +265,7 @@ function Create() {
         setPoll(post.poll ? post.poll.options.map((o) => o.label) : null);
         setLink(post.linkUrl);
         setLinked({ ...(post.event ? { eventId: post.event.id } : {}), ...(post.product ? { productId: post.product.id } : {}) });
+        setPlace(post.place ?? null);
         // Topics that aren't #tags in the text were chosen by hand.
         const inText = extractHashtags(post.body, 50);
         setTopics(post.topics.filter((tp) => !inText.includes(tp)).join(', '));
@@ -525,6 +529,7 @@ function Create() {
         collaborators: collaborators.map((u) => u.id),
         topics: topicList(),
         aiAssisted: aiUsed,
+        placeId: place?.id,
       };
     }
     return {
@@ -544,6 +549,7 @@ function Create() {
       poll: poll ? { options: poll.filter((o) => o.trim()) } : undefined,
       linkUrl: link?.trim() || undefined,
       ...linked,
+      placeId: communityId ? undefined : place?.id,
       music: music && postCanHaveMusic ? { ...musicInput(music), x: undefined, y: undefined, style: undefined } : undefined,
       topics: topicList(),
       aiAssisted: aiUsed,
@@ -882,6 +888,8 @@ function Create() {
               </Button>
             </div>
           ) : null}
+
+          {communityId ? null : <PlacePicker value={place} onChange={setPlace} />}
 
           {videoCost ? (
             <Alert tone="warning" title={t('dataSaver.title')} onDismiss={() => setVideoCost(null)} locale={locale}>

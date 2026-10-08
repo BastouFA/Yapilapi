@@ -1167,4 +1167,7 @@ export const am: Record<string, string> = {
   'You can pass the mic on one chain to up to {max} people.': 'በአንድ ሰንሰለት ውስጥ ማይኩን እስከ {max} ሰዎች ማቀበል ይችላሉ።',
   'You can’t take the mic on this chain.': 'በዚህ ሰንሰለት ውስጥ ማይኩን መውሰድ አይችሉም።',
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'ዛሬ ብዙ ሪሎችን ወደ ሰንሰለቶች አክለዋል። ነገ እንደገና ይሞክሩ።',
+  // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
+  'Near you is not enabled.': 'በአቅራቢያዎ አልበራም።',
+  'Zoom in to see what’s here.': 'እዚህ ያለውን ለማየት ያጉሉ።',
 };

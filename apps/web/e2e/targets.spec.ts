@@ -40,6 +40,7 @@ const PAGES: [string, (d: SeedData) => string][] = [
   ['settings: privacy', () => '/settings/privacy'],
   ['create', () => '/create'],
   ['market', () => '/market'],
+  ['near you', () => '/map'],
   ['market listing', (d) => `/market/${d.listingId}`],
   ['event', (d) => `/events/${d.eventId}`],
   ['together album', (d) => `/together/${d.togetherId}`],

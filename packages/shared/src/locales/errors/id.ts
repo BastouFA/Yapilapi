@@ -1215,4 +1215,7 @@ export const id: Record<string, string> = {
   'You can pass the mic on one chain to up to {max} people.': 'Di satu rantai, Anda bisa mengoper mikrofon ke hingga {max} orang.',
   'You can’t take the mic on this chain.': 'Anda tidak bisa mengambil mikrofon di rantai ini.',
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Anda sudah menambahkan banyak reel ke rantai hari ini. Coba lagi besok.',
+  // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
+  'Near you is not enabled.': 'Di dekat Anda tidak diaktifkan.',
+  'Zoom in to see what’s here.': 'Perbesar untuk melihat apa yang ada di sini.',
 };

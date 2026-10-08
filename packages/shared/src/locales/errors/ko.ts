@@ -1184,4 +1184,7 @@ export const ko: Record<string, string> = {
   'You can pass the mic on one chain to up to {max} people.': '한 릴레이에서 마이크는 최대 {max}명에게 넘길 수 있어요.',
   'You can’t take the mic on this chain.': '이 릴레이에서는 마이크를 받을 수 없어요.',
   'You’ve added a lot of reels to chains today. Try again tomorrow.': '오늘 릴레이에 릴스를 많이 추가했어요. 내일 다시 시도해 주세요.',
+  // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
+  'Near you is not enabled.': '내 주변 기능이 켜져 있지 않아요.',
+  'Zoom in to see what’s here.': '확대하면 여기에 무엇이 있는지 볼 수 있어요.',
 };

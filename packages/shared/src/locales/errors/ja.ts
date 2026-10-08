@@ -1205,4 +1205,7 @@ export const ja: Record<string, string> = {
   'You can pass the mic on one chain to up to {max} people.': '1つのリレーでマイクを渡せるのは最大{max}人までです。',
   'You can’t take the mic on this chain.': 'このリレーではマイクを受け取れません。',
   'You’ve added a lot of reels to chains today. Try again tomorrow.': '今日はたくさんのリールをリレーに追加しました。明日もう一度お試しください。',
+  // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
+  'Near you is not enabled.': '「あなたの近く」は有効になっていません。',
+  'Zoom in to see what’s here.': '拡大すると、ここにあるものが表示されます。',
 };

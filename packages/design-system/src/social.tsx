@@ -1477,7 +1477,7 @@ export function PostCard({
         </div>
       ) : null}
 
-      {(post.format === 'reel' && !showReelCard) || post.linkUrl || post.event || post.product || chipTopics.length ? (
+      {(post.format === 'reel' && !showReelCard) || post.linkUrl || post.event || post.place || post.product || chipTopics.length ? (
         <div className="yp-post__chips">
           {post.format === 'reel' && !showReelCard ? (
             <L href={`/reels?start=${post.id}`} className="yp-chip">
@@ -1495,6 +1495,12 @@ export function PostCard({
             <L href={`/events/${post.event.id}`} className="yp-chip">
               <Icon name="calendar" />
               {post.event.title}
+            </L>
+          ) : null}
+          {post.place ? (
+            <L href={`/places/${post.place.id}`} className="yp-chip">
+              <Icon name="map-pin" />
+              {post.place.name}
             </L>
           ) : null}
           {post.product ? (

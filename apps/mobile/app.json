@@ -16,7 +16,7 @@
         "NSPhotoLibraryAddUsageDescription": "YAPILAPI saves a photo, video or recap to your library only when you choose to save it.",
         "NSContactsUsageDescription": "YAPILAPI uses your contacts, only when you ask, to show which of your friends are already here. Email addresses are turned into codes on your phone before anything is sent, names never leave your phone, and nothing is kept.",
         "UIBackgroundModes": ["audio"],
-        "NSLocationWhenInUseUsageDescription": "YAPILAPI uses where you are only when you choose to share it with a chat, or to see what's for sale near you. It isn't used in the background."
+        "NSLocationWhenInUseUsageDescription": "YAPILAPI uses where you are only when you choose to: to share it with a chat, to show what's near you on the map, to show friends you're out, or to see what's for sale near you. It isn't used in the background."
       },
       "buildNumber": "1",
       "privacyManifests": {
@@ -162,7 +162,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "YAPILAPI uses where you are only when you choose to share it with a chat, or to see what's for sale near you. It isn't used in the background.",
+          "locationWhenInUsePermission": "YAPILAPI uses where you are only when you choose to: to share it with a chat, to show what's near you on the map, to show friends you're out, or to see what's for sale near you. It isn't used in the background.",
           "isIosBackgroundLocationEnabled": false,
           "isAndroidBackgroundLocationEnabled": false,
           "isAndroidForegroundServiceEnabled": false

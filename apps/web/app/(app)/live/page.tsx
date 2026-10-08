@@ -9,6 +9,7 @@ import type { LiveProduct, LiveSummary } from '@yapilapi/api-client';
 import { formatMoney } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { isVerificationError, VerifyPrompt } from '@/components/Verification';
+import { PlacePicker, type TaggedPlace } from '@/components/CityMap';
 import { useSession } from '../../providers';
 
 export default function LiveList() {
@@ -20,6 +21,8 @@ export default function LiveList() {
   const teen = !!me?.under18;
   const [visibility, setVisibility] = useState(teen ? 'followers' : 'public');
   const [ticketId, setTicketId] = useState('');
+  // A place page it's at: the live shows on the Near you map there while it's on.
+  const [place, setPlace] = useState<TaggedPlace | null>(null);
   const [tickets, setTickets] = useState<LiveProduct[]>([]);
   const [needsVerify, setNeedsVerify] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -54,7 +57,7 @@ export default function LiveList() {
         onSubmit={async (e) => {
           e.preventDefault();
           try {
-            const r = await api.live.create({ title, visibility, ticketProductId: ticketId || undefined });
+            const r = await api.live.create({ title, visibility, ticketProductId: ticketId || undefined, placeId: place?.id });
             sessionStorage.setItem(`ypl-ingest-${r.live.id}`, JSON.stringify(r.ingest));
             router.push(`/live/${r.live.id}`);
           } catch (err) {
@@ -85,6 +88,7 @@ export default function LiveList() {
             ))}
           </Select>
         ) : null}
+        <PlacePicker value={place} onChange={setPlace} />
         <Button type="submit" disabled={!title.trim()}>
           {t('live.form.submit')}
         </Button>

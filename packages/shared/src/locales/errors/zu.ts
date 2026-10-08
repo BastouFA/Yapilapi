@@ -1232,4 +1232,7 @@ export const zu: Record<string, string> = {
   'You can pass the mic on one chain to up to {max} people.': 'Ochungechungeni olulodwa ungadlulisela imakrofoni kubantu abafika ku-{max}.',
   'You can’t take the mic on this chain.': 'Awukwazi ukuthatha imakrofoni kulolu chungechunge.',
   'You’ve added a lot of reels to chains today. Try again tomorrow.': 'Wengeze ama-reel amaningi ezinchungechungeni namuhla. Zama futhi kusasa.',
+  // apps/api/src/modules/city-map.ts, packages/shared/src/city-map-schemas.ts
+  'Near you is not enabled.': 'Eduze nawe akuvuliwe.',
+  'Zoom in to see what’s here.': 'Sondeza ukuze ubone okulapha.',
 };
