@@ -162,9 +162,12 @@
       "webUrl": "http://localhost:3000",
       "app": "yap",
       "eas": {
-        "projectId": ""
-      }
+        "projectId": "9c7dad9a-4cfa-482a-b609-986620a6cd8b"
+      },
+      "appEnv": "development",
+      "router": {}
     },
-    "icon": "./assets/icon.png"
+    "icon": "./assets/icon.png",
+    "owner": "bastoufb"
   }
 }

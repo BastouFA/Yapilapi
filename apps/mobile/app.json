@@ -172,9 +172,12 @@
       "apiUrl": "http://localhost:4000",
       "webUrl": "http://localhost:3000",
       "eas": {
-        "projectId": ""
-      }
+        "projectId": "97f32af5-c10b-4c35-8525-cc0844f6ff8c"
+      },
+      "appEnv": "development",
+      "router": {}
     },
-    "icon": "./assets/icon.png"
+    "icon": "./assets/icon.png",
+    "owner": "bastoufb"
   }
 }
