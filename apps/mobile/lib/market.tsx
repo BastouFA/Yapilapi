@@ -2,8 +2,8 @@ import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
-import { formatMoney } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
+import { formatMoney } from '../../../packages/shared/src/i18n-core';
 import { approximatePoint, type LatLng } from '../../../packages/shared/src/location';
 import {
   MARKET_RATING_TEXT_MAX,

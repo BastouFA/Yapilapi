@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Linking, Modal, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import { client, errorMessage } from './api';
 import { useFlag } from './flags';
 import { useT } from './i18n';

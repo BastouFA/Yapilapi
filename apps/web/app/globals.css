@@ -4,6 +4,18 @@
   --font-sans: var(--font-figtree), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, 'SF Mono', Menlo, monospace;
 }
+/*
+ * Figtree and Bricolage (as loaded) have no letters with a dot below or stacked accents (Vietnamese
+ * ế ộ, Yorùbá ẹ ọ, Igbo ị ụ): pages in those languages read in the system font rather than mixing two
+ * fonts in one word. Other scripts (Cyrillic, Arabic, Devanagari, Bengali, Ethiopic, CJK, Hangul)
+ * aren't in these fonts at all and come whole from the system fonts after them.
+ */
+:root:lang(vi),
+:root:lang(yo),
+:root:lang(ig) {
+  --font-display: ui-sans-serif, system-ui, sans-serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
 html,
 body {
   margin: 0;

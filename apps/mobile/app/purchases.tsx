@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
 import type { PublicUser } from '../../../packages/shared/src/types';
 import { formatBytes } from '../../../packages/shared/src/data-saver';
-import { formatMoney } from '../../../packages/shared/src/i18n';
+import { formatMoney } from '../../../packages/shared/src/i18n-core';
 import { client, errorMessage } from '../lib/api';
 import { SectionHeader } from '../lib/chips';
 import { useT } from '../lib/i18n';

@@ -72,7 +72,7 @@ import { TranslatableText } from '../lib/translation';
 import { openMusic, useMusicCredit, useMusicLoop } from '../lib/music';
 import { CaptionOverlay, useCaptionCues, useCaptionTrack } from '../lib/captions';
 import { canWatch, useWatchStart } from '../lib/watch';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import { ECHO_PERMISSIONS, type EchoPermission } from '../../../packages/shared/src/echoes';
 import { onAppAway, recordFeedEvent } from '../lib/feed-events';
 import { compactCount } from '../../../packages/shared/src/post-stats';

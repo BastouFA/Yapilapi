@@ -42,6 +42,9 @@ const LATIN_WORDS: Record<string, string> = {
     dai kai mana masa mata yara yan sabon sabuwar ranar zamu zan zai zata bamu ban kowa wani wata`,
   ig: `na nke ya ha ndi ihe onye bu ka maka nime otu ma mana kedu daalu nnoo chukwu chineke obi uto ututu nne nna nwanne ndewo anyi unu gi ga eme mere di nwere
     enwere ebe oge taa echi unyahu biko nwoke nwanyi nwa umu ego ulo ahu mmadu ezigbo ihunanya`,
+  zu: `ngiyabonga siyabonga sawubona sanibonani yebo cha kanjani unjani ngikhona sikhona kodwa futhi kakhulu manje namhlanje kusasa izolo umuntu abantu
+    ukuthi ngoba lapho lokhu lokho mina wena thina nina bona yena uthando ngiyakuthanda ekuseni kahle hamba sala ubaba umama ikhaya ingane izingane
+    nkosi unkulunkulu impela ngicela ngifuna angazi akukho kukhona njalo nje`,
   de: `der die das und ist nicht ich du er sie wir ihr es ein eine einen mit auf fur von zu im den dem des auch aber wie was wer wo heute morgen danke hallo guten
     tag sehr gut mein meine dein sein haben habe hat sind bin war noch schon nur oder wenn dass mehr kein keine jetzt hier alle liebe`,
   it: `il lo la gli le un una uno e sono che di del della dei delle in con per ma molto piu io tu lui lei noi voi loro mio mia tuo tua suo sua non si ciao grazie

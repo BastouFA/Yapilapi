@@ -5,7 +5,7 @@ import { onPendingAsset, takePendingAsset } from '../../lib/create-sheet';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Image, Linking, ScrollView, Text, View } from 'react-native';
 import type { EditorParamsInput } from '../../../../packages/shared/src/filters';
-import type { MessageKey } from '../../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../../packages/shared/src/i18n-core';
 import type { CaptionIdeas, Circle, MediaItem, PublicUser } from '../../../../packages/shared/src/types';
 import { AUDIO_POST_MAX_MS, AUDIO_POST_MIN_MS, COMMENT_POLICIES, PLUS_AUDIO_POST_MAX_MS, type CommentPolicy } from '../../../../packages/shared/src/constants';
 import { extractHashtags } from '../../../../packages/shared/src/hashtags';

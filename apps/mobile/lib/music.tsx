@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Image, Modal, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { formatList } from '../../../packages/shared/src/feed-reasons';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import {
   MUSIC_CLIP_DEFAULT_MS,
   MUSIC_CLIP_MIN_MS,

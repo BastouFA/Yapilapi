@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { formatClock, uses12Hour } from '../../../packages/shared/src/date-picker';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import { bookingSlots } from '../../../packages/shared/src/scheduling';
 import type { PublicUser } from '../../../packages/shared/src/types';
 import { client, errorMessage } from './api';

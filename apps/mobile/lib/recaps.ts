@@ -1,5 +1,5 @@
 import { ApiError } from '../../../packages/api-client/src/index';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import type { Recap } from '../../../packages/shared/src/types';
 import { errorMessage } from './api';
 import type { Translate } from './locale';

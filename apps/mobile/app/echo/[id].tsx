@@ -3,7 +3,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ApiError } from '../../../../packages/api-client/src/index';
-import type { MessageKey } from '../../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../../packages/shared/src/i18n-core';
 import {
   ECHO_BALANCE_DEFAULT,
   ECHO_BLOCK_KEYS,

@@ -64,7 +64,7 @@ function tr(key: MessageKey, locale: string, vars?: Vars): string {
 
 /** Plural-aware tr(): picks the form of `key` for `count` (`.one`, `.other`, or Arabic's `.two`, `.few`…) and passes {count}, formatted for the locale. */
 function trp(key: PluralKey, count: number, locale: string): string {
-  return t(pluralFormKey(key, pluralCategory(locale, count), locale), locale, { count: new Intl.NumberFormat(locale).format(count) });
+  return t(pluralFormKey(key, pluralCategory(locale, count), locale, count), locale, { count: new Intl.NumberFormat(locale).format(count) });
 }
 
 /** "a, b and c" in the reader's language. */
@@ -1641,7 +1641,7 @@ export function PostStats({ post, isOwn, locale = 'en' }: { post: Post; isOwn?: 
   if (!views && !shares && !post.rising && !onlyYou && !liked) return null;
   const likedText = liked
     ? liked.others
-      ? t(pluralFormKey('post.likedBy.others', pluralCategory(locale, liked.others), locale), locale, {
+      ? t(pluralFormKey('post.likedBy.others', pluralCategory(locale, liked.others), locale, liked.others), locale, {
           count: new Intl.NumberFormat(locale).format(liked.others),
         })
       : t('post.likedBy', locale)

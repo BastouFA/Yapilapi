@@ -36,7 +36,7 @@ import {
   type CollageShape,
   type CollageSpec,
 } from '../../../packages/shared/src/collage';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import { client, errorMessage, mediaUrl } from './api';
 import { useT } from './i18n';
 import type { Picked } from './media';

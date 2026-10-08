@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button, Card, Select } from '@yapilapi/design-system';
-import { loadLocale, SUPPORTED_LOCALES, t as translate } from '@yapilapi/shared';
+import { autonym, byAutonym, loadLocale, SUPPORTED_LOCALES, t as translate } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/app/providers';
 import { Anchor } from './Shell';
@@ -42,9 +42,9 @@ export function LanguageCard() {
           }}
         >
           <Select label={t('settings.language')} name="locale" defaultValue={me.locale ?? 'en'}>
-            {SUPPORTED_LOCALES.map((l) => (
+            {byAutonym(SUPPORTED_LOCALES).map((l) => (
               <option key={l} value={l} lang={l}>
-                {new Intl.DisplayNames([l], { type: 'language' }).of(l)}
+                {autonym(l)}
               </option>
             ))}
           </Select>

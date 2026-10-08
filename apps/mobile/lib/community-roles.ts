@@ -1,5 +1,5 @@
 import { COMMUNITY_ROLE_RANK, type CommunityRole } from '../../../packages/shared/src/constants';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import type { Translate } from './i18n';
 
 export const ROLE_LABEL: Record<CommunityRole, MessageKey> = {

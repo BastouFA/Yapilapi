@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { Animated, Image, PanResponder, Pressable, StyleSheet, Text, View, type AccessibilityActionEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { dualInsetBox, nearestDualCorner, type DualCorner } from '../../../packages/shared/src/dual';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import { client, mediaUrl } from './api';
 import { useT } from './i18n';
 import { uploadFile, type Picked } from './media';

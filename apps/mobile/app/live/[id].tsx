@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { LiveChatMessage, LiveSummary } from '../../../../packages/api-client/src/index';
-import { formatMoney } from '../../../../packages/shared/src/i18n';
+import { formatMoney } from '../../../../packages/shared/src/i18n-core';
 import { client, errorMessage, isGone, mediaUrl } from '../../lib/api';
 import { useFlag } from '../../lib/flags';
 import { useT } from '../../lib/i18n';

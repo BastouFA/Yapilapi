@@ -2,7 +2,7 @@ import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { router, useIsFocused } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import {
   MIX_DESCRIPTION_MAX,
   MIX_TITLE_MAX,

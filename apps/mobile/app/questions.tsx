@@ -1,7 +1,7 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { AccessibilityInfo, Alert, FlatList, Platform, Pressable, RefreshControl, Text, View } from 'react-native';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import {
   ASK_ANSWER_MAX,
   ASK_FILTERS,

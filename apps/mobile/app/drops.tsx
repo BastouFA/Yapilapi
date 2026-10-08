@@ -2,7 +2,7 @@ import { Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { dropPhase, type Drop, type DropActivity } from '../../../packages/shared/src/drops';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import { client, errorMessage } from '../lib/api';
 import { DropCard, useNow } from '../lib/drops';
 import { useFlag } from '../lib/flags';

@@ -2,7 +2,7 @@ import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Alert, Platform, Pressable, RefreshControl, ScrollView, Share, Text, View } from 'react-native';
 import { dropPhase, type Drop } from '../../../../packages/shared/src/drops';
-import { formatMoney } from '../../../../packages/shared/src/i18n';
+import { formatMoney } from '../../../../packages/shared/src/i18n-core';
 import { client, errorMessage, isGone, webUrl } from '../../lib/api';
 import { DropCover, dropStatusText, useNow } from '../../lib/drops';
 import { useT } from '../../lib/i18n';

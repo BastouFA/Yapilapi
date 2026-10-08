@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import { ApiError } from '../../../packages/api-client/src/index';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import type { MarketChatCard, MarketOffer, MarketOfferStatus } from '../../../packages/shared/src/market';
 import type { Message } from '../../../packages/shared/src/types';
 import { client, errorMessage, mediaUrl } from './api';

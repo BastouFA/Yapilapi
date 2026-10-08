@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Platform, Pressable, Text, View } from 'react-native';
 import type { Profile } from '../../../packages/shared/src/types';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import {
   ASK_AUDIENCES,
   ASK_PROMPT_MAX,

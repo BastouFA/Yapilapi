@@ -18,7 +18,7 @@ import {
   type ChessMoveInput,
   type ChessState,
 } from '../../../packages/shared/src/games/index';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import { useT } from './i18n';
 import { radius, space } from './theme';
 import { Button, useColors, userText } from './ui';

@@ -94,7 +94,31 @@
       [
         "expo-localization",
         {
-          "supportedLocales": ["en", "fr", "ar", "es", "pt", "sw", "yo", "ha"]
+          "supportedLocales": [
+            "en",
+            "fr",
+            "ar",
+            "es",
+            "pt",
+            "sw",
+            "yo",
+            "ha",
+            "zh-Hans",
+            "hi",
+            "bn",
+            "ru",
+            "ja",
+            "de",
+            "id",
+            "tr",
+            "ko",
+            "it",
+            "vi",
+            "ur",
+            "am",
+            "ig",
+            "zu"
+          ]
         }
       ],
       "expo-video",

@@ -16,7 +16,7 @@ import {
   type ChatWallpaper,
 } from '../../../packages/shared/src/chat-theme';
 import { SCHEDULED_MESSAGE_MAX_DAYS } from '../../../packages/shared/src/constants';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import type { Message, ScheduledMessage } from '../../../packages/shared/src/types';
 import { scheduledFailureText } from '../../../packages/shared/src/job-failures';
 import { client, errorMessage } from './api';

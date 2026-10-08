@@ -4,7 +4,7 @@ import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import type { StoryGroup } from '../../../../packages/api-client/src/index';
 import type { FeedMode } from '../../../../packages/shared/src/constants';
 import type { Post } from '../../../../packages/shared/src/types';
-import type { MessageKey } from '../../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../../packages/shared/src/i18n-core';
 import { client, errorMessage } from '../../lib/api';
 import { AnnouncementCard } from '../../lib/announcement';
 import { feedSurface, FeedSurfaceContext, useFeedViewability } from '../../lib/feed-events';

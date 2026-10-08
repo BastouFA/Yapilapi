@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, FlatList, I18nManager, Modal, PanResponder, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Message, MessagePreview, PinnedMessage } from '../../../packages/shared/src/types';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import { chatTheme } from '../../../packages/shared/src/chat-theme';
 import { chessDrawReason } from '../../../packages/shared/src/games/index';
 import { callLineText, groupLineText, messagePreviewOf, messagePreviewText } from '../../../packages/shared/src/message-preview';

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
 import type { AdCampaign, Boost, CreatorAnalytics, CreatorTopPost, Payout, SalesReport, ServiceBooking } from '../../../packages/api-client/src/index';
 import { EARNINGS_HOLD_DAYS } from '../../../packages/shared/src/constants';
-import { formatMoney } from '../../../packages/shared/src/i18n';
+import { formatMoney } from '../../../packages/shared/src/i18n-core';
 import { client, errorMessage } from '../lib/api';
 import { SectionHeader } from '../lib/chips';
 import { BoostResult, DayBars, hasStudio, StatGrid } from '../lib/creator';

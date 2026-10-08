@@ -6,7 +6,7 @@
 import { router } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import type { AiSettings, CaptionIdeas, CatchUp, CatchUpOffer, SmartReplies } from '../../../packages/shared/src/types';
 import { client, errorMessage } from './api';
 import { Chip } from './chips';

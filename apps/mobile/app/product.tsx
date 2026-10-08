@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import type { ShopItem } from '../../../packages/api-client/src/index';
 import { formatBytes } from '../../../packages/shared/src/data-saver';
-import { formatMoney } from '../../../packages/shared/src/i18n';
+import { formatMoney } from '../../../packages/shared/src/i18n-core';
 import type { Profile } from '../../../packages/shared/src/types';
 import { client, errorMessage, isGone } from '../lib/api';
 import { useFlag } from '../lib/flags';

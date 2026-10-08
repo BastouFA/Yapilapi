@@ -2,10 +2,10 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PROFILE_MODES } from '../../../packages/shared/src/constants';
-import { SUPPORTED_LOCALES, type MessageKey } from '../../../packages/shared/src/i18n';
+import { SUPPORTED_LOCALES, type MessageKey } from '../../../packages/shared/src/i18n-core';
 import type { Post, Profile } from '../../../packages/shared/src/types';
 import { CITY_MAX, PRONOUNS_MAX, type ProfileAccent, type ProfileHeaderStyle, type ProfileTab } from '../../../packages/shared/src/profile-style';
-import { languageName } from '../../../packages/shared/src/translation';
+import { autonym, byAutonym } from '../../../packages/shared/src/translation';
 import { ApiError } from '../../../packages/api-client/src/index';
 import { client, errorMessage, mediaUrl } from '../lib/api';
 import { Chip, ChipRow } from '../lib/chips';
@@ -193,8 +193,8 @@ export default function ProfileEdit() {
         <Card style={{ gap: space[3] }}>
           <Title sub={t('m.profileEdit.languageHint')}>{t('settings.language')}</Title>
           <ChipRow radios label={t('settings.language')}>
-            {SUPPORTED_LOCALES.map((l) => (
-              <Chip key={l} radio label={languageName(l, l)} selected={locale === l} onPress={() => setLocale(l)} />
+            {byAutonym(SUPPORTED_LOCALES).map((l) => (
+              <Chip key={l} radio label={autonym(l)} selected={locale === l} onPress={() => setLocale(l)} />
             ))}
           </ChipRow>
         </Card>

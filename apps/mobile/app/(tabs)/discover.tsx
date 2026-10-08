@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { formatMoney, type MessageKey } from '../../../../packages/shared/src/i18n';
+import { formatMoney, type MessageKey } from '../../../../packages/shared/src/i18n-core';
 import { formatList } from '../../../../packages/shared/src/feed-reasons';
 import { normalizeTag } from '../../../../packages/shared/src/hashtags';
 import type { Community, EventItem, Post, PublicUser } from '../../../../packages/shared/src/types';

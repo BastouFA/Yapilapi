@@ -2,7 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { MessageKey } from '../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../packages/shared/src/i18n-core';
 import { useT } from './i18n';
 import { useReducedMotion } from './motion';
 import { useSession } from './session';

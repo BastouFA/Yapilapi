@@ -1,10 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Linking, ScrollView, Text, View } from 'react-native';
-import { formatMoney } from '../../../../packages/shared/src/i18n';
+import { formatMoney } from '../../../../packages/shared/src/i18n-core';
 import type { EventItem } from '../../../../packages/shared/src/types';
 import { PLACE_CATEGORIES } from '../../../../packages/shared/src/constants';
-import type { MessageKey } from '../../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../../packages/shared/src/i18n-core';
 import { hoursInWeekOrder, hoursKeyLabel } from '../../../../packages/shared/src/scheduling';
 import { client, errorMessage, isGone } from '../../lib/api';
 import { BookPlace, ManageBookings, MyBookings, PlaceReviews, RatingLine, usePlaceOwner, type ReviewData } from '../../lib/place-extras';

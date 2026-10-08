@@ -5,7 +5,7 @@ import { Animated, I18nManager, Image, Keyboard, Pressable, StyleSheet, Text, Vi
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { smallAvatarUrl } from '../../../../packages/shared/src/data-saver';
 import { initialsOf } from '../../../../packages/shared/src/initials';
-import type { MessageKey } from '../../../../packages/shared/src/i18n';
+import type { MessageKey } from '../../../../packages/shared/src/i18n-core';
 import type { NavGlyphName } from '../../../../packages/shared/src/nav-glyphs';
 import { client, mediaUrl } from '../../lib/api';
 import { useT } from '../../lib/i18n';

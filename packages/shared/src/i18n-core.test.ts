@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 // Only the core, as the web loads it: English is here, the other languages load on demand.
 import { loadLocale, localeReady, preferredLocale, SUPPORTED_LOCALES, t, tp } from './i18n-core.ts';
@@ -48,16 +48,38 @@ describe('languages loaded on demand', () => {
   });
 });
 
+describe('the phone', () => {
+  it('evaluates only English up front: its code imports i18n-core, never i18n (every catalog)', () => {
+    // apps/mobile, and apps/yap through the same files; Metro runs a catalog the first time loadLocale() imports it.
+    const offenders: string[] = [];
+    const walk = (dir: URL) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+        const url = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
+        if (entry.isDirectory()) walk(url);
+        else if (/\.(tsx?|jsx?)$/.test(entry.name) && /shared\/src\/i18n(\.ts)?['"]/.test(readFileSync(url, 'utf8'))) offenders.push(url.pathname);
+      }
+    };
+    for (const app of ['mobile', 'yap']) {
+      const dir = new URL(`../../../apps/${app}/`, import.meta.url);
+      if (existsSync(dir)) walk(dir);
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
 describe("a visitor's language", () => {
   it('takes the first preferred language the app has, by base language', () => {
     expect(preferredLocale(['fr-CA', 'en-US'])).toBe('fr');
-    expect(preferredLocale(['de-DE', 'de', 'ar-EG'])).toBe('ar');
+    expect(preferredLocale(['nl-NL', 'nl', 'ar-EG'])).toBe('ar');
+    expect(preferredLocale(['de-DE', 'ar-EG'])).toBe('de');
+    expect(preferredLocale(['zh-Hans-CN'])).toBe('zh');
     expect(preferredLocale(['pt_BR'])).toBe('pt');
     expect(preferredLocale(['SW-ke'])).toBe('sw');
   });
 
   it('is English when none of them is available', () => {
-    expect(preferredLocale(['de', 'ja'])).toBe('en');
+    expect(preferredLocale(['nl', 'th'])).toBe('en');
     expect(preferredLocale([])).toBe('en');
     expect(preferredLocale(['', null, undefined])).toBe('en');
   });
