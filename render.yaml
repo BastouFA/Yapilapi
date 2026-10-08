@@ -145,6 +145,9 @@ services:
       # New automatic translations a day for everyone (about $1–2 per 1,000); raise it as the app grows.
       - key: AUTO_TRANSLATE_DAILY_LIMIT
         value: '5000'
+      # Yapilapi Today scripts a day for everyone (about $0.01 each); raise it as the app grows.
+      - key: TODAY_DAILY_LIMIT
+        value: '500'
 
       # Optional: speech-to-text for automatic captions and voice message transcripts. Any
       # OpenAI-compatible service (Groq recommended: fast and cheap; OpenAI; a Whisper server).

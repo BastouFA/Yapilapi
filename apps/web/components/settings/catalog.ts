@@ -75,6 +75,8 @@ export const SETTINGS: { label: MessageKey; section: SectionId; anchor?: string 
   { label: 'wrap.settings.title', section: 'notifications', anchor: 'weekly-wrap' },
   { label: 'wrap.settings.enabled', section: 'notifications', anchor: 'weekly-wrap' },
   { label: 'wrap.settings.notify', section: 'notifications', anchor: 'weekly-wrap' },
+  { label: 'today.title', section: 'notifications', anchor: 'today' },
+  { label: 'today.settings.city', section: 'notifications', anchor: 'today' },
   { label: 'settings.friendsOnly', section: 'feed' },
   { label: 'settings.reducedRecs', section: 'feed' },
   { label: 'settings.focusMode', section: 'feed' },

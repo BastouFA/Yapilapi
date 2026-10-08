@@ -6,6 +6,7 @@ import { VerificationCard } from '../../lib/safety';
 import { useSession } from '../../lib/session';
 import { SECTIONS, type SectionId } from '../../lib/settings-catalog';
 import { WeeklyWrapSettingsCard } from '../../lib/wrap';
+import { TodaySettingsCard } from '../../lib/today';
 import {
   About,
   AccountDetails,
@@ -67,6 +68,7 @@ function Content({ section }: { section: SectionId }): ReactNode {
           <QuietHours />
           <NotificationSettings />
           <WeeklyWrapSettingsCard />
+          <TodaySettingsCard />
         </>
       );
     case 'feed':

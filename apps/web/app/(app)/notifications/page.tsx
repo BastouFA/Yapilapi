@@ -138,6 +138,8 @@ function hrefFor(n: NotificationItem, meUsername?: string): string | undefined {
   if (n.type === 'reel_echo')
     return Number(n.data.count ?? 1) > 1 && typeof n.data.originalId === 'string' ? `/reels/${n.data.originalId}/echoes` : `/reels?start=${n.entityId}`;
   if (n.type === 'weekly_wrap' || n.entityType === 'wrap') return n.entityId ? `/wraps/${n.entityId}` : '/wraps';
+  // "Your Today is ready": it's at the top of Pulse.
+  if (n.type === 'today_ready') return '/home';
   if (n.type === 'watch_invite' || n.entityType === 'watch') return n.entityId ? `/watch/${n.entityId}` : '/inbox';
   // A ticket a friend gave you opens your Tickets; being made a co-host opens the event's check-in.
   if (n.type === 'ticket_received') return '/tickets';
@@ -207,6 +209,7 @@ function batchedText(n: NotificationItem, t: Session['t'], tp: Session['tp']): s
   if (squad) return squad;
   // Whole sentences in your language (the name, when there is one, is part of them).
   if (n.type === 'weekly_wrap') return t('wrap.notif');
+  if (n.type === 'today_ready') return t('push.today_ready');
   if (n.type === 'watch_invite') return t('watch.invite', { name: n.actor?.displayName ?? t('m.calls.someone') });
   // Someone started sharing where they are with a chat you're in (it opens the chat).
   if (n.type === 'location_shared') return t('location.notif', { name: n.actor?.displayName ?? t('m.calls.someone') });

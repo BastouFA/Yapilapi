@@ -61,6 +61,8 @@ const CAPTION_CHUNK = 50;
 export interface GatewayOptions {
   /** The model for translations (AI_TRANSLATE_MODEL); the main provider when not given. */
   translator?: AiProvider;
+  /** The model that writes Yapilapi Today (AI_TODAY_MODEL, lib/today.ts); the main provider when not given. */
+  briefer?: AiProvider;
   /**
    * Production: the offline stand-in never answers "See translation" or translates captions
    * (its pseudo-translations must not reach people as if they were real).
@@ -89,6 +91,8 @@ export class AiGateway {
   /** Catch me up, suggested replies, photo descriptions and caption ideas (see assists.ts). */
   readonly assists: AiAssists;
   private translator: AiProvider;
+  /** Writes Yapilapi Today's scripts (lib/today.ts, which applies the gateway's rules itself). */
+  readonly briefer: AiProvider;
   private realTranslationsOnly: boolean;
 
   constructor(
@@ -99,6 +103,7 @@ export class AiGateway {
   ) {
     this.assists = new AiAssists(db, provider, storage);
     this.translator = opts.translator ?? provider;
+    this.briefer = opts.briefer ?? provider;
     this.realTranslationsOnly = !!opts.realTranslationsOnly;
   }
 

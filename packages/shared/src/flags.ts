@@ -30,6 +30,10 @@ export const FEATURE_FLAGS = {
   YAPS: { default: true, description: 'Yaps: voice posts of up to a minute, voice replies and voice intros, with transcripts.' },
   SQUADS: { default: true, description: 'Squads: small private groups of friends with a shared feed, story, chat and weekly memory.' },
   FAIR_START: { default: true, description: "Fair start: a new creator's first reels are shown to up to 1,000 people." },
+  TODAY: {
+    default: true,
+    description: 'Yapilapi Today: a short daily briefing of what your people and your city are talking about, read aloud (needs a real AI model).',
+  },
   CITY_MAP: { default: true, description: 'Near you: a live map of lives, events, Market listings, busy places, chains and friends who are out.' },
   ADS: { default: false, description: 'Sponsored posts: paid campaigns shown only to adults who opted in to advertising.' },
 } as const;

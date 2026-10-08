@@ -11,6 +11,7 @@ import { api } from '@/lib/api';
 import { PostList } from '@/components/PostList';
 import { StarterRow } from '@/components/StarterRow';
 import { CatchUpCard } from '@/components/AiHelpers';
+import { TodayCard } from '@/components/Today';
 import { SuggestedPeople } from '@/components/SuggestedPeople';
 import { PulseCards } from '@/components/WeeklyWrap';
 import { FollowingDrops } from '@/components/Drops';
@@ -86,6 +87,9 @@ export default function Home() {
           </Link>
         </div>
       </div>
+
+      {/* In the morning: Yapilapi Today, a short briefing of what your people and your city are talking about. */}
+      <TodayCard />
 
       {/* This week's wrap and "On this day", when there are any: gentle, and easy to put away. */}
       <PulseCards />

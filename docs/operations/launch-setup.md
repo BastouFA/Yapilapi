@@ -105,6 +105,12 @@ With a key they use Claude.
    off and "See translation" says translation isn't available. The spend is capped by
    `AUTO_TRANSLATE_DAILY_LIMIT` (default 20,000 new translations a day, roughly $20 to $40) and
    `AUTO_TRANSLATE_PER_HOUR` per person; Admin > Feature flags > `AUTO_TRANSLATE` turns it off.
+
+   Yapilapi Today (docs/product/yapilapi-today.md) has a model of its own too, `AI_TODAY_MODEL`
+   (default `claude-sonnet-5-5`), and is off until a key is set. `TODAY_DAILY_LIMIT` (default
+   5,000 new scripts a day, at most about $45) caps its spend and `TODAY_TTS_DAILY_CHAR_LIMIT`
+   (default 100,000 characters a day, within `TTS_DAILY_CHAR_LIMIT`) how much of it is read out;
+   Admin > Feature flags > `TODAY` turns it off.
 5. Check it: the launch check sends one tiny request and shows the model that answered.
 
 What is sent: only what a helper needs at that moment (the recent messages of the chat you are in,

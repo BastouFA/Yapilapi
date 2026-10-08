@@ -155,6 +155,8 @@ import type {
   WeeklyWrap,
   WeeklyWrapCard,
   WeeklyWrapSettings,
+  TodayBriefing,
+  TodaySettings,
   AnswerCard,
   AskBoxSettings,
   AskFilter,
@@ -1291,6 +1293,17 @@ export function createClient(opts: ClientOptions) {
         post<{ ok: true; serverTime: number }>(`/v1/watch/${id}/heartbeat`, b),
       react: (id: string, kind: WatchReaction) => post<{ ok: true }>(`/v1/watch/${id}/reactions`, { kind }),
     },
+    /** Yapilapi Today: the morning briefing on Pulse (private to you), and its settings. */
+    today: {
+      /** This morning's Today, or null. Pass the device's time zone. */
+      get: (tz?: string) => get<{ today: TodayBriefing | null }>(`/v1/today${qs({ tz })}`),
+      byId: (id: string) => get<{ today: TodayBriefing }>(`/v1/today/${id}`),
+      notInterested: (id: string, index: number) => post<{ today: TodayBriefing | null }>(`/v1/today/${id}/segments/${index}/not-interested`),
+      dismiss: (id: string) => post<{ ok: true }>(`/v1/today/${id}/dismiss`),
+      settings: () => get<{ settings: TodaySettings }>('/v1/me/today'),
+      updateSettings: (b: { enabled?: boolean; hour?: number; city?: boolean; notify?: boolean; timezone?: string }) =>
+        put<{ settings: TodaySettings }>('/v1/me/today', b),
+    },
     /** The weekly wrap (private to you) and the cards on Pulse. */
     wraps: {
       settings: () => get<{ settings: WeeklyWrapSettings }>('/v1/me/weekly-wrap'),
@@ -1518,6 +1531,7 @@ export function createClient(opts: ClientOptions) {
         voiceTranscripts?: boolean;
         voiceTranslation?: boolean;
         voiceListen?: boolean;
+        today?: boolean;
       }>('/v1/flags'),
     /** What anyone can see of a shared link without an account (link previews, signed-out views). */
     public: {

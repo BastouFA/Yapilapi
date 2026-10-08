@@ -172,4 +172,5 @@ page) where a reel's says "saw your reel"; its report says "listened to the end"
 - **Yap Radio** (hands-free listening): a queue over `GET /v1/feed?mode=yaps` that plays clip after
   clip, using `listen_*` events, `VoiceClip.peaks` for the screen and `voice.speech` for translations.
 - **Ask the city**: Yaps with a `place_id`, found through `posts_place_idx` and the transcript search.
-- **Yapilapi Today**: a daily digest from `post_stats.listen_completes` and transcripts (`lang`, `search`).
+- **Yapilapi Today** (built: docs/product/yapilapi-today.md): a daily spoken briefing ranked with
+  `post_stats.listen_completes`, written from transcripts.

@@ -249,6 +249,7 @@ const TEXT: Record<string, Text> = {
     tp('push.market_expiring', Number(d.days ?? 3), locale, { title: capitalized(listing(d, 'push.market.yourListing', locale), locale) }),
   market_expired: (_n, d, locale) => t('push.market_expired', locale, { title: capitalized(listing(d, 'push.market.yourListing', locale), locale) }),
   weekly_wrap: say('push.weekly_wrap'),
+  today_ready: say('push.today_ready'),
   // "Your reel passed 1,000 views": once per post and milestone (lib/milestones.ts).
   post_milestone: (_n, d, locale) =>
     d.threshold ? milestoneNoticeText({ type: 'post_milestone', data: d }, (key, vars) => t(key, locale, vars), locale)! : t('push.post_milestone', locale),

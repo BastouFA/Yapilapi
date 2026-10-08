@@ -17,6 +17,7 @@ import { useSession } from '../../lib/session';
 import { StarterRow } from '../../lib/starter';
 import { CatchUpCard } from '../../lib/ai-helpers';
 import { PulseCards } from '../../lib/wrap';
+import { TodayCard } from '../../lib/today';
 import { FollowingDrops } from '../../lib/drops';
 import { space } from '../../lib/theme';
 import { useFlag } from '../../lib/flags';
@@ -177,6 +178,8 @@ function Feed() {
           <View style={{ gap: space[3] }}>
             {/* A note from the team to everyone, until it ends or you close it. */}
             <AnnouncementCard />
+            {/* In the morning: Yapilapi Today, a short briefing of what your people and your city are talking about. */}
+            <TodayCard />
             <StoriesStrip groups={stories} onOpen={setViewing} onCreate={() => router.push({ pathname: '/camera', params: { mode: 'story' } })} />
             {/* After 12 hours or more away: a summary of what your people shared, on request. */}
             <CatchUpCard />

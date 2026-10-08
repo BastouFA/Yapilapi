@@ -1098,6 +1098,8 @@ export default async function safetyModule(app: FastifyInstance, ctx: AppContext
       voiceTranscripts,
       voiceTranslation,
       voiceListen: voiceTranslation && !!ctx.speech,
+      // Yapilapi Today: the flag and a real model (the offline stand-in outside production only).
+      today: flags.TODAY && (ctx.ai.briefer.name !== 'dev' || ctx.config.APP_ENV !== 'production'),
     };
   });
 

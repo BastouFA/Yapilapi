@@ -77,6 +77,7 @@ import passTheMicModule from './modules/pass-the-mic.ts';
 import squadsModule from './modules/squads.ts';
 import voiceModule from './modules/voice.ts';
 import cityMapModule from './modules/city-map.ts';
+import todayModule from './modules/today.ts';
 import tagsModule from './modules/tags.ts';
 import collabsModule from './modules/collabs.ts';
 import postCoversModule from './modules/post-covers.ts';
@@ -121,6 +122,7 @@ import { maybeRunRetention } from './lib/retention.ts';
 import { sweepMarket } from './lib/market.ts';
 import { sweepFairStarts } from './lib/fair-start.ts';
 import { sweepPresence } from './lib/city-map.ts';
+import { sweepToday } from './lib/today.ts';
 import Stripe from 'stripe';
 import { adminEmails, promoteListedAdmins } from './lib/admin-bootstrap.ts';
 import { ensureStripeWebhook, isStripeWebhookSecret, stripeWebhookUrl } from './lib/stripe-webhook-setup.ts';
@@ -145,6 +147,8 @@ export async function buildApp(
     mailTransport?: MailTransport;
     /** Replaces the model used for translations (tests and local checks pass a stand-in that isn't 'dev'). */
     translator?: AiProvider;
+    /** Replaces the model that writes Yapilapi Today (tests pass a stand-in). */
+    briefer?: AiProvider;
   } = {},
 ): Promise<BuiltApp> {
   const app = Fastify({
@@ -204,6 +208,10 @@ export async function buildApp(
   const translator =
     opts.translator ??
     (config.AI_PROVIDER === 'anthropic' && config.ANTHROPIC_API_KEY ? anthropicProvider(config.ANTHROPIC_API_KEY, config.AI_TRANSLATE_MODEL) : provider);
+  // Yapilapi Today has its own, cheaper model too (lib/today.ts).
+  const briefer =
+    opts.briefer ??
+    (config.AI_PROVIDER === 'anthropic' && config.ANTHROPIC_API_KEY ? anthropicProvider(config.ANTHROPIC_API_KEY, config.AI_TODAY_MODEL) : provider);
 
   const storage =
     config.STORAGE_DRIVER === 's3'
@@ -260,7 +268,7 @@ export async function buildApp(
     db,
     redis,
     realtime,
-    ai: new AiGateway(db, provider, storage, { translator, realTranslationsOnly: config.APP_ENV === 'production' }),
+    ai: new AiGateway(db, provider, storage, { translator, briefer, realTranslationsOnly: config.APP_ENV === 'production' }),
     email:
       config.EMAIL_TRANSPORT === 'smtp'
         ? smtpEmailSender({ url: config.SMTP_URL, from: config.EMAIL_FROM, transport: opts.mailTransport })
@@ -502,6 +510,7 @@ export async function buildApp(
     squadsModule,
     voiceModule,
     cityMapModule,
+    todayModule,
     plusModule,
     invitesModule,
     growthModule,
@@ -533,6 +542,7 @@ export async function buildApp(
   let lastWrapSweep = 0;
   let lastMusicRefresh = 0;
   let lastRetentionCheck = 0;
+  let todaySweeping = false;
   const jobHandlers = {
     ...mediaJobHandlers({ db, storage, moderator: ctx.mediaModerator, realtime: ctx.realtime }),
     ...studioJobHandlers({ db, storage, transcription: ctx.transcription, log: app.log }),
@@ -597,6 +607,13 @@ export async function buildApp(
         await sweepSquadMemories({ db, realtime: ctx.realtime }).catch((e) => app.log.warn({ err: e.message }, 'squad memories'));
         // "Show me on the map to friends" past its time: the point is deleted (lib/city-map.ts).
         await sweepPresence(db).catch((e) => app.log.warn({ err: e.message }, 'map presence sweep'));
+        // Yapilapi Today for people whose morning hour has come (lib/today.ts). Not awaited: each is a model call and a few clips.
+        if (!todaySweeping) {
+          todaySweeping = true;
+          void sweepToday({ db, storage, speech: ctx.speech, realtime: ctx.realtime, provider: ctx.ai.briefer, config })
+            .catch((e: Error) => app.log.warn({ err: e.message }, 'today sweep'))
+            .finally(() => (todaySweeping = false));
+        }
       }
       // Every 10 minutes: songs in use are read again from their providers (withdrawn ones play silently with a note).
       if (Date.now() - lastMusicRefresh > 10 * 60_000) {
