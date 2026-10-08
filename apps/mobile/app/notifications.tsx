@@ -102,6 +102,7 @@ const OWN_TEXT: Record<string, MessageKey> = {
   account_limited: 'm.notif.accountLimited',
   chapter_opened: 'm.notif.capsuleOpened',
   weekly_wrap: 'wrap.notif',
+  today_ready: 'push.today_ready',
 };
 
 type Group = { key: string; items: NotificationItem[]; actors: PublicUser[] };

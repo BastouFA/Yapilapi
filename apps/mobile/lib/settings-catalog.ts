@@ -70,6 +70,7 @@ export const SETTINGS: { label: MessageKey; section: SectionId }[] = [
   { label: 'st.quiet.title', section: 'notifications' },
   { label: 'st.categories.title', section: 'notifications' },
   { label: 'wrap.settings.title', section: 'notifications' },
+  { label: 'today.title', section: 'notifications' },
   { label: 'settings.friendsOnly', section: 'feed' },
   { label: 'settings.reducedRecs', section: 'feed' },
   { label: 'settings.focusMode', section: 'feed' },

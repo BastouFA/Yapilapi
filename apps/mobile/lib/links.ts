@@ -48,6 +48,8 @@ export function notificationHref(n: NotificationTarget): string | null {
   // Watch together: an invite opens the session (it says when it has ended); the weekly wrap opens that week.
   if (n.type === 'watch_invite' || n.entityType === 'watch') return id ? `/watch/${id}` : null;
   if (n.type === 'weekly_wrap' || n.entityType === 'wrap') return id ? `/wraps/${id}` : '/wraps';
+  // "Your Today is ready": it's at the top of Pulse.
+  if (n.type === 'today_ready') return '/';
   if (n.type === 'account_limited' || n.type === 'account_review') return '/settings';
   // A Mini App's review: the notification says how it went (and why); its page is on the web.
   if (n.entityType === 'mini_app') return null;

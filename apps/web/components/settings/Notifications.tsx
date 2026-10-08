@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Button, Card, Select, Switch, TextField } from '@yapilapi/design-system';
-import { NOTIFICATION_CATEGORIES, type InteractionSettings, type MessageKey, type WeeklyWrapSettings } from '@yapilapi/shared';
+import { NOTIFICATION_CATEGORIES, TODAY_HOURS, type InteractionSettings, type MessageKey, type TodaySettings, type WeeklyWrapSettings } from '@yapilapi/shared';
 import { api, errorMessage } from '@/lib/api';
 import { currentSubscription, disableBrowserPush, enableBrowserPush, pushSupported } from '@/lib/push';
 import { useSession } from '@/app/providers';
@@ -245,6 +245,63 @@ export function WeeklyWrapCard() {
           <p className="setting-hint">
             <Link href="/wraps">{t('wrap.past')}</Link>
           </p>
+        </div>
+      </Card>
+    </Anchor>
+  );
+}
+
+/**
+ * Yapilapi Today: a short morning briefing of what your people and your city are talking about,
+ * from the hour you choose (in your time zone), with your city or not, and whether to be told
+ * when it's ready (off by default; quiet hours hold the push).
+ */
+export function TodaySettingsCard() {
+  const { t, toast, flags, locale } = useSession();
+  const { value: settings, setValue: setSettings, error, retry } = useLoaded<TodaySettings>(() => api.today.settings().then((r) => r.settings));
+  if (!flags.TODAY) return null;
+  if (!settings) return error ? <LoadFailed title={t('today.title')} message={error} onRetry={retry} /> : null;
+  const save = async (patch: Partial<Pick<TodaySettings, 'enabled' | 'hour' | 'city' | 'notify'>>) => {
+    const before = settings;
+    setSettings({ ...settings, ...patch });
+    try {
+      setSettings((await api.today.updateSettings(patch)).settings);
+    } catch (e) {
+      setSettings(before);
+      toast(errorMessage(e));
+    }
+  };
+  const time = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' });
+  return (
+    <Anchor id="today">
+      <Card title={t('today.title')} subtitle={t('today.settings.desc')}>
+        <div className="stack-sm">
+          <Switch label={t('today.settings.enabled')} checked={settings.enabled} onChange={(v) => void save({ enabled: v })} />
+          <Select
+            label={t('today.settings.hour')}
+            value={String(settings.hour)}
+            disabled={!settings.enabled}
+            onChange={(e) => void save({ hour: Number(e.currentTarget.value) })}
+          >
+            {TODAY_HOURS.map((h) => (
+              <option key={h} value={h}>
+                {time.format(new Date(2026, 0, 1, h, 0))}
+              </option>
+            ))}
+          </Select>
+          <Switch
+            label={t('today.settings.city')}
+            checked={settings.enabled && settings.city}
+            disabled={!settings.enabled}
+            onChange={(v) => void save({ city: v })}
+          />
+          <Switch
+            label={t('today.settings.notify')}
+            checked={settings.enabled && settings.notify}
+            disabled={!settings.enabled}
+            onChange={(v) => void save({ notify: v })}
+          />
+          <p className="muted setting-hint">{t('wrap.settings.timezone', { zone: settings.timezone })}</p>
         </div>
       </Card>
     </Anchor>

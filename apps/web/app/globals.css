@@ -8854,6 +8854,43 @@ button.yp-chip[aria-pressed='true'] {
   font-weight: 600;
   color: var(--yapi);
 }
+
+/* Yapilapi Today on Pulse (components/Today.tsx). */
+.today__intro {
+  margin: 0;
+}
+.today {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  white-space: normal;
+}
+.today__part {
+  margin: 0;
+  font: 700 13px/18px var(--font-sans);
+  color: var(--ink-muted);
+}
+.today__text {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+}
+.today__sources,
+.today__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.today__source {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.today__controls .yp-btn,
+.today__sources .yp-btn {
+  min-height: 44px;
+}
 .smart-replies {
   display: flex;
   flex-wrap: wrap;

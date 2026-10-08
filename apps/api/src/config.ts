@@ -41,6 +41,8 @@ const schema = z.object({
   AI_MODEL: z.string().default('claude-opus-5'),
   /** The model for translations only (posts, comments, stories, messages and caption tracks): many short requests. */
   AI_TRANSLATE_MODEL: z.string().default('claude-sonnet-5-5'),
+  /** The model that writes Yapilapi Today (one short script per person and day, one per city): a cheaper one than AI_MODEL. */
+  AI_TODAY_MODEL: z.string().default('claude-sonnet-5-5'),
   ANTHROPIC_API_KEY: z.string().optional().default(''),
   PAYMENTS_PROVIDER: z.enum(['dev', 'stripe']).default('dev'),
   /** Stripe (PAYMENTS_PROVIDER=stripe): secret key, webhook signing secret, and the publishable key the browser uses. */
@@ -130,6 +132,10 @@ const schema = z.object({
   TTS_DAILY_CHAR_LIMIT: z.coerce.number().int().min(0).default(200000),
   /** New clips one person can cause in an hour (cached ones are free). */
   TTS_PER_HOUR: z.coerce.number().int().min(0).default(30),
+  /** Yapilapi Today: new scripts written a day (UTC) for everyone together. Past it, no new Today until midnight UTC. */
+  TODAY_DAILY_LIMIT: z.coerce.number().int().min(0).default(5000),
+  /** Yapilapi Today: characters read out a day (UTC), within TTS_DAILY_CHAR_LIMIT. Past it, new Todays are text with the original Yaps. */
+  TODAY_TTS_DAILY_CHAR_LIMIT: z.coerce.number().int().min(0).default(100000),
   RATE_LIMIT_MAX: z.coerce.number().default(300),
   /**
    * Which proxies may say who the caller is (X-Forwarded-For). The default trusts only proxies on

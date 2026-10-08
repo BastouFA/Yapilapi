@@ -1,9 +1,9 @@
 'use client';
 
-import { BrowserPushCard, CategoriesCard, PauseCard, QuietHoursCard, WeeklyWrapCard } from '@/components/settings/Notifications';
+import { BrowserPushCard, CategoriesCard, PauseCard, QuietHoursCard, TodaySettingsCard, WeeklyWrapCard } from '@/components/settings/Notifications';
 import { SettingsPage } from '@/components/settings/Shell';
 
-/** Notifications: on this browser, pausing, quiet hours, which kinds you get, and the weekly wrap. */
+/** Notifications: on this browser, pausing, quiet hours, which kinds you get, the weekly wrap and Yapilapi Today. */
 export default function NotificationSettings() {
   return (
     <SettingsPage section="notifications">
@@ -12,6 +12,7 @@ export default function NotificationSettings() {
       <QuietHoursCard />
       <CategoriesCard />
       <WeeklyWrapCard />
+      <TodaySettingsCard />
     </SettingsPage>
   );
 }

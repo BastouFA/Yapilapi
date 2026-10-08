@@ -482,6 +482,11 @@ export async function exportSections(db: Q, userId: string) {
 
   const ai = {
     catchUps: await q(`SELECT away_since, back_at, output, created_at FROM ai_catchups WHERE user_id = $1 ORDER BY created_at DESC`),
+    // Yapilapi Today: your last week's briefings, and the people you said you're not interested in hearing about.
+    todayBriefings: await q(`SELECT day, lang, segments, empty, hidden, dismissed_at, created_at FROM today_briefings WHERE user_id = $1 ORDER BY day DESC`),
+    todayNotInterested: await q(
+      `SELECT ${un('tf.author_id')} AS person, tf.post_id, tf.created_at FROM today_feedback tf WHERE tf.user_id = $1 ORDER BY tf.created_at DESC`,
+    ),
     replySuggestions: await q(`SELECT message_id, suggestions, lang, created_at FROM ai_reply_suggestions WHERE user_id = $1 ORDER BY created_at DESC`),
     assistantConversations: await q(`SELECT id, agent, created_at FROM ai_conversations WHERE user_id = $1 ORDER BY created_at DESC`),
     // The log of assistant and translation calls made for you (no content is logged).
@@ -539,7 +544,8 @@ export async function exportSections(db: Q, userId: string) {
     preferences: await first(
       `SELECT notification_categories, focus_mode, quiet_mode, friends_only, reduced_recommendations, daily_time_budget_minutes, notifications_paused_until, yaps_paused,
               data_saver, languages, auto_translate, messages_from, comments_from, mentions_from, quiet_start, quiet_end, quiet_timezone, sensitive_media,
-              sign_in_email_alerts, smart_replies, catch_up, transcribe_voice, weekly_wrap, weekly_wrap_notify, timezone, updated_at
+              sign_in_email_alerts, smart_replies, catch_up, transcribe_voice, weekly_wrap, weekly_wrap_notify, timezone,
+              today, today_hour, today_city, today_notify, updated_at
        FROM user_preferences WHERE user_id = $1`,
     ),
     teenControls: await first(
